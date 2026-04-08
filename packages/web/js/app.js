@@ -21,6 +21,22 @@ let selectedTrack = null;       // 'web-app' | 'agentic-app' | null
 let selectedFramework = null;   // framework name or null
 let pendingQuickPrompt = null;
 
+// ---------- Inspiration Carousel ----------
+let INSPIRATION_IDEAS = [
+  { title: 'Movie night pick that settles disputes', subtitle: 'Your group votes, and the app chooses confidently.', prompt: 'I want to build a movie night pick app that settles disputes — your group votes, and the app chooses confidently.' },
+  { title: 'AI recipe finder from fridge photos', subtitle: 'Snap a photo of your fridge, get dinner ideas instantly.', prompt: 'I want to build an AI recipe finder from fridge photos — snap a photo of your fridge, get dinner ideas instantly.' },
+  { title: 'Team standup bot that respects time zones', subtitle: 'Async standups that actually work for global teams.', prompt: 'I want to build a team standup bot that respects time zones — async standups that actually work for global teams.' },
+  { title: 'Pet adoption matcher powered by AI', subtitle: 'Swipe-style matching between shelters and families.', prompt: 'I want to build a pet adoption matcher powered by AI — swipe-style matching between shelters and families.' },
+  { title: 'Real-time air quality dashboard', subtitle: 'Hyperlocal pollution data with health recommendations.', prompt: 'I want to build a real-time air quality dashboard — hyperlocal pollution data with health recommendations.' },
+  { title: 'Neighborhood tool lending library', subtitle: 'Borrow a drill from your neighbor — no awkward texts required.', prompt: 'I want to build a neighborhood tool lending library — borrow a drill from your neighbor, no awkward texts required.' },
+  { title: 'Personal finance coach that speaks plain English', subtitle: 'Budget tracking without the spreadsheet headaches.', prompt: 'I want to build a personal finance coach that speaks plain English — budget tracking without the spreadsheet headaches.' },
+  { title: 'Workout generator for hotel rooms', subtitle: 'No equipment? No problem. AI builds a routine in seconds.', prompt: 'I want to build a workout generator for hotel rooms — no equipment needed, AI builds a routine in seconds.' },
+  { title: 'Live event parking optimizer', subtitle: 'Find the fastest lot and walking route to the venue.', prompt: 'I want to build a live event parking optimizer — find the fastest lot and walking route to the venue.' },
+  { title: 'Study group matchmaker for college', subtitle: 'Match with classmates by course, schedule, and study style.', prompt: 'I want to build a study group matchmaker for college — match with classmates by course, schedule, and study style.' },
+];
+let carouselIndex = 0;
+let carouselTimer = null;
+
 // ---------- Prompt Inspector ----------
 let promptInspectorOn = false;
 
@@ -125,6 +141,117 @@ document.getElementById('topbar-inspector-toggle')?.addEventListener('click', ()
   btn?.classList.toggle('active', promptInspectorOn);
 });
 
+// ==================== Inspiration Carousel ====================
+
+async function fetchInspirations() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 2000);
+  try {
+    const res = await fetch('/api/inspirations', { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data)) return null;
+    return data;
+  } catch {
+    clearTimeout(timeoutId);
+    return null;
+  }
+}
+
+function updateCarouselIdeas(ideas) {
+  INSPIRATION_IDEAS = ideas;
+  const viewport = document.getElementById('carousel-viewport');
+  const dotsContainer = document.getElementById('carousel-dots');
+  if (!viewport || !dotsContainer) return;
+
+  const newIndex = carouselIndex < ideas.length ? carouselIndex : 0;
+
+  viewport.innerHTML = ideas.map((idea, i) => `
+    <div class="carousel-slide ${i === newIndex ? 'active' : ''}" data-slide="${i}">
+      <div class="carousel-title">${escapeHtml(idea.title)}</div>
+      <div class="carousel-subtitle">${escapeHtml(idea.subtitle)}</div>
+    </div>
+  `).join('');
+
+  dotsContainer.innerHTML = ideas.map((_, i) => `
+    <button class="carousel-dot ${i === newIndex ? 'active' : ''}" data-dot="${i}" aria-label="Idea ${i + 1}"></button>
+  `).join('');
+
+  carouselIndex = newIndex;
+  resetCarouselTimer();
+}
+
+function initCarousel() {
+  const viewport = document.getElementById('carousel-viewport');
+  const dotsContainer = document.getElementById('carousel-dots');
+  if (!viewport || !dotsContainer) return;
+
+  viewport.innerHTML = INSPIRATION_IDEAS.map((idea, i) => `
+    <div class="carousel-slide ${i === 0 ? 'active' : ''}" data-slide="${i}">
+      <div class="carousel-title">${escapeHtml(idea.title)}</div>
+      <div class="carousel-subtitle">${escapeHtml(idea.subtitle)}</div>
+    </div>
+  `).join('');
+
+  dotsContainer.innerHTML = INSPIRATION_IDEAS.map((_, i) => `
+    <button class="carousel-dot ${i === 0 ? 'active' : ''}" data-dot="${i}" aria-label="Idea ${i + 1}"></button>
+  `).join('');
+
+  dotsContainer.addEventListener('click', (e) => {
+    const dot = e.target.closest('.carousel-dot');
+    if (!dot) return;
+    goToSlide(parseInt(dot.dataset.dot, 10));
+    resetCarouselTimer();
+  });
+
+  viewport.addEventListener('click', (e) => {
+    const slide = e.target.closest('.carousel-slide');
+    if (!slide) return;
+    const idx = parseInt(slide.dataset.slide, 10);
+    const idea = INSPIRATION_IDEAS[idx];
+    if (idea?.prompt) {
+      pendingQuickPrompt = idea.prompt;
+      transitionToChat();
+    }
+  });
+
+  resetCarouselTimer();
+}
+
+function goToSlide(newIndex) {
+  const viewport = document.getElementById('carousel-viewport');
+  const dotsContainer = document.getElementById('carousel-dots');
+  if (!viewport) return;
+
+  const slides = viewport.querySelectorAll('.carousel-slide');
+  const dots = dotsContainer?.querySelectorAll('.carousel-dot');
+
+  if (newIndex === carouselIndex) return;
+
+  slides[carouselIndex]?.classList.remove('active');
+  dots?.[carouselIndex]?.classList.remove('active');
+  carouselIndex = newIndex;
+  slides[carouselIndex]?.classList.add('active');
+  dots?.[carouselIndex]?.classList.add('active');
+}
+
+function nextSlide() {
+  goToSlide((carouselIndex + 1) % INSPIRATION_IDEAS.length);
+}
+
+function resetCarouselTimer() {
+  if (carouselTimer) clearInterval(carouselTimer);
+  carouselTimer = setInterval(nextSlide, 5000);
+}
+
+function stopCarousel() {
+  if (carouselTimer) {
+    clearInterval(carouselTimer);
+    carouselTimer = null;
+  }
+}
+
 // ==================== Landing Page ====================
 
 function initLandingListeners() {
@@ -164,6 +291,8 @@ function initLandingListeners() {
 }
 
 async function transitionToChat() {
+  stopCarousel();
+
   const landingEl = document.getElementById('landing-page');
   if (landingEl) {
     landingEl.classList.add('hiding');
@@ -452,6 +581,12 @@ async function boot() {
 
   // Landing page is shown by default (via HTML).
   initLandingListeners();
+
+  // Render carousel immediately with hardcoded ideas, then try API.
+  initCarousel();
+  fetchInspirations().then(ideas => {
+    if (ideas) updateCarouselIdeas(ideas);
+  });
 }
 
 // Run on DOM ready
