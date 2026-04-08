@@ -213,14 +213,21 @@ async function readStream(res, onChunk) {
 }
 
 function mergeChunk(prev, chunk) {
-  if (!prev) return { ...chunk };
+  if (!prev) {
+    // Initialize: map 'content' to 'message' for first chunk
+    const init = { ...chunk };
+    if (chunk.content && !chunk.message) {
+      init.message = chunk.content;
+    }
+    return init;
+  }
 
   return {
     ...prev,
     ...chunk,
-    // Accumulate message text from deltas
-    message: chunk.delta
-      ? (prev.message || '') + chunk.delta
+    // Accumulate message text from deltas (server sends 'content' or 'delta')
+    message: (chunk.delta || chunk.content)
+      ? (prev.message || '') + (chunk.delta || chunk.content)
       : (chunk.message ?? prev.message),
     // Always take latest phase/a2ui/systemPrompt
     phase: chunk.phase ?? prev.phase,

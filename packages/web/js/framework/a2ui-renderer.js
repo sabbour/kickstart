@@ -7,7 +7,7 @@
  * @module a2ui-renderer
  */
 
-import { createCodeBlock, createCard, createStatusBadge, escapeHtml } from './components.js';
+import { createCodeBlock, createCard, createStatusBadge, escapeHtml, renderMarkdown } from './components.js';
 
 /**
  * Render an A2UI JSON component tree to a DOM element.
@@ -63,8 +63,9 @@ const RENDERERS = {
 // --- Standard A2UI ---
 
 function renderText(schema) {
-  const el = document.createElement(schema.variant === 'heading' ? 'h3' : 'p');
-  el.textContent = schema.text ?? '';
+  const tag = schema.variant === 'heading' ? 'h3' : 'div';
+  const el = document.createElement(tag);
+  el.innerHTML = renderMarkdown(schema.text ?? '');
   if (schema.style) Object.assign(el.style, schema.style);
   if (schema.className) el.className = schema.className;
   return el;

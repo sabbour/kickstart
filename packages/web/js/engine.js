@@ -410,7 +410,7 @@ export function createApiEngine({ onPhaseChange, onResponse, apiClient, onError,
 
       if (apiRes.error) {
         onError?.({
-          message: apiRes.message || 'Something went wrong',
+          message: apiRes.message || (typeof apiRes.error === 'string' ? apiRes.error : 'Something went wrong'),
           retryable: apiRes.status === 429 || apiRes.status === 503 || apiRes.status === 0,
         });
         return;
