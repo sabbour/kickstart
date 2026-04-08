@@ -447,15 +447,24 @@ async function initEngine() {
         chatUI.setTyping(false);
         clearStreamingBubble();
 
+        // Always show text if present (streaming accumulated the text, now finalize it)
+        if (text) {
+          chatUI.addMessage({ role: 'assistant', text, model });
+        }
+
         if (a2ui) {
-          const html = renderA2UIMessage(a2ui);
-          chatUI.addMessage({ role: 'assistant', html, model });
-          // Show ArchitectureDiagram in preview panel
+          // Filter out ConversationPhase — it's shown in the phase bar, not inline
           const components = Array.isArray(a2ui) ? a2ui : [a2ui];
+          const nonPhaseComponents = components.filter(c => c.type !== 'ConversationPhase');
+
+          if (nonPhaseComponents.length > 0) {
+            const html = renderA2UIMessage(nonPhaseComponents);
+            chatUI.addMessage({ role: 'assistant', html });
+          }
+
+          // Show ArchitectureDiagram in preview panel
           const diagram = components.find(c => c.type === 'ArchitectureDiagram');
           if (diagram) showPreviewContent(diagram);
-        } else if (text) {
-          chatUI.addMessage({ role: 'assistant', text, model });
         }
 
         if (promptInspectorOn && systemPrompt) {

@@ -221,15 +221,40 @@ function renderConversationPhase(schema) {
   el.setAttribute('aria-label', 'Conversation phase');
 
   const phases = schema.phases ?? [];
-  el.innerHTML = phases.map((phase, i) => {
-    const status = i < schema.currentPhase ? 'completed' : i === schema.currentPhase ? 'active' : '';
-    const connector = i < phases.length - 1
-      ? `<span class="copilot-phase-connector ${i < schema.currentPhase ? 'completed' : ''}"></span>`
+
+  // Normalize: phases may be strings (demo) or objects (API: {id, label, status})
+  const normalizedPhases = phases.map(p =>
+    typeof p === 'string' ? { label: p, status: '' } : p
+  );
+
+  // Determine active index: currentPhase may be a number or a phase id string
+  let activeIndex;
+  if (typeof schema.currentPhase === 'number') {
+    activeIndex = schema.currentPhase;
+  } else if (typeof schema.currentPhase === 'string') {
+    activeIndex = normalizedPhases.findIndex(p => p.id === schema.currentPhase);
+    if (activeIndex === -1) activeIndex = 0;
+  } else {
+    activeIndex = 0;
+  }
+
+  el.innerHTML = normalizedPhases.map((phase, i) => {
+    // Use phase.status if provided (API), otherwise infer from index
+    let status;
+    if (phase.status === 'complete' || phase.status === 'completed') {
+      status = 'completed';
+    } else if (phase.status === 'active') {
+      status = 'active';
+    } else {
+      status = i < activeIndex ? 'completed' : i === activeIndex ? 'active' : '';
+    }
+    const connector = i < normalizedPhases.length - 1
+      ? `<span class="copilot-phase-connector ${i < activeIndex ? 'completed' : ''}"></span>`
       : '';
     return `
       <span class="copilot-phase-step">
         <span class="copilot-phase-dot ${status}"></span>
-        <span>${phase}</span>
+        <span>${escapeHtml(phase.label ?? phase)}</span>
       </span>
       ${connector}`;
   }).join('');
