@@ -722,10 +722,12 @@ async function boot() {
   // Footer version info
   const footerVersion = document.getElementById('landing-footer-version');
   if (footerVersion) {
-    // Build info injected at deploy time, fallback to defaults
-    const sha = window.__BUILD_SHA__ || 'dev';
-    const date = window.__BUILD_DATE__ || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    footerVersion.textContent = `${sha} · ${date}`;
+    const sha = window.__BUILD_SHA__ || 'local';
+    const raw = window.__BUILD_DATE__;
+    const date = typeof raw === 'string' && raw.includes('T')
+      ? new Date(raw).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+      : (raw || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }));
+    footerVersion.textContent = `build ${sha} · ${date}`;
   }
 }
 
