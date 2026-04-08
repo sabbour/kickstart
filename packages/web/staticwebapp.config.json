@@ -12,18 +12,6 @@
   },
   "routes": [
     {
-      "route": "/.auth/login/aad",
-      "statusCode": 200
-    },
-    {
-      "route": "/.auth/logout",
-      "statusCode": 200
-    },
-    {
-      "route": "/.auth/*",
-      "statusCode": 200
-    },
-    {
       "route": "/logout",
       "redirect": "/.auth/logout?post_logout_redirect_uri=/"
     },
@@ -44,6 +32,7 @@
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": [
+      "/.auth/*",
       "/assets/*",
       "/css/*",
       "/js/*",
