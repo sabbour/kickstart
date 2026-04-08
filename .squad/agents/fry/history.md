@@ -165,3 +165,26 @@
 - **CSS classes**: Removed `.suggestion-pills`, `.suggestion-pill`. Added `.hero-input-icon`, `.landing-hero-input-wrap input`, `.framework-section`, `.framework-separator-label`, `.framework-pills`, `.framework-pill`.
 - **JS**: Updated `initLandingListeners()` — removed suggestion pill handler, added framework pill handler with template string prompt. Hero input keydown works identically (plain input `.value` same as fluent-search `.value`).
 - **Files changed**: `packages/web/index.html`, `packages/web/css/landing.css`, `packages/web/js/app.js`.
+
+### 2025-07-28 — Landing page placeholder rotation UX
+- **App branding**: Changed page title and topbar brand from 'Kickstart' to 'Kickstart on Azure Kubernetes Service (AKS)'. Created white AKS Kubernetes logo SVG (assets/aks-logo-white.svg) with hexagon/helm wheel design.
+- **Hero title**: Changed from 'What do you want..' to 'What are you dreaming of building?'.
+- **Carousel removal**: Removed entire inspiration carousel section (HTML, CSS, JS) — ~80 lines of CSS, 90+ lines of JS removed.
+- **Rotating placeholder**: Replaced carousel with rotating placeholder text inside hero input. Uses INSPIRATION_IDEAS array to cycle through idea titles every 4 seconds. Implemented with position:absolute span (.hero-input-placeholder) that crossfades via opacity transitions.
+- **Placeholder behavior**: Shows visible on load, dims to opacity:0.4 on focus, hides completely when input has text. Rotates to next idea with 300ms fade-out, then 4-second delay.
+- **Send button**: Added circular send button (hero-send-btn) inside input wrapper, positioned absolute right. Uses right-arrow SVG icon, brand primary color background. Clicking with empty input sends the currently displayed placeholder idea's .prompt field.
+- **Input padding adjustment**: Changed from 'padding: 0 var(--spacing-l) 0 42px' to '0 44px 0 42px' to leave room for send button.
+- **JS refactor**: Removed initCarousel(), goToSlide(), nextSlide(), resetCarouselTimer(), stopCarousel(), updateCarouselIdeas(), and carousel event listeners. Added initPlaceholderRotation() and stopPlaceholderRotation(). Repurposed carouselIndex and carouselTimer for placeholder rotation.
+- **Hero Enter key behavior**: Updated to send current rotating idea if input is empty.
+- **Files changed**: packages/web/index.html (carousel HTML removed, placeholder span + send button added), packages/web/css/landing.css (carousel CSS removed, placeholder + send button CSS added), packages/web/js/app.js (carousel functions removed, placeholder rotation added), packages/web/assets/aks-logo-white.svg (new).
+
+### 2025-07-28 — Avatar 404 fix, Copilot send button, recent sessions, footer
+- **Avatar 404 fix**: Modified fetchUserPhoto() to check metadata endpoint (`/me/photo`) before fetching binary (`/me/photo/$value`). This prevents browser console 404 errors when user has no profile photo — the metadata call fails silently without noisy network error.
+- **Copilot sparkle icon**: Replaced send button arrow SVG with GitHub Copilot sparkle icon (dual-star design). Changed viewBox from "0 0 16 16" and increased size from 16×16 to 20×20.
+- **Prompt inspector removal**: Removed topbar button and event listener for prompt inspector toggle. Kept `promptInspectorOn` variable and conditional rendering logic in chat (for future programmatic use).
+- **Recent Sessions section**: Added localStorage-backed session history below framework pills. Shows last 5 sessions with title + date. Click handler resumes session by setting pendingQuickPrompt and calling transitionToChat(). Session saved at start of transitionToChat() with generated ID, title (first 100 chars of prompt), and timestamps.
+- **Footer**: Added centered footer with version info (git SHA · build date) in monospace font, and disclaimer "Kickstart uses AI. Check for mistakes." Build metadata injected via window.__BUILD_SHA__ and window.__BUILD_DATE__ (defaults to 'dev' and current date). Footer version populated in boot() after renderRecentSessions().
+- **CSS additions**: .recent-sessions-section, .recent-sessions-label, .recent-session-item (hover shadow + border), .recent-session-title (ellipsis overflow), .recent-session-date, .landing-footer, .landing-footer-version (monospace), .landing-footer-disclaimer.
+- **JS additions**: getSessions(), saveSession() (prepend or update, keep 20 max), renderRecentSessions() (show/hide section, build item HTML, attach click handler). Called in boot() after initPlaceholderRotation().
+- **HTML structure**: Hero → track cards → framework pills → recent sessions → footer (all in .landing-inner).
+- **Files changed**: packages/web/js/app.js (fetchUserPhoto, recent sessions helpers, transitionToChat session save, boot footer version), packages/web/index.html (removed prompt inspector button, replaced send icon, added recent sessions HTML, added footer, added build metadata script), packages/web/css/landing.css (recent sessions + footer styles).
