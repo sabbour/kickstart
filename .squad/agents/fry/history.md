@@ -92,3 +92,11 @@
 - **Files changed**: 8 files (3 CSS, 3 JS, 2 HTML)
 - **Tests**: All 118 Playwright E2E tests passing — carousel interaction, icon rendering, layout all verified
 - **Alignment**: Fully implements three user directives: no LLM emojis, no UI emojis (use Fluent icons instead), light theme only
+
+### 2025-07-27 — IDE launch links on landing page
+- **New section**: Added "Or use your IDE" section below framework pills on the landing page with three IDE cards: VS Code (stable), VS Code Insiders, and Claude Code.
+- **VS Code URIs**: Both VS Code cards use `vscode:mcp/install?{urlEncodedJson}` (and `vscode-insiders:` scheme) to trigger MCP server installation with `@kickstart/mcp-server` via npx.
+- **Claude Code clipboard**: Claude Code card uses `data-copy-command` attribute + click handler that copies `claude mcp add kickstart -- npx -y @kickstart/mcp-server` to clipboard with a 2-second "Copied!" feedback on the card name. Includes `execCommand('copy')` fallback.
+- **Inline SVG icons**: VS Code logo (blue #007ACC), VS Code Insiders logo (green #24931E), terminal icon (currentColor) — all 24×24. No external icon files.
+- **CSS**: `.landing-ide`, `.ide-cards`, `.ide-card` — horizontal card layout with border, hover shadow, matching the framework pills visual weight. Styled as secondary/tertiary prominence.
+- **Files changed**: `packages/web/index.html`, `packages/web/css/landing.css`, `packages/web/js/app.js`.
