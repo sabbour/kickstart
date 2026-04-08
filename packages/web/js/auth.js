@@ -27,9 +27,9 @@ const Auth = (() => {
   }[ENV];
 
   const ENTRA = {
-    clientId: '7a630e18-8f49-404e-8454-228b13089c57',
-    tenantId: '72f988bf-86f1-41af-91ab-2d7cd011db47',
-    authority: 'https://login.microsoftonline.com/72f988bf-86f1-41af-91ab-2d7cd011db47',
+    clientId: 'e71a23c6-aeb4-459a-88fc-07ff96fc9b92',
+    tenantId: 'd91aa5af-8c1e-442c-b77c-0b92988b387b',
+    authority: 'https://login.microsoftonline.com/d91aa5af-8c1e-442c-b77c-0b92988b387b',
     redirectUri: REDIRECT_URI,
     scopes: {
       login: ['openid', 'profile', 'User.Read'],
