@@ -77,7 +77,7 @@ document.getElementById('topbar-inspector-toggle')?.addEventListener('click', ()
 
 // ==================== Landing Page ====================
 
-const INSPIRATION_IDEAS = [
+let INSPIRATION_IDEAS = [
   { title: 'Movie night pick that settles disputes', subtitle: 'Your group votes, and the app chooses confidently.', prompt: 'I want to build a movie night pick app that settles disputes — your group votes, and the app chooses confidently.' },
   { title: 'AI recipe finder from fridge photos', subtitle: 'Snap a photo of your fridge, get dinner ideas instantly.', prompt: 'I want to build an AI recipe finder from fridge photos — snap a photo of your fridge, get dinner ideas instantly.' },
   { title: 'Team standup bot that respects time zones', subtitle: 'Async standups that actually work for global teams.', prompt: 'I want to build a team standup bot that respects time zones — async standups that actually work for global teams.' },
@@ -93,6 +93,54 @@ const INSPIRATION_IDEAS = [
 let carouselIndex = 0;
 let carouselTimer = null;
 let pendingQuickPrompt = null;
+
+/**
+ * Fetch inspiration ideas from the API with a 2-second timeout.
+ * Returns the parsed array on success, or null on any failure.
+ */
+async function fetchInspirations() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 2000);
+  try {
+    const res = await fetch('/api/inspirations', { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data)) return null;
+    return data;
+  } catch {
+    clearTimeout(timeoutId);
+    return null;
+  }
+}
+
+/**
+ * Replace carousel content with new ideas and restart rotation.
+ * Preserves the current slide index when possible.
+ */
+function updateCarouselIdeas(ideas) {
+  INSPIRATION_IDEAS = ideas;
+
+  const viewport = document.getElementById('carousel-viewport');
+  const dotsContainer = document.getElementById('carousel-dots');
+  if (!viewport || !dotsContainer) return;
+
+  const newIndex = carouselIndex < ideas.length ? carouselIndex : 0;
+
+  viewport.innerHTML = ideas.map((idea, i) => `
+    <div class="carousel-slide ${i === newIndex ? 'active' : ''}" data-slide="${i}">
+      <div class="carousel-title">${escapeHtml(idea.title)}</div>
+      <div class="carousel-subtitle">${escapeHtml(idea.subtitle)}</div>
+    </div>
+  `).join('');
+
+  dotsContainer.innerHTML = ideas.map((_, i) => `
+    <button class="carousel-dot ${i === newIndex ? 'active' : ''}" data-dot="${i}" aria-label="Idea ${i + 1}"></button>
+  `).join('');
+
+  carouselIndex = newIndex;
+  resetCarouselTimer();
+}
 
 function initCarousel() {
   const viewport = document.getElementById('carousel-viewport');
@@ -461,9 +509,16 @@ async function boot() {
   await initAuth();
 
   // Landing page is shown by default (via HTML).
-  // Initialize carousel and landing listeners.
+  // Render carousel immediately with hardcoded ideas.
   initCarousel();
   initLandingListeners();
+
+  // Try to fetch fresh ideas in background — never blocks page load.
+  fetchInspirations().then(ideas => {
+    if (ideas && ideas.length >= 3) {
+      updateCarouselIdeas(ideas);
+    }
+  }).catch(() => { /* silent fallback to hardcoded ideas */ });
 }
 
 // Run on DOM ready
