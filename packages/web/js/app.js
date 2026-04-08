@@ -658,7 +658,14 @@ async function updateAuthUI() {
     const photoUrl = await fetchUserPhoto();
     const avatar = userBtn.querySelector('fluent-avatar');
     if (avatar) {
-      avatar.setAttribute('src', photoUrl || 'assets/icons/commands/avatar-default.svg');
+      const fallback = 'assets/icons/commands/avatar-default.svg';
+      const imgSrc = photoUrl || fallback;
+      avatar.setAttribute('src', imgSrc);
+      // Handle 404 / broken image at the component level
+      const img = avatar.shadowRoot?.querySelector('img') || avatar.querySelector('img');
+      if (img) {
+        img.onerror = () => { img.src = fallback; img.onerror = null; };
+      }
     }
   } else {
     userBtn.innerHTML = `
