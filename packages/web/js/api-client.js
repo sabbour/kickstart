@@ -248,11 +248,12 @@ function mergeChunk(prev, chunk) {
     message: (chunk.delta || chunk.content)
       ? (prev.message || '') + (chunk.delta || chunk.content)
       : (chunk.message ?? prev.message),
-    // Always take latest phase/a2ui/systemPrompt/model
+    // Always take latest phase/a2ui/systemPrompt/model/cleanText
     phase: chunk.phase ?? prev.phase,
     a2ui: chunk.a2ui ?? prev.a2ui,
     systemPrompt: chunk.systemPrompt ?? prev.systemPrompt,
     model: chunk.model ?? prev.model,
+    cleanText: chunk.cleanText ?? prev.cleanText,
   };
 }
 

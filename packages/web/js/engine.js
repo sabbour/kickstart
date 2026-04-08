@@ -392,7 +392,8 @@ export function createApiEngine({ onPhaseChange, onResponse, apiClient, onError,
   function mapApiResponse(apiRes) {
     return {
       a2ui: apiRes.a2ui ?? null,
-      text: apiRes.message ?? null,
+      // Prefer cleanText (A2UI markers stripped) over raw message
+      text: apiRes.cleanText ?? apiRes.message ?? null,
       systemPrompt: apiRes.systemPrompt ?? null,
       files: apiRes.files ?? null,
       model: apiRes.model ?? null,

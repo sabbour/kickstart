@@ -213,6 +213,21 @@ chatUI.element.addEventListener('click', (e) => {
   }
 });
 
+// A2UI button event delegation — catches clicks on buttons rendered via innerHTML
+chatUI.element.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-a2ui-action]');
+  if (!btn) return;
+  const action = btn.dataset.a2uiAction;
+  let data = {};
+  try { data = JSON.parse(btn.dataset.a2uiData || '{}'); } catch { /* ignore */ }
+
+  if (action === 'reply' && data.text) {
+    handleUserMessage(data.text);
+  } else {
+    EventBus.emit('chat:action', { action, data });
+  }
+});
+
 // ---------- Sessions Sidebar Toggle ----------
 document.getElementById('topbar-sessions-toggle')?.addEventListener('click', () => {
   const sidebar = document.getElementById('sessions-sidebar');
@@ -539,14 +554,31 @@ function updateStreamingBubble(text) {
   const container = document.querySelector('#chat-messages-inner');
   if (!container) return;
 
+  // Strip any partial ~~~a2ui block from display
+  const a2uiIdx = text.indexOf('~~~a2ui');
+  const displayText = a2uiIdx >= 0 ? text.substring(0, a2uiIdx).trimEnd() : text;
+  // Also strip trailing tildes that might be the start of a marker
+  const cleanText = displayText.replace(/~+$/, '');
+
   if (!streamingBubbleEl) {
     streamingBubbleEl = document.createElement('div');
     streamingBubbleEl.className = 'chat-bubble assistant streaming';
     streamingBubbleEl.setAttribute('role', 'article');
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'streaming-text';
+    streamingBubbleEl.appendChild(textSpan);
+
+    const cursor = document.createElement('span');
+    cursor.className = 'streaming-cursor';
+    streamingBubbleEl.appendChild(cursor);
+
     container.appendChild(streamingBubbleEl);
   }
 
-  streamingBubbleEl.innerHTML = renderMarkdown(text);
+  // Use textContent — avoids DOM thrashing from innerHTML/renderMarkdown
+  const textSpan = streamingBubbleEl.querySelector('.streaming-text');
+  if (textSpan) textSpan.textContent = cleanText;
   chatUI.scrollToBottom();
 }
 

@@ -17,6 +17,7 @@ import {
 import type { PhaseItem } from "@kickstart/core";
 import { getSession, createSession, addMessage } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionStream, getChatDeploymentName } from "../lib/openai-client.js";
+import { processLLMResponse } from "../lib/response-processor.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -99,16 +100,23 @@ app.http("converse", {
 
       // Non-streaming: call OpenAI and return full response
       const result = await chatCompletion(messages);
-      addMessage(state.sessionId, "assistant", result.content);
+
+      // Post-process: extract A2UI components from response
+      const processed = processLLMResponse(
+        result.content,
+        engineState.currentPhase,
+      );
+
+      addMessage(state.sessionId, "assistant", processed.text);
 
       const phaseDef = getPhaseDefinition(engineState.currentPhase);
 
       const responseBody: ConverseResponse = {
         sessionId: state.sessionId,
         phase: engineState.currentPhase,
-        message: result.content,
+        message: processed.text,
         model: getChatDeploymentName(),
-        a2ui,
+        a2ui: [...a2ui, ...processed.components],
         ...(isNewSession
           ? {
               systemPrompt: state.messages.find((m) => m.role === "system")
@@ -149,12 +157,18 @@ function handleStreaming(
           );
         }
 
-        // Store the full assistant response
-        addMessage(sessionId, "assistant", fullContent);
+        // Post-process full response: extract A2UI components
+        const processed = processLLMResponse(
+          fullContent,
+          engineState.currentPhase,
+        );
+
+        // Store the clean text (without A2UI markers)
+        addMessage(sessionId, "assistant", processed.text);
 
         const phaseDef = getPhaseDefinition(engineState.currentPhase as import("@kickstart/core").Phase);
 
-        // Final event with metadata
+        // Final event with metadata + extracted A2UI components
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({
@@ -163,7 +177,8 @@ function handleStreaming(
               phase: engineState.currentPhase,
               phaseLabel: phaseDef.label,
               model: getChatDeploymentName(),
-              a2ui,
+              cleanText: processed.text,
+              a2ui: [...a2ui, ...processed.components],
             })}\n\n`,
           ),
         );

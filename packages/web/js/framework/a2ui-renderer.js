@@ -80,6 +80,13 @@ function renderButton(schema, ctx) {
   btn.textContent = schema.label ?? 'Button';
   if (schema.disabled) btn.disabled = true;
 
+  // Use data attributes for event delegation (survives innerHTML serialization)
+  if (schema.action) {
+    btn.dataset.a2uiAction = schema.action;
+    btn.dataset.a2uiData = JSON.stringify(schema.data || {});
+  }
+
+  // Also attach direct listener for DOM-node rendering paths
   if (schema.action && ctx.onAction) {
     btn.addEventListener('click', () => ctx.onAction(schema.action, schema.data));
   }
