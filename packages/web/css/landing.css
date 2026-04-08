@@ -289,7 +289,6 @@ body.on-landing #topbar-sessions-toggle {
 .recent-session-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: var(--spacing-m) var(--spacing-l);
   border-radius: var(--radius-medium);
   border: 1px solid var(--color-neutral-stroke-2);
@@ -345,6 +344,60 @@ body.on-landing #topbar-sessions-toggle {
 .recent-session-delete:hover {
   background: var(--color-neutral-background-3);
   color: var(--color-neutral-foreground-1);
+}
+
+.recent-session-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  width: 100%;
+}
+
+.confirm-delete-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  width: 100%;
+  padding: 2px 0;
+}
+
+.confirm-delete-label {
+  flex: 1;
+  font-size: var(--font-size-200);
+  color: var(--color-neutral-foreground-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.confirm-delete-yes,
+.confirm-delete-no {
+  border: none;
+  border-radius: var(--radius-small);
+  padding: 2px 10px;
+  font-size: var(--font-size-100);
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.confirm-delete-yes {
+  background: var(--color-status-danger-background-3, #d13438);
+  color: #fff;
+}
+
+.confirm-delete-yes:hover {
+  opacity: 0.9;
+}
+
+.confirm-delete-no {
+  background: var(--color-neutral-background-3);
+  color: var(--color-neutral-foreground-2);
+}
+
+.confirm-delete-no:hover {
+  background: var(--color-neutral-background-4, #e0e0e0);
 }
 
 /* ---------- Landing Footer ---------- */

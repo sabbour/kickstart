@@ -86,13 +86,15 @@ function renderRecentSessions() {
     const date = new Date(s.updatedAt || s.createdAt);
     const dateStr = date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
     return `<div class="recent-session-item" data-session-id="${s.id}">
-      <span class="recent-session-title">${escapeHtml(s.title || s.prompt || 'Untitled session')}</span>
-      <span class="recent-session-date">${dateStr}</span>
-      <button class="recent-session-delete" aria-label="Delete session" title="Delete session">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-          <path d="M2.146 2.146a.5.5 0 01.708 0L6 5.293l3.146-3.147a.5.5 0 01.708.708L6.707 6l3.147 3.146a.5.5 0 01-.708.708L6 6.707l-3.146 3.147a.5.5 0 01-.708-.708L5.293 6 2.146 2.854a.5.5 0 010-.708z"/>
-        </svg>
-      </button>
+      <div class="recent-session-content">
+        <span class="recent-session-title">${escapeHtml(s.title || s.prompt || 'Untitled session')}</span>
+        <span class="recent-session-date">${dateStr}</span>
+        <button class="recent-session-delete" aria-label="Delete session" title="Delete session">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+            <path d="M2.146 2.146a.5.5 0 01.708 0L6 5.293l3.146-3.147a.5.5 0 01.708.708L6.707 6l3.147 3.146a.5.5 0 01-.708.708L6 6.707l-3.146 3.147a.5.5 0 01-.708-.708L5.293 6 2.146 2.854a.5.5 0 010-.708z"/>
+          </svg>
+        </button>
+      </div>
     </div>`;
   }).join('');
 
@@ -103,16 +105,51 @@ function initRecentSessionsListener() {
   const list = document.getElementById('recent-sessions-list');
   if (!list) return;
   list.addEventListener('click', (e) => {
-    // Check for delete button click first
+    // Handle confirm-delete Yes
+    const yesBtn = e.target.closest('.confirm-delete-yes');
+    if (yesBtn) {
+      e.stopPropagation();
+      const item = yesBtn.closest('.recent-session-item');
+      if (item) {
+        deleteSession(item.dataset.sessionId);
+        renderRecentSessions();
+      }
+      return;
+    }
+
+    // Handle confirm-delete No (cancel)
+    const noBtn = e.target.closest('.confirm-delete-no');
+    if (noBtn) {
+      e.stopPropagation();
+      const item = noBtn.closest('.recent-session-item');
+      const confirmBar = item?.querySelector('.confirm-delete-bar');
+      if (confirmBar) confirmBar.remove();
+      // Restore the normal content visibility
+      const content = item?.querySelector('.recent-session-content');
+      if (content) content.style.display = '';
+      return;
+    }
+
+    // Check for delete button click — show inline confirmation
     const deleteBtn = e.target.closest('.recent-session-delete');
     if (deleteBtn) {
       e.stopPropagation();
       const item = deleteBtn.closest('.recent-session-item');
-      if (item) {
-        const sessionId = item.dataset.sessionId;
-        deleteSession(sessionId);
-        renderRecentSessions();
-      }
+      if (!item || item.querySelector('.confirm-delete-bar')) return; // already showing
+
+      const title = item.querySelector('.recent-session-title')?.textContent || 'this session';
+      const shortTitle = title.length > 20 ? title.slice(0, 20) + '…' : title;
+
+      // Hide normal content, show confirmation bar
+      const content = item.querySelector('.recent-session-content');
+      if (content) content.style.display = 'none';
+
+      const bar = document.createElement('div');
+      bar.className = 'confirm-delete-bar';
+      bar.innerHTML = `<span class="confirm-delete-label">Delete "${escapeHtml(shortTitle)}"?</span>
+        <button class="confirm-delete-yes">Yes</button>
+        <button class="confirm-delete-no">No</button>`;
+      item.appendChild(bar);
       return;
     }
 
