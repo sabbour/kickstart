@@ -829,3 +829,105 @@ Adopted Playwright with a lightweight static file server (`serve`) for E2E testi
 **By:** Ahmed Sabbour (via Copilot)  
 **What:** Use the Copilot icon (ssets/icons/fluent/copilot.svg) instead of sparkle icons anywhere an AI/assistant/copilot indicator is needed in the UI.  
 **Why:** User request — the Copilot brand icon is the correct visual for AI features, not a generic sparkle.
+
+## Decision: Per-Track System Prompt Addendums
+
+**Author:** Bender (Backend Dev)
+**Date:** 2025-07-25
+**Status:** Accepted
+
+### Context
+
+The app has two tracks (web-app and agentic-app) but the system prompt was track-agnostic. Users selecting different tracks got identical LLM guidance, missing track-specific deployment patterns.
+
+### Decision
+
+- uildSystemPrompt(phase, knownInfo, track) now accepts an optional 	rack parameter.
+- Two addendum constants (WEB_APP_ADDENDUM, AGENTIC_APP_ADDENDUM) are appended to the system prompt when a track is active.
+- Web-app addendum focuses on containerization, CI/CD, database connectivity, and scaling. Frames AKS Automatic as "a scalable app platform" per existing rules.
+- Agentic-app addendum introduces KAITO (GPU model serving) and RAGEngine (managed RAG) as platform capabilities, plus LangChain/Semantic Kernel patterns and Azure OpenAI integration.
+- Addendums are concise (~250-300 words each) to minimize token overhead since they're injected into every LLM call.
+
+### Impact
+
+All code paths (demo engine, API engine) now pass track to the prompt builder. The /api/converse endpoint does not yet forward track from the client — that can be added when the API session model supports it.
+
+## Decision: IDE Launch Links on Landing Page
+
+**Date:** 2025-07-27
+**Author:** Fry
+**Status:** Accepted
+
+### Context
+Users should be able to launch the Kickstart MCP server experience directly from their IDE. The landing page now includes a third section ("Or use your IDE") below framework pills.
+
+### Decision
+- VS Code and VS Code Insiders use scode:mcp/install? and scode-insiders:mcp/install? URI schemes to trigger MCP server installation with @kickstart/mcp-server.
+- Claude Code has no URI scheme, so its card copies the install command (claude mcp add kickstart -- npx -y @kickstart/mcp-server) to clipboard on click.
+- All icons are inline SVGs (brand logos for VS Code, terminal icon for Claude Code). No external icon files.
+- The section is styled as tertiary prominence — less visual weight than track cards and framework pills.
+
+## Decision: Landing page before chat
+
+**Author:** Fry (Frontend Dev)
+**Date:** 2025-07-26
+**Status:** Accepted
+
+### What
+
+Added a landing page shown before the chat UI begins. Users pick a track (web-app or agentic-app) or a framework quick-start pill. The selection configures the engine before the conversation starts.
+
+### Why
+
+- Gives users a clear choice between web-app and agentic-app tracks (per D12)
+- Framework pills skip the "which framework?" discovery question for users who already know
+- Inspiration carousel introduces what Kickstart can do without requiring immediate input
+
+### Details
+
+- Landing page lives inside .chat-main and is removed on transition
+- ody.on-landing class hides the sessions sidebar toggle
+- Engine accepts 	rack and preSelectedFramework optional params
+- LangChain Agent and RAG App auto-map to agentic-app track; all others to web-app
+
+## Decision: Light-only theme, no dark mode
+
+**By:** Fry  
+**Date:** 2026-04-08  
+**Status:** accepted
+
+### Context
+Dark mode was implemented in the chat-first redesign to match reference app styling. User explicitly requested its removal — "I don't want dark mode colors."
+
+### Decision
+Remove all @media (prefers-color-scheme: dark) blocks from web CSS and MCP App HTML. The app is light-theme only. Dark mode CSS variables are deleted, not commented out.
+
+### Consequences
+- Users on dark system themes will see the light UI.
+- Simplifies CSS maintenance (one theme to maintain).
+- If dark mode is ever re-requested, it must be re-implemented from scratch.
+
+## Decision: Lightweight inline markdown renderer for chat bubbles
+
+**Author:** Fry (Frontend Dev)
+**Date:** 2025-07-27
+**Status:** Accepted
+
+### Context
+
+Assistant text messages from the API can contain markdown (bold, code blocks, lists, links). Previously these were rendered as escaped plain text via scapeHtml(), making responses hard to read.
+
+### Decision
+
+Added enderMarkdown() to components.js — a zero-dependency, regex-based converter that handles the subset of markdown LLMs typically produce: bold, italic, inline code, fenced code blocks, unordered lists, links, paragraphs, and line breaks.
+
+User messages remain escaped plain text. Only assistant messages with msg.text (no msg.html) go through the markdown renderer.
+
+### Why not a library?
+
+The project uses zero build deps (vanilla ES modules). Pulling in marked or markdown-it would add a CDN dependency and ~30KB of code for features we don't need. The subset above covers >95% of LLM output patterns.
+
+### Consequences
+
+- If we need tables, headings, or nested lists in the future, extend enderMarkdown() or swap to a CDN-loaded library.
+- Streaming bubbles also render partial markdown via innerHTML — this is safe because the text is HTML-escaped before markdown transforms are applied.
