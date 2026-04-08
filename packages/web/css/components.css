@@ -69,6 +69,68 @@
   background: var(--color-neutral-background-3);
 }
 
+/* --- Prompt inspector toggle --- */
+.copilot-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.copilot-inspector-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--color-neutral-stroke-2);
+  border-radius: var(--radius-medium);
+  background: transparent;
+  color: var(--color-neutral-foreground-2);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.copilot-inspector-btn:hover {
+  background: var(--color-neutral-background-3);
+}
+
+.copilot-inspector-btn.active {
+  background: var(--color-brand-background-2);
+  border-color: var(--color-brand-stroke-1, var(--color-brand-background));
+  color: var(--color-brand-foreground-1, var(--color-brand-background));
+}
+
+/* --- Prompt inspector details block --- */
+.prompt-inspector {
+  margin-top: var(--spacing-s);
+  font-size: var(--font-size-200);
+}
+
+.prompt-inspector summary {
+  cursor: pointer;
+  color: var(--color-neutral-foreground-2);
+  font-size: var(--font-size-200);
+  padding: var(--spacing-xs) 0;
+  user-select: none;
+}
+
+.prompt-inspector summary:hover {
+  color: var(--color-brand-foreground-1, var(--color-brand-background));
+}
+
+.prompt-inspector .code-block {
+  margin-top: var(--spacing-s);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.prompt-inspector .code-block pre {
+  font-size: var(--font-size-100, 11px);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* --- Phase indicator --- */
 .copilot-phase {
   display: flex;

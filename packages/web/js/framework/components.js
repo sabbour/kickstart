@@ -15,7 +15,9 @@ export function createCopilotPanel(config = {}) {
 
   let messages = [];
   let isTyping = false;
+  let promptInspectorEnabled = false;
   let onSend = config.onSend ?? (() => {});
+  let onPromptInspectorToggle = config.onPromptInspectorToggle ?? (() => {});
 
   const phases = config.phases ?? [
     { id: 'understand', label: 'Understand' },
@@ -32,7 +34,18 @@ export function createCopilotPanel(config = {}) {
           <span class="copilot-icon" aria-hidden="true">✦</span>
           <span>Kickstart Copilot</span>
         </div>
-        <button class="copilot-close-btn" aria-label="Close Copilot panel" title="Close">✕</button>
+        <div class="copilot-header-actions">
+          <button class="copilot-inspector-btn${promptInspectorEnabled ? ' active' : ''}"
+                  aria-label="Toggle prompt inspector"
+                  aria-pressed="${promptInspectorEnabled}"
+                  title="${promptInspectorEnabled ? 'Hide prompts' : 'Show prompts'}">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1a7 7 0 110 14A7 7 0 018 1zm0 1.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM8 4a.75.75 0 01.75.75v2.5h2.5a.75.75 0 010 1.5h-2.5v2.5a.75.75 0 01-1.5 0v-2.5h-2.5a.75.75 0 010-1.5h2.5v-2.5A.75.75 0 018 4z"/>
+            </svg>
+            <span style="font-size:11px">Prompts</span>
+          </button>
+          <button class="copilot-close-btn" aria-label="Close Copilot panel" title="Close">✕</button>
+        </div>
       </header>
       <nav class="copilot-phase" aria-label="Conversation progress">
         ${renderPhases()}
@@ -88,6 +101,17 @@ export function createCopilotPanel(config = {}) {
 
   function bindEvents() {
     panel.querySelector('.copilot-close-btn')?.addEventListener('click', () => toggle(false));
+
+    panel.querySelector('.copilot-inspector-btn')?.addEventListener('click', () => {
+      promptInspectorEnabled = !promptInspectorEnabled;
+      const btn = panel.querySelector('.copilot-inspector-btn');
+      if (btn) {
+        btn.classList.toggle('active', promptInspectorEnabled);
+        btn.setAttribute('aria-pressed', String(promptInspectorEnabled));
+        btn.title = promptInspectorEnabled ? 'Hide prompts' : 'Show prompts';
+      }
+      onPromptInspectorToggle(promptInspectorEnabled);
+    });
 
     const textarea = panel.querySelector('.copilot-textarea');
     const sendBtn = panel.querySelector('.copilot-send-btn');
@@ -167,6 +191,7 @@ export function createCopilotPanel(config = {}) {
     setPhase,
     toggle,
     get isVisible() { return !panel.classList.contains('hidden'); },
+    get promptInspector() { return promptInspectorEnabled; },
   });
 }
 

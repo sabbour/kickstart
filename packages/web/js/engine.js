@@ -7,6 +7,8 @@
  * @module engine
  */
 
+import { buildSystemPrompt } from './prompts.js';
+
 // ── Phase definitions (6 phases, matching Decision 11) ──────────────
 export const Phase = Object.freeze({
   Discover: 'discover',
@@ -279,6 +281,9 @@ export function createEngine({ onPhaseChange, onResponse }) {
 
     const result = handler(userText, state);
     state.turnCount++;
+
+    // Attach the composed system prompt so the UI can optionally display it
+    result.systemPrompt = buildSystemPrompt(state.currentPhase, state.collected);
 
     if (result.advance) {
       state = advance(state);

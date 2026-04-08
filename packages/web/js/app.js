@@ -4,15 +4,18 @@
  */
 
 import { Router, Navigation, Breadcrumbs, EventBus } from './framework/core.js';
-import { createCopilotPanel, createCommandBar, createWizard, createCard, createCodeBlock } from './framework/components.js';
+import { createCopilotPanel, createCommandBar, createWizard, createCard, createCodeBlock, escapeHtml } from './framework/components.js';
 import { renderA2UI } from './framework/a2ui-renderer.js';
 import { createEngine } from './engine.js';
+import { buildSystemPrompt } from './prompts.js';
 import Auth from './auth.js';
 
 // ---------- Conversation Engine ----------
 let engine;
 
 // ---------- Copilot Panel ----------
+let promptInspectorOn = false;
+
 const copilot = createCopilotPanel({
   phases: [
     { id: 'discover', label: 'Discover' },
@@ -25,6 +28,9 @@ const copilot = createCopilotPanel({
   onSend(text) {
     handleUserMessage(text);
   },
+  onPromptInspectorToggle(enabled) {
+    promptInspectorOn = enabled;
+  },
 });
 
 // Mount Copilot panel
@@ -36,13 +42,19 @@ function initEngine() {
     onPhaseChange(phaseIndex) {
       copilot.setPhase(phaseIndex);
     },
-    onResponse({ a2ui, text }) {
+    onResponse({ a2ui, text, systemPrompt }) {
       copilot.setTyping(false);
       if (a2ui) {
         const html = renderA2UIMessage(a2ui);
         copilot.addMessage({ role: 'assistant', html });
       } else if (text) {
         copilot.addMessage({ role: 'assistant', text });
+      }
+
+      // Prompt Inspector: append system prompt preview when enabled
+      if (promptInspectorOn && systemPrompt) {
+        const promptHtml = renderPromptInspector(systemPrompt);
+        copilot.addMessage({ role: 'assistant', html: promptHtml });
       }
     },
   });
@@ -67,6 +79,24 @@ function renderA2UIMessage(a2uiJson) {
     },
   });
   return el.outerHTML;
+}
+
+/** Render an expandable system prompt inspector block. */
+function renderPromptInspector(systemPrompt) {
+  const promptA2UI = [
+    {
+      type: 'Text',
+      text: '<details class="prompt-inspector"><summary>🔍 View system prompt for this phase</summary></details>',
+    },
+  ];
+
+  const wrapper = renderA2UI(promptA2UI, {});
+  const details = wrapper.querySelector('details.prompt-inspector');
+  if (details) {
+    const codeBlock = createCodeBlock(systemPrompt, 'system-prompt');
+    details.appendChild(codeBlock);
+  }
+  return wrapper.outerHTML;
 }
 
 // ---------- Auth UI ----------
