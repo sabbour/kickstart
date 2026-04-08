@@ -48,3 +48,13 @@
 - **Moved:** `staticwebapp.config.json` → `packages/web/staticwebapp.config.json`
 - **Updated:** `deploy-swa.yml` app_location changed from "/" to "packages/web"
 - **Key paths:** `packages/core/src/`, `packages/mcp-server/src/`, `infra/`, `packages/web/staticwebapp.config.json`
+
+### 2025-07-25: 6-Phase Engine with GitHub Catalog and K8s-Delayed Prompts
+
+- **Phase rework:** Replaced 4-phase flow (Understand→Clarify→Needs→Plan) with 6 phases: Discover→Design→Generate→Review→Handoff→Deploy
+- **K8s delay principle:** Phases 1-3 never mention Kubernetes. AKS framed as "scalable app platform". K8s terminology only surfaces in Review (if asked) and Deploy (openly). Code comments in generated artifacts use correct K8s names — that's fine, it's code.
+- **Ship It pattern enforced:** Every phase prompt says "ONE concept per turn. Never show more than one decision point per response."
+- **Catalog additions:** RepoPicker (select/create GitHub repo), WorkflowStatus (GitHub Actions runs), CodespaceLink (deep-link to Codespaces/vscode.dev), AppOverview (app-at-a-glance card, avoids K8s jargon)
+- **Component union updated:** All 4 new components added to the `Component` oneOf in `kickstart-catalog.json`
+- **mcp-server fix:** Updated `kickstart.ts` to use Phase.Discover + non-K8s welcome message
+- **Key files changed:** `packages/core/src/engine/types.ts`, `phases.ts`, `machine.ts`, `packages/core/src/catalog/kickstart-catalog.json`, `packages/mcp-server/src/tools/kickstart.ts`

@@ -6,14 +6,18 @@
 
 /** Conversation phases in the Kickstart guided flow. */
 export enum Phase {
-  /** Understand what the user wants to build */
-  Understand = "understand",
-  /** Clarify requirements and fill gaps */
-  Clarify = "clarify",
-  /** Determine Azure resource needs */
-  Needs = "needs",
-  /** Generate deployment plan and artifacts */
-  Plan = "plan",
+  /** What is the app? Language/framework? Existing code? */
+  Discover = "discover",
+  /** What services needed? Architecture diagram */
+  Design = "design",
+  /** Create all deployment artifacts */
+  Generate = "generate",
+  /** Validate manifests, show cost estimate */
+  Review = "review",
+  /** Push to GitHub, open in Codespaces */
+  Handoff = "handoff",
+  /** Optional: deploy from Codespaces/CI */
+  Deploy = "deploy",
 }
 
 /** Status of a conversation phase. */

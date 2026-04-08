@@ -9,19 +9,19 @@ import { Phase } from "./types.js";
 import type { ConversationState, ConversationEvent, PhaseStatus } from "./types.js";
 import { getPhaseDefinition, getPhaseOrder } from "./phases.js";
 
-/** Create a fresh conversation state at the Understand phase. */
+/** Create a fresh conversation state at the Discover phase. */
 export function createInitialState(): ConversationState {
   const phases = getPhaseOrder();
   const phaseStatus = {} as Record<Phase, PhaseStatus>;
   const phaseData = {} as Record<Phase, Record<string, unknown>>;
 
   for (const phase of phases) {
-    phaseStatus[phase] = phase === Phase.Understand ? "active" : "pending";
+    phaseStatus[phase] = phase === Phase.Discover ? "active" : "pending";
     phaseData[phase] = {};
   }
 
   return {
-    currentPhase: Phase.Understand,
+    currentPhase: Phase.Discover,
     phaseStatus,
     phaseData,
     isComplete: false,

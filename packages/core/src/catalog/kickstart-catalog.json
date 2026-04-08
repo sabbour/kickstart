@@ -261,6 +261,101 @@
       ]
     },
 
+    "RepoPicker": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "RepoPicker" },
+            "label": { "type": "string" },
+            "value": { "type": "string", "description": "Repository full name (owner/repo)" },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": { "type": "string" },
+                  "value": { "type": "string" }
+                },
+                "required": ["label", "value"]
+              }
+            },
+            "allowCreate": { "type": "boolean", "default": true }
+          },
+          "required": ["type", "label"]
+        }
+      ]
+    },
+
+    "WorkflowStatus": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "WorkflowStatus" },
+            "runs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "status": { "type": "string", "enum": ["queued", "in_progress", "success", "failure", "cancelled"] },
+                  "url": { "type": "string", "format": "uri" },
+                  "conclusion": { "type": "string" }
+                },
+                "required": ["name", "status"]
+              }
+            }
+          },
+          "required": ["type", "runs"]
+        }
+      ]
+    },
+
+    "CodespaceLink": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "CodespaceLink" },
+            "repo": { "type": "string" },
+            "branch": { "type": "string" },
+            "provider": { "type": "string", "enum": ["codespaces", "vscode-dev"] },
+            "url": { "type": "string", "format": "uri" },
+            "label": { "type": "string" }
+          },
+          "required": ["type", "repo", "provider", "url"]
+        }
+      ]
+    },
+
+    "AppOverview": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "AppOverview" },
+            "appName": { "type": "string" },
+            "runtime": { "type": "string" },
+            "services": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "type": { "type": "string", "enum": ["database", "cache", "storage", "messaging", "ai"] }
+                },
+                "required": ["name", "type"]
+              }
+            },
+            "publicUrl": { "type": "string", "format": "uri" },
+            "status": { "type": "string", "enum": ["planning", "generating", "ready", "deploying", "deployed"] }
+          },
+          "required": ["type", "appName", "runtime", "services", "status"]
+        }
+      ]
+    },
+
     "Component": {
       "oneOf": [
         { "$ref": "#/$defs/Text" },
@@ -275,7 +370,11 @@
         { "$ref": "#/$defs/DeploymentProgress" },
         { "$ref": "#/$defs/ArchitectureDiagram" },
         { "$ref": "#/$defs/CostEstimate" },
-        { "$ref": "#/$defs/HandoffCard" }
+        { "$ref": "#/$defs/HandoffCard" },
+        { "$ref": "#/$defs/RepoPicker" },
+        { "$ref": "#/$defs/WorkflowStatus" },
+        { "$ref": "#/$defs/CodespaceLink" },
+        { "$ref": "#/$defs/AppOverview" }
       ]
     }
   },

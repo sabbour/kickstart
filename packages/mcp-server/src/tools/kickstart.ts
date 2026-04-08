@@ -52,14 +52,14 @@ export async function handleKickstart(
   const phases: PhaseItem[] = getPhaseOrder().map((phase) => ({
     id: phase,
     label: getPhaseDefinition(phase).label,
-    status: phase === Phase.Understand ? "active" : "pending",
+    status: phase === Phase.Discover ? "active" : "pending",
   }));
 
   const phaseComponent: ConversationPhaseComponent = {
     type: "ConversationPhase",
     id: "phase-indicator",
     phases,
-    currentPhase: Phase.Understand,
+    currentPhase: Phase.Discover,
   };
 
   const a2uiResource = createA2UIResource(
@@ -67,11 +67,11 @@ export async function handleKickstart(
     `a2ui://kickstart/session/${sessionId}/phase`,
   );
 
-  const welcomeText = `👋 Welcome to **AKS Kickstart**! I'll help you deploy your application to Azure Kubernetes Service.
+  const welcomeText = `👋 Welcome to **Kickstart**! I'll help you ship your application to a scalable app platform on Azure.
 
 **Session:** \`${sessionId}\`
 
-Let's start by understanding your application. Tell me:
+Let's start by learning about your app. Tell me:
 - What are you building?
 - What language or framework does it use?
 
