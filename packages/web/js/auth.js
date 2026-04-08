@@ -14,14 +14,14 @@ const Auth = (() => {
 
   const ENV = (() => {
     if (hostname === 'localhost' || hostname === '127.0.0.1') return 'local';
-    if (hostname === 'kickstart.prototypes.aks.azure.sabbour.me') return 'staging';
+    if (hostname === 'kickstart.aks.azure.sabbour.me') return 'staging';
     if (hostname === 'kickstart.aks.azure.com') return 'production';
     return 'unknown';
   })();
 
   const REDIRECT_URI = {
     local: origin,
-    staging: 'https://kickstart.prototypes.aks.azure.sabbour.me',
+    staging: 'https://kickstart.aks.azure.sabbour.me',
     production: 'https://kickstart.aks.azure.com',
     unknown: origin,
   }[ENV];

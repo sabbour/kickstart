@@ -26,7 +26,7 @@ TENANT="caglobaldemos2605.onmicrosoft.com"
 REDIRECT_URIS=(
   "http://localhost:8080"
   "http://localhost:4280"
-  "https://kickstart.prototypes.aks.azure.sabbour.me"
+  "https://kickstart.aks.azure.sabbour.me"
   "https://kickstart.aks.azure.com"
 )
 

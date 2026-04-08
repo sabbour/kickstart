@@ -23,7 +23,7 @@ param branch string = 'main'
 @description('Entra ID (Azure AD) client ID for authentication')
 param entraClientId string = ''
 
-@description('Custom domain hostname (e.g., kickstart.prototypes.aks.azure.sabbour.me). Leave empty to skip.')
+@description('Custom domain hostname (e.g., kickstart.aks.azure.sabbour.me). Leave empty to skip.')
 param customDomainHostname string = ''
 
 // ── Static Web App ──────────────────────────────────────────────
@@ -61,7 +61,7 @@ resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = if (!empty(
 
 // ── Custom Domain ───────────────────────────────────────────────
 // Prerequisites: CNAME record pointing customDomainHostname → defaultHostname
-// For kickstart.prototypes.aks.azure.sabbour.me → <swa-default>.azurestaticapps.net
+// For kickstart.aks.azure.sabbour.me → <swa-default>.azurestaticapps.net
 // DNS must be verified before this resource can be created.
 
 resource customDomain 'Microsoft.Web/staticSites/customDomains@2023-12-01' = if (!empty(customDomainHostname)) {

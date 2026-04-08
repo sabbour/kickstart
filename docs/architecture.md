@@ -268,7 +268,7 @@ flowchart TB
 
 | Target | Domain | Status |
 |--------|--------|--------|
-| Web (dev) | `kickstart.prototypes.aks.azure.sabbour.me` | Active |
+| Web (dev) | `kickstart.aks.azure.sabbour.me` | Active |
 | Web (production) | `kickstart.aks.azure.com` | Future |
 | IDE | npm: `@kickstart/mcp-server` | In development |
 

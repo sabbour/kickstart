@@ -262,7 +262,7 @@ chmod +x infra/setup-entra.sh
 2. **SPA Redirect URIs:**
    - `http://localhost:8080` (local dev)
    - `http://localhost:4280` (SWA CLI)
-   - `https://kickstart.prototypes.aks.azure.sabbour.me` (staging)
+   - `https://kickstart.aks.azure.sabbour.me` (staging)
    - `https://kickstart.aks.azure.com` (production)
 3. **API Permissions (delegated):**
    - Microsoft Graph: `User.Read`
@@ -288,7 +288,7 @@ After initial deployment, configure custom domains via the Azure Portal:
 3. Add your domain and follow the DNS validation steps
 
 **Current domains:**
-- **Staging:** `kickstart.prototypes.aks.azure.sabbour.me`
+- **Staging:** `kickstart.aks.azure.sabbour.me`
 - **Production:** `kickstart.aks.azure.com` (future)
 
 SWA automatically provisions and manages TLS certificates for custom domains.

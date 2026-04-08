@@ -32,7 +32,7 @@ The Kickstart web app uses Entra ID (Azure AD) for authentication via SWA's buil
 **SPA Redirect URIs:**
 - `http://localhost:8080`
 - `http://localhost:4280`
-- `https://kickstart.prototypes.aks.azure.sabbour.me`
+- `https://kickstart.aks.azure.sabbour.me`
 - `https://kickstart.aks.azure.com`
 
 **API Permissions (delegated):**
@@ -113,7 +113,7 @@ The script will:
 
 | Environment | Domain |
 |-------------|--------|
-| Temp | `kickstart.prototypes.aks.azure.sabbour.me` |
+| Temp | `kickstart.aks.azure.sabbour.me` |
 | Future | `kickstart.aks.azure.com` |
 
 Custom domains are configured via Bicep (`customDomainHostname` parameter). Requires a CNAME record pointing to the SWA default hostname before deployment.

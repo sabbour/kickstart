@@ -66,5 +66,5 @@
     ".js": "text/javascript",
     ".css": "text/css"
   },
-  "_comment": "Custom domains: kickstart.prototypes.aks.azure.sabbour.me (temp), kickstart.aks.azure.com (future). Configure via Azure Portal or Azure CLI."
+  "_comment": "Custom domains: kickstart.aks.azure.sabbour.me (temp), kickstart.aks.azure.com (future). Configure via Azure Portal or Azure CLI."
 }
