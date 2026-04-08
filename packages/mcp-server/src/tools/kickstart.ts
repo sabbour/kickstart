@@ -3,6 +3,7 @@
  *
  * Tool handler: Start a new Kickstart conversation.
  * Returns A2UI ConversationPhase component + intro text.
+ * Composes the system prompt dynamically based on the current phase.
  */
 
 import { randomUUID } from "node:crypto";
@@ -11,23 +12,59 @@ import {
   Phase,
   getPhaseOrder,
   getPhaseDefinition,
+  buildSystemPrompt,
+  DEPLOYMENT_SAFEGUARDS,
 } from "@kickstart/core";
-import type { SessionState, ConversationPhaseComponent, PhaseItem } from "@kickstart/core";
+import type {
+  SessionState,
+  ConversationState,
+  ConversationPhaseComponent,
+  PhaseItem,
+} from "@kickstart/core";
 import { createA2UIResource } from "../a2ui.js";
+import type { A2UICapability } from "../a2ui.js";
+
+/** MCP tool result content item. */
+type ContentItem =
+  | { type: "text"; text: string }
+  | { type: "resource"; resource: { uri: string; mimeType: string; text: string } };
+
+/** In-memory conversation engine state keyed by session ID. */
+const engineStates = new Map<string, ConversationState>();
+
+/** Retrieve the engine state for a session. */
+export function getEngineState(sessionId: string): ConversationState | undefined {
+  return engineStates.get(sessionId);
+}
+
+/** Store engine state for a session. */
+export function setEngineState(sessionId: string, state: ConversationState): void {
+  engineStates.set(sessionId, state);
+}
+
+/** Delete engine state for a session. */
+export function deleteEngineState(sessionId: string): void {
+  engineStates.delete(sessionId);
+}
 
 /**
  * Start a new Kickstart conversation session.
  *
- * Creates a session, initializes the conversation state machine,
- * and returns an A2UI ConversationPhase UI with welcome text.
+ * Creates a session, initialises the conversation state machine,
+ * composes a dynamic system prompt for the Discover phase, and
+ * returns an A2UI ConversationPhase UI with welcome text.
  */
 export async function handleKickstart(
   sessions: Map<string, SessionState>,
   initialMessage?: string,
-): Promise<{ content: Array<{ type: "text"; text: string } | { type: "resource"; resource: { uri: string; mimeType: string; text: string } }> }> {
+  capability: A2UICapability = "kickstart",
+): Promise<{ content: ContentItem[] }> {
   const sessionId = randomUUID();
   const now = new Date().toISOString();
   const engineState = createInitialState();
+
+  // Persist engine state for future tool calls
+  engineStates.set(sessionId, engineState);
 
   const session: SessionState = {
     sessionId,
@@ -48,6 +85,21 @@ export async function handleKickstart(
 
   sessions.set(sessionId, session);
 
+  // Compose the system prompt for the current phase
+  const systemPrompt = buildSystemPrompt({
+    phase: Phase.Discover,
+    appDefinition: session.appDefinition,
+    azureContext: session.azureContext,
+    githubContext: session.githubContext,
+  });
+
+  // Store the system prompt as a system message
+  session.messages.push({
+    role: "system",
+    content: systemPrompt,
+    timestamp: now,
+  });
+
   // Build A2UI ConversationPhase component
   const phases: PhaseItem[] = getPhaseOrder().map((phase) => ({
     id: phase,
@@ -65,11 +117,16 @@ export async function handleKickstart(
   const a2uiResource = createA2UIResource(
     phaseComponent,
     `a2ui://kickstart/session/${sessionId}/phase`,
+    capability,
   );
+
+  const safeguardCount = DEPLOYMENT_SAFEGUARDS.length;
 
   const welcomeText = `👋 Welcome to **Kickstart**! I'll help you ship your application to a scalable app platform on Azure.
 
 **Session:** \`${sessionId}\`
+**Phase:** Discover — tell me about your app
+**Safeguards:** ${safeguardCount} deployment best practices will be validated automatically
 
 Let's start by learning about your app. Tell me:
 - What are you building?
@@ -77,10 +134,8 @@ Let's start by learning about your app. Tell me:
 
 ${initialMessage ? `I see you said: "${initialMessage}" — let me work with that.` : "Just describe your app and we'll go from there!"}`;
 
-  return {
-    content: [
-      { type: "text", text: welcomeText },
-      a2uiResource,
-    ],
-  };
+  const content: ContentItem[] = [{ type: "text", text: welcomeText }];
+  if (a2uiResource) content.push(a2uiResource);
+
+  return { content };
 }

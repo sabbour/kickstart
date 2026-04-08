@@ -45,10 +45,10 @@ export async function handleCheckStatus(
     `a2ui://kickstart/session/${sessionId}/deployment-status`,
   );
 
-  return {
-    content: [
-      { type: "text", text: `📊 **Deployment status** for session \`${sessionId}\`:\n\nNo deployment has been initiated yet. Use \`generate-manifests\` first, then deploy.` },
-      a2uiResource,
-    ],
-  };
+  const content: Array<{ type: "text"; text: string } | { type: "resource"; resource: { uri: string; mimeType: string; text: string } }> = [
+    { type: "text", text: `📊 **Deployment status** for session \`${sessionId}\`:\n\nNo deployment has been initiated yet. Use \`generate-manifests\` first, then deploy.` },
+  ];
+  if (a2uiResource) content.push(a2uiResource);
+
+  return { content };
 }

@@ -114,10 +114,10 @@ export async function handleAction(
     ? "✅ **All phases complete!** Your deployment plan is ready."
     : `Now in **${currentDef.label}** phase: ${currentDef.description}`;
 
-  return {
-    content: [
-      { type: "text", text: statusText },
-      a2uiResource,
-    ],
-  };
+  const content: Array<{ type: "text"; text: string } | { type: "resource"; resource: { uri: string; mimeType: string; text: string } }> = [
+    { type: "text", text: statusText },
+  ];
+  if (a2uiResource) content.push(a2uiResource);
+
+  return { content };
 }
