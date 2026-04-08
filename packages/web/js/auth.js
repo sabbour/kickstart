@@ -1,14 +1,15 @@
 /**
- * Authentication module — MSAL.js (Entra ID) + GitHub OAuth
+ * Authentication module — SWA built-in auth + MSAL for Graph API tokens
  * @module auth
  *
+ * Primary auth: SWA built-in (/.auth/login/aad) — sets session cookie for API calls.
+ * Secondary: MSAL (Graph API tokens only, e.g. profile photo).
  * MSAL loaded via CDN in index.html (global `msal` object).
  */
 
 const Auth = (() => {
   'use strict';
 
-  // --- Configuration (environment-aware) ---
   const hostname = window.location.hostname;
   const origin = window.location.origin;
 
@@ -45,14 +46,16 @@ const Auth = (() => {
     callbackUrl: `${REDIRECT_URI}/.auth/login/github/callback`,
   };
 
-  // --- MSAL instance (lazy) ---
+  // --- SWA auth state ---
+  let clientPrincipal = null;
+
+  // --- MSAL instance (for Graph API tokens only) ---
   let msalInstance = null;
-  let currentAccount = null;
 
   function getMsal() {
     if (msalInstance) return msalInstance;
     if (typeof msal === 'undefined') {
-      console.warn('[Auth] MSAL library not loaded — Entra ID auth unavailable');
+      console.warn('[Auth] MSAL library not loaded — Graph API tokens unavailable');
       return null;
     }
 
@@ -63,7 +66,7 @@ const Auth = (() => {
         redirectUri: ENTRA.redirectUri,
       },
       cache: {
-        cacheLocation: 'sessionStorage',
+        cacheLocation: 'localStorage',
         storeAuthStateInCookie: false,
       },
     });
@@ -71,77 +74,81 @@ const Auth = (() => {
     return msalInstance;
   }
 
-  // --- Initialize (call on page load) ---
+  // --- Initialize: check SWA session + init MSAL ---
   async function initialize() {
-    const client = getMsal();
-    if (!client) return;
-
+    // 1. Check SWA built-in auth session
     try {
-      const response = await client.handleRedirectPromise();
-      if (response) {
-        currentAccount = response.account;
-      } else {
-        const accounts = client.getAllAccounts();
-        currentAccount = accounts.length > 0 ? accounts[0] : null;
+      const res = await fetch('/.auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        clientPrincipal = data.clientPrincipal || null;
       }
     } catch (err) {
-      console.error('[Auth] MSAL initialization error:', err);
+      console.warn('[Auth] SWA auth check failed:', err);
+    }
+
+    // 2. Initialize MSAL for Graph API token acquisition
+    const client = getMsal();
+    if (client) {
+      try {
+        await client.handleRedirectPromise();
+      } catch (err) {
+        console.warn('[Auth] MSAL init error:', err);
+      }
     }
   }
 
-  // --- Login (Entra ID) ---
-  async function login() {
+  // --- Login via SWA built-in auth (full-page redirect) ---
+  function login() {
+    window.location.href = '/.auth/login/aad?post_login_redirect_uri=/';
+    return new Promise(() => {}); // page navigates away
+  }
+
+  // --- Logout via SWA built-in auth ---
+  function logout() {
+    window.location.href = '/.auth/logout?post_logout_redirect_uri=/';
+    return new Promise(() => {}); // page navigates away
+  }
+
+  // --- Token acquisition (MSAL — for Graph API only) ---
+  async function getToken(scopes) {
     const client = getMsal();
     if (!client) return null;
 
+    const requestScopes = scopes ?? ENTRA.scopes.login;
+
+    // Try cached MSAL accounts first
+    const accounts = client.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        const response = await client.acquireTokenSilent({
+          scopes: requestScopes,
+          account: accounts[0],
+        });
+        return response.accessToken;
+      } catch { /* fall through */ }
+    }
+
+    // Try SSO silent — leverages existing Entra session from SWA login
+    if (clientPrincipal) {
+      try {
+        const response = await client.ssoSilent({
+          scopes: requestScopes,
+          loginHint: clientPrincipal.userDetails,
+        });
+        return response.accessToken;
+      } catch { /* fall through */ }
+    }
+
+    // Interactive fallback (popup)
     try {
-      const response = await client.loginPopup({
-        scopes: ENTRA.scopes.login,
+      const response = await client.acquireTokenPopup({
+        scopes: requestScopes,
       });
-      currentAccount = response.account;
-      return getUserInfo();
-    } catch (err) {
-      if (err.errorCode === 'user_cancelled') return null;
-      console.error('[Auth] Login failed:', err);
-      throw err;
-    }
-  }
-
-  // --- Logout ---
-  async function logout() {
-    const client = getMsal();
-    if (!client) return;
-
-    try {
-      await client.logoutPopup({ account: currentAccount });
-      currentAccount = null;
-    } catch (err) {
-      console.error('[Auth] Logout failed:', err);
-    }
-  }
-
-  // --- Token acquisition ---
-  async function getToken(scopes) {
-    const client = getMsal();
-    if (!client || !currentAccount) return null;
-
-    const request = {
-      scopes: scopes ?? ENTRA.scopes.login,
-      account: currentAccount,
-    };
-
-    try {
-      const response = await client.acquireTokenSilent(request);
       return response.accessToken;
     } catch (err) {
-      // Fallback to interactive
-      try {
-        const response = await client.acquireTokenPopup(request);
-        return response.accessToken;
-      } catch (interactiveErr) {
-        console.error('[Auth] Token acquisition failed:', interactiveErr);
-        return null;
-      }
+      console.warn('[Auth] Token acquisition failed:', err);
+      return null;
     }
   }
 
@@ -149,18 +156,22 @@ const Auth = (() => {
     return getToken(ENTRA.scopes.arm);
   }
 
-  // --- State ---
+  // --- State (from SWA clientPrincipal) ---
   function isAuthenticated() {
-    return currentAccount !== null;
+    return clientPrincipal !== null;
   }
 
   function getUserInfo() {
-    if (!currentAccount) return null;
-    return {
-      name: currentAccount.name ?? 'User',
-      email: currentAccount.username,
-      initials: getInitials(currentAccount.name),
-    };
+    if (!clientPrincipal) return null;
+    const claims = clientPrincipal.claims || [];
+    const nameClaim = claims.find(c => c.typ === 'name');
+    const emailClaim = claims.find(c =>
+      c.typ === 'preferred_username' ||
+      c.typ === 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'
+    );
+    const name = nameClaim?.val || clientPrincipal.userDetails || 'User';
+    const email = emailClaim?.val || clientPrincipal.userDetails || '';
+    return { name, email, initials: getInitials(name) };
   }
 
   // --- GitHub OAuth ---

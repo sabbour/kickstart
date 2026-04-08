@@ -649,27 +649,27 @@ async function updateAuthUI() {
   if (Auth.isAuthenticated()) {
     const info = Auth.getUserInfo();
     const fallback = 'assets/icons/commands/avatar-default.svg';
-    // Start with initials avatar, upgrade to photo when ready
+    const initials = info.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    // Use a plain <img> with initials placeholder — fluent-avatar is unreliable (0×0)
     userBtn.innerHTML = `
-      <fluent-avatar name="${escapeHtml(info.name)}" size="28" color="colorful"></fluent-avatar>
+      <span class="topbar-avatar-initials">${escapeHtml(initials)}</span>
       <span class="topbar-user-name">${escapeHtml(info.name)}</span>`;
     userBtn.onclick = () => Auth.logout().then(updateAuthUI);
     userBtn.title = `Signed in as ${info.email} — click to sign out`;
 
-    // Fetch photo in background, swap to <img> when ready
+    // Fetch photo in background, swap initials → <img> when ready
     const photoUrl = await fetchUserPhoto();
-    if (photoUrl) {
-      const fluentAvatar = userBtn.querySelector('fluent-avatar');
-      if (fluentAvatar) {
-        const img = document.createElement('img');
-        img.src = photoUrl;
-        img.alt = escapeHtml(info.name);
-        img.width = 28;
-        img.height = 28;
-        img.className = 'topbar-avatar-img';
-        img.onerror = () => { img.src = fallback; img.onerror = null; };
-        fluentAvatar.replaceWith(img);
-      }
+    const src = photoUrl || fallback;
+    const placeholder = userBtn.querySelector('.topbar-avatar-initials');
+    if (placeholder) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = escapeHtml(info.name);
+      img.width = 28;
+      img.height = 28;
+      img.className = 'topbar-avatar-img';
+      img.onerror = () => { img.src = fallback; img.onerror = null; };
+      placeholder.replaceWith(img);
     }
   } else {
     userBtn.innerHTML = `
@@ -684,16 +684,13 @@ async function updateAuthUI() {
 async function boot() {
   await initAuth();
 
-  // Handle /login path — auto-trigger client-side sign-in
+  // Handle /login path — redirect to SWA login
   if (window.location.pathname === '/login') {
     if (!Auth.isAuthenticated()) {
-      Auth.login().then(() => {
-        window.history.replaceState({}, '', '/');
-        updateAuthUI();
-      });
-    } else {
-      window.history.replaceState({}, '', '/');
+      Auth.login(); // redirects to /.auth/login/aad, then back to /
+      return;
     }
+    window.history.replaceState({}, '', '/');
   }
 
   // Landing page is shown by default (via HTML).
