@@ -131,17 +131,17 @@ function designHandler(_input, state) {
   const services = state.collected.services || ['Web'];
 
   const components = [
-    { name: appName, icon: '🌐', description: runtime },
-    { name: 'App Platform', icon: '☁️', description: 'Azure (scalable hosting)' },
+    { name: appName, icon: 'app', description: runtime },
+    { name: 'App Platform', icon: 'cloud', description: 'Azure (scalable hosting)' },
   ];
 
   if (services.some(s => ['PostgreSQL', 'MySQL', 'MongoDB'].includes(s))) {
-    components.push({ name: 'Database', icon: '🗄️', description: services.find(s => ['PostgreSQL', 'MySQL', 'MongoDB'].includes(s)) });
+    components.push({ name: 'Database', icon: 'database', description: services.find(s => ['PostgreSQL', 'MySQL', 'MongoDB'].includes(s)) });
   }
   if (services.includes('Redis')) {
-    components.push({ name: 'Cache', icon: '⚡', description: 'Redis' });
+    components.push({ name: 'Cache', icon: 'cache', description: 'Redis' });
   }
-  components.push({ name: 'CI/CD', icon: '🔄', description: 'GitHub Actions' });
+  components.push({ name: 'CI/CD', icon: 'cicd', description: 'GitHub Actions' });
 
   return {
     advance: true,
@@ -187,7 +187,7 @@ function generateHandler(_input, state) {
         language: 'yaml',
         code: workflowCode,
       },
-      { type: 'Text', text: "📁 These files are also available in the **file viewer** on the right. Next, let me show you the estimated cost." },
+      { type: 'Text', text: "These files are also available in the **file viewer** on the right. Next, let me show you the estimated cost." },
     ],
   };
 }
@@ -347,7 +347,7 @@ export function createDemoEngine({ onPhaseChange, onResponse, track, preSelected
     return [
       {
         type: 'Text',
-        text: "👋 Hi! I'm **Kickstart** — your AI guide for getting apps running on Azure.\n\nTell me: **what are you building?**",
+        text: "Hi! I'm **Kickstart** — your AI guide for getting apps running on Azure.\n\nTell me: **what are you building?**",
       },
     ];
   }
@@ -436,7 +436,7 @@ export function createApiEngine({ onPhaseChange, onResponse, apiClient, onError,
     return [
       {
         type: 'Text',
-        text: "👋 Hi! I'm **Kickstart** — your AI guide for getting apps running on Azure.\n\nTell me: **what are you building?**",
+        text: "Hi! I'm **Kickstart** — your AI guide for getting apps running on Azure.\n\nTell me: **what are you building?**",
       },
     ];
   }
