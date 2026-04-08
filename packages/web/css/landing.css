@@ -11,7 +11,8 @@
   flex: 1;
   overflow-y: auto;
   padding: var(--spacing-xxxl) var(--spacing-l);
-  background: var(--color-neutral-background-2);
+  background: url('../assets/hero-bg.svg') center/cover no-repeat,
+              var(--color-neutral-background-2);
   animation: landingFadeIn var(--duration-normal) var(--easing-ease-out);
 }
 
