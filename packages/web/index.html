@@ -89,9 +89,10 @@
             <div class="landing-hero" id="landing-hero">
               <h1 class="landing-hero-title">What do you want to deploy?</h1>
               <div class="landing-hero-input-wrap">
-                <input type="text" class="landing-hero-input" id="hero-input"
-                       placeholder="Describe what you want to deploy to AKS..."
-                       aria-label="Describe your app" autocomplete="off">
+                <fluent-search id="hero-input" appearance="outline"
+                               placeholder="Describe what you want to deploy to AKS..."
+                               aria-label="Describe your app" autocomplete="off">
+                </fluent-search>
               </div>
               <div class="suggestion-pills" id="suggestion-pills">
                 <button class="suggestion-pill" data-suggestion="I want to build an e-commerce API with product catalog, cart, and checkout">E-commerce API</button>
@@ -99,14 +100,6 @@
                 <button class="suggestion-pill" data-suggestion="I want to build a real-time dashboard that shows live metrics and alerts">Real-time dashboard</button>
                 <button class="suggestion-pill" data-suggestion="I want to build a microservices starter with API gateway, auth service, and message queue">Microservices starter</button>
               </div>
-            </div>
-
-            <!-- Inspiration Carousel -->
-            <div class="landing-carousel" id="landing-carousel">
-              <div class="carousel-viewport" id="carousel-viewport">
-                <!-- Slides injected by app.js -->
-              </div>
-              <div class="carousel-dots" id="carousel-dots"></div>
             </div>
 
             <!-- Track Cards -->
@@ -122,38 +115,6 @@
                 <div class="track-card-title">AI Agent</div>
                 <p class="track-card-desc">Deploy an AI agent that calls tools, retrieves knowledge, and reasons over data. Self-host open-source models or connect to Azure OpenAI — with built-in scaling and low cost.</p>
                 <button class="track-card-link" data-track="agentic-app">Get started →</button>
-              </div>
-            </div>
-
-            <!-- Framework Quick-Starts -->
-            <div class="landing-frameworks">
-              <span class="landing-frameworks-label">Or start with a framework</span>
-              <div class="framework-pills" id="framework-pills">
-                <button class="framework-pill" data-framework="Next.js">Next.js</button>
-                <button class="framework-pill" data-framework="Python FastAPI">Python FastAPI</button>
-                <button class="framework-pill" data-framework="Express.js">Express.js</button>
-                <button class="framework-pill" data-framework="Go">Go</button>
-                <button class="framework-pill" data-framework="Spring Boot">Spring Boot</button>
-                <button class="framework-pill" data-framework="Django">Django</button>
-                <button class="framework-pill" data-framework="Rust">Rust</button>
-                <button class="framework-pill" data-framework="LangChain Agent">LangChain Agent</button>
-                <button class="framework-pill" data-framework="RAG App">RAG App</button>
-              </div>
-            </div>
-
-            <!-- IDE Launch Links -->
-            <div class="landing-ide">
-              <span class="landing-ide-label">Or use your IDE</span>
-              <div class="ide-cards" id="ide-cards">
-                <a class="ide-card" href="vscode:mcp/install?%7B%22name%22%3A%22kickstart%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40kickstart%2Fmcp-server%22%5D%7D" target="_blank" rel="noopener">
-                  <span class="ide-card-icon"><img src="assets/icons/misc icons/vscode.svg" alt="" width="24" height="24"></span>
-                  <span class="ide-card-name">VS Code</span>
-                </a>
-                <a class="ide-card" href="vscode-insiders:mcp/install?%7B%22name%22%3A%22kickstart%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40kickstart%2Fmcp-server%22%5D%7D" target="_blank" rel="noopener">
-                  <span class="ide-card-icon"><img src="assets/icons/misc icons/vscode-insiders.svg" alt="" width="24" height="24"></span>
-                  <span class="ide-card-name">VS Code Insiders</span>
-                </a>
-
               </div>
             </div>
           </div>

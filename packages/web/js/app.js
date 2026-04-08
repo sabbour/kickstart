@@ -19,6 +19,7 @@ let isApiMode = false;
 // ---------- Landing page state ----------
 let selectedTrack = null;       // 'web-app' | 'agentic-app' | null
 let selectedFramework = null;   // framework name or null
+let pendingQuickPrompt = null;
 
 // ---------- Prompt Inspector ----------
 let promptInspectorOn = false;
@@ -126,163 +127,14 @@ document.getElementById('topbar-inspector-toggle')?.addEventListener('click', ()
 
 // ==================== Landing Page ====================
 
-let INSPIRATION_IDEAS = [
-  { title: 'Movie night pick that settles disputes', subtitle: 'Your group votes, and the app chooses confidently.', prompt: 'I want to build a movie night pick app that settles disputes — your group votes, and the app chooses confidently.' },
-  { title: 'AI recipe finder from fridge photos', subtitle: 'Snap a photo of your fridge, get dinner ideas instantly.', prompt: 'I want to build an AI recipe finder from fridge photos — snap a photo of your fridge, get dinner ideas instantly.' },
-  { title: 'Team standup bot that respects time zones', subtitle: 'Async standups that actually work for global teams.', prompt: 'I want to build a team standup bot that respects time zones — async standups that actually work for global teams.' },
-  { title: 'Pet adoption matcher powered by AI', subtitle: 'Swipe-style matching between shelters and families.', prompt: 'I want to build a pet adoption matcher powered by AI — swipe-style matching between shelters and families.' },
-  { title: 'Real-time air quality dashboard', subtitle: 'Hyperlocal pollution data with health recommendations.', prompt: 'I want to build a real-time air quality dashboard — hyperlocal pollution data with health recommendations.' },
-  { title: 'Neighborhood tool lending library', subtitle: 'Borrow a drill from your neighbor — no awkward texts required.', prompt: 'I want to build a neighborhood tool lending library — borrow a drill from your neighbor, no awkward texts required.' },
-  { title: 'Personal finance coach that speaks plain English', subtitle: 'Budget tracking without the spreadsheet headaches.', prompt: 'I want to build a personal finance coach that speaks plain English — budget tracking without the spreadsheet headaches.' },
-  { title: 'Workout generator for hotel rooms', subtitle: 'No equipment? No problem. AI builds a routine in seconds.', prompt: 'I want to build a workout generator for hotel rooms — no equipment needed, AI builds a routine in seconds.' },
-  { title: 'Live event parking optimizer', subtitle: 'Find the fastest lot and walking route to the venue.', prompt: 'I want to build a live event parking optimizer — find the fastest lot and walking route to the venue.' },
-  { title: 'Study group matchmaker for college', subtitle: 'Match with classmates by course, schedule, and study style.', prompt: 'I want to build a study group matchmaker for college — match with classmates by course, schedule, and study style.' },
-];
-
-let carouselIndex = 0;
-let carouselTimer = null;
-let pendingQuickPrompt = null;
-
-/**
- * Fetch inspiration ideas from the API with a 2-second timeout.
- * Returns the parsed array on success, or null on any failure.
- */
-async function fetchInspirations() {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 2000);
-  try {
-    const res = await fetch('/api/inspirations', { signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!Array.isArray(data)) return null;
-    return data;
-  } catch {
-    clearTimeout(timeoutId);
-    return null;
-  }
-}
-
-/**
- * Replace carousel content with new ideas and restart rotation.
- * Preserves the current slide index when possible.
- */
-function updateCarouselIdeas(ideas) {
-  INSPIRATION_IDEAS = ideas;
-
-  const viewport = document.getElementById('carousel-viewport');
-  const dotsContainer = document.getElementById('carousel-dots');
-  if (!viewport || !dotsContainer) return;
-
-  const newIndex = carouselIndex < ideas.length ? carouselIndex : 0;
-
-  viewport.innerHTML = ideas.map((idea, i) => `
-    <div class="carousel-slide ${i === newIndex ? 'active' : ''}" data-slide="${i}">
-      <div class="carousel-title">${escapeHtml(idea.title)}</div>
-      <div class="carousel-subtitle">${escapeHtml(idea.subtitle)}</div>
-    </div>
-  `).join('');
-
-  dotsContainer.innerHTML = ideas.map((_, i) => `
-    <button class="carousel-dot ${i === newIndex ? 'active' : ''}" data-dot="${i}" aria-label="Idea ${i + 1}"></button>
-  `).join('');
-
-  carouselIndex = newIndex;
-  resetCarouselTimer();
-}
-
-function initCarousel() {
-  const viewport = document.getElementById('carousel-viewport');
-  const dotsContainer = document.getElementById('carousel-dots');
-  if (!viewport || !dotsContainer) return;
-
-  // Build slides
-  viewport.innerHTML = INSPIRATION_IDEAS.map((idea, i) => `
-    <div class="carousel-slide ${i === 0 ? 'active' : ''}" data-slide="${i}">
-      <div class="carousel-title">${escapeHtml(idea.title)}</div>
-      <div class="carousel-subtitle">${escapeHtml(idea.subtitle)}</div>
-    </div>
-  `).join('');
-
-  // Build dots
-  dotsContainer.innerHTML = INSPIRATION_IDEAS.map((_, i) => `
-    <button class="carousel-dot ${i === 0 ? 'active' : ''}" data-dot="${i}" aria-label="Idea ${i + 1}"></button>
-  `).join('');
-
-  // Dot clicks
-  dotsContainer.addEventListener('click', (e) => {
-    const dot = e.target.closest('.carousel-dot');
-    if (!dot) return;
-    goToSlide(parseInt(dot.dataset.dot, 10));
-    resetCarouselTimer();
-  });
-
-  // Slide clicks — kickstart chat with the idea's prompt
-  viewport.addEventListener('click', (e) => {
-    const slide = e.target.closest('.carousel-slide');
-    if (!slide) return;
-    const idx = parseInt(slide.dataset.slide, 10);
-    const idea = INSPIRATION_IDEAS[idx];
-    if (idea?.prompt) {
-      pendingQuickPrompt = idea.prompt;
-      transitionToChat();
-    }
-  });
-
-  // Start auto-rotation
-  resetCarouselTimer();
-}
-
-function goToSlide(newIndex) {
-  const viewport = document.getElementById('carousel-viewport');
-  const dotsContainer = document.getElementById('carousel-dots');
-  if (!viewport) return;
-
-  const slides = viewport.querySelectorAll('.carousel-slide');
-  const dots = dotsContainer?.querySelectorAll('.carousel-dot');
-
-  if (newIndex === carouselIndex) return;
-
-  // Remove active from old
-  slides[carouselIndex]?.classList.remove('active');
-  slides[carouselIndex]?.classList.add('exit-left');
-  dots?.[carouselIndex]?.classList.remove('active');
-
-  // Clean up exit class after transition
-  const oldIdx = carouselIndex;
-  setTimeout(() => slides[oldIdx]?.classList.remove('exit-left'), 400);
-
-  carouselIndex = newIndex;
-
-  // Set active on new
-  slides[carouselIndex]?.classList.add('active');
-  dots?.[carouselIndex]?.classList.add('active');
-}
-
-function nextSlide() {
-  goToSlide((carouselIndex + 1) % INSPIRATION_IDEAS.length);
-}
-
-function resetCarouselTimer() {
-  if (carouselTimer) clearInterval(carouselTimer);
-  carouselTimer = setInterval(nextSlide, 5000);
-}
-
-function stopCarousel() {
-  if (carouselTimer) {
-    clearInterval(carouselTimer);
-    carouselTimer = null;
-  }
-}
-
 function initLandingListeners() {
-  // Hero input — Enter key starts chat
+  // Hero input — Enter key starts chat (fluent-search fires keydown on its host)
   const heroInput = document.getElementById('hero-input');
   if (heroInput) {
     heroInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        const text = heroInput.value.trim();
+        const text = heroInput.value?.trim();
         if (text) {
           pendingQuickPrompt = text;
           transitionToChat();
@@ -309,35 +161,9 @@ function initLandingListeners() {
       transitionToChat();
     });
   });
-
-  // Framework pills
-  const frameworkPrompts = {
-    'Next.js': 'I want to build a Next.js app and deploy it to Azure',
-    'Python FastAPI': 'I want to build a Python FastAPI app and deploy it to Azure',
-    'Express.js': 'I want to build an Express.js app and deploy it to Azure',
-    'Go': 'I want to build a Go app and deploy it to Azure',
-    'Spring Boot': 'I want to build a Spring Boot app and deploy it to Azure',
-    'Django': 'I want to build a Django app and deploy it to Azure',
-    'Rust': 'I want to build a Rust app and deploy it to Azure',
-    'LangChain Agent': 'I want to build a LangChain AI agent and deploy it to Azure',
-    'RAG App': 'I want to build a RAG application and deploy it to Azure',
-  };
-
-  document.querySelectorAll('.framework-pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      selectedFramework = pill.dataset.framework;
-      const agenticFrameworks = ['LangChain Agent', 'RAG App'];
-      selectedTrack = agenticFrameworks.includes(selectedFramework) ? 'agentic-app' : 'web-app';
-      pendingQuickPrompt = frameworkPrompts[selectedFramework]
-        ?? `I want to build a ${selectedFramework} app and deploy it to Azure`;
-      transitionToChat();
-    });
-  });
 }
 
 async function transitionToChat() {
-  stopCarousel();
-
   const landingEl = document.getElementById('landing-page');
   if (landingEl) {
     landingEl.classList.add('hiding');
@@ -357,7 +183,7 @@ async function transitionToChat() {
   const html = renderA2UIMessage(welcomeA2UI);
   chatUI.addMessage({ role: 'assistant', html });
 
-  // If a carousel idea was clicked, auto-send its prompt
+  // If a suggestion pill or track card was clicked, auto-send its prompt
   if (pendingQuickPrompt) {
     const prompt = pendingQuickPrompt;
     pendingQuickPrompt = null;
@@ -625,16 +451,7 @@ async function boot() {
   }
 
   // Landing page is shown by default (via HTML).
-  // Render carousel immediately with hardcoded ideas.
-  initCarousel();
   initLandingListeners();
-
-  // Try to fetch fresh ideas in background — never blocks page load.
-  fetchInspirations().then(ideas => {
-    if (ideas && ideas.length >= 3) {
-      updateCarouselIdeas(ideas);
-    }
-  }).catch(() => { /* silent fallback to hardcoded ideas */ });
 }
 
 // Run on DOM ready
