@@ -590,13 +590,13 @@ async function updateAuthUI() {
 
     // Fetch photo in background, update avatar when ready
     const photoUrl = await fetchUserPhoto();
-    if (photoUrl) {
-      const avatar = userBtn.querySelector('fluent-avatar');
-      if (avatar) avatar.setAttribute('src', photoUrl);
+    const avatar = userBtn.querySelector('fluent-avatar');
+    if (avatar) {
+      avatar.setAttribute('src', photoUrl || 'assets/icons/commands/avatar-default.svg');
     }
   } else {
     userBtn.innerHTML = `
-      <fluent-avatar name="?" size="28"></fluent-avatar>
+      <img src="assets/icons/commands/avatar-default.svg" width="28" height="28" alt="" style="border-radius:50%">
       <span>Sign in</span>`;
     userBtn.onclick = () => Auth.login().then(updateAuthUI);
     userBtn.title = 'Sign in with your Microsoft account';
