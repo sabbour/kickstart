@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kickstart — AKS Onboarding</title>
+<style>
+/* ── Fluent 2 Design Tokens ─────────────────────────────────────── */
+:root {
+  --color-brand-primary: #0078d4;
+  --color-brand-primary-hover: #106ebe;
+  --color-brand-primary-active: #005a9e;
+  --color-brand-light: #deecf9;
+  --color-brand-lighter: #eff6fc;
+  --color-brand-foreground-1: #0078d4;
+  --color-brand-background-2: #deecf9;
+  --color-brand-stroke-1: #0078d4;
+
+  --color-neutral-background-1: #ffffff;
+  --color-neutral-background-1-hover: #f5f5f5;
+  --color-neutral-background-2: #faf9f8;
+  --color-neutral-background-3: #f3f2f1;
+  --color-neutral-background-4: #edebe9;
+  --color-neutral-background-inverted: #1b1a19;
+  --color-neutral-foreground-1: #242424;
+  --color-neutral-foreground-2: #424242;
+  --color-neutral-foreground-3: #616161;
+  --color-neutral-foreground-disabled: #a19f9d;
+  --color-neutral-foreground-on-brand: #ffffff;
+  --color-neutral-stroke-1: #d1d1d1;
+  --color-neutral-stroke-2: #e1dfdd;
+
+  --color-success: #107c10;
+  --color-success-background: #dff6dd;
+  --color-warning: #ffb900;
+  --color-warning-background: #fff4ce;
+  --color-error: #d13438;
+  --color-error-background: #fde7e9;
+
+  --color-copilot-gradient-start: #7b2ff2;
+  --color-copilot-gradient-end: #0078d4;
+  --color-copilot-bg: #f7f7ff;
+
+  --font-family-base: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-family-mono: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+
+  --font-size-100: 10px;
+  --font-size-200: 12px;
+  --font-size-300: 14px;
+  --font-size-400: 16px;
+  --font-size-500: 20px;
+  --font-size-600: 24px;
+
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --spacing-xxs: 2px;
+  --spacing-xs: 4px;
+  --spacing-s: 8px;
+  --spacing-m: 12px;
+  --spacing-l: 16px;
+  --spacing-xl: 24px;
+  --spacing-xxl: 32px;
+  --spacing-xxxl: 48px;
+
+  --radius-none: 0;
+  --radius-small: 2px;
+  --radius-medium: 4px;
+  --radius-large: 8px;
+  --radius-xlarge: 12px;
+  --radius-circular: 9999px;
+
+  --shadow-2: 0 1px 2px rgba(0,0,0,0.12);
+  --shadow-4: 0 2px 4px rgba(0,0,0,0.14);
+  --shadow-8: 0 4px 8px rgba(0,0,0,0.14);
+
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+}
+
+/* ── Dark mode ──────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-brand-primary: #4ea8e6;
+    --color-brand-primary-hover: #62b5ed;
+    --color-brand-primary-active: #3a9cd8;
+    --color-brand-light: #1a3a52;
+    --color-brand-lighter: #0f2233;
+    --color-brand-foreground-1: #4ea8e6;
+    --color-brand-background-2: #1a3a52;
+    --color-brand-stroke-1: #4ea8e6;
+
+    --color-neutral-background-1: #1e1e1e;
+    --color-neutral-background-1-hover: #2a2a2a;
+    --color-neutral-background-2: #252526;
+    --color-neutral-background-3: #2d2d2d;
+    --color-neutral-background-4: #333333;
+    --color-neutral-background-inverted: #ffffff;
+    --color-neutral-foreground-1: #d4d4d4;
+    --color-neutral-foreground-2: #cccccc;
+    --color-neutral-foreground-3: #999999;
+    --color-neutral-foreground-disabled: #5d5d5d;
+    --color-neutral-foreground-on-brand: #1e1e1e;
+    --color-neutral-stroke-1: #3e3e3e;
+    --color-neutral-stroke-2: #333333;
+
+    --color-success: #4ec94e;
+    --color-success-background: #1a3a1a;
+    --color-warning: #e5a800;
+    --color-warning-background: #3a3000;
+    --color-error: #f48183;
+    --color-error-background: #3a1a1a;
+
+    --color-copilot-bg: #1e1a2e;
+
+    --shadow-2: 0 1px 2px rgba(0,0,0,0.36);
+    --shadow-4: 0 2px 4px rgba(0,0,0,0.40);
+    --shadow-8: 0 4px 8px rgba(0,0,0,0.40);
+  }
+}
+
+/* ── Reset & base ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  color: var(--color-neutral-foreground-1);
+  background: var(--color-neutral-background-1);
+  overflow: hidden;
+}
+
+/* ── App layout ─────────────────────────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  padding: var(--spacing-s) var(--spacing-l);
+  background: linear-gradient(135deg, var(--color-copilot-gradient-start), var(--color-copilot-gradient-end));
+  color: #fff;
+  flex-shrink: 0;
+}
+.app-header-icon { font-size: 18px; }
+.app-header-title { font-size: var(--font-size-300); font-weight: var(--font-weight-semibold); }
+
+/* ── Phase indicator ────────────────────────────────────────────── */
+.phase-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-s) var(--spacing-l);
+  background: var(--color-neutral-background-2);
+  border-bottom: 1px solid var(--color-neutral-stroke-2);
+  flex-shrink: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.phase-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-200);
+  color: var(--color-neutral-foreground-3);
+}
+.phase-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--color-neutral-stroke-1);
+  flex-shrink: 0;
+}
+.phase-dot.active {
+  background: var(--color-brand-primary);
+  box-shadow: 0 0 0 2px var(--color-brand-light);
+}
+.phase-dot.completed { background: var(--color-success); }
+.phase-connector {
+  width: 16px; height: 1px;
+  background: var(--color-neutral-stroke-2);
+  flex-shrink: 0;
+}
+.phase-connector.completed { background: var(--color-success); }
+
+/* ── Messages area ──────────────────────────────────────────────── */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-l);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-m);
+}
+
+.chat-bubble {
+  max-width: 92%;
+  padding: var(--spacing-s) var(--spacing-m);
+  border-radius: var(--radius-large);
+  font-size: var(--font-size-300);
+  line-height: 1.5;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+.chat-bubble.user {
+  align-self: flex-end;
+  background: var(--color-brand-primary);
+  color: var(--color-neutral-foreground-on-brand);
+  border-bottom-right-radius: var(--radius-small);
+}
+.chat-bubble.assistant {
+  align-self: flex-start;
+  background: var(--color-neutral-background-3);
+  border-bottom-left-radius: var(--radius-small);
+}
+.chat-bubble.error {
+  background: var(--color-error-background);
+  color: var(--color-error);
+}
+
+/* ── Typing indicator ───────────────────────────────────────────── */
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  align-self: flex-start;
+  padding: var(--spacing-s) var(--spacing-m);
+}
+.typing-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--color-neutral-foreground-3);
+  animation: typingBounce 1.2s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+
+/* ── Input area ─────────────────────────────────────────────────── */
+.input-area {
+  display: flex;
+  gap: var(--spacing-s);
+  padding: var(--spacing-s) var(--spacing-l);
+  border-top: 1px solid var(--color-neutral-stroke-2);
+  background: var(--color-neutral-background-1);
+  flex-shrink: 0;
+}
+.input-area textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--color-neutral-stroke-1);
+  border-radius: var(--radius-medium);
+  padding: var(--spacing-s) var(--spacing-m);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  background: var(--color-neutral-background-1);
+  color: var(--color-neutral-foreground-1);
+  outline: none;
+  min-height: 36px;
+  max-height: 120px;
+}
+.input-area textarea:focus {
+  border-color: var(--color-brand-primary);
+  box-shadow: 0 0 0 1px var(--color-brand-primary);
+}
+.send-btn {
+  width: 36px; height: 36px;
+  border: none;
+  border-radius: var(--radius-medium);
+  background: var(--color-brand-primary);
+  color: var(--color-neutral-foreground-on-brand);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--duration-fast);
+}
+.send-btn:hover { background: var(--color-brand-primary-hover); }
+.send-btn:active { background: var(--color-brand-primary-active); }
+.send-btn:disabled {
+  background: var(--color-neutral-background-4);
+  color: var(--color-neutral-foreground-disabled);
+  cursor: not-allowed;
+}
+
+/* ── A2UI Components ────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-m);
+  border: 1px solid var(--color-neutral-stroke-1);
+  border-radius: var(--radius-medium);
+  background: var(--color-neutral-background-1);
+  color: var(--color-neutral-foreground-1);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--duration-fast);
+}
+.btn:hover { background: var(--color-neutral-background-3); }
+.btn.primary {
+  background: var(--color-brand-primary);
+  color: var(--color-neutral-foreground-on-brand);
+  border-color: var(--color-brand-primary);
+}
+.btn.primary:hover { background: var(--color-brand-primary-hover); }
+
+.card {
+  border: 1px solid var(--color-neutral-stroke-2);
+  border-radius: var(--radius-large);
+  background: var(--color-neutral-background-1);
+  overflow: hidden;
+}
+.card-header {
+  padding: var(--spacing-m) var(--spacing-l);
+  border-bottom: 1px solid var(--color-neutral-stroke-2);
+}
+.card-title {
+  font-size: var(--font-size-300);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+.card-subtitle {
+  font-size: var(--font-size-200);
+  color: var(--color-neutral-foreground-3);
+  margin: var(--spacing-xxs) 0 0;
+}
+.card-body { padding: var(--spacing-m) var(--spacing-l); }
+.card-footer { padding: var(--spacing-m) var(--spacing-l); border-top: 1px solid var(--color-neutral-stroke-2); }
+
+.form-group { margin-bottom: var(--spacing-m); }
+.form-label {
+  display: block;
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-neutral-foreground-2);
+}
+.form-label .required { color: var(--color-error); }
+.form-input {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-s);
+  border: 1px solid var(--color-neutral-stroke-1);
+  border-radius: var(--radius-medium);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  background: var(--color-neutral-background-1);
+  color: var(--color-neutral-foreground-1);
+}
+.form-input:focus { border-color: var(--color-brand-primary); outline: none; box-shadow: 0 0 0 1px var(--color-brand-primary); }
+.form-hint { display: block; font-size: var(--font-size-100); color: var(--color-neutral-foreground-3); margin-top: var(--spacing-xxs); }
+
+.code-block {
+  border: 1px solid var(--color-neutral-stroke-2);
+  border-radius: var(--radius-medium);
+  overflow: hidden;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-200);
+}
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-s);
+  background: var(--color-neutral-background-3);
+  font-size: var(--font-size-100);
+  color: var(--color-neutral-foreground-3);
+}
+.code-block-copy {
+  border: none;
+  background: none;
+  color: var(--color-brand-foreground-1);
+  cursor: pointer;
+  font-size: var(--font-size-100);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xxs);
+}
+.code-block pre {
+  margin: 0;
+  padding: var(--spacing-s);
+  overflow-x: auto;
+  background: var(--color-neutral-background-2);
+  color: var(--color-neutral-foreground-1);
+}
+.code-block code { font-family: inherit; }
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 2px var(--spacing-s);
+  border-radius: var(--radius-circular);
+  font-size: var(--font-size-100);
+  font-weight: var(--font-weight-semibold);
+}
+.status-badge-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+}
+.status-badge.success { background: var(--color-success-background); color: var(--color-success); }
+.status-badge.success .status-badge-dot { background: var(--color-success); }
+.status-badge.error { background: var(--color-error-background); color: var(--color-error); }
+.status-badge.error .status-badge-dot { background: var(--color-error); }
+.status-badge.warning { background: var(--color-warning-background); color: var(--color-warning); }
+.status-badge.warning .status-badge-dot { background: var(--color-warning); }
+
+.tabs { display: flex; border-bottom: 1px solid var(--color-neutral-stroke-2); }
+.tab-item {
+  padding: var(--spacing-s) var(--spacing-l);
+  border: none;
+  background: none;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  color: var(--color-neutral-foreground-3);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tab-item.active { color: var(--color-brand-primary); border-bottom-color: var(--color-brand-primary); }
+.tab-content { padding: var(--spacing-m) 0; }
+
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--color-neutral-stroke-2);
+  border-top-color: var(--color-brand-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Header -->
+  <header class="app-header">
+    <span class="app-header-icon" aria-hidden="true">✦</span>
+    <span class="app-header-title">Kickstart</span>
+  </header>
+
+  <!-- Phase bar -->
+  <nav class="phase-bar" id="phase-bar" aria-label="Conversation progress"></nav>
+
+  <!-- Messages -->
+  <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Chat messages"></div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <textarea id="input" placeholder="Describe your app…" rows="1" aria-label="Message input"></textarea>
+    <button class="send-btn" id="send-btn" aria-label="Send message" title="Send">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M1.5 1.3l13 6.7-13 6.7 1.2-5.7H8v-2H2.7z"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   Kickstart MCP App — IDE Surface
+   Self-contained: A2UI renderer, chat logic, postMessage protocol
+   ========================================================================== */
+
+(function () {
+  "use strict";
+
+  // ── State ──────────────────────────────────────────────────────────
+  let sessionId = null;
+  let isWaiting = false;
+
+  const messagesEl = document.getElementById("messages");
+  const inputEl = document.getElementById("input");
+  const sendBtn = document.getElementById("send-btn");
+  const phaseBarEl = document.getElementById("phase-bar");
+
+  // ── PostMessage protocol ───────────────────────────────────────────
+
+  /**
+   * Send a message to the MCP server via postMessage to parent.
+   * MCP App iframe spec: messages go to window.parent.
+   */
+  function sendToServer(msg) {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage(msg, "*");
+    }
+  }
+
+  /**
+   * Handle incoming messages from the MCP server.
+   */
+  window.addEventListener("message", function (event) {
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.type) return;
+
+    switch (data.type) {
+      case "response":
+        handleServerResponse(data);
+        break;
+      case "error":
+        handleServerError(data);
+        break;
+    }
+  });
+
+  function handleServerResponse(data) {
+    setWaiting(false);
+
+    if (data.sessionId) {
+      sessionId = data.sessionId;
+    }
+
+    // Update phase indicator if provided
+    if (data.phase) {
+      updatePhaseFromName(data.phase);
+    }
+
+    // Render A2UI component tree if present
+    if (data.a2ui) {
+      const el = renderA2UI(data.a2ui);
+      addAssistantBubble(el);
+    }
+
+    // Render plain text if present (and no A2UI)
+    if (data.text && !data.a2ui) {
+      addMessage("assistant", data.text);
+    }
+  }
+
+  function handleServerError(data) {
+    setWaiting(false);
+    addMessage("error", data.message || "An error occurred.");
+  }
+
+  // ── Chat UI ────────────────────────────────────────────────────────
+
+  function addMessage(role, text) {
+    const bubble = document.createElement("div");
+    bubble.className = "chat-bubble " + role;
+    bubble.setAttribute("role", "article");
+    bubble.textContent = text;
+    messagesEl.appendChild(bubble);
+    scrollToBottom();
+  }
+
+  function addAssistantBubble(contentEl) {
+    const bubble = document.createElement("div");
+    bubble.className = "chat-bubble assistant";
+    bubble.setAttribute("role", "article");
+    bubble.appendChild(contentEl);
+    messagesEl.appendChild(bubble);
+    scrollToBottom();
+  }
+
+  function setWaiting(val) {
+    isWaiting = val;
+    sendBtn.disabled = val;
+    const existing = messagesEl.querySelector(".typing-indicator");
+    if (val && !existing) {
+      const indicator = document.createElement("div");
+      indicator.className = "typing-indicator";
+      indicator.setAttribute("aria-label", "Kickstart is thinking");
+      indicator.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+      messagesEl.appendChild(indicator);
+      scrollToBottom();
+    } else if (!val && existing) {
+      existing.remove();
+    }
+  }
+
+  function scrollToBottom() {
+    requestAnimationFrame(function () {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
+  }
+
+  // ── Input handling ─────────────────────────────────────────────────
+
+  function send() {
+    var text = inputEl.value.trim();
+    if (!text || isWaiting) return;
+
+    addMessage("user", text);
+    inputEl.value = "";
+    inputEl.style.height = "auto";
+    setWaiting(true);
+
+    if (!sessionId) {
+      sendToServer({ type: "kickstart" });
+    } else {
+      sendToServer({ type: "converse", sessionId: sessionId, message: text });
+    }
+  }
+
+  inputEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  });
+
+  inputEl.addEventListener("input", function () {
+    inputEl.style.height = "auto";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+  });
+
+  sendBtn.addEventListener("click", send);
+
+  // ── Phase bar ──────────────────────────────────────────────────────
+
+  var PHASES = [
+    { id: "Discover", label: "Discover" },
+    { id: "Design",   label: "Design" },
+    { id: "Generate", label: "Generate" },
+    { id: "Review",   label: "Review" },
+    { id: "Handoff",  label: "Handoff" },
+    { id: "Deploy",   label: "Deploy" },
+  ];
+
+  var currentPhaseIndex = 0;
+
+  function renderPhaseBar() {
+    var html = "";
+    for (var i = 0; i < PHASES.length; i++) {
+      var status = i < currentPhaseIndex ? "completed" : i === currentPhaseIndex ? "active" : "";
+      var connector = i < PHASES.length - 1
+        ? '<span class="phase-connector ' + (i < currentPhaseIndex ? "completed" : "") + '"></span>'
+        : "";
+      html += '<span class="phase-step">' +
+        '<span class="phase-dot ' + status + '"></span>' +
+        '<span>' + PHASES[i].label + '</span>' +
+        '</span>' + connector;
+    }
+    phaseBarEl.innerHTML = html;
+  }
+
+  function updatePhaseFromName(phaseName) {
+    for (var i = 0; i < PHASES.length; i++) {
+      if (PHASES[i].id === phaseName) {
+        currentPhaseIndex = i;
+        renderPhaseBar();
+        return;
+      }
+    }
+  }
+
+  // ── A2UI Renderer ──────────────────────────────────────────────────
+  // Adapted from packages/web/js/framework/a2ui-renderer.js
+  // Renders A2UI component descriptors into DOM elements.
+
+  function escapeHtml(str) {
+    var div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+  }
+
+  var RENDERERS = {
+    Text: renderText,
+    Button: renderButton,
+    TextField: renderTextField,
+    Row: renderRow,
+    Column: renderColumn,
+    Card: renderCardA2UI,
+    Tabs: renderTabs,
+    ConversationPhase: renderConversationPhase,
+    CodeBlock: renderCodeBlockA2UI,
+    ResourcePicker: renderResourcePicker,
+    DeploymentProgress: renderDeploymentProgress,
+    ArchitectureDiagram: renderArchitectureDiagram,
+    CostEstimate: renderCostEstimate,
+    HandoffCard: renderHandoffCard,
+    RepoPicker: renderRepoPicker,
+    WorkflowStatus: renderWorkflowStatus,
+    CodespaceLink: renderCodespaceLink,
+    AppOverview: renderAppOverview,
+  };
+
+  function renderA2UI(schema, ctx) {
+    ctx = ctx || {};
+    if (Array.isArray(schema)) {
+      var wrapper = document.createElement("div");
+      for (var i = 0; i < schema.length; i++) {
+        wrapper.appendChild(renderA2UI(schema[i], ctx));
+      }
+      return wrapper;
+    }
+    var renderer = RENDERERS[schema && schema.type];
+    if (!renderer) return createFallback(schema);
+    return renderer(schema, ctx);
+  }
+
+  // ── Standard components ────────────────────────────────────────────
+
+  function renderText(schema) {
+    var el = document.createElement(schema.variant === "heading" ? "h3" : "p");
+    el.textContent = schema.text || schema.content || "";
+    if (schema.style) Object.assign(el.style, schema.style);
+    if (schema.className) el.className = schema.className;
+    return el;
+  }
+
+  function renderButton(schema, ctx) {
+    var btn = document.createElement("button");
+    btn.className = "btn" + (schema.primary ? " primary" : "") + (schema.className ? " " + schema.className : "");
+    btn.textContent = schema.label || "Button";
+    if (schema.disabled) btn.disabled = true;
+    if (schema.action) {
+      btn.addEventListener("click", function () {
+        sendToServer({ type: "action", sessionId: sessionId, actionType: schema.action, payload: schema.data || {} });
+      });
+    }
+    return btn;
+  }
+
+  function renderTextField(schema, ctx) {
+    var group = document.createElement("div");
+    group.className = "form-group";
+    if (schema.label) {
+      var label = document.createElement("label");
+      label.className = "form-label";
+      label.textContent = schema.label;
+      if (schema.required) {
+        var star = document.createElement("span");
+        star.className = "required";
+        star.textContent = " *";
+        label.appendChild(star);
+      }
+      group.appendChild(label);
+    }
+    var input = document.createElement(schema.multiline ? "textarea" : "input");
+    input.className = "form-input";
+    input.placeholder = schema.placeholder || "";
+    input.value = schema.value || "";
+    if (schema.name) input.name = schema.name;
+    if (schema.required) input.required = true;
+    if (schema.multiline) input.rows = schema.rows || 3;
+    group.appendChild(input);
+    if (schema.hint) {
+      var hint = document.createElement("span");
+      hint.className = "form-hint";
+      hint.textContent = schema.hint;
+      group.appendChild(hint);
+    }
+    return group;
+  }
+
+  function renderRow(schema, ctx) {
+    var row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.gap = schema.gap || "var(--spacing-l)";
+    row.style.alignItems = schema.align || "flex-start";
+    if (schema.wrap) row.style.flexWrap = "wrap";
+    var children = schema.children || [];
+    for (var i = 0; i < children.length; i++) row.appendChild(renderA2UI(children[i], ctx));
+    return row;
+  }
+
+  function renderColumn(schema, ctx) {
+    var col = document.createElement("div");
+    col.style.display = "flex";
+    col.style.flexDirection = "column";
+    col.style.gap = schema.gap || "var(--spacing-m)";
+    col.style.flex = schema.flex || "1";
+    var children = schema.children || [];
+    for (var i = 0; i < children.length; i++) col.appendChild(renderA2UI(children[i], ctx));
+    return col;
+  }
+
+  function renderCardA2UI(schema, ctx) {
+    var card = document.createElement("article");
+    card.className = "card" + (schema.className ? " " + schema.className : "");
+    var html = "";
+    if (schema.title || schema.subtitle) {
+      html += '<div class="card-header"><div>';
+      if (schema.title) html += '<h3 class="card-title">' + escapeHtml(schema.title) + '</h3>';
+      if (schema.subtitle) html += '<p class="card-subtitle">' + escapeHtml(schema.subtitle) + '</p>';
+      html += '</div></div>';
+    }
+    html += '<div class="card-body"></div>';
+    card.innerHTML = html;
+    var body = card.querySelector(".card-body");
+    var children = schema.children || [];
+    for (var i = 0; i < children.length; i++) body.appendChild(renderA2UI(children[i], ctx));
+    return card;
+  }
+
+  function renderTabs(schema, ctx) {
+    var wrapper = document.createElement("div");
+    var tabBar = document.createElement("div");
+    tabBar.className = "tabs";
+    tabBar.setAttribute("role", "tablist");
+    var contentArea = document.createElement("div");
+    contentArea.className = "tab-content";
+    var tabs = schema.tabs || [];
+    var activeIndex = schema.activeTab || 0;
+
+    function showTab(index) {
+      tabBar.innerHTML = "";
+      contentArea.innerHTML = "";
+      for (var i = 0; i < tabs.length; i++) {
+        var btn = document.createElement("button");
+        btn.className = "tab-item" + (i === index ? " active" : "");
+        btn.setAttribute("role", "tab");
+        btn.setAttribute("aria-selected", String(i === index));
+        btn.textContent = tabs[i].label;
+        (function(idx) { btn.addEventListener("click", function() { showTab(idx); }); })(i);
+        tabBar.appendChild(btn);
+      }
+      var active = tabs[index];
+      if (active && active.children) {
+        for (var j = 0; j < active.children.length; j++) {
+          contentArea.appendChild(renderA2UI(active.children[j], ctx));
+        }
+      }
+    }
+    showTab(activeIndex);
+    wrapper.appendChild(tabBar);
+    wrapper.appendChild(contentArea);
+    return wrapper;
+  }
+
+  // ── Custom Kickstart components ────────────────────────────────────
+
+  function renderConversationPhase(schema) {
+    var el = document.createElement("div");
+    el.className = "phase-bar";
+    el.style.background = "none";
+    el.style.border = "none";
+    el.style.padding = "var(--spacing-xs) 0";
+    el.setAttribute("aria-label", "Conversation phase");
+    var phases = schema.phases || [];
+    var current = typeof schema.currentPhase === "number" ? schema.currentPhase : 0;
+    // If currentPhase is a string, resolve index
+    if (typeof schema.currentPhase === "string") {
+      for (var k = 0; k < phases.length; k++) {
+        var p = phases[k];
+        var pid = typeof p === "string" ? p : p.id;
+        if (pid === schema.currentPhase) { current = k; break; }
+      }
+    }
+    var html = "";
+    for (var i = 0; i < phases.length; i++) {
+      var phase = phases[i];
+      var label = typeof phase === "string" ? phase : phase.label || phase.id;
+      var st = i < current ? "completed" : i === current ? "active" : "";
+      var conn = i < phases.length - 1
+        ? '<span class="phase-connector ' + (i < current ? "completed" : "") + '"></span>'
+        : "";
+      html += '<span class="phase-step"><span class="phase-dot ' + st + '"></span><span>' + escapeHtml(label) + '</span></span>' + conn;
+    }
+    el.innerHTML = html;
+    // Also update top-level phase bar
+    if (typeof schema.currentPhase === "string") updatePhaseFromName(schema.currentPhase);
+    return el;
+  }
+
+  function renderCodeBlockA2UI(schema) {
+    var block = document.createElement("div");
+    block.className = "code-block";
+    var code = schema.code || "";
+    var lang = schema.language || "";
+    block.innerHTML =
+      '<div class="code-block-header"><span>' + escapeHtml(lang) + '</span>' +
+      '<button class="code-block-copy" aria-label="Copy code">Copy</button></div>' +
+      '<pre><code>' + escapeHtml(code) + '</code></pre>';
+    block.querySelector(".code-block-copy").addEventListener("click", function () {
+      try {
+        navigator.clipboard.writeText(code);
+        var btn = block.querySelector(".code-block-copy");
+        btn.textContent = "✓ Copied";
+        setTimeout(function () { btn.textContent = "Copy"; }, 2000);
+      } catch (e) { /* clipboard may not be available in sandbox */ }
+    });
+    return block;
+  }
+
+  function renderResourcePicker(schema, ctx) {
+    var group = document.createElement("div");
+    group.className = "form-group";
+    var label = document.createElement("label");
+    label.className = "form-label";
+    label.textContent = schema.label || "Select resource";
+    group.appendChild(label);
+    var select = document.createElement("select");
+    select.className = "form-input";
+    select.name = schema.name || "resource";
+    var ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = schema.placeholder || "-- Select --";
+    ph.disabled = true;
+    ph.selected = true;
+    select.appendChild(ph);
+    var options = schema.options || [];
+    for (var i = 0; i < options.length; i++) {
+      var opt = document.createElement("option");
+      opt.value = options[i].value || options[i].id;
+      opt.textContent = options[i].label || options[i].name;
+      select.appendChild(opt);
+    }
+    select.addEventListener("change", function () {
+      sendToServer({ type: "action", sessionId: sessionId, actionType: "select", payload: { resource: select.value } });
+    });
+    group.appendChild(select);
+    if (schema.hint) {
+      var hint = document.createElement("span");
+      hint.className = "form-hint";
+      hint.textContent = schema.hint;
+      group.appendChild(hint);
+    }
+    return group;
+  }
+
+  function statusIcon(status) {
+    switch (status) {
+      case "completed": return '<span style="color:var(--color-success)">✓</span>';
+      case "running":   return '<span class="spinner" style="width:14px;height:14px;border-width:2px"></span>';
+      case "error":     return '<span style="color:var(--color-error)">✕</span>';
+      default:          return '<span style="color:var(--color-neutral-foreground-disabled)">○</span>';
+    }
+  }
+
+  function renderDeploymentProgress(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    var steps = schema.steps || [];
+    var header = '<div class="card-header"><h3 class="card-title">' + escapeHtml(schema.title || "Deployment Progress") + '</h3></div>';
+    var body = '<div class="card-body"><div style="display:flex;flex-direction:column;gap:var(--spacing-s)">';
+    for (var i = 0; i < steps.length; i++) {
+      body += '<div style="display:flex;align-items:center;gap:var(--spacing-s)">' +
+        '<span style="width:20px;text-align:center">' + statusIcon(steps[i].status) + '</span>' +
+        '<span style="flex:1">' + escapeHtml(steps[i].label) + '</span>' +
+        '<span style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3)">' + (steps[i].duration || "") + '</span>' +
+        '</div>';
+    }
+    body += '</div></div>';
+    card.innerHTML = header + body;
+    return card;
+  }
+
+  function renderArchitectureDiagram(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    var comps = schema.components || [];
+    var items = "";
+    for (var i = 0; i < comps.length; i++) {
+      items += '<div class="card" style="min-width:100px;text-align:center;padding:var(--spacing-m)">' +
+        '<div style="font-size:24px;margin-bottom:var(--spacing-xs)">' + (comps[i].icon || "📦") + '</div>' +
+        '<div style="font-weight:var(--font-weight-semibold)">' + escapeHtml(comps[i].name) + '</div>' +
+        '<div style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3)">' + escapeHtml(comps[i].description || "") + '</div>' +
+        '</div>';
+    }
+    card.innerHTML = '<div class="card-header"><h3 class="card-title">' + escapeHtml(schema.title || "Architecture") + '</h3></div>' +
+      '<div class="card-body" style="text-align:center;padding:var(--spacing-l)">' +
+      '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:var(--spacing-m)">' + items + '</div></div>';
+    return card;
+  }
+
+  function renderCostEstimate(schema) {
+    var items = schema.items || [];
+    var total = schema.total != null ? schema.total : items.reduce(function (s, it) { return s + (it.cost || 0); }, 0);
+    var rows = "";
+    for (var i = 0; i < items.length; i++) {
+      rows += '<tr style="border-bottom:1px solid var(--color-neutral-stroke-2)">' +
+        '<td style="padding:var(--spacing-s)">' + escapeHtml(items[i].name) + '</td>' +
+        '<td style="padding:var(--spacing-s);color:var(--color-neutral-foreground-3)">' + escapeHtml(items[i].sku || "") + '</td>' +
+        '<td style="text-align:right;padding:var(--spacing-s)">$' + (items[i].cost || 0).toFixed(2) + '</td></tr>';
+    }
+    var card = document.createElement("article");
+    card.className = "card";
+    card.innerHTML = '<div class="card-header"><h3 class="card-title">' + escapeHtml(schema.title || "Estimated Monthly Cost") + '</h3></div>' +
+      '<div class="card-body"><table style="width:100%;border-collapse:collapse">' +
+      '<thead><tr style="border-bottom:1px solid var(--color-neutral-stroke-2)"><th style="text-align:left;padding:var(--spacing-s)">Resource</th><th style="text-align:left;padding:var(--spacing-s)">SKU</th><th style="text-align:right;padding:var(--spacing-s)">$/mo</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody>' +
+      '<tfoot><tr><td colspan="2" style="padding:var(--spacing-s);font-weight:var(--font-weight-semibold)">Total</td>' +
+      '<td style="text-align:right;padding:var(--spacing-s);font-weight:var(--font-weight-semibold)">$' + total.toFixed(2) + '</td></tr></tfoot></table></div>';
+    return card;
+  }
+
+  function renderHandoffCard(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    var actions = schema.actions || [];
+    var btns = "";
+    for (var i = 0; i < actions.length; i++) {
+      btns += '<button class="btn' + (actions[i].primary ? " primary" : "") + '" data-action="' + (actions[i].id || "") + '">' + escapeHtml(actions[i].label) + '</button>';
+    }
+    card.innerHTML = '<div class="card-header"><h3 class="card-title">' + escapeHtml(schema.title || "Next Steps") + '</h3></div>' +
+      '<div class="card-body"><p style="margin-bottom:var(--spacing-l)">' + escapeHtml(schema.description || "") + '</p>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:var(--spacing-s)">' + btns + '</div></div>';
+    for (var j = 0; j < actions.length; j++) {
+      if (actions[j].id) {
+        (function (action) {
+          var el = card.querySelector('[data-action="' + action.id + '"]');
+          if (el) el.addEventListener("click", function () {
+            sendToServer({ type: "action", sessionId: sessionId, actionType: action.id, payload: action.data || {} });
+          });
+        })(actions[j]);
+      }
+    }
+    return card;
+  }
+
+  // ── GitHub components ──────────────────────────────────────────────
+
+  function renderRepoPicker(schema, ctx) {
+    var group = document.createElement("div");
+    group.className = "form-group";
+    var label = document.createElement("label");
+    label.className = "form-label";
+    label.textContent = schema.label || "Repository";
+    group.appendChild(label);
+    var input = document.createElement("input");
+    input.className = "form-input";
+    input.placeholder = schema.placeholder || "Search repositories…";
+    input.value = schema.value || "";
+    input.setAttribute("autocomplete", "off");
+    group.appendChild(input);
+    // Simplified for IDE panel — no dropdown, just send selection via action
+    input.addEventListener("change", function () {
+      sendToServer({ type: "action", sessionId: sessionId, actionType: "select", payload: { repo: input.value } });
+    });
+    if (schema.hint) {
+      var hint = document.createElement("span");
+      hint.className = "form-hint";
+      hint.textContent = schema.hint;
+      group.appendChild(hint);
+    }
+    return group;
+  }
+
+  function renderWorkflowStatus(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    var runs = schema.runs || [];
+    var statusColor = function (s) {
+      switch (s) {
+        case "success":     return "var(--color-success)";
+        case "in_progress": return "var(--color-warning)";
+        case "failure":     return "var(--color-error)";
+        default:            return "var(--color-neutral-foreground-disabled)";
+      }
+    };
+    var items = "";
+    for (var i = 0; i < runs.length; i++) {
+      var r = runs[i];
+      items += '<div style="display:flex;align-items:center;gap:var(--spacing-s);padding:var(--spacing-s);border-radius:var(--radius-medium);border:1px solid var(--color-neutral-stroke-2)">' +
+        '<span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:' + statusColor(r.status) + '"></span>' +
+        '<span style="flex:1;font-weight:var(--font-weight-semibold)">' + escapeHtml(r.name) + '</span>' +
+        '<span style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3)">' + escapeHtml(r.branch || "") + '</span>' +
+        '<span style="font-size:var(--font-size-200);text-transform:capitalize;color:' + statusColor(r.status) + '">' + escapeHtml((r.status || "").replace(/_/g, " ")) + '</span></div>';
+    }
+    card.innerHTML = '<div class="card-header"><h3 class="card-title">' + escapeHtml(schema.title || "Workflow Runs") + '</h3></div>' +
+      '<div class="card-body"><div style="display:flex;flex-direction:column;gap:var(--spacing-s)">' + items + '</div></div>';
+    return card;
+  }
+
+  function renderCodespaceLink(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    card.style.cssText = "border:2px solid var(--color-brand-stroke-1);background:var(--color-brand-background-2)";
+    card.innerHTML = '<div class="card-body" style="text-align:center;padding:var(--spacing-xl)">' +
+      '<div style="font-size:32px;margin-bottom:var(--spacing-m)" aria-hidden="true">🚀</div>' +
+      '<h3 style="margin-bottom:var(--spacing-xs);font-size:var(--font-size-500)">' + escapeHtml(schema.repoFullName || "repository") + '</h3>' +
+      '<p style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3);margin-bottom:var(--spacing-l)">Branch: <strong>' + escapeHtml(schema.branch || "main") + '</strong></p>' +
+      '<div style="display:flex;gap:var(--spacing-m);justify-content:center;flex-wrap:wrap">' +
+      '<a href="' + (schema.codespaceUrl || "#") + '" target="_blank" rel="noopener" class="btn primary" style="text-decoration:none">⬡ Open in Codespaces</a>' +
+      '<a href="' + (schema.vscodeUrl || "#") + '" target="_blank" rel="noopener" class="btn" style="text-decoration:none">⌨ Open in vscode.dev</a>' +
+      '</div></div>';
+    return card;
+  }
+
+  function renderAppOverview(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    var statusColors = {
+      draft: "var(--color-neutral-foreground-3)",
+      running: "var(--color-success)",
+      stopped: "var(--color-error)",
+      deploying: "var(--color-warning)"
+    };
+    var color = statusColors[schema.status] || statusColors.draft;
+    var services = schema.services || [];
+    var tags = "";
+    if (schema.runtime) {
+      tags += '<span style="display:inline-block;padding:2px var(--spacing-s);border-radius:var(--radius-small);background:var(--color-brand-background-2);color:var(--color-brand-foreground-1);font-size:var(--font-size-200);font-weight:var(--font-weight-semibold)">' + escapeHtml(schema.runtime) + '</span>';
+    }
+    for (var i = 0; i < services.length; i++) {
+      tags += '<span style="display:inline-block;padding:2px var(--spacing-s);border-radius:var(--radius-small);background:var(--color-neutral-background-3);font-size:var(--font-size-200)">' + escapeHtml(services[i]) + '</span>';
+    }
+    card.innerHTML = '<div class="card-header" style="display:flex;align-items:center;justify-content:space-between"><div>' +
+      '<h3 class="card-title" style="display:flex;align-items:center;gap:var(--spacing-s)"><span aria-hidden="true">📦</span>' + escapeHtml(schema.appName || "App") + '</h3>' +
+      (schema.description ? '<p class="card-subtitle" style="margin-top:var(--spacing-xxs)">' + escapeHtml(schema.description) + '</p>' : '') +
+      '</div><span style="display:inline-flex;align-items:center;gap:var(--spacing-xs);font-size:var(--font-size-200)">' +
+      '<span style="width:8px;height:8px;border-radius:50%;background:' + color + '"></span>' + escapeHtml(schema.status || "draft") + '</span></div>' +
+      '<div class="card-body"><div style="display:flex;flex-wrap:wrap;gap:var(--spacing-s);align-items:center">' + tags + '</div>' +
+      (schema.url ? '<div style="margin-top:var(--spacing-m)"><a href="' + schema.url + '" target="_blank" rel="noopener" style="font-size:var(--font-size-200);color:var(--color-brand-foreground-1)">🔗 ' + escapeHtml(schema.url) + '</a></div>' : '') +
+      '</div>';
+    return card;
+  }
+
+  function createFallback(schema) {
+    var el = document.createElement("div");
+    el.style.padding = "var(--spacing-s)";
+    el.style.border = "1px dashed var(--color-warning)";
+    el.style.borderRadius = "var(--radius-medium)";
+    el.style.fontSize = "var(--font-size-200)";
+    el.style.color = "var(--color-neutral-foreground-3)";
+    el.textContent = "Unknown component: " + (schema && schema.type || "null");
+    return el;
+  }
+
+  // ── Boot ────────────────────────────────────────────────────────────
+
+  renderPhaseBar();
+
+  // Auto-kickstart on load
+  setWaiting(true);
+  sendToServer({ type: "kickstart" });
+
+})();
+</script>
+</body>
+</html>

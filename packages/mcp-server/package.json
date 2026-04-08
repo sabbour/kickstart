@@ -9,7 +9,7 @@
     "kickstart-mcp": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs=require('fs'),p=require('path');const d=p.join('dist','app');fs.mkdirSync(d,{recursive:true});fs.copyFileSync(p.join('src','app','kickstart-app.html'),p.join(d,'kickstart-app.html'))\"",
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm src/index.ts",
     "test": "vitest run",

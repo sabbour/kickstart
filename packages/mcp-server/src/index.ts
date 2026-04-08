@@ -5,8 +5,12 @@
  *
  * MCP server entry point for AKS Kickstart.
  * Exposes tools for guided AKS onboarding via the Model Context Protocol.
+ * Serves the MCP App HTML surface for IDE-native UX.
  */
 
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -25,6 +29,7 @@ import { handleCheckStatus } from "./tools/check-status.js";
 import { handleAction } from "./tools/action.js";
 import { resolveA2UICapability, KICKSTART_CATALOG_ID } from "./a2ui.js";
 import type { A2UICapability } from "./a2ui.js";
+import { parseAppMessage, handleAppMessage } from "./app/protocol.js";
 
 // ── In-memory session store (Phase 1 — no persistence) ─────────────
 
@@ -52,6 +57,23 @@ cleanupInterval.unref(); // Don't keep process alive for cleanup
 // ── Client A2UI capability (resolved during initialize) ─────────────
 
 let clientCapability: A2UICapability = "kickstart";
+
+// ── Load MCP App HTML ───────────────────────────────────────────────
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+/** The MCP App HTML content, loaded once at startup. */
+let appHtml: string;
+try {
+  appHtml = readFileSync(resolve(__dirname, "app", "kickstart-app.html"), "utf-8");
+} catch {
+  appHtml = "<html><body><p>Kickstart App failed to load.</p></body></html>";
+  process.stderr.write("Warning: kickstart-app.html not found in dist/app/\n");
+}
+
+/** Resource URI for the MCP App HTML. */
+const APP_RESOURCE_URI = "kickstart://app/main" as const;
 
 // ── MCP Server Setup ────────────────────────────────────────────────
 
@@ -117,6 +139,47 @@ server.tool(
   },
   async (params) =>
     handleAction(sessions, params.sessionId, params.actionType, params.payload),
+);
+
+// ── Tool: app-message ──────────────────────────────────────────────
+// Relay for postMessage protocol — routes messages from the MCP App iframe
+// through the appropriate tool handler.
+
+server.tool(
+  "app-message",
+  "Relay a message from the MCP App HTML surface. Routes kickstart/converse/action messages through the appropriate handler.",
+  {
+    message: z.record(z.string(), z.unknown()).describe("App-to-server message object with a 'type' field"),
+  },
+  async (params) => {
+    const parsed = parseAppMessage(params.message);
+    if (!parsed) {
+      return {
+        content: [{ type: "text" as const, text: "Invalid app message format." }],
+      };
+    }
+    const response = await handleAppMessage(parsed, sessions, clientCapability);
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify(response) }],
+    };
+  },
+);
+
+// ── Resource: MCP App HTML ─────────────────────────────────────────
+
+server.resource(
+  "kickstart-app",
+  APP_RESOURCE_URI,
+  { mimeType: "text/html", description: "Kickstart MCP App — IDE-native conversation UI" },
+  async () => ({
+    contents: [
+      {
+        uri: APP_RESOURCE_URI,
+        mimeType: "text/html" as const,
+        text: appHtml,
+      },
+    ],
+  }),
 );
 
 // ── Start Server ────────────────────────────────────────────────────
