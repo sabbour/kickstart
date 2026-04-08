@@ -87,7 +87,7 @@ export function isConfigured(): boolean {
 // Chat Completions API (conversation model)
 // ---------------------------------------------------------------------------
 
-const CHAT_API_VERSION = "2024-08-01-preview";
+const CHAT_API_VERSION = "2024-12-01-preview";
 
 /**
  * Call Azure OpenAI Chat Completions (non-streaming).
