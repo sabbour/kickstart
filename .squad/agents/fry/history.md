@@ -136,6 +136,16 @@
 - **Auth flow**: `initAuth()` now `await`s `updateAuthUI()` since it's async (fetches photo). No breaking change — `Auth.login().then(updateAuthUI)` still works because `.then()` handles async returns.
 - **Files changed**: `packages/web/js/app.js`, `packages/web/css/core.css`, `packages/web/staticwebapp.config.json`.
 
+### 2025-07-28 — Landing page simplification + Fluent 2 adoption
+- **Removed sections**: Inspiration carousel (HTML + CSS + JS + API fetch), framework pills (9 buttons), IDE launch links (VS Code/Insiders). ~470 lines deleted across 3 files.
+- **Fluent 2 search input**: Replaced custom `<input class="landing-hero-input">` with `<fluent-search id="hero-input" appearance="outline">` web component from CDN-loaded `@fluentui/web-components`. Custom `.landing-hero-input` CSS removed entirely — Fluent handles styling. Sized via `--input-height: 44px` CSS custom property on the wrapper.
+- **Fluent 2 typography**: Hero title upgraded from `font-size-800` (32px bold) to `font-size-900` (40px semibold, line-height 52px, letter-spacing -0.02em) — matches Fluent 2 Hero type ramp. Track card title/desc use explicit Fluent 2 `line-height` tokens.
+- **JS cleanup**: Removed `INSPIRATION_IDEAS` array, all carousel functions (`initCarousel`, `goToSlide`, `nextSlide`, `resetCarouselTimer`, `stopCarousel`, `fetchInspirations`, `updateCarouselIdeas`), framework pill handlers. `pendingQuickPrompt` moved to landing state section. `transitionToChat()` no longer calls `stopCarousel()`.
+- **Hero input binding**: `<fluent-search>` fires standard `keydown` events on the host element. Value accessed via `.value` property (same as native input). No binding changes needed.
+- **Landing page flow**: Now hero (title + Fluent search + suggestion pills) → track cards. Two focused entry points, zero visual clutter.
+- **User preference**: Ahmed wants clean, focused landing pages. "Too much going on" = remove secondary CTAs. Primary action (search) + secondary navigation (track cards) only.
+- **Files changed**: `packages/web/index.html`, `packages/web/css/landing.css`, `packages/web/js/app.js`.
+
 ### 2025-07-24 — Spark UX P0 (4 items in 1 commit)
 - **Context**: Implemented all 4 "Spark UX P0" items to make Kickstart feel like GitHub Spark.
 - **P0-1 Hero Input**: Added `landing-hero` section with centered text input + 4 suggestion pills above carousel. Reuses `pendingQuickPrompt` → `transitionToChat()` flow. CSS uses theme tokens; responsive breakpoints added.
