@@ -154,3 +154,14 @@
 - **P0-4 Preview Panel**: Transformed `#file-viewer` into contextual preview panel. Dynamic titles via `PREVIEW_TITLES` map keyed by phase name. `showPreviewContent()` renders ArchitectureDiagram to panel body. Panel header + close button added; file-viewer inner header hidden via CSS.
 - **Pattern**: Two engine creation paths (API vs demo) in `initEngine()` — both need identical `onPhaseChange`/`onResponse` wiring.
 - **Files changed**: `index.html`, `landing.css`, `components.css`, `app.js`, `engine.js`, `components.js`, `a2ui-renderer.js` (all in `packages/web/`).
+
+- **Carousel Restore (subtle strip)**: Re-added inspiration carousel between suggestion pills and track cards. Key design decisions: crossfade-only (opacity transitions, no translateX sliding), 70px viewport vs old 100px, 6px dots vs 8px, font-size-500/300 vs 600/400. `goToSlide` simplified — just toggles `.active` class for crossfade. `stopCarousel()` wired into `transitionToChat()` to prevent leaked intervals. `fetchInspirations()` kept as fire-and-forget upgrade from hardcoded ideas. **Gotcha**: fluent-search `.value` works same as plain input — no special handling needed for carousel click → chat trigger.
+
+### 2025-07-28 — Landing page redesign: lightbulb input + framework pills
+- **Layout reorder**: Title → lightbulb text input → carousel → track cards → "or start with a framework" → framework pills. Removed old suggestion pills between input and carousel — carousel now serves that discovery purpose.
+- **Input swap**: Replaced `<fluent-search>` with plain `<input type="text">` inside a relative wrapper. Lightbulb SVG icon absolutely positioned at left (14px inset, 20×20). Input left-padded 42px to clear the icon. Outline border, 44px height, brand-primary focus ring.
+- **Title changed**: "What do you want to deploy?" → "What do you want.." (two dots, no question mark). More open-ended/ideation feel.
+- **Framework section**: New `.framework-section` with uppercase label ("or start with a framework", font-size-100, letter-spacing 0.08em, neutral-foreground-3) and 9 `.framework-pill` buttons. Pills use `font-weight-regular` (vs old suggestion-pill `semibold`) for lighter feel. Click handler sends "I want to build an app using {name}" as chat prompt.
+- **CSS classes**: Removed `.suggestion-pills`, `.suggestion-pill`. Added `.hero-input-icon`, `.landing-hero-input-wrap input`, `.framework-section`, `.framework-separator-label`, `.framework-pills`, `.framework-pill`.
+- **JS**: Updated `initLandingListeners()` — removed suggestion pill handler, added framework pill handler with template string prompt. Hero input keydown works identically (plain input `.value` same as fluent-search `.value`).
+- **Files changed**: `packages/web/index.html`, `packages/web/css/landing.css`, `packages/web/js/app.js`.
