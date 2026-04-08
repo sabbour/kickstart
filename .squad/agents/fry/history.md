@@ -126,3 +126,12 @@
 - **DEVELOPMENT.md**: Created at repo root — prerequisites, quick start, credential setup, script reference table.
 - **Port convention**: SWA CLI dev at 4280, Playwright E2E tests at 4281 (separate `serve` instance via `playwright.config.ts`). No conflict.
 - **No Playwright changes**: E2E tests have their own `webServer` config in `playwright.config.ts` — completely independent of SWA CLI.
+
+### 2025-07-28 — Fluent avatar + client-side /login
+- **Fluent Avatar**: Replaced `.topbar-avatar` initials span with `<fluent-avatar>` web component. Uses `name` attr for initials fallback, `src` attr for profile photo, `size="28"`, `color="colorful"`. The CDN-loaded `@fluentui/web-components` (line 13 of index.html) provides the element.
+- **Profile photo**: `fetchUserPhoto()` helper calls `GET https://graph.microsoft.com/v1.0/me/photo/$value` with the user's `User.Read` access token. Returns blob URL or null. Photo loads async — avatar shows initials immediately, photo replaces when ready.
+- **XSS safety**: User name is passed through `escapeHtml()` before injecting into avatar/name HTML attributes.
+- **CSS**: Kept `.topbar-avatar` as fallback; added `.topbar-user-name` with `max-width: 140px` + `text-overflow: ellipsis` for long display names.
+- **/login route fix**: Removed server-side `/login → /.auth/login/aad` redirect from `staticwebapp.config.json`. Now handled client-side in `boot()` — checks `window.location.pathname === '/login'`, triggers MSAL login if unauthenticated, then `replaceState` to `/`.
+- **Auth flow**: `initAuth()` now `await`s `updateAuthUI()` since it's async (fetches photo). No breaking change — `Auth.login().then(updateAuthUI)` still works because `.then()` handles async returns.
+- **Files changed**: `packages/web/js/app.js`, `packages/web/css/core.css`, `packages/web/staticwebapp.config.json`.
