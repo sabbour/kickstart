@@ -6,14 +6,20 @@
 import { Router, Navigation, Breadcrumbs, EventBus } from './framework/core.js';
 import { createCopilotPanel, createCommandBar, createWizard, createCard, createCodeBlock } from './framework/components.js';
 import { renderA2UI } from './framework/a2ui-renderer.js';
+import { createEngine } from './engine.js';
 import Auth from './auth.js';
+
+// ---------- Conversation Engine ----------
+let engine;
 
 // ---------- Copilot Panel ----------
 const copilot = createCopilotPanel({
   phases: [
-    { id: 'understand', label: 'Understand' },
-    { id: 'architect', label: 'Architect' },
-    { id: 'configure', label: 'Configure' },
+    { id: 'discover', label: 'Discover' },
+    { id: 'design', label: 'Design' },
+    { id: 'generate', label: 'Generate' },
+    { id: 'review', label: 'Review' },
+    { id: 'handoff', label: 'Handoff' },
     { id: 'deploy', label: 'Deploy' },
   ],
   onSend(text) {
@@ -24,19 +30,31 @@ const copilot = createCopilotPanel({
 // Mount Copilot panel
 document.getElementById('copilot-slot')?.appendChild(copilot.element);
 
-// Wire A2UI rendering into Copilot messages
+// Wire conversation engine
+function initEngine() {
+  engine = createEngine({
+    onPhaseChange(phaseIndex) {
+      copilot.setPhase(phaseIndex);
+    },
+    onResponse({ a2ui, text }) {
+      copilot.setTyping(false);
+      if (a2ui) {
+        const html = renderA2UIMessage(a2ui);
+        copilot.addMessage({ role: 'assistant', html });
+      } else if (text) {
+        copilot.addMessage({ role: 'assistant', text });
+      }
+    },
+  });
+}
+
 function handleUserMessage(text) {
   copilot.setTyping(true);
 
-  // Placeholder: simulate a response after a short delay.
-  // In production, this calls the Kickstart conversation API.
+  // Small delay to feel natural
   setTimeout(() => {
-    copilot.setTyping(false);
-    copilot.addMessage({
-      role: 'assistant',
-      text: "I'm Kickstart — your AI guide for deploying to AKS. This is a prototype; backend is not connected yet.",
-    });
-  }, 1200);
+    engine.handleMessage(text);
+  }, 800);
 }
 
 function renderA2UIMessage(a2uiJson) {
@@ -142,9 +160,9 @@ function renderOverview(container) {
   features.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--spacing-xl);max-width:900px;margin:0 auto;padding-bottom:var(--spacing-xxxl)';
 
   const cards = [
-    { title: 'Understand', body: 'Tell us about your app — language, framework, dependencies. Kickstart figures out the rest.' },
-    { title: 'Architect', body: 'Get a recommended Azure architecture with cost estimates and best-practice configurations.' },
-    { title: 'Configure', body: 'Review and customize every resource — Kickstart generates deployment manifests and IaC templates.' },
+    { title: 'Discover', body: 'Tell us about your app — language, framework, dependencies. Kickstart figures out the rest.' },
+    { title: 'Design', body: 'Get a recommended architecture with cost estimates and best-practice configurations.' },
+    { title: 'Generate', body: 'Kickstart produces deployment files, CI/CD workflows, and infrastructure templates.' },
     { title: 'Deploy', body: 'One-click deployment with a live progress view. GitHub Actions pipeline included.' },
   ];
 
@@ -285,12 +303,12 @@ Breadcrumbs.init({
 // ---------- Boot ----------
 async function boot() {
   await initAuth();
+  initEngine();
 
-  // Send welcome message
-  copilot.addMessage({
-    role: 'assistant',
-    text: "👋 Hi! I'm Kickstart — your AI guide for deploying to AKS. Tell me about your app and I'll help you get it running on Azure Kubernetes Service.",
-  });
+  // Send welcome message using A2UI from engine
+  const welcomeA2UI = engine.getWelcome();
+  const html = renderA2UIMessage(welcomeA2UI);
+  copilot.addMessage({ role: 'assistant', html });
 
   Router.init('#content-area');
 }

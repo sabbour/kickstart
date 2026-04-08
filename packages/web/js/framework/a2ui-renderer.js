@@ -52,6 +52,12 @@ const RENDERERS = {
   ArchitectureDiagram:renderArchitectureDiagram,
   CostEstimate:       renderCostEstimate,
   HandoffCard:        renderHandoffCard,
+
+  // GitHub & app-overview components
+  RepoPicker:         renderRepoPicker,
+  WorkflowStatus:     renderWorkflowStatus,
+  CodespaceLink:      renderCodespaceLink,
+  AppOverview:        renderAppOverview,
 };
 
 // --- Standard A2UI ---
@@ -385,6 +391,200 @@ function renderHandoffCard(schema, ctx) {
         ?.addEventListener('click', () => ctx.onAction(action.id, action.data));
     }
   });
+
+  return card;
+}
+
+// --- GitHub & App-overview components ---
+
+function renderRepoPicker(schema, ctx) {
+  const group = document.createElement('div');
+  group.className = 'form-group';
+
+  const label = document.createElement('label');
+  label.className = 'form-label';
+  label.textContent = schema.label ?? 'Repository';
+  group.appendChild(label);
+
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'relative';
+
+  const input = document.createElement('input');
+  input.className = 'form-input';
+  input.placeholder = schema.placeholder ?? 'Search repositories…';
+  input.setAttribute('autocomplete', 'off');
+  input.value = schema.value ?? '';
+
+  const dropdown = document.createElement('ul');
+  dropdown.style.cssText =
+    'list-style:none;margin:0;padding:0;position:absolute;left:0;right:0;top:100%;' +
+    'max-height:200px;overflow-y:auto;background:var(--color-neutral-background-1);' +
+    'border:1px solid var(--color-neutral-stroke-1);border-radius:var(--radius-medium);' +
+    'display:none;z-index:10;box-shadow:var(--shadow-4)';
+
+  const repos = schema.options ?? [];
+  function buildItems(filter) {
+    dropdown.innerHTML = '';
+    const lf = filter.toLowerCase();
+    const matched = repos.filter(r => (r.fullName ?? r.label ?? '').toLowerCase().includes(lf));
+    matched.forEach(repo => {
+      const li = document.createElement('li');
+      li.style.cssText = 'padding:var(--spacing-s) var(--spacing-m);cursor:pointer;display:flex;align-items:center;gap:var(--spacing-s)';
+      li.innerHTML = `<span aria-hidden="true">📂</span><span>${escapeHtml(repo.fullName ?? repo.label)}</span>`;
+      li.addEventListener('mousedown', () => {
+        input.value = repo.fullName ?? repo.label;
+        dropdown.style.display = 'none';
+        ctx.onDataChange?.(schema.name ?? 'repo', repo.value ?? repo.fullName);
+      });
+      li.addEventListener('mouseenter', () => { li.style.background = 'var(--color-neutral-background-1-hover)'; });
+      li.addEventListener('mouseleave', () => { li.style.background = ''; });
+      dropdown.appendChild(li);
+    });
+
+    // "or create new" option
+    const createLi = document.createElement('li');
+    createLi.style.cssText =
+      'padding:var(--spacing-s) var(--spacing-m);cursor:pointer;display:flex;align-items:center;gap:var(--spacing-s);' +
+      'border-top:1px solid var(--color-neutral-stroke-2);font-weight:var(--font-weight-semibold);color:var(--color-brand-foreground-1)';
+    createLi.innerHTML = '<span aria-hidden="true">＋</span><span>Create new repository…</span>';
+    createLi.addEventListener('mousedown', () => {
+      dropdown.style.display = 'none';
+      ctx.onAction?.('repo:create', { name: filter || 'new-repo' });
+    });
+    dropdown.appendChild(createLi);
+
+    dropdown.style.display = 'block';
+  }
+
+  input.addEventListener('focus', () => buildItems(input.value));
+  input.addEventListener('input', () => buildItems(input.value));
+  input.addEventListener('blur', () => { setTimeout(() => { dropdown.style.display = 'none'; }, 150); });
+
+  wrapper.appendChild(input);
+  wrapper.appendChild(dropdown);
+  group.appendChild(wrapper);
+
+  if (schema.hint) {
+    const hint = document.createElement('span');
+    hint.className = 'form-hint';
+    hint.textContent = schema.hint;
+    group.appendChild(hint);
+  }
+
+  return group;
+}
+
+function renderWorkflowStatus(schema) {
+  const card = document.createElement('article');
+  card.className = 'card';
+
+  const statusColor = (s) => {
+    switch (s) {
+      case 'success':     return 'var(--color-success, #0e7a0d)';
+      case 'in_progress': return 'var(--color-warning, #c4a000)';
+      case 'failure':     return 'var(--color-error, #d13438)';
+      case 'queued':
+      default:            return 'var(--color-neutral-foreground-disabled, #888)';
+    }
+  };
+  const statusLabel = (s) => s.replace(/_/g, ' ');
+
+  const runs = schema.runs ?? [];
+  card.innerHTML = `
+    <div class="card-header"><h3 class="card-title">${escapeHtml(schema.title ?? 'Workflow Runs')}</h3></div>
+    <div class="card-body">
+      <div style="display:flex;flex-direction:column;gap:var(--spacing-s)">
+        ${runs.map(run => `
+          <a href="${run.url ?? '#'}" target="_blank" rel="noopener"
+             style="display:flex;align-items:center;gap:var(--spacing-s);padding:var(--spacing-s);
+                    border-radius:var(--radius-medium);text-decoration:none;color:inherit;
+                    border:1px solid var(--color-neutral-stroke-2)">
+            <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;
+                         background:${statusColor(run.status)}"></span>
+            <span style="flex:1;font-weight:var(--font-weight-semibold)">${escapeHtml(run.name)}</span>
+            <span style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3)">
+              ${escapeHtml(run.branch ?? '')}${run.sha ? ` · ${escapeHtml(run.sha.slice(0, 7))}` : ''}
+            </span>
+            <span style="font-size:var(--font-size-200);text-transform:capitalize;color:${statusColor(run.status)}">
+              ${statusLabel(run.status)}
+            </span>
+          </a>
+        `).join('')}
+      </div>
+    </div>`;
+
+  return card;
+}
+
+function renderCodespaceLink(schema) {
+  const card = document.createElement('article');
+  card.className = 'card';
+  card.style.cssText = 'border:2px solid var(--color-brand-stroke-1, #0078d4);background:var(--color-brand-background-2, #deecf9)';
+
+  card.innerHTML = `
+    <div class="card-body" style="text-align:center;padding:var(--spacing-xl)">
+      <div style="font-size:32px;margin-bottom:var(--spacing-m)" aria-hidden="true">🚀</div>
+      <h3 style="margin-bottom:var(--spacing-xs);font-size:var(--font-size-500)">${escapeHtml(schema.repoFullName ?? 'repository')}</h3>
+      <p style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3);margin-bottom:var(--spacing-l)">
+        Branch: <strong>${escapeHtml(schema.branch ?? 'main')}</strong>
+      </p>
+      <div style="display:flex;gap:var(--spacing-m);justify-content:center;flex-wrap:wrap">
+        <a href="${schema.codespaceUrl ?? '#'}" target="_blank" rel="noopener"
+           class="btn primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:var(--spacing-xs)">
+          <span aria-hidden="true">⬡</span> Open in Codespaces
+        </a>
+        <a href="${schema.vscodeUrl ?? '#'}" target="_blank" rel="noopener"
+           class="btn" style="text-decoration:none;display:inline-flex;align-items:center;gap:var(--spacing-xs)">
+          <span aria-hidden="true">⌨</span> Open in vscode.dev
+        </a>
+      </div>
+    </div>`;
+
+  return card;
+}
+
+function renderAppOverview(schema) {
+  const card = document.createElement('article');
+  card.className = 'card';
+
+  const statusColor = {
+    draft:    'var(--color-neutral-foreground-3)',
+    running:  'var(--color-success, #0e7a0d)',
+    stopped:  'var(--color-error, #d13438)',
+    deploying:'var(--color-warning, #c4a000)',
+  };
+
+  const services = schema.services ?? [];
+  const color = statusColor[schema.status] ?? statusColor.draft;
+
+  card.innerHTML = `
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <h3 class="card-title" style="display:flex;align-items:center;gap:var(--spacing-s)">
+          <span aria-hidden="true">📦</span>
+          ${escapeHtml(schema.appName ?? 'App')}
+        </h3>
+        ${schema.description ? `<p class="card-subtitle" style="margin-top:var(--spacing-xxs)">${escapeHtml(schema.description)}</p>` : ''}
+      </div>
+      <span style="display:inline-flex;align-items:center;gap:var(--spacing-xs);font-size:var(--font-size-200)">
+        <span style="width:8px;height:8px;border-radius:50%;background:${color}"></span>
+        ${escapeHtml(schema.status ?? 'draft')}
+      </span>
+    </div>
+    <div class="card-body">
+      <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-s);align-items:center">
+        ${schema.runtime ? `<span style="display:inline-block;padding:2px var(--spacing-s);border-radius:var(--radius-small);
+          background:var(--color-brand-background-2, #deecf9);color:var(--color-brand-foreground-1, #0078d4);
+          font-size:var(--font-size-200);font-weight:var(--font-weight-semibold)">${escapeHtml(schema.runtime)}</span>` : ''}
+        ${services.map(s => `<span style="display:inline-block;padding:2px var(--spacing-s);border-radius:var(--radius-small);
+          background:var(--color-neutral-background-3);font-size:var(--font-size-200)">${escapeHtml(s)}</span>`).join('')}
+      </div>
+      ${schema.url ? `<div style="margin-top:var(--spacing-m)">
+        <a href="${schema.url}" target="_blank" rel="noopener" style="font-size:var(--font-size-200);color:var(--color-brand-foreground-1)">
+          🔗 ${escapeHtml(schema.url)}
+        </a>
+      </div>` : ''}
+    </div>`;
 
   return card;
 }
