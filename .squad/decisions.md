@@ -657,6 +657,88 @@ The Kickstart project needs a dual-surface architecture: web (SWA) and IDE (MCP 
 
 ---
 
+### 2026-04-08T16:49: Entra App Registration resolved
+
+**By:** Ahmed Sabbour (via Copilot)  
+**Date:** 2026-04-08T16:49:00Z  
+**Status:** Completed
+
+**What:** Entra App Registration created in tenant `d91aa5af-8c1e-442c-b77c-0b92988b387b`:
+- App Name: Kickstart - AKS Onboarding
+- Client ID: `e71a23c6-aeb4-459a-88fc-07ff96fc9b92`
+- Object ID: `bf6ab22e-d654-4a27-bb35-6df7631f8023`
+- Tenant ID: `d91aa5af-8c1e-442c-b77c-0b92988b387b`
+
+**Why:** Required for SWA Entra ID authentication. Previously blocked on tenant login.
+
+**Impact:** Unblocks SWA auth configuration (staticwebapp.config.json), Bicep provisioning, and API backend AOAI credential wiring.
+
+---
+
+# Decision: SWA Entra ID Authentication via Built-in Provider
+
+**Author:** Bender (Backend Dev)  
+**Date:** 2026-04-08  
+**Status:** Accepted
+
+## Context
+
+Kickstart needs Entra ID auth to protect API routes that make Azure ARM calls on behalf of users. Ahmed created the Entra app registration manually.
+
+## Decision
+
+Use SWA's built-in `azureActiveDirectory` identity provider (Standard tier) instead of MSAL.js client-side auth.
+
+**Why:**
+- Zero frontend JS needed — SWA handles the OAuth flow, token management, and session cookies automatically via `/.auth/*` endpoints.
+- Client secret stays server-side (SWA app setting) — never exposed to the browser.
+- `/api/*` routes get the authenticated user's claims via `x-ms-client-principal` header automatically.
+- Simpler than wiring MSAL.js + token acquisition + bearer header injection on every API call.
+
+**Trade-off:** Less control over token scopes per-request. If we later need fine-grained scope control (e.g., different scopes for Graph vs ARM), we may need to add MSAL.js alongside or switch to a custom auth flow.
+
+## Auth Model
+
+- Static pages: Public (no auth required — it's a landing page)
+- `/api/*`: Requires `authenticated` role
+- `/login` → `/.auth/login/aad`
+- `/logout` → `/.auth/logout`
+- 401 → auto-redirect to login
+
+## App Settings
+
+- `AZURE_CLIENT_ID` — set via Bicep
+- `AZURE_CLIENT_SECRET` — set manually (never in source)
+
+---
+
+# Decision: SWA CLI for local development
+
+**Author:** Fry (Frontend Dev)  
+**Date:** 2026-04-08  
+**Status:** Accepted
+
+## Context
+
+The repo had no unified local dev server. Tests used `npx serve` on port 4281, but developers had no way to run the full stack (static frontend + Azure Functions API) locally.
+
+## Decision
+
+Use Azure Static Web Apps CLI (`swa start`) as the local dev server on port 4280. It proxies `/api/*` to Azure Functions Core Tools, matching the production SWA behavior exactly.
+
+- **Port 4280**: SWA CLI dev server (full stack)
+- **Port 4281**: Playwright E2E tests (static only, unchanged)
+- **Port 7071**: Azure Functions host (managed by SWA CLI)
+
+## Why
+
+- SWA CLI mirrors production routing (static files + API proxy + auth emulation)
+- Zero config needed beyond `swa-cli.config.json`
+- `npm run dev:web` still available for frontend-only work (falls back to demo mode)
+- Doesn't interfere with existing Playwright test setup
+
+---
+
 ## Decision 6: IaC — Bicep for Infra, CLI Scripts for Entra
 
 **Choice:** Bicep for Azure resources (SWA, etc.). Shell scripts for Entra App Registration. No Microsoft.Graph Bicep provider.

@@ -147,3 +147,15 @@
 - **Inspirations endpoint:** `GET /api/inspirations` at `packages/web/api/src/functions/inspirations.ts`. Returns `InspirationIdea[]` (title, subtitle, prompt). Uses Azure OpenAI if env vars are configured (temperature 0.9, max 1500 tokens, raw JSON response). Falls back to shuffled hardcoded ideas (mirrored from `app.js` `INSPIRATION_IDEAS`). Graceful degradation — if OpenAI call fails, logs warning and serves fallback.
 - **Pattern followed:** Matches `converse.ts` structure — `app.http()` registration, anonymous auth, proper error handling with context logging.
 - **No emojis:** LLM generation prompt for inspirations explicitly says "No emoji."
+
+### 2026-04-08: SWA Entra ID Authentication Setup
+
+- **Auth provider:** SWA built-in `azureActiveDirectory` identity provider (Standard tier feature). Config in `staticwebapp.config.json` under `auth.identityProviders.azureActiveDirectory`.
+- **Setting references, not values:** `clientIdSettingName: "AZURE_CLIENT_ID"`, `clientSecretSettingName: "AZURE_CLIENT_SECRET"` — these reference SWA app settings, not literal secrets.
+- **Tenant:** `d91aa5af-8c1e-442c-b77c-0b92988b387b` (CA Global Demos 2605). OpenID issuer: `https://login.microsoftonline.com/{tenant}/v2.0`.
+- **Client ID:** `e71a23c6-aeb4-459a-88fc-07ff96fc9b92` — safe to store in Bicep params and source.
+- **Client secret:** Must be set manually via `az staticwebapp appsettings set` or Azure Portal. Never committed.
+- **Route auth model:** `/api/*` requires `authenticated` role. Static assets (HTML/CSS/JS) are public. `/login` and `/logout` are convenience redirects to `/.auth/login/aad` and `/.auth/logout`. 401 responses auto-redirect to login.
+- **Bicep additions:** `entraClientId` param sets `AZURE_CLIENT_ID` app setting via `Microsoft.Web/staticSites/config` resource. `customDomainHostname` param creates `Microsoft.Web/staticSites/customDomains` resource (requires DNS CNAME pre-verification).
+- **deploy-swa.yml unchanged:** SWA deploy action doesn't need auth config — app settings are managed by Bicep/Portal, not the GitHub Action.
+- **Key files:** `packages/web/staticwebapp.config.json`, `infra/main.bicep`, `infra/parameters.dev.json`, `infra/README.md`

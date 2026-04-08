@@ -117,3 +117,12 @@
 - **Fallback guarantee**: If the API is unavailable (404, network error, timeout, bad data, or fewer than 3 ideas), the hardcoded array stays in place silently. Demo mode works identically to before.
 - **`INSPIRATION_IDEAS` changed to `let`**: Was `const`, now `let` so `updateCarouselIdeas()` can reassign it. All existing references (slide click, `nextSlide()`) read the variable by name, so reassignment propagates correctly.
 - **Files changed**: `packages/web/js/app.js`.
+
+### 2025-07-27 — SWA CLI local dev setup
+- **SWA CLI config**: `swa-cli.config.json` at repo root. `appLocation: packages/web`, `apiLocation: packages/web/api`, `outputLocation: .`, port 4280, apiPort 7071.
+- **Dev scripts**: `npm run dev` builds `@kickstart/core` then runs `npx swa start`. `npm run dev:web` serves static files only at port 4280 via `serve`.
+- **local.settings.json**: Already existed at `packages/web/api/local.settings.json` with Azure OpenAI settings. Added `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET` placeholders for Entra. Already gitignored (line 29 of `.gitignore`).
+- **SWA CLI installed**: Added `@azure/static-web-apps-cli` as root devDependency (v2.0.8). Scripts use `npx swa` so no global install required.
+- **DEVELOPMENT.md**: Created at repo root — prerequisites, quick start, credential setup, script reference table.
+- **Port convention**: SWA CLI dev at 4280, Playwright E2E tests at 4281 (separate `serve` instance via `playwright.config.ts`). No conflict.
+- **No Playwright changes**: E2E tests have their own `webServer` config in `playwright.config.ts` — completely independent of SWA CLI.
