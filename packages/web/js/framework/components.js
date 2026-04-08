@@ -51,9 +51,7 @@ export function createChatUI(config = {}) {
           <textarea class="chat-textarea" placeholder="Tell Kickstart about your app…"
                     rows="1" aria-label="Message input"></textarea>
           <button class="chat-send-btn" aria-label="Send message" title="Send">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M1.5 1.3l13 6.7-13 6.7 1.2-5.7H8v-2H2.7z"/>
-            </svg>
+            <img src="assets/icons/commands/go.svg" width="16" height="16" alt="">
           </button>
         </div>
       </div>`;

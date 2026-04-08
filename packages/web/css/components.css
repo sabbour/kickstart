@@ -242,15 +242,15 @@
   height: 32px;
   border: none;
   border-radius: var(--radius-medium);
-  background: var(--color-brand-primary);
-  color: var(--color-neutral-foreground-on-brand);
+  background: transparent;
+  color: var(--color-neutral-foreground-1);
   cursor: pointer;
   flex-shrink: 0;
   transition: background var(--duration-fast);
 }
 
 .chat-send-btn:hover {
-  background: var(--color-brand-primary-hover);
+  background: var(--color-neutral-background-3);
 }
 
 .chat-send-btn:disabled {

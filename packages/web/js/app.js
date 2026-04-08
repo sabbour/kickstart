@@ -20,6 +20,7 @@ let isApiMode = false;
 let selectedTrack = null;       // 'web-app' | 'agentic-app' | null
 let selectedFramework = null;   // framework name or null
 let pendingQuickPrompt = null;
+let resumingSessionId = null;   // set when clicking a recent session
 
 // ---------- Inspiration Carousel ----------
 let INSPIRATION_IDEAS = [
@@ -84,7 +85,12 @@ function renderRecentSessions() {
     </div>`;
   }).join('');
 
-  // Click handler — resume session
+}
+
+// Set up recent-sessions click delegation once (avoids stacking listeners)
+function initRecentSessionsListener() {
+  const list = document.getElementById('recent-sessions-list');
+  if (!list) return;
   list.addEventListener('click', (e) => {
     const item = e.target.closest('.recent-session-item');
     if (!item) return;
@@ -92,6 +98,7 @@ function renderRecentSessions() {
     const session = getSessions().find(s => s.id === sessionId);
     if (session) {
       pendingQuickPrompt = session.prompt || session.title;
+      resumingSessionId = session.id;
       transitionToChat();
     }
   });
@@ -317,13 +324,18 @@ function initLandingListeners() {
 }
 
 async function transitionToChat() {
-  // Save to recent sessions
-  if (pendingQuickPrompt) {
+  // Save to recent sessions (skip if resuming an existing session)
+  if (pendingQuickPrompt && !resumingSessionId) {
     saveSession({
       id: 'session-' + Date.now(),
       title: pendingQuickPrompt.substring(0, 100),
       prompt: pendingQuickPrompt,
     });
+  }
+  // If resuming, update the session's timestamp
+  if (resumingSessionId) {
+    saveSession({ id: resumingSessionId });
+    resumingSessionId = null;
   }
 
   stopPlaceholderRotation();
@@ -627,6 +639,7 @@ async function boot() {
 
   // Render recent sessions
   renderRecentSessions();
+  initRecentSessionsListener();
 
   // Footer version info
   const footerVersion = document.getElementById('landing-footer-version');
