@@ -100,3 +100,11 @@
 - **Inline SVG icons**: VS Code logo (blue #007ACC), VS Code Insiders logo (green #24931E), terminal icon (currentColor) — all 24×24. No external icon files.
 - **CSS**: `.landing-ide`, `.ide-cards`, `.ide-card` — horizontal card layout with border, hover shadow, matching the framework pills visual weight. Styled as secondary/tertiary prominence.
 - **Files changed**: `packages/web/index.html`, `packages/web/css/landing.css`, `packages/web/js/app.js`.
+
+### 2025-07-27 — 4 critical web UX bug fixes
+- **Health check fix**: `healthCheck()` in `api-client.js` now checks `res.ok || res.status === 405` instead of `res.status < 500`. Prevents 404 from undeployed Azure Functions from being treated as "API available".
+- **Track/pill prompts**: `initLandingListeners()` in `app.js` now sets `pendingQuickPrompt` when a track card or framework pill is clicked, so the user's intent auto-sends as a chat message after transition. Framework-specific prompts live in a `frameworkPrompts` map.
+- **Markdown renderer**: `renderMarkdown()` added to `components.js` — lightweight converter supporting bold, italic, inline code, fenced code blocks, unordered lists, links, paragraphs, and line breaks. Used in `renderMessages()` for assistant text (not HTML) messages and in `updateStreamingBubble()` for partial streaming content.
+- **Sessions sidebar UX**: Sidebar now has a close button (X icon in header), active-session indicator dot, "Current conversation" label, and a full-width "New session" button in a footer section. CSS classes: `.sessions-close-btn`, `.session-indicator`, `.sessions-footer`.
+- **CSS additions**: `components.css` gained markdown-specific styles for `pre`, `code`, `ul` inside `.chat-bubble.assistant`. `core.css` gained `.sessions-close-btn`, `.session-indicator`, `.sessions-footer`, and refactored `.sessions-new-btn` as full-width button.
+- **Files changed**: `packages/web/js/api-client.js`, `packages/web/js/app.js`, `packages/web/js/framework/components.js`, `packages/web/index.html`, `packages/web/css/components.css`, `packages/web/css/core.css`.
