@@ -32,3 +32,15 @@
 - A2UI catalog has 17 components (7 standard, 6 Kickstart, 4 GitHub). Catalog schema uses JSON Schema draft/2020-12.
 - 6-phase engine confirmed: Discover→Design→Generate→Review→Handoff→Deploy. K8s hidden in phases 1-3, visible in 4-6.
 - Deployment safeguards DS001–DS013 enforced across all phases via Layer 2 system prompt.
+
+### 2025-07-25: Spark-like UX Evolution Scoping
+- **Key insight:** Kickstart ≠ Spark. Spark generates full runnable apps; Kickstart generates infrastructure (Bicep, Dockerfiles, Helm, GH Actions) and deploys to AKS. "Preview" = architecture diagram + deployment plan, not a running app.
+- **Landing page** already Spark-like (carousel, track cards, framework pills, IDE links). Gap: needs a hero text input above everything — single biggest UX win.
+- **Split-view layout** (chat left, file-viewer right) already exists in `core.css`. File viewer is `<aside class="file-viewer">` toggled by `files:generated` EventBus event.
+- **File generation display** only in sidebar today. P0: add in-chat file chips with progressive status.
+- **No code view toggle** exists. P1: add Preview|Code toggle in right panel header.
+- **No deploy button.** P1: add Deploy CTA in topbar, maps to Spark's "Publish" but targets AKS.
+- **Spark tabs** (Iterate/Theme/Data/Prompts/Assets): Theme irrelevant (infra not UI). Prompts already exists as debug toggle. Assets (upload Dockerfiles/manifests) is P2.
+- **P0 is ~11 hours, all vanilla JS.** Hero input, file chips, sparkle loading, preview rename. No framework change needed.
+- **Key files touched:** `index.html` (hero input), `landing.css` (input styles), `components.css` (file chips, sparkle), `app.js` (hero handler, file chip rendering), `components.js` (new factories).
+- **Ahmed preference:** claude-opus-4.6 for code, claude-haiku-4.5 for non-code (confirmed still active).
