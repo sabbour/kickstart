@@ -164,6 +164,17 @@
   margin-bottom: 0;
 }
 
+/* --- Model indicator (small subtext below assistant responses) --- */
+.model-indicator {
+  display: block;
+  margin-top: var(--spacing-s);
+  font-size: 10px;
+  color: var(--color-neutral-foreground-3, #888);
+  opacity: 0.7;
+  font-family: var(--font-family-mono, monospace);
+  letter-spacing: 0.02em;
+}
+
 /* --- Typing indicator --- */
 .typing-indicator {
   display: flex;

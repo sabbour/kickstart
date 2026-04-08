@@ -16,7 +16,7 @@ import {
 } from "@kickstart/core";
 import type { PhaseItem } from "@kickstart/core";
 import { getSession, createSession, addMessage } from "../lib/session-store.js";
-import { chatCompletion, chatCompletionStream } from "../lib/openai-client.js";
+import { chatCompletion, chatCompletionStream, getChatDeploymentName } from "../lib/openai-client.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -27,6 +27,7 @@ interface ConverseResponse {
   sessionId: string;
   phase: string;
   message: string;
+  model?: string;
   a2ui?: object[];
   systemPrompt?: string;
 }
@@ -106,6 +107,7 @@ app.http("converse", {
         sessionId: state.sessionId,
         phase: engineState.currentPhase,
         message: result.content,
+        model: getChatDeploymentName(),
         a2ui,
         ...(isNewSession
           ? {
@@ -160,6 +162,7 @@ function handleStreaming(
               sessionId,
               phase: engineState.currentPhase,
               phaseLabel: phaseDef.label,
+              model: getChatDeploymentName(),
               a2ui,
             })}\n\n`,
           ),

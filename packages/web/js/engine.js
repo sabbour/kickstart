@@ -395,6 +395,7 @@ export function createApiEngine({ onPhaseChange, onResponse, apiClient, onError,
       text: apiRes.message ?? null,
       systemPrompt: apiRes.systemPrompt ?? null,
       files: apiRes.files ?? null,
+      model: apiRes.model ?? null,
       advance: false, // phase change handled by comparing phases
     };
   }

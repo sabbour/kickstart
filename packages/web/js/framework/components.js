@@ -86,7 +86,10 @@ export function createChatUI(config = {}) {
       } else {
         content = renderMarkdown(msg.text);
       }
-      return `<div class="chat-bubble ${cls}" role="article">${content}</div>`;
+      const modelTag = (cls === 'assistant' && msg.model)
+        ? `<span class="model-indicator">${escapeHtml(msg.model)}</span>`
+        : '';
+      return `<div class="chat-bubble ${cls}" role="article">${content}${modelTag}</div>`;
     }).join('');
 
     if (isTyping) {

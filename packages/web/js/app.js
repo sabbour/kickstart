@@ -443,19 +443,19 @@ async function initEngine() {
         chatUI.setPhase(phaseIndex);
         updatePreviewTitle(PHASE_NAMES[phaseIndex]);
       },
-      onResponse({ a2ui, text, systemPrompt }) {
+      onResponse({ a2ui, text, systemPrompt, model }) {
         chatUI.setTyping(false);
         clearStreamingBubble();
 
         if (a2ui) {
           const html = renderA2UIMessage(a2ui);
-          chatUI.addMessage({ role: 'assistant', html });
+          chatUI.addMessage({ role: 'assistant', html, model });
           // Show ArchitectureDiagram in preview panel
           const components = Array.isArray(a2ui) ? a2ui : [a2ui];
           const diagram = components.find(c => c.type === 'ArchitectureDiagram');
           if (diagram) showPreviewContent(diagram);
         } else if (text) {
-          chatUI.addMessage({ role: 'assistant', text });
+          chatUI.addMessage({ role: 'assistant', text, model });
         }
 
         if (promptInspectorOn && systemPrompt) {
