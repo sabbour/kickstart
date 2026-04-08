@@ -108,3 +108,12 @@
 - **Sessions sidebar UX**: Sidebar now has a close button (X icon in header), active-session indicator dot, "Current conversation" label, and a full-width "New session" button in a footer section. CSS classes: `.sessions-close-btn`, `.session-indicator`, `.sessions-footer`.
 - **CSS additions**: `components.css` gained markdown-specific styles for `pre`, `code`, `ul` inside `.chat-bubble.assistant`. `core.css` gained `.sessions-close-btn`, `.session-indicator`, `.sessions-footer`, and refactored `.sessions-new-btn` as full-width button.
 - **Files changed**: `packages/web/js/api-client.js`, `packages/web/js/app.js`, `packages/web/js/framework/components.js`, `packages/web/index.html`, `packages/web/css/components.css`, `packages/web/css/core.css`.
+
+### 2025-07-27 — Carousel wired to /api/inspirations endpoint
+- **API fetch pattern**: `fetchInspirations()` calls `GET /api/inspirations` with a 2-second `AbortController` timeout. Does NOT use `apiClient` — it is a simple public GET with no auth. Returns parsed JSON array or null on any failure (network, timeout, non-OK status, non-array response).
+- **Hot-swap**: `updateCarouselIdeas(ideas)` replaces the `INSPIRATION_IDEAS` array and re-renders slides + dots via `innerHTML`. Preserves current slide index if still valid, otherwise resets to 0. Restarts auto-rotation timer.
+- **Non-blocking**: Carousel renders immediately with hardcoded `INSPIRATION_IDEAS` at boot. The API fetch runs in the background and swaps content only if it returns 3+ valid ideas. Page load is never blocked.
+- **Event delegation preserved**: Slide click and dot click handlers are on parent containers (`#carousel-viewport`, `#carousel-dots`) using delegation, so replacing `innerHTML` children does not break listeners.
+- **Fallback guarantee**: If the API is unavailable (404, network error, timeout, bad data, or fewer than 3 ideas), the hardcoded array stays in place silently. Demo mode works identically to before.
+- **`INSPIRATION_IDEAS` changed to `let`**: Was `const`, now `let` so `updateCarouselIdeas()` can reassign it. All existing references (slide click, `nextSlide()`) read the variable by name, so reassignment propagates correctly.
+- **Files changed**: `packages/web/js/app.js`.
