@@ -481,23 +481,45 @@ function renderPromptInspector(systemPrompt) {
 // ---------- Auth UI ----------
 async function initAuth() {
   await Auth.initialize();
-  updateAuthUI();
+  await updateAuthUI();
 }
 
-function updateAuthUI() {
+async function fetchUserPhoto() {
+  try {
+    const token = await Auth.getToken(['User.Read']);
+    if (!token) return null;
+    const response = await fetch('https://graph.microsoft.com/v1.0/me/photo/$value', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
+}
+
+async function updateAuthUI() {
   const userBtn = document.getElementById('topbar-user');
   if (!userBtn) return;
 
   if (Auth.isAuthenticated()) {
     const info = Auth.getUserInfo();
     userBtn.innerHTML = `
-      <span class="topbar-avatar">${info.initials}</span>
-      <span>${info.name}</span>`;
+      <fluent-avatar name="${escapeHtml(info.name)}" size="28" color="colorful"></fluent-avatar>
+      <span class="topbar-user-name">${escapeHtml(info.name)}</span>`;
     userBtn.onclick = () => Auth.logout().then(updateAuthUI);
     userBtn.title = `Signed in as ${info.email} — click to sign out`;
+
+    // Fetch photo in background, update avatar when ready
+    const photoUrl = await fetchUserPhoto();
+    if (photoUrl) {
+      const avatar = userBtn.querySelector('fluent-avatar');
+      if (avatar) avatar.setAttribute('src', photoUrl);
+    }
   } else {
     userBtn.innerHTML = `
-      <span class="topbar-avatar">?</span>
+      <fluent-avatar name="?" size="28"></fluent-avatar>
       <span>Sign in</span>`;
     userBtn.onclick = () => Auth.login().then(updateAuthUI);
     userBtn.title = 'Sign in with your Microsoft account';
@@ -507,6 +529,18 @@ function updateAuthUI() {
 // ---------- Boot ----------
 async function boot() {
   await initAuth();
+
+  // Handle /login path — auto-trigger client-side sign-in
+  if (window.location.pathname === '/login') {
+    if (!Auth.isAuthenticated()) {
+      Auth.login().then(() => {
+        window.history.replaceState({}, '', '/');
+        updateAuthUI();
+      });
+    } else {
+      window.history.replaceState({}, '', '/');
+    }
+  }
 
   // Landing page is shown by default (via HTML).
   // Render carousel immediately with hardcoded ideas.

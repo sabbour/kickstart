@@ -121,6 +121,13 @@ html, body {
   font-weight: var(--font-weight-semibold);
 }
 
+.topbar-user-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* --- Main layout (three-column) --- */
 .app-layout {
   display: flex;
