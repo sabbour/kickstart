@@ -1013,3 +1013,83 @@ The project uses zero build deps (vanilla ES modules). Pulling in marked or mark
 
 - If we need tables, headings, or nested lists in the future, extend enderMarkdown() or swap to a CDN-loaded library.
 - Streaming bubbles also render partial markdown via innerHTML — this is safe because the text is HTML-escaped before markdown transforms are applied.
+
+## Decision: SWA + Entra Tenant Alignment
+
+**Author:** Bender (Backend Dev)
+**Date:** 2025-07-27
+**Status:** Proposed (awaiting Ahmed verification)
+
+### Context
+
+Investigation revealed two Entra app registrations across two tenants:
+- **Old:** 7a630e18-8f49-404e-8454-228b13089c57 ("Imagine - AKS Onboarding") in Microsoft internal tenant 72f988bf-86f1-41af-91ab-2d7cd011db47 — no longer accessible from CloudNative.
+- **New:** 71a23c6-aeb4-459a-88fc-07ff96fc9b92 ("Kickstart - AKS Onboarding") in CloudNative tenant d91aa5af-8c1e-442c-b77c-0b92988b387b — already wired as AZURE_CLIENT_ID in SWA.
+
+### Decision
+
+1. **Canonical Entra App ID** for Kickstart is 71a23c6-aeb4-459a-88fc-07ff96fc9b92 in the CloudNative tenant.
+2. **Old app ID** 7a630e18-8f49-404e-8454-228b13089c57 from decisions.md is stale and should be marked superseded.
+3. **openIdIssuer** in staticwebapp.config.json correctly targets CloudNative tenant — no change needed.
+
+### Required Actions (before auth will work)
+
+1. Generate a client secret on the Entra app and set it as AZURE_CLIENT_SECRET in SWA app settings.
+2. Add web platform redirect URIs to the Entra app:
+   - https://proud-mud-0660b8110.6.azurestaticapps.net/.auth/login/aad/callback
+   - https://kickstart.aks.azure.sabbour.me/.auth/login/aad/callback
+3. Set AZURE_STATIC_WEB_APPS_API_TOKEN GitHub secret on the repo.
+
+# Decision: Shorten staging domain
+
+**Date:** 2025-07-17
+**Author:** Fry (Frontend Dev)
+**Status:** Accepted
+
+## Context
+
+The temporary staging domain `kickstart.prototypes.aks.azure.sabbour.me` contained an unnecessary `.prototypes` segment that added no value and made URLs longer.
+
+## Decision
+
+Replace all references with `kickstart.aks.azure.sabbour.me` across infra config, docs, and frontend code. The production domain `kickstart.aks.azure.com` is unchanged.
+
+## Files affected
+
+- `infra/main.bicep` — Bicep param description and comment
+- `infra/setup-entra.sh` — Entra redirect URI
+- `infra/README.md` — infrastructure docs
+- `infra/parameters.dev.json` — dev deployment parameter
+- `docs/architecture.md` — domain table
+- `docs/deployment.md` — staging domain references
+- `packages/web/js/auth.js` — hostname detection and redirect URI
+- `packages/web/staticwebapp.config.json` — comment
+
+## Impact
+
+- DNS CNAME and Entra app registration must be updated to match the new domain.
+- `.squad/` files were intentionally left untouched (append-only policy).
+
+
+# Decision: Update Entra App Registration IDs in auth.js
+
+**Date:** 2025-07-17
+**Author:** Fry (Frontend Dev)
+**Status:** Accepted
+
+## Context
+
+`packages/web/js/auth.js` had hardcoded Entra client and tenant IDs from a different (Microsoft corp) app registration:
+- clientId: `7a630e18-…` → wrong
+- tenantId: `72f988bf-…` → Microsoft corp tenant, wrong
+
+## Decision
+
+Replaced with Ahmed's actual Entra App Registration values:
+- clientId: `e71a23c6-aeb4-459a-88fc-07ff96fc9b92`
+- tenantId: `d91aa5af-8c1e-442c-b77c-0b92988b387b`
+
+**No changes needed in:**
+- `infra/main.bicep` — uses a `param entraClientId` with no hardcoded IDs.
+- `infra/setup-entra.sh` — `TENANT` is `caglobaldemos2605.onmicrosoft.com`, which is the friendly domain for Ahmed's tenant (not the old Microsoft corp tenant). Left as-is.
+
