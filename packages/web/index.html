@@ -87,18 +87,14 @@
           <div class="landing-inner">
             <!-- Hero Input -->
             <div class="landing-hero" id="landing-hero">
-              <h1 class="landing-hero-title">What do you want to deploy?</h1>
+              <h1 class="landing-hero-title">What do you want..</h1>
               <div class="landing-hero-input-wrap">
-                <fluent-search id="hero-input" appearance="outline"
-                               placeholder="Describe what you want to deploy to AKS..."
-                               aria-label="Describe your app" autocomplete="off">
-                </fluent-search>
-              </div>
-              <div class="suggestion-pills" id="suggestion-pills">
-                <button class="suggestion-pill" data-suggestion="I want to build an e-commerce API with product catalog, cart, and checkout">E-commerce API</button>
-                <button class="suggestion-pill" data-suggestion="I want to build an AI chatbot that answers questions about my documentation">AI chatbot</button>
-                <button class="suggestion-pill" data-suggestion="I want to build a real-time dashboard that shows live metrics and alerts">Real-time dashboard</button>
-                <button class="suggestion-pill" data-suggestion="I want to build a microservices starter with API gateway, auth service, and message queue">Microservices starter</button>
+                <span class="hero-input-icon" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a4.5 4.5 0 00-1.5 8.74V12a.5.5 0 00.5.5h2a.5.5 0 00.5-.5v-1.26A4.502 4.502 0 0010 2zm-1 13a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-.5H9v.5zm-.5 1.5a.5.5 0 000 1h3a.5.5 0 000-1h-3z"/></svg>
+                </span>
+                <input type="text" id="hero-input"
+                       placeholder="Describe what you want to build.."
+                       aria-label="Describe your app" autocomplete="off">
               </div>
             </div>
 
@@ -123,6 +119,22 @@
                 <div class="track-card-title">AI Agent</div>
                 <p class="track-card-desc">Deploy an AI agent that calls tools, retrieves knowledge, and reasons over data. Self-host open-source models or connect to Azure OpenAI — with built-in scaling and low cost.</p>
                 <button class="track-card-link" data-track="agentic-app">Get started →</button>
+              </div>
+            </div>
+
+            <!-- Framework Pills -->
+            <div class="framework-section">
+              <span class="framework-separator-label">or start with a framework</span>
+              <div class="framework-pills">
+                <button class="framework-pill" data-framework="nextjs">Next.js</button>
+                <button class="framework-pill" data-framework="fastapi">Python FastAPI</button>
+                <button class="framework-pill" data-framework="express">Express.js</button>
+                <button class="framework-pill" data-framework="go">Go</button>
+                <button class="framework-pill" data-framework="spring">Spring Boot</button>
+                <button class="framework-pill" data-framework="django">Django</button>
+                <button class="framework-pill" data-framework="rust">Rust</button>
+                <button class="framework-pill" data-framework="langchain">LangChain Agent</button>
+                <button class="framework-pill" data-framework="rag">RAG App</button>
               </div>
             </div>
           </div>

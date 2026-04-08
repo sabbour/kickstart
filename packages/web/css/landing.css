@@ -47,27 +47,72 @@
   letter-spacing: -0.02em;
 }
 
-/* ---------- Fluent 2 Search Input ---------- */
+/* ---------- Hero Text Input with Lightbulb Icon ---------- */
 .landing-hero-input-wrap {
   width: 100%;
   max-width: 600px;
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
-.landing-hero-input-wrap fluent-search {
+.hero-input-icon {
+  position: absolute;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-neutral-foreground-3);
+  pointer-events: none;
+}
+
+.landing-hero-input-wrap input {
   width: 100%;
-  --input-height: 44px;
+  height: 44px;
+  padding: 0 var(--spacing-l) 0 42px;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--color-neutral-stroke-2);
+  background: var(--color-neutral-background-1);
+  color: var(--color-neutral-foreground-1);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-400);
+  outline: none;
+  transition: border-color var(--duration-fast);
+  box-sizing: border-box;
 }
 
-/* Suggestion pills */
-.suggestion-pills {
+.landing-hero-input-wrap input::placeholder {
+  color: var(--color-neutral-foreground-3);
+}
+
+.landing-hero-input-wrap input:focus {
+  border-color: var(--color-brand-primary);
+}
+
+/* ---------- Framework Section ---------- */
+.framework-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-l);
+}
+
+.framework-separator-label {
+  font-size: var(--font-size-100);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-foreground-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.framework-pills {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--spacing-s);
 }
 
-.suggestion-pill {
+.framework-pill {
   padding: var(--spacing-xs) var(--spacing-l);
   border-radius: var(--radius-circular);
   border: 1px solid var(--color-neutral-stroke-2);
@@ -75,13 +120,13 @@
   color: var(--color-neutral-foreground-2);
   font-family: var(--font-family-base);
   font-size: var(--font-size-200);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular);
   cursor: pointer;
   transition: all var(--duration-fast);
   white-space: nowrap;
 }
 
-.suggestion-pill:hover {
+.framework-pill:hover {
   background: var(--color-brand-lighter);
   border-color: var(--color-brand-primary);
   color: var(--color-brand-primary);

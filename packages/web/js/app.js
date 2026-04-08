@@ -255,7 +255,7 @@ function stopCarousel() {
 // ==================== Landing Page ====================
 
 function initLandingListeners() {
-  // Hero input — Enter key starts chat (fluent-search fires keydown on its host)
+  // Hero input — Enter key starts chat
   const heroInput = document.getElementById('hero-input');
   if (heroInput) {
     heroInput.addEventListener('keydown', (e) => {
@@ -270,10 +270,10 @@ function initLandingListeners() {
     });
   }
 
-  // Suggestion pills
-  document.querySelectorAll('.suggestion-pill').forEach(pill => {
+  // Framework pills
+  document.querySelectorAll('.framework-pill').forEach(pill => {
     pill.addEventListener('click', () => {
-      pendingQuickPrompt = pill.dataset.suggestion;
+      pendingQuickPrompt = `I want to build an app using ${pill.textContent}`;
       transitionToChat();
     });
   });
