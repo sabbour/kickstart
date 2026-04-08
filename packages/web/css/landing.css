@@ -63,6 +63,17 @@
   transform: translateX(0);
   pointer-events: auto;
   position: relative;
+  cursor: pointer;
+}
+
+.carousel-slide.active:hover {
+  transform: scale(1.02);
+  transition: opacity var(--duration-slow) var(--easing-ease-out),
+              transform var(--duration-fast) var(--easing-ease-out);
+}
+
+.carousel-slide.active:hover .carousel-title {
+  color: var(--color-brand-primary);
 }
 
 .carousel-slide.exit-left {
@@ -140,8 +151,9 @@
 }
 
 .track-card-icon {
-  font-size: 28px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-brand-primary);
 }
 
 .track-card-title {

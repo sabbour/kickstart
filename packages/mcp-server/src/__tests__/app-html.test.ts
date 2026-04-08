@@ -56,9 +56,9 @@ describe("kickstart-app.html", () => {
     }
   });
 
-  it("includes dark mode support", () => {
+  it("does not include dark mode (light only per user directive)", () => {
     const html = readFileSync(appHtmlPath, "utf-8");
-    expect(html).toContain("prefers-color-scheme: dark");
+    expect(html).not.toContain("prefers-color-scheme: dark");
   });
 
   it("includes Fluent 2 design tokens", () => {

@@ -74,20 +74,21 @@ document.getElementById('topbar-inspector-toggle')?.addEventListener('click', ()
 // ==================== Landing Page ====================
 
 const INSPIRATION_IDEAS = [
-  { title: 'Movie night pick that settles disputes', subtitle: 'Your group votes, and the app chooses confidently.' },
-  { title: 'AI recipe finder from fridge photos', subtitle: 'Snap a photo of your fridge, get dinner ideas instantly.' },
-  { title: 'Team standup bot that respects time zones', subtitle: 'Async standups that actually work for global teams.' },
-  { title: 'Pet adoption matcher powered by AI', subtitle: 'Swipe-style matching between shelters and families.' },
-  { title: 'Real-time air quality dashboard', subtitle: 'Hyperlocal pollution data with health recommendations.' },
-  { title: 'Neighborhood tool lending library', subtitle: 'Borrow a drill from your neighbor — no awkward texts required.' },
-  { title: 'Personal finance coach that speaks plain English', subtitle: 'Budget tracking without the spreadsheet headaches.' },
-  { title: 'Workout generator for hotel rooms', subtitle: 'No equipment? No problem. AI builds a routine in seconds.' },
-  { title: 'Live event parking optimizer', subtitle: 'Find the fastest lot and walking route to the venue.' },
-  { title: 'Study group matchmaker for college', subtitle: 'Match with classmates by course, schedule, and study style.' },
+  { title: 'Movie night pick that settles disputes', subtitle: 'Your group votes, and the app chooses confidently.', prompt: 'I want to build a movie night pick app that settles disputes — your group votes, and the app chooses confidently.' },
+  { title: 'AI recipe finder from fridge photos', subtitle: 'Snap a photo of your fridge, get dinner ideas instantly.', prompt: 'I want to build an AI recipe finder from fridge photos — snap a photo of your fridge, get dinner ideas instantly.' },
+  { title: 'Team standup bot that respects time zones', subtitle: 'Async standups that actually work for global teams.', prompt: 'I want to build a team standup bot that respects time zones — async standups that actually work for global teams.' },
+  { title: 'Pet adoption matcher powered by AI', subtitle: 'Swipe-style matching between shelters and families.', prompt: 'I want to build a pet adoption matcher powered by AI — swipe-style matching between shelters and families.' },
+  { title: 'Real-time air quality dashboard', subtitle: 'Hyperlocal pollution data with health recommendations.', prompt: 'I want to build a real-time air quality dashboard — hyperlocal pollution data with health recommendations.' },
+  { title: 'Neighborhood tool lending library', subtitle: 'Borrow a drill from your neighbor — no awkward texts required.', prompt: 'I want to build a neighborhood tool lending library — borrow a drill from your neighbor, no awkward texts required.' },
+  { title: 'Personal finance coach that speaks plain English', subtitle: 'Budget tracking without the spreadsheet headaches.', prompt: 'I want to build a personal finance coach that speaks plain English — budget tracking without the spreadsheet headaches.' },
+  { title: 'Workout generator for hotel rooms', subtitle: 'No equipment? No problem. AI builds a routine in seconds.', prompt: 'I want to build a workout generator for hotel rooms — no equipment needed, AI builds a routine in seconds.' },
+  { title: 'Live event parking optimizer', subtitle: 'Find the fastest lot and walking route to the venue.', prompt: 'I want to build a live event parking optimizer — find the fastest lot and walking route to the venue.' },
+  { title: 'Study group matchmaker for college', subtitle: 'Match with classmates by course, schedule, and study style.', prompt: 'I want to build a study group matchmaker for college — match with classmates by course, schedule, and study style.' },
 ];
 
 let carouselIndex = 0;
 let carouselTimer = null;
+let pendingQuickPrompt = null;
 
 function initCarousel() {
   const viewport = document.getElementById('carousel-viewport');
@@ -113,6 +114,18 @@ function initCarousel() {
     if (!dot) return;
     goToSlide(parseInt(dot.dataset.dot, 10));
     resetCarouselTimer();
+  });
+
+  // Slide clicks — kickstart chat with the idea's prompt
+  viewport.addEventListener('click', (e) => {
+    const slide = e.target.closest('.carousel-slide');
+    if (!slide) return;
+    const idx = parseInt(slide.dataset.slide, 10);
+    const idea = INSPIRATION_IDEAS[idx];
+    if (idea?.prompt) {
+      pendingQuickPrompt = idea.prompt;
+      transitionToChat();
+    }
   });
 
   // Start auto-rotation
@@ -203,6 +216,14 @@ async function transitionToChat() {
   const welcomeA2UI = engine.getWelcome();
   const html = renderA2UIMessage(welcomeA2UI);
   chatUI.addMessage({ role: 'assistant', html });
+
+  // If a carousel idea was clicked, auto-send its prompt
+  if (pendingQuickPrompt) {
+    const prompt = pendingQuickPrompt;
+    pendingQuickPrompt = null;
+    chatUI.addMessage({ role: 'user', text: prompt });
+    setTimeout(() => handleUserMessage(prompt), 300);
+  }
 }
 
 // ---------- Engine Setup ----------
@@ -376,7 +397,7 @@ function renderPromptInspector(systemPrompt) {
   const promptA2UI = [
     {
       type: 'Text',
-      text: '<details class="prompt-inspector"><summary>🔍 View system prompt for this phase</summary></details>',
+      text: '<details class="prompt-inspector"><summary><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:-2px;margin-right:4px"><path d="M5.854 3.354a.5.5 0 10-.708-.708l-4 4a.5.5 0 000 .708l4 4a.5.5 0 00.708-.708L2.207 8l3.647-3.646zm4.292-.708a.5.5 0 01.708 0l4 4a.5.5 0 010 .708l-4 4a.5.5 0 01-.708-.708L13.793 8l-3.647-3.646a.5.5 0 010-.708z"/></svg> View system prompt for this phase</summary></details>',
     },
   ];
 

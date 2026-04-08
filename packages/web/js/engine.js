@@ -131,17 +131,17 @@ function designHandler(_input, state) {
   const services = state.collected.services || ['Web'];
 
   const components = [
-    { name: appName, icon: 'app', description: runtime },
-    { name: 'App Platform', icon: 'cloud', description: 'Azure (scalable hosting)' },
+    { name: appName, icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.67 4-1.8 5.56l-.3-.17z"/></svg>', description: runtime },
+    { name: 'App Platform', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04A7.49 7.49 0 0012 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>', description: 'Azure (scalable hosting)' },
   ];
 
   if (services.some(s => ['PostgreSQL', 'MySQL', 'MongoDB'].includes(s))) {
-    components.push({ name: 'Database', icon: 'database', description: services.find(s => ['PostgreSQL', 'MySQL', 'MongoDB'].includes(s)) });
+    components.push({ name: 'Database', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C7.58 3 4 4.79 4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7c0-2.21-3.58-4-8-4zm6 14c0 .5-2.13 2-6 2s-6-1.5-6-2v-2.23c1.61.77 3.72 1.23 6 1.23s4.39-.46 6-1.23V17zm0-5c0 .5-2.13 2-6 2s-6-1.5-6-2V9.77c1.61.77 3.72 1.23 6 1.23s4.39-.46 6-1.23V12zm-6-3c-3.87 0-6-1.5-6-2s2.13-2 6-2 6 1.5 6 2-2.13 2-6 2z"/></svg>', description: services.find(s => ['PostgreSQL', 'MySQL', 'MongoDB'].includes(s)) });
   }
   if (services.includes('Redis')) {
-    components.push({ name: 'Cache', icon: 'cache', description: 'Redis' });
+    components.push({ name: 'Cache', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>', description: 'Redis' });
   }
-  components.push({ name: 'CI/CD', icon: 'cicd', description: 'GitHub Actions' });
+  components.push({ name: 'CI/CD', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0020 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 004 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>', description: 'GitHub Actions' });
 
   return {
     advance: true,

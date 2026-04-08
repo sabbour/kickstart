@@ -318,7 +318,7 @@ function renderArchitectureDiagram(schema) {
       <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:var(--spacing-l)">
         ${(schema.components ?? []).map(comp => `
           <div class="card" style="min-width:120px;text-align:center;padding:var(--spacing-l)">
-            <div style="font-size:24px;margin-bottom:var(--spacing-xs)">${comp.icon ?? '📦'}</div>
+            <div style="font-size:24px;margin-bottom:var(--spacing-xs)">${comp.icon ?? '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16.5c0 .38-.21.71-.53.88l-7.9 4.44c-.36.2-.82.2-1.14 0l-7.9-4.44A.991.991 0 013 16.5v-9c0-.38.21-.71.53-.88l7.9-4.44a.99.99 0 011.14 0l7.9 4.44c.32.17.53.5.53.88v9zM12 4.15L5 8.09v7.82l7 3.94 7-3.94V8.09l-7-3.94z"/></svg>'}</div>
             <div style="font-weight:var(--font-weight-semibold)">${escapeHtml(comp.name)}</div>
             <div style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3)">
               ${escapeHtml(comp.description ?? '')}
@@ -430,7 +430,7 @@ function renderRepoPicker(schema, ctx) {
     matched.forEach(repo => {
       const li = document.createElement('li');
       li.style.cssText = 'padding:var(--spacing-s) var(--spacing-m);cursor:pointer;display:flex;align-items:center;gap:var(--spacing-s)';
-      li.innerHTML = `<span aria-hidden="true">📂</span><span>${escapeHtml(repo.fullName ?? repo.label)}</span>`;
+      li.innerHTML = `<span aria-hidden="true"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style="vertical-align:-3px"><path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-5.586a1 1 0 01-.707-.293L8.293 4.293A1 1 0 007.586 4H4z"/></svg></span><span>${escapeHtml(repo.fullName ?? repo.label)}</span>`;
       li.addEventListener('mousedown', () => {
         input.value = repo.fullName ?? repo.label;
         dropdown.style.display = 'none';
@@ -523,7 +523,7 @@ function renderCodespaceLink(schema) {
 
   card.innerHTML = `
     <div class="card-body" style="text-align:center;padding:var(--spacing-xl)">
-      <div style="font-size:32px;margin-bottom:var(--spacing-m)" aria-hidden="true">🚀</div>
+      <div style="margin-bottom:var(--spacing-m)" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5c-1.1 0-4.5 2.9-4.5 9 0 1.5.2 2.8.5 3.9l-2.2 1.3c-.5.3-.8.8-.8 1.4v2.4l3.5-1.8c1 .9 2.1 1.3 3.5 1.3s2.5-.4 3.5-1.3l3.5 1.8v-2.4c0-.6-.3-1.1-.8-1.4l-2.2-1.3c.3-1.1.5-2.4.5-3.9 0-6.1-3.4-9-4.5-9zm0 11a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/></svg></div>
       <h3 style="margin-bottom:var(--spacing-xs);font-size:var(--font-size-500)">${escapeHtml(schema.repoFullName ?? 'repository')}</h3>
       <p style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3);margin-bottom:var(--spacing-l)">
         Branch: <strong>${escapeHtml(schema.branch ?? 'main')}</strong>
@@ -531,11 +531,11 @@ function renderCodespaceLink(schema) {
       <div style="display:flex;gap:var(--spacing-m);justify-content:center;flex-wrap:wrap">
         <a href="${schema.codespaceUrl ?? '#'}" target="_blank" rel="noopener"
            class="btn primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:var(--spacing-xs)">
-          <span aria-hidden="true">⬡</span> Open in Codespaces
+          <span aria-hidden="true"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style="vertical-align:-2px"><path d="M7.65 3.15a.5.5 0 01-.3.64l-.1.03-2.75.69a1.5 1.5 0 00-1.1 1.3l-.01.14v8.1a1.5 1.5 0 001 1.41l.11.03 2.75.69a.5.5 0 01-.14.98l-.1.01-2.76-.69A2.5 2.5 0 012.5 14.1V5.95a2.5 2.5 0 011.65-2.35l.1-.03 2.76-.69a.5.5 0 01.64.27zM12.35 3.15a.5.5 0 01.64-.3l.1.03 2.76.69A2.5 2.5 0 0117.5 5.95v8.1a2.5 2.5 0 01-1.65 2.35l-.1.03-2.76.69a.5.5 0 01-.34-.95l.1-.03 2.75-.69a1.5 1.5 0 001.1-1.3l.01-.14V5.95a1.5 1.5 0 00-1-1.41l-.11-.03-2.75-.69a.5.5 0 01-.4-.67zM7.15 7.35a.5.5 0 01.7 0L10 9.5l2.15-2.15a.5.5 0 11.7.7L10.71 10.2l2.14 2.15a.5.5 0 11-.7.7L10 10.91l-2.15 2.14a.5.5 0 11-.7-.7l2.14-2.15-2.14-2.15a.5.5 0 010-.7z"/></svg></span> Open in Codespaces
         </a>
         <a href="${schema.vscodeUrl ?? '#'}" target="_blank" rel="noopener"
            class="btn" style="text-decoration:none;display:inline-flex;align-items:center;gap:var(--spacing-xs)">
-          <span aria-hidden="true">⌨</span> Open in vscode.dev
+          <span aria-hidden="true"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style="vertical-align:-2px"><path d="M2 5.5A2.5 2.5 0 014.5 3h11A2.5 2.5 0 0118 5.5v7a2.5 2.5 0 01-2.5 2.5h-11A2.5 2.5 0 012 12.5v-7zM5 7a1 1 0 100 2 1 1 0 000-2zm3 0a1 1 0 100 2 1 1 0 000-2zm4 1a1 1 0 10-2 0 1 1 0 002 0zm2-1a1 1 0 100 2 1 1 0 000-2zm-8 4h8a.5.5 0 010 1H6a.5.5 0 010-1z"/></svg></span> Open in vscode.dev
         </a>
       </div>
     </div>`;
@@ -561,7 +561,7 @@ function renderAppOverview(schema) {
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
       <div>
         <h3 class="card-title" style="display:flex;align-items:center;gap:var(--spacing-s)">
-          <span aria-hidden="true">📦</span>
+          <span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16.5c0 .38-.21.71-.53.88l-7.9 4.44c-.36.2-.82.2-1.14 0l-7.9-4.44A.991.991 0 013 16.5v-9c0-.38.21-.71.53-.88l7.9-4.44a.99.99 0 011.14 0l7.9 4.44c.32.17.53.5.53.88v9zM12 4.15L5 8.09v7.82l7 3.94 7-3.94V8.09l-7-3.94z"/></svg></span>
           ${escapeHtml(schema.appName ?? 'App')}
         </h3>
         ${schema.description ? `<p class="card-subtitle" style="margin-top:var(--spacing-xxs)">${escapeHtml(schema.description)}</p>` : ''}
@@ -581,7 +581,7 @@ function renderAppOverview(schema) {
       </div>
       ${schema.url ? `<div style="margin-top:var(--spacing-m)">
         <a href="${schema.url}" target="_blank" rel="noopener" style="font-size:var(--font-size-200);color:var(--color-brand-foreground-1)">
-          🔗 ${escapeHtml(schema.url)}
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style="vertical-align:-2px;margin-right:2px"><path d="M7.47 12.41a4.5 4.5 0 01-.34-6l.34-.37 2.12-2.12a4.5 4.5 0 016.72 5.97l-.35.39-1.06 1.06a.5.5 0 01-.76-.64l.05-.07 1.06-1.06a3.5 3.5 0 00-4.86-5.03l-.09.08-2.12 2.12a3.5 3.5 0 00-.08 4.87l.08.08a.5.5 0 01-.71.71zm5.06-4.82a.5.5 0 01.71.71 4.5 4.5 0 01-.34 6l-.37.37-2.12 2.12a4.5 4.5 0 01-6.72-5.97l.35-.39 1.06-1.06a.5.5 0 01.76.64l-.05.07-1.06 1.06a3.5 3.5 0 004.86 5.03l.09-.08 2.12-2.12a3.5 3.5 0 00.08-4.87l-.08-.08a.5.5 0 010-.71z"/></svg> ${escapeHtml(schema.url)}
         </a>
       </div>` : ''}
     </div>`;
@@ -593,9 +593,9 @@ function renderAppOverview(schema) {
 
 function statusIcon(status) {
   switch (status) {
-    case 'completed': return '<span style="color:var(--color-success)">✓</span>';
+    case 'completed': return '<span style="color:var(--color-success)"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style="vertical-align:-2px"><path d="M7.03 13.9L3.56 10.44a.75.75 0 00-1.06 1.06l4 4a.75.75 0 001.06 0l9-9a.75.75 0 00-1.06-1.06L7.03 13.9z"/></svg></span>';
     case 'running':   return '<span class="spinner" style="width:14px;height:14px;border-width:2px"></span>';
-    case 'error':     return '<span style="color:var(--color-error)">✕</span>';
+    case 'error':     return '<span style="color:var(--color-error)"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style="vertical-align:-2px"><path d="M4.09 4.22a.5.5 0 01.63-.06l.07.06L10 9.44l5.22-5.22a.5.5 0 01.63-.06l.07.06a.5.5 0 01.06.63l-.06.07L10.7 10.1l5.22 5.22a.5.5 0 01-.63.76l-.07-.06L10 10.8l-5.22 5.22a.5.5 0 01-.63.06l-.07-.06a.5.5 0 01-.06-.63l.06-.07 5.22-5.22-5.22-5.22a.5.5 0 01-.06-.63l.06-.07z"/></svg></span>';
     case 'pending':
     default:          return '<span style="color:var(--color-neutral-foreground-disabled)">○</span>';
   }

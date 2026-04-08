@@ -168,8 +168,8 @@ export function createFileViewer() {
   function render() {
     viewer.innerHTML = `
       <div class="file-viewer-header">
-        <span class="file-viewer-title">📁 Generated Files</span>
-        <button class="file-viewer-close" aria-label="Close file viewer" title="Close">✕</button>
+        <span class="file-viewer-title"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style="vertical-align:-2px;margin-right:4px"><path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-5.586a1 1 0 01-.707-.293L8.293 4.293A1 1 0 007.586 4H4z"/></svg> Generated Files</span>
+        <button class="file-viewer-close" aria-label="Close file viewer" title="Close"><svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M4.09 4.22a.5.5 0 01.63-.06l.07.06L10 9.44l5.22-5.22a.5.5 0 01.63-.06l.07.06a.5.5 0 01.06.63l-.06.07L10.7 10.1l5.22 5.22a.5.5 0 01-.63.76l-.07-.06L10 10.8l-5.22 5.22a.5.5 0 01-.63.06l-.07-.06a.5.5 0 01-.06-.63l.06-.07 5.22-5.22-5.22-5.22a.5.5 0 01-.06-.63l.06-.07z"/></svg></button>
       </div>
       <div class="file-viewer-tabs" id="fv-tabs">
         ${renderTabs()}
@@ -218,7 +218,7 @@ export function createFileViewer() {
         await navigator.clipboard.writeText(code);
         const btn = viewer.querySelector('#fv-copy');
         const orig = btn.innerHTML;
-        btn.textContent = '✓ Copied';
+        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" style="vertical-align:-1px"><path d="M7.03 13.9L3.56 10.44a.75.75 0 00-1.06 1.06l4 4a.75.75 0 001.06 0l9-9a.75.75 0 00-1.06-1.06L7.03 13.9z"/></svg> Copied';
         setTimeout(() => { btn.innerHTML = orig; }, 2000);
       } catch { /* clipboard may not be available */ }
     });
@@ -319,7 +319,7 @@ export function createCodeBlock(code, language = '') {
       await navigator.clipboard.writeText(code);
       const btn = block.querySelector('.code-block-copy');
       const orig = btn.innerHTML;
-      btn.textContent = '✓ Copied';
+      btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" style="vertical-align:-1px"><path d="M7.03 13.9L3.56 10.44a.75.75 0 00-1.06 1.06l4 4a.75.75 0 001.06 0l9-9a.75.75 0 00-1.06-1.06L7.03 13.9z"/></svg> Copied';
       setTimeout(() => { btn.innerHTML = orig; }, 2000);
     } catch { /* clipboard API may not be available */ }
   });
