@@ -122,6 +122,13 @@ html, body {
   font-weight: var(--font-weight-semibold);
 }
 
+.topbar-avatar-img {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-circular);
+  object-fit: cover;
+}
+
 .topbar-user-name {
   max-width: 140px;
   overflow: hidden;

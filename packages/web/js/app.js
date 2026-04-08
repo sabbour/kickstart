@@ -648,23 +648,27 @@ async function updateAuthUI() {
 
   if (Auth.isAuthenticated()) {
     const info = Auth.getUserInfo();
+    const fallback = 'assets/icons/commands/avatar-default.svg';
+    // Start with initials avatar, upgrade to photo when ready
     userBtn.innerHTML = `
       <fluent-avatar name="${escapeHtml(info.name)}" size="28" color="colorful"></fluent-avatar>
       <span class="topbar-user-name">${escapeHtml(info.name)}</span>`;
     userBtn.onclick = () => Auth.logout().then(updateAuthUI);
     userBtn.title = `Signed in as ${info.email} — click to sign out`;
 
-    // Fetch photo in background, update avatar when ready
+    // Fetch photo in background, swap to <img> when ready
     const photoUrl = await fetchUserPhoto();
-    const avatar = userBtn.querySelector('fluent-avatar');
-    if (avatar) {
-      const fallback = 'assets/icons/commands/avatar-default.svg';
-      const imgSrc = photoUrl || fallback;
-      avatar.setAttribute('src', imgSrc);
-      // Handle 404 / broken image at the component level
-      const img = avatar.shadowRoot?.querySelector('img') || avatar.querySelector('img');
-      if (img) {
+    if (photoUrl) {
+      const fluentAvatar = userBtn.querySelector('fluent-avatar');
+      if (fluentAvatar) {
+        const img = document.createElement('img');
+        img.src = photoUrl;
+        img.alt = escapeHtml(info.name);
+        img.width = 28;
+        img.height = 28;
+        img.className = 'topbar-avatar-img';
         img.onerror = () => { img.src = fallback; img.onerror = null; };
+        fluentAvatar.replaceWith(img);
       }
     }
   } else {
