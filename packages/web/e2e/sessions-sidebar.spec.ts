@@ -1,53 +1,59 @@
-import { test, expect } from './helpers';
+import { test, expect, enterChatViaTrack } from './helpers';
 
 test.describe('Sessions sidebar', () => {
-  test.beforeEach(async ({ page }) => {
+  test('sidebar starts hidden on landing page', async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('#landing-page', { timeout: 10_000 });
-  });
 
-  test('sidebar starts hidden', async ({ page }) => {
     const sidebar = page.locator('#sessions-sidebar');
     await expect(sidebar).toHaveClass(/hidden/);
   });
 
-  test('toggle button opens the sidebar', async ({ page }) => {
-    const toggleBtn = page.locator('#topbar-sessions-toggle');
-    const sidebar = page.locator('#sessions-sidebar');
+  test.describe('after entering chat', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/');
+      await page.waitForSelector('#landing-page', { timeout: 10_000 });
+      await enterChatViaTrack(page, 'web-app');
+    });
 
-    await toggleBtn.click();
-    await expect(sidebar).not.toHaveClass(/hidden/);
-    await expect(sidebar).toBeVisible();
-  });
+    test('toggle button opens the sidebar', async ({ page }) => {
+      const toggleBtn = page.locator('#topbar-sessions-toggle');
+      const sidebar = page.locator('#sessions-sidebar');
 
-  test('close button closes the sidebar', async ({ page }) => {
-    const toggleBtn = page.locator('#topbar-sessions-toggle');
-    const sidebar = page.locator('#sessions-sidebar');
-    const closeBtn = page.locator('#sessions-close-btn');
+      await toggleBtn.click();
+      await expect(sidebar).not.toHaveClass(/hidden/);
+      await expect(sidebar).toBeVisible();
+    });
 
-    // Open first
-    await toggleBtn.click();
-    await expect(sidebar).not.toHaveClass(/hidden/);
+    test('close button closes the sidebar', async ({ page }) => {
+      const toggleBtn = page.locator('#topbar-sessions-toggle');
+      const sidebar = page.locator('#sessions-sidebar');
+      const closeBtn = page.locator('#sessions-close-btn');
 
-    // Close
-    await closeBtn.click();
-    await expect(sidebar).toHaveClass(/hidden/);
-  });
+      // Open first
+      await toggleBtn.click();
+      await expect(sidebar).not.toHaveClass(/hidden/);
 
-  test('toggle button can open and close the sidebar repeatedly', async ({ page }) => {
-    const toggleBtn = page.locator('#topbar-sessions-toggle');
-    const sidebar = page.locator('#sessions-sidebar');
+      // Close
+      await closeBtn.click();
+      await expect(sidebar).toHaveClass(/hidden/);
+    });
 
-    // Open
-    await toggleBtn.click();
-    await expect(sidebar).not.toHaveClass(/hidden/);
+    test('toggle button can open and close the sidebar repeatedly', async ({ page }) => {
+      const toggleBtn = page.locator('#topbar-sessions-toggle');
+      const sidebar = page.locator('#sessions-sidebar');
 
-    // Close via toggle
-    await toggleBtn.click();
-    await expect(sidebar).toHaveClass(/hidden/);
+      // Open
+      await toggleBtn.click();
+      await expect(sidebar).not.toHaveClass(/hidden/);
 
-    // Open again
-    await toggleBtn.click();
-    await expect(sidebar).not.toHaveClass(/hidden/);
+      // Close via toggle
+      await toggleBtn.click();
+      await expect(sidebar).toHaveClass(/hidden/);
+
+      // Open again
+      await toggleBtn.click();
+      await expect(sidebar).not.toHaveClass(/hidden/);
+    });
   });
 });

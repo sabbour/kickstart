@@ -70,10 +70,20 @@ test.describe('Chat experience (demo mode)', () => {
     expect(await userBubbles.count()).toBeGreaterThanOrEqual(3);
   });
 
-  test('markdown rendering in assistant messages', async ({ page }) => {
-    // The welcome message contains bold text via **Kickstart**
+  test('assistant messages render with A2UI text content', async ({ page }) => {
+    // The welcome message contains text from the A2UI engine
     const firstAssistant = page.locator('.chat-bubble.assistant').first();
-    const strongTag = firstAssistant.locator('strong');
-    await expect(strongTag.first()).toBeVisible();
+    await expect(firstAssistant).toContainText('Kickstart');
+
+    // Send a message to get a demo response with A2UI content
+    await sendChatMessage(page, 'A todo list app');
+    await expect(async () => {
+      const count = await page.locator('.chat-bubble.assistant').count();
+      expect(count).toBeGreaterThanOrEqual(2);
+    }).toPass({ timeout: 8000 });
+
+    // The demo response should ask about framework
+    const lastAssistant = page.locator('.chat-bubble.assistant').last();
+    await expect(lastAssistant).toContainText('language');
   });
 });
