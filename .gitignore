@@ -20,6 +20,10 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Playwright
+test-results/
+playwright-report/
+
 # Azure
 .azure/
 local.settings.json
