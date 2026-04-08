@@ -602,3 +602,51 @@ kickstart/
 - All meaningful changes require team consensus
 - Document architectural decisions here
 - Keep history focused on work, decisions focused on direction
+
+# Decision: SWA API Backend Architecture
+
+**Author:** Bender (Backend Dev)
+**Date:** 2025-07-25
+**Status:** Implemented
+
+## Context
+
+The web surface needs an LLM proxy to call Azure OpenAI on behalf of users. API keys can't live in the browser.
+
+## Decision
+
+1. **Azure Functions v4 in SWA:** API lives at `packages/web/api/` as an Azure Functions project. SWA handles routing `/api/*` requests to it.
+2. **Fetch-based OpenAI client:** No SDK dependency — direct REST calls to Azure OpenAI API. Lighter, fewer deps, same functionality.
+3. **Workspace member:** API added as explicit npm workspace (`packages/web/api`) for `@kickstart/core` resolution. Pre-built in CI before SWA deploy.
+4. **Session store pattern:** Same in-memory Map + TTL cleanup pattern used by MCP server. No persistence yet — sessions are ephemeral per deployment.
+5. **SSE streaming:** Converse endpoint supports both standard JSON and `text/event-stream` for real-time token streaming.
+
+## Consequences
+
+- API keys must be set in SWA app settings (not in source)
+- Sessions are lost on function cold starts (acceptable for Phase 1)
+- CI workflow now requires Node.js setup + multi-step build (core → api → SWA deploy)
+
+# Decision: API Client Architecture — Graceful Fallback to Demo Mode
+
+**Author:** Fry (Frontend Dev)
+**Date:** 2025-07-25
+**Status:** Implemented
+
+## What
+The web frontend now auto-detects whether the API backend (`POST /api/converse`) is available at boot via an OPTIONS health check. If available, it uses the real API with streaming support. If not, it falls back to the scripted demo engine and shows a visible "Demo mode" badge.
+
+## Why
+- The API backend (Bender's work) may not be deployed yet, or may be down during local dev.
+- Users and testers need a clear signal when they're seeing demo vs. real responses.
+- The demo flow must always work as a safety net.
+
+## Key Choices
+1. **Health check at boot, not per-request** — avoids latency on every message.
+2. **Streaming via ReadableStream (NDJSON)** — no EventSource needed since we POST with a body.
+3. **Auto-retry on 429/503** — exponential backoff, max 3 retries, so transient failures don't surface as errors.
+4. **Error bubbles with Retry** — users can re-send without retyping.
+
+## Consequences
+- When the API is deployed, the frontend will automatically switch to API mode on next page load.
+- If the API goes down mid-session, individual requests will show error bubbles (not a full crash).
