@@ -650,3 +650,30 @@ The web frontend now auto-detects whether the API backend (`POST /api/converse`)
 ## Consequences
 - When the API is deployed, the frontend will automatically switch to API mode on next page load.
 - If the API goes down mid-session, individual requests will show error bubbles (not a full crash).
+
+# Decision: Playwright E2E Test Infrastructure for Web UI
+
+**Author:** Hermes (Tester)  
+**Date:** 2026-04-08  
+**Status:** Accepted
+
+## Context
+
+The `packages/web/` static site had no automated E2E tests. Manual testing was required to verify navigation, copilot panel, conversation flow, A2UI component rendering, and wizard behavior.
+
+## Decision
+
+Adopted Playwright with a lightweight static file server (`serve`) for E2E testing. MSAL authentication and API endpoints are mocked via route interception to enable fully offline, deterministic tests.
+
+## Rationale
+
+- Playwright provides reliable browser automation with built-in assertions
+- Route interception (vs `addInitScript`) is the only reliable way to mock CDN-loaded MSAL
+- Intercepting `/api/converse` with 503 forces demo mode, ensuring tests run against the deterministic scripted engine
+- Port 4281 avoids conflicts with Azure SWA CLI (port 4280)
+
+## Consequences
+
+- Tests depend on demo engine behavior — if prompts change, conversation-flow tests may need updating
+- A2UI tests rely on content-based selectors since components lack unique CSS classes
+- 38 tests run in ~13s on Chromium only

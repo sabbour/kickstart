@@ -24,3 +24,11 @@
 - **Tenant pivot:** Entra app must be recreated in CA Global Demos 2605 tenant (caglobaldemos2605.onmicrosoft.com), not Microsoft corp tenant.
 - **Ahmed's model preference:** claude-opus-4.6 for code, claude-haiku-4.5 for non-code.
 - **Phase 1 defers:** cost estimation, Mermaid diagrams, K8s validation, MCP App UI, conversation phases 5-8, Codespaces integration.
+
+### 2025-07-25: Docs structure and architecture diagrams
+- Created `docs/architecture.md` with 7 Mermaid diagrams: system overview (C4-style), web flow sequence, IDE/MCP flow sequence, 6-phase conversation pipeline, A2UI rendering pipeline, 3-layer prompt architecture, and deployment architecture.
+- Created `docs/README.md` as index linking to architecture, contributing, and infra docs.
+- Created root `README.md` with project description, dual-surface concept, quick start, tech stack table, and links to docs.
+- A2UI catalog has 17 components (7 standard, 6 Kickstart, 4 GitHub). Catalog schema uses JSON Schema draft/2020-12.
+- 6-phase engine confirmed: Discover→Design→Generate→Review→Handoff→Deploy. K8s hidden in phases 1-3, visible in 4-6.
+- Deployment safeguards DS001–DS013 enforced across all phases via Layer 2 system prompt.
