@@ -183,28 +183,6 @@ function initLandingListeners() {
     });
   });
 
-  // IDE card — Claude Code (copy command)
-  document.querySelectorAll('.ide-card[data-copy-command]').forEach(card => {
-    card.addEventListener('click', async (e) => {
-      e.preventDefault();
-      const command = card.dataset.copyCommand;
-      try {
-        await navigator.clipboard.writeText(command);
-        const nameEl = card.querySelector('.ide-card-name');
-        const orig = nameEl.textContent;
-        nameEl.textContent = 'Copied!';
-        setTimeout(() => { nameEl.textContent = orig; }, 2000);
-      } catch {
-        const input = document.createElement('input');
-        input.value = command;
-        document.body.appendChild(input);
-        input.select();
-        document.execCommand('copy');
-        document.body.removeChild(input);
-      }
-    });
-  });
-
   // Framework pills
   document.querySelectorAll('.framework-pill').forEach(pill => {
     pill.addEventListener('click', () => {
