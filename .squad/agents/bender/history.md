@@ -138,3 +138,12 @@
 - **Alignment**: System prompt now enforces emoji ban globally for all LLM responses. Demo engine serves as reference implementation (emoji-free).
 - **Test status**: No failures — emoji removal is text-only, does not affect phase transitions or response parsing.
 - **Decision context**: Implements user directive from decision inbox: "LLM responses must not contain emojis"
+
+### 2025-07-25: Per-Track Prompt Addendums and Inspirations Endpoint
+
+- **Track addendums:** Added `WEB_APP_ADDENDUM` (~250 words) and `AGENTIC_APP_ADDENDUM` (~300 words) as exported constants in `packages/web/js/prompts.js`. Web-app addendum covers Dockerfiles, CI/CD, database connectivity, scaling, multi-stage builds. Agentic-app addendum covers KAITO for GPU model serving, RAGEngine for managed RAG, LangChain/Semantic Kernel patterns, Azure OpenAI integration.
+- **buildSystemPrompt() signature:** Added optional third parameter `track` (string). When `'web-app'` or `'agentic-app'`, the corresponding addendum is appended after the known-info block.
+- **Engine wiring:** Demo engine passes track from closure to `buildSystemPrompt()`. API engine updated to accept and forward `track` parameter. `createEngine()` factory passes track to both code paths.
+- **Inspirations endpoint:** `GET /api/inspirations` at `packages/web/api/src/functions/inspirations.ts`. Returns `InspirationIdea[]` (title, subtitle, prompt). Uses Azure OpenAI if env vars are configured (temperature 0.9, max 1500 tokens, raw JSON response). Falls back to shuffled hardcoded ideas (mirrored from `app.js` `INSPIRATION_IDEAS`). Graceful degradation — if OpenAI call fails, logs warning and serves fallback.
+- **Pattern followed:** Matches `converse.ts` structure — `app.http()` registration, anonymous auth, proper error handling with context logging.
+- **No emojis:** LLM generation prompt for inspirations explicitly says "No emoji."
