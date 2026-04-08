@@ -69,7 +69,15 @@ export function createChatUI(config = {}) {
   function renderMessages() {
     let html = messages.map(msg => {
       const cls = msg.role === 'user' ? 'user' : 'assistant';
-      return `<div class="chat-bubble ${cls}" role="article">${msg.html ?? escapeHtml(msg.text)}</div>`;
+      let content;
+      if (msg.html) {
+        content = msg.html;
+      } else if (cls === 'user') {
+        content = escapeHtml(msg.text);
+      } else {
+        content = renderMarkdown(msg.text);
+      }
+      return `<div class="chat-bubble ${cls}" role="article">${content}</div>`;
     }).join('');
 
     if (isTyping) {
@@ -325,6 +333,68 @@ export function createCodeBlock(code, language = '') {
   });
 
   return block;
+}
+
+// ---------- Markdown renderer (lightweight) ----------
+
+/**
+ * Convert a subset of Markdown to HTML for assistant messages.
+ * Supports: bold, italic, inline code, code blocks, paragraphs,
+ * unordered lists, links, and line breaks.
+ */
+export function renderMarkdown(text) {
+  if (!text) return '';
+
+  // Escape HTML entities
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  // Extract fenced code blocks into placeholders
+  const codeBlocks = [];
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
+    const idx = codeBlocks.length;
+    codeBlocks.push(`<pre><code>${code.trimEnd()}</code></pre>`);
+    return `\n\n%%CODEBLOCK_${idx}%%\n\n`;
+  });
+
+  // Inline code (before bold/italic so backtick-wrapped text isn't altered)
+  html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+  // Bold (**text**)
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+  // Italic (*text*) — single asterisks that aren't part of bold
+  html = html.replace(/\*([^\n*]+)\*/g, '<em>$1</em>');
+
+  // Links [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+  // Split into blocks on double-newlines
+  const blocks = html.split(/\n{2,}/);
+  html = blocks.map(block => {
+    block = block.trim();
+    if (!block) return '';
+
+    // Re-insert code block placeholders
+    const cbMatch = block.match(/^%%CODEBLOCK_(\d+)%%$/);
+    if (cbMatch) return codeBlocks[parseInt(cbMatch[1], 10)];
+
+    // Unordered list (all lines start with - or * )
+    const lines = block.split('\n');
+    const allList = lines.length > 0 && lines.every(l => /^\s*[-*]\s/.test(l));
+    if (allList) {
+      const items = lines.map(l => `<li>${l.replace(/^\s*[-*]\s+/, '')}</li>`).join('');
+      return `<ul>${items}</ul>`;
+    }
+
+    // Regular paragraph — single newlines become <br>
+    return `<p>${block.replace(/\n/g, '<br>')}</p>`;
+  }).filter(Boolean).join('\n');
+
+  return html;
 }
 
 // ---------- Helpers ----------

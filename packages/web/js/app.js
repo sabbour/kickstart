@@ -4,7 +4,7 @@
  */
 
 import { EventBus } from './framework/core.js';
-import { createChatUI, createFileViewer, createCodeBlock, escapeHtml } from './framework/components.js';
+import { createChatUI, createFileViewer, createCodeBlock, escapeHtml, renderMarkdown } from './framework/components.js';
 import { renderA2UI } from './framework/a2ui-renderer.js';
 import { createEngine } from './engine.js';
 import { createApiClient } from './api-client.js';
@@ -62,6 +62,10 @@ EventBus.on('files:generated', ({ files }) => {
 document.getElementById('topbar-sessions-toggle')?.addEventListener('click', () => {
   const sidebar = document.getElementById('sessions-sidebar');
   sidebar?.classList.toggle('hidden');
+});
+
+document.getElementById('sessions-close-btn')?.addEventListener('click', () => {
+  document.getElementById('sessions-sidebar')?.classList.add('hidden');
 });
 
 // ---------- Prompt Inspector Toggle ----------
@@ -179,17 +183,33 @@ function initLandingListeners() {
   document.querySelectorAll('.track-card-link').forEach(btn => {
     btn.addEventListener('click', () => {
       selectedTrack = btn.dataset.track;
+      pendingQuickPrompt = selectedTrack === 'agentic-app'
+        ? 'I want to build an AI agent and deploy it to Azure'
+        : 'I want to build a web app or API and deploy it to Azure';
       transitionToChat();
     });
   });
 
   // Framework pills
+  const frameworkPrompts = {
+    'Next.js': 'I want to build a Next.js app and deploy it to Azure',
+    'Python FastAPI': 'I want to build a Python FastAPI app and deploy it to Azure',
+    'Express.js': 'I want to build an Express.js app and deploy it to Azure',
+    'Go': 'I want to build a Go app and deploy it to Azure',
+    'Spring Boot': 'I want to build a Spring Boot app and deploy it to Azure',
+    'Django': 'I want to build a Django app and deploy it to Azure',
+    'Rust': 'I want to build a Rust app and deploy it to Azure',
+    'LangChain Agent': 'I want to build a LangChain AI agent and deploy it to Azure',
+    'RAG App': 'I want to build a RAG application and deploy it to Azure',
+  };
+
   document.querySelectorAll('.framework-pill').forEach(pill => {
     pill.addEventListener('click', () => {
       selectedFramework = pill.dataset.framework;
-      // Auto-detect track from framework
       const agenticFrameworks = ['LangChain Agent', 'RAG App'];
       selectedTrack = agenticFrameworks.includes(selectedFramework) ? 'agentic-app' : 'web-app';
+      pendingQuickPrompt = frameworkPrompts[selectedFramework]
+        ?? `I want to build a ${selectedFramework} app and deploy it to Azure`;
       transitionToChat();
     });
   });
@@ -325,7 +345,7 @@ function updateStreamingBubble(text) {
     container.appendChild(streamingBubbleEl);
   }
 
-  streamingBubbleEl.textContent = text;
+  streamingBubbleEl.innerHTML = renderMarkdown(text);
   chatUI.scrollToBottom();
 }
 

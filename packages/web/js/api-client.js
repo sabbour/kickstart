@@ -158,8 +158,9 @@ export function createApiClient({ baseUrl = DEFAULT_BASE_URL } = {}) {
         signal: controller.signal,
       });
       clearTimeout(timer);
-      // Accept any non-error response (2xx, 4xx method-not-allowed is fine — means server exists)
-      return res.status < 500;
+      // 2xx = endpoint exists and responds; 405 = endpoint exists but rejects OPTIONS.
+      // 404 means the endpoint isn't deployed yet — treat as unavailable.
+      return res.ok || res.status === 405;
     } catch {
       return false;
     }

@@ -111,12 +111,48 @@
   color: var(--color-brand-primary);
 }
 
+/* --- Markdown content inside assistant bubbles --- */
 .chat-bubble.assistant p {
   margin-bottom: var(--spacing-m);
 }
 
 .chat-bubble.assistant p:last-child {
   margin-bottom: 0;
+}
+
+.chat-bubble.assistant ul {
+  margin: var(--spacing-s) 0;
+  padding-left: var(--spacing-xl);
+}
+
+.chat-bubble.assistant ul li {
+  margin-bottom: var(--spacing-xs);
+}
+
+.chat-bubble.assistant pre {
+  background: var(--color-neutral-background-inverted);
+  color: #d4d4d4;
+  border-radius: var(--radius-medium);
+  padding: var(--spacing-m);
+  overflow-x: auto;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-200);
+  line-height: 1.5;
+  margin: var(--spacing-m) 0;
+}
+
+.chat-bubble.assistant code {
+  font-family: var(--font-family-mono);
+  font-size: 0.9em;
+  background: var(--color-neutral-background-3);
+  padding: 1px 4px;
+  border-radius: var(--radius-small);
+}
+
+.chat-bubble.assistant pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
 }
 
 /* A2UI components inside assistant bubbles get some breathing room */
