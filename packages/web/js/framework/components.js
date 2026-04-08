@@ -1,66 +1,50 @@
 /**
- * Component factories — Copilot panel, wizard, cards, command bar, etc.
+ * Component factories — Chat UI, file viewer, cards, code blocks
  * @module components
  */
 
 import { EventBus } from './core.js';
 
-// ---------- Copilot Panel ----------
-export function createCopilotPanel(config = {}) {
-  const panel = document.createElement('aside');
-  panel.className = 'copilot-panel';
-  panel.id = 'copilot-panel';
-  panel.setAttribute('role', 'complementary');
-  panel.setAttribute('aria-label', 'Kickstart Copilot');
+// ---------- Chat UI (main experience) ----------
+export function createChatUI(config = {}) {
+  const container = document.createElement('div');
+  container.className = 'chat-container';
+  container.id = 'chat-ui';
 
   let messages = [];
   let isTyping = false;
-  let promptInspectorEnabled = false;
   let onSend = config.onSend ?? (() => {});
-  let onPromptInspectorToggle = config.onPromptInspectorToggle ?? (() => {});
 
   const phases = config.phases ?? [
-    { id: 'understand', label: 'Understand' },
-    { id: 'architect', label: 'Architect' },
-    { id: 'configure', label: 'Configure' },
+    { id: 'discover', label: 'Discover' },
+    { id: 'design', label: 'Design' },
+    { id: 'generate', label: 'Generate' },
+    { id: 'review', label: 'Review' },
+    { id: 'handoff', label: 'Handoff' },
     { id: 'deploy', label: 'Deploy' },
   ];
   let currentPhase = 0;
 
   function render() {
-    panel.innerHTML = `
-      <header class="copilot-header">
-        <div class="copilot-header-title">
-          <span class="copilot-icon" aria-hidden="true">✦</span>
-          <span>Kickstart Copilot</span>
-        </div>
-        <div class="copilot-header-actions">
-          <button class="copilot-inspector-btn${promptInspectorEnabled ? ' active' : ''}"
-                  aria-label="Toggle prompt inspector"
-                  aria-pressed="${promptInspectorEnabled}"
-                  title="${promptInspectorEnabled ? 'Hide prompts' : 'Show prompts'}">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1a7 7 0 110 14A7 7 0 018 1zm0 1.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM8 4a.75.75 0 01.75.75v2.5h2.5a.75.75 0 010 1.5h-2.5v2.5a.75.75 0 01-1.5 0v-2.5h-2.5a.75.75 0 010-1.5h2.5v-2.5A.75.75 0 018 4z"/>
-            </svg>
-            <span style="font-size:11px">Prompts</span>
-          </button>
-          <button class="copilot-close-btn" aria-label="Close Copilot panel" title="Close">✕</button>
-        </div>
-      </header>
-      <nav class="copilot-phase" aria-label="Conversation progress">
+    container.innerHTML = `
+      <nav class="chat-phase" aria-label="Conversation progress">
         ${renderPhases()}
       </nav>
-      <div class="copilot-messages" role="log" aria-live="polite" aria-label="Chat messages">
-        ${renderMessages()}
+      <div class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
+        <div class="chat-messages-inner" id="chat-messages-inner">
+          ${renderMessages()}
+        </div>
       </div>
-      <div class="copilot-input-area">
-        <textarea class="copilot-textarea" placeholder="Ask Kickstart anything…"
-                  rows="1" aria-label="Message input"></textarea>
-        <button class="copilot-send-btn" aria-label="Send message" title="Send">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M1.5 1.3l13 6.7-13 6.7 1.2-5.7H8v-2H2.7z"/>
-          </svg>
-        </button>
+      <div class="chat-input-area">
+        <div class="chat-input-inner">
+          <textarea class="chat-textarea" placeholder="Tell Kickstart about your app…"
+                    rows="1" aria-label="Message input"></textarea>
+          <button class="chat-send-btn" aria-label="Send message" title="Send">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M1.5 1.3l13 6.7-13 6.7 1.2-5.7H8v-2H2.7z"/>
+            </svg>
+          </button>
+        </div>
       </div>`;
 
     bindEvents();
@@ -71,11 +55,11 @@ export function createCopilotPanel(config = {}) {
     return phases.map((phase, i) => {
       const status = i < currentPhase ? 'completed' : i === currentPhase ? 'active' : '';
       const connector = i < phases.length - 1
-        ? `<span class="copilot-phase-connector ${i < currentPhase ? 'completed' : ''}"></span>`
+        ? `<span class="chat-phase-connector ${i < currentPhase ? 'completed' : ''}"></span>`
         : '';
       return `
-        <span class="copilot-phase-step">
-          <span class="copilot-phase-dot ${status}" aria-hidden="true"></span>
+        <span class="chat-phase-step">
+          <span class="chat-phase-dot ${status}" aria-hidden="true"></span>
           <span>${phase.label}</span>
         </span>
         ${connector}`;
@@ -90,7 +74,7 @@ export function createCopilotPanel(config = {}) {
 
     if (isTyping) {
       html += `
-        <div class="typing-indicator" aria-label="Copilot is typing">
+        <div class="typing-indicator" aria-label="Kickstart is thinking">
           <span class="typing-dot"></span>
           <span class="typing-dot"></span>
           <span class="typing-dot"></span>
@@ -100,21 +84,8 @@ export function createCopilotPanel(config = {}) {
   }
 
   function bindEvents() {
-    panel.querySelector('.copilot-close-btn')?.addEventListener('click', () => toggle(false));
-
-    panel.querySelector('.copilot-inspector-btn')?.addEventListener('click', () => {
-      promptInspectorEnabled = !promptInspectorEnabled;
-      const btn = panel.querySelector('.copilot-inspector-btn');
-      if (btn) {
-        btn.classList.toggle('active', promptInspectorEnabled);
-        btn.setAttribute('aria-pressed', String(promptInspectorEnabled));
-        btn.title = promptInspectorEnabled ? 'Hide prompts' : 'Show prompts';
-      }
-      onPromptInspectorToggle(promptInspectorEnabled);
-    });
-
-    const textarea = panel.querySelector('.copilot-textarea');
-    const sendBtn = panel.querySelector('.copilot-send-btn');
+    const textarea = container.querySelector('.chat-textarea');
+    const sendBtn = container.querySelector('.chat-send-btn');
 
     textarea?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -123,17 +94,16 @@ export function createCopilotPanel(config = {}) {
       }
     });
 
-    // Auto-resize textarea
     textarea?.addEventListener('input', () => {
       textarea.style.height = 'auto';
-      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+      textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
     });
 
     sendBtn?.addEventListener('click', send);
   }
 
   function send() {
-    const textarea = panel.querySelector('.copilot-textarea');
+    const textarea = container.querySelector('.chat-textarea');
     const text = textarea?.value.trim();
     if (!text) return;
 
@@ -149,18 +119,18 @@ export function createCopilotPanel(config = {}) {
   }
 
   function refreshMessages() {
-    const container = panel.querySelector('.copilot-messages');
-    if (container) {
-      container.innerHTML = renderMessages();
+    const inner = container.querySelector('#chat-messages-inner');
+    if (inner) {
+      inner.innerHTML = renderMessages();
       scrollToBottom();
     }
   }
 
   function scrollToBottom() {
-    const container = panel.querySelector('.copilot-messages');
-    if (container) {
+    const scrollArea = container.querySelector('.chat-messages');
+    if (scrollArea) {
       requestAnimationFrame(() => {
-        container.scrollTop = container.scrollHeight;
+        scrollArea.scrollTop = scrollArea.scrollHeight;
       });
     }
   }
@@ -172,135 +142,120 @@ export function createCopilotPanel(config = {}) {
 
   function setPhase(index) {
     currentPhase = index;
-    const phaseEl = panel.querySelector('.copilot-phase');
+    const phaseEl = container.querySelector('.chat-phase');
     if (phaseEl) phaseEl.innerHTML = renderPhases();
-  }
-
-  function toggle(show) {
-    const visible = show ?? panel.classList.contains('hidden');
-    panel.classList.toggle('hidden', !visible);
-    EventBus.emit('copilot:toggled', { visible });
-  }
-
-  render();
-
-  return Object.freeze({
-    element: panel,
-    addMessage,
-    setTyping,
-    setPhase,
-    toggle,
-    get isVisible() { return !panel.classList.contains('hidden'); },
-    get promptInspector() { return promptInspectorEnabled; },
-  });
-}
-
-// ---------- Wizard ----------
-export function createWizard(config) {
-  const { steps = [], onComplete, onCancel } = config;
-  let currentStep = 0;
-  const stepData = {};
-
-  const container = document.createElement('div');
-  container.className = 'wizard';
-  container.setAttribute('role', 'form');
-  container.setAttribute('aria-label', config.title ?? 'Wizard');
-
-  function render() {
-    container.innerHTML = `
-      <div class="wizard-steps" role="navigation" aria-label="Wizard steps">
-        ${renderStepIndicators()}
-      </div>
-      <div class="wizard-body" id="wizard-step-content">
-      </div>
-      <footer class="wizard-footer">
-        <button class="wizard-btn" id="wizard-cancel" type="button">Cancel</button>
-        <button class="wizard-btn" id="wizard-back" type="button"
-                ${currentStep === 0 ? 'disabled' : ''}>Back</button>
-        ${currentStep < steps.length - 1
-          ? '<button class="wizard-btn primary" id="wizard-next" type="button">Next</button>'
-          : '<button class="wizard-btn primary" id="wizard-create" type="button">Create</button>'
-        }
-      </footer>`;
-
-    renderStepContent();
-    bindWizardEvents();
-  }
-
-  function renderStepIndicators() {
-    return steps.map((step, i) => {
-      const status = i < currentStep ? 'completed' : i === currentStep ? 'active' : '';
-      const checkmark = i < currentStep ? '✓' : i + 1;
-      const connector = i < steps.length - 1
-        ? `<span class="wizard-step-connector ${i < currentStep ? 'completed' : ''}"></span>`
-        : '';
-      return `
-        <span class="wizard-step-indicator ${status}" role="listitem"
-              aria-current="${i === currentStep ? 'step' : 'false'}">
-          <span class="wizard-step-circle">${checkmark}</span>
-          <span class="wizard-step-label">${step.title}</span>
-        </span>
-        ${connector}`;
-    }).join('');
-  }
-
-  function renderStepContent() {
-    const body = container.querySelector('#wizard-step-content');
-    if (!body) return;
-
-    body.innerHTML = '';
-    const step = steps[currentStep];
-    if (step?.render) {
-      const content = step.render(stepData);
-      if (typeof content === 'string') {
-        body.innerHTML = content;
-      } else if (content instanceof HTMLElement) {
-        body.appendChild(content);
-      }
-    }
-  }
-
-  function bindWizardEvents() {
-    container.querySelector('#wizard-cancel')?.addEventListener('click', () => {
-      onCancel?.();
-      EventBus.emit('wizard:cancelled', { step: currentStep });
-    });
-
-    container.querySelector('#wizard-back')?.addEventListener('click', () => {
-      if (currentStep > 0) {
-        currentStep--;
-        render();
-        EventBus.emit('wizard:step', { step: currentStep });
-      }
-    });
-
-    container.querySelector('#wizard-next')?.addEventListener('click', () => {
-      const step = steps[currentStep];
-      if (step.validate && !step.validate(stepData)) return;
-      currentStep++;
-      render();
-      EventBus.emit('wizard:step', { step: currentStep });
-    });
-
-    container.querySelector('#wizard-create')?.addEventListener('click', () => {
-      const step = steps[currentStep];
-      if (step.validate && !step.validate(stepData)) return;
-      onComplete?.(stepData);
-      EventBus.emit('wizard:completed', { data: stepData });
-    });
   }
 
   render();
 
   return Object.freeze({
     element: container,
-    getData: () => ({ ...stepData }),
-    goTo(index) {
-      if (index >= 0 && index < steps.length) {
-        currentStep = index;
-        render();
-      }
-    },
+    addMessage,
+    setTyping,
+    setPhase,
+    scrollToBottom,
+  });
+}
+
+// ---------- File Viewer ----------
+export function createFileViewer() {
+  const viewer = document.createElement('div');
+  viewer.className = 'file-viewer-container';
+
+  let files = [];
+  let activeIndex = 0;
+
+  function render() {
+    viewer.innerHTML = `
+      <div class="file-viewer-header">
+        <span class="file-viewer-title">📁 Generated Files</span>
+        <button class="file-viewer-close" aria-label="Close file viewer" title="Close">✕</button>
+      </div>
+      <div class="file-viewer-tabs" id="fv-tabs">
+        ${renderTabs()}
+      </div>
+      <div class="file-viewer-content">
+        <pre class="file-viewer-code" id="fv-code">${getActiveCode()}</pre>
+      </div>
+      <div class="file-viewer-actions">
+        <button class="file-viewer-copy-btn" id="fv-copy">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M4 4V1h11v11h-3v3H1V4h3zm1 0h6v7h3V2H5v2zm-1 1H2v9h9V5H4z"/>
+          </svg>
+          Copy
+        </button>
+      </div>`;
+
+    bindEvents();
+  }
+
+  function renderTabs() {
+    return files.map((f, i) =>
+      `<button class="file-tab ${i === activeIndex ? 'active' : ''}" data-idx="${i}">${escapeHtml(f.name)}</button>`
+    ).join('');
+  }
+
+  function getActiveCode() {
+    if (files.length === 0) return '';
+    return escapeHtml(files[activeIndex]?.code ?? '');
+  }
+
+  function bindEvents() {
+    viewer.querySelector('.file-viewer-close')?.addEventListener('click', () => {
+      EventBus.emit('fileViewer:close');
+    });
+
+    viewer.querySelectorAll('.file-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        activeIndex = parseInt(tab.dataset.idx, 10);
+        updateActiveTab();
+      });
+    });
+
+    viewer.querySelector('#fv-copy')?.addEventListener('click', async () => {
+      const code = files[activeIndex]?.code ?? '';
+      try {
+        await navigator.clipboard.writeText(code);
+        const btn = viewer.querySelector('#fv-copy');
+        const orig = btn.innerHTML;
+        btn.textContent = '✓ Copied';
+        setTimeout(() => { btn.innerHTML = orig; }, 2000);
+      } catch { /* clipboard may not be available */ }
+    });
+  }
+
+  function updateActiveTab() {
+    viewer.querySelectorAll('.file-tab').forEach((tab, i) => {
+      tab.classList.toggle('active', i === activeIndex);
+    });
+    const codeEl = viewer.querySelector('#fv-code');
+    if (codeEl) codeEl.textContent = files[activeIndex]?.code ?? '';
+  }
+
+  function addFile(name, code) {
+    const existing = files.findIndex(f => f.name === name);
+    if (existing >= 0) {
+      files[existing].code = code;
+    } else {
+      files.push({ name, code });
+    }
+    activeIndex = existing >= 0 ? existing : files.length - 1;
+    render();
+  }
+
+  function setFiles(fileList) {
+    files = fileList.map(f => ({ name: f.name, code: f.code }));
+    activeIndex = 0;
+    render();
+  }
+
+  render();
+
+  return Object.freeze({
+    element: viewer,
+    addFile,
+    setFiles,
+    get fileCount() { return files.length; },
   });
 }
 
@@ -333,36 +288,6 @@ export function createCard(config) {
   }
 
   return card;
-}
-
-// ---------- Command bar ----------
-export function createCommandBar(items = []) {
-  const bar = document.createElement('div');
-  bar.className = 'command-bar';
-  bar.setAttribute('role', 'toolbar');
-  bar.setAttribute('aria-label', 'Actions');
-
-  bar.innerHTML = items.map(item => {
-    if (item.type === 'divider') return '<span class="command-bar-divider"></span>';
-    if (item.type === 'spacer') return '<span class="command-bar-spacer"></span>';
-
-    const cls = `command-bar-btn ${item.primary ? 'primary' : ''}`.trim();
-    return `
-      <button class="${cls}" data-action="${item.action ?? ''}"
-              aria-label="${item.label}" title="${item.label}">
-        ${item.icon ? `<span aria-hidden="true">${item.icon}</span>` : ''}
-        <span>${item.label}</span>
-      </button>`;
-  }).join('');
-
-  // Bind click handlers
-  items.forEach(item => {
-    if (!item.action || !item.onClick) return;
-    bar.querySelector(`[data-action="${item.action}"]`)
-      ?.addEventListener('click', item.onClick);
-  });
-
-  return bar;
 }
 
 // ---------- Status badge ----------

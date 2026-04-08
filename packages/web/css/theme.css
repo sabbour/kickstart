@@ -102,8 +102,33 @@
 
   /* --- Layout --- */
   --topbar-height: 48px;
-  --nav-width: 240px;
-  --nav-width-collapsed: 48px;
-  --copilot-panel-width: 420px;
-  --command-bar-height: 44px;
+  --chat-max-width: 760px;
+  --sessions-sidebar-width: 260px;
+  --file-viewer-width: 420px;
+}
+
+/* --- Dark mode --- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-neutral-background-1: #1e1e1e;
+    --color-neutral-background-2: #252525;
+    --color-neutral-background-3: #2d2d2d;
+    --color-neutral-background-4: #333333;
+    --color-neutral-background-5: #3d3d3d;
+    --color-neutral-background-inverted: #f5f5f5;
+    --color-neutral-background-dark: #1a1a1a;
+    --color-neutral-foreground-1: #e0e0e0;
+    --color-neutral-foreground-2: #c0c0c0;
+    --color-neutral-foreground-3: #909090;
+    --color-neutral-foreground-disabled: #666666;
+    --color-neutral-stroke-1: #444444;
+    --color-neutral-stroke-2: #333333;
+    --color-copilot-bg: #1a1a2e;
+    --color-success-background: #1a3d1a;
+    --color-warning-background: #3d3a1a;
+    --color-error-background: #3d1a1a;
+    --color-info-background: #1a2a3d;
+    --color-brand-light: #1a2a3d;
+    --color-brand-lighter: #0d1a2d;
+  }
 }

@@ -1,199 +1,83 @@
 /* ==========================================================================
-   Components — Copilot panel, wizard, cards, status, code blocks
+   Components — Chat UI, file viewer, cards, status, code blocks
    ========================================================================== */
 
-/* ---------- Copilot Panel ---------- */
-.copilot-panel {
-  grid-area: copilot;
-  width: var(--copilot-panel-width);
-  background: var(--color-neutral-background-1);
-  border-left: 1px solid var(--color-neutral-stroke-2);
+/* ---------- Chat UI (main experience) ---------- */
+.chat-container {
   display: flex;
   flex-direction: column;
-  transform: translateX(0);
-  transition: transform var(--duration-slow) var(--easing-ease-out),
-              width var(--duration-slow) var(--easing-ease-out);
+  height: 100%;
   overflow: hidden;
 }
 
-.copilot-panel.hidden {
-  width: 0;
-  transform: translateX(100%);
-  border-left: none;
-}
-
-.copilot-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-m) var(--spacing-l);
-  border-bottom: 1px solid var(--color-neutral-stroke-2);
-  flex-shrink: 0;
-}
-
-.copilot-header-title {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-s);
-  font-size: var(--font-size-400);
-  font-weight: var(--font-weight-semibold);
-}
-
-.copilot-icon {
-  width: 20px;
-  height: 20px;
-  background: linear-gradient(135deg, var(--color-copilot-gradient-start), var(--color-copilot-gradient-end));
-  border-radius: var(--radius-medium);
+/* --- Phase indicator (subtle, at top of chat) --- */
+.chat-phase {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 12px;
-}
-
-.copilot-close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: var(--radius-medium);
-  background: transparent;
-  color: var(--color-neutral-foreground-2);
-  cursor: pointer;
-  font-size: var(--font-size-400);
-}
-
-.copilot-close-btn:hover {
-  background: var(--color-neutral-background-3);
-}
-
-/* --- Prompt inspector toggle --- */
-.copilot-header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-}
-
-.copilot-inspector-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border: 1px solid var(--color-neutral-stroke-2);
-  border-radius: var(--radius-medium);
-  background: transparent;
-  color: var(--color-neutral-foreground-2);
-  cursor: pointer;
-  font-size: 11px;
-  line-height: 1;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.copilot-inspector-btn:hover {
-  background: var(--color-neutral-background-3);
-}
-
-.copilot-inspector-btn.active {
-  background: var(--color-brand-background-2);
-  border-color: var(--color-brand-stroke-1, var(--color-brand-background));
-  color: var(--color-brand-foreground-1, var(--color-brand-background));
-}
-
-/* --- Prompt inspector details block --- */
-.prompt-inspector {
-  margin-top: var(--spacing-s);
-  font-size: var(--font-size-200);
-}
-
-.prompt-inspector summary {
-  cursor: pointer;
-  color: var(--color-neutral-foreground-2);
-  font-size: var(--font-size-200);
-  padding: var(--spacing-xs) 0;
-  user-select: none;
-}
-
-.prompt-inspector summary:hover {
-  color: var(--color-brand-foreground-1, var(--color-brand-background));
-}
-
-.prompt-inspector .code-block {
-  margin-top: var(--spacing-s);
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.prompt-inspector .code-block pre {
-  font-size: var(--font-size-100, 11px);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* --- Phase indicator --- */
-.copilot-phase {
-  display: flex;
-  align-items: center;
   gap: var(--spacing-s);
   padding: var(--spacing-s) var(--spacing-l);
-  background: var(--color-copilot-bg);
+  background: var(--color-neutral-background-1);
   border-bottom: 1px solid var(--color-neutral-stroke-2);
   font-size: var(--font-size-200);
-  color: var(--color-neutral-foreground-2);
+  color: var(--color-neutral-foreground-3);
   flex-shrink: 0;
 }
 
-.copilot-phase-step {
+.chat-phase-step {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
 }
 
-.copilot-phase-dot {
-  width: 8px;
-  height: 8px;
+.chat-phase-dot {
+  width: 6px;
+  height: 6px;
   border-radius: var(--radius-circular);
   background: var(--color-neutral-stroke-1);
   transition: background var(--duration-normal);
 }
 
-.copilot-phase-dot.active {
+.chat-phase-dot.active {
   background: var(--color-brand-primary);
+  box-shadow: 0 0 0 2px var(--color-brand-light);
 }
 
-.copilot-phase-dot.completed {
+.chat-phase-dot.completed {
   background: var(--color-success);
 }
 
-.copilot-phase-connector {
-  width: 24px;
-  height: 2px;
+.chat-phase-connector {
+  width: 16px;
+  height: 1px;
   background: var(--color-neutral-stroke-2);
 }
 
-.copilot-phase-connector.completed {
+.chat-phase-connector.completed {
   background: var(--color-success);
 }
 
-/* --- Messages area --- */
-.copilot-messages {
+/* --- Messages area (centered, ChatGPT-style) --- */
+.chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: var(--spacing-l);
+  scroll-behavior: smooth;
+}
+
+.chat-messages-inner {
+  max-width: var(--chat-max-width);
+  margin: 0 auto;
+  padding: var(--spacing-xl) var(--spacing-l);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-l);
-  scroll-behavior: smooth;
+  gap: var(--spacing-xl);
 }
 
 /* --- Chat bubble --- */
 .chat-bubble {
-  max-width: 90%;
-  padding: var(--spacing-m) var(--spacing-l);
-  border-radius: var(--radius-large);
+  padding: var(--spacing-m) 0;
   font-size: var(--font-size-300);
-  line-height: var(--line-height-300);
+  line-height: 1.6;
   word-wrap: break-word;
   animation: bubbleIn var(--duration-normal) var(--easing-ease-out);
 }
@@ -210,21 +94,38 @@
 }
 
 .chat-bubble.user {
-  align-self: flex-end;
+  padding: var(--spacing-m) var(--spacing-l);
   background: var(--color-brand-primary);
   color: var(--color-neutral-foreground-on-brand);
+  border-radius: var(--radius-large);
   border-bottom-right-radius: var(--radius-small);
+  align-self: flex-end;
+  max-width: 80%;
 }
 
 .chat-bubble.assistant {
-  align-self: flex-start;
-  background: var(--color-neutral-background-3);
   color: var(--color-neutral-foreground-1);
-  border-bottom-left-radius: var(--radius-small);
 }
 
 .chat-bubble.assistant a {
   color: var(--color-brand-primary);
+}
+
+.chat-bubble.assistant p {
+  margin-bottom: var(--spacing-m);
+}
+
+.chat-bubble.assistant p:last-child {
+  margin-bottom: 0;
+}
+
+/* A2UI components inside assistant bubbles get some breathing room */
+.chat-bubble.assistant .a2ui-component {
+  margin: var(--spacing-m) 0;
+}
+
+.chat-bubble.assistant .a2ui-component:last-child {
+  margin-bottom: 0;
 }
 
 /* --- Typing indicator --- */
@@ -232,10 +133,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: var(--spacing-m) var(--spacing-l);
-  background: var(--color-neutral-background-3);
-  border-radius: var(--radius-large);
-  align-self: flex-start;
+  padding: var(--spacing-m) 0;
   width: fit-content;
 }
 
@@ -255,48 +153,57 @@
   40% { transform: translateY(-6px); }
 }
 
-/* --- Input area --- */
-.copilot-input-area {
+/* --- Input area (centered, bottom of chat) --- */
+.chat-input-area {
+  flex-shrink: 0;
+  background: var(--color-neutral-background-2);
+  border-top: 1px solid var(--color-neutral-stroke-2);
+  padding: var(--spacing-m) var(--spacing-l) var(--spacing-l);
+}
+
+.chat-input-inner {
+  max-width: var(--chat-max-width);
+  margin: 0 auto;
   display: flex;
   align-items: flex-end;
   gap: var(--spacing-s);
-  padding: var(--spacing-m) var(--spacing-l);
-  border-top: 1px solid var(--color-neutral-stroke-2);
   background: var(--color-neutral-background-1);
-  flex-shrink: 0;
-}
-
-.copilot-textarea {
-  flex: 1;
-  min-height: 36px;
-  max-height: 120px;
-  padding: var(--spacing-s) var(--spacing-m);
   border: 1px solid var(--color-neutral-stroke-1);
-  border-radius: var(--radius-medium);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-300);
-  resize: none;
-  outline: none;
-  transition: border-color var(--duration-fast);
-  background: var(--color-neutral-background-1);
-  color: var(--color-neutral-foreground-1);
+  border-radius: var(--radius-large);
+  padding: var(--spacing-s) var(--spacing-m);
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
 }
 
-.copilot-textarea:focus {
+.chat-input-inner:focus-within {
   border-color: var(--color-brand-primary);
   box-shadow: 0 0 0 1px var(--color-brand-primary);
 }
 
-.copilot-textarea::placeholder {
+.chat-textarea {
+  flex: 1;
+  min-height: 24px;
+  max-height: 160px;
+  padding: var(--spacing-xs) 0;
+  border: none;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-neutral-foreground-1);
+}
+
+.chat-textarea::placeholder {
   color: var(--color-neutral-foreground-disabled);
 }
 
-.copilot-send-btn {
+.chat-send-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: var(--radius-medium);
   background: var(--color-brand-primary);
@@ -306,17 +213,17 @@
   transition: background var(--duration-fast);
 }
 
-.copilot-send-btn:hover {
+.chat-send-btn:hover {
   background: var(--color-brand-primary-hover);
 }
 
-.copilot-send-btn:disabled {
+.chat-send-btn:disabled {
   background: var(--color-neutral-background-4);
   color: var(--color-neutral-foreground-disabled);
   cursor: not-allowed;
 }
 
-/* ---------- Demo Mode Badge ---------- */
+/* --- Demo badge (in phase bar) --- */
 .demo-badge {
   display: inline-flex;
   align-items: center;
@@ -331,10 +238,42 @@
   margin-left: var(--spacing-s);
 }
 
+/* --- Prompt inspector details block --- */
+.prompt-inspector {
+  margin-top: var(--spacing-s);
+  font-size: var(--font-size-200);
+}
+
+.prompt-inspector summary {
+  cursor: pointer;
+  color: var(--color-neutral-foreground-2);
+  font-size: var(--font-size-200);
+  padding: var(--spacing-xs) 0;
+  user-select: none;
+}
+
+.prompt-inspector summary:hover {
+  color: var(--color-brand-primary);
+}
+
+.prompt-inspector .code-block {
+  margin-top: var(--spacing-s);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.prompt-inspector .code-block pre {
+  font-size: var(--font-size-100, 11px);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ---------- Error Bubble ---------- */
 .chat-bubble.error-bubble {
   background: var(--color-error-background);
   border: 1px solid var(--color-error);
+  padding: var(--spacing-m) var(--spacing-l);
+  border-radius: var(--radius-large);
   color: var(--color-neutral-foreground-1);
   display: flex;
   flex-direction: column;
@@ -367,128 +306,122 @@
 .chat-bubble.streaming {
   opacity: 0.85;
   border-left: 2px solid var(--color-brand-primary);
+  padding-left: var(--spacing-m);
 }
 
-/* ---------- Wizard ---------- */
-.wizard {
+/* ---------- File Viewer ---------- */
+.file-viewer-container {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-.wizard-steps {
+.file-viewer-header {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-l) var(--spacing-xl);
-  background: var(--color-neutral-background-1);
+  justify-content: space-between;
+  padding: var(--spacing-s) var(--spacing-m);
   border-bottom: 1px solid var(--color-neutral-stroke-2);
-  overflow-x: auto;
   flex-shrink: 0;
 }
 
-.wizard-step-indicator {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-s);
-  white-space: nowrap;
+.file-viewer-title {
+  font-size: var(--font-size-300);
+  font-weight: var(--font-weight-semibold);
 }
 
-.wizard-step-circle {
+.file-viewer-close {
   width: 28px;
   height: 28px;
-  border-radius: var(--radius-circular);
+  border: none;
+  border-radius: var(--radius-medium);
+  background: transparent;
+  color: var(--color-neutral-foreground-2);
+  cursor: pointer;
+  font-size: var(--font-size-400);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-200);
-  font-weight: var(--font-weight-semibold);
-  border: 2px solid var(--color-neutral-stroke-1);
-  color: var(--color-neutral-foreground-3);
-  background: var(--color-neutral-background-1);
-  flex-shrink: 0;
-  transition: all var(--duration-normal);
 }
 
-.wizard-step-indicator.active .wizard-step-circle {
-  border-color: var(--color-brand-primary);
-  background: var(--color-brand-primary);
-  color: var(--color-neutral-foreground-on-brand);
-}
-
-.wizard-step-indicator.completed .wizard-step-circle {
-  border-color: var(--color-success);
-  background: var(--color-success);
-  color: var(--color-neutral-foreground-on-brand);
-}
-
-.wizard-step-label {
-  font-size: var(--font-size-200);
-  color: var(--color-neutral-foreground-3);
-}
-
-.wizard-step-indicator.active .wizard-step-label {
-  color: var(--color-neutral-foreground-1);
-  font-weight: var(--font-weight-semibold);
-}
-
-.wizard-step-connector {
-  width: 32px;
-  height: 2px;
-  background: var(--color-neutral-stroke-2);
-  flex-shrink: 0;
-}
-
-.wizard-step-connector.completed {
-  background: var(--color-success);
-}
-
-.wizard-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--spacing-xl);
-}
-
-.wizard-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--spacing-s);
-  padding: var(--spacing-l) var(--spacing-xl);
-  background: var(--color-neutral-background-1);
-  border-top: 1px solid var(--color-neutral-stroke-2);
-  flex-shrink: 0;
-}
-
-.wizard-btn {
-  padding: var(--spacing-s) var(--spacing-xl);
-  border-radius: var(--radius-medium);
-  border: 1px solid var(--color-neutral-stroke-1);
-  background: var(--color-neutral-background-1);
-  color: var(--color-neutral-foreground-1);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-300);
-  cursor: pointer;
-  transition: all var(--duration-fast);
-}
-
-.wizard-btn:hover {
+.file-viewer-close:hover {
   background: var(--color-neutral-background-3);
 }
 
-.wizard-btn.primary {
-  background: var(--color-brand-primary);
-  color: var(--color-neutral-foreground-on-brand);
-  border-color: var(--color-brand-primary);
+.file-viewer-tabs {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-neutral-stroke-2);
+  background: var(--color-neutral-background-1);
+  flex-shrink: 0;
 }
 
-.wizard-btn.primary:hover {
-  background: var(--color-brand-primary-hover);
+.file-tab {
+  padding: var(--spacing-s) var(--spacing-l);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-neutral-foreground-2);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-200);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--duration-fast);
 }
 
-.wizard-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.file-tab:hover {
+  color: var(--color-neutral-foreground-1);
+  background: var(--color-neutral-background-3);
+}
+
+.file-tab.active {
+  color: var(--color-brand-primary);
+  border-bottom-color: var(--color-brand-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.file-viewer-content {
+  flex: 1;
+  overflow: auto;
+  background: var(--color-neutral-background-inverted);
+}
+
+.file-viewer-code {
+  margin: 0;
+  padding: var(--spacing-m);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-200);
+  line-height: 1.6;
+  color: #d4d4d4;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.file-viewer-actions {
+  display: flex;
+  gap: var(--spacing-s);
+  padding: var(--spacing-s) var(--spacing-m);
+  border-top: 1px solid var(--color-neutral-stroke-2);
+  background: var(--color-neutral-background-1);
+  flex-shrink: 0;
+}
+
+.file-viewer-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-m);
+  border: 1px solid var(--color-neutral-stroke-1);
+  border-radius: var(--radius-medium);
+  background: transparent;
+  color: var(--color-neutral-foreground-2);
+  font-size: var(--font-size-200);
+  font-family: var(--font-family-base);
+  cursor: pointer;
+}
+
+.file-viewer-copy-btn:hover {
+  background: var(--color-neutral-background-3);
 }
 
 /* ---------- Cards ---------- */

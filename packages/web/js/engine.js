@@ -68,10 +68,8 @@ function advance(state) {
 }
 
 // ── Scripted demo responses ─────────────────────────────────────────
-// Each handler returns { a2ui, text?, advance? }
-// a2ui: A2UI JSON array to render as assistant message
-// text: optional plain text fallback
-// advance: if true, transition to next phase after response
+// Each handler returns { a2ui, text?, advance?, files? }
+// ONE concept per turn. Conversation flows naturally.
 
 const DEMO_HANDLERS = {
   [Phase.Discover]: discoverHandler,
@@ -84,37 +82,67 @@ const DEMO_HANDLERS = {
 
 function discoverHandler(input, state) {
   if (state.turnCount === 0) {
-    // First turn — greet + ask
+    // First turn — user described their app. Ask about framework.
+    state.collected.description = input;
+    state.collected.appName = extractAppName(input);
     return {
       a2ui: [
-        { type: 'Text', text: "Great! Tell me a bit more — what language or framework does it use? (e.g. Node.js, Python, .NET, Java)" },
+        { type: 'Text', text: `Nice — **${state.collected.appName}** sounds great! What language or framework are you using? (e.g. Node.js, Python, .NET, Java, Go)` },
       ],
     };
   }
 
-  // Second turn — infer app from whatever the user typed, show AppOverview, advance
-  const appName = state.collected.appName || extractAppName(input);
-  const runtime = detectRuntime(input);
+  if (state.turnCount === 1) {
+    // Second turn — user said the framework. Ask about database/services.
+    const runtime = detectRuntime(input);
+    state.collected.runtime = runtime;
+    return {
+      a2ui: [
+        { type: 'Text', text: `Got it — **${runtime}**. Does your app need a database or any other backing services? (e.g. PostgreSQL, Redis, MongoDB, or "none")` },
+      ],
+    };
+  }
+
+  // Third turn — collect services, show summary, advance
+  const services = detectServices(input);
+  state.collected.services = services;
+  const appName = state.collected.appName || 'my-app';
 
   return {
     advance: true,
     a2ui: [
-      { type: 'Text', text: "Got it! Here's what I understand so far:" },
+      { type: 'Text', text: "Great, here's what I've gathered:" },
       {
         type: 'AppOverview',
         appName,
-        runtime,
+        runtime: state.collected.runtime || 'Node.js',
         status: 'draft',
-        services: detectServices(input),
+        services,
         description: state.collected.description || input,
       },
-      { type: 'Text', text: "Next I'll sketch out an architecture for you." },
+      { type: 'Text', text: "Let me sketch out an architecture for this. One moment…" },
     ],
   };
 }
 
 function designHandler(_input, state) {
   const appName = state.collected.appName || 'my-app';
+  const runtime = state.collected.runtime || 'Node.js';
+  const services = state.collected.services || ['Web'];
+
+  const components = [
+    { name: appName, icon: '🌐', description: runtime },
+    { name: 'App Platform', icon: '☁️', description: 'Azure (scalable hosting)' },
+  ];
+
+  if (services.some(s => ['PostgreSQL', 'MySQL', 'MongoDB'].includes(s))) {
+    components.push({ name: 'Database', icon: '🗄️', description: services.find(s => ['PostgreSQL', 'MySQL', 'MongoDB'].includes(s)) });
+  }
+  if (services.includes('Redis')) {
+    components.push({ name: 'Cache', icon: '⚡', description: 'Redis' });
+  }
+  components.push({ name: 'CI/CD', icon: '🔄', description: 'GitHub Actions' });
+
   return {
     advance: true,
     a2ui: [
@@ -122,35 +150,44 @@ function designHandler(_input, state) {
       {
         type: 'ArchitectureDiagram',
         title: 'Proposed Architecture',
-        components: [
-          { name: 'Web App', icon: '🌐', description: state.collected.runtime || 'Node.js' },
-          { name: 'App Platform', icon: '☁️', description: 'Scalable hosting' },
-          { name: 'Database', icon: '🗄️', description: 'Managed data store' },
-          { name: 'CI/CD', icon: '🔄', description: 'GitHub Actions' },
-        ],
+        components,
       },
-      { type: 'Text', text: "I'll now generate the deployment files for this setup." },
+      { type: 'Text', text: "Does this look right? I'll generate the deployment files next." },
     ],
   };
 }
 
 function generateHandler(_input, state) {
   const appName = state.collected.appName || 'my-app';
+  const runtime = state.collected.runtime || 'Node.js';
+
+  const dockerfileCode = runtime === 'Python'
+    ? `FROM python:3.12-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install -r requirements.txt\nCOPY . .\nEXPOSE 8000\nCMD ["python", "app.py"]`
+    : runtime === '.NET'
+    ? `FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /src\nCOPY . .\nRUN dotnet publish -c Release -o /app\n\nFROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY --from=build /app .\nEXPOSE 8080\nENTRYPOINT ["dotnet", "${appName}.dll"]`
+    : `FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --production\nCOPY . .\nEXPOSE 3000\nCMD ["node", "server.js"]`;
+
+  const workflowCode = `name: Deploy ${appName}\non:\n  push:\n    branches: [main]\njobs:\n  build-and-deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: docker build -t ${appName} .\n      - run: echo "Deploying to app platform..."`;
+
   return {
     advance: true,
+    files: [
+      { name: 'Dockerfile', code: dockerfileCode },
+      { name: `.github/workflows/deploy.yml`, code: workflowCode },
+    ],
     a2ui: [
       { type: 'Text', text: 'I\'ve generated the key files for your project:' },
       {
         type: 'CodeBlock',
         language: 'dockerfile',
-        code: `FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --production\nCOPY . .\nEXPOSE 3000\nCMD ["node", "server.js"]`,
+        code: dockerfileCode,
       },
       {
         type: 'CodeBlock',
         language: 'yaml',
-        code: `name: Deploy ${appName}\non:\n  push:\n    branches: [main]\njobs:\n  build-and-deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: docker build -t ${appName} .\n      - run: echo "Deploying to app platform..."`,
+        code: workflowCode,
       },
-      { type: 'Text', text: "Let's review the estimated cost before moving on." },
+      { type: 'Text', text: "📁 These files are also available in the **file viewer** on the right. Next, let me show you the estimated cost." },
     ],
   };
 }
@@ -170,7 +207,7 @@ function reviewHandler(_input, _state) {
         ],
         total: 99.17,
       },
-      { type: 'Text', text: "Looks good — let's hand this off to your GitHub repo so you can start coding." },
+      { type: 'Text', text: "Looks good? Let's set up your GitHub repo and get you coding." },
     ],
   };
 }
@@ -188,7 +225,7 @@ function handoffHandler(_input, state) {
         codespaceUrl: `https://github.com/codespaces/new?repo=contoso/${appName}&ref=main`,
         vscodeUrl: `https://vscode.dev/github/contoso/${appName}`,
       },
-      { type: 'Text', text: "When you're ready, I can help you deploy to Azure." },
+      { type: 'Text', text: "When you're ready, type **deploy** and I'll kick off the deployment to Azure." },
     ],
   };
 }
@@ -249,6 +286,7 @@ function detectServices(input) {
   if (/mongo/.test(lower)) services.push('MongoDB');
   if (/redis/.test(lower)) services.push('Redis');
   if (/mysql/.test(lower)) services.push('MySQL');
+  if (/none|no|nope|nah/.test(lower)) services.push('Web');
   if (services.length === 0) services.push('Web');
   return services;
 }
@@ -259,7 +297,7 @@ function detectServices(input) {
  * Create a scripted demo engine instance (no API backend).
  * @param {Object} opts
  * @param {Function} opts.onPhaseChange - (phaseIndex: number) => void
- * @param {Function} opts.onResponse    - ({ a2ui, text, systemPrompt, advance }) => void
+ * @param {Function} opts.onResponse    - ({ a2ui, text, systemPrompt, files }) => void
  */
 export function createDemoEngine({ onPhaseChange, onResponse }) {
   let state = createInitialState();
@@ -270,11 +308,6 @@ export function createDemoEngine({ onPhaseChange, onResponse }) {
 
   /** Process a user message and produce a response. */
   function handleMessage(userText) {
-    if (state.currentPhase === Phase.Discover && state.turnCount === 0) {
-      state.collected.description = userText;
-      state.collected.appName = extractAppName(userText);
-    }
-
     const handler = DEMO_HANDLERS[state.currentPhase];
     if (!handler) return;
 
@@ -295,7 +328,7 @@ export function createDemoEngine({ onPhaseChange, onResponse }) {
     return [
       {
         type: 'Text',
-        text: "👋 Hi! I'm Kickstart — your AI guide for getting apps running on Azure. Tell me: **what are you building?**",
+        text: "👋 Hi! I'm **Kickstart** — your AI guide for getting apps running on Azure.\n\nTell me: **what are you building?**",
       },
     ];
   }
@@ -316,7 +349,7 @@ export function createDemoEngine({ onPhaseChange, onResponse }) {
  * Create an API-backed engine that calls POST /api/converse.
  * @param {Object} opts
  * @param {Function} opts.onPhaseChange - (phaseIndex: number) => void
- * @param {Function} opts.onResponse    - ({ a2ui, text, systemPrompt, advance }) => void
+ * @param {Function} opts.onResponse    - ({ a2ui, text, systemPrompt, files }) => void
  * @param {Object}   opts.apiClient     - API client from createApiClient()
  * @param {Function} [opts.onError]     - ({ message, retryable }) => void
  * @param {Function} [opts.onStreaming]  - (partialText: string) => void
@@ -334,6 +367,7 @@ export function createApiEngine({ onPhaseChange, onResponse, apiClient, onError,
       a2ui: apiRes.a2ui ?? null,
       text: apiRes.message ?? null,
       systemPrompt: apiRes.systemPrompt ?? null,
+      files: apiRes.files ?? null,
       advance: false, // phase change handled by comparing phases
     };
   }
@@ -383,7 +417,7 @@ export function createApiEngine({ onPhaseChange, onResponse, apiClient, onError,
     return [
       {
         type: 'Text',
-        text: "👋 Hi! I'm Kickstart — your AI guide for getting apps running on Azure. Tell me: **what are you building?**",
+        text: "👋 Hi! I'm **Kickstart** — your AI guide for getting apps running on Azure.\n\nTell me: **what are you building?**",
       },
     ];
   }
