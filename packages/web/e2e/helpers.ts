@@ -1,13 +1,13 @@
 import { test as base, type Page } from '@playwright/test';
 
 /**
- * Shared test fixture that mocks MSAL before every page load
- * so the app renders without attempting Entra ID authentication.
+ * Shared test fixture that mocks MSAL and forces demo mode
+ * so the app renders without authentication or a real API backend.
  */
 export const test = base.extend<{ mockAuth: void }>({
   mockAuth: [async ({ page }, use) => {
-    // Intercept MSAL CDN request — return a lightweight mock so the
-    // real MSAL library never loads (avoids network dependency + Entra redirects).
+    // Intercept MSAL CDN — return a lightweight mock so the
+    // real MSAL library never loads (avoids Entra redirects).
     await page.route('**/msal-browser*', route =>
       route.fulfill({
         status: 200,
@@ -27,12 +27,12 @@ export const test = base.extend<{ mockAuth: void }>({
       }),
     );
 
-    // Intercept API calls — no backend in E2E tests, force demo mode
-    await page.route('**/api/converse', route =>
+    // Force demo mode — no backend in E2E tests
+    await page.route('**/api/**', route =>
       route.fulfill({ status: 503, contentType: 'text/plain', body: 'No backend' }),
     );
 
-    // Also intercept Fluent UI CDN — not needed for functional tests
+    // Intercept Fluent UI CDN — not needed for functional tests
     await page.route('**/unpkg.com/@fluentui/**', route =>
       route.fulfill({ status: 200, contentType: 'application/javascript', body: '/* noop */' }),
     );
@@ -43,29 +43,21 @@ export const test = base.extend<{ mockAuth: void }>({
 
 export { expect } from '@playwright/test';
 
-/** Navigate to a hash route and wait for the content area to finish loading. */
-export async function navigateTo(page: Page, route: string) {
-  await page.goto(`/#${route}`);
-  await page.waitForSelector('#content-area[aria-busy="false"]', { timeout: 10_000 });
-}
-
-/** Type a message in the copilot textarea and press Enter. */
-export async function sendCopilotMessage(page: Page, text: string) {
-  const textarea = page.locator('.copilot-textarea');
+/** Type a message in the chat textarea and press Enter. */
+export async function sendChatMessage(page: Page, text: string) {
+  const textarea = page.locator('.chat-textarea');
   await textarea.fill(text);
   await textarea.press('Enter');
 }
 
-/** Wait for the assistant response bubble that contains the given text. */
-export async function waitForAssistantMessage(page: Page, partialText: string, timeoutMs = 5000) {
+/** Wait for an assistant response bubble containing the given text. */
+export async function waitForAssistantMessage(page: Page, partialText: string, timeoutMs = 8000) {
   await page.locator('.chat-bubble.assistant', { hasText: partialText }).first().waitFor({ timeout: timeoutMs });
 }
 
-/** Ensure the copilot panel is visible. */
-export async function ensureCopilotOpen(page: Page) {
-  const panel = page.locator('#copilot-panel');
-  if (await panel.evaluate(el => el.classList.contains('hidden'))) {
-    await page.locator('#topbar-copilot-toggle').click();
-    await page.waitForTimeout(300);
-  }
+/** Transition from landing to chat by clicking a track card. */
+export async function enterChatViaTrack(page: Page, track: 'web-app' | 'agentic-app') {
+  await page.locator(`.track-card-link[data-track="${track}"]`).click();
+  await page.waitForSelector('#landing-page', { state: 'detached', timeout: 5000 });
+  await page.waitForSelector('#chat-ui', { state: 'visible', timeout: 5000 });
 }

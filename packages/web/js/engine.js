@@ -325,7 +325,7 @@ export function createDemoEngine({ onPhaseChange, onResponse, track, preSelected
     const result = handler(userText, state);
     state.turnCount++;
 
-    result.systemPrompt = buildSystemPrompt(state.currentPhase, state.collected);
+    result.systemPrompt = buildSystemPrompt(state.currentPhase, state.collected, track);
 
     if (result.advance) {
       state = advance(state);
@@ -372,8 +372,9 @@ export function createDemoEngine({ onPhaseChange, onResponse, track, preSelected
  * @param {Object}   opts.apiClient     - API client from createApiClient()
  * @param {Function} [opts.onError]     - ({ message, retryable }) => void
  * @param {Function} [opts.onStreaming]  - (partialText: string) => void
+ * @param {string}   [opts.track]       - 'web-app' or 'agentic-app'
  */
-export function createApiEngine({ onPhaseChange, onResponse, apiClient, onError, onStreaming }) {
+export function createApiEngine({ onPhaseChange, onResponse, apiClient, onError, onStreaming, track }) {
   let sessionId = null;
   let currentPhase_ = Phase.Discover;
 
@@ -468,7 +469,7 @@ export function createApiEngine({ onPhaseChange, onResponse, apiClient, onError,
  */
 export function createEngine({ onPhaseChange, onResponse, apiClient, onError, onStreaming, track, preSelectedFramework }) {
   if (apiClient) {
-    return createApiEngine({ onPhaseChange, onResponse, apiClient, onError, onStreaming });
+    return createApiEngine({ onPhaseChange, onResponse, apiClient, onError, onStreaming, track });
   }
   return createDemoEngine({ onPhaseChange, onResponse, track, preSelectedFramework });
 }

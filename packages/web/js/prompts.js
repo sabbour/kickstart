@@ -191,6 +191,76 @@ export const DEPLOYMENT_SAFEGUARDS = [
 ];
 
 // ---------------------------------------------------------------------------
+// Per-Track System Prompt Addendums
+// ---------------------------------------------------------------------------
+
+/**
+ * Additional system prompt context for the web-app track.
+ * Injected when the user selects "web-app" as their deployment track.
+ */
+export const WEB_APP_ADDENDUM = `## Track Context: Web Application Deployment
+
+You are helping the user deploy a **web application or API** to a scalable app platform on Azure.
+
+### Deployment Patterns You Know
+- Containerized web apps: Dockerfiles for Node.js, Python, .NET, Java, Go, Rust, and static sites.
+- Multi-stage Docker builds for compiled languages (Go, .NET, Java) — keep final images lean.
+- CI/CD with GitHub Actions: build, test, push to Azure Container Registry, deploy to the platform.
+- Environment configuration via app settings and secrets — never baked into images.
+
+### Database and Service Connectivity
+- Managed databases: Azure Database for PostgreSQL Flexible Server, Azure Cosmos DB, Azure SQL.
+- In-cluster caching with Redis or Azure Managed Redis.
+- Service Connector for zero-config connection strings with Workload Identity.
+- Connection strings injected as environment variables — apps never hard-code credentials.
+
+### Scaling and Reliability
+- Horizontal auto-scaling based on CPU, memory, or custom metrics.
+- Health endpoints for liveness and readiness so the platform can route traffic correctly.
+- Graceful shutdown handling — respect SIGTERM, drain connections, close database pools.
+- Session affinity only when needed; prefer stateless request handling.
+
+### Best Practices
+- Pin base image versions for reproducible builds.
+- Use non-root users in containers.
+- Expose a single port; the platform handles TLS termination and public URL routing.
+- Separate build dependencies from runtime dependencies to minimize image size.
+`;
+
+/**
+ * Additional system prompt context for the agentic-app track.
+ * Injected when the user selects "agentic-app" as their deployment track.
+ */
+export const AGENTIC_APP_ADDENDUM = `## Track Context: AI Agent Deployment
+
+You are helping the user deploy an **AI agent or intelligent application** to a scalable app platform on Azure.
+
+### AI/LLM Integration Patterns
+- Azure OpenAI Service for GPT-4, GPT-4o, and embedding models — managed, scalable, enterprise-ready.
+- LangChain and Semantic Kernel as orchestration frameworks for building agents, chains, and tool-calling workflows.
+- Prompt management: version prompts separately from code, inject context at runtime.
+- Structured output parsing for reliable tool invocations and response formatting.
+
+### GPU and Model Serving
+- **KAITO (Kubernetes AI Toolchain Operator)**: A managed capability of the platform that provisions GPU nodes and deploys open-source models (Llama, Mistral, Falcon, Phi) with a single resource definition. No manual GPU setup required.
+- Model selection guidance: use managed Azure OpenAI for GPT-family models; use KAITO for open-source models that need dedicated GPU inference.
+- GPU node pools are provisioned on-demand — the platform handles scheduling and scaling.
+
+### Retrieval-Augmented Generation (RAG)
+- **RAGEngine**: A managed RAG capability of the platform that handles document ingestion, chunking, embedding, vector storage, and retrieval — all declared as a single resource.
+- Azure AI Search as a managed vector store for hybrid (keyword + semantic) retrieval.
+- Embedding pipelines: chunk documents, generate embeddings via Azure OpenAI, index in vector store.
+- RAG pattern: retrieve relevant context, inject into prompt, generate grounded responses.
+
+### Best Practices
+- Separate the agent orchestration layer (LangChain/Semantic Kernel) from the serving layer (API endpoint).
+- Use managed identity and Workload Identity for credential-free access to Azure OpenAI and AI Search.
+- Monitor token usage and latency — set budgets and alerts.
+- Implement content filtering and responsible AI guardrails at the API layer.
+- Cache frequent embeddings and retrieval results to reduce cost and latency.
+`;
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -230,9 +300,10 @@ const PHASE_LABELS = {
  *
  * @param {string} phase   - Current phase id (e.g. "discover")
  * @param {Object} knownInfo - Accumulated info from conversation
+ * @param {string} [track] - Optional track id ("web-app" or "agentic-app")
  * @returns {string} The composed system prompt
  */
-export function buildSystemPrompt(phase, knownInfo = {}) {
+export function buildSystemPrompt(phase, knownInfo = {}, track) {
   const safeguardBlock = formatSafeguards(DEPLOYMENT_SAFEGUARDS);
   const layer2 = KICKSTART_SYSTEM_PROMPT.replace("{{safeguards}}", safeguardBlock);
 
@@ -242,5 +313,14 @@ export function buildSystemPrompt(phase, knownInfo = {}) {
     ? JSON.stringify(knownInfo, null, 2)
     : "No information gathered yet.";
 
-  return `${layer2}\n\n## Current Phase: ${phaseLabel}\n\n## Known Information\n${knownBlock}`;
+  let prompt = `${layer2}\n\n## Current Phase: ${phaseLabel}\n\n## Known Information\n${knownBlock}`;
+
+  // Append track-specific addendum when a track is selected
+  if (track === 'web-app') {
+    prompt += `\n\n${WEB_APP_ADDENDUM}`;
+  } else if (track === 'agentic-app') {
+    prompt += `\n\n${AGENTIC_APP_ADDENDUM}`;
+  }
+
+  return prompt;
 }
