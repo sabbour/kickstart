@@ -494,6 +494,143 @@ kickstart/
 
 ---
 
+# Decision: Chat-First UX Redesign
+
+**Date:** 2025-07-25  
+**Author:** Fry (Frontend Dev)  
+**Status:** Accepted  
+**Related:** copilot-directive-20260408-chat-first-ux
+
+## Context
+
+The Kickstart web app used a Portal Prototyper pattern (sidebar nav, breadcrumbs, command bar, wizard forms, content area with a toggleable Copilot panel). The AI chat was a secondary sidebar. The goal was to make the AI conversation THE primary experience — following the pattern from `sabbour/adaptive-ui-try-aks`.
+
+## Decision
+
+1. **Remove the portal shell entirely** — no nav-pane, breadcrumbs, command-bar, SPA router, or wizard forms.
+2. **Chat UI as the main content area** — centered at 760px max-width, always visible, no toggle.
+3. **File viewer as a right sidebar** — appears only when files are generated in GENERATE phase. Tabbed, with copy-per-file.
+4. **Sessions sidebar on the left** — toggleable from header. Placeholder for future multi-session support.
+5. **Conversational demo flow** — Discover phase asks ONE question per turn (3 turns) instead of presenting multi-field forms.
+6. **Dark mode** — via `prefers-color-scheme` media query, no user toggle.
+7. **Prompt inspector** — moved from copilot panel header to a topbar toggle button.
+
+## Consequences
+
+- `core.js` still exports Router/Navigation/Breadcrumbs but they're unused — can be removed in a future cleanup.
+- All `.copilot-*` CSS classes renamed to `.chat-*` — any external references will break.
+- A2UI renderer still renders inside chat messages — no changes needed there.
+- The demo flow is now truly conversational: one concept per turn, no multi-field wizards.
+- **NOTE (Scribe):** Dark mode implementation (Decision item 6) conflicts with copilot-directive-20260408-no-dark-mode which explicitly requests light theme only. Fry's dark mode was implemented as part of the chat-first UX directive (2026-04-08T14:37:00Z) which emphasized matching the reference app. This directive was accepted first. Dark mode is now live in production (commit d431093). Recommend clarifying with user whether dark mode should remain or be reverted.
+
+---
+
+# Decision: MCP App HTML Surface Architecture
+
+**Author:** Bender (Backend Dev)  
+**Date:** 2025-07-25  
+**Status:** Accepted  
+**Related:** MCP App integration for IDE surfaces
+
+## Context
+
+The Kickstart project needs a dual-surface architecture: web (SWA) and IDE (MCP App HTML). The IDE surface renders inside VS Code/Claude Code as a sandboxed iframe, communicating with the MCP server via postMessage.
+
+## Decisions
+
+### 1. Self-Contained HTML with Inline A2UI Renderer
+
+**Choice:** Single HTML file (`kickstart-app.html`) with all CSS and JS inlined. The A2UI renderer is a port of the web surface's `a2ui-renderer.js`, adapted for plain self-contained JS (no ES module imports).
+
+**Why:** MCP App iframes are sandboxed with no external resource loading. Everything must be in one file. The renderer covers all 18 A2UI component types so the IDE surface has feature parity with the web surface.
+
+### 2. PostMessage Protocol with Typed Validation
+
+**Choice:** Defined a typed protocol layer (`protocol.ts`) with `parseAppMessage()` for validation and `handleAppMessage()` for routing. Messages are validated before processing — invalid messages are silently dropped.
+
+**Why:** The iframe boundary requires strict validation. The typed protocol makes the contract explicit and testable. The handler reuses existing tool functions (handleKickstart, handleConverse, handleAction) — no logic duplication.
+
+### 3. HTML Served as MCP Resource (Not Embedded String)
+
+**Choice:** HTML file loaded from disk at startup via `readFileSync` and served as a `text/html` MCP resource at `kickstart://app/main`. Build script copies HTML to `dist/app/`.
+
+**Why:** Keeps the HTML maintainable as a separate file rather than an escaped string constant. The build-time copy ensures it ships with the compiled JS. Resource URI follows MCP App conventions.
+
+### 4. Auto-Kickstart on Load
+
+**Choice:** The app automatically sends a `kickstart` postMessage when it loads, creating a session without requiring user action first.
+
+**Why:** Reduces friction in the IDE. The user sees the welcome message and phase indicator immediately. They can start typing right away.
+
+## Consequences
+
+- Web and IDE surfaces share the same A2UI component catalog but have independent renderers
+- Protocol changes require updating both `protocol.ts` and the inline JS in the HTML file
+- Session is lost on iframe recreation (acceptable for Phase 1 per Decision 12)
+- 30 new tests added (protocol validation, HTML structure); 118 total tests passing
+
+---
+
+# User Directives (2026-04-08)
+
+## Copilot-Directive-20260408-Chat-First-UX
+
+**By:** Ahmed Sabbour (via Copilot)  
+**Date:** 2026-04-08T14:37:00Z  
+**Status:** Accepted  
+**Related:** Chat-first UX redesign (Fry)
+
+**What:** "I don't want to have static UI with input fields asking about the app name and repo and framework." The web experience must be entirely conversation-driven, matching the reference app at https://aui.prototypes.azure.sabbour.me/try-aks/. The chat IS the primary UI — not a side panel. No wizard steps, no static forms. The AI progressively discovers requirements through natural conversation (one concept per turn). Rich A2UI components (code blocks, diagrams, cost estimates, pickers) appear inline in the chat. A file viewer sidebar shows generated artifacts.
+
+**Why:** User request — the current Portal Prototyper chrome with toggleable Copilot panel deviates from the intended UX. The reference app proves the conversation-first pattern works.
+
+**Impact:** ✅ Implemented by Fry in commit d431093 (chat-first redesign).
+
+---
+
+## Copilot-Directive-20260408-No-Dark-Mode
+
+**By:** Ahmed Sabbour (via Copilot)  
+**Date:** 2026-04-08T15:05:00Z  
+**Status:** CONFLICT  
+**Related:** Chat-first UX redesign (Fry)
+
+**What:** No dark mode colors. Light theme only throughout the web UI.
+
+**Why:** User preference — keep the UI simple with a single light theme.
+
+**CONFLICT:** Fry's chat-first redesign (accepted from directive 2026-04-08T14:37:00Z) implemented dark mode via `prefers-color-scheme` media query as part of the complete overhaul. This directive (issued 28 minutes later) contradicts it. **Scribe note:** Dark mode is currently live in commit d431093. Recommend clarifying with user whether dark mode should remain (appears to match reference app styling) or be reverted to light-only.
+
+---
+
+## Copilot-Directive-20260408-No-Gists
+
+**By:** Ahmed Sabbour (via Copilot)  
+**Date:** 2026-04-08T14:48:00Z  
+**Status:** Accepted  
+**Related:** Session persistence research
+
+**What:** No GitHub Gists for session persistence. Explore Azure Cloud Shell storage as the persistence layer instead.
+
+**Why:** User request — Gists rejected as a persistence mechanism.
+
+**Impact:** Coordinator researched Cloud Shell storage. Finding: Cloud Shell can't be fully provisioned programmatically for first-time users. Session persistence deferred to future phase. Demo flows work without persistent storage.
+
+---
+
+## Copilot-Directive-20260408-Carousel-LLM
+
+**By:** Ahmed Sabbour (via Copilot)  
+**Date:** 2026-04-08T14:54:00Z  
+**Status:** Pending  
+**Related:** Landing page carousel UI
+
+**What:** The inspirational carousel on the landing page should generate its app ideas dynamically using an LLM call, not hardcode them. Each page load gets fresh, creative ideas.
+
+**Why:** User request — keeps the experience dynamic and surprising.
+
+**Impact:** Pending implementation. Requires: LLM integration in web surface or API call from app.js to SWA API endpoint. If using SWA API, add new endpoint for carousel generation. Demo carousel currently hardcoded.
+
 ## Decision 4: MCP — Tools First, App UI Later (Progressive)
 
 **Choice:** Option (c) — Progressive. Ship tools in Phase 1, add MCP App UI in Phase 2.
