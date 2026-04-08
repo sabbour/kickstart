@@ -1093,3 +1093,37 @@ Replaced with Ahmed's actual Entra App Registration values:
 - `infra/main.bicep` — uses a `param entraClientId` with no hardcoded IDs.
 - `infra/setup-entra.sh` — `TENANT` is `caglobaldemos2605.onmicrosoft.com`, which is the friendly domain for Ahmed's tenant (not the old Microsoft corp tenant). Left as-is.
 
+
+# Decision: SWA Auth Configuration Fixed
+
+**Date:** 2025-07-28
+**Author:** Bender
+**Status:** Executed
+
+## Context
+
+SWA built-in auth for `kickstart-web-dev` was failing because:
+1. The Entra app (`e71a23c6-aeb4-459a-88fc-07ff96fc9b92`) had no client secret — required by SWA's server-side auth flow.
+2. The Entra app had only SPA redirect URIs, but SWA built-in auth needs **Web platform** redirect URIs with the `/.auth/login/aad/callback` path.
+3. The `AZURE_STATIC_WEB_APPS_API_TOKEN` GitHub secret was not set.
+
+## Decision
+
+Executed the following fixes:
+1. Generated a 2-year client secret ("SWA Auth Secret") on the Entra app.
+2. Set `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET` as SWA app settings on `kickstart-web-dev`.
+3. Added Web redirect URIs for both the default SWA hostname and custom domain.
+4. Set `AZURE_STATIC_WEB_APPS_API_TOKEN` GitHub secret on `sabbour/kickstart`.
+
+## Verification
+
+- Entra app now has both SPA redirects (for local dev) and Web redirects (for SWA auth callbacks).
+- SWA app settings contain both `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`.
+- GitHub secret `AZURE_STATIC_WEB_APPS_API_TOKEN` confirmed set.
+
+## Impact
+
+- Auth should now work end-to-end on both `proud-mud-0660b8110.6.azurestaticapps.net` and `kickstart.aks.azure.sabbour.me`.
+- Client secret expires in ~2 years (July 2027) — will need rotation.
+- GitHub Actions deploy workflow can now deploy successfully.
+

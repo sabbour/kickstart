@@ -159,3 +159,27 @@
 - **Bicep additions:** `entraClientId` param sets `AZURE_CLIENT_ID` app setting via `Microsoft.Web/staticSites/config` resource. `customDomainHostname` param creates `Microsoft.Web/staticSites/customDomains` resource (requires DNS CNAME pre-verification).
 - **deploy-swa.yml unchanged:** SWA deploy action doesn't need auth config — app settings are managed by Bicep/Portal, not the GitHub Action.
 - **Key files:** `packages/web/staticwebapp.config.json`, `infra/main.bicep`, `infra/parameters.dev.json`, `infra/README.md`
+
+### 2025-07-27: SWA + Entra Tenant Investigation
+
+- **Two tenants clarified:**
+  - CloudNative (`caglobaldemos2605`): `d91aa5af-8c1e-442c-b77c-0b92988b387b` — SWA lives here, subscription `4498459e-01d5-4a3f-b07e-8f1f36598c16`
+  - Microsoft internal: `72f988bf-86f1-41af-91ab-2d7cd011db47` — old Imagine app reg lived here
+- **Old app reg dead:** `7a630e18-8f49-404e-8454-228b13089c57` ("Imagine - AKS Onboarding") was in Microsoft internal tenant. Does NOT exist in CloudNative tenant.
+- **New app reg confirmed:** `e71a23c6-aeb4-459a-88fc-07ff96fc9b92` ("Kickstart - AKS Onboarding") in CloudNative tenant. Object ID `bf6ab22e-d654-4a27-bb35-6df7631f8023`. Multi-tenant (`AzureADMultipleOrgs`).
+- **SWA app settings:** `AZURE_CLIENT_ID` correctly set to `e71a23c6-aeb4-459a-88fc-07ff96fc9b92`. `AZURE_CLIENT_SECRET` is MISSING — must be generated and set.
+- **openIdIssuer:** Points to CloudNative tenant — CORRECT for SWA built-in auth.
+- **Redirect URI gap:** App has SPA redirect URIs (localhost:4280, localhost:8080, kickstart.aks.azure.sabbour.me, kickstart.aks.azure.com) but NO web platform redirect URIs. SWA built-in auth callback needs web redirects: `https://<hostname>/.auth/login/aad/callback`.
+- **SWA hostname:** `proud-mud-0660b8110.6.azurestaticapps.net`, custom domain `kickstart.aks.azure.sabbour.me`
+- **decisions.md stale:** Still references old app ID `7a630e18-8f49-404e-8454-228b13089c57` and Microsoft internal tenant. Needs Scribe update.
+- **Deployment token retrieved:** Available for `AZURE_STATIC_WEB_APPS_API_TOKEN` GitHub secret.
+- **Workflow (`deploy-swa.yml`):** Looks correct — builds core+api, deploys from packages/web with api_location packages/web/api.
+
+### 2025-07-28: SWA Auth Fix — Entra App + Secrets Configured
+
+- **Client secret created:** Generated 2-year credential "SWA Auth Secret" on Entra app `e71a23c6-aeb4-459a-88fc-07ff96fc9b92` (CloudNative tenant).
+- **SWA app settings set:** `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET` both present on `kickstart-web-dev` SWA.
+- **Web redirect URIs added:** `https://proud-mud-0660b8110.6.azurestaticapps.net/.auth/login/aad/callback` and `https://kickstart.aks.azure.sabbour.me/.auth/login/aad/callback` — fixes the missing server-side callback that SWA built-in auth requires.
+- **SPA redirect URIs preserved:** localhost:4280, localhost:8080, kickstart.aks.azure.sabbour.me, kickstart.aks.azure.com still intact.
+- **GitHub secret set:** `AZURE_STATIC_WEB_APPS_API_TOKEN` on `sabbour/kickstart` — enables deploy workflow.
+- **Key insight:** SWA built-in auth uses server-side (Web platform) redirect URIs with `/.auth/login/aad/callback` path, NOT SPA redirects. Missing web redirects cause the "AADSTS50011: redirect URI mismatch" error.
