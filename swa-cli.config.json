@@ -1,0 +1,13 @@
+{
+  "$schema": "https://aka.ms/azure/static-web-apps-cli/schema",
+  "configurations": {
+    "default": {
+      "appLocation": "packages/web",
+      "apiLocation": "packages/web/api",
+      "outputLocation": ".",
+      "apiPort": 7071,
+      "devServerTimeout": 60000,
+      "port": 4280
+    }
+  }
+}
