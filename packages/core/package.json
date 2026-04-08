@@ -17,11 +17,20 @@
   },
   "scripts": {
     "build": "tsc",
+    "test": "vitest run",
     "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
   },
   "files": [
     "dist/",
     "src/catalog/kickstart-catalog.json"
   ],
-  "keywords": ["kickstart", "a2ui", "aks", "kubernetes"]
+  "keywords": [
+    "kickstart",
+    "a2ui",
+    "aks",
+    "kubernetes"
+  ],
+  "devDependencies": {
+    "vitest": "^4.1.3"
+  }
 }

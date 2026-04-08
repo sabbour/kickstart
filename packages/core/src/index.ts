@@ -56,6 +56,18 @@ export type {
   GeneratedFile,
 } from "./generators/index.js";
 
+// Prompts (Layer 2 system prompt + composition)
+export {
+  KICKSTART_SYSTEM_PROMPT,
+  DEPLOYMENT_SAFEGUARDS,
+  buildSystemPrompt,
+} from "./prompts/index.js";
+export type {
+  DeploymentSafeguard,
+  SafeguardSeverity,
+  SystemPromptContext,
+} from "./prompts/index.js";
+
 // Shared types
 export type {
   AzureContext,
