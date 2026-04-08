@@ -1,0 +1,257 @@
+/* ==========================================================================
+   Landing Page — Carousel, track cards, framework pills
+   ========================================================================== */
+
+/* ---------- Landing wrapper ---------- */
+.landing-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-xxxl) var(--spacing-l);
+  background: var(--color-neutral-background-2);
+  animation: landingFadeIn var(--duration-normal) var(--easing-ease-out);
+}
+
+@keyframes landingFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.landing-inner {
+  max-width: 900px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxl);
+}
+
+/* ---------- Inspiration Carousel ---------- */
+.landing-carousel {
+  text-align: center;
+  position: relative;
+  min-height: 100px;
+}
+
+.carousel-viewport {
+  overflow: hidden;
+  position: relative;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carousel-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateX(40px);
+  transition: opacity var(--duration-slow) var(--easing-ease-out),
+              transform var(--duration-slow) var(--easing-ease-out);
+  pointer-events: none;
+}
+
+.carousel-slide.active {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+  position: relative;
+}
+
+.carousel-slide.exit-left {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+
+.carousel-title {
+  font-size: var(--font-size-600);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-neutral-foreground-1);
+  line-height: 1.3;
+  margin-bottom: var(--spacing-xs);
+}
+
+.carousel-subtitle {
+  font-size: var(--font-size-400);
+  color: var(--color-neutral-foreground-3);
+  max-width: 560px;
+  line-height: 1.5;
+}
+
+/* Dot indicators */
+.carousel-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-s);
+  margin-top: var(--spacing-l);
+}
+
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-circular);
+  border: none;
+  background: var(--color-neutral-stroke-1);
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--duration-fast), transform var(--duration-fast);
+}
+
+.carousel-dot:hover {
+  background: var(--color-neutral-foreground-3);
+  transform: scale(1.3);
+}
+
+.carousel-dot.active {
+  background: var(--color-brand-primary);
+  transform: scale(1.2);
+}
+
+/* ---------- Track Cards ---------- */
+.landing-tracks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-xl);
+}
+
+.track-card {
+  background: var(--color-neutral-background-1);
+  border: 1px solid var(--color-neutral-stroke-2);
+  border-radius: var(--radius-xlarge);
+  padding: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-m);
+  transition: box-shadow var(--duration-fast), border-color var(--duration-fast);
+  cursor: default;
+}
+
+.track-card:hover {
+  box-shadow: var(--shadow-8);
+  border-color: var(--color-neutral-stroke-1);
+}
+
+.track-card-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.track-card-title {
+  font-size: var(--font-size-500);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-foreground-1);
+}
+
+.track-card-desc {
+  font-size: var(--font-size-300);
+  color: var(--color-neutral-foreground-2);
+  line-height: 1.6;
+  flex: 1;
+}
+
+.track-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  color: var(--color-brand-primary);
+  font-size: var(--font-size-300);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: var(--font-family-base);
+  transition: color var(--duration-fast);
+}
+
+.track-card-link:hover {
+  color: var(--color-brand-primary-hover);
+  text-decoration: underline;
+}
+
+/* ---------- Framework Quick-Starts ---------- */
+.landing-frameworks {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-l);
+}
+
+.landing-frameworks-label {
+  font-size: var(--font-size-100);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--color-neutral-foreground-3);
+}
+
+.framework-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--spacing-s);
+}
+
+.framework-pill {
+  padding: var(--spacing-xs) var(--spacing-l);
+  border-radius: var(--radius-circular);
+  border: 1px solid var(--color-neutral-stroke-2);
+  background: var(--color-neutral-background-1);
+  color: var(--color-neutral-foreground-2);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  white-space: nowrap;
+}
+
+.framework-pill:hover {
+  background: var(--color-brand-lighter);
+  border-color: var(--color-brand-primary);
+  color: var(--color-brand-primary);
+}
+
+/* ---------- Landing page transition ---------- */
+.landing-page.hiding {
+  animation: landingFadeOut var(--duration-normal) var(--easing-ease) forwards;
+}
+
+@keyframes landingFadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-12px); }
+}
+
+/* When on landing page, hide sessions toggle */
+body.on-landing #topbar-sessions-toggle {
+  display: none;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .landing-page {
+    padding: var(--spacing-xl) var(--spacing-m);
+  }
+
+  .landing-tracks {
+    grid-template-columns: 1fr;
+  }
+
+  .carousel-title {
+    font-size: var(--font-size-500);
+  }
+
+  .carousel-subtitle {
+    font-size: var(--font-size-300);
+  }
+}

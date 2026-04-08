@@ -19,8 +19,9 @@
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/core.css">
   <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/landing.css">
 </head>
-<body>
+<body class="on-landing">
 
   <div class="app-shell">
     <!-- ==================== Header ==================== -->
@@ -70,7 +71,52 @@
 
       <!-- Chat area (primary) -->
       <main class="chat-main" id="chat-main" role="main">
-        <!-- Populated by createChatUI() in app.js -->
+        <!-- Landing page (shown before chat begins) -->
+        <div class="landing-page" id="landing-page">
+          <div class="landing-inner">
+            <!-- Inspiration Carousel -->
+            <div class="landing-carousel" id="landing-carousel">
+              <div class="carousel-viewport" id="carousel-viewport">
+                <!-- Slides injected by app.js -->
+              </div>
+              <div class="carousel-dots" id="carousel-dots"></div>
+            </div>
+
+            <!-- Track Cards -->
+            <div class="landing-tracks">
+              <div class="track-card" id="track-web-app">
+                <span class="track-card-icon">🌐</span>
+                <div class="track-card-title">Web App or API</div>
+                <p class="track-card-desc">Ship a web frontend, REST API, or microservice. Bring your code or start fresh — you'll get a working app, CI/CD pipeline, and a production URL.</p>
+                <button class="track-card-link" data-track="web-app">Get started →</button>
+              </div>
+              <div class="track-card" id="track-agentic-app">
+                <span class="track-card-icon">🤖</span>
+                <div class="track-card-title">AI Agent</div>
+                <p class="track-card-desc">Deploy an AI agent that calls tools, retrieves knowledge, and reasons over data. Self-host open-source models or connect to Azure OpenAI — with built-in scaling and low cost.</p>
+                <button class="track-card-link" data-track="agentic-app">Get started →</button>
+              </div>
+            </div>
+
+            <!-- Framework Quick-Starts -->
+            <div class="landing-frameworks">
+              <span class="landing-frameworks-label">Or start with a framework</span>
+              <div class="framework-pills" id="framework-pills">
+                <button class="framework-pill" data-framework="Next.js">Next.js</button>
+                <button class="framework-pill" data-framework="Python FastAPI">Python FastAPI</button>
+                <button class="framework-pill" data-framework="Express.js">Express.js</button>
+                <button class="framework-pill" data-framework="Go">Go</button>
+                <button class="framework-pill" data-framework="Spring Boot">Spring Boot</button>
+                <button class="framework-pill" data-framework="Django">Django</button>
+                <button class="framework-pill" data-framework="Rust">Rust</button>
+                <button class="framework-pill" data-framework="LangChain Agent">LangChain Agent</button>
+                <button class="framework-pill" data-framework="RAG App">RAG App</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat UI populated by createChatUI() in app.js -->
       </main>
 
       <!-- File viewer sidebar (appears when files are generated) -->

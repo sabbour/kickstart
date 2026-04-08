@@ -298,9 +298,20 @@ function detectServices(input) {
  * @param {Object} opts
  * @param {Function} opts.onPhaseChange - (phaseIndex: number) => void
  * @param {Function} opts.onResponse    - ({ a2ui, text, systemPrompt, files }) => void
+ * @param {string}   [opts.track]       - 'web-app' or 'agentic-app'
+ * @param {string}   [opts.preSelectedFramework] - skip framework question
  */
-export function createDemoEngine({ onPhaseChange, onResponse }) {
+export function createDemoEngine({ onPhaseChange, onResponse, track, preSelectedFramework }) {
   let state = createInitialState();
+  if (track) state.collected.track = track;
+
+  // If framework is pre-selected, record it and start at turnCount 1
+  // so the discover handler skips the framework question.
+  if (preSelectedFramework) {
+    state.collected.runtime = detectRuntime(preSelectedFramework);
+    state.collected.preSelectedFramework = preSelectedFramework;
+    state.turnCount = 1; // skip the "which framework?" turn
+  }
 
   function currentPhaseIndex() {
     return phaseIndex(state.currentPhase);
@@ -325,6 +336,14 @@ export function createDemoEngine({ onPhaseChange, onResponse }) {
   }
 
   function getWelcome() {
+    if (preSelectedFramework) {
+      return [
+        {
+          type: 'Text',
+          text: `Great choice — let's build something with **${preSelectedFramework}**! Tell me about your app.`,
+        },
+      ];
+    }
     return [
       {
         type: 'Text',
@@ -444,10 +463,12 @@ export function createApiEngine({ onPhaseChange, onResponse, apiClient, onError,
  * @param {Object}   [opts.apiClient]   - If provided, uses API backend
  * @param {Function} [opts.onError]     - Error handler (API mode only)
  * @param {Function} [opts.onStreaming]  - Streaming chunk handler (API mode only)
+ * @param {string}   [opts.track]       - 'web-app' or 'agentic-app'
+ * @param {string}   [opts.preSelectedFramework] - Pre-selected framework name
  */
-export function createEngine({ onPhaseChange, onResponse, apiClient, onError, onStreaming }) {
+export function createEngine({ onPhaseChange, onResponse, apiClient, onError, onStreaming, track, preSelectedFramework }) {
   if (apiClient) {
     return createApiEngine({ onPhaseChange, onResponse, apiClient, onError, onStreaming });
   }
-  return createDemoEngine({ onPhaseChange, onResponse });
+  return createDemoEngine({ onPhaseChange, onResponse, track, preSelectedFramework });
 }

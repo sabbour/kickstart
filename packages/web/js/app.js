@@ -1,5 +1,5 @@
 /**
- * App — Chat-first UI initialization
+ * App — Chat-first UI initialization with landing page
  * @module app
  */
 
@@ -15,6 +15,10 @@ import Auth from './auth.js';
 let engine;
 let apiClient = null;
 let isApiMode = false;
+
+// ---------- Landing page state ----------
+let selectedTrack = null;       // 'web-app' | 'agentic-app' | null
+let selectedFramework = null;   // framework name or null
 
 // ---------- Prompt Inspector ----------
 let promptInspectorOn = false;
@@ -34,8 +38,10 @@ const chatUI = createChatUI({
   },
 });
 
-// Mount chat UI into main area
-document.getElementById('chat-main')?.appendChild(chatUI.element);
+// Mount chat UI into main area (hidden initially; landing page is shown first)
+const chatMain = document.getElementById('chat-main');
+chatMain?.appendChild(chatUI.element);
+chatUI.element.style.display = 'none';
 
 // ---------- File Viewer ----------
 const fileViewer = createFileViewer();
@@ -45,7 +51,6 @@ EventBus.on('fileViewer:close', () => {
   document.getElementById('file-viewer')?.classList.add('hidden');
 });
 
-// Show file viewer when files are emitted
 EventBus.on('files:generated', ({ files }) => {
   if (files && files.length > 0) {
     fileViewer.setFiles(files);
@@ -66,6 +71,140 @@ document.getElementById('topbar-inspector-toggle')?.addEventListener('click', ()
   btn?.classList.toggle('active', promptInspectorOn);
 });
 
+// ==================== Landing Page ====================
+
+const INSPIRATION_IDEAS = [
+  { title: 'Movie night pick that settles disputes', subtitle: 'Your group votes, and the app chooses confidently.' },
+  { title: 'AI recipe finder from fridge photos', subtitle: 'Snap a photo of your fridge, get dinner ideas instantly.' },
+  { title: 'Team standup bot that respects time zones', subtitle: 'Async standups that actually work for global teams.' },
+  { title: 'Pet adoption matcher powered by AI', subtitle: 'Swipe-style matching between shelters and families.' },
+  { title: 'Real-time air quality dashboard', subtitle: 'Hyperlocal pollution data with health recommendations.' },
+  { title: 'Neighborhood tool lending library', subtitle: 'Borrow a drill from your neighbor — no awkward texts required.' },
+  { title: 'Personal finance coach that speaks plain English', subtitle: 'Budget tracking without the spreadsheet headaches.' },
+  { title: 'Workout generator for hotel rooms', subtitle: 'No equipment? No problem. AI builds a routine in seconds.' },
+  { title: 'Live event parking optimizer', subtitle: 'Find the fastest lot and walking route to the venue.' },
+  { title: 'Study group matchmaker for college', subtitle: 'Match with classmates by course, schedule, and study style.' },
+];
+
+let carouselIndex = 0;
+let carouselTimer = null;
+
+function initCarousel() {
+  const viewport = document.getElementById('carousel-viewport');
+  const dotsContainer = document.getElementById('carousel-dots');
+  if (!viewport || !dotsContainer) return;
+
+  // Build slides
+  viewport.innerHTML = INSPIRATION_IDEAS.map((idea, i) => `
+    <div class="carousel-slide ${i === 0 ? 'active' : ''}" data-slide="${i}">
+      <div class="carousel-title">${escapeHtml(idea.title)}</div>
+      <div class="carousel-subtitle">${escapeHtml(idea.subtitle)}</div>
+    </div>
+  `).join('');
+
+  // Build dots
+  dotsContainer.innerHTML = INSPIRATION_IDEAS.map((_, i) => `
+    <button class="carousel-dot ${i === 0 ? 'active' : ''}" data-dot="${i}" aria-label="Idea ${i + 1}"></button>
+  `).join('');
+
+  // Dot clicks
+  dotsContainer.addEventListener('click', (e) => {
+    const dot = e.target.closest('.carousel-dot');
+    if (!dot) return;
+    goToSlide(parseInt(dot.dataset.dot, 10));
+    resetCarouselTimer();
+  });
+
+  // Start auto-rotation
+  resetCarouselTimer();
+}
+
+function goToSlide(newIndex) {
+  const viewport = document.getElementById('carousel-viewport');
+  const dotsContainer = document.getElementById('carousel-dots');
+  if (!viewport) return;
+
+  const slides = viewport.querySelectorAll('.carousel-slide');
+  const dots = dotsContainer?.querySelectorAll('.carousel-dot');
+
+  if (newIndex === carouselIndex) return;
+
+  // Remove active from old
+  slides[carouselIndex]?.classList.remove('active');
+  slides[carouselIndex]?.classList.add('exit-left');
+  dots?.[carouselIndex]?.classList.remove('active');
+
+  // Clean up exit class after transition
+  const oldIdx = carouselIndex;
+  setTimeout(() => slides[oldIdx]?.classList.remove('exit-left'), 400);
+
+  carouselIndex = newIndex;
+
+  // Set active on new
+  slides[carouselIndex]?.classList.add('active');
+  dots?.[carouselIndex]?.classList.add('active');
+}
+
+function nextSlide() {
+  goToSlide((carouselIndex + 1) % INSPIRATION_IDEAS.length);
+}
+
+function resetCarouselTimer() {
+  if (carouselTimer) clearInterval(carouselTimer);
+  carouselTimer = setInterval(nextSlide, 5000);
+}
+
+function stopCarousel() {
+  if (carouselTimer) {
+    clearInterval(carouselTimer);
+    carouselTimer = null;
+  }
+}
+
+function initLandingListeners() {
+  // Track card links
+  document.querySelectorAll('.track-card-link').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedTrack = btn.dataset.track;
+      transitionToChat();
+    });
+  });
+
+  // Framework pills
+  document.querySelectorAll('.framework-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      selectedFramework = pill.dataset.framework;
+      // Auto-detect track from framework
+      const agenticFrameworks = ['LangChain Agent', 'RAG App'];
+      selectedTrack = agenticFrameworks.includes(selectedFramework) ? 'agentic-app' : 'web-app';
+      transitionToChat();
+    });
+  });
+}
+
+async function transitionToChat() {
+  stopCarousel();
+
+  const landingEl = document.getElementById('landing-page');
+  if (landingEl) {
+    landingEl.classList.add('hiding');
+    await new Promise(r => setTimeout(r, 200));
+    landingEl.remove();
+  }
+
+  // Remove landing body class, show chat
+  document.body.classList.remove('on-landing');
+  chatUI.element.style.display = '';
+
+  // Init engine with selections
+  await initEngine();
+
+  // Send welcome message
+  const welcomeA2UI = engine.getWelcome();
+  const html = renderA2UIMessage(welcomeA2UI);
+  chatUI.addMessage({ role: 'assistant', html });
+}
+
 // ---------- Engine Setup ----------
 async function initEngine() {
   apiClient = createApiClient();
@@ -75,6 +214,8 @@ async function initEngine() {
     isApiMode = true;
     engine = createEngine({
       apiClient,
+      track: selectedTrack,
+      preSelectedFramework: selectedFramework,
       onPhaseChange(phaseIndex) {
         chatUI.setPhase(phaseIndex);
       },
@@ -106,6 +247,8 @@ async function initEngine() {
   } else {
     isApiMode = false;
     engine = createEngine({
+      track: selectedTrack,
+      preSelectedFramework: selectedFramework,
       onPhaseChange(phaseIndex) {
         chatUI.setPhase(phaseIndex);
       },
@@ -118,7 +261,6 @@ async function initEngine() {
           chatUI.addMessage({ role: 'assistant', text });
         }
 
-        // If files were generated, show in file viewer
         if (files && files.length > 0) {
           EventBus.emit('files:generated', { files });
         }
@@ -276,12 +418,11 @@ function updateAuthUI() {
 // ---------- Boot ----------
 async function boot() {
   await initAuth();
-  await initEngine();
 
-  // Send welcome message immediately — chat starts on page load
-  const welcomeA2UI = engine.getWelcome();
-  const html = renderA2UIMessage(welcomeA2UI);
-  chatUI.addMessage({ role: 'assistant', html });
+  // Landing page is shown by default (via HTML).
+  // Initialize carousel and landing listeners.
+  initCarousel();
+  initLandingListeners();
 }
 
 // Run on DOM ready
