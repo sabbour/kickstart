@@ -23,6 +23,34 @@ let selectedFramework = null;   // framework name or null
 // ---------- Prompt Inspector ----------
 let promptInspectorOn = false;
 
+// ---------- Preview Panel ----------
+const PHASE_NAMES = ['discover', 'design', 'generate', 'review', 'handoff', 'deploy'];
+const PREVIEW_TITLES = {
+  discover: 'Architecture Preview',
+  design: 'Architecture Preview',
+  generate: 'Generated Files',
+  review: 'Deployment Plan',
+  handoff: 'Project Handoff',
+  deploy: 'Deployment Status',
+};
+
+function updatePreviewTitle(phase) {
+  const titleEl = document.getElementById('preview-panel-title');
+  if (titleEl) titleEl.textContent = PREVIEW_TITLES[phase] || 'Preview';
+}
+
+function showPreviewContent(a2uiComponent) {
+  const body = document.getElementById('preview-panel-body');
+  const panel = document.getElementById('file-viewer');
+  if (!body || !panel) return;
+
+  const el = renderA2UI(a2uiComponent, {});
+  body.innerHTML = '';
+  body.appendChild(el);
+  body.classList.remove('hidden');
+  panel.classList.remove('hidden');
+}
+
 // ---------- Chat UI (primary experience) ----------
 const chatUI = createChatUI({
   phases: [
@@ -51,10 +79,31 @@ EventBus.on('fileViewer:close', () => {
   document.getElementById('file-viewer')?.classList.add('hidden');
 });
 
+// Preview panel close
+document.getElementById('preview-panel-close')?.addEventListener('click', () => {
+  document.getElementById('file-viewer')?.classList.add('hidden');
+});
+
 EventBus.on('files:generated', ({ files }) => {
   if (files && files.length > 0) {
     fileViewer.setFiles(files);
     document.getElementById('file-viewer')?.classList.remove('hidden');
+  }
+});
+
+// File chip click delegation — opens preview panel and highlights file
+chatUI.element.addEventListener('click', (e) => {
+  const chip = e.target.closest('.file-chip');
+  if (!chip) return;
+  const filename = chip.dataset.filename;
+  const panel = document.getElementById('file-viewer');
+  if (panel) {
+    panel.classList.remove('hidden');
+    // Find and click the matching file tab
+    const tabs = panel.querySelectorAll('.file-tab');
+    tabs.forEach(t => {
+      if (t.textContent.trim() === filename) t.click();
+    });
   }
 });
 
@@ -227,6 +276,29 @@ function stopCarousel() {
 }
 
 function initLandingListeners() {
+  // Hero input — Enter key starts chat
+  const heroInput = document.getElementById('hero-input');
+  if (heroInput) {
+    heroInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const text = heroInput.value.trim();
+        if (text) {
+          pendingQuickPrompt = text;
+          transitionToChat();
+        }
+      }
+    });
+  }
+
+  // Suggestion pills
+  document.querySelectorAll('.suggestion-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      pendingQuickPrompt = pill.dataset.suggestion;
+      transitionToChat();
+    });
+  });
+
   // Track card links
   document.querySelectorAll('.track-card-link').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -307,6 +379,7 @@ async function initEngine() {
       preSelectedFramework: selectedFramework,
       onPhaseChange(phaseIndex) {
         chatUI.setPhase(phaseIndex);
+        updatePreviewTitle(PHASE_NAMES[phaseIndex]);
       },
       onResponse({ a2ui, text, systemPrompt }) {
         chatUI.setTyping(false);
@@ -315,6 +388,10 @@ async function initEngine() {
         if (a2ui) {
           const html = renderA2UIMessage(a2ui);
           chatUI.addMessage({ role: 'assistant', html });
+          // Show ArchitectureDiagram in preview panel
+          const components = Array.isArray(a2ui) ? a2ui : [a2ui];
+          const diagram = components.find(c => c.type === 'ArchitectureDiagram');
+          if (diagram) showPreviewContent(diagram);
         } else if (text) {
           chatUI.addMessage({ role: 'assistant', text });
         }
@@ -340,12 +417,17 @@ async function initEngine() {
       preSelectedFramework: selectedFramework,
       onPhaseChange(phaseIndex) {
         chatUI.setPhase(phaseIndex);
+        updatePreviewTitle(PHASE_NAMES[phaseIndex]);
       },
       onResponse({ a2ui, text, systemPrompt, files }) {
         chatUI.setTyping(false);
         if (a2ui) {
           const html = renderA2UIMessage(a2ui);
           chatUI.addMessage({ role: 'assistant', html });
+          // Show ArchitectureDiagram in preview panel
+          const components = Array.isArray(a2ui) ? a2ui : [a2ui];
+          const diagram = components.find(c => c.type === 'ArchitectureDiagram');
+          if (diagram) showPreviewContent(diagram);
         } else if (text) {
           chatUI.addMessage({ role: 'assistant', text });
         }
@@ -437,7 +519,7 @@ function showErrorBubble(message, retryable) {
 
 function handleUserMessage(text) {
   lastRetryMessage = text;
-  chatUI.setTyping(true);
+  chatUI.setTyping(true, engine?.getCurrentPhase());
 
   if (isApiMode) {
     engine.handleMessage(text);

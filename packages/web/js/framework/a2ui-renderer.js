@@ -7,7 +7,7 @@
  * @module a2ui-renderer
  */
 
-import { createCodeBlock, createCard, createStatusBadge, escapeHtml, renderMarkdown } from './components.js';
+import { createCodeBlock, createCard, createStatusBadge, escapeHtml, renderMarkdown, renderFileChips } from './components.js';
 
 /**
  * Render an A2UI JSON component tree to a DOM element.
@@ -58,6 +58,9 @@ const RENDERERS = {
   WorkflowStatus:     renderWorkflowStatus,
   CodespaceLink:      renderCodespaceLink,
   AppOverview:        renderAppOverview,
+
+  // File generation chips
+  FileGeneration:     renderFileGeneration,
 };
 
 // --- Standard A2UI ---
@@ -588,6 +591,15 @@ function renderAppOverview(schema) {
     </div>`;
 
   return card;
+}
+
+// --- File generation chips ---
+
+function renderFileGeneration(schema) {
+  const el = document.createElement('div');
+  el.className = 'a2ui-component file-generation';
+  el.innerHTML = renderFileChips(schema.files ?? []);
+  return el;
 }
 
 // --- Helpers ---

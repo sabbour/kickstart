@@ -85,6 +85,22 @@
         <!-- Landing page (shown before chat begins) -->
         <div class="landing-page" id="landing-page">
           <div class="landing-inner">
+            <!-- Hero Input -->
+            <div class="landing-hero" id="landing-hero">
+              <h1 class="landing-hero-title">What do you want to deploy?</h1>
+              <div class="landing-hero-input-wrap">
+                <input type="text" class="landing-hero-input" id="hero-input"
+                       placeholder="Describe what you want to deploy to AKS..."
+                       aria-label="Describe your app" autocomplete="off">
+              </div>
+              <div class="suggestion-pills" id="suggestion-pills">
+                <button class="suggestion-pill" data-suggestion="I want to build an e-commerce API with product catalog, cart, and checkout">E-commerce API</button>
+                <button class="suggestion-pill" data-suggestion="I want to build an AI chatbot that answers questions about my documentation">AI chatbot</button>
+                <button class="suggestion-pill" data-suggestion="I want to build a real-time dashboard that shows live metrics and alerts">Real-time dashboard</button>
+                <button class="suggestion-pill" data-suggestion="I want to build a microservices starter with API gateway, auth service, and message queue">Microservices starter</button>
+              </div>
+            </div>
+
             <!-- Inspiration Carousel -->
             <div class="landing-carousel" id="landing-carousel">
               <div class="carousel-viewport" id="carousel-viewport">
@@ -146,9 +162,16 @@
         <!-- Chat UI populated by createChatUI() in app.js -->
       </main>
 
-      <!-- File viewer sidebar (appears when files are generated) -->
-      <aside class="file-viewer hidden" id="file-viewer" aria-label="Generated files">
-        <!-- Populated by createFileViewer() in app.js -->
+      <!-- Preview panel / file viewer sidebar -->
+      <aside class="file-viewer hidden" id="file-viewer" aria-label="Preview panel">
+        <div class="preview-panel-header">
+          <span class="preview-panel-title" id="preview-panel-title">Preview</span>
+          <button class="preview-panel-close" id="preview-panel-close" aria-label="Close preview" title="Close">
+            <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M4.09 4.22a.5.5 0 01.63-.06l.07.06L10 9.44l5.22-5.22a.5.5 0 01.63-.06l.07.06a.5.5 0 01.06.63l-.06.07L10.7 10.1l5.22 5.22a.5.5 0 01-.63.76l-.07-.06L10 10.8l-5.22 5.22a.5.5 0 01-.63.06l-.07-.06a.5.5 0 01-.06-.63l.06-.07 5.22-5.22-5.22-5.22a.5.5 0 01-.06-.63l.06-.07z"/></svg>
+          </button>
+        </div>
+        <div class="preview-panel-body hidden" id="preview-panel-body"></div>
+        <!-- File viewer content populated by createFileViewer() in app.js -->
       </aside>
     </div>
   </div>

@@ -178,6 +178,13 @@ function generateHandler(_input, state) {
     a2ui: [
       { type: 'Text', text: 'I\'ve generated the key files for your project:' },
       {
+        type: 'FileGeneration',
+        files: [
+          { name: 'Dockerfile', status: 'done' },
+          { name: '.github/workflows/deploy.yml', status: 'done' },
+        ],
+      },
+      {
         type: 'CodeBlock',
         language: 'dockerfile',
         code: dockerfileCode,
@@ -187,7 +194,7 @@ function generateHandler(_input, state) {
         language: 'yaml',
         code: workflowCode,
       },
-      { type: 'Text', text: "These files are also available in the **file viewer** on the right. Next, let me show you the estimated cost." },
+      { type: 'Text', text: "Click a file chip above to preview it, or continue to review the deployment plan." },
     ],
   };
 }

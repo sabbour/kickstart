@@ -5,6 +5,16 @@
 
 import { EventBus } from './core.js';
 
+// Phase-aware status text for the sparkle loading animation
+const PHASE_STATUS_TEXT = {
+  discover: 'Understanding your app...',
+  design: 'Designing architecture...',
+  generate: 'Generating files...',
+  review: 'Reviewing deployment plan...',
+  handoff: 'Preparing handoff...',
+  deploy: 'Deploying to AKS...',
+};
+
 // ---------- Chat UI (main experience) ----------
 export function createChatUI(config = {}) {
   const container = document.createElement('div');
@@ -13,6 +23,7 @@ export function createChatUI(config = {}) {
 
   let messages = [];
   let isTyping = false;
+  let currentTypingPhase = null;
   let onSend = config.onSend ?? (() => {});
 
   const phases = config.phases ?? [
@@ -81,11 +92,15 @@ export function createChatUI(config = {}) {
     }).join('');
 
     if (isTyping) {
+      const statusText = PHASE_STATUS_TEXT[currentTypingPhase] || 'Thinking...';
       html += `
-        <div class="typing-indicator" aria-label="Kickstart is thinking">
-          <span class="typing-dot"></span>
-          <span class="typing-dot"></span>
-          <span class="typing-dot"></span>
+        <div class="sparkle-loader" aria-label="${statusText}">
+          <div class="sparkle-dots">
+            <span class="sparkle-dot"></span>
+            <span class="sparkle-dot"></span>
+            <span class="sparkle-dot"></span>
+          </div>
+          <span class="sparkle-text">${statusText}</span>
         </div>`;
     }
     return html;
@@ -143,8 +158,9 @@ export function createChatUI(config = {}) {
     }
   }
 
-  function setTyping(val) {
+  function setTyping(val, phase) {
     isTyping = val;
+    currentTypingPhase = phase || null;
     refreshMessages();
   }
 
@@ -395,6 +411,34 @@ export function renderMarkdown(text) {
   }).filter(Boolean).join('\n');
 
   return html;
+}
+
+// ---------- File Chips ----------
+
+/**
+ * Render file generation chips as an HTML string.
+ * Each chip shows file icon, name, and status indicator.
+ */
+export function renderFileChips(files) {
+  if (!files || files.length === 0) return '';
+
+  const fileIcon = '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414a1 1 0 00-.293-.707l-3.414-3.414A1 1 0 0011.586 3H6zm5 1.5L14.5 7H12a1 1 0 01-1-1V3.5z"/></svg>';
+
+  const statusHtml = (status) => {
+    switch (status) {
+      case 'done': return '<svg width="14" height="14" viewBox="0 0 20 20" fill="var(--color-success)"><path d="M7.03 13.9L3.56 10.44a.75.75 0 00-1.06 1.06l4 4a.75.75 0 001.06 0l9-9a.75.75 0 00-1.06-1.06L7.03 13.9z"/></svg>';
+      case 'generating': return '<span class="file-chip-spinner"></span>';
+      default: return '<span class="file-chip-pending"></span>';
+    }
+  };
+
+  return `<div class="file-chips-row">${files.map(f =>
+    `<button class="file-chip" data-filename="${escapeHtml(f.name)}">` +
+    `<span class="file-chip-icon">${fileIcon}</span>` +
+    `<span class="file-chip-name">${escapeHtml(f.name)}</span>` +
+    `<span class="file-chip-status">${statusHtml(f.status)}</span>` +
+    `</button>`
+  ).join('')}</div>`;
 }
 
 // ---------- Helpers ----------
