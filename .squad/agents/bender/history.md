@@ -158,6 +158,16 @@
 - **Route auth model:** `/api/*` requires `authenticated` role. Static assets (HTML/CSS/JS) are public. `/login` and `/logout` are convenience redirects to `/.auth/login/aad` and `/.auth/logout`. 401 responses auto-redirect to login.
 - **Bicep additions:** `entraClientId` param sets `AZURE_CLIENT_ID` app setting via `Microsoft.Web/staticSites/config` resource. `customDomainHostname` param creates `Microsoft.Web/staticSites/customDomains` resource (requires DNS CNAME pre-verification).
 - **deploy-swa.yml unchanged:** SWA deploy action doesn't need auth config — app settings are managed by Bicep/Portal, not the GitHub Action.
+
+### 2026-04-08: Dual-Model Backend (Chat + Codex Responses API)
+
+- **Deployment env vars:** `AZURE_OPENAI_CHAT_DEPLOYMENT` (e.g. `gpt-5.3-chat`) for conversation, `AZURE_OPENAI_CODEX_DEPLOYMENT` (e.g. `gpt-5.3-codex`) for code generation. Fallback: `AZURE_OPENAI_DEPLOYMENT` for backward compatibility (existing single-model setups keep working).
+- **Responses API for Codex:** Azure OpenAI Codex endpoint uses `POST /openai/deployments/{deployment}/responses?api-version=2025-03-01-preview`. System prompt in `instructions` field, user messages in `input`. Streaming uses `response.output_text.delta` SSE events (different from Chat Completions `choices[0].delta.content`).
+- **New endpoint:** `POST /api/generate` dedicated to code generation. Accepts `prompt` and `type` (dockerfile, kubernetes, pipeline, bicep, generic). Returns streaming code generation with type-specific system instructions. Cleaner separation from conversation flow.
+- **Client:** `openai-client.ts` extended with `generateCode(prompt, type)` method. Uses Codex deployment when available, falls back to chat deployment for backward compatibility.
+- **Config:** `local.settings.json` updated with `AZURE_OPENAI_CHAT_DEPLOYMENT`, `AZURE_OPENAI_CODEX_DEPLOYMENT` examples. Bicep params updated to pass both deployments via SWA app settings.
+- **Committed:** 6e4c31d includes openai-client.ts refactor + /api/generate endpoint + updated local.settings.json.
+- **Ahmed's model preferences still active:** claude-opus-4.6 for code, claude-haiku-4.5 for non-code (noted for LLM selection logic if needed).
 - **Key files:** `packages/web/staticwebapp.config.json`, `infra/main.bicep`, `infra/parameters.dev.json`, `infra/README.md`
 
 ### 2025-07-27: SWA + Entra Tenant Investigation

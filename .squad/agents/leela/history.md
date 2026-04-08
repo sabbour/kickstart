@@ -44,3 +44,14 @@
 - **P0 is ~11 hours, all vanilla JS.** Hero input, file chips, sparkle loading, preview rename. No framework change needed.
 - **Key files touched:** `index.html` (hero input), `landing.css` (input styles), `components.css` (file chips, sparkle), `app.js` (hero handler, file chip rendering), `components.js` (new factories).
 - **Ahmed preference:** claude-opus-4.6 for code, claude-haiku-4.5 for non-code (confirmed still active).
+
+### 2026-04-08: Spark-like UX Roadmap — P0/P1/P2 Prioritization
+
+- **Full decision:** Documented in `.squad/decisions/inbox/leela-spark-ux-roadmap.md` (merged into decisions.md). Complete gap analysis + prioritized roadmap.
+- **P0 scope (~11 hours, ship next sprint):** (1) Hero text input above carousel, (2) In-chat file chips with status, (3) Sparkle/pulse loading animation, (4) Right panel as "Preview" (contextual titles, A2UI diagram support).
+- **P1 scope (~26 hours, one sprint after P0):** (5) Code view toggle (Preview|Code modes), (6) Deploy CTA button (top bar, AKS target dialog), (7) Session persistence + Recent/Favorites.
+- **P2 scope (backlog):** (8) Selective workspace tabs (Iterate, Files, Prompts, Assets — not Theme), (9) "Open Codespace" / "Create Repository" menu, (10) Mermaid diagram rendering in preview.
+- **Vanilla JS all the way:** No framework change needed. Component factory pattern in `components.js` handles all P0/P1 work.
+- **Event bus extensions:** `files:generating`, `files:generated`, `preview:show`, `deploy:ready`, `deploy:started`, `deploy:progress`, `deploy:complete`.
+- **Key distinction:** Spark publishes running apps. Kickstart generates infrastructure (Bicep, Dockerfiles, Helm, GH Actions) and deploys to AKS. Preview = architecture diagram + deployment plan + IaC files, not a running app. UX must reflect this.
+- **Next:** Fry assigned P0 in background mode. P1 is one sprint after P0 ships. P2 depends on GitHub OAuth and MCP App UI (deferred features).
