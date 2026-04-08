@@ -32,11 +32,18 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install dependencies and build API
+      - name: Install dependencies and build
         run: |
           npm ci
           npm run build -w @kickstart/core
           npm run build -w @kickstart/api
+
+      - name: Bundle core into API node_modules
+        run: |
+          mkdir -p packages/web/api/node_modules/@kickstart/core
+          cp -r packages/core/dist packages/web/api/node_modules/@kickstart/core/
+          cp packages/core/package.json packages/web/api/node_modules/@kickstart/core/
+          cp -r packages/core/src/catalog/kickstart-catalog.json packages/web/api/node_modules/@kickstart/core/dist/catalog/ 2>/dev/null || true
 
       - name: Deploy to Azure Static Web Apps
         id: swa_deploy
@@ -48,8 +55,7 @@ jobs:
           app_location: "packages/web"
           api_location: "packages/web/api"
           skip_app_build: true
-          skip_api_build: false
-          api_build_command: "npm run build"
+          skip_api_build: true
 
   close_staging:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
