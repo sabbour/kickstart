@@ -49,9 +49,15 @@ export function createApiClient({ baseUrl = DEFAULT_BASE_URL } = {}) {
           headers: { 'Content-Type': 'application/json' },
           body,
           signal: controller.signal,
+          redirect: 'manual',
         });
 
         clearTimeout(timer);
+
+        // SWA auth redirect — user needs to sign in
+        if (res.status === 302 || res.type === 'opaqueredirect') {
+          return { error: true, status: 401, message: 'Please sign in to use the AI assistant.' };
+        }
 
         if (isRetryable(res.status) && attempt < MAX_RETRIES) {
           lastError = { error: true, status: res.status, message: `Server returned ${res.status}` };
@@ -111,9 +117,15 @@ export function createApiClient({ baseUrl = DEFAULT_BASE_URL } = {}) {
           },
           body,
           signal: controller.signal,
+          redirect: 'manual',
         });
 
         clearTimeout(timer);
+
+        // SWA auth redirect — user needs to sign in
+        if (res.status === 302 || res.type === 'opaqueredirect') {
+          return { error: true, status: 401, message: 'Please sign in to use the AI assistant.' };
+        }
 
         if (isRetryable(res.status) && attempt < MAX_RETRIES) {
           lastError = { error: true, status: res.status, message: `Server returned ${res.status}` };
@@ -153,14 +165,17 @@ export function createApiClient({ baseUrl = DEFAULT_BASE_URL } = {}) {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
+      // Use redirect: 'manual' to detect SWA auth redirects (302 → login page)
       const res = await fetch(`${baseUrl}/api/converse`, {
         method: 'OPTIONS',
         signal: controller.signal,
+        redirect: 'manual',
       });
       clearTimeout(timer);
-      // 2xx = endpoint exists and responds; 405 = endpoint exists but rejects OPTIONS.
+      // 2xx = endpoint exists and responds; 405 = rejects OPTIONS but exists.
+      // 0 (opaqueredirect) or 302 = SWA auth gate — endpoint exists, needs login.
       // 404 means the endpoint isn't deployed yet — treat as unavailable.
-      return res.ok || res.status === 405;
+      return res.ok || res.status === 405 || res.status === 302 || res.type === 'opaqueredirect';
     } catch {
       return false;
     }

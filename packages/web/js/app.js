@@ -622,60 +622,23 @@ async function initAuth() {
   await updateAuthUI();
 }
 
-async function fetchUserPhoto() {
-  try {
-    const token = await Auth.getToken(['User.Read']);
-    if (!token) return null;
-    // Check if photo exists (metadata) before fetching binary
-    const meta = await fetch('https://graph.microsoft.com/v1.0/me/photo', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!meta.ok) return null;
-    const response = await fetch('https://graph.microsoft.com/v1.0/me/photo/$value', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!response.ok) return null;
-    const blob = await response.blob();
-    return URL.createObjectURL(blob);
-  } catch {
-    return null;
-  }
-}
-
 async function updateAuthUI() {
   const userBtn = document.getElementById('topbar-user');
   if (!userBtn) return;
 
   if (Auth.isAuthenticated()) {
     const info = Auth.getUserInfo();
-    const fallback = 'assets/icons/commands/avatar-default.svg';
     const initials = info.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-    // Use a plain <img> with initials placeholder — fluent-avatar is unreliable (0×0)
     userBtn.innerHTML = `
       <span class="topbar-avatar-initials">${escapeHtml(initials)}</span>
       <span class="topbar-user-name">${escapeHtml(info.name)}</span>`;
-    userBtn.onclick = () => Auth.logout().then(updateAuthUI);
+    userBtn.onclick = () => Auth.logout();
     userBtn.title = `Signed in as ${info.email} — click to sign out`;
-
-    // Fetch photo in background, swap initials → <img> when ready
-    const photoUrl = await fetchUserPhoto();
-    const src = photoUrl || fallback;
-    const placeholder = userBtn.querySelector('.topbar-avatar-initials');
-    if (placeholder) {
-      const img = document.createElement('img');
-      img.src = src;
-      img.alt = escapeHtml(info.name);
-      img.width = 28;
-      img.height = 28;
-      img.className = 'topbar-avatar-img';
-      img.onerror = () => { img.src = fallback; img.onerror = null; };
-      placeholder.replaceWith(img);
-    }
   } else {
     userBtn.innerHTML = `
       <img src="assets/icons/commands/avatar-default.svg" width="28" height="28" alt="" style="border-radius:50%">
       <span>Sign in</span>`;
-    userBtn.onclick = () => Auth.login().then(updateAuthUI);
+    userBtn.onclick = () => Auth.login();
     userBtn.title = 'Sign in with your Microsoft account';
   }
 }
