@@ -814,3 +814,18 @@ Adopted Playwright with a lightweight static file server (`serve`) for E2E testi
 - Tests depend on demo engine behavior — if prompts change, conversation-flow tests may need updating
 - A2UI tests rely on content-based selectors since components lack unique CSS classes
 - 38 tests run in ~13s on Chromium only
+
+### 2026-04-08T14:54:55Z: User directive — No LLM emojis
+**By:** Ahmed Sabbour (via Copilot)  
+**What:** LLM responses must not contain emojis. All AI-generated content (carousel inspirations, chat messages, system prompt outputs) should be emoji-free.  
+**Why:** User request — captured for team memory
+
+### 2026-04-08T14:58:40Z: User directive — Replace all emojis with Fluent 2 icons
+**By:** Ahmed Sabbour (via Copilot)  
+**What:** No emojis anywhere in the website design. Always use Fluent 2 icons instead of emoji characters for all visual indicators, decorations, and iconography throughout the web UI and MCP App surfaces.  
+**Why:** User request — captured for team memory
+
+### 2026-04-08T15:05:00Z: User directive — Use Copilot icon for AI indicators
+**By:** Ahmed Sabbour (via Copilot)  
+**What:** Use the Copilot icon (ssets/icons/fluent/copilot.svg) instead of sparkle icons anywhere an AI/assistant/copilot indicator is needed in the UI.  
+**Why:** User request — the Copilot brand icon is the correct visual for AI features, not a generic sparkle.

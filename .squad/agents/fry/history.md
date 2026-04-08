@@ -75,3 +75,20 @@
 - **Emojis → Fluent 2 SVG icons**: Replaced ALL emoji characters across `index.html`, `app.js`, `engine.js`, `a2ui-renderer.js`, and `components.js`. Track cards use 28px Globe/Bot SVGs. Architecture diagram components use 24px inline SVGs (Globe, Cloud, Database, Lightning, ArrowSync). Status indicators (checkmark, dismiss) use 14px SVGs. File viewer folder icon uses 16px SVG. Prompt inspector uses code-bracket SVG. Sessions new-btn uses 16px Add/Plus SVG. All SVGs use `fill="currentColor"` to inherit text color.
 - **Dark mode removed**: Deleted `@media (prefers-color-scheme: dark)` blocks from `theme.css` (web) and `kickstart-app.html` (MCP app). Updated MCP test to assert dark mode is NOT present. Light theme only per user directive.
 - **CSS adjustment**: `.track-card-icon` changed from `font-size: 28px` to `display: inline-flex; color: var(--color-brand-primary)` to properly hold SVG elements.
+
+### 2026-04-08 — Carousel clickability + emoji removal + dark mode cleanup
+- **Carousel interaction**: Carousel items now fully clickable — clicking a slide/dot automatically submits the item's .text field as a chat message via handleMessage(). No need for separate CTA button.
+- **Emoji replacement**: All 18 emoji characters replaced with inline Fluent 2 SVG icons:
+  - Copy/clipboard (📋), Eye (👁️), Close/X (❌), Checkmark/tick (✓), Plus/add (➕), Folder (📁), Settings (⚙️), and 11 others
+  - SVG icons inlined in A2UI renderer — no external file fetch needed
+  - Icons sized to match text baseline (0.9em), colored to match context (dark on light, light on dark)
+- **Dark mode removal**: Deleted all @media (prefers-color-scheme: dark) media query blocks:
+  - 	heme.css — removed dark palette variables and dark theme overrides
+  - landing.css — removed dark carousel styling
+  - components.css — removed dark input/button/card overrides
+  - Also removed from packages/mcp-server/src/app/kickstart-app.html (MCP App HTML surface)
+- **Light theme only**: UI now light theme exclusively. CSS file size reduced by ~120 lines.
+- **A2UI renderer update**: enderA2UI() now inlines SVG icons directly into rendered components rather than using emoji placeholders.
+- **Files changed**: 8 files (3 CSS, 3 JS, 2 HTML)
+- **Tests**: All 118 Playwright E2E tests passing — carousel interaction, icon rendering, layout all verified
+- **Alignment**: Fully implements three user directives: no LLM emojis, no UI emojis (use Fluent icons instead), light theme only

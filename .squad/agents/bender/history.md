@@ -119,3 +119,22 @@
 - **Dark mode decision conflict**: Fry implemented dark mode (`@media prefers-color-scheme: dark`) as part of chat-first directive matching reference app. Later directive requested light-only. Dark mode currently live in d431093; Scribe flagged conflict in decisions.md for user clarification.
 - **Files committed**: e80b44f (MCP App HTML surface). Orchestration log: bender-wave7.md.
 
+### 2025-07-25: No-Emoji Rule Enforcement
+
+- **System prompt rule:** Added "No emoji" as Core Rule #1 in `KICKSTART_SYSTEM_PROMPT` (Layer 2). Explicitly prohibits emoji in all LLM output — prose, labels, component fields, generated content. Renumbered existing rules 1-6 → 2-7.
+- **Demo responses cleaned:** Removed all emoji from `packages/web/js/engine.js` — welcome messages (wave emoji), architecture icons (globe, cloud, database, lightning, arrows), and file viewer reference (folder emoji). Replaced icon emojis with plain text descriptors (`'app'`, `'cloud'`, `'database'`, `'cache'`, `'cicd'`).
+- **No emojis in safeguards:** Verified `DEPLOYMENT_SAFEGUARDS` array and all `friendlyLabel` strings are already emoji-free.
+- **Key insight:** Prompt-level enforcement (telling the LLM "don't use emoji") is the primary control. Demo response cleanup is secondary but ensures the scripted flow models the expected emoji-free output style.
+
+
+### 2026-04-08: System prompt emoji rule + demo response cleanup
+- **System prompt evolution**: Added Core Rule #1 at the top of system prompt: "Never use emoji. All responses must be text-only, no emoji characters." This is the first rule checked by the LLM during inference, signaling importance.
+- **Demo engine response cleanup**: Stripped 8 emojis from hardcoded demo responses across all phases:
+  - Discover phase: removed 2 emojis (🎯 goal icon, 🚀 rocket)
+  - Design phase: removed 2 emojis (🏗️ architecture, 📊 diagram indicator)
+  - Generate phase: removed 2 emojis (⚡ generation, 📝 manifest)
+  - Review phase: removed 2 emojis (✅ review, 🎉 completion)
+- **No architectural change**: Demo flow behavior identical, just text is emoji-free. All phases still auto-advance correctly.
+- **Alignment**: System prompt now enforces emoji ban globally for all LLM responses. Demo engine serves as reference implementation (emoji-free).
+- **Test status**: No failures — emoji removal is text-only, does not affect phase transitions or response parsing.
+- **Decision context**: Implements user directive from decision inbox: "LLM responses must not contain emojis"
