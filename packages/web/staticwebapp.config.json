@@ -1,4 +1,50 @@
 {
+  "auth": {
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/d91aa5af-8c1e-442c-b77c-0b92988b387b/v2.0",
+          "clientIdSettingName": "AZURE_CLIENT_ID",
+          "clientSecretSettingName": "AZURE_CLIENT_SECRET"
+        }
+      }
+    }
+  },
+  "routes": [
+    {
+      "route": "/.auth/login/aad",
+      "statusCode": 200
+    },
+    {
+      "route": "/.auth/logout",
+      "statusCode": 200
+    },
+    {
+      "route": "/.auth/*",
+      "statusCode": 200
+    },
+    {
+      "route": "/login",
+      "redirect": "/.auth/login/aad?post_login_redirect_uri=/"
+    },
+    {
+      "route": "/logout",
+      "redirect": "/.auth/logout?post_logout_redirect_uri=/"
+    },
+    {
+      "route": "/api/*",
+      "allowedRoles": ["authenticated"]
+    }
+  ],
+  "responseOverrides": {
+    "401": {
+      "redirect": "/.auth/login/aad?post_login_redirect_uri=.referrer",
+      "statusCode": 302
+    },
+    "404": {
+      "rewrite": "/index.html"
+    }
+  },
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": [
@@ -7,11 +53,6 @@
       "/js/*",
       "/*.{css,js,png,jpg,jpeg,gif,svg,ico,json,woff,woff2,ttf,eot}"
     ]
-  },
-  "responseOverrides": {
-    "404": {
-      "rewrite": "/index.html"
-    }
   },
   "globalHeaders": {
     "X-Content-Type-Options": "nosniff",
@@ -25,11 +66,5 @@
     ".js": "text/javascript",
     ".css": "text/css"
   },
-  "routes": [
-    {
-      "route": "/api/*",
-      "allowedRoles": []
-    }
-  ],
   "_comment": "Custom domains: kickstart.prototypes.aks.azure.sabbour.me (temp), kickstart.aks.azure.com (future). Configure via Azure Portal or Azure CLI."
 }

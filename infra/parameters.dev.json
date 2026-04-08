@@ -16,6 +16,12 @@
     },
     "branch": {
       "value": "main"
+    },
+    "entraClientId": {
+      "value": "e71a23c6-aeb4-459a-88fc-07ff96fc9b92"
+    },
+    "customDomainHostname": {
+      "value": "kickstart.prototypes.aks.azure.sabbour.me"
     }
   }
 }

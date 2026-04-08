@@ -20,6 +20,12 @@ param repositoryUrl string = ''
 @description('Branch to deploy from')
 param branch string = 'main'
 
+@description('Entra ID (Azure AD) client ID for authentication')
+param entraClientId string = ''
+
+@description('Custom domain hostname (e.g., kickstart.prototypes.aks.azure.sabbour.me). Leave empty to skip.')
+param customDomainHostname string = ''
+
 // ── Static Web App ──────────────────────────────────────────────
 
 resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
@@ -37,6 +43,31 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
       skipGithubActionWorkflowGeneration: true
     }
   }
+}
+
+// ── App Settings (Entra auth references) ────────────────────────
+// AZURE_CLIENT_ID is safe to set via Bicep (not a secret).
+// AZURE_CLIENT_SECRET must be set manually via Azure Portal or CLI:
+//   az staticwebapp appsettings set -n <swa-name> -g <rg> \
+//     --setting-names AZURE_CLIENT_SECRET=<value>
+
+resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = if (!empty(entraClientId)) {
+  parent: staticWebApp
+  name: 'appsettings'
+  properties: {
+    AZURE_CLIENT_ID: entraClientId
+  }
+}
+
+// ── Custom Domain ───────────────────────────────────────────────
+// Prerequisites: CNAME record pointing customDomainHostname → defaultHostname
+// For kickstart.prototypes.aks.azure.sabbour.me → <swa-default>.azurestaticapps.net
+// DNS must be verified before this resource can be created.
+
+resource customDomain 'Microsoft.Web/staticSites/customDomains@2023-12-01' = if (!empty(customDomainHostname)) {
+  parent: staticWebApp
+  name: customDomainHostname
+  properties: {}
 }
 
 // ── Outputs ─────────────────────────────────────────────────────
