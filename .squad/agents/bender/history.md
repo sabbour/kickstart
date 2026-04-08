@@ -204,3 +204,16 @@
 - **inspirations.ts:** Updated `isOpenAIConfigured()` to accept `AZURE_OPENAI_CHAT_DEPLOYMENT` as alternative to `AZURE_OPENAI_DEPLOYMENT`.
 - **local.settings.json:** Added `AZURE_OPENAI_CHAT_DEPLOYMENT: "gpt-5.3-chat"` and `AZURE_OPENAI_CODEX_DEPLOYMENT: "gpt-5.3-codex"`.
 - **Key files:** `packages/web/api/src/lib/openai-client.ts`, `packages/web/api/src/functions/generate.ts`, `packages/web/api/local.settings.json`
+
+### 2025-07-28: SWA Auth Fix — "Empty stream response" 401 Bug
+
+- **Root cause:** Two independent auth systems fighting each other. MSAL popup set tokens in sessionStorage but never created the SWA session cookie. SWA's route auth (`allowedRoles: ["authenticated"]`) requires a session cookie from `/.auth/login/aad`. Without it, API calls got 401→302 redirect to login page HTML, which `readStream()` parsed as "Empty stream response."
+- **Fix:** Rewrote `packages/web/js/auth.js` to use SWA built-in auth for login/logout (full-page redirect to `/.auth/login/aad` and `/.auth/logout`), keeping MSAL only for Graph API token acquisition (profile photos via `User.Read` scope).
+- **SWA session state:** `initialize()` now fetches `/.auth/me` to get `clientPrincipal`. `isAuthenticated()` and `getUserInfo()` derive from `clientPrincipal` instead of MSAL's `currentAccount`.
+- **MSAL cache change:** Switched from `sessionStorage` to `localStorage` so MSAL tokens survive the full-page redirect cycle.
+- **Token fallback chain:** `getToken()` tries: (1) `acquireTokenSilent` with cached MSAL account, (2) `ssoSilent` with `loginHint` from `clientPrincipal.userDetails` (leverages existing Entra session), (3) `acquireTokenPopup` as last resort.
+- **login/logout return `new Promise(() => {})`:** Never-resolving promise — page navigates away. Callers using `.then()` chains are unaffected because callbacks never fire (correct behavior).
+- **app.js `/login` handler updated:** `Auth.login(); return;` — no `.then()` chain, just redirect and bail out of boot.
+- **getUserInfo() parses SWA claims:** Reads `name` claim type for display name, `preferred_username` or email claim for email, falls back to `clientPrincipal.userDetails`.
+- **No changes to:** `api-client.js` (relies on SWA cookie), `staticwebapp.config.json` (route auth stays), any config constants.
+- **Key lesson:** SWA built-in auth and MSAL are complementary, not alternatives. SWA handles session cookies for API route auth; MSAL handles delegated tokens for external APIs (Graph, ARM). Never use MSAL alone for login when SWA route auth is in play.
