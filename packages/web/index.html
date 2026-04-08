@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kickstart — Deploy to AKS</title>
+  <title>Kickstart on Azure Kubernetes Service (AKS)</title>
   <meta name="description" content="AI-guided onboarding for deploying apps to Azure Kubernetes Service">
 
   <!-- Favicon -->
@@ -27,8 +27,8 @@
     <!-- ==================== Header ==================== -->
     <header class="topbar" role="banner">
       <a class="topbar-brand" href="#/" aria-label="Kickstart — home">
-        <img src="assets/logo.svg" alt="" width="24" height="24">
-        <span>Kickstart</span>
+        <img src="assets/aks-logo-white.svg" alt="" width="24" height="24">
+        <span>Kickstart on Azure Kubernetes Service (AKS)</span>
       </a>
 
       <div class="topbar-actions">
@@ -37,14 +37,6 @@
                 aria-label="Toggle sessions" title="Sessions">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
             <path d="M3 4h14v1.5H3V4zm0 4h14v1.5H3V8zm0 4h10v1.5H3V12z"/>
-          </svg>
-        </button>
-
-        <!-- Prompt inspector toggle -->
-        <button class="topbar-btn" id="topbar-inspector-toggle"
-                aria-label="Toggle prompt inspector" title="Prompt Inspector">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M8 1a7 7 0 110 14A7 7 0 018 1zm0 1.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM8 4a.75.75 0 01.75.75v2.5h2.5a.75.75 0 010 1.5h-2.5v2.5a.75.75 0 01-1.5 0v-2.5h-2.5a.75.75 0 010-1.5h2.5v-2.5A.75.75 0 018 4z"/>
           </svg>
         </button>
 
@@ -87,23 +79,20 @@
           <div class="landing-inner">
             <!-- Hero Input -->
             <div class="landing-hero" id="landing-hero">
-              <h1 class="landing-hero-title">What do you want..</h1>
+              <h1 class="landing-hero-title">What are you dreaming of building?</h1>
               <div class="landing-hero-input-wrap">
                 <span class="hero-input-icon" aria-hidden="true">
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a4.5 4.5 0 00-1.5 8.74V12a.5.5 0 00.5.5h2a.5.5 0 00.5-.5v-1.26A4.502 4.502 0 0010 2zm-1 13a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-.5H9v.5zm-.5 1.5a.5.5 0 000 1h3a.5.5 0 000-1h-3z"/></svg>
                 </span>
+                <span class="hero-input-placeholder"></span>
                 <input type="text" id="hero-input"
-                       placeholder="Describe what you want to build.."
                        aria-label="Describe your app" autocomplete="off">
+                <button class="hero-send-btn" id="hero-send-btn" aria-label="Send" title="Send">
+                  <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M7.998 0a.75.75 0 01.727.563l.899 3.486 3.486.899a.75.75 0 010 1.454l-3.486.899-.899 3.486a.75.75 0 01-1.454 0L6.372 7.3l-3.486-.899a.75.75 0 010-1.454l3.486-.899.899-3.486A.75.75 0 017.998 0zM12.5 9a.75.75 0 01.69.46l.602 1.428 1.428.602a.75.75 0 010 1.38l-1.428.602-.602 1.428a.75.75 0 01-1.38 0l-.602-1.428-1.428-.602a.75.75 0 010-1.38l1.428-.602.602-1.428A.75.75 0 0112.5 9z"/>
+                  </svg>
+                </button>
               </div>
-            </div>
-
-            <!-- Inspiration Carousel -->
-            <div class="landing-carousel" id="landing-carousel">
-              <div class="carousel-viewport" id="carousel-viewport">
-                <!-- Slides injected by app.js -->
-              </div>
-              <div class="carousel-dots" id="carousel-dots"></div>
             </div>
 
             <!-- Track Cards -->
@@ -137,6 +126,18 @@
                 <button class="framework-pill" data-framework="rag">RAG App</button>
               </div>
             </div>
+
+            <!-- Recent Sessions -->
+            <div class="recent-sessions-section" id="recent-sessions-section" style="display: none;">
+              <span class="recent-sessions-label">Recent</span>
+              <div class="recent-sessions-list" id="recent-sessions-list"></div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="landing-footer">
+              <div class="landing-footer-version" id="landing-footer-version"></div>
+              <div class="landing-footer-disclaimer">Kickstart uses AI. Check for mistakes.</div>
+            </footer>
           </div>
         </div>
 
@@ -156,6 +157,12 @@
       </aside>
     </div>
   </div>
+
+  <!-- Build metadata — replaced by CI pipeline at deploy time -->
+  <script>
+    window.__BUILD_SHA__ = 'dev';
+    window.__BUILD_DATE__ = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  </script>
 
   <!-- App entry point (ES modules) -->
   <script type="module" src="js/app.js"></script>

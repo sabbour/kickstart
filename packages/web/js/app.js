@@ -40,6 +40,63 @@ let carouselTimer = null;
 // ---------- Prompt Inspector ----------
 let promptInspectorOn = false;
 
+// ---------- Recent Sessions (localStorage) ----------
+const SESSIONS_KEY = 'kickstart-sessions';
+const MAX_RECENT = 5;
+
+function getSessions() {
+  try {
+    return JSON.parse(localStorage.getItem(SESSIONS_KEY) || '[]');
+  } catch { return []; }
+}
+
+function saveSession(session) {
+  const sessions = getSessions();
+  // Update existing or prepend new
+  const idx = sessions.findIndex(s => s.id === session.id);
+  if (idx >= 0) {
+    sessions[idx] = { ...sessions[idx], ...session, updatedAt: Date.now() };
+  } else {
+    sessions.unshift({ ...session, createdAt: Date.now(), updatedAt: Date.now() });
+  }
+  // Keep only recent
+  localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, 20)));
+}
+
+function renderRecentSessions() {
+  const section = document.getElementById('recent-sessions-section');
+  const list = document.getElementById('recent-sessions-list');
+  if (!section || !list) return;
+
+  const sessions = getSessions().slice(0, MAX_RECENT);
+  if (sessions.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = '';
+  list.innerHTML = sessions.map(s => {
+    const date = new Date(s.updatedAt || s.createdAt);
+    const dateStr = date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+    return `<div class="recent-session-item" data-session-id="${s.id}">
+      <span class="recent-session-title">${escapeHtml(s.title || s.prompt || 'Untitled session')}</span>
+      <span class="recent-session-date">${dateStr}</span>
+    </div>`;
+  }).join('');
+
+  // Click handler — resume session
+  list.addEventListener('click', (e) => {
+    const item = e.target.closest('.recent-session-item');
+    if (!item) return;
+    const sessionId = item.dataset.sessionId;
+    const session = getSessions().find(s => s.id === sessionId);
+    if (session) {
+      pendingQuickPrompt = session.prompt || session.title;
+      transitionToChat();
+    }
+  });
+}
+
 // ---------- Preview Panel ----------
 const PHASE_NAMES = ['discover', 'design', 'generate', 'review', 'handoff', 'deploy'];
 const PREVIEW_TITLES = {
@@ -134,13 +191,6 @@ document.getElementById('sessions-close-btn')?.addEventListener('click', () => {
   document.getElementById('sessions-sidebar')?.classList.add('hidden');
 });
 
-// ---------- Prompt Inspector Toggle ----------
-document.getElementById('topbar-inspector-toggle')?.addEventListener('click', () => {
-  promptInspectorOn = !promptInspectorOn;
-  const btn = document.getElementById('topbar-inspector-toggle');
-  btn?.classList.toggle('active', promptInspectorOn);
-});
-
 // ==================== Inspiration Carousel ====================
 
 async function fetchInspirations() {
@@ -159,93 +209,45 @@ async function fetchInspirations() {
   }
 }
 
-function updateCarouselIdeas(ideas) {
-  INSPIRATION_IDEAS = ideas;
-  const viewport = document.getElementById('carousel-viewport');
-  const dotsContainer = document.getElementById('carousel-dots');
-  if (!viewport || !dotsContainer) return;
+// ---------- Placeholder Rotation ----------
+function initPlaceholderRotation() {
+  const placeholderEl = document.querySelector('.hero-input-placeholder');
+  const heroInput = document.getElementById('hero-input');
+  if (!placeholderEl || !heroInput) return;
 
-  const newIndex = carouselIndex < ideas.length ? carouselIndex : 0;
+  // Show first idea
+  carouselIndex = 0;
+  placeholderEl.textContent = INSPIRATION_IDEAS[0].title;
+  placeholderEl.classList.add('visible');
 
-  viewport.innerHTML = ideas.map((idea, i) => `
-    <div class="carousel-slide ${i === newIndex ? 'active' : ''}" data-slide="${i}">
-      <div class="carousel-title">${escapeHtml(idea.title)}</div>
-      <div class="carousel-subtitle">${escapeHtml(idea.subtitle)}</div>
-    </div>
-  `).join('');
-
-  dotsContainer.innerHTML = ideas.map((_, i) => `
-    <button class="carousel-dot ${i === newIndex ? 'active' : ''}" data-dot="${i}" aria-label="Idea ${i + 1}"></button>
-  `).join('');
-
-  carouselIndex = newIndex;
-  resetCarouselTimer();
-}
-
-function initCarousel() {
-  const viewport = document.getElementById('carousel-viewport');
-  const dotsContainer = document.getElementById('carousel-dots');
-  if (!viewport || !dotsContainer) return;
-
-  viewport.innerHTML = INSPIRATION_IDEAS.map((idea, i) => `
-    <div class="carousel-slide ${i === 0 ? 'active' : ''}" data-slide="${i}">
-      <div class="carousel-title">${escapeHtml(idea.title)}</div>
-      <div class="carousel-subtitle">${escapeHtml(idea.subtitle)}</div>
-    </div>
-  `).join('');
-
-  dotsContainer.innerHTML = INSPIRATION_IDEAS.map((_, i) => `
-    <button class="carousel-dot ${i === 0 ? 'active' : ''}" data-dot="${i}" aria-label="Idea ${i + 1}"></button>
-  `).join('');
-
-  dotsContainer.addEventListener('click', (e) => {
-    const dot = e.target.closest('.carousel-dot');
-    if (!dot) return;
-    goToSlide(parseInt(dot.dataset.dot, 10));
-    resetCarouselTimer();
+  // Hide placeholder when input has focus or text
+  heroInput.addEventListener('focus', () => {
+    if (!heroInput.value) placeholderEl.classList.add('dimmed');
   });
-
-  viewport.addEventListener('click', (e) => {
-    const slide = e.target.closest('.carousel-slide');
-    if (!slide) return;
-    const idx = parseInt(slide.dataset.slide, 10);
-    const idea = INSPIRATION_IDEAS[idx];
-    if (idea?.prompt) {
-      pendingQuickPrompt = idea.prompt;
-      transitionToChat();
+  heroInput.addEventListener('blur', () => {
+    if (!heroInput.value) placeholderEl.classList.remove('dimmed');
+  });
+  heroInput.addEventListener('input', () => {
+    if (heroInput.value) {
+      placeholderEl.classList.remove('visible');
+    } else {
+      placeholderEl.classList.add('visible');
+      placeholderEl.classList.remove('dimmed');
     }
   });
 
-  resetCarouselTimer();
+  // Rotate every 4 seconds
+  carouselTimer = setInterval(() => {
+    placeholderEl.classList.remove('visible');
+    setTimeout(() => {
+      carouselIndex = (carouselIndex + 1) % INSPIRATION_IDEAS.length;
+      placeholderEl.textContent = INSPIRATION_IDEAS[carouselIndex].title;
+      placeholderEl.classList.add('visible');
+    }, 300); // brief fade-out before new text
+  }, 4000);
 }
 
-function goToSlide(newIndex) {
-  const viewport = document.getElementById('carousel-viewport');
-  const dotsContainer = document.getElementById('carousel-dots');
-  if (!viewport) return;
-
-  const slides = viewport.querySelectorAll('.carousel-slide');
-  const dots = dotsContainer?.querySelectorAll('.carousel-dot');
-
-  if (newIndex === carouselIndex) return;
-
-  slides[carouselIndex]?.classList.remove('active');
-  dots?.[carouselIndex]?.classList.remove('active');
-  carouselIndex = newIndex;
-  slides[carouselIndex]?.classList.add('active');
-  dots?.[carouselIndex]?.classList.add('active');
-}
-
-function nextSlide() {
-  goToSlide((carouselIndex + 1) % INSPIRATION_IDEAS.length);
-}
-
-function resetCarouselTimer() {
-  if (carouselTimer) clearInterval(carouselTimer);
-  carouselTimer = setInterval(nextSlide, 5000);
-}
-
-function stopCarousel() {
+function stopPlaceholderRotation() {
   if (carouselTimer) {
     clearInterval(carouselTimer);
     carouselTimer = null;
@@ -264,9 +266,33 @@ function initLandingListeners() {
         const text = heroInput.value?.trim();
         if (text) {
           pendingQuickPrompt = text;
-          transitionToChat();
+        } else {
+          // Use current rotating placeholder idea
+          const idea = INSPIRATION_IDEAS[carouselIndex];
+          if (idea?.prompt) {
+            pendingQuickPrompt = idea.prompt;
+          }
+        }
+        transitionToChat();
+      }
+    });
+  }
+
+  // Send button
+  const sendBtn = document.getElementById('hero-send-btn');
+  if (sendBtn) {
+    sendBtn.addEventListener('click', () => {
+      const text = heroInput?.value?.trim();
+      if (text) {
+        pendingQuickPrompt = text;
+      } else {
+        // Use current rotating placeholder idea
+        const idea = INSPIRATION_IDEAS[carouselIndex];
+        if (idea?.prompt) {
+          pendingQuickPrompt = idea.prompt;
         }
       }
+      transitionToChat();
     });
   }
 
@@ -291,7 +317,16 @@ function initLandingListeners() {
 }
 
 async function transitionToChat() {
-  stopCarousel();
+  // Save to recent sessions
+  if (pendingQuickPrompt) {
+    saveSession({
+      id: 'session-' + Date.now(),
+      title: pendingQuickPrompt.substring(0, 100),
+      prompt: pendingQuickPrompt,
+    });
+  }
+
+  stopPlaceholderRotation();
 
   const landingEl = document.getElementById('landing-page');
   if (landingEl) {
@@ -525,6 +560,11 @@ async function fetchUserPhoto() {
   try {
     const token = await Auth.getToken(['User.Read']);
     if (!token) return null;
+    // Check if photo exists (metadata) before fetching binary
+    const meta = await fetch('https://graph.microsoft.com/v1.0/me/photo', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!meta.ok) return null;
     const response = await fetch('https://graph.microsoft.com/v1.0/me/photo/$value', {
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -582,11 +622,20 @@ async function boot() {
   // Landing page is shown by default (via HTML).
   initLandingListeners();
 
-  // Render carousel immediately with hardcoded ideas, then try API.
-  initCarousel();
-  fetchInspirations().then(ideas => {
-    if (ideas) updateCarouselIdeas(ideas);
-  });
+  // Render placeholder rotation immediately with hardcoded ideas
+  initPlaceholderRotation();
+
+  // Render recent sessions
+  renderRecentSessions();
+
+  // Footer version info
+  const footerVersion = document.getElementById('landing-footer-version');
+  if (footerVersion) {
+    // Build info injected at deploy time, fallback to defaults
+    const sha = window.__BUILD_SHA__ || 'dev';
+    const date = window.__BUILD_DATE__ || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    footerVersion.textContent = `${sha} · ${date}`;
+  }
 }
 
 // Run on DOM ready

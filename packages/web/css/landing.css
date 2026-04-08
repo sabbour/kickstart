@@ -68,7 +68,7 @@
 .landing-hero-input-wrap input {
   width: 100%;
   height: 44px;
-  padding: 0 var(--spacing-l) 0 42px;
+  padding: 0 44px 0 42px;
   border-radius: var(--radius-medium);
   border: 1px solid var(--color-neutral-stroke-2);
   background: var(--color-neutral-background-1);
@@ -86,6 +86,62 @@
 
 .landing-hero-input-wrap input:focus {
   border-color: var(--color-brand-primary);
+}
+
+/* ---------- Hero Input Placeholder Rotation ---------- */
+.hero-input-placeholder {
+  position: absolute;
+  left: 42px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-neutral-foreground-3);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-400);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 90px);
+}
+
+.hero-input-placeholder.visible {
+  opacity: 1;
+}
+
+.hero-input-placeholder.dimmed {
+  opacity: 0.4;
+}
+
+/* ---------- Hero Send Button ---------- */
+.hero-send-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-circular);
+  border: none;
+  background: var(--color-brand-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--duration-fast), transform var(--duration-fast);
+  padding: 0;
+}
+
+.hero-send-btn:hover {
+  background: var(--color-brand-primary-hover);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.hero-send-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* ---------- Framework Section ---------- */
@@ -131,91 +187,6 @@
   border-color: var(--color-brand-primary);
   color: var(--color-brand-primary);
   box-shadow: var(--shadow-2);
-}
-
-/* ---------- Inspiration Carousel (subtle strip) ---------- */
-.landing-carousel {
-  text-align: center;
-  position: relative;
-}
-
-.carousel-viewport {
-  overflow: hidden;
-  position: relative;
-  height: 70px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.carousel-slide {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity var(--duration-slow) var(--easing-ease-out);
-  pointer-events: none;
-  cursor: pointer;
-}
-
-.carousel-slide.active {
-  opacity: 1;
-  pointer-events: auto;
-  position: relative;
-}
-
-.carousel-slide.active:hover .carousel-title {
-  color: var(--color-brand-primary);
-}
-
-.carousel-title {
-  font-size: var(--font-size-400);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-neutral-foreground-1);
-  line-height: 1.3;
-  margin-bottom: var(--spacing-xxs);
-}
-
-.carousel-subtitle {
-  font-size: var(--font-size-200);
-  color: var(--color-neutral-foreground-3);
-  max-width: 560px;
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.carousel-dots {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-xs);
-  margin-top: var(--spacing-s);
-}
-
-.carousel-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-circular);
-  border: none;
-  background: var(--color-neutral-stroke-1);
-  cursor: pointer;
-  padding: 0;
-  transition: background var(--duration-fast), transform var(--duration-fast);
-}
-
-.carousel-dot:hover {
-  background: var(--color-neutral-foreground-3);
-  transform: scale(1.3);
-}
-
-.carousel-dot.active {
-  background: var(--color-brand-primary);
-  transform: scale(1.15);
 }
 
 /* ---------- Track Cards (Fluent 2 typography) ---------- */
@@ -298,6 +269,76 @@ body.on-landing #topbar-sessions-toggle {
   display: none;
 }
 
+/* ---------- Recent Sessions ---------- */
+.recent-sessions-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-m);
+}
+
+.recent-sessions-label {
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-foreground-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.recent-session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-m) var(--spacing-l);
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--color-neutral-stroke-2);
+  background: var(--color-neutral-background-1);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.recent-session-item:hover {
+  border-color: var(--color-neutral-stroke-1);
+  box-shadow: var(--shadow-4);
+}
+
+.recent-session-title {
+  font-size: var(--font-size-300);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-neutral-foreground-1);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-session-date {
+  font-size: var(--font-size-200);
+  color: var(--color-neutral-foreground-3);
+  white-space: nowrap;
+  margin-left: var(--spacing-l);
+}
+
+/* ---------- Landing Footer ---------- */
+.landing-footer {
+  text-align: center;
+  padding: var(--spacing-xl) 0 var(--spacing-m);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.landing-footer-version {
+  font-size: var(--font-size-100);
+  color: var(--color-neutral-foreground-4);
+  font-family: var(--font-family-monospace, 'Cascadia Code', 'Consolas', monospace);
+  letter-spacing: 0.02em;
+}
+
+.landing-footer-disclaimer {
+  font-size: var(--font-size-100);
+  color: var(--color-neutral-foreground-4);
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
   .landing-page {
@@ -311,13 +352,5 @@ body.on-landing #topbar-sessions-toggle {
 
   .landing-tracks {
     grid-template-columns: 1fr;
-  }
-
-  .carousel-title {
-    font-size: var(--font-size-400);
-  }
-
-  .carousel-subtitle {
-    font-size: var(--font-size-200);
   }
 }
