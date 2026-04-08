@@ -1,0 +1,303 @@
+/**
+ * App — Product-specific route config & initialization
+ * @module app
+ */
+
+import { Router, Navigation, Breadcrumbs, EventBus } from './framework/core.js';
+import { createCopilotPanel, createCommandBar, createWizard, createCard, createCodeBlock } from './framework/components.js';
+import { renderA2UI } from './framework/a2ui-renderer.js';
+import Auth from './auth.js';
+
+// ---------- Copilot Panel ----------
+const copilot = createCopilotPanel({
+  phases: [
+    { id: 'understand', label: 'Understand' },
+    { id: 'architect', label: 'Architect' },
+    { id: 'configure', label: 'Configure' },
+    { id: 'deploy', label: 'Deploy' },
+  ],
+  onSend(text) {
+    handleUserMessage(text);
+  },
+});
+
+// Mount Copilot panel
+document.getElementById('copilot-slot')?.appendChild(copilot.element);
+
+// Wire A2UI rendering into Copilot messages
+function handleUserMessage(text) {
+  copilot.setTyping(true);
+
+  // Placeholder: simulate a response after a short delay.
+  // In production, this calls the Kickstart conversation API.
+  setTimeout(() => {
+    copilot.setTyping(false);
+    copilot.addMessage({
+      role: 'assistant',
+      text: "I'm Kickstart — your AI guide for deploying to AKS. This is a prototype; backend is not connected yet.",
+    });
+  }, 1200);
+}
+
+function renderA2UIMessage(a2uiJson) {
+  const el = renderA2UI(a2uiJson, {
+    onAction(action, data) {
+      EventBus.emit('copilot:action', { action, data });
+    },
+    onDataChange(name, value) {
+      EventBus.emit('copilot:dataChange', { name, value });
+    },
+  });
+  return el.outerHTML;
+}
+
+// ---------- Auth UI ----------
+async function initAuth() {
+  await Auth.initialize();
+  updateAuthUI();
+}
+
+function updateAuthUI() {
+  const userBtn = document.getElementById('topbar-user');
+  if (!userBtn) return;
+
+  if (Auth.isAuthenticated()) {
+    const info = Auth.getUserInfo();
+    userBtn.innerHTML = `
+      <span class="topbar-avatar">${info.initials}</span>
+      <span>${info.name}</span>`;
+    userBtn.onclick = () => Auth.logout().then(updateAuthUI);
+    userBtn.title = `Signed in as ${info.email} — click to sign out`;
+  } else {
+    userBtn.innerHTML = `
+      <span class="topbar-avatar">?</span>
+      <span>Sign in</span>`;
+    userBtn.onclick = () => Auth.login().then(updateAuthUI);
+    userBtn.title = 'Sign in with your Microsoft account';
+  }
+}
+
+// ---------- Command bar ----------
+const commandBar = createCommandBar([
+  {
+    label: 'New deployment',
+    icon: '＋',
+    primary: true,
+    action: 'new-deployment',
+    onClick: () => Router.navigate('/create'),
+  },
+  { type: 'divider' },
+  {
+    label: 'Refresh',
+    icon: '↻',
+    action: 'refresh',
+    onClick: () => Router.resolve(),
+  },
+  { type: 'spacer' },
+  {
+    label: 'Copilot',
+    icon: '✦',
+    action: 'toggle-copilot',
+    onClick: () => copilot.toggle(),
+  },
+]);
+
+document.getElementById('command-bar-slot')?.appendChild(commandBar);
+
+// ---------- Routes ----------
+
+Router.register('/', renderOverview);
+Router.register('/overview', renderOverview);
+Router.register('/create', renderCreateWizard);
+Router.register('/deployments', renderDeployments);
+Router.register('/settings', renderSettings);
+Router.register('*', renderNotFound);
+
+// --- Overview (landing page) ---
+function renderOverview(container) {
+  container.innerHTML = '';
+
+  const hero = document.createElement('section');
+  hero.style.cssText = 'max-width:680px;margin:0 auto;text-align:center;padding:var(--spacing-xxxl) 0';
+  hero.innerHTML = `
+    <img src="assets/logo.svg" alt="" width="64" height="64" style="margin-bottom:var(--spacing-xl)">
+    <h1 style="font-size:var(--font-size-800);font-weight:var(--font-weight-bold);margin-bottom:var(--spacing-m)">
+      Deploy to AKS, guided by AI
+    </h1>
+    <p style="font-size:var(--font-size-400);color:var(--color-neutral-foreground-2);margin-bottom:var(--spacing-xxl)">
+      Kickstart walks you through containerizing your app, choosing the right Azure resources,
+      and deploying to AKS — step by step, with AI that explains every decision.
+    </p>
+    <button class="btn primary large" id="cta-get-started">Get Started</button>`;
+
+  hero.querySelector('#cta-get-started')?.addEventListener('click', () => {
+    Router.navigate('/create');
+    if (!copilot.isVisible) copilot.toggle(true);
+  });
+
+  container.appendChild(hero);
+
+  // Feature cards
+  const features = document.createElement('section');
+  features.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--spacing-xl);max-width:900px;margin:0 auto;padding-bottom:var(--spacing-xxxl)';
+
+  const cards = [
+    { title: 'Understand', body: 'Tell us about your app — language, framework, dependencies. Kickstart figures out the rest.' },
+    { title: 'Architect', body: 'Get a recommended Azure architecture with cost estimates and best-practice configurations.' },
+    { title: 'Configure', body: 'Review and customize every resource — Kickstart generates deployment manifests and IaC templates.' },
+    { title: 'Deploy', body: 'One-click deployment with a live progress view. GitHub Actions pipeline included.' },
+  ];
+
+  cards.forEach(c => features.appendChild(createCard(c)));
+  container.appendChild(features);
+}
+
+// --- Create AKS App (wizard placeholder) ---
+function renderCreateWizard(container) {
+  container.innerHTML = '';
+
+  const wizard = createWizard({
+    title: 'Create AKS App',
+    steps: [
+      {
+        title: 'App Details',
+        render: () => `
+          <h2 style="margin-bottom:var(--spacing-l)">Tell us about your app</h2>
+          <div class="form-group">
+            <label class="form-label">App name <span class="required">*</span></label>
+            <input class="form-input" placeholder="my-awesome-app" name="appName">
+          </div>
+          <div class="form-group">
+            <label class="form-label">GitHub repository</label>
+            <input class="form-input" placeholder="https://github.com/org/repo" name="repoUrl">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Language / Framework</label>
+            <select class="form-input" name="language">
+              <option value="">-- Select --</option>
+              <option>Node.js</option>
+              <option>Python</option>
+              <option>.NET</option>
+              <option>Java</option>
+              <option>Go</option>
+              <option>Other</option>
+            </select>
+          </div>`,
+        validate: () => true,
+      },
+      {
+        title: 'Architecture',
+        render: () => `
+          <h2 style="margin-bottom:var(--spacing-l)">Review architecture</h2>
+          <p style="color:var(--color-neutral-foreground-2);margin-bottom:var(--spacing-xl)">
+            Kickstart will analyze your repo and recommend an architecture.
+            This step will be powered by the AI conversation engine.
+          </p>
+          <div class="skeleton skeleton-block" style="height:200px"></div>`,
+        validate: () => true,
+      },
+      {
+        title: 'Configuration',
+        render: () => `
+          <h2 style="margin-bottom:var(--spacing-l)">Configure resources</h2>
+          <p style="color:var(--color-neutral-foreground-2)">
+            Resource configuration will be generated by the AI based on your app's needs.
+          </p>`,
+        validate: () => true,
+      },
+      {
+        title: 'Review + Create',
+        render: () => `
+          <h2 style="margin-bottom:var(--spacing-l)">Review and deploy</h2>
+          <p style="color:var(--color-neutral-foreground-2)">
+            Final review of all resources and configurations before deployment.
+          </p>`,
+        validate: () => true,
+      },
+    ],
+    onComplete(data) {
+      console.log('[App] Wizard completed:', data);
+      copilot.addMessage({ role: 'assistant', text: '🚀 Deployment initiated! (This is a prototype — no real resources will be created.)' });
+    },
+    onCancel() {
+      Router.navigate('/');
+    },
+  });
+
+  container.appendChild(wizard.element);
+
+  // Open copilot if not visible
+  if (!copilot.isVisible) copilot.toggle(true);
+}
+
+// --- Deployments (placeholder) ---
+function renderDeployments(container) {
+  container.innerHTML = `
+    <div style="max-width:680px;margin:var(--spacing-xxl) auto;text-align:center">
+      <h2 style="margin-bottom:var(--spacing-m)">Deployments</h2>
+      <p style="color:var(--color-neutral-foreground-2);margin-bottom:var(--spacing-xl)">
+        Your deployment history will appear here after you create your first AKS app.
+      </p>
+      <button class="btn primary" onclick="window.location.hash='/create'">Create your first app</button>
+    </div>`;
+}
+
+// --- Settings (placeholder) ---
+function renderSettings(container) {
+  container.innerHTML = `
+    <div style="max-width:680px;margin:var(--spacing-xxl) auto">
+      <h2 style="margin-bottom:var(--spacing-m)">Settings</h2>
+      <p style="color:var(--color-neutral-foreground-2)">
+        Settings and preferences will be available here. Coming soon.
+      </p>
+    </div>`;
+}
+
+// --- 404 ---
+function renderNotFound(container) {
+  container.innerHTML = `
+    <div style="max-width:480px;margin:var(--spacing-xxl) auto;text-align:center">
+      <h2 style="margin-bottom:var(--spacing-m)">Page not found</h2>
+      <p style="margin-bottom:var(--spacing-xl)">The page you're looking for doesn't exist.</p>
+      <a class="btn primary" href="#/">Go home</a>
+    </div>`;
+}
+
+// ---------- Navigation ----------
+Navigation.init({
+  items: [
+    { label: 'Overview', path: '/', icon: '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2.5l7 5.5v9a1 1 0 01-1 1h-4v-5H8v5H4a1 1 0 01-1-1V8l7-5.5z"/></svg>' },
+    { label: 'Create AKS App', path: '/create', icon: '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/></svg>' },
+    { divider: true },
+    { label: 'Deployments', path: '/deployments', icon: '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4h14v2H3V4zm0 5h14v2H3V9zm0 5h14v2H3v-2z"/></svg>' },
+    { label: 'Settings', path: '/settings', icon: '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M8.5 2h3l.4 2 1.3.5 1.7-1.2 2.1 2.1-1.2 1.7.5 1.3 2 .4v3l-2 .4-.5 1.3 1.2 1.7-2.1 2.1-1.7-1.2-1.3.5-.4 2h-3l-.4-2-1.3-.5-1.7 1.2-2.1-2.1 1.2-1.7-.5-1.3-2-.4v-3l2-.4.5-1.3L3.2 5.3l2.1-2.1 1.7 1.2L8.3 4l.2-2zM10 7a3 3 0 100 6 3 3 0 000-6z"/></svg>' },
+  ],
+});
+
+Breadcrumbs.init({
+  '/': 'Home',
+  '/overview': 'Overview',
+  '/create': 'Create AKS App',
+  '/deployments': 'Deployments',
+  '/settings': 'Settings',
+});
+
+// ---------- Boot ----------
+async function boot() {
+  await initAuth();
+
+  // Send welcome message
+  copilot.addMessage({
+    role: 'assistant',
+    text: "👋 Hi! I'm Kickstart — your AI guide for deploying to AKS. Tell me about your app and I'll help you get it running on Azure Kubernetes Service.",
+  });
+
+  Router.init('#content-area');
+}
+
+// Run on DOM ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}

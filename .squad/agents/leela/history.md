@@ -8,3 +8,19 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+
+### 2026-04-08: Kickstart Architecture Foundation
+- **Rename:** Project is "Imagine" → "Kickstart". Repo will move to sabbour/kickstart.
+- **Dual surface:** Web (SWA + Portal Prototyper) and MCP (tools + future App UI). If we host it, we provide the LLM. If MCP, user's LLM.
+- **Monorepo:** npm workspaces — `packages/core`, `packages/web`, `packages/mcp-server`.
+- **Web stays vanilla JS** — Portal Prototyper is zero-dep, SWA deploys with `skip_app_build: true`. No React unless proven necessary.
+- **A2UI pattern adopted, not library** — JSON UI schemas in core, each surface renders natively.
+- **Conversation engine:** Hybrid state machine (phase tracking) + LLM (natural language per phase). Phases 1-4 for Phase 1 ship.
+- **MCP tools first** in Phase 1: `kickstart`, `generate-manifests`, `check-status`. MCP App UI deferred.
+- **IaC:** Bicep for Azure infra, `az` CLI scripts for Entra (Graph Bicep provider is preview, too risky).
+- **Branching:** `squad/{issue}-{slug}`. Fry owns web/, Bender owns core/ + mcp-server/ + infra/, Hermes owns tests/.
+- **Shared contracts** (`ui-schema.ts`, `types.ts`) are the integration bottleneck — require Lead review.
+- **Key files:** `js/config.js` (auth config, needs migration to new tenant), `staticwebapp.config.json` (SWA routing), `infra/` (to be created).
+- **Tenant pivot:** Entra app must be recreated in CA Global Demos 2605 tenant (caglobaldemos2605.onmicrosoft.com), not Microsoft corp tenant.
+- **Ahmed's model preference:** claude-opus-4.6 for code, claude-haiku-4.5 for non-code.
+- **Phase 1 defers:** cost estimation, Mermaid diagrams, K8s validation, MCP App UI, conversation phases 5-8, Codespaces integration.

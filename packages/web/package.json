@@ -1,0 +1,11 @@
+{
+  "name": "@kickstart/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kickstart web frontend — Azure Portal-style UX for AI-guided AKS deployment",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": ["aks", "azure", "kickstart", "portal"],
+  "license": "MIT"
+}

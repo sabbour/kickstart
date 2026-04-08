@@ -17,7 +17,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
   },
   "files": [
     "dist/",
