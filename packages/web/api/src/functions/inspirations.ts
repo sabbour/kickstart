@@ -107,7 +107,7 @@ function shuffle<T>(arr: T[]): T[] {
 function isOpenAIConfigured(): boolean {
   return !!(
     process.env.AZURE_OPENAI_ENDPOINT &&
-    process.env.AZURE_OPENAI_DEPLOYMENT &&
+    (process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || process.env.AZURE_OPENAI_DEPLOYMENT) &&
     process.env.AZURE_OPENAI_API_KEY
   );
 }

@@ -183,3 +183,14 @@
 - **SPA redirect URIs preserved:** localhost:4280, localhost:8080, kickstart.aks.azure.sabbour.me, kickstart.aks.azure.com still intact.
 - **GitHub secret set:** `AZURE_STATIC_WEB_APPS_API_TOKEN` on `sabbour/kickstart` — enables deploy workflow.
 - **Key insight:** SWA built-in auth uses server-side (Web platform) redirect URIs with `/.auth/login/aad/callback` path, NOT SPA redirects. Missing web redirects cause the "AADSTS50011: redirect URI mismatch" error.
+
+### 2025-07-28: Dual-Model Support (Chat + Codex)
+
+- **Architecture:** Two Azure OpenAI models sharing one endpoint/key — `gpt-5.3-chat` for conversation (Chat Completions API), `gpt-5.3-codex` for code generation (Responses API).
+- **Env vars:** `AZURE_OPENAI_CHAT_DEPLOYMENT` and `AZURE_OPENAI_CODEX_DEPLOYMENT` added. `AZURE_OPENAI_DEPLOYMENT` kept as fallback for both. Same `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` for both models.
+- **Responses API shape:** `POST {endpoint}/openai/deployments/{codex}/responses?api-version=2025-03-01-preview`. Body uses `input` (non-system messages) + `instructions` (system prompt). Response has `output[].content[].text` where type=`output_text`. Streaming uses `response.output_text.delta` events with `delta` field.
+- **openai-client.ts:** Exports 4 functions — `chatCompletion`, `chatCompletionStream` (Chat Completions API), `codexCompletion`, `codexCompletionStream` (Responses API). Plus `isConfigured()` helper. All types exported.
+- **New endpoint:** `POST /api/generate` — code generation endpoint. Accepts `{ prompt, type?, context? }` where type is `dockerfile|kubernetes|pipeline|bicep|generic`. Each type has tailored system instructions. Supports SSE streaming. Uses codex model with temperature 0.2.
+- **inspirations.ts:** Updated `isOpenAIConfigured()` to accept `AZURE_OPENAI_CHAT_DEPLOYMENT` as alternative to `AZURE_OPENAI_DEPLOYMENT`.
+- **local.settings.json:** Added `AZURE_OPENAI_CHAT_DEPLOYMENT: "gpt-5.3-chat"` and `AZURE_OPENAI_CODEX_DEPLOYMENT: "gpt-5.3-codex"`.
+- **Key files:** `packages/web/api/src/lib/openai-client.ts`, `packages/web/api/src/functions/generate.ts`, `packages/web/api/local.settings.json`
