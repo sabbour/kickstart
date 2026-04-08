@@ -117,15 +117,15 @@
 /* ---------- Hero Send Button ---------- */
 .hero-send-btn {
   position: absolute;
-  right: 6px;
+  right: 4px;
   top: 50%;
   transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-circular);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-medium);
   border: none;
-  background: var(--color-brand-primary);
-  color: #fff;
+  background: transparent;
+  color: var(--color-neutral-foreground-1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -135,11 +135,11 @@
 }
 
 .hero-send-btn:hover {
-  background: var(--color-brand-primary-hover);
-  transform: translateY(-50%) scale(1.05);
+  background: var(--color-neutral-background-3);
+  transform: translateY(-50%);
 }
 
-.hero-send-btn svg {
+.hero-send-btn img {
   width: 16px;
   height: 16px;
 }
