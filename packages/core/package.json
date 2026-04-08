@@ -1,0 +1,27 @@
+{
+  "name": "@kickstart/core",
+  "version": "0.1.0",
+  "description": "Kickstart conversation engine, A2UI catalog, and code generators",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./catalog": {
+      "types": "./dist/catalog/index.d.ts",
+      "import": "./dist/catalog/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "files": [
+    "dist/",
+    "src/catalog/kickstart-catalog.json"
+  ],
+  "keywords": ["kickstart", "a2ui", "aks", "kubernetes"]
+}

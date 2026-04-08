@@ -1,0 +1,24 @@
+{
+  "name": "kickstart",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AI-guided onboarding for deploying apps to AKS",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "eslint packages/*/src/**/*.ts",
+    "clean": "npm run clean --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "@typescript-eslint/eslint-plugin": "^8.58.1",
+    "@typescript-eslint/parser": "^8.58.1",
+    "eslint": "^10.2.0",
+    "typescript": "^6.0.2"
+  }
+}

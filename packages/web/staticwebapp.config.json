@@ -31,5 +31,5 @@
       "allowedRoles": []
     }
   ],
-  "_comment": "Custom domains: imagine.prototypes.aks.azure.sabbour.me (temp), imagine.aks.azure.com (future). Configure via Azure Portal or Azure CLI."
+  "_comment": "Custom domains: kickstart.prototypes.aks.azure.sabbour.me (temp), kickstart.aks.azure.com (future). Configure via Azure Portal or Azure CLI."
 }

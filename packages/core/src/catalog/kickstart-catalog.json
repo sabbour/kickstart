@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kickstart.aks.azure.com/catalog/v1/kickstart-catalog.json",
+  "title": "Kickstart A2UI Catalog",
+  "description": "A2UI component catalog for AKS Kickstart. Extends the basic_catalog with domain-specific components for guided AKS onboarding.",
+  "type": "object",
+  "$defs": {
+    "BaseComponent": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "id": { "type": "string" }
+      },
+      "required": ["type"]
+    },
+
+    "Text": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "Text" },
+            "content": { "type": "string" },
+            "variant": { "type": "string", "enum": ["body", "heading", "caption", "code"] }
+          },
+          "required": ["type", "content"]
+        }
+      ]
+    },
+
+    "Button": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "Button" },
+            "label": { "type": "string" },
+            "action": { "type": "string" },
+            "variant": { "type": "string", "enum": ["primary", "secondary", "danger"] },
+            "disabled": { "type": "boolean", "default": false }
+          },
+          "required": ["type", "label", "action"]
+        }
+      ]
+    },
+
+    "TextField": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "TextField" },
+            "label": { "type": "string" },
+            "placeholder": { "type": "string" },
+            "value": { "type": "string" },
+            "required": { "type": "boolean", "default": false }
+          },
+          "required": ["type", "label"]
+        }
+      ]
+    },
+
+    "Row": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "Row" },
+            "children": { "type": "array", "items": { "$ref": "#/$defs/Component" } },
+            "gap": { "type": "string" }
+          },
+          "required": ["type", "children"]
+        }
+      ]
+    },
+
+    "Column": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "Column" },
+            "children": { "type": "array", "items": { "$ref": "#/$defs/Component" } },
+            "gap": { "type": "string" }
+          },
+          "required": ["type", "children"]
+        }
+      ]
+    },
+
+    "Card": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "Card" },
+            "title": { "type": "string" },
+            "children": { "type": "array", "items": { "$ref": "#/$defs/Component" } }
+          },
+          "required": ["type", "children"]
+        }
+      ]
+    },
+
+    "ConversationPhase": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "ConversationPhase" },
+            "phases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "label": { "type": "string" },
+                  "status": { "type": "string", "enum": ["pending", "active", "complete", "skipped"] }
+                },
+                "required": ["id", "label", "status"]
+              }
+            },
+            "currentPhase": { "type": "string" }
+          },
+          "required": ["type", "phases", "currentPhase"]
+        }
+      ]
+    },
+
+    "CodeBlock": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "CodeBlock" },
+            "code": { "type": "string" },
+            "language": { "type": "string" },
+            "filename": { "type": "string" },
+            "action": { "type": "string", "enum": ["copy", "download"] }
+          },
+          "required": ["type", "code", "language"]
+        }
+      ]
+    },
+
+    "ResourcePicker": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "ResourcePicker" },
+            "resourceType": {
+              "type": "string",
+              "enum": ["subscription", "resourceGroup", "region", "cluster"]
+            },
+            "label": { "type": "string" },
+            "value": { "type": "string" },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": { "type": "string" },
+                  "value": { "type": "string" }
+                },
+                "required": ["label", "value"]
+              }
+            }
+          },
+          "required": ["type", "resourceType", "label"]
+        }
+      ]
+    },
+
+    "DeploymentProgress": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "DeploymentProgress" },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "label": { "type": "string" },
+                  "status": { "type": "string", "enum": ["pending", "running", "success", "error", "skipped"] },
+                  "detail": { "type": "string" }
+                },
+                "required": ["id", "label", "status"]
+              }
+            },
+            "overallStatus": {
+              "type": "string",
+              "enum": ["pending", "running", "success", "error"]
+            }
+          },
+          "required": ["type", "steps", "overallStatus"]
+        }
+      ]
+    },
+
+    "ArchitectureDiagram": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "ArchitectureDiagram" },
+            "mermaid": {
+              "type": "string",
+              "description": "Mermaid diagram source code"
+            }
+          },
+          "required": ["type", "mermaid"]
+        }
+      ]
+    },
+
+    "CostEstimate": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "CostEstimate" },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "sku": { "type": "string" },
+                  "monthlyCost": { "type": "number" },
+                  "currency": { "type": "string", "default": "USD" }
+                },
+                "required": ["name", "sku", "monthlyCost"]
+              }
+            },
+            "total": { "type": "number" },
+            "currency": { "type": "string", "default": "USD" }
+          },
+          "required": ["type", "items", "total", "currency"]
+        }
+      ]
+    },
+
+    "HandoffCard": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "type": { "const": "HandoffCard" },
+            "title": { "type": "string" },
+            "description": { "type": "string" },
+            "url": { "type": "string", "format": "uri" },
+            "provider": { "type": "string", "enum": ["codespaces", "vscode-dev"] },
+            "repoUrl": { "type": "string", "format": "uri" }
+          },
+          "required": ["type", "title", "description", "url", "provider", "repoUrl"]
+        }
+      ]
+    },
+
+    "Component": {
+      "oneOf": [
+        { "$ref": "#/$defs/Text" },
+        { "$ref": "#/$defs/Button" },
+        { "$ref": "#/$defs/TextField" },
+        { "$ref": "#/$defs/Row" },
+        { "$ref": "#/$defs/Column" },
+        { "$ref": "#/$defs/Card" },
+        { "$ref": "#/$defs/ConversationPhase" },
+        { "$ref": "#/$defs/CodeBlock" },
+        { "$ref": "#/$defs/ResourcePicker" },
+        { "$ref": "#/$defs/DeploymentProgress" },
+        { "$ref": "#/$defs/ArchitectureDiagram" },
+        { "$ref": "#/$defs/CostEstimate" },
+        { "$ref": "#/$defs/HandoffCard" }
+      ]
+    }
+  },
+
+  "properties": {
+    "version": { "type": "string", "const": "0.9" },
+    "root": { "$ref": "#/$defs/Component" }
+  },
+  "required": ["version", "root"]
+}

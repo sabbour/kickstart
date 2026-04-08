@@ -1,0 +1,71 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_SUBSCRIPTION_ID: '4498459e-01d5-4a3f-b07e-8f1f36598c16'
+  AZURE_RESOURCE_GROUP: 'rg-kickstart-dev'
+  AZURE_LOCATION: 'centralus'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Bicep template
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create resource group
+        run: |
+          az group create \
+            --name ${{ env.AZURE_RESOURCE_GROUP }} \
+            --location ${{ env.AZURE_LOCATION }} \
+            --tags project=kickstart environment=dev
+
+      - name: Deploy Bicep template
+        id: deploy
+        run: |
+          OUTPUT=$(az deployment group create \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --template-file infra/main.bicep \
+            --parameters @infra/parameters.dev.json \
+            --query 'properties.outputs' \
+            --output json)
+
+          echo "deployment_output=$OUTPUT" >> $GITHUB_OUTPUT
+
+          # Extract individual outputs
+          DEFAULT_HOSTNAME=$(echo "$OUTPUT" | jq -r '.defaultHostname.value')
+          RESOURCE_ID=$(echo "$OUTPUT" | jq -r '.resourceId.value')
+          SWA_NAME=$(echo "$OUTPUT" | jq -r '.swaName.value')
+
+          echo "default_hostname=$DEFAULT_HOSTNAME" >> $GITHUB_OUTPUT
+          echo "resource_id=$RESOURCE_ID" >> $GITHUB_OUTPUT
+          echo "swa_name=$SWA_NAME" >> $GITHUB_OUTPUT
+
+      - name: Store deployment outputs
+        run: |
+          echo "### 🚀 Infrastructure Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Hostname | ${{ steps.deploy.outputs.default_hostname }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource ID | ${{ steps.deploy.outputs.resource_id }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SWA Name | ${{ steps.deploy.outputs.swa_name }} |" >> $GITHUB_STEP_SUMMARY

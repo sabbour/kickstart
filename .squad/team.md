@@ -1,6 +1,6 @@
 # Squad Team
 
-> Imagine — AI-guided onboarding experience for deploying apps to AKS
+> Kickstart — AI-guided onboarding experience for deploying apps to AKS
 
 ## Coordinator
 
@@ -55,7 +55,7 @@
 ## Project Context
 
 - **Owner:** Ahmed Sabbour
-- **Project:** Imagine — AI-guided onboarding for AKS
+- **Project:** Kickstart — AI-guided onboarding for AKS
 - **Stack:** HTML/CSS/JS (Portal Prototyper), TypeScript, Azure/AKS, AI/LLM
 - **Description:** A web-based experience that guides developers from app idea to production deployment on AKS Automatic, without requiring Kubernetes expertise
 - **Created:** 2026-04-08

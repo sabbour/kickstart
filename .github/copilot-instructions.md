@@ -4,7 +4,7 @@
 
 This project uses **Squad** — an AI team framework where a coordinator agent routes work to specialized agents. The team roster, routing rules, and decision history live in `.squad/`.
 
-**Imagine** is an AI-guided onboarding experience for deploying apps to Azure Kubernetes Service (AKS). It guides developers from app idea to production deployment on AKS Automatic, without requiring Kubernetes expertise. Built with the [Portal Prototyper](https://github.com/azure-management-and-platforms/portal-prototyper) framework for Azure-consistent UX.
+**Kickstart** is an AI-guided onboarding experience for deploying apps to Azure Kubernetes Service (AKS). It guides developers from app idea to production deployment on AKS Automatic, without requiring Kubernetes expertise. Built as a monorepo with npm workspaces (packages/core, packages/web, packages/mcp-server).
 
 ## Team (Futurama universe)
 

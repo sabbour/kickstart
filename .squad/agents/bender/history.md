@@ -34,3 +34,17 @@
 - **GitHub OAuth:** Requires manual creation via GitHub UI. Setup docs at `docs/github-oauth-setup.md`
 - **Secret management:** Client IDs in source code (not secrets), client secrets in GitHub Secrets / SWA app settings only
 - **Key files:** `js/config.js`, `docs/github-oauth-setup.md`, `.squad/decisions/inbox/bender-auth-setup.md`
+
+### 2026-04-08: Kickstart Monorepo Scaffold
+
+- **Rename:** Project renamed from "Imagine" to "Kickstart"
+- **Monorepo:** npm workspaces at root with `packages/*` — core, mcp-server, web (web owned by Fry)
+- **@kickstart/core:** Conversation engine (FSM with Phase enum: Understand→Clarify→Needs→Plan), A2UI catalog (JSON Schema draft/2020-12 with 7 custom components), K8s + GitHub Actions code generators
+- **@kickstart/mcp-server:** MCP server using `@modelcontextprotocol/sdk`, 4 tools (kickstart, generate-manifests, check-status, action), A2UI responses via `application/json+a2ui` MIME type
+- **A2UI Catalog:** Custom components: ConversationPhase, CodeBlock, ResourcePicker, DeploymentProgress, ArchitectureDiagram, CostEstimate, HandoffCard — all extending basic_catalog (Text, Button, TextField, Row, Column, Card)
+- **Infrastructure:** `infra/main.bicep` (SWA Standard), `infra/setup-entra.sh` (Entra app reg for CA Global Demos 2605 tenant), `infra/parameters.dev.json`, `.github/workflows/deploy-infra.yml` (OIDC login + Bicep deploy)
+- **TypeScript:** ESM (type: module), strict mode, Node16 moduleResolution, project references between packages
+- **Deleted:** `js/config.js` (old Imagine auth config with invalid client ID), `docs/github-oauth-setup.md` (replaced by `infra/README.md`)
+- **Moved:** `staticwebapp.config.json` → `packages/web/staticwebapp.config.json`
+- **Updated:** `deploy-swa.yml` app_location changed from "/" to "packages/web"
+- **Key paths:** `packages/core/src/`, `packages/mcp-server/src/`, `infra/`, `packages/web/staticwebapp.config.json`
