@@ -425,7 +425,13 @@ function returnToLanding() {
 // ---------- Engine Setup ----------
 async function initEngine() {
   apiClient = createApiClient();
-  const apiAvailable = await apiClient.healthCheck();
+
+  // On known deployment hosts the API always exists — skip healthCheck.
+  // healthCheck fails because OPTIONS (CORS preflight) never sends cookies,
+  // so SWA returns 401/redirect even for authenticated users.
+  const knownHosts = ['kickstart.aks.azure.sabbour.me', 'kickstart.aks.azure.com'];
+  const apiAvailable = knownHosts.includes(window.location.hostname)
+    || await apiClient.healthCheck();
 
   if (apiAvailable) {
     isApiMode = true;
