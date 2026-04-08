@@ -6,12 +6,15 @@
   "type": "module",
   "main": "dist/functions/*.js",
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true})\" && node esbuild.config.mjs",
+    "build:tsc": "tsc",
     "start": "func start",
     "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
   },
   "dependencies": {
-    "@azure/functions": "^4.6.0",
-    "@kickstart/core": "*"
+    "@azure/functions": "^4.6.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }
