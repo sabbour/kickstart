@@ -165,17 +165,21 @@ export function createApiClient({ baseUrl = DEFAULT_BASE_URL } = {}) {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
-      // Use redirect: 'manual' to detect SWA auth redirects (302 → login page)
+      // Send a lightweight POST (the function only registers POST, not OPTIONS).
+      // Use redirect: 'manual' to detect SWA auth redirects (302 → login page).
       const res = await fetch(`${baseUrl}/api/converse`, {
-        method: 'OPTIONS',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: '' }),
         signal: controller.signal,
         redirect: 'manual',
+        credentials: 'include',
       });
       clearTimeout(timer);
-      // 2xx = endpoint exists and responds; 405 = rejects OPTIONS but exists.
-      // 0 (opaqueredirect) or 302 = SWA auth gate — endpoint exists, needs login.
-      // 404 means the endpoint isn't deployed yet — treat as unavailable.
-      return res.ok || res.status === 405 || res.status === 302 || res.type === 'opaqueredirect';
+      // Any real response from the function means the API exists:
+      // 200/400/500 = function responded; 302/opaqueredirect = SWA auth gate (API exists, needs login).
+      return res.ok || res.status === 400 || res.status === 500
+        || res.status === 302 || res.type === 'opaqueredirect';
     } catch {
       return false;
     }
