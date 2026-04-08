@@ -64,6 +64,12 @@ function saveSession(session) {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, 20)));
 }
 
+function deleteSession(id) {
+  let sessions = getSessions();
+  sessions = sessions.filter(s => s.id !== id);
+  localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+}
+
 function renderRecentSessions() {
   const section = document.getElementById('recent-sessions-section');
   const list = document.getElementById('recent-sessions-list');
@@ -82,6 +88,11 @@ function renderRecentSessions() {
     return `<div class="recent-session-item" data-session-id="${s.id}">
       <span class="recent-session-title">${escapeHtml(s.title || s.prompt || 'Untitled session')}</span>
       <span class="recent-session-date">${dateStr}</span>
+      <button class="recent-session-delete" aria-label="Delete session" title="Delete session">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+          <path d="M2.146 2.146a.5.5 0 01.708 0L6 5.293l3.146-3.147a.5.5 0 01.708.708L6.707 6l3.147 3.146a.5.5 0 01-.708.708L6 6.707l-3.146 3.147a.5.5 0 01-.708-.708L5.293 6 2.146 2.854a.5.5 0 010-.708z"/>
+        </svg>
+      </button>
     </div>`;
   }).join('');
 
@@ -92,6 +103,20 @@ function initRecentSessionsListener() {
   const list = document.getElementById('recent-sessions-list');
   if (!list) return;
   list.addEventListener('click', (e) => {
+    // Check for delete button click first
+    const deleteBtn = e.target.closest('.recent-session-delete');
+    if (deleteBtn) {
+      e.stopPropagation();
+      const item = deleteBtn.closest('.recent-session-item');
+      if (item) {
+        const sessionId = item.dataset.sessionId;
+        deleteSession(sessionId);
+        renderRecentSessions();
+      }
+      return;
+    }
+
+    // Handle session item click
     const item = e.target.closest('.recent-session-item');
     if (!item) return;
     const sessionId = item.dataset.sessionId;
@@ -344,7 +369,8 @@ async function transitionToChat() {
   if (landingEl) {
     landingEl.classList.add('hiding');
     await new Promise(r => setTimeout(r, 200));
-    landingEl.remove();
+    landingEl.classList.remove('hiding');
+    landingEl.style.display = 'none';
   }
 
   // Remove landing body class, show chat
@@ -366,6 +392,34 @@ async function transitionToChat() {
     chatUI.addMessage({ role: 'user', text: prompt });
     setTimeout(() => handleUserMessage(prompt), 300);
   }
+}
+
+function returnToLanding() {
+  // Hide chat UI
+  if (chatUI && chatUI.element) {
+    chatUI.element.style.display = 'none';
+  }
+
+  // Show landing page
+  const landingEl = document.getElementById('landing-page');
+  if (landingEl) {
+    landingEl.style.display = '';
+  }
+
+  // Add back landing body class
+  document.body.classList.add('on-landing');
+
+  // Clear hero input
+  const heroInput = document.getElementById('hero-input');
+  if (heroInput) {
+    heroInput.value = '';
+  }
+
+  // Re-render recent sessions
+  renderRecentSessions();
+
+  // Restart placeholder rotation
+  initPlaceholderRotation();
 }
 
 // ---------- Engine Setup ----------
@@ -633,6 +687,12 @@ async function boot() {
 
   // Landing page is shown by default (via HTML).
   initLandingListeners();
+
+  // New session button
+  const newSessionBtn = document.getElementById('sessions-new-btn');
+  if (newSessionBtn) {
+    newSessionBtn.addEventListener('click', returnToLanding);
+  }
 
   // Render placeholder rotation immediately with hardcoded ideas
   initPlaceholderRotation();

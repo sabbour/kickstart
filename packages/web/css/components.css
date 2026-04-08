@@ -241,9 +241,9 @@
   width: 32px;
   height: 32px;
   border: none;
-  border-radius: var(--radius-medium);
+  border-radius: 8px;
   background: transparent;
-  color: var(--color-neutral-foreground-1);
+  color: var(--color-neutral-foreground-3);
   cursor: pointer;
   flex-shrink: 0;
   transition: background var(--duration-fast);
@@ -254,7 +254,7 @@
 }
 
 .chat-send-btn:disabled {
-  background: var(--color-neutral-background-4);
+  background: transparent;
   color: var(--color-neutral-foreground-disabled);
   cursor: not-allowed;
 }

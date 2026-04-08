@@ -296,6 +296,7 @@ body.on-landing #topbar-sessions-toggle {
   background: var(--color-neutral-background-1);
   cursor: pointer;
   transition: all var(--duration-fast);
+  position: relative;
 }
 
 .recent-session-item:hover {
@@ -318,6 +319,32 @@ body.on-landing #topbar-sessions-toggle {
   color: var(--color-neutral-foreground-3);
   white-space: nowrap;
   margin-left: var(--spacing-l);
+}
+
+.recent-session-delete {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: var(--spacing-s);
+  border: none;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-neutral-foreground-3);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all var(--duration-fast);
+}
+
+.recent-session-item:hover .recent-session-delete {
+  display: flex;
+}
+
+.recent-session-delete:hover {
+  background: var(--color-neutral-background-3);
+  color: var(--color-neutral-foreground-1);
 }
 
 /* ---------- Landing Footer ---------- */
