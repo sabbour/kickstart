@@ -316,6 +316,59 @@
   cursor: not-allowed;
 }
 
+/* ---------- Demo Mode Badge ---------- */
+.demo-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-warning);
+  background: var(--color-warning-background);
+  border-radius: var(--radius-medium);
+  margin-left: var(--spacing-s);
+}
+
+/* ---------- Error Bubble ---------- */
+.chat-bubble.error-bubble {
+  background: var(--color-error-background);
+  border: 1px solid var(--color-error);
+  color: var(--color-neutral-foreground-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-s);
+}
+
+.error-bubble-text {
+  font-size: var(--font-size-200);
+}
+
+.error-retry-btn {
+  align-self: flex-start;
+  padding: var(--spacing-xs) var(--spacing-m);
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-error);
+  background: transparent;
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-medium);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+
+.error-retry-btn:hover {
+  background: var(--color-error);
+  color: white;
+}
+
+/* ---------- Streaming Bubble ---------- */
+.chat-bubble.streaming {
+  opacity: 0.85;
+  border-left: 2px solid var(--color-brand-primary);
+}
+
 /* ---------- Wizard ---------- */
 .wizard {
   display: flex;

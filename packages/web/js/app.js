@@ -7,11 +7,14 @@ import { Router, Navigation, Breadcrumbs, EventBus } from './framework/core.js';
 import { createCopilotPanel, createCommandBar, createWizard, createCard, createCodeBlock, escapeHtml } from './framework/components.js';
 import { renderA2UI } from './framework/a2ui-renderer.js';
 import { createEngine } from './engine.js';
+import { createApiClient } from './api-client.js';
 import { buildSystemPrompt } from './prompts.js';
 import Auth from './auth.js';
 
 // ---------- Conversation Engine ----------
 let engine;
+let apiClient = null;
+let isApiMode = false;
 
 // ---------- Copilot Panel ----------
 let promptInspectorOn = false;
@@ -37,36 +40,158 @@ const copilot = createCopilotPanel({
 document.getElementById('copilot-slot')?.appendChild(copilot.element);
 
 // Wire conversation engine
-function initEngine() {
-  engine = createEngine({
-    onPhaseChange(phaseIndex) {
-      copilot.setPhase(phaseIndex);
-    },
-    onResponse({ a2ui, text, systemPrompt }) {
-      copilot.setTyping(false);
-      if (a2ui) {
-        const html = renderA2UIMessage(a2ui);
-        copilot.addMessage({ role: 'assistant', html });
-      } else if (text) {
-        copilot.addMessage({ role: 'assistant', text });
-      }
+async function initEngine() {
+  // Try to connect to API backend
+  apiClient = createApiClient();
+  const apiAvailable = await apiClient.healthCheck();
 
-      // Prompt Inspector: append system prompt preview when enabled
-      if (promptInspectorOn && systemPrompt) {
-        const promptHtml = renderPromptInspector(systemPrompt);
-        copilot.addMessage({ role: 'assistant', html: promptHtml });
+  if (apiAvailable) {
+    isApiMode = true;
+    engine = createEngine({
+      apiClient,
+      onPhaseChange(phaseIndex) {
+        copilot.setPhase(phaseIndex);
+      },
+      onResponse({ a2ui, text, systemPrompt }) {
+        copilot.setTyping(false);
+        clearStreamingBubble();
+
+        if (a2ui) {
+          const html = renderA2UIMessage(a2ui);
+          copilot.addMessage({ role: 'assistant', html });
+        } else if (text) {
+          copilot.addMessage({ role: 'assistant', text });
+        }
+
+        if (promptInspectorOn && systemPrompt) {
+          const promptHtml = renderPromptInspector(systemPrompt);
+          copilot.addMessage({ role: 'assistant', html: promptHtml });
+        }
+      },
+      onError({ message, retryable }) {
+        copilot.setTyping(false);
+        clearStreamingBubble();
+        showErrorBubble(message, retryable);
+      },
+      onStreaming(partialText) {
+        updateStreamingBubble(partialText);
+      },
+    });
+  } else {
+    // Fallback to demo mode
+    isApiMode = false;
+    engine = createEngine({
+      onPhaseChange(phaseIndex) {
+        copilot.setPhase(phaseIndex);
+      },
+      onResponse({ a2ui, text, systemPrompt }) {
+        copilot.setTyping(false);
+        if (a2ui) {
+          const html = renderA2UIMessage(a2ui);
+          copilot.addMessage({ role: 'assistant', html });
+        } else if (text) {
+          copilot.addMessage({ role: 'assistant', text });
+        }
+
+        if (promptInspectorOn && systemPrompt) {
+          const promptHtml = renderPromptInspector(systemPrompt);
+          copilot.addMessage({ role: 'assistant', html: promptHtml });
+        }
+      },
+    });
+
+    showDemoBadge();
+  }
+}
+
+// ---------- Demo Mode Badge ----------
+function showDemoBadge() {
+  const header = document.querySelector('.copilot-header-title');
+  if (!header || header.querySelector('.demo-badge')) return;
+
+  const badge = document.createElement('span');
+  badge.className = 'demo-badge';
+  badge.textContent = 'Demo';
+  badge.title = 'Running without API backend — using scripted demo responses';
+  header.appendChild(badge);
+}
+
+// ---------- Streaming bubble ----------
+let streamingBubbleEl = null;
+let lastRetryMessage = null;
+
+function updateStreamingBubble(text) {
+  copilot.setTyping(false);
+  const container = document.querySelector('.copilot-messages');
+  if (!container) return;
+
+  if (!streamingBubbleEl) {
+    streamingBubbleEl = document.createElement('div');
+    streamingBubbleEl.className = 'chat-bubble assistant streaming';
+    streamingBubbleEl.setAttribute('role', 'article');
+    container.appendChild(streamingBubbleEl);
+  }
+
+  streamingBubbleEl.textContent = text;
+  requestAnimationFrame(() => {
+    container.scrollTop = container.scrollHeight;
+  });
+}
+
+function clearStreamingBubble() {
+  if (streamingBubbleEl) {
+    streamingBubbleEl.remove();
+    streamingBubbleEl = null;
+  }
+}
+
+// ---------- Error bubble ----------
+function showErrorBubble(message, retryable) {
+  const container = document.querySelector('.copilot-messages');
+  if (!container) return;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble assistant error-bubble';
+  bubble.setAttribute('role', 'alert');
+
+  const msgEl = document.createElement('span');
+  msgEl.className = 'error-bubble-text';
+  msgEl.textContent = message;
+  bubble.appendChild(msgEl);
+
+  if (retryable) {
+    lastRetryMessage = lastRetryMessage; // preserve for retry
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'error-retry-btn';
+    retryBtn.textContent = 'Retry';
+    retryBtn.addEventListener('click', () => {
+      bubble.remove();
+      if (lastRetryMessage) {
+        handleUserMessage(lastRetryMessage);
       }
-    },
+    });
+    bubble.appendChild(retryBtn);
+  }
+
+  container.appendChild(bubble);
+  requestAnimationFrame(() => {
+    container.scrollTop = container.scrollHeight;
   });
 }
 
 function handleUserMessage(text) {
+  lastRetryMessage = text;
   copilot.setTyping(true);
 
-  // Small delay to feel natural
-  setTimeout(() => {
+  if (isApiMode) {
+    // API mode — async, real latency
     engine.handleMessage(text);
-  }, 800);
+  } else {
+    // Demo mode — small delay to feel natural
+    setTimeout(() => {
+      engine.handleMessage(text);
+    }, 800);
+  }
 }
 
 function renderA2UIMessage(a2uiJson) {
@@ -333,7 +458,7 @@ Breadcrumbs.init({
 // ---------- Boot ----------
 async function boot() {
   await initAuth();
-  initEngine();
+  await initEngine();
 
   // Send welcome message using A2UI from engine
   const welcomeA2UI = engine.getWelcome();

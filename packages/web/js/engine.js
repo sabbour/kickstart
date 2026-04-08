@@ -253,15 +253,15 @@ function detectServices(input) {
   return services;
 }
 
-// ── Public API ──────────────────────────────────────────────────────
+// ── Demo Engine (scripted flow, no backend needed) ──────────────────
 
 /**
- * Create a conversation engine instance.
+ * Create a scripted demo engine instance (no API backend).
  * @param {Object} opts
  * @param {Function} opts.onPhaseChange - (phaseIndex: number) => void
- * @param {Function} opts.onResponse    - ({ a2ui, text }) => void
+ * @param {Function} opts.onResponse    - ({ a2ui, text, systemPrompt, advance }) => void
  */
-export function createEngine({ onPhaseChange, onResponse }) {
+export function createDemoEngine({ onPhaseChange, onResponse }) {
   let state = createInitialState();
 
   function currentPhaseIndex() {
@@ -270,7 +270,6 @@ export function createEngine({ onPhaseChange, onResponse }) {
 
   /** Process a user message and produce a response. */
   function handleMessage(userText) {
-    // Stash first user input as description / appName on first discover turn
     if (state.currentPhase === Phase.Discover && state.turnCount === 0) {
       state.collected.description = userText;
       state.collected.appName = extractAppName(userText);
@@ -282,7 +281,6 @@ export function createEngine({ onPhaseChange, onResponse }) {
     const result = handler(userText, state);
     state.turnCount++;
 
-    // Attach the composed system prompt so the UI can optionally display it
     result.systemPrompt = buildSystemPrompt(state.currentPhase, state.collected);
 
     if (result.advance) {
@@ -293,7 +291,6 @@ export function createEngine({ onPhaseChange, onResponse }) {
     onResponse?.(result);
   }
 
-  /** Get welcome A2UI for the initial screen. */
   function getWelcome() {
     return [
       {
@@ -309,5 +306,114 @@ export function createEngine({ onPhaseChange, onResponse }) {
     getCurrentPhase: () => state.currentPhase,
     getCurrentPhaseIndex: () => currentPhaseIndex(),
     getState: () => structuredClone(state),
+    isDemo: true,
   });
+}
+
+// ── API Engine (real backend) ───────────────────────────────────────
+
+/**
+ * Create an API-backed engine that calls POST /api/converse.
+ * @param {Object} opts
+ * @param {Function} opts.onPhaseChange - (phaseIndex: number) => void
+ * @param {Function} opts.onResponse    - ({ a2ui, text, systemPrompt, advance }) => void
+ * @param {Object}   opts.apiClient     - API client from createApiClient()
+ * @param {Function} [opts.onError]     - ({ message, retryable }) => void
+ * @param {Function} [opts.onStreaming]  - (partialText: string) => void
+ */
+export function createApiEngine({ onPhaseChange, onResponse, apiClient, onError, onStreaming }) {
+  let sessionId = null;
+  let currentPhase_ = Phase.Discover;
+
+  function currentPhaseIndex() {
+    return phaseIndex(currentPhase_);
+  }
+
+  function mapApiResponse(apiRes) {
+    return {
+      a2ui: apiRes.a2ui ?? null,
+      text: apiRes.message ?? null,
+      systemPrompt: apiRes.systemPrompt ?? null,
+      advance: false, // phase change handled by comparing phases
+    };
+  }
+
+  function handlePhaseFromApi(newPhase) {
+    if (newPhase && newPhase !== currentPhase_ && PHASE_ORDER.includes(newPhase)) {
+      currentPhase_ = newPhase;
+      onPhaseChange?.(currentPhaseIndex());
+    }
+  }
+
+  async function handleMessage(userText) {
+    try {
+      const apiRes = await apiClient.converseStream(sessionId, userText, (partial) => {
+        // Deliver incremental streaming updates
+        if (partial.message) {
+          onStreaming?.(partial.message);
+        }
+      });
+
+      if (apiRes.error) {
+        onError?.({
+          message: apiRes.message || 'Something went wrong',
+          retryable: apiRes.status === 429 || apiRes.status === 503 || apiRes.status === 0,
+        });
+        return;
+      }
+
+      // Update session
+      if (apiRes.sessionId) sessionId = apiRes.sessionId;
+
+      // Handle phase transitions
+      handlePhaseFromApi(apiRes.phase);
+
+      // Map to engine response format
+      const result = mapApiResponse(apiRes);
+      onResponse?.(result);
+    } catch (err) {
+      onError?.({
+        message: err.message || 'Unexpected error',
+        retryable: true,
+      });
+    }
+  }
+
+  function getWelcome() {
+    return [
+      {
+        type: 'Text',
+        text: "👋 Hi! I'm Kickstart — your AI guide for getting apps running on Azure. Tell me: **what are you building?**",
+      },
+    ];
+  }
+
+  return Object.freeze({
+    handleMessage,
+    getWelcome,
+    getCurrentPhase: () => currentPhase_,
+    getCurrentPhaseIndex: () => currentPhaseIndex(),
+    getState: () => ({ currentPhase: currentPhase_, sessionId }),
+    isDemo: false,
+  });
+}
+
+// ── Smart Factory (auto-selects API or demo) ────────────────────────
+
+/**
+ * Create a conversation engine, auto-selecting API mode if an apiClient
+ * is provided, or falling back to demo mode.
+ *
+ * @param {Object} opts
+ * @param {Function} opts.onPhaseChange
+ * @param {Function} opts.onResponse
+ * @param {Object}   [opts.apiClient]   - If provided, uses API backend
+ * @param {Function} [opts.onError]     - Error handler (API mode only)
+ * @param {Function} [opts.onStreaming]  - Streaming chunk handler (API mode only)
+ */
+export function createEngine({ onPhaseChange, onResponse, apiClient, onError, onStreaming }) {
+  if (apiClient) {
+    return createApiEngine({ onPhaseChange, onResponse, apiClient, onError, onStreaming });
+  }
+  return createDemoEngine({ onPhaseChange, onResponse });
 }
