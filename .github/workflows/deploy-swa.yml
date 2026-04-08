@@ -55,7 +55,8 @@ jobs:
           app_location: "packages/web"
           api_location: "packages/web/api"
           skip_app_build: true
-          skip_api_build: true
+          skip_api_build: false
+          api_build_command: "echo 'API already built'"
 
   close_staging:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
