@@ -19,6 +19,7 @@ import {
 import type { SessionState, ConversationState } from "@kickstart/core";
 
 import { handleKickstart, deleteEngineState } from "./tools/kickstart.js";
+import { handleConverse } from "./tools/converse.js";
 import { handleGenerateManifests } from "./tools/generate-manifests.js";
 import { handleCheckStatus } from "./tools/check-status.js";
 import { handleAction } from "./tools/action.js";
@@ -68,6 +69,18 @@ server.tool(
     message: z.string().optional().describe("Optional initial message from the user"),
   },
   async (params) => handleKickstart(sessions, params.message, clientCapability),
+);
+
+// ── Tool: converse ──────────────────────────────────────────────────
+
+server.tool(
+  "converse",
+  "Continue a multi-turn Kickstart conversation. Processes user message through the phase machine and returns the phase-appropriate system prompt with A2UI phase indicator.",
+  {
+    sessionId: z.string().describe("Active session ID from a kickstart conversation"),
+    message: z.string().describe("User message to process"),
+  },
+  async (params) => handleConverse(sessions, params.sessionId, params.message, clientCapability),
 );
 
 // ── Tool: generate-manifests ────────────────────────────────────────
