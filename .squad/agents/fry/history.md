@@ -135,3 +135,12 @@
 - **/login route fix**: Removed server-side `/login → /.auth/login/aad` redirect from `staticwebapp.config.json`. Now handled client-side in `boot()` — checks `window.location.pathname === '/login'`, triggers MSAL login if unauthenticated, then `replaceState` to `/`.
 - **Auth flow**: `initAuth()` now `await`s `updateAuthUI()` since it's async (fetches photo). No breaking change — `Auth.login().then(updateAuthUI)` still works because `.then()` handles async returns.
 - **Files changed**: `packages/web/js/app.js`, `packages/web/css/core.css`, `packages/web/staticwebapp.config.json`.
+
+### 2025-07-24 — Spark UX P0 (4 items in 1 commit)
+- **Context**: Implemented all 4 "Spark UX P0" items to make Kickstart feel like GitHub Spark.
+- **P0-1 Hero Input**: Added `landing-hero` section with centered text input + 4 suggestion pills above carousel. Reuses `pendingQuickPrompt` → `transitionToChat()` flow. CSS uses theme tokens; responsive breakpoints added.
+- **P0-2 File Chips**: Created `renderFileChips(files)` in components.js, `FileGeneration` A2UI renderer, engine integration. **Key learning**: A2UI renders to `outerHTML` strings — event listeners are lost. File chip clicks MUST use event delegation on chat container, not direct listeners.
+- **P0-3 Sparkle Loader**: Replaced typing dots with gradient-pulsing sparkle animation + phase-aware status text. `setTyping(val, phase)` API — phase is optional for backward compat. Uses `--color-copilot-gradient-start/end` tokens.
+- **P0-4 Preview Panel**: Transformed `#file-viewer` into contextual preview panel. Dynamic titles via `PREVIEW_TITLES` map keyed by phase name. `showPreviewContent()` renders ArchitectureDiagram to panel body. Panel header + close button added; file-viewer inner header hidden via CSS.
+- **Pattern**: Two engine creation paths (API vs demo) in `initEngine()` — both need identical `onPhaseChange`/`onResponse` wiring.
+- **Files changed**: `index.html`, `landing.css`, `components.css`, `app.js`, `engine.js`, `components.js`, `a2ui-renderer.js` (all in `packages/web/`).
