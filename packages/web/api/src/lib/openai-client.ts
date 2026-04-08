@@ -112,7 +112,7 @@ export async function chatCompletion(
     body: JSON.stringify({
       messages,
       temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 2048,
+      max_completion_tokens: options.maxTokens ?? 2048,
       stream: false,
     }),
   });
@@ -156,7 +156,7 @@ export async function* chatCompletionStream(
     body: JSON.stringify({
       messages,
       temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 2048,
+      max_completion_tokens: options.maxTokens ?? 2048,
       stream: true,
     }),
   });
