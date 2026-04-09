@@ -14,6 +14,10 @@ import { GitHubCommit } from './components/GitHubCommit';
 import { AzureLoginCard } from './components/AzureLoginCard';
 import { AzureResourcePicker } from './components/AzureResourcePicker';
 import { AzureResourceForm } from './components/AzureResourceForm';
+import { ArchitectureDiagram } from './components/ArchitectureDiagram';
+import { FileEditor } from './components/FileEditor';
+import { CostEstimate } from './components/CostEstimate';
+import { DeploymentProgress } from './components/DeploymentProgress';
 
 const kickstartComponents: ReactComponentImplementation[] = [
   ...Array.from(basicCatalog.components.values()),
@@ -30,6 +34,10 @@ const kickstartComponents: ReactComponentImplementation[] = [
   AzureLoginCard,
   AzureResourcePicker,
   AzureResourceForm,
+  ArchitectureDiagram,
+  FileEditor,
+  CostEstimate,
+  DeploymentProgress,
 ];
 
 export const kickstartCatalog = new Catalog<ReactComponentImplementation>(
