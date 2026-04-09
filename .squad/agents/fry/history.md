@@ -341,3 +341,9 @@
   - **Playground.tsx**: Replaced 7 inline styles (`style={{textTransform: 'uppercase', letterSpacing: '0.04em'}}`, `style={{marginTop: tokens.spacingVerticalXS}}`, `style={{...}}`) with `makeStyles` classes. Changed hardcoded `gap: '2px'` to `gap: tokens.spacingVerticalXXS`. All components now follow the audit checklist: no hardcoded px/hex/rgb values, all spacing/fonts/colors use tokens, no raw HTML elements where Fluent equivalents exist.
 - **Build verification**: Ran `npx vite build` from `packages/web/` — build passed with zero TypeScript errors. 2826 modules transformed, 1.08 MB bundle (302 KB gzipped).
 - **Pattern**: All three components (CodeBlock, Markdown, and all audited components) use `@fluentui/react-components` primitives, `makeStyles` + tokens for styling, and the A2UI adapter pattern (`createReactComponent`).
+
+### 2025-07-30 — Playground JSON viewer fix for keyword-based scenarios
+- **Problem**: `getScenarioJson()` in `Playground.tsx` showed a useless placeholder object for keyword-based Kickstart Scenarios instead of actual A2UI messages. Users saw `{ "note": "This scenario is driven by demo-scenarios.ts keyword: ..." }` in the JSON tab.
+- **Fix**: Replaced the placeholder with real demo engine calls — same pattern as `injectScenario()`: `resetDemoState()` + `getDemoResponse()` (with the burn-turn-1 trick for non-welcome keywords). Returns actual `a2uiMessages` JSON. Demo state reset is harmless here since `injectScenario` already ran when user clicked the scenario.
+- **UX improvement**: Added a brief scenario help description at the top of the left sidebar explaining the two scenario categories (Kickstart Scenarios vs Basic Controls) and how to use Preview/JSON tabs. Styled with `scenarioHelp` class using Fluent tokens.
+- **Build**: Vite build passes, zero errors.

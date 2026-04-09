@@ -113,6 +113,15 @@ const useStyles = makeStyles({
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
   },
+  scenarioHelp: {
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    color: tokens.colorNeutralForeground3,
+    lineHeight: tokens.lineHeightBase200,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
   jsonArea: {
     paddingTop: tokens.spacingVerticalXXS,
     paddingBottom: tokens.spacingVerticalS,
@@ -281,7 +290,7 @@ export function Playground() {
   const surfaceEntries = Array.from(a2ui.surfaces.entries());
   const grouped = getGroupedScenarios();
 
-  // Get JSON for the selected scenario
+  // Get JSON for the selected scenario (including keyword-based ones)
   const getScenarioJson = useCallback(() => {
     if (!selectedScenario) return '';
     
@@ -290,12 +299,20 @@ export function Playground() {
       return JSON.stringify(msgs, null, 2);
     }
 
-    // For keyword-based scenarios, we can't easily get the exact JSON
-    // without running the demo-scenarios logic, so we show a placeholder
-    return JSON.stringify({
-      note: `This scenario is driven by the demo-scenarios.ts keyword: "${selectedScenario.keyword}"`,
-      description: selectedScenario.description,
-    }, null, 2);
+    // For keyword-based scenarios, run the demo engine to get real A2UI messages.
+    // injectScenario already ran resetDemoState(), so the state is already set;
+    // we reset + replay here to capture the messages without side-effect concerns.
+    const keyword = selectedScenario.keyword!;
+    let msgs: A2uiMsg[];
+    if (keyword === '__welcome__') {
+      resetDemoState();
+      msgs = getDemoResponse('anything').a2uiMessages;
+    } else {
+      resetDemoState();
+      getDemoResponse('skip'); // burn turn 1 (WELCOME)
+      msgs = getDemoResponse(keyword).a2uiMessages;
+    }
+    return JSON.stringify(msgs, null, 2);
   }, [selectedScenario]);
 
   return (
@@ -322,6 +339,13 @@ export function Playground() {
         {/* ---- LEFT: scenario explorer ---- */}
         <div className="playground-left">
           <div className="playground-left-scroll">
+            <div className={classes.scenarioHelp}>
+              <Caption1>
+                <strong>Kickstart Scenarios</strong> replay the app's guided demo flow (Welcome → Deploy).{' '}
+                <strong>Basic Controls</strong> render individual A2UI components in isolation.{' '}
+                Click any scenario to preview it; switch to <strong>JSON</strong> tab to inspect the raw A2UI messages.
+              </Caption1>
+            </div>
             <Accordion
               multiple
               openItems={openItems}
