@@ -83,6 +83,10 @@ export type {
   SystemPromptContext,
 } from "./prompts/index.js";
 
+// Tool registry
+export { ToolRegistry, defaultRegistry } from "./tools/registry.js";
+export type { Tool, OpenAIToolDefinition, ToolCall, ToolCallResult } from "./tools/types.js";
+
 // Services (response processing)
 export { processResponse } from "./services/index.js";
 export type {

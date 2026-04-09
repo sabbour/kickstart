@@ -4,6 +4,9 @@
  * Shared types across the Kickstart platform.
  */
 
+// Re-export Tool so that ./tools/* can import from "../types.js"
+export type { Tool } from "./tools/types.js";
+
 /** Azure subscription and resource context for a deployment. */
 export interface AzureContext {
   subscriptionId: string;
