@@ -250,3 +250,16 @@
 - **Collapsible sections**: Sidebar sections (Kickstart Scenarios, Layout, Content, Inputs, Custom Controls, Custom JSON) are collapsible with chevron animation. State tracked via `Set<string>`.
 - **Responsive**: On viewports < 768px, panels stack vertically with left panel capped at 40vh.
 - **Files changed**: `packages/web/src/pages/Playground.tsx` (rewrite), `packages/web/css/playground.css` (rewrite), `packages/web/src/pages/playground-scenarios.ts` (new).
+### 2026-04-08 — Fluent UI React v9 migration (Playground + App shell)
+- **FluentProvider**: Wrapped both App.tsx return paths (playground + main) in `<FluentProvider theme={webLightTheme}>`. All children now inherit Fluent 2 design tokens.
+- **Playground refactored**: Replaced hand-rolled HTML elements with Fluent UI v9 components:
+  - `<h1>` → `<Subtitle2>`, custom badge → `<CounterBadge>`, `<button>` → `<Button appearance="primary|outline">`
+  - Collapsible sections → `<Accordion multiple>` + `<AccordionItem>` + `<AccordionHeader>` + `<AccordionPanel>` with controlled `openItems` state
+  - `<textarea>` → `<Textarea>` (Fluent), `.pg-json-error` → `<MessageBar intent="error">`
+  - Surface cards → `<Card appearance="outline">` + `<CardHeader>`
+  - Activity log header → `<Body1Strong>`, empty state → `<Text>`
+- **makeStyles pattern**: Component-level styles use Griffel `makeStyles()` hook with Fluent `tokens` (colors, spacing, typography, radii). Layout-only CSS kept in `playground.css`.
+- **CSS cleanup**: Removed ~250 lines of component CSS (buttons, badges, typography, chevrons, section headers, scenario buttons, JSON editor, surface cards, activity log). Kept layout shell (~80 lines): flex containers, scroll areas, responsive breakpoints.
+- **Build**: Vite production build passes — 2539 modules (up from 483 before Fluent tree). No errors.
+- **State change**: Accordion `openItems` (string array) replaces old `Set<string>` + separate `jsonSectionOpen` boolean. JSON section is now just another AccordionItem with value `"custom-json"`.
+- **Key imports from @fluentui/react-components**: Button, CounterBadge, Card, CardHeader, Accordion/AccordionItem/AccordionHeader/AccordionPanel, Textarea, Text, Subtitle2, Caption1, Body1Strong, MessageBar, MessageBarBody, makeStyles, tokens.

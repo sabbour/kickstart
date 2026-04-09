@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { Layout } from './components/Layout';
 import { Landing } from './components/Landing';
 import { ChatShell } from './components/Chat/ChatShell';
@@ -198,59 +199,63 @@ export function App() {
   // Playground mode — standalone A2UI test harness
   if (playgroundEnabled) {
     return (
-      <Layout
-        sidebarOpen={false}
-        onToggleSidebar={() => {}}
-        onNewSession={() => {}}
-        showSessionsToggle={false}
-        hasFiles={false}
-      >
-        <Playground />
-      </Layout>
+      <FluentProvider theme={webLightTheme}>
+        <Layout
+          sidebarOpen={false}
+          onToggleSidebar={() => {}}
+          onNewSession={() => {}}
+          showSessionsToggle={false}
+          hasFiles={false}
+        >
+          <Playground />
+        </Layout>
+      </FluentProvider>
     );
   }
 
   return (
-    <Layout
-      sidebarOpen={sidebarOpen}
-      onToggleSidebar={() => setSidebarOpen(prev => !prev)}
-      onNewSession={handleNewSession}
-      showSessionsToggle={mode === 'chat'}
-      hasFiles={hasFiles}
-      sidebar={mode === 'chat' ? (
-        <SessionsSidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          sessions={sessions.sessions}
-          activeSessionId={sessions.activeSessionId}
-          onSelectSession={handleResumeSession}
-          onNewSession={handleNewSession}
-        />
-      ) : undefined}
-      fileEditor={mode === 'chat' ? (
-        <FileEditor
-          fs={fs}
-          selectedPath={selectedFile}
-          onSelectFile={setSelectedFile}
-        />
-      ) : undefined}
-    >
-      {mode === 'landing' ? (
-        <Landing
-          onStartChat={handleStartChat}
-          recentSessions={sessions.recentSessions}
-          onResumeSession={handleResumeSession}
-          onDeleteSession={sessions.deleteSession}
-        />
-      ) : (
-        <ChatShell
-          messages={messages}
-          isStreaming={isStreaming}
-          streamingText={currentStreamText}
-          onSend={handleSendMessage}
-          getSurface={a2ui.getSurface}
-        />
-      )}
-    </Layout>
+    <FluentProvider theme={webLightTheme}>
+      <Layout
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+        onNewSession={handleNewSession}
+        showSessionsToggle={mode === 'chat'}
+        hasFiles={hasFiles}
+        sidebar={mode === 'chat' ? (
+          <SessionsSidebar
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            sessions={sessions.sessions}
+            activeSessionId={sessions.activeSessionId}
+            onSelectSession={handleResumeSession}
+            onNewSession={handleNewSession}
+          />
+        ) : undefined}
+        fileEditor={mode === 'chat' ? (
+          <FileEditor
+            fs={fs}
+            selectedPath={selectedFile}
+            onSelectFile={setSelectedFile}
+          />
+        ) : undefined}
+      >
+        {mode === 'landing' ? (
+          <Landing
+            onStartChat={handleStartChat}
+            recentSessions={sessions.recentSessions}
+            onResumeSession={handleResumeSession}
+            onDeleteSession={sessions.deleteSession}
+          />
+        ) : (
+          <ChatShell
+            messages={messages}
+            isStreaming={isStreaming}
+            streamingText={currentStreamText}
+            onSend={handleSendMessage}
+            getSurface={a2ui.getSurface}
+          />
+        )}
+      </Layout>
+    </FluentProvider>
   );
 }
