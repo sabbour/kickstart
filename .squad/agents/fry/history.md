@@ -493,3 +493,34 @@ Preserved in Core Context:
 - Session ID mapping backend/frontend
 
 All component patterns, API conventions, and architectural decisions from this period remain in effect and are reflected in ongoing PRs/issues.
+
+### 2026-04-10 — Create tab wired to real LLM chat (B-26)
+- **What changed**: Replaced the static placeholder in Playground.tsx Create tab with a full conversational chat experience connected to `/api/converse` via `useStreaming`.
+- **Dual-state layout**: Empty state shows the existing centered hero ("What would you like to build?" + input). Once the user sends a first message, the layout switches to a chat shell (`createChatShell` — flex column) with a scrollable message area (`createMsgArea`) and a pinned input bar (`createInputBar`).
+- **Hooks used**: Added `useStreaming` (new import) and a second `useA2UI` instance (`createA2ui`) dedicated to the Create tab. The existing `customA2ui` is preserved for the Advanced JSON editor.
+- **Session continuity**: `createSessionIdRef` (a ref, not state) tracks the backend session ID across turns — each follow-up message reuses the same backend session for LLM memory.
+- **Surface ID tracking**: `pendingSurfaceIdsRef` accumulates surface IDs from `onA2UI` callbacks during streaming; they are attached to the assistant `ChatMessage` on `onComplete` for per-turn A2UI rendering.
+- **Streaming UX**: Shows a typing-dots animation while waiting for the first token; shows the accumulating stream text with a `createBubbleStreaming` style (brand-colored left border) while tokens arrive.
+- **Secondary actions**: "Start Blank" and "Advanced JSON" remain accessible — in empty state as links below the input; in chat state as a footer row below the input bar. "Advanced JSON" in chat mode renders the editor inside the scrollable message area (above the scroll anchor).
+- **Clear All**: Updated to also reset `createMessages`, `createA2ui`, and `createSessionIdRef` so the tab returns to empty state.
+- **Build**: Zero TypeScript errors. Bundle 1311 KB minified / 333 KB gzip (unchanged).
+
+### 2026-04-09 17:32 — Playwright e2e integration + Create tab chat shipping complete
+
+**Session:** Wave 2 parallel agents (Fry + Hermes)
+
+**Learnings:**
+- **Playwright now standard in development loop** — Hermes' e2e suite (57/57 passing) validates frontend builds. Local testing with `vite preview` ensures production builds are correct, not just dev server builds. All future feature work must include e2e validation.
+- **useStreaming + useA2UI pattern is production-ready** — Create tab shipped with streaming LLM responses and A2UI surface rendering. No new infrastructure needed. Pattern reused from main chat, confirming FCC design robustness.
+- **Session tracking via refs (not state) avoids stale closures** — `createSessionIdRef` model prevents re-render bugs in streaming callbacks. Key insight for future streaming features (e.g., Phase 3 API response streaming).
+- **"Clear All" implications** — Resetting ephemeral UI state (Create tab chat, JSON editor, A2UI surfaces) is now a compound operation. Future auth/session resets may need similar multi-component coordination.
+
+**Key files:** 
+- `packages/web/src/Playground.tsx` (Create tab + dual-state layout)
+- `playwright.config.ts` (vite preview mode enabled)
+- `tests/playground.spec.ts` (new comprehensive 5-tab coverage)
+
+**Next for Fry:**
+- B-10/B-11 refactor: rename ServiceConnector → APIConnector, ServicePack → IntegrationKit
+- B-14: integrate action re-prompting into Advanced JSON surfaces
+- Consider session persistence layer (currently Create tab is ephemeral)

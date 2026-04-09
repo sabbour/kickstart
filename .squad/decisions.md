@@ -1837,6 +1837,7 @@ Secondary issue: using the entire `useA2UI()` return object as a `useMemo` depen
 | **B-32** | **Add logging & telemetry** | Bender | DONE-6 | 1 day | Ops: Session replay, action tracking, error aggregation, performance metrics |
 | **B-33** | **Theme customization system** | Fry | DONE-14 | 1 day | Fluent UI themes switchable, Dark mode support, branding overrides |
 | **B-34** | **Keyboard navigation & accessibility audit** | Hermes | B-12, B-14 | 2 days | A11y: Tab order, ARIA labels, screen reader support, WCAG 2.1 AA compliance |
+| **B-43** | **Bring back VSCode launch & MCP install buttons** | Fry | — | 1 day | Restore buttons to launch VSCode/VSCode Insiders and install the MCP server from the web UI |
 
 ---
 
@@ -1853,6 +1854,7 @@ Secondary issue: using the entire `useA2UI()` return object as a `useMemo` depen
 | **B-40** | **Cost estimation UI (CostEstimate component)** | Fry | B-19 | 2 days | Real-time pricing calculator, resource SKU selector, monthly projection |
 | **B-41** | **Conversation collaboration (multi-user)** | Bender | DONE-6 | 2-3 weeks | Share sessions, real-time cursors, turn comments, approval workflows |
 | **B-42** | **K8s validation rules engine** | Hermes | B-18 | 2 days | 20+ validation rules, auto-fix suggestions, helm lint integration |
+| **B-44** | **Remote filesystem abstraction + Cloud Shell provider** | Bender | B-17 | 3-5 days | Filesystem abstraction layer (read/write/list/delete) with pluggable providers. Cloud Shell as first provider (terminal access, real file ops). Future providers: Codespaces, local FS. Replaces B-09 IndexedDB for real deployment scenarios. |
 
 ---
 
@@ -2012,3 +2014,16 @@ Per decision F17: "ALL three samples handle user button clicks by translating th
 **By:** Ahmed Sabbour (via Copilot)
 **What:** Factor Playwright local testing into all work. Run e2e tests to catch bugs — don't rely only on unit tests. All feature work should include or be validated by Playwright tests.
 **Why:** User request — without e2e testing, bugs aren't being captured. Makes the development loop more robust.
+### 2026-04-09T17:32:00Z: Playwright webServer configured for Vite preview
+
+**By:** Hermes (Tester)
+**What:** Modified `playwright.config.ts` webServer command from `npx serve packages/web -l 4281` to `cd packages/web && npx vite build && npx vite preview --port 4281` with `timeout: 180_000`.
+**Why:** Project migrated to React/Vite SPA; `npx serve` only serves static files. `vite preview` serves production build, matching real deployment. Timeout required for ~2 minute build step.
+**Consequence:** All E2E tests run against production build. Catches production-only issues. CI must have Node.js and dependencies installed.
+
+### 2026-04-09T17:32:00Z: Create tab wired to real LLM chat experience
+
+**By:** Fry (Frontend Dev)
+**What:** Playground Create tab now uses `useStreaming` + dedicated `useA2UI` instance connected to `/api/converse`. Static placeholder removed. Dual-state layout (hero → chat shell) preserves empty state UX.
+**Why:** Reuses existing hooks (zero new infrastructure). A2UI surfaces isolated from JSON editor. Backend session ID tracked via `ref` to avoid stale closures. Surface IDs accumulated per turn for history rendering.
+**Consequence:** Create tab chat is ephemeral (in-component state, not persisted). "Clear All" resets both JSON editor and chat. B-26 complete.

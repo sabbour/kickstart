@@ -286,3 +286,19 @@ The following learnings predate 2026-04-09 and are candidates for archival to `h
 - Subsequent React/Vite migration entries through 2026-04-09
 
 These capture foundational auth setup, monorepo structure, and Phase 1 architectural decisions. Current living work (B-23, B-24, B-25, etc.) is reflected in new dated entries above.
+
+### 2026-04-09 17:32 — Create tab chat delivery + Playwright validation
+
+**Session:** Wave 2 parallel agents (Fry + Hermes)
+
+**Status delivered to Fry:**
+- Create tab now streams real LLM responses via `/api/converse` — B-26 complete
+- useStreaming hook integrated; A2UI surfaces render per turn
+- Dual-state layout preserves empty state UX while supporting multi-turn chat
+- Session ID tracking via refs prevents stale closures
+- Build passes with zero TypeScript errors
+
+**Next deliverables for Bender:**
+- B-27: `/api/converse` endpoint refinement (session lifecycle, error handling)
+- B-28: Backend integration for Create tab sessions (persistence, cleanup)
+- B-10/B-11 prep: APIConnector OAuth flows, IntegrationKit service bundling
