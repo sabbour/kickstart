@@ -1085,7 +1085,7 @@ function PlaygroundInner() {
         <div className={classes.createChatShell}>
           {/* Scrollable message area */}
           <div className={classes.createMsgArea}>
-            {createMessages.map(msg => (
+            {createMessages.map((msg, index) => (
               <div key={msg.id} className={classes.createBubbleRow}>
                 <div className={msg.role === 'user' ? classes.createBubbleUser : classes.createBubbleAssistant}>
                   {msg.text}
@@ -1095,7 +1095,7 @@ function PlaygroundInner() {
                   const surface = createA2ui.getSurface(sid);
                   return surface ? (
                     <div key={sid} className={classes.createSurfaceBlock}>
-                      <A2UISurfaceWrapper surface={surface} />
+                      <A2UISurfaceWrapper surface={surface} isActive={index === createMessages.length - 1} />
                     </div>
                   ) : null;
                 })}

@@ -7,9 +7,11 @@ import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapt
 interface ChatMessageProps {
   message: ChatMessageType;
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
+  /** When false, A2UI surfaces in this message are dimmed and non-interactive. Defaults to true. */
+  isActive?: boolean;
 }
 
-export function ChatMessage({ message, getSurface }: ChatMessageProps) {
+export function ChatMessage({ message, getSurface, isActive = true }: ChatMessageProps) {
   if (message.role === 'user') {
     return (
       <div className="chat-bubble user">
@@ -40,7 +42,7 @@ export function ChatMessage({ message, getSurface }: ChatMessageProps) {
           if (!surface) return null;
           return (
             <div key={surfaceId} className="a2ui-component">
-              <A2UISurfaceWrapper surface={surface} />
+              <A2UISurfaceWrapper surface={surface} isActive={isActive} />
             </div>
           );
         })}

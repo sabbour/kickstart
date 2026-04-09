@@ -13,10 +13,16 @@ interface MessageListProps {
 }
 
 export function MessageList({ messages, isStreaming, streamingText, getSurface }: MessageListProps) {
+  const lastIndex = messages.length - 1;
   return (
     <>
-      {messages.map(msg => (
-        <ChatMessage key={msg.id} message={msg} getSurface={getSurface} />
+      {messages.map((msg, index) => (
+        <ChatMessage
+          key={msg.id}
+          message={msg}
+          getSurface={getSurface}
+          isActive={index === lastIndex}
+        />
       ))}
 
       {/* Streaming message (being generated) */}

@@ -5,14 +5,24 @@ import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapt
 
 interface A2UISurfaceWrapperProps {
   surface: SurfaceModel<ReactComponentImplementation>;
+  /** When false, the surface is dimmed and non-interactive (past-turn isolation). Defaults to true. */
+  isActive?: boolean;
 }
 
-export function A2UISurfaceWrapper({ surface }: A2UISurfaceWrapperProps) {
+export function A2UISurfaceWrapper({ surface, isActive = true }: A2UISurfaceWrapperProps) {
   return (
-    <div className="a2ui-surface-wrapper" style={{
-      borderRadius: 'var(--radius-large, 8px)',
-      overflow: 'hidden',
-    }}>
+    <div
+      className="a2ui-surface-wrapper"
+      style={{
+        borderRadius: 'var(--radius-large, 8px)',
+        overflow: 'hidden',
+        ...(isActive ? {} : {
+          opacity: 0.5,
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }),
+      }}
+    >
       <A2uiSurface surface={surface} />
     </div>
   );
