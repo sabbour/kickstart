@@ -2027,3 +2027,7 @@ Per decision F17: "ALL three samples handle user button clicks by translating th
 **What:** Playground Create tab now uses `useStreaming` + dedicated `useA2UI` instance connected to `/api/converse`. Static placeholder removed. Dual-state layout (hero → chat shell) preserves empty state UX.
 **Why:** Reuses existing hooks (zero new infrastructure). A2UI surfaces isolated from JSON editor. Backend session ID tracked via `ref` to avoid stale closures. Surface IDs accumulated per turn for history rendering.
 **Consequence:** Create tab chat is ephemeral (in-component state, not persisted). "Clear All" resets both JSON editor and chat. B-26 complete.
+### 2026-04-09T18:19:00Z: User directive
+**By:** Ahmed (via Copilot)
+**What:** Start formally tracking a changelog and versioning for Kickstart.
+**Why:** User request — captured for team memory. All future releases should follow semver and maintain a changelog.
