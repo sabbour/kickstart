@@ -98,6 +98,16 @@
 
 ### 2026-04-08: Two-Repo Strategy — sabbour/a2ui Fork + sabbour/kickstart App
 - **Pattern:** Mirrors adaptive-ui-framework + adaptive-ui-try-aks split. Framework extensions in fork, app-specific code in Kickstart.
+
+### 2026-04-09: Consolidated Backlog Audit — Single Source of Truth
+- **Finding:** Three disconnected tracking systems (SQL todos, decisions.md R-items, untracked Playground work) caused duplication + gaps. No single source of truth.
+- **Audit:** Consolidated 45 items across 5 sources (SQL, R01–R09 + G01–G08 + G1–G6 from decisions, Playground work, untracked infrastructure). Created 105 B-items (B-01 through B-103).
+- **Cross-reference table:** Every old ID (p1–p4, R1–R9, G01–G08, G1–G6) mapped to new B-item or marked superseded. Two items (leela-rendering-architecture, leela-spark-ux-roadmap) archived as decision obsoletes.
+- **Key blockers identified:** Action loop (B-23–B-25) is hard blocker. Components fire events but have no handler. Blocks all P1 work. Recommend P0 = 9 days.
+- **Effort reality:** 68 days for P0+P1+P2+Ops (45 items) assumes clear specs. P1 has unknowns (fat components, token mgmt, artifact store API). Recommend: Timebox B-10 (ServicePack design) as 2-day spike, run B-12 (Azure components) as proof-of-concept early.
+- **Critical unknowns:** OpenAI function calling stability, MSAL token refresh in SSE, A2UI v0.9 component streaming capability, GitHub OAuth timeout UX. Recommend: Early spikes before commitments.
+- **Deferred-but-important:** MCP tools (undefined scope, Phase 1 pivot unclear), multi-surface rendering (P3), cost estimation (scope ambiguous — spike recommended).
+- **Output:** `.squad/decisions/inbox/leela-consolidated-backlog.md` — 20KB canonical backlog with cross-references, superseded items table, effort summary, owner assignments, critical path, and recommendations.
 - **sabbour/a2ui (fork):** Generic catalog components (Table, Chart, Stepper), renderer improvements (streaming, SSR), data binding utilities, schema tooling, upstream contributions. Zero Kickstart/Azure/AKS logic.
 - **sabbour/kickstart (app):** All Kickstart-specific components (CostEstimate, ArchitectureDiagram, FileEditor, AuthCard, WorkflowStatus, etc.), chat UI, LLM integration, phase engine, MCP server, Azure/GitHub APIs.
 - **Consumption:** npm workspace + side-by-side checkout. Dev: `npm link @a2ui/react` for instant changes. CI: `file:` dependency OR published GitHub Package (future).

@@ -5,7 +5,7 @@
  * Tabs: Create | Gallery | Components | Icons | Widgets
  */
 
-import React, { useState, useCallback, useRef, useMemo, memo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react';
 import {
   Button, CounterBadge, SearchBox,
   Card, CardHeader,
@@ -28,6 +28,15 @@ import {
   CONTROL_SCENARIOS,
   type ScenarioDef,
 } from './playground-scenarios';
+import {
+  ALL_ICON_CATEGORIES,
+  AZURE_ICON_CATEGORIES,
+  UI_ICON_CATEGORIES,
+  FLUENT_ICON_CATEGORY,
+  TOTAL_ICON_COUNT,
+  type IconCategory,
+  type IconEntry,
+} from './playground-icons';
 
 // Scenario grouping for tabs
 const GALLERY_GROUPS = ['Kickstart Scenarios', 'Data Binding', 'Events & Actions', 'Surface Lifecycle', 'Dynamic Patterns'];
@@ -76,29 +85,43 @@ const useStyles = makeStyles({
     flexShrink: 0,
   },
   galleryCard: {
-    backgroundColor: `rgba(${tokens.colorNeutralBackground1}, 0.8)`,
+    backgroundColor: tokens.colorNeutralBackground1,
     borderRadius: tokens.borderRadiusXLarge,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
+    boxShadow: tokens.shadow4,
     cursor: 'pointer',
-    transition: 'box-shadow 0.2s ease, transform 0.1s ease',
+    transition: 'box-shadow 0.2s ease, transform 0.15s ease',
     breakInside: 'avoid' as const,
     marginBottom: tokens.spacingVerticalM,
+    overflow: 'hidden',
     ':hover': {
-      boxShadow: tokens.shadow8,
-      transform: 'translateY(-2px)',
+      boxShadow: tokens.shadow16,
+      transform: 'translateY(-3px)',
     },
   },
   cardLabel: {
+    display: 'block',
     paddingTop: tokens.spacingVerticalS,
     paddingLeft: tokens.spacingHorizontalM,
     paddingRight: tokens.spacingHorizontalM,
     color: tokens.colorNeutralForeground3,
     fontSize: tokens.fontSizeBase200,
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.04em',
+    letterSpacing: '0.05em',
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  cardDescription: {
+    display: 'block',
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    paddingTop: tokens.spacingVerticalXS,
+    color: tokens.colorNeutralForeground4,
+    fontSize: tokens.fontSizeBase200,
   },
   cardBody: {
     padding: tokens.spacingHorizontalM,
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalM,
   },
   dialogContent: {
     display: 'flex',
@@ -171,8 +194,10 @@ const useStyles = makeStyles({
     },
   },
   iconSymbol: {
-    fontSize: '32px',
+    display: 'block',
     marginBottom: tokens.spacingVerticalS,
+    marginLeft: 'auto',
+    marginRight: 'auto',
   },
   widgetGrid: {
     display: 'grid',
@@ -208,39 +233,51 @@ interface GalleryCardProps {
 
 const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
   const classes = useStyles();
-  const a2ui = useA2UI();
+  const { surfaces, processMessages } = useA2UI();
 
-  // Generate scenario surfaces on mount
-  useMemo(() => {
+  // Process scenario messages in useEffect so the onSurfaceCreated
+  // subscription (set up in useA2UI's own useEffect) is active first.
+  useEffect(() => {
     if (scenario.generate) {
       const msgs = scenario.generate();
-      a2ui.processMessages(msgs);
+      processMessages(msgs);
     } else if (scenario.keyword) {
       const keyword = scenario.keyword;
       if (keyword === '__welcome__') {
         resetDemoState();
         const resp = getDemoResponse('anything');
-        a2ui.processMessages(resp.a2uiMessages);
+        processMessages(resp.a2uiMessages);
       } else {
         resetDemoState();
         getDemoResponse('skip'); // burn turn 1 (WELCOME)
         const resp = getDemoResponse(keyword);
-        a2ui.processMessages(resp.a2uiMessages);
+        processMessages(resp.a2uiMessages);
       }
     }
-  }, [scenario, a2ui]);
+    // processMessages is stable (useCallback with ref-based processor)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenario]);
 
-  const surfaceEntries = Array.from(a2ui.surfaces.entries());
+  const surfaceEntries = Array.from(surfaces.entries());
 
   return (
-    <div className={classes.galleryCard} onClick={() => onCardClick(scenario, a2ui.surfaces)}>
+    <div className={classes.galleryCard} onClick={() => onCardClick(scenario, surfaces)}>
       <Caption1 className={classes.cardLabel}>{scenario.label}</Caption1>
+      {scenario.description && (
+        <Caption1 className={classes.cardDescription}>{scenario.description}</Caption1>
+      )}
       <div className={classes.cardBody}>
-        {surfaceEntries.map(([id, surface]) => (
-          <div key={id} className="a2ui-component">
-            <A2UISurfaceWrapper surface={surface} />
+        {surfaceEntries.length === 0 ? (
+          <div style={{ padding: '12px 0', color: tokens.colorNeutralForeground4, fontSize: tokens.fontSizeBase200 }}>
+            Loading…
           </div>
-        ))}
+        ) : (
+          surfaceEntries.map(([id, surface]) => (
+            <div key={id} className="a2ui-component">
+              <A2UISurfaceWrapper surface={surface} />
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -258,13 +295,14 @@ interface WidgetCardProps {
 
 const WidgetCard = memo(({ widget, onWidgetClick, onDuplicate, onDelete }: WidgetCardProps) => {
   const classes = useStyles();
-  const a2ui = useA2UI();
+  const { surfaces, processMessages } = useA2UI();
 
-  useMemo(() => {
-    a2ui.processMessages(widget.messages);
-  }, [widget.messages, a2ui]);
+  useEffect(() => {
+    processMessages(widget.messages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.messages]);
 
-  const surfaceEntries = Array.from(a2ui.surfaces.entries());
+  const surfaceEntries = Array.from(surfaces.entries());
 
   return (
     <Card
@@ -306,13 +344,14 @@ interface WidgetPreviewProps {
 }
 
 const WidgetPreview = memo(({ widget }: WidgetPreviewProps) => {
-  const a2ui = useA2UI();
+  const { surfaces, processMessages } = useA2UI();
 
-  useMemo(() => {
-    a2ui.processMessages(widget.messages);
-  }, [widget.messages, a2ui]);
+  useEffect(() => {
+    processMessages(widget.messages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widget.messages]);
 
-  const surfaceEntries = Array.from(a2ui.surfaces.entries());
+  const surfaceEntries = Array.from(surfaces.entries());
 
   return (
     <>
@@ -329,17 +368,12 @@ const WidgetPreview = memo(({ widget }: WidgetPreviewProps) => {
 
 WidgetPreview.displayName = 'WidgetPreview';
 
-// ---- Material Symbols Icons Catalog ----
-const MATERIAL_ICONS = [
-  'cloud', 'database', 'storage', 'security', 'code', 'terminal', 'settings',
-  'account_circle', 'dashboard', 'analytics', 'monitoring', 'api', 'bug_report',
-  'check_circle', 'error', 'warning', 'info', 'help', 'search', 'filter_list',
-  'refresh', 'sync', 'download', 'upload', 'folder', 'file_copy', 'description',
-  'edit', 'delete', 'add', 'remove', 'close', 'menu', 'more_vert', 'more_horiz',
-  'notifications', 'mail', 'message', 'chat', 'phone', 'location_on', 'home',
-  'work', 'build', 'lock', 'vpn_key', 'visibility', 'visibility_off', 'language',
-  'public', 'wifi', 'bluetooth', 'network_check', 'device_hub', 'developer_mode',
-  'integration_instructions', 'data_object', 'http', 'dns', 'webhook', 'deployed_code',
+// Icon sections for the Icons tab (Azure, UI, Fluent 2)
+// Icon category sections for the Icons tab
+const ICON_SECTIONS = [
+  { label: 'Azure Services', categories: AZURE_ICON_CATEGORIES },
+  { label: 'UI Icons', categories: UI_ICON_CATEGORIES },
+  { label: 'Fluent 2', categories: [FLUENT_ICON_CATEGORY] },
 ];
 
 // ---- Main Playground Component (Inner) ----
@@ -349,6 +383,7 @@ function PlaygroundInner() {
   const [activeTab, setActiveTab] = useState<'create' | 'gallery' | 'components' | 'icons' | 'widgets'>('gallery');
   const [filterQuery, setFilterQuery] = useState('');
   const [iconFilter, setIconFilter] = useState('');
+  const [iconSection, setIconSection] = useState<string>('Azure Services');
   const [jsonInput, setJsonInput] = useState('');
   const [widgetName, setWidgetName] = useState('My Widget');
   const [jsonError, setJsonError] = useState('');
@@ -380,12 +415,24 @@ function PlaygroundInner() {
     );
   }, [filterQuery]);
 
-  // Filter icons
-  const filteredIcons = useMemo(() => {
-    if (!iconFilter.trim()) return MATERIAL_ICONS;
+  // Filter icons across selected section
+  const filteredIconCategories = useMemo(() => {
+    const section = ICON_SECTIONS.find(s => s.label === iconSection);
+    if (!section) return [];
+    if (!iconFilter.trim()) return section.categories;
     const query = iconFilter.toLowerCase();
-    return MATERIAL_ICONS.filter(icon => icon.includes(query));
-  }, [iconFilter]);
+    return section.categories
+      .map(cat => ({
+        ...cat,
+        icons: cat.icons.filter(icon => icon.name.toLowerCase().includes(query)),
+      }))
+      .filter(cat => cat.icons.length > 0);
+  }, [iconFilter, iconSection]);
+
+  const filteredIconCount = useMemo(
+    () => filteredIconCategories.reduce((sum, cat) => sum + cat.icons.length, 0),
+    [filteredIconCategories],
+  );
 
   // Filter scenarios (old variable for compatibility)
   const filteredScenarios = filteredGalleryScenarios;
@@ -441,9 +488,9 @@ function PlaygroundInner() {
     resetDemoState();
   }, [customA2ui]);
 
-  // Handle copy icon name
-  const handleCopyIcon = useCallback((iconName: string) => {
-    navigator.clipboard.writeText(iconName);
+  // Handle copy icon path
+  const handleCopyIcon = useCallback((icon: IconEntry) => {
+    navigator.clipboard.writeText(icon.path);
   }, []);
 
   // Handle widget click
@@ -482,7 +529,7 @@ function PlaygroundInner() {
     switch (activeTab) {
       case 'gallery': return filteredGalleryScenarios.length;
       case 'components': return filteredComponentScenarios.length;
-      case 'icons': return filteredIcons.length;
+      case 'icons': return filteredIconCount;
       case 'widgets': return widgets.length;
       case 'create': return customSurfaceEntries.length;
       default: return 0;
@@ -660,28 +707,65 @@ function PlaygroundInner() {
       {/* ---- Tab 4: Icons ---- */}
       {activeTab === 'icons' && (
         <div className="playground-create-scroll">
-          <div className={classes.jsonEditorContainer}>
-            <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
-              Material Symbols Icons
-            </Body1Strong>
-            <Caption1 style={{ marginBottom: tokens.spacingVerticalM, color: tokens.colorNeutralForeground3 }}>
-              Click an icon to copy its name to clipboard. Use the Icon component with the copied name.
-            </Caption1>
-            <div className={classes.iconGrid}>
-              {filteredIcons.map(icon => (
-                <Card
-                  key={icon}
-                  appearance="outline"
-                  className={classes.iconCard}
-                  onClick={() => handleCopyIcon(icon)}
-                >
-                  <span className={`material-symbols-outlined ${classes.iconSymbol}`}>
-                    {icon}
-                  </span>
-                  <Caption1>{icon}</Caption1>
-                </Card>
+          <div style={{ padding: tokens.spacingHorizontalL }}>
+            {/* Section tabs */}
+            <TabList
+              selectedValue={iconSection}
+              onTabSelect={(_e, data) => setIconSection(data.value as string)}
+              size="small"
+              style={{ marginBottom: tokens.spacingVerticalM }}
+            >
+              {ICON_SECTIONS.map(section => (
+                <Tab key={section.label} value={section.label}>{section.label}</Tab>
               ))}
-            </div>
+            </TabList>
+
+            <Caption1 style={{ display: 'block', marginBottom: tokens.spacingVerticalM, color: tokens.colorNeutralForeground3 }}>
+              Click an icon to copy its path to clipboard. Use in A2UI Icon components.
+            </Caption1>
+
+            {filteredIconCategories.map(cat => (
+              <div key={cat.id}>
+                <Subtitle2 className={classes.groupHeader}>
+                  {cat.label}
+                  <Caption1 style={{ marginLeft: tokens.spacingHorizontalS, color: tokens.colorNeutralForeground3 }}>
+                    ({cat.icons.length})
+                  </Caption1>
+                </Subtitle2>
+                <div className={classes.iconGrid}>
+                  {cat.icons.map(icon => (
+                    <Card
+                      key={icon.path}
+                      appearance="outline"
+                      className={classes.iconCard}
+                      onClick={() => handleCopyIcon(icon)}
+                      title={`${icon.name}\nClick to copy path`}
+                    >
+                      <img
+                        src={icon.path}
+                        alt={icon.name}
+                        className={classes.iconSymbol}
+                        loading="lazy"
+                        style={{ width: 32, height: 32, objectFit: 'contain' }}
+                      />
+                      <Caption1 style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '100%',
+                      }}>{icon.name}</Caption1>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {filteredIconCategories.length === 0 && (
+              <div className={classes.emptyState}>
+                <div className={classes.emptyIcon}>🔍</div>
+                <Body1Strong>No icons match "{iconFilter}"</Body1Strong>
+              </div>
+            )}
           </div>
         </div>
       )}

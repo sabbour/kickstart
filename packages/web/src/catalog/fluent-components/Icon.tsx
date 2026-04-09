@@ -7,13 +7,23 @@ const useStyles = makeStyles({
   root: {
     marginTop: tokens.spacingVerticalS,
     marginBottom: tokens.spacingVerticalS,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: tokens.colorNeutralForeground1,
+  },
+  img: {
+    width: '24px',
+    height: '24px',
+    objectFit: 'contain' as const,
+  },
+  text: {
     fontSize: tokens.fontSizeBase500,
     width: '24px',
     height: '24px',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: tokens.colorNeutralForeground1,
   },
 });
 
@@ -26,8 +36,18 @@ export const Icon = createReactComponent(IconApi, ({props}) => {
     return <Body1>?</Body1>;
   }
 
+  // SVG path-based icons (from /assets/icons/...)
+  if (iconName.startsWith('/')) {
+    return (
+      <span className={classes.root}>
+        <img src={iconName} alt={iconName.split('/').pop() || 'icon'} className={classes.img} />
+      </span>
+    );
+  }
+
+  // Text-based fallback
   return (
-    <span className={`material-symbols-outlined ${classes.root}`}>
+    <span className={`${classes.root} ${classes.text}`}>
       {iconName}
     </span>
   );

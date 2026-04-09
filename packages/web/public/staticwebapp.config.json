@@ -16,6 +16,10 @@
       "redirect": "/.auth/logout?post_logout_redirect_uri=/"
     },
     {
+      "route": "/api/health",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/*",
       "allowedRoles": ["authenticated"]
     }
