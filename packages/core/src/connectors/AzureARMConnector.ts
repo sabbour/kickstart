@@ -33,7 +33,7 @@ export class AzureARMConnector implements APIConnector {
 
   async authenticate(): Promise<void> {
     // TODO (B-14): acquire MSAL token and store in this._token
-    console.warn('[AzureARMConnector] authenticate() is stubbed — MSAL integration pending (B-14)');
+    // Stubbed — MSAL integration pending (B-14)
   }
 
   isAuthenticated(): boolean {

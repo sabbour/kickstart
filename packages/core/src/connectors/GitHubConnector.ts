@@ -40,7 +40,7 @@ export class GitHubConnector implements APIConnector {
 
   async authenticate(): Promise<void> {
     // TODO (B-14): run GitHub OAuth Device Flow and store token
-    console.warn('[GitHubConnector] authenticate() is stubbed — GitHub OAuth pending (B-14)');
+    // Stubbed — GitHub OAuth pending (B-14)
   }
 
   isAuthenticated(): boolean {
