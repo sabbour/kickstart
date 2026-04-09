@@ -1,23 +1,23 @@
 /**
- * Playground — A2UI Gallery (masonry card layout).
+ * Playground — A2UI Gallery (5-tab architecture).
  *
  * Access via ?playground URL parameter.
- * Gallery view: All scenarios rendered as masonry cards
- * Create view: Custom JSON editor
+ * Tabs: Create | Gallery | Components | Icons | Widgets
  */
 
 import React, { useState, useCallback, useRef, useMemo, memo } from 'react';
 import {
   Button, CounterBadge, SearchBox,
   Card, CardHeader,
-  Textarea, Text, Subtitle2, Caption1, Body1Strong,
+  Textarea, Text, Subtitle2, Caption1, Body1Strong, Body1,
   MessageBar, MessageBarBody,
-  TabList, Tab,
+  TabList, Tab, Input,
   Dialog, DialogTrigger, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions,
   makeStyles, tokens,
 } from '@fluentui/react-components';
-import { Dismiss24Regular } from '@fluentui/react-icons';
+import { Dismiss24Regular, Copy24Regular, Delete24Regular, DocumentCopy24Regular } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
+import { WidgetsProvider, useWidgets } from '../hooks/useWidgets';
 import { getDemoResponse, resetDemoState } from '../services/demo-scenarios';
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
 import type { A2uiMsg } from '../types';
@@ -29,7 +29,12 @@ import {
   type ScenarioDef,
 } from './playground-scenarios';
 
-const ALL_SCENARIOS = [...KICKSTART_SCENARIOS, ...CONTROL_SCENARIOS];
+// Scenario grouping for tabs
+const GALLERY_GROUPS = ['Kickstart Scenarios', 'Data Binding', 'Events & Actions', 'Surface Lifecycle', 'Dynamic Patterns'];
+const COMPONENT_GROUPS = ['Layout', 'Content', 'Inputs', 'Custom Controls'];
+
+const GALLERY_SCENARIOS = [...KICKSTART_SCENARIOS, ...CONTROL_SCENARIOS].filter(s => GALLERY_GROUPS.includes(s.group));
+const COMPONENT_SCENARIOS = CONTROL_SCENARIOS.filter(s => COMPONENT_GROUPS.includes(s.group));
 
 const useStyles = makeStyles({
   playgroundPage: {
@@ -149,6 +154,50 @@ const useStyles = makeStyles({
   detailTabs: {
     marginBottom: tokens.spacingVerticalM,
   },
+  iconGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+    gap: tokens.spacingVerticalM,
+    marginTop: tokens.spacingVerticalM,
+  },
+  iconCard: {
+    cursor: 'pointer',
+    textAlign: 'center' as const,
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    transition: 'background-color 0.2s ease',
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
+  },
+  iconSymbol: {
+    fontSize: '32px',
+    marginBottom: tokens.spacingVerticalS,
+  },
+  widgetGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+    gap: tokens.spacingVerticalM,
+    marginTop: tokens.spacingVerticalM,
+  },
+  widgetCard: {
+    cursor: 'pointer',
+    transition: 'box-shadow 0.2s ease',
+    ':hover': {
+      boxShadow: tokens.shadow8,
+    },
+  },
+  widgetActions: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalXS,
+    marginTop: tokens.spacingVerticalS,
+  },
+  groupHeader: {
+    marginTop: tokens.spacingVerticalXL,
+    marginBottom: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalS,
+    borderBottom: `2px solid ${tokens.colorBrandBackground}`,
+  },
 });
 
 // ---- GalleryCard Component ----
@@ -199,30 +248,147 @@ const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
 
 GalleryCard.displayName = 'GalleryCard';
 
-// ---- Main Playground Component ----
+// ---- WidgetCard Component ----
+interface WidgetCardProps {
+  widget: { id: string; name: string; createdAt: number; messages: A2uiMsg[] };
+  onWidgetClick: (widgetId: string) => void;
+  onDuplicate: (widgetId: string) => void;
+  onDelete: (widgetId: string) => void;
+}
 
-export function Playground() {
+const WidgetCard = memo(({ widget, onWidgetClick, onDuplicate, onDelete }: WidgetCardProps) => {
   const classes = useStyles();
-  const [activeView, setActiveView] = useState<'gallery' | 'create'>('gallery');
+  const a2ui = useA2UI();
+
+  useMemo(() => {
+    a2ui.processMessages(widget.messages);
+  }, [widget.messages, a2ui]);
+
+  const surfaceEntries = Array.from(a2ui.surfaces.entries());
+
+  return (
+    <Card
+      appearance="outline"
+      className={classes.widgetCard}
+      onClick={() => onWidgetClick(widget.id)}
+    >
+      <CardHeader header={<Body1Strong>{widget.name}</Body1Strong>} />
+      <div className={classes.cardBody}>
+        {surfaceEntries.map(([id, surface]) => (
+          <div key={id} className="a2ui-component">
+            <A2UISurfaceWrapper surface={surface} />
+          </div>
+        ))}
+      </div>
+      <div className={classes.widgetActions} onClick={(e) => e.stopPropagation()}>
+        <Button
+          appearance="subtle"
+          size="small"
+          icon={<DocumentCopy24Regular />}
+          onClick={() => onDuplicate(widget.id)}
+        />
+        <Button
+          appearance="subtle"
+          size="small"
+          icon={<Delete24Regular />}
+          onClick={() => onDelete(widget.id)}
+        />
+      </div>
+    </Card>
+  );
+});
+
+WidgetCard.displayName = 'WidgetCard';
+
+// ---- WidgetPreview Component (for dialog) ----
+interface WidgetPreviewProps {
+  widget: { id: string; name: string; createdAt: number; messages: A2uiMsg[] };
+}
+
+const WidgetPreview = memo(({ widget }: WidgetPreviewProps) => {
+  const a2ui = useA2UI();
+
+  useMemo(() => {
+    a2ui.processMessages(widget.messages);
+  }, [widget.messages, a2ui]);
+
+  const surfaceEntries = Array.from(a2ui.surfaces.entries());
+
+  return (
+    <>
+      {surfaceEntries.map(([id, surface]) => (
+        <div key={id} style={{ marginBottom: tokens.spacingVerticalM }}>
+          <div className="a2ui-component">
+            <A2UISurfaceWrapper surface={surface} />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+});
+
+WidgetPreview.displayName = 'WidgetPreview';
+
+// ---- Material Symbols Icons Catalog ----
+const MATERIAL_ICONS = [
+  'cloud', 'database', 'storage', 'security', 'code', 'terminal', 'settings',
+  'account_circle', 'dashboard', 'analytics', 'monitoring', 'api', 'bug_report',
+  'check_circle', 'error', 'warning', 'info', 'help', 'search', 'filter_list',
+  'refresh', 'sync', 'download', 'upload', 'folder', 'file_copy', 'description',
+  'edit', 'delete', 'add', 'remove', 'close', 'menu', 'more_vert', 'more_horiz',
+  'notifications', 'mail', 'message', 'chat', 'phone', 'location_on', 'home',
+  'work', 'build', 'lock', 'vpn_key', 'visibility', 'visibility_off', 'language',
+  'public', 'wifi', 'bluetooth', 'network_check', 'device_hub', 'developer_mode',
+  'integration_instructions', 'data_object', 'http', 'dns', 'webhook', 'deployed_code',
+];
+
+// ---- Main Playground Component (Inner) ----
+
+function PlaygroundInner() {
+  const classes = useStyles();
+  const [activeTab, setActiveTab] = useState<'create' | 'gallery' | 'components' | 'icons' | 'widgets'>('gallery');
   const [filterQuery, setFilterQuery] = useState('');
+  const [iconFilter, setIconFilter] = useState('');
   const [jsonInput, setJsonInput] = useState('');
+  const [widgetName, setWidgetName] = useState('My Widget');
   const [jsonError, setJsonError] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState<ScenarioDef | null>(null);
   const [selectedSurfaces, setSelectedSurfaces] = useState<Map<string, SurfaceModel<ReactComponentImplementation>>>(new Map());
+  const [selectedWidget, setSelectedWidget] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<'preview' | 'json'>('preview');
   const customCounter = useRef(0);
   const customA2ui = useA2UI(); // For custom JSON editor
+  const { widgets, addWidget, updateWidget, deleteWidget, duplicateWidget } = useWidgets();
 
   // Filter scenarios
-  const filteredScenarios = useMemo(() => {
-    if (!filterQuery.trim()) return ALL_SCENARIOS;
+  const filteredGalleryScenarios = useMemo(() => {
+    if (!filterQuery.trim()) return GALLERY_SCENARIOS;
     const query = filterQuery.toLowerCase();
-    return ALL_SCENARIOS.filter(s => 
+    return GALLERY_SCENARIOS.filter(s => 
       s.label.toLowerCase().includes(query) || 
       s.description.toLowerCase().includes(query)
     );
   }, [filterQuery]);
+
+  const filteredComponentScenarios = useMemo(() => {
+    if (!filterQuery.trim()) return COMPONENT_SCENARIOS;
+    const query = filterQuery.toLowerCase();
+    return COMPONENT_SCENARIOS.filter(s => 
+      s.label.toLowerCase().includes(query) || 
+      s.description.toLowerCase().includes(query)
+    );
+  }, [filterQuery]);
+
+  // Filter icons
+  const filteredIcons = useMemo(() => {
+    if (!iconFilter.trim()) return MATERIAL_ICONS;
+    const query = iconFilter.toLowerCase();
+    return MATERIAL_ICONS.filter(icon => icon.includes(query));
+  }, [iconFilter]);
+
+  // Filter scenarios (old variable for compatibility)
+  const filteredScenarios = filteredGalleryScenarios;
 
   // Handle card click → open detail dialog
   const handleCardClick = useCallback((scenario: ScenarioDef, surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>) => {
@@ -249,6 +415,24 @@ export function Playground() {
     }
   }, [jsonInput, customA2ui]);
 
+  // Handle save as widget
+  const handleSaveAsWidget = useCallback(() => {
+    setJsonError('');
+    try {
+      const parsed = JSON.parse(jsonInput);
+      const msgs: A2uiMsg[] = Array.isArray(parsed) ? parsed : [parsed];
+      for (const m of msgs) {
+        if (!m.version) throw new Error('Each message must have a "version" field');
+      }
+      addWidget(widgetName, msgs);
+      setWidgetName('My Widget');
+      setJsonInput('');
+      setActiveTab('widgets');
+    } catch (err: any) {
+      setJsonError(err.message || 'Invalid JSON');
+    }
+  }, [jsonInput, widgetName, addWidget]);
+
   // Handle clear all
   const handleClearAll = useCallback(() => {
     customA2ui.reset();
@@ -256,6 +440,18 @@ export function Playground() {
     setJsonError('');
     resetDemoState();
   }, [customA2ui]);
+
+  // Handle copy icon name
+  const handleCopyIcon = useCallback((iconName: string) => {
+    navigator.clipboard.writeText(iconName);
+  }, []);
+
+  // Handle widget click
+  const handleWidgetClick = useCallback((widgetId: string) => {
+    setSelectedWidget(widgetId);
+    setDetailTab('preview');
+    setDialogOpen(true);
+  }, []);
 
   // Get JSON for selected scenario
   const getScenarioJson = useCallback(() => {
@@ -281,20 +477,32 @@ export function Playground() {
 
   const customSurfaceEntries = Array.from(customA2ui.surfaces.entries());
 
+  // Determine counter for topbar
+  const getCounter = () => {
+    switch (activeTab) {
+      case 'gallery': return filteredGalleryScenarios.length;
+      case 'components': return filteredComponentScenarios.length;
+      case 'icons': return filteredIcons.length;
+      case 'widgets': return widgets.length;
+      case 'create': return customSurfaceEntries.length;
+      default: return 0;
+    }
+  };
+
   return (
     <div className={`playground-page ${classes.playgroundPage}`}>
       {/* ---- Top bar ---- */}
       <div className={classes.topbar}>
         <div className={classes.topbarLeft}>
-          <Subtitle2>A2UI Gallery</Subtitle2>
+          <Subtitle2>A2UI Playground</Subtitle2>
           <CounterBadge
-            count={activeView === 'gallery' ? filteredScenarios.length : customSurfaceEntries.length}
+            count={getCounter()}
             appearance="filled"
             color="brand"
             overflowCount={999}
           />
         </div>
-        {activeView === 'gallery' && (
+        {(activeTab === 'gallery' || activeTab === 'components') && (
           <div className={classes.topbarCenter}>
             <SearchBox
               placeholder="Filter scenarios..."
@@ -304,46 +512,55 @@ export function Playground() {
             />
           </div>
         )}
+        {activeTab === 'icons' && (
+          <div className={classes.topbarCenter}>
+            <SearchBox
+              placeholder="Filter icons..."
+              value={iconFilter}
+              onChange={(_e, data) => setIconFilter(data.value)}
+              size="small"
+            />
+          </div>
+        )}
         <div className={classes.topbarActions}>
-          {activeView === 'create' && (
+          {activeTab === 'create' && (
             <Button appearance="outline" size="small" onClick={handleClearAll}>Clear All</Button>
           )}
         </div>
       </div>
 
-      {/* ---- Tabs: Gallery / Create ---- */}
+      {/* ---- Tabs: Create | Gallery | Components | Icons | Widgets ---- */}
       <div className={classes.tabsContainer}>
         <TabList
-          selectedValue={activeView}
-          onTabSelect={(_e, data) => setActiveView(data.value as 'gallery' | 'create')}
+          selectedValue={activeTab}
+          onTabSelect={(_e, data) => setActiveTab(data.value as any)}
           size="medium"
         >
-          <Tab value="gallery">Gallery</Tab>
           <Tab value="create">Create</Tab>
+          <Tab value="gallery">Gallery</Tab>
+          <Tab value="components">Components</Tab>
+          <Tab value="icons">Icons</Tab>
+          <Tab value="widgets">Widgets</Tab>
         </TabList>
       </div>
 
-      {/* ---- Gallery View ---- */}
-      {activeView === 'gallery' && (
-        <div className="playground-gallery-scroll">
-          <div className="playground-gallery">
-            {filteredScenarios.map(scenario => (
-              <GalleryCard key={scenario.id} scenario={scenario} onCardClick={handleCardClick} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ---- Create View (Custom JSON Editor) ---- */}
-      {activeView === 'create' && (
+      {/* ---- Tab 1: Create ---- */}
+      {activeTab === 'create' && (
         <div className="playground-create-scroll">
           <div className={classes.jsonEditorContainer}>
             <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
               Custom A2UI JSON
             </Body1Strong>
             <Caption1 style={{ marginBottom: tokens.spacingVerticalM, color: tokens.colorNeutralForeground3 }}>
-              Paste A2UI JSON messages below and click "Render JSON" to preview them.
+              Paste A2UI JSON messages below and click "Render JSON" to preview them. Save your work as a Widget for later access.
+              <br /><em>AI-assisted creation coming soon (R18 render_ui tool).</em>
             </Caption1>
+            <Input
+              value={widgetName}
+              onChange={(_e, data) => setWidgetName(data.value)}
+              placeholder="Widget name..."
+              style={{ marginBottom: tokens.spacingVerticalM }}
+            />
             <Textarea
               className={classes.jsonTextarea}
               value={jsonInput}
@@ -373,6 +590,14 @@ export function Playground() {
               >
                 Render JSON
               </Button>
+              <Button
+                appearance="outline"
+                size="medium"
+                onClick={handleSaveAsWidget}
+                disabled={!jsonInput.trim() || !widgetName.trim()}
+              >
+                Save as Widget
+              </Button>
             </div>
 
             {/* Rendered Custom Surfaces */}
@@ -401,6 +626,98 @@ export function Playground() {
         </div>
       )}
 
+      {/* ---- Tab 2: Gallery (Scenarios) ---- */}
+      {activeTab === 'gallery' && (
+        <div className="playground-gallery-scroll">
+          <div className="playground-gallery">
+            {filteredGalleryScenarios.map(scenario => (
+              <GalleryCard key={scenario.id} scenario={scenario} onCardClick={handleCardClick} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ---- Tab 3: Basic Components ---- */}
+      {activeTab === 'components' && (
+        <div className="playground-gallery-scroll">
+          {COMPONENT_GROUPS.map(group => {
+            const groupScenarios = filteredComponentScenarios.filter(s => s.group === group);
+            if (groupScenarios.length === 0) return null;
+            return (
+              <div key={group}>
+                <Subtitle2 className={classes.groupHeader}>{group}</Subtitle2>
+                <div className="playground-gallery">
+                  {groupScenarios.map(scenario => (
+                    <GalleryCard key={scenario.id} scenario={scenario} onCardClick={handleCardClick} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ---- Tab 4: Icons ---- */}
+      {activeTab === 'icons' && (
+        <div className="playground-create-scroll">
+          <div className={classes.jsonEditorContainer}>
+            <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
+              Material Symbols Icons
+            </Body1Strong>
+            <Caption1 style={{ marginBottom: tokens.spacingVerticalM, color: tokens.colorNeutralForeground3 }}>
+              Click an icon to copy its name to clipboard. Use the Icon component with the copied name.
+            </Caption1>
+            <div className={classes.iconGrid}>
+              {filteredIcons.map(icon => (
+                <Card
+                  key={icon}
+                  appearance="outline"
+                  className={classes.iconCard}
+                  onClick={() => handleCopyIcon(icon)}
+                >
+                  <span className={`material-symbols-outlined ${classes.iconSymbol}`}>
+                    {icon}
+                  </span>
+                  <Caption1>{icon}</Caption1>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Tab 5: Widgets ---- */}
+      {activeTab === 'widgets' && (
+        <div className="playground-create-scroll">
+          <div className={classes.jsonEditorContainer}>
+            <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
+              My Widgets
+            </Body1Strong>
+            {widgets.length === 0 ? (
+              <div className={classes.emptyState}>
+                <div className={classes.emptyIcon}>📦</div>
+                <Body1Strong>No widgets yet</Body1Strong>
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
+                  Go to the Create tab to build your first widget.
+                </Caption1>
+              </div>
+            ) : (
+              <div className={classes.widgetGrid}>
+                {widgets.map(widget => (
+                  <WidgetCard
+                    key={widget.id}
+                    widget={widget}
+                    onWidgetClick={handleWidgetClick}
+                    onDuplicate={duplicateWidget}
+                    onDelete={deleteWidget}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ---- Detail Dialog ---- */}
       <Dialog open={dialogOpen} onOpenChange={(_e, data) => setDialogOpen(data.open)}>
         <DialogSurface className={classes.dialogSurface}>
@@ -414,13 +731,15 @@ export function Playground() {
                 />
               }
             >
-              {selectedScenario?.label}
+              {selectedScenario?.label || widgets.find(w => w.id === selectedWidget)?.name}
             </DialogTitle>
             <DialogContent>
               <div className={classes.dialogContent}>
-                <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-                  {selectedScenario?.description}
-                </Caption1>
+                {selectedScenario && (
+                  <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                    {selectedScenario.description}
+                  </Caption1>
+                )}
 
                 {/* Detail Tabs */}
                 <TabList
@@ -435,17 +754,22 @@ export function Playground() {
 
                 {detailTab === 'preview' ? (
                   <div>
-                    {Array.from(selectedSurfaces.entries()).map(([id, surface]) => (
+                    {selectedScenario && Array.from(selectedSurfaces.entries()).map(([id, surface]) => (
                       <div key={id} style={{ marginBottom: tokens.spacingVerticalM }}>
                         <div className="a2ui-component">
                           <A2UISurfaceWrapper surface={surface} />
                         </div>
                       </div>
                     ))}
+                    {selectedWidget && (() => {
+                      const widget = widgets.find(w => w.id === selectedWidget);
+                      if (!widget) return null;
+                      return <WidgetPreview widget={widget} />;
+                    })()}
                   </div>
                 ) : (
                   <div className={classes.jsonCodeBlock}>
-                    {getScenarioJson()}
+                    {selectedScenario ? getScenarioJson() : JSON.stringify(widgets.find(w => w.id === selectedWidget)?.messages, null, 2)}
                   </div>
                 )}
               </div>
@@ -457,5 +781,15 @@ export function Playground() {
         </DialogSurface>
       </Dialog>
     </div>
+  );
+}
+
+// ---- Wrapper Component with WidgetsProvider ----
+
+export function Playground() {
+  return (
+    <WidgetsProvider>
+      <PlaygroundInner />
+    </WidgetsProvider>
   );
 }

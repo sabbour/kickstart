@@ -433,3 +433,25 @@ Added 12 new scenarios across 4 groups to test A2UI capabilities beyond basic co
 
 - **Build Verification**: npx vite build completed successfully with zero TypeScript errors (2826 modules, 303 KB gzipped). All new scenarios type-check correctly.
 
+
+
+### Playground 5-Tab Restructure (2025-01-14)
+
+Restructured Playground from 2-tab (Gallery/Create) to 5-tab architecture (Create | Gallery | Components | Icons | Widgets):
+
+- **Tab Architecture**: Create (JSON editor + widget builder) | Gallery (app scenarios + advanced patterns) | Components (basic UI components catalog) | Icons (Material Symbols reference) | Widgets (user-created widget collection).
+- **Shared Widget State**: Created useWidgets hook + WidgetsProvider context to manage widget state between Create and Widgets tabs. Widget type has id, name, createdAt, messages fields. Operations: addWidget, updateWidget, deleteWidget, duplicateWidget.
+- **Create Tab Enhanced**: Added widget name input + Save as Widget button alongside existing JSON editor. JSON can be rendered inline OR saved to Widgets collection. Added placeholder note for future AI-assisted creation (R18 render_ui tool).
+- **Gallery Tab Curated**: Shows scenarios from groups: Kickstart Scenarios, Data Binding, Events & Actions, Surface Lifecycle, Dynamic Patterns. Uses filteredGalleryScenarios (43 scenarios total).
+- **Components Tab Organized**: Shows basic component scenarios grouped by category with section headers: Layout, Content, Inputs, Custom Controls. Uses filteredComponentScenarios (18 scenarios). Masonry grid per group.
+- **Icons Tab**: Material Symbols icon catalog (60+ icons) displayed in grid. Each icon shows symbol + name. Click to copy name to clipboard. Searchable. Icons: cloud, database, storage, security, code, terminal, settings, account_circle, dashboard, analytics, monitoring, api, etc.
+- **Widgets Tab**: Grid of user-created widgets (empty state if none). Each widget card shows rendered A2UI surface + duplicate/delete actions. Click widget to open detail dialog with Preview/JSON tabs.
+- **Component Patterns**: Extracted WidgetCard and WidgetPreview memo components to avoid React hook violations (cannot call useA2UI inside map). Each component instance gets its own isolated A2UI state.
+- **Detail Dialog Updated**: Handles both scenarios (from Gallery/Components tabs) and widgets (from Widgets tab). Shows appropriate title, description (for scenarios only), Preview tab renders surfaces, JSON tab shows messages.
+- **Dynamic Counter**: Topbar counter badge adapts to active tab: gallery count, components count, icons count, widgets count, or rendered surfaces count (Create tab).
+- **Search/Filter**: Gallery and Components tabs share scenario filter (searches label + description). Icons tab has separate icon name filter.
+- **CSS Updates**: Added iconGrid, iconCard, iconSymbol, widgetGrid, widgetCard, widgetActions, groupHeader styles. Kept existing masonry grid responsive breakpoints.
+- **Type Safety**: All new state (activeTab, iconFilter, widgetName, selectedWidget) typed correctly. Tab value union type: create | gallery | components | icons | widgets.
+- **Build Verification**: npx vite build passes with zero TypeScript errors. 2827 modules transformed, 306 KB gzipped. Fixed syntax error from leftover code during edits.
+- **Pattern Established**: Playground now serves 3 distinct use cases: (1) Learn/explore pre-built examples (Gallery/Components), (2) Reference available primitives (Icons), (3) Build and manage custom UIs (Create/Widgets). Clear separation between read-only scenarios and user-created content.
+
