@@ -1,8 +1,22 @@
 # Kickstart API Reference
 
-The Kickstart web surface exposes a single API endpoint through Azure Static Web Apps (SWA) managed Functions. This endpoint proxies user messages to Azure OpenAI and manages conversation state.
+The Kickstart web surface exposes API endpoints through Azure Static Web Apps (SWA) managed Functions. These endpoints handle conversation, action processing, code generation, CORS proxying for Azure and GitHub APIs, and health checks.
 
 > **Related docs:** [Prompt Architecture](./prompt-architecture.md) for system prompt details · [Deployment Guide](./deployment.md) for hosting setup
+
+---
+
+## Endpoint Summary
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/converse` | `POST` | Main LLM conversation proxy |
+| `/api/action` | `POST` | A2UI action event processing |
+| `/api/generate` | `POST` | Code generation (Codex model) |
+| `/api/health` | `GET` | Health check |
+| `/api/arm-proxy/{*path}` | `ANY` | CORS proxy → Azure Resource Manager |
+| `/api/github-proxy/{*path}` | `ANY` | CORS proxy → GitHub REST API |
+| `/api/pricing-proxy` | `GET` | CORS proxy → Azure Retail Prices API |
 
 ---
 
@@ -272,4 +286,145 @@ curl -X POST http://localhost:4280/api/converse \
   -H "Content-Type: application/json" \
   -H "Accept: text/event-stream" \
   -d '{"message": "Hello"}'
+```
+
+---
+
+## `POST /api/action`
+
+A2UI action event processing. Receives action events fired by A2UI components in the browser, routes them by type, and returns updated conversation state with a fresh LLM response.
+
+**Source:** [`packages/web/api/src/functions/action.ts`](../packages/web/api/src/functions/action.ts)
+
+### Action routing
+
+Per decision F17, **all action types re-prompt the LLM** — the LLM stays in full control of state transitions.
+
+| Action prefix | Behaviour |
+|---------------|-----------|
+| *(default)* `reply` | Translate action to natural language, re-prompt |
+| `navigate:` / `nav:` | Update phase intent, re-prompt framed as navigation |
+| `api:` | Stubbed — returns `not_implemented` |
+
+### Request
+
+```http
+POST /api/action
+Content-Type: application/json
+```
+
+```typescript
+interface ActionRequest {
+  sessionId: string;
+  action: {
+    name: string;                     // Action name (may include prefix)
+    context?: Record<string, unknown>; // Payload from the component
+  };
+}
+```
+
+### Response
+
+Same shape as `/api/converse` response — `{ sessionId, phase, message, a2ui? }`.
+
+---
+
+## `POST /api/generate`
+
+Code generation endpoint powered by the Azure OpenAI Responses API (Codex model). Returns generated code for a given prompt and type hint. Supports SSE streaming.
+
+**Source:** [`packages/web/api/src/functions/generate.ts`](../packages/web/api/src/functions/generate.ts)
+
+### Request
+
+```http
+POST /api/generate
+Content-Type: application/json
+```
+
+```typescript
+interface GenerateRequest {
+  prompt: string;
+  type?: "dockerfile" | "kubernetes" | "pipeline" | "bicep" | "generic";
+  context?: string;  // Optional additional context
+}
+```
+
+### Response
+
+```typescript
+interface GenerateResponse {
+  type: string;
+  code: string;
+  responseId: string;
+}
+```
+
+Supports streaming via `Accept: text/event-stream` — same SSE format as `/api/converse`.
+
+### Additional environment variable
+
+| Variable | Description |
+|----------|-------------|
+| `AZURE_OPENAI_CODEX_DEPLOYMENT` | Codex model deployment name (e.g. `gpt-5.3-codex`) |
+
+---
+
+## `GET /api/health`
+
+Health check. Returns `{ "status": "ok" }` with HTTP 200. Used by Azure Static Web Apps and monitoring tools.
+
+**Source:** [`packages/web/api/src/functions/health.ts`](../packages/web/api/src/functions/health.ts)
+
+---
+
+## `ANY /api/arm-proxy/{*path}`
+
+CORS proxy for the Azure Resource Manager API. Forwards requests to `management.azure.com`, passing the caller's `Authorization` header and all query parameters. Injects a default `api-version` if the caller omits one.
+
+**Source:** [`packages/web/api/src/functions/arm-proxy.ts`](../packages/web/api/src/functions/arm-proxy.ts)
+
+Supported methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.
+
+Rate-limit response headers are forwarded from ARM: `x-ratelimit-*`, `retry-after`, `x-ms-ratelimit-*`, `x-ms-request-id`, `x-ms-correlation-request-id`.
+
+**Example:**
+
+```bash
+# List AKS clusters in a subscription
+curl http://localhost:4280/api/arm-proxy/subscriptions/{subId}/providers/Microsoft.ContainerService/managedClusters \
+  -H "Authorization: Bearer <token>"
+```
+
+---
+
+## `ANY /api/github-proxy/{*path}`
+
+CORS proxy for the GitHub REST API. Forwards requests to `api.github.com`, injecting the GitHub API `Accept` header and passing through the caller's `Authorization` token.
+
+**Source:** [`packages/web/api/src/functions/github-proxy.ts`](../packages/web/api/src/functions/github-proxy.ts)
+
+Rate-limit response headers are forwarded: `x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-reset`, `x-ratelimit-used`, `x-ratelimit-resource`.
+
+**Example:**
+
+```bash
+# List repos for the authenticated user
+curl http://localhost:4280/api/github-proxy/user/repos \
+  -H "Authorization: Bearer ghp_..."
+```
+
+---
+
+## `GET /api/pricing-proxy`
+
+CORS proxy for the Azure Retail Prices API. Forwards query parameters to `prices.azure.com/api/retail/prices`. No authentication required — the Azure pricing API is public.
+
+**Source:** [`packages/web/api/src/functions/pricing-proxy.ts`](../packages/web/api/src/functions/pricing-proxy.ts)
+
+**Example:**
+
+```bash
+# Get AKS pricing
+curl "http://localhost:4280/api/pricing-proxy?\$filter=serviceName eq 'Azure Kubernetes Service'"
 ```

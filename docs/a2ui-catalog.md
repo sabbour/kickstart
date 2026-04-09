@@ -1,6 +1,6 @@
 # A2UI Catalog Reference
 
-A2UI (Agent-to-UI) is a protocol for AI agents to return structured UI components alongside text responses. Kickstart uses A2UI to render rich interactive elements — phase indicators, code blocks, architecture diagrams, cost estimates — in compatible clients.
+A2UI (Agent-to-UI) v0.9 is the component protocol Kickstart uses to render rich interactive UI alongside AI responses. The LLM returns structured A2UI JSON; the web surface renders it using React 19 with Fluent 2 styling.
 
 > **Related docs:** [MCP Server](./mcp-server.md) for catalog negotiation · [API Reference](./api-reference.md) for the web endpoint
 
@@ -10,20 +10,11 @@ A2UI (Agent-to-UI) is a protocol for AI agents to return structured UI component
 
 ### What is A2UI?
 
-A2UI lets MCP tools return structured JSON that clients can render as interactive UI instead of plain text. Each response is an **A2UI document** containing a component tree:
+A2UI lets AI agents return structured JSON that clients render as interactive UI instead of plain text. Each response is an **A2UI document** containing a component tree.
 
-```typescript
-interface A2UIDocument {
-  version: "0.9";
-  root: Component;  // Root component of the tree
-}
-```
+### Kickstart Catalog
 
-### How Kickstart Uses A2UI
-
-- **MCP Server:** Returns A2UI components as MCP embedded resources with MIME type `application/json+a2ui`
-- **Web API:** Returns A2UI components in the `a2ui` field of the response JSON
-- **Catalog negotiation:** The MCP server detects client capabilities and degrades gracefully (see [MCP Server — Catalog Negotiation](./mcp-server.md#a2ui-catalog-negotiation))
+The Kickstart catalog (`packages/web/src/catalog/kickstart-catalog.ts`) is built on the vendor A2UI v0.9 basic catalog plus **16 custom Kickstart components**. The basic catalog provides standard layout and input primitives (Text, Button, Row, Column, Card, TextField, Image, Icon, Tabs, Modal, etc.) with Fluent 2 styled overrides.
 
 ### MIME Type
 
@@ -33,315 +24,236 @@ application/json+a2ui
 
 All A2UI payloads in MCP embedded resources use this MIME type.
 
-### Catalog URI
-
-```
-https://kickstart.aks.azure.com/catalog/v1/kickstart-catalog.json
-```
-
-**Source:** [`packages/core/src/catalog/kickstart-catalog.json`](../packages/core/src/catalog/kickstart-catalog.json)
-
 ---
 
-## Component Reference
+## Custom Kickstart Components
 
-The Kickstart catalog defines **17 components** organized in three categories:
+The 16 Kickstart-specific components are defined in `packages/web/src/catalog/components/` and registered via `kickstartCatalog`.
 
-| Category | Components | Count |
-|----------|------------|-------|
-| Standard | Text, Button, TextField, Row, Column, Card | 6 |
-| Kickstart Custom | ConversationPhase, CodeBlock, ResourcePicker, DeploymentProgress, ArchitectureDiagram, CostEstimate, HandoffCard | 7 |
-| GitHub | RepoPicker, WorkflowStatus, CodespaceLink, AppOverview | 4 |
+### RadioGroup
 
-All components extend `BaseComponent`:
+Single-select option group rendered as radio buttons or a visual tile picker.
 
 ```json
 {
-  "type": "object",
-  "properties": {
-    "type": { "type": "string" },
-    "id": { "type": "string" }
-  },
-  "required": ["type"]
-}
-```
-
----
-
-### Standard Components
-
-These are basic building blocks available in any A2UI catalog.
-
-#### Text
-
-Display text content with optional formatting variant.
-
-```json
-{
-  "type": "Text",
-  "id": "welcome-msg",
-  "content": "Welcome to Kickstart!",
-  "variant": "heading"
-}
-```
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"Text"` | Yes | Component type |
-| `content` | `string` | Yes | Text content (supports markdown) |
-| `variant` | `"body" \| "heading" \| "caption" \| "code"` | No | Visual style |
-
----
-
-#### Button
-
-Interactive button that triggers an action.
-
-```json
-{
-  "type": "Button",
-  "id": "deploy-btn",
-  "label": "Deploy Now",
-  "action": "deploy",
-  "variant": "primary"
-}
-```
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"Button"` | Yes | Component type |
-| `label` | `string` | Yes | Button text |
-| `action` | `string` | Yes | Action identifier sent back to the server |
-| `variant` | `"primary" \| "secondary" \| "danger"` | No | Visual style |
-| `disabled` | `boolean` | No | Whether the button is disabled (default: `false`) |
-
----
-
-#### TextField
-
-Text input field for user data entry.
-
-```json
-{
-  "type": "TextField",
-  "id": "app-name",
-  "label": "Application Name",
-  "placeholder": "my-awesome-app",
-  "required": true
-}
-```
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"TextField"` | Yes | Component type |
-| `label` | `string` | Yes | Input label |
-| `placeholder` | `string` | No | Placeholder text |
-| `value` | `string` | No | Pre-filled value |
-| `required` | `boolean` | No | Whether the field is required (default: `false`) |
-
----
-
-#### Row
-
-Horizontal layout container for child components.
-
-```json
-{
-  "type": "Row",
-  "id": "button-row",
-  "children": [
-    { "type": "Button", "id": "btn-yes", "label": "Yes", "action": "confirm" },
-    { "type": "Button", "id": "btn-no", "label": "No", "action": "cancel", "variant": "secondary" }
+  "type": "RadioGroup",
+  "id": "runtime-picker",
+  "label": "Select runtime",
+  "options": [
+    { "label": "Node.js", "value": "node" },
+    { "label": "Python", "value": "python" },
+    { "label": "Go", "value": "go" }
   ],
-  "gap": "8px"
+  "value": "node"
 }
 ```
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"Row"` | Yes | Component type |
-| `children` | `Component[]` | Yes | Child components rendered horizontally |
-| `gap` | `string` | No | CSS gap value between children |
-
 ---
 
-#### Column
+### FormGroup
 
-Vertical layout container for child components.
+Container that groups labelled form fields with validation support.
 
 ```json
 {
-  "type": "Column",
-  "id": "form-fields",
+  "type": "FormGroup",
+  "id": "app-config",
+  "label": "Application settings",
   "children": [
-    { "type": "TextField", "id": "name", "label": "Name" },
-    { "type": "TextField", "id": "port", "label": "Port" }
-  ],
-  "gap": "16px"
-}
-```
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"Column"` | Yes | Component type |
-| `children` | `Component[]` | Yes | Child components rendered vertically |
-| `gap` | `string` | No | CSS gap value between children |
-
----
-
-#### Card
-
-Container with an optional title, used for grouping related content.
-
-```json
-{
-  "type": "Card",
-  "id": "summary-card",
-  "title": "Application Summary",
-  "children": [
-    { "type": "Text", "id": "desc", "content": "Node.js Express API" }
+    { "type": "TextField", "id": "app-name", "label": "App name" },
+    { "type": "TextField", "id": "port", "label": "Container port" }
   ]
 }
 ```
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"Card"` | Yes | Component type |
-| `title` | `string` | No | Card header text |
-| `children` | `Component[]` | Yes | Child components inside the card |
-
 ---
 
-### Kickstart Custom Components
+### CodeBlock
 
-Domain-specific components for guided AKS onboarding. These require the Kickstart catalog to render natively — clients with only `basic_catalog` support see a fallback Card with JSON.
-
-#### ConversationPhase
-
-Displays the 6-phase conversation progress indicator. Updated on every tool call.
-
-```json
-{
-  "type": "ConversationPhase",
-  "id": "phase-indicator",
-  "phases": [
-    { "id": "discover", "label": "Discover", "status": "complete" },
-    { "id": "design", "label": "Design", "status": "active" },
-    { "id": "generate", "label": "Generate", "status": "pending" },
-    { "id": "review", "label": "Review", "status": "pending" },
-    { "id": "handoff", "label": "Handoff", "status": "pending" },
-    { "id": "deploy", "label": "Deploy", "status": "pending" }
-  ],
-  "currentPhase": "design"
-}
-```
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"ConversationPhase"` | Yes | Component type |
-| `phases` | `PhaseItem[]` | Yes | Array of phase objects |
-| `currentPhase` | `string` | Yes | ID of the currently active phase |
-
-**PhaseItem:**
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `id` | `string` | Yes | Phase identifier |
-| `label` | `string` | Yes | Human-readable phase name |
-| `status` | `"pending" \| "active" \| "complete" \| "skipped"` | Yes | Phase status |
-
----
-
-#### CodeBlock
-
-Displays generated code with syntax highlighting, filename, and copy/download actions.
+Displays generated code with syntax highlighting, optional filename, and copy/download actions.
 
 ```json
 {
   "type": "CodeBlock",
-  "id": "code-deployment-yaml",
+  "id": "deployment-yaml",
   "code": "apiVersion: apps/v1\nkind: Deployment\n...",
   "language": "yaml",
-  "filename": "k8s/deployment.yaml",
-  "action": "copy"
+  "filename": "k8s/deployment.yaml"
 }
 ```
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `type` | `"CodeBlock"` | Yes | Component type |
 | `code` | `string` | Yes | Source code content |
 | `language` | `string` | Yes | Language for syntax highlighting |
 | `filename` | `string` | No | Display filename |
-| `action` | `"copy" \| "download"` | No | User action on the code block |
 
 ---
 
-#### ResourcePicker
+### ProgressSteps
 
-Dropdown/selector for Azure resources (subscription, resource group, region, cluster).
+Step-by-step progress indicator for multi-step workflows.
 
 ```json
 {
-  "type": "ResourcePicker",
-  "id": "region-picker",
-  "resourceType": "region",
-  "label": "Select a region",
+  "type": "ProgressSteps",
+  "id": "onboarding-steps",
+  "steps": [
+    { "id": "discover", "label": "Discover", "status": "complete" },
+    { "id": "design", "label": "Design", "status": "active" },
+    { "id": "generate", "label": "Generate", "status": "pending" }
+  ],
+  "currentStep": "design"
+}
+```
+
+---
+
+### Markdown
+
+Renders a markdown string as formatted HTML. Used for long-form LLM output blocks that need headings, lists, or code fences.
+
+```json
+{
+  "type": "Markdown",
+  "id": "summary-text",
+  "content": "## Architecture Summary\n\nYour app will be deployed on **AKS Automatic**..."
+}
+```
+
+---
+
+### GitHubLoginCard
+
+OAuth Device Flow sign-in card for GitHub. Presents the device code and polling state until the user completes authentication in a browser.
+
+```json
+{
+  "type": "GitHubLoginCard",
+  "id": "gh-login",
+  "deviceCode": "ABCD-EFGH",
+  "verificationUrl": "https://github.com/login/device",
+  "expiresAt": "2025-01-01T12:30:00Z"
+}
+```
+
+---
+
+### GitHubRepoPicker
+
+Repository picker with search, pagination, and optional new-repo creation. Populated from the GitHub API via `GitHubConnector`.
+
+```json
+{
+  "type": "GitHubRepoPicker",
+  "id": "repo-selector",
+  "label": "Choose a repository",
+  "allowCreate": true,
   "options": [
-    { "label": "East US", "value": "eastus" },
-    { "label": "West Europe", "value": "westeurope" }
+    { "label": "my-app", "value": "owner/my-app" },
+    { "label": "my-api", "value": "owner/my-api" }
   ]
 }
 ```
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"ResourcePicker"` | Yes | Component type |
-| `resourceType` | `"subscription" \| "resourceGroup" \| "region" \| "cluster"` | Yes | Type of Azure resource |
-| `label` | `string` | Yes | Picker label |
-| `value` | `string` | No | Currently selected value |
-| `options` | `{ label: string, value: string }[]` | No | Available options |
-
 ---
 
-#### DeploymentProgress
+### GitHubAction
 
-Multi-step deployment progress tracker with per-step status.
+Displays a GitHub Actions workflow run with status badge and link.
 
 ```json
 {
-  "type": "DeploymentProgress",
-  "id": "deployment-status",
-  "steps": [
-    { "id": "acr-build", "label": "Build container image", "status": "success" },
-    { "id": "aks-deploy", "label": "Deploy to AKS cluster", "status": "running" },
-    { "id": "ingress-setup", "label": "Configure ingress", "status": "pending" },
-    { "id": "dns-config", "label": "Set up DNS", "status": "pending" }
-  ],
-  "overallStatus": "running"
+  "type": "GitHubAction",
+  "id": "ci-run",
+  "workflowName": "Build & Deploy",
+  "status": "success",
+  "runUrl": "https://github.com/owner/repo/actions/runs/123",
+  "branch": "main",
+  "commitSha": "abc1234"
 }
 ```
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"DeploymentProgress"` | Yes | Component type |
-| `steps` | `DeploymentStep[]` | Yes | Array of deployment steps |
-| `overallStatus` | `"pending" \| "running" \| "success" \| "error"` | Yes | Aggregate status |
-
-**DeploymentStep:**
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `id` | `string` | Yes | Step identifier |
-| `label` | `string` | Yes | Human-readable step name |
-| `status` | `"pending" \| "running" \| "success" \| "error" \| "skipped"` | Yes | Step status |
-| `detail` | `string` | No | Additional detail text |
+| Property | Type | Description |
+|----------|------|-------------|
+| `status` | `"queued" \| "in_progress" \| "success" \| "failure" \| "cancelled"` | Run status |
 
 ---
 
-#### ArchitectureDiagram
+### GitHubCommit
 
-Renders an architecture diagram using Mermaid syntax.
+Displays a single GitHub commit with author, message, and short SHA.
+
+```json
+{
+  "type": "GitHubCommit",
+  "id": "latest-commit",
+  "sha": "abc1234",
+  "message": "feat: add AKS deployment manifests",
+  "author": "Ahmed Sabbour",
+  "timestamp": "2025-01-01T12:00:00Z",
+  "url": "https://github.com/owner/repo/commit/abc1234"
+}
+```
+
+---
+
+### AzureLoginCard
+
+MSAL sign-in card with subscription auto-selection. Renders a sign-in button and, once authenticated, shows the signed-in account and available subscriptions.
+
+```json
+{
+  "type": "AzureLoginCard",
+  "id": "azure-login",
+  "prompt": "Sign in to discover your Azure resources"
+}
+```
+
+---
+
+### AzureResourcePicker
+
+Dropdown populated at render time from the Azure Resource Manager API via `AzureARMConnector`. Supports subscription, resource group, region, and cluster picking.
+
+```json
+{
+  "type": "AzureResourcePicker",
+  "id": "cluster-picker",
+  "resourceType": "cluster",
+  "label": "Select an AKS cluster",
+  "subscriptionId": "4498459e-...",
+  "value": "my-cluster"
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `resourceType` | `"subscription" \| "resourceGroup" \| "region" \| "cluster"` | Type of Azure resource |
+
+---
+
+### AzureResourceForm
+
+Form for configuring new Azure resources — pre-filled with sensible defaults for AKS Automatic deployments.
+
+```json
+{
+  "type": "AzureResourceForm",
+  "id": "new-cluster-form",
+  "resourceType": "cluster",
+  "fields": [
+    { "id": "name", "label": "Cluster name", "value": "my-aks-cluster" },
+    { "id": "region", "label": "Region", "value": "eastus" }
+  ]
+}
+```
+
+---
+
+### ArchitectureDiagram
+
+Renders an architecture diagram from Mermaid syntax. Used in the Design phase to visualise the proposed deployment topology.
 
 ```json
 {
@@ -353,21 +265,41 @@ Renders an architecture diagram using Mermaid syntax.
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `type` | `"ArchitectureDiagram"` | Yes | Component type |
-| `mermaid` | `string` | Yes | Mermaid diagram source code |
+| `mermaid` | `string` | Yes | Mermaid diagram source |
 
 ---
 
-#### CostEstimate
+### FileEditor
 
-Displays a cost breakdown by service with monthly totals.
+Interactive code editor for reviewing and editing generated files. Backed by the virtual file system (`services/virtual-fs`).
+
+```json
+{
+  "type": "FileEditor",
+  "id": "manifest-editor",
+  "filename": "k8s/deployment.yaml",
+  "language": "yaml",
+  "content": "apiVersion: apps/v1\n...",
+  "readOnly": false
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `readOnly` | `boolean` | Prevent edits (default: `false`) |
+
+---
+
+### CostEstimate
+
+Displays a monthly cost breakdown by Azure service with a total.
 
 ```json
 {
   "type": "CostEstimate",
   "id": "cost-breakdown",
   "items": [
-    { "name": "App Platform", "sku": "Standard", "monthlyCost": 73.00 },
+    { "name": "AKS Automatic", "sku": "Standard", "monthlyCost": 73.00 },
     { "name": "PostgreSQL", "sku": "Burstable B1ms", "monthlyCost": 25.00 },
     { "name": "Container Registry", "sku": "Basic", "monthlyCost": 5.00 }
   ],
@@ -378,260 +310,92 @@ Displays a cost breakdown by service with monthly totals.
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `type` | `"CostEstimate"` | Yes | Component type |
-| `items` | `CostItem[]` | Yes | Line items |
-| `total` | `number` | Yes | Monthly total cost |
+| `items` | `CostItem[]` | Yes | Line items (name, sku, monthlyCost) |
+| `total` | `number` | Yes | Monthly total |
 | `currency` | `string` | Yes | Currency code (default: `"USD"`) |
 
-**CostItem:**
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `name` | `string` | Yes | Service name |
-| `sku` | `string` | Yes | SKU/tier |
-| `monthlyCost` | `number` | Yes | Monthly cost |
-| `currency` | `string` | No | Currency code (default: `"USD"`) |
-
 ---
 
-#### HandoffCard
+### DeploymentProgress
 
-Call-to-action card for the Handoff phase — links to Codespaces or vscode.dev.
+Multi-step deployment progress tracker with per-step status. Used during the Deploy phase to show live deployment state.
 
 ```json
 {
-  "type": "HandoffCard",
-  "id": "handoff-cta",
-  "title": "Your code is ready!",
-  "description": "Open in GitHub Codespaces to start building",
-  "url": "https://codespaces.new/owner/repo",
-  "provider": "codespaces",
-  "repoUrl": "https://github.com/owner/repo"
-}
-```
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"HandoffCard"` | Yes | Component type |
-| `title` | `string` | Yes | Card title |
-| `description` | `string` | Yes | Card description |
-| `url` | `string` (URI) | Yes | Deep link to IDE |
-| `provider` | `"codespaces" \| "vscode-dev"` | Yes | IDE provider |
-| `repoUrl` | `string` (URI) | Yes | GitHub repository URL |
-
----
-
-### GitHub Components
-
-Components for GitHub integration — repo selection, workflow monitoring, IDE links.
-
-#### RepoPicker
-
-Select an existing GitHub repo or create a new one.
-
-```json
-{
-  "type": "RepoPicker",
-  "id": "repo-selector",
-  "label": "Choose a repository",
-  "allowCreate": true,
-  "options": [
-    { "label": "my-app", "value": "owner/my-app" },
-    { "label": "my-api", "value": "owner/my-api" }
-  ]
-}
-```
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"RepoPicker"` | Yes | Component type |
-| `label` | `string` | Yes | Picker label |
-| `value` | `string` | No | Selected repo (full name: `owner/repo`) |
-| `options` | `{ label: string, value: string }[]` | No | Available repositories |
-| `allowCreate` | `boolean` | No | Allow creating a new repo (default: `true`) |
-
----
-
-#### WorkflowStatus
-
-Displays GitHub Actions workflow run statuses.
-
-```json
-{
-  "type": "WorkflowStatus",
-  "id": "ci-status",
-  "runs": [
-    { "name": "Build & Deploy", "status": "success", "url": "https://github.com/owner/repo/actions/runs/123" },
-    { "name": "Integration Tests", "status": "in_progress" }
-  ]
-}
-```
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"WorkflowStatus"` | Yes | Component type |
-| `runs` | `WorkflowRun[]` | Yes | Array of workflow runs |
-
-**WorkflowRun:**
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `name` | `string` | Yes | Workflow name |
-| `status` | `"queued" \| "in_progress" \| "success" \| "failure" \| "cancelled"` | Yes | Run status |
-| `url` | `string` (URI) | No | Link to the GitHub Actions run |
-| `conclusion` | `string` | No | Final conclusion |
-
----
-
-#### CodespaceLink
-
-Deep link to open a repository in GitHub Codespaces or vscode.dev.
-
-```json
-{
-  "type": "CodespaceLink",
-  "id": "open-codespace",
-  "repo": "owner/my-app",
-  "branch": "main",
-  "provider": "codespaces",
-  "url": "https://codespaces.new/owner/my-app?ref=main",
-  "label": "Open in Codespaces"
-}
-```
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"CodespaceLink"` | Yes | Component type |
-| `repo` | `string` | Yes | Repository full name (`owner/repo`) |
-| `branch` | `string` | No | Branch to open |
-| `provider` | `"codespaces" \| "vscode-dev"` | Yes | IDE provider |
-| `url` | `string` (URI) | Yes | Direct URL to the IDE |
-| `label` | `string` | No | Link text |
-
----
-
-#### AppOverview
-
-At-a-glance summary of the user's application. Avoids K8s jargon — frames everything in app terms.
-
-```json
-{
-  "type": "AppOverview",
-  "id": "app-summary",
-  "appName": "My Express API",
-  "runtime": "node",
-  "services": [
-    { "name": "PostgreSQL", "type": "database" },
-    { "name": "Redis", "type": "cache" }
+  "type": "DeploymentProgress",
+  "id": "deployment-status",
+  "steps": [
+    { "id": "acr-build", "label": "Build container image", "status": "success" },
+    { "id": "aks-deploy", "label": "Deploy to AKS cluster", "status": "running" },
+    { "id": "ingress-setup", "label": "Configure ingress", "status": "pending" }
   ],
-  "status": "generating"
+  "overallStatus": "running"
 }
 ```
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `type` | `"AppOverview"` | Yes | Component type |
-| `appName` | `string` | Yes | Application name |
-| `runtime` | `string` | Yes | Runtime/language |
-| `services` | `ServiceItem[]` | Yes | Connected services |
-| `publicUrl` | `string` (URI) | No | Live URL if deployed |
-| `status` | `"planning" \| "generating" \| "ready" \| "deploying" \| "deployed"` | Yes | Current status |
+| `steps` | `DeploymentStep[]` | Yes | Array of steps |
+| `overallStatus` | `"pending" \| "running" \| "success" \| "error"` | Yes | Aggregate status |
 
-**ServiceItem:**
+**DeploymentStep:**
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `name` | `string` | Yes | Service display name |
-| `type` | `"database" \| "cache" \| "storage" \| "messaging" \| "ai"` | Yes | Service category |
+| `id` | `string` | Yes | Step identifier |
+| `label` | `string` | Yes | Human-readable name |
+| `status` | `"pending" \| "running" \| "success" \| "error" \| "skipped"` | Yes | Step status |
+| `detail` | `string` | No | Additional detail text |
 
 ---
 
-## Catalog Negotiation Flow
+## Vendor A2UI Basic Catalog (Fluent-Styled)
 
-```
-Client                          MCP Server
-  │                                 │
-  │  initialize (catalogs: [...])   │
-  │ ───────────────────────────────>│
-  │                                 │  resolveA2UICapability()
-  │                                 │  → "kickstart" | "basic" | "none"
-  │  initialized                    │
-  │ <───────────────────────────────│
-  │                                 │
-  │  tool/call (kickstart)          │
-  │ ───────────────────────────────>│
-  │                                 │  createA2UIResource(component, uri, capability)
-  │  result (text + resource?)      │  → full | degraded | null
-  │ <───────────────────────────────│
-```
+The vendor A2UI v0.9 basic catalog provides standard primitives. Kickstart overrides all of these with Fluent 2 styled implementations in `packages/web/src/catalog/fluent-components/`:
 
-See [MCP Server — A2UI Catalog Negotiation](./mcp-server.md#a2ui-catalog-negotiation) for implementation details.
+Text, Image, Icon, Video, AudioPlayer, Row, Column, List, Card, Tabs, Modal, Divider, Button, TextField, CheckBox, ChoicePicker, Slider, DateTimeInput
 
 ---
 
 ## Adding a New Custom Component
 
-To add a new component to the Kickstart catalog:
+### 1. Create the component file
 
-### 1. Define the JSON Schema
+Add `packages/web/src/catalog/components/MyComponent.tsx`:
 
-Add the component to `packages/core/src/catalog/kickstart-catalog.json` under `$defs`:
+```tsx
+import { createReactComponent } from '../vendor/a2ui/react/adapter';
+import { MyComponentApi } from './MyComponent.api';
 
-```json
-"MyComponent": {
-  "allOf": [
-    { "$ref": "#/$defs/BaseComponent" },
-    {
-      "properties": {
-        "type": { "const": "MyComponent" },
-        "myProp": { "type": "string" }
-      },
-      "required": ["type", "myProp"]
-    }
-  ]
-}
+export const MyComponent = createReactComponent(MyComponentApi, ({ props }) => (
+  <div>{props.myProp}</div>
+));
 ```
 
-### 2. Add to the Component union
+### 2. Register in the catalog
 
-In the same file, add a reference in the `Component` `oneOf` array:
-
-```json
-"Component": {
-  "oneOf": [
-    // ... existing components
-    { "$ref": "#/$defs/MyComponent" }
-  ]
-}
-```
-
-### 3. Add TypeScript type
-
-Export a TypeScript interface matching the schema in `@kickstart/core` types:
+Add the import and entry to `packages/web/src/catalog/kickstart-catalog.ts`:
 
 ```typescript
-export interface MyComponentType {
-  type: "MyComponent";
-  id?: string;
-  myProp: string;
-}
+import { MyComponent } from './components/MyComponent';
+
+const kickstartComponents = [
+  // ...existing components
+  MyComponent,
+];
+```
+
+### 3. Register in the IntegrationKit (optional)
+
+If the component is contributed by a kit, add to the kit's `components` array:
+
+```typescript
+export const myKit: IntegrationKit = {
+  // ...
+  components: [{ type: 'MyComponent', description: 'Does X' }],
+};
 ```
 
 ### 4. Use in tool handlers
 
-Import and use the component in MCP tool handlers:
-
-```typescript
-import { createA2UIResource } from "../a2ui.js";
-
-const component: MyComponentType = {
-  type: "MyComponent",
-  id: "my-instance",
-  myProp: "value",
-};
-
-const resource = createA2UIResource(component, "a2ui://kickstart/my-component", capability);
-if (resource) content.push(resource);
-```
-
-The `degradeToBasic()` function in `a2ui.ts` automatically handles fallback for clients that don't support the Kickstart catalog — it wraps any unknown component in a `Card` + `Text` with the JSON serialized as code.
+The component type string is sent in A2UI JSON from the LLM or tool handler response. The catalog runtime looks up the registered React component by `type` and renders it.
