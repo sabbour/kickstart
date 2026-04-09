@@ -5,6 +5,15 @@ import {
   DynamicStringSchema,
   ActionSchema,
 } from '../../vendor/a2ui/web_core/schema/common-types';
+import {
+  Card,
+  CardHeader,
+  Badge,
+  Body1,
+  Caption1,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 
 const RadioGroupApi = {
   name: 'RadioGroup',
@@ -20,8 +29,28 @@ const RadioGroupApi = {
   }).strict(),
 };
 
+const useStyles = makeStyles({
+  root: {
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+  },
+  card: {
+    marginBottom: tokens.spacingVerticalS,
+    cursor: 'pointer',
+    width: '100%',
+  },
+  selectedCard: {
+    marginBottom: tokens.spacingVerticalS,
+    cursor: 'pointer',
+    width: '100%',
+    borderColor: tokens.colorBrandStroke1,
+    borderWidth: tokens.strokeWidthThick,
+  },
+});
+
 export const RadioGroup = createReactComponent(RadioGroupApi, ({ props }) => {
   const [selected, setSelected] = useState(props.value || '');
+  const classes = useStyles();
 
   const handleSelect = (id: string) => {
     setSelected(id);
@@ -31,25 +60,25 @@ export const RadioGroup = createReactComponent(RadioGroupApi, ({ props }) => {
   };
 
   return (
-    <div className="kickstart-radio-group" style={{ margin: '8px' }}>
+    <div className={classes.root}>
       {(props.options || []).map((opt) => (
-        <div
+        <Card
           key={opt.id}
-          className={`kickstart-radio-card ${selected === opt.id ? 'selected' : ''}`}
+          className={selected === opt.id ? classes.selectedCard : classes.card}
           onClick={() => handleSelect(opt.id)}
           role="radio"
           aria-checked={selected === opt.id}
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSelect(opt.id); }}
         >
-          {opt.recommended && (
-            <span className="kickstart-recommended-badge">Recommended</span>
-          )}
-          <div className="kickstart-radio-card-title">{opt.label}</div>
-          {opt.description && (
-            <div className="kickstart-radio-card-desc">{opt.description}</div>
-          )}
-        </div>
+          <CardHeader
+            header={<Body1 weight="semibold">{opt.label}</Body1>}
+            description={opt.description ? <Caption1>{opt.description}</Caption1> : undefined}
+            action={
+              opt.recommended ? (
+                <Badge appearance="filled" color="brand">Recommended</Badge>
+              ) : undefined
+            }
+          />
+        </Card>
       ))}
     </div>
   );

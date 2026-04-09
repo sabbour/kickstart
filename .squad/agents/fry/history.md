@@ -270,3 +270,42 @@
 - **Key lesson**: When mixing raw HTML elements with Fluent UI components inside `FluentProvider`, always explicitly set `fontFamily: tokens.fontFamilyBase` on `<button>`, `<input>`, `<select>`, and `<textarea>` elements — they never inherit font from parent due to browser UA stylesheet. `<span>` and `<div>` do inherit, but being explicit prevents regressions.
 - **Monospace already correct**: `jsonTextarea` and `surfaceIdText` already had `fontFamily: tokens.fontFamilyMonospace`.
 - **Build**: Vite production build passes — 2539 modules, no errors.
+
+### 2025-07-29 — Full Fluent UI v9 migration of A2UI renderers + custom components
+- **Scope**: Migrated ALL 18 A2UI basic catalog renderers + 4 kickstart custom components + `utils.ts` from raw HTML elements to Fluent UI React v9 components.
+- **Basic catalog** (in `packages/web/src/vendor/a2ui/react/catalog/basic/components/`):
+  - **Button.tsx**: `<button>` → `FluentButton` with `appearance` mapping (primary/transparent/secondary).
+  - **Text.tsx**: `<h1>`-`<h5>`, `<caption>`, `<span>` → Title1/Title2/Title3/Subtitle1/Subtitle2/Caption1/Body1.
+  - **Card.tsx**: `<div>` with shadow → `FluentCard`.
+  - **Tabs.tsx**: `<div>+<button>` → `TabList` + `Tab` with `selectedValue`/`onTabSelect`.
+  - **TextField.tsx**: `<input>`, `<textarea>`, `<label>` → `Input`/`Textarea` wrapped in `Field`.
+  - **CheckBox.tsx**: `<input type="checkbox">` + `<label>` → `Checkbox` wrapped in `Field`.
+  - **Slider.tsx**: `<input type="range">` → `FluentSlider` + `Label` + `Body1`.
+  - **ChoicePicker.tsx**: radio/checkbox/chip modes → `FluentRadioGroup`/`Radio`, `Checkbox`, `ToggleButton`, `Input`, `Label`.
+  - **Divider.tsx**: `<div>` line → `FluentDivider`.
+  - **Modal.tsx**: custom overlay → `Dialog`/`DialogSurface`/`DialogBody`/`DialogContent`/`DialogActions`.
+  - **List.tsx**, **Row.tsx**, **Column.tsx**: structural `<div>` kept but styled with `makeStyles` + tokens.
+  - **DateTimeInput.tsx**: `<input>` + `<label>` → `Input` in `Field`.
+  - **Image.tsx**: `<img>` → `FluentImage` with `fit`/`shape` props.
+  - **Icon.tsx**: `<span class="material-symbols-outlined">` → `Body1` with `makeStyles`.
+  - **AudioPlayer.tsx**: `<span>` → `Caption1`; `<audio>` kept (no Fluent equivalent).
+  - **Video.tsx**: `<video>` kept; styled with `makeStyles` + tokens.
+  - **ChildList.tsx**: No changes (structural React.Fragment).
+- **Custom components** (in `packages/web/src/catalog/components/`):
+  - **RadioGroup.tsx**: raw `<div>` cards → `Card` + `CardHeader` + `Badge` + `Body1`/`Caption1`.
+  - **ProgressSteps.tsx**: raw `<div>` dots/labels → `Caption1` + `Badge` + `makeStyles` with tokens for colors.
+  - **FormGroup.tsx**: raw `<div>` + `<span>` → `Card` + `CardHeader` + `Subtitle2` + `Badge`.
+  - **CodeBlock.tsx**: raw `<div>` + `<button>` → `Card` + `Button` + `Body1`/`Caption1` + `CopyRegular`/`CheckmarkRegular` icons. Kept `<pre>/<code>` styled with `tokens.fontFamilyMonospace`.
+- **utils.ts**: Replaced hardcoded pixel values and color strings with Fluent tokens: `LEAF_MARGIN` → `tokens.spacingVerticalS`, `CONTAINER_PADDING` → `tokens.spacingHorizontalL`, `STANDARD_BORDER` → `tokens.colorNeutralStroke1`, `STANDARD_RADIUS` → `tokens.borderRadiusMedium`.
+- **Pattern preserved**: All components still use `createReactComponent(Api, renderFn)` adapter pattern. No adapter changes.
+- **No inline color/size hardcodes**: All hardcoded `#ccc`, `#666`, `#fff`, `#007bff`, `rgba(...)`, pixel font sizes replaced with tokens.
+- **Build**: Vite production build passes — 2539 modules, no errors.
+
+### 2025-07-29 — Fluent UI v9 override catalog (non-vendor)
+- **Architecture**: Created `packages/web/src/catalog/fluent-components/` directory with 18 Fluent UI v9 component implementations + `ChildList` utility + `index.ts` barrel. These override the vendor basic catalog components using A2UI's `Catalog` Map overwrite behavior — later entries with the same `.name` replace earlier ones.
+- **Override pattern**: Each file imports the same `{Component}Api` from `../../vendor/a2ui/web_core/basic_catalog/index` (ensuring `.name` matches vendor) and uses `createReactComponent` from the adapter. Vendor files are never modified.
+- **kickstart-catalog.ts update**: Added `...fluentOverrides` array between `basicCatalog.components` spread and custom components. Order: vendor (18 basic) → fluent overrides (18 same-name replacements) → custom (RadioGroup, FormGroup, CodeBlock, ProgressSteps).
+- **Components already Fluent**: Button, Text, Card, Tabs, TextField, CheckBox, Slider were already using Fluent UI v9 in the vendor — override files match those patterns with corrected import paths.
+- **Components newly Fluent**: ChoicePicker (RadioGroup/Radio/Checkbox/ToggleButton), Divider (FluentDivider), Modal (Dialog/DialogSurface/DialogBody/DialogContent), DateTimeInput (Input/Field), Image (FluentImage with shape/fit), Icon (makeStyles+tokens), AudioPlayer (Caption1), Video (makeStyles+tokens), Row/Column/List (makeStyles+tokens with ChildList).
+- **Custom components verified**: RadioGroup, FormGroup, CodeBlock, ProgressSteps were already migrated to Fluent UI v9 in a prior session — no changes needed.
+- **Build**: Vite production build passes — 2559 modules, zero TypeScript errors.

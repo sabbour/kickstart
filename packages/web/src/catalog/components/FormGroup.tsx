@@ -5,6 +5,14 @@ import {
   DynamicStringSchema,
   ComponentIdSchema,
 } from '../../vendor/a2ui/web_core/schema/common-types';
+import {
+  Card,
+  CardHeader,
+  Badge,
+  Subtitle2,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 
 const FormGroupApi = {
   name: 'FormGroup',
@@ -15,18 +23,31 @@ const FormGroupApi = {
   }).strict(),
 };
 
+const useStyles = makeStyles({
+  root: {
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+    width: '100%',
+    padding: tokens.spacingHorizontalL,
+  },
+});
+
 export const FormGroup = createReactComponent(FormGroupApi, ({ props, buildChild }) => {
+  const classes = useStyles();
+
   return (
-    <div className="kickstart-form-group" style={{ margin: '8px', width: '100%', boxSizing: 'border-box' }}>
-      <div className="kickstart-form-group-header">
-        {props.step != null && (
-          <span className="kickstart-step-badge">Step {props.step}</span>
-        )}
-        <span className="kickstart-form-group-title">{props.title}</span>
-      </div>
+    <Card className={classes.root}>
+      <CardHeader
+        header={<Subtitle2>{props.title}</Subtitle2>}
+        action={
+          props.step != null ? (
+            <Badge appearance="filled" color="informative">Step {props.step}</Badge>
+          ) : undefined
+        }
+      />
       <div>
         {props.child ? buildChild(props.child) : null}
       </div>
-    </div>
+    </Card>
   );
 });
