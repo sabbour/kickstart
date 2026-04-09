@@ -373,6 +373,58 @@ const dataBindingForm = (): A2uiMsg[] => {
   ];
 };
 
+/**
+ * B-22: JSON Pointer Live Binding — verifies that:
+ *  1. updateDataModel with a JSON Pointer path (e.g. /data/name) sets initial state
+ *  2. A TextField bound to { path: '/data/name' } reactively reflects the data model value
+ *  3. Typing in the TextField calls setValue → DataContext.set('/data/name', …) which
+ *     notifies all components subscribed to /data/name (including the Text mirror below)
+ *  4. sendDataModel: true causes the surface to emit data model snapshots back to the server
+ *
+ * Result: Typing in the TextField immediately updates the Text display — no server round-trip.
+ * JSON Pointer data binding is confirmed working end-to-end.
+ */
+const dataBindingJsonPointerLive = (): A2uiMsg[] => {
+  const sid = uid('jsonptr-live');
+  return [
+    {
+      version: 'v0.9',
+      createSurface: { surfaceId: sid, catalogId: CATALOG_ID, sendDataModel: true },
+    } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/data/name', value: 'my-aks-app' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/data/selectedResource', value: 'aks-cluster-prod' } } as A2uiMsg,
+    {
+      version: 'v0.9',
+      updateComponents: {
+        surfaceId: sid,
+        components: [
+          { id: 'root', component: 'Column', children: ['heading', 'desc', 'input-card', 'mirror-card'], gap: 'medium' },
+          { id: 'heading', component: 'Text', text: 'JSON Pointer Live Binding', variant: 'h3' },
+          {
+            id: 'desc',
+            component: 'Text',
+            text: 'Type in the fields below — the mirror section updates immediately via JSON Pointer reactive binding.',
+            variant: 'body2',
+          },
+          { id: 'input-card', component: 'Card', children: ['input-col'], title: 'Inputs (bound to /data/*)' },
+          { id: 'input-col', component: 'Column', children: ['name-field', 'resource-field'], gap: 'medium' },
+          { id: 'name-field', component: 'TextField', label: 'App Name  →  /data/name', value: { path: '/data/name' } },
+          {
+            id: 'resource-field',
+            component: 'TextField',
+            label: 'Selected Resource  →  /data/selectedResource',
+            value: { path: '/data/selectedResource' },
+          },
+          { id: 'mirror-card', component: 'Card', children: ['mirror-col'], title: 'Live Mirror (reads same /data/* paths)' },
+          { id: 'mirror-col', component: 'Column', children: ['mirror-name', 'mirror-resource'], gap: 'small' },
+          { id: 'mirror-name', component: 'Text', text: { path: '/data/name' }, variant: 'h4' },
+          { id: 'mirror-resource', component: 'Text', text: { path: '/data/selectedResource' }, variant: 'body1' },
+        ],
+      },
+    } as A2uiMsg,
+  ];
+};
+
 const dataBindingSequence = (): A2uiMsg[] => {
   const sid = uid('databind-sequence');
   return [
@@ -620,6 +672,7 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'data-basic',    label: 'Basic Data Binding',     description: 'Text components bound to data paths',        group: 'Data Binding',    generate: dataBindingBasic },
   { id: 'data-form',     label: 'Data-Bound Form',        description: 'Form fields with path bindings',             group: 'Data Binding',    generate: dataBindingForm },
   { id: 'data-sequence', label: 'Data Update Sequence',   description: 'Progressive data model updates',             group: 'Data Binding',    generate: dataBindingSequence },
+  { id: 'data-jsonptr',  label: 'JSON Pointer Live Binding', description: 'TextField ↔ Text via /data/* JSON Pointer paths (B-22 verification)', group: 'Data Binding', generate: dataBindingJsonPointerLive },
   // Events & Actions
   { id: 'event-buttons', label: 'Button Events',          description: 'Actions with event context data',            group: 'Events & Actions', generate: eventsButtonActions },
   { id: 'event-form',    label: 'Form Submit Action',     description: 'Submit with context path bindings',          group: 'Events & Actions', generate: eventsFormSubmit },

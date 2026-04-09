@@ -210,3 +210,124 @@ export class VirtualFileSystem {
     for (const fn of this.listeners) fn();
   }
 }
+
+// ---------------------------------------------------------------------------
+// VirtualFS — IndexedDB-backed persistent virtual filesystem
+// ---------------------------------------------------------------------------
+
+const IDB_NAME = 'kickstart-vfs';
+const IDB_VERSION = 1;
+const IDB_STORE = 'files';
+
+function openIDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(IDB_STORE, { keyPath: 'path' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/**
+ * IndexedDB-backed virtual filesystem.
+ *
+ * Files are stored as `{ path, content }` records in an IDB object store.
+ * All methods are async. Subscribe to change notifications via `subscribe()`.
+ */
+export class VirtualFS {
+  private readonly dbPromise: Promise<IDBDatabase>;
+  private readonly listeners = new Set<() => void>();
+
+  constructor() {
+    this.dbPromise = openIDB();
+  }
+
+  async writeFile(path: string, content: string): Promise<void> {
+    const db = await this.dbPromise;
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put({ path, content });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    this.notify();
+  }
+
+  async readFile(path: string): Promise<string> {
+    const db = await this.dbPromise;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(path);
+      req.onsuccess = () => {
+        if (req.result) resolve((req.result as { path: string; content: string }).content);
+        else reject(new Error(`File not found: ${path}`));
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async listFiles(dir?: string): Promise<string[]> {
+    const db = await this.dbPromise;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).getAllKeys();
+      req.onsuccess = () => {
+        const keys = req.result as string[];
+        resolve(dir ? keys.filter((k) => k.startsWith(dir)) : keys);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async deleteFile(path: string): Promise<void> {
+    const db = await this.dbPromise;
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(path);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    this.notify();
+  }
+
+  async exists(path: string): Promise<boolean> {
+    const db = await this.dbPromise;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).count(IDBKeyRange.only(path));
+      req.onsuccess = () => resolve(req.result > 0);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async exportZip(): Promise<Blob> {
+    const { default: JSZip } = await import('jszip');
+    const db = await this.dbPromise;
+    const records: Array<{ path: string; content: string }> = await new Promise(
+      (resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readonly');
+        const req = tx.objectStore(IDB_STORE).getAll();
+        req.onsuccess = () => resolve(req.result as Array<{ path: string; content: string }>);
+        req.onerror = () => reject(req.error);
+      },
+    );
+    const zip = new JSZip();
+    for (const { path, content } of records) {
+      zip.file(path, content);
+    }
+    return zip.generateAsync({ type: 'blob' });
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify(): void {
+    for (const fn of this.listeners) fn();
+  }
+}
