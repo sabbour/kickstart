@@ -47,6 +47,16 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 
 ## Learnings
 
+### IndexedDB VirtualFS + JSON Pointer Binding (B-09 + B-22) — 2026-04-10
+
+- **Raw IndexedDB API pattern:** `indexedDB.open(name, version)` → `onupgradeneeded` creates object store with `{ keyPath: 'path' }`. Wrap every IDB operation in a Promise over `tx.oncomplete`/`tx.onerror`. For `count()`, use `IDBKeyRange.only(key)` not the key directly.
+- **Dynamic import of jszip:** `const { default: JSZip } = await import('jszip')` inside async methods works cleanly; Vite warns that a dynamic import doesn't move jszip into a separate chunk when it's already statically imported elsewhere (ArtifactContext.tsx) — warning is harmless.
+- **VirtualFS subscribe pattern:** Notify listeners synchronously after `writeFile`/`deleteFile`. In `VirtualFSProvider`, the `useEffect` subscribes to the `VirtualFS` instance and calls `listFiles()` async to refresh state. Use a `mountedRef` to guard against setState-after-unmount.
+- **FileTreePanel CSS classes:** Reuses the same `.file-editor`, `.file-tree`, `.file-tree-header`, `.file-tree-list`, `.file-tree-item`, `.code-view`, `.code-view-pre` class names from the existing FileEditor — no new CSS needed.
+- **JSON Pointer two-way binding confirmed:** A2UI `DataModel` uses JSON Pointer paths natively. `GenericBinder.resolveAndBind` generates a `setValue(newVal)` setter for every `DYNAMIC` property with a path binding. Calling `setValue` in TextField's `onChange` routes through `DataContext.set(path, value)` → `DataModel.set` → Preact signal notify → reactive Text re-renders immediately. No server round-trip. `sendDataModel: true` on the surface makes it emit snapshots back to the server.
+- **Playground scenario format:** To include a `sendDataModel` flag, pass it in `createSurface: { surfaceId, catalogId, sendDataModel: true }` — it's part of the `CreateSurfaceMessage` schema (optional boolean).
+- **B-22 conclusion:** JSON Pointer data binding works end-to-end. `updateDataModel` with `/data/selectedResource` paths sets initial state; TextField + Text components bound to the same path react immediately via signals. Added `data-jsonptr` scenario to Playground "Data Binding" group as living proof.
+
 ### ArchitectureDiagram + Custom Catalog Components (B-19 + B-08) — 2026-04-10
 
 - **Mermaid lazy loading:** Use a singleton loader (`loadMermaid()`) that dynamically imports mermaid once and caches it — avoids re-initialization across re-renders. `mermaid.render(id, syntax)` returns `{ svg }` string; inject into container via `innerHTML`, then fix SVG dimensions post-render.
