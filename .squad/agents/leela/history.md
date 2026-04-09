@@ -162,6 +162,18 @@
 - **Cross-team alignment:** Bender and Fry briefed. Will refactor codebase in B-11/B-10 PRs.
 - **Backlog consolidated:** Merged all scattered SQL todos, R-items, G-items, and untracked work into single-source-of-truth backlog (leela-consolidated-backlog.md). 45 total items, 68-day estimate, P0–P3 + Ops prioritized. Critical path: B-23–B-25 (action loop) 9 days.
 
+### 2025-07-26: IntegrationKit Abstraction (B-10)
+
+- **Name:** `IntegrationKit` (renamed from ServicePack per user directive). Lives in `packages/core/src/kits/`.
+- **Interface:** `{ name, description, tools: Tool<any>[], connectors: APIConnector[], prompts?: string[], components?: ComponentRegistration[] }`. `components` is frontend-only — core records type identifiers, web binds React components.
+- **Registry pattern:** `IntegrationKitRegistry` mirrors `ToolRegistry` / `APIConnectorRegistry`. `registerKit(kit)` is the public API; delegates to `defaultKitRegistry`. On register, auto-wires tools → `ToolRegistry`, connectors → `APIConnectorRegistry`.
+- **Typed constraint:** `tools: Tool<any>[]` required (not `Tool[]`) because individual tool files type their args as specific interfaces, not `Record<string, unknown>`. The `Tool<any>` escape hatch matches `ToolRegistry`'s existing pattern.
+- **AzureKit:** azure_resource_list + azure_resource_get + estimate_cost tools; AzureARMConnector + PricingConnector; 4 system-prompt augmentations (AKS Automatic preference, resource discovery, cost transparency, K8s abstraction); azureLoginCard + azureResourcePicker component registrations.
+- **GitHubKit:** github_repo_info tool; GitHubConnector; 3 system-prompt augmentations (repo-first detection, CI/CD OIDC wiring, branch strategy); githubLoginCard + githubRepoPicker component registrations.
+- **App startup wiring:** `registerKit(azureKit); registerKit(githubKit)` called in `packages/web/src/main.tsx` before ReactDOM render. Kits push into `defaultRegistry` (tools) and `defaultConnectorRegistry` (connectors) — both singletons available to engine + MCP.
+- **Tests:** 23 contract tests in `integration-kit.test.ts`, all green alongside existing 286 tests (309 total).
+- **Commit:** `c7b99ac` on main.
+
 ---
 
 ## [ARCHIVE SUMMARY] Pre-2026-04-09 Architecture & Decisions
