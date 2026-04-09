@@ -7,6 +7,13 @@ import { FormGroup } from './components/FormGroup';
 import { CodeBlock } from './components/CodeBlock';
 import { ProgressSteps } from './components/ProgressSteps';
 import { Markdown } from './components/Markdown';
+import { GitHubLoginCard } from './components/GitHubLoginCard';
+import { GitHubRepoPicker } from './components/GitHubRepoPicker';
+import { GitHubAction } from './components/GitHubAction';
+import { GitHubCommit } from './components/GitHubCommit';
+import { AzureLoginCard } from './components/AzureLoginCard';
+import { AzureResourcePicker } from './components/AzureResourcePicker';
+import { AzureResourceForm } from './components/AzureResourceForm';
 
 const kickstartComponents: ReactComponentImplementation[] = [
   ...Array.from(basicCatalog.components.values()),
@@ -16,6 +23,13 @@ const kickstartComponents: ReactComponentImplementation[] = [
   CodeBlock,
   ProgressSteps,
   Markdown,
+  GitHubLoginCard,
+  GitHubRepoPicker,
+  GitHubAction,
+  GitHubCommit,
+  AzureLoginCard,
+  AzureResourcePicker,
+  AzureResourceForm,
 ];
 
 export const kickstartCatalog = new Catalog<ReactComponentImplementation>(
