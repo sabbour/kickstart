@@ -43,8 +43,20 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 ## Completed Tasks
 - B-20: Past-turn isolation guards ✅ (pushed 2026-04-09)
 - B-14: GitHub IntegrationKit A2UI components ✅ (pushed 2026-04-10)
+- B-12: Azure IntegrationKit fat A2UI components ✅ (pushed 2026-04-10)
 
 ## Learnings
+
+### Azure A2UI Fat Components (B-12)
+- Fat components are identical in structure to GitHub components — `createReactComponent` render function is a React FC, hooks work.
+- `useAPIConnector('azure-arm')` pattern: cast to `AzureARMConnector | undefined`, guard with null check before calling methods like `listResources()` or `authenticate()`.
+- `AzureLoginCard` mirrors `GitHubLoginCard` exactly: `useState` for auth state initialized from `connector.isAuthenticated()`, async `authenticate()` on click, `onSignIn`/`onSignOut` action props.
+- `AzureResourcePicker` follows `GitHubRepoPicker` pattern: `useEffect` with `connector.listResources(subscriptionId)`, loading spinner, card list with selected highlight.
+- `AzureResourceForm` uses `context.dispatchAction({ event: { name: 'api:azure-arm.createResource', context: {...} } })` directly (not props.action) because it needs to pass dynamic form values back. This routes through `useActionDispatch`'s `api:` category via the surface→`_onAction`→`actionHandler` chain.
+- Action schema props (`onSignIn`, `onSelect`) are resolved by the GenericBinder to `() => void` callables — call as `(props.onSignIn as () => void)()`. No dynamic data can be passed through them; use `context.dispatchAction` for dynamic context.
+- `Fluent UI v9 Field + Select` works for dropdown form controls; `Avatar color="brand"` for branded user avatars.
+- The kickstart-catalog.ts in HEAD may already have import lines pre-seeded by Bender — just create the component files and they wire up automatically.
+- Build grew from 2876 modules — chunking warning is expected/pre-existing, not caused by these components.
 
 ### GitHub A2UI Components (B-14)
 - Catalog components CAN use React hooks like `useAPIConnector` and `useArtifacts` — both providers are mounted in `main.tsx` above the full app tree, so all catalog components rendered in chat turns are inside the providers.
