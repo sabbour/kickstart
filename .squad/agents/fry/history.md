@@ -347,3 +347,14 @@
 - **Fix**: Replaced the placeholder with real demo engine calls — same pattern as `injectScenario()`: `resetDemoState()` + `getDemoResponse()` (with the burn-turn-1 trick for non-welcome keywords). Returns actual `a2uiMessages` JSON. Demo state reset is harmless here since `injectScenario` already ran when user clicked the scenario.
 - **UX improvement**: Added a brief scenario help description at the top of the left sidebar explaining the two scenario categories (Kickstart Scenarios vs Basic Controls) and how to use Preview/JSON tabs. Styled with `scenarioHelp` class using Fluent tokens.
 - **Build**: Vite build passes, zero errors.
+
+### 2026-04-09 — Polish Round Summary — Session Closure
+- **Scenario JSON tab fix**: Fixed `getScenarioJson()` to show real A2UI JSON for keyword-based scenarios instead of placeholder. Decision: `.squad/decisions/inbox/fry-playground-json-viewer.md` (merged to decisions.md).
+- **Fluent 2 syntax highlighting**: Installed highlight.js, registered 10+ languages, applied VS theme. CodeBlock now renders syntax-highlighted code with `useMemo` performance optimization. Decision: Part 1 of `.squad/decisions/inbox/fry-fluent2-polish.md`.
+- **Markdown component**: Created `Markdown.tsx` using react-markdown + remark-gfm. All elements styled with Fluent 2 tokens via makeStyles. Code blocks delegate to highlight.js. Registered in kickstart-catalog.ts. Decision: Part 2 of fry-fluent2-polish.md.
+- **Component audit**: Audited Modal, Icon, Video, ProgressSteps, Playground for Fluent 2 compliance. Removed all inline styles, replaced hardcoded px/hex/rgb with tokens. Zero raw HTML elements. Decision: Part 3 of fry-fluent2-polish.md.
+- **Session ID bridge**: Implemented backendSessionId field to map frontend UI session IDs to backend conversation session UUIDs. LLM now has full history across messages. Decision: `.squad/decisions/inbox/fry-session-id-fix.md` (merged to decisions.md).
+- **Build status**: `npx vite build` passes, 302 KB gzipped bundle.
+- **Dependencies added**: highlight.js, react-markdown, remark-gfm.
+- **Git commits**: 54c8573 (scenario JSON fix), e97e8ee (Fluent 2 polish).
+- **Decisions merged**: All 5 inbox files (fry-fluent2-polish, fry-playground-json-viewer, fry-scenario-json-fix, fry-session-id-fix) appended to `.squad/decisions.md`.

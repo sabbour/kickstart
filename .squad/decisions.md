@@ -5238,3 +5238,769 @@ Each override imports the vendor's Api object (e.g., `ButtonApi`) to guarantee t
 - **Single source of truth** — component names are owned by vendor Api objects; we never duplicate or hardcode them.
 - **Consistent Fluent styling** — all components use `makeStyles`, `tokens`, and Fluent primitives. No inline hardcoded colors.
 
+---
+
+# Decision: Smart Control Pack Patterns for Kickstart A2UI Architecture
+
+**Author:** Leela (Lead)  
+**Date:** 2025-07-26  
+**Status:** Proposed  
+**Supersedes:** None  
+**Related:** leela-pragmatic-a2ui-react.md, leela-two-repo-strategy.md
+
+## Context
+
+Ahmed's previous prototype (`sabbour/adaptive-ui-try-aks`) used the **adaptive-ui-framework** — a custom React framework for conversational, agent-driven UIs. It had a **pack system** where bundles of smart components + LLM knowledge + tools + auth were registered as units. We need to understand these patterns and map them into our A2UI v0.9 + React + Fluent UI v9 architecture.
+
+This decision documents every pattern found, assesses A2UI compatibility, and prescribes how to bring each into Kickstart.
+
+## 1. Pack Inventory
+
+### 1.1 Azure Pack (`@sabbour/adaptive-ui-azure-pack`)
+
+| Component | Type | Description |
+|-----------|------|-------------|
+| `azureLogin` | Self-managing auth | MSAL popup sign-in. Sets `__azureToken` + fetches subscriptions. Auto-selects single subscription. |
+| `azureResourceForm` | Dynamic form | Auto-generates forms from ARM provider metadata at runtime — zero hardcoded schemas. |
+| `azurePicker` | Data-fetching dropdown | Dropdown that calls ARM API at render time. Used for regions, resource groups, SKUs. Guards against unresolved `{{state}}` interpolation. |
+| `azureQuery` | Write-with-confirm | ARM API caller for PUT/POST/PATCH/DELETE with user confirmation dialog. Results stored in state. |
+
+**Tools (inference-time):**
+| Tool | Description |
+|------|-------------|
+| `azure_arm_get` | Read-only ARM REST API. LLM uses to reason before producing UI. Auto-injects subscription ID. |
+| `azure_pricing` | Azure retail pricing API. Public, no auth. Returns up to 10 price records. |
+
+**Skills Resolver:** Keyword-triggered domain knowledge injection — ARM PUT body templates for AKS, App Service, Container Apps, ACR, Cosmos DB, Key Vault, Storage, SQL, role assignments. Plus AKS Automatic domain knowledge (Gateway API, Workload Identity, Deployment Safeguards).
+
+**Auth:** MSAL.js (`@azure/msal-browser`). Uses Azure CLI client ID. CORS proxied through `/api/auth-proxy`. Tokens cached in localStorage. Silent + popup flow. Also supports Graph token acquisition for incremental consent.
+
+**Settings UI:** Sign-in/sign-out card injected into settings panel.
+
+**Diagram Icons:** 27 Azure service SVG icons registered for Mermaid diagrams (`%%icon:azure/aks%%`).
+
+### 1.2 GitHub Pack (`@sabbour/adaptive-ui-github-pack`)
+
+| Component | Type | Description |
+|-----------|------|-------------|
+| `githubLogin` | Self-managing auth | OAuth Device Flow. User enters code on github.com. Polls for token. Shows green confirmation if already signed in. |
+| `githubPicker` | Data-fetching dropdown | Fetches from GitHub API at render time. Auto-paginates (up to 300). Used for orgs, repos, branches. Personal account detection. |
+| `githubQuery` | Write-with-confirm | GitHub API caller for POST/PUT/PATCH/DELETE with confirm dialog. Auto-rewrites personal account API paths. |
+| `githubRepoInfo` | Read-only card | Rich repo card (name, description, language, stars, forks). |
+| `githubCreatePR` | Multi-step action | Creates branch, commits all generated artifacts, opens PR. Auto-initializes empty repos. |
+| `githubSetSecret` | Encrypted action | Sets GitHub Actions secrets using libsodium sealed box encryption. Self-contained, one-per-turn. |
+
+**Tools (inference-time):**
+| Tool | Description |
+|------|-------------|
+| `github_api_get` | Read-only GitHub REST API with auto-pagination (up to 200 items). Response slimming (repos→6 fields, issues→7 fields). |
+
+**Auth:** OAuth Device Flow OR PAT entry. Token stored in localStorage + module cache. CORS proxied through `/api/github-oauth/*`.
+
+**Settings UI:** OAuth client ID configuration, CORS proxy URL, PAT entry, token inspection.
+
+### 1.3 App-Level Custom Components (try-aks)
+
+| Component | Type | Description |
+|-----------|------|-------------|
+| `ArchitectureDiagram` | Visualization | Mermaid diagram renderer with ELK layout, pan/zoom, Azure icon substitution, auto-fit. |
+| `CostEstimate` | Data display | Scans generated artifacts for cost breakdown. |
+| `CompactCodeBlock` | File chip | Override of codeBlock — renders as compact file chip, full code goes to file viewer panel. |
+| `DevEnvironmentCard` | Action card | Opens repo in VS Code / vscode.dev / Codespaces. |
+| `K8sValidator` | Validation engine | Client-side AKS Deployment Safeguards validation (DS001-DS013). Validates + auto-fixes YAML manifests. |
+| `SafeguardsChecker` | LLM feedback | Formats violations as markdown for LLM context injection → self-correction loop. |
+| `DiagramBuilder` | Generator | Builds Mermaid diagrams from artifact context (Bicep resources + K8s manifests). |
+
+### 1.4 Core Framework (`@sabbour/adaptive-ui-core`)
+
+Not a "pack" but foundational capabilities all packs depend on:
+- **Component Registry** — `registerComponent()`, `registerPackWithSkills()`, `getComponent()`
+- **AdaptiveApp** — Conversation orchestrator (turn management, LLM adapter, history)
+- **Context** — React Context with state, dispatch, handleAction, sendPrompt, disabled flag
+- **Renderer** — Recursive node renderer consuming `AdaptiveUISpec.layout`
+- **Interpolation** — `{{state.key}}` resolution in any string prop
+- **Tools** — `registerTool()`, `executeTool()`, tool-call loop in LLM adapter
+- **Artifacts** — Scoped file storage for generated code
+- **Session Manager** — localStorage persistence with 24h TTL
+- **Request Tracker** — `trackedFetch()` wrapper for API call monitoring
+- **DisabledScope** — Wraps past turns, sets `disabled=true`, components skip side effects
+- **Decision Log** — Audit trail of adapter/tool decisions
+- **Sanitizer** — XSS protection for rendered content
+
+## 2. Pattern Catalog (14 Patterns)
+
+### P01: Pack Registration
+**What:** Bundle of components + system prompt + skills resolver + settings UI + LLM tools, registered as a single unit via `registerPackWithSkills(createAzurePack())`.  
+**How it works:** `createAzurePack()` returns a `ComponentPack` object. `registerPackWithSkills()` iterates components → `registry.set()`, stores system prompt, wires skill resolver, registers tools, injects settings.  
+**Why it matters:** Clean separation of concerns. Adding GitHub support = one line. Removing it = one line. LLM automatically knows about available capabilities via system prompt injection.
+
+### P02: Self-Managing Login Component
+**What:** Login components handle their entire auth flow internally — render sign-in button, trigger popup/device flow, store token in state, fetch initial data (subscriptions, user info), show confirmation.  
+**How it works:** Component checks `disabled` flag (skip in past turns). Checks existing token. If no token → renders sign-in UI. On click → triggers auth flow. On success → dispatches `SET` action to store token as `__azureToken`. LLM told to "omit next" — component self-manages.  
+**Key detail:** Double-underscore prefix (`__`) = private state, hidden from LLM in form submissions.
+
+### P03: Data-Fetching Picker
+**What:** Dropdown that fetches options from an API at render time. Handles loading, error, empty states. Auto-paginates (GitHub: up to 300 items).  
+**How it works:** Component receives `api` prop with `{{state.key}}` interpolation in the URL. On mount, resolves interpolation → fetches → renders dropdown. Guards: if interpolation yields literal `{{state.*}}`, shows "Waiting for selection..." instead of making broken API call.  
+**Example:** `{type:"azurePicker", api:"/subscriptions/{{state.__azureSubscription}}/locations?api-version=2022-12-01", bind:"region", labelKey:"displayName", valueKey:"name"}`
+
+### P04: Write-with-Confirm Action
+**What:** Component that calls a write API (PUT/POST/DELETE) with explicit user confirmation before executing.  
+**How it works:** Renders a confirm button (label customizable). On click → calls API with interpolated path + body → stores result in state under `bind` key. Shows loading spinner during execution.  
+**Key detail:** `confirm` prop can be boolean (show/hide) or string (custom button label, e.g. "Create Repository").
+
+### P05: LLM Inference-Time Tools
+**What:** Functions the LLM calls during text generation, before producing UI. Results feed back into LLM reasoning.  
+**How it works:** Tools registered via `registerTool(definition, handler)`. LLM adapter includes tool definitions in API request. When LLM emits tool_call → adapter executes handler → sends result back → LLM continues generating. Loop until LLM produces final response.  
+**Example:** LLM calls `azure_arm_get` to check if a resource group exists → gets result → decides whether to show "create new" or "use existing" UI.  
+**Key distinction from components:** Tools run DURING inference. Components run AFTER inference (render time). Tools inform LLM reasoning. Components present results to user.
+
+### P06: Knowledge Skills Resolver
+**What:** Per-turn prompt enrichment that injects domain knowledge based on conversation context.  
+**How it works:** Before each LLM call, `resolvePackSkills(prompt)` runs all registered resolvers. Each resolver checks keywords → returns additional system prompt text. Only injects if content is new (not same as last turn). Content: ARM PUT body templates, AKS Automatic rules (Gateway API, Workload Identity, Deployment Safeguards).  
+**Key detail:** Skill content is LARGE (multi-KB). Only injected when relevant. Prevents token waste on irrelevant turns.
+
+### P07: Disabled Context (Past Turn Isolation)
+**What:** Past conversation turns rendered in `DisabledScope` — components skip API calls, auth checks, and other side effects.  
+**How it works:** `DisabledScope` wraps past-turn rendering, overrides context with `disabled: true`. Components check `useAdaptive().disabled` and short-circuit.  
+**Why it matters:** Without this, scrolling through conversation history would re-trigger N auth popups and N×M API calls.
+
+### P08: State-as-Token Convention
+**What:** Auth tokens stored in conversation state with `__` prefix. Components check state for token presence to determine auth status. LLM instructions say "show login if `__azureToken` not set."  
+**How it works:** Login component sets `__azureToken` → next turn, LLM reads state → sees token present → skips login → shows resource pickers. If token expired, component silently refreshes via `acquireTokenSilent()`.  
+**Key detail:** `__` prefix hides from form submit payloads but LLM CAN reference in `{{state.__azureToken}}` for API calls.
+
+### P09: CORS Proxy Pattern
+**What:** All external API calls routed through a backend proxy (`/api/*`) to bypass browser CORS restrictions.  
+**How it works:** Azure Functions backend with routes: `/api/arm-proxy/*` → ARM API, `/api/auth-proxy/*` → login.microsoftonline.com, `/api/github-oauth/*` → github.com, `/api/pricing-proxy/*` → Azure retail prices. Token forwarded in Authorization header.  
+**Why it matters:** MSAL token exchange requires server-side call (CORS). ARM API requires it. GitHub OAuth requires it. The proxy also enables workload identity fallback when no user token is available.
+
+### P10: Artifact-Aware Components
+**What:** Components that read/write from a shared artifact store (generated files like Dockerfiles, Bicep, Helm charts).  
+**How it works:** `githubCreatePR` reads ALL artifacts → creates branch → commits each file → opens PR. `CompactCodeBlock` renders as a file chip linking to the artifact in the file viewer panel. `CostEstimate` scans artifacts for cost-relevant resources. `DiagramBuilder` generates architecture diagrams from artifact context.  
+**Key insight:** Artifacts are the bridge between LLM-generated code and external systems (GitHub, deployment).
+
+### P11: Auto-Continue Component
+**What:** Components that automatically advance the conversation after completing their action.  
+**How it works:** `githubSetSecret` and `githubCreatePR` call `sendPrompt()` after success with a result summary. LLM picks up the next turn. User sees seamless flow without clicking "Continue."  
+**Key detail:** "Self-contained, one per turn" — the system prompt explicitly tells the LLM to show these components alone.
+
+### P12: ARM Introspection
+**What:** Runtime discovery of Azure resource type schemas from ARM provider metadata — no hardcoded forms.  
+**How it works:** `fetchResourceTypeSchema()` calls `/providers/{namespace}?api-version=...`, finds resource type definition, extracts properties, caches with 5-min TTL. `azureResourceForm` consumes the schema to generate form fields dynamically.  
+**Why it matters:** Works for ANY ARM resource type without code changes. New Azure services automatically get forms.
+
+### P13: Client-Side Validation + Auto-Fix
+**What:** K8s manifest validator that checks AKS Deployment Safeguards (13 rules) and can auto-fix violations.  
+**How it works:** Parses YAML → checks each container for resources, probes, security context, image tags, etc. Returns structured violations. `fixK8sManifest()` applies default fixes (adds resource limits, probes, security settings). Violations formatted as markdown → injected into LLM context → LLM self-corrects in next turn.  
+**Key pattern:** Validate → format for LLM → LLM fixes → re-validate loop.
+
+### P14: Intent Resolvers (Preconfigured Components)
+**What:** Shortcut names that expand to fully-configured component props.  
+**How it works:** `azure-regions` resolver returns `{type:"azurePicker", api:"/subscriptions/.../locations?...", labelKey:"displayName", valueKey:"name", filterKey:"metadata.regionType", filterValue:"Physical"}`. LLM uses intent name instead of specifying full props.  
+**Why it matters:** Reduces LLM prompt complexity. Common patterns pre-baked.
+
+## 3. Architecture Recommendations for Kickstart (A2UI + Fluent UI v9)
+
+### R01: ServicePack Abstraction Layer
+
+**Problem:** A2UI has no concept of "packs." It has custom components and that's it. No system for bundling components + prompts + tools + auth.
+
+**Recommendation:** Create a `ServicePack` TypeScript interface in Kickstart's `packages/core`:
+
+```typescript
+interface ServicePack {
+  name: string;
+  displayName: string;
+  
+  // A2UI custom component registrations
+  components: Record<string, A2UICustomComponent>;
+  
+  // System prompt additions for the LLM
+  systemPrompt: string;
+  
+  // Knowledge skills — injected per-turn based on context
+  resolveSkills?: (prompt: string) => Promise<string | null>;
+  
+  // LLM inference-time tools
+  tools?: ToolDefinition[];
+  
+  // Service connector (auth + API client)
+  connector: ServiceConnector;
+}
+```
+
+This wraps A2UI's component registration with the additional machinery. Kickstart's engine calls `registerServicePack()` at startup, which:
+1. Registers each component via `createReactComponent()` (A2UI)
+2. Appends system prompt to the LLM context
+3. Registers tools with the tool executor
+4. Initializes the service connector
+
+### R02: ServiceConnector Pattern (Auth + API)
+
+**Problem:** The old framework stored tokens in conversation state (`__azureToken`). A2UI's data model uses JSON Pointers, not arbitrary state. We need auth tokens accessible to components without polluting the UI data model.
+
+**Recommendation:** Create per-service `ServiceConnector` as React Context + singleton:
+
+```typescript
+interface ServiceConnector {
+  name: string;
+  isAuthenticated: boolean;
+  login(): Promise<void>;
+  logout(): void;
+  getToken(): Promise<string>;
+  fetch(path: string, init?: RequestInit): Promise<Response>;
+}
+```
+
+Components access via `useServiceConnector('azure')`. Tokens managed internally (MSAL/OAuth), never in A2UI state. Components report results (not tokens) back to the orchestrator via `action.event`.
+
+**Port from old framework:**
+- `azureLogin` auth logic → `AzureConnector` (MSAL, silent refresh, proxy routing)
+- `githubLogin` auth logic → `GitHubConnector` (Device Flow, PAT, token storage)
+
+### R03: Fat Components for Data-Fetching Controls
+
+**Problem:** A2UI components receive props and render. They don't natively fetch data. The old framework's pickers called APIs at render time.
+
+**Recommendation:** Build each pack control as a **fat A2UI custom component** — self-contained React component registered via `createReactComponent()` that:
+1. Receives config props from LLM (API path, bind key, labels)
+2. Uses `useServiceConnector()` to get auth + make API calls
+3. Manages its own loading/error/empty states (Fluent UI v9 Spinner, MessageBar)
+4. Reports selection back via A2UI `action.event` → orchestrator updates data model
+
+**Mapping:**
+| Old Component | Kickstart A2UI Component | Notes |
+|---------------|-------------------------|-------|
+| azureLogin | `<AzureLoginCard>` | Fat component, uses AzureConnector |
+| azurePicker | `<AzureResourcePicker>` | Fat component, fetches at render |
+| azureResourceForm | `<AzureResourceForm>` | Fat component, ARM introspection |
+| azureQuery | `<AzureAction>` | Fat component, confirm + execute |
+| githubLogin | `<GitHubLoginCard>` | Fat component, Device Flow |
+| githubPicker | `<GitHubPicker>` | Fat component, auto-paginate |
+| githubQuery | `<GitHubAction>` | Fat component, confirm + execute |
+| githubCreatePR | `<GitHubCommit>` | Fat component, reads artifacts |
+| githubSetSecret | `<GitHubSetSecret>` | Fat component, libsodium encryption |
+
+### R04: Keep LLM Tools in Orchestration Layer
+
+**Problem:** A2UI has no tool concept. Tools are a Kickstart concern.
+
+**Recommendation:** Tools stay in Kickstart's LLM adapter (backend SSE endpoint or client-side adapter). Port `azure_arm_get`, `azure_pricing`, `github_api_get`, `fetch_webpage` directly. They use `ServiceConnector.getToken()` for auth instead of reading from state.
+
+### R05: Port Knowledge Skills to Phase Engine
+
+**Problem:** A2UI has no skill resolver concept.
+
+**Recommendation:** Kickstart's 6-phase engine already has per-phase system prompts. Add a skill resolver middleware:
+1. Before each LLM call, run all registered pack skill resolvers against the user prompt
+2. Append returned knowledge to the system prompt for that turn only
+3. Cache to avoid re-injecting identical content
+
+Port `resolveAzureSkills()` directly — the keyword → ARM template mapping is valuable and framework-independent.
+
+### R06: CORS Proxy Backend (Same Pattern)
+
+**Recommendation:** Exact same architecture. SWA Functions backend with:
+- `/api/arm-proxy/*` → Azure ARM API (forwards Bearer token or uses managed identity)
+- `/api/auth-proxy/*` → login.microsoftonline.com (MSAL token exchange)
+- `/api/github-oauth/*` → github.com (Device Flow + token exchange)
+- `/api/pricing-proxy/*` → Azure retail pricing API
+
+Already planned in Kickstart infra. No changes needed from the old pattern.
+
+### R07: Artifact Store (Port Directly)
+
+**Recommendation:** Port the artifact store concept to Kickstart's `packages/core`. A2UI components report generated files via `action.event`. The orchestrator stores them. Components like `<GitHubCommit>` read from the store to create PRs.
+
+### R08: Client-Side Validation (Port Directly)
+
+**Recommendation:** Port `k8s-validator.ts` and `safeguards-checker.ts` to `packages/core`. They're pure TypeScript, zero framework dependency. Wire into the phase engine: after Generate phase, validate artifacts → inject violations into LLM context → Review phase auto-corrects.
+
+### R09: Diagram System (Port to A2UI)
+
+**Recommendation:** `ArchitectureDiagram` → A2UI custom component `<ArchitectureDiagram>`. Mermaid + ELK rendering, Azure icon substitution, pan/zoom. Register Azure diagram icons from the Azure pack.
+
+The old framework's diagram registry (`registerDiagramRenderer()`, `registerAzureDiagramIcons()`) maps cleanly to A2UI component registration.
+
+## 4. Gaps — Things A2UI Can't Do Natively
+
+### G01: No Pack/Bundle System
+**A2UI provides:** Individual component registration.  
+**Gap:** No way to bundle components + prompts + tools + auth as a unit.  
+**Solution:** `ServicePack` abstraction (R01). Kickstart concern, not A2UI concern.
+
+### G02: No Service/Connector Layer
+**A2UI provides:** Data binding via JSON Pointers on a SurfaceModel.  
+**Gap:** No mechanism for components to acquire auth tokens or call external APIs.  
+**Solution:** `ServiceConnector` pattern (R02). React Context + hooks.
+
+### G03: No LLM Tool System
+**A2UI provides:** Nothing for inference-time tool calls.  
+**Gap:** Tools are the bridge between "LLM needs data" and "show UI with data."  
+**Solution:** Keep in Kickstart's orchestration layer (R04). Not an A2UI concern.
+
+### G04: No Prompt Injection / Skills System
+**A2UI provides:** Nothing for dynamic system prompt management.  
+**Gap:** Knowledge skills are critical for Azure domain expertise.  
+**Solution:** Phase engine middleware (R05). Not an A2UI concern.
+
+### G05: No Artifact Store
+**A2UI provides:** Nothing for file-level artifact management.  
+**Gap:** Generated code (Bicep, Dockerfiles, manifests) needs persistent storage and cross-component access.  
+**Solution:** Kickstart artifact store in `packages/core` (R07).
+
+### G06: No Disabled/Past-Turn Isolation
+**A2UI provides:** Messages are immutable by design once rendered.  
+**Gap:** In conversation UIs, past turns must not re-trigger side effects when scrolled into view.  
+**Solution:** A2UI's `@a2ui/react` renderer already handles this — past messages are static DOM. But fat components with `useEffect` need their own `isActive` guard. Recommend: components check a `turnActive` prop or context value.
+
+### G07: No Auto-Continue
+**A2UI provides:** Components can fire `action.event`, but there's no "auto advance conversation" mechanism.  
+**Gap:** Components like `githubCreatePR` need to automatically trigger the next turn.  
+**Solution:** Auto-continue middleware in the Kickstart conversation engine. When a component fires a specific event type (e.g., `action.complete`), the engine synthesizes a user prompt and advances.
+
+### G08: No State Interpolation in Props
+**A2UI provides:** Data binding via JSON Pointers.  
+**Gap:** The old framework used `{{state.key}}` in any string prop (API paths, labels, etc.).  
+**Solution:** A2UI uses JSON Pointer references (`/data/region`) which serve the same purpose. LLM generates A2UI JSON with pointer references instead of `{{state.key}}`. Different syntax, same capability.
+
+## 5. Migration Priority
+
+| Priority | Pattern | Effort | Rationale |
+|----------|---------|--------|-----------|
+| P0 | ServiceConnector (Azure auth) | 1 day | Everything depends on auth |
+| P0 | ServiceConnector (GitHub auth) | 1 day | PR creation depends on it |
+| P0 | ServicePack abstraction | 0.5 day | Registration framework |
+| P0 | CORS proxy backend | 1 day | Already planned in infra |
+| P1 | AzureResourcePicker (fat component) | 1 day | Core UX for resource selection |
+| P1 | GitHubPicker (fat component) | 1 day | Core UX for repo/branch selection |
+| P1 | GitHubCommit (createPR) | 1.5 days | Core deployment path |
+| P1 | Azure/GitHub LoginCards | 1 day | Auth UI |
+| P1 | K8s Validator + auto-fix | 0.5 day | Pure TS port, zero framework |
+| P1 | Knowledge skills resolver | 0.5 day | Prompt middleware |
+| P2 | AzureResourceForm (ARM introspection) | 2 days | Dynamic forms are complex |
+| P2 | ArchitectureDiagram | 1.5 days | Mermaid + ELK + icons |
+| P2 | AzureAction / GitHubAction (write-with-confirm) | 1 day | Write operations |
+| P2 | GitHubSetSecret | 0.5 day | Libsodium encryption |
+| P2 | CostEstimate | 1 day | Pricing API integration |
+| P3 | LLM tools port | 1 day | Already have pattern |
+| P3 | DiagramBuilder (auto-generate from artifacts) | 1 day | Nice-to-have |
+| P3 | Intent resolvers (shortcuts) | 0.5 day | Convenience, not critical |
+
+**Total estimate:** ~16.5 developer-days for full pack port.
+
+## Decision
+
+Adopt the **ServicePack + ServiceConnector** pattern as Kickstart's extension model. All pack components become fat A2UI custom components. Auth, tools, skills, and artifacts live in Kickstart's orchestration layer, not in A2UI. Port patterns P01-P14 following the priority table above.
+
+This gives us the same rich capabilities as the adaptive-ui-framework while building on A2UI's renderer and Google's component model. We keep what worked (structured JSON, fat components, tools, skills) and drop what A2UI replaces (custom registry, custom renderer, custom context).
+
+---
+
+# Decision: Smart Control Patterns from adaptive-ui-trip-notebook
+
+**Date:** 2025-07-25
+**Author:** Leela (Lead)
+**Status:** Research / Informational
+**Requested by:** Ahmed Sabbour
+
+## Context
+
+Research analysis of `sabbour/adaptive-ui-trip-notebook` — an AI travel planning assistant built on the same adaptive-ui-framework used by the AKS app (`sabbour/adaptive-ui-try-aks`). This app uses 3 domain-specific packs with 11 smart controls, revealing additional architectural patterns beyond what the AKS app demonstrates.
+
+## 1. Control Inventory
+
+### Travel Data Pack (`@sabbour/adaptive-ui-travel-data-pack`)
+
+| Control | Props | Pattern | API |
+|---------|-------|---------|-----|
+| `weatherCard` | `city` | Client-side fetch + 3-day forecast strip | wttr.in (free, no key) |
+| `countryInfoCard` | `country` | Client-side fetch + fact card with flag | restcountries.com (free) |
+| `currencyConverter` | `from?, to?` | Interactive widget with amount input + swap | open.er-api.com (free) |
+| `travelChecklist` | `items, bind` | Checkbox list with progress bar | None (local state) |
+| `budgetTracker` | `items, currency?, bind?` | Category-bar visualization + auto-artifact | None (auto-saves) |
+
+**Tools:** `get_weather`, `get_exchange_rate`, `get_country_info`, `get_time_zone`
+
+### Google Maps Pack (`@sabbour/adaptive-ui-google-maps-pack`)
+
+| Control | Props | Pattern | API |
+|---------|-------|---------|-----|
+| `googleMaps` | `mode, query, origin, destination...` | 5-mode iframe embed | Maps Embed API |
+| `googlePlacesSearch` | `query, bind` | Click-to-select place list | Places API (new) |
+| `googleNearby` | `location, bind, placeType?` | Photo grid with ratings | Places API (new) |
+| `googlePhotoCard` | `query, caption?` | Hero image with overlay | Places API (photos) |
+
+**Tools:** `google_places_search`, `google_place_details`, `google_geocode`
+
+### Google Flights Pack (`@sabbour/adaptive-ui-google-flights-pack`)
+
+| Control | Props | Pattern | API |
+|---------|-------|---------|-----|
+| `flightSearch` | `from, to, date, bind?` | Live results via CORS proxy + HTML parse | Google Flights (scrape) |
+| `flightCard` | `from, to, date` | Deep link card with protobuf URL | None (URL construction) |
+
+**Tools:** `search_flights`
+
+## 2. New Patterns (Not Found in AKS App)
+
+### Pattern A: Component-Autonomous Data Fetching
+
+Components call external APIs themselves at render time. The LLM provides minimal props (`city: "Paris"`) and the component handles the entire API lifecycle: loading state → fetch → parse → render → error recovery. The LLM never sees the fetched data.
+
+**Why it matters:** Saves tokens, parallelizes API calls, and enables real-time data without tool calls. For Kickstart, a `DeploymentStatus` component could poll Azure APIs directly without the LLM orchestrating it.
+
+**Example:** `{type: "weatherCard", city: "Cairo"}` — component fetches wttr.in, shows loading spinner, renders 3-day forecast. LLM moves on immediately.
+
+### Pattern B: Artifact Extraction Pipeline
+
+The app walks the entire AdaptiveUISpec layout tree after each LLM response, extracting structured data from component nodes. Extraction functions recognize component types (`countryInfoCard` → destination, `flightSearch` → flight info, `budgetTracker` → budget items) and persist them as typed artifacts via `upsertArtifact()`.
+
+**Extraction targets:** places, flights, weather, checklists, photos, itinerary days, code blocks — each with its own tree-walking function.
+
+**Why it matters:** Creates a persistent structured data layer from ephemeral chat components. Enables the second-panel "Trip Notebook" to aggregate all trip data across the conversation.
+
+### Pattern C: Dual-Role API Integration (Tool + Component)
+
+Every external API has TWO entry points:
+1. **Tool** — LLM calls it at inference time, sees the response, reasons about it
+2. **Component** — renders visually for the user, fetches data client-side
+
+The system prompt explicitly instructs when to use each: "Use `get_weather` TOOL when LLM needs data to reason. Use `weatherCard` COMPONENT to display weather visually."
+
+**Why it matters:** Optimizes token usage. The LLM only calls tools when it needs data to make decisions. Visual display uses components that fetch independently. For Kickstart: `check_aks_status` tool for LLM reasoning vs. `aksStatusCard` component for user display.
+
+### Pattern D: Cross-Component State Binding via `{{state.key}}`
+
+The `bind` prop + `{{state.key}}` interpolation creates implicit cross-component communication:
+- User selects a hotel in `googlePlacesSearch` → stores in `state.hotel`
+- `googleNearby` uses `location: "{{state.hotel}}"` → shows restaurants near selected hotel
+- `flightSearch` uses `from: "{{state.fromAirport}}"` → updates when departure is set
+
+State is managed via `dispatch({ type: 'SET', key, value })`. Components read via `interpolate(prop, state)`.
+
+**Why it matters:** Enables multi-step wizards without LLM orchestration. Once state is set, downstream components auto-update. For Kickstart: selecting a runtime could auto-update deployment templates, resource suggestions, and cost estimates.
+
+### Pattern E: Graceful Degradation Chain
+
+FlightSearch demonstrates a 3-tier fallback:
+1. **Rich mode:** CORS proxy → fetch Google Flights HTML → parse → show interactive results
+2. **Link mode:** No proxy or parse fails → show styled "Search on Google Flights" link card
+3. **Error mode:** Missing params → show yellow warning banner
+
+GoogleNearby: Photos attempt Places API photo fetch → fall back to colored placeholder initials.
+
+**Why it matters:** External APIs are unreliable. Every component needs a degradation path. For Kickstart: Azure API down → show cached state → show "check in portal" link.
+
+### Pattern F: Artifact-Driven Side Panel
+
+The TripNotebook panel uses `useSyncExternalStore` to subscribe to the artifact store. It categorizes artifacts by filename prefix convention:
+- `place-*` → Overview tab destinations
+- `flight-*` → Travel tab flights
+- `budget-*` → Budget tab line items
+- `weather-*` → Overview tab weather
+- `itinerary-day-*` → Itinerary tab (sorted by day number)
+- `checklist-*` → Packing tab
+- Everything else → Trip Files
+
+**Why it matters:** Decouples data production (chat components) from data consumption (notebook panel). For Kickstart: a "Deployment Dashboard" panel could aggregate all deployment artifacts by convention.
+
+### Pattern G: Protobuf URL Construction
+
+The flights pack includes a minimal protobuf encoder (`protobuf.ts`) that builds binary-encoded Google Flights URLs. It implements the wire format (varint, length-delimited, tags) and specific message types (Airport, FlightData, Info).
+
+**Why it matters:** Pattern for integrating with services that use binary/encoded URL parameters. Could apply to Azure Portal deep links with complex state.
+
+### Pattern H: HTML Scraping as API Alternative
+
+The flights pack parses Google Flights HTML responses to extract structured flight data (`parser.ts`). It looks for specific script tags (`class="ds:1"`) and `AF_initDataCallback` patterns, then walks nested JSON arrays to extract prices, airlines, legs, durations, and carbon emissions.
+
+**Why it matters:** When official APIs don't exist or are too expensive, scraping-via-CORS-proxy is a viable pattern. For Kickstart: could scrape Azure pricing pages or status pages as a fallback.
+
+### Pattern I: Pack Scoping
+
+`getActivePackScope() / setActivePackScope('travel')` + `clearAllPacks()` ensures multi-app isolation. When the travel app mounts, it clears any other app's packs and registers its own.
+
+### Pattern J: Session-Scoped Artifact Persistence
+
+Each session has its own artifact namespace. Switching sessions calls `saveArtifactsForSession(oldId)` then `loadArtifactsForSession(newId)`. Deleting a session also deletes its artifacts.
+
+## 3. Cross-Domain Patterns (Shared with AKS App)
+
+Both apps share the same foundational architecture:
+
+| Pattern | Implementation |
+|---------|---------------|
+| Pack factory | `create{Name}Pack(): ComponentPack` |
+| Registration | `registerPackWithSkills(pack)` |
+| Component typing | `AdaptiveComponentProps<T extends AdaptiveNodeBase>` |
+| State access | `useAdaptive()` → `{ state, dispatch, disabled }` |
+| Template interpolation | `interpolate(value, state)` for `{{state.key}}` |
+| Tool definition | OpenAI function-calling format (`type: 'function'`) |
+| Tool handler | `async (args: Record<string, unknown>) => string` |
+| Observable fetch | `trackedFetch(url, options)` |
+| Settings panel | `settingsComponent` in pack definition |
+| System prompt per pack | `systemPrompt` string in pack definition |
+| API key storage | `localStorage` via settings components |
+| Error display | Shared `Banner` component pattern |
+| Loading display | Shared `LoadingSpinner` component pattern |
+
+## 4. Architecture Implications for Kickstart A2UI Pack Design
+
+### 4.1 Pack Anatomy Formalized
+
+Every Kickstart pack should have this structure:
+```
+{
+  name: string,
+  displayName: string,
+  components: Record<string, React.FC>,    // visual controls
+  tools: ToolDefinition[],                  // LLM-callable functions
+  systemPrompt: string,                     // instructions for when/how to use
+  settingsComponent?: React.FC,             // API key / config UI
+}
+```
+
+### 4.2 Component Autonomy Principle
+
+Components that display external data should fetch it themselves (like `weatherCard` fetches wttr.in). The LLM provides intent (`what` to show), the component handles execution (`how` to get and display it). This saves tokens and enables real-time updates.
+
+**Kickstart application:**
+- `aksClusterStatus` — polls Azure for cluster health, shows live status
+- `deploymentProgress` — polls deployment, shows step-by-step progress
+- `costEstimate` — fetches Azure pricing calculator, shows cost breakdown
+- `resourceHealth` — subscribes to Azure Resource Health API
+
+### 4.3 Dual-Entry API Pattern
+
+For every Azure/GitHub API integration:
+- **Tool:** `check_deployment_status` — LLM calls it, sees JSON, reasons about next steps
+- **Component:** `deploymentStatusCard` — user sees live visual, component polls API
+- **System prompt rule:** "Use the tool when you need data to decide. Use the component when showing the user."
+
+### 4.4 Artifact Convention for Dashboard Panel
+
+If we build a Kickstart dashboard panel (like TripNotebook), use filename prefix convention:
+- `infra-*` — Infrastructure resources
+- `deploy-*` — Deployment status/progress
+- `cost-*` — Cost estimates and breakdowns
+- `manifest-*` — Generated Bicep/Helm/Dockerfile files
+- `auth-*` — Entra/RBAC configuration
+
+### 4.5 State Binding for Multi-Step Flows
+
+Kickstart's 6-phase conversation can use `bind` + `{{state.key}}` for cross-phase data flow:
+- Phase 1 (Discover): user picks runtime → `state.runtime`
+- Phase 2 (Design): `architectureDiagram` reads `{{state.runtime}}`
+- Phase 3 (Generate): manifest templates interpolate `{{state.runtime}}`
+- Phase 4 (Review): cost estimate uses `{{state.runtime}}` for pricing
+
+### 4.6 Graceful Degradation Required
+
+Every component that calls an external API must have:
+1. Rich interactive mode (API available)
+2. Static/cached mode (API slow or intermittent)
+3. Link-out mode (API unavailable — "Check in Azure Portal")
+4. Error display mode (with actionable message)
+
+## 5. Recommended Kickstart Packs
+
+Based on patterns from both apps:
+
+| Pack | Components | Tools |
+|------|-----------|-------|
+| `kickstart-azure-pack` | aksClusterStatus, resourceGroup, costEstimate, deploymentProgress | check_cluster, get_pricing, list_resources |
+| `kickstart-github-pack` | repoCard, workflowStatus, prCard, codeViewer | create_repo, trigger_workflow, get_file |
+| `kickstart-iac-pack` | fileEditor, manifestPreview, architectureDiagram, diffViewer | generate_bicep, generate_helm, validate_k8s |
+| `kickstart-auth-pack` | entraAppCard, rbacMatrix, secretsPanel | configure_entra, assign_roles, create_secret |
+
+---
+
+# Decision: Playground JSON Viewer Implementation
+
+**Date:** 2026-04-09  
+**Author:** Fry  
+**Status:** Implemented  
+
+## Context
+
+Users needed a way to view the raw A2UI JSON behind each scenario in the Playground to understand the structure and learn how to create their own scenarios.
+
+## Decision
+
+Added a tabbed interface to the Playground right panel with "Preview" and "JSON" tabs:
+
+1. **Tab Navigation**: Used Fluent UI React v9 `TabList` and `Tab` components for a consistent, accessible tab interface.
+
+2. **State Management**: 
+   - `selectedScenario`: Tracks which scenario is currently active (set when user clicks a scenario)
+   - `selectedTab`: Tracks active tab ('preview' | 'json'), defaults to 'preview'
+
+3. **JSON Generation**:
+   - For scenarios with `generate()` functions: Call the function and stringify the result
+   - For keyword-based scenarios: Call `resetDemoState()` + `getDemoResponse()` to produce real A2UI JSON
+
+4. **Styling Approach**:
+   - All styles use Fluent UI tokens (no raw CSS values)
+   - Code block uses `tokens.fontFamilyMonospace` for consistency
+   - Background uses `colorNeutralBackground3` for subtle contrast
+   - Proper spacing with `spacingHorizontalL` and `spacingVerticalM`
+
+5. **Layout Integration**:
+   - Tabs header is fixed (flexShrink: 0) to stay visible while scrolling
+   - Both tab panels maintain the scrolling behavior from playground.css
+   - JSON viewer container has `flex: 1` and `overflow: auto` to fill available space
+
+## Alternatives Considered
+
+1. **Side-by-side split view**: Would have been harder to fit in the already-split layout
+2. **Toggle button instead of tabs**: Less discoverable, tabs are more conventional for this use case
+3. **Syntax highlighting library**: Decided to keep it simple with monospace font and proper indentation initially; added via separate decision
+
+## Impact
+
+- Users can now inspect the A2UI JSON structure for any scenario
+- Helps with learning and debugging
+- No breaking changes to existing functionality
+- Maintains accessibility through Fluent UI components
+
+---
+
+# Decision: Fluent 2 Polish — Syntax Highlighting, Markdown Control, Component Audit
+
+**Date:** 2026-04-10  
+**Decider:** Fry (Frontend Dev)  
+**Status:** Implemented
+
+## Context
+
+Ahmed Sabbour identified three UI polish issues in the Kickstart web app:
+1. Code blocks lacked syntax highlighting (plain monospace text)
+2. No Markdown component for rendering LLM markdown responses with Fluent styling
+3. Some controls had slipped Fluent 2 design language (spacing, typography, layout inconsistencies)
+
+These issues affected code readability, content formatting flexibility, and visual consistency.
+
+## Decision
+
+Implemented a three-part polish pass:
+
+### 1. Code Block Syntax Highlighting
+- Added `highlight.js` to `CodeBlock.tsx` component
+- Registered 10+ common languages (JavaScript, TypeScript, Python, Java, C#, JSON, XML/HTML, CSS, Bash, Markdown)
+- Applied VS theme (`highlight.js/styles/vs.css`) to complement Fluent 2 neutral palette
+- Used `useMemo` for performance optimization
+
+### 2. Markdown A2UI Component
+- Created new `Markdown.tsx` component using `react-markdown` and `remark-gfm`
+- All HTML elements styled with Fluent 2 tokens via `makeStyles`
+- Code blocks within Markdown delegate to highlight.js
+- Registered in `kickstart-catalog.ts` alongside other custom components
+
+### 3. Fluent 2 Component Audit
+- Audited all components in `fluent-components/`, `components/`, and `Playground.tsx`
+- Fixed violations in Modal.tsx, Icon.tsx, Video.tsx, ProgressSteps.tsx, Playground.tsx
+- Replaced inline styles with `makeStyles` classes
+- Replaced hardcoded values (px, hex, rgb) with Fluent tokens
+- Ensured all spacing/fonts/colors use `tokens.*` references
+
+## Rationale
+
+**Syntax highlighting:** Improves code readability and provides visual hierarchy within code blocks. `highlight.js` chosen for lightweight footprint (190+ languages available) and VS theme chosen for Fluent 2 compatibility.
+
+**Markdown component:** Enables flexible content formatting from LLM responses while maintaining Fluent 2 design system consistency. Using `react-markdown` provides GitHub-flavored markdown support (tables, strikethrough, task lists).
+
+**Component audit:** Ensures visual consistency across the app by enforcing Fluent 2 design language. Using tokens instead of hardcoded values makes theme changes easier and ensures consistency with Microsoft design systems.
+
+## Consequences
+
+**Positive:**
+- Code blocks now have professional syntax highlighting
+- Markdown content can be rendered with full Fluent 2 styling
+- Visual consistency improved across all components
+- Design system compliance makes future theme updates easier
+- All changes use existing Fluent UI React v9 + A2UI adapter pattern
+
+**Negative:**
+- Added two dependencies (`highlight.js`, `react-markdown`, `remark-gfm`)
+- Bundle size increased slightly (but build still optimizes to 302 KB gzipped)
+
+## Alternatives Considered
+
+**For syntax highlighting:**
+- Prism.js — more plugins but heavier
+- Shiki — better accuracy but requires WASM and is slower
+
+**For Markdown:**
+- marked.js — smaller but no React integration, harder to style
+- Custom markdown parser — too much work for limited benefit
+
+**For audit:**
+- Leave inline styles — rejected because it violates Fluent 2 design language
+- Create global CSS classes — rejected because `makeStyles` provides better scoping and token integration
+
+## Implementation
+
+- Files changed:
+  - `packages/web/src/catalog/components/CodeBlock.tsx` (syntax highlighting)
+  - `packages/web/src/catalog/components/Markdown.tsx` (new component)
+  - `packages/web/src/catalog/kickstart-catalog.ts` (registration)
+  - `packages/web/src/catalog/fluent-components/Modal.tsx` (inline styles removed)
+  - `packages/web/src/catalog/fluent-components/Icon.tsx` (hardcoded font size removed)
+  - `packages/web/src/catalog/fluent-components/Video.tsx` (inline aspectRatio removed)
+  - `packages/web/src/catalog/components/ProgressSteps.tsx` (font family added)
+  - `packages/web/src/pages/Playground.tsx` (7 inline styles removed)
+- Build verification: `npx vite build` passes with zero errors
+- All components follow Fluent 2 audit checklist
+
+---
+
+# Decision: Backend Session ID Bridge Pattern
+
+**Date**: 2026-04-10  
+**Author**: Fry (Frontend Dev)  
+**Status**: Implemented  
+
+## Context
+
+The LLM had no conversation memory because the frontend and backend used incompatible session ID systems:
+- Frontend: `session-{timestamp}-{random}` (generated in `useSessions.ts`)
+- Backend: `randomUUID()` (generated in `session-store.ts`)
+
+When the frontend passed its session ID to the backend, it never matched any existing session in the backend's Map, causing a new session to be created for every message. The LLM only saw the system prompt + current message with no history.
+
+## Decision
+
+Introduce a `backendSessionId` field on the `Session` type to bridge the two ID systems:
+
+1. Frontend sessions keep their UI-friendly IDs for localStorage and display
+2. Each frontend session tracks its corresponding backend session ID via `backendSessionId?: string`
+3. On first message, pass `undefined` to backend → backend creates new session and returns its UUID
+4. Capture the backend UUID from the SSE `done` event and store it on the frontend session
+5. On subsequent messages, pass the stored `backendSessionId` instead of the frontend ID
+
+## Implementation
+
+- Added `backendSessionId?: string` to `Session` type in `types.ts`
+- Updated `StreamCallbacks.onComplete` signature to include `sessionId?: string` parameter
+- Modified `useStreaming.ts` to capture `event.sessionId` from SSE responses and pass to `onComplete`
+- Updated `useMockStreaming.ts` to match the new callback signature (passes `undefined`)
+- Added `updateSession()` method to `useSessions.ts` for updating session metadata
+- Modified `App.tsx` to read `backendSessionId` before calling `streaming.send()` and store it on first response
+
+## Consequences
+
+**Positive:**
+- LLM now has full conversation history across multiple messages
+- Clean separation between UI session IDs and backend session IDs
+- No breaking changes to existing session storage format (backendSessionId is optional)
+
+**Neutral:**
+- Adds one extra field to session state
+- Introduces slight coupling between frontend and backend session models
+
+**Trade-offs:**
+- Could have unified to a single ID system, but that would require migrating existing localStorage sessions or changing backend UUID generation
+- This approach is minimally invasive and preserves both systems
+
