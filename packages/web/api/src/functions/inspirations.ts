@@ -158,7 +158,7 @@ app.http("inspirations", {
           ideas = await generateIdeas();
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          context.warn(`OpenAI generation failed, using fallback: ${msg}`);
+          context.log(`OpenAI generation failed, using fallback: ${msg}`);
           ideas = [shuffle(FALLBACK_IDEAS)[0]];
         }
       } else {
@@ -172,7 +172,7 @@ app.http("inspirations", {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      context.error(`Inspirations error: ${message}`);
+      context.log(`Inspirations error: ${message}`);
       return { status: 500, jsonBody: { error: message } };
     }
   },
