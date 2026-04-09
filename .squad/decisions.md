@@ -6592,3 +6592,148 @@ User → converse.ts → LLM (with catalog schema + examples in prompt)
 
 The key shift: **LLM generates A2UI JSON directly** instead of us post-processing markdown into components. This is more reliable, supports the full component catalog, and enables the prompt-generate-validate loop the spec prescribes.
 
+# Decision: A2UI Official Sample Implementation Analysis
+
+**Author:** Copilot (Coordinator)
+**Date:** 2025-07-26
+**Status:** Research Finding
+**Requested by:** Ahmed Sabbour
+**Sources:**
+- https://github.com/google/A2UI/tree/main/samples/agent/adk/restaurant_finder
+- https://github.com/google/A2UI/tree/main/samples/agent/adk/contact_lookup
+- https://github.com/google/A2UI/tree/main/samples/agent/adk/rizzcharts
+
+---
+
+## Summary
+
+Analyzed all three official A2UI ADK sample implementations. Found two distinct agent architectures and seven new findings (F16-F22) with direct impact on Kickstart's implementation approach.
+
+## Two A2UI Agent Architectures
+
+### Pattern 1: Prompt-Inject + Validate (restaurant_finder, contact_lookup)
+- Schema + few-shot examples injected into LLM system prompt via `A2uiSchemaManager.generate_system_prompt()`
+- LLM generates A2UI JSON inline in text output, wrapped in `A2UI_OPEN_TAG`/`A2UI_CLOSE_TAG` tags
+- Backend parses response, validates with `jsonschema`, retries on failure (max_retries=1)
+- Uses `BasicCatalog.get_config()` — no custom catalog
+- Both v0.8 and v0.9 supported with separate runners per version
+
+### Pattern 2: Tool-Based (rizzcharts) ⭐ RECOMMENDED FOR KICKSTART
+- LLM calls `send_a2ui_json_to_client` TOOL with A2UI JSON as argument
+- Schema/examples loaded into session state (not prompt) by executor at setup time
+- Toolset reads schema from session state, validates JSON, returns error as tool response
+- Uses `CatalogConfig.from_path()` for CUSTOM catalog + BasicCatalog as fallback
+- `BuiltInPlanner` with `ThinkingConfig` enables reasoning before UI generation
+- `include_schema=False, include_examples=False` in system prompt — toolset handles it
+
+## New Findings
+
+### F16: Two A2UI Agent Architectures
+**What:** Google's official samples demonstrate two distinct patterns for A2UI generation: (1) prompt-inject where the LLM outputs A2UI in text, and (2) tool-based where the LLM calls a function with A2UI JSON.
+**Impact:** The tool-based pattern (rizzcharts) is more reliable for OpenAI models because:
+- Structured output via function calling (no text parsing needed)
+- Validation happens in tool — error goes back as natural tool response
+- LLM reasoning is separate from A2UI output
+- More compatible with OpenAI's function calling / Responses API
+**Recommendation:** Adopt tool-based pattern for Kickstart. Define a `render_ui` function/tool that accepts A2UI JSON, validates it, and streams to client.
+
+### F17: Actions = Re-Prompt LLM (All Three Samples)
+**What:** ALL three samples handle user button clicks by translating the action into natural language and re-prompting the LLM. Example from restaurant_finder agent_executor.py:
+- `"book_restaurant"` action → `"USER_WANTS_TO_BOOK: {restaurant_name}, Address: {address}, ImageURL: {image_url}"`
+- `"submit_booking"` action → `"User submitted a booking for {restaurant_name} for {party_size} people at {reservation_time}..."`
+**Impact:** This is fundamentally different from our adaptive-ui-framework approach (direct action dispatch to handlers). In A2UI, the LLM stays in full control of ALL state transitions. No separate action handlers needed.
+**Recommendation:** For Kickstart, convert button click events to conversation messages. The LLM decides what happens next based on the action context. This aligns perfectly with our conversation-driven architecture.
+
+### F18: Custom Catalog is Self-Contained (rizzcharts)
+**What:** Rizzcharts' custom catalog (~35KB JSON Schema) includes ALL basic catalog components (Text, Image, Button, TextField, CheckBox, ChoicePicker, Slider, DateTimeInput, etc.) PLUS custom components (Chart, GoogleMap, Canvas). It is NOT a delta/extension — it's a full standalone catalog.
+**Impact:** Confirms R1 (create kickstart_catalog.json as native catalog). Our catalog must define ALL components we want the LLM to use, not just custom ones.
+**Components in rizzcharts catalog:** Text, Image, Icon, Video, AudioPlayer, Row, Column, List, Card, Tabs, Modal, Divider, Button, TextField, CheckBox, ChoicePicker, Slider, DateTimeInput, Canvas, Chart, GoogleMap
+**Recommendation:** Our kickstart_catalog.json should include: all Fluent UI components we support + custom Kickstart components (AzureResourcePicker, GitHubRepoPicker, DeploymentStatus, CostEstimate, etc.)
+
+### F19: Canvas Component = Side Panel Pattern
+**What:** The rizzcharts catalog defines a `Canvas` component described as: "Renders the UI element in a stateful panel next to the chat window." Used as root component for surfaces that should appear alongside (not inline with) the conversation.
+**Impact:** This is exactly what we need for file editor, architecture diagrams, cost estimates — content that persists alongside the chat. The Canvas pattern provides a spec-compliant way to implement our split-pane playground layout.
+**Recommendation:** Include a `Canvas` (or `Panel`) component in kickstart_catalog.json for side-panel rendering. Map to our existing split-pane layout.
+
+### F20: Multi-Catalog Support
+**What:** Rizzcharts registers BOTH its custom catalog AND the basic catalog simultaneously:
+```python
+catalogs=[
+    CatalogConfig.from_path(name="rizzcharts", ...),
+    BasicCatalog.get_config(version=version, ...),
+]
+```
+Agent selects catalog based on client `supportedCatalogIds` capability.
+**Impact:** We can support multiple catalogs — a rich Kickstart catalog for our app, plus basic catalog as fallback for simpler clients.
+**Recommendation:** Register kickstart_catalog + basic_catalog. Use kickstart_catalog by default, fall back to basic_catalog for external/third-party clients.
+
+### F21: SendA2uiToClientToolset Pattern (rizzcharts)
+**What:** Instead of parsing A2UI from text output, rizzcharts uses `SendA2uiToClientToolset` — the LLM calls `send_a2ui_json_to_client` as a tool/function:
+```python
+tools=[
+    get_store_sales,
+    get_sales_data,
+    SendA2uiToClientToolset(
+        a2ui_catalog=self._a2ui_catalog_provider,
+        a2ui_enabled=self._a2ui_enabled_provider,
+        a2ui_examples=self._a2ui_examples_provider,
+    ),
+]
+```
+The toolset:
+- Reads catalog schema from session state (via providers)
+- Validates the A2UI JSON the LLM passes as argument
+- Returns validation errors as tool response (natural retry)
+- Streams validated A2UI to client
+**Impact:** This is the cleanest integration pattern. For Kickstart with OpenAI, we define `render_ui` as a function in the Responses API. The LLM calls it with A2UI JSON. Our backend validates and streams.
+**Recommendation:** Implement a `render_ui` tool/function for our converse.ts endpoint. LLM calls it to send UI. We validate and stream. This replaces our current response-processor.ts manual construction.
+
+### F22: Session State for A2UI Context
+**What:** Rizzcharts' executor injects A2UI metadata into session state at runtime:
+```python
+state_delta={
+    _A2UI_ENABLED_KEY: True,
+    _A2UI_CATALOG_KEY: a2ui_catalog,
+    _A2UI_EXAMPLES_KEY: examples,
+}
+```
+The toolset reads from session state when the LLM calls it — catalog and examples are available dynamically, not baked into the system prompt.
+**Impact:** Decouples A2UI setup from prompt construction. The system prompt stays lean (role + workflow + UI description). Schema/examples are injected at runtime based on client capabilities negotiation.
+**Recommendation:** For Kickstart, store catalog schema and examples in conversation context (or session state). The render_ui tool reads them when called. System prompt only needs role description, workflow rules, and UI template rules.
+
+## Architecture Comparison: Current vs Target
+
+### Current Flow (Broken)
+```
+User → converse.ts → LLM (no schema, no tools) → markdown text
+  → response-processor.ts manually constructs A2UI components
+  → Client renders (actions → console.log dead-end)
+```
+
+### Target Flow (Per Rizzcharts Pattern)
+```
+User → converse.ts → LLM (with render_ui tool + data tools)
+  → LLM calls render_ui(a2ui_json) ← validated by tool
+  → Stream A2UI messages to client
+  → Client renders → user clicks → action → translate to NL → re-prompt LLM
+```
+
+### Key Architectural Shifts
+1. **LLM generates A2UI directly** via tool call (not post-processing markdown)
+2. **Actions re-prompt LLM** (not direct dispatch to handlers)
+3. **Catalog schema as tool context** (not in system prompt)
+4. **Validation in tool** (not in response processor)
+5. **Multiple tools** — data tools (Azure, GitHub APIs) + render_ui tool (A2UI output)
+
+## Updated Cumulative Recommendations
+
+| ID | Priority | Recommendation | Updated By |
+|----|----------|---------------|------------|
+| R18 | P0 | Implement `render_ui` tool/function for LLM to output A2UI JSON (tool-based pattern from rizzcharts) | F16, F21 |
+| R19 | P0 | Convert action events to conversation messages and re-prompt LLM (action re-prompting pattern from all 3 samples) | F17 |
+| R20 | P1 | Include Canvas/Panel component in kickstart_catalog for side-panel rendering | F19 |
+| R21 | P1 | Register multi-catalog (kickstart + basic) with capability-based selection | F20 |
+| R22 | P2 | Store catalog schema/examples in session state, not system prompt | F22 |
+
+Note: R18 supersedes R3 (feed catalog to system prompt) and R10 (add backend action endpoint). The tool-based pattern is cleaner than both.
+Note: R19 supersedes R9 (wire action handler) and R11 (fix button schema). Actions become conversation messages, not dispatched events.
