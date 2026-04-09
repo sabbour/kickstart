@@ -105,9 +105,13 @@ const useStyles = makeStyles({
   sectionItems: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
+    gap: tokens.spacingVerticalXXS,
     paddingTop: tokens.spacingVerticalXXS,
     paddingBottom: tokens.spacingVerticalS,
+  },
+  accordionCaption: {
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
   },
   jsonArea: {
     paddingTop: tokens.spacingVerticalXXS,
@@ -120,6 +124,9 @@ const useStyles = makeStyles({
   jsonActions: {
     display: 'flex',
     gap: tokens.spacingHorizontalXS,
+    marginTop: tokens.spacingVerticalXS,
+  },
+  errorMessage: {
     marginTop: tokens.spacingVerticalXS,
   },
   surfaceBody: {
@@ -185,6 +192,11 @@ const useStyles = makeStyles({
     padding: tokens.spacingVerticalM,
     borderRadius: tokens.borderRadiusMedium,
     overflowX: 'auto',
+  },
+  activityHeader: {
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    fontSize: tokens.fontSizeBase200,
   },
 });
 
@@ -321,7 +333,7 @@ export function Playground() {
                   <AccordionItem key={group} value={group}>
                     <AccordionHeader size="small">
                       <div className={classes.accordionHeader}>
-                        <Caption1 weight="semibold" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <Caption1 weight="semibold" className={classes.accordionCaption}>
                           {group}
                         </Caption1>
                         <Caption1 className={classes.sectionCount}>{scenarios.length}</Caption1>
@@ -349,7 +361,7 @@ export function Playground() {
               {/* JSON editor */}
               <AccordionItem value="custom-json">
                 <AccordionHeader size="small">
-                  <Caption1 weight="semibold" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <Caption1 weight="semibold" className={classes.accordionCaption}>
                     Custom JSON
                   </Caption1>
                 </AccordionHeader>
@@ -371,7 +383,7 @@ export function Playground() {
                       spellCheck={false}
                     />
                     {jsonError && (
-                      <MessageBar intent="error" style={{ marginTop: tokens.spacingVerticalXS }}>
+                      <MessageBar intent="error" className={classes.errorMessage}>
                         <MessageBarBody>{jsonError}</MessageBarBody>
                       </MessageBar>
                     )}
@@ -463,7 +475,7 @@ export function Playground() {
           {/* Activity log */}
           {activityLog.length > 0 && (
             <div className={classes.logSection}>
-              <Body1Strong style={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: tokens.fontSizeBase200 }}>
+              <Body1Strong className={classes.activityHeader}>
                 Activity Log
               </Body1Strong>
               <div className={classes.logItems}>

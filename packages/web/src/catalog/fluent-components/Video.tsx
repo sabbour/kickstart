@@ -8,6 +8,7 @@ const useStyles = makeStyles({
     width: '100%',
     marginTop: tokens.spacingVerticalS,
     marginBottom: tokens.spacingVerticalS,
+    aspectRatio: '16/9',
   },
 });
 
@@ -19,7 +20,6 @@ export const Video = createReactComponent(VideoApi, ({props}) => {
       src={props.url}
       controls
       className={classes.root}
-      style={{aspectRatio: '16/9'}}
     />
   );
 });

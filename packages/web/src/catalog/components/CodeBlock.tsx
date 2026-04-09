@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
@@ -11,6 +11,31 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { CopyRegular, CheckmarkRegular } from '@fluentui/react-icons';
+import hljs from 'highlight.js/lib/core';
+import javascript from 'highlight.js/lib/languages/javascript';
+import typescript from 'highlight.js/lib/languages/typescript';
+import python from 'highlight.js/lib/languages/python';
+import java from 'highlight.js/lib/languages/java';
+import csharp from 'highlight.js/lib/languages/csharp';
+import json from 'highlight.js/lib/languages/json';
+import xml from 'highlight.js/lib/languages/xml';
+import css from 'highlight.js/lib/languages/css';
+import bash from 'highlight.js/lib/languages/bash';
+import markdown from 'highlight.js/lib/languages/markdown';
+import 'highlight.js/styles/vs.css';
+
+// Register highlight.js languages
+hljs.registerLanguage('javascript', javascript);
+hljs.registerLanguage('typescript', typescript);
+hljs.registerLanguage('python', python);
+hljs.registerLanguage('java', java);
+hljs.registerLanguage('csharp', csharp);
+hljs.registerLanguage('json', json);
+hljs.registerLanguage('xml', xml);
+hljs.registerLanguage('html', xml);
+hljs.registerLanguage('css', css);
+hljs.registerLanguage('bash', bash);
+hljs.registerLanguage('markdown', markdown);
 
 const CodeBlockApi = {
   name: 'CodeBlock',
@@ -56,6 +81,23 @@ export const CodeBlock = createReactComponent(CodeBlockApi, ({ props }) => {
   const [copied, setCopied] = useState(false);
   const classes = useStyles();
 
+  const highlightedCode = useMemo(() => {
+    if (!props.code) return '';
+    
+    try {
+      if (props.language) {
+        const result = hljs.highlight(props.code, { language: props.language });
+        return result.value;
+      } else {
+        const result = hljs.highlightAuto(props.code);
+        return result.value;
+      }
+    } catch (error) {
+      // If highlighting fails, return original code
+      return props.code;
+    }
+  }, [props.code, props.language]);
+
   const handleCopy = () => {
     navigator.clipboard.writeText(props.code || '').then(() => {
       setCopied(true);
@@ -84,7 +126,7 @@ export const CodeBlock = createReactComponent(CodeBlockApi, ({ props }) => {
         </div>
       )}
       <pre className={classes.codeContent}>
-        <code>{props.code}</code>
+        <code dangerouslySetInnerHTML={{ __html: highlightedCode }} />
       </pre>
     </Card>
   );

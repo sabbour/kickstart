@@ -47,6 +47,7 @@ const useStyles = makeStyles({
     justifyContent: 'center',
     fontWeight: tokens.fontWeightSemibold,
     fontSize: tokens.fontSizeBase200,
+    fontFamily: tokens.fontFamilyBase,
   },
   dotPending: {
     backgroundColor: tokens.colorNeutralBackground3,

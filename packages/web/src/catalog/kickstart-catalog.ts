@@ -6,6 +6,7 @@ import { RadioGroup } from './components/RadioGroup';
 import { FormGroup } from './components/FormGroup';
 import { CodeBlock } from './components/CodeBlock';
 import { ProgressSteps } from './components/ProgressSteps';
+import { Markdown } from './components/Markdown';
 
 const kickstartComponents: ReactComponentImplementation[] = [
   ...Array.from(basicCatalog.components.values()),
@@ -14,6 +15,7 @@ const kickstartComponents: ReactComponentImplementation[] = [
   FormGroup,
   CodeBlock,
   ProgressSteps,
+  Markdown,
 ];
 
 export const kickstartCatalog = new Catalog<ReactComponentImplementation>(

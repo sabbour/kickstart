@@ -8,15 +8,29 @@ import {
   DialogContent,
   DialogTrigger,
   Button,
+  makeStyles,
+  tokens,
 } from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  trigger: {
+    display: 'inline-block',
+  },
+  actions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginTop: tokens.spacingVerticalM,
+  },
+});
 
 export const Modal = createReactComponent(ModalApi, ({props, buildChild}) => {
   const [isOpen, setIsOpen] = useState(false);
+  const classes = useStyles();
 
   return (
     <Dialog open={isOpen} onOpenChange={(_e, data) => setIsOpen(data.open)}>
       <DialogTrigger disableButtonEnhancement>
-        <div style={{display: 'inline-block'}}>
+        <div className={classes.trigger}>
           {props.trigger ? buildChild(props.trigger) : null}
         </div>
       </DialogTrigger>
@@ -25,7 +39,7 @@ export const Modal = createReactComponent(ModalApi, ({props, buildChild}) => {
           <DialogContent>
             {props.content ? buildChild(props.content) : null}
           </DialogContent>
-          <div style={{display: 'flex', justifyContent: 'flex-end', marginTop: '8px'}}>
+          <div className={classes.actions}>
             <Button appearance="secondary" onClick={() => setIsOpen(false)}>
               Close
             </Button>

@@ -7,7 +7,7 @@ const useStyles = makeStyles({
   root: {
     marginTop: tokens.spacingVerticalS,
     marginBottom: tokens.spacingVerticalS,
-    fontSize: '24px',
+    fontSize: tokens.fontSizeBase500,
     width: '24px',
     height: '24px',
     display: 'inline-flex',
