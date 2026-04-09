@@ -96,6 +96,16 @@ export type {
   Action,
 } from "./services/index.js";
 
+// APIConnectors — authenticated API client adapters
+export type { APIConnector, APIConnectorRequestOptions } from "./connectors/index.js";
+export { APIConnectorRegistry, defaultConnectorRegistry } from "./connectors/index.js";
+export { AzureARMConnector } from "./connectors/index.js";
+export type { AzureResource, AzureResourceGroup } from "./connectors/index.js";
+export { GitHubConnector } from "./connectors/index.js";
+export type { GitHubRepo, GitHubBranch, GitHubRepoOptions } from "./connectors/index.js";
+export { PricingConnector } from "./connectors/index.js";
+export type { ResourceCostInput, ResourceCostEstimate, CostEstimateResult } from "./connectors/index.js";
+
 // Shared types
 export type {
   AzureContext,

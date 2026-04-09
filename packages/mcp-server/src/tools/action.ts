@@ -21,7 +21,7 @@ import type {
 } from "@kickstart/core";
 import { createA2UIResource } from "../a2ui.js";
 
-type ActionType = "advance" | "skip" | "select" | "submit";
+type ActionType = "advance" | "skip" | "select" | "submit" | "reply" | "navigate" | "api";
 
 /**
  * Handle a user action from the A2UI interface.
@@ -67,22 +67,114 @@ export async function handleAction(
     case "advance":
       engineState = transition(engineState, { type: "ADVANCE", data: payload });
       break;
+
     case "skip":
       engineState = transition(engineState, { type: "SKIP" });
       break;
+
     case "select":
-      // Store selection data in session
       if (payload) {
         Object.assign(session.appDefinition, payload);
       }
       break;
+
     case "submit":
-      // Store form data and advance
       if (payload) {
         Object.assign(session.appDefinition, payload);
       }
       engineState = transition(engineState, { type: "ADVANCE", data: payload });
       break;
+
+    case "reply": {
+      const message = payload?.message;
+      if (!message || typeof message !== "string" || message.trim() === "") {
+        session.updatedAt = new Date().toISOString();
+        sessions.set(sessionId, session);
+        return {
+          content: [{ type: "text", text: "❌ Missing required field: `message` is required for reply actions." }],
+        };
+      }
+      session.messages = session.messages ?? [];
+      session.messages.push({ role: "user", content: message });
+      session.updatedAt = new Date().toISOString();
+      sessions.set(sessionId, session);
+      const replyDef = getPhaseDefinition(session.currentPhase as Phase);
+      return {
+        content: [{ type: "text", text: `Now in **${replyDef.label}** phase: ${replyDef.description}` }],
+      };
+    }
+
+    case "navigate": {
+      const targetPhase = payload?.targetPhase;
+      if (!targetPhase) {
+        session.updatedAt = new Date().toISOString();
+        sessions.set(sessionId, session);
+        return {
+          content: [{ type: "text", text: "❌ Missing required field: `targetPhase` is required for navigate actions." }],
+        };
+      }
+      const validPhases = getPhaseOrder() as string[];
+      if (!validPhases.includes(targetPhase as string)) {
+        session.updatedAt = new Date().toISOString();
+        sessions.set(sessionId, session);
+        return {
+          content: [{ type: "text", text: `❌ Invalid phase: \`${targetPhase}\` is not a recognized phase.` }],
+        };
+      }
+      // Direct phase assignment — navigation can go forward or backward
+      session.currentPhase = targetPhase as string;
+      session.updatedAt = new Date().toISOString();
+      sessions.set(sessionId, session);
+
+      // Rebuild phase status for the new current phase
+      const navPhases = getPhaseOrder();
+      const navPhaseStatus = {} as Record<Phase, PhaseStatus>;
+      for (const phase of navPhases) {
+        if (phase === session.currentPhase) {
+          navPhaseStatus[phase] = "active";
+        } else if (navPhases.indexOf(phase) < navPhases.indexOf(session.currentPhase as Phase)) {
+          navPhaseStatus[phase] = "complete";
+        } else {
+          navPhaseStatus[phase] = "pending";
+        }
+      }
+      const navPhaseItems: PhaseItem[] = navPhases.map((phase) => ({
+        id: phase,
+        label: getPhaseDefinition(phase).label,
+        status: navPhaseStatus[phase],
+      }));
+      const navPhaseComponent: ConversationPhaseComponent = {
+        type: "ConversationPhase",
+        id: "phase-indicator",
+        phases: navPhaseItems,
+        currentPhase: session.currentPhase as Phase,
+      };
+      const navResource = createA2UIResource(
+        navPhaseComponent,
+        `a2ui://kickstart/session/${sessionId}/phase`,
+      );
+      const navDef = getPhaseDefinition(session.currentPhase as Phase);
+      const navContent: Array<{ type: "text"; text: string } | { type: "resource"; resource: { uri: string; mimeType: string; text: string } }> = [
+        { type: "text", text: `Navigated to **${navDef.label}** phase: ${navDef.description}` },
+      ];
+      if (navResource) navContent.push(navResource);
+      return { content: navContent };
+    }
+
+    case "api": {
+      session.updatedAt = new Date().toISOString();
+      sessions.set(sessionId, session);
+      return {
+        content: [{ type: "text", text: "⚠️ API actions are not yet implemented — stub acknowledged. This action will be connected to the ServiceConnector in a future iteration." }],
+      };
+    }
+
+    default: {
+      // Unknown action type — return error, do not mutate state
+      return {
+        content: [{ type: "text", text: `❌ Unknown action type: \`${actionType}\`. Valid types are: advance, skip, select, submit, reply, navigate, api.` }],
+      };
+    }
   }
 
   // Update session

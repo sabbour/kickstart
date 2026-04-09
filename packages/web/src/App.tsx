@@ -11,6 +11,7 @@ import { useActionDispatch } from './hooks/useActionDispatch';
 import { useSessions } from './hooks/useSessions';
 import { useStreaming } from './hooks/useStreaming';
 import { useMockStreaming } from './hooks/useMockStreaming';
+import { useAPIConnectorRegistry } from './contexts/APIConnectorContext';
 import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
@@ -25,8 +26,11 @@ export function App() {
   const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(mockEnabled ? true : null);
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
 
+  const connectorRegistry = useAPIConnectorRegistry();
+
   const actionHandler = useActionDispatch({
     onSendMessage: (msg) => handleSendMessage(msg),
+    connectorRegistry,
   });
 
   const a2ui = useA2UI({ actionHandler });

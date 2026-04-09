@@ -93,8 +93,11 @@ export const generateKubernetesManifest: Tool<GenerateKubernetesManifestArgs> = 
   },
 
   async execute(args: GenerateKubernetesManifestArgs): Promise<unknown> {
+    // Coerce appName to string — prevents TypeError if LLM passes a number
+    const safeAppName = typeof args.appName === "string" ? args.appName : String(args.appName ?? "app");
+
     const app: AppDefinition = {
-      name: args.appName,
+      name: safeAppName,
       description: `${args.appName} application`,
       runtime: (args.runtime as AppDefinition["runtime"]) ?? "node",
       port: args.port,
