@@ -302,3 +302,49 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - B-27: `/api/converse` endpoint refinement (session lifecycle, error handling)
 - B-28: Backend integration for Create tab sessions (persistence, cleanup)
 - B-10/B-11 prep: APIConnector OAuth flows, IntegrationKit service bundling
+
+### 2026-04-09: B-24 — /api/action Endpoint
+
+- **Delivered:** `packages/web/api/src/functions/action.ts` — POST `/api/action` Azure Function.
+- **Request shape:** `{ sessionId, action: { name, context? }, context? }`. Session validated against in-memory store; 404 if not found.
+- **Action routing:** Same prefix logic as `useActionDispatch` on the frontend:
+  - `reply` (default): `actionToMessage()` → `addMessage(user)` → `chatCompletion()` → `addMessage(assistant)` → returns `{ success, message, phase, a2uiMessages, model }`
+  - `navigate:` / `nav:`: same as reply but frames the LLM prompt as a navigation intent: `"... — User is requesting to navigate to the '{phase}' phase. Please acknowledge and guide them accordingly."`
+  - `api:`: stub — returns `{ success: false, status: 'not_implemented', message: 'API actions require APIConnector (B-11)' }`. No LLM call.
+- **LLM call:** reuses `chatCompletion` from `openai-client.ts`, same JSON envelope format (`response_format: json_object`), same `processResponse` parser. Phase indicator A2UI message prepended to response A2UI array.
+- **Build fix:** Pre-existing uncommitted work (`tools/`, `converse.ts`, `openai-client.ts`) referenced `defaultRegistry` and typed tools that weren't exported from `@kickstart/core`. Fixed:
+  - Added `export { ToolRegistry, defaultRegistry }` + tool types to `packages/core/src/index.ts`
+  - Re-exported `Tool` interface from `packages/core/src/types.ts` so `tools/*.ts` can import from `"../types.js"`
+  - Changed `ToolRegistry` internals to `Tool<any>` to accept typed tool implementations
+- **Tests:** 194/202 pass. 8 failures are pre-existing (MCP server `action-handler.test.ts`, unrelated to this endpoint).
+- **Key pattern confirmed:** The `/api/action` endpoint is intentionally thin — it's a bridge from A2UI events to the conversation engine. No direct state machine manipulation; LLM drives all transitions.
+
+### 2026-04-09: B-13 — LLM Tool System
+
+- **Tool registry:** Created `packages/core/src/tools/` with `ToolRegistry` class and `defaultRegistry` singleton. `toOpenAIFormat()` outputs OpenAI function-calling schema.
+- **5 built-in tools:** `azure_resource_list`, `azure_resource_get`, `github_repo_info`, `generate_kubernetes_manifest` (real — delegates to generators/kubernetes.ts), `estimate_cost` (stub pricing table).
+- **All exported from @kickstart/core** — both MCP server and web API can import.
+- **openai-client.ts extended:** `ChatMessage` now supports `role: "tool"` and `tool_calls`. `ChatCompletionResult` includes `toolCalls`. New `chatCompletionWithTools()` handles multi-step tool loops (max 5 rounds).
+- **converse.ts wired:** Non-streaming path uses `chatCompletionWithTools`. Streaming path resolves tool calls round-by-round, emitting `event: tool_call` and `event: tool_result` SSE events per round, then emits `chunk/message/a2ui/done` for the final response.
+- **IntegrationKit extension point:** `defaultRegistry.register(tool)` — one-liner to add a tool.
+- **22 new tests** — all pass. Zero regressions (pre-existing 8 failures unrelated).
+- **Key files:** `packages/core/src/tools/` (all new), `packages/web/api/src/lib/openai-client.ts`, `packages/web/api/src/functions/converse.ts`
+
+### 2026-04-09: Decision — Changesets Monorepo Versioning
+
+- **Decision logged:** Use `@changesets/cli` for Kickstart monorepo versioning. All 3 packages linked for lockstep versioning. Config at `.changeset/config.json`, root changelog at `CHANGELOG.md`.
+- **Why changesets:** Purpose-built for npm workspaces. Changesets are markdown files (reviewable in PRs). Integrates with GitHub Actions for future automated publishing.
+- **Workflow:** Run `npm run changeset` to create changeset file. `npm run version` to consume changesets and bump. `npm run release` to publish.
+- **All packages linked:** Major version bump in any package bumps all three. Keeps monorepo cohesive.
+
+### 2026-04-09: Decision — /api/action Session Store
+
+- **Decision logged:** POST `/api/action` shares the same in-memory session store as `/api/converse` (Map from session-store.ts). Does NOT create sessions — only reads. 404 if unknown session ID.
+- **Why:** Actions arrive after conversation starts. Requiring valid session ensures action context. Shared history means LLM sees full conversation when re-prompted.
+- **Implication:** Frontend must get sessionId from `/api/converse` first. `useActionDispatch` already has sessionId via `useStreaming` hook.
+
+### 2026-04-09: Decision — Tool Registry Extension Pattern
+
+- **Decision logged:** LLM tools in `packages/core/src/tools/`. `ToolRegistry` class + `defaultRegistry` singleton bootstrapped on module load. IntegrationKits call `defaultRegistry.register(tool)` to add domain-specific tools.
+- **Streaming SSE events:** `event: tool_call` (LLM requests tool), `event: tool_result` (tool executes). Frontend can render spinners.
+- **No converse.ts changes needed** — tool system self-contained within the registry and openai-client.ts.

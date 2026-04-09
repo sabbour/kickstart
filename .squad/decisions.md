@@ -2031,3 +2031,102 @@ Per decision F17: "ALL three samples handle user button clicks by translating th
 **By:** Ahmed (via Copilot)
 **What:** Start formally tracking a changelog and versioning for Kickstart.
 **Why:** User request — captured for team memory. All future releases should follow semver and maintain a changelog.
+
+---
+
+# Decision: Changesets for Monorepo Versioning
+
+**Author:** Bender (Backend Dev)
+**Date:** 2025-07-27
+**Status:** Accepted
+
+## Context
+
+Kickstart is a monorepo with 3 npm workspace packages (`@kickstart/core`, `@kickstart/mcp-server`, `@kickstart/web`). We need a versioning strategy that keeps packages in sync, generates changelogs, and doesn't require manual coordination.
+
+## Decision
+
+Use **@changesets/cli** for version management and changelog generation.
+
+### Configuration
+
+- **Access:** `restricted` — `kickstart` root and `@kickstart/web` are private; `@kickstart/core` and `@kickstart/mcp-server` may publish later
+- **Linked packages:** All 3 packages (`@kickstart/core`, `@kickstart/mcp-server`, `@kickstart/web`) are linked so they version in lockstep — a major bump in one bumps them all
+- **Base branch:** `main`
+- **Commit:** `false` — version bumps are committed manually so we control the commit message
+- **Changelog format:** Default `@changesets/cli/changelog`
+
+### Workflow
+
+1. **Adding a changeset:** Run `npm run changeset` and describe the change + bump type (patch/minor/major)
+2. **Versioning:** Run `npm run version` to consume pending changesets, bump versions, and update changelogs
+3. **Publishing:** Run `npm run release` to publish non-private packages to npm (when ready)
+
+### Why Changesets
+
+- Purpose-built for npm monorepos with workspaces
+- Linked versioning keeps packages in sync without manual coordination
+- Changesets are committed as markdown files — reviewable in PRs
+- Integrates with GitHub Actions for automated releases later (via `changesets/action`)
+
+## Impact
+
+- All team members should run `npm run changeset` when making changes that warrant a version bump
+- CI can be extended later with `changesets/action` for automated publishing
+- Config lives at `.changeset/config.json`; root changelog at `CHANGELOG.md`
+
+---
+
+# Decision: /api/action endpoint uses same session store as /api/converse
+
+**Author:** Bender  
+**Date:** 2026-04-09  
+**Task:** B-24
+
+## Decision
+
+The `/api/action` endpoint shares the same in-memory `Map<string, ApiSession>` session store
+(from `packages/web/api/src/lib/session-store.ts`) as `/api/converse`. It does NOT create sessions — 
+only `getSession()` is called; 404 is returned for unknown session IDs.
+
+## Rationale
+
+- Actions arrive after a conversation has started. Requiring a valid session ensures actions
+  are always in context of an existing conversation thread.
+- Sharing the store means message history accumulated by `/converse` is visible to `/action`
+  and vice versa — the LLM sees the full conversation when re-prompted by an action.
+- No separate action session concept needed for v1.
+
+## Implications
+
+- Frontend must obtain a `sessionId` from `/api/converse` before sending actions.
+- `useActionDispatch` (B-23) already has access to `sessionId` via the `useStreaming` hook pattern.
+- When `api:` actions are wired in B-11 (APIConnector), they can still use the same session
+  context to correlate API calls with conversation state.
+
+---
+
+# Decision: Tool Registry Pattern (B-13)
+
+**Date:** 2026-04-09  
+**Author:** Bender  
+**Status:** Implemented
+
+## Decision
+
+The LLM tool system lives in `packages/core/src/tools/` with a `ToolRegistry` class and `defaultRegistry` singleton. Tools are separate files, each exporting a `Tool<TArgs>` object. `defaultRegistry` is bootstrapped with 5 built-ins on module import.
+
+## Tool execution loop
+
+`chatCompletionWithTools()` in `openai-client.ts` handles multi-step tool use: up to 5 rounds of (call → execute → append result) before returning. Streaming path in `converse.ts` runs tool rounds non-streaming, then emits final content as chunks.
+
+## Extension point
+
+IntegrationKits (B-10) call `defaultRegistry.register(tool)` or `defaultRegistry.registerAll([...])` to add domain-specific tools. No changes to converse.ts needed.
+
+## SSE events for tool calls (streaming path)
+
+- `event: tool_call` — emitted when LLM requests a tool (includes tool name)
+- `event: tool_result` — emitted after tool executes (includes name + result)
+
+Frontend can use these to show "Looking up Azure resources…" spinners.
