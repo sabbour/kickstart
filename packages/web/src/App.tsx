@@ -4,22 +4,29 @@ import { Landing } from './components/Landing';
 import { ChatShell } from './components/Chat/ChatShell';
 import { SessionsSidebar } from './components/Sidebar/SessionsSidebar';
 import { FileEditor } from './components/FileEditor/FileEditor';
+import { Playground } from './pages/Playground';
 import { useA2UI } from './hooks/useA2UI';
 import { useSessions } from './hooks/useSessions';
 import { useStreaming } from './hooks/useStreaming';
+import { useMockStreaming } from './hooks/useMockStreaming';
 import { healthCheck } from './services/api-client';
+import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
 import type { AppMode, ChatMessage } from './types';
 
+const mockEnabled = isMockMode();
+const playgroundEnabled = isPlaygroundMode();
+
 export function App() {
-  const [mode, setMode] = useState<AppMode>('landing');
+  const [mode, setMode] = useState<AppMode>(playgroundEnabled ? 'chat' : 'landing');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(null);
+  const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(mockEnabled ? true : null);
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
 
   const a2ui = useA2UI();
   const sessions = useSessions();
   const streaming = useStreaming();
+  const mockStreaming = useMockStreaming();
 
   // Single VFS instance for the app lifetime
   const fs = useMemo(() => new VirtualFileSystem(), []);
@@ -27,9 +34,11 @@ export function App() {
   // Messages for the active session
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // Check API availability on mount
+  // Check API availability on mount (skip in mock mode — already true)
   useEffect(() => {
-    healthCheck().then(setIsApiAvailable);
+    if (!mockEnabled) {
+      healthCheck().then(setIsApiAvailable);
+    }
   }, []);
 
   // Sync messages from session store when session changes
@@ -70,34 +79,71 @@ export function App() {
       return;
     }
 
-    streaming.send(text, sessionId, {
-      onDelta: () => {},
-      onA2UI: (msgs) => {
-        a2ui.processMessages(msgs);
-      },
-      onPhase: () => {},
-      onComplete: (fullText) => {
-        const assistantMsg: ChatMessage = {
-          id: `msg-${Date.now()}-assistant`,
-          role: 'assistant',
-          text: fullText,
-          timestamp: Date.now(),
-        };
-        setMessages(prev => [...prev, assistantMsg]);
-        sessions.addMessage(sessionId!, assistantMsg);
-      },
-      onError: (error) => {
-        const errorMsg: ChatMessage = {
-          id: `msg-${Date.now()}-error`,
-          role: 'assistant',
-          text: `⚠️ ${error}`,
-          timestamp: Date.now(),
-        };
-        setMessages(prev => [...prev, errorMsg]);
-        sessions.addMessage(sessionId!, errorMsg);
-      },
-    });
-  }, [sessions, streaming, a2ui, isApiAvailable]);
+    // Use mock streaming when ?mock is active, real streaming otherwise
+    if (mockEnabled) {
+      mockStreaming.send(text, sessionId, {
+        onDelta: () => {},
+        onA2UI: (msgs) => {
+          a2ui.processMessages(msgs);
+        },
+        onPhase: () => {},
+        onComplete: (fullText, model) => {
+          const surfaceIds = a2ui.surfaces.size > 0
+            ? Array.from(a2ui.surfaces.keys())
+            : undefined;
+          const assistantMsg: ChatMessage = {
+            id: `msg-${Date.now()}-assistant`,
+            role: 'assistant',
+            text: fullText,
+            model,
+            surfaceIds,
+            timestamp: Date.now(),
+          };
+          setMessages(prev => [...prev, assistantMsg]);
+          sessions.addMessage(sessionId!, assistantMsg);
+        },
+        onError: (error) => {
+          const errorMsg: ChatMessage = {
+            id: `msg-${Date.now()}-error`,
+            role: 'assistant',
+            text: `⚠️ ${error}`,
+            timestamp: Date.now(),
+          };
+          setMessages(prev => [...prev, errorMsg]);
+          sessions.addMessage(sessionId!, errorMsg);
+        },
+      });
+    } else {
+      streaming.send(text, sessionId, {
+        onDelta: () => {},
+        onA2UI: (msgs) => {
+          a2ui.processMessages(msgs);
+        },
+        onPhase: () => {},
+        onComplete: (fullText, model) => {
+          const assistantMsg: ChatMessage = {
+            id: `msg-${Date.now()}-assistant`,
+            role: 'assistant',
+            text: fullText,
+            model,
+            timestamp: Date.now(),
+          };
+          setMessages(prev => [...prev, assistantMsg]);
+          sessions.addMessage(sessionId!, assistantMsg);
+        },
+        onError: (error) => {
+          const errorMsg: ChatMessage = {
+            id: `msg-${Date.now()}-error`,
+            role: 'assistant',
+            text: `⚠️ ${error}`,
+            timestamp: Date.now(),
+          };
+          setMessages(prev => [...prev, errorMsg]);
+          sessions.addMessage(sessionId!, errorMsg);
+        },
+      });
+    }
+  }, [sessions, streaming, mockStreaming, a2ui, isApiAvailable]);
 
   const handleStartChat = useCallback((prompt: string) => {
     a2ui.reset();
@@ -144,10 +190,25 @@ export function App() {
     }
   }, [sessions]);
 
-  const isStreaming = streaming.isStreaming;
-  const currentStreamText = streaming.streamText;
+  const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
+  const currentStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
   const hasFiles = fsFiles.length > 0;
+
+  // Playground mode — standalone A2UI test harness
+  if (playgroundEnabled) {
+    return (
+      <Layout
+        sidebarOpen={false}
+        onToggleSidebar={() => {}}
+        onNewSession={() => {}}
+        showSessionsToggle={false}
+        hasFiles={false}
+      >
+        <Playground />
+      </Layout>
+    );
+  }
 
   return (
     <Layout

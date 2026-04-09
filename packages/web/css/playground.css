@@ -1,0 +1,231 @@
+/* ----------------------------------------------------------------
+   Playground — A2UI test harness (accessed via ?playground)
+   ---------------------------------------------------------------- */
+
+.playground-page {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.playground-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Header */
+.playground-header {
+  text-align: center;
+}
+
+.playground-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 8px;
+}
+
+.playground-subtitle {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin: 0 0 12px;
+}
+
+.playground-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--color-brand-bg, #e8f0fe);
+  color: var(--color-brand-primary, #0078d4);
+}
+
+/* Sections */
+.playground-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.playground-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+}
+
+/* Scenario button grid */
+.playground-btn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.playground-scenario-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: var(--radius-medium, 6px);
+  background: var(--color-bg-primary, #fff);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.playground-scenario-btn:hover {
+  border-color: var(--color-brand-primary, #0078d4);
+  box-shadow: 0 0 0 1px var(--color-brand-primary, #0078d4);
+}
+
+.scenario-btn-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.scenario-btn-desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* Action row */
+.playground-action-row {
+  display: flex;
+  gap: 8px;
+}
+
+.playground-action-btn {
+  padding: 8px 20px;
+  border-radius: var(--radius-medium, 6px);
+  border: 1px solid var(--color-border, #e0e0e0);
+  background: var(--color-bg-primary, #fff);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.playground-action-btn:hover {
+  background: var(--color-bg-hover, #f5f5f5);
+}
+
+.playground-action-btn.primary {
+  background: var(--color-brand-primary, #0078d4);
+  color: #fff;
+  border-color: transparent;
+}
+
+.playground-action-btn.primary:hover {
+  opacity: 0.9;
+}
+
+.playground-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* JSON editor */
+.playground-json-editor {
+  width: 100%;
+  min-height: 180px;
+  padding: 12px;
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: var(--radius-medium, 6px);
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--color-bg-secondary, #f8f8f8);
+  color: var(--color-text-primary);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.playground-json-editor:focus {
+  outline: 2px solid var(--color-brand-primary, #0078d4);
+  outline-offset: -1px;
+}
+
+.playground-json-error {
+  padding: 8px 12px;
+  border-radius: var(--radius-medium, 6px);
+  background: #fce4e4;
+  color: #c42b1c;
+  font-size: 13px;
+}
+
+/* Rendered surfaces */
+.playground-surfaces {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.playground-surface-card {
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: var(--radius-large, 8px);
+  overflow: hidden;
+}
+
+.playground-surface-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--color-bg-secondary, #f8f8f8);
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  font-size: 12px;
+}
+
+.playground-surface-id {
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  color: var(--color-text-secondary);
+}
+
+.playground-surface-catalog {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  padding: 2px 8px;
+  background: var(--color-bg-primary, #fff);
+  border-radius: 999px;
+}
+
+.playground-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  border: 2px dashed var(--color-border, #e0e0e0);
+  border-radius: var(--radius-large, 8px);
+}
+
+/* Activity log */
+.playground-log {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.playground-log-item {
+  padding: 4px 10px;
+  border-radius: var(--radius-small, 4px);
+  background: var(--color-bg-secondary, #f8f8f8);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .playground-page {
+    padding: 16px 12px 48px;
+  }
+  .playground-btn-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
