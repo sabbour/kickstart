@@ -376,3 +376,13 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **Tests:** All 286 vitest tests pass including the Hermes numeric-appName test and all B-23 action-handler tests.
 - **Build:** Web bundle builds clean (1,323 kB). Playwright failures (60) are pre-existing system-level issue (`libnspr4.so` missing), not regressions.
 - **Key files changed:** `packages/mcp-server/src/tools/action.ts`, `packages/core/src/tools/generate-kubernetes-manifest.ts`
+
+### 2026-04-09: B-16 — CORS Proxy Functions
+
+- **Three SWA Functions added** in `packages/web/api/src/functions/`:
+  - `arm-proxy.ts` — `ANY arm-proxy/{*path}` → `management.azure.com`. Requires `Authorization` header (returns 401 if absent). Injects `api-version=2024-03-01` if omitted. Passes through `x-ms-*` rate-limit headers.
+  - `github-proxy.ts` — `ANY github-proxy/{*path}` → `api.github.com`. Injects `Accept: application/vnd.github+json` and `X-GitHub-Api-Version: 2022-11-28`. Auth is optional (unauthenticated requests allowed for public repos).
+  - `pricing-proxy.ts` — `GET pricing-proxy` → `prices.azure.com/api/retail/prices`. No auth. Adds `Cache-Control: public, max-age=300` (prices stable for minutes).
+- **Pattern:** All proxies use `request.params["path"]` for wildcard route capture, `request.query` forwarding, native `fetch`, `arrayBuffer()` for body pass-through, and return upstream HTTP status verbatim.
+- **Build:** 8 functions bundled (was 5). All 286 vitest tests pass.
+- **Key files:** `packages/web/api/src/functions/arm-proxy.ts`, `packages/web/api/src/functions/github-proxy.ts`, `packages/web/api/src/functions/pricing-proxy.ts`
