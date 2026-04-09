@@ -1,17 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://kickstart.aks.azure.com/catalog/v1/kickstart-catalog.json",
-  "title": "Kickstart A2UI Catalog",
-  "description": "A2UI component catalog for AKS Kickstart. Extends the basic_catalog with domain-specific components for guided AKS onboarding.",
+  "$id": "https://kickstart.aks.azure.com/catalog/v0.9/kickstart-catalog.json",
+  "title": "Kickstart A2UI v0.9 Catalog",
+  "description": "A2UI v0.9 component catalog for AKS Kickstart. Extends the basic_catalog (18 components) with 5 domain-specific components for guided AKS onboarding. Components use flat adjacency lists with id-based references.",
   "type": "object",
   "$defs": {
     "BaseComponent": {
       "type": "object",
+      "description": "Every component has a unique id and a component type name.",
       "properties": {
-        "type": { "type": "string" },
-        "id": { "type": "string" }
+        "id": { "type": "string", "description": "Unique component identifier" },
+        "component": { "type": "string", "description": "Component type name from catalog" }
       },
-      "required": ["type"]
+      "required": ["id", "component"]
     },
 
     "Text": {
@@ -19,43 +20,65 @@
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "Text" },
-            "content": { "type": "string" },
-            "variant": { "type": "string", "enum": ["body", "heading", "caption", "code"] }
+            "component": { "const": "Text" },
+            "text": { "type": "string" },
+            "variant": { "type": "string", "enum": ["h1", "h2", "h3", "body", "caption", "code"] }
           },
-          "required": ["type", "content"]
+          "required": ["component", "text"]
         }
       ]
     },
 
-    "Button": {
+    "Image": {
       "allOf": [
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "Button" },
-            "label": { "type": "string" },
-            "action": { "type": "string" },
-            "variant": { "type": "string", "enum": ["primary", "secondary", "danger"] },
-            "disabled": { "type": "boolean", "default": false }
+            "component": { "const": "Image" },
+            "src": { "type": "string", "format": "uri" },
+            "alt": { "type": "string" }
           },
-          "required": ["type", "label", "action"]
+          "required": ["component", "src", "alt"]
         }
       ]
     },
 
-    "TextField": {
+    "Icon": {
       "allOf": [
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "TextField" },
-            "label": { "type": "string" },
-            "placeholder": { "type": "string" },
-            "value": { "type": "string" },
-            "required": { "type": "boolean", "default": false }
+            "component": { "const": "Icon" },
+            "name": { "type": "string" },
+            "size": { "type": "string" }
           },
-          "required": ["type", "label"]
+          "required": ["component", "name"]
+        }
+      ]
+    },
+
+    "Video": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "component": { "const": "Video" },
+            "src": { "type": "string", "format": "uri" }
+          },
+          "required": ["component", "src"]
+        }
+      ]
+    },
+
+    "AudioPlayer": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "component": { "const": "AudioPlayer" },
+            "src": { "type": "string", "format": "uri" }
+          },
+          "required": ["component", "src"]
         }
       ]
     },
@@ -65,11 +88,14 @@
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "Row" },
-            "children": { "type": "array", "items": { "$ref": "#/$defs/Component" } },
-            "gap": { "type": "string" }
+            "component": { "const": "Row" },
+            "children": { "type": "array", "items": { "type": "string" }, "description": "Array of child component ids" },
+            "gap": { "type": "string" },
+            "justify": { "type": "string", "enum": ["start", "center", "end", "spaceBetween", "spaceAround"] },
+            "align": { "type": "string", "enum": ["start", "center", "end", "stretch"] },
+            "wrap": { "type": "boolean" }
           },
-          "required": ["type", "children"]
+          "required": ["component", "children"]
         }
       ]
     },
@@ -79,11 +105,25 @@
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "Column" },
-            "children": { "type": "array", "items": { "$ref": "#/$defs/Component" } },
+            "component": { "const": "Column" },
+            "children": { "type": "array", "items": { "type": "string" } },
             "gap": { "type": "string" }
           },
-          "required": ["type", "children"]
+          "required": ["component", "children"]
+        }
+      ]
+    },
+
+    "List": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "component": { "const": "List" },
+            "children": { "type": "array", "items": { "type": "string" } },
+            "ordered": { "type": "boolean", "default": false }
+          },
+          "required": ["component", "children"]
         }
       ]
     },
@@ -93,68 +133,130 @@
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "Card" },
-            "title": { "type": "string" },
-            "children": { "type": "array", "items": { "$ref": "#/$defs/Component" } }
+            "component": { "const": "Card" },
+            "children": { "type": "array", "items": { "type": "string" } }
           },
-          "required": ["type", "children"]
+          "required": ["component", "children"]
         }
       ]
     },
 
-    "ConversationPhase": {
+    "Tabs": {
       "allOf": [
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "ConversationPhase" },
-            "phases": {
+            "component": { "const": "Tabs" },
+            "tabs": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "id": { "type": "string" },
                   "label": { "type": "string" },
-                  "status": { "type": "string", "enum": ["pending", "active", "complete", "skipped"] }
+                  "children": { "type": "array", "items": { "type": "string" } }
                 },
-                "required": ["id", "label", "status"]
+                "required": ["label", "children"]
               }
-            },
-            "currentPhase": { "type": "string" }
+            }
           },
-          "required": ["type", "phases", "currentPhase"]
+          "required": ["component", "tabs"]
         }
       ]
     },
 
-    "CodeBlock": {
+    "Divider": {
       "allOf": [
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "CodeBlock" },
-            "code": { "type": "string" },
-            "language": { "type": "string" },
-            "filename": { "type": "string" },
-            "action": { "type": "string", "enum": ["copy", "download"] }
+            "component": { "const": "Divider" }
           },
-          "required": ["type", "code", "language"]
+          "required": ["component"]
         }
       ]
     },
 
-    "ResourcePicker": {
+    "Modal": {
       "allOf": [
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "ResourcePicker" },
-            "resourceType": {
-              "type": "string",
-              "enum": ["subscription", "resourceGroup", "region", "cluster"]
-            },
+            "component": { "const": "Modal" },
+            "child": { "type": "string", "description": "Single child component id" },
+            "title": { "type": "string" },
+            "open": { "type": "boolean", "default": false }
+          },
+          "required": ["component", "child", "title"]
+        }
+      ]
+    },
+
+    "Button": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "component": { "const": "Button" },
+            "child": { "type": "string", "description": "Label component id" },
+            "variant": { "type": "string", "enum": ["primary", "secondary", "outline", "danger", "ghost"] },
+            "disabled": { "type": "boolean", "default": false },
+            "action": {
+              "type": "object",
+              "properties": {
+                "event": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "data": { "type": "object" }
+                  },
+                  "required": ["name"]
+                }
+              }
+            }
+          },
+          "required": ["component", "child", "action"]
+        }
+      ]
+    },
+
+    "TextField": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "component": { "const": "TextField" },
             "label": { "type": "string" },
+            "placeholder": { "type": "string" },
             "value": { "type": "string" },
+            "action": { "type": "object" }
+          },
+          "required": ["component", "label"]
+        }
+      ]
+    },
+
+    "CheckBox": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "component": { "const": "CheckBox" },
+            "label": { "type": "string" },
+            "checked": { "type": "boolean", "default": false },
+            "action": { "type": "object" }
+          },
+          "required": ["component", "label"]
+        }
+      ]
+    },
+
+    "ChoicePicker": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "component": { "const": "ChoicePicker" },
+            "label": { "type": "string" },
             "options": {
               "type": "array",
               "items": {
@@ -165,54 +267,41 @@
                 },
                 "required": ["label", "value"]
               }
-            }
-          },
-          "required": ["type", "resourceType", "label"]
-        }
-      ]
-    },
-
-    "DeploymentProgress": {
-      "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
-        {
-          "properties": {
-            "type": { "const": "DeploymentProgress" },
-            "steps": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": { "type": "string" },
-                  "label": { "type": "string" },
-                  "status": { "type": "string", "enum": ["pending", "running", "success", "error", "skipped"] },
-                  "detail": { "type": "string" }
-                },
-                "required": ["id", "label", "status"]
-              }
             },
-            "overallStatus": {
-              "type": "string",
-              "enum": ["pending", "running", "success", "error"]
-            }
+            "action": { "type": "object" }
           },
-          "required": ["type", "steps", "overallStatus"]
+          "required": ["component", "label", "options"]
         }
       ]
     },
 
-    "ArchitectureDiagram": {
+    "Slider": {
       "allOf": [
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "ArchitectureDiagram" },
-            "mermaid": {
-              "type": "string",
-              "description": "Mermaid diagram source code"
-            }
+            "component": { "const": "Slider" },
+            "label": { "type": "string" },
+            "min": { "type": "number" },
+            "max": { "type": "number" },
+            "value": { "type": "number" },
+            "action": { "type": "object" }
           },
-          "required": ["type", "mermaid"]
+          "required": ["component", "label", "min", "max"]
+        }
+      ]
+    },
+
+    "DateTimeInput": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "component": { "const": "DateTimeInput" },
+            "label": { "type": "string" },
+            "value": { "type": "string", "format": "date-time" }
+          },
+          "required": ["component", "label"]
         }
       ]
     },
@@ -222,7 +311,7 @@
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "CostEstimate" },
+            "component": { "const": "CostEstimate" },
             "items": {
               "type": "array",
               "items": {
@@ -230,8 +319,7 @@
                 "properties": {
                   "name": { "type": "string" },
                   "sku": { "type": "string" },
-                  "monthlyCost": { "type": "number" },
-                  "currency": { "type": "string", "default": "USD" }
+                  "monthlyCost": { "type": "number" }
                 },
                 "required": ["name", "sku", "monthlyCost"]
               }
@@ -239,119 +327,96 @@
             "total": { "type": "number" },
             "currency": { "type": "string", "default": "USD" }
           },
-          "required": ["type", "items", "total", "currency"]
+          "required": ["component", "items", "total", "currency"]
         }
       ]
     },
 
-    "HandoffCard": {
+    "ArchitectureDiagram": {
       "allOf": [
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "HandoffCard" },
-            "title": { "type": "string" },
-            "description": { "type": "string" },
-            "url": { "type": "string", "format": "uri" },
-            "provider": { "type": "string", "enum": ["codespaces", "vscode-dev"] },
-            "repoUrl": { "type": "string", "format": "uri" }
-          },
-          "required": ["type", "title", "description", "url", "provider", "repoUrl"]
-        }
-      ]
-    },
-
-    "RepoPicker": {
-      "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
-        {
-          "properties": {
-            "type": { "const": "RepoPicker" },
-            "label": { "type": "string" },
-            "value": { "type": "string", "description": "Repository full name (owner/repo)" },
-            "options": {
+            "component": { "const": "ArchitectureDiagram" },
+            "nodes": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
+                  "id": { "type": "string" },
                   "label": { "type": "string" },
-                  "value": { "type": "string" }
+                  "type": { "type": "string", "enum": ["compute", "database", "cache", "network", "storage", "ai", "messaging"] }
                 },
-                "required": ["label", "value"]
+                "required": ["id", "label", "type"]
               }
             },
-            "allowCreate": { "type": "boolean", "default": true }
-          },
-          "required": ["type", "label"]
-        }
-      ]
-    },
-
-    "WorkflowStatus": {
-      "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
-        {
-          "properties": {
-            "type": { "const": "WorkflowStatus" },
-            "runs": {
+            "edges": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "name": { "type": "string" },
-                  "status": { "type": "string", "enum": ["queued", "in_progress", "success", "failure", "cancelled"] },
-                  "url": { "type": "string", "format": "uri" },
-                  "conclusion": { "type": "string" }
+                  "from": { "type": "string" },
+                  "to": { "type": "string" }
                 },
-                "required": ["name", "status"]
+                "required": ["from", "to"]
               }
             }
           },
-          "required": ["type", "runs"]
+          "required": ["component", "nodes", "edges"]
         }
       ]
     },
 
-    "CodespaceLink": {
+    "FileEditor": {
       "allOf": [
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "CodespaceLink" },
-            "repo": { "type": "string" },
-            "branch": { "type": "string" },
-            "provider": { "type": "string", "enum": ["codespaces", "vscode-dev"] },
-            "url": { "type": "string", "format": "uri" },
-            "label": { "type": "string" }
+            "component": { "const": "FileEditor" },
+            "filename": { "type": "string" },
+            "language": { "type": "string" },
+            "content": { "type": "string" }
           },
-          "required": ["type", "repo", "provider", "url"]
+          "required": ["component", "filename", "language", "content"]
         }
       ]
     },
 
-    "AppOverview": {
+    "AuthCard": {
       "allOf": [
         { "$ref": "#/$defs/BaseComponent" },
         {
           "properties": {
-            "type": { "const": "AppOverview" },
-            "appName": { "type": "string" },
-            "runtime": { "type": "string" },
-            "services": {
+            "component": { "const": "AuthCard" },
+            "provider": { "type": "string", "enum": ["azure", "github"] },
+            "title": { "type": "string" },
+            "description": { "type": "string" }
+          },
+          "required": ["component", "provider", "title"]
+        }
+      ]
+    },
+
+    "DeploymentProgress": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "properties": {
+            "component": { "const": "DeploymentProgress" },
+            "steps": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "name": { "type": "string" },
-                  "type": { "type": "string", "enum": ["database", "cache", "storage", "messaging", "ai"] }
+                  "id": { "type": "string" },
+                  "label": { "type": "string" },
+                  "status": { "type": "string", "enum": ["pending", "running", "complete", "error", "skipped"] }
                 },
-                "required": ["name", "type"]
+                "required": ["id", "label", "status"]
               }
-            },
-            "publicUrl": { "type": "string", "format": "uri" },
-            "status": { "type": "string", "enum": ["planning", "generating", "ready", "deploying", "deployed"] }
+            }
           },
-          "required": ["type", "appName", "runtime", "services", "status"]
+          "required": ["component", "steps"]
         }
       ]
     },
@@ -359,22 +424,28 @@
     "Component": {
       "oneOf": [
         { "$ref": "#/$defs/Text" },
-        { "$ref": "#/$defs/Button" },
-        { "$ref": "#/$defs/TextField" },
+        { "$ref": "#/$defs/Image" },
+        { "$ref": "#/$defs/Icon" },
+        { "$ref": "#/$defs/Video" },
+        { "$ref": "#/$defs/AudioPlayer" },
         { "$ref": "#/$defs/Row" },
         { "$ref": "#/$defs/Column" },
+        { "$ref": "#/$defs/List" },
         { "$ref": "#/$defs/Card" },
-        { "$ref": "#/$defs/ConversationPhase" },
-        { "$ref": "#/$defs/CodeBlock" },
-        { "$ref": "#/$defs/ResourcePicker" },
-        { "$ref": "#/$defs/DeploymentProgress" },
-        { "$ref": "#/$defs/ArchitectureDiagram" },
+        { "$ref": "#/$defs/Tabs" },
+        { "$ref": "#/$defs/Divider" },
+        { "$ref": "#/$defs/Modal" },
+        { "$ref": "#/$defs/Button" },
+        { "$ref": "#/$defs/TextField" },
+        { "$ref": "#/$defs/CheckBox" },
+        { "$ref": "#/$defs/ChoicePicker" },
+        { "$ref": "#/$defs/Slider" },
+        { "$ref": "#/$defs/DateTimeInput" },
         { "$ref": "#/$defs/CostEstimate" },
-        { "$ref": "#/$defs/HandoffCard" },
-        { "$ref": "#/$defs/RepoPicker" },
-        { "$ref": "#/$defs/WorkflowStatus" },
-        { "$ref": "#/$defs/CodespaceLink" },
-        { "$ref": "#/$defs/AppOverview" }
+        { "$ref": "#/$defs/ArchitectureDiagram" },
+        { "$ref": "#/$defs/FileEditor" },
+        { "$ref": "#/$defs/AuthCard" },
+        { "$ref": "#/$defs/DeploymentProgress" }
       ]
     }
   },

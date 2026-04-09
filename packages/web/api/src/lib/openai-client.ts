@@ -18,6 +18,7 @@ export interface ChatMessage {
 export interface ChatCompletionOptions {
   temperature?: number;
   maxTokens?: number;
+  responseFormat?: { type: string };
 }
 
 export interface ChatCompletionResult {
@@ -121,6 +122,7 @@ export async function chatCompletion(
     body: JSON.stringify({
       messages,
       ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+      ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
       max_completion_tokens: options.maxTokens ?? 2048,
       stream: false,
     }),
@@ -165,6 +167,7 @@ export async function* chatCompletionStream(
     body: JSON.stringify({
       messages,
       ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+      ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
       max_completion_tokens: options.maxTokens ?? 2048,
       stream: true,
     }),

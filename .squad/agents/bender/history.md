@@ -217,3 +217,29 @@
 - **getUserInfo() parses SWA claims:** Reads `name` claim type for display name, `preferred_username` or email claim for email, falls back to `clientPrincipal.userDetails`.
 - **No changes to:** `api-client.js` (relies on SWA cookie), `staticwebapp.config.json` (route auth stays), any config constants.
 - **Key lesson:** SWA built-in auth and MSAL are complementary, not alternatives. SWA handles session cookies for API route auth; MSAL handles delegated tokens for external APIs (Graph, ARM). Never use MSAL alone for login when SWA route auth is in play.
+
+### 2026-04-09: React/Vite Migration + A2UI v0.9 Vendor (Phase 1a)
+
+- **Vendored A2UI v0.9:** Copied `renderers/react/src/v0_9/` and `renderers/web_core/src/v0_9/` from google/A2UI into `packages/web/src/vendor/a2ui/`. Excluded test files. Included JSON schemas from `specification/v0_9/json/`. Apache 2.0 LICENSE included.
+- **Import path rewrite:** All `@a2ui/web_core/v0_9` imports in vendored React files → relative paths. Stripped `.js` extensions from web_core internal imports. Removed `with {type: 'json'}` import assertions (Vite handles JSON natively).
+- **A2UI npm dependencies:** `@preact/signals-core`, `date-fns`, `zod`, `zod-to-json-schema` — all required by web_core runtime.
+- **React/Vite scaffold:** `packages/web/` now has Vite + React 19 + TypeScript. `vite build` produces ~360KB JS bundle (452 modules). `dist/` is the output directory.
+- **Vite config:** `@vitejs/plugin-react`, `@` → `src/` alias, `/api` proxy to `localhost:7071`, `json.stringify: true` for large JSON schema imports.
+- **tsconfig:** `moduleResolution: "bundler"`, `jsx: "react-jsx"`, strict mode, `@/*` path alias.
+- **index.html updated:** Added `<div id="root">` and `<script type="module" src="/src/main.tsx">`. Old vanilla `js/app.js` script removed (old JS files kept in `js/` for now).
+- **App.tsx proof-of-concept:** Renders A2UI minimal catalog (Text + Button in a Column) via `SurfaceModel` + `MessageProcessor` + `A2uiSurface` component. Proves vendor integration works end-to-end.
+- **DO NOT TOUCH:** `packages/web/api/` (Azure Functions backend, separate build/deploy). `packages/web/js/`, `css/`, `assets/` kept as-is for now.
+- **Key files:** `packages/web/package.json`, `vite.config.ts`, `tsconfig.json`, `src/main.tsx`, `src/App.tsx`, `src/vendor/a2ui/`
+
+### 2026-04-09: JSON Envelope + A2UI v0.9 Backend Rewrite
+
+- **Killed regex extraction:** Removed `~~~a2ui` fenced-block parsing from the LLM response pipeline. Backend now expects pure JSON from the LLM.
+- **JSON envelope format:** LLM outputs `{"message":"...","a2ui":[...],"actions":[]}`. `response_format: { type: "json_object" }` enforced in Azure OpenAI calls.
+- **New response-processor:** Created `packages/core/src/services/response-processor.ts` — parses JSON envelope, validates A2UI messages (createSurface, updateComponents, updateDataModel, deleteSurface), graceful fallback to plain text on invalid JSON. No regex.
+- **System prompt rewrite:** Teaches LLM the full JSON envelope format with all 23 components (18 basic + 5 custom). Includes 2 complete example responses. Flat adjacency list format with id-based references.
+- **A2UI v0.9 catalog:** Rewrote `kickstart-catalog.json` — 18 basic components (Text, Image, Icon, Video, AudioPlayer, Row, Column, List, Card, Tabs, Divider, Modal, Button, TextField, CheckBox, ChoicePicker, Slider, DateTimeInput) + 5 custom (CostEstimate, ArchitectureDiagram, FileEditor, AuthCard, DeploymentProgress). Components use `"component"` field (not `"type"`), flat `"children"` id arrays.
+- **Phase prompts:** All 6 phases rewritten with opinionated descriptions and JSON envelope examples. ChoicePicker for selections, Tabs for multi-section views, FileEditor for code, DeploymentProgress for tracking.
+- **Typed SSE events:** converse.ts now emits `event: chunk` (raw deltas), `event: message` (parsed text), `event: a2ui` (per-message), `event: done` (metadata), `event: error`.
+- **openai-client.ts:** Added `responseFormat` option to `ChatCompletionOptions`, passed as `response_format` in both streaming and non-streaming calls.
+- **Tests:** 47 tests pass — 12 catalog (updated for 23 components), 12 phases, 12 machine, 11 new response-processor tests (JSON parsing, fallbacks, malformed messages, edge cases).
+- **Key files changed:** `packages/core/src/prompts/system-prompt.ts`, `packages/core/src/services/response-processor.ts` (NEW), `packages/core/src/engine/phases.ts`, `packages/core/src/catalog/kickstart-catalog.json`, `packages/core/src/catalog/index.ts`, `packages/web/api/src/functions/converse.ts`, `packages/web/api/src/lib/openai-client.ts`

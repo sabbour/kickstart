@@ -73,11 +73,14 @@ describe("K8s exposure guard", () => {
    * Splits a prompt into the body (above RULES:) and the rules section.
    * K8s terms are acceptable inside the RULES section (negative instructions
    * to the LLM) but must not leak into the conversational body.
+   * Also excludes JSON example blocks (which may contain event names).
    */
   function getBodyBeforeRules(prompt: string): string {
     const lower = prompt.toLowerCase();
     const rulesIdx = lower.indexOf("rules:");
-    return rulesIdx === -1 ? lower : lower.slice(0, rulesIdx);
+    const body = rulesIdx === -1 ? lower : lower.slice(0, rulesIdx);
+    // Strip JSON examples (they contain component data, not K8s terms)
+    return body.replace(/\{[^}]*\}/g, "");
   }
 
   for (const phase of earlyPhases) {
@@ -114,7 +117,7 @@ describe("K8s exposure guard", () => {
     }
   });
 
-  it("Review, Handoff, or Deploy may reference K8s(no assertion — just coverage)", () => {
+  it("Review, Handoff, or Deploy may reference K8s (no assertion — just coverage)", () => {
     for (const phase of [Phase.Review, Phase.Handoff, Phase.Deploy]) {
       const def = getPhaseDefinition(phase);
       expect(def.promptTemplate.length).toBeGreaterThan(0);

@@ -1,156 +1,252 @@
 /**
  * @module @kickstart/core/catalog
  *
- * TypeScript types derived from the Kickstart A2UI Catalog schema.
- * These types mirror the JSON Schema definitions in kickstart-catalog.json.
+ * TypeScript types for the Kickstart A2UI v0.9 catalog.
+ * Components use flat adjacency lists: each component has an "id" and
+ * references children by id via "children" (array) or "child" (single).
  */
 
 // ── Base ────────────────────────────────────────────────────────────
 
 export interface BaseComponent {
-  type: string;
-  id?: string;
+  id: string;
+  component: string;
+  [key: string]: unknown;
 }
 
-// ── Basic Catalog Components ────────────────────────────────────────
+// ── Basic Catalog Components (18) ──────────────────────────────────
 
 export interface TextComponent extends BaseComponent {
-  type: "Text";
-  content: string;
-  variant?: "body" | "heading" | "caption" | "code";
+  component: "Text";
+  text: string;
+  variant?: "h1" | "h2" | "h3" | "body" | "caption" | "code";
 }
 
-export interface ButtonComponent extends BaseComponent {
-  type: "Button";
-  label: string;
-  action: string;
-  variant?: "primary" | "secondary" | "danger";
-  disabled?: boolean;
+export interface ImageComponent extends BaseComponent {
+  component: "Image";
+  src: string;
+  alt: string;
 }
 
-export interface TextFieldComponent extends BaseComponent {
-  type: "TextField";
-  label: string;
-  placeholder?: string;
-  value?: string;
-  required?: boolean;
+export interface IconComponent extends BaseComponent {
+  component: "Icon";
+  name: string;
+  size?: string;
+}
+
+export interface VideoComponent extends BaseComponent {
+  component: "Video";
+  src: string;
+}
+
+export interface AudioPlayerComponent extends BaseComponent {
+  component: "AudioPlayer";
+  src: string;
 }
 
 export interface RowComponent extends BaseComponent {
-  type: "Row";
-  children: Component[];
+  component: "Row";
+  children: string[];
   gap?: string;
+  justify?: "start" | "center" | "end" | "spaceBetween" | "spaceAround";
+  align?: "start" | "center" | "end" | "stretch";
+  wrap?: boolean;
 }
 
 export interface ColumnComponent extends BaseComponent {
-  type: "Column";
-  children: Component[];
+  component: "Column";
+  children: string[];
   gap?: string;
 }
 
+export interface ListComponent extends BaseComponent {
+  component: "List";
+  children: string[];
+  ordered?: boolean;
+}
+
 export interface CardComponent extends BaseComponent {
-  type: "Card";
-  title?: string;
-  children: Component[];
+  component: "Card";
+  children: string[];
 }
 
-// ── Kickstart Custom Components ─────────────────────────────────────
-
-export interface PhaseItem {
-  id: string;
+export interface TabDef {
   label: string;
-  status: "pending" | "active" | "complete" | "skipped";
+  children: string[];
 }
 
-export interface ConversationPhaseComponent extends BaseComponent {
-  type: "ConversationPhase";
-  phases: PhaseItem[];
-  currentPhase: string;
+export interface TabsComponent extends BaseComponent {
+  component: "Tabs";
+  tabs: TabDef[];
 }
 
-export interface CodeBlockComponent extends BaseComponent {
-  type: "CodeBlock";
-  code: string;
-  language: string;
-  filename?: string;
-  action?: "copy" | "download";
+export interface DividerComponent extends BaseComponent {
+  component: "Divider";
 }
 
-export interface ResourceOption {
+export interface ModalComponent extends BaseComponent {
+  component: "Modal";
+  child: string;
+  title: string;
+  open?: boolean;
+}
+
+export interface ButtonAction {
+  event: {
+    name: string;
+    data?: Record<string, unknown>;
+  };
+}
+
+export interface ButtonComponent extends BaseComponent {
+  component: "Button";
+  child: string;
+  variant?: "primary" | "secondary" | "outline" | "danger" | "ghost";
+  disabled?: boolean;
+  action: ButtonAction;
+}
+
+export interface TextFieldComponent extends BaseComponent {
+  component: "TextField";
+  label: string;
+  placeholder?: string;
+  value?: string;
+  action?: { event: { name: string } };
+}
+
+export interface CheckBoxComponent extends BaseComponent {
+  component: "CheckBox";
+  label: string;
+  checked?: boolean;
+  action?: { event: { name: string } };
+}
+
+export interface ChoiceOption {
   label: string;
   value: string;
 }
 
-export interface ResourcePickerComponent extends BaseComponent {
-  type: "ResourcePicker";
-  resourceType: "subscription" | "resourceGroup" | "region" | "cluster";
+export interface ChoicePickerComponent extends BaseComponent {
+  component: "ChoicePicker";
+  label: string;
+  options: ChoiceOption[];
+  action?: { event: { name: string } };
+}
+
+export interface SliderComponent extends BaseComponent {
+  component: "Slider";
+  label: string;
+  min: number;
+  max: number;
+  value?: number;
+  action?: { event: { name: string } };
+}
+
+export interface DateTimeInputComponent extends BaseComponent {
+  component: "DateTimeInput";
   label: string;
   value?: string;
-  options?: ResourceOption[];
 }
 
-export interface DeploymentStep {
-  id: string;
-  label: string;
-  status: "pending" | "running" | "success" | "error" | "skipped";
-  detail?: string;
-}
-
-export interface DeploymentProgressComponent extends BaseComponent {
-  type: "DeploymentProgress";
-  steps: DeploymentStep[];
-  overallStatus: "pending" | "running" | "success" | "error";
-}
-
-export interface ArchitectureDiagramComponent extends BaseComponent {
-  type: "ArchitectureDiagram";
-  /** Mermaid diagram source code */
-  mermaid: string;
-}
+// ── Custom Kickstart Components (5) ─────────────────────────────────
 
 export interface CostItem {
   name: string;
   sku: string;
   monthlyCost: number;
-  currency?: string;
 }
 
 export interface CostEstimateComponent extends BaseComponent {
-  type: "CostEstimate";
+  component: "CostEstimate";
   items: CostItem[];
   total: number;
   currency: string;
 }
 
-export interface HandoffCardComponent extends BaseComponent {
-  type: "HandoffCard";
+export interface ArchNode {
+  id: string;
+  label: string;
+  type: "compute" | "database" | "cache" | "network" | "storage" | "ai" | "messaging";
+}
+
+export interface ArchEdge {
+  from: string;
+  to: string;
+}
+
+export interface ArchitectureDiagramComponent extends BaseComponent {
+  component: "ArchitectureDiagram";
+  nodes: ArchNode[];
+  edges: ArchEdge[];
+}
+
+export interface FileEditorComponent extends BaseComponent {
+  component: "FileEditor";
+  filename: string;
+  language: string;
+  content: string;
+}
+
+export interface AuthCardComponent extends BaseComponent {
+  component: "AuthCard";
+  provider: "azure" | "github";
   title: string;
-  description: string;
-  url: string;
-  provider: "codespaces" | "vscode-dev";
-  repoUrl: string;
+  description?: string;
+}
+
+export interface DeploymentStep {
+  id: string;
+  label: string;
+  status: "pending" | "running" | "complete" | "error" | "skipped";
+}
+
+export interface DeploymentProgressComponent extends BaseComponent {
+  component: "DeploymentProgress";
+  steps: DeploymentStep[];
 }
 
 // ── Union Type ──────────────────────────────────────────────────────
 
 export type Component =
   | TextComponent
-  | ButtonComponent
-  | TextFieldComponent
+  | ImageComponent
+  | IconComponent
+  | VideoComponent
+  | AudioPlayerComponent
   | RowComponent
   | ColumnComponent
+  | ListComponent
   | CardComponent
-  | ConversationPhaseComponent
-  | CodeBlockComponent
-  | ResourcePickerComponent
-  | DeploymentProgressComponent
-  | ArchitectureDiagramComponent
+  | TabsComponent
+  | DividerComponent
+  | ModalComponent
+  | ButtonComponent
+  | TextFieldComponent
+  | CheckBoxComponent
+  | ChoicePickerComponent
+  | SliderComponent
+  | DateTimeInputComponent
   | CostEstimateComponent
-  | HandoffCardComponent;
+  | ArchitectureDiagramComponent
+  | FileEditorComponent
+  | AuthCardComponent
+  | DeploymentProgressComponent;
 
-// ── A2UI Document ───────────────────────────────────────────────────
+// ── A2UI v0.9 Document ──────────────────────────────────────────────
 
 export interface A2UIDocument {
   version: "0.9";
   root: Component;
+}
+
+// ── Legacy re-exports for backward compat ───────────────────────────
+
+/** @deprecated Use ChoiceOption instead */
+export type ResourceOption = ChoiceOption;
+
+/** @deprecated Phase indicator is now handled via the JSON envelope */
+export interface PhaseItem {
+  id: string;
+  label: string;
+  status: "pending" | "active" | "complete" | "skipped";
 }

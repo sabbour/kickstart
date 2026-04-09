@@ -29,25 +29,45 @@ describe("catalog metadata", () => {
 });
 
 describe("component definitions", () => {
-  const expectedComponents = [
+  // 18 basic + 5 custom = 23 components
+  const basicComponents = [
     "Text",
-    "Button",
-    "TextField",
+    "Image",
+    "Icon",
+    "Video",
+    "AudioPlayer",
     "Row",
     "Column",
+    "List",
     "Card",
-    "ConversationPhase",
-    "CodeBlock",
-    "ResourcePicker",
-    "DeploymentProgress",
-    "ArchitectureDiagram",
-    "CostEstimate",
-    "HandoffCard",
-    "RepoPicker",
-    "WorkflowStatus",
-    "CodespaceLink",
-    "AppOverview",
+    "Tabs",
+    "Divider",
+    "Modal",
+    "Button",
+    "TextField",
+    "CheckBox",
+    "ChoicePicker",
+    "Slider",
+    "DateTimeInput",
   ];
+
+  const customComponents = [
+    "CostEstimate",
+    "ArchitectureDiagram",
+    "FileEditor",
+    "AuthCard",
+    "DeploymentProgress",
+  ];
+
+  const expectedComponents = [...basicComponents, ...customComponents];
+
+  it("has 18 basic components", () => {
+    expect(basicComponents).toHaveLength(18);
+  });
+
+  it("has 5 custom Kickstart components", () => {
+    expect(customComponents).toHaveLength(5);
+  });
 
   it("all expected component types exist in the oneOf union", () => {
     const catalog = loadCatalog();
@@ -72,26 +92,24 @@ describe("component definitions", () => {
     }
   });
 
-  it('each component definition has required "type" property', () => {
+  it('each component definition has required "component" property (v0.9 format)', () => {
     const catalog = loadCatalog();
     const defs = catalog["$defs"] as Record<string, Record<string, unknown>>;
 
     for (const name of expectedComponents) {
       const def = defs[name];
-      // Components use allOf with BaseComponent which has "type" required
       const allOf = def["allOf"] as Array<Record<string, unknown>>;
       expect(allOf).toBeDefined();
 
-      // The second entry in allOf has the component-specific properties
       const specific = allOf[1] as Record<string, unknown>;
       const props = specific["properties"] as Record<string, unknown>;
-      expect(props).toHaveProperty("type");
+      expect(props).toHaveProperty("component");
     }
   });
 });
 
 describe("custom Kickstart components", () => {
-  it("ArchitectureDiagram has mermaid property", () => {
+  it("ArchitectureDiagram has nodes and edges properties", () => {
     const catalog = loadCatalog();
     const defs = catalog["$defs"] as Record<string, Record<string, unknown>>;
     const allOf = defs["ArchitectureDiagram"]["allOf"] as Array<
@@ -100,7 +118,8 @@ describe("custom Kickstart components", () => {
     const props = (allOf[1] as Record<string, unknown>)[
       "properties"
     ] as Record<string, unknown>;
-    expect(props).toHaveProperty("mermaid");
+    expect(props).toHaveProperty("nodes");
+    expect(props).toHaveProperty("edges");
   });
 
   it("CostEstimate has items, total, and currency", () => {
@@ -117,48 +136,34 @@ describe("custom Kickstart components", () => {
     expect(props).toHaveProperty("currency");
   });
 
-  it("HandoffCard has url, provider, and repoUrl", () => {
+  it("FileEditor has filename, language, and content", () => {
     const catalog = loadCatalog();
     const defs = catalog["$defs"] as Record<string, Record<string, unknown>>;
-    const allOf = defs["HandoffCard"]["allOf"] as Array<
+    const allOf = defs["FileEditor"]["allOf"] as Array<
       Record<string, unknown>
     >;
     const props = (allOf[1] as Record<string, unknown>)[
       "properties"
     ] as Record<string, unknown>;
-    expect(props).toHaveProperty("url");
+    expect(props).toHaveProperty("filename");
+    expect(props).toHaveProperty("language");
+    expect(props).toHaveProperty("content");
+  });
+
+  it("AuthCard has provider and title", () => {
+    const catalog = loadCatalog();
+    const defs = catalog["$defs"] as Record<string, Record<string, unknown>>;
+    const allOf = defs["AuthCard"]["allOf"] as Array<
+      Record<string, unknown>
+    >;
+    const props = (allOf[1] as Record<string, unknown>)[
+      "properties"
+    ] as Record<string, unknown>;
     expect(props).toHaveProperty("provider");
-    expect(props).toHaveProperty("repoUrl");
+    expect(props).toHaveProperty("title");
   });
 
-  it("AppOverview has appName, runtime, services, and status", () => {
-    const catalog = loadCatalog();
-    const defs = catalog["$defs"] as Record<string, Record<string, unknown>>;
-    const allOf = defs["AppOverview"]["allOf"] as Array<
-      Record<string, unknown>
-    >;
-    const props = (allOf[1] as Record<string, unknown>)[
-      "properties"
-    ] as Record<string, unknown>;
-    expect(props).toHaveProperty("appName");
-    expect(props).toHaveProperty("runtime");
-    expect(props).toHaveProperty("services");
-    expect(props).toHaveProperty("status");
-  });
-
-  it("ResourcePicker has resourceType property", () => {
-    const catalog = loadCatalog();
-    const defs = catalog["$defs"] as Record<string, Record<string, unknown>>;
-    const allOf = defs["ResourcePicker"]["allOf"] as Array<
-      Record<string, unknown>
-    >;
-    const props = (allOf[1] as Record<string, unknown>)[
-      "properties"
-    ] as Record<string, unknown>;
-    expect(props).toHaveProperty("resourceType");
-  });
-
-  it("DeploymentProgress has steps and overallStatus", () => {
+  it("DeploymentProgress has steps", () => {
     const catalog = loadCatalog();
     const defs = catalog["$defs"] as Record<string, Record<string, unknown>>;
     const allOf = defs["DeploymentProgress"]["allOf"] as Array<
@@ -168,6 +173,5 @@ describe("custom Kickstart components", () => {
       "properties"
     ] as Record<string, unknown>;
     expect(props).toHaveProperty("steps");
-    expect(props).toHaveProperty("overallStatus");
   });
 });

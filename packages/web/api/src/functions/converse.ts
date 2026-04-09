@@ -3,9 +3,9 @@
  *
  * POST /api/converse — Main LLM proxy endpoint for the web surface.
  *
- * Accepts a user message, manages session state, calls Azure OpenAI,
- * and returns the response with phase metadata.
- * Supports SSE streaming when Accept: text/event-stream is set.
+ * Accepts a user message, manages session state, calls Azure OpenAI with
+ * response_format: json_object, and returns the response as typed SSE events.
+ * The LLM outputs a JSON envelope: { message, a2ui, actions }.
  */
 
 import { app } from "@azure/functions";
@@ -13,11 +13,11 @@ import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/fu
 import {
   getPhaseDefinition,
   getPhaseOrder,
+  processResponse,
 } from "@kickstart/core";
 import type { PhaseItem } from "@kickstart/core";
 import { getSession, createSession, addMessage } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionStream, getChatDeploymentName } from "../lib/openai-client.js";
-import { processLLMResponse } from "../lib/response-processor.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -80,7 +80,7 @@ app.http("converse", {
               : ("pending" as const),
       }));
 
-      const a2ui = [
+      const phaseA2ui = [
         {
           type: "ConversationPhase",
           id: "phase-indicator",
@@ -95,28 +95,25 @@ app.http("converse", {
         ?.includes("text/event-stream");
 
       if (wantsStream) {
-        return handleStreaming(messages, state.sessionId, engineState, a2ui, context);
+        return handleStreaming(messages, state.sessionId, engineState, phaseA2ui, context);
       }
 
-      // Non-streaming: call OpenAI and return full response
-      const result = await chatCompletion(messages);
+      // Non-streaming: call OpenAI with JSON object format
+      const result = await chatCompletion(messages, {
+        responseFormat: { type: "json_object" },
+      });
 
-      // Post-process: extract A2UI components from response
-      const processed = processLLMResponse(
-        result.content,
-        engineState.currentPhase,
-      );
+      // Parse the JSON envelope
+      const processed = processResponse(result.content);
 
-      addMessage(state.sessionId, "assistant", processed.text);
-
-      const phaseDef = getPhaseDefinition(engineState.currentPhase);
+      addMessage(state.sessionId, "assistant", processed.message);
 
       const responseBody: ConverseResponse = {
         sessionId: state.sessionId,
         phase: engineState.currentPhase,
-        message: processed.text,
+        message: processed.message,
         model: getChatDeploymentName(),
-        a2ui: [...a2ui, ...processed.components],
+        a2ui: [...phaseA2ui, ...processed.a2uiMessages],
         ...(isNewSession
           ? {
               systemPrompt: state.messages.find((m) => m.role === "system")
@@ -134,12 +131,12 @@ app.http("converse", {
   },
 });
 
-/** Handle SSE streaming response. */
+/** Handle SSE streaming response with typed events. */
 function handleStreaming(
   messages: Array<{ role: string; content: string }>,
   sessionId: string,
   engineState: { currentPhase: string },
-  a2ui: object[],
+  phaseA2ui: object[],
   context: InvocationContext,
 ): HttpResponseInit {
   const encoder = new TextEncoder();
@@ -148,37 +145,53 @@ function handleStreaming(
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        // Accumulate the full JSON response from the LLM
         for await (const chunk of chatCompletionStream(
           messages as Array<{ role: "system" | "user" | "assistant"; content: string }>,
+          { responseFormat: { type: "json_object" } },
         )) {
           fullContent += chunk;
+          // Send raw chunks for progress indication
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`),
+            encoder.encode(`event: chunk\ndata: ${JSON.stringify({ content: chunk })}\n\n`),
           );
         }
 
-        // Post-process full response: extract A2UI components
-        const processed = processLLMResponse(
-          fullContent,
-          engineState.currentPhase,
+        // Parse the completed JSON envelope
+        const processed = processResponse(fullContent);
+
+        // Store the conversational text
+        addMessage(sessionId, "assistant", processed.message);
+
+        // Emit typed SSE events
+
+        // event: message — the conversational text
+        controller.enqueue(
+          encoder.encode(
+            `event: message\ndata: ${JSON.stringify({ content: processed.message })}\n\n`,
+          ),
         );
 
-        // Store the clean text (without A2UI markers)
-        addMessage(sessionId, "assistant", processed.text);
+        // event: a2ui — each A2UI message (phase indicator + LLM-generated)
+        const allA2ui = [...phaseA2ui, ...processed.a2uiMessages];
+        for (const msg of allA2ui) {
+          controller.enqueue(
+            encoder.encode(
+              `event: a2ui\ndata: ${JSON.stringify(msg)}\n\n`,
+            ),
+          );
+        }
 
         const phaseDef = getPhaseDefinition(engineState.currentPhase as import("@kickstart/core").Phase);
 
-        // Final event with metadata + extracted A2UI components
+        // event: done — metadata
         controller.enqueue(
           encoder.encode(
-            `data: ${JSON.stringify({
-              done: true,
+            `event: done\ndata: ${JSON.stringify({
               sessionId,
               phase: engineState.currentPhase,
               phaseLabel: phaseDef.label,
               model: getChatDeploymentName(),
-              cleanText: processed.text,
-              a2ui: [...a2ui, ...processed.components],
             })}\n\n`,
           ),
         );
@@ -188,7 +201,7 @@ function handleStreaming(
         const msg = err instanceof Error ? err.message : String(err);
         context.error(`Stream error: ${msg}`);
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`),
+          encoder.encode(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`),
         );
         controller.close();
       }

@@ -9,22 +9,37 @@ export type {
   Component,
   BaseComponent,
   TextComponent,
-  ButtonComponent,
-  TextFieldComponent,
+  ImageComponent,
+  IconComponent,
+  VideoComponent,
+  AudioPlayerComponent,
   RowComponent,
   ColumnComponent,
+  ListComponent,
   CardComponent,
-  ConversationPhaseComponent,
-  CodeBlockComponent,
-  ResourcePickerComponent,
-  DeploymentProgressComponent,
-  ArchitectureDiagramComponent,
+  TabsComponent,
+  TabDef,
+  DividerComponent,
+  ModalComponent,
+  ButtonComponent,
+  ButtonAction,
+  TextFieldComponent,
+  CheckBoxComponent,
+  ChoicePickerComponent,
+  ChoiceOption,
+  SliderComponent,
+  DateTimeInputComponent,
   CostEstimateComponent,
-  HandoffCardComponent,
-  PhaseItem,
-  ResourceOption,
+  ArchitectureDiagramComponent,
+  ArchNode,
+  ArchEdge,
+  FileEditorComponent,
+  AuthCardComponent,
+  DeploymentProgressComponent,
   DeploymentStep,
   CostItem,
+  PhaseItem,
+  ResourceOption,
 } from "./catalog/index.js";
 
 // Engine
@@ -67,6 +82,15 @@ export type {
   SafeguardSeverity,
   SystemPromptContext,
 } from "./prompts/index.js";
+
+// Services (response processing)
+export { processResponse } from "./services/index.js";
+export type {
+  ProcessedResponse,
+  A2UIMessage,
+  A2UIMessageType,
+  Action,
+} from "./services/index.js";
 
 // Shared types
 export type {
