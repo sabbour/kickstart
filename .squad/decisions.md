@@ -3861,6 +3861,31 @@ export const Button = createReactComponent(ButtonApi, ({props, buildChild}) => {
 ```
 
 **Custom component registration:**
+
+---
+
+# Decision: Fluent UI React v9 for Playground + App Shell
+
+**Author:** Fry (Frontend Dev)  
+**Date:** 2025-07-27  
+**Status:** Accepted
+
+## Context
+
+The Playground and App shell used hand-rolled HTML/CSS for all interactive components (buttons, collapsible sections, badges, text areas, cards). The `@fluentui/react-components` (v9) package was already installed but not wired up.
+
+## Decision
+
+- Wrap the entire app in `<FluentProvider theme={webLightTheme}>` at the App.tsx level so all descendant components inherit Fluent 2 design tokens.
+- Replace Playground's hand-rolled elements with Fluent UI v9 components: Button, Accordion, Card, Textarea, MessageBar, CounterBadge, and Fluent typography (Subtitle2, Caption1, Body1Strong, Text).
+- Use Griffel `makeStyles()` with Fluent `tokens` for component-level styling; keep layout-only CSS (flex containers, scroll areas, responsive breakpoints) in `playground.css`.
+
+## Consequences
+
+- Bundle size increased (2539 → was 483 modules) due to Fluent UI tree — expected and acceptable.
+- Future components anywhere in the app can now use Fluent tokens and components without additional setup.
+- playground.css shrank from ~376 lines to ~80 lines (layout-only).
+- The Accordion's controlled `openItems` API replaces the previous Set-based toggle pattern.
 ```tsx
 const registry = ComponentRegistry.getInstance();
 registry.register('CostEstimate', { component: MyCostEstimate });
