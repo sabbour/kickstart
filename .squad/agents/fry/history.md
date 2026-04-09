@@ -309,3 +309,23 @@
 - **Components newly Fluent**: ChoicePicker (RadioGroup/Radio/Checkbox/ToggleButton), Divider (FluentDivider), Modal (Dialog/DialogSurface/DialogBody/DialogContent), DateTimeInput (Input/Field), Image (FluentImage with shape/fit), Icon (makeStyles+tokens), AudioPlayer (Caption1), Video (makeStyles+tokens), Row/Column/List (makeStyles+tokens with ChildList).
 - **Custom components verified**: RadioGroup, FormGroup, CodeBlock, ProgressSteps were already migrated to Fluent UI v9 in a prior session — no changes needed.
 - **Build**: Vite production build passes — 2559 modules, zero TypeScript errors.
+
+
+### 2026-04-09 — JSON viewer added to Playground page
+- **Feature**: Added tabbed interface to Playground right panel allowing users to switch between "Preview" and "JSON" views for selected scenarios.
+- **Implementation**: Used Fluent UI React v9 TabList and Tab components. JSON is displayed in a monospace code block with proper indentation (JSON.stringify with 2 spaces).
+- **State management**: Added selectedTab ('preview' | 'json') and selectedScenario (ScenarioDef | null) state. Scenario selection auto-switches to preview tab.
+- **JSON generation**: For scenarios with generate() functions, JSON is extracted by calling the function and stringifying the result. For keyword-based scenarios, shows a note explaining they're driven by demo-scenarios.ts.
+- **Styling**: Added 	absContainer, jsonViewerContainer, and jsonCodeBlock styles using Fluent UI tokens for colors and spacing. JSON code block uses 	okens.fontFamilyMonospace, colorNeutralBackground3 background, and orderRadiusMedium.
+- **Layout**: Tabs sit in a fixed header above the scrollable content area. Both Preview and JSON views maintain the scrolling behavior defined in playground.css.
+- **File paths**: packages/web/src/pages/Playground.tsx (main implementation).
+
+### 2026-04-10 — Fixed session memory bug (LLM conversation history)
+- **Root cause**: Frontend session IDs (session-{timestamp}-{random}) never matched backend session IDs (UUIDs from randomUUID()), causing backend to create a new session every message.
+- **Solution**: Added backendSessionId field to Session type to bridge frontend and backend session ID systems.
+- **Streaming hook**: Updated useStreaming.ts to capture sessionId from SSE done event (already in StreamEvent type). Added third parameter to onComplete callback: sessionId?: string.
+- **Mock streaming**: Updated useMockStreaming.ts callback signature to match (passes undefined for sessionId).
+- **Session management**: Added updateSession() method to useSessions.ts to update session metadata (like backendSessionId).
+- **App integration**: In App.tsx, read activeSession.backendSessionId before calling streaming.send(). On first response, store the received sessionId via updateSession(). On subsequent messages, pass the stored backendSessionId to the backend instead of the frontend session ID.
+- **Pattern**: Frontend session ID is UI-only; backend session ID (UUID) holds the actual conversation history. The backendSessionId field maps between the two.
+- **Key files**: types.ts, useStreaming.ts, useMockStreaming.ts, useSessions.ts, App.tsx.

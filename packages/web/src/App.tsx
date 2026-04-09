@@ -115,13 +115,22 @@ export function App() {
         },
       });
     } else {
-      streaming.send(text, sessionId, {
+      // For real streaming, use the backend session ID if available
+      const activeSession = sessions.getActiveSession();
+      const backendSessionId = activeSession?.backendSessionId;
+      
+      streaming.send(text, backendSessionId, {
         onDelta: () => {},
         onA2UI: (msgs) => {
           a2ui.processMessages(msgs);
         },
         onPhase: () => {},
-        onComplete: (fullText, model) => {
+        onComplete: (fullText, model, receivedSessionId) => {
+          // Store the backend session ID on first response
+          if (receivedSessionId && !activeSession?.backendSessionId) {
+            sessions.updateSession(sessionId!, { backendSessionId: receivedSessionId });
+          }
+          
           const assistantMsg: ChatMessage = {
             id: `msg-${Date.now()}-assistant`,
             role: 'assistant',

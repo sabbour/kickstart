@@ -13,6 +13,7 @@ import {
   Accordion, AccordionItem, AccordionHeader, AccordionPanel,
   Textarea, Text, Subtitle2, Caption1, Body1Strong,
   MessageBar, MessageBarBody,
+  TabList, Tab,
   makeStyles, tokens,
 } from '@fluentui/react-components';
 import { useA2UI } from '../hooks/useA2UI';
@@ -162,6 +163,29 @@ const useStyles = makeStyles({
     fontFamily: tokens.fontFamilyBase,
     color: tokens.colorNeutralForeground2,
   },
+  tabsContainer: {
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    flexShrink: 0,
+  },
+  jsonViewerContainer: {
+    flex: 1,
+    overflow: 'auto',
+    padding: tokens.spacingHorizontalL,
+  },
+  jsonCodeBlock: {
+    fontFamily: tokens.fontFamilyMonospace,
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase400,
+    whiteSpace: 'pre' as const,
+    color: tokens.colorNeutralForeground1,
+    backgroundColor: tokens.colorNeutralBackground3,
+    padding: tokens.spacingVerticalM,
+    borderRadius: tokens.borderRadiusMedium,
+    overflowX: 'auto',
+  },
 });
 
 export function Playground() {
@@ -171,6 +195,8 @@ export function Playground() {
   const [jsonInput, setJsonInput] = useState('');
   const [jsonError, setJsonError] = useState('');
   const customCounter = useRef(0);
+  const [selectedTab, setSelectedTab] = useState<'preview' | 'json'>('preview');
+  const [selectedScenario, setSelectedScenario] = useState<ScenarioDef | null>(null);
 
   // Accordion open state: scenario groups default open, "custom-json" starts closed
   const [openItems, setOpenItems] = useState<string[]>(() => [...SCENARIO_GROUPS]);
@@ -178,6 +204,9 @@ export function Playground() {
   // ---- Scenario injection ----
 
   const injectScenario = useCallback((scenario: ScenarioDef) => {
+    setSelectedScenario(scenario);
+    setSelectedTab('preview');
+    
     if (scenario.generate) {
       const msgs = scenario.generate();
       a2ui.processMessages(msgs);
@@ -212,6 +241,8 @@ export function Playground() {
     setActivityLog([]);
     setJsonInput('');
     setJsonError('');
+    setSelectedScenario(null);
+    setSelectedTab('preview');
     resetDemoState();
   }, [a2ui]);
 
@@ -237,6 +268,23 @@ export function Playground() {
 
   const surfaceEntries = Array.from(a2ui.surfaces.entries());
   const grouped = getGroupedScenarios();
+
+  // Get JSON for the selected scenario
+  const getScenarioJson = useCallback(() => {
+    if (!selectedScenario) return '';
+    
+    if (selectedScenario.generate) {
+      const msgs = selectedScenario.generate();
+      return JSON.stringify(msgs, null, 2);
+    }
+
+    // For keyword-based scenarios, we can't easily get the exact JSON
+    // without running the demo-scenarios logic, so we show a placeholder
+    return JSON.stringify({
+      note: `This scenario is driven by the demo-scenarios.ts keyword: "${selectedScenario.keyword}"`,
+      description: selectedScenario.description,
+    }, null, 2);
+  }, [selectedScenario]);
 
   return (
     <div className={`playground-page ${classes.playgroundPage}`}>
@@ -346,34 +394,71 @@ export function Playground() {
 
         {/* ---- RIGHT: rendered output ---- */}
         <div className="playground-right">
-          <div className="playground-right-scroll">
-            {surfaceEntries.length === 0 ? (
-              <div className={classes.emptyState}>
-                <div className={classes.emptyIcon}>⬡</div>
-                <Text>No surfaces yet. Click a scenario or paste JSON to get started.</Text>
-              </div>
-            ) : (
-              <div className="playground-surfaces">
-                {surfaceEntries.map(([id, surface]) => (
-                  <Card key={id} appearance="outline">
-                    <CardHeader
-                      header={
-                        <Caption1 className={classes.surfaceIdText}>{id}</Caption1>
-                      }
-                      description={
-                        <Caption1>{id.replace(/-\d+$/, '')}</Caption1>
-                      }
-                    />
-                    <div className={classes.surfaceBody}>
-                      <div className="a2ui-component">
-                        <A2UISurfaceWrapper surface={surface} />
+          {/* Tabs for Preview / JSON */}
+          {selectedScenario && (
+            <div className={classes.tabsContainer}>
+              <TabList
+                selectedValue={selectedTab}
+                onTabSelect={(_e, data) => setSelectedTab(data.value as 'preview' | 'json')}
+                size="small"
+              >
+                <Tab value="preview">Preview</Tab>
+                <Tab value="json">JSON</Tab>
+              </TabList>
+            </div>
+          )}
+
+          {selectedTab === 'preview' ? (
+            <div className="playground-right-scroll">
+              {surfaceEntries.length === 0 ? (
+                <div className={classes.emptyState}>
+                  <div className={classes.emptyIcon}>⬡</div>
+                  <Text>No surfaces yet. Click a scenario or paste JSON to get started.</Text>
+                </div>
+              ) : (
+                <div className="playground-surfaces">
+                  {surfaceEntries.map(([id, surface]) => (
+                    <Card key={id} appearance="outline">
+                      <CardHeader
+                        header={
+                          <Caption1 className={classes.surfaceIdText}>{id}</Caption1>
+                        }
+                        description={
+                          <Caption1>{id.replace(/-\d+$/, '')}</Caption1>
+                        }
+                      />
+                      <div className={classes.surfaceBody}>
+                        <div className="a2ui-component">
+                          <A2UISurfaceWrapper surface={surface} />
+                        </div>
                       </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className={classes.jsonViewerContainer}>
+              {selectedScenario ? (
+                <Card appearance="outline">
+                  <CardHeader
+                    header={<Body1Strong>{selectedScenario.label} — A2UI JSON</Body1Strong>}
+                    description={<Caption1>{selectedScenario.description}</Caption1>}
+                  />
+                  <div className={classes.surfaceBody}>
+                    <div className={classes.jsonCodeBlock}>
+                      {getScenarioJson()}
                     </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
+                  </div>
+                </Card>
+              ) : (
+                <div className={classes.emptyState}>
+                  <div className={classes.emptyIcon}>📄</div>
+                  <Text>Select a scenario to view its JSON definition.</Text>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Activity log */}
           {activityLog.length > 0 && (

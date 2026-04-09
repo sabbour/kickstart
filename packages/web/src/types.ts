@@ -17,6 +17,7 @@ export interface Session {
   messages: ChatMessage[];
   createdAt: number;
   updatedAt: number;
+  backendSessionId?: string;
 }
 
 export type AppMode = 'landing' | 'chat';

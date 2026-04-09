@@ -13,7 +13,7 @@ interface MockStreamCallbacks {
   onDelta: (text: string) => void;
   onA2UI: (messages: A2uiMsg[]) => void;
   onPhase: (phase: string) => void;
-  onComplete: (fullText: string, model: string) => void;
+  onComplete: (fullText: string, model?: string, sessionId?: string) => void;
   onError: (error: string) => void;
 }
 
@@ -40,7 +40,7 @@ export function useMockStreaming() {
       onComplete: (fullText, model) => {
         setIsStreaming(false);
         abortRef.current = null;
-        callbacks.onComplete(fullText, model);
+        callbacks.onComplete(fullText, model, undefined);
       },
       onError: (error) => {
         setIsStreaming(false);

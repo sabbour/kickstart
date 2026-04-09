@@ -5,7 +5,7 @@ interface StreamCallbacks {
   onDelta: (text: string) => void;
   onA2UI: (messages: A2uiMsg[]) => void;
   onPhase: (phase: string) => void;
-  onComplete: (fullText: string, model?: string) => void;
+  onComplete: (fullText: string, model?: string, sessionId?: string) => void;
   onError: (error: string) => void;
 }
 
@@ -27,6 +27,7 @@ export function useStreaming() {
 
     let accumulated = '';
     let lastModel: string | undefined;
+    let lastSessionId: string | undefined;
 
     try {
       const res = await fetch('/api/converse', {
@@ -88,11 +89,15 @@ export function useStreaming() {
             if (event.model) {
               lastModel = event.model;
             }
+
+            if (event.sessionId) {
+              lastSessionId = event.sessionId;
+            }
           } catch { /* skip malformed JSON */ }
         }
       }
 
-      callbacks.onComplete(accumulated, lastModel);
+      callbacks.onComplete(accumulated, lastModel, lastSessionId);
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         callbacks.onError(err.message || 'Connection failed');

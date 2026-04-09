@@ -63,6 +63,17 @@ export function useSessions() {
     }));
   }, []);
 
+  const updateSession = useCallback((sessionId: string, updates: Partial<Session>) => {
+    setSessions(prev => prev.map(s => {
+      if (s.id !== sessionId) return s;
+      return {
+        ...s,
+        ...updates,
+        updatedAt: Date.now(),
+      };
+    }));
+  }, []);
+
   const deleteSession = useCallback((sessionId: string) => {
     setSessions(prev => prev.filter(s => s.id !== sessionId));
     if (activeSessionId === sessionId) {
@@ -83,6 +94,7 @@ export function useSessions() {
     createSession,
     addMessage,
     updateMessage,
+    updateSession,
     deleteSession,
     getActiveSession,
     recentSessions,
