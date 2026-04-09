@@ -386,3 +386,24 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **Pattern:** All proxies use `request.params["path"]` for wildcard route capture, `request.query` forwarding, native `fetch`, `arrayBuffer()` for body pass-through, and return upstream HTTP status verbatim.
 - **Build:** 8 functions bundled (was 5). All 286 vitest tests pass.
 - **Key files:** `packages/web/api/src/functions/arm-proxy.ts`, `packages/web/api/src/functions/github-proxy.ts`, `packages/web/api/src/functions/pricing-proxy.ts`
+
+### 2025-07-28: Auto-Continue Middleware (B-21)
+
+- **New file:** `packages/core/src/engine/auto-continue.ts` — pure functions for auto-continuation logic. `shouldAutoContinue(name)` detects `complete:`/`continue:` prefixes. `synthesizeContinuationPrompt(action)` builds LLM-friendly prompt from action name + context. `synthesizeNavigationPrompt(phase, context)` builds phase-transition prompt. `AUTO_CONTINUE_MAX_CONSECUTIVE = 3` constant.
+- **Exports wired:** New symbols exported through `engine/index.ts` → `core/src/index.ts` so web surface can import from `@kickstart/core`.
+- **useActionDispatch refactor:** Added `auto-continue` and `navigate` as routing categories. `complete:`/`continue:` prefixed actions synthesize completion prompts and call `onAutoContinue`. `navigate:` actions synthesize navigation prompts and auto-continue (phase transitions). Rate limiting: max 3 consecutive auto-continues via `consecutiveRef`; warns and no-ops when exceeded. Now returns `{ handler, resetConsecutiveCount, consecutiveAutoContinueCount }` instead of just the handler. `resetConsecutiveCount()` called by App.tsx on manual sends.
+- **UI:** `ChatMessage.isAutoContinue?: boolean` added to types. `ChatMessage.tsx` renders a subtle "Continuing..." indicator (italic, muted) instead of the user bubble for auto-continue messages. CSS class `.chat-bubble.auto-continue` / `.auto-continue-label` added to `components.css`.
+- **App.tsx wiring:** `handleSendMessage(text, isAutoContinue = false)` — skips counter reset for auto-continues. Passes `isAutoContinue` flag to `ChatMessage` creation. `onAutoContinue` callback routes to `handleSendMessage(msg, true)`.
+- **All 359 tests pass.** Build clean.
+- **Key insight:** `useActionDispatch` uses `optionsRef` to always call the latest options — safe to reference `handleSendMessage` before it's defined because the callbacks are only invoked after render.
+
+### 2025-07-29: B-15 — Skill Resolver Middleware
+
+- **skill-resolver.ts** lives in `packages/core/src/engine/` — exports `resolveSkills(phase, kits)` and `formatSkillsSection(skills)`.
+- **Priority chain**: `kit.phasePrompts[phase]` > keyword-heuristic filter of `kit.prompts` > include all (unclassified).
+- **Discover phase** gets a synthetic tool-listing prompt auto-built from kit.tools so the LLM always knows what it can call.
+- **IntegrationKit type** extended with `phasePrompts?: Partial<Record<Phase, string[]>>` — backward compat (flat `prompts` still works).
+- **buildSystemPrompt** gains `kitPrompts?: string[]` context field — appended as `## Available Capabilities` after Layer 3 (phase prompt).
+- **converse endpoint** now calls `resolveSkills` on every turn and injects the fresh system prompt, so the LLM gets correct capabilities as the phase advances.
+- **azure-kit + github-kit** have full `phasePrompts` coverage for all 6 phases.
+- 28 new tests, 359 total — zero regressions.
