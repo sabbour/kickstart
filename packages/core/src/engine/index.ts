@@ -23,6 +23,13 @@ export { resolveSkills, formatSkillsSection } from "./skill-resolver.js";
 export type { ResolvedSkills } from "./skill-resolver.js";
 
 export {
+  resolveDataPath,
+  interpolateTemplate,
+  createDefaultValues,
+  interpolateA2UIMessage,
+} from "./data-binding.js";
+
+export {
   AUTO_CONTINUE_PREFIXES,
   AUTO_CONTINUE_MAX_CONSECUTIVE,
   shouldAutoContinue,

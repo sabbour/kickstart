@@ -6,6 +6,9 @@
  * No regex. No markdown fences. Just JSON.
  */
 
+import { logger } from "../telemetry/index.js";
+import { interpolateA2UIMessage } from "../engine/data-binding.js";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -75,7 +78,10 @@ const VALID_A2UI_TYPES = new Set<string>([
  * - Missing `message` → empty text, just components
  * - Malformed A2UI messages → skip bad messages, keep the rest
  */
-export function processResponse(jsonString: string): ProcessedResponse {
+export function processResponse(
+  jsonString: string,
+  dataModel?: Record<string, unknown>,
+): ProcessedResponse {
   const raw = jsonString;
 
   // Attempt JSON parse
@@ -83,6 +89,7 @@ export function processResponse(jsonString: string): ProcessedResponse {
   try {
     parsed = JSON.parse(jsonString);
   } catch {
+    logger.warn('processResponse: not valid JSON, treating as plain text');
     // Not valid JSON — treat the whole thing as plain text
     return { message: jsonString.trim(), a2uiMessages: [], actions: [], raw };
   }
@@ -99,12 +106,22 @@ export function processResponse(jsonString: string): ProcessedResponse {
     typeof envelope.message === "string" ? envelope.message : "";
 
   // Extract and validate A2UI messages
-  const a2uiMessages = validateA2UIMessages(envelope.a2ui);
+  const rawA2UI = validateA2UIMessages(envelope.a2ui);
+  // Interpolate data paths in component props when a data model is provided
+  const a2uiMessages = dataModel
+    ? rawA2UI.map(msg => interpolateA2UIMessage(msg, dataModel))
+    : rawA2UI;
 
   // Extract and validate actions
   const actions = validateActions(envelope.actions);
 
-  return { message, a2uiMessages, actions, raw };
+  const result = { message, a2uiMessages, actions, raw };
+  logger.track('conversation.turn', {
+    messageLength: message.length,
+    a2uiMessages: a2uiMessages.length,
+    actions: actions.length,
+  });
+  return result;
 }
 
 // ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@
  */
 
 import type { Tool, OpenAIToolDefinition } from "./types.js";
+import { logger } from "../telemetry/index.js";
 
 export class ToolRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,6 +48,28 @@ export class ToolRegistry {
         parameters: tool.parameters,
       },
     }));
+  }
+
+  /**
+   * Execute a named tool, logging the call and result.
+   * Throws if the tool is not registered or execution fails.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async execute(name: string, args: Record<string, unknown>): Promise<unknown> {
+    const tool = this.tools.get(name);
+    if (!tool) {
+      logger.warn(`Tool not found: ${name}`);
+      throw new Error(`Tool not registered: ${name}`);
+    }
+    logger.track('tool.call', { tool: name, args });
+    try {
+      const result = await tool.execute(args);
+      logger.track('tool.result', { tool: name, result });
+      return result;
+    } catch (err) {
+      logger.error(`Tool execution failed: ${name}`, err);
+      throw err;
+    }
   }
 
   /** Number of registered tools. */

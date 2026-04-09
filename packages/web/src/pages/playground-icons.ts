@@ -13,7 +13,7 @@ export interface IconEntry {
 export interface IconCategory {
   id: string;
   label: string;
-  type: 'azure' | 'fluent' | 'ui';
+  type: 'azure' | 'fluent' | 'ui' | 'fluent-react';
   icons: IconEntry[];
 }
 
@@ -2732,10 +2732,51 @@ export const FLUENT_ICON_CATEGORY: IconCategory = {
   id: 'fluent', label: 'Fluent 2', type: 'fluent', icons: FLUENT_ICONS,
 };
 
+// ---- Fluent UI React Icons (from @fluentui/react-icons) ----
+
+const FLUENT_REACT_ICONS: IconEntry[] = [
+  { name: 'document', path: 'document' },
+  { name: 'folder', path: 'folder' },
+  { name: 'code', path: 'code' },
+  { name: 'save', path: 'save' },
+  { name: 'copy', path: 'copy' },
+  { name: 'home', path: 'home' },
+  { name: 'arrowLeft', path: 'arrowLeft' },
+  { name: 'chevronDown', path: 'chevronDown' },
+  { name: 'link', path: 'link' },
+  { name: 'add', path: 'add' },
+  { name: 'delete', path: 'delete' },
+  { name: 'edit', path: 'edit' },
+  { name: 'send', path: 'send' },
+  { name: 'dismiss', path: 'dismiss' },
+  { name: 'filter', path: 'filter' },
+  { name: 'search', path: 'search' },
+  { name: 'upload', path: 'upload' },
+  { name: 'download', path: 'download' },
+  { name: 'checkmarkCircle', path: 'checkmarkCircle' },
+  { name: 'warning', path: 'warning' },
+  { name: 'info', path: 'info' },
+  { name: 'star', path: 'star' },
+  { name: 'person', path: 'person' },
+  { name: 'key', path: 'key' },
+  { name: 'lock', path: 'lock' },
+  { name: 'settings', path: 'settings' },
+  { name: 'cloud', path: 'cloud' },
+  { name: 'globe', path: 'globe' },
+  { name: 'chat', path: 'chat' },
+  { name: 'clock', path: 'clock' },
+  { name: 'tag', path: 'tag' },
+];
+
+export const FLUENT_REACT_ICON_CATEGORY: IconCategory = {
+  id: 'fluent-react', label: 'Fluent UI React', type: 'fluent-react', icons: FLUENT_REACT_ICONS,
+};
+
 export const ALL_ICON_CATEGORIES: IconCategory[] = [
   ...AZURE_ICON_CATEGORIES,
   ...UI_ICON_CATEGORIES,
   FLUENT_ICON_CATEGORY,
+  FLUENT_REACT_ICON_CATEGORY,
 ];
 
 /** Total icon count across all categories */

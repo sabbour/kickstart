@@ -34,10 +34,12 @@ import {
   AZURE_ICON_CATEGORIES,
   UI_ICON_CATEGORIES,
   FLUENT_ICON_CATEGORY,
+  FLUENT_REACT_ICON_CATEGORY,
   TOTAL_ICON_COUNT,
   type IconCategory,
   type IconEntry,
 } from './playground-icons';
+import { getFluentIcon } from '../catalog/icons/fluent-icons';
 
 // Scenario grouping for tabs
 const GALLERY_GROUPS = ['Kickstart Scenarios', 'Data Binding', 'Events & Actions', 'Surface Lifecycle', 'Dynamic Patterns'];
@@ -98,6 +100,11 @@ const useStyles = makeStyles({
     ':hover': {
       boxShadow: tokens.shadow16,
       transform: 'translateY(-3px)',
+    },
+    ':focus-visible': {
+      outline: `2px solid ${tokens.colorBrandStroke1}`,
+      outlineOffset: '2px',
+      boxShadow: tokens.shadow16,
     },
   },
   cardLabel: {
@@ -524,7 +531,14 @@ const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
   const surfaceEntries = Array.from(surfaces.entries());
 
   return (
-    <div className={classes.galleryCard} onClick={() => onCardClick(scenario, surfaces)}>
+    <div
+      className={classes.galleryCard}
+      role="button"
+      tabIndex={0}
+      aria-label={scenario.label}
+      onClick={() => onCardClick(scenario, surfaces)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(scenario, surfaces); } }}
+    >
       <Caption1 className={classes.cardLabel}>{scenario.label}</Caption1>
       {scenario.description && (
         <Caption1 className={classes.cardDescription}>{scenario.description}</Caption1>
@@ -643,12 +657,13 @@ const WidgetPreview = memo(({ widget }: WidgetPreviewProps) => {
 
 WidgetPreview.displayName = 'WidgetPreview';
 
-// Icon sections for the Icons tab (Azure, UI, Fluent 2)
+// Icon sections for the Icons tab (Azure, UI, Fluent 2, Fluent React)
 // Icon category sections for the Icons tab
 const ICON_SECTIONS = [
   { label: 'Azure Services', categories: AZURE_ICON_CATEGORIES },
   { label: 'UI Icons', categories: UI_ICON_CATEGORIES },
   { label: 'Fluent 2', categories: [FLUENT_ICON_CATEGORY] },
+  { label: 'Fluent React', categories: [FLUENT_REACT_ICON_CATEGORY] },
 ];
 
 // ---- Main Playground Component (Inner) ----
@@ -676,6 +691,9 @@ function PlaygroundInner() {
   const createSessionIdRef = useRef<string | undefined>(undefined);
   const pendingSurfaceIdsRef = useRef<string[]>([]);
   const createEndRef = useRef<HTMLDivElement>(null);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
+  const iconSearchRef = useRef<HTMLDivElement>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
   const [createMessages, setCreateMessages] = useState<ChatMessage[]>([]);
   const { widgets, addWidget, updateWidget, deleteWidget, duplicateWidget } = useWidgets();
 
@@ -783,6 +801,26 @@ function PlaygroundInner() {
     }
   }, [createMessages, createStreaming.isStreaming, createStreaming.streamText]);
 
+  // Keyboard shortcuts: Ctrl+K or / focuses the active search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isEditing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (isEditing) return;
+      if (e.key === '/' || (e.key === 'k' && (e.ctrlKey || e.metaKey))) {
+        if (activeTab === 'gallery' || activeTab === 'components') {
+          e.preventDefault();
+          searchBoxRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+        } else if (activeTab === 'icons') {
+          e.preventDefault();
+          iconSearchRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab]);
+
   // Handle create from prompt — sends to /api/converse via useStreaming
   const handleCreateSend = useCallback((text: string) => {
     if (!text.trim() || createStreaming.isStreaming) return;
@@ -850,6 +888,21 @@ function PlaygroundInner() {
     pendingSurfaceIdsRef.current = [];
   }, [customA2ui, createA2ui]);
 
+  // Arrow key navigation within the gallery grid
+  const handleGalleryKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+    const cards = galleryRef.current?.querySelectorAll<HTMLElement>('[role="button"]');
+    if (!cards || cards.length === 0) return;
+    const arr = Array.from(cards);
+    const idx = arr.indexOf(document.activeElement as HTMLElement);
+    if (idx === -1) return;
+    e.preventDefault();
+    const next = e.key === 'ArrowRight' || e.key === 'ArrowDown'
+      ? Math.min(idx + 1, arr.length - 1)
+      : Math.max(idx - 1, 0);
+    arr[next]?.focus();
+  }, []);
+
   // Handle copy icon path
   const handleCopyIcon = useCallback((icon: IconEntry) => {
     navigator.clipboard.writeText(icon.path);
@@ -912,7 +965,7 @@ function PlaygroundInner() {
           />
         </div>
         {(activeTab === 'gallery' || activeTab === 'components') && (
-          <div className={classes.topbarCenter}>
+          <div className={classes.topbarCenter} ref={searchBoxRef}>
             <SearchBox
               placeholder="Filter scenarios..."
               value={filterQuery}
@@ -922,7 +975,7 @@ function PlaygroundInner() {
           </div>
         )}
         {activeTab === 'icons' && (
-          <div className={classes.topbarCenter}>
+          <div className={classes.topbarCenter} ref={iconSearchRef}>
             <SearchBox
               placeholder="Filter icons..."
               value={iconFilter}
@@ -945,11 +998,11 @@ function PlaygroundInner() {
           onTabSelect={(_e, data) => setActiveTab(data.value as any)}
           size="medium"
         >
-          <Tab value="create">Create</Tab>
-          <Tab value="gallery">Gallery</Tab>
-          <Tab value="components">Components</Tab>
-          <Tab value="icons">Icons</Tab>
-          <Tab value="widgets">Widgets</Tab>
+          <Tab id="tab-create" value="create" aria-controls="panel-create">Create</Tab>
+          <Tab id="tab-gallery" value="gallery" aria-controls="panel-gallery">Gallery</Tab>
+          <Tab id="tab-components" value="components" aria-controls="panel-components">Components</Tab>
+          <Tab id="tab-icons" value="icons" aria-controls="panel-icons">Icons</Tab>
+          <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets">Widgets</Tab>
         </TabList>
       </div>
 
@@ -966,7 +1019,7 @@ function PlaygroundInner() {
 
       {/* ---- Tab 1: Create (empty state — no messages yet) ---- */}
       {activeTab === 'create' && createMessages.length === 0 && (
-        <div className="playground-create-scroll">
+        <div id="panel-create" role="tabpanel" aria-labelledby="tab-create" className="playground-create-scroll">
           {/* Hero section */}
           <div className={classes.createHero}>
             <div className={classes.createHeading}>What would you like to build?</div>
@@ -976,6 +1029,7 @@ function PlaygroundInner() {
                 value={createPrompt}
                 onChange={(e) => setCreatePrompt(e.target.value)}
                 placeholder="Describe your A2UI widget..."
+                aria-label="Describe your A2UI widget"
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSend(createPrompt); }}
                 disabled={createStreaming.isStreaming}
               />
@@ -991,7 +1045,13 @@ function PlaygroundInner() {
             </div>
             <div className={classes.createSubtext}>
               or{' '}
-              <span className={classes.startBlankLink} onClick={handleStartBlank}>
+              <span
+                className={classes.startBlankLink}
+                onClick={handleStartBlank}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleStartBlank(); } }}
+              >
                 Start Blank
               </span>
             </div>
@@ -1000,6 +1060,10 @@ function PlaygroundInner() {
             <div
               className={classes.advancedToggle}
               onClick={() => setShowAdvancedJson(!showAdvancedJson)}
+              role="button"
+              tabIndex={0}
+              aria-expanded={showAdvancedJson}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAdvancedJson(v => !v); } }}
             >
               {showAdvancedJson ? '▾' : '▸'} Advanced: paste raw A2UI JSON
             </div>
@@ -1012,6 +1076,7 @@ function PlaygroundInner() {
                 value={widgetName}
                 onChange={(_e, data) => setWidgetName(data.value)}
                 placeholder="Widget name..."
+                aria-label="Widget name"
                 style={{ marginBottom: tokens.spacingVerticalM }}
               />
               <Textarea
@@ -1028,6 +1093,7 @@ function PlaygroundInner() {
                 rows={12}
                 resize="vertical"
                 spellCheck={false}
+                aria-label="A2UI JSON input"
               />
               {jsonError && (
                 <MessageBar intent="error" className={classes.errorMessage}>
@@ -1082,9 +1148,9 @@ function PlaygroundInner() {
 
       {/* ---- Tab 1: Create (chat active — conversation in progress) ---- */}
       {activeTab === 'create' && createMessages.length > 0 && (
-        <div className={classes.createChatShell}>
+        <div id="panel-create" role="tabpanel" aria-labelledby="tab-create" className={classes.createChatShell}>
           {/* Scrollable message area */}
-          <div className={classes.createMsgArea}>
+          <div className={classes.createMsgArea} role="log" aria-live="polite" aria-label="Chat messages">
             {createMessages.map((msg, index) => (
               <div key={msg.id} className={classes.createBubbleRow}>
                 <div className={msg.role === 'user' ? classes.createBubbleUser : classes.createBubbleAssistant}>
@@ -1184,6 +1250,7 @@ function PlaygroundInner() {
                 value={createPrompt}
                 onChange={(e) => setCreatePrompt(e.target.value)}
                 placeholder="Continue the conversation..."
+                aria-label="Continue the conversation"
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSend(createPrompt); }}
                 disabled={createStreaming.isStreaming}
               />
@@ -1198,11 +1265,20 @@ function PlaygroundInner() {
               </Button>
             </div>
             <div className={classes.createChatFooter}>
-              <span className={classes.startBlankLink} onClick={handleStartBlank}>Start Blank</span>
+              <span
+                className={classes.startBlankLink}
+                onClick={handleStartBlank}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleStartBlank(); } }}
+              >Start Blank</span>
               <span className={classes.createFooterSep}>·</span>
               <span
                 className={classes.startBlankLink}
                 onClick={() => setShowAdvancedJson(v => !v)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAdvancedJson(v => !v); } }}
               >
                 {showAdvancedJson ? 'Hide JSON' : 'Advanced JSON'}
               </span>
@@ -1213,8 +1289,8 @@ function PlaygroundInner() {
 
       {/* ---- Tab 2: Gallery (Scenarios) ---- */}
       {activeTab === 'gallery' && (
-        <div className="playground-gallery-scroll">
-          <div className="playground-gallery">
+        <div id="panel-gallery" role="tabpanel" aria-labelledby="tab-gallery" className="playground-gallery-scroll">
+          <div className="playground-gallery" ref={galleryRef} onKeyDown={handleGalleryKeyDown}>
             {filteredGalleryScenarios.map(scenario => (
               <GalleryCardErrorBoundary key={scenario.id} label={scenario.label}>
                 <GalleryCard scenario={scenario} onCardClick={handleCardClick} />
@@ -1226,7 +1302,7 @@ function PlaygroundInner() {
 
       {/* ---- Tab 3: Basic Components ---- */}
       {activeTab === 'components' && (
-        <div className="playground-gallery-scroll">
+        <div id="panel-components" role="tabpanel" aria-labelledby="tab-components" className="playground-gallery-scroll">
           {COMPONENT_GROUPS.map(group => {
             const groupScenarios = filteredComponentScenarios.filter(s => s.group === group);
             if (groupScenarios.length === 0) return null;
@@ -1248,7 +1324,7 @@ function PlaygroundInner() {
 
       {/* ---- Tab 4: Icons ---- */}
       {activeTab === 'icons' && (
-        <div className="playground-create-scroll">
+        <div id="panel-icons" role="tabpanel" aria-labelledby="tab-icons" className="playground-create-scroll">
           <div style={{ padding: tokens.spacingHorizontalL }}>
             {/* Section tabs */}
             <TabList
@@ -1263,7 +1339,7 @@ function PlaygroundInner() {
             </TabList>
 
             <Caption1 style={{ display: 'block', marginBottom: tokens.spacingVerticalM, color: tokens.colorNeutralForeground3 }}>
-              Click an icon to copy its path to clipboard. Use in A2UI Icon components.
+              Click an icon to copy its name to clipboard. Azure/UI/Fluent 2 use path references; Fluent React icons use the registered name.
             </Caption1>
 
             {filteredIconCategories.map(cat => (
@@ -1275,29 +1351,41 @@ function PlaygroundInner() {
                   </Caption1>
                 </Subtitle2>
                 <div className={classes.iconGrid}>
-                  {cat.icons.map(icon => (
-                    <Card
-                      key={icon.path}
-                      appearance="outline"
-                      className={classes.iconCard}
-                      onClick={() => handleCopyIcon(icon)}
-                      title={`${icon.name}\nClick to copy path`}
-                    >
-                      <img
-                        src={icon.path}
-                        alt={icon.name}
-                        className={classes.iconSymbol}
-                        loading="lazy"
-                        style={{ width: 32, height: 32, objectFit: 'contain' }}
-                      />
-                      <Caption1 style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        maxWidth: '100%',
-                      }}>{icon.name}</Caption1>
-                    </Card>
-                  ))}
+                  {cat.icons.map(icon => {
+                    const FluentReactIcon = cat.type === 'fluent-react' ? getFluentIcon(icon.name) : null;
+                    return (
+                      <Card
+                        key={icon.path}
+                        appearance="outline"
+                        className={classes.iconCard}
+                        onClick={() => handleCopyIcon(icon)}
+                        title={`${icon.name}\nClick to copy name`}
+                        aria-label={`${icon.name} — copy icon name`}
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyIcon(icon); } }}
+                      >
+                        {FluentReactIcon ? (
+                          <span style={{ width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: tokens.colorNeutralForeground1 }}>
+                            <FluentReactIcon fontSize={24} />
+                          </span>
+                        ) : (
+                          <img
+                            src={icon.path}
+                            alt={icon.name}
+                            className={classes.iconSymbol}
+                            loading="lazy"
+                            style={{ width: 32, height: 32, objectFit: 'contain' }}
+                          />
+                        )}
+                        <Caption1 style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: '100%',
+                        }}>{icon.name}</Caption1>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -1316,7 +1404,7 @@ function PlaygroundInner() {
 
       {/* ---- Tab 5: Widgets ---- */}
       {activeTab === 'widgets' && (
-        <div className="playground-create-scroll">
+        <div id="panel-widgets" role="tabpanel" aria-labelledby="tab-widgets" className="playground-create-scroll">
           <div className={classes.jsonEditorContainer}>
             <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
               My Widgets
@@ -1356,6 +1444,7 @@ function PlaygroundInner() {
               action={
                 <Button
                   appearance="subtle"
+                  aria-label="Dismiss"
                   icon={<Dismiss24Regular />}
                   onClick={() => setDialogOpen(false)}
                 />

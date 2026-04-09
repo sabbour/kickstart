@@ -8,6 +8,7 @@
 import { Phase } from "./types.js";
 import type { ConversationState, ConversationEvent, PhaseStatus } from "./types.js";
 import { getPhaseDefinition, getPhaseOrder } from "./phases.js";
+import { logger } from "../telemetry/index.js";
 
 /** Create a fresh conversation state at the Discover phase. */
 export function createInitialState(): ConversationState {
@@ -40,6 +41,7 @@ export function transition(
 
   switch (event.type) {
     case "START":
+      logger.track('conversation.start');
       return createInitialState();
 
     case "ADVANCE": {
@@ -47,6 +49,7 @@ export function transition(
       if (!currentDef.nextPhase) {
         next.phaseStatus[next.currentPhase] = "complete";
         next.isComplete = true;
+        logger.track('conversation.complete', { phase: next.currentPhase });
         return next;
       }
       next.phaseStatus[next.currentPhase] = "complete";
@@ -55,6 +58,7 @@ export function transition(
       if (event.data) {
         Object.assign(next.phaseData[currentDef.nextPhase], event.data);
       }
+      logger.track('conversation.advance', { from: state.currentPhase, to: next.currentPhase });
       return next;
     }
 
@@ -63,11 +67,13 @@ export function transition(
       if (!currentDef.nextPhase) {
         next.phaseStatus[next.currentPhase] = "skipped";
         next.isComplete = true;
+        logger.track('conversation.complete', { phase: next.currentPhase, skipped: true });
         return next;
       }
       next.phaseStatus[next.currentPhase] = "skipped";
       next.currentPhase = currentDef.nextPhase;
       next.phaseStatus[currentDef.nextPhase] = "active";
+      logger.track('conversation.skip', { from: state.currentPhase, to: next.currentPhase });
       return next;
     }
 
@@ -81,19 +87,20 @@ export function transition(
       if (def.nextPhase) {
         next.currentPhase = def.nextPhase;
         next.phaseStatus[def.nextPhase] = "active";
+        logger.track('conversation.phaseComplete', { phase: event.phase, next: def.nextPhase });
       } else {
         next.isComplete = true;
+        logger.track('conversation.complete', { phase: event.phase });
       }
       return next;
     }
 
     case "RESET":
+      logger.track('conversation.reset');
       return createInitialState();
 
     case "USER_INPUT":
-      // User input is recorded but doesn't change phase state directly.
-      // Phase advancement is driven by ADVANCE or PHASE_COMPLETE events
-      // after the LLM processes the input.
+      logger.info(`User input in phase: ${state.currentPhase}`, { length: event.input?.length });
       return next;
 
     default:

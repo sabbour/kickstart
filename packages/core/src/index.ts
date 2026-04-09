@@ -59,6 +59,10 @@ export {
   shouldAutoContinue,
   synthesizeContinuationPrompt,
   synthesizeNavigationPrompt,
+  resolveDataPath,
+  interpolateTemplate,
+  createDefaultValues,
+  interpolateA2UIMessage,
 } from "./engine/index.js";
 export type {
   PhaseStatus,
@@ -139,6 +143,10 @@ export { noPrivilegedValidator } from "./validation/index.js";
 export { namespaceSetValidator } from "./validation/index.js";
 export { replicaCountValidator } from "./validation/index.js";
 export { imagePullPolicyValidator } from "./validation/index.js";
+
+// Telemetry — structured logger with in-memory ring buffer
+export { Logger, logger, getLogEntries } from "./telemetry/index.js";
+export type { LogLevel, LogEntry, TrackEntry, LogRecord } from "./telemetry/index.js";
 
 // Shared types
 export type {
