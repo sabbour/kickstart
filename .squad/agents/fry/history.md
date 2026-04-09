@@ -548,3 +548,12 @@ All component patterns, API conventions, and architectural decisions from this p
 - **Components tab headers**: `groupHeader` style — increased `marginTop` from `spacingVerticalXL` to `spacingVerticalXXL`, `marginBottom` from `spacingVerticalM` to `spacingVerticalL`, added horizontal padding to prevent content collision.
 - **Widgets tab broken image**: Fixed path from `container-registry.svg` (nonexistent) to `container-registries.svg` (correct filename in `/assets/icons/containers/`).
 - **Rule**: Always verify asset filenames against `public/assets/icons/` — pluralization varies (e.g., `container-registries.svg` not `container-registry.svg`).
+
+### 2026-04-10 — B-20: Past-turn isolation guards for A2UI surfaces
+
+- **What:** Multi-turn conversation surfaces from previous turns are now read-only. Only the latest message's A2UI surface is interactive.
+- **Implementation**: 3-layer prop threading: `A2UISurfaceWrapper` (isActive → CSS opacity+pointer-events), `ChatMessage` (isActive → passes to wrapper), `MessageList` (isActive = index === messages.length - 1). Playground Create tab gets same guard inline.
+- **CSS approach**: `opacity: 0.5; pointer-events: none; user-select: none` on the wrapper div. Surfaces are NOT destroyed — just visually dimmed and click-blocked. No action handler changes needed since pointer-events: none prevents all user-initiated interactions.
+- **Default safe**: `isActive` defaults to `true` in both `A2UISurfaceWrapper` and `ChatMessage` — existing callers (GalleryCard, WidgetCard, advanced JSON editor) are unaffected.
+- **Playwright**: Pre-existing env failure (missing `libnspr4.so`). Unrelated to this PR. Build: 2852 modules, zero TypeScript errors.
+- **Rule**: For read-only surfaces, CSS pointer-events: none at the wrapper level is the correct mechanism — no need to null-out action handlers deeper in the component tree.
