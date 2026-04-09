@@ -20,9 +20,9 @@ const WELCOME: DemoResponse = {
     { id: 'title-text', component: 'Text', text: 'Choose your path', variant: 'subtitle1' },
     { id: 'radio-group', component: 'RadioGroup',
       options: [
-        { id: 'web-app', label: '🌐 Web App or API', description: 'Ship a web frontend, REST API, or microservice with CI/CD and a production URL.', recommended: true },
-        { id: 'agentic', label: '🤖 AI Agent', description: 'Deploy an AI agent that calls tools, retrieves knowledge, and reasons over data.' },
-        { id: 'data-pipeline', label: '📊 Data Pipeline', description: 'Process streaming or batch data with auto-scaling workers and managed storage.' },
+        { id: 'web-app', label: 'Web App or API', description: 'Ship a web frontend, REST API, or microservice with CI/CD and a production URL.', recommended: true },
+        { id: 'agentic', label: 'AI Agent', description: 'Deploy an AI agent that calls tools, retrieves knowledge, and reasons over data.' },
+        { id: 'data-pipeline', label: 'Data Pipeline', description: 'Process streaming or batch data with auto-scaling workers and managed storage.' },
       ],
       value: '',
       action: { event: { name: 'select-track', data: { track: 'web-app' } } },
@@ -123,27 +123,27 @@ const FILE_GENERATION: DemoResponse = {
     { id: 'file-cards', component: 'Column', children: ['fc1', 'fc2', 'fc3', 'fc4', 'fc5'], gap: 'small' },
     { id: 'fc1', component: 'Card', child: 'fc1-col' },
     { id: 'fc1-col', component: 'Column', children: ['fc1-name', 'fc1-desc'] },
-    { id: 'fc1-name', component: 'Text', text: '📦 Dockerfile', variant: 'subtitle2' },
+    { id: 'fc1-name', component: 'Text', text: 'Dockerfile', variant: 'subtitle2' },
     { id: 'fc1-desc', component: 'Text', text: 'Multi-stage build: Node.js builder → Nginx runtime. Optimized layers, non-root user, health check endpoint.', variant: 'body2' },
     // K8s manifests
     { id: 'fc2', component: 'Card', child: 'fc2-col' },
     { id: 'fc2-col', component: 'Column', children: ['fc2-name', 'fc2-desc'] },
-    { id: 'fc2-name', component: 'Text', text: '⎈ deployment.yaml', variant: 'subtitle2' },
+    { id: 'fc2-name', component: 'Text', text: 'deployment.yaml', variant: 'subtitle2' },
     { id: 'fc2-desc', component: 'Text', text: 'Kubernetes Deployment + Service + Ingress. 2 replicas, resource limits, readiness/liveness probes, auto-scaling to 10 pods.', variant: 'body2' },
     // CI/CD
     { id: 'fc3', component: 'Card', child: 'fc3-col' },
     { id: 'fc3-col', component: 'Column', children: ['fc3-name', 'fc3-desc'] },
-    { id: 'fc3-name', component: 'Text', text: '🔄 .github/workflows/deploy.yml', variant: 'subtitle2' },
+    { id: 'fc3-name', component: 'Text', text: '.github/workflows/deploy.yml', variant: 'subtitle2' },
     { id: 'fc3-desc', component: 'Text', text: 'GitHub Actions pipeline: build → test → push to ACR → deploy to AKS. Staging + production environments with approval gates.', variant: 'body2' },
     // Bicep
     { id: 'fc4', component: 'Card', child: 'fc4-col' },
     { id: 'fc4-col', component: 'Column', children: ['fc4-name', 'fc4-desc'] },
-    { id: 'fc4-name', component: 'Text', text: '🏗️ infra/main.bicep', variant: 'subtitle2' },
+    { id: 'fc4-name', component: 'Text', text: 'infra/main.bicep', variant: 'subtitle2' },
     { id: 'fc4-desc', component: 'Text', text: 'Azure Infrastructure as Code: AKS Automatic cluster, ACR, Cosmos DB, Key Vault, and Application Gateway — all in one template.', variant: 'body2' },
     // Config
     { id: 'fc5', component: 'Card', child: 'fc5-col' },
     { id: 'fc5-col', component: 'Column', children: ['fc5-name', 'fc5-desc'] },
-    { id: 'fc5-name', component: 'Text', text: '⚙️ .env.template', variant: 'subtitle2' },
+    { id: 'fc5-name', component: 'Text', text: '.env.template', variant: 'subtitle2' },
     { id: 'fc5-desc', component: 'Text', text: 'Environment variable template with all required secrets documented. Never commit actual values — those go in Key Vault.', variant: 'body2' },
   ]),
 };
@@ -169,7 +169,7 @@ const REVIEW: DemoResponse = {
     { id: 'deploy-row', component: 'Row', children: ['deploy-btn', 'cancel-btn'], gap: 'small' },
     { id: 'deploy-btn', component: 'Button', child: 'deploy-text', variant: 'primary',
       action: { event: { name: 'deploy' } } },
-    { id: 'deploy-text', component: 'Text', text: '🚀 Deploy to AKS' },
+    { id: 'deploy-text', component: 'Text', text: 'Deploy to AKS' },
     { id: 'cancel-btn', component: 'Button', child: 'cancel-text', variant: 'outlined',
       action: { event: { name: 'cancel-deploy' } } },
     { id: 'cancel-text', component: 'Text', text: 'Go back' },
@@ -177,7 +177,7 @@ const REVIEW: DemoResponse = {
 };
 
 const DEPLOY_SUCCESS: DemoResponse = {
-  text: "🎉 **Deployment complete!** Your app is live. Here are your endpoints and next steps.",
+  text: "**Deployment complete!** Your app is live. Here are your endpoints and next steps.",
   phase: 'deploy',
   model: 'gpt-5.3-chat',
   typingDelay: 2500,
@@ -191,7 +191,7 @@ const DEPLOY_SUCCESS: DemoResponse = {
     ] },
     { id: 'success-card', component: 'Card', child: 'success-inner' },
     { id: 'success-inner', component: 'Column', children: ['check-title', 'divider1', 'endpoints'], gap: 'small' },
-    { id: 'check-title', component: 'Text', text: '✅ Deployment Successful', variant: 'h2' },
+    { id: 'check-title', component: 'Text', text: 'Deployment Successful', variant: 'h2' },
     { id: 'divider1', component: 'Divider' },
     { id: 'endpoints', component: 'List', children: ['ep1', 'ep2', 'ep3'], variant: 'unordered' },
     { id: 'ep1', component: 'Text', text: '**App URL:** https://my-awesome-app.aksauto.io' },
@@ -206,7 +206,7 @@ const DEPLOY_SUCCESS: DemoResponse = {
     { id: 'ns3', component: 'Text', text: 'Add a custom domain in the Azure Portal' },
     { id: 'codespace-btn', component: 'Button', child: 'cs-text', variant: 'primary',
       action: { event: { name: 'open-codespace' } } },
-    { id: 'cs-text', component: 'Text', text: '💻 Open in Codespaces' },
+    { id: 'cs-text', component: 'Text', text: 'Open in Codespaces' },
   ]),
 };
 

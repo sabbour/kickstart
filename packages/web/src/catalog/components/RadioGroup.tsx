@@ -31,18 +31,21 @@ const RadioGroupApi = {
 
 const useStyles = makeStyles({
   root: {
-    marginTop: tokens.spacingVerticalS,
-    marginBottom: tokens.spacingVerticalS,
+    marginTop: tokens.spacingVerticalXS,
+    marginBottom: tokens.spacingVerticalXS,
+    width: '100%',
   },
   card: {
-    marginBottom: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalXS,
     cursor: 'pointer',
     width: '100%',
+    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
   },
   selectedCard: {
-    marginBottom: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalXS,
     cursor: 'pointer',
     width: '100%',
+    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
     borderColor: tokens.colorBrandStroke1,
     borderWidth: tokens.strokeWidthThick,
   },

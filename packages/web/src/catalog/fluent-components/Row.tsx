@@ -1,13 +1,15 @@
 import React from 'react';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
 import {RowApi} from '../../vendor/a2ui/web_core/basic_catalog/index';
-import {makeStyles} from '@fluentui/react-components';
+import {makeStyles, tokens} from '@fluentui/react-components';
 import {ChildList} from './ChildList';
 
 const useStyles = makeStyles({
   root: {
     display: 'flex',
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: tokens.spacingHorizontalM,
     width: '100%',
     margin: '0',
     padding: '0',
@@ -33,7 +35,7 @@ const mapAlign = (a?: string) => {
     case 'center': return 'center';
     case 'end': return 'flex-end';
     case 'stretch': return 'stretch';
-    default: return 'stretch';
+    default: return 'center';
   }
 };
 

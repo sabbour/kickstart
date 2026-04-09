@@ -1,13 +1,14 @@
 import React from 'react';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
 import {ColumnApi} from '../../vendor/a2ui/web_core/basic_catalog/index';
-import {makeStyles} from '@fluentui/react-components';
+import {makeStyles, tokens} from '@fluentui/react-components';
 import {ChildList} from './ChildList';
 
 const useStyles = makeStyles({
   root: {
     display: 'flex',
     flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
     width: '100%',
     margin: '0',
     padding: '0',

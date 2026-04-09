@@ -5,21 +5,23 @@ import {
   Dialog,
   DialogSurface,
   DialogBody,
+  DialogTitle,
   DialogContent,
+  DialogActions,
   DialogTrigger,
   Button,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
+import {DismissRegular} from '@fluentui/react-icons';
 
 const useStyles = makeStyles({
   trigger: {
     display: 'inline-block',
   },
-  actions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    marginTop: tokens.spacingVerticalM,
+  surface: {
+    maxWidth: '600px',
+    padding: tokens.spacingHorizontalXXL,
   },
 });
 
@@ -34,16 +36,27 @@ export const Modal = createReactComponent(ModalApi, ({props, buildChild}) => {
           {props.trigger ? buildChild(props.trigger) : null}
         </div>
       </DialogTrigger>
-      <DialogSurface>
+      <DialogSurface className={classes.surface}>
         <DialogBody>
+          <DialogTitle
+            action={
+              <DialogTrigger action="close">
+                <Button
+                  appearance="subtle"
+                  aria-label="Close"
+                  icon={<DismissRegular />}
+                />
+              </DialogTrigger>
+            }
+          />
           <DialogContent>
             {props.content ? buildChild(props.content) : null}
           </DialogContent>
-          <div className={classes.actions}>
-            <Button appearance="secondary" onClick={() => setIsOpen(false)}>
-              Close
-            </Button>
-          </div>
+          <DialogActions>
+            <DialogTrigger disableButtonEnhancement>
+              <Button appearance="secondary">Close</Button>
+            </DialogTrigger>
+          </DialogActions>
         </DialogBody>
       </DialogSurface>
     </Dialog>

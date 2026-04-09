@@ -1,33 +1,57 @@
 import React from 'react';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
-import {ButtonApi} from '../../vendor/a2ui/web_core/basic_catalog/index';
+import {z} from 'zod';
+import {
+  ComponentIdSchema,
+  DynamicStringSchema,
+  ActionSchema,
+  CheckableSchema,
+} from '../../vendor/a2ui/web_core/schema/common-types';
 import {Button as FluentButton, makeStyles, tokens} from '@fluentui/react-components';
+
+// Flexible ButtonApi: accepts `label` as shorthand (avoids needing a separate Text child)
+const FlexibleButtonApi = {
+  name: 'Button' as const,
+  schema: z.object({
+    accessibility: z.any().optional(),
+    weight: z.number().optional(),
+    child: ComponentIdSchema.optional(),
+    label: DynamicStringSchema.optional(),
+    variant: z.string().default('default').optional(),
+    action: ActionSchema.optional(),
+    checks: CheckableSchema.shape.checks,
+    isValid: z.boolean().optional(),
+  }),
+};
 
 const useStyles = makeStyles({
   root: {
-    marginTop: tokens.spacingVerticalS,
-    marginBottom: tokens.spacingVerticalS,
+    marginTop: tokens.spacingVerticalXS,
+    marginBottom: tokens.spacingVerticalXS,
   },
 });
 
-export const Button = createReactComponent(ButtonApi, ({props, buildChild}) => {
+export const Button = createReactComponent(FlexibleButtonApi, ({props, buildChild}) => {
   const classes = useStyles();
 
-  const appearance =
-    props.variant === 'primary'
-      ? 'primary'
-      : props.variant === 'borderless'
-        ? 'transparent'
-        : 'secondary';
+  const appearance = (() => {
+    switch (props.variant) {
+      case 'primary': return 'primary';
+      case 'borderless':
+      case 'text': return 'transparent';
+      case 'outlined': return 'outline';
+      default: return 'secondary';
+    }
+  })();
 
   return (
     <FluentButton
       className={classes.root}
-      appearance={appearance as 'primary' | 'transparent' | 'secondary'}
+      appearance={appearance as 'primary' | 'transparent' | 'outline' | 'secondary'}
       onClick={props.action}
       disabled={props.isValid === false}
     >
-      {props.child ? buildChild(props.child) : null}
+      {props.child ? buildChild(props.child) : (props.label ?? null)}
     </FluentButton>
   );
 });

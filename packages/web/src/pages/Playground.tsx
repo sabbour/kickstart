@@ -159,11 +159,15 @@ const useStyles = makeStyles({
     marginTop: tokens.spacingVerticalXS,
   },
   emptyState: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
     textAlign: 'center' as const,
     paddingTop: '60px',
     paddingBottom: '60px',
     paddingLeft: tokens.spacingHorizontalXL,
     paddingRight: tokens.spacingHorizontalXL,
+    gap: tokens.spacingVerticalS,
   },
   emptyIcon: {
     fontSize: '32px',
@@ -762,7 +766,9 @@ function PlaygroundInner() {
 
             {filteredIconCategories.length === 0 && (
               <div className={classes.emptyState}>
-                <div className={classes.emptyIcon}>🔍</div>
+                <div className={classes.emptyIcon}>
+                  <img src="/assets/icons/general/search.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
+                </div>
                 <Body1Strong>No icons match "{iconFilter}"</Body1Strong>
               </div>
             )}
@@ -779,7 +785,9 @@ function PlaygroundInner() {
             </Body1Strong>
             {widgets.length === 0 ? (
               <div className={classes.emptyState}>
-                <div className={classes.emptyIcon}>📦</div>
+                <div className={classes.emptyIcon}>
+                  <img src="/assets/icons/containers/container-registry.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
+                </div>
                 <Body1Strong>No widgets yet</Body1Strong>
                 <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
                   Go to the Create tab to build your first widget.

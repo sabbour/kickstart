@@ -22,7 +22,10 @@ import xml from 'highlight.js/lib/languages/xml';
 import css from 'highlight.js/lib/languages/css';
 import bash from 'highlight.js/lib/languages/bash';
 import markdown from 'highlight.js/lib/languages/markdown';
-import 'highlight.js/styles/vs.css';
+import dockerfile from 'highlight.js/lib/languages/dockerfile';
+import yaml from 'highlight.js/lib/languages/yaml';
+import go from 'highlight.js/lib/languages/go';
+import 'highlight.js/styles/github.css';
 
 // Register highlight.js languages
 hljs.registerLanguage('javascript', javascript);
@@ -36,6 +39,9 @@ hljs.registerLanguage('html', xml);
 hljs.registerLanguage('css', css);
 hljs.registerLanguage('bash', bash);
 hljs.registerLanguage('markdown', markdown);
+hljs.registerLanguage('dockerfile', dockerfile);
+hljs.registerLanguage('yaml', yaml);
+hljs.registerLanguage('go', go);
 
 const CodeBlockApi = {
   name: 'CodeBlock',
@@ -71,8 +77,8 @@ const useStyles = makeStyles({
     margin: '0',
     overflowX: 'auto',
     fontFamily: tokens.fontFamilyMonospace,
-    fontSize: tokens.fontSizeBase300,
-    lineHeight: tokens.lineHeightBase300,
+    fontSize: '12px',
+    lineHeight: '18px',
     backgroundColor: tokens.colorNeutralBackground1,
   },
 });
