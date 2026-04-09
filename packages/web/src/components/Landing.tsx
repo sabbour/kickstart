@@ -76,8 +76,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
       if (!res.ok) throw new Error('API error');
       const ideas = await res.json();
       if (Array.isArray(ideas) && ideas.length > 0) {
-        const pick = ideas[Math.floor(Math.random() * ideas.length)];
-        setInputValue(pick.prompt);
+        setInputValue(ideas[0].prompt);
         inputRef.current?.focus();
         return;
       }

@@ -120,15 +120,15 @@ async function generateIdeas(): Promise<InspirationIdea[]> {
     [
       {
         role: "system",
-        content: `You generate creative app ideas for developers who want to deploy to Azure. Each idea should be a real-world useful application that a developer would be excited to build. Return ONLY a JSON array of exactly 10 objects, each with "title" (short catchy name, max 8 words), "subtitle" (one-line description, max 12 words), and "prompt" (a first-person sentence starting with "I want to build"). No emoji. No markdown. Raw JSON only.`,
+        content: `You generate a single creative app idea for a developer who wants to deploy to Azure. The idea MUST require a server-side component — a backend API, a database, a scheduled job, a webhook, or an AI/ML service. Do NOT suggest client-only apps (static sites, browser extensions, CLI tools, or anything that runs purely in the browser without a server). Return ONLY a JSON array with exactly 1 object containing "title" (short catchy name, max 8 words), "subtitle" (one-line description, max 12 words), and "prompt" (a first-person sentence starting with "I want to build"). No emoji. No markdown. Raw JSON only.`,
       },
       {
         role: "user",
         content:
-          "Generate 10 creative and diverse app ideas spanning web apps, APIs, AI agents, data dashboards, and developer tools.",
+          "Generate 1 creative app idea that requires server-side deployment. Think web apps with APIs, AI agents, real-time services, data pipelines, or multi-tier architectures.",
       },
     ],
-    { temperature: 0.9, maxTokens: 1500 },
+    { temperature: 1.0, maxTokens: 300 },
   );
 
   const parsed = JSON.parse(result.content) as InspirationIdea[];
@@ -159,10 +159,10 @@ app.http("inspirations", {
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           context.warn(`OpenAI generation failed, using fallback: ${msg}`);
-          ideas = shuffle(FALLBACK_IDEAS);
+          ideas = [shuffle(FALLBACK_IDEAS)[0]];
         }
       } else {
-        ideas = shuffle(FALLBACK_IDEAS);
+        ideas = [shuffle(FALLBACK_IDEAS)[0]];
       }
 
       return {

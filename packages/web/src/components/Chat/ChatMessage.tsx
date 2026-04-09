@@ -1,4 +1,5 @@
 import React from 'react';
+import { BotSparkle24Regular } from '@fluentui/react-icons';
 import { A2UISurfaceWrapper } from '../A2UI/A2UISurfaceWrapper';
 import type { ChatMessage as ChatMessageType } from '../../types';
 import type { SurfaceModel } from '../../vendor/a2ui/web_core/index';
@@ -30,13 +31,7 @@ export function ChatMessage({ message, getSurface, isActive = true }: ChatMessag
   // Assistant message
   return (
     <div className="chat-bubble-row">
-      <img
-        src="/assets/icons/compute/aks-automatic.svg"
-        alt=""
-        className="assistant-avatar"
-        width="28"
-        height="28"
-      />
+      <BotSparkle24Regular className="assistant-avatar" />
       <div className="chat-bubble assistant">
         {/* Render text with basic markdown-like formatting */}
         {message.text && (

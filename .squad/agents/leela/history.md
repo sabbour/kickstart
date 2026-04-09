@@ -213,3 +213,12 @@ Core decisions preserved in `.squad/decisions.md` supersede archived entries. Th
 **Next P3 priority:** Advanced auth (service principal, ADFS, Enterprise GitHub), offline mode (local code generation), analytics/telemetry, internationalization (i18n).
 
 **Closing notes:** System is stable on main. All decisions recorded. Ready for production deployment decision. Consider P3 scope: either expand platform support (Oracle Cloud, AWS) or deepen AKS Automatic guidance (Workload Identity, gateway API setup, cost optimization).
+
+### B-97 — Docs site update (2025-01)
+
+- Audited docs/ and docs-site/ against the actual codebase before writing — always read source files first.
+- Architecture has diverged significantly from early docs: IntegrationKit+APIConnector pattern, ToolRegistry (7 tools), ValidationEngine (7 validators), ArtifactStore, Skill Resolver, and React 19 + Vite 6 frontend.
+- Kickstart catalog has 16 custom components (not the 4 or 17 in older docs): RadioGroup, FormGroup, CodeBlock, ProgressSteps, Markdown + 4 GitHub + 3 Azure + 4 deployment components.
+- API surface grew from 1 endpoint (/api/chat) to 7: converse, action, generate, health, arm-proxy, github-proxy, pricing-proxy.
+- Created docs/development.md (new) with npm run dev, npx vitest run, npx playwright test, and build commands.
+- Updated both docs/ (authoritative) and docs-site/ (Docusaurus) in the same commit.

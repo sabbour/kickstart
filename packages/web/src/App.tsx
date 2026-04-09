@@ -21,6 +21,11 @@ import type { AppMode, ChatMessage } from './types';
 const mockEnabled = isMockMode();
 const playgroundEnabled = isPlaygroundMode();
 
+let msgSeq = 0;
+function msgId(role: string) {
+  return `msg-${Date.now()}-${++msgSeq}-${role}`;
+}
+
 export function App() {
   const { theme } = useTheme();
   const fluentTheme = theme === 'dark' ? webDarkTheme : webLightTheme;
