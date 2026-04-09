@@ -223,7 +223,7 @@ test.describe('Playground', () => {
 
     test('shows empty state when no widgets exist', async ({ page }) => {
       await expect(page.getByText('No widgets yet')).toBeVisible();
-      await expect(page.getByText(/Create tab/)).toBeVisible();
+      await expect(page.getByText('Go to the Create tab to build your first widget.')).toBeVisible();
     });
 
     test('"Start Blank" on Create tab creates a widget and switches to Widgets tab', async ({ page }) => {
@@ -377,6 +377,228 @@ test.describe('Playground', () => {
       await expect(
         page.locator('[class*="createTypingDots"], [class*="createBubbleStreaming"]'),
       ).toBeVisible({ timeout: 5000 });
+    });
+  });
+
+  // ---- Accessibility ----
+
+  test.describe('Accessibility', () => {
+    // --- ARIA roles on tab panels ---
+
+    test('Gallery tab panel has role="tabpanel" and aria-labelledby="tab-gallery"', async ({ page }) => {
+      const panel = page.locator('#panel-gallery');
+      await expect(panel).toHaveAttribute('role', 'tabpanel');
+      await expect(panel).toHaveAttribute('aria-labelledby', 'tab-gallery');
+    });
+
+    test('Components tab panel has correct ARIA attributes', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Components' }).click();
+      const panel = page.locator('#panel-components');
+      await expect(panel).toHaveAttribute('role', 'tabpanel');
+      await expect(panel).toHaveAttribute('aria-labelledby', 'tab-components');
+    });
+
+    test('Icons tab panel has correct ARIA attributes', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Icons', exact: true }).click();
+      const panel = page.locator('#panel-icons');
+      await expect(panel).toHaveAttribute('role', 'tabpanel');
+      await expect(panel).toHaveAttribute('aria-labelledby', 'tab-icons');
+    });
+
+    test('Widgets tab panel has correct ARIA attributes', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Widgets' }).click();
+      const panel = page.locator('#panel-widgets');
+      await expect(panel).toHaveAttribute('role', 'tabpanel');
+      await expect(panel).toHaveAttribute('aria-labelledby', 'tab-widgets');
+    });
+
+    test('Create tab panel has correct ARIA attributes', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Create' }).click();
+      const panel = page.locator('#panel-create');
+      await expect(panel).toHaveAttribute('role', 'tabpanel');
+      await expect(panel).toHaveAttribute('aria-labelledby', 'tab-create');
+    });
+
+    // --- Tab IDs (aria-controls wiring) ---
+
+    test('Gallery tab has id="tab-gallery" and aria-controls="panel-gallery"', async ({ page }) => {
+      const tab = page.getByRole('tab', { name: 'Gallery' });
+      await expect(tab).toHaveAttribute('id', 'tab-gallery');
+      await expect(tab).toHaveAttribute('aria-controls', 'panel-gallery');
+    });
+
+    // --- Gallery card ARIA ---
+
+    test('gallery cards have role="button" and aria-label', async ({ page }) => {
+      const firstCard = page.locator('.playground-gallery [role="button"]').first();
+      await expect(firstCard).toBeVisible({ timeout: 5000 });
+      await expect(firstCard).toHaveAttribute('role', 'button');
+      const label = await firstCard.getAttribute('aria-label');
+      expect(label).toBeTruthy();
+    });
+
+    test('Enter key on focused gallery card opens dialog', async ({ page }) => {
+      const firstCard = page.locator('.playground-gallery [role="button"]').first();
+      await firstCard.waitFor({ timeout: 5000 });
+      await firstCard.focus();
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
+    });
+
+    test('Space key on focused gallery card opens dialog', async ({ page }) => {
+      const firstCard = page.locator('.playground-gallery [role="button"]').first();
+      await firstCard.waitFor({ timeout: 5000 });
+      await firstCard.focus();
+      await page.keyboard.press(' ');
+      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
+    });
+
+    test('Escape closes open dialog', async ({ page }) => {
+      await page.locator('.playground-gallery [role="button"]').first().click();
+      await page.getByRole('dialog').waitFor({ timeout: 5000 });
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 3000 });
+    });
+
+    // --- Arrow key gallery navigation ---
+
+    test('ArrowRight moves focus to next gallery card', async ({ page }) => {
+      const cards = page.locator('.playground-gallery [role="button"]');
+      await cards.first().waitFor({ timeout: 5000 });
+      await cards.first().focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(cards.nth(1)).toBeFocused();
+    });
+
+    test('ArrowLeft moves focus to previous gallery card', async ({ page }) => {
+      const cards = page.locator('.playground-gallery [role="button"]');
+      await cards.first().waitFor({ timeout: 5000 });
+      // Focus second card then go back
+      await cards.nth(1).focus();
+      await page.keyboard.press('ArrowLeft');
+      await expect(cards.first()).toBeFocused();
+    });
+
+    test('ArrowDown moves focus to next gallery card', async ({ page }) => {
+      const cards = page.locator('.playground-gallery [role="button"]');
+      await cards.first().waitFor({ timeout: 5000 });
+      await cards.first().focus();
+      await page.keyboard.press('ArrowDown');
+      await expect(cards.nth(1)).toBeFocused();
+    });
+
+    test('ArrowRight does not go past last gallery card', async ({ page }) => {
+      const cards = page.locator('.playground-gallery [role="button"]');
+      await cards.first().waitFor({ timeout: 5000 });
+      const count = await cards.count();
+      await cards.last().focus();
+      await page.keyboard.press('ArrowRight');
+      // Focus stays on last card
+      await expect(cards.nth(count - 1)).toBeFocused();
+    });
+
+    // --- Keyboard shortcuts ---
+
+    test('Ctrl+K focuses gallery search input', async ({ page }) => {
+      // Ensure no input is focused
+      await page.locator('body').click();
+      await page.keyboard.press('Control+k');
+      await expect(page.getByPlaceholder('Filter scenarios...')).toBeFocused();
+    });
+
+    test('/ key focuses gallery search input', async ({ page }) => {
+      await page.locator('body').click();
+      await page.keyboard.press('/');
+      await expect(page.getByPlaceholder('Filter scenarios...')).toBeFocused();
+    });
+
+    test('Ctrl+K focuses icons search when Icons tab is active', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Icons', exact: true }).click();
+      await page.locator('body').click();
+      await page.keyboard.press('Control+k');
+      await expect(page.getByPlaceholder('Filter icons...')).toBeFocused();
+    });
+
+    test('/ key focuses icons search when Icons tab is active', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Icons', exact: true }).click();
+      await page.locator('body').click();
+      await page.keyboard.press('/');
+      await expect(page.getByPlaceholder('Filter icons...')).toBeFocused();
+    });
+
+    // --- Form controls ---
+
+    test('Create tab prompt input has aria-label', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Create' }).click();
+      // Accessible by name via aria-label
+      await expect(page.getByRole('textbox', { name: 'Describe your A2UI widget' })).toBeVisible();
+    });
+
+    test('Advanced JSON widget name input has aria-label', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Create' }).click();
+      await page.getByText(/Advanced.*paste raw A2UI JSON/).click();
+      await expect(page.getByRole('textbox', { name: 'Widget name' })).toBeVisible();
+    });
+
+    test('Advanced JSON textarea has aria-label', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Create' }).click();
+      await page.getByText(/Advanced.*paste raw A2UI JSON/).click();
+      await expect(page.getByRole('textbox', { name: 'A2UI JSON input' })).toBeVisible();
+    });
+
+    // --- Icon card ARIA ---
+
+    test('icon cards have aria-label', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Icons', exact: true }).click();
+      const firstCard = page.locator('.playground-create-scroll [aria-label*="copy icon"]').first();
+      await firstCard.waitFor({ timeout: 8000 });
+      const label = await firstCard.getAttribute('aria-label');
+      expect(label).toBeTruthy();
+      expect(label).toMatch(/copy icon/);
+    });
+
+    test('icon cards are keyboard activatable', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Icons', exact: true }).click();
+      const firstCard = page.locator('.playground-create-scroll [aria-label*="copy icon"]').first();
+      await firstCard.waitFor({ timeout: 8000 });
+      // Should be focusable
+      await firstCard.focus();
+      await expect(firstCard).toBeFocused();
+    });
+
+    // --- Advanced toggle aria-expanded ---
+
+    test('Advanced JSON toggle has aria-expanded=false initially', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Create' }).click();
+      const toggle = page.locator('[aria-expanded]').filter({ hasText: /Advanced.*paste raw A2UI JSON/ });
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    test('Advanced JSON toggle aria-expanded becomes true when open', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Create' }).click();
+      const toggle = page.locator('[aria-expanded]').filter({ hasText: /Advanced.*paste raw A2UI JSON/ });
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    // --- Start Blank keyboard support ---
+
+    test('Start Blank is keyboard activatable with Enter', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Create' }).click();
+      const startBlank = page.locator('[role="button"]').filter({ hasText: 'Start Blank' }).first();
+      await expect(startBlank).toBeVisible();
+      await startBlank.focus();
+      await page.keyboard.press('Enter');
+      // Should switch to Widgets tab
+      await expect(page.getByRole('tab', { name: 'Widgets' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    // --- Dialog accessibility ---
+
+    test('dialog dismiss button has aria-label', async ({ page }) => {
+      await page.locator('.playground-gallery [role="button"]').first().click();
+      await page.getByRole('dialog').waitFor({ timeout: 5000 });
+      await expect(page.getByRole('button', { name: 'Dismiss' })).toBeVisible();
     });
   });
 });

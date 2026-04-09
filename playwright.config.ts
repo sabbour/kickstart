@@ -22,7 +22,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npx serve packages/web -l 4281 --no-clipboard',
+    command: 'npx serve packages/web/dist -l 4281 --no-clipboard',
     port: 4281,
     reuseExistingServer: !process.env.CI,
   },
