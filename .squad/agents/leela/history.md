@@ -131,3 +131,15 @@
 - **7 trip notebook patterns codified:** A (Component-Autonomous Fetching), B (Artifact Extraction), C (Dual-Entry API), D (State Binding), E (Graceful Degradation), F (Artifact-Driven Panel), G (Protobuf URLs), H (HTML Scraping), I (Pack Scoping), J (Session-Scoped Artifacts).
 - **Architecture ready for buildout:** Foundation stone is ServiceConnector (auth token management outside UI state). Once connectors exist, fat components can register and orchestrator can wire tools. All subsequent packs follow same pattern.
 - **Decisions merged:** leela-pack-architecture.md + leela-trip-notebook-patterns.md appended to `.squad/decisions.md`.
+
+### 2025-07-26: A2UI Actions System Analysis — Gap Analysis & Implementation Path
+- **A2UI v0.9 action model:** Two-tier system — Events (agent-side, carry name/surfaceId/context with resolved JSON Pointer values) and Functions (local renderer-only, openUrl + validation + math/string ops). Data Model Sync sends full UI state with every message. Write contract guarantees synchronous local updates. Sandboxed execution prevents arbitrary code injection.
+- **Critical finding — ACTION DEAD-END:** `useA2UI.ts` wires the MessageProcessor action handler to `console.log` only. A2UI events fire correctly through the full vendor pipeline (ComponentContext → SurfaceModel → SurfaceGroupModel → MessageProcessor) but produce zero effect. Every interactive component is decorative.
+- **No action endpoint:** Backend `converse.ts` only accepts chat messages (`{ sessionId, message }`). No way to receive structured A2UI action events.
+- **Hybrid action mismatch:** `response-processor.ts` generates buttons with non-standard `action: "reply"` format that bypasses A2UI ActionSchema entirely. Two incompatible action systems coexist.
+- **6 major gaps identified:** G1 (action dead-end), G2 (no action endpoint), G3 (hybrid action mismatch), G4 (no tool system), G5 (no service layer), G6 (no pack system).
+- **Key architectural insight:** A2UI's `action.event` system IS the ServicePack action bus. Event name = action type, context = payload, action handler = router to pack logic. This is structurally identical to adaptive-ui-framework's `handleAction` switch but using A2UI native plumbing.
+- **5-phase implementation path:** (1) Wire action loop + backend endpoint (2-3 days), (2) Tool system with tool-call loop (3-4 days), (3) ServiceConnector + auth (3-4 days), (4) Pack system (2-3 days), (5) Rich interactions — artifacts, auto-continue, disabled context (2-3 days). Total ~12-17 days.
+- **Phase 1 is critical path.** Everything builds on a working action loop. Without it, no ServicePack, no tools, no auth can function.
+- **adaptive-ui-framework action types mapped:** sendPrompt → event with prompt in context, setState → local data model update, navigate → openUrl function, submit → event with serialized state, custom → pack-specific event handler.
+- **Full decision:** `.squad/decisions/inbox/leela-a2ui-actions-analysis.md`

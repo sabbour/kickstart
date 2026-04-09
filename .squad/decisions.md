@@ -6004,3 +6004,474 @@ Introduce a `backendSessionId` field on the `Session` type to bridge the two ID 
 - Could have unified to a single ID system, but that would require migrating existing localStorage sessions or changing backend UUID generation
 - This approach is minimally invasive and preserves both systems
 
+
+
+# Decision: A2UI v0.9 Full Specification Analysis — New Insights
+
+**Author:** Copilot (Coordinator)
+**Date:** 2025-07-26
+**Status:** Research Complete
+**Requested by:** Ahmed Sabbour
+
+---
+
+## Context
+
+Read and analyzed the complete A2UI v0.9 specification at https://a2ui.org/specification/v0.9-a2ui/. This supplements prior findings from catalog guides, component reference, agent development guide, and Leela's actions analysis.
+
+## New Findings (beyond prior research)
+
+### F6: Prompt-First Philosophy (Major Design Shift)
+
+v0.9 is explicitly designed to be embedded directly in the LLM prompt — NOT for structured output mode. The spec states: "The LLM is then asked to produce JSON that matches the provided examples and schema descriptions." This requires robust post-generation validation but enables richer, more expressive schemas.
+
+**Impact on Kickstart:** Validates our R3 recommendation (inject schema into system prompt). This is not just a good practice — it's the core design intent of v0.9. Our converse.ts endpoint MUST include the catalog schema in the system prompt.
+
+### F7: Swappable Catalog via $ref Indirection
+
+The envelope schema (`server_to_client.json`) uses `$ref: "catalog.json#/$defs/anyComponent"` — a placeholder filename. To use a custom catalog, you simply map `catalog.json` to your own file. The same envelope schema works with ANY compliant catalog without modification.
+
+**Impact on Kickstart:** Our Kickstart catalog should be a standalone JSON Schema file that can be swapped in as `catalog.json`. Not a wrapper around Basic Catalog — a complete replacement per F1 (No Mappers Needed).
+
+### F8: Client inlineCatalogs Capability
+
+`a2uiClientCapabilities` supports `inlineCatalogs` — the client can send its full catalog definition inline to the server at runtime. This means the client pushes the catalog to the agent dynamically, no hardcoding needed on the server.
+
+**Impact on Kickstart:** We could have the web client announce its Kickstart catalog to the backend, which then includes it in the LLM prompt. This enables catalog versioning without backend redeployment.
+
+### F9: formatString Interpolation System
+
+Rich `${/path}` syntax for inline data binding within strings, with function call nesting: `${formatDate(value:${/currentDate}, format:'yyyy-MM-dd')}`. Supports relative paths in collection scopes.
+
+**Impact on Kickstart:** We're not using formatString at all. This enables dynamic text like "Welcome, ${/user/name}!" or "You have ${/items/length} items" without custom components.
+
+### F10: Button Checks = Auto-Disable
+
+Buttons can define `checks` with compound conditions (`and`, `or`, `not`) that auto-disable the button when conditions fail. Example: "Submit" disabled until terms accepted AND (email OR phone provided).
+
+**Impact on Kickstart:** Form submission gates with zero custom code. LLM can generate self-validating forms natively.
+
+### F11: Prompt-Generate-Validate Loop (Official Pattern)
+
+The spec defines a three-step loop: (1) Prompt with schema + examples, (2) Generate JSON, (3) Validate against schema. On failure, send `VALIDATION_FAILED` error with `code`, `surfaceId`, `path`, and `message` back to LLM for self-correction.
+
+**Impact on Kickstart:** This is exactly what R6 (agent-side validation) should implement. The error format is standardized — we should use it.
+
+### F12: Transport Bindings — A2A, AG-UI, MCP
+
+A2UI officially supports A2A (Agent-to-Agent), AG-UI, MCP, SSE/JSONRPC, WebSocket, and REST as transport layers. The spec provides concrete binding details for A2A (messages map to A2A Part payloads, metadata carries data model and capabilities).
+
+**Impact on Kickstart:** Our current REST approach works fine. Future evolution path: A2A for multi-agent orchestration, or AG-UI for framework integration. Not blocking, but good to know.
+
+### F13: Server Capabilities Advertisement
+
+Servers advertise via `server_capabilities.json` which catalogs they can generate UI for and whether they accept inline catalogs from clients. This is exchanged via transport metadata (Agent Cards in A2A, capabilities in MCP).
+
+**Impact on Kickstart:** When we build the agent endpoint, it should declare: "I support `kickstart` catalog" and "I accept inline catalogs". This enables proper capability negotiation.
+
+### F14: Validator Compliance for Custom Catalogs
+
+Custom catalogs MUST use `ComponentId` type from `common_types.json` for single child references and `ChildList` type for list references. Validators trace structural links by looking for these specific `$ref` types — raw strings are treated as static text.
+
+**Impact on Kickstart:** When building `kickstart_catalog.json`, we must use proper `$ref` types, not raw `"type": "string"` for component ID fields. Otherwise validators won't check parent-child integrity.
+
+### F15: Two-Way Binding is Local-Only
+
+Input components (TextField, CheckBox, Slider, ChoicePicker, DateTimeInput) update the local data model IMMEDIATELY on user interaction. Server sync ONLY happens when an action is dispatched (button click). The data model is reactive — a TextField bound to `/user/name` and a Text also bound to `/user/name` update in real-time as the user types.
+
+**Impact on Kickstart:** Our vendor DataContext class supports this, but we never wire it. Interactive forms should "just work" once we enable data binding — no custom state management needed.
+
+---
+
+## Updated Recommendation Table (cumulative)
+
+| # | Action | Priority | Source |
+|---|--------|----------|--------|
+| R1 | Create `kickstart_catalog.json` as NATIVE catalog (standalone JSON Schema, not mapping Basic) | P0 | F1, F7, F14 |
+| R2 | Change catalogId to URI format | P0 | Prior |
+| R3 | Feed catalog schema + few-shot examples to LLM system prompt (prompt-first design) | P0 | F2, F6 |
+| R4 | Implement updateDataModel for interactive components | P1 | F5, F15 |
+| R5 | Define custom functions in catalog | P1 | Prior |
+| R6 | Agent-side validation via jsonschema + VALIDATION_FAILED error format | P1 | F2, F11 |
+| R7 | Catalog versioning strategy (consider F8 inlineCatalogs) | P2 | F8 |
+| R8 | Graceful degradation + error reporting | P2 | Prior |
+| R9 | Wire action handler (replace console.log dead-end) | P0 | Leela G1 |
+| R10 | Add backend action endpoint | P0 | Leela G2 |
+| R11 | Fix response-processor button schema to proper A2UI ActionSchema | P0 | Leela G3 |
+| R12 | Build tool system for LLM (registerTool, executeTool, tool-call loop) | P1 | Leela G4 |
+| R13 | Build ServiceConnector + auth (MSAL for Azure, GitHub OAuth) | P1 | Leela G5 |
+| R14 | Build pack system (KickstartPack interface) | P1 | Leela G6 |
+| R15 | Implement formatString support in renderer | P2 | F9 |
+| R16 | Implement button checks / auto-disable | P2 | F10 |
+| R17 | Server capabilities advertisement | P2 | F13 |
+
+
+### 2026-04-09T07:15:00Z: A2UI Catalog Best Practices — Gap Analysis & Recommendations
+**By:** Ahmed Sabbour (via Copilot Coordinator)
+**Source:** https://a2ui.org/concepts/catalogs/ (reviewed 2026-04-09)
+
+**What:** Our Kickstart catalog implementation has significant gaps compared to A2UI's official catalog best practices. We need a proper catalog JSON Schema, URI-based catalogId, catalog negotiation, validation, data binding, and versioning.
+
+**Gap Analysis:**
+
+| A2UI Best Practice | Our Status | Priority |
+|---|---|---|
+| Catalog JSON Schema file defining components, props, types, required fields | ❌ Missing — only have runtime TS `Catalog` object | P0 |
+| URI-based catalogId (globally unique, stable identifier) | ❌ Using bare string `'kickstart'` | P0 |
+| Catalog negotiation (`supportedCatalogIds` in message metadata) | ❌ Not implemented | P1 |
+| Agent-side validation (validate LLM output before sending to client) | ❌ None | P1 |
+| Client-side schema validation | 🟡 Partial (A2UI web_core basic processing only) | P2 |
+| Data binding (`updateDataModel` messages + JSON Pointer bindings) | ❌ Not used anywhere | P1 |
+| Custom functions definition in catalog | ❌ None defined | P1 |
+| Versioning strategy in catalogId | ❌ None | P2 |
+| Graceful degradation (fallback for unknown components) | 🟡 Partial — silently fails | P2 |
+| Error reporting (`VALIDATION_FAILED` events back to agent) | ❌ None | P3 |
+| Freestanding/self-contained catalog JSON | ❌ N/A (no JSON to make freestanding) | Depends on P0 |
+| Composition via `$ref` / `allOf` extending basic catalog | ❌ Not applicable yet | Depends on P0 |
+
+**Recommendations:**
+
+**R1 (P0): Create `kickstart_catalog.json`**
+- Define a proper JSON Schema catalog file reflecting our Fluent UI v9 design system
+- Include all component definitions: basic catalog components + our custom components (CodeBlock, Markdown, ProgressSteps, FormGroup, RadioGroup) + all 18 Fluent overrides
+- Each component schema must define: type, description, properties (with types + descriptions), required fields
+- Follow A2UI's recommendation: "build catalogs that directly reflect a client's design system rather than trying to map the Basic Catalog to it through an adapter"
+- Use `--extend-basic-catalog` pattern: import all basic catalog components, then add/override with our Fluent implementations
+- Location: `packages/web/src/catalog/kickstart_catalog.json` (or a `catalogs/` directory)
+
+**R2 (P0): Use URI-based catalogId**
+- Change from `'kickstart'` to `'https://imagine.aks.azure.com/catalogs/kickstart/v1/catalog.json'`
+- This URI does NOT need to be fetchable at runtime — it's just a stable identifier
+- Update in: `kickstart-catalog.ts`, `playground-scenarios.ts`, `demo-scenarios.ts`, `Playground.tsx`
+
+**R3 (P1): Feed catalog schema to the LLM**
+- The catalog JSON Schema is what tells the LLM what components/props are available
+- Include it in the system prompt (or as a tool/context) so the LLM generates valid A2UI JSON
+- This is the single biggest improvement for LLM output quality — currently it's guessing
+
+**R4 (P1): Implement `updateDataModel` usage**
+- Start sending `updateDataModel` messages alongside `updateComponents`
+- Use JSON Pointer data bindings (`{ "$data": "/path" }`) in component props instead of hardcoded values
+- Enable `sendDataModel: true` on surfaces that need to read user input back
+- Critical for: forms, pickers, multi-step flows, smart controls
+
+**R5 (P1): Define custom functions in catalog**
+- Functions are the A2UI way to define client-side callable actions
+- Define functions for: form submission, navigation, state updates, pack connector calls
+- These replace our ad-hoc `action.functionCall` usage
+
+**R6 (P1): Agent-side validation**
+- Before sending A2UI JSON to client, validate it against our catalog schema
+- On validation failure: attempt to fix/regenerate, or fall back to text
+- This catches LLM hallucinated properties and malformed structures
+
+**R7 (P2): Catalog versioning strategy**
+- Embed version in URI: `.../kickstart/v1/catalog.json`
+- Breaking changes (new containers, removed containers, type changes) → bump major
+- Non-breaking changes (new leaf components, optional props) → stay at current version
+- Plan for v1 → v2 migration using dual-catalog negotiation
+
+**R8 (P2): Graceful degradation**
+- Implement fallback placeholder for unknown components (generic card with component name)
+- Text fallback when entire surface fails to render
+- Error reporting via `VALIDATION_FAILED` events
+
+**Why:** The catalog JSON is the foundational contract between the LLM and our renderer. Without it, we have no formal component contract, no validation, no negotiation, and the LLM generates A2UI by guessing. This is the single most impactful architectural improvement for Kickstart's A2UI integration quality.
+
+**Decision:** Proceed with R1-R2 (P0) first, then R3-R6 (P1), then R7-R8 (P2). The catalog JSON unblocks everything else.
+
+
+### 2026-04-09T07:20:00Z: A2UI "Defining Your Own Catalog" guide + Agent Development findings
+**By:** Ahmed Sabbour (via Copilot research)
+**Status:** Accepted — augments prior catalog best practices decision
+**References:** https://a2ui.org/guides/defining-your-own-catalog/, https://a2ui.org/reference/components/, https://a2ui.org/guides/agent-development/
+
+#### New Findings (beyond prior gap analysis)
+
+**F1: "No Mappers Needed" principle**
+The official guide explicitly states: "It is recommended to build catalogs that directly reflect your client's design system rather than trying to map a generic catalog (like the Basic Catalog) to it through an adapter." We are currently doing the opposite — overriding Basic Catalog components with Fluent UI wrappers. Recommendation: define a Kickstart-native catalog JSON Schema where components ARE our Fluent-based implementations, not mapped from generic ones.
+
+**F2: Agent Development — Concrete LLM Integration Pattern**
+The agent development guide shows exactly how to feed A2UI to an LLM:
+- Inject the full A2UI JSON Schema into the system prompt as `A2UI_SCHEMA`
+- Add few-shot UI template examples (`RESTAURANT_UI_EXAMPLES` pattern) for in-context learning
+- Use a `---a2ui_JSON---` delimiter — LLM outputs conversational text first, then raw JSON list of A2UI messages
+- Parse and validate the JSON against the schema using `jsonschema.validate()` before sending to client
+- This directly maps to our R3 (feed schema to LLM) and R6 (agent-side validation)
+
+**F3: v0.9 Component Syntax Confirmed**
+Full v0.9 component reference confirms flat syntax we should use:
+- `"component": "Text"` (not nested `"component": { "Text": { } }`)
+- Direct string values (not `{ "literalString": "..." }`)
+- `variant` instead of `usageHint`
+- `justify`/`align` instead of `distribution`/`alignment`
+- `ChoicePicker` instead of `MultipleChoice`
+- Actions use `{ "event": { "name": "..." } }` format
+
+**F4: Security Requirements**
+- Allowlist components: only register trusted components
+- Validate properties: ensure agent messages match expected type constraints
+- Sanitize text: avoid rendering un-sanitized content from agent
+
+**F5: Data Binding Pervasive in Interactive Components**
+Every interactive component (TextField, CheckBox, Slider, ChoicePicker, DateTimeInput) uses `{ "path": "/data/field" }` for data binding. This reinforces R4 (implement updateDataModel) — without it, none of these components can read/write state.
+
+#### Updated Recommendation Priority
+
+| # | Action | Priority | New insight |
+|---|--------|----------|-------------|
+| R1 | Create `kickstart_catalog.json` as native catalog (NOT mapping Basic Catalog) | P0 | F1 changes approach — direct catalog, not override |
+| R3 | Feed schema + few-shot examples to LLM using delimiter pattern | P0 (bumped) | F2 provides concrete implementation pattern |
+| R6 | Agent-side validation via jsonschema before sending to client | P1 | F2 confirms this is standard practice |
+| R4 | Implement updateDataModel for all interactive components | P1 | F5 — every input component requires it |
+
+R2, R5, R7, R8 unchanged from prior decision.
+
+
+# Decision: A2UI Actions System Analysis — Gap Analysis & Implementation Path
+
+**Author:** Leela (Lead)
+**Date:** 2025-07-26
+**Status:** Analysis Complete
+**Requested by:** Ahmed Sabbour
+
+---
+
+## 1. A2UI Action Model Summary
+
+A2UI v0.9 provides a two-tier action system designed for security-first, sandboxed UI interaction:
+
+### 1.1 Events (Agent-Side)
+
+Events dispatch user interactions to the backend agent for processing. They carry:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Stable identifier the agent switches on (e.g., `submit_reservation`) |
+| `surfaceId` | Which surface originated the event |
+| `sourceComponentId` | Which component triggered it |
+| `timestamp` | ISO 8601 timestamp |
+| `context` | Key-value map with resolved data model paths |
+
+Events are the primary mechanism for user→agent communication. The renderer resolves all `path` references against the local data model before dispatch, so the agent receives fully resolved values.
+
+### 1.2 Functions (Local/Renderer)
+
+Functions execute locally without a network round-trip. The agent is NOT informed. Limited to:
+
+- `openUrl` — opens a URL in new window
+- Validation checks (`required`, `regex`, `length`, `numeric`, `email`)
+- Arithmetic, comparison, logic, string operations, formatting
+
+Functions act as a sandboxed execution layer — no arbitrary code injection possible.
+
+### 1.3 Data Model & State
+
+- **Write Contract:** Input components write to the local data model synchronously. No race conditions between typing and clicking.
+- **Data Model Sync:** When `sendDataModel: true`, the renderer attaches the FULL data model to every outgoing message. Agent becomes stateless — receives complete UI state with each interaction.
+- **Checks:** Client-side validation rules that auto-disable buttons when conditions fail. UX-only; data integrity validated agent-side.
+
+### 1.4 Transport & Security
+
+- Transport-agnostic (A2A, WebSockets)
+- Sandboxed execution — agents can only trigger pre-registered behaviors
+- Surface ownership pattern for multi-agent orchestration
+- Data model isolation enforced by orchestrator (data from surface A never leaks to agent B)
+- Error reporting: `VALIDATION_FAILED` errors flow from renderer→agent for self-correction
+
+### 1.5 What A2UI Does NOT Provide
+
+- No tool/function-calling system for LLM inference
+- No service pack bundling (components + prompts + tools + auth)
+- No external API bridging
+- No artifact storage
+- No auth token management
+- No dynamic system prompt injection
+- No multi-step workflow orchestration beyond event→response cycles
+
+---
+
+## 2. Gap Table: A2UI Native vs adaptive-ui-framework vs Kickstart
+
+| Capability | A2UI v0.9 Native | adaptive-ui-framework | Kickstart Current |
+|---|---|---|---|
+| **Event→Agent dispatch** | ✅ Full (`action.event` → `client_to_server.json`) | ✅ `handleAction()` in AdaptiveProvider | ⚠️ Vendor code works, but handler only `console.log`s — dead end |
+| **Local functions** | ✅ `openUrl`, validation, math/string ops | ✅ Same + custom via interpolation | ✅ Vendor basic functions available |
+| **Action types** | 2 (event, functionCall) | 5 (sendPrompt, setState, navigate, submit, custom) | 0 implemented (buttons use non-standard `action: "reply"`) |
+| **State binding** | ✅ JSON Pointers, DataModel, Signals | ✅ `{{state.key}}` interpolation, `bind` prop | ⚠️ DataModel class exists in vendor, not wired to app state |
+| **Data Model Sync** | ✅ `sendDataModel: true` sends full state | N/A (uses state store directly) | ❌ Not configured |
+| **Form submission** | ✅ Local write → event with resolved context | ✅ `submit` action serializes state to prompt | ❌ No form→backend pipeline |
+| **Client validation** | ✅ Checks with auto-disable | ✅ Validation rules on inputs | ⚠️ Vendor code supports it, no components use it |
+| **Action→Backend endpoint** | Spec only (transport-agnostic) | ✅ `sendPrompt()` → LLM adapter | ❌ No action endpoint. Only `/api/converse` for chat |
+| **Tool system (LLM calls)** | ❌ Not in scope | ✅ `registerTool()`, tool-call loop, `fetch_webpage`, `azure_arm_get`, `github_api_get` | ❌ None |
+| **Service packs** | ❌ Not in scope | ✅ `ComponentPack` (components + systemPrompt + tools + skills + settings) | ❌ None |
+| **Auth/ServiceConnector** | ❌ Not in scope | ✅ `entra-auth.ts` (MSAL), GitHub OAuth, per-pack settings | ❌ None |
+| **Knowledge skills** | ❌ Not in scope | ✅ `resolveSkills()` — dynamic prompt injection per pack | ❌ None |
+| **Artifact store** | ❌ Not in scope | ✅ `artifacts.ts` — typed extraction, session-scoped | ❌ None |
+| **Custom action dispatch** | ❌ (events are the mechanism) | ✅ `onCustomAction` callback for host app | ❌ None |
+| **Disabled context (past turns)** | ❌ Not in scope | ✅ `DisabledScope` — components skip side effects | ❌ None |
+| **Auto-continue** | ❌ Not in scope | ✅ LLM adapter re-invokes on phase transitions | ❌ None |
+| **Error self-correction** | ✅ `VALIDATION_FAILED` → agent retry | ❌ Not implemented | ❌ Not implemented |
+| **Orchestration routing** | ✅ Surface ownership pattern | N/A (single-agent) | ❌ Not needed yet |
+
+---
+
+## 3. Critical Gaps in Kickstart
+
+### G1: Action Dead-End (CRITICAL)
+
+`useA2UI.ts` line 23-25:
+```ts
+(action) => {
+  console.log('[A2UI] action:', action);
+}
+```
+
+A2UI events fire from components, bubble through `ComponentContext → SurfaceModel → SurfaceGroupModel → MessageProcessor`, and then... nothing. The action handler is a console.log. No backend communication, no state updates, no prompt generation.
+
+**Impact:** Every interactive component (buttons, forms, pickers) in our catalog is decorative. User clicks produce no effect.
+
+### G2: No Action Endpoint
+
+`converse.ts` accepts `{ sessionId, message }` — a chat message. There is no endpoint for structured A2UI action events. No way to send `{ action: { name, surfaceId, context } }` back to the backend.
+
+### G3: Hybrid Action Model Mismatch
+
+`response-processor.ts` generates buttons with `action: "reply", data: { text: "..." }` — this is NOT the A2UI ActionSchema. It's a custom format that doesn't go through `dispatchAction()`. It's a separate code path that bypasses the entire A2UI action infrastructure.
+
+### G4: No Tool System
+
+The LLM has no tools. It can't query Azure ARM, check GitHub repos, validate K8s manifests, or fetch documentation. adaptive-ui-framework's power comes from tools being available during LLM inference — the LLM decides whether to call `azure_arm_get` or `github_api_get` before generating its UI response.
+
+### G5: No Service Layer
+
+No `ServiceConnector` for managing auth tokens. No CORS proxy. No way for components to make authenticated API calls to Azure or GitHub.
+
+### G6: No Pack System
+
+Components, prompts, tools, and auth are not bundled. When we add an Azure pack, there's no mechanism to register its tools, inject its system prompt, or wire its auth.
+
+---
+
+## 4. Recommended Implementation Path
+
+### Phase 1: Wire the Action Loop (2-3 days)
+
+**Goal:** Make A2UI events produce actual effects.
+
+1. **Implement action handler in `useA2UI.ts`** that maps A2UI event names to behaviors:
+   - `sendPrompt` events → call `converse()` with the event context as a structured message
+   - `setState` events → update the data model locally
+   - `navigate` events → `window.location.href`
+   - All other events → serialize to a prompt: `"User triggered action: {name} with context: {JSON.stringify(context)}"`
+
+2. **Add action endpoint to backend** — extend `converse.ts` or create new `/api/action` endpoint that accepts `A2uiClientAction` payloads. Convert them to LLM messages like adaptive-ui does:
+   ```ts
+   const query = `User action "${action.name}" with context: ${JSON.stringify(action.context)}`;
+   ```
+
+3. **Fix response-processor.ts** — stop generating non-standard `action: "reply"` buttons. Use proper A2UI ActionSchema: `{ event: { name: "select-runtime", context: { value: "Node.js" } } }`.
+
+4. **Enable DataModel Sync** — set `sendDataModel: true` on surface creation. Include data model in action payloads.
+
+**Maps to ServicePack:** This is the foundation. Without a working action loop, no ServicePack can function.
+
+### Phase 2: Tool System (3-4 days)
+
+**Goal:** LLM can call external APIs during inference.
+
+1. **Port `tools.ts` pattern from adaptive-ui-framework** — `registerTool()`, `executeTool()`, tool-call loop.
+2. **Implement tool-call loop in `converse.ts`** — when LLM returns `tool_calls`, execute them server-side, send results back, continue until LLM produces final response.
+3. **Register initial tools:** `fetch_webpage` (documentation), `azure_arm_get` (ARM queries), `github_api_get` (repo info).
+
+**Maps to ServicePack:** Tools are a ServicePack export. Each pack registers its tools via `pack.tools`.
+
+### Phase 3: ServiceConnector + Auth (3-4 days)
+
+**Goal:** Components can make authenticated API calls.
+
+1. **Build ServiceConnector abstraction** — React Context providing `getToken(scope)` per service (Azure, GitHub).
+2. **Wire MSAL for Azure** — `entra-auth.ts` already exists in adaptive-ui-framework, port it.
+3. **Wire GitHub OAuth** — device flow + PAT fallback.
+4. **CORS proxy** — SWA API function that proxies authenticated requests to Azure ARM / GitHub API.
+
+**Maps to ServicePack:** ServiceConnector is the R02 gap from our prior pack architecture decision. It's the foundation stone — once connectors exist, fat components can register and orchestrator can wire tools.
+
+### Phase 4: Pack System (2-3 days)
+
+**Goal:** Bundled component packs with prompts, tools, auth, and skills.
+
+1. **Define `KickstartPack` interface** — mirrors adaptive-ui-framework's `ComponentPack` but with A2UI component registration:
+   ```ts
+   interface KickstartPack {
+     name: string;
+     components: ReactComponentImplementation[];
+     systemPrompt: string;
+     tools?: ToolDefinition[];
+     resolveSkills?: (prompt: string) => Promise<string | null>;
+     serviceConnector?: ServiceConnectorConfig;
+   }
+   ```
+
+2. **Register packs at app startup** — auto-inject system prompts, register tools, wire auth.
+3. **Build initial packs:** `azure-pack`, `github-pack`, `iac-pack`.
+
+**Maps to ServicePack:** This IS the ServicePack architecture from decision `leela-pack-architecture.md`. Phase 4 makes it real.
+
+### Phase 5: Rich Interactions (2-3 days)
+
+**Goal:** Approach adaptive-ui-framework's interaction depth.
+
+1. **Custom action handler** — `onCustomAction` for pack-specific actions (deploy, validate, create-repo).
+2. **Artifact extraction** — walk A2UI component tree after each response, extract structured data.
+3. **Auto-continue** — when phase engine detects transition, auto-invoke next LLM turn.
+4. **Disabled context** — past-turn components become read-only, skip API calls.
+
+---
+
+## 5. Architecture Mapping: A2UI Actions → ServicePack
+
+| A2UI Concept | ServicePack Mapping | Implementation |
+|---|---|---|
+| `action.event` | Pack event handler | Action handler in `useA2UI.ts` routes by event name to pack-specific logic |
+| `action.functionCall` | Local functions from pack catalog | Registered via pack's component catalog |
+| `DataModel` + JSON Pointers | Pack state namespace | Each pack gets a `/packName/*` prefix in the data model |
+| `sendDataModel` | State sync for tools | Tool calls receive current data model for context |
+| `checks` | Pack validation rules | Client-side validation per pack's component schemas |
+| `surfaceId` | Pack surface ownership | Each pack creates surfaces with `{packName}-{surfaceType}` IDs |
+| Error reporting | Self-correction loop | Validation errors → re-prompt LLM with error context |
+
+### Key Insight: A2UI Events ARE the ServicePack Action Bus
+
+A2UI's event system (`action.event.name` + `action.event.context`) is exactly the primitive we need. The gap is that we're not USING it. The event name becomes the action type, the context becomes the payload, and the action handler becomes the router to pack-specific logic:
+
+```
+Component fires event → A2UI dispatchAction → MessageProcessor actionHandler
+  → Router: "deploy" → azure-pack handler → calls ARM API
+  → Router: "select-runtime" → sends structured prompt to LLM
+  → Router: "approve-arch" → updates state + triggers next phase
+```
+
+This is architecturally identical to adaptive-ui-framework's `handleAction` switch, but using A2UI's native event plumbing instead of a custom action object.
+
+---
+
+## 6. Estimated Timeline
+
+| Phase | Effort | Depends On | ServicePack Alignment |
+|-------|--------|------------|----------------------|
+| Phase 1: Wire Action Loop | 2-3 days | Nothing | Foundation |
+| Phase 2: Tool System | 3-4 days | Phase 1 | Pack tool registration |
+| Phase 3: ServiceConnector | 3-4 days | Phase 1 | R02 gap closure |
+| Phase 4: Pack System | 2-3 days | Phases 2+3 | Full ServicePack |
+| Phase 5: Rich Interactions | 2-3 days | Phase 4 | Pack capabilities |
+| **Total** | **~12-17 days** | | |
+
+Phase 1 is the critical path. Everything else builds on a working action loop.
+
+---
+
+## 7. Summary
+
+A2UI provides the right primitives for rich interaction — events, data binding, validation, sandboxed functions. What it doesn't provide (tools, packs, auth, artifacts) is exactly what adaptive-ui-framework adds on top. Our Kickstart implementation has the A2UI vendor code properly wired for action dispatch, but the app layer treats it as a dead end (console.log). The fix is straightforward: wire the action handler to a router, add a backend action endpoint, and build up from there to tools, auth, and packs. The ServicePack architecture we already decided on maps cleanly to A2UI events as the action bus.
+
