@@ -241,3 +241,12 @@
 - **URL param pattern**: Module-level `isMockMode()` and `isPlaygroundMode()` called once at App load. Evaluated outside React to avoid re-renders. `playgroundEnabled` triggers a separate Layout render path with just the Playground component.
 - **Key insight**: `getDemoResponse()` uses a global `turnCount` variable. For playground, must call `resetDemoState()` before each scenario injection, then burn turn 1 (always returns WELCOME) before using keyword matching for specific scenarios.
 - **Sign-in**: Still a placeholder button — noted but not fixed (Phase 3).
+
+### 2025-07-29 — Playground redesign: split-pane + component explorer
+- **Split-pane layout**: Replaced single-column playground with a left/right split. Left panel (320px, scrollable) has collapsible scenario sections; right panel (flex: 1, scrollable) shows rendered surfaces and activity log. Fixes the scroll bug — playground renders inside `Layout → .app-shell → .app-layout → .chat-main` (all `overflow: hidden`), so `.playground-page` now uses `height: 100%` + flex layout with `min-height: 0` and independent `overflow-y: auto` on each panel.
+- **Scenario file extracted**: New `packages/web/src/pages/playground-scenarios.ts` — contains all scenario definitions (8 Kickstart + 19 built-in controls). Each control scenario has a `generate()` function that creates a unique surface via `uid()` counter, avoiding "Surface already exists" errors on repeated clicks.
+- **Built-in control coverage**: 19 scenarios covering Row, Column, List, Card, Tabs, Divider, Text (all variants), Image, Button (3 variants), TextField, CheckBox, ChoicePicker (chips + list), Slider, DateTimeInput, Modal, RadioGroup, FormGroup, CodeBlock, ProgressSteps. All use `catalogId: 'kickstart'`.
+- **Component API patterns**: Button uses `child` (component ID) not `text`. Card uses `child`. Tabs uses `tabs: [{title, child}]` not `children`. Modal uses `trigger` + `content` component IDs. These are easy to get wrong.
+- **Collapsible sections**: Sidebar sections (Kickstart Scenarios, Layout, Content, Inputs, Custom Controls, Custom JSON) are collapsible with chevron animation. State tracked via `Set<string>`.
+- **Responsive**: On viewports < 768px, panels stack vertically with left panel capped at 40vh.
+- **Files changed**: `packages/web/src/pages/Playground.tsx` (rewrite), `packages/web/css/playground.css` (rewrite), `packages/web/src/pages/playground-scenarios.ts` (new).

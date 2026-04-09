@@ -5104,3 +5104,49 @@ These components render their own buttons and auto-continue. Show them ALONE:
 Estimated effort: 1 sprint (5 dev-days for Fry on frontend, 1 dev-day for Leela on prompts).
 
 The state binding (E13-E15) and pack components (E16-E18) are higher effort but lower urgency — the conversation works fine without them, it just requires the LLM to re-parse natural language instead of reading structured state.
+
+---
+
+## 2026-04-08T20:32:15Z: User directive — Fluent 2 design system
+
+**By:** Ahmed Sabbour (via Copilot)
+
+**What:** Playground fonts must match Fluent 2 design system (https://fluent2.microsoft.design/). All UI should use Fluent 2 typography, spacing, and visual language.
+
+**Why:** User request — captured for team memory
+
+---
+
+## 2026-04-09T03:33Z: Adopt Fluent UI React v9
+
+**By:** Ahmed Sabbour (via Copilot)
+
+**What:** Build on @fluentui/react-components (Fluent UI React v9) for Fluent 2 compliance. Wrap app in FluentProvider with webLightTheme. Use Fluent UI components for all UI chrome.
+
+**Why:** User directive - fonts and visual language must match Fluent 2 design system.
+
+---
+
+## 2026-04-09T03:33Z: Playground split-pane layout + component explorer
+
+**Author:** Fry (Frontend Dev)
+
+**Date:** 2025-07-29
+
+**Status:** Accepted
+
+### What
+
+Redesigned the A2UI Playground from a single-column scroll page to a split-pane layout (scenario explorer left, rendered output right). Extracted all scenario definitions to `playground-scenarios.ts`. Added 19 built-in control scenarios covering every A2UI component except Icon/Video/AudioPlayer.
+
+### Why
+
+1. **Scroll bug** — playground content overflowed inside `.chat-main` (overflow: hidden) and couldn't scroll. Split-pane with independent scroll containers fixes this.
+2. **Discoverability** — with 27 total scenarios, a flat button grid doesn't scale. Collapsible sections grouped by type work better.
+3. **Separation of concerns** — scenario data in its own file keeps `Playground.tsx` focused on layout and interaction.
+
+### Key decisions
+
+- Each built-in scenario generates a **unique surfaceId** via a counter (`uid()`), so clicking the same scenario twice doesn't throw.
+- All surfaces use `catalogId: 'kickstart'` — the kickstart catalog extends the basic catalog.
+- Skipped Icon, Video, and AudioPlayer scenarios — they need external URLs that may not load in a test harness.
