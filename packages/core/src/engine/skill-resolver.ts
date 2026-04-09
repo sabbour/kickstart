@@ -1,0 +1,194 @@
+/**
+ * @module @kickstart/core/engine/skill-resolver
+ *
+ * Skill resolver middleware — injects relevant IntegrationKit knowledge into
+ * the system prompt based on the current conversation phase.
+ *
+ * Layer 1 of the Three-Layer Prompt Architecture: Azure Skills (domain
+ * knowledge loaded per-phase from registered IntegrationKits).
+ *
+ * Phase → knowledge mapping:
+ *   Discover  — tool descriptions so the LLM knows what it can query
+ *   Design    — architecture and recommendation knowledge
+ *   Generate  — code generation templates and file-generation rules
+ *   Review / Handoff / Deploy — deployment validation and safeguard knowledge
+ *
+ * Usage:
+ *   const skills = resolveSkills(Phase.Design, defaultKitRegistry.getAll());
+ *   const prompt = buildSystemPrompt({ phase, kitPrompts: skills.prompts });
+ */
+
+import { Phase } from "./types.js";
+import type { IntegrationKit } from "../kits/types.js";
+
+// ---------------------------------------------------------------------------
+// Phase groups — used to filter general prompts to relevant phases
+// ---------------------------------------------------------------------------
+
+/** Phases where tool-discovery prompts are relevant. */
+const DISCOVERY_PHASES = new Set<Phase>([Phase.Discover]);
+
+/** Phases where architecture/recommendation prompts are relevant. */
+const DESIGN_PHASES = new Set<Phase>([Phase.Discover, Phase.Design]);
+
+/** Phases where code-generation prompts are relevant. */
+const GENERATE_PHASES = new Set<Phase>([Phase.Generate]);
+
+/** Phases where deployment/validation prompts are relevant. */
+const DEPLOYMENT_PHASES = new Set<Phase>([
+  Phase.Review,
+  Phase.Handoff,
+  Phase.Deploy,
+]);
+
+// ---------------------------------------------------------------------------
+// Keyword classifiers — used to route flat prompts to phases when
+// a kit does not declare explicit phasePrompts
+// ---------------------------------------------------------------------------
+
+const DISCOVER_KEYWORDS = [
+  "discover", "detect", "list", "find", "existing", "query", "inspect",
+  "what language", "what runtime", "repo_info", "resource_list",
+];
+
+const DESIGN_KEYWORDS = [
+  "architecture", "recommend", "prefer", "design", "database", "service",
+  "plan", "default", "unless", "aks automatic", "managed",
+];
+
+const GENERATE_KEYWORDS = [
+  "generat", "workflow", "dockerfile", "manifest", "artifact", "ci/cd",
+  "pipeline", "template", "oidc", "credential",
+];
+
+const DEPLOYMENT_KEYWORDS = [
+  "deploy", "safeguard", "validation", "cost", "estimate", "security",
+  "review", "budget", "production", "push",
+];
+
+/**
+ * Heuristically classify a prompt string to a set of phases.
+ * A prompt may belong to multiple phases.
+ */
+function classifyPrompt(prompt: string): Set<Phase> {
+  const lower = prompt.toLowerCase();
+  const matched = new Set<Phase>();
+
+  if (DISCOVER_KEYWORDS.some((kw) => lower.includes(kw))) {
+    matched.add(Phase.Discover);
+  }
+  if (DESIGN_KEYWORDS.some((kw) => lower.includes(kw))) {
+    matched.add(Phase.Design);
+  }
+  if (GENERATE_KEYWORDS.some((kw) => lower.includes(kw))) {
+    matched.add(Phase.Generate);
+  }
+  if (DEPLOYMENT_KEYWORDS.some((kw) => lower.includes(kw))) {
+    matched.add(Phase.Review);
+    matched.add(Phase.Handoff);
+    matched.add(Phase.Deploy);
+  }
+
+  // If nothing matched, include for all phases (general knowledge)
+  if (matched.size === 0) {
+    for (const phase of Object.values(Phase)) {
+      matched.add(phase);
+    }
+  }
+
+  return matched;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/** Output of the skill resolver for a given phase. */
+export interface ResolvedSkills {
+  /** Ordered list of prompt strings to inject into the system prompt. */
+  prompts: string[];
+  /** Names of tools available in this phase (for transparency/logging). */
+  availableTools: string[];
+}
+
+/**
+ * Resolve all relevant skill prompts for the current phase from a set of
+ * registered IntegrationKits.
+ *
+ * Resolution order (highest priority first):
+ *   1. `kit.phasePrompts[phase]` — explicit per-phase augmentations
+ *   2. `kit.prompts` filtered by keyword heuristics — backward compat
+ *
+ * Additionally, for the Discover phase, a synthetic tool-listing prompt is
+ * prepended so the LLM knows which tools it can call.
+ */
+export function resolveSkills(
+  phase: Phase,
+  kits: IntegrationKit[],
+): ResolvedSkills {
+  const prompts: string[] = [];
+  const availableTools: string[] = [];
+
+  // Synthetic tool-listing prompt for Discover phase
+  if (phase === Phase.Discover || DESIGN_PHASES.has(phase)) {
+    const toolsByKit: string[] = [];
+    for (const kit of kits) {
+      if (kit.tools.length > 0) {
+        const names = kit.tools.map((t) => `\`${t.name}\``).join(", ");
+        const descs = kit.tools
+          .map((t) => `  - **${t.name}**: ${t.description}`)
+          .join("\n");
+        toolsByKit.push(`**${kit.name} kit** (${names}):\n${descs}`);
+        availableTools.push(...kit.tools.map((t) => t.name));
+      }
+    }
+
+    if (toolsByKit.length > 0 && DISCOVERY_PHASES.has(phase)) {
+      prompts.push(
+        `You have access to the following tools. Call them proactively to avoid asking the user for information you can discover yourself:\n\n${toolsByKit.join("\n\n")}`,
+      );
+    } else if (toolsByKit.length > 0) {
+      for (const kit of kits) {
+        availableTools.push(...kit.tools.map((t) => t.name));
+      }
+    }
+  } else {
+    for (const kit of kits) {
+      availableTools.push(...kit.tools.map((t) => t.name));
+    }
+  }
+
+  for (const kit of kits) {
+    // Priority 1: explicit per-phase prompts
+    const explicit = kit.phasePrompts?.[phase];
+    if (explicit && explicit.length > 0) {
+      prompts.push(...explicit);
+      continue;
+    }
+
+    // Priority 2: heuristic filtering of flat prompts (backward compat)
+    if (kit.prompts && kit.prompts.length > 0) {
+      for (const p of kit.prompts) {
+        const phases = classifyPrompt(p);
+        if (phases.has(phase)) {
+          prompts.push(p);
+        }
+      }
+    }
+  }
+
+  return { prompts, availableTools };
+}
+
+/**
+ * Format resolved skills into a "## Available Capabilities" markdown section
+ * ready for appending to a system prompt.
+ *
+ * Returns an empty string if there are no prompts to inject.
+ */
+export function formatSkillsSection(skills: ResolvedSkills): string {
+  if (skills.prompts.length === 0) return "";
+
+  const items = skills.prompts.map((p) => p.trim()).join("\n\n");
+  return `## Available Capabilities\n\n${items}`;
+}

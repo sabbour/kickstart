@@ -48,6 +48,12 @@ export interface SystemPromptContext {
   githubContext?: Partial<GitHubContext>;
   /** Additional key-value pairs injected into the phase template */
   templateVars?: Record<string, string>;
+  /**
+   * Layer 1 skill prompts resolved from registered IntegrationKits for the
+   * current phase.  These are appended as an "## Available Capabilities"
+   * section after the phase-specific (Layer 3) instructions.
+   */
+  kitPrompts?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -374,15 +380,23 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
     vars["repoInfo"] = JSON.stringify(context.githubContext, null, 2);
   }
 
-  // Compose: Layer 2 (system prompt) + Layer 3 (phase prompt)
+  // Compose: Layer 2 (system prompt) + Layer 3 (phase prompt) + Layer 1 (kit skills)
   const layer2 = interpolate(KICKSTART_SYSTEM_PROMPT, vars);
   const layer3 = interpolate(phaseDefinition.promptTemplate, vars);
 
-  return [
+  const parts = [
     layer2,
     `## Current Phase: ${phaseDefinition.label}`,
     phaseDefinition.description,
     "",
     layer3,
-  ].join("\n\n");
+  ];
+
+  // Layer 1: inject resolved kit skills as "Available Capabilities"
+  if (context.kitPrompts && context.kitPrompts.length > 0) {
+    const capabilities = context.kitPrompts.map((p) => p.trim()).join("\n\n");
+    parts.push(`\n## Available Capabilities\n\n${capabilities}`);
+  }
+
+  return parts.join("\n\n");
 }

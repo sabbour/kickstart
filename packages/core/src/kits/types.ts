@@ -12,6 +12,7 @@
 
 import type { Tool } from '../tools/types.js';
 import type { APIConnector } from '../connectors/types.js';
+import type { Phase } from '../engine/types.js';
 
 /**
  * A lightweight descriptor for a UI component contributed by a kit.
@@ -49,8 +50,19 @@ export interface IntegrationKit {
   tools: Tool<any>[];
   /** Authenticated API connectors this kit contributes */
   connectors: APIConnector[];
-  /** Optional system-prompt augmentations injected per phase */
+  /**
+   * Optional flat system-prompt augmentations.  These are injected for all
+   * phases (or filtered by keyword heuristics in the skill resolver when
+   * `phasePrompts` is not set).  Use `phasePrompts` for explicit phase
+   * targeting.
+   */
   prompts?: string[];
+  /**
+   * Optional per-phase system-prompt augmentations.  When present for a
+   * given phase, these take priority over the flat `prompts` array.
+   * Keys are Phase enum values; values are arrays of prompt strings.
+   */
+  phasePrompts?: Partial<Record<Phase, string[]>>;
   /** Optional A2UI component registrations (frontend-only) */
   components?: ComponentRegistration[];
 }

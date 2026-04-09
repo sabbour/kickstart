@@ -11,10 +11,14 @@
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import {
+  Phase,
   getPhaseDefinition,
   getPhaseOrder,
   processResponse,
   defaultRegistry,
+  buildSystemPrompt,
+  resolveSkills,
+  defaultKitRegistry,
 } from "@kickstart/core";
 import type { PhaseItem } from "@kickstart/core";
 import { getSession, createSession, addMessage } from "../lib/session-store.js";
@@ -63,10 +67,22 @@ app.http("converse", {
       // Add user message to history
       addMessage(state.sessionId, "user", body.message);
 
-      // Build messages array for OpenAI
-      const messages: import("../lib/openai-client.js").ChatMessage[] = state.messages.map((m) => ({
+      // Resolve kit skills for the current phase and build a fresh system prompt.
+      // This ensures the LLM always has the correct phase-specific capabilities
+      // injected, even as the conversation advances through phases.
+      const currentPhase = engineState.currentPhase as Phase;
+      const resolvedSkills = resolveSkills(currentPhase, defaultKitRegistry.getAll());
+      const freshSystemPrompt = buildSystemPrompt({
+        phase: currentPhase,
+        appDefinition: state.appDefinition,
+        kitPrompts: resolvedSkills.prompts,
+      });
+
+      // Build messages array for OpenAI, replacing the stored system prompt
+      // with the freshly resolved one (phase + kit skills).
+      const messages: import("../lib/openai-client.js").ChatMessage[] = state.messages.map((m, idx) => ({
         role: m.role as "system" | "user" | "assistant",
-        content: m.content,
+        content: idx === 0 && m.role === "system" ? freshSystemPrompt : m.content,
       }));
 
       // Build A2UI phase indicator
