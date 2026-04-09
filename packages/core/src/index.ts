@@ -124,6 +124,22 @@ export { IntegrationKitRegistry, defaultKitRegistry, registerKit } from "./kits/
 export { azureKit } from "./kits/index.js";
 export { githubKit } from "./kits/index.js";
 
+// Validation — client-side artifact validation against deployment safeguards
+export type {
+  ValidationSeverity,
+  ValidationResult,
+  Validator,
+  ArtifactValidationReport,
+} from "./validation/index.js";
+export { ValidationEngine, createDefaultValidationEngine } from "./validation/index.js";
+export { resourceLimitsValidator } from "./validation/index.js";
+export { noLatestTagValidator } from "./validation/index.js";
+export { healthProbesValidator } from "./validation/index.js";
+export { noPrivilegedValidator } from "./validation/index.js";
+export { namespaceSetValidator } from "./validation/index.js";
+export { replicaCountValidator } from "./validation/index.js";
+export { imagePullPolicyValidator } from "./validation/index.js";
+
 // Shared types
 export type {
   AzureContext,
