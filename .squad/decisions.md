@@ -5183,3 +5183,58 @@ Redesigned the A2UI Playground from a single-column scroll page to a split-pane 
 - Each built-in scenario generates a **unique surfaceId** via a counter (`uid()`), so clicking the same scenario twice doesn't throw.
 - All surfaces use `catalogId: 'kickstart'` — the kickstart catalog extends the basic catalog.
 - Skipped Icon, Video, and AudioPlayer scenarios — they need external URLs that may not load in a test harness.
+
+---
+
+# Decision: Full Fluent UI v9 Migration for All A2UI Renderers
+
+**Author:** Fry (Frontend Dev)
+**Date:** 2025-07-29
+**Status:** Accepted
+
+## Context
+
+User directive: "I don't want to use raw elements anywhere." All A2UI component renderers and kickstart custom components must use Fluent UI React v9 components from `@fluentui/react-components`.
+
+## Decision
+
+Migrated all 22 component files (18 basic catalog + 4 custom) plus `utils.ts` to Fluent UI v9. Zero raw `<button>`, `<input>`, `<label>`, `<span>`, `<h1>`-`<h5>`, `<strong>` remaining. Only permitted raw elements are layout `<div>` (no Fluent flex component), `<audio>`/`<video>` (no Fluent media player), and `<pre>`/`<code>` (no Fluent preformatted text).
+
+## Key Conventions
+
+- All colors via `tokens.colorNeutral*`, `tokens.colorBrand*`, `tokens.colorPalette*`
+- All spacing via `tokens.spacing*`
+- All border radii via `tokens.borderRadius*`
+- Custom styling via `makeStyles` — no inline hardcoded colors/sizes
+- `createReactComponent(Api, renderFn)` adapter pattern preserved in all files
+
+---
+
+# Decision: Fluent UI v9 Override Catalog Architecture
+
+**Author:** Fry (Frontend Dev)
+**Date:** 2025-07-29
+**Status:** Accepted
+
+## Context
+
+The A2UI vendor basic catalog ships 18 components with mixed styling — some already use Fluent UI v9, others use inline styles with hardcoded colors. We need all components to render with Fluent UI v9 for visual consistency, but vendor files must remain untouched.
+
+## Decision
+
+Created a **Fluent override catalog** at `packages/web/src/catalog/fluent-components/` containing 18 component files that re-implement each basic catalog component using Fluent UI v9. These overrides exploit A2UI's `Catalog` Map behavior: when components share the same `.name`, later entries in the constructor array overwrite earlier ones.
+
+**Catalog composition order:**
+1. `basicCatalog.components` — 18 vendor components (will be overridden)
+2. `fluentOverrides` — 18 Fluent UI v9 replacements (same names, replaces above)
+3. Custom components — RadioGroup, FormGroup, CodeBlock, ProgressSteps
+
+Each override imports the vendor's Api object (e.g., `ButtonApi`) to guarantee the `.name` property matches exactly, then wraps a new Fluent UI v9 render function via `createReactComponent()`.
+
+## Consequences
+
+- **Zero vendor modifications** — all 18 overrides live in our catalog directory.
+- **Easy rollback** — removing `...fluentOverrides` from kickstart-catalog.ts reverts to vendor rendering.
+- **Single source of truth** — component names are owned by vendor Api objects; we never duplicate or hardcode them.
+- **Consistent Fluent styling** — all components use `makeStyles`, `tokens`, and Fluent primitives. No inline hardcoded colors.
+
