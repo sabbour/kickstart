@@ -47,6 +47,17 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 
 ## Learnings
 
+### ArchitectureDiagram + Custom Catalog Components (B-19 + B-08) — 2026-04-10
+
+- **Mermaid lazy loading:** Use a singleton loader (`loadMermaid()`) that dynamically imports mermaid once and caches it — avoids re-initialization across re-renders. `mermaid.render(id, syntax)` returns `{ svg }` string; inject into container via `innerHTML`, then fix SVG dimensions post-render.
+- **Pan/zoom with CSS transform:** `translate(x,y) scale(s)` on the canvas div; `transformOrigin: '0 0'` on the parent; track drag with `useRef` (not `useState`) for start coords to avoid stale closures mid-drag.
+- **Mermaid code-splitting:** Vite automatically splits mermaid into ~50 lazy chunks (flowDiagram, sequenceDiagram, etc.). Chunk size warnings are expected and pre-existing — do not try to suppress them.
+- **FileEditor pattern:** Default `readOnly=true` (show hljs-highlighted `<pre>`); `readOnly=false` flips to a plain `<textarea>` styled with monospace tokens. `artifactPath` resolution via `useArtifacts().getArtifact()` takes priority over inline `content` prop.
+- **CostEstimate table:** Use `<table>/<thead>/<tbody>/<tfoot>` in JSX; apply Fluent tokens via inline styles only where `makeStyles` can't target HTML table elements (`textAlign`, `borderCollapse`). `Intl.NumberFormat` for currency formatting.
+- **DeploymentProgress:** Connector lines between steps via CSS `::before` pseudo-element positioned absolutely. Skip connector on last step by conditionally omitting the class.
+- **DeploymentProgress was missing** — it was called out as "should already exist" in the backlog but was never built. Created fresh.
+- Catalog now at **17 custom components** (+ fluent overrides + basic catalog).
+
 ### Azure A2UI Fat Components (B-12)
 - Fat components are identical in structure to GitHub components — `createReactComponent` render function is a React FC, hooks work.
 - `useAPIConnector('azure-arm')` pattern: cast to `AzureARMConnector | undefined`, guard with null check before calling methods like `listResources()` or `authenticate()`.
