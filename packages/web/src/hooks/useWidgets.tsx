@@ -3,7 +3,7 @@
  * Widgets are A2UI surfaces created in the "Create" tab and displayed in the "Widgets" tab.
  */
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import type { A2uiMsg } from '../types';
 
 export interface Widget {
@@ -21,10 +21,25 @@ interface WidgetsContextValue {
   duplicateWidget: (id: string) => void;
 }
 
+const STORAGE_KEY = 'kickstart-playground-widgets';
+
+function loadWidgets(): Widget[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Widget[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 const WidgetsContext = createContext<WidgetsContextValue | null>(null);
 
 export function WidgetsProvider({ children }: { children: ReactNode }) {
-  const [widgets, setWidgets] = useState<Widget[]>([]);
+  const [widgets, setWidgets] = useState<Widget[]>(loadWidgets);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
+  }, [widgets]);
 
   const addWidget = useCallback((name: string, messages: A2uiMsg[]) => {
     const newWidget: Widget = {

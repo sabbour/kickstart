@@ -106,3 +106,39 @@
   --sessions-sidebar-width: 260px;
   --file-viewer-width: 420px;
 }
+
+/* ==========================================================================
+   Dark theme overrides (activated via data-theme="dark" on <html>)
+   ========================================================================== */
+
+[data-theme="dark"] {
+  /* --- Brand colors (keep brand recognisable, darken backgrounds) --- */
+  --color-brand-light: #004578;
+  --color-brand-lighter: #003263;
+
+  /* --- Neutral palette — dark surface stack --- */
+  --color-neutral-background-1: #1b1a19;
+  --color-neutral-background-2: #252423;
+  --color-neutral-background-3: #292827;
+  --color-neutral-background-4: #323130;
+  --color-neutral-background-5: #3b3a39;
+  --color-neutral-background-inverted: #f3f2f1;
+  --color-neutral-background-dark: #141414;
+
+  /* --- Foreground --- */
+  --color-neutral-foreground-1: #f3f2f1;
+  --color-neutral-foreground-2: #c8c6c4;
+  --color-neutral-foreground-3: #a19f9d;
+  --color-neutral-foreground-disabled: #605e5c;
+
+  /* --- Strokes --- */
+  --color-neutral-stroke-1: #484644;
+  --color-neutral-stroke-2: #3b3a39;
+
+  /* --- Semantic colors --- */
+  --color-success-background: #093807;
+  --color-warning-background: #3a2e02;
+  --color-error-background: #3b0509;
+  --color-info-background: #002848;
+  --color-copilot-bg: #1a1a2e;
+}

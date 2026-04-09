@@ -164,6 +164,22 @@
   margin-bottom: 0;
 }
 
+/* Fade-in animation for components arriving progressively during streaming */
+@keyframes componentEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.a2ui-component--entering {
+  animation: componentEnter var(--duration-normal) var(--easing-ease-out) both;
+}
+
 /* --- Model indicator (small subtext below assistant responses) --- */
 .model-indicator {
   display: block;

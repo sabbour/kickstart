@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { FluentProvider, webLightTheme } from '@fluentui/react-components';
+import React, { useState, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { FluentProvider, webLightTheme, webDarkTheme } from '@fluentui/react-components';
 import { Layout } from './components/Layout';
 import { Landing } from './components/Landing';
 import { ChatShell } from './components/Chat/ChatShell';
@@ -12,6 +12,7 @@ import { useSessions } from './hooks/useSessions';
 import { useStreaming } from './hooks/useStreaming';
 import { useMockStreaming } from './hooks/useMockStreaming';
 import { useAPIConnectorRegistry } from './contexts/APIConnectorContext';
+import { useTheme } from './contexts/ThemeContext';
 import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
@@ -21,6 +22,9 @@ const mockEnabled = isMockMode();
 const playgroundEnabled = isPlaygroundMode();
 
 export function App() {
+  const { theme } = useTheme();
+  const fluentTheme = theme === 'dark' ? webDarkTheme : webLightTheme;
+
   const [mode, setMode] = useState<AppMode>(playgroundEnabled ? 'chat' : 'landing');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(mockEnabled ? true : null);
@@ -44,6 +48,10 @@ export function App() {
 
   // Messages for the active session
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // Surface IDs that arrive progressively during the active stream
+  const [streamingSurfaceIds, setStreamingSurfaceIds] = useState<string[]>([]);
+  const streamingSurfaceIdsRef = useRef<string[]>([]);
 
   // Check API availability on mount (skip in mock mode — already true)
   useEffect(() => {
@@ -96,18 +104,27 @@ export function App() {
       return;
     }
 
+    // Reset streaming surface IDs for the new turn
+    streamingSurfaceIdsRef.current = [];
+    setStreamingSurfaceIds([]);
+
     // Use mock streaming when ?mock is active, real streaming otherwise
     if (mockEnabled) {
       mockStreaming.send(text, sessionId, {
         onDelta: () => {},
         onA2UI: (msgs) => {
-          a2ui.processMessages(msgs);
+          const newIds = a2ui.processMessages(msgs);
+          if (newIds.length > 0) {
+            streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
+            setStreamingSurfaceIds([...streamingSurfaceIdsRef.current]);
+          }
         },
         onPhase: () => {},
         onComplete: (fullText, model) => {
-          const surfaceIds = a2ui.surfaces.size > 0
-            ? Array.from(a2ui.surfaces.keys())
-            : undefined;
+          const collectedIds = streamingSurfaceIdsRef.current;
+          const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
+          streamingSurfaceIdsRef.current = [];
+          setStreamingSurfaceIds([]);
           const assistantMsg: ChatMessage = {
             id: `msg-${Date.now()}-assistant`,
             role: 'assistant',
@@ -120,6 +137,8 @@ export function App() {
           sessions.addMessage(sessionId!, assistantMsg);
         },
         onError: (error) => {
+          streamingSurfaceIdsRef.current = [];
+          setStreamingSurfaceIds([]);
           const errorMsg: ChatMessage = {
             id: `msg-${Date.now()}-error`,
             role: 'assistant',
@@ -138,7 +157,11 @@ export function App() {
       streaming.send(text, backendSessionId, {
         onDelta: () => {},
         onA2UI: (msgs) => {
-          a2ui.processMessages(msgs);
+          const newIds = a2ui.processMessages(msgs);
+          if (newIds.length > 0) {
+            streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
+            setStreamingSurfaceIds([...streamingSurfaceIdsRef.current]);
+          }
         },
         onPhase: () => {},
         onComplete: (fullText, model, receivedSessionId) => {
@@ -146,18 +169,24 @@ export function App() {
           if (receivedSessionId && !activeSession?.backendSessionId) {
             sessions.updateSession(sessionId!, { backendSessionId: receivedSessionId });
           }
-          
+          const collectedIds = streamingSurfaceIdsRef.current;
+          const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
+          streamingSurfaceIdsRef.current = [];
+          setStreamingSurfaceIds([]);
           const assistantMsg: ChatMessage = {
             id: `msg-${Date.now()}-assistant`,
             role: 'assistant',
             text: fullText,
             model,
+            surfaceIds,
             timestamp: Date.now(),
           };
           setMessages(prev => [...prev, assistantMsg]);
           sessions.addMessage(sessionId!, assistantMsg);
         },
         onError: (error) => {
+          streamingSurfaceIdsRef.current = [];
+          setStreamingSurfaceIds([]);
           const errorMsg: ChatMessage = {
             id: `msg-${Date.now()}-error`,
             role: 'assistant',
@@ -224,7 +253,7 @@ export function App() {
   // Playground mode — standalone A2UI test harness
   if (playgroundEnabled) {
     return (
-      <FluentProvider theme={webLightTheme}>
+      <FluentProvider theme={fluentTheme}>
         <Layout
           sidebarOpen={false}
           onToggleSidebar={() => {}}
@@ -239,7 +268,7 @@ export function App() {
   }
 
   return (
-    <FluentProvider theme={webLightTheme}>
+    <FluentProvider theme={fluentTheme}>
       <Layout
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(prev => !prev)}
@@ -276,6 +305,7 @@ export function App() {
             messages={messages}
             isStreaming={isStreaming}
             streamingText={currentStreamText}
+            streamingSurfaceIds={streamingSurfaceIds}
             onSend={handleSendMessage}
             getSurface={a2ui.getSurface}
           />

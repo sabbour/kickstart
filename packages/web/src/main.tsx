@@ -4,6 +4,7 @@ import { App } from './App';
 import { APIConnectorProvider } from './contexts/APIConnectorContext';
 import { ArtifactProvider } from './contexts/ArtifactContext';
 import { VirtualFSProvider } from './contexts/VirtualFSContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { registerKit, azureKit, githubKit } from '@kickstart/core';
 
 // Register integration kits at startup — auto-wires tools + connectors into
@@ -13,12 +14,14 @@ registerKit(githubKit);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <APIConnectorProvider>
-      <ArtifactProvider>
-        <VirtualFSProvider>
-          <App />
-        </VirtualFSProvider>
-      </ArtifactProvider>
-    </APIConnectorProvider>
+    <ThemeProvider>
+      <APIConnectorProvider>
+        <ArtifactProvider>
+          <VirtualFSProvider>
+            <App />
+          </VirtualFSProvider>
+        </ArtifactProvider>
+      </APIConnectorProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );
