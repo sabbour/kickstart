@@ -20,6 +20,10 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/api/inspirations",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/*",
       "allowedRoles": ["authenticated"]
     }
@@ -54,6 +58,5 @@
     ".json": "application/json",
     ".js": "text/javascript",
     ".css": "text/css"
-  },
-  "_comment": "Custom domains: kickstart.aks.azure.sabbour.me (temp), kickstart.aks.azure.com (future). Configure via Azure Portal or Azure CLI."
+  }
 }
