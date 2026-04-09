@@ -26,6 +26,15 @@ param entraClientId string = ''
 @description('Custom domain hostname (e.g., kickstart.aks.azure.sabbour.me). Leave empty to skip.')
 param customDomainHostname string = ''
 
+@description('Azure OpenAI endpoint (e.g., https://<name>.openai.azure.com/). Leave empty to skip.')
+param openAiEndpoint string = ''
+
+@description('Azure OpenAI chat deployment name (e.g., gpt-5.3-chat)')
+param openAiChatDeployment string = ''
+
+@description('Azure OpenAI Codex deployment name for code generation (e.g., gpt-5.3-codex)')
+param openAiCodexDeployment string = ''
+
 // ── Static Web App ──────────────────────────────────────────────
 
 resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
@@ -45,17 +54,20 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
   }
 }
 
-// ── App Settings (Entra auth references) ────────────────────────
-// AZURE_CLIENT_ID is safe to set via Bicep (not a secret).
-// AZURE_CLIENT_SECRET must be set manually via Azure Portal or CLI:
+// ── App Settings (Entra auth + OpenAI references) ───────────────
+// AZURE_CLIENT_ID and AZURE_OPENAI_* are safe to set via Bicep (not secrets).
+// AZURE_CLIENT_SECRET and AZURE_OPENAI_API_KEY must be set manually:
 //   az staticwebapp appsettings set -n <swa-name> -g <rg> \
-//     --setting-names AZURE_CLIENT_SECRET=<value>
+//     --setting-names AZURE_CLIENT_SECRET=<value> AZURE_OPENAI_API_KEY=<value>
 
 resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = if (!empty(entraClientId)) {
   parent: staticWebApp
   name: 'appsettings'
   properties: {
     AZURE_CLIENT_ID: entraClientId
+    AZURE_OPENAI_ENDPOINT: openAiEndpoint
+    AZURE_OPENAI_CHAT_DEPLOYMENT: openAiChatDeployment
+    AZURE_OPENAI_CODEX_DEPLOYMENT: openAiCodexDeployment
   }
 }
 

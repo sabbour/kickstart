@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  ci:
+    name: Lint, Build, Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build core
+        run: npm run build -w @kickstart/core
+
+      - name: Build API
+        run: cd packages/web/api && npm run build
+
+      - name: Build web app (Vite)
+        run: cd packages/web && npx vite build
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Playwright e2e tests
+        run: npx playwright test

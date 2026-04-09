@@ -22,6 +22,15 @@
     },
     "customDomainHostname": {
       "value": "kickstart.aks.azure.sabbour.me"
+    },
+    "openAiEndpoint": {
+      "value": "https://<your-openai-resource>.openai.azure.com/"
+    },
+    "openAiChatDeployment": {
+      "value": "gpt-5.3-chat"
+    },
+    "openAiCodexDeployment": {
+      "value": "gpt-5.3-codex"
     }
   }
 }
