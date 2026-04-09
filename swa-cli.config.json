@@ -4,7 +4,8 @@
     "default": {
       "appLocation": "packages/web",
       "apiLocation": "packages/web/api",
-      "outputLocation": ".",
+      "outputLocation": "dist",
+      "appDevserverUrl": "http://localhost:5173",
       "apiPort": 7071,
       "devServerTimeout": 60000,
       "port": 4280

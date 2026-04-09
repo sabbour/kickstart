@@ -45,6 +45,9 @@ jobs:
           sed -i "s|window.__BUILD_SHA__ = 'dev';|window.__BUILD_SHA__ = '${SHORT_SHA}';|" packages/web/index.html
           sed -i "s|window.__BUILD_DATE__ = new Date().*|window.__BUILD_DATE__ = '${BUILD_DATE}';|" packages/web/index.html
 
+      - name: Build web app (Vite)
+        run: cd packages/web && npx vite build
+
       - name: Deploy to Azure Static Web Apps
         id: swa_deploy
         uses: Azure/static-web-apps-deploy@v1
@@ -54,6 +57,7 @@ jobs:
           action: "upload"
           app_location: "packages/web"
           api_location: "packages/web/api"
+          output_location: "dist"
           skip_app_build: true
           skip_api_build: false
           api_build_command: "echo 'API already built'"
