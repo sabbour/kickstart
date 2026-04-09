@@ -4,6 +4,9 @@
 
 Kickstart helps developers go from "I have an app" to "it's running on Azure" through a guided conversation. It frames AKS Automatic as a scalable app platform — no Kubernetes knowledge required.
 
+🌐 **Live app:** [kickstart.aks.azure.sabbour.me](https://kickstart.aks.azure.sabbour.me)
+📖 **Docs:** [sabbour.github.io/kickstart](https://sabbour.github.io/kickstart/)
+
 ## Two Surfaces, One Engine
 
 | Surface | How it works | LLM |
@@ -15,12 +18,18 @@ Both surfaces share `@kickstart/core` — the conversation engine, A2UI componen
 
 ## Quick Start
 
-### Prerequisites
+### Option 1: Dev Container (recommended)
 
-- Node.js 20+ (22 recommended)
-- npm 10+
+The easiest way to get started. Open the repo in a GitHub Codespace or VS Code with the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers):
 
-### Run locally
+1. **GitHub Codespace:** Click **Code → Codespaces → New codespace** on the repo page
+2. **VS Code:** Open the repo folder, then **Ctrl+Shift+P → Dev Containers: Reopen in Container**
+
+The container auto-installs dependencies, builds all packages, and starts the dev server. Open [http://localhost:4280](http://localhost:4280) when ready.
+
+### Option 2: Local setup
+
+**Prerequisites:** Node.js 20+ (22 recommended), npm 10+
 
 ```bash
 # Install dependencies
@@ -29,19 +38,19 @@ npm install
 # Build all packages
 npm run build
 
-# Start the web frontend
-npx serve packages/web -l 4280
+# Start the dev server (Vite + SWA CLI)
+npm run dev
 ```
 
-Open [http://localhost:4280](http://localhost:4280) to view the app.
+- **http://localhost:4280** — Full app (SWA CLI: frontend + API)
+- **http://localhost:5173** — Vite dev server (HMR, frontend only)
+
+> **Note:** The API requires Azure OpenAI credentials. See [DEVELOPMENT.md](./DEVELOPMENT.md) for configuration details. Without credentials, the app runs in **demo mode** automatically.
 
 ### Run MCP server (IDE)
 
 ```bash
-# Build
 npm run build
-
-# Start MCP server
 node packages/mcp-server/dist/index.js
 ```
 
@@ -52,7 +61,7 @@ Then configure your MCP client (VS Code or Claude Code) to connect to the server
 | Layer | Technology |
 |-------|-----------|
 | Shared core | TypeScript, npm workspaces |
-| Web frontend | Vanilla JS, HTML/CSS (Portal Prototyper) |
+| Web frontend | React 19, Vite 6, A2UI v0.9 |
 | Web API | Azure Functions (Node.js) |
 | IDE integration | MCP SDK (`@modelcontextprotocol/sdk`) |
 | AI | Azure OpenAI |
@@ -64,20 +73,26 @@ Then configure your MCP client (VS Code or Claude Code) to connect to the server
 
 ```
 packages/
-  core/           Conversation engine, A2UI catalog, prompts, generators
-  web/            Portal-style frontend + Azure Functions API
+  core/           Conversation engine, prompts, generators
+  web/            React frontend + Azure Functions API
+    src/           React app (components, hooks, services, A2UI catalog)
+    api/           Azure Functions API
+    css/           Stylesheets (Fluent 2 theme, A2UI overrides)
+    public/        Static assets (icons, favicon)
   mcp-server/     MCP server for IDE integration
-infra/            Bicep templates, setup scripts
-docs/             Architecture and documentation
+infra/            Bicep templates
+docs-site/        Docusaurus documentation site
 ```
 
 ## Documentation
 
-See [`docs/`](./docs/) for detailed documentation:
+📖 **Full docs:** [sabbour.github.io/kickstart](https://sabbour.github.io/kickstart/)
 
-- **[Architecture](./docs/architecture.md)** — System diagrams (Mermaid), data flows, prompt layers, deployment
-- **[Contributing](./CONTRIBUTING.md)** — Dev setup, project structure, code style
-- **[Infrastructure](./infra/README.md)** — Azure deployment details
+- **[Architecture](https://sabbour.github.io/kickstart/docs/architecture/overview)** — System design, A2UI integration, JSON envelope format
+- **[Getting Started](https://sabbour.github.io/kickstart/docs/getting-started/local-setup)** — Local setup, project structure
+- **[Custom Components](https://sabbour.github.io/kickstart/docs/components/custom-catalog)** — Kickstart A2UI catalog
+- **[Contributing](./CONTRIBUTING.md)** — Dev setup, code style
+- **[Development Guide](./DEVELOPMENT.md)** — Credentials, scripts, testing
 
 ## License
 

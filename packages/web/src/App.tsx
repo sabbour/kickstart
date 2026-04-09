@@ -7,7 +7,6 @@ import { FileEditor } from './components/FileEditor/FileEditor';
 import { useA2UI } from './hooks/useA2UI';
 import { useSessions } from './hooks/useSessions';
 import { useStreaming } from './hooks/useStreaming';
-import { getDemoResponse, resetDemoState, populateDemoFiles } from './services/demo-scenarios';
 import { healthCheck } from './services/api-client';
 import { VirtualFileSystem } from './services/virtual-fs';
 import type { AppMode, ChatMessage } from './types';
@@ -15,7 +14,7 @@ import type { AppMode, ChatMessage } from './types';
 export function App() {
   const [mode, setMode] = useState<AppMode>('landing');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isApiAvailable, setIsApiAvailable] = useState(false);
+  const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
 
   const a2ui = useA2UI();
@@ -25,10 +24,8 @@ export function App() {
   // Single VFS instance for the app lifetime
   const fs = useMemo(() => new VirtualFileSystem(), []);
 
-  // Messages for the active session (stored in component state for real-time updates)
+  // Messages for the active session
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [demoStreamText, setDemoStreamText] = useState('');
-  const [isDemoStreaming, setIsDemoStreaming] = useState(false);
 
   // Check API availability on mount
   useEffect(() => {
@@ -42,29 +39,6 @@ export function App() {
       setMessages(active.messages);
     }
   }, [sessions.activeSessionId]);
-
-  // Simulate streaming text for demo mode
-  const simulateStreaming = useCallback(async (text: string): Promise<void> => {
-    return new Promise(resolve => {
-      let idx = 0;
-      const words = text.split(' ');
-      setDemoStreamText('');
-      setIsDemoStreaming(true);
-
-      const interval = setInterval(() => {
-        idx++;
-        const partial = words.slice(0, idx).join(' ');
-        setDemoStreamText(partial);
-
-        if (idx >= words.length) {
-          clearInterval(interval);
-          setIsDemoStreaming(false);
-          setDemoStreamText('');
-          resolve();
-        }
-      }, 40);
-    });
-  }, []);
 
   const handleSendMessage = useCallback(async (text: string) => {
     // Ensure we have an active session
@@ -84,73 +58,48 @@ export function App() {
     setMessages(prev => [...prev, userMsg]);
     sessions.addMessage(sessionId!, userMsg);
 
-    if (isApiAvailable) {
-      // Real API mode
-      streaming.send(text, sessionId, {
-        onDelta: () => {},
-        onA2UI: (msgs) => {
-          a2ui.processMessages(msgs);
-        },
-        onPhase: () => {},
-        onComplete: (fullText) => {
-          const assistantMsg: ChatMessage = {
-            id: `msg-${Date.now()}-assistant`,
-            role: 'assistant',
-            text: fullText,
-            timestamp: Date.now(),
-          };
-          setMessages(prev => [...prev, assistantMsg]);
-          sessions.addMessage(sessionId!, assistantMsg);
-        },
-        onError: (error) => {
-          const errorMsg: ChatMessage = {
-            id: `msg-${Date.now()}-error`,
-            role: 'assistant',
-            text: `⚠️ ${error}. Running in demo mode.`,
-            timestamp: Date.now(),
-          };
-          setMessages(prev => [...prev, errorMsg]);
-          // Fall back to demo
-          handleDemoResponse(text, sessionId!);
-        },
-      });
-    } else {
-      await handleDemoResponse(text, sessionId);
-    }
-  }, [sessions, streaming, a2ui, isApiAvailable, simulateStreaming]);
-
-  const handleDemoResponse = useCallback(async (userText: string, sessionId: string) => {
-    const demo = getDemoResponse(userText);
-
-    // Simulate typing delay
-    await simulateStreaming(demo.text);
-
-    // If this is the file-generation phase, populate the VFS
-    if (demo.phase === 'generate') {
-      populateDemoFiles(fs);
+    if (!isApiAvailable) {
+      const errorMsg: ChatMessage = {
+        id: `msg-${Date.now()}-error`,
+        role: 'assistant',
+        text: '⚠️ The API is not available. Please check that Azure OpenAI credentials are configured and the API is running.',
+        timestamp: Date.now(),
+      };
+      setMessages(prev => [...prev, errorMsg]);
+      sessions.addMessage(sessionId!, errorMsg);
+      return;
     }
 
-    // Process A2UI messages
-    let surfaceIds: string[] = [];
-    if (demo.a2uiMessages.length > 0) {
-      surfaceIds = a2ui.processMessages(demo.a2uiMessages);
-    }
-
-    const assistantMsg: ChatMessage = {
-      id: `msg-${Date.now()}-assistant`,
-      role: 'assistant',
-      text: demo.text,
-      surfaceIds,
-      phase: demo.phase,
-      model: demo.model,
-      timestamp: Date.now(),
-    };
-    setMessages(prev => [...prev, assistantMsg]);
-    sessions.addMessage(sessionId, assistantMsg);
-  }, [a2ui, sessions, simulateStreaming, fs]);
+    streaming.send(text, sessionId, {
+      onDelta: () => {},
+      onA2UI: (msgs) => {
+        a2ui.processMessages(msgs);
+      },
+      onPhase: () => {},
+      onComplete: (fullText) => {
+        const assistantMsg: ChatMessage = {
+          id: `msg-${Date.now()}-assistant`,
+          role: 'assistant',
+          text: fullText,
+          timestamp: Date.now(),
+        };
+        setMessages(prev => [...prev, assistantMsg]);
+        sessions.addMessage(sessionId!, assistantMsg);
+      },
+      onError: (error) => {
+        const errorMsg: ChatMessage = {
+          id: `msg-${Date.now()}-error`,
+          role: 'assistant',
+          text: `⚠️ ${error}`,
+          timestamp: Date.now(),
+        };
+        setMessages(prev => [...prev, errorMsg]);
+        sessions.addMessage(sessionId!, errorMsg);
+      },
+    });
+  }, [sessions, streaming, a2ui, isApiAvailable]);
 
   const handleStartChat = useCallback((prompt: string) => {
-    resetDemoState();
     a2ui.reset();
     fs.clear();
     setSelectedFile(undefined);
@@ -170,13 +119,12 @@ export function App() {
       setMessages([userMsg]);
       sessions.addMessage(session.id, userMsg);
 
-      // Get demo response
-      handleDemoResponse(prompt, session.id);
+      // Send via real API
+      handleSendMessage(prompt);
     }, 100);
-  }, [sessions, a2ui, handleDemoResponse, fs]);
+  }, [sessions, a2ui, handleSendMessage, fs]);
 
   const handleNewSession = useCallback(() => {
-    resetDemoState();
     a2ui.reset();
     fs.clear();
     setSelectedFile(undefined);
@@ -196,8 +144,8 @@ export function App() {
     }
   }, [sessions]);
 
-  const isStreaming = streaming.isStreaming || isDemoStreaming;
-  const currentStreamText = isDemoStreaming ? demoStreamText : streaming.streamText;
+  const isStreaming = streaming.isStreaming;
+  const currentStreamText = streaming.streamText;
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
   const hasFiles = fsFiles.length > 0;
 

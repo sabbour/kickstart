@@ -16,6 +16,21 @@ Local development setup for the Kickstart monorepo.
 
 ## Quick Start
 
+### Dev Container (easiest)
+
+Open the repo in a **GitHub Codespace** or **VS Code Dev Container**:
+
+1. **Codespace:** Click **Code → Codespaces → New codespace** on the GitHub repo page
+2. **VS Code:** Open the repo folder, then **Ctrl+Shift+P → Dev Containers: Reopen in Container**
+
+The container installs dependencies, builds packages, and starts the dev server automatically. The app opens at **http://localhost:4280**.
+
+Ports forwarded:
+- **4280** — SWA CLI (full app: frontend + API)
+- **5173** — Vite dev server (HMR, frontend only)
+
+### Manual Setup
+
 ```bash
 # 1. Install dependencies
 npm install
@@ -29,7 +44,7 @@ npm run build
 npm run dev
 ```
 
-This opens the app at **http://localhost:4280** with the static frontend and Azure Functions API running together.
+This starts **Vite** (port 5173) and **SWA CLI** (port 4280) in parallel using `concurrently`. The SWA CLI proxies to Vite for the frontend and serves Azure Functions for the API.
 
 ## Configure Azure OpenAI Credentials
 
@@ -54,13 +69,13 @@ The API needs Azure OpenAI credentials to power the conversation engine. Edit `p
 
 ## Running Just the Frontend
 
-If you're working on HTML/CSS/JS only and don't need the API:
+If you're working on React components and don't need the API:
 
 ```bash
-npm run dev:web
+npm run dev:vite
 ```
 
-This serves the static files at **http://localhost:4280** using `serve`. The app will detect the API is unavailable and fall back to demo mode automatically (yellow "Demo" badge in the chat header).
+This starts the Vite dev server at **http://localhost:5173** with hot module replacement (HMR). The app will detect the API is unavailable and fall back to demo mode automatically (yellow "Demo" badge in the chat header).
 
 ## Running Full Stack (Frontend + API)
 
@@ -68,11 +83,9 @@ This serves the static files at **http://localhost:4280** using `serve`. The app
 npm run dev
 ```
 
-This:
-1. Builds `@kickstart/core` (the API depends on it)
-2. Starts the SWA CLI, which serves:
-   - Static files from `packages/web/` at http://localhost:4280
-   - Azure Functions API from `packages/web/api/` at http://localhost:4280/api/*
+This runs both services in parallel:
+1. **Vite** dev server on port 5173 (React app with HMR)
+2. **SWA CLI** on port 4280 (proxies to Vite, serves Azure Functions API)
 
 The SWA CLI proxies `/api/*` requests to the Azure Functions host, just like the production Azure Static Web Apps environment.
 
@@ -101,11 +114,16 @@ E2E tests use their own dev server on port 4281 — they don't conflict with the
 ```
 packages/
 ├── core/           # TypeScript conversation engine
-├── web/            # Static HTML/CSS/JS frontend
+├── web/            # React 19 + Vite 6 frontend
 │   ├── api/        # Azure Functions API (TypeScript)
-│   ├── css/        # Stylesheets
-│   ├── js/         # Client-side modules
-│   └── index.html  # Entry point
+│   ├── src/        # React app
+│   │   ├── components/   # Chat, FileEditor, Landing
+│   │   ├── hooks/        # useA2UI, useChat
+│   │   ├── services/     # API client, demo scenarios, virtual-fs
+│   │   ├── catalog/      # Custom A2UI components
+│   │   └── vendor/       # Vendored A2UI v0.9
+│   ├── css/        # Stylesheets (Fluent 2, A2UI overrides)
+│   └── public/     # Static assets (copied to dist/)
 └── mcp-server/     # MCP server for IDE integration
 ```
 
@@ -113,8 +131,8 @@ packages/
 
 | Script | Description |
 |--------|-------------|
-| `npm run dev` | Full-stack dev server (SWA CLI: frontend + API) |
-| `npm run dev:web` | Frontend only (static file server, demo mode) |
+| `npm run dev` | Full-stack dev server (Vite + SWA CLI in parallel) |
+| `npm run dev:vite` | Vite dev server only (HMR, port 5173) |
 | `npm run build` | Build all packages |
 | `npm run api:build` | Build core + API only |
 | `npm test` | Unit/integration tests (vitest) |
