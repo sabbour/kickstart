@@ -450,13 +450,13 @@ const useStyles = makeStyles({
   },
   tabIntro: {
     margin: 0,
-    paddingTop: tokens.spacingVerticalM,
-    paddingBottom: tokens.spacingVerticalM,
+    paddingTop: tokens.spacingVerticalXS,
+    paddingBottom: tokens.spacingVerticalS,
     paddingLeft: tokens.spacingHorizontalL,
     paddingRight: tokens.spacingHorizontalL,
-    color: tokens.colorNeutralForeground2,
-    fontSize: tokens.fontSizeBase400,
-    lineHeight: tokens.lineHeightBase400,
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
     flexShrink: 0,
   },
 });
@@ -1008,13 +1008,13 @@ function PlaygroundInner() {
 
       {/* ---- Tab intro ---- */}
       {!(activeTab === 'create' && createMessages.length > 0) && (
-        <Text as="p" className={classes.tabIntro}>
-          {activeTab === 'create' && 'Build A2UI interfaces by describing what you want. The AI generates interactive components from your prompt.'}
-          {activeTab === 'gallery' && 'Explore example conversations and sample interactions. Click any card to see it in action.'}
-          {activeTab === 'components' && 'Advanced A2UI component demos showing complex layouts, forms, and interactive patterns.'}
-          {activeTab === 'icons' && 'Search the icon catalog used across Kickstart components. Click to copy the icon path.'}
-          {activeTab === 'widgets' && 'Your saved A2UI widgets. Create new ones from the Create tab or start blank.'}
-        </Text>
+        <Caption1 as="p" className={classes.tabIntro}>
+          {activeTab === 'create' && 'Describe what you want and the AI generates interactive components.'}
+          {activeTab === 'gallery' && 'Explore examples. Click any card to see it in action.'}
+          {activeTab === 'components' && 'Advanced component demos with layouts, forms, and interactive patterns.'}
+          {activeTab === 'icons' && 'Browse the icon catalog. Click to copy the path.'}
+          {activeTab === 'widgets' && 'Your saved widgets. Create new ones or start blank.'}
+        </Caption1>
       )}
 
       {/* ---- Tab 1: Create (empty state — no messages yet) ---- */}
@@ -1033,15 +1033,16 @@ function PlaygroundInner() {
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSend(createPrompt); }}
                 disabled={createStreaming.isStreaming}
               />
-              <Button
-                appearance="primary"
-                shape="circular"
-                size="medium"
+              <button
+                className="hero-send-btn"
+                aria-label="Create"
+                title="Create"
                 onClick={() => handleCreateSend(createPrompt)}
                 disabled={!createPrompt.trim() || createStreaming.isStreaming}
+                style={{ position: 'absolute', right: '8px' }}
               >
-                Create
-              </Button>
+                <img src="assets/icons/commands/go.svg" width="16" height="16" alt="" />
+              </button>
             </div>
             <div className={classes.createSubtext}>
               or{' '}

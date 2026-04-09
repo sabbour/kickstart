@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { MessageProcessor, Catalog } from '../vendor/a2ui/web_core/index';
 import { kickstartCatalog } from '../catalog/kickstart-catalog';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
@@ -30,7 +30,7 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   handlerRef.current = options.actionHandler;
 
   if (!processorRef.current) {
-    processorRef.current = new MessageProcessor<ReactComponentImplementation>(
+    const proc = new MessageProcessor<ReactComponentImplementation>(
       [kickstartCatalog as Catalog<ReactComponentImplementation>],
       (action: A2uiClientAction) => {
         if (handlerRef.current) {
@@ -40,12 +40,15 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
         }
       }
     );
-  }
 
-  const processor = processorRef.current;
-
-  useEffect(() => {
-    const sub = processor.onSurfaceCreated((surface) => {
+    // Bind surface lifecycle events to React state at creation time instead
+    // of in a useEffect. This avoids a React 19 StrictMode ordering bug:
+    // useEffect cleanups run in registration order, so useA2UI's cleanup
+    // (unsubscribe) fires BEFORE the consumer's cleanup (deleteSurface).
+    // That leaves disposed surfaces in React state because onSurfaceDeleted
+    // has no listener. By subscribing here and never unsubscribing, the
+    // listener stays active through StrictMode cleanup/remount cycles.
+    proc.onSurfaceCreated((surface) => {
       setSurfaces(prev => {
         const next = new Map(prev);
         next.set(surface.id, surface);
@@ -53,7 +56,7 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
       });
     });
 
-    const delSub = processor.onSurfaceDeleted((id) => {
+    proc.onSurfaceDeleted((id) => {
       setSurfaces(prev => {
         const next = new Map(prev);
         next.delete(id);
@@ -61,11 +64,10 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
       });
     });
 
-    return () => {
-      sub.unsubscribe();
-      delSub.unsubscribe();
-    };
-  }, [processor]);
+    processorRef.current = proc;
+  }
+
+  const processor = processorRef.current;
 
   const processMessages = useCallback((msgs: A2uiMsg[]): string[] => {
     const surfaceIds: string[] = [];
@@ -83,12 +85,11 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   }, [processor]);
 
   const reset = useCallback(() => {
-    // Delete all existing surfaces
-    for (const [id] of surfaces) {
+    for (const [id] of processor.model.surfacesMap) {
       try { processor.model.deleteSurface(id); } catch { /* ignore */ }
     }
     setSurfaces(new Map());
-  }, [processor, surfaces]);
+  }, [processor]);
 
   return { processor, surfaces, processMessages, getSurface, reset };
 }

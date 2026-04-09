@@ -143,9 +143,15 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
                 <path d="M10 2a4.5 4.5 0 00-1.5 8.74V12a.5.5 0 00.5.5h2a.5.5 0 00.5-.5v-1.26A4.502 4.502 0 0010 2zm-1 13a.5.5 0 00.5.5h1a.5.5 0 00.5-.5v-.5H9v.5zm-.5 1.5a.5.5 0 000 1h3a.5.5 0 000-1h-3z" />
               </svg>
             </span>
-            {!inputValue && (
+            {inspireLoading && <div className="hero-input-progress" />}
+            {!inputValue && !inspireLoading && (
               <span className={`hero-input-placeholder${placeholderVisible ? ' visible' : ''}`}>
                 {INSPIRATIONS[placeholderIdx]}
+              </span>
+            )}
+            {!inputValue && inspireLoading && (
+              <span className="hero-input-placeholder visible" style={{ opacity: 0.5 }}>
+                Generating idea...
               </span>
             )}
             <input

@@ -46,8 +46,14 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     width: '100%',
     padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
-    borderColor: tokens.colorBrandStroke1,
-    borderWidth: tokens.strokeWidthThick,
+    borderTopColor: tokens.colorBrandStroke1,
+    borderRightColor: tokens.colorBrandStroke1,
+    borderBottomColor: tokens.colorBrandStroke1,
+    borderLeftColor: tokens.colorBrandStroke1,
+    borderTopWidth: tokens.strokeWidthThick,
+    borderRightWidth: tokens.strokeWidthThick,
+    borderBottomWidth: tokens.strokeWidthThick,
+    borderLeftWidth: tokens.strokeWidthThick,
   },
 });
 

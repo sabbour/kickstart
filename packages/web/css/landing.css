@@ -216,6 +216,33 @@
   100% { opacity: 0.4; }
 }
 
+/* ---------- Hero Input Progress Bar ---------- */
+.hero-input-progress {
+  position: absolute;
+  bottom: 1px;
+  left: 1px;
+  right: 1px;
+  height: 2px;
+  border-radius: 0 0 var(--radius-medium) var(--radius-medium);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+.hero-input-progress::after {
+  content: '';
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: var(--color-brand-primary);
+  border-radius: 1px;
+  animation: heroInputSlide 1.2s ease-in-out infinite;
+}
+@keyframes heroInputSlide {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(200%); }
+  100% { transform: translateX(-100%); }
+}
+
 /* ---------- Framework Section ---------- */
 .framework-section {
   display: flex;

@@ -253,7 +253,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
 
         // Fire-and-forget: re-prompt the LLM with the result so the conversation stays coherent.
         Promise.resolve()
-          .then(() => (method as Function).call(connector, action.context))
+          .then(() => (method as (...args: unknown[]) => unknown).call(connector, action.context))
           .then((result: unknown) => {
             const resultSummary = result !== undefined
               ? `[API Result: ${connectorName}.${operation}] ${JSON.stringify(result)}`
