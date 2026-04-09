@@ -5,9 +5,31 @@
 - **Stack:** HTML/CSS/JS (Portal Prototyper framework), TypeScript, Azure/AKS
 - **Created:** 2026-04-08
 
+## Core Context
+
+Fry (Frontend Dev) has shipped ~16 major feature/polish work cycles across the Kickstart web surface. The stack evolved from vanilla Portal Prototyper → npm workspaces + React + Fluent UI v9 + A2UI. Key architectural wins:
+
+- **Web scaffold** (2026-04-08): `packages/web/` with hash-based SPA router, component factory pattern, A2UI renderer, Fluent 2 CSS tokens, zero build deps initially.
+- **6-phase conversation engine** (2026-07-22): Scripted demo flow (DISCOVER→DESIGN→GENERATE→REVIEW→HANDOFF→DEPLOY), A2UI custom renderers (RepoPicker, WorkflowStatus, CodespaceLink, AppOverview), K8s jargon hidden in phases 1-4.
+- **API client + streaming** (2026-07-25): `/api/converse` endpoint, ReadableStream/SSE support, smart fallback to demo mode on API unavailability, streaming UX (temporary chat bubbles), error recovery with Retry.
+- **Chat-first UX redesign** (2026-07-25): Removed Portal Prototyper shell, adopted 3-column layout (sessions | chat | file-viewer), file viewer with tabbed display and syntax highlighting, sessions sidebar for history.
+- **Fluent UI v9 migration** (2026-04-09): All 22 components (18 basic + 4 custom) migrated to Fluent UI v9. Created override catalog pattern to replace vendor components without modifying source. Zero raw HTML elements; all primitives via Fluent.
+- **Component audit trail**: Repeatedly audited for Fluent 2 compliance — spacing tokens, font tokens, color tokens, no hardcoded px/hex/rgb values. This became a pattern: every new component or fix includes audit verification.
+- **Playground interface** (2026-04-09): Added tabbed Preview|JSON view, scenario selector, real-time JSON generation for keyword-based scenarios, helper descriptions, all with Fluent UI components.
+- **Syntax highlighting** (2026-04-10): Added highlight.js to CodeBlock, registered 10+ languages, VS theme for Fluent 2 compatibility, useMemo optimization.
+- **Markdown component** (2026-04-10): Created react-markdown + remark-gfm component, all elements styled with Fluent 2 tokens via makeStyles, code blocks delegate to highlight.js.
+- **Session ID bridge** (2026-04-10): Implemented backendSessionId field mapping frontend UI sessions to backend conversation UUIDs. Solved LLM memory loss across messages.
+
+**Build status**: Vite build stable, 302 KB gzipped bundle, zero TypeScript errors.
+
+**Key dependencies**: @fluentui/react-components, react-markdown, remark-gfm, highlight.js, @a2ui/react (adapter).
+
+**Pattern**: All components use `createReactComponent(Api, renderFn)` adapter pattern, `makeStyles` for styling, Fluent tokens exclusively, no framework state (A2UI data model is source of truth).
+
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+
 
 ### 2026-04-08 — packages/web scaffold created
 - **Structure**: `packages/web/` contains `index.html`, `css/{theme,core,components}.css`, `js/{app,auth}.js`, `js/framework/{core,components,a2ui-renderer}.js`, `assets/{logo,favicon}.svg`, `package.json`, `staticwebapp.config.json`.
