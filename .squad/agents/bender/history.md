@@ -348,3 +348,31 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **Decision logged:** LLM tools in `packages/core/src/tools/`. `ToolRegistry` class + `defaultRegistry` singleton bootstrapped on module load. IntegrationKits call `defaultRegistry.register(tool)` to add domain-specific tools.
 - **Streaming SSE events:** `event: tool_call` (LLM requests tool), `event: tool_result` (tool executes). Frontend can render spinners.
 - **No converse.ts changes needed** — tool system self-contained within the registry and openai-client.ts.
+
+### 2026-04-09: B-11 — APIConnector Pattern
+
+- **APIConnector interface:** `packages/core/src/connectors/types.ts` — `name`, `baseUrl`, `authenticate()`, `request(method, path, body?, options?)`, `isAuthenticated()`. Works isomorphically (browser + Node/Azure Functions).
+- **APIConnectorRegistry:** `packages/core/src/connectors/registry.ts` — `register(connector)`, `get(name)`, `names()`, `has(name)`, `unregister(name)`. Singleton `defaultConnectorRegistry` exported.
+- **Concrete stubs:**
+  - `AzureARMConnector` (`name: "azure-arm"`) — `listResources(subscriptionId)`, `getResource(resourceId)`, `createResource(...)`. Returns stub Azure data. Auth via MSAL pending (B-14).
+  - `GitHubConnector` (`name: "github"`) — `getRepo(owner, repo)`, `createRepo(name, options)`, `listBranches(owner, repo)`. Returns stub GitHub data. Auth via Device Flow pending (B-14).
+  - `PricingConnector` (`name: "pricing"`) — `estimateCost(resources[])`. No auth needed. Stub pricing table baked in.
+- **React Context:** `packages/web/src/contexts/APIConnectorContext.tsx` — `APIConnectorProvider` (wraps app, initializes all 3 connectors), `useAPIConnector(name)`, `useAPIConnectorRegistry()`.
+- **main.tsx:** Wrapped `<App />` with `<APIConnectorProvider>`.
+- **App.tsx:** Calls `useAPIConnectorRegistry()` and passes `connectorRegistry` to `useActionDispatch`.
+- **useActionDispatch wired:** `api:` actions now route through the registry. Action name format: `api:{connectorName}.{operation}`. Connector method is called with `action.context`; result is serialized and re-prompts the LLM. Unknown connectors/methods fall back to LLM re-prompt with console.warn.
+- **tsconfig fix:** Added `"DOM"` to `lib` in `packages/core/tsconfig.json` — connectors need `fetch`, `Response`, `AbortSignal` types. Pre-existing tools didn't use these; no regression.
+- **Build:** 2833 modules, passes. **Tests:** 286/286 pass.
+- **Key files:** `packages/core/src/connectors/` (all new), `packages/web/src/contexts/APIConnectorContext.tsx` (new), `packages/web/src/hooks/useActionDispatch.ts`, `packages/web/src/App.tsx`, `packages/web/src/main.tsx`, `packages/core/tsconfig.json`
+
+### 2026-04-09: B-25 — Unify Action Model + Fix Manifest Bug
+
+- **Action model unified:** Extended `handleAction` in `packages/mcp-server/src/tools/action.ts` to support `reply`, `navigate`, `api`, and unknown action types in addition to existing `advance`, `skip`, `select`, `submit`.
+  - `reply` — validates `payload.message`, pushes to `session.messages` as user role, returns phase description without advancing.
+  - `navigate` — validates `payload.targetPhase` against `getPhaseOrder()`, directly assigns `session.currentPhase` (supports forward + backward navigation), returns A2UI phase indicator resource.
+  - `api` — returns stub/placeholder text response; phase unchanged. Ready for ServiceConnector wiring.
+  - unknown — returns error with list of valid types; no session mutation.
+- **Manifest bug fixed:** `generate-kubernetes-manifest.ts` now coerces `appName` via `String(args.appName)` before use — prevents `TypeError: app.name.toLowerCase is not a function` when LLM passes a number.
+- **Tests:** All 286 vitest tests pass including the Hermes numeric-appName test and all B-23 action-handler tests.
+- **Build:** Web bundle builds clean (1,323 kB). Playwright failures (60) are pre-existing system-level issue (`libnspr4.so` missing), not regressions.
+- **Key files changed:** `packages/mcp-server/src/tools/action.ts`, `packages/core/src/tools/generate-kubernetes-manifest.ts`
