@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Sparkle24Regular } from '@fluentui/react-icons';
 import type { Session } from '../types';
 
 const INSPIRATIONS = [
@@ -56,15 +57,39 @@ interface LandingProps {
   recentSessions: Session[];
   onResumeSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
+  onClearAllSessions: () => void;
 }
 
-export function Landing({ onStartChat, recentSessions, onResumeSession, onDeleteSession }: LandingProps) {
+export function Landing({ onStartChat, recentSessions, onResumeSession, onDeleteSession, onClearAllSessions }: LandingProps) {
   const [inputValue, setInputValue] = useState('');
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const [placeholderVisible, setPlaceholderVisible] = useState(true);
   const [isHiding, setIsHiding] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [inspireLoading, setInspireLoading] = useState(false);
+
+  const handleInspire = useCallback(async () => {
+    setInspireLoading(true);
+    try {
+      const res = await fetch('/api/inspirations');
+      if (!res.ok) throw new Error('API error');
+      const ideas = await res.json();
+      if (Array.isArray(ideas) && ideas.length > 0) {
+        const pick = ideas[Math.floor(Math.random() * ideas.length)];
+        setInputValue(pick.prompt);
+        inputRef.current?.focus();
+        return;
+      }
+    } catch {
+      // Fallback: pick from the local INSPIRATIONS array
+    } finally {
+      setInspireLoading(false);
+    }
+    const pick = INSPIRATIONS[Math.floor(Math.random() * INSPIRATIONS.length)];
+    setInputValue(pick);
+    inputRef.current?.focus();
+  }, []);
 
   // Rotate placeholder inspiration
   useEffect(() => {
@@ -134,6 +159,15 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
               onKeyDown={handleKeyDown}
             />
             <button
+              className={`hero-inspire-btn${inspireLoading ? ' loading' : ''}`}
+              aria-label="Inspire me"
+              title="Inspire me"
+              onClick={handleInspire}
+              disabled={inspireLoading}
+            >
+              <Sparkle24Regular />
+            </button>
+            <button
               className="hero-send-btn"
               aria-label="Send"
               title="Send"
@@ -151,7 +185,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
               <span className="track-card-icon">{track.icon}</span>
               <div className="track-card-title">{track.title}</div>
               <p className="track-card-desc">{track.desc}</p>
-              <button className="track-card-link" onClick={e => { e.stopPropagation(); handleSubmit(track.prompt); }}>
+              <button className="track-card-link" data-track={track.id} onClick={e => { e.stopPropagation(); handleSubmit(track.prompt); }}>
                 Get started →
               </button>
             </div>
@@ -166,6 +200,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
               <button
                 key={fw.id}
                 className="framework-pill"
+                data-framework={fw.label}
                 onClick={() => handleSubmit(`I want to build with ${fw.label}`)}
               >
                 {fw.label}
@@ -176,18 +211,29 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
 
         {/* Footer */}
         <footer className="landing-footer">
-          <div className="landing-footer-version">
-            Kickstart Preview · {(window as any).__BUILD_DATE__ || 'dev'}
+          <div className="landing-footer-powered">
+            <span>Powered by</span>
+            <img src="assets/icons/compute/aks-automatic.svg" alt="" width="16" height="16" />
+            <span>Azure Kubernetes Service (AKS) Automatic</span>
           </div>
           <div className="landing-footer-disclaimer">
             Kickstart uses AI. Check for mistakes.
+          </div>
+          <div className="landing-footer-meta">
+            <span className="landing-footer-version">
+              Kickstart Preview · {(window as any).__BUILD_DATE__ || 'dev'}
+            </span>
+            <a className="landing-footer-link" href="?playground">Playground</a>
           </div>
         </footer>
 
         {/* Recent Sessions */}
         {recentSessions.length > 0 && (
           <div className="recent-sessions-section">
-            <span className="recent-sessions-label">Recent</span>
+            <div className="recent-sessions-header">
+              <span className="recent-sessions-label">Recent</span>
+              <button className="recent-sessions-clear" onClick={onClearAllSessions}>Clear all</button>
+            </div>
             <div className="recent-sessions-list">
               {recentSessions.map(session => (
                 <div
