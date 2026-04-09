@@ -253,3 +253,15 @@
 - **openai-client.ts:** Added `responseFormat` option to `ChatCompletionOptions`, passed as `response_format` in both streaming and non-streaming calls.
 - **Tests:** 47 tests pass — 12 catalog (updated for 23 components), 12 phases, 12 machine, 11 new response-processor tests (JSON parsing, fallbacks, malformed messages, edge cases).
 - **Key files changed:** `packages/core/src/prompts/system-prompt.ts`, `packages/core/src/services/response-processor.ts` (NEW), `packages/core/src/engine/phases.ts`, `packages/core/src/catalog/kickstart-catalog.json`, `packages/core/src/catalog/index.ts`, `packages/web/api/src/functions/converse.ts`, `packages/web/api/src/lib/openai-client.ts`
+
+### 2025-07-26: B-23 — A2UI Action Dispatch System
+
+- **Problem:** A2UI components fired actions but the handler was `console.log` — a complete no-op. Buttons, forms, and selections did nothing.
+- **Solution:** Created `useActionDispatch` hook that routes A2UI `A2uiClientAction` events based on action name prefixes:
+  - Default / no prefix → `reply`: translates action to natural language message (`[Action: {name}] {context}`) and re-prompts the LLM (per decision F17)
+  - `navigate:` / `nav:` prefix → `navigate`: fires optional local callback then re-prompts LLM with navigation intent
+  - `api:` prefix → `api`: stubbed for future ServiceConnector, falls back to LLM re-prompt
+- **Architecture:** `useActionDispatch` returns an `ActionHandler` function. `useA2UI` now accepts an optional `actionHandler` via `A2UIOptions`. The handler is stored in a ref inside `useA2UI` so the `MessageProcessor` (created once) always calls the latest handler version. Playground callers pass no handler (falls back to console.log).
+- **Key pattern:** Actions re-prompt the LLM (not direct dispatch). The LLM stays in full control of all state transitions. Action context is serialized as `key: value` pairs in the message.
+- **Circular dep avoidance:** `useActionDispatch` uses `useRef` for options so it can reference `handleSendMessage` before it's defined in the render function. The closure only executes on user interaction (post-render).
+- **Key files:** `packages/web/src/hooks/useActionDispatch.ts` (NEW), `packages/web/src/hooks/useA2UI.ts`, `packages/web/src/App.tsx`

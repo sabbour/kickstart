@@ -7,6 +7,7 @@ import { SessionsSidebar } from './components/Sidebar/SessionsSidebar';
 import { FileEditor } from './components/FileEditor/FileEditor';
 import { Playground } from './pages/Playground';
 import { useA2UI } from './hooks/useA2UI';
+import { useActionDispatch } from './hooks/useActionDispatch';
 import { useSessions } from './hooks/useSessions';
 import { useStreaming } from './hooks/useStreaming';
 import { useMockStreaming } from './hooks/useMockStreaming';
@@ -24,7 +25,11 @@ export function App() {
   const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(mockEnabled ? true : null);
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
 
-  const a2ui = useA2UI();
+  const actionHandler = useActionDispatch({
+    onSendMessage: (msg) => handleSendMessage(msg),
+  });
+
+  const a2ui = useA2UI({ actionHandler });
   const sessions = useSessions();
   const streaming = useStreaming();
   const mockStreaming = useMockStreaming();
