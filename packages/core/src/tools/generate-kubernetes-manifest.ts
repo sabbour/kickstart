@@ -8,6 +8,7 @@
 import type { Tool } from "../types.js";
 import { generateKubernetesManifests } from "../generators/index.js";
 import type { AppDefinition, AzureContext } from "../types.js";
+import { defaultArtifactStore } from "../artifacts/index.js";
 
 interface GenerateKubernetesManifestArgs {
   appName: string;
@@ -118,6 +119,14 @@ export const generateKubernetesManifest: Tool<GenerateKubernetesManifestArgs> = 
     };
 
     const output = generateKubernetesManifests({ app, azure });
+
+    // Persist each generated file into the shared artifact store
+    for (const file of output.files) {
+      defaultArtifactStore.put(file.path, file.content, {
+        language: file.language,
+        metadata: { generator: output.generator, appName: safeAppName },
+      });
+    }
 
     return {
       generator: output.generator,

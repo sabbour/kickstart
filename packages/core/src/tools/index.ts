@@ -14,6 +14,8 @@ export { azureResourceGet } from "./azure-resource-get.js";
 export { githubRepoInfo } from "./github-repo-info.js";
 export { generateKubernetesManifest } from "./generate-kubernetes-manifest.js";
 export { estimateCost } from "./estimate-cost.js";
+export { listArtifacts } from "./list-artifacts.js";
+export { getArtifact } from "./get-artifact.js";
 
 // Bootstrap the default registry with all built-in tools
 import { defaultRegistry } from "./registry.js";
@@ -22,6 +24,8 @@ import { azureResourceGet } from "./azure-resource-get.js";
 import { githubRepoInfo } from "./github-repo-info.js";
 import { generateKubernetesManifest } from "./generate-kubernetes-manifest.js";
 import { estimateCost } from "./estimate-cost.js";
+import { listArtifacts } from "./list-artifacts.js";
+import { getArtifact } from "./get-artifact.js";
 
 defaultRegistry.registerAll([
   azureResourceList,
@@ -29,4 +33,6 @@ defaultRegistry.registerAll([
   githubRepoInfo,
   generateKubernetesManifest,
   estimateCost,
+  listArtifacts,
+  getArtifact,
 ]);

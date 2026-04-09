@@ -15,6 +15,7 @@
     "@preact/signals-core": "^1.13.0",
     "date-fns": "^4.1.0",
     "highlight.js": "^11.11.1",
+    "jszip": "^3.10.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
