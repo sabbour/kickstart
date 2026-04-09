@@ -1,30 +1,31 @@
 /**
- * Playground — standalone A2UI test harness (split-pane layout).
+ * Playground — A2UI Gallery (masonry card layout).
  *
  * Access via ?playground URL parameter.
- * Left panel:  collapsible scenario explorer + JSON editor
- * Right panel: rendered surfaces + activity log
+ * Gallery view: All scenarios rendered as masonry cards
+ * Create view: Custom JSON editor
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo, memo } from 'react';
 import {
-  Button, CounterBadge,
+  Button, CounterBadge, SearchBox,
   Card, CardHeader,
-  Accordion, AccordionItem, AccordionHeader, AccordionPanel,
   Textarea, Text, Subtitle2, Caption1, Body1Strong,
   MessageBar, MessageBarBody,
   TabList, Tab,
+  Dialog, DialogTrigger, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions,
   makeStyles, tokens,
 } from '@fluentui/react-components';
+import { Dismiss24Regular } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import { getDemoResponse, resetDemoState } from '../services/demo-scenarios';
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
 import type { A2uiMsg } from '../types';
+import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
+import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
 import {
   KICKSTART_SCENARIOS,
   CONTROL_SCENARIOS,
-  SCENARIO_GROUPS,
-  getGroupedScenarios,
   type ScenarioDef,
 } from './playground-scenarios';
 
@@ -53,78 +54,69 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalS,
     minWidth: 0,
   },
+  topbarCenter: {
+    flex: 1,
+    maxWidth: '400px',
+  },
   topbarActions: {
     display: 'flex',
     gap: tokens.spacingHorizontalXS,
     flexShrink: 0,
   },
-  accordionHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  sectionCount: {
-    color: tokens.colorNeutralForeground3,
-  },
-  scenarioBtn: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1px',
-    paddingTop: tokens.spacingVerticalXS,
-    paddingBottom: tokens.spacingVerticalXS,
+  tabsContainer: {
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
     paddingLeft: tokens.spacingHorizontalL,
-    paddingRight: tokens.spacingHorizontalS,
-    border: 'none',
-    borderRadius: tokens.borderRadiusSmall,
-    backgroundColor: 'transparent',
+    paddingRight: tokens.spacingHorizontalL,
+    flexShrink: 0,
+  },
+  galleryCard: {
+    backgroundColor: `rgba(${tokens.colorNeutralBackground1}, 0.8)`,
+    borderRadius: tokens.borderRadiusXLarge,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
     cursor: 'pointer',
-    textAlign: 'left' as const,
-    width: '100%',
-    fontFamily: tokens.fontFamilyBase,
+    transition: 'box-shadow 0.2s ease, transform 0.1s ease',
+    breakInside: 'avoid' as const,
+    marginBottom: tokens.spacingVerticalM,
     ':hover': {
-      backgroundColor: tokens.colorNeutralBackground1Hover,
-    },
-    ':active': {
-      backgroundColor: tokens.colorBrandBackground2,
+      boxShadow: tokens.shadow8,
+      transform: 'translateY(-2px)',
     },
   },
-  scenarioLabel: {
-    fontSize: tokens.fontSizeBase300,
-    fontWeight: tokens.fontWeightSemibold,
-    fontFamily: tokens.fontFamilyBase,
-    color: tokens.colorNeutralForeground1,
-    lineHeight: tokens.lineHeightBase300,
-  },
-  scenarioDesc: {
-    fontSize: tokens.fontSizeBase200,
-    fontFamily: tokens.fontFamilyBase,
-    color: tokens.colorNeutralForeground2,
-    lineHeight: tokens.lineHeightBase200,
-  },
-  sectionItems: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXXS,
-    paddingTop: tokens.spacingVerticalXXS,
-    paddingBottom: tokens.spacingVerticalS,
-  },
-  accordionCaption: {
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-  },
-  scenarioHelp: {
+  cardLabel: {
     paddingTop: tokens.spacingVerticalS,
-    paddingBottom: tokens.spacingVerticalS,
     paddingLeft: tokens.spacingHorizontalM,
     paddingRight: tokens.spacingHorizontalM,
     color: tokens.colorNeutralForeground3,
-    lineHeight: tokens.lineHeightBase200,
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    fontSize: tokens.fontSizeBase200,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.04em',
   },
-  jsonArea: {
-    paddingTop: tokens.spacingVerticalXXS,
-    paddingBottom: tokens.spacingVerticalS,
+  cardBody: {
+    padding: tokens.spacingHorizontalM,
+  },
+  dialogContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  jsonCodeBlock: {
+    fontFamily: tokens.fontFamilyMonospace,
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase400,
+    whiteSpace: 'pre' as const,
+    color: tokens.colorNeutralForeground1,
+    backgroundColor: tokens.colorNeutralBackground3,
+    padding: tokens.spacingVerticalM,
+    borderRadius: tokens.borderRadiusMedium,
+    overflowX: 'auto',
+    maxHeight: '400px',
+    overflow: 'auto',
+  },
+  jsonEditorContainer: {
+    padding: tokens.spacingHorizontalXL,
+    maxWidth: '800px',
+    margin: '0 auto',
   },
   jsonTextarea: {
     width: '100%',
@@ -133,16 +125,10 @@ const useStyles = makeStyles({
   jsonActions: {
     display: 'flex',
     gap: tokens.spacingHorizontalXS,
-    marginTop: tokens.spacingVerticalXS,
+    marginTop: tokens.spacingVerticalM,
   },
   errorMessage: {
     marginTop: tokens.spacingVerticalXS,
-  },
-  surfaceBody: {
-    padding: tokens.spacingHorizontalL,
-  },
-  surfaceIdText: {
-    fontFamily: tokens.fontFamilyMonospace,
   },
   emptyState: {
     textAlign: 'center' as const,
@@ -156,119 +142,97 @@ const useStyles = makeStyles({
     marginBottom: tokens.spacingVerticalM,
     opacity: 0.4,
   },
-  logSection: {
-    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
-    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalXL}`,
-    backgroundColor: tokens.colorNeutralBackground1,
-    flexShrink: 0,
+  dialogSurface: {
+    maxWidth: '90vw',
+    width: '800px',
   },
-  logItems: {
-    display: 'flex',
-    flexWrap: 'wrap' as const,
-    gap: tokens.spacingHorizontalXXS,
-    marginTop: tokens.spacingVerticalXS,
-  },
-  logItem: {
-    paddingTop: '2px',
-    paddingBottom: '2px',
-    paddingLeft: tokens.spacingHorizontalS,
-    paddingRight: tokens.spacingHorizontalS,
-    borderRadius: tokens.borderRadiusSmall,
-    backgroundColor: tokens.colorNeutralBackground3,
-    fontSize: tokens.fontSizeBase200,
-    fontFamily: tokens.fontFamilyBase,
-    color: tokens.colorNeutralForeground2,
-  },
-  tabsContainer: {
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground1,
-    paddingLeft: tokens.spacingHorizontalL,
-    paddingRight: tokens.spacingHorizontalL,
-    flexShrink: 0,
-  },
-  jsonViewerContainer: {
-    flex: 1,
-    overflow: 'auto',
-    padding: tokens.spacingHorizontalL,
-  },
-  jsonCodeBlock: {
-    fontFamily: tokens.fontFamilyMonospace,
-    fontSize: tokens.fontSizeBase300,
-    lineHeight: tokens.lineHeightBase400,
-    whiteSpace: 'pre' as const,
-    color: tokens.colorNeutralForeground1,
-    backgroundColor: tokens.colorNeutralBackground3,
-    padding: tokens.spacingVerticalM,
-    borderRadius: tokens.borderRadiusMedium,
-    overflowX: 'auto',
-  },
-  activityHeader: {
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-    fontSize: tokens.fontSizeBase200,
+  detailTabs: {
+    marginBottom: tokens.spacingVerticalM,
   },
 });
 
-export function Playground() {
+// ---- GalleryCard Component ----
+interface GalleryCardProps {
+  scenario: ScenarioDef;
+  onCardClick: (scenario: ScenarioDef, surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>) => void;
+}
+
+const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
   const classes = useStyles();
   const a2ui = useA2UI();
-  const [activityLog, setActivityLog] = useState<string[]>([]);
-  const [jsonInput, setJsonInput] = useState('');
-  const [jsonError, setJsonError] = useState('');
-  const customCounter = useRef(0);
-  const [selectedTab, setSelectedTab] = useState<'preview' | 'json'>('preview');
-  const [selectedScenario, setSelectedScenario] = useState<ScenarioDef | null>(null);
 
-  // Accordion open state: scenario groups default open, "custom-json" starts closed
-  const [openItems, setOpenItems] = useState<string[]>(() => [...SCENARIO_GROUPS]);
-
-  // ---- Scenario injection ----
-
-  const injectScenario = useCallback((scenario: ScenarioDef) => {
-    setSelectedScenario(scenario);
-    setSelectedTab('preview');
-    
+  // Generate scenario surfaces on mount
+  useMemo(() => {
     if (scenario.generate) {
       const msgs = scenario.generate();
       a2ui.processMessages(msgs);
-      setActivityLog(prev => [...prev, scenario.label]);
-      return;
+    } else if (scenario.keyword) {
+      const keyword = scenario.keyword;
+      if (keyword === '__welcome__') {
+        resetDemoState();
+        const resp = getDemoResponse('anything');
+        a2ui.processMessages(resp.a2uiMessages);
+      } else {
+        resetDemoState();
+        getDemoResponse('skip'); // burn turn 1 (WELCOME)
+        const resp = getDemoResponse(keyword);
+        a2ui.processMessages(resp.a2uiMessages);
+      }
     }
+  }, [scenario, a2ui]);
 
-    const keyword = scenario.keyword!;
-    if (keyword === '__welcome__') {
-      resetDemoState();
-      const resp = getDemoResponse('anything');
-      a2ui.processMessages(resp.a2uiMessages);
-    } else {
-      resetDemoState();
-      getDemoResponse('skip'); // burn turn 1 (WELCOME)
-      const resp = getDemoResponse(keyword);
-      a2ui.processMessages(resp.a2uiMessages);
-    }
-    setActivityLog(prev => [...prev, scenario.label]);
-  }, [a2ui]);
+  const surfaceEntries = Array.from(a2ui.surfaces.entries());
 
-  const injectAll = useCallback(() => {
-    a2ui.reset();
-    setActivityLog([]);
-    ALL_SCENARIOS.forEach((s, i) => {
-      setTimeout(() => injectScenario(s), i * 80);
-    });
-  }, [a2ui, injectScenario]);
+  return (
+    <div className={classes.galleryCard} onClick={() => onCardClick(scenario, a2ui.surfaces)}>
+      <Caption1 className={classes.cardLabel}>{scenario.label}</Caption1>
+      <div className={classes.cardBody}>
+        {surfaceEntries.map(([id, surface]) => (
+          <div key={id} className="a2ui-component">
+            <A2UISurfaceWrapper surface={surface} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
 
-  const clearAll = useCallback(() => {
-    a2ui.reset();
-    setActivityLog([]);
-    setJsonInput('');
-    setJsonError('');
-    setSelectedScenario(null);
-    setSelectedTab('preview');
-    resetDemoState();
-  }, [a2ui]);
+GalleryCard.displayName = 'GalleryCard';
 
-  // ---- JSON editor ----
+// ---- Main Playground Component ----
 
+export function Playground() {
+  const classes = useStyles();
+  const [activeView, setActiveView] = useState<'gallery' | 'create'>('gallery');
+  const [filterQuery, setFilterQuery] = useState('');
+  const [jsonInput, setJsonInput] = useState('');
+  const [jsonError, setJsonError] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState<ScenarioDef | null>(null);
+  const [selectedSurfaces, setSelectedSurfaces] = useState<Map<string, SurfaceModel<ReactComponentImplementation>>>(new Map());
+  const [detailTab, setDetailTab] = useState<'preview' | 'json'>('preview');
+  const customCounter = useRef(0);
+  const customA2ui = useA2UI(); // For custom JSON editor
+
+  // Filter scenarios
+  const filteredScenarios = useMemo(() => {
+    if (!filterQuery.trim()) return ALL_SCENARIOS;
+    const query = filterQuery.toLowerCase();
+    return ALL_SCENARIOS.filter(s => 
+      s.label.toLowerCase().includes(query) || 
+      s.description.toLowerCase().includes(query)
+    );
+  }, [filterQuery]);
+
+  // Handle card click → open detail dialog
+  const handleCardClick = useCallback((scenario: ScenarioDef, surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>) => {
+    setSelectedScenario(scenario);
+    setSelectedSurfaces(surfaces);
+    setDetailTab('preview');
+    setDialogOpen(true);
+  }, []);
+
+  // Handle custom JSON render
   const handleJsonRender = useCallback(() => {
     setJsonError('');
     try {
@@ -277,20 +241,23 @@ export function Playground() {
       for (const m of msgs) {
         if (!m.version) throw new Error('Each message must have a "version" field');
       }
-      a2ui.processMessages(msgs);
+      customA2ui.processMessages(msgs);
       customCounter.current++;
-      setActivityLog(prev => [...prev, `Custom #${customCounter.current}`]);
+      setJsonInput('');
     } catch (err: any) {
       setJsonError(err.message || 'Invalid JSON');
     }
-  }, [jsonInput, a2ui]);
+  }, [jsonInput, customA2ui]);
 
-  // ---- Data ----
+  // Handle clear all
+  const handleClearAll = useCallback(() => {
+    customA2ui.reset();
+    setJsonInput('');
+    setJsonError('');
+    resetDemoState();
+  }, [customA2ui]);
 
-  const surfaceEntries = Array.from(a2ui.surfaces.entries());
-  const grouped = getGroupedScenarios();
-
-  // Get JSON for the selected scenario (including keyword-based ones)
+  // Get JSON for selected scenario
   const getScenarioJson = useCallback(() => {
     if (!selectedScenario) return '';
     
@@ -299,9 +266,6 @@ export function Playground() {
       return JSON.stringify(msgs, null, 2);
     }
 
-    // For keyword-based scenarios, run the demo engine to get real A2UI messages.
-    // injectScenario already ran resetDemoState(), so the state is already set;
-    // we reset + replay here to capture the messages without side-effect concerns.
     const keyword = selectedScenario.keyword!;
     let msgs: A2uiMsg[];
     if (keyword === '__welcome__') {
@@ -315,155 +279,115 @@ export function Playground() {
     return JSON.stringify(msgs, null, 2);
   }, [selectedScenario]);
 
+  const customSurfaceEntries = Array.from(customA2ui.surfaces.entries());
+
   return (
     <div className={`playground-page ${classes.playgroundPage}`}>
       {/* ---- Top bar ---- */}
       <div className={classes.topbar}>
         <div className={classes.topbarLeft}>
-          <Subtitle2>A2UI Playground</Subtitle2>
+          <Subtitle2>A2UI Gallery</Subtitle2>
           <CounterBadge
-            count={surfaceEntries.length}
+            count={activeView === 'gallery' ? filteredScenarios.length : customSurfaceEntries.length}
             appearance="filled"
             color="brand"
             overflowCount={999}
           />
         </div>
+        {activeView === 'gallery' && (
+          <div className={classes.topbarCenter}>
+            <SearchBox
+              placeholder="Filter scenarios..."
+              value={filterQuery}
+              onChange={(_e, data) => setFilterQuery(data.value)}
+              size="small"
+            />
+          </div>
+        )}
         <div className={classes.topbarActions}>
-          <Button appearance="primary" size="small" onClick={injectAll}>Load All</Button>
-          <Button appearance="outline" size="small" onClick={clearAll}>Clear All</Button>
+          {activeView === 'create' && (
+            <Button appearance="outline" size="small" onClick={handleClearAll}>Clear All</Button>
+          )}
         </div>
       </div>
 
-      {/* ---- Split pane ---- */}
-      <div className="playground-split">
-        {/* ---- LEFT: scenario explorer ---- */}
-        <div className="playground-left">
-          <div className="playground-left-scroll">
-            <div className={classes.scenarioHelp}>
-              <Caption1>
-                <strong>Kickstart Scenarios</strong> replay the app's guided demo flow (Welcome → Deploy).{' '}
-                <strong>Basic Controls</strong> render individual A2UI components in isolation.{' '}
-                Click any scenario to preview it; switch to <strong>JSON</strong> tab to inspect the raw A2UI messages.
-              </Caption1>
-            </div>
-            <Accordion
-              multiple
-              openItems={openItems}
-              onToggle={(_e, data) => setOpenItems(data.openItems as string[])}
-            >
-              {SCENARIO_GROUPS.map(group => {
-                const scenarios = grouped.get(group) || [];
-                return (
-                  <AccordionItem key={group} value={group}>
-                    <AccordionHeader size="small">
-                      <div className={classes.accordionHeader}>
-                        <Caption1 weight="semibold" className={classes.accordionCaption}>
-                          {group}
-                        </Caption1>
-                        <Caption1 className={classes.sectionCount}>{scenarios.length}</Caption1>
-                      </div>
-                    </AccordionHeader>
-                    <AccordionPanel>
-                      <div className={classes.sectionItems}>
-                        {scenarios.map(s => (
-                          <button
-                            key={s.id}
-                            className={classes.scenarioBtn}
-                            onClick={() => injectScenario(s)}
-                            title={s.description}
-                          >
-                            <span className={classes.scenarioLabel}>{s.label}</span>
-                            <span className={classes.scenarioDesc}>{s.description}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </AccordionPanel>
-                  </AccordionItem>
-                );
-              })}
+      {/* ---- Tabs: Gallery / Create ---- */}
+      <div className={classes.tabsContainer}>
+        <TabList
+          selectedValue={activeView}
+          onTabSelect={(_e, data) => setActiveView(data.value as 'gallery' | 'create')}
+          size="medium"
+        >
+          <Tab value="gallery">Gallery</Tab>
+          <Tab value="create">Create</Tab>
+        </TabList>
+      </div>
 
-              {/* JSON editor */}
-              <AccordionItem value="custom-json">
-                <AccordionHeader size="small">
-                  <Caption1 weight="semibold" className={classes.accordionCaption}>
-                    Custom JSON
-                  </Caption1>
-                </AccordionHeader>
-                <AccordionPanel>
-                  <div className={classes.jsonArea}>
-                    <Textarea
-                      className={classes.jsonTextarea}
-                      value={jsonInput}
-                      onChange={(_e, data) => setJsonInput(data.value)}
-                      placeholder={JSON.stringify([
-                        { version: 'v0.9', createSurface: { surfaceId: 'my-test', catalogId: 'kickstart' } },
-                        { version: 'v0.9', updateComponents: { surfaceId: 'my-test', components: [
-                          { id: 'root', component: 'Column', children: ['t1'] },
-                          { id: 't1', component: 'Text', text: 'Hello!', variant: 'h2' },
-                        ] } },
-                      ], null, 2)}
-                      rows={8}
-                      resize="vertical"
-                      spellCheck={false}
-                    />
-                    {jsonError && (
-                      <MessageBar intent="error" className={classes.errorMessage}>
-                        <MessageBarBody>{jsonError}</MessageBarBody>
-                      </MessageBar>
-                    )}
-                    <div className={classes.jsonActions}>
-                      <Button
-                        appearance="primary"
-                        size="small"
-                        onClick={handleJsonRender}
-                        disabled={!jsonInput.trim()}
-                      >
-                        Render JSON
-                      </Button>
-                    </div>
-                  </div>
-                </AccordionPanel>
-              </AccordionItem>
-            </Accordion>
+      {/* ---- Gallery View ---- */}
+      {activeView === 'gallery' && (
+        <div className="playground-gallery-scroll">
+          <div className="playground-gallery">
+            {filteredScenarios.map(scenario => (
+              <GalleryCard key={scenario.id} scenario={scenario} onCardClick={handleCardClick} />
+            ))}
           </div>
         </div>
+      )}
 
-        {/* ---- RIGHT: rendered output ---- */}
-        <div className="playground-right">
-          {/* Tabs for Preview / JSON */}
-          {selectedScenario && (
-            <div className={classes.tabsContainer}>
-              <TabList
-                selectedValue={selectedTab}
-                onTabSelect={(_e, data) => setSelectedTab(data.value as 'preview' | 'json')}
-                size="small"
+      {/* ---- Create View (Custom JSON Editor) ---- */}
+      {activeView === 'create' && (
+        <div className="playground-create-scroll">
+          <div className={classes.jsonEditorContainer}>
+            <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
+              Custom A2UI JSON
+            </Body1Strong>
+            <Caption1 style={{ marginBottom: tokens.spacingVerticalM, color: tokens.colorNeutralForeground3 }}>
+              Paste A2UI JSON messages below and click "Render JSON" to preview them.
+            </Caption1>
+            <Textarea
+              className={classes.jsonTextarea}
+              value={jsonInput}
+              onChange={(_e, data) => setJsonInput(data.value)}
+              placeholder={JSON.stringify([
+                { version: 'v0.9', createSurface: { surfaceId: 'my-test', catalogId: 'kickstart' } },
+                { version: 'v0.9', updateComponents: { surfaceId: 'my-test', components: [
+                  { id: 'root', component: 'Column', children: ['t1'] },
+                  { id: 't1', component: 'Text', text: 'Hello!', variant: 'h2' },
+                ] } },
+              ], null, 2)}
+              rows={12}
+              resize="vertical"
+              spellCheck={false}
+            />
+            {jsonError && (
+              <MessageBar intent="error" className={classes.errorMessage}>
+                <MessageBarBody>{jsonError}</MessageBarBody>
+              </MessageBar>
+            )}
+            <div className={classes.jsonActions}>
+              <Button
+                appearance="primary"
+                size="medium"
+                onClick={handleJsonRender}
+                disabled={!jsonInput.trim()}
               >
-                <Tab value="preview">Preview</Tab>
-                <Tab value="json">JSON</Tab>
-              </TabList>
+                Render JSON
+              </Button>
             </div>
-          )}
 
-          {selectedTab === 'preview' ? (
-            <div className="playground-right-scroll">
-              {surfaceEntries.length === 0 ? (
-                <div className={classes.emptyState}>
-                  <div className={classes.emptyIcon}>⬡</div>
-                  <Text>No surfaces yet. Click a scenario or paste JSON to get started.</Text>
-                </div>
-              ) : (
+            {/* Rendered Custom Surfaces */}
+            {customSurfaceEntries.length > 0 && (
+              <div style={{ marginTop: tokens.spacingVerticalXL }}>
+                <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
+                  Rendered Surfaces ({customSurfaceEntries.length})
+                </Body1Strong>
                 <div className="playground-surfaces">
-                  {surfaceEntries.map(([id, surface]) => (
-                    <Card key={id} appearance="outline">
+                  {customSurfaceEntries.map(([id, surface]) => (
+                    <Card key={id} appearance="outline" style={{ marginBottom: tokens.spacingVerticalM }}>
                       <CardHeader
-                        header={
-                          <Caption1 className={classes.surfaceIdText}>{id}</Caption1>
-                        }
-                        description={
-                          <Caption1>{id.replace(/-\d+$/, '')}</Caption1>
-                        }
+                        header={<Caption1 style={{ fontFamily: tokens.fontFamilyMonospace }}>{id}</Caption1>}
                       />
-                      <div className={classes.surfaceBody}>
+                      <div className={classes.cardBody}>
                         <div className="a2ui-component">
                           <A2UISurfaceWrapper surface={surface} />
                         </div>
@@ -471,46 +395,67 @@ export function Playground() {
                     </Card>
                   ))}
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className={classes.jsonViewerContainer}>
-              {selectedScenario ? (
-                <Card appearance="outline">
-                  <CardHeader
-                    header={<Body1Strong>{selectedScenario.label} — A2UI JSON</Body1Strong>}
-                    description={<Caption1>{selectedScenario.description}</Caption1>}
-                  />
-                  <div className={classes.surfaceBody}>
-                    <div className={classes.jsonCodeBlock}>
-                      {getScenarioJson()}
-                    </div>
-                  </div>
-                </Card>
-              ) : (
-                <div className={classes.emptyState}>
-                  <div className={classes.emptyIcon}>📄</div>
-                  <Text>Select a scenario to view its JSON definition.</Text>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Activity log */}
-          {activityLog.length > 0 && (
-            <div className={classes.logSection}>
-              <Body1Strong className={classes.activityHeader}>
-                Activity Log
-              </Body1Strong>
-              <div className={classes.logItems}>
-                {activityLog.map((s, i) => (
-                  <span key={i} className={classes.logItem}>✓ {s}</span>
-                ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ---- Detail Dialog ---- */}
+      <Dialog open={dialogOpen} onOpenChange={(_e, data) => setDialogOpen(data.open)}>
+        <DialogSurface className={classes.dialogSurface}>
+          <DialogBody>
+            <DialogTitle
+              action={
+                <Button
+                  appearance="subtle"
+                  icon={<Dismiss24Regular />}
+                  onClick={() => setDialogOpen(false)}
+                />
+              }
+            >
+              {selectedScenario?.label}
+            </DialogTitle>
+            <DialogContent>
+              <div className={classes.dialogContent}>
+                <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                  {selectedScenario?.description}
+                </Caption1>
+
+                {/* Detail Tabs */}
+                <TabList
+                  selectedValue={detailTab}
+                  onTabSelect={(_e, data) => setDetailTab(data.value as 'preview' | 'json')}
+                  size="small"
+                  className={classes.detailTabs}
+                >
+                  <Tab value="preview">Preview</Tab>
+                  <Tab value="json">JSON</Tab>
+                </TabList>
+
+                {detailTab === 'preview' ? (
+                  <div>
+                    {Array.from(selectedSurfaces.entries()).map(([id, surface]) => (
+                      <div key={id} style={{ marginBottom: tokens.spacingVerticalM }}>
+                        <div className="a2ui-component">
+                          <A2UISurfaceWrapper surface={surface} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={classes.jsonCodeBlock}>
+                    {getScenarioJson()}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => setDialogOpen(false)}>Close</Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
     </div>
   );
 }

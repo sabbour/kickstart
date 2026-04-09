@@ -329,6 +329,266 @@ const customProgressSteps = (): A2uiMsg[] => {
 };
 
 // ---------------------------------------------------------------------------
+// Advanced Scenarios — Data Binding, Events, Lifecycle, Dynamic Patterns
+// ---------------------------------------------------------------------------
+
+// --- Data Binding ---
+
+const dataBindingBasic = (): A2uiMsg[] => {
+  const sid = uid('databind-basic');
+  return [
+    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/app/name', value: 'My Web App' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/app/region', value: 'East US 2' } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
+      { id: 'root', component: 'Column', children: ['heading', 'name-display', 'region-display'], gap: 'medium' },
+      { id: 'heading', component: 'Text', text: 'Data Binding Demo', variant: 'h3' },
+      { id: 'name-display', component: 'Text', text: { path: '/app/name' }, variant: 'body1' },
+      { id: 'region-display', component: 'Text', text: { path: '/app/region' }, variant: 'body2' },
+    ] } } as A2uiMsg,
+  ];
+};
+
+const dataBindingForm = (): A2uiMsg[] => {
+  const sid = uid('databind-form');
+  return [
+    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/config/appName', value: 'web-api' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/config/replicas', value: 3 } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/config/region', value: 'westus2' } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
+      { id: 'root', component: 'Column', children: ['heading', 'form-card', 'summary-card'], gap: 'medium' },
+      { id: 'heading', component: 'Text', text: 'Data-Bound Form', variant: 'h3' },
+      { id: 'form-card', component: 'Card', children: ['form-col'], title: 'Configuration' },
+      { id: 'form-col', component: 'Column', children: ['app-input', 'region-input', 'replica-slider'], gap: 'medium' },
+      { id: 'app-input', component: 'TextField', label: 'App Name', value: { path: '/config/appName' } },
+      { id: 'region-input', component: 'TextField', label: 'Region', value: { path: '/config/region' } },
+      { id: 'replica-slider', component: 'Slider', label: 'Replicas', min: 1, max: 10, value: { path: '/config/replicas' } },
+      { id: 'summary-card', component: 'Card', children: ['summary-col'], title: 'Summary' },
+      { id: 'summary-col', component: 'Column', children: ['summary-app', 'summary-region', 'summary-replicas'], gap: 'small' },
+      { id: 'summary-app', component: 'Text', text: { path: '/config/appName' }, variant: 'body1' },
+      { id: 'summary-region', component: 'Text', text: { path: '/config/region' }, variant: 'body2' },
+      { id: 'summary-replicas', component: 'Text', text: { path: '/config/replicas' }, variant: 'body2' },
+    ] } } as A2uiMsg,
+  ];
+};
+
+const dataBindingSequence = (): A2uiMsg[] => {
+  const sid = uid('databind-sequence');
+  return [
+    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
+      { id: 'root', component: 'Column', children: ['heading', 'status-card'], gap: 'medium' },
+      { id: 'heading', component: 'Text', text: 'Progressive Updates', variant: 'h3' },
+      { id: 'status-card', component: 'Card', children: ['status-col'], title: 'Deployment Status' },
+      { id: 'status-col', component: 'Column', children: ['status-text', 'progress-text'], gap: 'medium' },
+      { id: 'status-text', component: 'Text', text: { path: '/deployment/status' }, variant: 'h4' },
+      { id: 'progress-text', component: 'Text', text: { path: '/deployment/progress' }, variant: 'body1' },
+    ] } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/status', value: 'Initializing' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/progress', value: '0%' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/status', value: 'Building' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/progress', value: '40%' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/status', value: 'Deploying' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/progress', value: '80%' } } as A2uiMsg,
+  ];
+};
+
+// --- Events & Actions ---
+
+const eventsButtonActions = (): A2uiMsg[] => {
+  const sid = uid('events-buttons');
+  return [
+    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/app/name', value: 'kickstart-demo' } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
+      { id: 'root', component: 'Column', children: ['heading', 'button-row'], gap: 'medium' },
+      { id: 'heading', component: 'Text', text: 'Button Events', variant: 'h3' },
+      { id: 'button-row', component: 'Row', children: ['deploy-btn', 'config-btn', 'cancel-btn'], gap: 'medium' },
+      { id: 'deploy-btn', component: 'Button', label: 'Deploy', variant: 'primary', action: { event: { name: 'deploy', context: { environment: 'production', appName: { path: '/app/name' } } } } },
+      { id: 'config-btn', component: 'Button', label: 'Configure', variant: 'outlined', action: { event: { name: 'configure', context: { step: 'networking' } } } },
+      { id: 'cancel-btn', component: 'Button', label: 'Cancel', variant: 'text', action: { event: { name: 'cancel' } } },
+    ] } } as A2uiMsg,
+  ];
+};
+
+const eventsFormSubmit = (): A2uiMsg[] => {
+  const sid = uid('events-form');
+  return [
+    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/form/name', value: 'John Doe' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/form/email', value: 'john@example.com' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/form/message', value: 'I need help with AKS deployment' } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
+      { id: 'root', component: 'Column', children: ['heading', 'form-card'], gap: 'medium' },
+      { id: 'heading', component: 'Text', text: 'Contact Form', variant: 'h3' },
+      { id: 'form-card', component: 'Card', children: ['form-col'], title: 'Send a message' },
+      { id: 'form-col', component: 'Column', children: ['name-field', 'email-field', 'msg-field', 'submit-btn'], gap: 'medium' },
+      { id: 'name-field', component: 'TextField', label: 'Name', value: { path: '/form/name' } },
+      { id: 'email-field', component: 'TextField', label: 'Email', value: { path: '/form/email' } },
+      { id: 'msg-field', component: 'TextField', label: 'Message', value: { path: '/form/message' }, multiline: true },
+      { id: 'submit-btn', component: 'Button', label: 'Submit', variant: 'primary', action: { event: { name: 'submit_contact', context: { name: { path: '/form/name' }, email: { path: '/form/email' }, message: { path: '/form/message' } } } } },
+    ] } } as A2uiMsg,
+  ];
+};
+
+const eventsFunctionCall = (): A2uiMsg[] => {
+  const sid = uid('events-func');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'func-card'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Function Call Action', variant: 'h3' },
+    { id: 'func-card', component: 'Card', children: ['func-col'], title: 'Date Formatter' },
+    { id: 'func-col', component: 'Column', children: ['desc-text', 'format-btn'], gap: 'medium' },
+    { id: 'desc-text', component: 'Text', text: 'This button triggers a functionCall action (not executed in playground)', variant: 'body2' },
+    { id: 'format-btn', component: 'Button', label: 'Format Date', variant: 'primary', action: { functionCall: { call: 'formatDate', args: { date: '2025-07-28', format: 'long' } } } },
+  ] as A2uiComponent[]);
+};
+
+// --- Surface Lifecycle ---
+
+const lifecycleMultiSurface = (): A2uiMsg[] => {
+  const sidA = uid('multi-surface-a');
+  const sidB = uid('multi-surface-b');
+  const sidC = uid('multi-surface-c');
+  return [
+    // Surface A - simple card
+    { version: 'v0.9', createSurface: { surfaceId: sidA, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sidA, components: [
+      { id: 'root', component: 'Card', children: ['title'], title: 'Surface A' },
+      { id: 'title', component: 'Text', text: 'This is the first surface', variant: 'body1' },
+    ] } } as A2uiMsg,
+    // Surface B - form
+    { version: 'v0.9', createSurface: { surfaceId: sidB, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sidB, components: [
+      { id: 'root', component: 'Card', children: ['col'], title: 'Surface B' },
+      { id: 'col', component: 'Column', children: ['input1', 'input2'], gap: 'medium' },
+      { id: 'input1', component: 'TextField', label: 'Field 1' },
+      { id: 'input2', component: 'TextField', label: 'Field 2' },
+    ] } } as A2uiMsg,
+    // Surface C - status
+    { version: 'v0.9', createSurface: { surfaceId: sidC, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sidC, components: [
+      { id: 'root', component: 'Card', children: ['status'], title: 'Surface C' },
+      { id: 'status', component: 'Text', text: 'Status: All systems operational', variant: 'body1' },
+    ] } } as A2uiMsg,
+  ];
+};
+
+const lifecycleSurfaceUpdate = (): A2uiMsg[] => {
+  const sid = uid('surface-update');
+  return [
+    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
+      { id: 'root', component: 'Column', children: ['loading'], gap: 'medium' },
+      { id: 'loading', component: 'Text', text: 'Loading deployment status...', variant: 'h4' },
+    ] } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
+      { id: 'root', component: 'Column', children: ['heading', 'content-card'], gap: 'medium' },
+      { id: 'heading', component: 'Text', text: 'Deployment Complete', variant: 'h3' },
+      { id: 'content-card', component: 'Card', children: ['content-col'], title: 'Status' },
+      { id: 'content-col', component: 'Column', children: ['status-text', 'endpoint-text'], gap: 'medium' },
+      { id: 'status-text', component: 'Text', text: 'All services running', variant: 'body1' },
+      { id: 'endpoint-text', component: 'Text', text: 'https://my-app.azurewebsites.net', variant: 'body2' },
+    ] } } as A2uiMsg,
+  ];
+};
+
+const lifecycleDeleteSurface = (): A2uiMsg[] => {
+  const sidA = uid('delete-surface-a');
+  const sidB = uid('delete-surface-b');
+  return [
+    // Create surface A
+    { version: 'v0.9', createSurface: { surfaceId: sidA, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sidA, components: [
+      { id: 'root', component: 'Card', children: ['text'], title: 'Surface A (will be deleted)' },
+      { id: 'text', component: 'Text', text: 'This surface will be removed', variant: 'body1' },
+    ] } } as A2uiMsg,
+    // Create surface B
+    { version: 'v0.9', createSurface: { surfaceId: sidB, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sidB, components: [
+      { id: 'root', component: 'Card', children: ['text'], title: 'Surface B (remains)' },
+      { id: 'text', component: 'Text', text: 'This surface stays visible', variant: 'body1' },
+    ] } } as A2uiMsg,
+    // Delete surface A
+    { version: 'v0.9', deleteSurface: { surfaceId: sidA } } as A2uiMsg,
+  ];
+};
+
+// --- Dynamic Patterns ---
+
+const dynamicNestedScopes = (): A2uiMsg[] => {
+  const sid = uid('dynamic-nested');
+  return [
+    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/services/0', value: { name: 'Web API', status: 'Running', port: 8080 } } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/services/1', value: { name: 'Worker', status: 'Stopped', port: 8081 } } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
+      { id: 'root', component: 'Column', children: ['heading', 'service0', 'service1'], gap: 'medium' },
+      { id: 'heading', component: 'Text', text: 'Service Status', variant: 'h3' },
+      { id: 'service0', component: 'Card', children: ['s0-col'], title: 'Service 0' },
+      { id: 's0-col', component: 'Column', children: ['s0-name', 's0-status', 's0-port'], gap: 'small' },
+      { id: 's0-name', component: 'Text', text: { path: '/services/0/name' }, variant: 'h4' },
+      { id: 's0-status', component: 'Text', text: { path: '/services/0/status' }, variant: 'body1' },
+      { id: 's0-port', component: 'Text', text: { path: '/services/0/port' }, variant: 'body2' },
+      { id: 'service1', component: 'Card', children: ['s1-col'], title: 'Service 1' },
+      { id: 's1-col', component: 'Column', children: ['s1-name', 's1-status', 's1-port'], gap: 'small' },
+      { id: 's1-name', component: 'Text', text: { path: '/services/1/name' }, variant: 'h4' },
+      { id: 's1-status', component: 'Text', text: { path: '/services/1/status' }, variant: 'body1' },
+      { id: 's1-port', component: 'Text', text: { path: '/services/1/port' }, variant: 'body2' },
+    ] } } as A2uiMsg,
+  ];
+};
+
+const dynamicConditionalContent = (): A2uiMsg[] => {
+  const sid = uid('dynamic-conditional');
+  return [
+    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/feature/enabled', value: true } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/feature/name', value: 'Auto-scaling' } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
+      { id: 'root', component: 'Column', children: ['heading', 'feature-card'], gap: 'medium' },
+      { id: 'heading', component: 'Text', text: 'Feature Flags', variant: 'h3' },
+      { id: 'feature-card', component: 'Card', children: ['feature-col'], title: 'Feature Status' },
+      { id: 'feature-col', component: 'Column', children: ['feature-name', 'feature-enabled'], gap: 'medium' },
+      { id: 'feature-name', component: 'Text', text: { path: '/feature/name' }, variant: 'h4' },
+      { id: 'feature-enabled', component: 'Text', text: { path: '/feature/enabled' }, variant: 'body1' },
+    ] } } as A2uiMsg,
+  ];
+};
+
+const dynamicComplexDashboard = (): A2uiMsg[] => {
+  const sid = uid('dynamic-dashboard');
+  return [
+    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/name', value: 'production-cluster' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/status', value: 'Healthy' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/replicas', value: 5 } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/region', value: 'eastus2' } } as A2uiMsg,
+    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/tier', value: 'Standard_D4s_v3' } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
+      { id: 'root', component: 'Column', children: ['heading', 'dashboard-card'], gap: 'medium' },
+      { id: 'heading', component: 'Text', text: 'Deployment Dashboard', variant: 'h3' },
+      { id: 'dashboard-card', component: 'Card', children: ['tabs'], title: { path: '/deployment/name' } },
+      { id: 'tabs', component: 'Tabs', children: ['tab-overview', 'tab-config', 'tab-logs'] },
+      { id: 'tab-overview', component: 'Card', children: ['overview-col'], title: 'Overview' },
+      { id: 'overview-col', component: 'Column', children: ['status-text', 'replicas-text'], gap: 'medium' },
+      { id: 'status-text', component: 'Text', text: { path: '/deployment/status' }, variant: 'h4' },
+      { id: 'replicas-text', component: 'Text', text: { path: '/deployment/replicas' }, variant: 'body1' },
+      { id: 'tab-config', component: 'Card', children: ['config-col'], title: 'Configuration' },
+      { id: 'config-col', component: 'Column', children: ['region-field', 'tier-field', 'replica-slider'], gap: 'medium' },
+      { id: 'region-field', component: 'TextField', label: 'Region', value: { path: '/deployment/region' } },
+      { id: 'tier-field', component: 'TextField', label: 'VM Tier', value: { path: '/deployment/tier' } },
+      { id: 'replica-slider', component: 'Slider', label: 'Replicas', min: 1, max: 10, value: { path: '/deployment/replicas' } },
+      { id: 'tab-logs', component: 'Card', children: ['logs-code'], title: 'Logs' },
+      { id: 'logs-code', component: 'CodeBlock', code: `[2025-07-28 14:23:45] Deployment started
+[2025-07-28 14:24:12] Scaling to 5 replicas
+[2025-07-28 14:25:01] Health check passed
+[2025-07-28 14:25:30] Deployment complete`, language: 'text', filename: 'deployment.log' },
+    ] } } as A2uiMsg,
+  ];
+};
+
+// ---------------------------------------------------------------------------
 // Control scenarios assembled
 // ---------------------------------------------------------------------------
 
@@ -356,6 +616,22 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'ctrl-form',     label: 'FormGroup',      description: 'Stepped form sections',            group: 'Custom Controls', generate: customFormGroup },
   { id: 'ctrl-code',     label: 'CodeBlock',      description: 'Syntax-highlighted code',          group: 'Custom Controls', generate: customCodeBlock },
   { id: 'ctrl-progress', label: 'ProgressSteps',  description: 'Multi-step progress tracker',      group: 'Custom Controls', generate: customProgressSteps },
+  // Data Binding
+  { id: 'data-basic',    label: 'Basic Data Binding',     description: 'Text components bound to data paths',        group: 'Data Binding',    generate: dataBindingBasic },
+  { id: 'data-form',     label: 'Data-Bound Form',        description: 'Form fields with path bindings',             group: 'Data Binding',    generate: dataBindingForm },
+  { id: 'data-sequence', label: 'Data Update Sequence',   description: 'Progressive data model updates',             group: 'Data Binding',    generate: dataBindingSequence },
+  // Events & Actions
+  { id: 'event-buttons', label: 'Button Events',          description: 'Actions with event context data',            group: 'Events & Actions', generate: eventsButtonActions },
+  { id: 'event-form',    label: 'Form Submit Action',     description: 'Submit with context path bindings',          group: 'Events & Actions', generate: eventsFormSubmit },
+  { id: 'event-func',    label: 'Function Call Action',   description: 'Button with functionCall action',            group: 'Events & Actions', generate: eventsFunctionCall },
+  // Surface Lifecycle
+  { id: 'life-multi',    label: 'Multi-Surface',          description: 'Three parallel surfaces',                    group: 'Surface Lifecycle', generate: lifecycleMultiSurface },
+  { id: 'life-update',   label: 'Surface Update',         description: 'Replace components on existing surface',     group: 'Surface Lifecycle', generate: lifecycleSurfaceUpdate },
+  { id: 'life-delete',   label: 'Delete Surface',         description: 'Create and delete surfaces',                 group: 'Surface Lifecycle', generate: lifecycleDeleteSurface },
+  // Dynamic Patterns
+  { id: 'dyn-nested',    label: 'Nested Data Scopes',     description: 'Components with nested path bindings',       group: 'Dynamic Patterns', generate: dynamicNestedScopes },
+  { id: 'dyn-conditional', label: 'Conditional Content',  description: 'Feature flags with data binding',            group: 'Dynamic Patterns', generate: dynamicConditionalContent },
+  { id: 'dyn-dashboard', label: 'Complex Dashboard',      description: 'Multi-tab dashboard with data binding',      group: 'Dynamic Patterns', generate: dynamicComplexDashboard },
 ];
 
 /** All scenario groups in display order */
@@ -365,6 +641,10 @@ export const SCENARIO_GROUPS = [
   'Content',
   'Inputs',
   'Custom Controls',
+  'Data Binding',
+  'Events & Actions',
+  'Surface Lifecycle',
+  'Dynamic Patterns',
 ] as const;
 
 /** Combined list of all scenarios */

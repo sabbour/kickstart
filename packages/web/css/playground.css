@@ -1,12 +1,12 @@
 /* ----------------------------------------------------------------
-   Playground — A2UI test harness (split-pane layout)
+   Playground — A2UI Gallery (masonry card layout)
    Renders inside Layout → .app-shell → .app-layout → .chat-main
    all of which have overflow: hidden. We must fill the space and
    manage our own scroll containers.
 
    Component styling is handled by Fluent UI v9 (makeStyles + tokens).
    This file retains layout-only rules: flex containers, scroll areas,
-   responsive breakpoints.
+   masonry grid, responsive breakpoints.
    ---------------------------------------------------------------- */
 
 /* Fill the entire .chat-main area */
@@ -19,68 +19,51 @@
   font-family: var(--fontFamilyBase);
 }
 
-/* Split pane container */
-.playground-split {
-  display: flex;
-  flex: 1;
-  min-height: 0; /* critical for flex children to respect overflow */
-  overflow: hidden;
-}
-
-/* ---- Left panel (sidebar) ---- */
-.playground-left {
-  width: 320px;
-  min-width: 280px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--color-border, #e0e0e0);
-  background: var(--color-bg-primary, #fff);
-  overflow: hidden;
-}
-
-.playground-left-scroll {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 4px 12px;
-}
-
-/* ---- Right panel (output) ---- */
-.playground-right {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-  background: var(--color-bg-secondary, #f8f8f8);
-}
-
-.playground-right-scroll {
+/* ---- Gallery View: Masonry Grid ---- */
+.playground-gallery-scroll {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 20px;
+  background: var(--color-bg-secondary, #f8f8f8);
 }
 
-/* ---- Right panel: surface cards ---- */
+.playground-gallery {
+  column-count: 1;
+  column-gap: 16px;
+}
+
+/* Responsive column breakpoints (inspired by A2UI Composer) */
+@media (min-width: 640px) {
+  .playground-gallery {
+    column-count: 2;
+  }
+}
+
+@media (min-width: 1024px) {
+  .playground-gallery {
+    column-count: 3;
+  }
+}
+
+@media (min-width: 1280px) {
+  .playground-gallery {
+    column-count: 4;
+  }
+}
+
+/* ---- Create View: JSON Editor ---- */
+.playground-create-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 40px 20px;
+  background: var(--color-bg-secondary, #f8f8f8);
+}
+
+/* ---- Rendered Custom Surfaces ---- */
 .playground-surfaces {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-/* ---- Responsive: stack on narrow viewports ---- */
-@media (max-width: 768px) {
-  .playground-split {
-    flex-direction: column;
-  }
-
-  .playground-left {
-    width: 100%;
-    min-width: 0;
-    max-height: 40vh;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border, #e0e0e0);
-  }
 }

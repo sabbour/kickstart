@@ -6737,3 +6737,83 @@ User → converse.ts → LLM (with render_ui tool + data tools)
 
 Note: R18 supersedes R3 (feed catalog to system prompt) and R10 (add backend action endpoint). The tool-based pattern is cleaner than both.
 Note: R19 supersedes R9 (wire action handler) and R11 (fix button schema). Actions become conversation messages, not dispatched events.
+# Decision: Playground Gallery Layout Redesign
+
+**Date**: 2026-01-XX  
+**Decider**: Fry (Frontend Dev)  
+**Status**: Implemented  
+
+## Context
+
+The A2UI Playground had a traditional split-pane layout (left: scenario explorer accordion, right: rendered output). This required users to click individual scenarios one-at-a-time to preview them. The A2UI Composer gallery (https://a2ui-composer.ag-ui.com/gallery) demonstrated a superior pattern: all scenarios visible simultaneously in a masonry card grid.
+
+## Decision
+
+**Redesign the Playground as a masonry card gallery** where ALL scenarios render as live A2UI previews in a responsive grid. Add Gallery/Create tabs for viewing vs. authoring. Replace accordion navigation with search/filter.
+
+## Rationale
+
+1. **Discoverability**: Users see all 23 scenarios at once — no need to expand accordions or guess which category contains what they need.
+2. **Visual scanning**: Masonry grid allows quick visual comparison of components side-by-side.
+3. **Responsive design**: Multi-column layout adapts to viewport width (1-4 columns).
+4. **Reduced clicks**: No more "click scenario → wait for render → click another scenario" loop.
+5. **Modern UX**: Gallery pattern matches expectations from component libraries (Storybook, Fluent UI docs, A2UI Composer).
+
+## Implementation Details
+
+### Gallery View
+- **Masonry grid**: CSS `column-count` with responsive breakpoints (640px → 2 cols, 1024px → 3 cols, 1280px → 4 cols).
+- **GalleryCard component**: Each card has isolated A2UI state (`useA2UI()` instance per card). Surfaces generated on mount via `useMemo()`. Wrapped in `React.memo()` for performance.
+- **Card styling**: Fluent UI tokens only — no hardcoded values. Uses `colorNeutralBackground1` (80% opacity), `borderRadiusXLarge`, `shadow4` → `shadow8` hover effect.
+- **Click behavior**: Opens Fluent UI `Dialog` with full-size preview + JSON tab.
+
+### Create Tab
+- Moved custom JSON editor from accordion to separate tab.
+- Rendered surfaces display below editor as stacked cards.
+- "Clear All" button visible only on Create tab.
+
+### Search/Filter
+- `SearchBox` in top bar filters scenarios by label/description.
+- Count badge updates dynamically.
+
+### Removed
+- Accordion navigation (left sidebar)
+- Activity log
+- "Load All" button
+- Split-pane CSS
+
+## Consequences
+
+**Positive**:
+- 23 live A2UI surfaces render simultaneously — showcases full component library at a glance.
+- Faster scenario exploration — no navigation overhead.
+- Responsive design handles mobile → desktop viewports.
+- Search enables quick lookup by keyword.
+
+**Negative**:
+- Initial render cost: 23 `useA2UI()` instances + surface generation on mount. Mitigated by `React.memo()` and `useMemo()`.
+- More DOM nodes: each card has its own A2UI surface tree. Performance acceptable for 23 scenarios.
+
+**Neutral**:
+- Removed activity log (previously tracked scenario injection history). Not critical for gallery UX.
+
+## Files Changed
+
+- `packages/web/src/pages/Playground.tsx` — Major rewrite (~350 lines)
+- `packages/web/css/playground.css` — Replaced split-pane with masonry grid
+
+## Build Verification
+
+```
+npx vite build
+✓ 2826 modules transformed
+✓ built in 9.33s
+```
+
+Zero TypeScript errors. 301 KB gzipped bundle (unchanged).
+
+## Future Considerations
+
+- **Lazy loading**: If scenario count grows beyond 50, consider virtualizing the gallery or lazy-loading cards outside viewport.
+- **URL state**: Add ?scenario={id} query param to deep-link to specific scenario dialogs.
+- **Keyboard navigation**: Add arrow key navigation for gallery cards (a11y improvement).

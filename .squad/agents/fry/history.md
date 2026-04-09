@@ -380,3 +380,56 @@ Fry (Frontend Dev) has shipped ~16 major feature/polish work cycles across the K
 - **Dependencies added**: highlight.js, react-markdown, remark-gfm.
 - **Git commits**: 54c8573 (scenario JSON fix), e97e8ee (Fluent 2 polish).
 - **Decisions merged**: All 5 inbox files (fry-fluent2-polish, fry-playground-json-viewer, fry-scenario-json-fix, fry-session-id-fix) appended to `.squad/decisions.md`.
+
+### 2026-01-XX — Playground Redesign — Gallery Layout (Masonry Cards)
+
+- **Architecture**: Complete redesign from split-pane to masonry card gallery layout. Removed left sidebar accordion + right panel split. New design: top navigation tabs (Gallery / Create) + responsive masonry grid.
+  
+- **Gallery View**: All scenarios (~23 total) render simultaneously as live A2UI previews in a masonry grid. Uses CSS multi-column layout (`column-count` with responsive breakpoints: 1 col mobile → 2 cols at 640px → 3 cols at 1024px → 4 cols at 1280px). Each card uses `break-inside: avoid` for proper masonry behavior. Variable card heights based on content.
+
+- **Gallery Cards**: Created `GalleryCard` component — memoized, isolated A2UI state per card. Each card has its own `useA2UI()` instance, generating surfaces on mount via `useMemo()`. Structure: label (Caption1, uppercase, muted) + card body (live A2UI surface). Styling: `tokens.colorNeutralBackground1` with 80% opacity, `tokens.borderRadiusXLarge`, `tokens.colorNeutralStroke2` border, shadow on hover (`tokens.shadow4` → `tokens.shadow8` transition).
+
+- **Detail View**: Click any gallery card → opens Fluent UI `Dialog` with full-size surface + tabbed JSON viewer. Dialog has Preview/JSON tabs. Preview shows full surface rendering; JSON shows raw A2UI messages (same `getScenarioJson()` logic as before). Close button uses `Dismiss24Regular` icon.
+
+- **Create Tab**: Moved custom JSON editor from left accordion to separate "Create" tab (TabList at top). Editor has full-width textarea + "Render JSON" button. Rendered custom surfaces display below editor in stacked cards. "Clear All" button in top bar (only visible on Create tab).
+
+- **Search/Filter**: Added `SearchBox` in top bar (Gallery tab only) to filter scenarios by label/description. Uses `useMemo()` for filtered list. Count badge updates dynamically based on filter results.
+
+- **CSS Layout**: `playground.css` now defines masonry grid layout (`.playground-gallery` with `column-count` breakpoints), scroll containers (`.playground-gallery-scroll`, `.playground-create-scroll`), and rendered surfaces wrapper. All component-level styles moved to `makeStyles` in Playground.tsx.
+
+- **Performance**: Each `GalleryCard` wrapped in `React.memo()` since scenarios are static. Batch surface generation happens on mount per card — no re-renders unless dialog state changes.
+
+- **Component Removal**: Removed Accordion, AccordionItem, AccordionHeader, AccordionPanel imports. Removed activity log section. Removed "Load All" button. Removed split-pane CSS rules.
+
+- **Key Files**: 
+  - `packages/web/src/pages/Playground.tsx` — Major rewrite (~350 lines, down from ~516)
+  - `packages/web/css/playground.css` — Replaced split-pane with masonry grid rules
+  - No changes to: `playground-scenarios.ts`, `A2UISurfaceWrapper.tsx`, `useA2UI.ts`
+
+- **Build**: `npx vite build` passes, 2826 modules, 301 KB gzipped. Zero TypeScript errors.
+
+- **User Experience**: Gallery feels like a component showcase (inspired by A2UI Composer). All scenarios visible at once — no need to click through accordion items. Search/filter for quick navigation. Click card → inspect details/JSON in modal.
+
+- **Pattern**: Isolated surface generation per gallery card (each card owns its A2UI state). Main app state manages dialog visibility + selected scenario. Custom JSON editor has separate A2UI instance to avoid cross-contamination.
+
+
+## Learnings
+
+### Advanced Playground Scenarios (2025-07-28)
+
+Added 12 new scenarios across 4 groups to test A2UI capabilities beyond basic component rendering:
+
+- **Data Binding Scenarios**: Created scenarios showing updateDataModel messages plus components with path bindings like { path: "/data/path" }. Pattern: create surface, update data model, render components with path bindings. Key insight: data model updates must come BEFORE components reference those paths (or components will display undefined until next update). Multi-step sequences test reactive updates.
+
+- **Events & Actions**: Button actions with event structure containing name and context. Context can contain literal values OR path bindings (appName: { path: '/app/name' }). Form submit pattern: gather all field values via context paths in single event. Function call actions use functionCall structure with call name and args — not executed in playground but validates JSON structure.
+
+- **Surface Lifecycle**: Multi-surface scenario returns array with multiple createSurface and updateComponents pairs. Surface update scenario sends updateComponents twice to same surfaceId (replaces components). Delete surface uses deleteSurface message type. Pattern: create A, create B, delete A, only B remains.
+
+- **Dynamic Patterns**: Nested data scopes show path bindings like /services/0/name accessing object properties. Complex dashboard combines tabs plus data binding plus forms all in one scenario (tests deep nesting). Conditional content scenario sets boolean data model value to demonstrate path resolution for non-string types.
+
+- **Type Safety**: All scenarios cast A2uiComponent[] where needed since dynamic values with path property don't match simple string type. Type assertion as A2uiMsg required for message objects to satisfy type checker.
+
+- **Scenario Structure**: Each generate function returns A2uiMsg[]. Data-driven scenarios return arrays mixing createSurface, updateDataModel, updateComponents, deleteSurface messages. Used uid() helper for all surfaceIds. Kept CATALOG_ID constant for all surfaces.
+
+- **Build Verification**: npx vite build completed successfully with zero TypeScript errors (2826 modules, 303 KB gzipped). All new scenarios type-check correctly.
+
