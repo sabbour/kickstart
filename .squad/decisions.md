@@ -3877,6 +3877,14 @@ The Playground and App shell used hand-rolled HTML/CSS for all interactive compo
 ## Decision
 
 - Wrap the entire app in `<FluentProvider theme={webLightTheme}>` at the App.tsx level so all descendant components inherit Fluent 2 design tokens.
+
+---
+
+### 2026-04-09T04:01:38Z: No raw HTML elements — Fluent UI React v9 only
+**By:** Ahmed Sabbour (via Copilot)  
+**What:** No raw HTML elements (`<button>`, `<span>`, `<div>` for UI controls, `<input>`, etc.) anywhere in the project. Always use Fluent UI React v9 components from `@fluentui/react-components`. This applies to both the app UI AND the A2UI component renderers.  
+**Why:** User directive — ensures consistent Fluent 2 design system compliance across the entire application, including rendered A2UI surfaces.
+**Status:** Accepted
 - Replace Playground's hand-rolled elements with Fluent UI v9 components: Button, Accordion, Card, Textarea, MessageBar, CounterBadge, and Fluent typography (Subtitle2, Caption1, Body1Strong, Text).
 - Use Griffel `makeStyles()` with Fluent `tokens` for component-level styling; keep layout-only CSS (flex containers, scroll areas, responsive breakpoints) in `playground.css`.
 
