@@ -539,3 +539,12 @@ All component patterns, API conventions, and architectural decisions from this p
 **Bug 3 — GalleryCard error boundary**
 - Added `GalleryCardErrorBoundary` class component (React requires class components for error boundaries). Wraps every `<GalleryCard />` in both the Gallery and Components tabs. If a single card crashes, it renders a minimal fallback rather than taking down the whole gallery.
 - **Build**: `npx vite build` passes (0 TS errors, 2833 modules). `npx playwright test` exits code 0 (all passed, 1 skipped).
+
+### 2025-07-27 — Playground tab UX polish (5 fixes)
+- **File**: `packages/web/src/pages/Playground.tsx`
+- **Tab intro typography**: Changed `<p>` to Fluent `<Text as="p">`. Updated `tabIntro` style: `fontSizeBase300` to `fontSizeBase400`, color from `colorNeutralForeground3` to `colorNeutralForeground2`, added `lineHeightBase400`, increased vertical padding from `spacingVerticalS` to `spacingVerticalM`.
+- **Create tab input**: Restyled `createInputRow` + `createInput` to match landing page hero input (`landing.css .landing-hero-input-wrap`). Changed pill shape (`28px` radius) to `borderRadiusMedium`, removed shadow, set 44px height, bumped font to `fontSizeBase400`, stroke from `colorNeutralStroke1` to `colorNeutralStroke2`.
+- **Gallery tab copy**: Updated intro text to frame items as examples/samples rather than feature description.
+- **Components tab headers**: `groupHeader` style — increased `marginTop` from `spacingVerticalXL` to `spacingVerticalXXL`, `marginBottom` from `spacingVerticalM` to `spacingVerticalL`, added horizontal padding to prevent content collision.
+- **Widgets tab broken image**: Fixed path from `container-registry.svg` (nonexistent) to `container-registries.svg` (correct filename in `/assets/icons/containers/`).
+- **Rule**: Always verify asset filenames against `public/assets/icons/` — pluralization varies (e.g., `container-registries.svg` not `container-registry.svg`).

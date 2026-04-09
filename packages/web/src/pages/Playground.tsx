@@ -178,34 +178,32 @@ const useStyles = makeStyles({
     alignItems: 'center',
     width: '100%',
     maxWidth: '600px',
-    borderRadius: '28px',
-    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    position: 'relative',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground1,
-    boxShadow: tokens.shadow4,
-    paddingLeft: '20px',
-    paddingRight: '6px',
-    paddingTop: '6px',
-    paddingBottom: '6px',
-    transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
+    transition: 'border-color 0.15s ease',
     ':focus-within': {
       borderTopColor: tokens.colorBrandStroke1,
       borderRightColor: tokens.colorBrandStroke1,
       borderBottomColor: tokens.colorBrandStroke1,
       borderLeftColor: tokens.colorBrandStroke1,
-      boxShadow: tokens.shadow8,
     },
   },
   createInput: {
     flex: 1,
+    height: '44px',
     border: 'none',
     outline: 'none',
     backgroundColor: 'transparent',
-    fontSize: tokens.fontSizeBase300,
+    fontSize: tokens.fontSizeBase400,
     fontFamily: tokens.fontFamilyBase,
     color: tokens.colorNeutralForeground1,
-    lineHeight: '40px',
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalXS,
+    boxSizing: 'border-box' as const,
     '::placeholder': {
-      color: tokens.colorNeutralForeground4,
+      color: tokens.colorNeutralForeground3,
     },
   },
   createSubtext: {
@@ -300,9 +298,12 @@ const useStyles = makeStyles({
     marginTop: tokens.spacingVerticalS,
   },
   groupHeader: {
-    marginTop: tokens.spacingVerticalXL,
-    marginBottom: tokens.spacingVerticalM,
+    display: 'block',
+    marginTop: tokens.spacingVerticalXXL,
+    marginBottom: tokens.spacingVerticalL,
     paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
     borderBottom: `2px solid ${tokens.colorBrandBackground}`,
   },
   // ---- Create tab: chat active layout ----
@@ -442,9 +443,13 @@ const useStyles = makeStyles({
   },
   tabIntro: {
     margin: 0,
-    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalL}`,
-    color: tokens.colorNeutralForeground3,
-    fontSize: tokens.fontSizeBase300,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase400,
+    lineHeight: tokens.lineHeightBase400,
     flexShrink: 0,
   },
 });
@@ -950,13 +955,13 @@ function PlaygroundInner() {
 
       {/* ---- Tab intro ---- */}
       {!(activeTab === 'create' && createMessages.length > 0) && (
-        <p className={classes.tabIntro}>
+        <Text as="p" className={classes.tabIntro}>
           {activeTab === 'create' && 'Build A2UI interfaces by describing what you want. The AI generates interactive components from your prompt.'}
-          {activeTab === 'gallery' && 'Browse all built-in A2UI scenarios. Click any card to preview the full surface.'}
+          {activeTab === 'gallery' && 'Explore example conversations and sample interactions. Click any card to see it in action.'}
           {activeTab === 'components' && 'Advanced A2UI component demos showing complex layouts, forms, and interactive patterns.'}
           {activeTab === 'icons' && 'Search the icon catalog used across Kickstart components. Click to copy the icon path.'}
           {activeTab === 'widgets' && 'Your saved A2UI widgets. Create new ones from the Create tab or start blank.'}
-        </p>
+        </Text>
       )}
 
       {/* ---- Tab 1: Create (empty state — no messages yet) ---- */}
@@ -1319,7 +1324,7 @@ function PlaygroundInner() {
             {widgets.length === 0 ? (
               <div className={classes.emptyState}>
                 <div className={classes.emptyIcon}>
-                  <img src="/assets/icons/containers/container-registry.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
+                  <img src="/assets/icons/containers/container-registries.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
                 </div>
                 <Body1Strong>No widgets yet</Body1Strong>
                 <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
