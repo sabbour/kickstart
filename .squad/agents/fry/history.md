@@ -232,3 +232,12 @@
 - **CI/CD**: `.github/workflows/deploy-docs.yml` — triggers on push to `main` when `docs-site/**` changes, uses `actions/deploy-pages@v4` for GitHub Pages deployment.
 - **Build**: `npm run build` succeeds with zero errors. Output in `docs-site/build/`.
 - **Gotcha**: Blog must be explicitly disabled (`blog: false`) in preset config to avoid broken links from default blog scaffold.
+
+### 2025-07-28 — A2UI Playground + Mock Streaming + Model Indicator Fix
+- **Playground page**: New `packages/web/src/pages/Playground.tsx` — standalone A2UI test harness accessed via `?playground` URL parameter. Shows scenario buttons for all 8 demo scenarios (Welcome, Architecture, Design Detail, Configure Form, Code Preview, File Generation, Review, Deploy Success). Has a JSON editor textarea for pasting raw A2UI messages. Uses `getDemoResponse()` with keyword matching to load specific scenarios. CSS in `packages/web/css/playground.css`.
+- **Mock streaming**: New `packages/web/src/services/mock-streaming.ts` + `packages/web/src/hooks/useMockStreaming.ts`. Activated via `?mock` URL param. Intercepts the streaming pipeline, returns canned responses from `demo-scenarios.ts` with word-by-word typing simulation (30-50ms delays). Sets `model: 'gpt-5.3-chat (mock)'` on all responses. Supports abort. Each user message advances through the scenario sequence via `getDemoResponse()`.
+- **Model indicator fix**: `useStreaming.ts` now captures `event.model` from SSE stream events and passes it through `onComplete(fullText, model)`. `App.tsx` wires model to `ChatMessage.model` so `ChatMessage.tsx` renders the existing `.model-indicator` span.
+- **Mock mode bypass**: When `?mock` is in URL, `isApiAvailable` initializes to `true` (skips health check), so track cards and framework pills work without a backend.
+- **URL param pattern**: Module-level `isMockMode()` and `isPlaygroundMode()` called once at App load. Evaluated outside React to avoid re-renders. `playgroundEnabled` triggers a separate Layout render path with just the Playground component.
+- **Key insight**: `getDemoResponse()` uses a global `turnCount` variable. For playground, must call `resetDemoState()` before each scenario injection, then burn turn 1 (always returns WELCOME) before using keyword matching for specific scenarios.
+- **Sign-in**: Still a placeholder button — noted but not fixed (Phase 3).
