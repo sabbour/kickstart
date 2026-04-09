@@ -524,3 +524,18 @@ All component patterns, API conventions, and architectural decisions from this p
 - B-10/B-11 refactor: rename ServiceConnector → APIConnector, ServicePack → IntegrationKit
 - B-14: integrate action re-prompting into Advanced JSON surfaces
 - Consider session persistence layer (currently Create tab is ephemeral)
+
+### 2025-07-29 — Fix 3 console errors: Strict Mode surface crash, borderColor shorthand, ErrorBoundary
+
+**Bug 1 — "Surface already exists" crash (React 19 Strict Mode)**
+- **Root cause**: React 19 Strict Mode double-fires `useEffect` callbacks in development. `GalleryCard`, `WidgetCard`, and `WidgetPreview` called `processMessages` in `useEffect` with no cleanup. On the second fire, the surface already existed in `MessageProcessor` → `A2uiStateError`.
+- **Fix**: Added cleanup functions to all three components' useEffects that delete the created surfaces using `processor.model.deleteSurface(id)`. `processMessages` already returns surface IDs, so we capture them and delete them in cleanup. The `onSurfaceDeleted` event in `useA2UI.ts` propagates the deletion to React state automatically.
+- **Pattern**: Any `useEffect` that creates A2UI surfaces MUST return a cleanup that deletes them. Use the IDs returned by `processMessages()` — don't read from the `surfaces` state (stale closure risk).
+
+**Bug 2 — Griffel `borderColor` shorthand warning**
+- Griffel (Fluent UI's CSS-in-JS) doesn't support CSS shorthands like `borderColor`. The one occurrence at the `:focus-within` pseudo-selector in `createInputBar` was replaced with all four longhand properties (`borderTopColor`, `borderRightColor`, `borderBottomColor`, `borderLeftColor`).
+- **Rule**: In `makeStyles` calls, always use longhand border properties: `borderTopColor`, `borderRightColor`, `borderBottomColor`, `borderLeftColor`. `borderRadius` is fine.
+
+**Bug 3 — GalleryCard error boundary**
+- Added `GalleryCardErrorBoundary` class component (React requires class components for error boundaries). Wraps every `<GalleryCard />` in both the Gallery and Components tabs. If a single card crashes, it renders a minimal fallback rather than taking down the whole gallery.
+- **Build**: `npx vite build` passes (0 TS errors, 2833 modules). `npx playwright test` exits code 0 (all passed, 1 skipped).

@@ -17,10 +17,11 @@ import {
 } from '@fluentui/react-components';
 import { Dismiss24Regular, Copy24Regular, Delete24Regular, DocumentCopy24Regular } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
+import { useStreaming } from '../hooks/useStreaming';
 import { WidgetsProvider, useWidgets } from '../hooks/useWidgets';
 import { getDemoResponse, resetDemoState } from '../services/demo-scenarios';
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
-import type { A2uiMsg } from '../types';
+import type { A2uiMsg, ChatMessage } from '../types';
 import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
 import {
@@ -155,6 +156,83 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalXS,
     marginTop: tokens.spacingVerticalM,
   },
+  createHero: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: '120px',
+    paddingBottom: '60px',
+    paddingLeft: tokens.spacingHorizontalXXL,
+    paddingRight: tokens.spacingHorizontalXXL,
+    gap: tokens.spacingVerticalL,
+  },
+  createHeading: {
+    fontSize: '28px',
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground1,
+    textAlign: 'center' as const,
+  },
+  createInputRow: {
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: '600px',
+    borderRadius: '28px',
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+    paddingLeft: '20px',
+    paddingRight: '6px',
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
+    ':focus-within': {
+      borderTopColor: tokens.colorBrandStroke1,
+      borderRightColor: tokens.colorBrandStroke1,
+      borderBottomColor: tokens.colorBrandStroke1,
+      borderLeftColor: tokens.colorBrandStroke1,
+      boxShadow: tokens.shadow8,
+    },
+  },
+  createInput: {
+    flex: 1,
+    border: 'none',
+    outline: 'none',
+    backgroundColor: 'transparent',
+    fontSize: tokens.fontSizeBase300,
+    fontFamily: tokens.fontFamilyBase,
+    color: tokens.colorNeutralForeground1,
+    lineHeight: '40px',
+    '::placeholder': {
+      color: tokens.colorNeutralForeground4,
+    },
+  },
+  createSubtext: {
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+    textAlign: 'center' as const,
+  },
+  startBlankLink: {
+    color: tokens.colorBrandForeground1,
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    ':hover': {
+      color: tokens.colorBrandForeground2,
+    },
+  },
+  advancedToggle: {
+    marginTop: tokens.spacingVerticalXXL,
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    ':hover': {
+      color: tokens.colorNeutralForeground1,
+    },
+  },
   errorMessage: {
     marginTop: tokens.spacingVerticalXS,
   },
@@ -227,7 +305,176 @@ const useStyles = makeStyles({
     paddingBottom: tokens.spacingVerticalS,
     borderBottom: `2px solid ${tokens.colorBrandBackground}`,
   },
+  // ---- Create tab: chat active layout ----
+  createChatShell: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
+  createMsgArea: {
+    flex: 1,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    paddingTop: tokens.spacingVerticalXL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+    // Keep messages from growing too wide
+    '& > *': {
+      maxWidth: '760px',
+      width: '100%',
+      marginLeft: 'auto',
+      marginRight: 'auto',
+    },
+  },
+  createBubbleRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    maxWidth: '760px',
+    width: '100%',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+  },
+  createBubbleUser: {
+    alignSelf: 'flex-end',
+    backgroundColor: tokens.colorBrandBackground,
+    color: tokens.colorNeutralForegroundOnBrand,
+    borderRadius: `${tokens.borderRadiusXLarge} ${tokens.borderRadiusXLarge} ${tokens.borderRadiusMedium} ${tokens.borderRadiusXLarge}`,
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    maxWidth: '75%',
+    wordBreak: 'break-word',
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+  },
+  createBubbleAssistant: {
+    alignSelf: 'flex-start',
+    backgroundColor: tokens.colorNeutralBackground1,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: `${tokens.borderRadiusXLarge} ${tokens.borderRadiusXLarge} ${tokens.borderRadiusXLarge} ${tokens.borderRadiusMedium}`,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    maxWidth: '85%',
+    wordBreak: 'break-word',
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    whiteSpace: 'pre-wrap' as const,
+  },
+  createBubbleStreaming: {
+    alignSelf: 'flex-start',
+    backgroundColor: tokens.colorNeutralBackground1,
+    border: `1px solid ${tokens.colorBrandStroke1}`,
+    borderLeft: `3px solid ${tokens.colorBrandBackground}`,
+    borderRadius: `${tokens.borderRadiusXLarge} ${tokens.borderRadiusXLarge} ${tokens.borderRadiusXLarge} ${tokens.borderRadiusMedium}`,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    maxWidth: '85%',
+    wordBreak: 'break-word',
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    whiteSpace: 'pre-wrap' as const,
+  },
+  createSurfaceBlock: {
+    alignSelf: 'flex-start',
+    width: '100%',
+    maxWidth: '100%',
+    marginTop: tokens.spacingVerticalXS,
+  },
+  createTypingDots: {
+    alignSelf: 'flex-start',
+    display: 'flex',
+    gap: tokens.spacingHorizontalXS,
+    alignItems: 'center',
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    backgroundColor: tokens.colorNeutralBackground1,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusXLarge,
+    '& span': {
+      width: '6px',
+      height: '6px',
+      borderRadius: tokens.borderRadiusCircular,
+      backgroundColor: tokens.colorNeutralForeground3,
+      animationName: {
+        '0%, 80%, 100%': { transform: 'scale(0.6)', opacity: '0.4' },
+        '40%': { transform: 'scale(1)', opacity: '1' },
+      },
+      animationDuration: '1.2s',
+      animationIterationCount: 'infinite',
+      animationTimingFunction: 'ease-in-out',
+    },
+    '& span:nth-child(2)': { animationDelay: '0.2s' },
+    '& span:nth-child(3)': { animationDelay: '0.4s' },
+  },
+  createInputBar: {
+    flexShrink: 0,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+  },
+  createChatFooter: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalS,
+    justifyContent: 'center',
+    marginTop: tokens.spacingVerticalS,
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+  },
+  createFooterSep: {
+    color: tokens.colorNeutralForeground3,
+  },
+  tabIntro: {
+    margin: 0,
+    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalL}`,
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase300,
+    flexShrink: 0,
+  },
 });
+
+// ---- GalleryCardErrorBoundary ----
+// Isolates crashes in individual gallery cards so one broken card
+// doesn't bring down the whole gallery.
+interface ErrorBoundaryState { hasError: boolean; message: string }
+class GalleryCardErrorBoundary extends React.Component<
+  React.PropsWithChildren<{ label?: string }>,
+  ErrorBoundaryState
+> {
+  constructor(props: React.PropsWithChildren<{ label?: string }>) {
+    super(props);
+    this.state = { hasError: false, message: '' };
+  }
+  static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
+    return { hasError: true, message: String(error) };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '8px', color: tokens.colorStatusDangerForeground1, fontSize: tokens.fontSizeBase200 }}>
+          {this.props.label ?? 'Card'} failed to render
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ---- GalleryCard Component ----
 interface GalleryCardProps {
@@ -237,28 +484,35 @@ interface GalleryCardProps {
 
 const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
   const classes = useStyles();
-  const { surfaces, processMessages } = useA2UI();
+  const { surfaces, processMessages, processor } = useA2UI();
 
   // Process scenario messages in useEffect so the onSurfaceCreated
   // subscription (set up in useA2UI's own useEffect) is active first.
+  // Cleanup deletes surfaces so React 19 Strict Mode double-fire doesn't crash.
   useEffect(() => {
+    let createdIds: string[] = [];
     if (scenario.generate) {
       const msgs = scenario.generate();
-      processMessages(msgs);
+      createdIds = processMessages(msgs);
     } else if (scenario.keyword) {
       const keyword = scenario.keyword;
       if (keyword === '__welcome__') {
         resetDemoState();
         const resp = getDemoResponse('anything');
-        processMessages(resp.a2uiMessages);
+        createdIds = processMessages(resp.a2uiMessages);
       } else {
         resetDemoState();
         getDemoResponse('skip'); // burn turn 1 (WELCOME)
         const resp = getDemoResponse(keyword);
-        processMessages(resp.a2uiMessages);
+        createdIds = processMessages(resp.a2uiMessages);
       }
     }
-    // processMessages is stable (useCallback with ref-based processor)
+    return () => {
+      for (const id of createdIds) {
+        try { processor.model.deleteSurface(id); } catch { /* already gone */ }
+      }
+    };
+    // processMessages and processor are stable (useCallback / ref-based)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenario]);
 
@@ -299,10 +553,15 @@ interface WidgetCardProps {
 
 const WidgetCard = memo(({ widget, onWidgetClick, onDuplicate, onDelete }: WidgetCardProps) => {
   const classes = useStyles();
-  const { surfaces, processMessages } = useA2UI();
+  const { surfaces, processMessages, processor } = useA2UI();
 
   useEffect(() => {
-    processMessages(widget.messages);
+    const createdIds = processMessages(widget.messages);
+    return () => {
+      for (const id of createdIds) {
+        try { processor.model.deleteSurface(id); } catch { /* already gone */ }
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.messages]);
 
@@ -326,12 +585,14 @@ const WidgetCard = memo(({ widget, onWidgetClick, onDuplicate, onDelete }: Widge
         <Button
           appearance="subtle"
           size="small"
+          aria-label="Duplicate widget"
           icon={<DocumentCopy24Regular />}
           onClick={() => onDuplicate(widget.id)}
         />
         <Button
           appearance="subtle"
           size="small"
+          aria-label="Delete widget"
           icon={<Delete24Regular />}
           onClick={() => onDelete(widget.id)}
         />
@@ -348,10 +609,15 @@ interface WidgetPreviewProps {
 }
 
 const WidgetPreview = memo(({ widget }: WidgetPreviewProps) => {
-  const { surfaces, processMessages } = useA2UI();
+  const { surfaces, processMessages, processor } = useA2UI();
 
   useEffect(() => {
-    processMessages(widget.messages);
+    const createdIds = processMessages(widget.messages);
+    return () => {
+      for (const id of createdIds) {
+        try { processor.model.deleteSurface(id); } catch { /* already gone */ }
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.messages]);
 
@@ -391,6 +657,8 @@ function PlaygroundInner() {
   const [jsonInput, setJsonInput] = useState('');
   const [widgetName, setWidgetName] = useState('My Widget');
   const [jsonError, setJsonError] = useState('');
+  const [createPrompt, setCreatePrompt] = useState('');
+  const [showAdvancedJson, setShowAdvancedJson] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState<ScenarioDef | null>(null);
   const [selectedSurfaces, setSelectedSurfaces] = useState<Map<string, SurfaceModel<ReactComponentImplementation>>>(new Map());
@@ -398,6 +666,12 @@ function PlaygroundInner() {
   const [detailTab, setDetailTab] = useState<'preview' | 'json'>('preview');
   const customCounter = useRef(0);
   const customA2ui = useA2UI(); // For custom JSON editor
+  const createA2ui = useA2UI(); // For Create tab chat
+  const createStreaming = useStreaming();
+  const createSessionIdRef = useRef<string | undefined>(undefined);
+  const pendingSurfaceIdsRef = useRef<string[]>([]);
+  const createEndRef = useRef<HTMLDivElement>(null);
+  const [createMessages, setCreateMessages] = useState<ChatMessage[]>([]);
   const { widgets, addWidget, updateWidget, deleteWidget, duplicateWidget } = useWidgets();
 
   // Filter scenarios
@@ -484,13 +758,92 @@ function PlaygroundInner() {
     }
   }, [jsonInput, widgetName, addWidget]);
 
+  // Handle "Start Blank" — create empty widget and switch to widgets tab
+  const handleStartBlank = useCallback(() => {
+    const blankMessages: A2uiMsg[] = [
+      { version: 'v0.9', createSurface: { surfaceId: 'blank-widget', catalogId: 'kickstart' } },
+      { version: 'v0.9', updateComponents: { surfaceId: 'blank-widget', components: [
+        { id: 'root', component: 'Column', children: ['t1'] },
+        { id: 't1', component: 'Text', text: 'New widget — edit the JSON to build something!', variant: 'body1' },
+      ] } },
+    ];
+    addWidget('Untitled widget', blankMessages);
+    setActiveTab('widgets');
+  }, [addWidget]);
+
+  // Auto-scroll to bottom when messages or streaming text updates
+  useEffect(() => {
+    if (createMessages.length > 0 || createStreaming.isStreaming) {
+      createEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [createMessages, createStreaming.isStreaming, createStreaming.streamText]);
+
+  // Handle create from prompt — sends to /api/converse via useStreaming
+  const handleCreateSend = useCallback((text: string) => {
+    if (!text.trim() || createStreaming.isStreaming) return;
+    setCreatePrompt('');
+
+    const userMsg: ChatMessage = {
+      id: `create-${Date.now()}-user`,
+      role: 'user',
+      text,
+      timestamp: Date.now(),
+    };
+    setCreateMessages(prev => [...prev, userMsg]);
+
+    pendingSurfaceIdsRef.current = [];
+
+    createStreaming.send(text, createSessionIdRef.current, {
+      onDelta: () => {},
+      onA2UI: (msgs) => {
+        const ids = createA2ui.processMessages(msgs);
+        pendingSurfaceIdsRef.current.push(...ids);
+      },
+      onPhase: () => {},
+      onComplete: (fullText, model, receivedSessionId) => {
+        if (receivedSessionId && !createSessionIdRef.current) {
+          createSessionIdRef.current = receivedSessionId;
+        }
+        const surfaceIds = pendingSurfaceIdsRef.current.length > 0
+          ? [...pendingSurfaceIdsRef.current]
+          : undefined;
+        pendingSurfaceIdsRef.current = [];
+
+        const assistantMsg: ChatMessage = {
+          id: `create-${Date.now()}-assistant`,
+          role: 'assistant',
+          text: fullText,
+          model,
+          surfaceIds,
+          timestamp: Date.now(),
+        };
+        setCreateMessages(prev => [...prev, assistantMsg]);
+      },
+      onError: (error) => {
+        pendingSurfaceIdsRef.current = [];
+        const errorMsg: ChatMessage = {
+          id: `create-${Date.now()}-error`,
+          role: 'assistant',
+          text: `⚠️ ${error}`,
+          timestamp: Date.now(),
+        };
+        setCreateMessages(prev => [...prev, errorMsg]);
+      },
+    });
+  }, [createStreaming, createA2ui]);
+
   // Handle clear all
   const handleClearAll = useCallback(() => {
     customA2ui.reset();
     setJsonInput('');
     setJsonError('');
     resetDemoState();
-  }, [customA2ui]);
+    // Also reset the Create tab chat
+    createA2ui.reset();
+    setCreateMessages([]);
+    createSessionIdRef.current = undefined;
+    pendingSurfaceIdsRef.current = [];
+  }, [customA2ui, createA2ui]);
 
   // Handle copy icon path
   const handleCopyIcon = useCallback((icon: IconEntry) => {
@@ -595,84 +948,260 @@ function PlaygroundInner() {
         </TabList>
       </div>
 
-      {/* ---- Tab 1: Create ---- */}
-      {activeTab === 'create' && (
+      {/* ---- Tab intro ---- */}
+      {!(activeTab === 'create' && createMessages.length > 0) && (
+        <p className={classes.tabIntro}>
+          {activeTab === 'create' && 'Build A2UI interfaces by describing what you want. The AI generates interactive components from your prompt.'}
+          {activeTab === 'gallery' && 'Browse all built-in A2UI scenarios. Click any card to preview the full surface.'}
+          {activeTab === 'components' && 'Advanced A2UI component demos showing complex layouts, forms, and interactive patterns.'}
+          {activeTab === 'icons' && 'Search the icon catalog used across Kickstart components. Click to copy the icon path.'}
+          {activeTab === 'widgets' && 'Your saved A2UI widgets. Create new ones from the Create tab or start blank.'}
+        </p>
+      )}
+
+      {/* ---- Tab 1: Create (empty state — no messages yet) ---- */}
+      {activeTab === 'create' && createMessages.length === 0 && (
         <div className="playground-create-scroll">
-          <div className={classes.jsonEditorContainer}>
-            <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
-              Custom A2UI JSON
-            </Body1Strong>
-            <Caption1 style={{ marginBottom: tokens.spacingVerticalM, color: tokens.colorNeutralForeground3 }}>
-              Paste A2UI JSON messages below and click "Render JSON" to preview them. Save your work as a Widget for later access.
-              <br /><em>AI-assisted creation coming soon (R18 render_ui tool).</em>
-            </Caption1>
-            <Input
-              value={widgetName}
-              onChange={(_e, data) => setWidgetName(data.value)}
-              placeholder="Widget name..."
-              style={{ marginBottom: tokens.spacingVerticalM }}
-            />
-            <Textarea
-              className={classes.jsonTextarea}
-              value={jsonInput}
-              onChange={(_e, data) => setJsonInput(data.value)}
-              placeholder={JSON.stringify([
-                { version: 'v0.9', createSurface: { surfaceId: 'my-test', catalogId: 'kickstart' } },
-                { version: 'v0.9', updateComponents: { surfaceId: 'my-test', components: [
-                  { id: 'root', component: 'Column', children: ['t1'] },
-                  { id: 't1', component: 'Text', text: 'Hello!', variant: 'h2' },
-                ] } },
-              ], null, 2)}
-              rows={12}
-              resize="vertical"
-              spellCheck={false}
-            />
-            {jsonError && (
-              <MessageBar intent="error" className={classes.errorMessage}>
-                <MessageBarBody>{jsonError}</MessageBarBody>
-              </MessageBar>
-            )}
-            <div className={classes.jsonActions}>
+          {/* Hero section */}
+          <div className={classes.createHero}>
+            <div className={classes.createHeading}>What would you like to build?</div>
+            <div className={classes.createInputRow}>
+              <input
+                className={classes.createInput}
+                value={createPrompt}
+                onChange={(e) => setCreatePrompt(e.target.value)}
+                placeholder="Describe your A2UI widget..."
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSend(createPrompt); }}
+                disabled={createStreaming.isStreaming}
+              />
               <Button
                 appearance="primary"
+                shape="circular"
                 size="medium"
-                onClick={handleJsonRender}
-                disabled={!jsonInput.trim()}
+                onClick={() => handleCreateSend(createPrompt)}
+                disabled={!createPrompt.trim() || createStreaming.isStreaming}
               >
-                Render JSON
-              </Button>
-              <Button
-                appearance="outline"
-                size="medium"
-                onClick={handleSaveAsWidget}
-                disabled={!jsonInput.trim() || !widgetName.trim()}
-              >
-                Save as Widget
+                Create
               </Button>
             </div>
+            <div className={classes.createSubtext}>
+              or{' '}
+              <span className={classes.startBlankLink} onClick={handleStartBlank}>
+                Start Blank
+              </span>
+            </div>
 
-            {/* Rendered Custom Surfaces */}
-            {customSurfaceEntries.length > 0 && (
-              <div style={{ marginTop: tokens.spacingVerticalXL }}>
-                <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
-                  Rendered Surfaces ({customSurfaceEntries.length})
-                </Body1Strong>
-                <div className="playground-surfaces">
-                  {customSurfaceEntries.map(([id, surface]) => (
-                    <Card key={id} appearance="outline" style={{ marginBottom: tokens.spacingVerticalM }}>
-                      <CardHeader
-                        header={<Caption1 style={{ fontFamily: tokens.fontFamilyMonospace }}>{id}</Caption1>}
-                      />
-                      <div className={classes.cardBody}>
-                        <div className="a2ui-component">
-                          <A2UISurfaceWrapper surface={surface} />
+            {/* Advanced: raw JSON editor toggle */}
+            <div
+              className={classes.advancedToggle}
+              onClick={() => setShowAdvancedJson(!showAdvancedJson)}
+            >
+              {showAdvancedJson ? '▾' : '▸'} Advanced: paste raw A2UI JSON
+            </div>
+          </div>
+
+          {/* Collapsible JSON editor */}
+          {showAdvancedJson && (
+            <div className={classes.jsonEditorContainer}>
+              <Input
+                value={widgetName}
+                onChange={(_e, data) => setWidgetName(data.value)}
+                placeholder="Widget name..."
+                style={{ marginBottom: tokens.spacingVerticalM }}
+              />
+              <Textarea
+                className={classes.jsonTextarea}
+                value={jsonInput}
+                onChange={(_e, data) => setJsonInput(data.value)}
+                placeholder={JSON.stringify([
+                  { version: 'v0.9', createSurface: { surfaceId: 'my-test', catalogId: 'kickstart' } },
+                  { version: 'v0.9', updateComponents: { surfaceId: 'my-test', components: [
+                    { id: 'root', component: 'Column', children: ['t1'] },
+                    { id: 't1', component: 'Text', text: 'Hello!', variant: 'h2' },
+                  ] } },
+                ], null, 2)}
+                rows={12}
+                resize="vertical"
+                spellCheck={false}
+              />
+              {jsonError && (
+                <MessageBar intent="error" className={classes.errorMessage}>
+                  <MessageBarBody>{jsonError}</MessageBarBody>
+                </MessageBar>
+              )}
+              <div className={classes.jsonActions}>
+                <Button
+                  appearance="primary"
+                  size="medium"
+                  onClick={handleJsonRender}
+                  disabled={!jsonInput.trim()}
+                >
+                  Render JSON
+                </Button>
+                <Button
+                  appearance="outline"
+                  size="medium"
+                  onClick={handleSaveAsWidget}
+                  disabled={!jsonInput.trim() || !widgetName.trim()}
+                >
+                  Save as Widget
+                </Button>
+              </div>
+
+              {/* Rendered Custom Surfaces */}
+              {customSurfaceEntries.length > 0 && (
+                <div style={{ marginTop: tokens.spacingVerticalXL }}>
+                  <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
+                    Rendered Surfaces ({customSurfaceEntries.length})
+                  </Body1Strong>
+                  <div className="playground-surfaces">
+                    {customSurfaceEntries.map(([id, surface]) => (
+                      <Card key={id} appearance="outline" style={{ marginBottom: tokens.spacingVerticalM }}>
+                        <CardHeader
+                          header={<Caption1 style={{ fontFamily: tokens.fontFamilyMonospace }}>{id}</Caption1>}
+                        />
+                        <div className={classes.cardBody}>
+                          <div className="a2ui-component">
+                            <A2UISurfaceWrapper surface={surface} />
+                          </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---- Tab 1: Create (chat active — conversation in progress) ---- */}
+      {activeTab === 'create' && createMessages.length > 0 && (
+        <div className={classes.createChatShell}>
+          {/* Scrollable message area */}
+          <div className={classes.createMsgArea}>
+            {createMessages.map(msg => (
+              <div key={msg.id} className={classes.createBubbleRow}>
+                <div className={msg.role === 'user' ? classes.createBubbleUser : classes.createBubbleAssistant}>
+                  {msg.text}
+                </div>
+                {/* Render A2UI surfaces returned with this message */}
+                {msg.surfaceIds && msg.surfaceIds.map(sid => {
+                  const surface = createA2ui.getSurface(sid);
+                  return surface ? (
+                    <div key={sid} className={classes.createSurfaceBlock}>
+                      <A2UISurfaceWrapper surface={surface} />
+                    </div>
+                  ) : null;
+                })}
+              </div>
+            ))}
+
+            {/* Streaming: text arriving */}
+            {createStreaming.isStreaming && createStreaming.streamText && (
+              <div className={classes.createBubbleRow}>
+                <div className={classes.createBubbleStreaming}>
+                  {createStreaming.streamText}
                 </div>
               </div>
             )}
+
+            {/* Streaming: waiting for first token */}
+            {createStreaming.isStreaming && !createStreaming.streamText && (
+              <div className={classes.createTypingDots}>
+                <span /><span /><span />
+              </div>
+            )}
+
+            {/* Advanced JSON editor (collapsible, scrolls with messages) */}
+            {showAdvancedJson && (
+              <div style={{ maxWidth: '760px', width: '100%', margin: `${tokens.spacingVerticalL} auto 0` }}>
+                <div className={classes.jsonEditorContainer} style={{ padding: 0 }}>
+                  <Input
+                    value={widgetName}
+                    onChange={(_e, data) => setWidgetName(data.value)}
+                    placeholder="Widget name..."
+                    style={{ marginBottom: tokens.spacingVerticalM }}
+                  />
+                  <Textarea
+                    className={classes.jsonTextarea}
+                    value={jsonInput}
+                    onChange={(_e, data) => setJsonInput(data.value)}
+                    placeholder={JSON.stringify([
+                      { version: 'v0.9', createSurface: { surfaceId: 'my-test', catalogId: 'kickstart' } },
+                    ], null, 2)}
+                    rows={8}
+                    resize="vertical"
+                    spellCheck={false}
+                  />
+                  {jsonError && (
+                    <MessageBar intent="error" className={classes.errorMessage}>
+                      <MessageBarBody>{jsonError}</MessageBarBody>
+                    </MessageBar>
+                  )}
+                  <div className={classes.jsonActions}>
+                    <Button appearance="primary" size="medium" onClick={handleJsonRender} disabled={!jsonInput.trim()}>
+                      Render JSON
+                    </Button>
+                    <Button appearance="outline" size="medium" onClick={handleSaveAsWidget} disabled={!jsonInput.trim() || !widgetName.trim()}>
+                      Save as Widget
+                    </Button>
+                  </div>
+                  {customSurfaceEntries.length > 0 && (
+                    <div style={{ marginTop: tokens.spacingVerticalXL }}>
+                      <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
+                        Rendered Surfaces ({customSurfaceEntries.length})
+                      </Body1Strong>
+                      <div className="playground-surfaces">
+                        {customSurfaceEntries.map(([id, surface]) => (
+                          <Card key={id} appearance="outline" style={{ marginBottom: tokens.spacingVerticalM }}>
+                            <CardHeader header={<Caption1 style={{ fontFamily: tokens.fontFamilyMonospace }}>{id}</Caption1>} />
+                            <div className={classes.cardBody}>
+                              <div className="a2ui-component"><A2UISurfaceWrapper surface={surface} /></div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div ref={createEndRef} />
+          </div>
+
+          {/* Pinned input bar */}
+          <div className={classes.createInputBar}>
+            <div className={classes.createInputRow}>
+              <input
+                className={classes.createInput}
+                value={createPrompt}
+                onChange={(e) => setCreatePrompt(e.target.value)}
+                placeholder="Continue the conversation..."
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSend(createPrompt); }}
+                disabled={createStreaming.isStreaming}
+              />
+              <Button
+                appearance="primary"
+                shape="circular"
+                size="medium"
+                onClick={() => handleCreateSend(createPrompt)}
+                disabled={!createPrompt.trim() || createStreaming.isStreaming}
+              >
+                Send
+              </Button>
+            </div>
+            <div className={classes.createChatFooter}>
+              <span className={classes.startBlankLink} onClick={handleStartBlank}>Start Blank</span>
+              <span className={classes.createFooterSep}>·</span>
+              <span
+                className={classes.startBlankLink}
+                onClick={() => setShowAdvancedJson(v => !v)}
+              >
+                {showAdvancedJson ? 'Hide JSON' : 'Advanced JSON'}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -682,7 +1211,9 @@ function PlaygroundInner() {
         <div className="playground-gallery-scroll">
           <div className="playground-gallery">
             {filteredGalleryScenarios.map(scenario => (
-              <GalleryCard key={scenario.id} scenario={scenario} onCardClick={handleCardClick} />
+              <GalleryCardErrorBoundary key={scenario.id} label={scenario.label}>
+                <GalleryCard scenario={scenario} onCardClick={handleCardClick} />
+              </GalleryCardErrorBoundary>
             ))}
           </div>
         </div>
@@ -699,7 +1230,9 @@ function PlaygroundInner() {
                 <Subtitle2 className={classes.groupHeader}>{group}</Subtitle2>
                 <div className="playground-gallery">
                   {groupScenarios.map(scenario => (
-                    <GalleryCard key={scenario.id} scenario={scenario} onCardClick={handleCardClick} />
+                    <GalleryCardErrorBoundary key={scenario.id} label={scenario.label}>
+                      <GalleryCard scenario={scenario} onCardClick={handleCardClick} />
+                    </GalleryCardErrorBoundary>
                   ))}
                 </div>
               </div>
