@@ -14,10 +14,11 @@ import {
   getPhaseDefinition,
   getPhaseOrder,
   processResponse,
+  defaultRegistry,
 } from "@kickstart/core";
 import type { PhaseItem } from "@kickstart/core";
 import { getSession, createSession, addMessage } from "../lib/session-store.js";
-import { chatCompletion, chatCompletionStream, getChatDeploymentName } from "../lib/openai-client.js";
+import { chatCompletion, chatCompletionWithTools, getChatDeploymentName } from "../lib/openai-client.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -63,7 +64,7 @@ app.http("converse", {
       addMessage(state.sessionId, "user", body.message);
 
       // Build messages array for OpenAI
-      const messages = state.messages.map((m) => ({
+      const messages: import("../lib/openai-client.js").ChatMessage[] = state.messages.map((m) => ({
         role: m.role as "system" | "user" | "assistant",
         content: m.content,
       }));
@@ -98,10 +99,20 @@ app.http("converse", {
         return handleStreaming(messages, state.sessionId, engineState, phaseA2ui, context);
       }
 
-      // Non-streaming: call OpenAI with JSON object format
-      const result = await chatCompletion(messages, {
-        responseFormat: { type: "json_object" },
-      });
+      // Non-streaming: call OpenAI with JSON object format + tool support
+      const toolDefs = defaultRegistry.toOpenAIFormat();
+      const result = await chatCompletionWithTools(
+        messages,
+        {
+          responseFormat: { type: "json_object" },
+          tools: toolDefs,
+        },
+        async (name, args) => {
+          const tool = defaultRegistry.get(name);
+          if (!tool) throw new Error(`Unknown tool: ${name}`);
+          return tool.execute(args);
+        },
+      );
 
       // Parse the JSON envelope
       const processed = processResponse(result.content);
@@ -133,68 +144,111 @@ app.http("converse", {
 
 /** Handle SSE streaming response with typed events. */
 function handleStreaming(
-  messages: Array<{ role: string; content: string }>,
+  messages: import("../lib/openai-client.js").ChatMessage[],
   sessionId: string,
   engineState: { currentPhase: string },
   phaseA2ui: object[],
   context: InvocationContext,
 ): HttpResponseInit {
   const encoder = new TextEncoder();
-  let fullContent = "";
 
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Accumulate the full JSON response from the LLM
-        for await (const chunk of chatCompletionStream(
-          messages as Array<{ role: "system" | "user" | "assistant"; content: string }>,
-          { responseFormat: { type: "json_object" } },
-        )) {
-          fullContent += chunk;
-          // Send raw chunks for progress indication
-          controller.enqueue(
-            encoder.encode(`event: chunk\ndata: ${JSON.stringify({ content: chunk })}\n\n`),
-          );
+        // Resolve any tool calls first (non-streaming rounds), then stream final response
+        const toolDefs = defaultRegistry.toOpenAIFormat();
+        let workingMessages = [...messages];
+        let toolRoundsComplete = false;
+
+        // Run tool resolution rounds (non-streaming)
+        for (let round = 0; round < 5 && !toolRoundsComplete; round++) {
+          const probe = await chatCompletion(workingMessages, {
+            responseFormat: { type: "json_object" },
+            tools: toolDefs,
+          });
+
+          if (probe.finishReason !== "tool_calls" || !probe.toolCalls?.length) {
+            // No more tool calls — stream the final content we already have
+            const chunks = probe.content.match(/.{1,50}/g) ?? [probe.content];
+            for (const chunk of chunks) {
+              controller.enqueue(
+                encoder.encode(`event: chunk\ndata: ${JSON.stringify({ content: chunk })}\n\n`),
+              );
+            }
+
+            const processed = processResponse(probe.content);
+            addMessage(sessionId, "assistant", processed.message);
+
+            controller.enqueue(
+              encoder.encode(
+                `event: message\ndata: ${JSON.stringify({ content: processed.message })}\n\n`,
+              ),
+            );
+
+            const allA2ui = [...phaseA2ui, ...processed.a2uiMessages];
+            for (const msg of allA2ui) {
+              controller.enqueue(
+                encoder.encode(`event: a2ui\ndata: ${JSON.stringify(msg)}\n\n`),
+              );
+            }
+
+            const phaseDef = getPhaseDefinition(engineState.currentPhase as import("@kickstart/core").Phase);
+            controller.enqueue(
+              encoder.encode(
+                `event: done\ndata: ${JSON.stringify({
+                  sessionId,
+                  phase: engineState.currentPhase,
+                  phaseLabel: phaseDef.label,
+                  model: getChatDeploymentName(),
+                })}\n\n`,
+              ),
+            );
+
+            toolRoundsComplete = true;
+            break;
+          }
+
+          // Emit tool execution status to client
+          for (const tc of probe.toolCalls) {
+            controller.enqueue(
+              encoder.encode(
+                `event: tool_call\ndata: ${JSON.stringify({ name: tc.function.name })}\n\n`,
+              ),
+            );
+          }
+
+          // Append assistant tool-call message
+          workingMessages.push({
+            role: "assistant",
+            content: null,
+            tool_calls: probe.toolCalls,
+          });
+
+          // Execute tools and append results
+          for (const tc of probe.toolCalls) {
+            let toolResult: unknown;
+            try {
+              const args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+              const tool = defaultRegistry.get(tc.function.name);
+              if (!tool) throw new Error(`Unknown tool: ${tc.function.name}`);
+              toolResult = await tool.execute(args);
+            } catch (err) {
+              toolResult = { error: err instanceof Error ? err.message : String(err) };
+            }
+
+            controller.enqueue(
+              encoder.encode(
+                `event: tool_result\ndata: ${JSON.stringify({ name: tc.function.name, result: toolResult })}\n\n`,
+              ),
+            );
+
+            workingMessages.push({
+              role: "tool",
+              tool_call_id: tc.id,
+              content: JSON.stringify(toolResult),
+            });
+          }
         }
-
-        // Parse the completed JSON envelope
-        const processed = processResponse(fullContent);
-
-        // Store the conversational text
-        addMessage(sessionId, "assistant", processed.message);
-
-        // Emit typed SSE events
-
-        // event: message — the conversational text
-        controller.enqueue(
-          encoder.encode(
-            `event: message\ndata: ${JSON.stringify({ content: processed.message })}\n\n`,
-          ),
-        );
-
-        // event: a2ui — each A2UI message (phase indicator + LLM-generated)
-        const allA2ui = [...phaseA2ui, ...processed.a2uiMessages];
-        for (const msg of allA2ui) {
-          controller.enqueue(
-            encoder.encode(
-              `event: a2ui\ndata: ${JSON.stringify(msg)}\n\n`,
-            ),
-          );
-        }
-
-        const phaseDef = getPhaseDefinition(engineState.currentPhase as import("@kickstart/core").Phase);
-
-        // event: done — metadata
-        controller.enqueue(
-          encoder.encode(
-            `event: done\ndata: ${JSON.stringify({
-              sessionId,
-              phase: engineState.currentPhase,
-              phaseLabel: phaseDef.label,
-              model: getChatDeploymentName(),
-            })}\n\n`,
-          ),
-        );
 
         controller.close();
       } catch (err) {

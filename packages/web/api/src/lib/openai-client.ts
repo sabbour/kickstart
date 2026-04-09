@@ -144,6 +144,57 @@ export async function chatCompletion(
 }
 
 /**
+ * Call Azure OpenAI Chat Completions with automatic tool execution.
+ *
+ * Supports multi-step tool use: if the LLM requests tool calls, executes them
+ * via the provided registry, appends results, and calls the LLM again — up to
+ * maxToolRounds times — before returning the final text response.
+ */
+export async function chatCompletionWithTools(
+  messages: ChatMessage[],
+  options: ChatCompletionOptions,
+  executeTool: (name: string, args: Record<string, unknown>) => Promise<unknown>,
+  maxToolRounds = 5,
+): Promise<ChatCompletionResult> {
+  const workingMessages = [...messages];
+
+  for (let round = 0; round < maxToolRounds; round++) {
+    const result = await chatCompletion(workingMessages, options);
+
+    if (result.finishReason !== "tool_calls" || !result.toolCalls?.length) {
+      return result;
+    }
+
+    // Append the assistant's tool-call message
+    workingMessages.push({
+      role: "assistant",
+      content: null,
+      tool_calls: result.toolCalls,
+    });
+
+    // Execute each requested tool and append results
+    for (const toolCall of result.toolCalls) {
+      let toolResult: unknown;
+      try {
+        const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+        toolResult = await executeTool(toolCall.function.name, args);
+      } catch (err) {
+        toolResult = { error: err instanceof Error ? err.message : String(err) };
+      }
+
+      workingMessages.push({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        content: JSON.stringify(toolResult),
+      });
+    }
+  }
+
+  // Exceeded max rounds — do a final call without tools to get a text response
+  return chatCompletion(workingMessages, { ...options, tools: undefined });
+}
+
+/**
  * Call Azure OpenAI Chat Completions with streaming (SSE).
  * Yields content deltas as they arrive.
  */
