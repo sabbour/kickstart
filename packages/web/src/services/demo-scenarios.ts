@@ -1,6 +1,7 @@
 import type { DemoResponse, A2uiMsg, A2uiComponent } from '../types';
+import type { VirtualFileSystem } from './virtual-fs';
 
-const CATALOG_ID = 'https://a2ui.org/specification/v0_9/basic_catalog.json';
+const CATALOG_ID = 'kickstart';
 
 function surface(surfaceId: string, components: A2uiComponent[]): A2uiMsg[] {
   return [
@@ -15,26 +16,17 @@ const WELCOME: DemoResponse = {
   model: 'gpt-5.3-chat',
   typingDelay: 1200,
   a2uiMessages: surface('welcome-surface', [
-    { id: 'root', component: 'Column', children: ['card'] },
-    { id: 'card', component: 'Card', child: 'card-inner' },
-    { id: 'card-inner', component: 'Column', children: ['title', 'divider', 'options-row'] },
-    { id: 'title', component: 'Text', text: 'Choose your path', variant: 'subtitle1' },
-    { id: 'divider', component: 'Divider' },
-    { id: 'options-row', component: 'Row', children: ['opt-web', 'opt-ai'], gap: 'medium' },
-    { id: 'opt-web', component: 'Card', child: 'opt-web-col' },
-    { id: 'opt-web-col', component: 'Column', children: ['opt-web-title', 'opt-web-desc', 'opt-web-btn'] },
-    { id: 'opt-web-title', component: 'Text', text: '🌐 Web App or API', variant: 'subtitle2' },
-    { id: 'opt-web-desc', component: 'Text', text: 'Ship a web frontend, REST API, or microservice with CI/CD and a production URL.', variant: 'body2' },
-    { id: 'opt-web-btn', component: 'Button', child: 'opt-web-btn-text', variant: 'primary',
-      action: { event: { name: 'select-track', data: { track: 'web-app' } } } },
-    { id: 'opt-web-btn-text', component: 'Text', text: 'Build a Web App' },
-    { id: 'opt-ai', component: 'Card', child: 'opt-ai-col' },
-    { id: 'opt-ai-col', component: 'Column', children: ['opt-ai-title', 'opt-ai-desc', 'opt-ai-btn'] },
-    { id: 'opt-ai-title', component: 'Text', text: '🤖 AI Agent', variant: 'subtitle2' },
-    { id: 'opt-ai-desc', component: 'Text', text: 'Deploy an AI agent that calls tools, retrieves knowledge, and reasons over data.', variant: 'body2' },
-    { id: 'opt-ai-btn', component: 'Button', child: 'opt-ai-btn-text', variant: 'outlined',
-      action: { event: { name: 'select-track', data: { track: 'agentic' } } } },
-    { id: 'opt-ai-btn-text', component: 'Text', text: 'Build an AI Agent' },
+    { id: 'root', component: 'Column', children: ['title-text', 'radio-group'] },
+    { id: 'title-text', component: 'Text', text: 'Choose your path', variant: 'subtitle1' },
+    { id: 'radio-group', component: 'RadioGroup',
+      options: [
+        { id: 'web-app', label: '🌐 Web App or API', description: 'Ship a web frontend, REST API, or microservice with CI/CD and a production URL.', recommended: true },
+        { id: 'agentic', label: '🤖 AI Agent', description: 'Deploy an AI agent that calls tools, retrieves knowledge, and reasons over data.' },
+        { id: 'data-pipeline', label: '📊 Data Pipeline', description: 'Process streaming or batch data with auto-scaling workers and managed storage.' },
+      ],
+      value: '',
+      action: { event: { name: 'select-track', data: { track: 'web-app' } } },
+    },
   ]),
 };
 
@@ -190,7 +182,13 @@ const DEPLOY_SUCCESS: DemoResponse = {
   model: 'gpt-5.3-chat',
   typingDelay: 2500,
   a2uiMessages: surface('deploy-surface', [
-    { id: 'root', component: 'Column', children: ['success-card', 'next-card'] },
+    { id: 'root', component: 'Column', children: ['progress', 'success-card', 'next-card'] },
+    { id: 'progress', component: 'ProgressSteps', steps: [
+      { id: 'build', label: 'Build', status: 'complete' },
+      { id: 'push', label: 'Push to ACR', status: 'complete' },
+      { id: 'deploy', label: 'Deploy to AKS', status: 'complete' },
+      { id: 'verify', label: 'Health Check', status: 'complete' },
+    ] },
     { id: 'success-card', component: 'Card', child: 'success-inner' },
     { id: 'success-inner', component: 'Column', children: ['check-title', 'divider1', 'endpoints'], gap: 'small' },
     { id: 'check-title', component: 'Text', text: '✅ Deployment Successful', variant: 'h2' },
@@ -212,10 +210,103 @@ const DEPLOY_SUCCESS: DemoResponse = {
   ]),
 };
 
+const CONFIGURE_FORM: DemoResponse = {
+  text: "Let's configure your app. Fill in the details below — I'll handle the rest.",
+  phase: 'generate',
+  model: 'gpt-5.3-chat',
+  typingDelay: 1500,
+  a2uiMessages: surface('config-surface', [
+    { id: 'root', component: 'Column', children: ['progress', 'form1', 'form2'] },
+    { id: 'progress', component: 'ProgressSteps', steps: [
+      { id: 'info', label: 'App Info', status: 'active' },
+      { id: 'infra', label: 'Infrastructure', status: 'pending' },
+      { id: 'cicd', label: 'CI/CD', status: 'pending' },
+      { id: 'done', label: 'Deploy', status: 'pending' },
+    ] },
+    { id: 'form1', component: 'FormGroup', title: 'Application Details', step: 1, child: 'form1-inner' },
+    { id: 'form1-inner', component: 'Column', children: ['app-name', 'app-region'] },
+    { id: 'app-name', component: 'TextField', label: 'App Name', value: 'my-web-app', placeholder: 'Enter your app name' },
+    { id: 'app-region', component: 'ChoicePicker', label: 'Region', options: [
+      { id: 'eastus', label: 'East US' },
+      { id: 'westus3', label: 'West US 3' },
+      { id: 'westeurope', label: 'West Europe' },
+    ], value: 'eastus' },
+    { id: 'form2', component: 'FormGroup', title: 'Runtime', step: 2, child: 'form2-inner' },
+    { id: 'form2-inner', component: 'Column', children: ['runtime-pick', 'continue-btn'] },
+    { id: 'runtime-pick', component: 'RadioGroup', options: [
+      { id: 'node', label: 'Node.js 20', description: 'JavaScript/TypeScript runtime', recommended: true },
+      { id: 'python', label: 'Python 3.12', description: 'Great for APIs and data services' },
+      { id: 'dotnet', label: '.NET 8', description: 'Enterprise-grade C# runtime' },
+    ], value: '', action: { event: { name: 'select-runtime' } } },
+    { id: 'continue-btn', component: 'Button', child: 'continue-text', variant: 'primary',
+      action: { event: { name: 'continue-config' } } },
+    { id: 'continue-text', component: 'Text', text: 'Continue →' },
+  ]),
+};
+
+const CODE_PREVIEW: DemoResponse = {
+  text: "Here are the key files I generated for your app. Everything is production-ready with best practices baked in.",
+  phase: 'generate',
+  model: 'gpt-5.3-chat',
+  typingDelay: 1800,
+  a2uiMessages: surface('code-surface', [
+    { id: 'root', component: 'Column', children: ['code-title', 'dockerfile-block', 'deployment-block'] },
+    { id: 'code-title', component: 'Text', text: 'Generated Files', variant: 'h2' },
+    { id: 'dockerfile-block', component: 'CodeBlock',
+      filename: 'Dockerfile',
+      language: 'dockerfile',
+      code: `FROM node:20-slim AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --production=false
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+EXPOSE 80
+HEALTHCHECK CMD wget -q --spider http://localhost/health || exit 1
+USER nginx`,
+    },
+    { id: 'deployment-block', component: 'CodeBlock',
+      filename: 'k8s/deployment.yaml',
+      language: 'yaml',
+      code: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-web-app
+  labels:
+    app: my-web-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: my-web-app
+  template:
+    spec:
+      containers:
+        - name: app
+          image: myacr.azurecr.io/my-web-app:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi`,
+    },
+  ]),
+};
+
 const SCENARIOS: { match: RegExp | null; response: DemoResponse }[] = [
   { match: /deploy|ship|launch|go live/i, response: DEPLOY_SUCCESS },
   { match: /review|summary|ready|looks good/i, response: REVIEW },
-  { match: /generat|file|scaffold|code|create/i, response: FILE_GENERATION },
+  { match: /code|preview|dockerfile|yaml|file/i, response: CODE_PREVIEW },
+  { match: /config|form|setup|step/i, response: CONFIGURE_FORM },
+  { match: /generat|scaffold|create/i, response: FILE_GENERATION },
   { match: /detail|service|network|tab/i, response: DESIGN_DETAIL },
   { match: /architect|design|stack|build|movie|app|api|recipe|bot|match|dash|library|coach|workout|parking|study/i, response: ARCHITECTURE },
   { match: null, response: WELCOME },
@@ -232,7 +323,7 @@ export function getDemoResponse(userMessage: string): DemoResponse {
   }
 
   // Cycle through scenarios for subsequent turns
-  const scenarioFlow = [ARCHITECTURE, DESIGN_DETAIL, FILE_GENERATION, REVIEW, DEPLOY_SUCCESS];
+  const scenarioFlow = [ARCHITECTURE, DESIGN_DETAIL, CONFIGURE_FORM, CODE_PREVIEW, FILE_GENERATION, REVIEW, DEPLOY_SUCCESS];
   
   // Check keyword matches first
   for (const scenario of SCENARIOS) {
@@ -247,4 +338,274 @@ export function getDemoResponse(userMessage: string): DemoResponse {
 
 export function resetDemoState(): void {
   turnCount = 0;
+}
+
+// --- Demo file content for the Spark file-generation experience ---
+
+const DEMO_FILES: { path: string; content: string; language: string }[] = [
+  {
+    path: 'Dockerfile',
+    language: 'dockerfile',
+    content: `FROM node:20-slim AS builder
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --ignore-scripts
+
+COPY tsconfig.json ./
+COPY src/ ./src/
+RUN npm run build
+
+# --- Production image ---
+FROM node:20-slim AS runtime
+WORKDIR /app
+
+ENV NODE_ENV=production
+RUN addgroup --system app && adduser --system --ingroup app app
+
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY package*.json ./
+
+EXPOSE 3000
+USER app
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \\
+  CMD node -e "fetch('http://localhost:3000/healthz').then(r=>{if(!r.ok)throw r})"
+
+CMD ["node", "dist/index.js"]`,
+  },
+  {
+    path: 'deployment.yaml',
+    language: 'yaml',
+    content: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  labels:
+    app: my-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: my-app
+          image: myacr.azurecr.io/my-app:latest
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: COSMOS_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: my-app-secrets
+                  key: cosmos-connection`,
+  },
+  {
+    path: 'service.yaml',
+    language: 'yaml',
+    content: `apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  labels:
+    app: my-app
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app: my-app
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    kubernetes.io/ingress.class: webapprouting.kubernetes.azure.com
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - my-app.aksauto.io
+      secretName: my-app-tls
+  rules:
+    - host: my-app.aksauto.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-app
+                port:
+                  number: 80`,
+  },
+  {
+    path: '.github/workflows/deploy.yml',
+    language: 'yaml',
+    content: `name: Deploy to AKS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ACR_NAME: myacr
+  AKS_CLUSTER: my-aks-cluster
+  RESOURCE_GROUP: my-app-rg
+  IMAGE_NAME: my-app
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: \${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: \${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: \${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build & push to ACR
+        run: |
+          az acr build \\
+            --registry \${{ env.ACR_NAME }} \\
+            --image \${{ env.IMAGE_NAME }}:\${{ github.sha }} \\
+            --image \${{ env.IMAGE_NAME }}:latest .
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: \${{ env.RESOURCE_GROUP }}
+          cluster-name: \${{ env.AKS_CLUSTER }}
+
+      - name: Deploy to AKS
+        run: |
+          kubectl set image deployment/my-app \\
+            my-app=\${{ env.ACR_NAME }}.azurecr.io/\${{ env.IMAGE_NAME }}:\${{ github.sha }}
+          kubectl rollout status deployment/my-app --timeout=120s`,
+  },
+  {
+    path: 'src/index.ts',
+    language: 'typescript',
+    content: `import express from 'express';
+
+const app = express();
+const PORT = process.env.PORT ?? 3000;
+
+app.use(express.json());
+
+// Health check endpoint
+app.get('/healthz', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Root endpoint
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'my-app',
+    version: '1.0.0',
+    message: 'Welcome to the API — deployed on AKS Automatic',
+  });
+});
+
+// Example CRUD endpoint
+app.get('/api/items', (_req, res) => {
+  res.json([
+    { id: '1', name: 'First item', createdAt: new Date().toISOString() },
+    { id: '2', name: 'Second item', createdAt: new Date().toISOString() },
+  ]);
+});
+
+app.listen(PORT, () => {
+  console.log(\`Server running on port \${PORT}\`);
+});`,
+  },
+  {
+    path: 'package.json',
+    language: 'json',
+    content: `{
+  "name": "my-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  }
+}`,
+  },
+];
+
+/**
+ * Populate the VirtualFileSystem with demo files, simulating a staggered
+ * generation effect. Each file appears as "generating" then flips to "complete".
+ */
+export function populateDemoFiles(fs: VirtualFileSystem): void {
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i >= DEMO_FILES.length) {
+      clearInterval(interval);
+      return;
+    }
+    const f = DEMO_FILES[i];
+    // Brief generating flash, then complete
+    fs.writeGenerating(f.path, f.content, f.language);
+    setTimeout(() => {
+      fs.write(f.path, f.content, f.language);
+    }, 400);
+    i++;
+  }, 350);
+}
+
+/** Check whether the current demo turn is the file-generation phase. */
+export function isDemoFileGenerationPhase(): boolean {
+  return turnCount >= 4; // FILE_GENERATION is the 3rd scenario (turn 4+)
 }

@@ -1,0 +1,295 @@
+/* ==========================================================================
+   File Editor — Spark code generation panel
+   ========================================================================== */
+
+/* --- File editor panel (right column) --- */
+.file-editor {
+  display: flex;
+  width: var(--file-viewer-width);
+  min-width: 320px;
+  max-width: 50vw;
+  flex-shrink: 0;
+  border-left: 1px solid var(--color-neutral-stroke-2);
+  background: var(--color-neutral-background-1);
+  overflow: hidden;
+}
+
+/* --- File tree (left side of editor) --- */
+.file-tree {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--color-neutral-stroke-2);
+  background: var(--color-neutral-background-inverted);
+  color: #cccccc;
+  overflow: hidden;
+}
+
+.file-tree-header {
+  padding: var(--spacing-s) var(--spacing-m);
+  font-size: var(--font-size-100);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888888;
+  border-bottom: 1px solid #333333;
+  flex-shrink: 0;
+}
+
+.file-tree-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-xs) 0;
+}
+
+.file-tree-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: 3px 12px;
+  border: none;
+  background: transparent;
+  color: #cccccc;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-200);
+  line-height: var(--line-height-200);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background var(--duration-fast) var(--easing-ease);
+}
+
+.file-tree-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.file-tree-item.selected {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.file-tree-item.generating {
+  animation: tree-pulse 1.5s ease-in-out infinite;
+}
+
+.file-tree-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.file-tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Code view (right side of editor) --- */
+.code-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: #1e1e1e;
+  color: #d4d4d4;
+}
+
+.code-view-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.code-view-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-m);
+  color: #666666;
+  font-size: var(--font-size-300);
+}
+
+.code-view-placeholder-icon {
+  font-size: 40px;
+  opacity: 0.5;
+}
+
+/* --- Code header bar --- */
+.code-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-xs) var(--spacing-m);
+  background: #252526;
+  border-bottom: 1px solid #333333;
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.code-view-file-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.code-view-filename {
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-semibold);
+  color: #cccccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.code-view-lang-badge {
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: var(--radius-small);
+  background: #0e639c;
+  color: #ffffff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.code-view-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.code-view-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: #aaaaaa;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-100);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+.code-view-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+/* --- Code body with line numbers --- */
+.code-view-body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--spacing-s) 0;
+}
+
+.code-view-pre {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  line-height: 20px;
+  tab-size: 2;
+}
+
+.code-line {
+  display: flex;
+  min-height: 20px;
+  padding: 0 var(--spacing-m) 0 0;
+}
+
+.code-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.code-line-number {
+  display: inline-block;
+  width: 48px;
+  padding-right: var(--spacing-m);
+  text-align: right;
+  color: #555555;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.code-line-content {
+  flex: 1;
+  white-space: pre;
+  min-width: 0;
+}
+
+/* --- Generating state --- */
+.code-view.generating {
+  position: relative;
+}
+
+.code-view-generating {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  padding: var(--spacing-xs) var(--spacing-m);
+  background: #252526;
+  border-top: 1px solid #333333;
+  color: #aaaaaa;
+  font-size: var(--font-size-100);
+  flex-shrink: 0;
+}
+
+.generating-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-brand-primary);
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+
+/* --- Animations --- */
+@keyframes tree-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+/* --- Three-column layout when files exist --- */
+.app-layout.has-files .chat-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- Scrollbar styling for dark panels --- */
+.file-tree-list::-webkit-scrollbar,
+.code-view-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.file-tree-list::-webkit-scrollbar-track,
+.code-view-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.file-tree-list::-webkit-scrollbar-thumb,
+.code-view-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.file-tree-list::-webkit-scrollbar-thumb:hover,
+.code-view-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}

@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { MessageProcessor, Catalog } from '../vendor/a2ui/web_core/index';
-import { basicCatalog } from '../vendor/a2ui/react/index';
+import { kickstartCatalog } from '../catalog/kickstart-catalog';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
 import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
 import type { A2uiMsg } from '../types';
@@ -19,7 +19,7 @@ export function useA2UI(): A2UIHandle {
 
   if (!processorRef.current) {
     processorRef.current = new MessageProcessor<ReactComponentImplementation>(
-      [basicCatalog as Catalog<ReactComponentImplementation>],
+      [kickstartCatalog as Catalog<ReactComponentImplementation>],
       (action) => {
         console.log('[A2UI] action:', action);
       }

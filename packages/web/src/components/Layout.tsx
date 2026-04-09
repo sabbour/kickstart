@@ -7,6 +7,8 @@ interface LayoutProps {
   onNewSession: () => void;
   showSessionsToggle: boolean;
   sidebar?: React.ReactNode;
+  fileEditor?: React.ReactNode;
+  hasFiles?: boolean;
   children: React.ReactNode;
 }
 
@@ -16,6 +18,8 @@ export function Layout({
   onNewSession,
   showSessionsToggle,
   sidebar,
+  fileEditor,
+  hasFiles,
   children,
 }: LayoutProps) {
   return (
@@ -25,11 +29,12 @@ export function Layout({
         onNewSession={onNewSession}
         showSessionsToggle={showSessionsToggle}
       />
-      <div className="app-layout">
+      <div className={`app-layout${hasFiles ? ' has-files' : ''}`}>
         {sidebar}
         <main className="chat-main" role="main">
           {children}
         </main>
+        {fileEditor}
       </div>
     </div>
   );

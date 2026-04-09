@@ -20,27 +20,36 @@ export function ChatMessage({ message, getSurface }: ChatMessageProps) {
 
   // Assistant message
   return (
-    <div className="chat-bubble assistant">
-      {/* Render text with basic markdown-like formatting */}
-      {message.text && (
-        <div dangerouslySetInnerHTML={{ __html: formatText(message.text) }} />
-      )}
+    <div className="chat-bubble-row">
+      <img
+        src="/assets/icons/compute/aks-automatic.svg"
+        alt=""
+        className="assistant-avatar"
+        width="28"
+        height="28"
+      />
+      <div className="chat-bubble assistant">
+        {/* Render text with basic markdown-like formatting */}
+        {message.text && (
+          <div dangerouslySetInnerHTML={{ __html: formatText(message.text) }} />
+        )}
 
-      {/* Render A2UI surfaces inline */}
-      {message.surfaceIds?.map(surfaceId => {
-        const surface = getSurface(surfaceId);
-        if (!surface) return null;
-        return (
-          <div key={surfaceId} className="a2ui-component">
-            <A2UISurfaceWrapper surface={surface} />
-          </div>
-        );
-      })}
+        {/* Render A2UI surfaces inline */}
+        {message.surfaceIds?.map(surfaceId => {
+          const surface = getSurface(surfaceId);
+          if (!surface) return null;
+          return (
+            <div key={surfaceId} className="a2ui-component">
+              <A2UISurfaceWrapper surface={surface} />
+            </div>
+          );
+        })}
 
-      {/* Model indicator */}
-      {message.model && (
-        <span className="model-indicator">{message.model}</span>
-      )}
+        {/* Model indicator */}
+        {message.model && (
+          <span className="model-indicator">{message.model}</span>
+        )}
+      </div>
     </div>
   );
 }

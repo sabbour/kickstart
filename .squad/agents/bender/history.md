@@ -199,6 +199,16 @@
 - **Architecture:** Two Azure OpenAI models sharing one endpoint/key — `gpt-5.3-chat` for conversation (Chat Completions API), `gpt-5.3-codex` for code generation (Responses API).
 - **Env vars:** `AZURE_OPENAI_CHAT_DEPLOYMENT` and `AZURE_OPENAI_CODEX_DEPLOYMENT` added. `AZURE_OPENAI_DEPLOYMENT` kept as fallback for both. Same `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` for both models.
 - **Responses API shape:** `POST {endpoint}/openai/deployments/{codex}/responses?api-version=2025-03-01-preview`. Body uses `input` (non-system messages) + `instructions` (system prompt). Response has `output[].content[].text` where type=`output_text`. Streaming uses `response.output_text.delta` events with `delta` field.
+
+### 2026-04-08: Virtual Filesystem & File Editor (Phase 2 — Spark)
+
+- **VirtualFileSystem service:** In-memory `Map<string, VirtualFile>` with `useSyncExternalStore` compatibility (subscribe + getSnapshot). Path normalization strips leading slashes, collapses duplicates, forward-slashes only. Language detection via extension map + filename map (Dockerfile, Makefile, etc.).
+- **Tree generation:** Flat file list → nested `FileTreeNode[]` via path splitting. Directories sorted before files, alphabetical within each group. Auto-expanded by default.
+- **FileEditor component:** Three-part panel — FileTree (220px dark sidebar), CodeView (dark VS Code-style code area), wired into Layout as a right column slot.
+- **Demo file generation:** `populateDemoFiles()` stagger-writes 6 realistic AKS deployment files (Dockerfile, deployment.yaml, service.yaml, GitHub Actions workflow, Express app, package.json) with a brief `generating` → `complete` animation per file.
+- **Layout pattern:** Added `fileEditor` and `hasFiles` props to Layout component. `has-files` CSS class on `.app-layout` enables 3-column mode (Sidebar | Chat | FileEditor).
+- **CSS theming:** file-editor.css uses VS Code dark palette (#1e1e1e, #252526, #333333) with project CSS custom properties (spacing, radius, font-family-mono). Generating state uses pulse animation.
+- **Key files:** `packages/web/src/services/virtual-fs.ts`, `packages/web/src/components/FileEditor/`, `packages/web/css/file-editor.css`
 - **openai-client.ts:** Exports 4 functions — `chatCompletion`, `chatCompletionStream` (Chat Completions API), `codexCompletion`, `codexCompletionStream` (Responses API). Plus `isConfigured()` helper. All types exported.
 - **New endpoint:** `POST /api/generate` — code generation endpoint. Accepts `{ prompt, type?, context? }` where type is `dockerfile|kubernetes|pipeline|bicep|generic`. Each type has tailored system instructions. Supports SSE streaming. Uses codex model with temperature 0.2.
 - **inspirations.ts:** Updated `isOpenAIConfigured()` to accept `AZURE_OPENAI_CHAT_DEPLOYMENT` as alternative to `AZURE_OPENAI_DEPLOYMENT`.

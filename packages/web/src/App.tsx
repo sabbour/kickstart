@@ -1,23 +1,29 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { Layout } from './components/Layout';
 import { Landing } from './components/Landing';
 import { ChatShell } from './components/Chat/ChatShell';
 import { SessionsSidebar } from './components/Sidebar/SessionsSidebar';
+import { FileEditor } from './components/FileEditor/FileEditor';
 import { useA2UI } from './hooks/useA2UI';
 import { useSessions } from './hooks/useSessions';
 import { useStreaming } from './hooks/useStreaming';
-import { getDemoResponse, resetDemoState } from './services/demo-scenarios';
+import { getDemoResponse, resetDemoState, populateDemoFiles } from './services/demo-scenarios';
 import { healthCheck } from './services/api-client';
+import { VirtualFileSystem } from './services/virtual-fs';
 import type { AppMode, ChatMessage } from './types';
 
 export function App() {
   const [mode, setMode] = useState<AppMode>('landing');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isApiAvailable, setIsApiAvailable] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<string | undefined>();
 
   const a2ui = useA2UI();
   const sessions = useSessions();
   const streaming = useStreaming();
+
+  // Single VFS instance for the app lifetime
+  const fs = useMemo(() => new VirtualFileSystem(), []);
 
   // Messages for the active session (stored in component state for real-time updates)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -119,6 +125,11 @@ export function App() {
     // Simulate typing delay
     await simulateStreaming(demo.text);
 
+    // If this is the file-generation phase, populate the VFS
+    if (demo.phase === 'generate') {
+      populateDemoFiles(fs);
+    }
+
     // Process A2UI messages
     let surfaceIds: string[] = [];
     if (demo.a2uiMessages.length > 0) {
@@ -136,11 +147,13 @@ export function App() {
     };
     setMessages(prev => [...prev, assistantMsg]);
     sessions.addMessage(sessionId, assistantMsg);
-  }, [a2ui, sessions, simulateStreaming]);
+  }, [a2ui, sessions, simulateStreaming, fs]);
 
   const handleStartChat = useCallback((prompt: string) => {
     resetDemoState();
     a2ui.reset();
+    fs.clear();
+    setSelectedFile(undefined);
     setMessages([]);
     setMode('chat');
     document.body.classList.remove('on-landing');
@@ -160,16 +173,18 @@ export function App() {
       // Get demo response
       handleDemoResponse(prompt, session.id);
     }, 100);
-  }, [sessions, a2ui, handleDemoResponse]);
+  }, [sessions, a2ui, handleDemoResponse, fs]);
 
   const handleNewSession = useCallback(() => {
     resetDemoState();
     a2ui.reset();
+    fs.clear();
+    setSelectedFile(undefined);
     setMessages([]);
     setMode('landing');
     document.body.classList.add('on-landing');
     sessions.setActiveSessionId(null);
-  }, [a2ui, sessions]);
+  }, [a2ui, sessions, fs]);
 
   const handleResumeSession = useCallback((sessionId: string) => {
     sessions.setActiveSessionId(sessionId);
@@ -183,6 +198,8 @@ export function App() {
 
   const isStreaming = streaming.isStreaming || isDemoStreaming;
   const currentStreamText = isDemoStreaming ? demoStreamText : streaming.streamText;
+  const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
+  const hasFiles = fsFiles.length > 0;
 
   return (
     <Layout
@@ -190,6 +207,7 @@ export function App() {
       onToggleSidebar={() => setSidebarOpen(prev => !prev)}
       onNewSession={handleNewSession}
       showSessionsToggle={mode === 'chat'}
+      hasFiles={hasFiles}
       sidebar={mode === 'chat' ? (
         <SessionsSidebar
           isOpen={sidebarOpen}
@@ -198,6 +216,13 @@ export function App() {
           activeSessionId={sessions.activeSessionId}
           onSelectSession={handleResumeSession}
           onNewSession={handleNewSession}
+        />
+      ) : undefined}
+      fileEditor={mode === 'chat' ? (
+        <FileEditor
+          fs={fs}
+          selectedPath={selectedFile}
+          onSelectFile={setSelectedFile}
         />
       ) : undefined}
     >

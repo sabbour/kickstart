@@ -210,3 +210,14 @@
 - **CSS class reuse**: All components use existing CSS classes (`.app-shell`, `.chat-bubble.user`, `.chat-bubble.assistant`, `.landing-page`, `.track-card`, `.framework-pill`, `.sessions-sidebar`, etc.) — no new CSS files created.
 - **Placeholder carousel**: 10 inspiration ideas rotate every 4s with fade animation (CSS `.hero-input-placeholder.visible` class toggle).
 - **Build**: `npx vite build` succeeds — 467 modules, 388KB bundle. No TypeScript errors.
+
+### 2025-07-29 — A2UI Phase 2: Fluent 2 styling + custom Kickstart catalog
+- **A2UI override CSS**: Created `packages/web/css/a2ui-overrides.css` — comprehensive Fluent 2 styling for all vendored A2UI components using CSS `!important` overrides. Targets buttons, cards, text variants, tabs, inputs, checkboxes, choice pickers, dividers, rows/columns. Uses theme.css design tokens (`--color-brand-primary`, `--shadow-2`, `--radius-large`, etc.).
+- **Override strategy**: Scoped to `.a2ui-surface-wrapper` selector prefix. Inline styles from vendored components overridden with `!important`. Tab active state detected via `[style*="font-weight: bold"]` attribute selector. Card containers detected via `[style*="boxShadow"]`.
+- **Assistant avatar**: Added AKS Automatic icon (`/assets/icons/compute/aks-automatic.svg`) as `.assistant-avatar` to the left of assistant chat bubbles. Wrapped in `.chat-bubble-row` flex container for horizontal layout.
+- **Kickstart catalog**: Created `packages/web/src/catalog/kickstart-catalog.ts` — extends `basicCatalog` with 4 custom components. Registered in `useA2UI` hook replacing `basicCatalog`. Catalog ID changed to `'kickstart'`.
+- **Custom components**: RadioGroup (selectable card grid with recommended badge), FormGroup (titled card with step indicator), CodeBlock (dark-themed code with filename header + copy button), ProgressSteps (horizontal step dots with pulse animation).
+- **Demo scenarios updated**: Welcome now uses RadioGroup for track selection (3 options with recommended badge). Added CONFIGURE_FORM scenario (FormGroup + ProgressSteps + RadioGroup). Added CODE_PREVIEW scenario (CodeBlock with Dockerfile + deployment.yaml). DEPLOY_SUCCESS now includes ProgressSteps showing completed pipeline.
+- **CATALOG_ID**: Changed from basic catalog URL to `'kickstart'` string in demo-scenarios.ts to match the kickstart catalog ID.
+- **Build**: `npx vite build` succeeds — 478 modules. No TypeScript errors.
+- **Pattern**: Custom components use `createReactComponent` from A2UI adapter, same pattern as vendored components. CSS classes prefixed with `kickstart-` to avoid collisions.
