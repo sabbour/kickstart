@@ -2621,3 +2621,187 @@ Created `packages/core/src/kits/` with:
 ---
 
 - Kit-level connector injection into `APIConnectorContext` React registry — the context still manages its own connector instances. The kit's connectors go into `defaultConnectorRegistry` for engine/server use. Cross-wiring deferred to when auth connectors are built (B-14).
+
+---
+
+# Decision: Unified Action Model for handleAction (B-25)
+
+**Author:** Bender (Backend Dev)
+**Date:** 2026-04-09
+**Status:** Accepted
+**Supersedes:** None
+**Related:** B-23 (A2UI action handler TDD tests), B-24 (action endpoint)
+
+## Decision
+
+`handleAction` in `packages/mcp-server/src/tools/action.ts` is the canonical server-side dispatcher for all A2UI action types. The action type union is now:
+
+```
+"advance" | "skip" | "select" | "submit" | "reply" | "navigate" | "api"
+```
+
+Any unrecognized action type returns a structured error and **does not mutate session state**.
+
+## Routing rules
+
+| ActionType | Effect |
+|------------|--------|
+| `advance`  | FSM `ADVANCE` transition |
+| `skip`     | FSM `SKIP` transition |
+| `select`   | Stores payload in `appDefinition`, no phase change |
+| `submit`   | Stores payload + FSM `ADVANCE` |
+| `reply`    | Requires `payload.message`. Pushes to `session.messages` as user role. No phase change. |
+| `navigate` | Requires `payload.targetPhase` (must be a valid `Phase`). Direct phase assignment — can go forward or backward. Returns A2UI resource. |
+| `api`      | Stub acknowledgement. No phase change. Will route through `APIConnectorRegistry` in B-14+. |
+| unknown    | Error text returned, no session mutation. |
+
+## Rationale
+
+The B-23 TDD tests required `reply` and `navigate` to be first-class action types. Direct phase assignment for `navigate` is intentional — the LLM or UI may need to navigate backward (e.g., user clicks "go back to Design"). This bypasses the FSM `transition()` deliberately.
+
+---
+
+# Decision: APIConnector api: action routing convention
+
+**Date:** 2026-04-09
+**Author:** Bender
+**Status:** Implemented
+**Relates to:** B-11, F17
+
+## What
+
+Established the `api:` action name format for routing A2UI component actions to specific connector operations:
+
+```
+api:{connectorName}.{operation}
+```
+
+Examples:
+- `api:azure-arm.listResources` → calls `AzureARMConnector.listResources(context)`
+- `api:github.getRepo` → calls `GitHubConnector.getRepo(context)`
+- `api:pricing.estimateCost` → calls `PricingConnector.estimateCost(context)`
+
+## Behavior
+
+1. Connector is looked up in the `APIConnectorRegistry` by name.
+2. Operation is called as a method on the connector with `action.context` as argument.
+3. Result is serialized as `[API Result: {connector}.{op}] {json}` and re-prompts the LLM.
+4. Errors are serialized as `[API Error: {connector}.{op}] {message}` and re-prompt the LLM.
+5. Unknown connector name or missing method → console.warn + fall back to LLM re-prompt.
+
+## Why
+
+Keeps the LLM in the loop (per F17). API results feed back into the conversation so the LLM can react to real data. No direct UI state mutation.
+
+## Impact
+
+- IntegrationKits (B-10) should register connectors using their own namespaced `name` (e.g. `"my-kit-api"`) to avoid collisions.
+- B-14 (real MSAL/OAuth) will just implement `authenticate()` — no changes to routing needed.
+
+---
+
+# Decision: Artifact Store Singleton Pattern (B-17)
+
+**Date:** 2026-04-10
+**Author:** Bender
+**Status:** Implemented
+
+## Decision
+
+Tools write to `defaultArtifactStore` (singleton exported from `@kickstart/core`) directly via import. The React `ArtifactProvider` polls this singleton every 1s to sync state into React.
+
+## Rationale
+
+- Tools run outside React (in the LLM tool loop). No React context available at execution time.
+- A module-level singleton is the simplest shared-state mechanism without introducing an event bus or message passing.
+- 1s polling is negligible overhead and well within LLM response latency — no need for a pub/sub system in v1.
+
+## Implications
+
+- `generate_kubernetes_manifest` (and any future tool) imports `defaultArtifactStore` directly and calls `put()`.
+- Frontend components call `useArtifacts()` to read the reactive snapshot.
+- `InMemoryArtifactStore` resets on page reload — artifacts are session-scoped. Persistence (B-future) would swap `defaultArtifactStore` for a `LocalStorageArtifactStore`.
+- `ArtifactProvider` accepts an optional `store` prop for test injection.
+
+---
+
+# Decision: CORS Proxy Authorization Policy
+
+**Date:** 2026-04-09  
+**Author:** Bender  
+**Task:** B-16
+
+## Decision
+
+- **ARM proxy** (`/api/arm-proxy/*`): Requires `Authorization` header; returns 401 if absent. ARM tokens are user-scoped and must be supplied by the frontend.
+- **GitHub proxy** (`/api/github-proxy/*`): Authorization is optional — unauthenticated requests are allowed (needed for public repo access). Token passed through if present.
+- **Pricing proxy** (`/api/pricing-proxy`): No authorization at all — Azure Retail Prices API is fully public.
+
+## Rationale
+
+ARM always requires a token (no public endpoints). GitHub has both public and authenticated endpoints; making auth optional maximizes flexibility without breaking unauthenticated flows. Pricing data is inherently public.
+
+## Implications
+
+- Frontend must supply a valid Azure AD bearer token for ARM calls.
+- Rate-limit headers from all three upstreams are forwarded so the frontend can implement backoff.
+
+---
+
+# Decision: phasePrompts field on IntegrationKit for explicit phase targeting
+
+**Author:** Bender (Backend Dev)
+**Date:** 2025-07-29
+**Status:** Accepted
+**Related:** B-15, B-10
+
+## Decision
+
+Extended `IntegrationKit` with an optional `phasePrompts?: Partial<Record<Phase, string[]>>` field for explicit per-phase prompt augmentations. The flat `prompts?: string[]` field is retained for backward compatibility and falls back to keyword-heuristic classification when `phasePrompts` is not set.
+
+## Rationale
+
+Kit authors know which prompts apply to which phases. Explicit per-phase declarations are clearer and more maintainable than relying purely on keyword heuristics. Heuristics remain as a fallback for third-party kits that only provide flat prompts.
+
+## Consequences
+
+- New kits should prefer `phasePrompts` over the flat `prompts` array.
+- `azureKit` and `githubKit` have been updated with full per-phase coverage.
+- The skill resolver in `engine/skill-resolver.ts` is the single source of truth for phase→prompt mapping logic.
+- System prompt stays flat `prompts` compatible — no breaking change.
+
+---
+
+# Decision: IntegrationKit Abstraction (B-10)
+
+**Author:** Leela (Lead)
+**Date:** 2025-07-26
+**Status:** Implemented
+**Commit:** c7b99ac
+
+## Context
+
+B-10 called for an `IntegrationKit` abstraction (renamed from ServicePack) that bundles tools + connectors + prompts + component registrations into a composable, registerable unit. Dependencies B-11 (APIConnector) and B-13 (ToolRegistry) were available.
+
+## Decision
+
+Created `packages/core/src/kits/` with:
+
+- **`IntegrationKit` interface** — `{ name, description, tools: Tool<any>[], connectors: APIConnector[], prompts?: string[], components?: ComponentRegistration[] }`. The `tools` field uses `Tool<any>[]` (not `Tool[]`) to accommodate specific-args typed tools.
+- **`IntegrationKitRegistry`** — mirrors ToolRegistry/APIConnectorRegistry. Constructor accepts optional custom registries for test isolation. `register(kit)` auto-wires tools + connectors.
+- **`registerKit(kit)`** — convenience function delegating to `defaultKitRegistry`.
+- **`AzureKit`** — azure_resource_list, azure_resource_get, estimate_cost + AzureARMConnector, PricingConnector + 4 Azure-specific prompts + azureLoginCard/azureResourcePicker component registrations.
+- **`GitHubKit`** — github_repo_info + GitHubConnector + 3 GitHub-specific prompts + githubLoginCard/githubRepoPicker component registrations.
+
+## Startup Wiring
+
+`packages/web/src/main.tsx` calls `registerKit(azureKit)` and `registerKit(githubKit)` before ReactDOM render. Kits register into `defaultRegistry` (tools, used by engine + MCP) and `defaultConnectorRegistry` (connectors, shared with Azure Functions).
+
+## Test Coverage
+
+23 contract tests in `integration-kit.test.ts`. All 309 tests green.
+
+## What's NOT included
+
+- Actual React component implementations for azureLoginCard/azureResourcePicker/githubLoginCard/githubRepoPicker — those are `ComponentRegistration` descriptors only. Fry wires the React components in the web package when building those components.
+- Kit-level connector injection into `APIConnectorContext` React registry — the context still manages its own connector instances. The kit's connectors go into `defaultConnectorRegistry` for engine/server use. Cross-wiring deferred to when auth connectors are built (B-14).
