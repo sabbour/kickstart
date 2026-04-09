@@ -478,3 +478,11 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 **Handoff:** All branches merged to main. Ready for QA E2E testing.
 
 **Next P3 priority:** Address B-13 type coercion bug (kubectl manifest appName validation). Consider: service-principal auth, offline mode, advanced error recovery.
+
+### 2026-04-08: Ops Batch B-99/B-100/B-101 — Legacy Cleanup, CI, Bicep
+
+- **B-99 (legacy JS removed):** Deleted `packages/web/js/` entirely — 8 vanilla JS files (api-client, app, auth, engine, framework/a2ui-renderer, framework/components, framework/core, prompts). These were the pre-React codebase. `index.html` only loads `/src/main.tsx`; Vite build has zero references to `js/`. CSS files in `packages/web/css/` are still live (linked from index.html, copied by Vite).
+- **B-100 (CI workflow added):** Created `.github/workflows/ci.yml` — triggers on push/PR to main. Steps: checkout → node@20 → npm ci → lint → core build → API build → Vite build → vitest run → playwright install + test. `deploy-swa.yml` already had correct `app_location: "packages/web/dist"` and API build; no changes needed there.
+- **B-101 (Bicep updated):** Added `openAiEndpoint`, `openAiChatDeployment`, `openAiCodexDeployment` params to `infra/main.bicep`. Wired into `appSettings` resource alongside `AZURE_CLIENT_ID`. `AZURE_OPENAI_API_KEY` intentionally excluded (manual set — same pattern as `AZURE_CLIENT_SECRET`). Updated `parameters.dev.json` with placeholder values for new params.
+- **Build verification:** Vite build clean after js/ removal. All 423 unit tests pass.
+- **Key insight:** In SWA + managed Functions architecture, the `api_location` in the GitHub Action is sufficient — no separate Azure Functions resource in Bicep. The SWA resource manages the function app automatically.
