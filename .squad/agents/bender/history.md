@@ -265,3 +265,24 @@
 - **Key pattern:** Actions re-prompt the LLM (not direct dispatch). The LLM stays in full control of all state transitions. Action context is serialized as `key: value` pairs in the message.
 - **Circular dep avoidance:** `useActionDispatch` uses `useRef` for options so it can reference `handleSendMessage` before it's defined in the render function. The closure only executes on user interaction (post-render).
 - **Key files:** `packages/web/src/hooks/useActionDispatch.ts` (NEW), `packages/web/src/hooks/useA2UI.ts`, `packages/web/src/App.tsx`
+
+### 2026-04-09: Naming Decision — APIConnector + IntegrationKit
+
+- **Leela proposed:** APIClient + IntegrationKit as replacements for ServiceConnector (B-11) and ServicePack (B-10).
+- **User override:** APIClient → APIConnector to better convey the connection/auth-handling aspect.
+- **Final names:** 
+  - B-11: `APIConnector` — authenticated API client adapter handling tokens, OAuth, CORS proxying, request lifecycle
+  - B-10: `IntegrationKit` — composable module bundling components + tools + prompts + auth
+- **Action:** Use these names in B-11/B-10 implementation and refactor existing `ServiceConnector`/`ServicePack` references.
+
+---
+
+## [ARCHIVE SUMMARY] Pre-2026-04-09 Learnings
+
+The following learnings predate 2026-04-09 and are candidates for archival to `history-archive.md` when file size exceeds 50KB:
+- Azure Static Web Apps Deployment Setup (2025-01-21)
+- Auth Registration Setup (2025-07-24)
+- Kickstart Monorepo Scaffold (2026-04-08)
+- Subsequent React/Vite migration entries through 2026-04-09
+
+These capture foundational auth setup, monorepo structure, and Phase 1 architectural decisions. Current living work (B-23, B-24, B-25, etc.) is reflected in new dated entries above.

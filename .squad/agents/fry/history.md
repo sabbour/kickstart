@@ -465,3 +465,31 @@ Restructured Playground from 2-tab (Gallery/Create) to 5-tab architecture (Creat
 - **Build**: `npx vite build` passes (zero errors, 2828 modules).
 - **Pattern**: Never use `useMemo` for side effects (like `processMessages`). Always use `useEffect`. When destructuring hook returns for effect dependencies, prefer individual stable callbacks over the whole object.
 
+
+### 2026-04-09: B-23 Action Dispatch — Bender Delivered useActionDispatch Hook
+
+- **What:** Bender completed B-23 — wired A2UI action handler via `useActionDispatch` hook.
+- **Pattern:** Actions routed by name prefix:
+  - Default/no prefix → `reply`: Translates to natural language message, re-prompts LLM
+  - `navigate:`/`nav:` → fires local callback + LLM re-prompt for phase tracking
+  - `api:` → stubbed for Phase 3 ServiceConnector, falls back to LLM
+- **Integration:** `useA2UI` hook now accepts optional `actionHandler` parameter (backward-compatible). Playground still works without a handler.
+- **Quality:** 20 B-23 tests pass. Foundation for Phase 2 (tool system) and Phase 3 (ServiceConnector APIs).
+- **Key files:** `packages/web/src/hooks/useActionDispatch.ts` (NEW)
+- **Implication for Fry:** Action handler ready for integration into A2UI-based features (B-12, B-14, fat components). Re-prompting pattern confirmed per F17 decision.
+
+---
+
+## [ARCHIVE SUMMARY] Pre-2026-04-09 Core Context & Learnings
+
+The "Core Context" section at the top of this file (2026-04-08 web scaffold through 2026-04-10 session ID bridge) is a curated summary of 16 major Fry work cycles. Original timestamped learnings below that (2026-04-08 packages/web scaffold through 2025-07-22 engine phase definitions) are foundational but can be archived to `history-archive.md` when file exceeds 75KB.
+
+Preserved in Core Context:
+- Web scaffold evolution (Portal Prototyper → npm workspaces + React)
+- Phase conversation engine integration
+- Fluent UI v9 migration (audit trail methodology)
+- Playground interface with JSON preview
+- Syntax highlighting and Markdown components
+- Session ID mapping backend/frontend
+
+All component patterns, API conventions, and architectural decisions from this period remain in effect and are reflected in ongoing PRs/issues.

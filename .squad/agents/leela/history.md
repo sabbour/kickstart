@@ -153,3 +153,19 @@
 - **Phase 1 is critical path.** Everything builds on a working action loop. Without it, no ServicePack, no tools, no auth can function.
 - **adaptive-ui-framework action types mapped:** sendPrompt → event with prompt in context, setState → local data model update, navigate → openUrl function, submit → event with serialized state, custom → pack-specific event handler.
 - **Full decision:** `.squad/decisions/inbox/leela-a2ui-actions-analysis.md`
+
+### 2026-04-09: Naming Proposal Approved — APIConnector + IntegrationKit
+
+- **Proposed:** APIClient + IntegrationKit for ServiceConnector (B-11) and ServicePack (B-10).
+- **User override:** APIClient → APIConnector (better emphasizes connection/auth management).
+- **Final decision documented:** Both names follow established patterns (HttpClient, Firebase Kit conventions). Ready for implementation.
+- **Cross-team alignment:** Bender and Fry briefed. Will refactor codebase in B-11/B-10 PRs.
+- **Backlog consolidated:** Merged all scattered SQL todos, R-items, G-items, and untracked work into single-source-of-truth backlog (leela-consolidated-backlog.md). 45 total items, 68-day estimate, P0–P3 + Ops prioritized. Critical path: B-23–B-25 (action loop) 9 days.
+
+---
+
+## [ARCHIVE SUMMARY] Pre-2026-04-09 Architecture & Decisions
+
+The learnings in this file through 2026-04-09 capture foundational architecture (monorepo, toolchain, auth setup, backlog consolidation). When file size exceeds 50KB, consider archiving older entries (pre-April 2026) to `history-archive.md` while keeping recent named-decision entries (B-10/B-11 naming, consolidated backlog, etc.).
+
+Core decisions preserved in `.squad/decisions.md` supersede archived entries. This history is Leela's decision ledger; archive only when approaching 75KB to preserve recent context.
