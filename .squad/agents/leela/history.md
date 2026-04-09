@@ -45,6 +45,18 @@
 - **Key files touched:** `index.html` (hero input), `landing.css` (input styles), `components.css` (file chips, sparkle), `app.js` (hero handler, file chip rendering), `components.js` (new factories).
 - **Ahmed preference:** claude-opus-4.6 for code, claude-haiku-4.5 for non-code (confirmed still active).
 
+### 2025-07-26: Smart Control Pack Patterns — Deep Dive into adaptive-ui-framework
+- **Source repos analyzed:** `sabbour/adaptive-ui-framework` (core + pack system), `sabbour/adaptive-ui-azure-pack`, `sabbour/adaptive-ui-github-pack`, `sabbour/adaptive-ui-try-aks` (app).
+- **14 patterns catalogued:** Pack Registration (P01), Self-Managing Login (P02), Data-Fetching Picker (P03), Write-with-Confirm (P04), LLM Inference-Time Tools (P05), Knowledge Skills Resolver (P06), Disabled Context (P07), State-as-Token (P08), CORS Proxy (P09), Artifact-Aware Components (P10), Auto-Continue (P11), ARM Introspection (P12), Client-Side Validation + Auto-Fix (P13), Intent Resolvers (P14).
+- **Azure Pack:** 4 components (azureLogin, azureResourceForm, azurePicker, azureQuery), 2 tools (azure_arm_get, azure_pricing), skills resolver (ARM templates + AKS Automatic knowledge), MSAL auth, 27 diagram icons.
+- **GitHub Pack:** 6 components (githubLogin, githubPicker, githubQuery, githubRepoInfo, githubCreatePR, githubSetSecret), 1 tool (github_api_get), OAuth Device Flow + PAT auth.
+- **App Layer:** ArchitectureDiagram (Mermaid+ELK+icons+pan/zoom), CostEstimate, CompactCodeBlock, DevEnvironmentCard, K8sValidator (13 rules + auto-fix), SafeguardsChecker, DiagramBuilder.
+- **Key architecture insight:** The old framework's power comes from 3 layers A2UI doesn't have: (1) ServicePack bundling (components + prompts + tools + auth), (2) ServiceConnector (auth token management separate from UI state), (3) orchestration middleware (skills resolvers, tool executors, artifact store). All 3 must be built in Kickstart's app layer.
+- **A2UI mapping:** All pack components → fat A2UI custom components via `createReactComponent()`. Auth → ServiceConnector (React Context). Tools → Kickstart orchestration layer. Skills → phase engine middleware. Artifacts → Kickstart core store.
+- **8 gaps identified:** No pack system (G01), no service layer (G02), no tool system (G03), no prompt injection (G04), no artifact store (G05), no past-turn isolation (G06), no auto-continue (G07), no state interpolation (G08, but JSON Pointers cover it).
+- **Migration estimate:** ~16.5 developer-days for full pack port. P0 = auth connectors + CORS proxy (3.5 days). P1 = core pickers, loginCards, GitHub commit, validator (5.5 days). P2 = ARM forms, diagrams, write actions (6 days). P3 = tool ports, diagram builder, intent resolvers (2.5 days).
+- **Full decision:** `.squad/decisions/inbox/leela-pack-architecture.md`
+
 ### 2026-04-08: Spark-like UX Roadmap — P0/P1/P2 Prioritization
 
 - **Full decision:** Documented in `.squad/decisions/inbox/leela-spark-ux-roadmap.md` (merged into decisions.md). Complete gap analysis + prioritized roadmap.
@@ -94,3 +106,18 @@
 - **Developer setup:** Clone both repos side-by-side, `npm link` in fork, link in Kickstart. README documents this.
 - **Why NOT submodules:** Pain. Why NOT GitHub Packages now: Overkill for prototype. Why NOT vendoring: Drift risk.
 - **Full decision:** `.squad/decisions/inbox/leela-two-repo-strategy.md`
+
+### 2025-07-25: Trip Notebook Smart Control Patterns Research
+- **Repo analyzed:** `sabbour/adaptive-ui-trip-notebook` — AI travel planning assistant with 3 packs, 11 smart controls, 7 tools.
+- **Three packs:** `@sabbour/adaptive-ui-travel-data-pack` (weather, country info, currency, checklists, budget), `@sabbour/adaptive-ui-google-maps-pack` (maps, places search, nearby, photo cards), `@sabbour/adaptive-ui-google-flights-pack` (flight search, flight cards with protobuf URL encoding).
+- **Key pattern: Component-Autonomous Fetching** — Components like weatherCard/countryInfoCard call APIs themselves at render time. LLM provides minimal props (city name), component handles loading/error/display. Saves tokens, enables real-time data.
+- **Key pattern: Dual-Entry API** — Every external API has BOTH a tool (LLM calls for reasoning) AND a component (visual, client-side fetch). System prompt instructs when to use each. Optimizes token usage.
+- **Key pattern: Artifact Extraction Pipeline** — App walks AdaptiveUISpec layout tree after each LLM response, extracts structured data (places, flights, budget items, itinerary days, photos) into typed artifacts. Enables second-panel aggregation.
+- **Key pattern: Cross-Component State Binding** — `bind` prop + `{{state.key}}` interpolation enables implicit communication. Selecting a hotel auto-updates restaurant search location. Eliminates need for LLM-orchestrated multi-step updates.
+- **Key pattern: Graceful Degradation Chain** — FlightSearch: live results → link-only → error banner. Three tiers. Every component that calls external APIs needs this.
+- **Key pattern: Artifact-Driven Side Panel** — TripNotebook subscribes to artifact store, categorizes by filename prefix convention (flight-*, budget-*, itinerary-day-*), renders in tabbed interface. Decouples data production from consumption.
+- **Key pattern: Protobuf URL Construction** — Custom minimal protobuf encoder for Google Flights deep links. Pattern for services with binary/encoded URL parameters.
+- **Key pattern: HTML Scraping as API** — Flights pack parses Google Flights HTML via CORS proxy when no official API exists. Fallback pattern for APIs that don't have official endpoints.
+- **Kickstart implications:** (1) Components should fetch their own data for real-time display (e.g., AKS cluster status polling), (2) Every Azure/GitHub API needs both tool + component entry points, (3) Artifact prefix convention enables dashboard panel aggregation, (4) State binding enables cross-phase data flow in 6-phase conversation, (5) All external API components need 4-tier degradation (rich → cached → link → error).
+- **Recommended Kickstart packs:** azure-pack (cluster status, cost, deployment), github-pack (repo, workflow, PR), iac-pack (file editor, manifest preview, architecture diagram), auth-pack (Entra app, RBAC, secrets).
+- **Full decision:** `.squad/decisions/inbox/leela-trip-notebook-patterns.md`
