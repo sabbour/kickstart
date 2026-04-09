@@ -28,8 +28,9 @@ export function App() {
 
   const connectorRegistry = useAPIConnectorRegistry();
 
-  const actionHandler = useActionDispatch({
+  const { handler: actionHandler, resetConsecutiveCount } = useActionDispatch({
     onSendMessage: (msg) => handleSendMessage(msg),
+    onAutoContinue: (msg) => handleSendMessage(msg, true),
     connectorRegistry,
   });
 
@@ -59,7 +60,12 @@ export function App() {
     }
   }, [sessions.activeSessionId]);
 
-  const handleSendMessage = useCallback(async (text: string) => {
+  const handleSendMessage = useCallback(async (text: string, isAutoContinue = false) => {
+    // Manual messages reset the consecutive auto-continue counter
+    if (!isAutoContinue) {
+      resetConsecutiveCount();
+    }
+
     // Ensure we have an active session
     let sessionId = sessions.activeSessionId;
     if (!sessionId) {
@@ -67,12 +73,13 @@ export function App() {
       sessionId = newSession.id;
     }
 
-    // Add user message
+    // Add user message (auto-continue shows a subtle indicator instead of the full text)
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}-user`,
       role: 'user',
       text,
       timestamp: Date.now(),
+      isAutoContinue,
     };
     setMessages(prev => [...prev, userMsg]);
     sessions.addMessage(sessionId!, userMsg);
@@ -162,7 +169,7 @@ export function App() {
         },
       });
     }
-  }, [sessions, streaming, mockStreaming, a2ui, isApiAvailable]);
+  }, [sessions, streaming, mockStreaming, a2ui, isApiAvailable, resetConsecutiveCount]);
 
   const handleStartChat = useCallback((prompt: string) => {
     a2ui.reset();

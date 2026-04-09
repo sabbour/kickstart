@@ -18,3 +18,14 @@ export {
   getCurrentPhase,
   canAdvance,
 } from "./machine.js";
+
+export { resolveSkills, formatSkillsSection } from "./skill-resolver.js";
+export type { ResolvedSkills } from "./skill-resolver.js";
+
+export {
+  AUTO_CONTINUE_PREFIXES,
+  AUTO_CONTINUE_MAX_CONSECUTIVE,
+  shouldAutoContinue,
+  synthesizeContinuationPrompt,
+  synthesizeNavigationPrompt,
+} from "./auto-continue.js";

@@ -1,23 +1,33 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { A2uiClientAction } from '../vendor/a2ui/web_core/schema/client-to-server';
 import type { APIConnectorRegistry } from '@kickstart/core';
+import {
+  shouldAutoContinue,
+  synthesizeContinuationPrompt,
+  synthesizeNavigationPrompt,
+  AUTO_CONTINUE_MAX_CONSECUTIVE,
+} from '@kickstart/core';
 
 /**
  * Action routing categories.
  *
- * - reply:    Translate the action into natural language and re-prompt the LLM.
- *             This is the default for ALL actions (per decision F17).
- * - navigate: Phase-transition request — still re-prompts the LLM but framed
- *             as a navigation intent so the LLM can decide the next phase.
- * - api:      Direct API call — routed through APIConnectorRegistry (B-11).
+ * - reply:         Translate the action into natural language and re-prompt the LLM.
+ *                  This is the default for ALL actions (per decision F17).
+ * - navigate:      Phase-transition request — auto-continues the conversation with a
+ *                  synthesized prompt framing the navigation as a phase transition.
+ * - auto-continue: Explicit completion signal (complete: / continue: prefix) — the
+ *                  conversation advances automatically with a synthesized prompt.
+ * - api:           Direct API call — routed through APIConnectorRegistry (B-11).
  */
-type ActionCategory = 'reply' | 'navigate' | 'api';
+type ActionCategory = 'reply' | 'navigate' | 'auto-continue' | 'api';
 
 /** Prefix → category mapping. Actions without a known prefix default to 'reply'. */
 const PREFIX_MAP: Record<string, ActionCategory> = {
   'navigate:': 'navigate',
   'nav:': 'navigate',
   'api:': 'api',
+  'complete:': 'auto-continue',
+  'continue:': 'auto-continue',
 };
 
 function categorize(actionName: string): ActionCategory {
@@ -76,6 +86,11 @@ function parseApiAction(actionName: string): { connectorName: string | undefined
 export interface ActionDispatchOptions {
   /** Send a message to the conversation (re-prompts the LLM). */
   onSendMessage: (message: string) => void;
+  /**
+   * Send an auto-generated continuation message (no user bubble shown).
+   * Falls back to onSendMessage if not provided.
+   */
+  onAutoContinue?: (message: string) => void;
   /** Optional callback for navigate actions (in addition to re-prompting). */
   onNavigate?: (phase: string, context: Record<string, unknown>) => void;
   /**
@@ -90,39 +105,105 @@ export interface ActionDispatchOptions {
 
 export type ActionHandler = (action: A2uiClientAction) => void;
 
+export interface ActionDispatchResult {
+  /** The action handler to pass to useA2UI. */
+  handler: ActionHandler;
+  /** Reset the consecutive auto-continue counter (call when the user manually sends a message). */
+  resetConsecutiveCount: () => void;
+  /** Number of consecutive auto-continues since the last manual message or reset. */
+  consecutiveAutoContinueCount: number;
+}
+
 /**
  * Creates an action handler that routes A2UI component actions.
  *
  * The core pattern (from decision F17): button clicks are translated into
  * natural language and re-prompt the LLM. The LLM decides what happens next.
  *
- * Three routing categories exist:
- * - Default / `reply` → translate to message, send to conversation
- * - `navigate:*` → re-prompt with navigation intent
- * - `api:*` → route to APIConnectorRegistry if available, otherwise fall back
- *             to LLM re-prompt with a console warning
+ * Four routing categories exist:
+ * - Default / `reply`         → translate to message, send to conversation
+ * - `navigate:*` / `nav:*`    → auto-continue with synthesized navigation prompt
+ * - `complete:*` / `continue:*` → auto-continue with synthesized completion prompt
+ * - `api:*`                   → route to APIConnectorRegistry if available, otherwise fall back
+ *                               to LLM re-prompt with a console warning
+ *
+ * Auto-continues are rate-limited to AUTO_CONTINUE_MAX_CONSECUTIVE consecutive calls.
+ * Call resetConsecutiveCount() when the user manually sends a message.
  */
-export function useActionDispatch(options: ActionDispatchOptions): ActionHandler {
+export function useActionDispatch(options: ActionDispatchOptions): ActionDispatchResult {
   // Use ref to avoid stale closure over options
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  return useCallback((action: A2uiClientAction) => {
+  // Track consecutive auto-continues — use both ref (for immediate logic) and
+  // state (to expose the current value to callers).
+  const consecutiveRef = useRef(0);
+  const [consecutiveAutoContinueCount, setConsecutiveAutoContinueCount] = useState(0);
+
+  const resetConsecutiveCount = useCallback(() => {
+    consecutiveRef.current = 0;
+    setConsecutiveAutoContinueCount(0);
+  }, []);
+
+  /**
+   * Dispatch an auto-continuation. Checks rate limit and calls onAutoContinue
+   * (or falls back to onSendMessage) with the synthesized prompt.
+   */
+  const dispatchAutoContinue = useCallback((message: string) => {
+    if (consecutiveRef.current >= AUTO_CONTINUE_MAX_CONSECUTIVE) {
+      console.warn(
+        `[ActionDispatch] Auto-continue rate limit reached ` +
+        `(${AUTO_CONTINUE_MAX_CONSECUTIVE} consecutive). Waiting for user input.`,
+      );
+      return;
+    }
+
+    consecutiveRef.current += 1;
+    setConsecutiveAutoContinueCount(consecutiveRef.current);
+
+    const { onAutoContinue, onSendMessage } = optionsRef.current;
+    if (onAutoContinue) {
+      onAutoContinue(message);
+    } else {
+      onSendMessage(message);
+    }
+  }, []);
+
+  const handler = useCallback((action: A2uiClientAction) => {
     const category = categorize(action.name);
-    const message = actionToMessage(action);
 
     switch (category) {
       case 'reply': {
+        // Manual action — reset the consecutive counter
+        consecutiveRef.current = 0;
+        setConsecutiveAutoContinueCount(0);
+        const message = actionToMessage(action);
         optionsRef.current.onSendMessage(message);
         break;
       }
 
       case 'navigate': {
-        // Fire optional navigate callback for any local side effects
         const phase = action.name.replace(/^(navigate:|nav:)/, '');
+        // Fire optional navigate callback for any local side effects
         optionsRef.current.onNavigate?.(phase, action.context ?? {});
-        // Always re-prompt — LLM controls phase transitions
-        optionsRef.current.onSendMessage(message);
+        // Phase transitions auto-continue
+        const message = synthesizeNavigationPrompt(phase, action.context ?? {});
+        dispatchAutoContinue(message);
+        break;
+      }
+
+      case 'auto-continue': {
+        // Explicit completion signal — synthesize a continuation prompt
+        if (!shouldAutoContinue(action.name)) {
+          // Shouldn't happen, but guard defensively
+          optionsRef.current.onSendMessage(actionToMessage(action));
+          break;
+        }
+        const message = synthesizeContinuationPrompt({
+          name: action.name,
+          context: action.context ?? {},
+        });
+        dispatchAutoContinue(message);
         break;
       }
 
@@ -133,7 +214,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionHandler
             `[ActionDispatch] api action "${action.name}" — no connectorRegistry provided. Falling back to LLM re-prompt.`,
             action,
           );
-          optionsRef.current.onSendMessage(message);
+          optionsRef.current.onSendMessage(actionToMessage(action));
           break;
         }
 
@@ -144,7 +225,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionHandler
             `Expected format: api:{connectorName}.{operation}. Falling back to LLM re-prompt.`,
             action,
           );
-          optionsRef.current.onSendMessage(message);
+          optionsRef.current.onSendMessage(actionToMessage(action));
           break;
         }
 
@@ -155,7 +236,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionHandler
             `Registered: [${registry.names().join(', ')}]. Falling back to LLM re-prompt.`,
             action,
           );
-          optionsRef.current.onSendMessage(message);
+          optionsRef.current.onSendMessage(actionToMessage(action));
           break;
         }
 
@@ -166,7 +247,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionHandler
             `[ActionDispatch] api action "${action.name}" — connector "${connectorName}" has no method "${operation}". Falling back to LLM re-prompt.`,
             action,
           );
-          optionsRef.current.onSendMessage(message);
+          optionsRef.current.onSendMessage(actionToMessage(action));
           break;
         }
 
@@ -189,5 +270,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionHandler
         break;
       }
     }
-  }, []);
+  }, [dispatchAutoContinue]);
+
+  return { handler, resetConsecutiveCount, consecutiveAutoContinueCount };
 }

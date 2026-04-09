@@ -13,6 +13,13 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message, getSurface, isActive = true }: ChatMessageProps) {
   if (message.role === 'user') {
+    if (message.isAutoContinue) {
+      return (
+        <div className="chat-bubble auto-continue">
+          <span className="auto-continue-label">Continuing...</span>
+        </div>
+      );
+    }
     return (
       <div className="chat-bubble user">
         {message.text}

@@ -52,12 +52,20 @@ export {
   transition,
   getCurrentPhase,
   canAdvance,
+  resolveSkills,
+  formatSkillsSection,
+  AUTO_CONTINUE_PREFIXES,
+  AUTO_CONTINUE_MAX_CONSECUTIVE,
+  shouldAutoContinue,
+  synthesizeContinuationPrompt,
+  synthesizeNavigationPrompt,
 } from "./engine/index.js";
 export type {
   PhaseStatus,
   ConversationState,
   PhaseDefinition,
   ConversationEvent,
+  ResolvedSkills,
 } from "./engine/index.js";
 
 // Generators
@@ -86,6 +94,10 @@ export type {
 // Tool registry
 export { ToolRegistry, defaultRegistry } from "./tools/registry.js";
 export type { Tool, OpenAIToolDefinition, ToolCall, ToolCallResult } from "./tools/types.js";
+
+// Artifact store — generated files (K8s manifests, Dockerfiles, CI workflows, etc.)
+export type { Artifact, ArtifactStore } from "./artifacts/index.js";
+export { InMemoryArtifactStore, defaultArtifactStore } from "./artifacts/index.js";
 
 // Services (response processing)
 export { processResponse } from "./services/index.js";
