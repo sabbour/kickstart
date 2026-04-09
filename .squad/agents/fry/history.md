@@ -221,3 +221,14 @@
 - **CATALOG_ID**: Changed from basic catalog URL to `'kickstart'` string in demo-scenarios.ts to match the kickstart catalog ID.
 - **Build**: `npx vite build` succeeds — 478 modules. No TypeScript errors.
 - **Pattern**: Custom components use `createReactComponent` from A2UI adapter, same pattern as vendored components. CSS classes prefixed with `kickstart-` to avoid collisions.
+
+### 2025-07-24 — Docusaurus documentation site created
+
+- **Location**: `docs-site/` at repo root — independent from monorepo workspaces, has its own `package.json` and `node_modules`.
+- **Stack**: Docusaurus 3.10 (classic preset), TypeScript, deployed via GitHub Pages to `https://sabbour.github.io/kickstart/`.
+- **Config**: `docusaurus.config.ts` — title "Kickstart", Azure blue (#0078d4) primary color, blog disabled, favicon reused from `packages/web/public/assets/favicon.svg`.
+- **Docs structure**: 8 pages across 4 sections — intro, Architecture (overview, A2UI integration, JSON envelope), Getting Started (local setup, project structure), Components (custom catalog), Contributing.
+- **Landing page**: Hero with "Get Started" CTA + 3-column feature grid (Conversational AI, Rich UI Components, Real Artifacts). Uses emoji instead of SVG illustrations.
+- **CI/CD**: `.github/workflows/deploy-docs.yml` — triggers on push to `main` when `docs-site/**` changes, uses `actions/deploy-pages@v4` for GitHub Pages deployment.
+- **Build**: `npm run build` succeeds with zero errors. Output in `docs-site/build/`.
+- **Gotcha**: Blog must be explicitly disabled (`blog: false`) in preset config to avoid broken links from default blog scaffold.

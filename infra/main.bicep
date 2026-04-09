@@ -39,7 +39,7 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
     repositoryUrl: repositoryUrl
     branch: branch
     buildProperties: {
-      appLocation: 'packages/web'
+      appLocation: 'packages/web/dist'
       skipGithubActionWorkflowGeneration: true
     }
   }
