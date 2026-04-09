@@ -55,3 +55,42 @@
 - **Event bus extensions:** `files:generating`, `files:generated`, `preview:show`, `deploy:ready`, `deploy:started`, `deploy:progress`, `deploy:complete`.
 - **Key distinction:** Spark publishes running apps. Kickstart generates infrastructure (Bicep, Dockerfiles, Helm, GH Actions) and deploys to AKS. Preview = architecture diagram + deployment plan + IaC files, not a running app. UX must reflect this.
 - **Next:** Fry assigned P0 in background mode. P1 is one sprint after P0 ships. P2 depends on GitHub OAuth and MCP App UI (deferred features).
+
+### 2025-07-25: Rendering Architecture Decision — Kill the Regex
+- **Root cause confirmed:** `response-processor.ts` regex `A2UI_FENCE_RE` requires closing `~~~` at exact string end. Any trailing LLM content = silent extraction failure. Components vanish, raw JSON shows as chat text.
+- **Heuristic fallback only covers 2/6 phases** (discover, design). Generate/Review/Handoff/Deploy get zero components on regex failure — exactly the phases where components matter most.
+- **adaptive-ui comparison:** adaptive-ui uses NO regex. Entire LLM response is a JSON `AdaptiveUISpec`. Renderer consumes directly. That's why Ahmed got better results — the framework makes failure impossible.
+- **Decision: Option C — Structured JSON Envelope.** 3-phase migration:
+  - Phase 1 (1-2 days): Fix regex + expand heuristics to all 6 phases. Ship immediately.
+  - Phase 2 (1-2 weeks): Switch to `response_format: json_object`. LLM outputs `{ message, components, stateUpdates }`. Incremental JSON streaming for text. Eliminates regex entirely. Adds state management.
+  - Phase 3 (1 week): Component streaming (components appear one-by-one like Spark files). State binding (`{{state.runtime}}`). Auto-continue for phase transitions.
+- **a2ui-renderer.js is PRESERVED.** All 17 component renderers unchanged. Only the extraction layer changes (regex → JSON parse).
+- **A2UI vs adaptive-ui verdict:** A2UI architecture was the right choice (MCP integration, multi-surface, catalog model). Implementation was wrong (fenced blocks in markdown). Fix = adopt adaptive-ui's structured JSON pattern into A2UI's component model. Best of both.
+- **Key pipeline files:** `response-processor.ts` (extraction), `converse.ts` (streaming SSE), `api-client.js` (client stream reader), `engine.js` (state machine), `a2ui-renderer.js` (DOM rendering), `system-prompt.ts` (LLM instructions), `phases.ts` (phase prompts with ~~~a2ui examples).
+- **Full decision:** `.squad/decisions/inbox/leela-rendering-architecture.md`
+- **SUPERSEDED:** This decision was obsoleted by `leela-pragmatic-a2ui-react.md` after discovery that A2UI React renderer already exists.
+
+### 2026-04-08: Pragmatic A2UI v0.9 React Adoption — The Shortest Path
+- **Discovery:** `@a2ui/react` v0.9 renderer ALREADY EXISTS at `renderers/react/src/v0_9/`. Apache 2.0 licensed, production-ready, 18 basic components implemented.
+- **Architecture:** Two-context React pattern with `A2uiSurface`, `createReactComponent()` factory, `GenericBinder` + `useSyncExternalStore`, `DeferredChild` for lazy loading, `SurfaceModel` from `@a2ui/web_core/v0_9` for component buffer + data model.
+- **adaptive-ui-try-aks pattern:** React/Vite/TypeScript, outputs structured JSON (not fenced blocks), renders via React engine. This is the proven path — same team, same tech stack.
+- **Decision:** Adopt `@a2ui/react` v0.9 directly. Migrate frontend to React/Vite. Kill the regex. Output structured JSON from LLM.
+- **Alignment strategy:** Use the code that exists today (Apache 2.0). When v0.9 ships officially, update the dependency. If release stalls, vendor it. Either way, we're not blocked.
+- **Frontend migration:** Vanilla JS → React/Vite (~1 week, Fry's domain). Portal Prototyper CSS preserved (it's just CSS classes). Vite = instant dev server, HMR, TypeScript out-of-box.
+- **Structured JSON envelope:** LLM outputs `{ message, a2ui_messages }`. Backend parses JSON, forwards A2UI messages via SSE. Client calls `processMessages()`. Regex eliminated.
+- **Free from `@a2ui/react`:** 18 basic components, surface model, data binding via JSON Pointers, component registry, theme system, two-context optimization, DeferredChild, action handling.
+- **Kickstart custom components:** CostEstimate, ArchitectureDiagram, FileEditor, AuthCard, WorkflowStatus, RepoPicker, CodespaceLink, AppOverview — all registered via `createReactComponent()`.
+- **4-phase migration:** (1) React/Vite + A2UI integration + kill regex (1 week), (2) Custom Kickstart catalog (1-2 weeks), (3) Port try-aks features — diagrams, K8s validation, auth, Cloud Shell (2-3 weeks), (4) Data binding, multi-surface, component streaming (1-2 weeks).
+- **Supersedes:** `.squad/decisions/inbox/leela-rendering-architecture.md` (Option C). Previous decision assumed vanilla JS rendering + JSON extraction. Now we're adopting React renderer entirely.
+- **Full decision:** `.squad/decisions/inbox/leela-pragmatic-a2ui-react.md`
+
+### 2026-04-08: Two-Repo Strategy — sabbour/a2ui Fork + sabbour/kickstart App
+- **Pattern:** Mirrors adaptive-ui-framework + adaptive-ui-try-aks split. Framework extensions in fork, app-specific code in Kickstart.
+- **sabbour/a2ui (fork):** Generic catalog components (Table, Chart, Stepper), renderer improvements (streaming, SSR), data binding utilities, schema tooling, upstream contributions. Zero Kickstart/Azure/AKS logic.
+- **sabbour/kickstart (app):** All Kickstart-specific components (CostEstimate, ArchitectureDiagram, FileEditor, AuthCard, WorkflowStatus, etc.), chat UI, LLM integration, phase engine, MCP server, Azure/GitHub APIs.
+- **Consumption:** npm workspace + side-by-side checkout. Dev: `npm link @a2ui/react` for instant changes. CI: `file:` dependency OR published GitHub Package (future).
+- **Boundary rule:** If ANY A2UI app could use it → fork. If it knows AKS/Azure/GitHub/Kickstart → app. When unsure → start in app, promote when reuse proven.
+- **Upstream path:** Develop in fork, test in Kickstart, PR to google/A2UI when stable. Bug fixes always upstream.
+- **Developer setup:** Clone both repos side-by-side, `npm link` in fork, link in Kickstart. README documents this.
+- **Why NOT submodules:** Pain. Why NOT GitHub Packages now: Overkill for prototype. Why NOT vendoring: Drift risk.
+- **Full decision:** `.squad/decisions/inbox/leela-two-repo-strategy.md`

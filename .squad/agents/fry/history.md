@@ -188,3 +188,25 @@
 - **JS additions**: getSessions(), saveSession() (prepend or update, keep 20 max), renderRecentSessions() (show/hide section, build item HTML, attach click handler). Called in boot() after initPlaceholderRotation().
 - **HTML structure**: Hero → track cards → framework pills → recent sessions → footer (all in .landing-inner).
 - **Files changed**: packages/web/js/app.js (fetchUserPhoto, recent sessions helpers, transitionToChat session save, boot footer version), packages/web/index.html (removed prompt inspector button, replaced send icon, added recent sessions HTML, added footer, added build metadata script), packages/web/css/landing.css (recent sessions + footer styles).
+
+### 2025-07-27 — "WOW" UX Vision document authored
+- **Vision doc**: Wrote `.squad/decisions/inbox/fry-wow-ux-vision.md` — a comprehensive buildable spec for a hybrid UX that goes beyond both GitHub Spark and try-aks (adaptive-ui).
+- **Core concept**: "The conversation IS the workspace" — persistent components (architecture diagram, cost estimate, file tree) that live across turns and UPDATE rather than recreate. Three-column layout: Context Rail (240px) | Conversation Stream (flex) | Workspace Panel (380px).
+- **New components designed**: QuestionnaireCard (rich radio options with title+description — biggest gap vs try-aks), FileGeneration (real-time file creation list), FileEditor (split-pane tree+code), ArchitectureDiagram (animated SVG with node-by-node entrance), CostEstimate (animated counters), AuthCard, ResourcePicker, PRCreation, ProgressStepper (breadcrumb replacing phase bar), AppCard (persistent context summary).
+- **Streaming architecture**: Proposed SSE event types (`text`, `component`, `file_chunk`, `file_complete`, `phase`, `done`) to replace the brittle `~~~a2ui` fenced block pattern. Components appear MID-STREAM, not after.
+- **Animation system**: Spring easing for emphasis (`cubic-bezier(0.34, 1.56, 0.64, 1)`), staggered entries (60-100ms), `stroke-dashoffset` for connection line drawing, counter animations for cost values, `prefers-reduced-motion` respect.
+- **State model**: Persistent state (AppCard, file tree, architecture, costs, session state) vs ephemeral (streaming buffer, typing indicator, unselected questionnaire options).
+- **Implementation phasing**: Phase 1 (~14h) = QuestionnaireCard + ProgressStepper + streaming markdown + entrance animations + SSE events. Phase 2 (~28h) = FileGeneration + FileEditor + file streaming + Context Rail + Workspace Panel. Phase 3 (~34h) = animated ArchitectureDiagram + CostEstimate counters + AuthCard + PRCreation + cross-turn persistence.
+- **Key "wow" factors identified**: (1) Watching code write itself line-by-line, (2) living workspace that accumulates across turns, (3) decisions with visible consequences (choose DB → diagram adds node → cost ticks up), (4) progressive complexity emergence, (5) animated cost counters.
+- **Current codebase gaps noted**: a2ui-renderer.js only has flat renderers (no state binding, no streaming), components.js FileViewer is tab-based (not split-pane), app.js streaming is plaintext-only (no component events), system-prompt.ts uses `~~~a2ui` fenced blocks (brittle regex extraction).
+
+### 2025-07-29 — Full React chat app built with A2UI v0.9 integration
+- **Complete React rewrite**: Replaced vanilla JS app-shell with React 19 component tree. `index.html` now only has `<div id="root">` — all UI rendered by React.
+- **Component architecture**: `App.tsx` (root, mode switching) → `Layout.tsx` (app-shell, topbar, sidebars) → `Landing.tsx` (hero input, tracks, pills, carousel) or `ChatShell.tsx` (messages + input). 15 component files total.
+- **A2UI v0.9 MessageProcessor**: `useA2UI` hook creates singleton `MessageProcessor<ReactComponentImplementation>` with `basicCatalog`. Surfaces tracked via `onSurfaceCreated`/`onSurfaceDeleted` subscriptions → React state. `processMessages()` returns surfaceIds for linking to chat messages.
+- **Demo mode**: 6 rich scenarios (Welcome, Architecture, Design Detail, File Generation, Review, Deploy Success) using all major A2UI components: Text, Button, Card, Column, Row, Tabs, List, ChoicePicker, TextField, Divider. Word-by-word streaming simulation at 40ms/word.
+- **Session management**: `useSessions` hook persists to localStorage. CRUD ops for sessions, messages. Recent sessions show on landing with delete confirmation UI.
+- **Streaming hook**: `useStreaming` for real API SSE. Falls back to demo mode on API health check failure. Supports abort via AbortController.
+- **CSS class reuse**: All components use existing CSS classes (`.app-shell`, `.chat-bubble.user`, `.chat-bubble.assistant`, `.landing-page`, `.track-card`, `.framework-pill`, `.sessions-sidebar`, etc.) — no new CSS files created.
+- **Placeholder carousel**: 10 inspiration ideas rotate every 4s with fade animation (CSS `.hero-input-placeholder.visible` class toggle).
+- **Build**: `npx vite build` succeeds — 467 modules, 388KB bundle. No TypeScript errors.
