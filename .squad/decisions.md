@@ -6475,3 +6475,120 @@ Phase 1 is the critical path. Everything else builds on a working action loop.
 
 A2UI provides the right primitives for rich interaction — events, data binding, validation, sandboxed functions. What it doesn't provide (tools, packs, auth, artifacts) is exactly what adaptive-ui-framework adds on top. Our Kickstart implementation has the A2UI vendor code properly wired for action dispatch, but the app layer treats it as a dead end (console.log). The fix is straightforward: wire the action handler to a router, add a backend action endpoint, and build up from there to tools, auth, and packs. The ServicePack architecture we already decided on maps cleanly to A2UI events as the action bus.
 
+
+
+# Decision: A2UI Implementation Patterns — Concrete Code References
+
+**Author:** Copilot (Coordinator)
+**Date:** 2025-07-26
+**Status:** Reference Material
+**Requested by:** Ahmed Sabbour
+**Sources:**
+- https://a2ui.org/guides/defining-your-own-catalog
+- https://a2ui.org/guides/agent-development/#generating-a2ui-messages
+
+---
+
+## 1. Custom Catalog Implementation Steps (from Defining Your Own Catalog guide)
+
+The official guide prescribes 5 steps for custom catalogs:
+
+1. **Define the Catalog**: Create a JSON Schema listing components, functions, and styles
+2. **Register the Catalog**: Register catalog + component implementations (renderers) with client
+3. **Announce Support**: Client informs agent via `supportedCatalogIds` in capabilities metadata
+4. **Agent Selects Catalog**: Agent chooses catalog via `catalogId` in `createSurface`
+5. **Agent Generates UI**: Agent generates messages using catalog component names
+
+### Key Principle: "No Mappers Needed"
+> "It is recommended to build catalogs that directly reflect your client's design system rather than trying to map a generic catalog (like the Basic Catalog) to it through an adapter."
+
+**What this means for Kickstart:** Our current approach of composing `basicCatalog + fluentOverrides + customComponents` in `kickstart-catalog.ts` is explicitly against the recommended pattern. We should create a standalone `kickstart_catalog.json` that directly defines our Fluent UI React v9 components — NOT override/map the Basic Catalog.
+
+### Security Requirements
+1. **Allowlist components** — Only register trusted components in catalog definition
+2. **Validate properties** — Always validate component properties from agent messages match expected types
+3. **Sanitize text** — Avoid rendering un-sanitized agent content unless safe bounds established
+
+---
+
+## 2. Agent Development — Generating A2UI Messages (Concrete Pattern)
+
+The agent development guide provides the exact implementation pattern for LLM → A2UI generation.
+
+### Step 1: Import the Schema
+```python
+from .a2ui_schema import A2UI_SCHEMA  # The full JSON Schema for A2UI messages
+```
+
+### Step 2: Construct System Prompt with Schema + Examples
+```python
+RESTAURANT_UI_EXAMPLES = """
+# (few-shot examples of valid A2UI JSON for in-context learning)
+"""
+
+A2UI_AND_AGENT_INSTRUCTION = AGENT_INSTRUCTION + f"""
+Your final output MUST be a a2ui UI JSON response.
+
+To generate the response, you MUST follow these rules:
+1. Your response MUST be in two parts, separated by the delimiter: `---a2ui_JSON---`.
+2. The first part is your conversational text response.
+3. The second part is a single, raw JSON object which is a list of A2UI messages.
+4. The JSON part MUST validate against the A2UI JSON SCHEMA provided below.
+
+--- UI TEMPLATE RULES ---
+Follow these rules to select the appropriate UI template:
+{RESTAURANT_UI_EXAMPLES}
+
+---BEGIN A2UI JSON SCHEMA---
+{A2UI_SCHEMA}
+---END A2UI JSON SCHEMA---
+"""
+```
+
+### Step 3: Parse and Validate Output
+```python
+# 1. Parse the JSON (split on ---a2ui_JSON--- delimiter)
+parsed_json_data = json.loads(json_string_cleaned)
+
+# 2. Validate against A2UI_SCHEMA
+jsonschema.validate(instance=parsed_json_data, schema=self.a2ui_schema_object)
+```
+
+### What Kickstart Needs to Implement
+
+**In `converse.ts` (backend):**
+1. Load our `kickstart_catalog.json` schema
+2. Inject it into the LLM system prompt using the `---BEGIN A2UI JSON SCHEMA---` / `---END A2UI JSON SCHEMA---` delimiters
+3. Add few-shot examples of valid Kickstart A2UI JSON between `--- UI TEMPLATE RULES ---` markers
+4. Use `---a2ui_JSON---` as the delimiter between conversational text and A2UI JSON
+
+**In `response-processor.ts` (backend):**
+1. Split LLM response on `---a2ui_JSON---` delimiter
+2. Parse the JSON portion
+3. Validate against our catalog schema (use `ajv` or similar for JSON Schema validation in TypeScript)
+4. On validation failure, send `VALIDATION_FAILED` error back to LLM for self-correction
+5. On success, stream the A2UI messages to the client
+
+**This replaces our current approach** where response-processor.ts manually constructs A2UI components from LLM markdown. Instead, the LLM generates the A2UI JSON directly — we just validate and pass through.
+
+---
+
+## 3. Impact on Current Architecture
+
+### Current Flow (Broken)
+```
+User → converse.ts → LLM (no schema awareness) → markdown text
+  → response-processor.ts manually constructs A2UI components
+  → Client renders
+```
+
+### Target Flow (Per A2UI Spec)
+```
+User → converse.ts → LLM (with catalog schema + examples in prompt)
+  → text + ---a2ui_JSON--- + A2UI JSON list
+  → response-processor.ts validates JSON, passes through
+  → Client renders native catalog components
+```
+
+The key shift: **LLM generates A2UI JSON directly** instead of us post-processing markdown into components. This is more reliable, supports the full component catalog, and enables the prompt-generate-validate loop the spec prescribes.
+
