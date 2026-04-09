@@ -263,3 +263,10 @@
 - **Build**: Vite production build passes — 2539 modules (up from 483 before Fluent tree). No errors.
 - **State change**: Accordion `openItems` (string array) replaces old `Set<string>` + separate `jsonSectionOpen` boolean. JSON section is now just another AccordionItem with value `"custom-json"`.
 - **Key imports from @fluentui/react-components**: Button, CounterBadge, Card, CardHeader, Accordion/AccordionItem/AccordionHeader/AccordionPanel, Textarea, Text, Subtitle2, Caption1, Body1Strong, MessageBar, MessageBarBody, makeStyles, tokens.
+
+### 2025-07-29 — Fluent 2 font inheritance fix for Playground
+- **Root cause**: `FluentProvider` sets `--fontFamilyBase` on its wrapper div, but browsers apply their own default `font-family` to `<button>` elements, overriding CSS inheritance. Raw `<button>` scenario items never picked up Segoe UI Variable.
+- **Fix**: Added `fontFamily: tokens.fontFamilyBase` to: `playgroundPage` (root-level cascade), `scenarioBtn` (critical — buttons don't inherit font), `scenarioLabel`, `scenarioDesc`, `logItem`. Also added `font-family: var(--fontFamilyBase)` to `.playground-page` in `playground.css` as fallback.
+- **Key lesson**: When mixing raw HTML elements with Fluent UI components inside `FluentProvider`, always explicitly set `fontFamily: tokens.fontFamilyBase` on `<button>`, `<input>`, `<select>`, and `<textarea>` elements — they never inherit font from parent due to browser UA stylesheet. `<span>` and `<div>` do inherit, but being explicit prevents regressions.
+- **Monospace already correct**: `jsonTextarea` and `surfaceIdText` already had `fontFamily: tokens.fontFamilyMonospace`.
+- **Build**: Vite production build passes — 2539 modules, no errors.

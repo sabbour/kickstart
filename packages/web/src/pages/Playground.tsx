@@ -30,6 +30,9 @@ import {
 const ALL_SCENARIOS = [...KICKSTART_SCENARIOS, ...CONTROL_SCENARIOS];
 
 const useStyles = makeStyles({
+  playgroundPage: {
+    fontFamily: tokens.fontFamilyBase,
+  },
   topbar: {
     display: 'flex',
     alignItems: 'center',
@@ -77,6 +80,7 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     textAlign: 'left' as const,
     width: '100%',
+    fontFamily: tokens.fontFamilyBase,
     ':hover': {
       backgroundColor: tokens.colorNeutralBackground1Hover,
     },
@@ -87,11 +91,13 @@ const useStyles = makeStyles({
   scenarioLabel: {
     fontSize: tokens.fontSizeBase300,
     fontWeight: tokens.fontWeightSemibold,
+    fontFamily: tokens.fontFamilyBase,
     color: tokens.colorNeutralForeground1,
     lineHeight: tokens.lineHeightBase300,
   },
   scenarioDesc: {
     fontSize: tokens.fontSizeBase200,
+    fontFamily: tokens.fontFamilyBase,
     color: tokens.colorNeutralForeground2,
     lineHeight: tokens.lineHeightBase200,
   },
@@ -153,6 +159,7 @@ const useStyles = makeStyles({
     borderRadius: tokens.borderRadiusSmall,
     backgroundColor: tokens.colorNeutralBackground3,
     fontSize: tokens.fontSizeBase200,
+    fontFamily: tokens.fontFamilyBase,
     color: tokens.colorNeutralForeground2,
   },
 });
@@ -232,7 +239,7 @@ export function Playground() {
   const grouped = getGroupedScenarios();
 
   return (
-    <div className="playground-page">
+    <div className={`playground-page ${classes.playgroundPage}`}>
       {/* ---- Top bar ---- */}
       <div className={classes.topbar}>
         <div className={classes.topbarLeft}>
