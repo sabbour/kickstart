@@ -42,6 +42,18 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 
 ## Completed Tasks
 - B-20: Past-turn isolation guards ✅ (pushed 2026-04-09)
+- B-14: GitHub IntegrationKit A2UI components ✅ (pushed 2026-04-10)
+
+## Learnings
+
+### GitHub A2UI Components (B-14)
+- Catalog components CAN use React hooks like `useAPIConnector` and `useArtifacts` — both providers are mounted in `main.tsx` above the full app tree, so all catalog components rendered in chat turns are inside the providers.
+- `createReactComponent(Api, renderFn)` render function is a real React FC — `useState`, `useEffect`, custom hooks all work inside it.
+- `useAPIConnector('github')` returns a `GitHubConnector | undefined`; always guard with `as GitHubConnector | undefined` cast plus null check.
+- Stub repos with extra fields (`stargazers_count`, `updated_at`) can be defined locally in the component file since the connector's GitHubRepo type only covers minimal fields.
+- `useArtifacts()` → `getArtifact(path)` returns `Artifact | null`; check for null before rendering artifact content.
+- Status badge components (GitHubAction) pair well with icon-only imports from `@fluentui/react-icons` — individual named imports avoid bundle bloat vs icon-set imports.
+- 4 new components (GitHubLoginCard, GitHubRepoPicker, GitHubAction, GitHubCommit) registered in kickstart-catalog.ts — total catalog now at 9 custom components + fluent overrides + basic catalog.
 
 ## Historical Context (Archived)
 
