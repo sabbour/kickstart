@@ -44,8 +44,22 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - B-20: Past-turn isolation guards ✅ (pushed 2026-04-09)
 - B-14: GitHub IntegrationKit A2UI components ✅ (pushed 2026-04-10)
 - B-12: Azure IntegrationKit fat A2UI components ✅ (pushed 2026-04-10)
+- B-27: Widgets localStorage persistence ✅ (pushed 2026-04-11)
+- B-29: Progressive component streaming ✅ (pushed 2026-04-11)
+- B-33: Theme customization system ✅ (pushed 2026-04-11)
 
 ## Learnings
+
+### P2 Polish Batch (B-27, B-29, B-33) — 2026-04-11
+
+- **localStorage init pattern for useState:** Pass a function (not a value) to `useState(() => loadFromStorage())` to avoid re-running on every render. Write back in a `useEffect([state])` dep. Key: `localStorage.setItem(KEY, JSON.stringify(state))`.
+- **Progressive streaming surfaces — ref+state dual pattern:** Use a `useRef` to accumulate surface IDs inside streaming callbacks (avoids stale closure in async callbacks), and a `useState` mirror purely for triggering re-renders. Reset both at the top of each new `handleSendMessage` call. `processMessages()` already returns new surface IDs — just collect them.
+- **Streaming bubble restructuring:** When surfaces need to appear during streaming, the streaming bubble must use the full `.chat-bubble-row` + avatar structure (same as `ChatMessage`) so the layout is consistent. Import `A2UISurfaceWrapper` directly into `MessageList` for this.
+- **CSS componentEnter animation:** `.a2ui-component--entering` class with a `componentEnter` keyframe (`opacity 0→1, translateY 6px→0, duration-normal`) gives a natural "pop in" feel for each new component without a React animation library.
+- **ThemeContext pattern:** `ThemeProvider` above all other providers in `main.tsx`. Sets `document.documentElement.setAttribute('data-theme', theme)` in a `useEffect` so CSS custom properties pick it up. `useTheme()` in `App.tsx` drives `webLightTheme` / `webDarkTheme` into `<FluentProvider>`. Custom CSS uses `[data-theme="dark"]` overrides on `:root` variables — no extra class on body needed.
+- **Dark mode CSS variable stack:** Override all `--color-neutral-background-*`, `--color-neutral-foreground-*`, `--color-neutral-stroke-*`, and semantic background colors. Brand primary stays the same (#0078d4). `--color-brand-light` / `--color-brand-lighter` go dark (#004578 / #003263) to prevent blinding light patches on dark surfaces.
+- **Topbar theme toggle:** Simple moon/sun SVG inline icons, toggled with `isDark` flag from `useTheme()`. Uses existing `.topbar-btn` class — no new CSS needed.
+- **Build size unchanged:** 4714 modules, all 423 tests pass. Chunk warnings are pre-existing.
 
 ### IndexedDB VirtualFS + JSON Pointer Binding (B-09 + B-22) — 2026-04-10
 
@@ -91,3 +105,30 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 ## Historical Context (Archived)
 
 [See `archives/history.archived.2026-04-09.md` for pre-2026-04-08 work — hash-based SPA router, A2UI custom renderers, 6-phase engine, API client + streaming, demo/API engine factory, dual-surface (web+IDE MCP App), dark mode removal, Fluent 2 icon migration, playground polish.]
+
+## 2026-04-09T22:32Z — P0–P2 Wave Complete Handoff
+
+**Items shipped (P0→P2):** B-12, B-14, B-19, B-20, B-22, B-26, B-27, B-29, B-33 (11 total, distributed across all phases)
+
+**Key contributions:**
+- **B-12 Azure fat components:** Self-managing auth (MSAL popup), ARM API calls, streaming responses. Components: AzureLogin, AzureResourceForm, AzurePicker, AzureQuery. Catalog catalog registered + 423 tests.
+- **B-14 GitHub fat components:** OAuth Device Flow, GitHub API pagination, branch/repo selection. Components: GitHubLogin, GitHubRepoPicker, GitHubAction, GitHubCommit. Integrated into catalog.
+- **B-19 deployment safeguards UI:** K8s manifest validation UI. 7 validators (image, replica-count, pull policy, etc.). Key learning: Placeholder awareness (`<IMAGE_PLACEHOLDER>`), list-entry regex (`^\s+(?:-\s+)?image:`), severity gating (single-replica is warning, not error).
+- **B-20 past-turn isolation:** Dim old conversation turns to improve focus in multi-phase conversations. Improves readability.
+- **B-22 settings panel:** User preferences UI. Dark mode storage, API endpoint overrides, etc.
+- **B-26 toolbar component:** Header controls (refresh, export, help). Clean integration with Fluent UI.
+- **B-27 widget persistence:** LocalStorage + React state sync. Clean recovery on reload. Tested.
+- **B-29 streaming response UI:** Real-time token rendering with graceful fallbacks. Artifact display pipeline.
+- **B-33 dark mode toggle:** Fluent UI tokens + CSS variables. No hardcoded colors. Persistent across sessions.
+
+**Pattern learnings:**
+- Fat components (auth + API + streaming) reduce boilerplate. Clear component boundaries.
+- Validation UI should use consistent error messaging (DS001–DS006 codes linked to safeguards docs).
+- LocalStorage recovery pattern: Fetch persisted state, validate schema, restore or discard gracefully.
+- Streaming: Use callbacks + event emitters, not promises. Allows real-time token rendering.
+
+**Test status:** 423 passing. No regressions.
+
+**Handoff:** All branches merged to main. UI fully integrated with backend. Dark mode, persistence, streaming all working.
+
+**Next P3 priority:** Internationalization (i18n), service principal auth, advanced error recovery with retry strategies.

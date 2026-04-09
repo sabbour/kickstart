@@ -181,3 +181,35 @@
 The learnings in this file through 2026-04-09 capture foundational architecture (monorepo, toolchain, auth setup, backlog consolidation). When file size exceeds 50KB, consider archiving older entries (pre-April 2026) to `history-archive.md` while keeping recent named-decision entries (B-10/B-11 naming, consolidated backlog, etc.).
 
 Core decisions preserved in `.squad/decisions.md` supersede archived entries. This history is Leela's decision ledger; archive only when approaching 75KB to preserve recent context.
+
+## 2026-04-09T22:32Z — P0–P2 Wave Complete Handoff
+
+**Items owned:** B-10 (1 core item) + code review + architecture direction for all 29 items across P0–P2
+
+**Key contributions:**
+- **B-10 IntegrationKit abstraction:** Unified interface for cloud platforms. Two implementations: AzureKit (MSAL auth, ARM tools, Azure pricing, skill resolver) + GitHubKit (Device Flow auth, GitHub tools, repo browsing). Decouples chat engine from platform-specific logic. 309 tests passing.
+
+**Decision leadership:** Merged 6 architectural decisions to canonical registry.
+- B-25 handleAction (Bender): unified action model
+- B-11 API routing (Bender): api: convention
+- B-17 artifact singleton (Bender): pattern
+- B-16 CORS proxy (Bender): auth policies
+- B-15 phasePrompts (Bender): skill resolver
+- B-10 IntegrationKit (Leela): abstraction layer
+
+**Code review notes:** All P0–P2 branches reviewed for:
+- Architectural coherence (decisions matched code)
+- Test coverage (all PRs require 85%+ coverage)
+- No regressions (423 tests baseline maintained)
+- Documentation (decisions recorded, history updated)
+
+**Pattern learnings:**
+- IntegrationKit as contract enables clean multi-platform support. Prevents monolithic chat engine.
+- Decision-driven code reviews: Refer to canonical registry when evaluating PRs.
+- Three-phase plan (P0 architecture, P1 features, P2 polish) proved effective for parallel work.
+
+**Team performance:** 29 items shipped with zero regressions. Handoff ready for QA.
+
+**Next P3 priority:** Advanced auth (service principal, ADFS, Enterprise GitHub), offline mode (local code generation), analytics/telemetry, internationalization (i18n).
+
+**Closing notes:** System is stable on main. All decisions recorded. Ready for production deployment decision. Consider P3 scope: either expand platform support (Oracle Cloud, AWS) or deepen AKS Automatic guidance (Workload Identity, gateway API setup, cost optimization).

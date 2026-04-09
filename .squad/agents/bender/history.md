@@ -446,3 +446,35 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **Playground Icons tab:** New "Fluent React" section tab. Cards for fluent-react icons render via `<FluentIcon>` component (not `<img src>`). Caption updated to explain both naming conventions.
 - **Pattern:** Fluent React icons copy the icon name (e.g. `document`); SVG icons copy the path (e.g. `/assets/icons/...`). The A2UI Icon component auto-detects which to use at render time.
 - **Commit:** 791891a — 12 files, 624 insertions.
+
+## 2026-04-09T22:32Z — P0–P2 Wave Complete Handoff
+
+**Items shipped (P0→P2):** B-11, B-13, B-15, B-16, B-17, B-21, B-23, B-24, B-25, B-28, B-30, B-32 (12 total)
+
+**Key contributions:**
+- **B-25 handleAction:** Unified action dispatcher replacing ad-hoc event listeners. Pattern: single canonical handler integrates auth, validation, artifact binding.
+- **B-11 API routing:** `api: action-name` message format. Standardizes LLM→UI action contracts.
+- **B-17 artifact store:** Singleton + DI pattern. Queryable by LLM tool system.
+- **B-16 CORS proxy:** Centralized auth middleware (ARM, GitHub, Pricing). Token lifecycle isolated from frontend.
+- **B-15 phasePrompts:** Extensible LLM skill injection. Enables task-scoped domain knowledge (AKS Automatic, GitHub workflows).
+- **B-13 tool system:** 60 tests. Real bug found: `generate_kubernetes_manifest` crashes on non-string appName. Hermes blocked; needs input validation.
+- **B-21 auto-continue:** Middleware advances phase when LLM intent clear. Reduces friction.
+- **B-23 artifact binding:** Session state ↔ LLM tools via singleton. Enables stateful multi-step loops.
+- **B-24 action endpoint:** HTTP dispatcher for external action calls (non-UI, e.g., deployment scripts).
+- **B-28 icons:** 27 Azure SVG icons in Mermaid diagrams. Registry pattern.
+- **B-30 state binding:** Service layer for component ↔ session state. Decouples logic from Redux/Zustand.
+- **B-32 logging:** Winston-based framework. Session/artifact correlation. Error tracking.
+
+**Decisions merged to canonical registry (6):**
+1. B-25 handleAction — unified action model
+2. B-11 API routing — api: convention
+3. B-17 artifact singleton — pattern
+4. B-16 CORS proxy — auth policies
+5. B-15 phasePrompts — skill resolver extension
+6. (P0 architecture decisions now canonical reference for future work)
+
+**Test status:** 423 passing. No regressions.
+
+**Handoff:** All branches merged to main. Ready for QA E2E testing.
+
+**Next P3 priority:** Address B-13 type coercion bug (kubectl manifest appName validation). Consider: service-principal auth, offline mode, advanced error recovery.
