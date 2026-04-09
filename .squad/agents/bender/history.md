@@ -420,3 +420,29 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **main.tsx:** Wrapped `<App>` with `<ArtifactProvider>`.
 - **Tests:** 22 new tests in `artifact-store.test.ts`. All 359 tests pass.
 - **Key pattern:** Tools write to `defaultArtifactStore` directly; React polls it. No event bus needed for v1 — polling is fine given 1s cadence and LLM response latency.
+
+### 2026-04-10: B-32, B-30, B-28 — Telemetry, Data Binding, Icon System
+
+**B-32: Logging & Telemetry**
+- **Logger class:** `packages/core/src/telemetry/logger.ts` — `info/warn/error/track` methods. In-memory ring buffer (last 100), `LogRecord` = `LogEntry | TrackEntry` (discriminated union via `kind` field).
+- **Singleton:** `logger` + `getLogEntries()` exported from `@kickstart/core`.
+- **Wired into 3 places:** `response-processor.ts` (track `conversation.turn` per parsed response), `machine.ts` (track all phase transitions: start, advance, skip, phaseComplete, complete, reset, userInput), `tools/registry.ts` (track `tool.call` + `tool.result`, error-log failures via new `execute(name, args)` method on registry).
+- **423 tests pass. Build clean.**
+
+**B-30: State Binding & Data Interpolation**
+- **`packages/core/src/engine/data-binding.ts`:** 4 exported utilities:
+  - `resolveDataPath(path, dataModel)`: RFC 6901 JSON Pointer — handles `~0`/`~1` escaping, array index support, nested objects.
+  - `interpolateTemplate(template, dataModel)`: replaces `{{/json/pointer}}` placeholders; leaves unresolved paths as-is; stringifies objects.
+  - `createDefaultValues(schema)`: recursive JSON Schema → default values (object/array/string/number/boolean/null). Respects `schema.default`.
+  - `interpolateA2UIMessage(msg, dataModel)`: deep-traverses an A2UI message and interpolates all string values recursively.
+- **Wired into processResponse:** Optional `dataModel?` parameter — when provided, interpolates all component props in A2UI messages before returning.
+- **All 4 utilities exported from `@kickstart/core`.**
+- **Key insight:** JSON Pointer paths in A2UI props use `{{/path/to/value}}` syntax. The `{{` / `}}` delimiters distinguish data refs from literal text.
+
+**B-28: Fluent UI React Icon System**
+- **`packages/web/src/catalog/icons/fluent-icons.ts`:** `FLUENT_REACT_ICON_REGISTRY` (31 icons mapped by camelCase name). `getFluentIcon(name)` / `renderFluentIcon(name, props)` helpers.
+- **Icon component updated:** `fluent-components/Icon.tsx` now checks registry first — if name matches, renders `<FluentIcon fontSize={24} />`. Falls back to SVG path, then text.
+- **playground-icons.ts:** Added `FLUENT_REACT_ICON_CATEGORY` (31 entries, `type: 'fluent-react'`). `IconCategory.type` extended with `'fluent-react'`. New category in `ALL_ICON_CATEGORIES`.
+- **Playground Icons tab:** New "Fluent React" section tab. Cards for fluent-react icons render via `<FluentIcon>` component (not `<img src>`). Caption updated to explain both naming conventions.
+- **Pattern:** Fluent React icons copy the icon name (e.g. `document`); SVG icons copy the path (e.g. `/assets/icons/...`). The A2UI Icon component auto-detects which to use at render time.
+- **Commit:** 791891a — 12 files, 624 insertions.
