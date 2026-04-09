@@ -407,3 +407,16 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **converse endpoint** now calls `resolveSkills` on every turn and injects the fresh system prompt, so the LLM gets correct capabilities as the phase advances.
 - **azure-kit + github-kit** have full `phasePrompts` coverage for all 6 phases.
 - 28 new tests, 359 total — zero regressions.
+
+### 2026-04-10: B-17 — Artifact Store
+
+- **ArtifactStore interface + Artifact type:** `packages/core/src/artifacts/types.ts` — `put(path, content, metadata?)`, `get(path) → Artifact | null`, `list(glob?) → Artifact[]`, `delete(path)`, `export() → Record<string, string>`, `clear()`.
+- **InMemoryArtifactStore:** `packages/core/src/artifacts/in-memory.ts` — Map-backed, language auto-inferred from extension (yaml, ts, py, go, rs, java, cs, sh, tf, bicep, dockerfile, etc.), glob filtering via `*` (within segment) and `**` (across segments), preserves `createdAt` on update.
+- **defaultArtifactStore singleton:** Exported from `@kickstart/core` — shared by all tools in same process.
+- **generate_kubernetes_manifest updated:** Each generated file is stored in `defaultArtifactStore` with language + metadata (generator name, appName).
+- **list_artifacts tool:** Returns count + artifact inventory; optional glob filter. Registered in defaultRegistry.
+- **get_artifact tool:** Retrieves full content by exact path. Registered in defaultRegistry (7 tools total now).
+- **ArtifactContext.tsx:** `ArtifactProvider` + `useArtifacts()` hook. Polls defaultArtifactStore every 1s (configurable) for updates from tool calls outside React. Exposes `artifacts[]`, `getArtifact(path)`, `downloadAll()` (JSZip), `refresh()`.
+- **main.tsx:** Wrapped `<App>` with `<ArtifactProvider>`.
+- **Tests:** 22 new tests in `artifact-store.test.ts`. All 359 tests pass.
+- **Key pattern:** Tools write to `defaultArtifactStore` directly; React polls it. No event bus needed for v1 — polling is fine given 1s cadence and LLM response latency.
