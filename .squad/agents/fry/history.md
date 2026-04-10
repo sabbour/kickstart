@@ -149,3 +149,9 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - **Schema design:** `steps` array of `{ title: DynamicStringSchema, child: ComponentIdSchema }` + optional `activeStep` number. Strict schema. Child references point to component IDs in the same surface.
 - **Playground scenario:** 3-step demo (Application Settings → Scaling → Review) registered in Custom Controls group. Uses `surface()` helper + `uid()` for unique surface IDs.
 - **Build verified:** Zero new TypeScript errors. Pre-existing errors in AzureLoginCard/AzureResourcePicker/CodeBlock are unrelated.
+
+### Clear All Sessions Fix (#45) + README Playground Section (#51) — 2026-07-18
+
+- **clearAllSessions compound reset:** The raw `useSessions.clearAllSessions` only clears session state and localStorage. Added `handleClearAllSessions` wrapper in `App.tsx` that also resets `messages`, `a2ui` surfaces, virtual filesystem, and selected file. This prevents stale data from lingering after clearing all sessions.
+- **Pattern:** Compound state operations (like "clear everything") should be handled at the App level, not delegated to individual hooks, so ALL related state is reset together.
+- **README playground section:** Added `## Playground` section linking to `/?playground` with a brief description of the A2UI sandbox.
