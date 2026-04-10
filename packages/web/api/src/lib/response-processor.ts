@@ -217,7 +217,7 @@ function btn(
     action: {
       event: {
         name: "reply",
-        data: { text: replyText },
+        context: { text: replyText },
       },
     },
   };
