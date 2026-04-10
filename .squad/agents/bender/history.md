@@ -550,3 +550,4 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **Validation:** 30 B-25 contract tests pass, all 423 tests green, lint/build clean.
 - **Key files:** `packages/web/api/src/lib/response-processor.ts`, `packages/core/src/catalog/index.ts` (ButtonAction type), `packages/core/src/__tests__/action-schema.test.ts` (B-25 tests)
 - **PR:** #78
+- **Review fix (2026-04-10):** Copilot reviewer caught `data`/`context` mismatch in docs vs code. The web surface's A2UI v0.9 ActionSchema uses `event.context`, while `@kickstart/core`'s `ButtonAction` uses `event.data`. Added inline comment to `btn()` and fixed history entry + PR description. Always verify doc/code schema alignment when two type systems describe the same payload.
