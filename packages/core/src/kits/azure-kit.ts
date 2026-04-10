@@ -58,6 +58,24 @@ export const azureKit: IntegrationKit = {
     // Deployment safeguards
     'Never expose Kubernetes YAML or kubectl commands directly to the user. Translate all infrastructure ' +
     'operations into plain-language deployment steps. K8s complexity is hidden behind AKS Automatic.',
+
+    // KAITO (Kubernetes AI Toolchain Operator)
+    'When the user wants to run AI/ML workloads (open-source LLMs, inference, fine-tuning), recommend the ' +
+    'KAITO add-on for AKS. KAITO automates GPU node provisioning, downloads model images from the KAITO model ' +
+    'registry, and deploys inference endpoints — users only write a Workspace CRD specifying the model name ' +
+    '(e.g. falcon-7b, llama-2-13b, mistral-7b, phi-3). KAITO supports preset models and custom model imports.',
+
+    // RAGEngine
+    'For retrieval-augmented generation (RAG) scenarios, recommend RAGEngine — an AKS add-on that pairs with KAITO. ' +
+    'RAGEngine manages the end-to-end RAG pipeline: document ingestion, embedding generation, vector store indexing ' +
+    '(Azure AI Search or in-cluster FAISS), and query-time retrieval + LLM completion. Users define a RAGEngine CRD ' +
+    'referencing their KAITO Workspace and a document source (Azure Blob, Git repo, or inline).',
+
+    // Fine-tuning
+    'KAITO supports fine-tuning open-source models on AKS GPU nodes. Users specify a Workspace CRD with ' +
+    'tuning.method (LoRA or QLoRA), a training dataset (Azure Blob or HuggingFace), and hyperparameters. ' +
+    'KAITO handles checkpoint management, GPU scheduling, and model export. Fine-tuned models can be served ' +
+    'immediately as a KAITO inference Workspace or pushed to ACR as a custom model image.',
   ],
 
   phasePrompts: {
@@ -72,6 +90,9 @@ export const azureKit: IntegrationKit = {
       'Recommend managed Azure services: Azure Database for PostgreSQL, Azure Cache for Redis, Azure Service Bus, Azure AI Search. ' +
       'Use azure_resource_list to discover existing resources before proposing new ones. ' +
       'Present the architecture with ArchitectureDiagram + CostEstimate using estimate_cost tool output.',
+      'For AI/ML workloads: recommend KAITO add-on for model inference (GPU node provisioning is automatic), ' +
+      'RAGEngine for RAG pipelines, and KAITO fine-tuning for custom model training. ' +
+      'Include GPU node pool costs in the estimate_cost breakdown when KAITO is part of the architecture.',
     ],
 
     [Phase.Generate]: [
@@ -81,7 +102,12 @@ export const azureKit: IntegrationKit = {
       '  • ACR integration: AcrPull role binding for kubelet (never imagePullSecrets)\n' +
       '  • HPA: min 2 replicas, max 10, CPU threshold 70%\n' +
       '  • PDB: minAvailable 1\n' +
-      'Do NOT set dnsPrefix, networkProfile, or nodeResourceGroup on the AKS Automatic cluster resource.',
+      'Do NOT set dnsPrefix, networkProfile, or nodeResourceGroup on the AKS Automatic cluster resource.\n' +
+      'For AI/ML workloads with KAITO:\n' +
+      '  • Generate a Workspace CRD (apiVersion: kaito.sh/v1alpha1, kind: Workspace) with the model preset name\n' +
+      '  • Set resource.instanceType to the appropriate GPU VM size (e.g. Standard_NC12s_v3 for 7B models)\n' +
+      '  • For RAG: generate a RAGEngine CRD referencing the KAITO Workspace and document source\n' +
+      '  • For fine-tuning: set tuning.method (lora/qlora), tuning.input (dataset source), and tuning.output',
     ],
 
     [Phase.Review]: [
@@ -92,8 +118,11 @@ export const azureKit: IntegrationKit = {
 
     [Phase.Handoff]: [
       'After code is pushed to GitHub, remind the user that the GitHub Actions workflow will deploy ' +
-      'automatically on every push to the default branch. No manual Azure steps needed. ' +
-      'The workflow uses OIDC Workload Identity — no secrets to configure.',
+      'automatically on every push to the default branch. No manual Azure steps needed beyond initial OIDC setup. ' +
+      'The workflow uses OIDC Workload Identity Federation — this eliminates long-lived secrets but still requires ' +
+      'one-time setup: an Entra app registration (or User-Assigned Managed Identity) with a federated credential ' +
+      'for the GitHub repo, and three GitHub repository variables (AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID). ' +
+      'Guide the user through this setup if it has not been done yet.',
     ],
 
     [Phase.Deploy]: [
@@ -106,11 +135,21 @@ export const azureKit: IntegrationKit = {
   components: [
     {
       type: 'azureLoginCard',
-      description: 'MSAL sign-in card with automatic subscription selection',
+      description:
+        'MSAL sign-in card with automatic subscription selection.\n' +
+        'Props:\n' +
+        '  - displayName (optional string): Display name shown on the avatar and user info. Defaults to "Azure User".\n' +
+        '  - onSignIn (optional action): Callback fired after successful MSAL sign-in.\n' +
+        '  - onSignOut (optional action): Callback fired when the user signs out.',
     },
     {
       type: 'azureResourcePicker',
-      description: 'Dropdown populated from ARM API at render time (regions, resource groups, SKUs)',
+      description:
+        'Dropdown populated from ARM API at render time (regions, resource groups, SKUs).\n' +
+        'Props:\n' +
+        '  - subscriptionId (optional string): Azure subscription ID to list resources from. Falls back to a stub if omitted.\n' +
+        '  - label (optional string): Header text above the resource list. Defaults to "Select an Azure resource".\n' +
+        '  - onSelect (optional action): Callback fired when the user selects a resource.',
     },
   ],
 };
