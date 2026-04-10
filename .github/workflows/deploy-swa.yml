@@ -3,8 +3,8 @@ name: Deploy to Azure Static Web Apps
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches:

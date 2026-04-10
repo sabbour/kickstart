@@ -222,3 +222,11 @@ Core decisions preserved in `.squad/decisions.md` supersede archived entries. Th
 - API surface grew from 1 endpoint (/api/chat) to 7: converse, action, generate, health, arm-proxy, github-proxy, pricing-proxy.
 - Created docs/development.md (new) with npm run dev, npx vitest run, npx playwright test, and build commands.
 - Updated both docs/ (authoritative) and docs-site/ (Docusaurus) in the same commit.
+
+### 2025-07-27: PR + Tagged Release Workflow
+- **Branch protection enabled:** Main branch requires PRs. 0 approvers (agents are the team), admins not exempt. No direct pushes.
+- **SWA deploy now tag-gated:** `deploy-swa.yml` triggers on `push: tags: ['v*']` instead of `push: branches: [main]`. PR preview environments preserved via `pull_request` trigger.
+- **CI is PR-only:** `ci.yml` removed `push: branches: [main]` trigger — runs only on PRs. Added TypeScript check step (`npx tsc --noEmit`).
+- **Release flow:** changeset per PR → `npx changeset version` → `git tag vX.Y.Z` → push tag → auto deploy.
+- **Infra + docs deploys unchanged:** Still trigger on push to main (path-scoped). Lower risk, no tag gate needed yet.
+- **Full decision:** `.squad/decisions/inbox/leela-pr-release-workflow.md`

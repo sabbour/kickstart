@@ -1,9 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
@@ -28,6 +25,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: TypeScript check (web)
+        run: cd packages/web && npx tsc --noEmit
 
       - name: Build core
         run: npm run build -w @kickstart/core
