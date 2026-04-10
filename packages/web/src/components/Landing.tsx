@@ -184,7 +184,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
     if (inputRef.current) {
       inputRef.current.style.height = '44px';
       const scrollHeight = inputRef.current.scrollHeight;
-      inputRef.current.style.height = Math.min(scrollHeight, 160) + 'px';
+      inputRef.current.style.height = Math.min(scrollHeight, 200) + 'px';
     }
   }, [inputValue]);
 
