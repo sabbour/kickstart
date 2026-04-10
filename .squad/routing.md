@@ -42,8 +42,10 @@ How to decide who handles what.
 
 | Signal | Route to Zapp |
 |--------|---------------|
+| Design Proposal (DP) posted on issue | Primary — review for security concerns |
+| PR marked ready for review | Primary — security-focused code review |
 | Security review request | Primary |
-| Architecture decision review | Secondary (after Leela) |
-| PR security audit | Primary |
 | Vulnerability analysis | Primary |
 | Auth/CORS/secrets concerns | Primary |
+
+> **Scope boundary:** Zapp reviews for **security only**. Architecture quality review is Leela's responsibility. Both review DPs on issues and code on PRs, but in their respective domains.

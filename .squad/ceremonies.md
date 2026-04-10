@@ -8,17 +8,20 @@
 |-------|-------|
 | **Trigger** | auto |
 | **When** | before |
-| **Condition** | multi-agent task involving 2+ agents modifying shared systems |
+| **Condition** | Design Proposal (DP) comment posted on an issue, OR multi-agent task involving 2+ agents modifying shared systems |
 | **Facilitator** | lead |
-| **Participants** | all-relevant |
+| **Participants** | all-relevant, Zapp (security input) |
 | **Time budget** | focused |
 | **Enabled** | ✅ yes |
 
 **Agenda:**
-1. Review the task and requirements
-2. Agree on interfaces and contracts between components
-3. Identify risks and edge cases
-4. Assign action items
+1. Review the Design Proposal (DP) comment on the issue
+2. Leela evaluates architecture quality and alignment
+3. Zapp evaluates security concerns and threat surface
+4. Agree on interfaces and contracts between components
+5. Identify risks and edge cases
+6. Both approve → implementation proceeds
+7. Capture decisions as comments on the issue (or as a GitHub Discussion if cross-issue)
 
 ---
 
@@ -63,6 +66,8 @@
 6. Assign sprint capacity per agent based on estimates
 7. Output: milestone roadmap with release targets
 
+**Artifacts:** Create a GitHub Discussion (or milestone comment) linking to the sprint plan. Include the sprint goal, issue list, wave breakdown, and capacity estimates.
+
 ---
 
 ## Sprint Retro
@@ -81,6 +86,9 @@
 1. What shipped? (milestone summary)
 2. What slipped? (issues that moved between milestones)
 3. Velocity check: estimated vs actual story points
-4. What went well?
-5. What should change?
-6. Action items for next sprint
+4. Wall-clock time vs estimates (per issue and per wave)
+5. What went well?
+6. What should change?
+7. Action items for next sprint
+
+**Artifacts:** Create a GitHub Discussion (or milestone comment) with the retro summary, including wall-clock vs estimate analysis and velocity metrics.
