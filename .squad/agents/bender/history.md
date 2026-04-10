@@ -542,3 +542,12 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **SWA route ordering matters:** Anonymous routes for specific endpoints MUST appear before the catch-all `/api/*` authenticated rule. Otherwise the endpoint requires login.
 - **Protocol tests:** 22 tests in `packages/mcp-server/src/__tests__/action-endpoint.test.ts` validate `parseAppMessage`/`handleAppMessage` for the action protocol layer.
 - **PR:** #77 (draft), closes #23.
+### 2026-04-10: Unified Button Action Format (B-25 / Issue #24)
+
+- **Problem:** The `btn()` helper in `packages/web/api/src/lib/response-processor.ts` used a custom flat format (`action: "reply", data: { text }`) that bypassed the A2UI ActionSchema.
+- **Fix:** Updated `btn()` to emit `action: { event: { name: "reply", context: { text } } }` — the canonical A2UI v0.9 ActionSchema shape (uses `event.context`, not `event.data`).
+- **Scope:** Only the web API response-processor needed fixing. The core catalog (`ButtonAction` type), action dispatch hooks, and MCP server action handler already used the correct format.
+- **Validation:** 30 B-25 contract tests pass, all 423 tests green, lint/build clean.
+- **Key files:** `packages/web/api/src/lib/response-processor.ts`, `packages/core/src/catalog/index.ts` (ButtonAction type), `packages/core/src/__tests__/action-schema.test.ts` (B-25 tests)
+- **PR:** #78
+- **Review fix (2026-04-10):** Copilot reviewer caught `data`/`context` mismatch in docs vs code. The web surface's A2UI v0.9 ActionSchema uses `event.context`, while `@kickstart/core`'s `ButtonAction` uses `event.data`. Added inline comment to `btn()` and fixed history entry + PR description. Always verify doc/code schema alignment when two type systems describe the same payload.
