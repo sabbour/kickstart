@@ -231,7 +231,7 @@ const useStyles = makeStyles({
     fontFamily: tokens.fontFamilyBase,
     color: tokens.colorNeutralForeground1,
     paddingLeft: tokens.spacingHorizontalM,
-    paddingRight: tokens.spacingHorizontalXS,
+    paddingRight: '80px',
     paddingTop: '11px',
     paddingBottom: '11px',
     boxSizing: 'border-box' as const,
@@ -1095,15 +1095,6 @@ function PlaygroundInner() {
           <Tab id="tab-icons" value="icons" aria-controls="panel-icons">Icons</Tab>
           <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets">Widgets</Tab>
         </TabList>
-        {!(activeTab === 'create' && createMessages.length > 0) && (
-          <Caption1 className={classes.tabHint}>
-            {activeTab === 'create' && 'AI-generated interactive components'}
-            {activeTab === 'gallery' && 'Click any card to preview'}
-            {activeTab === 'components' && 'Layouts, forms, and interactive patterns'}
-            {activeTab === 'icons' && 'Click to copy path'}
-            {activeTab === 'widgets' && 'Your saved creations'}
-          </Caption1>
-        )}
       </div>
 
       {/* ---- Tab 1: Create (empty state — no messages yet) ---- */}
