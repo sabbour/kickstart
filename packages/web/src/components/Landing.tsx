@@ -65,29 +65,93 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const [placeholderVisible, setPlaceholderVisible] = useState(true);
   const [isHiding, setIsHiding] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [inspireLoading, setInspireLoading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleInspire = useCallback(async () => {
+    // Abort any existing stream
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
     setInspireLoading(true);
+    setInputValue(''); // Clear existing value
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const res = await fetch('/api/inspirations');
-      if (!res.ok) throw new Error('API error');
-      const ideas = await res.json();
-      if (Array.isArray(ideas) && ideas.length > 0) {
-        setInputValue(ideas[0].prompt);
-        inputRef.current?.focus();
+      const res = await fetch('/api/inspirations?stream=true', {
+        signal: controller.signal,
+      });
+
+      if (!res.ok) throw new Error('Streaming API error');
+      if (!res.body) throw new Error('No response body');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let accumulatedText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              setInspireLoading(false);
+              inputRef.current?.focus();
+              return;
+            }
+            if (data.startsWith('[ERROR]')) {
+              throw new Error(data.slice(8));
+            }
+            // Append token to accumulated text
+            accumulatedText += data;
+            setInputValue(accumulatedText);
+          }
+        }
+      }
+
+      setInspireLoading(false);
+      inputRef.current?.focus();
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        // Stream was aborted - this is expected when clicking Inspire again
         return;
       }
-    } catch {
-      // Fallback: pick from the local INSPIRATIONS array
+
+      // Fallback to non-streaming JSON path
+      setInputValue(''); // Clear any partial streaming
+      try {
+        const res = await fetch('/api/inspirations');
+        if (!res.ok) throw new Error('API error');
+        const ideas = await res.json();
+        if (Array.isArray(ideas) && ideas.length > 0) {
+          setInputValue(ideas[0].prompt);
+          inputRef.current?.focus();
+          setInspireLoading(false);
+          return;
+        }
+      } catch {
+        // Double fallback: pick from local INSPIRATIONS
+      } finally {
+        setInspireLoading(false);
+      }
+      const pick = INSPIRATIONS[Math.floor(Math.random() * INSPIRATIONS.length)];
+      setInputValue(pick);
+      inputRef.current?.focus();
     } finally {
-      setInspireLoading(false);
+      abortControllerRef.current = null;
     }
-    const pick = INSPIRATIONS[Math.floor(Math.random() * INSPIRATIONS.length)];
-    setInputValue(pick);
-    inputRef.current?.focus();
   }, []);
 
   // Rotate placeholder inspiration
@@ -108,12 +172,21 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
     setTimeout(() => onStartChat(prompt.trim()), 350);
   }, [onStartChat]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(inputValue);
     }
   };
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = '44px';
+      const scrollHeight = inputRef.current.scrollHeight;
+      inputRef.current.style.height = Math.min(scrollHeight, 160) + 'px';
+    }
+  }, [inputValue]);
 
   const handleDeleteClick = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
@@ -154,9 +227,9 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
                 Generating idea...
               </span>
             )}
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
+              rows={1}
               aria-label="Describe your app"
               autoComplete="off"
               value={inputValue}
@@ -226,7 +299,10 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
           </div>
           <div className="landing-footer-meta">
             <span className="landing-footer-version">
-              Kickstart Preview · {(window as any).__BUILD_DATE__ || 'dev'}
+              Kickstart Preview v{(window as any).__BUILD_VERSION__ || '0.1.0'}
+              {(window as any).__BUILD_SHA__ && (window as any).__BUILD_SHA__ !== 'dev'
+                ? ` · ${(window as any).__BUILD_SHA__}`
+                : ' · dev'}
             </span>
             <a className="landing-footer-link" href="?playground">Playground</a>
           </div>

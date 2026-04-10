@@ -86,6 +86,17 @@ const useStyles = makeStyles({
     paddingLeft: tokens.spacingHorizontalL,
     paddingRight: tokens.spacingHorizontalL,
     flexShrink: 0,
+    display: 'flex',
+    alignItems: 'flex-end',
+  },
+  tabHint: {
+    marginLeft: 'auto',
+    paddingBottom: tokens.spacingVerticalS,
+    paddingRight: tokens.spacingHorizontalXS,
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    whiteSpace: 'nowrap' as const,
   },
   galleryCard: {
     backgroundColor: tokens.colorNeutralBackground1,
@@ -447,17 +458,6 @@ const useStyles = makeStyles({
   },
   createFooterSep: {
     color: tokens.colorNeutralForeground3,
-  },
-  tabIntro: {
-    margin: 0,
-    paddingTop: tokens.spacingVerticalXS,
-    paddingBottom: tokens.spacingVerticalS,
-    paddingLeft: tokens.spacingHorizontalL,
-    paddingRight: tokens.spacingHorizontalL,
-    color: tokens.colorNeutralForeground3,
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
-    flexShrink: 0,
   },
 });
 
@@ -987,6 +987,9 @@ function PlaygroundInner() {
           {activeTab === 'create' && (
             <Button appearance="outline" size="small" onClick={handleClearAll}>Clear All</Button>
           )}
+          <Caption1 style={{ color: tokens.colorNeutralForeground3, marginLeft: '12px' }}>
+            v{(window as any).__BUILD_VERSION__ || '0.0.0'} · {(window as any).__BUILD_SHA__ || 'dev'}
+          </Caption1>
         </div>
       </div>
 
@@ -1003,18 +1006,16 @@ function PlaygroundInner() {
           <Tab id="tab-icons" value="icons" aria-controls="panel-icons">Icons</Tab>
           <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets">Widgets</Tab>
         </TabList>
+        {!(activeTab === 'create' && createMessages.length > 0) && (
+          <Caption1 className={classes.tabHint}>
+            {activeTab === 'create' && 'AI-generated interactive components'}
+            {activeTab === 'gallery' && 'Click any card to preview'}
+            {activeTab === 'components' && 'Layouts, forms, and interactive patterns'}
+            {activeTab === 'icons' && 'Click to copy path'}
+            {activeTab === 'widgets' && 'Your saved creations'}
+          </Caption1>
+        )}
       </div>
-
-      {/* ---- Tab intro ---- */}
-      {!(activeTab === 'create' && createMessages.length > 0) && (
-        <Caption1 as="p" className={classes.tabIntro}>
-          {activeTab === 'create' && 'Describe what you want and the AI generates interactive components.'}
-          {activeTab === 'gallery' && 'Explore examples. Click any card to see it in action.'}
-          {activeTab === 'components' && 'Advanced component demos with layouts, forms, and interactive patterns.'}
-          {activeTab === 'icons' && 'Browse the icon catalog. Click to copy the path.'}
-          {activeTab === 'widgets' && 'Your saved widgets. Create new ones or start blank.'}
-        </Caption1>
-      )}
 
       {/* ---- Tab 1: Create (empty state — no messages yet) ---- */}
       {activeTab === 'create' && createMessages.length === 0 && (

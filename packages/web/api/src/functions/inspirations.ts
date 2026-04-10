@@ -2,6 +2,7 @@
  * @module @kickstart/api/functions/inspirations
  *
  * GET /api/inspirations — Returns carousel inspiration ideas for the landing page.
+ * GET /api/inspirations?stream=true — Streams a single inspiration idea token-by-token.
  *
  * If Azure OpenAI is configured, generates creative app ideas via LLM.
  * Otherwise, returns a shuffled subset of hardcoded fallback ideas.
@@ -112,7 +113,7 @@ function isOpenAIConfigured(): boolean {
   );
 }
 
-/** Generate ideas via Azure OpenAI. */
+/** Generate ideas via Azure OpenAI (non-streaming). */
 async function generateIdeas(): Promise<InspirationIdea[]> {
   const { chatCompletion } = await import("../lib/openai-client.js");
 
@@ -120,7 +121,7 @@ async function generateIdeas(): Promise<InspirationIdea[]> {
     [
       {
         role: "system",
-        content: `You generate a single creative app idea for a developer who wants to deploy to Azure. The idea MUST require a server-side component — a backend API, a database, a scheduled job, a webhook, or an AI/ML service. Do NOT suggest client-only apps (static sites, browser extensions, CLI tools, or anything that runs purely in the browser without a server). Return ONLY a JSON array with exactly 1 object containing "title" (short catchy name, max 8 words), "subtitle" (one-line description, max 12 words), and "prompt" (a first-person sentence starting with "I want to build"). No emoji. No markdown. Raw JSON only.`,
+        content: `You generate a single creative app idea for a developer to build and deploy to Azure Kubernetes Service in a couple of hours. The idea should be small enough to implement in one focused coding session but impressive enough to demo. It MUST require a server-side component — a backend API, a database, or an AI/ML service. Return ONLY a JSON array with exactly 1 object containing "title" (short catchy name, max 8 words), "subtitle" (one-line description, max 12 words), and "prompt" (a first-person sentence starting with "I want to build"). No emoji. No markdown. Raw JSON only.`,
       },
       {
         role: "user",
@@ -138,6 +139,19 @@ async function generateIdeas(): Promise<InspirationIdea[]> {
   return parsed;
 }
 
+/** Stream a text character-by-character with small delays (simulated streaming). */
+async function* simulateStream(text: string): AsyncGenerator<string> {
+  for (const char of text) {
+    yield char;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
+/** Format SSE data line. */
+function sseData(content: string): string {
+  return `data: ${content}\n\n`;
+}
+
 // ---------------------------------------------------------------------------
 // Endpoint
 // ---------------------------------------------------------------------------
@@ -150,7 +164,91 @@ app.http("inspirations", {
     request: HttpRequest,
     context: InvocationContext,
   ): Promise<HttpResponseInit> => {
+    const url = new URL(request.url);
+    const isStreaming = url.searchParams.get("stream") === "true";
+
     try {
+      // STREAMING PATH
+      if (isStreaming) {
+        if (isOpenAIConfigured()) {
+          // Stream from OpenAI
+          const { chatCompletionStream } = await import("../lib/openai-client.js");
+          
+          const encoder = new TextEncoder();
+          const stream = new ReadableStream({
+            async start(controller) {
+              try {
+                const gen = chatCompletionStream(
+                  [
+                    {
+                      role: "system",
+                      content: `You generate a single creative app idea for a developer to build and deploy to Azure Kubernetes Service in a couple of hours. The idea should be small enough to implement in one focused coding session but impressive enough to demo. It MUST require a server-side component — a backend API, a database, or an AI/ML service. Return ONLY the idea as a first-person sentence starting with "I want to build" (no JSON, no markdown, no title, just the sentence). Max 2 sentences. No emoji.`,
+                    },
+                    {
+                      role: "user",
+                      content:
+                        "Generate 1 creative app idea that requires server-side deployment.",
+                    },
+                  ],
+                  { temperature: 1.0, maxTokens: 200 },
+                );
+
+                for await (const chunk of gen) {
+                  controller.enqueue(encoder.encode(sseData(chunk)));
+                }
+                controller.enqueue(encoder.encode(sseData("[DONE]")));
+                controller.close();
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                context.log(`Streaming error: ${msg}`);
+                controller.enqueue(encoder.encode(sseData(`[ERROR] ${msg}`)));
+                controller.close();
+              }
+            },
+          });
+
+          return {
+            status: 200,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              "Connection": "keep-alive",
+            },
+            body: stream,
+          };
+        } else {
+          // Simulate streaming with fallback idea
+          const fallbackIdea = shuffle(FALLBACK_IDEAS)[0];
+          const encoder = new TextEncoder();
+          const stream = new ReadableStream({
+            async start(controller) {
+              try {
+                for await (const char of simulateStream(fallbackIdea.prompt)) {
+                  controller.enqueue(encoder.encode(sseData(char)));
+                }
+                controller.enqueue(encoder.encode(sseData("[DONE]")));
+                controller.close();
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                context.log(`Simulated streaming error: ${msg}`);
+                controller.close();
+              }
+            },
+          });
+
+          return {
+            status: 200,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              "Connection": "keep-alive",
+            },
+            body: stream,
+          };
+        }
+      }
+
+      // NON-STREAMING PATH (original behavior)
       let ideas: InspirationIdea[];
 
       if (isOpenAIConfigured()) {

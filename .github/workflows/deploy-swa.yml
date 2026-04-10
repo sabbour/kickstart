@@ -41,9 +41,9 @@ jobs:
       - name: Stamp build metadata
         run: |
           SHORT_SHA="${GITHUB_SHA:0:7}"
-          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          PKG_VERSION=$(node -p "require('./packages/web/package.json').version")
           sed -i "s|window.__BUILD_SHA__ = 'dev';|window.__BUILD_SHA__ = '${SHORT_SHA}';|" packages/web/index.html
-          sed -i "s|window.__BUILD_DATE__ = new Date().*|window.__BUILD_DATE__ = '${BUILD_DATE}';|" packages/web/index.html
+          sed -i "s|window.__BUILD_VERSION__ = '0.1.0';|window.__BUILD_VERSION__ = '${PKG_VERSION}';|" packages/web/index.html
 
       - name: Build web app (Vite)
         run: cd packages/web && npx vite build

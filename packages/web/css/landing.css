@@ -96,26 +96,34 @@
   pointer-events: none;
 }
 
-.landing-hero-input-wrap input {
+.landing-hero-input-wrap input,
+.landing-hero-input-wrap textarea {
   width: 100%;
+  min-height: 44px;
   height: 44px;
-  padding: 0 80px 0 42px;
+  max-height: 160px;
+  padding: 11px 80px 11px 42px;
   border-radius: var(--radius-medium);
   border: 1px solid var(--color-neutral-stroke-2);
   background: var(--color-neutral-background-1);
   color: var(--color-neutral-foreground-1);
   font-family: var(--font-family-base);
   font-size: var(--font-size-400);
+  line-height: 1.43;
   outline: none;
   transition: border-color var(--duration-fast);
   box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
 }
 
-.landing-hero-input-wrap input::placeholder {
+.landing-hero-input-wrap input::placeholder,
+.landing-hero-input-wrap textarea::placeholder {
   color: var(--color-neutral-foreground-3);
 }
 
-.landing-hero-input-wrap input:focus {
+.landing-hero-input-wrap input:focus,
+.landing-hero-input-wrap textarea:focus {
   border-color: var(--color-brand-primary);
 }
 

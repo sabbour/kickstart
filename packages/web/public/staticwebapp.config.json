@@ -24,6 +24,10 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/api/inspirations/widgets",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/*",
       "allowedRoles": ["authenticated"]
     }
