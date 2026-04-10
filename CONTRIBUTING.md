@@ -71,13 +71,15 @@ npm test
 
 ### Creating a Changeset
 
-Before merging a feature or fix branch, create a changeset to document changes for the next release:
+Every PR that changes user-facing behavior should include a changeset:
 
 ```bash
-npx changeset add
+npx changeset
 ```
 
-Follow the prompts to select which packages changed and the type of bump (major, minor, patch). Changesets are stored in `.changeset/` and are committed with your branch. When the maintainer is ready to cut a release, they'll run `changeset version` to bump versions and collate changes into CHANGELOG.md.
+Follow the prompts to select which packages changed and the bump type (patch for fixes, minor for features). Changesets are stored in `.changeset/` and committed with your branch.
+
+For the full release workflow — cutting releases, tagging, deploying — see **[RELEASING.md](RELEASING.md)**.
 
 ### Key Entry Points
 
