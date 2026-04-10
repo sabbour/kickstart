@@ -515,3 +515,12 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **Playground prompt upgrade:** Rewrote `playground.ts` system prompt with explicit "one-shot component design rules", a full worked example (deployment rollout tracker), and guidance on realistic sample data, rich layouts (4-6 component types), meaningful color/status mapping, and interactive controls.
 - **Constraints preserved:** Temperature=1 (reasoning model requirement), maxTokens=400 for streaming, maxTokens=300 for non-streaming inspire, safety clauses retained in all prompts.
 - **Key files:** `packages/web/api/src/functions/widget-inspirations.ts`, `packages/web/api/src/functions/playground.ts`
+
+### 2025-07-26: Fix #54 — Playground Create Tab "[Loading root...]" Bug
+
+- **Root cause (structural):** `handleCreateSend` in `Playground.tsx` created A2UI messages with `createSurface` + a `body` field, but the A2UI protocol ignores `body` on createSurface messages. No `updateComponents` message was ever sent, so surfaces were created empty — hence "[Loading root...]" (the renderer couldn't find the root component).
+- **Root cause (format):** The LLM system prompt in `playground.ts` instructed the LLM to output nested tree format (`{type, id, props, children: [{nested}]}`) with non-catalog type names (TextBlock, Container, ColumnSet, etc.). A2UI expects flat components (`{id, component, ...props, children: ["id-refs"]}`) with catalog names (Text, Column, Row, etc.).
+- **Fix (system prompt):** Rewrote the playground system prompt to teach the LLM the flat A2UI format with correct catalog component names, children-by-ID-reference pattern, and mandatory `id: "root"` entry point. Updated the example to show flat format.
+- **Fix (frontend):** Replaced broken single-message pattern with proper `createSurface` → `updateComponents` two-message sequence. Added `normalizePlaygroundComponents()` safety-net transformer that handles both flat and nested LLM output, maps unknown type names to catalog equivalents (TextBlock→Text, Container→Column, etc.), converts nested children to ID references, and ensures a root component always exists.
+- **A2UI protocol rule:** `createSurface` only creates an empty surface. Components must be added via a separate `updateComponents` message. One component MUST have `id: "root"`.
+- **Key files:** `packages/web/src/pages/Playground.tsx`, `packages/web/api/src/functions/playground.ts`
