@@ -18,6 +18,7 @@
 
 ## How I Work
 
+- Before starting issue work, read `.squad/skills/pr-workflow/SKILL.md` for the PR and issue workflow
 - Build with the Portal Prototyper framework — zero-dependency static HTML/CSS/JS that mirrors Azure Portal UX
 - Start with the user journey: what does the user see, click, and feel?
 - Use framework components (tables, filters, wizards, panels) rather than custom widgets

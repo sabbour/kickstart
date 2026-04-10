@@ -52,6 +52,13 @@
 - Performance-critical paths requiring benchmarking
 - Changes requiring cross-team discussion
 
+## Issue Source
+
+- **Repository:** sabbour/kickstart
+- **Project Board:** https://github.com/users/sabbour/projects/3
+- **Connected:** 2026-04-08
+- **Assign to:** person running the Squad commands
+
 ## Project Context
 
 - **Owner:** Ahmed Sabbour

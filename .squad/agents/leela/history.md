@@ -239,3 +239,10 @@ Core decisions preserved in `.squad/decisions.md` supersede archived entries. Th
 - **Key dependency chain:** #22→#23→#24 (action handler), #34→#25→#30→#31/#32 (ServiceConnector→ServicePack→fat components).
 - **Capacity balance:** v0.2.0 is Bender-heavy (core loop), v0.3.0 is balanced, v0.4.0 is light (prompt batch), v0.5.0 is stretch.
 - **Full decision:** `.squad/decisions/inbox/leela-sprint-planning-roadmap.md`
+### 2026-04-10: Consolidated process directives into reusable skill
+- **Created `.squad/skills/pr-workflow/SKILL.md`** — single reference for the full issue→PR→review→merge lifecycle
+- Consolidated 12 inbox directives (draft PRs, rebase-only, copilot review API, CI gates, board updates, sprint cycles, model pref) into one actionable document
+- Updated Fry, Bender, Hermes charters to read the skill before starting issue work
+- Project board field IDs are NOT hardcoded — skill includes GraphQL discovery query so agents can self-serve
+- Inbox files left intact per protocol — Scribe handles cleanup
+- **Decision:** `.squad/decisions/inbox/leela-process-optimization.md`

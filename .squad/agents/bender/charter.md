@@ -18,6 +18,7 @@
 
 ## How I Work
 
+- Before starting issue work, read `.squad/skills/pr-workflow/SKILL.md` for the PR and issue workflow
 - Design APIs contract-first — define the interface before writing implementation
 - Use Azure best practices for AKS Automatic (security defaults, managed identity, auto-provisioning)
 - Generate infrastructure-as-code that's production-ready out of the box
