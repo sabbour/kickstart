@@ -10,6 +10,32 @@ export interface GitHubRepo {
   description: string | null;
   default_branch: string;
   language: string | null;
+  stargazers_count?: number;
+  updated_at?: string;
+}
+
+export interface GitHubUser {
+  login: string;
+  avatar_url: string;
+  html_url: string;
+  name: string | null;
+}
+
+export interface GitHubDeviceCodeResponse {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  expires_in: number;
+  interval: number;
+}
+
+export interface GitHubPullRequest {
+  number: number;
+  html_url: string;
+  title: string;
+  state: string;
+  head: { ref: string; sha: string };
+  base: { ref: string };
 }
 
 export interface GitHubBranch {
@@ -27,10 +53,6 @@ export interface GitHubRepoOptions {
 
 /**
  * Default GitHub OAuth scopes — read-only access.
- * `read:user` grants access to the authenticated user's profile and public
- * repo metadata, which is sufficient for Kickstart's read-only tools.
- * Tools that need write access (e.g., creating repos) would require scope
- * elevation to `public_repo` or `repo`.
  */
 const DEFAULT_GITHUB_SCOPES = ['read:user'];
 
@@ -48,11 +70,6 @@ export class GitHubConnector extends BaseConnector {
     return 'https://api.github.com';
   }
 
-  /**
-   * Create a new GitHubConnector.
-   * @param config - Optional connector config. Defaults to OAuth2 auth
-   *                 with GitHub scopes if not specified.
-   */
   constructor(config?: ConnectorConfig) {
     super(config ?? { auth: { kind: 'oauth2', scopes: DEFAULT_GITHUB_SCOPES } });
   }
@@ -77,10 +94,6 @@ export class GitHubConnector extends BaseConnector {
     return (await res.json()) as GitHubRepo;
   }
 
-  /**
-   * Create a new repository in the authenticated user's account.
-   * Returns stub data when not authenticated.
-   */
   async createRepo(name: string, options: GitHubRepoOptions = {}): Promise<GitHubRepo> {
     if (this.isStubMode()) {
       return { ...STUB_REPO, name, full_name: `stub-user/${name}` };
@@ -99,9 +112,79 @@ export class GitHubConnector extends BaseConnector {
     const res = await this.request('GET', `/repos/${owner}/${repo}/branches`);
     return (await res.json()) as GitHubBranch[];
   }
+
+  /**
+   * List repositories for the authenticated user.
+   * Supports pagination via `page` and `perPage` parameters.
+   * Returns stub data when not authenticated.
+   */
+  async listUserRepos(
+    page = 1,
+    perPage = 30,
+    sort: 'updated' | 'full_name' | 'created' | 'pushed' = 'updated',
+  ): Promise<GitHubRepo[]> {
+    if (this.isStubMode()) {
+      return STUB_REPOS;
+    }
+
+    const res = await this.request(
+      'GET',
+      `/user/repos?page=${page}&per_page=${perPage}&sort=${sort}&affiliation=owner,collaborator,organization_member`,
+    );
+    return (await res.json()) as GitHubRepo[];
+  }
+
+  /** Get the authenticated user's profile. Returns stub data when not authenticated. */
+  async getAuthenticatedUser(): Promise<GitHubUser> {
+    if (this.isStubMode()) {
+      return STUB_USER;
+    }
+
+    const res = await this.request('GET', '/user');
+    return (await res.json()) as GitHubUser;
+  }
+
+  /**
+   * Create a pull request on a repository.
+   * Returns stub data when not authenticated.
+   */
+  async createPullRequest(
+    owner: string,
+    repo: string,
+    title: string,
+    head: string,
+    base: string,
+    body?: string,
+  ): Promise<GitHubPullRequest> {
+    if (this.isStubMode()) {
+      return {
+        number: 1,
+        html_url: `https://github.com/${owner}/${repo}/pull/1`,
+        title,
+        state: 'open',
+        head: { ref: head, sha: 'abc1234' },
+        base: { ref: base },
+      };
+    }
+
+    const res = await this.request('POST', `/repos/${owner}/${repo}/pulls`, {
+      title,
+      head,
+      base,
+      body,
+    });
+    return (await res.json()) as GitHubPullRequest;
+  }
 }
 
 // ── Stub data ─────────────────────────────────────────────────────────────────
+
+const STUB_USER: GitHubUser = {
+  login: 'stub-user',
+  avatar_url: 'https://avatars.githubusercontent.com/u/0',
+  html_url: 'https://github.com/stub-user',
+  name: 'Stub User',
+};
 
 const STUB_REPO: GitHubRepo = {
   id: 123456789,
@@ -114,15 +197,49 @@ const STUB_REPO: GitHubRepo = {
   language: 'TypeScript',
 };
 
+const STUB_REPOS: GitHubRepo[] = [
+  { ...STUB_REPO },
+  {
+    id: 123456790,
+    name: 'api-service',
+    full_name: 'stub-user/api-service',
+    private: false,
+    html_url: 'https://github.com/stub-user/api-service',
+    description: 'REST API built with Node.js',
+    default_branch: 'main',
+    language: 'JavaScript',
+    stargazers_count: 17,
+    updated_at: '2026-03-28T08:30:00Z',
+  },
+  {
+    id: 123456791,
+    name: 'k8s-configs',
+    full_name: 'stub-user/k8s-configs',
+    private: true,
+    html_url: 'https://github.com/stub-user/k8s-configs',
+    description: 'Kubernetes manifests and Helm charts',
+    default_branch: 'main',
+    language: 'YAML',
+    stargazers_count: 5,
+    updated_at: '2026-04-05T16:45:00Z',
+  },
+];
+
 const STUB_BRANCHES: GitHubBranch[] = [
   {
     name: 'main',
     protected: true,
-    commit: { sha: 'abc123', url: 'https://api.github.com/repos/stub-user/my-app/commits/abc123' },
+    commit: {
+      sha: 'abc123',
+      url: 'https://api.github.com/repos/stub-user/my-app/commits/abc123',
+    },
   },
   {
     name: 'develop',
     protected: false,
-    commit: { sha: 'def456', url: 'https://api.github.com/repos/stub-user/my-app/commits/def456' },
+    commit: {
+      sha: 'def456',
+      url: 'https://api.github.com/repos/stub-user/my-app/commits/def456',
+    },
   },
 ];
