@@ -206,7 +206,7 @@ function inferDesignComponents(
   return [];
 }
 
-// Helper: create a suggestion button component
+// Helper: create a suggestion button using A2UI ActionSchema format
 function btn(
   label: string,
   replyText: string,
@@ -214,7 +214,11 @@ function btn(
   return {
     type: "Button",
     label,
-    action: "reply",
-    data: { text: replyText },
+    action: {
+      event: {
+        name: "reply",
+        data: { text: replyText },
+      },
+    },
   };
 }
