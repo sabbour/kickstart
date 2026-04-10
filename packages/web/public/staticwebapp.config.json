@@ -28,6 +28,10 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/api/action",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/inspirations",
       "allowedRoles": ["anonymous"]
     },

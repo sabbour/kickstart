@@ -534,3 +534,11 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **CI:** Non-blocking `changeset status` step added to `.github/workflows/ci.yml` (warns if changeset missing, doesn't fail build)
 - **Docs:** `RELEASING.md` has the full workflow; `CONTRIBUTING.md` links to it
 - **Key files:** `.changeset/config.json`, `RELEASING.md`, `.github/workflows/ci.yml`, `package.json`
+
+### 2025-07-26: /api/action Anonymous Access Route (Issue #23)
+
+- **Gap found:** `POST /api/action` endpoint existed on main (commit `4bbf64c`, B-24) with full implementation — action routing (reply/navigate/api), session handling, LLM re-prompting — but lacked its anonymous access route in `staticwebapp.config.json`.
+- **Fix:** Added `/api/action` route with `allowedRoles: ["anonymous"]` to `packages/web/public/staticwebapp.config.json`, matching the pattern used by `/api/converse` and `/api/playground`.
+- **SWA route ordering matters:** Anonymous routes for specific endpoints MUST appear before the catch-all `/api/*` authenticated rule. Otherwise the endpoint requires login.
+- **Protocol tests:** 22 tests in `packages/mcp-server/src/__tests__/action-endpoint.test.ts` validate `parseAppMessage`/`handleAppMessage` for the action protocol layer.
+- **PR:** #77 (draft), closes #23.
