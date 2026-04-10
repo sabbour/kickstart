@@ -52,6 +52,10 @@ const ALLOWED_RESOURCE_TYPES = new Set([
 
 /** Validate an ARM path conforms to expected patterns. */
 function validateArmPath(path: string): string | null {
+  // Length cap (check early to avoid regex on huge strings)
+  if (path.length > 500) {
+    return 'ARM path exceeds maximum length';
+  }
   // Must start with /subscriptions/
   if (!path.startsWith('/subscriptions/')) {
     return 'Path must start with /subscriptions/';
@@ -66,17 +70,15 @@ function validateArmPath(path: string): string | null {
   if (rgMatch && !RESOURCE_NAME_RE.test(rgMatch[1])) {
     return 'Invalid resource group name';
   }
-  // Check resource type is in allowlist
+  // REQUIRE /providers/ — paths without it bypass the resource-type allowlist
   const providerMatch = path.match(/providers\/([^/]+\/[^/?]+)/i);
-  if (providerMatch) {
-    const resourceType = providerMatch[1].toLowerCase();
-    if (!ALLOWED_RESOURCE_TYPES.has(resourceType)) {
-      return `Resource type "${providerMatch[1]}" is not in the allowed operations list`;
-    }
+  if (!providerMatch) {
+    return 'Path must target a specific resource provider (must contain /providers/)';
   }
-  // Length cap
-  if (path.length > 500) {
-    return 'ARM path exceeds maximum length';
+  // Check resource type is in allowlist
+  const resourceType = providerMatch[1].toLowerCase();
+  if (!ALLOWED_RESOURCE_TYPES.has(resourceType)) {
+    return `Resource type "${providerMatch[1]}" is not in the allowed operations list`;
   }
   return null;
 }

@@ -22,6 +22,36 @@ import {
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
 import type { AzureARMConnector, AzureLocation } from '@kickstart/core';
 
+// ── Input validation & sanitization helpers ──
+
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RESOURCE_GROUP_RE = /^[-\w.()]{1,90}$/;
+const RESOURCE_GROUP_NO_TRAILING_DOT_RE = /[^.]$/;
+const RESOURCE_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,89}$/;
+
+/** URI-encode a single ARM path segment, preventing path-traversal characters. */
+export function sanitizeArmPathSegment(segment: string): string {
+  // Strip any slashes first — a segment must never contain path separators
+  const stripped = segment.replace(/[/\\]/g, '');
+  return encodeURIComponent(stripped);
+}
+
+function validateSubscriptionId(value: string): string | null {
+  if (!GUID_RE.test(value)) return 'Subscription ID must be a valid GUID';
+  return null;
+}
+
+function validateResourceGroup(value: string): string | null {
+  if (!RESOURCE_GROUP_RE.test(value)) return 'Resource group: 1-90 chars, alphanumeric/hyphens/underscores/periods/parentheses';
+  if (!RESOURCE_GROUP_NO_TRAILING_DOT_RE.test(value)) return 'Resource group name cannot end with a period';
+  return null;
+}
+
+function validateResourceName(value: string): string | null {
+  if (!RESOURCE_NAME_RE.test(value)) return 'Resource name: 1-90 chars, starts with alphanumeric, allows alphanumeric/periods/hyphens/underscores';
+  return null;
+}
+
 const AzureResourceFormApi = {
   name: 'AzureResourceForm',
   schema: z.object({
@@ -118,6 +148,10 @@ export const AzureResourceForm = createReactComponent(AzureResourceFormApi, ({ p
   const resourceGroup = props.resourceGroup ? String(props.resourceGroup) : 'kickstart-rg';
   const resourceType = props.resourceType ? String(props.resourceType) : 'Microsoft.ContainerService/managedClusters';
 
+  // Validate path segments
+  const subscriptionIdError = validateSubscriptionId(subscriptionId);
+  const resourceGroupError = validateResourceGroup(resourceGroup);
+
   const [locations, setLocations] = useState<AzureLocation[]>(FALLBACK_LOCATIONS);
   const [location, setLocation] = useState('eastus');
   const [sku, setSku] = useState('Standard');
@@ -165,6 +199,13 @@ export const AzureResourceForm = createReactComponent(AzureResourceFormApi, ({ p
     e.preventDefault();
     if (!resourceName.trim()) return;
 
+    // Validate all path segments before proceeding
+    const nameError = validateResourceName(resourceName.trim());
+    if (subscriptionIdError || resourceGroupError || nameError) {
+      setError(subscriptionIdError ?? resourceGroupError ?? nameError ?? 'Validation failed');
+      return;
+    }
+
     setSubmitting(true);
     setError(undefined);
     setSuccess(false);
@@ -178,14 +219,19 @@ export const AzureResourceForm = createReactComponent(AzureResourceFormApi, ({ p
         }
       }
 
+      // Sanitize path segments before dispatch
+      const safeSubscriptionId = sanitizeArmPathSegment(subscriptionId);
+      const safeResourceGroup = sanitizeArmPathSegment(resourceGroup);
+      const safeResourceName = sanitizeArmPathSegment(resourceName.trim());
+
       await context.dispatchAction({
         event: {
           name: 'api:azure-arm.createResource',
           context: {
-            subscriptionId,
-            resourceGroup,
+            subscriptionId: safeSubscriptionId,
+            resourceGroup: safeResourceGroup,
             resourceType,
-            resourceName: resourceName.trim(),
+            resourceName: safeResourceName,
             location,
             sku,
             ...properties,
@@ -302,6 +348,17 @@ export const AzureResourceForm = createReactComponent(AzureResourceFormApi, ({ p
           Resource group: <strong>{resourceGroup}</strong> · Type: <strong>{resourceType.split('/').pop()}</strong>
         </Body1>
 
+        {subscriptionIdError && (
+          <MessageBar intent="error">
+            <MessageBarBody>{subscriptionIdError}</MessageBarBody>
+          </MessageBar>
+        )}
+        {resourceGroupError && (
+          <MessageBar intent="error">
+            <MessageBarBody>{resourceGroupError}</MessageBarBody>
+          </MessageBar>
+        )}
+
         {success && (
           <Caption1 className={classes.successMsg}>
             ✓ Resource creation initiated successfully.
@@ -325,7 +382,7 @@ export const AzureResourceForm = createReactComponent(AzureResourceFormApi, ({ p
           <Button
             appearance="primary"
             type="submit"
-            disabled={submitting || !resourceName.trim()}
+            disabled={submitting || !resourceName.trim() || !!subscriptionIdError || !!resourceGroupError}
             icon={submitting ? <Spinner size="tiny" /> : undefined}
           >
             {submitting ? 'Creating…' : 'Create resource'}
