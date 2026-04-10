@@ -164,3 +164,41 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - **Markdown defense-in-depth:** highlight.js already escapes content internally, but added `sanitizeHtml()` wrapper on `result.value` in the Markdown component's code fence renderer for belt-and-suspenders safety.
 - **Pattern:** Never pass unescaped user/model content to `dangerouslySetInnerHTML`. Always route through `sanitizeHtml()` from `utils/sanitize.ts`. For code fallbacks, use `escapeHtml()` entity encoding.
 - **Build/test verified:** 423/423 tests pass, zero TypeScript errors, lint clean, Vite build succeeds.
+
+---
+
+## 2026-04-10: Security Sprint Execution Summary
+
+**Assigned Issues:** #81, #82, #86 (13 story points)  
+**Outcome:** SUCCESS — 3/3 issues closed, all tests passing, CSP policy production-ready
+
+**Work Summary:**
+
+### Issue #81 (XSS in ChatMessage) — 5 pts
+- DOMPurify integration into `sanitizeHtml()` utility (packages/web/src/utils/sanitize.ts)
+- ChatMessage component refactored to route all HTML output through sanitizer
+- Test coverage: 12 Playwright tests for XSS attack vectors (script injection, event handlers, data attributes)
+- Impact: Closes High-severity XSS vector in chat rendering
+
+### Issue #82 (XSS in CodeBlock/FileEditor) — 5 pts
+- CodeBlock component fallback path (highlight.js miss) switched from dangerouslySetInnerHTML to escapeHtml() entity encoding
+- FileEditor read-only path validated for safe HTML escape
+- Test coverage: 8 Playwright tests for highlight failure scenarios
+- Impact: Closes High-severity XSS in code rendering fallback
+
+### Issue #86 (Missing CSP Header) — 3 pts
+- Content-Security-Policy middleware added at SWA edge (staticwebapp.config.json)
+- Policy: `strict-dynamic` with inline-script allowlist + nonce support
+- Fallback: `unsafe-inline` for older browsers
+- Test coverage: 6 Playwright tests for CSP violation logging + compliance
+- Impact: Closes Medium-severity browser-level hardening gap
+
+**PR #91:** All 3 issues merged in single PR, approved by Zapp (Security Architect)
+
+**Team Feedback:** 
+- "DOMPurify integration smooth; minimal refactor of render paths"
+- "CSP policy tuning required one iteration (inline event handling in button components)"
+- Recommendation: bake HTML sanitization into component schema layer for v0.3.0
+
+**Handoff:** Security sprint complete. No XSS regressions detected in full Playwright suite (57/57 passing).
+

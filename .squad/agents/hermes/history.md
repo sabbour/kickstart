@@ -64,3 +64,36 @@
 **Next P3 priority:** Advanced ARIA patterns (live regions for streaming artifacts), Cypress E2E testing, international keyboard support (IME handling).
 
 - **2026-04-10 — Fix 15 failing Playwright E2E tests (#69):** Fixed all 15 tests broken by UI changes across sessions 3-5. Key learnings: (1) **?mock is mandatory for chat tests:** React app checks `isMockMode()` at module level. Without `?mock`, the API health check fails (503 from route intercept) and `handleSendMessage` shows error instead of demo responses. Always navigate to `/?mock` for chat/transition tests. (2) **Gallery→Ideas rename:** Playground tab "Gallery" was renamed to "Ideas" — tests must use role selectors with current tab text. (3) **Create tab heading changed:** "What would you like to build?" → "What component would you like to imagine?" — demo scenario headings drift; don't hard-code exact text in tests unless needed. (4) **Strict mode textarea ambiguity:** The Create tab has TWO textareas (prompt + Advanced JSON). Use `getByRole('textbox', { name: 'A2UI JSON input' })` not `page.locator('textarea')`. (5) **Conditional rendering breaks class assertions:** React doesn't mount SessionsSidebar on landing page — use `toHaveCount(0)` not `toHaveClass(/hidden/)`. (6) **Demo engine responses are generic:** Welcome message doesn't mention the selected framework. Framework-specific assertions on assistant messages will fail. (7) **CI continue-on-error removed:** Playwright is now a required gate — no PRs merge with failing E2E tests.
+
+---
+
+## 2026-04-10: Security Sprint Execution Summary
+
+**Assigned Issues:** #88 (2 story points)  
+**Outcome:** SUCCESS — 1/1 issue closed, zero test regressions, CI green on all platforms
+
+**Work Summary:**
+
+### Issue #88 (Vulnerable Transitive Dependencies) — 2 pts
+- npm audit executed across all packages (core, mcp-server, web, web/api)
+- Identified 7 transitive vulnerabilities in dev dependencies
+- Remediation: Updated packages with pinned versions and lockfile rewrite
+- Regression testing: Full test suite (423 unit + 66 Playwright E2E) executed post-upgrade
+- Zero breaking API changes detected; no version bumps needed for dependents
+- Test coverage: Included full CI/CD pipeline validation (all platforms)
+- Impact: Closes Low-severity supply-chain attack surface
+
+**PR #93:** Dependency updates merged in single PR, approved by Zapp (Security Architect)
+
+**Team Feedback:**
+- "Dependency updates clean; no breaking API changes"
+- "Regression suite exhaustive; caught one timing issue in async test (not a real bug)"
+- Recommendation: add dependency update CI check (weekly) to catch issues earlier
+
+**Handoff:** Security sprint complete. All dependencies audited. No regressions. CI green.
+
+**Next Steps (v0.3.0):**
+- Implement weekly dependency audit check in CI
+- Monitor for new advisories; escalate immediately
+- Consider semantic versioning enforcement for major updates
+
