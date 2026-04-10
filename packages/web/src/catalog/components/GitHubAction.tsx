@@ -63,14 +63,55 @@ function validateGitHubPath(path: string): string | null {
   return null;
 }
 
+/** Extract branch-like string values from a request body (defensive scan). */
+function extractBranchCandidates(body: Record<string, unknown>): string[] {
+  const candidates: string[] = [];
+  // Explicit fields that GitHub APIs use for branch targeting
+  const branchFields = ['ref', 'base', 'branch', 'head', 'default_branch', 'target_branch', 'source_branch'];
+  for (const field of branchFields) {
+    const val = body[field];
+    if (typeof val === 'string' && val.length > 0) {
+      candidates.push(val.replace(/^refs\/heads\//, ''));
+    }
+  }
+  // Nested: body.base.ref / body.head.ref (PR create payloads)
+  for (const wrapper of ['base', 'head']) {
+    const nested = body[wrapper];
+    if (nested && typeof nested === 'object' && nested !== null) {
+      const nestedRef = (nested as Record<string, unknown>).ref;
+      if (typeof nestedRef === 'string') {
+        candidates.push(nestedRef.replace(/^refs\/heads\//, ''));
+      }
+    }
+  }
+  return candidates;
+}
+
+/** Extract branch references from URL path segments and query parameters. */
+function extractBranchesFromUrl(path: string): string[] {
+  const candidates: string[] = [];
+  // /branches/{name}
+  const branchInPath = path.match(/\/branches\/([^/?]+)/)?.[1];
+  if (branchInPath) candidates.push(decodeURIComponent(branchInPath));
+  // /contents/... or /git/... paths with ?ref=branchName
+  const queryMatch = path.match(/[?&]ref=([^&]+)/);
+  if (queryMatch) candidates.push(decodeURIComponent(queryMatch[1]).replace(/^refs\/heads\//, ''));
+  // /merge path with sha_branch pattern (e.g., /repos/o/r/merges body has base/head)
+  // /git/refs/heads/{branch}
+  const gitRefMatch = path.match(/\/git\/refs\/heads\/([^/?]+)/)?.[1];
+  if (gitRefMatch) candidates.push(decodeURIComponent(gitRefMatch));
+  return candidates;
+}
+
 /** Check if the operation targets a protected branch. */
 function checkProtectedBranch(path: string, body: Record<string, unknown>): string | null {
-  const branchInPath = path.match(/\/branches\/([^/]+)/)?.[1];
-  const branchInBody = typeof body.ref === 'string' ? body.ref.replace('refs/heads/', '') : null;
-  const baseInBody = typeof body.base === 'string' ? body.base : null;
+  const candidates = [
+    ...extractBranchesFromUrl(path),
+    ...extractBranchCandidates(body),
+  ];
 
-  for (const branch of [branchInPath, branchInBody, baseInBody]) {
-    if (branch && PROTECTED_BRANCHES.has(branch)) {
+  for (const branch of candidates) {
+    if (PROTECTED_BRANCHES.has(branch)) {
       return `Direct writes to protected branch "${branch}" are blocked. Use a feature branch and create a pull request instead.`;
     }
   }
@@ -84,7 +125,7 @@ const GitHubActionApi = {
     description: DynamicStringSchema.optional(),
     method: z.enum(['POST', 'PUT', 'PATCH', 'DELETE']),
     path: DynamicStringSchema,
-    operationType: DynamicStringSchema.optional(),
+    operationType: DynamicStringSchema,
     body: z.record(z.unknown()).optional(),
     confirmLabel: DynamicStringSchema.optional(),
     onSuccess: ActionSchema.optional(),
@@ -160,8 +201,8 @@ export const GitHubAction = createReactComponent(GitHubActionApi, ({ props }) =>
   // Validation checks
   const pathError = validateGitHubPath(apiPath);
   const branchError = checkProtectedBranch(apiPath, body);
-  const allowlistError = operationType && !ALLOWED_OPERATIONS.has(operationType)
-    ? `Operation type "${operationType}" is not in the allowed operations list`
+  const allowlistError = !operationType || !ALLOWED_OPERATIONS.has(operationType)
+    ? `Operation type "${operationType ?? '(not specified)'}" is not in the allowed operations list`
     : null;
   const validationError = pathError ?? branchError ?? allowlistError;
 
