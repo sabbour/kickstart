@@ -498,8 +498,7 @@ const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
   const classes = useStyles();
   const { surfaces, processMessages, processor } = useA2UI();
 
-  // Process scenario messages in useEffect so the onSurfaceCreated
-  // subscription (set up in useA2UI's own useEffect) is active first.
+  // Process scenario messages in useEffect.
   // Cleanup deletes surfaces so React 19 Strict Mode double-fire doesn't crash.
   useEffect(() => {
     let createdIds: string[] = [];
