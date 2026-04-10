@@ -24,6 +24,8 @@ import type { PhaseItem } from "@kickstart/core";
 import { getSession, createSession, addMessage } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools, getChatDeploymentName } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
+import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
+import { safeErrorResponse, safeStreamError } from "../lib/error-response.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -36,7 +38,6 @@ interface ConverseResponse {
   message: string;
   model?: string;
   a2ui?: object[];
-  systemPrompt?: string;
 }
 
 app.http("converse", {
@@ -47,6 +48,12 @@ app.http("converse", {
     request: HttpRequest,
     context: InvocationContext,
   ): Promise<HttpResponseInit> => {
+    // Rate limit check
+    const rateCheck = checkRateLimit(request);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterMs!);
+    }
+
     try {
       const body = (await request.json()) as ConverseRequest;
 
@@ -64,7 +71,6 @@ app.http("converse", {
       let session = body.sessionId
         ? getSession(body.sessionId)
         : undefined;
-      const isNewSession = !session;
       if (!session) {
         session = createSession();
       }
@@ -148,19 +154,11 @@ app.http("converse", {
         message: processed.message,
         model: getChatDeploymentName(),
         a2ui: [...phaseA2ui, ...processed.a2uiMessages],
-        ...(isNewSession
-          ? {
-              systemPrompt: state.messages.find((m) => m.role === "system")
-                ?.content,
-            }
-          : {}),
       };
 
       return { status: 200, jsonBody: responseBody };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      context.error(`Converse error: ${message}`);
-      return { status: 500, jsonBody: { error: message } };
+      return safeErrorResponse(err, context, "Converse error");
     }
   },
 });
@@ -275,10 +273,9 @@ function handleStreaming(
 
         controller.close();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        context.error(`Stream error: ${msg}`);
+        const safeMsg = safeStreamError(err, context, "Stream error");
         controller.enqueue(
-          encoder.encode(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`),
+          encoder.encode(`event: error\ndata: ${JSON.stringify({ error: safeMsg })}\n\n`),
         );
         controller.close();
       }

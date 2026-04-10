@@ -20,24 +20,28 @@
       "allowedRoles": ["anonymous"]
     },
     {
-      "route": "/api/playground",
-      "allowedRoles": ["anonymous"]
-    },
-    {
-      "route": "/api/converse",
-      "allowedRoles": ["anonymous"]
-    },
-    {
-      "route": "/api/action",
-      "allowedRoles": ["anonymous"]
-    },
-    {
       "route": "/api/inspirations",
       "allowedRoles": ["anonymous"]
     },
     {
       "route": "/api/inspirations/*",
       "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/api/playground",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/api/converse",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/api/action",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/api/generate",
+      "allowedRoles": ["authenticated"]
     },
     {
       "route": "/api/*",

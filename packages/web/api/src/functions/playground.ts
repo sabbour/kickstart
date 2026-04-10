@@ -14,6 +14,8 @@ import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/fu
 import { randomUUID } from "node:crypto";
 import { chatCompletion, getChatDeploymentName } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
+import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
+import { safeErrorResponse } from "../lib/error-response.js";
 import type { ChatMessage } from "../lib/openai-client.js";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -166,6 +168,12 @@ app.http("playground", {
     request: HttpRequest,
     context: InvocationContext,
   ): Promise<HttpResponseInit> => {
+    // Rate limit check
+    const rateCheck = checkRateLimit(request);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterMs!);
+    }
+
     try {
       const body = (await request.json()) as PlaygroundRequest;
 
@@ -234,9 +242,7 @@ app.http("playground", {
 
       return { status: 200, jsonBody: responseBody };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      context.error(`Playground error: ${message}`);
-      return { status: 500, jsonBody: { error: message } };
+      return safeErrorResponse(err, context, "Playground error");
     }
   },
 });

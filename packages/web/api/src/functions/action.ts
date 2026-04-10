@@ -26,6 +26,8 @@ import type { Phase, PhaseItem } from "@kickstart/core";
 import type { A2UIMessage } from "@kickstart/core";
 import { getSession, addMessage } from "../lib/session-store.js";
 import { chatCompletion, getChatDeploymentName } from "../lib/openai-client.js";
+import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
+import { safeErrorResponse } from "../lib/error-response.js";
 
 // ---------------------------------------------------------------------------
 // Request / response types
@@ -178,6 +180,12 @@ app.http("action", {
     request: HttpRequest,
     context: InvocationContext,
   ): Promise<HttpResponseInit> => {
+    // Rate limit check
+    const rateCheck = checkRateLimit(request);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterMs!);
+    }
+
     try {
       // --- Parse & validate request ---
       let body: ActionRequest;
@@ -268,9 +276,7 @@ app.http("action", {
       };
       return { status: 200, jsonBody: response };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      context.error(`[action] error: ${message}`);
-      return { status: 500, jsonBody: { error: message } };
+      return safeErrorResponse(err, context, "[action] error");
     }
   },
 });

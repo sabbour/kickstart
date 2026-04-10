@@ -19,6 +19,8 @@ import {
   codexCompletionStream,
   isConfigured,
 } from "../lib/openai-client.js";
+import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
+import { safeErrorResponse, safeStreamError } from "../lib/error-response.js";
 import type { ChatMessage } from "../lib/openai-client.js";
 
 type GenerateType =
@@ -61,6 +63,12 @@ app.http("generate", {
     request: HttpRequest,
     context: InvocationContext,
   ): Promise<HttpResponseInit> => {
+    // Rate limit check
+    const rateCheck = checkRateLimit(request);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterMs!);
+    }
+
     try {
       if (!isConfigured()) {
         return {
@@ -112,9 +120,7 @@ app.http("generate", {
 
       return { status: 200, jsonBody: responseBody };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      context.error(`Generate error: ${message}`);
-      return { status: 500, jsonBody: { error: message } };
+      return safeErrorResponse(err, context, "Generate error");
     }
   },
 });
@@ -150,10 +156,9 @@ function handleCodexStreaming(
         );
         controller.close();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        context.error(`Codex stream error: ${msg}`);
+        const safeMsg = safeStreamError(err, context, "Codex stream error");
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`),
+          encoder.encode(`data: ${JSON.stringify({ error: safeMsg })}\n\n`),
         );
         controller.close();
       }
