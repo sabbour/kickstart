@@ -2819,3 +2819,118 @@ Created `packages/core/src/kits/` with:
 
 - Actual React component implementations for azureLoginCard/azureResourcePicker/githubLoginCard/githubRepoPicker — those are `ComponentRegistration` descriptors only. Fry wires the React components in the web package when building those components.
 - Kit-level connector injection into `APIConnectorContext` React registry — the context still manages its own connector instances. The kit's connectors go into `defaultConnectorRegistry` for engine/server use. Cross-wiring deferred to when auth connectors are built (B-14).
+# APIConnector & IntegrationKit Audit
+
+**Date:** 2025-07-24
+**Author:** Bender (Backend Dev)
+**Requested by:** Ahmed Sabbour
+
+---
+
+## APIConnector System
+
+### `APIConnector` Interface (`packages/core/src/connectors/types.ts`)
+✅ **Working.** Clean interface with `name`, `baseUrl`, `authenticate()`, `request()`, `isAuthenticated()`. All three connectors implement it correctly.
+
+### `APIConnectorRegistry` (`packages/core/src/connectors/registry.ts`)
+✅ **Working.** Map-backed registry with `register()`, `get()`, `has()`, `names()`, `unregister()`. Shared singleton `defaultConnectorRegistry` is used by both kits and React context. No issues.
+
+### `AzureARMConnector` (`packages/core/src/connectors/AzureARMConnector.ts`)
+⚠️ **Stubbed (by design).**
+- `authenticate()` is a no-op (TODO B-14 MSAL).
+- `isAuthenticated()` always returns `false` since `_token` starts null.
+- `request()` is a **real implementation** — it builds a proper fetch with auth headers, content-type, signal. Will work once a token is set.
+- Domain methods (`listResources`, `getResource`, `createResource`) return **stub data** when not authenticated, and delegate to real ARM calls when authenticated.
+- **No crashes or noisy warnings.** Stub path is silent and well-shaped.
+
+### `GitHubConnector` (`packages/core/src/connectors/GitHubConnector.ts`)
+⚠️ **Stubbed (by design).**
+- Same pattern as AzureARM: `authenticate()` is a no-op (TODO B-14 OAuth Device Flow).
+- `request()` is real — proper fetch with GitHub API headers, auth token injection.
+- Domain methods (`getRepo`, `createRepo`, `listBranches`) return stub data when not authenticated.
+- **No crashes or noisy warnings.**
+
+### `PricingConnector` (`packages/core/src/connectors/PricingConnector.ts`)
+✅ **Working.**
+- `authenticate()` is a no-op (correct — public API, no auth needed).
+- `isAuthenticated()` always returns `true`.
+- `request()` is a real fetch to `prices.azure.com`.
+- `estimateCost()` uses a **stub pricing table** (not the real API) but returns well-shaped data.
+
+### CORS Proxy Endpoints
+✅ **Working.** All three Azure Functions proxy handlers are properly implemented:
+- `/api/arm-proxy/{*path}` — forwards to `management.azure.com`, requires auth header, injects default api-version.
+- `/api/github-proxy/{*path}` — forwards to `api.github.com`, auth optional, correct API headers.
+- `/api/pricing-proxy` — forwards to `prices.azure.com/api/retail/prices`, no auth, 5-minute cache header.
+- **Note:** Connectors currently call upstream APIs directly (not through proxies). When CORS blocks browser calls, the connectors will need to be updated to route through these proxies.
+
+### React Context (`packages/web/src/contexts/APIConnectorContext.tsx`)
+✅ **Working.** Clean provider/hook pattern:
+- `APIConnectorProvider` creates a registry with all 3 connectors, calls `authenticate()` on mount.
+- `useAPIConnector(name)` hook for individual lookup.
+- `useAPIConnectorRegistry()` hook for full registry access.
+- Errors on `authenticate()` are intentionally swallowed (correct for stub connectors).
+
+---
+
+## IntegrationKit System
+
+### `IntegrationKit` Interface (`packages/core/src/kits/types.ts`)
+✅ **Working.** Bundles tools, connectors, prompts, phasePrompts, and component registrations.
+
+### `IntegrationKitRegistry` (`packages/core/src/kits/registry.ts`)
+✅ **Working.** `register()` auto-wires kit tools into `ToolRegistry` and kit connectors into `APIConnectorRegistry`. The `registerKit()` convenience function delegates to the singleton `defaultKitRegistry`.
+
+### `azureKit` (`packages/core/src/kits/azure-kit.ts`)
+✅ **Working.**
+- Registers 3 tools: `azure_resource_list`, `azure_resource_get`, `estimate_cost`.
+- Registers 2 connectors: `AzureARMConnector`, `PricingConnector`.
+- Has proper phase-specific and general system prompts.
+- Registers 2 component types: `azureLoginCard`, `azureResourcePicker`.
+
+### `githubKit` (`packages/core/src/kits/github-kit.ts`)
+✅ **Working.**
+- Registers 1 tool: `github_repo_info`.
+- Registers 1 connector: `GitHubConnector`.
+- Proper phase-specific and general system prompts.
+- Registers 2 component types: `githubLoginCard`, `githubRepoPicker`.
+
+### Tool Implementations
+⚠️ **All 4 tools are stubbed but functional:**
+- `azure_resource_list` — returns hard-coded AKS + ACR resources with `_stub: true` flag.
+- `azure_resource_get` — returns hard-coded cluster properties with `_stub: true` flag.
+- `estimate_cost` — returns computed estimates from a stub pricing table with `_stub: true` flag.
+- `github_repo_info` — returns hard-coded repo metadata with `_stub: true` flag.
+- All tools are callable, return well-shaped data, and don't crash.
+
+### Kit Registration at App Startup
+✅ **Working.** `main.tsx` calls `registerKit(azureKit)` and `registerKit(githubKit)` before rendering.
+
+---
+
+## Summary
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| APIConnector interface | ✅ Working | Clean, well-typed |
+| APIConnectorRegistry | ✅ Working | Map-backed, thread-safe |
+| AzureARMConnector | ⚠️ Stubbed | Auth no-op, request() is real, domain methods return stubs |
+| GitHubConnector | ⚠️ Stubbed | Auth no-op, request() is real, domain methods return stubs |
+| PricingConnector | ✅ Working | No auth needed, estimateCost uses stub pricing table |
+| CORS proxy (arm) | ✅ Working | Azure Function, requires auth header |
+| CORS proxy (github) | ✅ Working | Azure Function, auth optional |
+| CORS proxy (pricing) | ✅ Working | Azure Function, no auth, cached |
+| React context | ✅ Working | Provider + hooks, silent auth on mount |
+| IntegrationKit interface | ✅ Working | Clean bundle type |
+| KitRegistry | ✅ Working | Auto-wires tools + connectors |
+| azureKit | ✅ Working | 3 tools, 2 connectors, prompts |
+| githubKit | ✅ Working | 1 tool, 1 connector, prompts |
+| Kit startup registration | ✅ Working | main.tsx registers both kits |
+| Tool implementations | ⚠️ Stubbed | All 4 tools return stub data with `_stub: true` |
+
+**No bugs found.** The system is architecturally sound. Auth is intentionally stubbed pending MSAL (B-14). Connectors don't crash, don't log noisy warnings, and return well-shaped stub data. The `request()` methods are real implementations that will work once tokens are set.
+
+**Next milestone:** B-14 (MSAL + GitHub OAuth) will complete the auth story. When that lands, connectors will need to route through the CORS proxies instead of calling upstream APIs directly from the browser.
+
+---
+
