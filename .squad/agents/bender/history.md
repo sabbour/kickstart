@@ -486,3 +486,23 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **B-101 (Bicep updated):** Added `openAiEndpoint`, `openAiChatDeployment`, `openAiCodexDeployment` params to `infra/main.bicep`. Wired into `appSettings` resource alongside `AZURE_CLIENT_ID`. `AZURE_OPENAI_API_KEY` intentionally excluded (manual set — same pattern as `AZURE_CLIENT_SECRET`). Updated `parameters.dev.json` with placeholder values for new params.
 - **Build verification:** Vite build clean after js/ removal. All 423 unit tests pass.
 - **Key insight:** In SWA + managed Functions architecture, the `api_location` in the GitHub Action is sufficient — no separate Azure Functions resource in Bicep. The SWA resource manages the function app automatically.
+
+### 2025-07-27: Content Safety Guardrails
+
+- **System prompt hardening:** Added safety clause to all 4 LLM system prompts that generate inspiration ideas (2 in `inspirations.ts`, 2 in `widget-inspirations.ts`). Clause appended to end of existing prompt content — forbids weapons, violence, illegal, adult, gambling content.
+- **User input validation:** Created `packages/web/api/src/lib/content-safety.ts` — lightweight LLM pre-flight check on user messages in the converse endpoint. Uses chat deployment with `maxTokens: 10` and `temperature: 0` for fast, deterministic classification.
+- **Graceful degradation:** If Azure OpenAI is not configured, the safety check is skipped (returns safe). If the safety check itself throws, it also returns safe — never blocks users due to infrastructure issues.
+- **Response format:** Unsafe content returns HTTP 400 with a user-friendly error message guiding them toward appropriate app ideas.
+- **Key files:** `packages/web/api/src/lib/content-safety.ts`, `packages/web/api/src/functions/converse.ts`, `packages/web/api/src/functions/inspirations.ts`, `packages/web/api/src/functions/widget-inspirations.ts`
+
+### 2025-07-27: Dedicated /api/playground Endpoint for A2UI Component Generation
+
+- **Problem:** Playground Create tab was calling `/api/converse` which runs the full Kickstart AKS onboarding flow — wrong context for free-form A2UI component design.
+- **Solution:** Created `packages/web/api/src/functions/playground.ts` — a standalone Azure Functions HTTP endpoint at `POST /api/playground`.
+- **Architecture:** Uses its own in-memory session store (Map-based with 1-hour TTL, same pattern as session-store.ts), separate from the main onboarding session state. No dependency on @kickstart/core engine phases.
+- **System prompt:** Custom prompt for A2UI component design: instructs LLM to return JSON `{ message, a2ui }` envelope, documents all available component types (TextBlock, Container, ColumnSet, Chart, Table, Badge, etc.), nesting rules, and guidelines.
+- **JSON mode:** Uses `response_format: { type: "json_object" }` to ensure valid JSON from the LLM. Falls back gracefully if LLM returns non-JSON.
+- **Frontend wiring:** Updated `Playground.tsx` `handleCreateSend` to call `/api/playground` directly via fetch (non-streaming JSON) instead of `useStreaming` hook (which was SSE-based and hardcoded to `/api/converse`). Replaced `createStreaming.isStreaming` state with simple `createLoading` boolean.
+- **A2UI surface rendering:** LLM-returned `a2ui` array components are wrapped as A2UI messages and fed through `createA2ui.processMessages()` — same surface system used by the rest of the app.
+- **Content safety:** Reuses existing `checkContentSafety` from `../lib/content-safety.ts`.
+- **Key files:** `packages/web/api/src/functions/playground.ts`, `packages/web/src/pages/Playground.tsx`
