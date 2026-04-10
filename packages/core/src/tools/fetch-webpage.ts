@@ -97,6 +97,7 @@ export const fetchWebpage: Tool<FetchWebpageArgs> = {
   name: "fetch_webpage",
   description:
     "Fetch a webpage URL and return its text content. Use this to read documentation pages, README files, blog posts, or any public web content that helps answer user questions.",
+  requireApproval: true,
   parameters: {
     type: "object",
     properties: {
@@ -136,6 +137,10 @@ export const fetchWebpage: Tool<FetchWebpageArgs> = {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
+      // Use redirect: "error" to block all redirects.
+      // This prevents open-redirect SSRF where a public URL redirects to an
+      // internal host. DNS rebinding protection would require a custom DNS
+      // resolver and is out of scope for this demo app.
       const res = await fetch(args.url, {
         method: "GET",
         headers: {
@@ -143,22 +148,10 @@ export const fetchWebpage: Tool<FetchWebpageArgs> = {
           Accept: "text/html, text/plain, application/json, */*",
         },
         signal: controller.signal,
-        redirect: "follow",
+        redirect: "error",
       });
 
       clearTimeout(timeout);
-
-      // After redirect, validate the final URL is also not a private host
-      if (res.url && res.url !== args.url) {
-        try {
-          const redirected = new URL(res.url);
-          if (!ALLOWED_SCHEMES.includes(redirected.protocol) || isBlockedHost(redirected.hostname)) {
-            return { error: "Redirect to a private or internal network address is not allowed." };
-          }
-        } catch {
-          return { error: "Redirect resulted in an invalid URL." };
-        }
-      }
 
       if (!res.ok) {
         return {
@@ -193,6 +186,9 @@ export const fetchWebpage: Tool<FetchWebpageArgs> = {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("abort")) {
         return { error: `Request timed out after ${FETCH_TIMEOUT_MS / 1000}s`, url: args.url };
+      }
+      if (message.includes("redirect")) {
+        return { error: "Request was redirected. Redirects are blocked for security.", url: args.url };
       }
       return { error: message, url: args.url };
     }
