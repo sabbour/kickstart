@@ -1316,6 +1316,7 @@ function PlaygroundInner() {
 
         {/* ---- Left Sidebar ---- */}
         <aside
+          id="playground-sidebar"
           className={`${classes.sidebar}${sidebarOpen ? ` ${classes.sidebarOpen}` : ''}`}
           aria-label="Playground navigation"
         >
@@ -1383,8 +1384,10 @@ function PlaygroundInner() {
                 className={classes.menuButton}
                 appearance="subtle"
                 icon={<Navigation24Regular />}
-                aria-label="Open navigation"
-                onClick={() => setSidebarOpen(true)}
+                aria-label="Toggle navigation"
+                aria-expanded={sidebarOpen}
+                aria-controls="playground-sidebar"
+                onClick={() => setSidebarOpen(prev => !prev)}
               />
               <Body1Strong style={{ color: tokens.colorNeutralForeground2 }}>
                 {TAB_LABELS[activeTab]}
