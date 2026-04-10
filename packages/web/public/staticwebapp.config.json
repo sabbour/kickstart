@@ -20,11 +20,19 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/api/playground",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/api/converse",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/inspirations",
       "allowedRoles": ["anonymous"]
     },
     {
-      "route": "/api/inspirations/widgets",
+      "route": "/api/inspirations/*",
       "allowedRoles": ["anonymous"]
     },
     {
