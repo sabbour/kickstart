@@ -3569,3 +3569,210 @@ All 8 security issues were triaged by Zapp (Security Architect) and are ready fo
 
 **Total:** 8 issues, 39 story points, 3 agents, 2–3 week sprint
 
+
+---
+
+## Sprint Planning & Process Governance (2026-04-10)
+
+### Decision 8: ServicePack Security Conditions Implementation
+**Date:** 2026-04-10  
+**Author:** Bender  
+**Decision:** All 4 security conditions from Zapp's review (issue #30) addressed in `squad/30-servicepack` branch (PR #103):
+
+1. **Transactional register/unregister:** `register()` rolls back on `onActivate` failure (removes tools, connectors, ownership, kit entry; restores previous kit on re-register). `unregister()` keeps kit if `onDeactivate` throws.
+
+2. **Cycle detection:** DFS-based `detectCycle()` walks existing dependency graph. Throws with human-readable cycle path (e.g. `A → B → C → A`).
+
+3. **Auth schema validation:** `validateAuth()` runs before registration. Rejects empty provider, empty scopes, scopes containing empty strings. Warns on duplicate provider within same kit.
+
+4. **Trust model documentation:** JSDoc on `IntegrationKit` interface and `IntegrationKitRegistry` class: "Kits are trusted first-party code. No sandboxing. If third-party kits needed, implement capability restrictions first."
+
+**Implementation:** 16 new tests cover all conditions (61 total, all passing). `ToolRegistry.unregister()` was added as a side-effect (needed for rollback); matches existing `APIConnectorRegistry.unregister()`.
+
+**Status:** Complete in PR #103 (61 tests passing)
+
+---
+
+### Decision 9: v0.3.0 Sprint Execution Plan
+**Date:** 2026-04-10  
+**Lead:** Leela  
+**Decision:** Execute v0.3.0 as a 2-week sprint delivering foundational service architecture and component authoring capability. After closing #79 (fixed in PR #76), execute 8 issues in 3 waves:
+
+1. **Wave 1 (Days 1–4):** Independent foundational items (#25, #34, #37, #44)
+2. **Wave 2 (Days 5–7):** ServicePack abstraction + LLM tool system (#30, #26)
+3. **Wave 3 (Days 8–10):** A2UI component packs (#31, #32)
+
+**Critical Path:** #25 (ServiceConnector) → #30 (ServicePack) → #26 (LLM tools), #31/#32 (A2UI packs)
+
+**Story Points & Velocity:**
+- Total: 34 story points
+- Velocity: 17 pts/week
+- Commitment: 100%
+
+**Assignments:**
+- **Bender:** #25 (8), #34 (5), #37 (3), #26 (5) = 21 pts
+- **Fry:** #44 (3), #31 (5), #32 (5) = 13 pts
+- **Leela:** #30 design + architecture review
+- **Hermes:** Testing, accessibility, E2E coverage
+
+**Success Metrics:**
+- All 8 issues completed
+- >30 story points completed (>90%)
+- Test coverage >80%
+- WCAG A: All new components
+- Release: v0.3.0 tagged 2026-04-24
+
+---
+
+### Decision 10: IntegrationKit (ServicePack) Architecture Design
+**Date:** 2026-04-10  
+**Decider:** Leela  
+**Related Issues:** #30 (B-10)  
+**Decision:** Extend IntegrationKit with new optional fields and support dynamic kit-driven catalog assembly:
+
+**D1:** Extend IntegrationKit, don't replace it. Add `auth` (KitAuthRequirement[]), `dependencies` (string[]), `onActivate`, and `onDeactivate` as optional fields to the existing interface. Fully backward-compatible.
+
+**D2:** Kit-driven catalog assembly. Replace the hardcoded flat component list in `kickstart-catalog.ts` with a dynamic `buildCatalog()` function that assembles components from registered kits via `registerKitComponents()`. Web-layer kit component bindings live in `packages/web/src/kits/{kit-name}/components.ts`.
+
+**D3:** Registration-time dependency validation. Enhanced `IntegrationKitRegistry.register()` validates that all declared dependencies are already registered and warns on tool/connector name collisions. Registration order is the caller's responsibility (no topological sorting).
+
+**D4:** Auth requirements are declarative. Kits declare auth requirements (connector name + strategy + label) so the host app can wire providers without inspecting connector internals.
+
+**D5:** `register()` becomes async to support lifecycle hooks (`onActivate`). Existing synchronous `registerKit()` convenience function wraps it.
+
+**Impact:** Changes to `packages/core/src/kits/types.ts`, `packages/core/src/kits/registry.ts`, `packages/web/src/catalog/kickstart-catalog.ts`, and new directory `packages/web/src/kits/`.
+
+**Status:** Approved by Zapp with 4 conditions (implemented in PR #103)
+
+---
+
+### Decision 11: Security Conditions for DP #30
+**Date:** 2026-04-10  
+**Reviewer:** Zapp  
+**Issue:** #30  
+**Decision:** APPROVED WITH CONDITIONS
+
+**Required Conditions Before Implementation Sign-off:**
+1. Registration/unregistration must be transactional with rollback on lifecycle hook failures.
+2. Dependency validation must include explicit circular dependency detection (including re-registration paths).
+3. `KitAuthRequirement` inputs must be schema-validated (provider allowlist + constrained scopes).
+4. Trust boundary must be explicit: kits are trusted first-party code only unless sandbox/capability controls are added.
+
+**Rationale:** These controls prevent authorization drift, inconsistent runtime state, and plugin-level abuse paths while preserving the DP's backward-compatible architecture.
+
+**Status:** All conditions implemented in PR #103
+
+---
+
+## Ceremony & Process Improvements (2026-04-10)
+
+### Decision 12: Enforce Full Ceremony Lifecycle
+**Date:** 2026-04-10  
+**By:** Ahmed Sabbour (User Directive)  
+**Decision:** Ralph must enforce the full ceremony lifecycle for every sprint:
+
+1. **Sprint Planning** (before sprint starts) — Leela facilitates
+2. **Design Review** (before multi-agent work on shared systems) — Leela facilitates, Zapp participates for security input
+3. **Sprint Retro** (after sprint completes) — Leela facilitates, includes wall-clock vs estimate analysis
+
+The Design Review ceremony is already in `ceremonies.md` but was being skipped. It must fire before Wave-level work where 2+ agents modify shared packages (e.g., packages/core).
+
+**Rationale:** Design Reviews were being skipped despite being configured as auto-triggered ceremonies. This gate prevents architectural drift.
+
+---
+
+### Decision 13: Design Proposal (DP) Process — KEP-Inspired
+**Date:** 2026-04-10  
+**By:** Ahmed Sabbour (User Directive)  
+**Decision:** Implement a Design Proposal (DP) process with hard gates:
+
+**Process:**
+1. Issue = requirements + acceptance criteria (problem statement written by Ahmed/Leela)
+2. Agent picks up issue and posts a **Design Proposal (DP)** comment on the issue BEFORE writing code
+3. DP includes: problem statement, proposed approach, files to modify, patterns/dependencies, API contracts, security considerations, alternatives considered
+4. Leela reviews DP for architecture quality
+5. Zapp reviews DP for security
+6. Both approve → agent implements
+7. Draft PR opened for code review only (design already approved)
+8. PR marked ready → CI → merge
+
+**Key Principles:**
+- Design discussion happens on the ISSUE, not the PR
+- The DP comment IS the architecture decision record
+- PRs are for code review only — design is settled before code starts
+- For foundational issues, DP may reference a design doc in `docs/architecture/`
+- DP is a HARD GATE — no coding until both Leela and Zapp approve
+- Ralph enforces this gate by spawning agents in 3 steps: (1) post DP, (2) review by Leela+Zapp, (3) implement
+
+**DP Ownership:**
+- Issue body (problem + acceptance criteria) = written by Ahmed/Leela
+- DP comment (proposed approach) = written by implementing agent
+- Agents do NOT write problem statements — they propose solutions to defined problems
+
+**Status:** New process effective immediately
+
+---
+
+### Decision 14: Ceremony Artifacts Linked on GitHub
+**Date:** 2026-04-10  
+**By:** Ahmed Sabbour (User Directive)  
+**Decision:** Ceremony artifacts must be visible and linked on GitHub, not buried in `.squad/log/`:
+
+1. **Sprint Plans** → Create a GitHub Discussion (or issue comment on the milestone) linking to the plan. Include sprint goal, issue list, wave breakdown, capacity.
+2. **Sprint Retros** → Create a GitHub Discussion (or issue comment on the milestone) with retro summary, including wall-clock vs estimates.
+3. **Design Reviews** → Capture as comments on relevant issue(s). Include design decisions, participants, action items. If multi-issue, create a Discussion and link from each issue.
+
+**Rationale:** Ceremony artifacts are invisible on GitHub. Stakeholders and future sessions can't find them without digging through `.squad/log/` files.
+
+**Status:** Process updated
+
+---
+
+### Decision 15: Pre-Code Architecture Review (DP) Before Post-Code (PR)
+**Date:** 2026-04-10  
+**By:** Ahmed Sabbour (User Directive)  
+**Decision:** Architecture and security reviews happen at TWO points:
+
+**BEFORE code (on the issue via DP):**
+- Implementing agent posts Design Proposal comment on issue
+- Leela reviews for architecture quality
+- Zapp reviews for security concerns
+- Implementation proceeds ONLY after both approve
+- Lightweight format — 2-3 paragraphs
+
+**AFTER code (on the PR):**
+- Standard PR review as before — Leela for architecture, Zapp for security
+- Catches implementation issues not visible in the approach
+
+**Architecture Decision Records:**
+- Each issue's DP comment becomes the architecture record
+- Decisions affecting other issues go to `decisions.md` via inbox
+- Foundational patterns (#25-type issues) create a design doc in `docs/architecture/`
+
+**Rationale:** Reviews only on PRs mean architecture problems are caught after code is written — expensive to fix. Pre-code DP review is cheap and catches design issues early.
+
+**Status:** Active (supersedes earlier approach-on-issue directive)
+
+---
+
+### Decision 16: Versioning Policy — Use Appropriate Semver Levels
+**Date:** 2026-04-10  
+**By:** Ahmed Sabbour (User Directive)  
+**Decision:** Releases use appropriate semver levels based on actual changes:
+
+- **Patch** (v0.x.Y): bug fixes, security fixes, docs updates, dependency bumps — anything without new user-facing features
+- **Minor** (v0.X.0): new features, new APIs, new capabilities
+- **Major** (vX.0.0): breaking changes (post-1.0 only)
+
+**Examples:**
+- Security-fixes milestone = patch (v0.2.1)
+- New feature sprint = minor (v0.3.0)
+- Bug-only release = patch (v0.2.1)
+
+**Rationale:** All releases were minor bumps regardless of content. Proper semver communicates what changed.
+
+**Impact:** Changesets should specify the correct bump level in their metadata.
+
+**Status:** Policy effective for future releases
+
+---

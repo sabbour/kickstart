@@ -12,3 +12,4 @@
 - 2026-04-10: Pre-v0.3.0 security audit completed. Highest-risk patterns were frontend HTML injection paths (`dangerouslySetInnerHTML`) and public AI endpoints lacking auth/throttling.
 - 2026-04-10: `/api/converse` currently exposes full system prompts to clients on new sessions; treat system prompts as sensitive control-plane data.
 - 2026-04-10: Security hardening backlog now tracked in Security milestone issues #81-#88 with severity and OWASP mapping.
+- 2026-04-10: DP #30 (IntegrationKit lifecycle/dependency/auth extension) approved with conditions requiring transactional lifecycle rollback, cycle detection on re-registration, explicit auth schema validation, and documented trusted-kit boundary.
