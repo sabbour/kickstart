@@ -545,7 +545,7 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 ### 2026-04-10: Unified Button Action Format (B-25 / Issue #24)
 
 - **Problem:** The `btn()` helper in `packages/web/api/src/lib/response-processor.ts` used a custom flat format (`action: "reply", data: { text }`) that bypassed the A2UI ActionSchema.
-- **Fix:** Updated `btn()` to emit `action: { event: { name: "reply", data: { text } } }` — the canonical A2UI v0.9 ActionSchema shape.
+- **Fix:** Updated `btn()` to emit `action: { event: { name: "reply", context: { text } } }` — the canonical A2UI v0.9 ActionSchema shape (uses `event.context`, not `event.data`).
 - **Scope:** Only the web API response-processor needed fixing. The core catalog (`ButtonAction` type), action dispatch hooks, and MCP server action handler already used the correct format.
 - **Validation:** 30 B-25 contract tests pass, all 423 tests green, lint/build clean.
 - **Key files:** `packages/web/api/src/lib/response-processor.ts`, `packages/core/src/catalog/index.ts` (ButtonAction type), `packages/core/src/__tests__/action-schema.test.ts` (B-25 tests)

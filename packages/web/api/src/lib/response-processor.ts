@@ -206,7 +206,10 @@ function inferDesignComponents(
   return [];
 }
 
-// Helper: create a suggestion button using A2UI ActionSchema format
+// Helper: create a suggestion button using A2UI v0.9 ActionSchema format.
+// Note: This targets the web surface's ActionSchema (event.context), not
+// @kickstart/core's ButtonAction type (event.data). Keep in sync with
+// packages/web/src/vendor/a2ui/web_core/schema/common-types.ts.
 function btn(
   label: string,
   replyText: string,
