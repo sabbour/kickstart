@@ -6,6 +6,7 @@ Kickstart helps developers go from "I have an app" to "it's running on Azure" th
 
 🌐 **Live app:** [kickstart.aks.azure.sabbour.me](https://kickstart.aks.azure.sabbour.me)
 📖 **Docs:** [sabbour.github.io/kickstart](https://sabbour.github.io/kickstart/)
+🎮 **Playground:** [/?playground](/?playground) — Explore the A2UI component library and demo scenarios
 
 ## Two Surfaces, One Engine
 
