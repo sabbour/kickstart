@@ -18,6 +18,7 @@
 
 ## How I Work
 
+- Before starting issue work, read `.squad/skills/pr-workflow/SKILL.md` for the PR and issue workflow
 - Write tests alongside (or before) feature code — not after
 - Prioritise integration tests over unit mocks for user-facing flows
 - Check every wizard step, every error state, every empty state
