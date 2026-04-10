@@ -312,3 +312,31 @@ Key decision: Lead (Leela) will not write code in future — routing code fixes 
 **Retrospective report:** `.squad/log/2026-04-10-sprint-retro-v0.3.0.md`
 
 **Next sprint:** v0.4.0 pending issue planning. Focus areas identified: (1) component streaming, (2) state interpolation, (3) MCP app UI prototype, (4) K8s validation rules.
+
+### 2026-04-10: v0.4.0 Sprint Planning Complete
+
+**v0.3.0 closed:** Milestone moved from open → closed (10 closed issues, 0 open).
+
+**v0.4.0 planned and ready:**
+- **12 issues pre-assigned** to v0.4.0 milestone (no scope negotiation)
+- **35 story points** across 3 domains: Bender (24, knowledge imports), Fry (9, components), Leela (2, docs)
+- **Wave structure:** Wave 1 (knowledge intake + components, Days 1–2), Wave 2 (code review, Days 3–4), Wave 3 (release, Day 5)
+- **DP gate enforced:** 100% compliance required (all agents post Design Proposal before coding)
+- **No blocking dependencies:** Bender and Fry work independent streams; Leela runs parallel doc updates
+- **Retro action items integrated:**
+  - A3 (ServicePack naming docs) → assigned to #52 (Leela)
+  - A4 (working sessions vs calendar) → sprint plan uses sessions + wall-clock days
+  - A5 (DP checklist) → template created for this sprint
+- **Release target:** 2026-04-17 (1 week, 5 working days); merge window Friday with tag + SWA deployment
+
+**v0.4.0 differences from v0.3.0:**
+- Smaller scope (12 issues vs 8), lower story points (35 vs 34), faster turnaround (1 week vs 2)
+- 100% non-architecture work (knowledge imports + component polish vs feature architecture)
+- No security-critical features (Zapp review lighter load)
+- Execution: 2-3 parallel work streams instead of 3 waves
+- Docs refresh (#52) runs concurrent with code to avoid staleness
+
+**Sprint plan artifact:** `.squad/log/2026-04-10-sprint-plan-v0.4.0.md`
+
+**Key decision:** v0.5.0 backlog remains unchanged (18 issues, 68 pts) — ready for post-v0.4.0 planning. Next sprint could accelerate if v0.4.0 ships early (high confidence: low architectural risk).
+
