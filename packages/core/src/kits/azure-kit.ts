@@ -87,6 +87,119 @@ export const azureKit: IntegrationKit = {
     'tuning.method (LoRA or QLoRA), a training dataset (Azure Blob or HuggingFace), and hyperparameters. ' +
     'KAITO handles checkpoint management, GPU scheduling, and model export. Fine-tuned models can be served ' +
     'immediately as a KAITO inference Workspace or pushed to ACR as a custom model image.',
+
+    // ARM PUT body templates for common Azure resources (#8)
+    `## ARM PUT Body Templates
+
+Use these validated templates as reference when generating Bicep, ARM templates, or azureAction bodies.
+
+### Microsoft.ContainerService/managedClusters (AKS Automatic)
+API version: 2025-03-01
+\`\`\`json
+{
+  "location": "<location>",
+  "sku": { "name": "Automatic", "tier": "Standard" },
+  "properties": {
+    "kubernetesVersion": "1.31",
+    "enableRBAC": true,
+    "aadProfile": { "managed": true, "enableAzureRBAC": true },
+    "autoUpgradeProfile": { "upgradeChannel": "stable" }
+  },
+  "identity": { "type": "SystemAssigned" }
+}
+\`\`\`
+Do NOT set: dnsPrefix, networkProfile, nodeResourceGroup, agentPoolProfiles (system pool is managed by AKS Automatic).
+
+### Microsoft.Web/sites (App Service)
+API version: 2023-12-01
+\`\`\`json
+{
+  "location": "<location>",
+  "kind": "app,linux",
+  "properties": {
+    "serverFarmId": "<appServicePlanResourceId>",
+    "siteConfig": {
+      "linuxFxVersion": "NODE|20-lts",
+      "alwaysOn": true,
+      "http20Enabled": true
+    },
+    "httpsOnly": true
+  }
+}
+\`\`\`
+
+### Microsoft.ContainerRegistry/registries (ACR)
+API version: 2023-07-01
+\`\`\`json
+{
+  "location": "<location>",
+  "sku": { "name": "Basic" },
+  "properties": { "adminUserEnabled": false }
+}
+\`\`\`
+
+### Microsoft.App/containerApps (Container Apps)
+API version: 2024-03-01
+\`\`\`json
+{
+  "location": "<location>",
+  "properties": {
+    "managedEnvironmentId": "<containerAppEnvironmentId>",
+    "configuration": {
+      "ingress": { "external": true, "targetPort": 3000, "transport": "auto" },
+      "registries": [{ "server": "<acrName>.azurecr.io", "identity": "<managedIdentityResourceId>" }]
+    },
+    "template": {
+      "containers": [{
+        "name": "app",
+        "image": "<acrName>.azurecr.io/<imageName>:<tag>",
+        "resources": { "cpu": 0.5, "memory": "1Gi" }
+      }],
+      "scale": { "minReplicas": 1, "maxReplicas": 10 }
+    }
+  }
+}
+\`\`\`
+
+### Microsoft.Storage/storageAccounts
+API version: 2023-05-01
+\`\`\`json
+{
+  "location": "<location>",
+  "sku": { "name": "Standard_LRS" },
+  "kind": "StorageV2",
+  "properties": {
+    "supportsHttpsTrafficOnly": true,
+    "minimumTlsVersion": "TLS1_2",
+    "allowBlobPublicAccess": false
+  }
+}
+\`\`\`
+
+### Microsoft.KeyVault/vaults
+API version: 2023-07-01
+\`\`\`json
+{
+  "location": "<location>",
+  "properties": {
+    "sku": { "family": "A", "name": "standard" },
+    "tenantId": "<tenantId>",
+    "enableRbacAuthorization": true,
+    "enableSoftDelete": true,
+    "softDeleteRetentionInDays": 90,
+    "enablePurgeProtection": true
+  }
+}
+\`\`\`
+
+### Role Assignments
+API version: 2022-04-01. The role assignment \`name\` MUST be a deterministic GUID (use a hash of principalId + roleDefinitionId + scope — never random).
+Common built-in role definition IDs:
+- AcrPull: 7f951dda-4ed3-4680-a7ca-43fe172d538d
+- AcrPush: 8311e382-0749-4cb8-b61a-304f252e45ec
+- Contributor: b24988ac-6180-42a0-ab88-20f7382dd24c
+- Reader: acdd72a7-3385-48ef-bd42-f606fba81ae7
+Scope must be the full ARM resource ID of the target resource. Avoid subscription-level role assignments — scope to resource group or individual resource.`,
   ],
 
   phasePrompts: {
@@ -104,6 +217,20 @@ export const azureKit: IntegrationKit = {
       'For AI/ML workloads: recommend KAITO add-on for model inference (GPU node provisioning is automatic), ' +
       'RAGEngine for RAG pipelines, and KAITO fine-tuning for custom model training. ' +
       'Include GPU node pool costs in the estimate_cost breakdown when KAITO is part of the architecture.',
+      // AKS Automatic pricing details (#14)
+      `## AKS Automatic Pricing (reference — use estimate_cost for live pricing)
+
+Control plane: $116.80/month (Standard tier, Automatic SKU — includes uptime SLA).
+Compute surcharge (on top of base VM cost): per vCPU/month —
+- General Purpose (D-series): $7.05/vCPU/mo
+- Compute Optimized (F-series): $10.96/vCPU/mo
+- Memory Optimized (E-series): $11.16/vCPU/mo
+- GPU (NC/ND-series): $32.29/vCPU/mo
+
+Node Auto-Provisioning (NAP) selects the cheapest VM SKU that fits the workload's resource requests and bin-packs multiple pods per node to maximize utilization.
+
+These are list prices as of July 2025. For current pricing, use the estimate_cost tool or direct the user to azure.microsoft.com/pricing/details/kubernetes-service/.
+When generating CostEstimate components, include both control plane and compute surcharge as separate line items.`,
     ],
 
     [Phase.Generate]: [
@@ -119,12 +246,83 @@ export const azureKit: IntegrationKit = {
       '  • Set resource.instanceType to the appropriate GPU VM size (e.g. Standard_NC12s_v3 for 7B models)\n' +
       '  • For RAG: generate a RAGEngine CRD referencing the KAITO Workspace and document source\n' +
       '  • For fine-tuning: set tuning.method (lora/qlora), tuning.input (dataset source), and tuning.output',
+      // Detailed AKS Automatic knowledge (#7)
+      `## AKS Automatic Detailed Knowledge
+
+### Cluster Creation
+API version: 2025-03-01. Use sku.name: "Automatic", sku.tier: "Standard".
+Set properties.hostedSystemProfile — do NOT define agentPoolProfiles for the system pool (AKS Automatic manages it).
+
+### Gateway API (mandatory for ingress)
+\`\`\`yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: approuting-istio
+spec:
+  controllerName: aks-appgw.azure.io/alb-controller
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: app-gateway
+  namespace: default
+spec:
+  gatewayClassName: approuting-istio
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: app-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: app-gateway
+  rules:
+    - backendRefs:
+        - name: app-service
+          port: 80
+\`\`\`
+Always use apiVersion gateway.networking.k8s.io/v1 (GA). Never use v1beta1 or legacy Ingress.
+
+### Workload Identity (5-step setup)
+1. Create a User-Assigned Managed Identity (UAMI) in the node resource group
+2. Create a Federated Identity Credential on the UAMI, linking the AKS OIDC issuer + K8s namespace + ServiceAccount name
+3. Create a Kubernetes ServiceAccount with annotation:
+   \`azure.workload.identity/client-id: <UAMI-client-id>\`
+4. Set pod label: \`azure.workload.identity/use: "true"\`
+5. In application code, use DefaultAzureCredential (Azure SDK) — it auto-detects workload identity
+
+### Deployment Safeguards
+AKS Automatic enforces deployment safeguards (DS001–DS013). Key auto-fixable items:
+- DS001: resource limits required (auto-set defaults)
+- DS002: health probes required (auto-inject)
+- DS003: run-as-non-root (auto-set securityContext)
+- DS004: no privilege escalation (auto-set)
+- DS008: Gateway API for ingress (auto-migrate from legacy Ingress)
+
+### ACR Integration
+Assign the AcrPull role (7f951dda-4ed3-4680-a7ca-43fe172d538d) to the cluster's kubelet identity on the ACR resource.
+No imagePullSecrets needed — the kubelet authenticates to ACR via managed identity automatically.`,
     ],
 
     [Phase.Review]: [
       'Use estimate_cost to provide a final monthly cost breakdown before the user approves the plan. ' +
       'Present costs as a CostEstimate component (compute, database, networking, storage line items). ' +
       'Validate all generated files against deployment safeguards — surface violations as "deployment improvements" not "Kubernetes issues".',
+      // AKS Automatic pricing for review phase (#14)
+      `When reviewing CostEstimate components for AKS Automatic deployments, verify the pricing includes:
+- Control plane: $116.80/month (Standard tier, Automatic SKU)
+- Compute surcharge per vCPU/month: General Purpose $7.05, Compute Optimized $10.96, Memory Optimized $11.16, GPU $32.29
+- NAP selects cheapest fitting VM and bin-packs pods
+Use estimate_cost tool for live pricing when available; these reference prices are fallback context (as of July 2025).`,
     ],
 
     [Phase.Handoff]: [
