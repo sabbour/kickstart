@@ -506,3 +506,12 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **A2UI surface rendering:** LLM-returned `a2ui` array components are wrapped as A2UI messages and fed through `createA2ui.processMessages()` — same surface system used by the rest of the app.
 - **Content safety:** Reuses existing `checkContentSafety` from `../lib/content-safety.ts`.
 - **Key files:** `packages/web/api/src/functions/playground.ts`, `packages/web/src/pages/Playground.tsx`
+
+### 2025-07-26: Widget Inspiration Prompts — Dev/Deploy/Ops Focus
+
+- **Prompt rewrite:** Rewrote system prompts in `widget-inspirations.ts` (both streaming and non-streaming paths) to focus exclusively on Kubernetes/AKS deployment, CI/CD pipelines, container workflows, cloud infrastructure monitoring, and developer productivity for cloud-native apps.
+- **One-shot specificity:** Prompts now instruct the LLM to specify which A2UI component types to use, what realistic sample data to show, what interactions to include, and how to lay out the component — so a single AI response can produce a complete working component.
+- **Fallback overhaul:** Replaced 12 generic fallback ideas with 12 highly detailed, one-shottable prompts covering: Deployment Rollout Tracker, Namespace Resource Dashboard, Container Image Scanner, CI/CD Pipeline Monitor, Interactive Scaling Panel, Kubernetes Event Stream, Helm Release Manager, Service Endpoint Health, GitOps Sync Status, Pod Log Viewer, AKS Cluster Overview, Secret/ConfigMap Browser.
+- **Playground prompt upgrade:** Rewrote `playground.ts` system prompt with explicit "one-shot component design rules", a full worked example (deployment rollout tracker), and guidance on realistic sample data, rich layouts (4-6 component types), meaningful color/status mapping, and interactive controls.
+- **Constraints preserved:** Temperature=1 (reasoning model requirement), maxTokens=400 for streaming, maxTokens=300 for non-streaming inspire, safety clauses retained in all prompts.
+- **Key files:** `packages/web/api/src/functions/widget-inspirations.ts`, `packages/web/api/src/functions/playground.ts`
