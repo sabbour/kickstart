@@ -3,13 +3,23 @@
  *
  * IntegrationKitRegistry — central register for IntegrationKits.
  *
+ * ## Trust Model
+ *
+ * Kits are trusted first-party code. No sandboxing is applied — lifecycle
+ * hooks and tool/connector code run with full process privileges. If
+ * third-party kits are needed in the future, implement capability
+ * restrictions and sandboxing before allowing untrusted code.
+ *
  * Registering a kit automatically:
- *   1. Validates dependencies (all declared deps must be registered first).
- *   2. Detects tool/connector name collisions with existing kits.
- *   3. Records the kit in this registry (look up by name).
- *   4. Registers all kit tools into the provided ToolRegistry.
- *   5. Registers all kit connectors into the provided APIConnectorRegistry.
- *   6. Calls onActivate() lifecycle hook if provided.
+ *   1. Validates auth schema (provider/scopes).
+ *   2. Validates dependencies (all declared deps must be registered first).
+ *   3. Detects circular dependencies via DFS.
+ *   4. Detects tool/connector name collisions with existing kits.
+ *   5. Records the kit in this registry (look up by name).
+ *   6. Registers all kit tools into the provided ToolRegistry.
+ *   7. Registers all kit connectors into the provided APIConnectorRegistry.
+ *   8. Calls onActivate() lifecycle hook if provided.
+ *   9. On onActivate failure, rolls back all changes (transactional).
  *
  * Usage:
  *   import { registerKit, defaultKitRegistry } from '@kickstart/core';
@@ -20,6 +30,15 @@ import type { IntegrationKit } from './types.js';
 import { ToolRegistry, defaultRegistry } from '../tools/registry.js';
 import { APIConnectorRegistry, defaultConnectorRegistry } from '../connectors/registry.js';
 
+/**
+ * Central registry for IntegrationKits.
+ *
+ * **Trust Model:** Kits are trusted first-party code. No sandboxing is
+ * applied — lifecycle hooks (`onActivate`, `onDeactivate`) and tool
+ * `execute` functions run with full process privileges. If third-party
+ * kits are needed in the future, implement capability restrictions and
+ * sandboxing before allowing untrusted code to register as a kit.
+ */
 export class IntegrationKitRegistry {
   private readonly kits = new Map<string, IntegrationKit>();
   private readonly toolRegistry: ToolRegistry;
@@ -41,13 +60,18 @@ export class IntegrationKitRegistry {
    * Register a kit and auto-wire its tools and connectors into their
    * respective registries.
    *
-   * Validates dependencies and detects tool/connector name collisions
-   * before registration. Re-registration of the same kit name is allowed
-   * (overwrites) for backward compatibility.
+   * Validates auth schema, dependencies, detects cycles and tool/connector
+   * name collisions before registration. Re-registration of the same kit
+   * name is allowed (overwrites) for backward compatibility.
    *
-   * Calls the kit's `onActivate()` hook after successful registration.
+   * If `onActivate()` throws, all changes are rolled back: tools removed
+   * from ToolRegistry, connectors from APIConnectorRegistry, kit from
+   * the kits map, and ownership maps are restored.
    */
   async register(kit: IntegrationKit): Promise<void> {
+    // ── Auth schema validation ───────────────────────────────────────────
+    this.validateAuth(kit);
+
     // ── Dependency validation ──────────────────────────────────────────
     if (kit.dependencies?.length) {
       const missing = kit.dependencies.filter((dep) => !this.kits.has(dep));
@@ -57,6 +81,9 @@ export class IntegrationKitRegistry {
           `Register dependencies first.`,
         );
       }
+
+      // ── Cycle detection ────────────────────────────────────────────────
+      this.detectCycle(kit.name, kit.dependencies);
     }
 
     // ── Collision detection ────────────────────────────────────────────
@@ -82,8 +109,11 @@ export class IntegrationKitRegistry {
       );
     }
 
+    // ── Snapshot previous state for rollback ──────────────────────────
+    const previousKit = this.kits.get(kit.name);
+
     // ── Clean up previous registration (if re-registering same kit) ───
-    if (this.kits.has(kit.name)) {
+    if (previousKit) {
       this.clearOwnership(kit.name);
     }
 
@@ -100,9 +130,43 @@ export class IntegrationKitRegistry {
       this.connectorRegistry.register(connector);
     }
 
-    // ── Lifecycle: onActivate ──────────────────────────────────────────
+    // ── Lifecycle: onActivate (with rollback on failure) ───────────────
     if (kit.onActivate) {
-      await kit.onActivate();
+      try {
+        await kit.onActivate();
+      } catch (err) {
+        // Roll back: remove tools from ToolRegistry
+        for (const tool of kit.tools) {
+          this.toolRegistry.unregister(tool.name);
+          this.toolOwners.delete(tool.name);
+        }
+        // Roll back: remove connectors from APIConnectorRegistry
+        for (const connector of kit.connectors) {
+          this.connectorRegistry.unregister(connector.name);
+          this.connectorOwners.delete(connector.name);
+        }
+        // Roll back: remove kit from kits map
+        this.kits.delete(kit.name);
+
+        // Restore previous kit if re-registering
+        if (previousKit) {
+          this.kits.set(previousKit.name, previousKit);
+          for (const tool of previousKit.tools) {
+            this.toolOwners.set(tool.name, previousKit.name);
+          }
+          this.toolRegistry.registerAll(previousKit.tools);
+          for (const connector of previousKit.connectors) {
+            this.connectorOwners.set(connector.name, previousKit.name);
+            this.connectorRegistry.register(connector);
+          }
+        }
+
+        throw new Error(
+          `Kit "${kit.name}" onActivate failed — registration rolled back. ` +
+          `Cause: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err },
+        );
+      }
     }
   }
 
@@ -111,6 +175,9 @@ export class IntegrationKitRegistry {
    *
    * Blocks if other registered kits declare this kit as a dependency.
    * Calls the kit's `onDeactivate()` hook before removal.
+   *
+   * If `onDeactivate()` throws, the kit is kept registered and the error
+   * is re-thrown — preventing a partially torn-down state.
    */
   async unregister(name: string): Promise<void> {
     const kit = this.kits.get(name);
@@ -127,12 +194,26 @@ export class IntegrationKitRegistry {
       );
     }
 
-    // ── Lifecycle: onDeactivate ────────────────────────────────────────
+    // ── Lifecycle: onDeactivate (keep kit if it fails) ────────────────
     if (kit.onDeactivate) {
-      await kit.onDeactivate();
+      try {
+        await kit.onDeactivate();
+      } catch (err) {
+        throw new Error(
+          `Kit "${name}" onDeactivate failed — kit remains registered. ` +
+          `Cause: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err },
+        );
+      }
     }
 
     // ── Remove tools and connectors ────────────────────────────────────
+    for (const tool of kit.tools) {
+      this.toolRegistry.unregister(tool.name);
+    }
+    for (const connector of kit.connectors) {
+      this.connectorRegistry.unregister(connector.name);
+    }
     this.clearOwnership(name);
     this.kits.delete(name);
   }
@@ -187,6 +268,91 @@ export class IntegrationKitRegistry {
    */
   getConnectorOwner(connectorName: string): string | undefined {
     return this.connectorOwners.get(connectorName);
+  }
+
+  /**
+   * DFS-based cycle detection. Checks whether adding `kitName` with the
+   * given `dependencies` would create a circular dependency chain.
+   *
+   * Walks from each direct dependency through the existing dependency
+   * graph. If any path leads back to `kitName`, a cycle exists.
+   *
+   * @throws Error with a human-readable cycle path (e.g. A → B → A)
+   */
+  private detectCycle(kitName: string, dependencies: string[]): void {
+    for (const dep of dependencies) {
+      const visited = new Set<string>();
+      const path = [kitName, dep];
+
+      const hasCycle = this.dfsVisit(dep, kitName, visited, path);
+      if (hasCycle) {
+        throw new Error(
+          `Kit "${kitName}" has circular dependency: ${path.join(' → ')}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Recursive DFS helper. Returns true if `target` is reachable from
+   * `current` through the dependency graph.
+   */
+  private dfsVisit(
+    current: string,
+    target: string,
+    visited: Set<string>,
+    path: string[],
+  ): boolean {
+    if (visited.has(current)) return false;
+    visited.add(current);
+
+    const kit = this.kits.get(current);
+    if (!kit?.dependencies) return false;
+
+    for (const dep of kit.dependencies) {
+      path.push(dep);
+      if (dep === target) return true;
+      if (this.dfsVisit(dep, target, visited, path)) return true;
+      path.pop();
+    }
+    return false;
+  }
+
+  /**
+   * Validates KitAuthRequirement entries at registration time.
+   * - `provider` must be a non-empty string
+   * - `scopes` must be a non-empty array of non-empty strings
+   * - Warns on duplicate provider declarations within the same kit
+   */
+  private validateAuth(kit: IntegrationKit): void {
+    if (!kit.auth?.length) return;
+
+    const seenProviders = new Set<string>();
+    for (const req of kit.auth) {
+      if (!req.provider || typeof req.provider !== 'string' || req.provider.trim() === '') {
+        throw new Error(
+          `Kit "${kit.name}" has invalid auth requirement: provider must be a non-empty string.`,
+        );
+      }
+      if (
+        !Array.isArray(req.scopes) ||
+        req.scopes.length === 0 ||
+        req.scopes.some((s) => typeof s !== 'string' || s.trim() === '')
+      ) {
+        throw new Error(
+          `Kit "${kit.name}" has invalid auth requirement for provider "${req.provider}": ` +
+          `scopes must be a non-empty array of non-empty strings.`,
+        );
+      }
+      if (seenProviders.has(req.provider)) {
+        // eslint-disable-next-line no-console -- intentional warning for kit authors
+        console.warn(
+          `Kit "${kit.name}": duplicate auth provider "${req.provider}" — ` +
+          `only declare each provider once per kit.`,
+        );
+      }
+      seenProviders.add(req.provider);
+    }
   }
 
   /** Remove ownership records for a kit's tools and connectors. */

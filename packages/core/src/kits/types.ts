@@ -63,6 +63,14 @@ export interface KitAuthRequirement {
  *   wire up auth providers).
  * - **dependencies** — Names of kits that must be registered before this one.
  * - **onActivate / onDeactivate** — Lifecycle hooks for setup/teardown.
+ *
+ * ## Trust Model
+ *
+ * Kits are trusted first-party code. No sandboxing is applied — lifecycle
+ * hooks (`onActivate`, `onDeactivate`) and tool `execute` functions run
+ * with full process privileges. If third-party kits are needed in the
+ * future, implement capability restrictions and sandboxing before allowing
+ * untrusted code to register as a kit.
  */
 export interface IntegrationKit {
   /** Unique kit identifier, e.g. 'azure', 'github' */

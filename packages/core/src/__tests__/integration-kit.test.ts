@@ -477,3 +477,224 @@ describe('multi-kit registration', () => {
     expect(connectorRegistry.get('github')).toBeDefined();
   });
 });
+
+// ── Condition 1: Transactional register/unregister with rollback ────────────
+
+describe('transactional register (rollback on onActivate failure)', () => {
+  it('rolls back kit, tools, and connectors when onActivate throws', async () => {
+    const { kitRegistry, toolRegistry, connectorRegistry } = makeIsolatedRegistry();
+    const tool = makeTool('rollback_tool');
+    const connector = makeConnector('rollback-conn');
+    const kit = makeKit('failing-kit', {
+      tools: [tool],
+      connectors: [connector],
+      onActivate: async () => { throw new Error('activation boom'); },
+    });
+
+    await expect(kitRegistry.register(kit)).rejects.toThrow(/onActivate failed.*rolled back/);
+
+    // Kit should not be registered
+    expect(kitRegistry.has('failing-kit')).toBe(false);
+    expect(kitRegistry.size).toBe(0);
+
+    // Tools and connectors should be removed
+    expect(toolRegistry.get('rollback_tool')).toBeUndefined();
+    expect(connectorRegistry.get('rollback-conn')).toBeUndefined();
+
+    // Ownership should be cleared
+    expect(kitRegistry.getToolOwner('rollback_tool')).toBeUndefined();
+    expect(kitRegistry.getConnectorOwner('rollback-conn')).toBeUndefined();
+  });
+
+  it('preserves the original error message in the rollback error', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    const kit = makeKit('boom-kit', {
+      onActivate: async () => { throw new Error('specific failure reason'); },
+    });
+
+    await expect(kitRegistry.register(kit)).rejects.toThrow(/specific failure reason/);
+  });
+
+  it('restores previous kit on re-register rollback', async () => {
+    const { kitRegistry, toolRegistry } = makeIsolatedRegistry();
+    const v1Tool = makeTool('v1_tool');
+    const v1 = makeKit('my-kit', { tools: [v1Tool], description: 'v1' });
+    await kitRegistry.register(v1);
+
+    const v2 = makeKit('my-kit', {
+      tools: [makeTool('v2_tool')],
+      description: 'v2',
+      onActivate: async () => { throw new Error('v2 boom'); },
+    });
+    await expect(kitRegistry.register(v2)).rejects.toThrow(/onActivate failed/);
+
+    // v1 should still be registered
+    expect(kitRegistry.has('my-kit')).toBe(true);
+    expect(kitRegistry.get('my-kit')!.description).toBe('v1');
+    expect(toolRegistry.get('v1_tool')).toBe(v1Tool);
+    expect(kitRegistry.getToolOwner('v1_tool')).toBe('my-kit');
+  });
+});
+
+describe('transactional unregister (keep kit on onDeactivate failure)', () => {
+  it('keeps kit registered when onDeactivate throws', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    const kit = makeKit('sticky-kit', {
+      onDeactivate: async () => { throw new Error('deactivation boom'); },
+    });
+    await kitRegistry.register(kit);
+
+    await expect(kitRegistry.unregister('sticky-kit')).rejects.toThrow(
+      /onDeactivate failed.*remains registered/,
+    );
+
+    // Kit should still be there
+    expect(kitRegistry.has('sticky-kit')).toBe(true);
+    expect(kitRegistry.size).toBe(1);
+  });
+
+  it('preserves tool/connector ownership when onDeactivate fails', async () => {
+    const { kitRegistry, toolRegistry, connectorRegistry } = makeIsolatedRegistry();
+    const tool = makeTool('sticky_tool');
+    const connector = makeConnector('sticky-conn');
+    const kit = makeKit('sticky-kit', {
+      tools: [tool],
+      connectors: [connector],
+      onDeactivate: async () => { throw new Error('deactivation boom'); },
+    });
+    await kitRegistry.register(kit);
+
+    await expect(kitRegistry.unregister('sticky-kit')).rejects.toThrow();
+
+    // Everything should remain intact
+    expect(toolRegistry.get('sticky_tool')).toBe(tool);
+    expect(connectorRegistry.get('sticky-conn')).toBe(connector);
+    expect(kitRegistry.getToolOwner('sticky_tool')).toBe('sticky-kit');
+    expect(kitRegistry.getConnectorOwner('sticky-conn')).toBe('sticky-kit');
+  });
+});
+
+// ── Condition 2: Cycle detection ────────────────────────────────────────────
+
+describe('cycle detection', () => {
+  it('detects direct A → B → A cycle', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    await kitRegistry.register(makeKit('kit-a', { dependencies: [] }));
+    await kitRegistry.register(makeKit('kit-b', { dependencies: ['kit-a'] }));
+
+    // Now try to register kit-a again with dependency on kit-b (cycle)
+    const cyclicA = makeKit('kit-a', { dependencies: ['kit-b'] });
+    await expect(kitRegistry.register(cyclicA)).rejects.toThrow(
+      /circular dependency.*kit-a → kit-b → kit-a/,
+    );
+  });
+
+  it('detects transitive A → B → C → A cycle', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    await kitRegistry.register(makeKit('kit-a'));
+    await kitRegistry.register(makeKit('kit-b', { dependencies: ['kit-a'] }));
+    await kitRegistry.register(makeKit('kit-c', { dependencies: ['kit-b'] }));
+
+    const cyclicA = makeKit('kit-a', { dependencies: ['kit-c'] });
+    await expect(kitRegistry.register(cyclicA)).rejects.toThrow(
+      /circular dependency.*kit-a → kit-c → kit-b → kit-a/,
+    );
+  });
+
+  it('allows valid (non-cyclic) dependency chains', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    await kitRegistry.register(makeKit('base'));
+    await kitRegistry.register(makeKit('mid', { dependencies: ['base'] }));
+    await kitRegistry.register(makeKit('top', { dependencies: ['mid'] }));
+
+    expect(kitRegistry.has('top')).toBe(true);
+    expect(kitRegistry.size).toBe(3);
+  });
+
+  it('allows diamond dependencies (non-cyclic)', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    await kitRegistry.register(makeKit('root'));
+    await kitRegistry.register(makeKit('left', { dependencies: ['root'] }));
+    await kitRegistry.register(makeKit('right', { dependencies: ['root'] }));
+    await kitRegistry.register(makeKit('top', { dependencies: ['left', 'right'] }));
+
+    expect(kitRegistry.has('top')).toBe(true);
+    expect(kitRegistry.size).toBe(4);
+  });
+});
+
+// ── Condition 3: Auth schema validation ─────────────────────────────────────
+
+describe('auth schema validation', () => {
+  it('rejects empty provider string', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    const kit = makeKit('bad-auth', {
+      auth: [{ provider: '', scopes: ['read'] }],
+    });
+    await expect(kitRegistry.register(kit)).rejects.toThrow(
+      /provider must be a non-empty string/,
+    );
+  });
+
+  it('rejects whitespace-only provider', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    const kit = makeKit('bad-auth', {
+      auth: [{ provider: '   ', scopes: ['read'] }],
+    });
+    await expect(kitRegistry.register(kit)).rejects.toThrow(
+      /provider must be a non-empty string/,
+    );
+  });
+
+  it('rejects empty scopes array', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    const kit = makeKit('bad-auth', {
+      auth: [{ provider: 'my-provider', scopes: [] }],
+    });
+    await expect(kitRegistry.register(kit)).rejects.toThrow(
+      /scopes must be a non-empty array/,
+    );
+  });
+
+  it('rejects scopes with empty strings', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    const kit = makeKit('bad-auth', {
+      auth: [{ provider: 'my-provider', scopes: ['valid', ''] }],
+    });
+    await expect(kitRegistry.register(kit)).rejects.toThrow(
+      /scopes must be a non-empty array of non-empty strings/,
+    );
+  });
+
+  it('warns on duplicate provider in the same kit', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const kit = makeKit('dupe-auth', {
+      auth: [
+        { provider: 'oauth', scopes: ['read'] },
+        { provider: 'oauth', scopes: ['write'] },
+      ],
+    });
+    await kitRegistry.register(kit);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('duplicate auth provider "oauth"'),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('accepts valid auth requirements', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    const kit = makeKit('good-auth', {
+      auth: [{ provider: 'my-provider', scopes: ['read', 'write'], optional: true }],
+    });
+    await kitRegistry.register(kit);
+    expect(kitRegistry.has('good-auth')).toBe(true);
+  });
+
+  it('skips validation when auth is undefined', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    await kitRegistry.register(makeKit('no-auth'));
+    expect(kitRegistry.has('no-auth')).toBe(true);
+  });
+});

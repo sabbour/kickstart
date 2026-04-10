@@ -76,6 +76,11 @@ export class ToolRegistry {
     }
   }
 
+  /** Remove a tool from the registry by name. No-op if not found. */
+  unregister(name: string): void {
+    this.tools.delete(name);
+  }
+
   /** Number of registered tools. */
   get size(): number {
     return this.tools.size;
