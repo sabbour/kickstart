@@ -15,13 +15,20 @@ import {
 import type {
   SessionState,
   ConversationState,
-  ConversationPhaseComponent,
   PhaseItem,
   PhaseStatus,
 } from "@kickstart/core";
 import { createA2UIResource } from "../a2ui.js";
 
 type ActionType = "advance" | "skip" | "select" | "submit" | "reply" | "navigate" | "api";
+
+/** Local structural type for the ConversationPhase A2UI component. */
+interface ConversationPhaseComponent {
+  type: "ConversationPhase";
+  id: string;
+  phases: PhaseItem[];
+  currentPhase: Phase;
+}
 
 /**
  * Handle a user action from the A2UI interface.
@@ -38,7 +45,7 @@ export async function handleAction(
   const session = sessions.get(sessionId);
   if (!session) {
     return {
-      content: [{ type: "text", text: `❌ Session \`${sessionId}\` not found.` }],
+      content: [{ type: "text", text: `Error: Session \`${sessionId}\` not found.` }],
     };
   }
 
@@ -91,16 +98,20 @@ export async function handleAction(
         session.updatedAt = new Date().toISOString();
         sessions.set(sessionId, session);
         return {
-          content: [{ type: "text", text: "❌ Missing required field: `message` is required for reply actions." }],
+          content: [{ type: "text", text: "Error: Missing required field: `message` is required for reply actions." }],
         };
       }
       session.messages = session.messages ?? [];
-      session.messages.push({ role: "user", content: message });
+      session.messages.push({
+        role: "user",
+        content: message,
+        timestamp: new Date().toISOString(),
+      });
       session.updatedAt = new Date().toISOString();
       sessions.set(sessionId, session);
       const replyDef = getPhaseDefinition(session.currentPhase as Phase);
       return {
-        content: [{ type: "text", text: `Now in **${replyDef.label}** phase: ${replyDef.description}` }],
+        content: [{ type: "text", text: `Received reply in **${replyDef.label}** phase. The conversation will continue from here.` }],
       };
     }
 
@@ -110,7 +121,7 @@ export async function handleAction(
         session.updatedAt = new Date().toISOString();
         sessions.set(sessionId, session);
         return {
-          content: [{ type: "text", text: "❌ Missing required field: `targetPhase` is required for navigate actions." }],
+          content: [{ type: "text", text: "Error: Missing required field: `targetPhase` is required for navigate actions." }],
         };
       }
       const validPhases = getPhaseOrder() as string[];
@@ -118,7 +129,7 @@ export async function handleAction(
         session.updatedAt = new Date().toISOString();
         sessions.set(sessionId, session);
         return {
-          content: [{ type: "text", text: `❌ Invalid phase: \`${targetPhase}\` is not a recognized phase.` }],
+          content: [{ type: "text", text: `Error: Invalid phase: \`${targetPhase}\` is not a recognized phase.` }],
         };
       }
       // Direct phase assignment — navigation can go forward or backward
@@ -165,14 +176,14 @@ export async function handleAction(
       session.updatedAt = new Date().toISOString();
       sessions.set(sessionId, session);
       return {
-        content: [{ type: "text", text: "⚠️ API actions are not yet implemented — stub acknowledged. This action will be connected to the ServiceConnector in a future iteration." }],
+        content: [{ type: "text", text: "API actions are not yet implemented -- stub acknowledged. This action will be connected to the ServiceConnector in a future iteration." }],
       };
     }
 
     default: {
       // Unknown action type — return error, do not mutate state
       return {
-        content: [{ type: "text", text: `❌ Unknown action type: \`${actionType}\`. Valid types are: advance, skip, select, submit, reply, navigate, api.` }],
+        content: [{ type: "text", text: `Error: Unknown action type: \`${actionType}\`. Valid types are: advance, skip, select, submit, reply, navigate, api.` }],
       };
     }
   }
@@ -203,7 +214,7 @@ export async function handleAction(
 
   const currentDef = getPhaseDefinition(engineState.currentPhase);
   const statusText = engineState.isComplete
-    ? "✅ **All phases complete!** Your deployment plan is ready."
+    ? "**All phases complete.** Your deployment plan is ready."
     : `Now in **${currentDef.label}** phase: ${currentDef.description}`;
 
   const content: Array<{ type: "text"; text: string } | { type: "resource"; resource: { uri: string; mimeType: string; text: string } }> = [
