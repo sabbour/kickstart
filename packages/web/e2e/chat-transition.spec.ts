@@ -2,7 +2,7 @@ import { test, expect, waitForAssistantMessage } from './helpers';
 
 test.describe('Landing to chat transition', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?mock');
     await page.waitForSelector('#landing-page', { timeout: 10_000 });
   });
 
@@ -41,8 +41,8 @@ test.describe('Landing to chat transition', () => {
     const userBubble = page.locator('.chat-bubble.user');
     await expect(userBubble.first()).toContainText('Go');
 
-    // Welcome message mentions the framework
-    await waitForAssistantMessage(page, 'Go');
+    // Welcome message appears from assistant (generic Kickstart greeting)
+    await waitForAssistantMessage(page, 'Kickstart');
   });
 
   test('after transition, landing page is removed from DOM', async ({ page }) => {
@@ -57,9 +57,9 @@ test.describe('Landing to chat transition', () => {
     await page.locator('.framework-pill[data-framework="Next.js"]').click();
     await page.waitForSelector('#landing-page', { state: 'detached', timeout: 5000 });
 
-    // Assistant welcome + framework-specific greeting
+    // Assistant welcome message appears (generic Kickstart greeting)
     const assistantBubbles = page.locator('.chat-bubble.assistant');
     await expect(assistantBubbles.first()).toBeVisible();
-    await expect(assistantBubbles.first()).toContainText('Next.js');
+    await expect(assistantBubbles.first()).toContainText('Kickstart');
   });
 });
