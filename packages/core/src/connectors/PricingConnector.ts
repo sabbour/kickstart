@@ -1,4 +1,5 @@
-import type { APIConnector, APIConnectorRequestOptions } from './types.js';
+import type { ConnectorConfig } from './types.js';
+import { BaseConnector } from './BaseConnector.js';
 
 export interface ResourceCostInput {
   /** Azure resource type, e.g. "Microsoft.ContainerService/managedClusters" */
@@ -33,36 +34,20 @@ export interface CostEstimateResult {
  * Connector for the Azure Pricing REST API.
  *
  * No auth required — the Azure pricing API is public.
- * `authenticate()` is a no-op; `isAuthenticated()` always returns true.
+ * Auth strategy defaults to "none".
  *
- * `estimateCost()` currently returns stub data. Real pricing calls (B-14+)
+ * `estimateCost()` currently returns stub data. Real pricing calls
  * will query https://prices.azure.com/api/retail/prices.
  */
-export class PricingConnector implements APIConnector {
+export class PricingConnector extends BaseConnector {
   readonly name = 'pricing';
-  readonly baseUrl = 'https://prices.azure.com';
 
-  async authenticate(): Promise<void> {
-    // No auth needed for public pricing API.
+  protected get defaultBaseUrl(): string {
+    return 'https://prices.azure.com';
   }
 
-  isAuthenticated(): boolean {
-    return true;
-  }
-
-  async request(
-    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-    path: string,
-    body?: unknown,
-    options?: APIConnectorRequestOptions,
-  ): Promise<Response> {
-    const url = `${this.baseUrl}${path}`;
-    return fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal: options?.signal,
-    });
+  constructor(config?: ConnectorConfig) {
+    super(config ?? { auth: { kind: 'none' } });
   }
 
   // ── Domain methods ─────────────────────────────────────────────────────────

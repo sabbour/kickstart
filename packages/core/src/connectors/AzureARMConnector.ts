@@ -1,4 +1,5 @@
-import type { APIConnector, APIConnectorRequestOptions } from './types.js';
+import type { ConnectorConfig } from './types.js';
+import { BaseConnector } from './BaseConnector.js';
 
 /** Sample resource shapes returned by the stub. */
 export interface AzureResource {
@@ -17,55 +18,38 @@ export interface AzureResourceGroup {
 }
 
 /**
+ * Default ARM auth scopes — requests tokens for the Azure management plane.
+ */
+const DEFAULT_ARM_SCOPES = ['https://management.azure.com/.default'];
+
+/**
  * Connector for the Azure Resource Manager REST API.
  *
- * Auth: MSAL (coming in B-14). For now, `authenticate()` is a no-op and
- * `isAuthenticated()` returns false until tokens are wired.
- *
- * All methods return stub data so the rest of the app can build against
- * real shapes before the auth layer exists.
+ * Auth: OAuth2 via MSAL (injected with `setTokenProvider()`).
+ * When no token provider is set, domain methods return stub data so
+ * the app can function offline during local development.
  */
-export class AzureARMConnector implements APIConnector {
+export class AzureARMConnector extends BaseConnector {
   readonly name = 'azure-arm';
-  readonly baseUrl = 'https://management.azure.com';
 
-  private _token: string | null = null;
-
-  async authenticate(): Promise<void> {
-    // TODO (B-14): acquire MSAL token and store in this._token
-    // Stubbed — MSAL integration pending (B-14)
+  protected get defaultBaseUrl(): string {
+    return 'https://management.azure.com';
   }
 
-  isAuthenticated(): boolean {
-    return this._token !== null;
-  }
-
-  async request(
-    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-    path: string,
-    body?: unknown,
-    options?: APIConnectorRequestOptions,
-  ): Promise<Response> {
-    const url = `${this.baseUrl}${path}`;
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(this._token ? { Authorization: `Bearer ${this._token}` } : {}),
-      ...options?.headers,
-    };
-
-    return fetch(url, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal: options?.signal,
-    });
+  /**
+   * Create a new AzureARMConnector.
+   * @param config - Optional connector config. Defaults to OAuth2 auth
+   *                 with ARM scopes if not specified.
+   */
+  constructor(config?: ConnectorConfig) {
+    super(config ?? { auth: { kind: 'oauth2', scopes: DEFAULT_ARM_SCOPES } });
   }
 
   // ── Domain methods ─────────────────────────────────────────────────────────
 
   /**
-   * Lists resource groups and resources for a subscription.
-   * Returns stub data until auth is wired (B-14).
+   * Lists resources for a subscription.
+   * Returns stub data when not authenticated (local dev / stub mode).
    */
   async listResources(subscriptionId: string): Promise<AzureResource[]> {
     if (!this.isAuthenticated()) {
@@ -77,13 +61,13 @@ export class AzureARMConnector implements APIConnector {
 
     const path = `/subscriptions/${subscriptionId}/resources?api-version=2021-04-01`;
     const res = await this.request('GET', path);
-    const json = await res.json();
+    const json = (await res.json()) as { value?: AzureResource[] };
     return json.value ?? [];
   }
 
   /**
    * Gets a single resource by its full ARM resource ID.
-   * Returns stub data until auth is wired (B-14).
+   * Returns stub data when not authenticated.
    */
   async getResource(resourceId: string): Promise<AzureResource | null> {
     if (!this.isAuthenticated()) {
@@ -93,12 +77,12 @@ export class AzureARMConnector implements APIConnector {
     const path = `${resourceId}?api-version=2021-04-01`;
     const res = await this.request('GET', path);
     if (res.status === 404) return null;
-    return res.json();
+    return (await res.json()) as AzureResource;
   }
 
   /**
    * Creates (or updates) an Azure resource.
-   * Returns stub data until auth is wired (B-14).
+   * Returns stub data when not authenticated.
    */
   async createResource(
     subscriptionId: string,
@@ -119,7 +103,7 @@ export class AzureARMConnector implements APIConnector {
 
     const path = `/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/${resourceType}/${resourceName}?api-version=2021-04-01`;
     const res = await this.request('PUT', path, { location: 'eastus', ...properties });
-    return res.json();
+    return (await res.json()) as AzureResource;
   }
 }
 
