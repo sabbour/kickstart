@@ -19,12 +19,21 @@
  */
 
 import type { IntegrationKit } from './types.js';
+import type { KitAuthRequirement } from './types.js';
 import { Phase } from '../engine/types.js';
 import { azureResourceList } from '../tools/azure-resource-list.js';
 import { azureResourceGet } from '../tools/azure-resource-get.js';
 import { estimateCost } from '../tools/estimate-cost.js';
 import { AzureARMConnector } from '../connectors/AzureARMConnector.js';
 import { PricingConnector } from '../connectors/PricingConnector.js';
+
+const azureAuth: KitAuthRequirement[] = [
+  {
+    provider: 'azure-msal',
+    scopes: ['https://management.azure.com/.default'],
+    optional: false,
+  },
+];
 
 export const azureKit: IntegrationKit = {
   name: 'azure',
@@ -152,4 +161,6 @@ export const azureKit: IntegrationKit = {
         '  - onSelect (optional action): Callback fired when the user selects a resource.',
     },
   ],
+
+  auth: azureAuth,
 };

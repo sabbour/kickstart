@@ -5,9 +5,14 @@
  * optional component registrations.  Kits are the canonical unit for
  * extending Kickstart with a new integration target (e.g. Azure, GitHub).
  *
+ * ServicePack extensions (issue #30) add:
+ *   - Declarative auth requirements
+ *   - Kit-to-kit dependency declarations
+ *   - Async lifecycle hooks (onActivate / onDeactivate)
+ *
  * Usage:
  *   const myKit: IntegrationKit = { name: 'my-kit', ... };
- *   registerKit(myKit);
+ *   await registerKit(myKit);
  */
 
 import type { Tool } from '../tools/types.js';
@@ -28,6 +33,21 @@ export interface ComponentRegistration {
 }
 
 /**
+ * Declarative auth requirement for a kit. The web layer reads these to
+ * determine which auth providers must be configured before the kit is
+ * fully functional.  Core never performs actual auth — it only declares
+ * what is needed.
+ */
+export interface KitAuthRequirement {
+  /** Auth provider identifier, e.g. 'azure-msal', 'github-oauth' */
+  provider: string;
+  /** OAuth scopes or permission strings required */
+  scopes: string[];
+  /** If true, the kit can function (degraded) without this auth */
+  optional?: boolean;
+}
+
+/**
  * An IntegrationKit bundles everything needed to add a new integration
  * surface into Kickstart:
  *
@@ -39,6 +59,10 @@ export interface ComponentRegistration {
  *   appended to the active phase's system prompt when this kit is loaded.
  * - **components** — Optional A2UI component type registrations
  *   (frontend-only; core records names, web layer binds React components).
+ * - **auth** — Declarative auth requirements (web layer uses these to
+ *   wire up auth providers).
+ * - **dependencies** — Names of kits that must be registered before this one.
+ * - **onActivate / onDeactivate** — Lifecycle hooks for setup/teardown.
  */
 export interface IntegrationKit {
   /** Unique kit identifier, e.g. 'azure', 'github' */
@@ -64,4 +88,15 @@ export interface IntegrationKit {
   phasePrompts?: Partial<Record<Phase, string[]>>;
   /** Optional A2UI component registrations (frontend-only) */
   components?: ComponentRegistration[];
+
+  // ── ServicePack extensions (issue #30) ───────────────────────────────
+
+  /** Declarative auth requirements — web layer uses these to wire providers */
+  auth?: KitAuthRequirement[];
+  /** Names of kits that must be registered before this kit */
+  dependencies?: string[];
+  /** Called after the kit is registered and all deps are validated */
+  onActivate?: () => Promise<void>;
+  /** Called before the kit is removed from the registry */
+  onDeactivate?: () => Promise<void>;
 }
