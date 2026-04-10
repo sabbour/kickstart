@@ -340,3 +340,30 @@ Key decision: Lead (Leela) will not write code in future — routing code fixes 
 
 **Key decision:** v0.5.0 backlog remains unchanged (18 issues, 68 pts) — ready for post-v0.4.0 planning. Next sprint could accelerate if v0.4.0 ships early (high confidence: low architectural risk).
 
+
+## Issue #52 — Documentation Update (2026-04-10)
+
+**Status:** ✅ Completed | **PR:** #109
+
+**Work summary:**
+- Updated README.md with v0.3.0 architectural features: Fat A2UI components, LLM function calling, ServiceConnector/ServicePack patterns, CORS proxy security
+- Expanded docs/README.md index with full documentation map and v0.3.0 highlights
+- Enhanced docs/architecture.md with new sections:
+  - ServicePack Pattern — auth requirements, lifecycle hooks, transactional registration
+  - Fat Components & Component Lifecycle — Azure/GitHub components with security table
+  - Tool System & LLM Function Calling — updated tool list (9 tools), function calling details, SSRF controls
+  - ServiceConnector Pattern — unified API authentication
+  - CORS Proxy Security — IP filtering, redirect validation, hostname allowlisting, rate limiting
+- Added Fat A2UI Components section to docs/a2ui-catalog.md with security feature matrix
+
+**Acceptance criteria met:**
+- ✓ README reflects current architecture
+- ✓ API reference docs present (docs/api-reference.md already complete)
+- ✓ Component catalog documented (docs/a2ui-catalog.md with fat components)
+- ✓ Deployment guide current (docs/deployment.md already complete)
+
+**Branch:** `squad/52-docs-update`
+**Commit:** 6804267 (docs: Update README and architecture docs for v0.3.0 features)
+**PR:** https://github.com/sabbour/kickstart/pull/109
+
+All DP reviewers approved; implementation complete per scope.
