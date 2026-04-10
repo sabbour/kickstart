@@ -31,6 +31,9 @@
     },
     "openAiCodexDeployment": {
       "value": "gpt-5.3-codex"
+    },
+    "keyVaultName": {
+      "value": "kv-kickstart-dev"
     }
   }
 }

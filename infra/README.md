@@ -6,9 +6,24 @@ Infrastructure-as-code for the AKS Kickstart platform.
 
 | File | Purpose |
 |------|---------|
-| `main.bicep` | Azure Static Web App resource (Standard tier), Entra app settings, custom domain |
-| `parameters.dev.json` | Dev environment parameters (includes Entra client ID and custom domain) |
+| `main.bicep` | Azure Static Web App, Key Vault for secrets, managed identity, RBAC, custom domain |
+| `parameters.dev.json` | Dev environment parameters (includes Entra client ID, custom domain, Key Vault name) |
 | `setup-entra.sh` | Entra ID app registration script |
+
+## Architecture
+
+```
+┌─────────────────────┐       ┌──────────────────────────┐
+│  Static Web App     │──MI──▶│  Key Vault               │
+│  (system-assigned   │       │  • entra-client-secret    │
+│   managed identity) │       │  • openai-api-key         │
+└─────────────────────┘       └──────────────────────────┘
+        │                              ▲
+        │  @Microsoft.KeyVault(...)    │
+        └──────────────────────────────┘
+```
+
+**Secret flow:** Secrets are stored in Azure Key Vault and referenced by SWA app settings using `@Microsoft.KeyVault(SecretUri=...)`. The SWA's system-assigned managed identity is granted the `Key Vault Secrets User` RBAC role, so no API keys or passwords are stored in SWA configuration or ARM state.
 
 ## Prerequisites
 
@@ -43,21 +58,42 @@ The Kickstart web app uses Entra ID (Azure AD) for authentication via SWA's buil
 
 The SWA auth config in `staticwebapp.config.json` references these app settings by name:
 
-| Setting Name | How to Set |
+| Setting Name | How It's Set |
 |-------------|------------|
-| `AZURE_CLIENT_ID` | Set automatically via Bicep (`entraClientId` parameter) |
-| `AZURE_CLIENT_SECRET` | Set manually — never commit the secret value |
+| `AZURE_CLIENT_ID` | Bicep parameter (`entraClientId`) — not a secret |
+| `AZURE_CLIENT_SECRET` | Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`) |
+| `AZURE_OPENAI_API_KEY` | Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`) |
+| `AZURE_OPENAI_ENDPOINT` | Bicep parameter — not a secret |
+| `AZURE_OPENAI_*_DEPLOYMENT` | Bicep parameters — not secrets |
 
-To set the client secret manually:
+### Secret Management
+
+Secrets are stored in Azure Key Vault and referenced by SWA via `@Microsoft.KeyVault(SecretUri=...)`. The SWA's system-assigned managed identity has the `Key Vault Secrets User` RBAC role on the vault.
+
+**To set secrets during deployment**, pass them as `@secure()` Bicep parameters:
 
 ```bash
-az staticwebapp appsettings set \
-  --name kickstart-web-dev \
+az deployment group create \
   --resource-group rg-kickstart-dev \
-  --setting-names AZURE_CLIENT_SECRET=<your-secret-value>
+  --template-file infra/main.bicep \
+  --parameters @infra/parameters.dev.json \
+  --parameters \
+    openAiApiKey='<your-api-key>' \
+    entraClientSecret='<your-secret>'
 ```
 
-Or set it via the Azure Portal under Static Web App > Settings > Application settings.
+**To rotate a secret**, update it in Key Vault:
+
+```bash
+az keyvault secret set \
+  --vault-name kv-kickstart-dev \
+  --name openai-api-key \
+  --value '<new-key>'
+```
+
+The SWA automatically picks up the latest secret version (versionless URI).
+
+**In CI/CD**, secrets are passed from GitHub Actions secrets. See `.github/workflows/deploy-infra.yml`.
 
 ### Auth Routes
 

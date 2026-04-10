@@ -46,6 +46,9 @@ jobs:
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --template-file infra/main.bicep \
             --parameters @infra/parameters.dev.json \
+            --parameters \
+              openAiApiKey='${{ secrets.AZURE_OPENAI_API_KEY }}' \
+              entraClientSecret='${{ secrets.AZURE_CLIENT_SECRET }}' \
             --query 'properties.outputs' \
             --output json)
 

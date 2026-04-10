@@ -38,6 +38,52 @@ param openAiCodexDeployment string = ''
 @description('Azure OpenAI deployment for inspiration generation (e.g., gpt-5.4-nano). Falls back to chat deployment if empty.')
 param openAiInspireDeployment string = ''
 
+@description('Name of the Key Vault for secret storage (must be globally unique, 3-24 alphanumeric chars and hyphens)')
+param keyVaultName string = 'kv-kickstart'
+
+@secure()
+@description('Azure OpenAI API key. When provided, stored in Key Vault and referenced by SWA.')
+param openAiApiKey string = ''
+
+@secure()
+@description('Entra ID client secret. When provided, stored in Key Vault and referenced by SWA.')
+param entraClientSecret string = ''
+
+// ── Key Vault ───────────────────────────────────────────────────
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: keyVaultName
+  location: location
+  properties: {
+    tenantId: subscription().tenantId
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
+    enableRbacAuthorization: true
+    enableSoftDelete: true
+    softDeleteRetentionInDays: 90
+  }
+}
+
+resource secretOpenAiApiKey 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(openAiApiKey)) {
+  parent: keyVault
+  name: 'openai-api-key'
+  properties: {
+    value: openAiApiKey
+    contentType: 'text/plain'
+  }
+}
+
+resource secretEntraClientSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(entraClientSecret)) {
+  parent: keyVault
+  name: 'entra-client-secret'
+  properties: {
+    value: entraClientSecret
+    contentType: 'text/plain'
+  }
+}
+
 // ── Static Web App ──────────────────────────────────────────────
 
 resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
@@ -46,6 +92,9 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
   sku: {
     name: skuName
     tier: skuName
+  }
+  identity: {
+    type: 'SystemAssigned'
   }
   properties: {
     repositoryUrl: repositoryUrl
@@ -57,22 +106,46 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
   }
 }
 
-// ── App Settings (Entra auth + OpenAI references) ───────────────
-// AZURE_CLIENT_ID and AZURE_OPENAI_* are safe to set via Bicep (not secrets).
-// AZURE_CLIENT_SECRET and AZURE_OPENAI_API_KEY must be set manually:
-//   az staticwebapp appsettings set -n <swa-name> -g <rg> \
-//     --setting-names AZURE_CLIENT_SECRET=<value> AZURE_OPENAI_API_KEY=<value>
+// ── Key Vault RBAC — SWA reads secrets via managed identity ─────
+// Role: Key Vault Secrets User (4633458b-17de-408a-b874-0445c86b69e6)
 
-resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = if (!empty(entraClientId)) {
+resource kvSecretsUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVault.id, staticWebApp.id, '4633458b-17de-408a-b874-0445c86b69e6')
+  scope: keyVault
+  properties: {
+    principalId: staticWebApp.identity.principalId
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      '4633458b-17de-408a-b874-0445c86b69e6'
+    )
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ── App Settings ────────────────────────────────────────────────
+// Non-secret config is set directly. Secrets use Key Vault references
+// so that secret values never appear in SWA config or ARM state.
+
+var baseAppSettings = {
+  AZURE_CLIENT_ID: entraClientId
+  AZURE_OPENAI_ENDPOINT: openAiEndpoint
+  AZURE_OPENAI_CHAT_DEPLOYMENT: openAiChatDeployment
+  AZURE_OPENAI_CODEX_DEPLOYMENT: openAiCodexDeployment
+  AZURE_OPENAI_INSPIRE_DEPLOYMENT: openAiInspireDeployment
+}
+
+var clientSecretSetting = !empty(entraClientSecret)
+  ? { AZURE_CLIENT_SECRET: '@Microsoft.KeyVault(SecretUri=${keyVault.properties.vaultUri}secrets/entra-client-secret)' }
+  : {}
+
+var apiKeySetting = !empty(openAiApiKey)
+  ? { AZURE_OPENAI_API_KEY: '@Microsoft.KeyVault(SecretUri=${keyVault.properties.vaultUri}secrets/openai-api-key)' }
+  : {}
+
+resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = if (!empty(entraClientId) || !empty(openAiApiKey)) {
   parent: staticWebApp
   name: 'appsettings'
-  properties: {
-    AZURE_CLIENT_ID: entraClientId
-    AZURE_OPENAI_ENDPOINT: openAiEndpoint
-    AZURE_OPENAI_CHAT_DEPLOYMENT: openAiChatDeployment
-    AZURE_OPENAI_CODEX_DEPLOYMENT: openAiCodexDeployment
-    AZURE_OPENAI_INSPIRE_DEPLOYMENT: openAiInspireDeployment
-  }
+  properties: union(baseAppSettings, clientSecretSetting, apiKeySetting)
 }
 
 // ── Custom Domain ───────────────────────────────────────────────
@@ -96,3 +169,9 @@ output resourceId string = staticWebApp.id
 
 @description('Name of the Static Web App')
 output swaName string = staticWebApp.name
+
+@description('Key Vault name for secret management')
+output keyVaultName string = keyVault.name
+
+@description('Key Vault URI')
+output keyVaultUri string = keyVault.properties.vaultUri
