@@ -131,12 +131,12 @@ async function generateWidgetIdeas(): Promise<WidgetIdea[]> {
     [
       {
         role: "system",
-        content: `You generate a single creative AKS operational widget idea for platform engineers and DevOps teams. The widget should be something that would appear on a Kubernetes operations dashboard — deployment status, pod health monitoring, cost tracking, service mesh topology, log viewers, alert management, cluster scaling, ingress configuration, certificate management, canary deployment controls, performance metrics, or GitOps sync status. Return ONLY a JSON array with exactly 1 object containing "title" (short catchy name, max 8 words), "subtitle" (one-line description, max 15 words), and "prompt" (a first-person sentence starting with "I want to build a widget that..." describing what the widget shows or does). No emoji. No markdown. Raw JSON only. All generated ideas must be appropriate for a professional tech audience. Never generate ideas related to weapons, violence, illegal activities, adult content, gambling, or anything harmful or offensive. Keep ideas constructive, inclusive, and suitable for a workplace demo.`,
+        content: `You generate a single creative interactive component idea for a chat-based AI assistant UX. The component should be something that appears inline within a conversation — not a static dashboard widget. Think: interactive cards, mini-forms, live data visualizations, approval workflows, configuration wizards, status summaries, or actionable notifications that a user interacts with during a conversation with an AI copilot. Examples: a deployment approval card, a resource picker, a cost breakdown chart, a cluster health summary, a scaling slider, or a config diff viewer. Return ONLY a JSON array with exactly 1 object containing "title" (short catchy name, max 8 words), "subtitle" (one-line description, max 15 words), and "prompt" (a first-person sentence starting with "I want to build a component that..." describing what it shows or does). No emoji. No markdown. Raw JSON only. All generated ideas must be appropriate for a professional tech audience. Never generate ideas related to weapons, violence, illegal activities, adult content, gambling, or anything harmful or offensive. Keep ideas constructive, inclusive, and suitable for a workplace demo.`,
       },
       {
         role: "user",
         content:
-          "Generate 1 creative AKS operational widget idea for a Kubernetes dashboard.",
+          "Generate 1 creative interactive component idea for a chat-based AI assistant experience.",
       },
     ],
     { temperature: 1.0, maxTokens: 300 },
@@ -157,15 +157,15 @@ async function* generateWidgetPromptStream(): AsyncGenerator<string> {
     [
       {
         role: "system",
-        content: `You generate a single creative AKS operational widget idea for platform engineers and DevOps teams. The widget should be something that would appear on a Kubernetes operations dashboard — deployment status, pod health monitoring, cost tracking, service mesh topology, log viewers, alert management, cluster scaling, ingress configuration, certificate management, canary deployment controls, performance metrics, or GitOps sync status. Return ONLY a first-person sentence starting with "I want to build a widget that..." describing what the widget shows or does. Max 2 sentences. No JSON. No markdown. No title. Just the prompt text. All generated ideas must be appropriate for a professional tech audience. Never generate ideas related to weapons, violence, illegal activities, adult content, gambling, or anything harmful or offensive. Keep ideas constructive, inclusive, and suitable for a workplace demo.`,
+        content: `You generate a single creative interactive component idea for a chat-based AI assistant UX. The component should be something that appears inline within a conversation — not a static dashboard widget. Think: interactive cards, mini-forms, live data visualizations, approval workflows, configuration wizards, status summaries, or actionable notifications that a user interacts with during a conversation with an AI copilot. Return ONLY a single first-person sentence starting with "I want to build a component that..." describing what it shows or does. Keep it under 25 words. No JSON. No markdown. No title. Just the sentence. All generated ideas must be appropriate for a professional tech audience. Never generate ideas related to weapons, violence, illegal activities, adult content, gambling, or anything harmful or offensive. Keep ideas constructive, inclusive, and suitable for a workplace demo.`,
       },
       {
         role: "user",
         content:
-          "Generate 1 creative AKS operational widget idea prompt for a Kubernetes dashboard.",
+          "Generate 1 creative interactive component idea for a chat-based AI assistant experience.",
       },
     ],
-    { temperature: 1.0, maxTokens: 200 },
+    { temperature: 1.0, maxTokens: 400 },
   );
 
   for await (const chunk of stream) {
