@@ -3,7 +3,7 @@ import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
-  Body1,
+  Body1Strong,
   Body2,
   Caption1,
   Card,
@@ -129,7 +129,7 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
   return (
     <Card className={classes.root}>
       <CardHeader
-        header={<Body1 weight="semibold">{message}</Body1>}
+        header={<Body1Strong>{message}</Body1Strong>}
         description={
           <div className={classes.shaRow}>
             <Tooltip content={sha} relationship="description">
@@ -158,7 +158,7 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
 
       {filesChanged.length > 0 && (
         <div className={classes.fileList}>
-          {filesChanged.map((f) => (
+          {filesChanged.map((f: string) => (
             <span key={f} className={classes.fileChip}>
               <Document20Regular style={{ fontSize: '12px', color: tokens.colorNeutralForeground3 }} />
               <Caption1 style={{ fontFamily: tokens.fontFamilyMonospace }}>{f}</Caption1>
@@ -169,7 +169,7 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
 
       {artifact && (
         <div className={classes.artifactSection}>
-          <Body2 weight="semibold" style={{ marginBottom: tokens.spacingVerticalXS }}>
+          <Body2 style={{ fontWeight: 600, marginBottom: tokens.spacingVerticalXS }}>
             Generated artifact: {artifact.path}
           </Body2>
           <pre className={classes.artifactCode}>

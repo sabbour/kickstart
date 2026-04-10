@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { DynamicStringSchema, ActionSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Avatar,
-  Body1,
+  Body1Strong,
   Body2,
   Button,
   Card,
@@ -87,7 +87,7 @@ export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props
     return (
       <Card className={classes.root}>
         <CardHeader
-          header={<Body1 weight="semibold">GitHub</Body1>}
+          header={<Body1Strong>GitHub</Body1Strong>}
           description={
             <Caption1>
               <span className={classes.statusDot} />
@@ -102,7 +102,7 @@ export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props
             size={36}
           />
           <div className={classes.userInfo}>
-            <Body2 weight="semibold">{props.username ? String(props.username) : 'GitHub User'}</Body2>
+            <Body2 style={{ fontWeight: 600 }}>{props.username ? String(props.username) : 'GitHub User'}</Body2>
             <Caption1>Signed in via GitHub</Caption1>
           </div>
         </div>
@@ -118,7 +118,7 @@ export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props
   return (
     <Card className={classes.root}>
       <CardHeader
-        header={<Body1 weight="semibold">GitHub</Body1>}
+        header={<Body1Strong>GitHub</Body1Strong>}
         description={<Caption1>Sign in to connect your repositories</Caption1>}
       />
       <div className={classes.actions}>

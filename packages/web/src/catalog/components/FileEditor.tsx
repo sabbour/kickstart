@@ -3,10 +3,11 @@ import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
-  Body1,
+  Body1Strong,
   Caption1,
   Card,
   makeStyles,
+  shorthands,
   tokens,
 } from '@fluentui/react-components';
 import { useArtifacts } from '../../contexts/ArtifactContext';
@@ -102,7 +103,7 @@ const useStyles = makeStyles({
     lineHeight: '18px',
     backgroundColor: tokens.colorNeutralBackground1,
     color: tokens.colorNeutralForeground1,
-    borderWidth: '0',
+    ...shorthands.borderWidth('0'),
     outlineWidth: '0',
     resize: 'vertical',
     boxSizing: 'border-box',
@@ -154,7 +155,7 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
       {(resolvedFileName || resolvedLanguage) && (
         <div className={classes.header}>
           <div className={classes.fileInfo}>
-            {resolvedFileName && <Body1 weight="semibold">{resolvedFileName}</Body1>}
+            {resolvedFileName && <Body1Strong>{resolvedFileName}</Body1Strong>}
             {resolvedLanguage && <Caption1>{resolvedLanguage}</Caption1>}
           </div>
           {isReadOnly && <span className={classes.readOnlyBadge}>read-only</span>}

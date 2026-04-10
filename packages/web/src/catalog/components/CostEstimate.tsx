@@ -139,9 +139,9 @@ export const CostEstimate = createReactComponent(CostEstimateApi, ({ props }) =>
             {resources.map((resource, i) => (
               <tr key={i}>
                 <td className={classes.td}>
-                  <div>{resource.name}</div>
+                  <div>{typeof resource.name === 'string' ? resource.name : ''}</div>
                   {resource.sku && (
-                    <div className={classes.tdMuted}>{resource.sku}</div>
+                    <div className={classes.tdMuted}>{typeof resource.sku === 'string' ? resource.sku : ''}</div>
                   )}
                 </td>
                 <td className={`${classes.td} ${classes.tdRight}`}>

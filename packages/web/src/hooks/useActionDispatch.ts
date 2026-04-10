@@ -245,7 +245,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
         }
 
         // Connector found — invoke the operation if it exists as a method.
-        const method = (connector as Record<string, unknown>)[operation];
+        const method = (connector as unknown as Record<string, unknown>)[operation];
         if (typeof method !== 'function') {
           // eslint-disable-next-line no-console
           console.warn(

@@ -5,7 +5,7 @@ import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-ty
 import {
   Card,
   Button,
-  Body1,
+  Body1Strong,
   Caption1,
   makeStyles,
   tokens,
@@ -120,7 +120,7 @@ export const CodeBlock = createReactComponent(CodeBlockApi, ({ props }) => {
       {(props.filename || props.language) && (
         <div className={classes.header}>
           <div className={classes.fileInfo}>
-            {props.filename && <Body1 weight="semibold">{props.filename}</Body1>}
+            {props.filename && <Body1Strong>{props.filename}</Body1Strong>}
             {props.language && (
               <Caption1>{props.language}</Caption1>
             )}

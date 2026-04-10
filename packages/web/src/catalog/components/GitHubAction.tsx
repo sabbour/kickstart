@@ -3,7 +3,7 @@ import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
-  Body1,
+  Body1Strong,
   Body2,
   Caption1,
   Card,
@@ -105,7 +105,7 @@ export const GitHubAction = createReactComponent(GitHubActionApi, ({ props }) =>
   return (
     <Card className={classes.root}>
       <CardHeader
-        header={<Body1 weight="semibold">{String(props.workflowName)}</Body1>}
+        header={<Body1Strong>{String(props.workflowName)}</Body1Strong>}
         description={
           <div className={classes.statusRow}>
             {cfg.icon}

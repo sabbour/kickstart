@@ -2934,3 +2934,224 @@ Created `packages/core/src/kits/` with:
 
 ---
 
+
+---
+
+## Decisions Merged from Inbox (2026-04-10T07:00Z)
+
+### 2026-07-26: Decision — A2UI Message Protocol for Dynamic Surfaces
+**Author:** Bender  
+**Status:** Accepted (enforced by fix for #54)
+
+When creating A2UI surfaces dynamically (e.g. from LLM responses), always use the **two-message pattern**:
+1. `{ version: 'v0.9', createSurface: { surfaceId, catalogId } }` — creates an empty surface
+2. `{ version: 'v0.9', updateComponents: { surfaceId, components: [...] } }` — adds components
+
+Never put a `body` field on `createSurface` — it is silently ignored. One component in the `updateComponents` array **must** have `id: "root"` — this is the renderer's entry point. Components use the flat format: `{ id, component, ...props, children: ["child-id-refs"] }`. Never nest component objects inline.
+
+**Implications:**
+- Any new code that creates A2UI surfaces must follow this pattern.
+- LLM system prompts that generate A2UI must teach the flat format with `id: "root"`.
+- The `normalizePlaygroundComponents()` function in Playground.tsx can be reused as a safety net for LLM output normalization.
+
+---
+
+### 2026-07-27: Decision — Content Safety Guardrails for LLM-Generated Content
+**Author:** Bender  
+**Status:** Implemented
+
+Public-facing LLM endpoints (inspirations, converse) could generate or respond to inappropriate content. Two layers of defense:
+
+1. **System prompt hardening** — All 4 inspiration generation prompts include a safety clause forbidding weapons, violence, illegal activities, adult content, gambling, and harmful/offensive ideas.
+2. **User input pre-flight check** — New `content-safety.ts` module performs lightweight LLM classification (`safe`/`unsafe`) on user messages before they reach the main converse flow. Uses `maxTokens: 10`, `temperature: 0` for speed/cost. Gracefully skips if OpenAI is unavailable or the check fails.
+
+**Implications:**
+- All agents/team members adding new LLM prompts should include the safety clause.
+- The content safety check uses the chat deployment (not inspire), keeping it on the faster model path.
+- This is a first layer — not a comprehensive content moderator. Future work may add Azure Content Safety service integration.
+
+---
+
+### 2026-07-27: Decision — Dedicated /api/playground Endpoint for A2UI Playground
+**Author:** Bender  
+**Status:** Accepted
+
+Playground Create tab was calling `/api/converse`, which uses the full Kickstart onboarding engine (phases, kit skills, phase indicators). Wrong context — the playground needs free-form A2UI component generation, not an AKS deployment guide.
+
+Created a dedicated `POST /api/playground` endpoint with:
+- Its own system prompt focused on A2UI component design
+- Its own lightweight in-memory session store (separate from onboarding sessions)
+- JSON mode (`response_format: json_object`) for reliable structured output
+- Simpler response shape: `{ sessionId, message, a2ui }` — no phases, no streaming
+- Content safety via the existing shared `checkContentSafety` module
+
+Frontend `Playground.tsx` updated to call `/api/playground` with direct fetch instead of SSE-based `useStreaming` hook.
+
+**Rationale:**
+- **Separation of concerns:** Playground and onboarding are fundamentally different use cases.
+- **Simpler contract:** Playground doesn't need phases, tool calling, or SSE streaming — single JSON round-trip is cleaner and easier to debug.
+- **Independent session state:** Playground sessions don't pollute onboarding session storage and vice versa.
+
+---
+
+### 2026-07-26: Decision — Widget Inspiration Prompts — Dev/Deploy/Ops Focus
+**Author:** Bender  
+**Status:** Implemented
+
+Widget inspiration system (Ideas tab in Playground) was generating generic "chat-based AI assistant UX" component ideas. Too vague for one-shot component generation and not aligned with Kickstart's focus on Kubernetes/AKS deployment operations.
+
+All widget inspiration prompts are now scoped exclusively to:
+1. Kubernetes deployment and operations (rollouts, scaling, pod health, events, logs)
+2. CI/CD pipelines and container workflows (GitHub Actions, image builds, registry scanning)
+3. Cloud infrastructure monitoring (resource usage, cost tracking, SLOs, alerting)
+4. Developer productivity for cloud-native apps (Helm releases, GitOps sync, secret management)
+
+Prompts now include explicit instructions to specify A2UI component types, realistic sample data, interactions, and layout — enabling one-shot complete component generation.
+
+**Impact:**
+- `widget-inspirations.ts` — Both streaming and non-streaming LLM prompts + 12 fallback ideas rewritten
+- `playground.ts` — System prompt upgraded with one-shot design rules and worked example
+- No API contract changes; temperature and token limits preserved
+
+---
+
+### 2026-07-18: Decision — ArchitectureDiagram Fluent 2 Theme & Auto-sizing
+**Author:** Fry  
+**Status:** Implemented
+
+ArchitectureDiagram used Mermaid's `neutral` theme with fixed 400px viewport, producing tiny diagrams that didn't match Fluent 2 visuals.
+
+**Choices:**
+1. **Mermaid `base` theme with Fluent 2 `themeVariables`** — hardcoded hex values (not runtime tokens) since Mermaid config is static.
+2. **SVG post-processing** — icon injection via keyword matching on node labels, rounded corners, thin strokes, flat styling.
+3. **Auto-sizing viewport** — 300–800px range based on SVG natural dimensions.
+4. **Fit-and-center** — diagram scales to fit container width and centers on render; reset button re-fits instead of going to 1:1.
+
+**Rationale:**
+- `theme: 'base'` gives full color control; `neutral` ignores `themeVariables`.
+- Post-processing is necessary because Mermaid has no native icon support.
+- Auto-sizing prevents "tiny diagram in a big box" problem and avoids scroll for small diagrams.
+
+---
+
+### 2026-07-18: Decision — SteppedCarousel Component Pattern
+**Author:** Fry  
+**Status:** Implemented
+
+Needed wizard-style alternative to FormGroup for multi-step flows where showing all steps at once is overwhelming.
+
+**Implementation:** Created `SteppedCarousel` as a custom A2UI component using the same `createReactComponent` pattern.
+- **Client-side state only:** Step navigation is purely `useState` — no server round-trip needed for step changes.
+- **Child-based content:** Each step references a `child` ComponentId, same delegation pattern as FormGroup. Step content is composable from any A2UI components.
+- **No animation:** Simple content swap keeps it lightweight and avoids CSS transition complexity.
+
+**Impact:** New component available in kickstart catalog. No breaking changes to existing components.
+
+---
+
+### 2025-07-27: Decision — PR + Tagged Release Workflow
+**Author:** Leela  
+**Status:** Accepted  
+**Requested by:** Ahmed Sabbour
+
+Team was pushing directly to main and deploying on every merge, creating risk. No gate for review or rollback control. Ahmed requested proper flow: PRs for all work, tagged releases for production deploys.
+
+**Branch Strategy:**
+```
+squad/{issue}-{slug} → PR to main → merge → tag release → deploy to SWA
+```
+- **Branch naming:** `squad/{issue-number}-{kebab-case-slug}` (existing convention, now enforced)
+- **Main is protected:** Requires a PR to merge. 0 approvers required (agents are the team), but PR flow gives CI a gate.
+- **No direct pushes to main.**
+
+**CI on PRs (`.github/workflows/ci.yml`):**
+1. Lint (`npm run lint`)
+2. TypeScript check (`cd packages/web && npx tsc --noEmit`)
+3. Build core, API, web
+4. Unit tests (`vitest`)
+5. Playwright e2e tests
+
+**SWA Deploy on Tags (`.github/workflows/deploy-swa.yml`):**
+Production deploys trigger on:
+- **Version tags:** `v*` (e.g., `v0.2.0`)
+- **Manual dispatch:** `workflow_dispatch` (emergency deploys)
+
+PR preview environments still work — `pull_request` trigger is preserved for staging builds. Staging environments close when PRs close.
+
+**Release Flow:**
+1. Each PR includes a changeset (`npx changeset`) describing the change
+2. When ready to release: `npx changeset version` bumps versions + updates CHANGELOG
+3. Tag the release: `git tag v0.X.Y && git push --tags`
+4. Tag push triggers SWA production deploy automatically
+
+**Who Can Tag Releases:**
+- **Ahmed (human):** Manual releases at any time
+- **Ralph (automated):** Can tag releases after N PRs merge (future automation)
+- **Philosophy:** Release early, release often
+
+**Infra and Docs Deploys:**
+`deploy-infra.yml` and `deploy-docs.yml` still trigger on push to main (path-scoped). Lower-risk, no tag gate needed. Can be revisited later.
+
+---
+
+### 2026-04-10T06:03Z: User Directive — Project Board Integration
+**By:** Ahmed Sabbour  
+**What:** Use GitHub project board (https://github.com/users/sabbour/projects/3/views/2) and move items through stages (Backlog → Ready → In progress → In review → Done) as agents work on them.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-10T06:03Z: User Directive — Deploy from Tagged Releases Only
+**By:** Ahmed Sabbour  
+**What:** Only deploy to public website from tagged releases. Use pull requests for work instead of pushing directly to main. Agents should create branches, open PRs, and releases can be cut early and often.
+**Why:** User request — production deployment control. No more direct pushes to main.
+
+---
+
+### 2026-04-10T06:08Z: User Directive — Milestones Tied to Releases
+**By:** Ahmed Sabbour  
+**What:** Use GitHub milestones when updating work items. Tie milestones to releases so work is grouped by version.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-10T06:08Z: User Directive — SWA Slots for Pre-Prod/Prod
+**By:** Ahmed Sabbour  
+**What:** If SWA supports slots or similar, use main branch as pre-prod and tagged releases as prod deployment. Investigate SWA preview/staging environments.
+**Why:** User request — production deployment control
+
+---
+
+### 2026-04-10T06:08Z: User Directive — Track ALL Work on GitHub Issues
+**By:** Ahmed Sabbour  
+**What:** Always track work backlog on GitHub Issues to avoid losing context and memory. Don't rely on in-memory state or decisions.md alone — GitHub is the source of truth for work items.
+**Why:** User request — durability of work tracking across sessions
+
+---
+
+### 2026-04-10T06:08Z: User Directive — Hire Consultant for Complex/Stuck Work
+**By:** Ahmed Sabbour  
+**What:** For complex things that have been failing, need a second opinion, or involve major architecture decisions/redesigns, hire a 3rd-party "consultant" agent using gpt-5.4 model. This is a temporary team member for specific tasks.
+**Why:** User request — escalation path for hard problems
+
+---
+
+### 2026-04-10T06:52:30Z: User Directive — Claude Opus 4.6 for Code
+**By:** Ahmed Sabbour  
+**What:** Use claude-opus-4.6 for all code-writing work (implementation, refactoring, bug fixes, test code, prompts).
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-10T06:53:57Z: User Directive — GitHub Comments on Issues
+**By:** Ahmed Sabbour  
+**What:** As part of workflow, each issue must be updated with major findings in form of GitHub comments. When agents work on issue, they should post comments summarizing key findings, decisions, progress, and results.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-10T07:01:13Z: User Directive — Assign Issues to @sabbour
+**By:** Ahmed Sabbour  
+**What:** When agent picks up work in Ralph loop, assign GitHub issue to @sabbour since AI agents have no GitHub accounts. Use `gh issue edit <number> --add-assignee sabbour`.
+**Why:** User request — agents can't be assigned issues directly, so use human owner's account.
+
