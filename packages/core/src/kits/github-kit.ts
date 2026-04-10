@@ -12,7 +12,7 @@
  *
  * Component registrations (rendered by packages/web):
  *   - githubLoginCard    (OAuth Device Flow sign-in card)
- *   - githubRepoPicker   (repository picker with search and pagination)
+ *   - githubRepoPicker   (repository picker with search and client-side filtering)
  */
 
 import type { IntegrationKit } from './types.js';
@@ -43,7 +43,7 @@ export const githubKit: IntegrationKit = {
     'When generating deployment artifacts, always include a GitHub Actions workflow (.github/workflows/deploy.yml) ' +
     'that builds the container image, pushes to ACR, and triggers a rolling update on AKS. ' +
     'The workflow should use OIDC Workload Identity Federation — never hardcode credentials. ' +
-    'OIDC eliminates secret rotation but requires one-time setup of Azure credentials as GitHub repository variables.',
+    'OIDC eliminates secret rotation but requires one-time setup of Azure credentials as GitHub repository secrets.',
 
     // Branch strategy
     'Recommend a trunk-based deployment strategy: pushes to the default branch trigger production deploys. ' +
@@ -55,8 +55,8 @@ export const githubKit: IntegrationKit = {
     '  2. Add a federated credential: issuer "https://token.actions.githubusercontent.com", ' +
     'subject "repo:{owner}/{repo}:ref:refs/heads/{default_branch}" (and optionally for pull_request).\n' +
     '  3. Grant the app/identity the required Azure RBAC roles (Contributor on the resource group, AcrPush on the ACR).\n' +
-    '  4. Set three GitHub repository variables: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID.\n' +
-    '  5. The deploy.yml workflow uses `azure/login@v2` with `client-id`, `tenant-id`, `subscription-id` from those variables.\n' +
+    '  4. Set three GitHub repository secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID.\n' +
+    '  5. The deploy.yml workflow uses `azure/login@v2` with `client-id`, `tenant-id`, `subscription-id` from those secrets.\n' +
     'This replaces service principal client secrets with short-lived, scope-limited OIDC tokens. ' +
     'No secret rotation is needed. The federated credential is scoped to the specific repo and branch.',
   ],
@@ -77,7 +77,7 @@ export const githubKit: IntegrationKit = {
     [Phase.Generate]: [
       'Generate a GitHub Actions workflow at .github/workflows/deploy.yml. It must:\n' +
       '  • Trigger on push to the default branch and on pull_request\n' +
-      '  • Use `azure/login@v2` with OIDC: read client-id, tenant-id, subscription-id from GitHub vars\n' +
+      '  • Use `azure/login@v2` with OIDC: read client-id, tenant-id, subscription-id from GitHub secrets\n' +
       '  • Set `permissions: { id-token: write, contents: read }` for OIDC token issuance\n' +
       '  • Build and push the container image to ACR\n' +
       '  • Run `az aks get-credentials` then apply deployment files\n' +
@@ -90,8 +90,8 @@ export const githubKit: IntegrationKit = {
       'Walk the user through getting their generated files into GitHub:\n' +
       '  1. Ask: new repo or push to existing? Use ChoicePicker.\n' +
       '  2. Show AuthCard for GitHub sign-in if needed.\n' +
-      '  3. Verify OIDC federation is set up — check that AZURE_CLIENT_ID, AZURE_TENANT_ID, and ' +
-      'AZURE_SUBSCRIPTION_ID are configured as repository variables. If not, walk the user through the setup.\n' +
+      '  3. Verify OIDC federation is set up — ask the user to confirm that AZURE_CLIENT_ID, AZURE_TENANT_ID, and ' +
+      'AZURE_SUBSCRIPTION_ID are configured as repository secrets. If not, walk the user through the setup.\n' +
       '  4. After push: "Your workflow will deploy automatically on every push to {branch}."\n' +
       '  5. Offer a Codespaces link so they can edit and iterate in the browser.',
     ],
@@ -118,7 +118,7 @@ export const githubKit: IntegrationKit = {
     {
       type: 'githubRepoPicker',
       description:
-        'Repository picker with search, pagination, and org/personal account support.\n' +
+        'Repository picker with search and client-side filtering.\n' +
         'Props:\n' +
         '  - placeholder (optional string): Placeholder text for the search input. Defaults to "Search repositories…".\n' +
         '  - selectedRepo (optional string): Full name (owner/repo) of the pre-selected repository.\n' +

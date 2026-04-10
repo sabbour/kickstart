@@ -15,7 +15,7 @@
  *
  * Component registrations (rendered by packages/web):
  *   - azureLoginCard       (MSAL sign-in card with subscription auto-select)
- *   - azureResourcePicker  (dropdown populated from ARM at render time)
+ *   - azureResourcePicker  (selectable card list populated from ARM at render time)
  */
 
 import type { IntegrationKit } from './types.js';
@@ -121,7 +121,7 @@ export const azureKit: IntegrationKit = {
       'automatically on every push to the default branch. No manual Azure steps needed beyond initial OIDC setup. ' +
       'The workflow uses OIDC Workload Identity Federation — this eliminates long-lived secrets but still requires ' +
       'one-time setup: an Entra app registration (or User-Assigned Managed Identity) with a federated credential ' +
-      'for the GitHub repo, and three GitHub repository variables (AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID). ' +
+      'for the GitHub repo, and three GitHub repository secrets (AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID). ' +
       'Guide the user through this setup if it has not been done yet.',
     ],
 
@@ -145,7 +145,7 @@ export const azureKit: IntegrationKit = {
     {
       type: 'azureResourcePicker',
       description:
-        'Dropdown populated from ARM API at render time (regions, resource groups, SKUs).\n' +
+        'Selectable card list populated from ARM API at render time (resource names, types, groups, locations).\n' +
         'Props:\n' +
         '  - subscriptionId (optional string): Azure subscription ID to list resources from. Falls back to a stub if omitted.\n' +
         '  - label (optional string): Header text above the resource list. Defaults to "Select an Azure resource".\n' +
