@@ -230,6 +230,14 @@ export function App() {
     }, 100);
   }, [sessions, a2ui, handleSendMessage, fs]);
 
+  const handleClearAllSessions = useCallback(() => {
+    sessions.clearAllSessions();
+    setMessages([]);
+    a2ui.reset();
+    fs.clear();
+    setSelectedFile(undefined);
+  }, [sessions, a2ui, fs]);
+
   const handleNewSession = useCallback(() => {
     a2ui.reset();
     fs.clear();
@@ -304,7 +312,7 @@ export function App() {
             recentSessions={sessions.recentSessions}
             onResumeSession={handleResumeSession}
             onDeleteSession={sessions.deleteSession}
-            onClearAllSessions={sessions.clearAllSessions}
+            onClearAllSessions={handleClearAllSessions}
           />
         ) : (
           <ChatShell

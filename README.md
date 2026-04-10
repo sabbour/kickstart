@@ -66,6 +66,10 @@ node packages/mcp-server/dist/index.js
 
 Then configure your MCP client (VS Code or Claude Code) to connect to the server.
 
+## Playground
+
+Open the A2UI playground at [**/?playground**](https://kickstart.aks.azure.sabbour.me/?playground) to build and preview A2UI components with AI. The playground provides an interactive sandbox for exploring the component catalog, testing scenarios, and previewing JSON-driven surfaces in real time — no backend required.
+
 ## Tech Stack
 
 | Layer | Technology |
