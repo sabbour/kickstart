@@ -84,6 +84,9 @@ export function useSessions() {
   const clearAllSessions = useCallback(() => {
     setSessions([]);
     setActiveSessionId(null);
+    // Clear localStorage synchronously so it persists even if the
+    // component unmounts before the useEffect fires.
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
   }, []);
 
   const getActiveSession = useCallback((): Session | undefined => {
