@@ -2,16 +2,17 @@ import { test, expect, enterChatViaTrack } from './helpers';
 
 test.describe('Sessions sidebar', () => {
   test('sidebar starts hidden on landing page', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?mock');
     await page.waitForSelector('#landing-page', { timeout: 10_000 });
 
+    // SessionsSidebar is not mounted on landing — it only renders in chat mode
     const sidebar = page.locator('#sessions-sidebar');
-    await expect(sidebar).toHaveClass(/hidden/);
+    await expect(sidebar).toHaveCount(0);
   });
 
   test.describe('after entering chat', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/');
+      await page.goto('/?mock');
       await page.waitForSelector('#landing-page', { timeout: 10_000 });
       await enterChatViaTrack(page, 'web-app');
     });

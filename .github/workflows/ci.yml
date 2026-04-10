@@ -48,7 +48,6 @@ jobs:
   e2e:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout code

@@ -2,7 +2,7 @@ import { test, expect, sendChatMessage, waitForAssistantMessage, enterChatViaTra
 
 test.describe('Chat experience (demo mode)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?mock');
     await page.waitForSelector('#landing-page', { timeout: 10_000 });
     await enterChatViaTrack(page, 'web-app');
     // Wait for welcome message before each test
@@ -64,8 +64,8 @@ test.describe('Chat experience (demo mode)', () => {
       expect(count).toBeGreaterThanOrEqual(2);
     }).toPass({ timeout: 8000 });
 
-    // The demo response should ask about framework
+    // The demo response should show architecture details
     const lastAssistant = page.locator('.chat-bubble.assistant').last();
-    await expect(lastAssistant).toContainText('language');
+    await expect(lastAssistant).toContainText('architecture');
   });
 });

@@ -12,20 +12,20 @@ test.describe('Playground', () => {
 
   test.describe('Tab navigation', () => {
     test('all five tabs are visible', async ({ page }) => {
-      for (const tab of ['Create', 'Gallery', 'Components', 'Icons', 'Widgets']) {
+      for (const tab of ['Create', 'Ideas', 'Components', 'Icons', 'Widgets']) {
         await expect(page.getByRole('tab', { name: tab })).toBeVisible();
       }
     });
 
-    test('Gallery tab is active by default', async ({ page }) => {
-      await expect(page.getByRole('tab', { name: 'Gallery' })).toHaveAttribute('aria-selected', 'true');
+    test('Ideas tab is active by default', async ({ page }) => {
+      await expect(page.getByRole('tab', { name: 'Ideas' })).toHaveAttribute('aria-selected', 'true');
       await expect(page.locator('.playground-gallery')).toBeVisible();
     });
 
     test('switching to Create tab shows the prompt hero', async ({ page }) => {
       await page.getByRole('tab', { name: 'Create' }).click();
       await expect(page.getByRole('tab', { name: 'Create' })).toHaveAttribute('aria-selected', 'true');
-      await expect(page.getByText('What would you like to build?')).toBeVisible();
+      await expect(page.getByText('What component would you like to imagine?')).toBeVisible();
     });
 
     test('switching to Components tab shows the gallery grid', async ({ page }) => {
@@ -290,8 +290,8 @@ test.describe('Playground', () => {
       await page.getByRole('tab', { name: 'Create' }).click();
     });
 
-    test('renders "What would you like to build?" heading', async ({ page }) => {
-      await expect(page.getByText('What would you like to build?')).toBeVisible();
+    test('renders "What component would you like to imagine?" heading', async ({ page }) => {
+      await expect(page.getByText('What component would you like to imagine?')).toBeVisible();
     });
 
     test('prompt input field renders with correct placeholder', async ({ page }) => {
@@ -348,7 +348,7 @@ test.describe('Playground', () => {
         },
       ]);
 
-      await page.locator('textarea').fill(validJson);
+      await page.getByRole('textbox', { name: 'A2UI JSON input' }).fill(validJson);
       await page.getByRole('button', { name: 'Render JSON' }).click();
 
       // A2UI surface should be rendered
@@ -357,7 +357,7 @@ test.describe('Playground', () => {
 
     test('Advanced JSON: invalid JSON shows an error message', async ({ page }) => {
       await page.getByText(/Advanced.*paste raw A2UI JSON/).click();
-      await page.locator('textarea').fill('{ invalid json }');
+      await page.getByRole('textbox', { name: 'A2UI JSON input' }).fill('{ invalid json }');
       await page.getByRole('button', { name: 'Render JSON' }).click();
 
       // The error is displayed as text — it will include common parse error keywords
@@ -385,7 +385,7 @@ test.describe('Playground', () => {
   test.describe('Accessibility', () => {
     // --- ARIA roles on tab panels ---
 
-    test('Gallery tab panel has role="tabpanel" and aria-labelledby="tab-gallery"', async ({ page }) => {
+    test('Ideas tab panel has role="tabpanel" and aria-labelledby="tab-gallery"', async ({ page }) => {
       const panel = page.locator('#panel-gallery');
       await expect(panel).toHaveAttribute('role', 'tabpanel');
       await expect(panel).toHaveAttribute('aria-labelledby', 'tab-gallery');
@@ -421,8 +421,8 @@ test.describe('Playground', () => {
 
     // --- Tab IDs (aria-controls wiring) ---
 
-    test('Gallery tab has id="tab-gallery" and aria-controls="panel-gallery"', async ({ page }) => {
-      const tab = page.getByRole('tab', { name: 'Gallery' });
+    test('Ideas tab has id="tab-gallery" and aria-controls="panel-gallery"', async ({ page }) => {
+      const tab = page.getByRole('tab', { name: 'Ideas' });
       await expect(tab).toHaveAttribute('id', 'tab-gallery');
       await expect(tab).toHaveAttribute('aria-controls', 'panel-gallery');
     });
