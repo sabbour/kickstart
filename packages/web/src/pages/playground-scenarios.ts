@@ -159,7 +159,7 @@ const contentImage = (): A2uiMsg[] => {
   return surface(sid, [
     { id: 'root', component: 'Column', children: ['heading', 'img1'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'Image Component', variant: 'h3' },
-    { id: 'img1', component: 'Image', src: 'https://via.placeholder.com/300x200', alt: 'Placeholder image' },
+    { id: 'img1', component: 'Image', src: 'https://picsum.photos/400/200', alt: 'Placeholder image' },
   ] as A2uiComponent[]);
 };
 
