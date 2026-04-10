@@ -17,7 +17,6 @@ import {
 } from '@fluentui/react-components';
 import { Dismiss24Regular, Copy24Regular, Delete24Regular, DocumentCopy24Regular, Sparkle24Regular } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
-import { useStreaming } from '../hooks/useStreaming';
 import { WidgetsProvider, useWidgets } from '../hooks/useWidgets';
 import { getDemoResponse, resetDemoState } from '../services/demo-scenarios';
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
@@ -710,9 +709,8 @@ function PlaygroundInner() {
   const customCounter = useRef(0);
   const customA2ui = useA2UI(); // For custom JSON editor
   const createA2ui = useA2UI(); // For Create tab chat
-  const createStreaming = useStreaming();
+  const [createLoading, setCreateLoading] = useState(false);
   const createSessionIdRef = useRef<string | undefined>(undefined);
-  const pendingSurfaceIdsRef = useRef<string[]>([]);
   const createEndRef = useRef<HTMLDivElement>(null);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const iconSearchRef = useRef<HTMLDivElement>(null);
@@ -885,12 +883,12 @@ function PlaygroundInner() {
     setActiveTab('widgets');
   }, [addWidget]);
 
-  // Auto-scroll to bottom when messages or streaming text updates
+  // Auto-scroll to bottom when messages update
   useEffect(() => {
-    if (createMessages.length > 0 || createStreaming.isStreaming) {
+    if (createMessages.length > 0 || createLoading) {
       createEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [createMessages, createStreaming.isStreaming, createStreaming.streamText]);
+  }, [createMessages, createLoading]);
 
   // Keyboard shortcuts: Ctrl+K or / focuses the active search input
   useEffect(() => {
@@ -912,9 +910,9 @@ function PlaygroundInner() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [activeTab]);
 
-  // Handle create from prompt — sends to /api/converse via useStreaming
-  const handleCreateSend = useCallback((text: string) => {
-    if (!text.trim() || createStreaming.isStreaming) return;
+  // Handle create from prompt — calls /api/playground (dedicated A2UI endpoint)
+  const handleCreateSend = useCallback(async (text: string) => {
+    if (!text.trim() || createLoading) return;
     setCreatePrompt('');
 
     const userMsg: ChatMessage = {
@@ -924,47 +922,63 @@ function PlaygroundInner() {
       timestamp: Date.now(),
     };
     setCreateMessages(prev => [...prev, userMsg]);
+    setCreateLoading(true);
 
-    pendingSurfaceIdsRef.current = [];
+    try {
+      const res = await fetch('/api/playground', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: createSessionIdRef.current,
+          message: text,
+        }),
+      });
 
-    createStreaming.send(text, createSessionIdRef.current, {
-      onDelta: () => {},
-      onA2UI: (msgs) => {
-        const ids = createA2ui.processMessages(msgs);
-        pendingSurfaceIdsRef.current.push(...ids);
-      },
-      onPhase: () => {},
-      onComplete: (fullText, model, receivedSessionId) => {
-        if (receivedSessionId && !createSessionIdRef.current) {
-          createSessionIdRef.current = receivedSessionId;
-        }
-        const surfaceIds = pendingSurfaceIdsRef.current.length > 0
-          ? [...pendingSurfaceIdsRef.current]
-          : undefined;
-        pendingSurfaceIdsRef.current = [];
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `API error: ${res.status}` }));
+        throw new Error(err.error || `API error: ${res.status}`);
+      }
 
-        const assistantMsg: ChatMessage = {
-          id: `create-${Date.now()}-assistant`,
-          role: 'assistant',
-          text: fullText,
-          model,
-          surfaceIds,
-          timestamp: Date.now(),
-        };
-        setCreateMessages(prev => [...prev, assistantMsg]);
-      },
-      onError: (error) => {
-        pendingSurfaceIdsRef.current = [];
-        const errorMsg: ChatMessage = {
-          id: `create-${Date.now()}-error`,
-          role: 'assistant',
-          text: `⚠️ ${error}`,
-          timestamp: Date.now(),
-        };
-        setCreateMessages(prev => [...prev, errorMsg]);
-      },
-    });
-  }, [createStreaming, createA2ui]);
+      const data = await res.json() as { sessionId: string; message: string; a2ui?: object[] };
+
+      if (data.sessionId && !createSessionIdRef.current) {
+        createSessionIdRef.current = data.sessionId;
+      }
+
+      // Process A2UI components through the surface system
+      let surfaceIds: string[] | undefined;
+      if (data.a2ui && data.a2ui.length > 0) {
+        const a2uiMessages = data.a2ui.map((component: any) => ({
+          version: 'v0.9' as const,
+          createSurface: {
+            surfaceId: component.id || `pg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            catalogId: 'kickstart',
+          },
+          body: [component],
+        }));
+        surfaceIds = createA2ui.processMessages(a2uiMessages);
+      }
+
+      const assistantMsg: ChatMessage = {
+        id: `create-${Date.now()}-assistant`,
+        role: 'assistant',
+        text: data.message,
+        surfaceIds: surfaceIds && surfaceIds.length > 0 ? surfaceIds : undefined,
+        timestamp: Date.now(),
+      };
+      setCreateMessages(prev => [...prev, assistantMsg]);
+    } catch (err: any) {
+      const errorMsg: ChatMessage = {
+        id: `create-${Date.now()}-error`,
+        role: 'assistant',
+        text: `⚠️ ${err.message || 'Connection failed'}`,
+        timestamp: Date.now(),
+      };
+      setCreateMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setCreateLoading(false);
+    }
+  }, [createLoading, createA2ui]);
 
   // Handle clear all
   const handleClearAll = useCallback(() => {
@@ -976,7 +990,6 @@ function PlaygroundInner() {
     createA2ui.reset();
     setCreateMessages([]);
     createSessionIdRef.current = undefined;
-    pendingSurfaceIdsRef.current = [];
   }, [customA2ui, createA2ui]);
 
   // Arrow key navigation within the gallery grid
@@ -1116,7 +1129,7 @@ function PlaygroundInner() {
                 placeholder="Describe your A2UI widget..."
                 aria-label="Describe your A2UI widget"
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCreateSend(createPrompt); } }}
-                disabled={createStreaming.isStreaming}
+                disabled={createLoading}
                 rows={1}
                 style={{ resize: 'none', overflowY: 'hidden' }}
               />
@@ -1125,7 +1138,7 @@ function PlaygroundInner() {
                 aria-label="Inspire me"
                 title="Inspire me"
                 onClick={handleInspire}
-                disabled={inspireLoading || createStreaming.isStreaming}
+                disabled={inspireLoading || createLoading}
               >
                 <Sparkle24Regular />
               </button>
@@ -1134,7 +1147,7 @@ function PlaygroundInner() {
                 aria-label="Create"
                 title="Create"
                 onClick={() => handleCreateSend(createPrompt)}
-                disabled={!createPrompt.trim() || createStreaming.isStreaming}
+                disabled={!createPrompt.trim() || createLoading}
                 style={{ position: 'absolute', right: '8px' }}
               >
                 <img src="assets/icons/commands/go.svg" width="16" height="16" alt="" />
@@ -1265,17 +1278,8 @@ function PlaygroundInner() {
               </div>
             ))}
 
-            {/* Streaming: text arriving */}
-            {createStreaming.isStreaming && createStreaming.streamText && (
-              <div className={classes.createBubbleRow}>
-                <div className={classes.createBubbleStreaming}>
-                  {createStreaming.streamText}
-                </div>
-              </div>
-            )}
-
-            {/* Streaming: waiting for first token */}
-            {createStreaming.isStreaming && !createStreaming.streamText && (
+            {/* Loading: waiting for response */}
+            {createLoading && (
               <div className={classes.createTypingDots}>
                 <span /><span /><span />
               </div>
@@ -1349,7 +1353,7 @@ function PlaygroundInner() {
                 placeholder="Continue the conversation..."
                 aria-label="Continue the conversation"
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSend(createPrompt); }}
-                disabled={createStreaming.isStreaming}
+                disabled={createLoading}
                 style={{ paddingRight: '48px' }}
               />
               <button
@@ -1357,7 +1361,7 @@ function PlaygroundInner() {
                 aria-label="Send"
                 title="Send"
                 onClick={() => handleCreateSend(createPrompt)}
-                disabled={!createPrompt.trim() || createStreaming.isStreaming}
+                disabled={!createPrompt.trim() || createLoading}
                 style={{ position: 'absolute', right: '8px' }}
               >
                 <img src="assets/icons/commands/go.svg" width="16" height="16" alt="" />
