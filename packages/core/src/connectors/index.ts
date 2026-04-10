@@ -35,6 +35,6 @@ export { APIConnectorRegistry, defaultConnectorRegistry } from './registry.js';
 export { AzureARMConnector } from './AzureARMConnector.js';
 export type { AzureResource, AzureResourceGroup, AzureSubscription, AzureLocation } from './AzureARMConnector.js';
 export { GitHubConnector } from './GitHubConnector.js';
-export type { GitHubRepo, GitHubBranch, GitHubRepoOptions, GitHubUser, GitHubDeviceCodeResponse, GitHubPullRequest } from './GitHubConnector.js';
+export type { GitHubRepo, GitHubBranch, GitHubRepoOptions, GitHubUser, GitHubDeviceCodeResponse, GitHubPullRequest, GitHubTree, GitHubTreeEntry, GitHubFileContent } from './GitHubConnector.js';
 export { PricingConnector } from './PricingConnector.js';
 export type { ResourceCostInput, ResourceCostEstimate, CostEstimateResult } from './PricingConnector.js';

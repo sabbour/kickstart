@@ -5,7 +5,9 @@
  * augmentations into a single registerable unit.
  *
  * Provided tools:
- *   - github_repo_info   (detect runtime, language, CI setup, topics)
+ *   - github_repo_info       (detect runtime, language, CI setup, topics)
+ *   - github_repo_tree       (recursive file tree with key-file detection)
+ *   - github_repo_file_read  (read individual files for manifest inspection)
  *
  * Provided connectors:
  *   - GitHubConnector    (GitHub REST API with OAuth Device Flow + PAT auth)
@@ -19,6 +21,8 @@ import type { IntegrationKit } from './types.js';
 import type { KitAuthRequirement } from './types.js';
 import { Phase } from '../engine/types.js';
 import { githubRepoInfo } from '../tools/github-repo-info.js';
+import { githubRepoTree } from '../tools/github-repo-tree.js';
+import { githubRepoFileRead } from '../tools/github-repo-file-read.js';
 import { GitHubConnector } from '../connectors/GitHubConnector.js';
 
 const githubAuth: KitAuthRequirement[] = [
@@ -36,6 +40,8 @@ export const githubKit: IntegrationKit = {
 
   tools: [
     githubRepoInfo,
+    githubRepoTree,
+    githubRepoFileRead,
   ],
 
   connectors: [
@@ -72,9 +78,35 @@ export const githubKit: IntegrationKit = {
 
   phasePrompts: {
     [Phase.Discover]: [
-      'If the user provides a GitHub repository URL or repo name, immediately call github_repo_info to detect ' +
-      'the runtime language, framework, default branch, and any existing CI workflows. ' +
-      'Use the result to pre-fill app details — do not ask questions you can answer from the repo.',
+      // Existing-repo analysis protocol (multi-step)
+      'When a user provides a GitHub repository URL or repo name, run the full repo analysis protocol:\n' +
+      '\n' +
+      '**Step 1 — Metadata:** Call `github_repo_info` to detect the primary language, framework, ' +
+      'default branch, and visibility.\n' +
+      '\n' +
+      '**Step 2 — File tree:** Call `github_repo_tree` to get the full recursive file listing. ' +
+      'Note the `keyFiles` array — it highlights deployment-relevant files ' +
+      '(Dockerfile, package.json, K8s manifests, CI workflows, etc.).\n' +
+      '\n' +
+      '**Step 3 — Read key manifests:** For each file in `keyFiles`, call `github_repo_file_read` to ' +
+      'inspect its contents. Prioritize reading in this order:\n' +
+      '  1. Dockerfile or docker-compose.yml (container readiness)\n' +
+      '  2. Package manifest (package.json, go.mod, requirements.txt, pom.xml, etc.)\n' +
+      '  3. Existing K8s manifests (kubernetes/, k8s/, deploy/, helm/, Chart.yaml, kustomization.yaml)\n' +
+      '  4. CI/CD workflows (.github/workflows/*.yml)\n' +
+      'Read at most 5 key files to stay within context limits.\n' +
+      '\n' +
+      '**Step 4 — Summarize:** Synthesize a concise app profile from the data collected:\n' +
+      '  • App type (web app, API, worker, static site, monorepo)\n' +
+      '  • Runtime and framework (e.g. Node.js 20 + Express, Python 3.12 + FastAPI)\n' +
+      '  • Container readiness (has Dockerfile? multi-stage? base image?)\n' +
+      '  • Existing CI/CD (has GitHub Actions? what do they do?)\n' +
+      '  • Existing K8s manifests (any deployments, services, ingress?)\n' +
+      '  • Deployment readiness: ready / almost ready / needs work\n' +
+      '\n' +
+      'Use this profile to pre-fill app details. Do NOT ask the user questions ' +
+      'you can answer from the repo analysis. Present the summary and let the user ' +
+      'confirm or correct before moving to the Design phase.',
     ],
 
     [Phase.Design]: [

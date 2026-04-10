@@ -35,8 +35,7 @@ export const Button = createReactComponent(ButtonApi, ({props, buildChild}) => {
         return 'primary';
       case 'borderless':
         return 'transparent';
-      case 'outlined':
-        return 'outline';
+      case 'default':
       default:
         return 'secondary';
     }
@@ -45,7 +44,7 @@ export const Button = createReactComponent(ButtonApi, ({props, buildChild}) => {
   return (
     <FluentButton
       className={classes.root}
-      appearance={appearance as 'primary' | 'transparent' | 'outline' | 'secondary'}
+      appearance={appearance as 'primary' | 'transparent' | 'secondary'}
       onClick={props.action}
       disabled={props.isValid === false}
     >
