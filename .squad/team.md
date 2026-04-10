@@ -16,6 +16,7 @@
 | Fry | Frontend Dev | `.squad/agents/fry/charter.md` | ✅ Active |
 | Bender | Backend Dev | `.squad/agents/bender/charter.md` | ✅ Active |
 | Hermes | Tester | `.squad/agents/hermes/charter.md` | ✅ Active |
+| Zapp | Security Architect | `.squad/agents/zapp/charter.md` | ✅ Active |
 | Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 📋 Silent |
 | Ralph | Work Monitor | — | 🔄 Monitor |
 

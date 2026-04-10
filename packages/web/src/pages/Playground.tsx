@@ -13,14 +13,12 @@ import {
   MessageBar, MessageBarBody,
   TabList, Tab, Input,
   Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions,
-  Tooltip,
   makeStyles, tokens,
 } from '@fluentui/react-components';
 import {
   Dismiss24Regular, Delete24Regular, DocumentCopy24Regular, Sparkle24Regular,
   Add24Regular, Lightbulb24Regular, Grid24Regular, Icons24Regular,
   CardUi24Regular, Navigation24Regular,
-  SlideText24Regular, BookOpen24Regular,
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import { WidgetsProvider, useWidgets } from '../hooks/useWidgets';
@@ -284,13 +282,6 @@ const useStyles = makeStyles({
     paddingLeft: tokens.spacingHorizontalL,
     paddingRight: tokens.spacingHorizontalL,
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  sidebarSeparator: {
-    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
-    marginTop: tokens.spacingVerticalXS,
-    marginBottom: tokens.spacingVerticalXS,
-    marginLeft: tokens.spacingHorizontalM,
-    marginRight: tokens.spacingHorizontalM,
   },
   mainContent: {
     flex: 1,
@@ -1346,16 +1337,7 @@ function PlaygroundInner() {
               <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets" icon={<CardUi24Regular />}>Widgets</Tab>
             </TabList>
 
-            {/* Coming-soon placeholders */}
-            <div className={classes.sidebarSeparator} />
-            <TabList vertical size="medium">
-              <Tooltip content="Coming soon" relationship="label" positioning="after">
-                <Tab value="theater" icon={<SlideText24Regular />} disabled>Theater</Tab>
-              </Tooltip>
-              <Tooltip content="Coming soon" relationship="label" positioning="after">
-                <Tab value="tutorial" icon={<BookOpen24Regular />} disabled>Tutorial</Tab>
-              </Tooltip>
-            </TabList>
+
           </nav>
 
           {/* Quick widget list in sidebar */}
