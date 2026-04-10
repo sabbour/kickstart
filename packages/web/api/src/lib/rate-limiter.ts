@@ -1,9 +1,12 @@
 /**
  * @module @kickstart/api/lib/rate-limiter
  *
- * Simple in-memory per-IP rate limiter for API endpoints.
- * Tracks request counts in a sliding window and rejects requests
- * that exceed the configured limit.
+ * In-memory sliding-window rate limiter for API endpoints.
+ *
+ * Key resolution order:
+ *   1. SWA authenticated principal ID (x-ms-client-principal-id) — trusted
+ *   2. IP from proxy headers (x-forwarded-for, x-client-ip, x-real-ip) — fallback
+ *   3. Global backstop bucket — always enforced regardless of per-client key
  */
 
 interface RateLimitEntry {
@@ -15,6 +18,11 @@ const store = new Map<string, RateLimitEntry>();
 
 const DEFAULT_WINDOW_MS = 60_000; // 1 minute
 const DEFAULT_MAX_REQUESTS = 30;
+
+// Global backstop: shared bucket for all requests (prevents aggregate abuse)
+const GLOBAL_KEY = "__global__";
+const GLOBAL_MAX_REQUESTS = 300;
+const GLOBAL_WINDOW_MS = 60_000;
 
 // Periodically clean up expired entries to prevent unbounded memory growth
 const cleanupInterval = setInterval(() => {
@@ -28,16 +36,22 @@ const cleanupInterval = setInterval(() => {
 cleanupInterval.unref();
 
 /**
- * Extract the client IP from an Azure Functions HTTP request.
- * Falls back to "unknown" if no IP can be determined.
+ * Extract a client identifier from the request.
+ * Prefers SWA authenticated principal ID (trusted, not spoofable),
+ * falls back to IP-based headers only when auth is unavailable.
  */
-function getClientIp(request: { headers: { get(name: string): string | undefined | null } }): string {
-  return (
+function getClientId(request: { headers: { get(name: string): string | undefined | null } }): string {
+  // SWA injects x-ms-client-principal-id after auth — trusted, not spoofable
+  const principalId = request.headers.get("x-ms-client-principal-id");
+  if (principalId) return `principal:${principalId}`;
+
+  // Fallback to IP headers (spoofable, but better than nothing)
+  return `ip:${
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-client-ip") ||
     request.headers.get("x-real-ip") ||
     "unknown"
-  );
+  }`;
 }
 
 export interface RateLimitResult {
@@ -46,24 +60,18 @@ export interface RateLimitResult {
   retryAfterMs?: number;
 }
 
-/**
- * Check whether a request from the given IP is within the rate limit.
- * Returns { allowed, remaining, retryAfterMs }.
- */
-export function checkRateLimit(
-  request: { headers: { get(name: string): string | undefined | null } },
-  maxRequests = DEFAULT_MAX_REQUESTS,
-  windowMs = DEFAULT_WINDOW_MS,
+/** Check a single bucket. Returns { allowed, remaining, retryAfterMs }. */
+function checkBucket(
+  key: string,
+  maxRequests: number,
+  windowMs: number,
 ): RateLimitResult {
-  const ip = getClientIp(request);
   const now = Date.now();
+  let entry = store.get(key);
 
-  let entry = store.get(ip);
-
-  // Start a new window if none exists or the current one has expired
   if (!entry || now - entry.windowStart >= windowMs) {
     entry = { count: 0, windowStart: now };
-    store.set(ip, entry);
+    store.set(key, entry);
   }
 
   entry.count++;
@@ -74,6 +82,24 @@ export function checkRateLimit(
   }
 
   return { allowed: true, remaining: maxRequests - entry.count };
+}
+
+/**
+ * Check whether a request is within rate limits.
+ * Enforces both a per-client limit and a global backstop.
+ */
+export function checkRateLimit(
+  request: { headers: { get(name: string): string | undefined | null } },
+  maxRequests = DEFAULT_MAX_REQUESTS,
+  windowMs = DEFAULT_WINDOW_MS,
+): RateLimitResult {
+  // Global backstop — always checked regardless of per-client key
+  const globalResult = checkBucket(GLOBAL_KEY, GLOBAL_MAX_REQUESTS, GLOBAL_WINDOW_MS);
+  if (!globalResult.allowed) return globalResult;
+
+  // Per-client limit
+  const clientId = getClientId(request);
+  return checkBucket(clientId, maxRequests, windowMs);
 }
 
 /**

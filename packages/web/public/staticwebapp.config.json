@@ -21,11 +21,11 @@
     },
     {
       "route": "/api/inspirations",
-      "allowedRoles": ["anonymous"]
+      "allowedRoles": ["authenticated"]
     },
     {
       "route": "/api/inspirations/*",
-      "allowedRoles": ["anonymous"]
+      "allowedRoles": ["authenticated"]
     },
     {
       "route": "/api/playground",
