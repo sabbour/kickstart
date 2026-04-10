@@ -137,7 +137,7 @@ export { withRetry, calculateDelay, parseRetryAfter } from "./connectors/index.j
 export { BaseConnector } from "./connectors/index.js";
 export { APIConnectorRegistry, defaultConnectorRegistry } from "./connectors/index.js";
 export { AzureARMConnector } from "./connectors/index.js";
-export type { AzureResource, AzureResourceGroup } from "./connectors/index.js";
+export type { AzureResource, AzureResourceGroup, AzureSubscription, AzureLocation } from "./connectors/index.js";
 export { GitHubConnector } from "./connectors/index.js";
 export type { GitHubRepo, GitHubBranch, GitHubRepoOptions } from "./connectors/index.js";
 export { PricingConnector } from "./connectors/index.js";

@@ -1,27 +1,29 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import { DynamicStringSchema, ActionSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Avatar,
-  Body1,
   Body1Strong,
   Body2,
   Button,
   Card,
   CardHeader,
   Caption1,
+  MessageBar,
+  MessageBarBody,
   Spinner,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
-import type { AzureARMConnector } from '@kickstart/core';
+import type { AzureARMConnector, AzureSubscription } from '@kickstart/core';
 
 const AzureLoginCardApi = {
   name: 'AzureLoginCard',
   schema: z.object({
     displayName: DynamicStringSchema.optional(),
+    showTokenInfo: z.boolean().optional(),
     onSignIn: ActionSchema.optional(),
     onSignOut: ActionSchema.optional(),
   }).strict(),
@@ -53,6 +55,16 @@ const useStyles = makeStyles({
     display: 'inline-block',
     marginRight: tokens.spacingHorizontalXS,
   },
+  subscriptionInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+    marginTop: tokens.spacingVerticalS,
+    paddingTop: tokens.spacingVerticalS,
+    borderTopWidth: tokens.strokeWidthThin,
+    borderTopStyle: 'solid',
+    borderTopColor: tokens.colorNeutralStroke2,
+  },
   actions: {
     display: 'flex',
     gap: tokens.spacingHorizontalS,
@@ -60,21 +72,68 @@ const useStyles = makeStyles({
   },
 });
 
+/** Stub subscriptions shown when connector is unavailable. */
+const STUB_SUBSCRIPTIONS: AzureSubscription[] = [
+  {
+    subscriptionId: '00000000-0000-0000-0000-000000000001',
+    displayName: 'Kickstart Dev Subscription',
+    state: 'Enabled',
+    tenantId: '00000000-0000-0000-0000-000000000099',
+  },
+];
+
 export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }) => {
   const classes = useStyles();
   const connector = useAPIConnector('azure-arm') as AzureARMConnector | undefined;
+
   const [loading, setLoading] = useState(false);
   const [authenticated, setAuthenticated] = useState(() => connector?.isAuthenticated() ?? false);
+  const [subscriptions, setSubscriptions] = useState<AzureSubscription[]>([]);
+  const [error, setError] = useState<string | undefined>();
+  // Track token metadata in React state (per Leela: NOT connector accessor)
+  const [authTime, setAuthTime] = useState<Date | null>(null);
 
   const displayName = props.displayName ? String(props.displayName) : 'Azure User';
 
+  const fetchSubscriptions = useCallback(async (conn: AzureARMConnector) => {
+    try {
+      const subs = await conn.listSubscriptions();
+      setSubscriptions(subs);
+    } catch {
+      setSubscriptions([]);
+    }
+  }, []);
+
+  // Fetch subscriptions on mount if already authenticated
+  useEffect(() => {
+    if (connector?.isAuthenticated()) {
+      fetchSubscriptions(connector);
+    }
+  }, [connector, fetchSubscriptions]);
+
   const handleSignIn = async () => {
-    if (!connector) return;
+    if (!connector) {
+      // Stub mode — show stub subscriptions
+      setAuthenticated(true);
+      setSubscriptions(STUB_SUBSCRIPTIONS);
+      setAuthTime(new Date());
+      if (props.onSignIn) (props.onSignIn as () => void)();
+      return;
+    }
+
     setLoading(true);
+    setError(undefined);
     try {
       await connector.authenticate();
-      setAuthenticated(connector.isAuthenticated());
+      const isAuth = connector.isAuthenticated();
+      setAuthenticated(isAuth);
+      if (isAuth) {
+        setAuthTime(new Date());
+        await fetchSubscriptions(connector);
+      }
       if (props.onSignIn) (props.onSignIn as () => void)();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign-in failed');
     } finally {
       setLoading(false);
     }
@@ -82,6 +141,9 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
 
   const handleSignOut = () => {
     setAuthenticated(false);
+    setSubscriptions([]);
+    setAuthTime(null);
+    setError(undefined);
     if (props.onSignOut) (props.onSignOut as () => void)();
   };
 
@@ -104,6 +166,33 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
             <Caption1>Signed in to Azure</Caption1>
           </div>
         </div>
+
+        {subscriptions.length > 0 && (
+          <div className={classes.subscriptionInfo}>
+            <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+              {subscriptions.length === 1 ? 'Subscription' : `${subscriptions.length} subscriptions available`}
+            </Caption1>
+            {subscriptions.slice(0, 3).map((sub) => (
+              <Caption1 key={sub.subscriptionId}>
+                {sub.displayName} ({sub.state})
+              </Caption1>
+            ))}
+            {subscriptions.length > 3 && (
+              <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                +{subscriptions.length - 3} more
+              </Caption1>
+            )}
+          </div>
+        )}
+
+        {props.showTokenInfo && authTime && (
+          <div className={classes.subscriptionInfo}>
+            <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+              Authenticated at {authTime.toLocaleTimeString()}
+            </Caption1>
+          </div>
+        )}
+
         <div className={classes.actions}>
           <Button appearance="subtle" size="small" onClick={handleSignOut}>
             Sign out
@@ -119,6 +208,11 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
         header={<Body1Strong>Azure</Body1Strong>}
         description={<Caption1>Sign in to access your Azure resources</Caption1>}
       />
+      {error && (
+        <MessageBar intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
+      )}
       <div className={classes.actions}>
         <Button
           appearance="primary"
@@ -129,6 +223,11 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
           {loading ? 'Signing in…' : 'Sign in to Azure'}
         </Button>
       </div>
+      {!connector && (
+        <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalXS }}>
+          Running in offline mode — sign-in will use stub data
+        </Caption1>
+      )}
     </Card>
   );
 });

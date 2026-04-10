@@ -214,3 +214,13 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 
 **Learning:** Both `ToolRegistry` and `APIConnectorRegistry` already had `unregister()` methods — no new API surface needed. When touching registry code, always verify both ownership maps AND sub-registry state are kept in sync.
 
+
+### Azure A2UI Fat Components (#31) — 2026-07-27
+
+- **Token metadata in React state, not connector accessor:** Per Leela's condition, track auth time and subscription data in `useState` after `authenticate()` resolves. Never call `connector.getToken()` (it's `protected` on BaseConnector). The GitHub card pattern already worked this way — keep consistent.
+- **Stub/offline rendering pattern:** When `connector` is null or not authenticated, components render with stub data from hardcoded arrays. AzureLoginCard shows "offline mode" hint. AzureResourcePicker uses inline stub subscriptions/resources. AzureResourceForm falls back to FALLBACK_LOCATIONS. AzureAction simulates success after 1s delay.
+- **Cascading select anti-pattern:** Don't reset child selectors when parent changes unless the parent actually changed. Use `presetSubId`/`presetRg` props to skip the cascade when the LLM pre-fills values. Auto-select single-item results (1 subscription → skip dropdown).
+- **ARM path validation for security:** Use regex-based allowlisting on AzureAction: GUID format for subscription IDs, conservative `[a-zA-Z0-9._-]` regex for resource names, resource type allowlist (Set of known Microsoft.* providers), and 500-char length cap on paths. This addresses Zapp's "arbitrary write path risk" finding.
+- **Destructive confirm UX:** DELETE operations require typing the exact resource name (extracted from the ARM path's last segment). Use a separate `confirming` state in the state machine (idle → confirming → executing → success/error). Non-destructive operations skip straight to executing.
+- **Dynamic form field generation:** `getDefaultFields(resourceType)` returns field definitions based on resource type name matching. Not full ARM schema introspection yet (would need `GET /providers/{namespace}` endpoint + RBAC), but provides type-specific fields for AKS, ACR, Storage. Falls back to name-only for unknown types.
+- **MessageBar for errors:** Use Fluent `<MessageBar intent="error">` instead of raw `<Caption1>` for error display — better accessibility and consistent styling.

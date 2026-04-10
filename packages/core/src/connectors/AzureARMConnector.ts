@@ -17,6 +17,18 @@ export interface AzureResourceGroup {
   provisioningState: string;
 }
 
+export interface AzureSubscription {
+  subscriptionId: string;
+  displayName: string;
+  state: string;
+  tenantId: string;
+}
+
+export interface AzureLocation {
+  name: string;
+  displayName: string;
+}
+
 /**
  * Default ARM auth scopes — requests tokens for the Azure management plane.
  */
@@ -105,9 +117,104 @@ export class AzureARMConnector extends BaseConnector {
     const res = await this.request('PUT', path, { location: 'eastus', ...properties });
     return (await res.json()) as AzureResource;
   }
+
+  /**
+   * Lists subscriptions accessible to the authenticated user.
+   * Returns stub data when not authenticated.
+   */
+  async listSubscriptions(): Promise<AzureSubscription[]> {
+    if (this.isStubMode()) {
+      return STUB_SUBSCRIPTIONS;
+    }
+
+    const path = '/subscriptions?api-version=2022-12-01';
+    const res = await this.request('GET', path);
+    const json = (await res.json()) as { value?: AzureSubscription[] };
+    return json.value ?? [];
+  }
+
+  /**
+   * Lists resource groups in a subscription.
+   * Returns stub data when not authenticated.
+   */
+  async listResourceGroups(subscriptionId: string): Promise<AzureResourceGroup[]> {
+    if (this.isStubMode()) {
+      return STUB_RESOURCE_GROUPS.map((rg) => ({
+        ...rg,
+        id: rg.id.replace('{subscriptionId}', subscriptionId),
+      }));
+    }
+
+    const path = `/subscriptions/${encodeURIComponent(subscriptionId)}/resourcegroups?api-version=2021-04-01`;
+    const res = await this.request('GET', path);
+    const json = (await res.json()) as { value?: AzureResourceGroup[] };
+    return json.value ?? [];
+  }
+
+  /**
+   * Lists locations available for a subscription.
+   * Returns stub data when not authenticated.
+   */
+  async listLocations(subscriptionId: string): Promise<AzureLocation[]> {
+    if (this.isStubMode()) {
+      return STUB_LOCATIONS;
+    }
+
+    const path = `/subscriptions/${encodeURIComponent(subscriptionId)}/locations?api-version=2022-12-01`;
+    const res = await this.request('GET', path);
+    const json = (await res.json()) as { value?: AzureLocation[] };
+    return json.value ?? [];
+  }
 }
 
 // ── Stub data ─────────────────────────────────────────────────────────────────
+
+const STUB_SUBSCRIPTIONS: AzureSubscription[] = [
+  {
+    subscriptionId: '00000000-0000-0000-0000-000000000001',
+    displayName: 'Kickstart Dev Subscription',
+    state: 'Enabled',
+    tenantId: '00000000-0000-0000-0000-000000000099',
+  },
+  {
+    subscriptionId: '00000000-0000-0000-0000-000000000002',
+    displayName: 'Kickstart Prod Subscription',
+    state: 'Enabled',
+    tenantId: '00000000-0000-0000-0000-000000000099',
+  },
+];
+
+const STUB_RESOURCE_GROUPS: AzureResourceGroup[] = [
+  {
+    id: '/subscriptions/{subscriptionId}/resourceGroups/kickstart-rg',
+    name: 'kickstart-rg',
+    location: 'eastus',
+    provisioningState: 'Succeeded',
+  },
+  {
+    id: '/subscriptions/{subscriptionId}/resourceGroups/kickstart-prod-rg',
+    name: 'kickstart-prod-rg',
+    location: 'westus2',
+    provisioningState: 'Succeeded',
+  },
+  {
+    id: '/subscriptions/{subscriptionId}/resourceGroups/networking-rg',
+    name: 'networking-rg',
+    location: 'eastus',
+    provisioningState: 'Succeeded',
+  },
+];
+
+const STUB_LOCATIONS: AzureLocation[] = [
+  { name: 'eastus', displayName: 'East US' },
+  { name: 'eastus2', displayName: 'East US 2' },
+  { name: 'westus', displayName: 'West US' },
+  { name: 'westus2', displayName: 'West US 2' },
+  { name: 'westeurope', displayName: 'West Europe' },
+  { name: 'northeurope', displayName: 'North Europe' },
+  { name: 'southeastasia', displayName: 'Southeast Asia' },
+  { name: 'australiaeast', displayName: 'Australia East' },
+];
 
 const STUB_RESOURCES: AzureResource[] = [
   {
