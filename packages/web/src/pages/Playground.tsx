@@ -40,6 +40,135 @@ import {
 } from './playground-icons';
 import { getFluentIcon } from '../catalog/icons/fluent-icons';
 
+// ── LLM → A2UI component normalizer ─────────────────────────────────────
+// The LLM may output components in two formats:
+//   1. Flat A2UI format:  { id, component, text, children: ["id1", "id2"] }
+//   2. Nested tree format: { type, id, props: {...}, children: [{...nested...}] }
+// This function normalizes both into the flat A2UI updateComponents format
+// and ensures a "root" component exists.
+
+const TYPE_MAP: Record<string, string> = {
+  TextBlock: 'Text', Container: 'Column', ColumnSet: 'Row',
+  ActionSet: 'Row', 'Action.Submit': 'Button', 'Action.OpenUrl': 'Button',
+  'Input.Text': 'TextField', 'Input.Number': 'TextField',
+  'Input.Toggle': 'CheckBox', 'Input.ChoiceSet': 'ChoicePicker',
+  FactSet: 'Column', Table: 'Markdown', ProgressBar: 'ProgressSteps',
+  Badge: 'Text', Chart: 'Markdown',
+};
+
+function normalizePlaygroundComponents(raw: any[]): any[] {
+  // Detect format: if any item has "component" key, assume flat format
+  const isFlat = raw.every((c: any) => typeof c.component === 'string');
+  if (isFlat) {
+    // Already flat — just ensure "root" exists
+    const hasRoot = raw.some((c: any) => c.id === 'root');
+    if (hasRoot) return raw;
+    // Wrap all top-level items in a root Column
+    const childIds = raw.map((c: any) => c.id).filter(Boolean);
+    return [{ id: 'root', component: 'Column', children: childIds }, ...raw];
+  }
+
+  // Nested tree format — flatten recursively
+  const flat: any[] = [];
+  let counter = 0;
+
+  function flatten(node: any, assignId?: string): string {
+    const id = assignId || node.id || `auto-${counter++}`;
+    const type = TYPE_MAP[node.type] || node.type || 'Text';
+    const props = node.props || {};
+    const children = node.children;
+
+    const comp: any = { id, component: type };
+
+    // Spread props to top-level
+    for (const [k, v] of Object.entries(props)) {
+      if (k !== 'id' && k !== 'component') comp[k] = v;
+    }
+
+    // Handle special type conversions
+    if (node.type === 'Action.Submit' || node.type === 'Action.OpenUrl') {
+      const label = props.title || 'Action';
+      const labelId = `${id}-label`;
+      flat.push({ id: labelId, component: 'Text', text: label });
+      comp.component = 'Button';
+      comp.child = labelId;
+      delete comp.title;
+      if (node.type === 'Action.OpenUrl' && props.url) {
+        comp.action = { name: 'open-url', data: { url: props.url } };
+      }
+    } else if (node.type === 'FactSet' && props.facts) {
+      // Convert facts to Text children
+      const childIds: string[] = [];
+      for (const fact of props.facts as any[]) {
+        const fid = `${id}-fact-${counter++}`;
+        flat.push({ id: fid, component: 'Text', text: `**${fact.title}:** ${fact.value}` });
+        childIds.push(fid);
+      }
+      comp.children = childIds;
+      delete comp.facts;
+    } else if (node.type === 'Badge') {
+      comp.text = props.text || '';
+      comp.variant = 'caption';
+    } else if ((node.type === 'Table' || node.type === 'Chart') && !comp.content) {
+      // Convert Table/Chart to Markdown fallback
+      comp.component = 'Markdown';
+      if (node.type === 'Table' && props.columns && props.rows) {
+        const cols = props.columns as any[];
+        const rows = props.rows as any[];
+        let md = '| ' + cols.map((c: any) => c.label || c.key).join(' | ') + ' |\n';
+        md += '| ' + cols.map(() => '---').join(' | ') + ' |\n';
+        for (const row of rows) {
+          md += '| ' + cols.map((c: any) => row.cells?.[c.key] || '').join(' | ') + ' |\n';
+        }
+        comp.content = md;
+      } else if (node.type === 'Chart') {
+        comp.content = `**${props.title || 'Chart'}** _(chart visualization)_`;
+      }
+    } else if (node.type === 'ProgressBar') {
+      comp.component = 'ProgressSteps';
+      comp.steps = [{ label: props.label || 'Progress', status: 'active' }];
+      delete comp.value;
+      delete comp.status;
+      delete comp.label;
+    }
+
+    // Recursively flatten children
+    if (Array.isArray(children) && children.length > 0) {
+      if (typeof children[0] === 'string') {
+        // Already ID references
+        comp.children = children;
+      } else {
+        // Nested objects — flatten them
+        const childIds: string[] = [];
+        for (const child of children) {
+          if (typeof child === 'object' && child !== null) {
+            const childId = flatten(child);
+            childIds.push(childId);
+          }
+        }
+        if (type === 'Button' || type === 'Card') {
+          comp.child = childIds[0];
+        } else {
+          comp.children = childIds;
+        }
+      }
+    }
+
+    flat.push(comp);
+    return id;
+  }
+
+  // If there are multiple top-level items, wrap them in a root Column
+  if (raw.length === 1) {
+    flatten(raw[0], 'root');
+  } else {
+    const childIds = raw.map((node: any) => flatten(node));
+    flat.push({ id: 'root', component: 'Column', children: childIds });
+  }
+
+  return flat;
+}
+
 // Scenario grouping for tabs
 const GALLERY_GROUPS = ['Kickstart Scenarios', 'Data Binding', 'Events & Actions', 'Surface Lifecycle', 'Dynamic Patterns'];
 const COMPONENT_GROUPS = ['Layout', 'Content', 'Inputs', 'Custom Controls'];
@@ -947,14 +1076,12 @@ function PlaygroundInner() {
       // Process A2UI components through the surface system
       let surfaceIds: string[] | undefined;
       if (data.a2ui && data.a2ui.length > 0) {
-        const a2uiMessages = data.a2ui.map((component: any) => ({
-          version: 'v0.9' as const,
-          createSurface: {
-            surfaceId: component.id || `pg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            catalogId: 'kickstart',
-          },
-          body: [component],
-        }));
+        const surfaceId = `pg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const components = normalizePlaygroundComponents(data.a2ui as any[]);
+        const a2uiMessages: A2uiMsg[] = [
+          { version: 'v0.9', createSurface: { surfaceId, catalogId: 'kickstart' } },
+          { version: 'v0.9', updateComponents: { surfaceId, components } },
+        ];
         surfaceIds = createA2ui.processMessages(a2uiMessages);
       }
 
