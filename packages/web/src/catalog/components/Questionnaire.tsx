@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
-import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
+import { DynamicStringSchema, ActionSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Button,
   Checkbox,
@@ -19,13 +19,14 @@ const QuestionnaireApi = {
   name: 'Questionnaire',
   schema: z.object({
     questions: z.array(z.object({
-      id: DynamicStringSchema,
+      id: z.string(),
       label: DynamicStringSchema,
       type: z.enum(['text', 'choice', 'multiChoice']).optional(),
-      choices: z.array(z.object({ id: DynamicStringSchema, label: DynamicStringSchema })).optional(),
+      choices: z.array(z.object({ id: z.string(), label: DynamicStringSchema })).optional(),
       required: z.boolean().optional(),
     })),
     submitLabel: DynamicStringSchema.optional(),
+    onSubmit: ActionSchema.optional(),
   }).strict(),
 };
 
@@ -80,6 +81,18 @@ export const Questionnaire = createReactComponent(QuestionnaireApi, ({ props }) 
     });
   };
 
+  const isComplete = (props.questions || [])
+    .filter((q) => q.required)
+    .every((q) => {
+      const val = answers[q.id];
+      if (Array.isArray(val)) return val.length > 0;
+      return typeof val === 'string' && val.trim().length > 0;
+    });
+
+  const handleSubmit = () => {
+    if (props.onSubmit) (props.onSubmit as () => void)();
+  };
+
   return (
     <Card className={classes.root}>
       <Subtitle2 style={{ marginBottom: tokens.spacingVerticalM }}>
@@ -88,7 +101,7 @@ export const Questionnaire = createReactComponent(QuestionnaireApi, ({ props }) 
 
       {(props.questions || []).map((q) => {
         const qType = q.type || 'text';
-        const qId = q.id as string;
+        const qId = q.id;
         const qLabel = q.label as string;
 
         return (
@@ -113,8 +126,8 @@ export const Questionnaire = createReactComponent(QuestionnaireApi, ({ props }) 
               >
                 {q.choices.map((c) => (
                   <Radio
-                    key={c.id as string}
-                    value={c.id as string}
+                    key={c.id}
+                    value={c.id}
                     label={c.label as string}
                   />
                 ))}
@@ -124,12 +137,12 @@ export const Questionnaire = createReactComponent(QuestionnaireApi, ({ props }) 
             {qType === 'multiChoice' && q.choices && (
               <div className={classes.checkboxGroup}>
                 {q.choices.map((c) => {
-                  const selected = ((answers[qId] as string[]) || []).includes(c.id as string);
+                  const selected = ((answers[qId] as string[]) || []).includes(c.id);
                   return (
                     <Checkbox
-                      key={c.id as string}
+                      key={c.id}
                       checked={selected}
-                      onChange={() => toggleMultiChoice(qId, c.id as string)}
+                      onChange={() => toggleMultiChoice(qId, c.id)}
                       label={c.label as string}
                     />
                   );
@@ -141,7 +154,7 @@ export const Questionnaire = createReactComponent(QuestionnaireApi, ({ props }) 
       })}
 
       <div className={classes.footer}>
-        <Button appearance="primary">
+        <Button appearance="primary" disabled={!isComplete} onClick={handleSubmit}>
           {(props.submitLabel as string) || 'Submit'}
         </Button>
       </div>
