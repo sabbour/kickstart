@@ -19,6 +19,8 @@ import type {
   HttpResponseInit,
   InvocationContext,
 } from "@azure/functions";
+import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
+import { safeErrorResponse, safeStreamError } from "../lib/error-response.js";
 
 interface InspirationIdea {
   title: string;
@@ -206,6 +208,12 @@ app.http("inspirations", {
     request: HttpRequest,
     context: InvocationContext,
   ): Promise<HttpResponseInit> => {
+    // Rate limit check
+    const rateCheck = checkRateLimit(request);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterMs!);
+    }
+
     const url = new URL(request.url);
     const isStreaming = url.searchParams.get("stream") === "true";
 
@@ -252,9 +260,8 @@ app.http("inspirations", {
               controller.enqueue(encoder.encode(sseData("[DONE]")));
               controller.close();
             } catch (err) {
-              const msg = err instanceof Error ? err.message : String(err);
-              context.log(`Streaming error: ${msg}`);
-              controller.enqueue(encoder.encode(sseData(`[ERROR] ${msg}`)));
+              const safeMsg = safeStreamError(err, context, "Inspiration stream error");
+              controller.enqueue(encoder.encode(sseData(`[ERROR] ${safeMsg}`)));
               controller.close();
             }
           },
@@ -284,12 +291,12 @@ app.http("inspirations", {
       try {
         ideas = await generateIdeas();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        context.log(`OpenAI generation failed: ${msg}`);
+        const detail = err instanceof Error ? err.message : String(err);
+        context.error(`OpenAI generation failed: ${detail}`);
         return {
           status: 502,
           headers: { "Content-Type": "application/json" },
-          jsonBody: { error: `Inspiration generation failed: ${msg}` },
+          jsonBody: { error: "Inspiration generation is temporarily unavailable." },
         };
       }
 
@@ -299,9 +306,7 @@ app.http("inspirations", {
         jsonBody: ideas,
       };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      context.log(`Inspirations error: ${message}`);
-      return { status: 500, jsonBody: { error: message } };
+      return safeErrorResponse(err, context, "Inspirations error");
     }
   },
 });
