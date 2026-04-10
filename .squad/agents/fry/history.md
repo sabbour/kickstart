@@ -202,3 +202,15 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 
 **Handoff:** Security sprint complete. No XSS regressions detected in full Playwright suite (57/57 passing).
 
+### Backend Security Fix — PR #103 (2026-04-10)
+
+**Context:** Bender (Backend Dev) was locked out after a reviewer rejection on PR #103. Fry picked up the two security issues flagged by Zapp (Security Architect) in `IntegrationKitRegistry.register()`.
+
+**Fixes applied:**
+1. **Self-dependency bypass:** Added explicit `kit.dependencies?.includes(kit.name)` check before dependency validation. The existing DFS cycle detection missed this case on re-registration because the old kit was already in the registry map.
+2. **Orphaned tools/connectors on re-registration:** The cleanup block only called `clearOwnership()` but didn't remove old tools from `ToolRegistry` or old connectors from `APIConnectorRegistry`. Added `unregister()` calls for each old tool/connector before clearing ownership.
+
+**Tests added (4):** self-dep on first reg, self-dep on re-reg, old tools removed, old connectors removed. All 65 tests pass.
+
+**Learning:** Both `ToolRegistry` and `APIConnectorRegistry` already had `unregister()` methods — no new API surface needed. When touching registry code, always verify both ownership maps AND sub-registry state are kept in sync.
+
