@@ -228,7 +228,8 @@ const useStyles = makeStyles({
   },
   createInput: {
     flex: 1,
-    height: '44px',
+    minHeight: '44px',
+    maxHeight: '200px',
     border: 'none',
     outline: 'none',
     backgroundColor: 'transparent',
@@ -237,7 +238,10 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground1,
     paddingLeft: tokens.spacingHorizontalM,
     paddingRight: tokens.spacingHorizontalXS,
+    paddingTop: '11px',
+    paddingBottom: '11px',
     boxSizing: 'border-box' as const,
+    lineHeight: '1.43',
     '::placeholder': {
       color: tokens.colorNeutralForeground3,
     },
@@ -716,6 +720,7 @@ function PlaygroundInner() {
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const iconSearchRef = useRef<HTMLDivElement>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
+  const createInputRef = useRef<HTMLTextAreaElement>(null);
   const [createMessages, setCreateMessages] = useState<ChatMessage[]>([]);
   const { widgets, addWidget, updateWidget, deleteWidget, duplicateWidget } = useWidgets();
   const [inspireLoading, setInspireLoading] = useState(false);
@@ -726,6 +731,14 @@ function PlaygroundInner() {
     return () => { inspireAbortRef.current?.abort(); };
   }, []);
 
+  // Auto-resize create textarea
+  useEffect(() => {
+    if (createInputRef.current) {
+      createInputRef.current.style.height = '0';
+      createInputRef.current.style.height = Math.max(44, Math.min(createInputRef.current.scrollHeight, 200)) + 'px';
+    }
+  }, [createPrompt]);
+
   const handleInspire = useCallback(async () => {
     inspireAbortRef.current?.abort();
     setInspireLoading(true);
@@ -735,7 +748,7 @@ function PlaygroundInner() {
     inspireAbortRef.current = controller;
 
     try {
-      const res = await fetch('/api/inspirations?stream=true', { signal: controller.signal });
+      const res = await fetch('/api/widget-inspirations?stream=true', { signal: controller.signal });
       if (!res.ok || !res.body) throw new Error('Streaming API error');
 
       const reader = res.body.getReader();
@@ -764,7 +777,7 @@ function PlaygroundInner() {
       if (err instanceof Error && err.name === 'AbortError') return;
       setCreatePrompt('');
       try {
-        const res = await fetch('/api/inspirations');
+        const res = await fetch('/api/widget-inspirations');
         if (res.ok) {
           const ideas = await res.json();
           if (Array.isArray(ideas) && ideas.length > 0) {
@@ -1104,17 +1117,20 @@ function PlaygroundInner() {
         <div id="panel-create" role="tabpanel" aria-labelledby="tab-create" className="playground-create-scroll">
           {/* Hero section */}
           <div className={classes.createHero}>
-            <div className={classes.createHeading}>What would you like to build?</div>
+            <div className={classes.createHeading}>What component would you like to imagine?</div>
             <div className={classes.createInputRow}>
               {inspireLoading && <div className="hero-input-progress" />}
-              <input
+              <textarea
+                ref={createInputRef}
                 className={classes.createInput}
                 value={createPrompt}
                 onChange={(e) => setCreatePrompt(e.target.value)}
                 placeholder="Describe your A2UI widget..."
                 aria-label="Describe your A2UI widget"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSend(createPrompt); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCreateSend(createPrompt); } }}
                 disabled={createStreaming.isStreaming}
+                rows={1}
+                style={{ resize: 'none', overflowY: 'hidden' }}
               />
               <button
                 className={`hero-inspire-btn${inspireLoading ? ' loading' : ''}`}
