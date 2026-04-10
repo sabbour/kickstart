@@ -248,6 +248,41 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
           </div>
         </div>
 
+        {/* IDE Launch Links */}
+        <div className="landing-ide">
+          <span className="landing-ide-label">Or use your IDE</span>
+          <div className="ide-cards">
+            <a
+              className="ide-card"
+              href={`vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'kickstart', command: 'npx', args: ['-y', '@kickstart/mcp-server'] }))}`}
+              target="_blank"
+              rel="noopener"
+              title="Install Kickstart MCP server in VS Code"
+            >
+              <span className="ide-card-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M17.583 2.003l-5.58 5.078L7.29 3.7 3 5.962v12.076l4.29 2.262 4.713-3.381 5.58 5.078 3.417-1.66V3.663l-3.417-1.66zM7.29 14.728V9.272L11.003 12 7.29 14.728zM17.583 17.9l-4.58-4.17V10.27l4.58-4.17V17.9z" fill="#007ACC" />
+                </svg>
+              </span>
+              <span className="ide-card-name">VS Code</span>
+            </a>
+            <a
+              className="ide-card"
+              href={`vscode-insiders:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'kickstart', command: 'npx', args: ['-y', '@kickstart/mcp-server'] }))}`}
+              target="_blank"
+              rel="noopener"
+              title="Install Kickstart MCP server in VS Code Insiders"
+            >
+              <span className="ide-card-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M17.583 2.003l-5.58 5.078L7.29 3.7 3 5.962v12.076l4.29 2.262 4.713-3.381 5.58 5.078 3.417-1.66V3.663l-3.417-1.66zM7.29 14.728V9.272L11.003 12 7.29 14.728zM17.583 17.9l-4.58-4.17V10.27l4.58-4.17V17.9z" fill="#24931E" />
+                </svg>
+              </span>
+              <span className="ide-card-name">VS Code Insiders</span>
+            </a>
+          </div>
+        </div>
+
         {/* Footer */}
         <footer className="landing-footer">
           <div className="landing-footer-powered">
