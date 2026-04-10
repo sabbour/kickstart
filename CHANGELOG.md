@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## 0.3.0
+
+### Features
+
+- **IntegrationKit ServicePack** — Extensible kit system with auth requirements, dependency validation, lifecycle hooks, and security hardening (#30, PR #103)
+- **Azure A2UI Fat Components** — Self-managing AzureLoginCard, AzureResourcePicker, AzureResourceForm, AzureAction with MSAL auth and ARM validation (#31, PR #104)
+- **GitHub A2UI Fat Components** — Self-managing GitHubLoginCard, GitHubRepoPicker, GitHubAction, GitHubCommit with device-code auth and operation allowlisting (#32, PR #105)
+- **ServiceConnector Pattern** — BaseConnector with token provider injection, retry, CORS proxy (#25, PR #96)
+- **LLM Tool System** — Function calling with ToolRegistry, approval gates, and security restrictions (#26, PR #100)
+- **VSCode Launch Buttons** — Quick-launch buttons for VSCode/Insiders with MCP server install (#44, PR #94)
+- **CORS Proxy Security** — Host allowlist, GitHub OAuth path restrictions, auto-continue middleware (#34, #37, PR #97)
+
+### Process
+
+- Design Proposal (DP) 3-step gate workflow
+- CI path filters for docs/infra-only changes
+- Proper semver versioning (#101, #102)
+
 ## 0.2.0
 
 ### @kickstart/web
