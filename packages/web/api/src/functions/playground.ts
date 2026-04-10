@@ -13,6 +13,7 @@ import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { randomUUID } from "node:crypto";
 import { chatCompletion, getChatDeploymentName } from "../lib/openai-client.js";
+import { chatCompletionWithAutoContinue } from "../lib/auto-continue.js";
 import { checkContentSafety } from "../lib/content-safety.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
 import { safeErrorResponse } from "../lib/error-response.js";
@@ -209,8 +210,8 @@ app.http("playground", {
       // Append user message
       session.messages.push({ role: "user", content: body.message });
 
-      // Call Azure OpenAI with JSON mode
-      const result = await chatCompletion(session.messages, {
+      // Call Azure OpenAI with JSON mode + auto-continue for truncation handling
+      const result = await chatCompletionWithAutoContinue(session.messages, {
         responseFormat: { type: "json_object" },
         temperature: 1,
         maxTokens: 4096,

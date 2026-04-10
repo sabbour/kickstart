@@ -11,6 +11,7 @@
 
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { isAllowedHost, blockedHostResponse } from "../lib/proxy-allowlist.js";
 
 const PRICING_BASE = "https://prices.azure.com/api/retail/prices";
 
@@ -32,6 +33,12 @@ app.http("pricing-proxy", {
     request.query.forEach((value, key) => {
       upstreamUrl.searchParams.set(key, value);
     });
+
+    // Host allowlist validation
+    if (!isAllowedHost(upstreamUrl, "pricing-proxy")) {
+      context.warn(`[pricing-proxy] blocked host: ${upstreamUrl.hostname}`);
+      return blockedHostResponse(upstreamUrl.hostname);
+    }
 
     context.log(`[pricing-proxy] GET ${upstreamUrl.toString()}`);
 

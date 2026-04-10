@@ -10,6 +10,7 @@
 
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { isAllowedHost, blockedHostResponse } from "../lib/proxy-allowlist.js";
 
 const ARM_BASE = "https://management.azure.com";
 const DEFAULT_API_VERSION = "2024-03-01";
@@ -37,6 +38,12 @@ app.http("arm-proxy", {
 
     // Build upstream URL, preserving all query parameters
     const upstreamUrl = new URL(`${ARM_BASE}/${upstreamPath}`);
+
+    // Host allowlist validation
+    if (!isAllowedHost(upstreamUrl, "arm-proxy")) {
+      context.warn(`[arm-proxy] blocked host: ${upstreamUrl.hostname}`);
+      return blockedHostResponse(upstreamUrl.hostname);
+    }
     request.query.forEach((value, key) => {
       upstreamUrl.searchParams.set(key, value);
     });
