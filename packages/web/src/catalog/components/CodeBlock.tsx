@@ -77,6 +77,8 @@ const useStyles = makeStyles({
     margin: '0',
     overflowX: 'auto',
     borderRadius: '0',
+    backgroundColor: '#0d1117',
+    color: '#c9d1d9',
   },
   codeElement: {
     fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace',
