@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------
-   Playground — A2UI Gallery (5-tab masonry layout)
+   Playground — A2UI Gallery (sidebar layout)
    Renders inside Layout → .app-shell → .app-layout → .chat-main
    all of which have overflow: hidden. We must fill the space and
    manage our own scroll containers.
@@ -35,7 +35,7 @@
   margin: 0 auto;
 }
 
-/* Responsive column breakpoints (inspired by A2UI Composer) */
+/* Responsive column breakpoints */
 @media (min-width: 640px) {
   .playground-gallery {
     column-count: 2;

@@ -246,3 +246,10 @@ Core decisions preserved in `.squad/decisions.md` supersede archived entries. Th
 - Project board field IDs are NOT hardcoded — skill includes GraphQL discovery query so agents can self-serve
 - Inbox files left intact per protocol — Scribe handles cleanup
 - **Decision:** `.squad/decisions/inbox/leela-process-optimization.md`
+
+### 2025-07-28: PR #76 Review Feedback — Sidebar Layout
+- Addressed Copilot review comments on PR #76 (squad/59-playground-sidebar)
+- **Comment 1 (Theater/Tutorial):** PR description was stale — referenced coming-soon Theater/Tutorial items that Fry already removed per #79. Updated PR description to reflect current state.
+- **Comment 2 (Accessibility):** Added `aria-expanded={sidebarOpen}` and `aria-controls="playground-sidebar"` to mobile nav button; added `id="playground-sidebar"` to sidebar `<aside>`. Button now toggles open/close.
+- Replied to both review comments, pushed fix, requested fresh Copilot review.
+- Lint and build both clean after changes.

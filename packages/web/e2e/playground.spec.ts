@@ -240,7 +240,8 @@ test.describe('Playground', () => {
       await page.getByRole('tab', { name: 'Create' }).click();
       await page.getByText('Start Blank').first().click();
 
-      await expect(page.getByText('Untitled widget')).toBeVisible({ timeout: 5000 });
+      const panel = page.getByRole('tabpanel');
+      await expect(panel.getByText('Untitled widget')).toBeVisible({ timeout: 5000 });
     });
 
     test('clicking a widget card opens a preview dialog', async ({ page }) => {
@@ -248,8 +249,9 @@ test.describe('Playground', () => {
       await page.getByRole('tab', { name: 'Create' }).click();
       await page.getByText('Start Blank').first().click();
 
-      // Click the widget card (not the action buttons)
-      await page.getByText('Untitled widget').first().click();
+      // Click the widget card in the main panel (not the sidebar shortcut)
+      const panel = page.getByRole('tabpanel');
+      await panel.getByText('Untitled widget').first().click();
       await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
       await page.getByRole('button', { name: 'Close' }).click();
     });
@@ -258,7 +260,8 @@ test.describe('Playground', () => {
       await page.getByRole('tab', { name: 'Create' }).click();
       await page.getByText('Start Blank').first().click();
 
-      await expect(page.getByText('Untitled widget')).toBeVisible();
+      const panel = page.getByRole('tabpanel');
+      await expect(panel.getByText('Untitled widget')).toBeVisible();
 
       // Click the "Delete widget" button (has aria-label)
       await page.getByRole('button', { name: 'Delete widget' }).click();
@@ -271,14 +274,15 @@ test.describe('Playground', () => {
       await page.getByRole('tab', { name: 'Create' }).click();
       await page.getByText('Start Blank').first().click();
 
-      await expect(page.getByText('Untitled widget')).toBeVisible();
-      const initialCount = await page.getByText('Untitled widget').count();
+      const panel = page.getByRole('tabpanel');
+      await expect(panel.getByText('Untitled widget')).toBeVisible();
+      const initialCount = await panel.getByText('Untitled widget').count();
 
       await page.getByRole('button', { name: 'Duplicate widget' }).click();
 
       // Should now have more widgets
       await expect(async () => {
-        expect(await page.getByText('Untitled widget').count()).toBeGreaterThan(initialCount);
+        expect(await panel.getByText('Untitled widget').count()).toBeGreaterThan(initialCount);
       }).toPass({ timeout: 3000 });
     });
   });

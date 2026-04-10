@@ -1,8 +1,8 @@
 /**
- * Playground — A2UI Gallery (5-tab architecture).
+ * Playground — A2UI Gallery (sidebar layout).
  *
  * Access via ?playground URL parameter.
- * Tabs: Create | Gallery | Components | Icons | Widgets
+ * Left sidebar navigation: Create | Ideas | Components | Icons | Widgets
  */
 
 import React, { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react';
@@ -15,7 +15,11 @@ import {
   Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions,
   makeStyles, tokens,
 } from '@fluentui/react-components';
-import { Dismiss24Regular, Delete24Regular, DocumentCopy24Regular, Sparkle24Regular } from '@fluentui/react-icons';
+import {
+  Dismiss24Regular, Delete24Regular, DocumentCopy24Regular, Sparkle24Regular,
+  Add24Regular, Lightbulb24Regular, Grid24Regular, Icons24Regular,
+  CardUi24Regular, Navigation24Regular,
+} from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import { WidgetsProvider, useWidgets } from '../hooks/useWidgets';
 import { getDemoResponse, resetDemoState } from '../services/demo-scenarios';
@@ -173,10 +177,120 @@ const COMPONENT_GROUPS = ['Layout', 'Content', 'Inputs', 'Custom Controls'];
 const GALLERY_SCENARIOS = [...KICKSTART_SCENARIOS, ...CONTROL_SCENARIOS].filter(s => GALLERY_GROUPS.includes(s.group));
 const COMPONENT_SCENARIOS = CONTROL_SCENARIOS.filter(s => COMPONENT_GROUPS.includes(s.group));
 
+const SIDEBAR_WIDTH = '240px';
+const SIDEBAR_COLLAPSED_BP = '768px';
+
 const useStyles = makeStyles({
   playgroundPage: {
     fontFamily: tokens.fontFamilyBase,
   },
+  // ---- Sidebar + Main shell ----
+  shellRow: {
+    display: 'flex',
+    flex: 1,
+    overflow: 'hidden',
+    minHeight: 0,
+  },
+  sidebar: {
+    width: SIDEBAR_WIDTH,
+    flexShrink: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: tokens.colorNeutralBackground2,
+    borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
+    overflow: 'hidden',
+    [`@media (max-width: ${SIDEBAR_COLLAPSED_BP})`]: {
+      position: 'fixed' as const,
+      top: 0,
+      left: 0,
+      bottom: 0,
+      zIndex: 1000,
+      transform: 'translateX(-100%)',
+      transition: 'transform 0.25s ease',
+      boxShadow: 'none',
+    },
+  },
+  sidebarOpen: {
+    [`@media (max-width: ${SIDEBAR_COLLAPSED_BP})`]: {
+      transform: 'translateX(0)',
+      boxShadow: tokens.shadow64,
+    },
+  },
+  sidebarOverlay: {
+    display: 'none',
+    [`@media (max-width: ${SIDEBAR_COLLAPSED_BP})`]: {
+      display: 'block',
+      position: 'fixed' as const,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.3)',
+      zIndex: 999,
+    },
+  },
+  sidebarBrand: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    flexShrink: 0,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  sidebarNav: {
+    flex: 1,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+  },
+  sidebarWidgets: {
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    maxHeight: '200px',
+    overflowY: 'auto',
+  },
+  sidebarWidgetItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    paddingTop: tokens.spacingVerticalXS,
+    paddingBottom: tokens.spacingVerticalXS,
+    paddingLeft: tokens.spacingHorizontalS,
+    paddingRight: tokens.spacingHorizontalS,
+    borderRadius: tokens.borderRadiusMedium,
+    cursor: 'pointer',
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
+  },
+  sidebarFooter: {
+    flexShrink: 0,
+    paddingTop: tokens.spacingVerticalXS,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  mainContent: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    minWidth: 0,
+  },
+  // ---- Top bar (now inside main content) ----
   topbar: {
     display: 'flex',
     alignItems: 'center',
@@ -188,6 +302,7 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground1,
     flexShrink: 0,
     gap: tokens.spacingHorizontalM,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
   },
   topbarLeft: {
     display: 'flex',
@@ -204,21 +319,11 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalXS,
     flexShrink: 0,
   },
-  tabsContainer: {
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground1,
-    paddingLeft: tokens.spacingHorizontalL,
-    paddingRight: tokens.spacingHorizontalL,
-    flexShrink: 0,
-    display: 'flex',
-    flexDirection: 'column' as const,
-  },
-  tabHint: {
-    paddingLeft: tokens.spacingHorizontalXXS,
-    paddingBottom: tokens.spacingVerticalS,
-    color: tokens.colorNeutralForeground4,
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
+  menuButton: {
+    display: 'none',
+    [`@media (max-width: ${SIDEBAR_COLLAPSED_BP})`]: {
+      display: 'inline-flex',
+    },
   },
   galleryCard: {
     backgroundColor: tokens.colorNeutralBackground1,
@@ -842,6 +947,7 @@ function PlaygroundInner() {
   const { widgets, addWidget, updateWidget: _updateWidget, deleteWidget, duplicateWidget } = useWidgets();
   const [inspireLoading, setInspireLoading] = useState(false);
   const inspireAbortRef = useRef<AbortController | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Abort in-flight inspiration stream on unmount
   useEffect(() => {
@@ -1175,71 +1281,154 @@ function PlaygroundInner() {
     }
   };
 
+  // Tab label map for topbar heading
+  const TAB_LABELS: Record<string, string> = {
+    create: 'Create',
+    gallery: 'Ideas',
+    components: 'Components',
+    icons: 'Icons',
+    widgets: 'Widgets',
+  };
+  const TAB_DESCRIPTIONS: Record<string, string> = {
+    create: 'Build A2UI components with AI',
+    gallery: 'Browse pre-built demo scenarios',
+    components: 'A2UI component reference',
+    icons: 'Fluent icon browser',
+    widgets: 'Your saved widget library',
+  };
+
+  const handleTabSelect = useCallback((_e: any, data: any) => {
+    setActiveTab(data.value as any);
+    setSidebarOpen(false);
+  }, []);
+
   return (
     <div className={`playground-page ${classes.playgroundPage}`}>
-      {/* ---- Top bar ---- */}
-      <div className={classes.topbar}>
-        <div className={classes.topbarLeft}>
-          <Body1Strong style={{ color: tokens.colorNeutralForeground2 }}>A2UI Playground</Body1Strong>
-          <CounterBadge
-            count={getCounter()}
-            appearance="filled"
-            color="brand"
-            overflowCount={999}
-            size="small"
+      <div className={classes.shellRow}>
+        {/* ---- Mobile overlay ---- */}
+        {sidebarOpen && (
+          <div
+            className={classes.sidebarOverlay}
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
           />
-        </div>
-        {(activeTab === 'gallery' || activeTab === 'components') && (
-          <div className={classes.topbarCenter} ref={searchBoxRef}>
-            <SearchBox
-              placeholder="Filter scenarios..."
-              value={filterQuery}
-              onChange={(_e, data) => setFilterQuery(data.value)}
-              size="small"
-            />
-          </div>
         )}
-        {activeTab === 'icons' && (
-          <div className={classes.topbarCenter} ref={iconSearchRef}>
-            <SearchBox
-              placeholder="Filter icons..."
-              value={iconFilter}
-              onChange={(_e, data) => setIconFilter(data.value)}
-              size="small"
-            />
-          </div>
-        )}
-        <div className={classes.topbarActions}>
-          {activeTab === 'create' && (
-            <Button appearance="outline" size="small" onClick={handleClearAll}>Clear All</Button>
-          )}
-          <Caption1 style={{ color: tokens.colorNeutralForeground3, marginLeft: '12px' }}>
-            v{(window as any).__BUILD_VERSION__ || '0.0.0'} · {(window as any).__BUILD_SHA__ || 'dev'}
-          </Caption1>
-        </div>
-      </div>
 
-      {/* ---- Tabs: Create | Gallery | Components | Icons | Widgets ---- */}
-      <div className={classes.tabsContainer}>
-        <TabList
-          selectedValue={activeTab}
-          onTabSelect={(_e, data) => setActiveTab(data.value as any)}
-          size="medium"
+        {/* ---- Left Sidebar ---- */}
+        <aside
+          id="playground-sidebar"
+          className={`${classes.sidebar}${sidebarOpen ? ` ${classes.sidebarOpen}` : ''}`}
+          aria-label="Playground navigation"
         >
-          <Tab id="tab-create" value="create" aria-controls="panel-create">Create</Tab>
-          <Tab id="tab-gallery" value="gallery" aria-controls="panel-gallery">Ideas</Tab>
-          <Tab id="tab-components" value="components" aria-controls="panel-components">Components</Tab>
-          <Tab id="tab-icons" value="icons" aria-controls="panel-icons">Icons</Tab>
-          <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets">Widgets</Tab>
-        </TabList>
-        <Caption1 style={{ color: tokens.colorNeutralForeground3, paddingTop: tokens.spacingVerticalXS, paddingBottom: tokens.spacingVerticalXS }}>
-          {activeTab === 'create' && 'Build A2UI components with AI'}
-          {activeTab === 'gallery' && 'Browse pre-built demo scenarios'}
-          {activeTab === 'components' && 'A2UI component reference'}
-          {activeTab === 'icons' && 'Fluent icon browser'}
-          {activeTab === 'widgets' && 'Your saved widget library'}
-        </Caption1>
-      </div>
+          <div className={classes.sidebarBrand}>
+            <Body1Strong style={{ color: tokens.colorNeutralForeground2 }}>A2UI Playground</Body1Strong>
+          </div>
+
+          <nav className={classes.sidebarNav}>
+            <TabList
+              vertical
+              selectedValue={activeTab}
+              onTabSelect={handleTabSelect}
+              size="medium"
+            >
+              <Tab id="tab-create" value="create" aria-controls="panel-create" icon={<Add24Regular />}>Create</Tab>
+              <Tab id="tab-gallery" value="gallery" aria-controls="panel-gallery" icon={<Lightbulb24Regular />}>Ideas</Tab>
+              <Tab id="tab-components" value="components" aria-controls="panel-components" icon={<Grid24Regular />}>Components</Tab>
+              <Tab id="tab-icons" value="icons" aria-controls="panel-icons" icon={<Icons24Regular />}>Icons</Tab>
+              <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets" icon={<CardUi24Regular />}>Widgets</Tab>
+            </TabList>
+
+
+          </nav>
+
+          {/* Quick widget list in sidebar */}
+          {widgets.length > 0 && (
+            <div className={classes.sidebarWidgets}>
+              <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: tokens.spacingVerticalXS, fontWeight: tokens.fontWeightSemibold }}>
+                Widgets ({widgets.length})
+              </Caption1>
+              {widgets.slice(0, 8).map(w => (
+                <div
+                  key={w.id}
+                  className={classes.sidebarWidgetItem}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { handleWidgetClick(w.id); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleWidgetClick(w.id); } }}
+                >
+                  <CardUi24Regular style={{ fontSize: '14px', flexShrink: 0 }} />
+                  {w.name}
+                </div>
+              ))}
+              {widgets.length > 8 && (
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, paddingLeft: tokens.spacingHorizontalS }}>
+                  +{widgets.length - 8} more
+                </Caption1>
+              )}
+            </div>
+          )}
+
+          <div className={classes.sidebarFooter}>
+            <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+              v{(window as any).__BUILD_VERSION__ || '0.0.0'} · {(window as any).__BUILD_SHA__ || 'dev'}
+            </Caption1>
+          </div>
+        </aside>
+
+        {/* ---- Main Content ---- */}
+        <div className={classes.mainContent}>
+          {/* ---- Top bar ---- */}
+          <div className={classes.topbar}>
+            <div className={classes.topbarLeft}>
+              <Button
+                className={classes.menuButton}
+                appearance="subtle"
+                icon={<Navigation24Regular />}
+                aria-label="Toggle navigation"
+                aria-expanded={sidebarOpen}
+                aria-controls="playground-sidebar"
+                onClick={() => setSidebarOpen(prev => !prev)}
+              />
+              <Body1Strong style={{ color: tokens.colorNeutralForeground2 }}>
+                {TAB_LABELS[activeTab]}
+              </Body1Strong>
+              <CounterBadge
+                count={getCounter()}
+                appearance="filled"
+                color="brand"
+                overflowCount={999}
+                size="small"
+              />
+            </div>
+            {(activeTab === 'gallery' || activeTab === 'components') && (
+              <div className={classes.topbarCenter} ref={searchBoxRef}>
+                <SearchBox
+                  placeholder="Filter scenarios..."
+                  value={filterQuery}
+                  onChange={(_e, data) => setFilterQuery(data.value)}
+                  size="small"
+                />
+              </div>
+            )}
+            {activeTab === 'icons' && (
+              <div className={classes.topbarCenter} ref={iconSearchRef}>
+                <SearchBox
+                  placeholder="Filter icons..."
+                  value={iconFilter}
+                  onChange={(_e, data) => setIconFilter(data.value)}
+                  size="small"
+                />
+              </div>
+            )}
+            <div className={classes.topbarActions}>
+              {activeTab === 'create' && (
+                <Button appearance="outline" size="small" onClick={handleClearAll}>Clear All</Button>
+              )}
+              <Caption1 style={{ color: tokens.colorNeutralForeground3, marginLeft: '12px' }}>
+                {TAB_DESCRIPTIONS[activeTab]}
+              </Caption1>
+            </div>
+          </div>
 
       {/* ---- Tab 1: Create (empty state — no messages yet) ---- */}
       {activeTab === 'create' && createMessages.length === 0 && (
@@ -1730,6 +1919,8 @@ function PlaygroundInner() {
           </DialogBody>
         </DialogSurface>
       </Dialog>
+        </div>{/* end mainContent */}
+      </div>{/* end shellRow */}
     </div>
   );
 }
