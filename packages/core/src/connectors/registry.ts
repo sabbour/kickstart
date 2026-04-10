@@ -1,4 +1,4 @@
-import type { APIConnector } from './types.js';
+import type { APIConnector, ConfigurableConnector } from './types.js';
 
 /**
  * Central registry for APIConnectors.
@@ -25,6 +25,18 @@ export class APIConnectorRegistry {
    */
   get(name: string): APIConnector | undefined {
     return this.connectors.get(name);
+  }
+
+  /**
+   * Look up a connector by name and narrow to ConfigurableConnector.
+   * Returns `undefined` if not found or if the connector doesn't support auth configuration.
+   */
+  getConfigurable(name: string): ConfigurableConnector | undefined {
+    const connector = this.connectors.get(name);
+    if (connector && 'setAuthProvider' in connector) {
+      return connector as ConfigurableConnector;
+    }
+    return undefined;
   }
 
   /** Returns all registered connector names. */

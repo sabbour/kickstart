@@ -113,7 +113,26 @@ export type {
 } from "./services/index.js";
 
 // APIConnectors — authenticated API client adapters
-export type { APIConnector, APIConnectorRequestOptions } from "./connectors/index.js";
+export type {
+  APIConnector,
+  ConfigurableConnector,
+  APIConnectorRequestOptions,
+  HttpMethod,
+  AuthStrategy,
+  OAuth2AuthStrategy,
+  APIKeyAuthStrategy,
+  ManagedIdentityAuthStrategy,
+  NoAuthStrategy,
+  TokenInfo,
+  TokenProvider,
+  RetryConfig,
+  CORSProxyConfig,
+  ConnectorConfig,
+  ConnectorErrorCode,
+} from "./connectors/index.js";
+export { ConnectorError, DEFAULT_RETRY_CONFIG } from "./connectors/index.js";
+export { withRetry, calculateDelay, parseRetryAfter } from "./connectors/index.js";
+export { BaseConnector } from "./connectors/index.js";
 export { APIConnectorRegistry, defaultConnectorRegistry } from "./connectors/index.js";
 export { AzureARMConnector } from "./connectors/index.js";
 export type { AzureResource, AzureResourceGroup } from "./connectors/index.js";

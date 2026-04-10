@@ -6,19 +6,208 @@
  * app never has to think about auth.
  */
 
+// ── HTTP primitives ──────────────────────────────────────────────────────────
+
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
 export interface APIConnectorRequestOptions {
   headers?: Record<string, string>;
   /** Abort signal — pass to cancel long-running requests. */
   signal?: AbortSignal;
 }
 
+// ── Auth strategies ──────────────────────────────────────────────────────────
+
+/** OAuth2 flow — token obtained via MSAL or GitHub OAuth. */
+export interface OAuth2AuthStrategy {
+  readonly kind: 'oauth2';
+  /** OAuth2 scopes to request. */
+  readonly scopes: string[];
+  /** Optional tenant ID (Azure AD). */
+  readonly tenantId?: string;
+  /** Optional client ID override. */
+  readonly clientId?: string;
+}
+
+/** Static API key sent in a header. */
+export interface APIKeyAuthStrategy {
+  readonly kind: 'api-key';
+  /** Header name (default: "Authorization"). */
+  readonly headerName?: string;
+  /** Header value prefix (e.g. "Bearer", "token"). */
+  readonly prefix?: string;
+}
+
+/** Azure Managed Identity — tokens acquired automatically in cloud environments. */
+export interface ManagedIdentityAuthStrategy {
+  readonly kind: 'managed-identity';
+  /** Resource URL to request a token for. */
+  readonly resource: string;
+  /** Optional client ID for user-assigned managed identity. */
+  readonly clientId?: string;
+}
+
+/** No authentication required (public APIs like Azure Pricing). */
+export interface NoAuthStrategy {
+  readonly kind: 'none';
+}
+
+export type AuthStrategy =
+  | OAuth2AuthStrategy
+  | APIKeyAuthStrategy
+  | ManagedIdentityAuthStrategy
+  | NoAuthStrategy;
+
+// ── Token management ─────────────────────────────────────────────────────────
+
+export interface TokenInfo {
+  /** The raw access token string. */
+  accessToken: string;
+  /** Expiry as Unix epoch seconds. */
+  expiresAt: number;
+  /** Scopes granted by the token. */
+  scopes?: string[];
+}
+
+/**
+ * A TokenProvider is an async function that acquires tokens.
+ * Injected via `setTokenProvider()` so connectors stay browser-agnostic —
+ * the web layer provides the MSAL / OAuth implementation.
+ */
+export type TokenProvider = (scopes: string[]) => Promise<TokenInfo>;
+
+// ── Strategy-aware auth providers ────────────────────────────────────────────
+
+/** OAuth2 auth provider — acquires tokens via MSAL or similar. */
+export interface OAuth2AuthProvider {
+  readonly kind: 'oauth2';
+  getToken(scopes: string[]): Promise<TokenInfo>;
+}
+
+/** API key auth provider — returns a static or rotated key. */
+export interface APIKeyAuthProvider {
+  readonly kind: 'api-key';
+  getApiKey(): Promise<string>;
+}
+
+/** Managed Identity auth provider — acquires tokens from IMDS. */
+export interface ManagedIdentityAuthProvider {
+  readonly kind: 'managed-identity';
+  getToken(resource: string, clientId?: string): Promise<TokenInfo>;
+}
+
+/**
+ * Strategy-aware auth provider — discriminated union keyed by auth kind.
+ * Replaces the flat `TokenProvider` signature for non-OAuth2 strategies.
+ */
+export type AuthProvider =
+  | OAuth2AuthProvider
+  | APIKeyAuthProvider
+  | ManagedIdentityAuthProvider;
+
+// ── Retry configuration ──────────────────────────────────────────────────────
+
+export interface RetryConfig {
+  /** Maximum number of retry attempts (default: 3). */
+  maxRetries: number;
+  /** Base delay in milliseconds for exponential backoff (default: 1000). */
+  baseDelayMs: number;
+  /** Maximum delay cap in milliseconds (default: 30000). */
+  maxDelayMs: number;
+  /** Jitter factor 0–1 applied to each delay (default: 0.5). */
+  jitterFactor: number;
+  /** HTTP status codes that trigger a retry (default: [429, 500, 502, 503, 504]). */
+  retryableStatuses: number[];
+}
+
+export const DEFAULT_RETRY_CONFIG: Readonly<RetryConfig> = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 30_000,
+  jitterFactor: 0.5,
+  retryableStatuses: [429, 500, 502, 503, 504],
+};
+
+// ── CORS proxy ───────────────────────────────────────────────────────────────
+
+export interface CORSProxyConfig {
+  /** Base URL of the CORS proxy (e.g. "/api/proxy" for SWA Functions). */
+  proxyBaseUrl: string;
+  /**
+   * If true, rewrites the full target URL as a query parameter.
+   * e.g. /api/proxy?url=https://management.azure.com/...
+   * If false, appends the path directly: /api/proxy/subscriptions/...
+   */
+  useQueryParam?: boolean;
+  /** Extra headers the proxy requires. */
+  extraHeaders?: Record<string, string>;
+}
+
+// ── Connector configuration ──────────────────────────────────────────────────
+
+export interface ConnectorConfig {
+  /** Auth strategy for this connector. */
+  auth: AuthStrategy;
+  /** Optional CORS proxy to route requests through. */
+  corsProxy?: CORSProxyConfig;
+  /** Retry configuration (defaults to DEFAULT_RETRY_CONFIG). */
+  retry?: Partial<RetryConfig>;
+  /** Base URL override (useful for testing / staging). */
+  baseUrl?: string;
+  /**
+   * Explicitly allow stub/offline mode. When true, connectors return stub
+   * data if no auth provider is configured. Default: false (fail-closed).
+   */
+  allowStubMode?: boolean;
+  /**
+   * Additional allowed target hosts for CORS proxy URL rewriting.
+   * The connector's own base URL host is always allowed automatically.
+   */
+  allowedProxyHosts?: string[];
+}
+
+// ── Error handling ───────────────────────────────────────────────────────────
+
+export type ConnectorErrorCode =
+  | 'AUTH_FAILED'
+  | 'TOKEN_EXPIRED'
+  | 'NETWORK_ERROR'
+  | 'TIMEOUT'
+  | 'RATE_LIMITED'
+  | 'SERVER_ERROR'
+  | 'NOT_FOUND'
+  | 'FORBIDDEN'
+  | 'BAD_REQUEST'
+  | 'STUB_MODE_DISABLED'
+  | 'PROXY_HOST_BLOCKED'
+  | 'UNKNOWN';
+
+export class ConnectorError extends Error {
+  readonly code: ConnectorErrorCode;
+  readonly status?: number;
+  readonly retryable: boolean;
+
+  constructor(
+    message: string,
+    code: ConnectorErrorCode,
+    options?: { status?: number; retryable?: boolean; cause?: unknown },
+  ) {
+    super(message, options?.cause ? { cause: options.cause } : undefined);
+    this.name = 'ConnectorError';
+    this.code = code;
+    this.status = options?.status;
+    this.retryable = options?.retryable ?? false;
+  }
+}
+
+// ── APIConnector interface ───────────────────────────────────────────────────
+
 /**
  * The canonical interface every connector must implement.
  *
  * - `name` is the registry key (e.g. "azure-arm", "github", "pricing").
  * - `baseUrl` is the root endpoint this connector talks to.
- * - `authenticate()` acquires / refreshes auth tokens.  Connectors that
- *   need no auth (PricingConnector) implement this as a no-op.
+ * - `authenticate()` acquires / refreshes auth tokens.
  * - `request()` sends an HTTP request through the connector, attaching
  *   whatever auth headers the connector manages.
  * - `isAuthenticated()` returns true if the connector currently holds a
@@ -29,10 +218,22 @@ export interface APIConnector {
   readonly baseUrl: string;
   authenticate(): Promise<void>;
   request(
-    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    method: HttpMethod,
     path: string,
     body?: unknown,
     options?: APIConnectorRequestOptions,
   ): Promise<Response>;
   isAuthenticated(): boolean;
+}
+
+/**
+ * Extended connector interface for connectors that support auth configuration.
+ * Use this type when retrieving connectors from the registry to wire auth
+ * without downcasting.
+ */
+export interface ConfigurableConnector extends APIConnector {
+  /** Inject a legacy OAuth2 token provider. */
+  setTokenProvider(provider: TokenProvider): void;
+  /** Inject a strategy-aware auth provider. */
+  setAuthProvider(provider: AuthProvider): void;
 }
