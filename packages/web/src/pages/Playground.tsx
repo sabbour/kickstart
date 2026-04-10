@@ -742,7 +742,7 @@ function PlaygroundInner() {
     inspireAbortRef.current = controller;
 
     try {
-      const res = await fetch('/api/widget-inspirations?stream=true', { signal: controller.signal });
+      const res = await fetch('/api/inspirations/widgets?stream=true', { signal: controller.signal });
       if (!res.ok || !res.body) throw new Error('Streaming API error');
 
       const reader = res.body.getReader();
@@ -771,7 +771,7 @@ function PlaygroundInner() {
       if (err instanceof Error && err.name === 'AbortError') return;
       setCreatePrompt('');
       try {
-        const res = await fetch('/api/widget-inspirations');
+        const res = await fetch('/api/inspirations/widgets');
         if (res.ok) {
           const ideas = await res.json();
           if (Array.isArray(ideas) && ideas.length > 0) {
