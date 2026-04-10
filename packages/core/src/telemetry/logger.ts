@@ -47,8 +47,10 @@ export class Logger {
   info(message: string, data?: unknown): void {
     this.push({ kind: 'log', level: 'info', message, data, timestamp: Date.now() });
     if (data !== undefined) {
+      // eslint-disable-next-line no-console
       console.info(`[Kickstart] ${message}`, data);
     } else {
+      // eslint-disable-next-line no-console
       console.info(`[Kickstart] ${message}`);
     }
   }
@@ -56,8 +58,10 @@ export class Logger {
   warn(message: string, data?: unknown): void {
     this.push({ kind: 'log', level: 'warn', message, data, timestamp: Date.now() });
     if (data !== undefined) {
+      // eslint-disable-next-line no-console
       console.warn(`[Kickstart] ${message}`, data);
     } else {
+      // eslint-disable-next-line no-console
       console.warn(`[Kickstart] ${message}`);
     }
   }
@@ -65,8 +69,10 @@ export class Logger {
   error(message: string, data?: unknown): void {
     this.push({ kind: 'log', level: 'error', message, data, timestamp: Date.now() });
     if (data !== undefined) {
+      // eslint-disable-next-line no-console
       console.error(`[Kickstart] ${message}`, data);
     } else {
+      // eslint-disable-next-line no-console
       console.error(`[Kickstart] ${message}`);
     }
   }
@@ -74,8 +80,10 @@ export class Logger {
   track(event: string, properties?: Record<string, unknown>): void {
     this.push({ kind: 'track', event, properties, timestamp: Date.now() });
     if (properties !== undefined) {
+      // eslint-disable-next-line no-console
       console.info(`[Kickstart:track] ${event}`, properties);
     } else {
+      // eslint-disable-next-line no-console
       console.info(`[Kickstart:track] ${event}`);
     }
   }

@@ -86,7 +86,7 @@ describe("InMemoryArtifactStore", () => {
   it("list with ** matches nested paths", () => {
     store.put("k8s/deployment.yaml", "");
     store.put(".github/workflows/deploy.yml", "");
-    const results = store.list("**/*.y{a,}ml");
+    const _results = store.list("**/*.y{a,}ml");
     // glob regex doesn't support {a,} — just verify ** works with .yaml and .yml separately
     const yaml = store.list("**/*.yaml");
     const yml = store.list("**/*.yml");

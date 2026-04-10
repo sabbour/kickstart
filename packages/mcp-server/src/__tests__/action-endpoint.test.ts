@@ -18,7 +18,6 @@ import {
   handleAppMessage,
 } from "../app/protocol.js";
 import type {
-  AppToServerMessage,
   ServerToAppMessage,
   ActionMessage,
 } from "../app/protocol.js";

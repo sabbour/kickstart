@@ -6,7 +6,7 @@ import {
   canAdvance,
 } from "../engine/machine.js";
 import { Phase } from "../engine/types.js";
-import type { ConversationState } from "../engine/types.js";
+import type { ConversationState as _ConversationState } from "../engine/types.js";
 
 describe("createInitialState", () => {
   it("returns state with Discover phase active and all others pending", () => {

@@ -151,6 +151,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
    */
   const dispatchAutoContinue = useCallback((message: string) => {
     if (consecutiveRef.current >= AUTO_CONTINUE_MAX_CONSECUTIVE) {
+      // eslint-disable-next-line no-console
       console.warn(
         `[ActionDispatch] Auto-continue rate limit reached ` +
         `(${AUTO_CONTINUE_MAX_CONSECUTIVE} consecutive). Waiting for user input.`,
@@ -210,6 +211,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
       case 'api': {
         const registry = optionsRef.current.connectorRegistry;
         if (!registry) {
+          // eslint-disable-next-line no-console
           console.warn(
             `[ActionDispatch] api action "${action.name}" — no connectorRegistry provided. Falling back to LLM re-prompt.`,
             action,
@@ -220,6 +222,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
 
         const { connectorName, operation } = parseApiAction(action.name);
         if (!connectorName) {
+          // eslint-disable-next-line no-console
           console.warn(
             `[ActionDispatch] api action "${action.name}" has no connector name. ` +
             `Expected format: api:{connectorName}.{operation}. Falling back to LLM re-prompt.`,
@@ -231,6 +234,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
 
         const connector = registry.get(connectorName);
         if (!connector) {
+          // eslint-disable-next-line no-console
           console.warn(
             `[ActionDispatch] api action "${action.name}" — connector "${connectorName}" not found in registry. ` +
             `Registered: [${registry.names().join(', ')}]. Falling back to LLM re-prompt.`,
@@ -243,6 +247,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
         // Connector found — invoke the operation if it exists as a method.
         const method = (connector as Record<string, unknown>)[operation];
         if (typeof method !== 'function') {
+          // eslint-disable-next-line no-console
           console.warn(
             `[ActionDispatch] api action "${action.name}" — connector "${connectorName}" has no method "${operation}". Falling back to LLM re-prompt.`,
             action,
@@ -262,6 +267,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
           })
           .catch((err: unknown) => {
             const errMsg = err instanceof Error ? err.message : String(err);
+            // eslint-disable-next-line no-console
             console.error(`[ActionDispatch] api action "${action.name}" failed:`, err);
             optionsRef.current.onSendMessage(
               `[API Error: ${connectorName}.${operation}] ${errMsg}`,

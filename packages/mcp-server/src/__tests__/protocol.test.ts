@@ -5,7 +5,6 @@ import {
 } from "../app/protocol.js";
 import type {
   AppToServerMessage,
-  ServerToAppMessage,
 } from "../app/protocol.js";
 import type { SessionState } from "@kickstart/core";
 

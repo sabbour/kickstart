@@ -9,13 +9,13 @@ import React, { useState, useCallback, useRef, useMemo, useEffect, memo } from '
 import {
   Button, CounterBadge, SearchBox,
   Card, CardHeader,
-  Textarea, Text, Subtitle2, Caption1, Body1Strong, Body1,
+  Textarea, Subtitle2, Caption1, Body1Strong,
   MessageBar, MessageBarBody,
   TabList, Tab, Input,
-  Dialog, DialogTrigger, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions,
+  Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions,
   makeStyles, tokens,
 } from '@fluentui/react-components';
-import { Dismiss24Regular, Copy24Regular, Delete24Regular, DocumentCopy24Regular, Sparkle24Regular } from '@fluentui/react-icons';
+import { Dismiss24Regular, Delete24Regular, DocumentCopy24Regular, Sparkle24Regular } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import { WidgetsProvider, useWidgets } from '../hooks/useWidgets';
 import { getDemoResponse, resetDemoState } from '../services/demo-scenarios';
@@ -29,13 +29,10 @@ import {
   type ScenarioDef,
 } from './playground-scenarios';
 import {
-  ALL_ICON_CATEGORIES,
   AZURE_ICON_CATEGORIES,
   UI_ICON_CATEGORIES,
   FLUENT_ICON_CATEGORY,
   FLUENT_REACT_ICON_CATEGORY,
-  TOTAL_ICON_COUNT,
-  type IconCategory,
   type IconEntry,
 } from './playground-icons';
 import { getFluentIcon } from '../catalog/icons/fluent-icons';
@@ -670,7 +667,6 @@ const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
       }
     };
     // processMessages and processor are stable (useCallback / ref-based)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenario]);
 
   const surfaceEntries = Array.from(surfaces.entries());
@@ -731,7 +727,6 @@ const WidgetCard = memo(({ widget, onWidgetClick, onDuplicate, onDelete }: Widge
         try { processor.model.deleteSurface(id); } catch { /* already gone */ }
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.messages]);
 
   const surfaceEntries = Array.from(surfaces.entries());
@@ -787,7 +782,6 @@ const WidgetPreview = memo(({ widget }: WidgetPreviewProps) => {
         try { processor.model.deleteSurface(id); } catch { /* already gone */ }
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widget.messages]);
 
   const surfaceEntries = Array.from(surfaces.entries());
@@ -845,7 +839,7 @@ function PlaygroundInner() {
   const galleryRef = useRef<HTMLDivElement>(null);
   const createInputRef = useRef<HTMLTextAreaElement>(null);
   const [createMessages, setCreateMessages] = useState<ChatMessage[]>([]);
-  const { widgets, addWidget, updateWidget, deleteWidget, duplicateWidget } = useWidgets();
+  const { widgets, addWidget, updateWidget: _updateWidget, deleteWidget, duplicateWidget } = useWidgets();
   const [inspireLoading, setInspireLoading] = useState(false);
   const inspireAbortRef = useRef<AbortController | null>(null);
 
@@ -953,7 +947,7 @@ function PlaygroundInner() {
   );
 
   // Filter scenarios (old variable for compatibility)
-  const filteredScenarios = filteredGalleryScenarios;
+  const _filteredScenarios = filteredGalleryScenarios;
 
   // Handle card click → open detail dialog
   const handleCardClick = useCallback((scenario: ScenarioDef, surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>) => {

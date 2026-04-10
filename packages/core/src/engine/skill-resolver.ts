@@ -32,10 +32,10 @@ const DISCOVERY_PHASES = new Set<Phase>([Phase.Discover]);
 const DESIGN_PHASES = new Set<Phase>([Phase.Discover, Phase.Design]);
 
 /** Phases where code-generation prompts are relevant. */
-const GENERATE_PHASES = new Set<Phase>([Phase.Generate]);
+const _GENERATE_PHASES = new Set<Phase>([Phase.Generate]);
 
 /** Phases where deployment/validation prompts are relevant. */
-const DEPLOYMENT_PHASES = new Set<Phase>([
+const _DEPLOYMENT_PHASES = new Set<Phase>([
   Phase.Review,
   Phase.Handoff,
   Phase.Deploy,

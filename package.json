@@ -11,7 +11,7 @@
   "scripts": {
     "build": "npm run clean --workspaces --if-present && npm run build --workspaces --if-present",
     "test": "npx vitest run",
-    "lint": "eslint packages/*/src/**/*.ts",
+    "lint": "eslint packages/*/src/**/*.ts packages/*/src/**/*.tsx",
     "api:build": "npm run build -w @kickstart/core && npm run build -w @kickstart/api",
     "clean": "npm run clean --workspaces --if-present",
     "dev": "npm run build -w @kickstart/core && concurrently \"npm run dev:vite\" \"npx swa start\"",

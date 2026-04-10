@@ -46,7 +46,6 @@ export interface IntegrationKit {
   /** Human-readable summary of what this kit provides */
   description: string;
   /** Tools this kit contributes to the LLM tool registry */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools: Tool<any>[];
   /** Authenticated API connectors this kit contributes */
   connectors: APIConnector[];

@@ -10,7 +10,7 @@
  *   • Double-registration idempotency
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { IntegrationKitRegistry, registerKit, defaultKitRegistry } from '../kits/registry.js';
 import { azureKit } from '../kits/azure-kit.js';
 import { githubKit } from '../kits/github-kit.js';

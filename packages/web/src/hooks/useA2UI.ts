@@ -36,6 +36,7 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
         if (handlerRef.current) {
           handlerRef.current(action);
         } else {
+          // eslint-disable-next-line no-console
           console.log('[A2UI] action (no handler):', action);
         }
       }

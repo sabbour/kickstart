@@ -245,19 +245,16 @@ describe("Tool execution", () => {
   describe("missing required args — graceful handling (TDD targets)", () => {
     it("execute with empty args object does not throw", async () => {
       // Stubs may return degraded results but must not crash
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await expect(azureResourceList.execute({} as any)).resolves.toBeDefined();
     });
 
     it("execute with null arg values does not throw", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await expect(azureResourceList.execute({ subscriptionId: null as any })).resolves.toBeDefined();
     });
 
     it("execute with missing required args returns an error indicator OR degrades gracefully", async () => {
       // A well-implemented tool should either return { error: ... } or throw a typed error.
       // Stub currently returns data with undefined fields — this test documents the expected contract.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await azureResourceList.execute({} as any) as Record<string, unknown>;
       // Must return either a result object or an error field — not undefined
       expect(result).not.toBeUndefined();
@@ -269,7 +266,6 @@ describe("Tool execution", () => {
       await expect(
         estimateCost.execute({
           region: "eastus",
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           nodeCount: "three" as any,
           vmSize: "Standard_D4s_v3",
         }),
@@ -279,7 +275,6 @@ describe("Tool execution", () => {
     it("generate_kubernetes_manifest with numeric appName does not crash", async () => {
       await expect(
         generateKubernetesManifest.execute({
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           appName: 42 as any,
           runtime: "node",
           port: 3000,

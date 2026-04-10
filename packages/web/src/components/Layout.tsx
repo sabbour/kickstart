@@ -13,7 +13,7 @@ interface LayoutProps {
 }
 
 export function Layout({
-  sidebarOpen,
+  sidebarOpen: _sidebarOpen,
   onToggleSidebar,
   onNewSession,
   showSessionsToggle,

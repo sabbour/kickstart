@@ -359,7 +359,7 @@ describe("B-23: A2UI action handler — action context propagation", () => {
     const session = createSession("s-ctx");
     sessions.set("s-ctx", session);
 
-    const result = await handleAction(sessions, "s-ctx", "select", {
+    const _result = await handleAction(sessions, "s-ctx", "select", {
       runtime: "python",
       port: 5000,
     });
