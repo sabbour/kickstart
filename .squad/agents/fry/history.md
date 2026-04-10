@@ -155,3 +155,12 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - **clearAllSessions compound reset:** The raw `useSessions.clearAllSessions` only clears session state and localStorage. Added `handleClearAllSessions` wrapper in `App.tsx` that also resets `messages`, `a2ui` surfaces, virtual filesystem, and selected file. This prevents stale data from lingering after clearing all sessions.
 - **Pattern:** Compound state operations (like "clear everything") should be handled at the App level, not delegated to individual hooks, so ALL related state is reset together.
 - **README playground section:** Added `## Playground` section linking to `/?playground` with a brief description of the A2UI sandbox.
+
+### XSS Sanitization (Issues #81, #82) — 2026-04-10
+
+- **DOMPurify shared utility:** Created `packages/web/src/utils/sanitize.ts` — wraps `DOMPurify.sanitize()` with a strict allowlist of formatting tags and safe attributes (`class`, `href`, `target`, `rel`, `title`). No `data-*` attributes allowed. Use this for ALL `dangerouslySetInnerHTML` usage.
+- **ChatMessage fix:** The `formatText()` function applied regex formatting (bold, paragraphs, br) to raw text without HTML escaping first. Wrapped output in `sanitizeHtml()` before injection.
+- **CodeBlock/FileEditor fallback fix:** The highlight.js `catch` block returned raw `props.code`/`resolvedContent` directly, which then went into `dangerouslySetInnerHTML`. Added `escapeHtml()` (entity-encode `&<>"'`) for fallback paths, plus `sanitizeHtml()` on all hljs output as defense-in-depth.
+- **Markdown defense-in-depth:** highlight.js already escapes content internally, but added `sanitizeHtml()` wrapper on `result.value` in the Markdown component's code fence renderer for belt-and-suspenders safety.
+- **Pattern:** Never pass unescaped user/model content to `dangerouslySetInnerHTML`. Always route through `sanitizeHtml()` from `utils/sanitize.ts`. For code fallbacks, use `escapeHtml()` entity encoding.
+- **Build/test verified:** 423/423 tests pass, zero TypeScript errors, lint clean, Vite build succeeds.
