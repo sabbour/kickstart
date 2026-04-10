@@ -105,6 +105,38 @@ Before running any `gh` commands, ensure you are authenticated with the correct 
 
 ---
 
+## Design Proposal (DP) Process
+
+> Design discussion happens on the **issue**, not the PR. PRs are for code review only.
+
+### Authorship
+
+- **Issue body** (problem + acceptance criteria) = written by Ahmed or Leela during triage. This is the "what and why."
+- **DP comment** (proposed approach) = written by the implementing agent (Bender/Fry/Hermes). This is the "how."
+- Agents do NOT write problem statements — they propose solutions to problems defined by the product owner or Lead.
+
+### DP Lifecycle
+
+1. **Issue is triaged** — Ahmed or Leela writes the problem statement and acceptance criteria in the issue body.
+2. **Agent picks up issue** — posts a **Design Proposal (DP)** as a structured comment on the issue BEFORE writing any code.
+3. **DP structure:**
+   - Problem statement (reference to issue body)
+   - Proposed approach
+   - Files to modify / create
+   - Patterns and dependencies
+   - API contracts (if applicable)
+   - Security considerations
+   - Alternatives considered
+4. **Leela reviews DP** for architecture quality (comment on issue).
+5. **Zapp reviews DP** for security concerns (comment on issue).
+6. **Both approve** → agent proceeds to implementation.
+7. **Draft PR opened** — code review only; design is already approved on the issue.
+8. **PR marked ready** → CI → Leela reviews code quality → Zapp reviews security → merge.
+
+> For foundational patterns (e.g., ServiceConnector, ServicePack, LLM tool system), the DP may reference a full design doc in `docs/architecture/`.
+
+---
+
 ## PR Workflow
 
 ### Creating a PR
@@ -149,6 +181,15 @@ Only after work is complete AND CI passes:
 ```bash
 gh pr ready <N>
 ```
+
+### Review Gates
+
+Before a PR can merge, it must pass two review gates:
+
+1. **Leela** — reviews for code quality, architecture alignment with the approved DP
+2. **Zapp** — reviews for security concerns (auth, injection, secrets, CORS)
+
+Zapp's review is a **pre-merge gate** for foundational patterns. Do not merge without Zapp's approval on security-sensitive changes.
 
 ### Requesting Copilot Review
 
@@ -241,13 +282,19 @@ Example: `squad/42-fix-login-validation`
 □ Assign issue to current user (gh api user -q .login)
 □ Set milestone
 □ Update board → In progress
+□ Post Design Proposal (DP) comment on issue
+□ Leela approves DP (architecture)
+□ Zapp approves DP (security)
 □ Create branch: squad/{N}-{slug}
+□ Implement (design already approved)
 □ Open draft PR: gh pr create --draft
 □ Post progress comments on PR
 □ Rebase if behind main (never merge)
 □ All CI green
 □ gh pr ready
 □ Request @copilot review via API
+□ Leela reviews code quality
+□ Zapp reviews security
 □ Address all review comments
 □ Resolve all threads
 □ Update board → In review
