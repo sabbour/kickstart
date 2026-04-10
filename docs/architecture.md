@@ -196,9 +196,57 @@ flowchart LR
     ConnReg -->|request()| Connectors["AzureARMConnector\nGitHubConnector\nPricingConnector"]
 ```
 
+### ServicePack Pattern
+
+**ServicePacks** extend `IntegrationKit` with declarative **auth requirements**, **lifecycle hooks**, and **dependency management**:
+
+```typescript
+interface ServicePack extends IntegrationKit {
+  authRequirements?: KitAuthRequirement[];  // Declare needed credentials
+  dependencies?: string[];                   // Kit names this pack requires
+  onActivate?(): Promise<void>;             // Called after registration
+  onDeactivate?(): Promise<void>;           // Called before unregistration
+}
+
+interface KitAuthRequirement {
+  provider: 'azure-msal' | 'github-oauth' | ...;
+  scopes: string[];
+}
+```
+
+**Registration is transactional:**
+- Validates dependencies exist (DFS cycle detection)
+- Validates auth schemas
+- Calls `onActivate()` on all kits; rolls back on failure
+- Unregistration keeps a kit if its `onDeactivate()` fails (safety-first)
+
+**Example:** The `github` kit declares `{ provider: 'github-oauth', scopes: ['repo', 'read:user'] }`. When a component needs GitHub functionality, the app calls `GitHubConnector.authenticate()`, which kicks off device code flow (with in-memory token storage — no localStorage).
+
 ---
 
-## Tool System
+### Fat Components & Component Lifecycle
+
+**Fat A2UI components** are self-managing, opinionated implementations of common workflows:
+
+| Component | Auth | Lifecycle | Security |
+|-----------|------|-----------|----------|
+| **AzureLoginCard** | MSAL (Device Code) | Display code → poll token → fetch profile | Token in memory; logout clears it |
+| **AzureResourcePicker** | AzureARMConnector | Fetch subscriptions → list resources with live search | Rate-limit handling + stub fallback |
+| **AzureResourceForm** | AzureARMConnector | Collect deployment params, preview cost, submit | Input validation + cost estimation |
+| **GitHubLoginCard** | GitHub OAuth (Device Code) | Display code → poll token → fetch user + profile | Token in memory; no localStorage |
+| **GitHubRepoPicker** | GitHubConnector | Fetch user's repos, debounced search, pagination | Rate-limit warnings + stub fallback |
+| **GitHubAction** | GitHubConnector | Map to allowlisted GitHub API operations, require typed confirmation for destructive ops | Blocks main/master/production branches |
+| **GitHubCommit** | GitHubConnector | Artifact selection, branch name validation, PR creation flow, diff preview | Protected-branch guards |
+
+**Security guardrails:**
+- **In-memory token storage only** — tokens are cleared on logout or session end
+- **Operation allowlisting** — write operations must be explicitly listed (no arbitrary API calls)
+- **Typed confirmation** — DELETE and merge operations require developer confirmation
+- **Protected-branch blocking** — Cannot push to main/master/production via the component
+
+---
+
+## Tool System & LLM Function Calling
 
 The `ToolRegistry` is the central register for LLM-callable tools. Tools are plain objects implementing `Tool<TArgs>`:
 
@@ -211,19 +259,57 @@ interface Tool<TArgs> {
 }
 ```
 
-The registry exports tools in OpenAI function-calling format via `toOpenAIFormat()` and routes `execute(name, args)` calls with structured logging.
+The registry exports tools in **OpenAI function-calling format** via `toOpenAIFormat()` and routes `execute(name, args)` calls with structured logging. When the LLM returns a `tool_calls` response, the engine:
+1. Maps tool names to `ToolRegistry` entries
+2. Validates arguments against JSON schemas
+3. Executes each tool and collects results
+4. Sends results back to the LLM for follow-up reasoning
 
-**7 built-in tools** (auto-registered at import):
+**9 built-in tools** (auto-registered at import):
 
-| Tool | Kit | Purpose |
-|------|-----|---------|
-| `azure_resource_list` | azure | List Azure resources in a subscription |
-| `azure_resource_get` | azure | Inspect a specific Azure resource |
-| `estimate_cost` | azure | Monthly cost estimate for a deployment plan |
-| `github_repo_info` | github | Detect language, runtime, CI setup from a GitHub repo |
-| `generate_kubernetes_manifest` | core | Generate K8s Deployment/Service/Ingress YAML |
-| `list_artifacts` | core | List generated artifacts in the store |
-| `get_artifact` | core | Retrieve a generated artifact by path |
+| Tool | Kit | Purpose | Function Call? |
+|------|-----|---------|:---:|
+| `azure_resource_list` | azure | List Azure resources in a subscription | ✓ |
+| `azure_resource_get` | azure | Inspect a specific Azure resource | ✓ |
+| `estimate_cost` | azure | Monthly cost estimate for a deployment plan | ✓ |
+| `github_repo_info` | github | Detect language, runtime, CI setup from a GitHub repo | ✓ |
+| `github_api_get` | github | General-purpose GitHub REST API read-only query | ✓ |
+| `fetch_webpage` | core | Fetch webpage and convert HTML to text (SSRF-protected) | ✓ |
+| `generate_kubernetes_manifest` | core | Generate K8s Deployment/Service/Ingress YAML | No |
+| `list_artifacts` | core | List generated artifacts in the store | No |
+| `get_artifact` | core | Retrieve a generated artifact by path | No |
+
+**SSRF & Security Controls:**
+- `fetch_webpage` blocks private IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x)
+- Blocks localhost, cloud metadata endpoints, and suspicious redirects
+- All tools sanitize output to prevent injection attacks
+
+### ServiceConnector Pattern
+
+**ServiceConnectors** (`AzureARMConnector`, `GitHubConnector`, `PricingConnector`) handle authenticated API calls on behalf of the engine. Each connector:
+
+1. **Manages authentication** — Token lifecycle, refresh, and credential storage
+2. **Implements uniform interface** — `authenticate()`, `request()`, `isAuthenticated()`
+3. **Provides domain methods** — `listResources()`, `getResource()`, `listUserRepos()`, etc.
+4. **Handles errors gracefully** — Rate limiting, retry logic, stub fallback for offline mode
+
+Connectors are registered in `APIConnectorRegistry` and are shared across tools and fat components. When a component or tool needs to call an API, it looks up the connector by name and calls its methods.
+
+---
+
+## CORS Proxy Security
+
+The web API provides CORS proxy endpoints (`/api/arm-proxy`, `/api/github-proxy`, `/api/pricing-proxy`) to allow the browser to access external APIs. These proxies enforce strict security controls:
+
+| Control | Purpose |
+|---------|---------|
+| **Private IP blocking** | Rejects requests to 10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x |
+| **Redirect validation** | Follows redirects only to same origin or Azure/GitHub domains |
+| **Hostname allowlist** | Blocks localhost, 127.0.0.1, cloud metadata endpoints (169.254.169.254, etc.) |
+| **Rate limiting** | Per-user, per-endpoint throttling to prevent abuse |
+| **Header filtering** | Strips sensitive headers; only allows safe response headers back to browser |
+
+**Auto-continue middleware** wraps the conversation engine to automatically advance past "waiting for user decision" phases when the LLM has enough context. This keeps the flow smooth even with network latency.
 
 ---
 
