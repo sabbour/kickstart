@@ -15,7 +15,7 @@ import {
   Dialog, DialogTrigger, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions,
   makeStyles, tokens,
 } from '@fluentui/react-components';
-import { Dismiss24Regular, Copy24Regular, Delete24Regular, DocumentCopy24Regular } from '@fluentui/react-icons';
+import { Dismiss24Regular, Copy24Regular, Delete24Regular, DocumentCopy24Regular, Sparkle24Regular } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import { useStreaming } from '../hooks/useStreaming';
 import { WidgetsProvider, useWidgets } from '../hooks/useWidgets';
