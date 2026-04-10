@@ -44,6 +44,7 @@ const FRAMEWORKS = [
   { id: 'nextjs', label: 'Next.js' },
   { id: 'fastapi', label: 'Python FastAPI' },
   { id: 'express', label: 'Express.js' },
+  { id: 'dotnet', label: '.NET' },
   { id: 'go', label: 'Go' },
   { id: 'spring', label: 'Spring Boot' },
   { id: 'django', label: 'Django' },
