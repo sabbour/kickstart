@@ -43,7 +43,10 @@ How to decide who handles what.
 | Signal | Route to Zapp |
 |--------|---------------|
 | Security review request | Primary |
-| Architecture decision review | Secondary (after Leela) |
-| PR security audit | Primary |
+| PR security review (threats, auth, secrets, compliance) | Primary |
 | Vulnerability analysis | Primary |
 | Auth/CORS/secrets concerns | Primary |
+| Architecture design review | ❌ NOT Zapp — route to Leela |
+| General code quality review | ❌ NOT Zapp — route to Leela |
+
+**Handoff with Leela:** Leela designs architecture → Zapp reviews for security only. On foundational PRs (#25, #30, #26 type issues), both review: Leela for design quality, Zapp for security risks. Zapp does NOT comment on abstraction quality, naming, or pattern choices unless they have security implications.
