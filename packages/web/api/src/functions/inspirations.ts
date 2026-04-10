@@ -168,7 +168,7 @@ async function generateIdeas(): Promise<InspirationIdea[]> {
       },
     ],
     {
-      temperature: 1.2,
+      temperature: 1,
       maxTokens: 300,
       ...(inspireDeployment ? { deployment: inspireDeployment } : {}),
     },
@@ -212,102 +212,85 @@ app.http("inspirations", {
     try {
       // STREAMING PATH
       if (isStreaming) {
-        if (isOpenAIConfigured()) {
-          // Stream from OpenAI
-          const { chatCompletionStream, getInspireDeploymentName } = await import("../lib/openai-client.js");
-          const domain = randomDomainHint();
-          const inspireDeployment = getInspireDeploymentName();
-          
-          const encoder = new TextEncoder();
-          const stream = new ReadableStream({
-            async start(controller) {
-              try {
-                const gen = chatCompletionStream(
-                  [
-                    {
-                      role: "system",
-                      content: `You generate a single creative app idea for a developer to build and deploy to Azure Kubernetes Service in a couple of hours. Be wildly creative and original. Never repeat common themes like todo apps, weather dashboards, or chat bots. Pick an unexpected angle from the domain hinted below. The idea should be small enough to implement in one focused coding session but impressive enough to demo. It MUST require a server-side component — a backend API, a database, or an AI/ML service. Return ONLY the idea as a first-person sentence starting with "I want to build" (no JSON, no markdown, no title, just the sentence). Max 2 sentences. No emoji.`,
-                    },
-                    {
-                      role: "user",
-                      content: `Generate 1 creative app idea in the "${domain}" space that requires server-side deployment. Surprise me with something novel.`,
-                    },
-                  ],
-                  {
-                    temperature: 1.2,
-                    maxTokens: 200,
-                    ...(inspireDeployment ? { deployment: inspireDeployment } : {}),
-                  },
-                );
-
-                for await (const chunk of gen) {
-                  controller.enqueue(encoder.encode(sseData(chunk)));
-                }
-                controller.enqueue(encoder.encode(sseData("[DONE]")));
-                controller.close();
-              } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
-                context.log(`Streaming error: ${msg}`);
-                controller.enqueue(encoder.encode(sseData(`[ERROR] ${msg}`)));
-                controller.close();
-              }
-            },
-          });
-
+        if (!isOpenAIConfigured()) {
           return {
-            status: 200,
-            headers: {
-              "Content-Type": "text/event-stream",
-              "Cache-Control": "no-cache",
-              "Connection": "keep-alive",
-            },
-            body: stream,
-          };
-        } else {
-          // Simulate streaming with fallback idea
-          const fallbackIdea = shuffle(FALLBACK_IDEAS)[0];
-          const encoder = new TextEncoder();
-          const stream = new ReadableStream({
-            async start(controller) {
-              try {
-                for await (const char of simulateStream(fallbackIdea.prompt)) {
-                  controller.enqueue(encoder.encode(sseData(char)));
-                }
-                controller.enqueue(encoder.encode(sseData("[DONE]")));
-                controller.close();
-              } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
-                context.log(`Simulated streaming error: ${msg}`);
-                controller.close();
-              }
-            },
-          });
-
-          return {
-            status: 200,
-            headers: {
-              "Content-Type": "text/event-stream",
-              "Cache-Control": "no-cache",
-              "Connection": "keep-alive",
-            },
-            body: stream,
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+            jsonBody: { error: "Azure OpenAI not configured." },
           };
         }
+
+        const { chatCompletionStream, getInspireDeploymentName } = await import("../lib/openai-client.js");
+        const domain = randomDomainHint();
+        const inspireDeployment = getInspireDeploymentName();
+        
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          async start(controller) {
+            try {
+              const gen = chatCompletionStream(
+                [
+                  {
+                    role: "system",
+                    content: `You generate a single creative app idea for a developer to build and deploy to Azure Kubernetes Service in a couple of hours. Be wildly creative and original. Never repeat common themes like todo apps, weather dashboards, or chat bots. Pick an unexpected angle from the domain hinted below. The idea should be small enough to implement in one focused coding session but impressive enough to demo. It MUST require a server-side component — a backend API, a database, or an AI/ML service. Return ONLY the idea as a first-person sentence starting with "I want to build" (no JSON, no markdown, no title, just the sentence). Max 2 sentences. No emoji.`,
+                  },
+                  {
+                    role: "user",
+                    content: `Generate 1 creative app idea in the "${domain}" space that requires server-side deployment. Surprise me with something novel.`,
+                  },
+                ],
+                {
+                  temperature: 1,
+                  maxTokens: 200,
+                  ...(inspireDeployment ? { deployment: inspireDeployment } : {}),
+                },
+              );
+
+              for await (const chunk of gen) {
+                controller.enqueue(encoder.encode(sseData(chunk)));
+              }
+              controller.enqueue(encoder.encode(sseData("[DONE]")));
+              controller.close();
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              context.log(`Streaming error: ${msg}`);
+              controller.enqueue(encoder.encode(sseData(`[ERROR] ${msg}`)));
+              controller.close();
+            }
+          },
+        });
+
+        return {
+          status: 200,
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+          },
+          body: stream,
+        };
       }
 
       // NON-STREAMING PATH (original behavior)
-      let ideas: InspirationIdea[];
+      if (!isOpenAIConfigured()) {
+        return {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+          jsonBody: { error: "Azure OpenAI not configured. Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and a deployment name." },
+        };
+      }
 
-      if (isOpenAIConfigured()) {
-        try {
-          ideas = await generateIdeas();
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          context.log(`OpenAI generation failed, using fallback: ${msg}`);
-          ideas = [shuffle(FALLBACK_IDEAS)[0]];
-        }
-      } else {
-        ideas = [shuffle(FALLBACK_IDEAS)[0]];
+      let ideas: InspirationIdea[];
+      try {
+        ideas = await generateIdeas();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        context.log(`OpenAI generation failed: ${msg}`);
+        return {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
+          jsonBody: { error: `Inspiration generation failed: ${msg}` },
+        };
       }
 
       return {

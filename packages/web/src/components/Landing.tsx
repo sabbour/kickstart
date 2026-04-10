@@ -68,97 +68,26 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [inspireLoading, setInspireLoading] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const handleInspire = useCallback(async () => {
-    // Abort any existing stream
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
+  const handleInspire= useCallback(async () => {
     setInspireLoading(true);
-    setInputValue(''); // Clear existing value
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
     try {
-      const res = await fetch('/api/inspirations?stream=true', {
-        signal: controller.signal,
-      });
-
-      if (!res.ok) throw new Error('Streaming API error');
-      if (!res.body) throw new Error('No response body');
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let accumulatedText = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') {
-              setInspireLoading(false);
-              inputRef.current?.focus();
-              return;
-            }
-            if (data.startsWith('[ERROR]')) {
-              throw new Error(data.slice(8));
-            }
-            // Append token to accumulated text
-            accumulatedText += data;
-            setInputValue(accumulatedText);
-          }
-        }
-      }
-
-      setInspireLoading(false);
-      inputRef.current?.focus();
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        // Stream was aborted - this is expected when clicking Inspire again
+      const res = await fetch('/api/inspirations');
+      if (!res.ok) throw new Error('API error');
+      const ideas = await res.json();
+      if (Array.isArray(ideas) && ideas.length > 0) {
+        setInputValue(ideas[0].prompt);
+        inputRef.current?.focus();
         return;
       }
-
-      // Fallback to non-streaming JSON path
-      setInputValue(''); // Clear any partial streaming
-      try {
-        const res = await fetch('/api/inspirations');
-        if (!res.ok) throw new Error('API error');
-        const ideas = await res.json();
-        if (Array.isArray(ideas) && ideas.length > 0) {
-          setInputValue(ideas[0].prompt);
-          inputRef.current?.focus();
-          setInspireLoading(false);
-          return;
-        }
-      } catch {
-        // Double fallback: pick from local INSPIRATIONS
-      } finally {
-        setInspireLoading(false);
-      }
-      const pick = INSPIRATIONS[Math.floor(Math.random() * INSPIRATIONS.length)];
-      setInputValue(pick);
-      inputRef.current?.focus();
+    } catch {
+      // Fallback: pick from local INSPIRATIONS array
     } finally {
-      abortControllerRef.current = null;
+      setInspireLoading(false);
     }
-  }, []);
-
-  // Abort any in-flight streaming request on unmount
-  useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-    };
+    const pick = INSPIRATIONS[Math.floor(Math.random() * INSPIRATIONS.length)];
+    setInputValue(pick);
+    inputRef.current?.focus();
   }, []);
 
   // Rotate placeholder inspiration
