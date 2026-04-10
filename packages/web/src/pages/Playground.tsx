@@ -137,6 +137,20 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground4,
     fontSize: tokens.fontSizeBase200,
   },
+  catalogBadge: {
+    display: 'inline-block',
+    fontSize: '10px',
+    lineHeight: '16px',
+    fontWeight: tokens.fontWeightSemibold,
+    padding: `0 ${tokens.spacingHorizontalSNudge}`,
+    borderRadius: tokens.borderRadiusSmall,
+    backgroundColor: tokens.colorNeutralBackground4,
+    color: tokens.colorNeutralForeground3,
+    textTransform: 'lowercase' as const,
+    letterSpacing: '0.02em',
+    marginLeft: tokens.spacingHorizontalS,
+    verticalAlign: 'middle',
+  },
   cardBody: {
     padding: tokens.spacingHorizontalM,
     paddingTop: tokens.spacingVerticalS,
@@ -538,7 +552,12 @@ const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
       onClick={() => onCardClick(scenario, surfaces)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(scenario, surfaces); } }}
     >
-      <Caption1 className={classes.cardLabel}>{scenario.label}</Caption1>
+      <Caption1 className={classes.cardLabel}>
+        {scenario.label}
+        {scenario.catalog && (
+          <span className={classes.catalogBadge}>{scenario.catalog}</span>
+        )}
+      </Caption1>
       {scenario.description && (
         <Caption1 className={classes.cardDescription}>{scenario.description}</Caption1>
       )}
@@ -1001,7 +1020,7 @@ function PlaygroundInner() {
           size="medium"
         >
           <Tab id="tab-create" value="create" aria-controls="panel-create">Create</Tab>
-          <Tab id="tab-gallery" value="gallery" aria-controls="panel-gallery">Gallery</Tab>
+          <Tab id="tab-gallery" value="gallery" aria-controls="panel-gallery">Ideas</Tab>
           <Tab id="tab-components" value="components" aria-controls="panel-components">Components</Tab>
           <Tab id="tab-icons" value="icons" aria-controls="panel-icons">Icons</Tab>
           <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets">Widgets</Tab>

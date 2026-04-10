@@ -16,7 +16,10 @@ import xml from 'highlight.js/lib/languages/xml';
 import css from 'highlight.js/lib/languages/css';
 import bash from 'highlight.js/lib/languages/bash';
 import markdown from 'highlight.js/lib/languages/markdown';
-import 'highlight.js/styles/vs.css';
+import dockerfile from 'highlight.js/lib/languages/dockerfile';
+import yaml from 'highlight.js/lib/languages/yaml';
+import go from 'highlight.js/lib/languages/go';
+import 'highlight.js/styles/github-dark.css';
 
 // Register highlight.js languages
 hljs.registerLanguage('javascript', javascript);
@@ -30,6 +33,9 @@ hljs.registerLanguage('html', xml);
 hljs.registerLanguage('css', css);
 hljs.registerLanguage('bash', bash);
 hljs.registerLanguage('markdown', markdown);
+hljs.registerLanguage('dockerfile', dockerfile);
+hljs.registerLanguage('yaml', yaml);
+hljs.registerLanguage('go', go);
 
 const MarkdownApi = {
   name: 'Markdown',
@@ -135,7 +141,8 @@ const useStyles = makeStyles({
     fontFamily: tokens.fontFamilyMonospace,
     fontSize: tokens.fontSizeBase300,
     lineHeight: tokens.lineHeightBase300,
-    backgroundColor: tokens.colorNeutralBackground1,
+    backgroundColor: '#0d1117',
+    color: '#c9d1d9',
     padding: tokens.spacingHorizontalM,
     borderRadius: tokens.borderRadiusMedium,
     overflowX: 'auto',
@@ -214,7 +221,7 @@ export const Markdown = createReactComponent(MarkdownApi, ({ props }) => {
                 });
                 return (
                   <pre className={classes.pre}>
-                    <code dangerouslySetInnerHTML={{ __html: result.value }} />
+                    <code className="hljs" dangerouslySetInnerHTML={{ __html: result.value }} />
                   </pre>
                 );
               } catch (error) {
@@ -229,7 +236,7 @@ export const Markdown = createReactComponent(MarkdownApi, ({ props }) => {
                 const result = hljs.highlightAuto(String(children).replace(/\n$/, ''));
                 return (
                   <pre className={classes.pre}>
-                    <code dangerouslySetInnerHTML={{ __html: result.value }} />
+                    <code className="hljs" dangerouslySetInnerHTML={{ __html: result.value }} />
                   </pre>
                 );
               } catch (error) {

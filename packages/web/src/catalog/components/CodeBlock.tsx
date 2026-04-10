@@ -25,7 +25,7 @@ import markdown from 'highlight.js/lib/languages/markdown';
 import dockerfile from 'highlight.js/lib/languages/dockerfile';
 import yaml from 'highlight.js/lib/languages/yaml';
 import go from 'highlight.js/lib/languages/go';
-import 'highlight.js/styles/github.css';
+import 'highlight.js/styles/github-dark.css';
 
 // Register highlight.js languages
 hljs.registerLanguage('javascript', javascript);
@@ -79,7 +79,9 @@ const useStyles = makeStyles({
     fontFamily: tokens.fontFamilyMonospace,
     fontSize: '12px',
     lineHeight: '18px',
-    backgroundColor: tokens.colorNeutralBackground1,
+    backgroundColor: '#0d1117',
+    color: '#c9d1d9',
+    borderRadius: '0',
   },
 });
 
@@ -132,7 +134,7 @@ export const CodeBlock = createReactComponent(CodeBlockApi, ({ props }) => {
         </div>
       )}
       <pre className={classes.codeContent}>
-        <code dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+        <code className="hljs" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
       </pre>
     </Card>
   );

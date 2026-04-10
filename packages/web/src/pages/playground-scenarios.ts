@@ -37,6 +37,8 @@ export interface ScenarioDef {
   label: string;
   description: string;
   group: string;
+  /** Which catalog this component originates from */
+  catalog?: string;
   /** If present, this scenario is driven by demo-scenarios.ts keyword matching */
   keyword?: string;
   /** If present, this function generates the A2UI messages directly */
@@ -325,6 +327,38 @@ const customProgressSteps = (): A2uiMsg[] => {
       { id: 'review', label: 'Review', status: 'pending' },
       { id: 'deploy', label: 'Deploy', status: 'pending' },
     ] },
+  ] as A2uiComponent[]);
+};
+
+const customArchitectureDiagram = (): A2uiMsg[] => {
+  const sid = uid('arch-diagram-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'ad1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Architecture Diagram', variant: 'h3' },
+    { id: 'ad1', component: 'ArchitectureDiagram',
+      title: 'AKS Application Architecture',
+      description: 'Typical microservice deployment on Azure Kubernetes Service',
+      diagram: `graph LR
+  Client([Client]) --> Ingress[Ingress Controller]
+  Ingress --> FE[Frontend Pod]
+  Ingress --> API[API Pod]
+  API --> DB[(Azure SQL)]
+  API --> Cache[(Redis Cache)]
+  API --> Queue[Service Bus]
+  Queue --> Worker[Worker Pod]
+  Worker --> Storage[(Blob Storage)]
+  subgraph AKS Cluster
+    Ingress
+    FE
+    API
+    Worker
+  end
+  subgraph Azure Services
+    DB
+    Cache
+    Queue
+    Storage
+  end` },
   ] as A2uiComponent[]);
 };
 
@@ -646,28 +680,29 @@ const dynamicComplexDashboard = (): A2uiMsg[] => {
 
 export const CONTROL_SCENARIOS: ScenarioDef[] = [
   // Layout
-  { id: 'ctrl-row',      label: 'Row',           description: 'Horizontal flex layout',          group: 'Layout',          generate: layoutRow },
-  { id: 'ctrl-column',   label: 'Column',        description: 'Vertical flex layout',            group: 'Layout',          generate: layoutColumn },
-  { id: 'ctrl-list',     label: 'List',           description: 'Ordered list of items',           group: 'Layout',          generate: layoutList },
-  { id: 'ctrl-card',     label: 'Card',           description: 'Content card wrapper',            group: 'Layout',          generate: layoutCard },
-  { id: 'ctrl-tabs',     label: 'Tabs',           description: 'Tabbed content panels',           group: 'Layout',          generate: layoutTabs },
-  { id: 'ctrl-divider',  label: 'Divider',        description: 'Horizontal separator',            group: 'Layout',          generate: layoutDivider },
+  { id: 'ctrl-row',      label: 'Row',           description: 'Horizontal flex layout',          group: 'Layout',          catalog: 'a2ui',      generate: layoutRow },
+  { id: 'ctrl-column',   label: 'Column',        description: 'Vertical flex layout',            group: 'Layout',          catalog: 'a2ui',      generate: layoutColumn },
+  { id: 'ctrl-list',     label: 'List',           description: 'Ordered list of items',           group: 'Layout',          catalog: 'a2ui',      generate: layoutList },
+  { id: 'ctrl-card',     label: 'Card',           description: 'Content card wrapper',            group: 'Layout',          catalog: 'a2ui',      generate: layoutCard },
+  { id: 'ctrl-tabs',     label: 'Tabs',           description: 'Tabbed content panels',           group: 'Layout',          catalog: 'a2ui',      generate: layoutTabs },
+  { id: 'ctrl-divider',  label: 'Divider',        description: 'Horizontal separator',            group: 'Layout',          catalog: 'a2ui',      generate: layoutDivider },
   // Content
-  { id: 'ctrl-text',     label: 'Text',           description: 'All text variants h1–overline',   group: 'Content',         generate: contentText },
-  { id: 'ctrl-image',    label: 'Image',          description: 'Image with placeholder',          group: 'Content',         generate: contentImage },
+  { id: 'ctrl-text',     label: 'Text',           description: 'All text variants h1–overline',   group: 'Content',         catalog: 'a2ui',      generate: contentText },
+  { id: 'ctrl-image',    label: 'Image',          description: 'Image with placeholder',          group: 'Content',         catalog: 'a2ui',      generate: contentImage },
   // Inputs
-  { id: 'ctrl-button',   label: 'Button',         description: 'Primary / outlined / text',       group: 'Inputs',          generate: inputButton },
-  { id: 'ctrl-textfield',label: 'TextField',      description: 'Text input with label',           group: 'Inputs',          generate: inputTextField },
-  { id: 'ctrl-checkbox', label: 'CheckBox',       description: 'Toggle checkboxes',               group: 'Inputs',          generate: inputCheckBox },
-  { id: 'ctrl-choice',   label: 'ChoicePicker',   description: 'Chips and list variants',         group: 'Inputs',          generate: inputChoicePicker },
-  { id: 'ctrl-slider',   label: 'Slider',         description: 'Range slider control',            group: 'Inputs',          generate: inputSlider },
-  { id: 'ctrl-datetime', label: 'DateTimeInput',  description: 'Date and time picker',            group: 'Inputs',          generate: inputDateTime },
-  { id: 'ctrl-modal',    label: 'Modal',          description: 'Modal dialog with trigger',       group: 'Inputs',          generate: inputModal },
+  { id: 'ctrl-button',   label: 'Button',         description: 'Primary / outlined / text',       group: 'Inputs',          catalog: 'a2ui',      generate: inputButton },
+  { id: 'ctrl-textfield',label: 'TextField',      description: 'Text input with label',           group: 'Inputs',          catalog: 'a2ui',      generate: inputTextField },
+  { id: 'ctrl-checkbox', label: 'CheckBox',       description: 'Toggle checkboxes',               group: 'Inputs',          catalog: 'a2ui',      generate: inputCheckBox },
+  { id: 'ctrl-choice',   label: 'ChoicePicker',   description: 'Chips and list variants',         group: 'Inputs',          catalog: 'a2ui',      generate: inputChoicePicker },
+  { id: 'ctrl-slider',   label: 'Slider',         description: 'Range slider control',            group: 'Inputs',          catalog: 'a2ui',      generate: inputSlider },
+  { id: 'ctrl-datetime', label: 'DateTimeInput',  description: 'Date and time picker',            group: 'Inputs',          catalog: 'a2ui',      generate: inputDateTime },
+  { id: 'ctrl-modal',    label: 'Modal',          description: 'Modal dialog with trigger',       group: 'Inputs',          catalog: 'a2ui',      generate: inputModal },
   // Custom Controls
-  { id: 'ctrl-radio',    label: 'RadioGroup',     description: 'Radio options with descriptions',  group: 'Custom Controls', generate: customRadioGroup },
-  { id: 'ctrl-form',     label: 'FormGroup',      description: 'Stepped form sections',            group: 'Custom Controls', generate: customFormGroup },
-  { id: 'ctrl-code',     label: 'CodeBlock',      description: 'Syntax-highlighted code',          group: 'Custom Controls', generate: customCodeBlock },
-  { id: 'ctrl-progress', label: 'ProgressSteps',  description: 'Multi-step progress tracker',      group: 'Custom Controls', generate: customProgressSteps },
+  { id: 'ctrl-radio',    label: 'RadioGroup',     description: 'Radio options with descriptions',  group: 'Custom Controls', catalog: 'kickstart', generate: customRadioGroup },
+  { id: 'ctrl-form',     label: 'FormGroup',      description: 'Stepped form sections',            group: 'Custom Controls', catalog: 'kickstart', generate: customFormGroup },
+  { id: 'ctrl-code',     label: 'CodeBlock',      description: 'Syntax-highlighted code',          group: 'Custom Controls', catalog: 'kickstart', generate: customCodeBlock },
+  { id: 'ctrl-progress', label: 'ProgressSteps',  description: 'Multi-step progress tracker',      group: 'Custom Controls', catalog: 'kickstart', generate: customProgressSteps },
+  { id: 'ctrl-arch',     label: 'ArchitectureDiagram', description: 'Mermaid-powered architecture diagram', group: 'Custom Controls', catalog: 'kickstart', generate: customArchitectureDiagram },
   // Data Binding
   { id: 'data-basic',    label: 'Basic Data Binding',     description: 'Text components bound to data paths',        group: 'Data Binding',    generate: dataBindingBasic },
   { id: 'data-form',     label: 'Data-Bound Form',        description: 'Form fields with path bindings',             group: 'Data Binding',    generate: dataBindingForm },
