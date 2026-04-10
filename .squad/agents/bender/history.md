@@ -555,3 +555,50 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 ### 2026-04-10: PR #78 Review Fix & v0.2.0 Release
 
 Addressed Copilot review on PR #78 (data→context terminology fix). PR merged successfully as part of v0.2.0 milestone closeout. Backend conventions now align with updated naming scheme.
+
+---
+
+## 2026-04-10: Security Sprint Execution Summary
+
+**Assigned Issues:** #83, #84, #85, #87 (24 story points)  
+**Outcome:** SUCCESS — 4/4 issues closed, all tests passing, API hardening production-ready
+
+**Work Summary:**
+
+### Issue #83 (API Auth & Rate Limiting) — 8 pts
+- SWA authentication middleware deployed to 4 AI endpoints: `/api/converse`, `/api/playground`, `/api/action`, `/api/generate`
+- Public endpoints remain anonymous: `/api/health`, `/api/inspirations`
+- In-memory sliding-window rate limiter (30 req/min per IP, 15 min window) at `lib/rate-limiter.ts`
+- Test coverage: 18 integration tests for auth + rate limiting + threshold edge cases
+- Impact: Closes High-severity API abuse vector
+
+### Issue #84 (System Prompt Exposure) — 3 pts
+- `systemPrompt` field removed from converse response type + actual response body
+- Clients now receive only: `{ sessionId, phase, message, a2ui? }`
+- Test coverage: 4 tests verifying prompt redaction across all endpoints
+- Impact: Closes Medium-severity prompt injection attack surface
+
+### Issue #85 (Error Information Leakage) — 5 pts
+- Centralized error response utilities: `lib/error-response.ts` with `safeErrorResponse()` + `safeStreamError()`
+- All API handlers updated to use generic client message: `"An error occurred processing your request."`
+- Full error details (stack traces) logged server-side only
+- Test coverage: 12 tests verifying error message sanitization across all handlers
+- Impact: Closes Medium-severity information disclosure
+
+### Issue #87 (Key Vault Integration) — 8 pts
+- Azure Key Vault client setup in `lib/keyvault-client.ts`
+- Secrets rotation strategy: Environment variables → Key Vault seamless fallback
+- CI/CD injection: `deploy-infra.yml` updated to populate vault with GitHub Actions secrets
+- Dev environment: `local.settings.json` template for local secret management
+- Test coverage: 8 tests for vault connectivity + secret retrieval + fallback behavior
+- Impact: Closes Medium-severity infrastructure secrets gap
+
+**PR #92:** All 4 issues merged in single PR, approved by Zapp (Security Architect)
+
+**Team Feedback:**
+- "API auth middleware complexity moderate; SWA integration straightforward"
+- "Rate limiter edge cases (burst scenarios) required careful testing"
+- "Key Vault integration simplified infrastructure onboarding; recommend keeping for future secrets"
+
+**Handoff:** Security sprint complete. API endpoints hardened. No security regressions in full test suite (all handlers compliant).
+
