@@ -72,6 +72,13 @@ export class IntegrationKitRegistry {
     // ── Auth schema validation ───────────────────────────────────────────
     this.validateAuth(kit);
 
+    // ── Self-dependency check ─────────────────────────────────────────
+    if (kit.dependencies?.includes(kit.name)) {
+      throw new Error(
+        `Kit "${kit.name}" declares a dependency on itself.`,
+      );
+    }
+
     // ── Dependency validation ──────────────────────────────────────────
     if (kit.dependencies?.length) {
       const missing = kit.dependencies.filter((dep) => !this.kits.has(dep));
@@ -114,6 +121,12 @@ export class IntegrationKitRegistry {
 
     // ── Clean up previous registration (if re-registering same kit) ───
     if (previousKit) {
+      for (const tool of previousKit.tools) {
+        this.toolRegistry.unregister(tool.name);
+      }
+      for (const connector of previousKit.connectors) {
+        this.connectorRegistry.unregister(connector.name);
+      }
       this.clearOwnership(kit.name);
     }
 

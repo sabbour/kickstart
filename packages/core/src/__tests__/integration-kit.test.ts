@@ -698,3 +698,55 @@ describe('auth schema validation', () => {
     expect(kitRegistry.has('no-auth')).toBe(true);
   });
 });
+
+// ── Self-dependency detection ───────────────────────────────────────────────
+
+describe('self-dependency detection', () => {
+  it('rejects self-dependency on first registration', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    const kit = makeKit('self-kit', { dependencies: ['self-kit'] });
+    await expect(kitRegistry.register(kit)).rejects.toThrow(
+      /Kit "self-kit" declares a dependency on itself/,
+    );
+  });
+
+  it('rejects self-dependency on re-registration', async () => {
+    const { kitRegistry } = makeIsolatedRegistry();
+    await kitRegistry.register(makeKit('self-kit'));
+
+    const v2 = makeKit('self-kit', { dependencies: ['self-kit'] });
+    await expect(kitRegistry.register(v2)).rejects.toThrow(
+      /Kit "self-kit" declares a dependency on itself/,
+    );
+  });
+});
+
+// ── Re-registration cleanup ─────────────────────────────────────────────────
+
+describe('re-registration cleanup', () => {
+  it('removes old tools from ToolRegistry on re-registration', async () => {
+    const { kitRegistry, toolRegistry } = makeIsolatedRegistry();
+    const oldTool = makeTool('old-tool');
+    const newTool = makeTool('new-tool');
+
+    await kitRegistry.register(makeKit('swap-kit', { tools: [oldTool] }));
+    expect(toolRegistry.get('old-tool')).toBe(oldTool);
+
+    await kitRegistry.register(makeKit('swap-kit', { tools: [newTool] }));
+    expect(toolRegistry.get('old-tool')).toBeUndefined();
+    expect(toolRegistry.get('new-tool')).toBe(newTool);
+  });
+
+  it('removes old connectors from APIConnectorRegistry on re-registration', async () => {
+    const { kitRegistry, connectorRegistry } = makeIsolatedRegistry();
+    const oldConn = makeConnector('old-conn');
+    const newConn = makeConnector('new-conn');
+
+    await kitRegistry.register(makeKit('swap-kit', { connectors: [oldConn] }));
+    expect(connectorRegistry.get('old-conn')).toBe(oldConn);
+
+    await kitRegistry.register(makeKit('swap-kit', { connectors: [newConn] }));
+    expect(connectorRegistry.get('old-conn')).toBeUndefined();
+    expect(connectorRegistry.get('new-conn')).toBe(newConn);
+  });
+});
