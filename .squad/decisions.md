@@ -3364,3 +3364,208 @@ Create and track explicit remediation work under a dedicated **Security** milest
 - Security debt is now visible and schedulable for v0.3.0 planning.
 - Release risk reduces by addressing exploitable client-side and API-surface vulnerabilities first.
 - Future security reviews should block release if High findings remain open.
+
+---
+
+# Decision: DOMPurify for all dangerouslySetInnerHTML
+
+**Date:** 2026-04-10
+**Author:** Fry
+**Issues:** #81, #82
+**PR:** #90
+
+## Decision
+
+All `dangerouslySetInnerHTML` usage in the web package must route HTML through `sanitizeHtml()` from `packages/web/src/utils/sanitize.ts` (DOMPurify with strict allowlist). Code highlight fallback paths must use `escapeHtml()` entity encoding to prevent raw content injection.
+
+## Rationale
+
+Security audit (Zapp) flagged ChatMessage, CodeBlock, and FileEditor as High-severity XSS vectors. DOMPurify is the industry standard for HTML sanitization with a minimal allowlist approach.
+
+---
+
+# Decision: API Security Hardening
+
+**Date:** 2026-04-10
+**Author:** Bender
+**PR:** #89
+**Issues:** #83 (CRITICAL), #84 (MEDIUM), #85 (MEDIUM)
+
+## Context
+
+Zapp's security audit (v0.2.0) identified three API vulnerabilities: unauthenticated AI endpoints, system prompt exposure, and internal error leakage.
+
+## Decisions
+
+1. **SWA auth for AI endpoints.** `/api/converse`, `/api/playground`, `/api/action`, `/api/generate` now require `authenticated` role via SWA config. Public-safe endpoints (`/api/health`, `/api/inspirations`) stay anonymous.
+
+2. **In-memory rate limiter as defense-in-depth.** Sliding-window rate limiter at `lib/rate-limiter.ts` (30 req/min per IP). Applied to all AI endpoints. This supplements SWA auth — even authenticated users get throttled.
+
+3. **Never return system prompts to clients.** The `systemPrompt` field was removed from the converse response type and response body. Clients don't need it, and it exposes attack surface for prompt injection.
+
+4. **Generic error messages only.** All API error handlers use shared `lib/error-response.ts` utilities (`safeErrorResponse`, `safeStreamError`). Clients receive `"An error occurred processing your request."` — never raw exception text. Full details (including stack traces) are logged server-side.
+
+## Convention
+
+Any new API endpoint that calls an LLM **must** import `checkRateLimit` + `safeErrorResponse` from the shared lib.
+
+---
+
+# Decision: Security Sprint Planning Decisions
+**Date:** 2026-04-10  
+**Facilitator:** Leela (Lead)  
+**Participants:** All-active (Fry, Bender, Hermes, Zapp)
+
+---
+
+## Decisions
+
+### Decision 1: Sprint Goal & Scope
+**Decision:** Execute all 8 security findings (#81–#88) from Zapp's audit in a single focused sprint before v0.3.0.
+
+**Rationale:**
+- All 8 issues are triaged, assigned, and ready to start
+- Security-critical nature justifies dedicated sprint (XSS and API auth are high-impact)
+- Clearing security backlog before feature development improves team confidence
+- v0.2.0 shipped; team has momentum and fresh context
+
+**Consequences:**
+- Sprint slightly over-capacity (39 pts vs 35 pt baseline), but justified by criticality
+- Feature work deferred to v0.3.0; schedule reflected in roadmap
+- Requires Zapp availability for architecture reviews (coordinated upfront)
+
+**Approved by:** Leela
+
+---
+
+### Decision 2: Story Point Estimates (Fibonacci Scale)
+**Decision:** Assign estimates using Fibonacci scale (1, 2, 3, 5, 8, 13) based on complexity and effort.
+
+| Issue | Points | Reasoning |
+|-------|--------|-----------|
+| #81 | 5 | XSS audit (chat component) + sanitization + testing |
+| #82 | 5 | XSS audit (CodeBlock/FileEditor) + mitigation + testing |
+| #83 | 8 | Full API surface audit, auth middleware, rate limiting, broad test coverage |
+| #84 | 3 | Targeted fix (redact system prompt), low risk |
+| #85 | 5 | Error handling audit across all handlers, standardization work |
+| #86 | 3 | CSP header middleware, browser testing |
+| #87 | 8 | Key Vault integration, CI/CD injection, dev environment setup |
+| #88 | 2 | npm audit, dependency resolution, regression testing |
+
+**Sprint Total:** 39 story points
+
+**Rationale:**
+- Estimates based on auditor (Zapp) discovery + complexity of fix
+- P0 critical = 5–8 pts (high complexity, broad impact)
+- P1 important = 3–8 pts (medium-to-high complexity)
+- P2 nice-to-have = 2 pts (straightforward dependency work)
+- 8-point estimates reflect cross-cutting nature (#83 API audit, #87 infra work)
+
+**Approved by:** Leela
+
+---
+
+### Decision 3: Agent Capacity & Skill Alignment
+**Decision:** Allocate issues to maximize parallel execution and match agent expertise.
+
+| Agent | Assigned | Points | Justification |
+|-------|----------|--------|---------------|
+| **Fry** (Frontend) | #81, #82, #86 | 13 pts | XSS vulnerabilities (DOM/component-level) + CSP header config. Fry's core competency. |
+| **Bender** (Backend) | #83, #84, #85, #87 | 24 pts | API authentication, error handling, Key Vault infra. Bender's core competency. Largest load, justified by critical API work. |
+| **Hermes** (QA) | #88 | 2 pts | Dependency updates and regression testing. Light load allows ad-hoc security testing support. |
+
+**Parallelization Strategy:**
+- Week 1: Fry (#81/#82) + Bender (#83) + Bender (#87) in parallel → fast P0 resolution
+- Week 2: Fry (#86) + Bender (#84/#85) in parallel → P1 sweep
+- Week 3: Hermes (#88) + team retesting
+
+**Approved by:** Leela
+
+---
+
+### Decision 4: Review Gates & Zapp Involvement
+**Decision:** All security PRs (#81–#87) require architecture review from Zapp before merge (hard gate). Standard code review is secondary.
+
+**Rationale:**
+- Zapp performed the audit; she understands threat model and remediation intent
+- Security issues require domain expertise beyond code style review
+- Sets precedent for security-critical work: architect first, then code review
+- Hard gate prevents premature merge of incomplete security fixes
+
+**Implementation:**
+- Add `@zapp` as required reviewer on all #81–#87 PRs
+- Target 24 hr SLA for Zapp review (coordinate calendar availability)
+- Zapp focuses on: threat mitigation, compliance, design correctness (not style/nitpicks)
+- Standard reviewer (Leela or domain expert) handles code quality after Zapp approval
+
+**Note:** #88 (dependency management) is standard review only (no security architecture needed).
+
+**Approved by:** Leela
+
+---
+
+### Decision 5: Dependency Sequencing
+**Decision:** #83 (API auth audit) informs #84 and #85, but does not hard-block them. Can be done in loose sequence.
+
+**Rationale:**
+- Bender needs to understand full API surface before writing error handling (#85) and prompt redaction (#86)
+- #83 discovery (1–2 days) is front-loaded; allows #84/#85 to start mid-Week 1
+- Loose dependency avoids hard blocking; Bender can parallelize with #87 infra work while processing #83 findings
+
+**Critical path:**
+1. #81/#82 (Fry) and #83 (Bender) parallel → P0 complete by end Week 1
+2. #84/#85/#86/#87 (Bender & Fry) parallel → P1 complete by end Week 2
+3. #88 (Hermes) → P2 by end Week 3
+
+**Approved by:** Leela
+
+---
+
+### Decision 6: Definition of Done for Security Issues
+**Decision:** Each security issue must include: code fix, tests, Zapp architecture sign-off, standard code review, and regression testing.
+
+**Checklist per issue:**
+- [ ] Threat/vulnerability fixed (verified by Zapp)
+- [ ] Automated tests added (unit + integration)
+- [ ] Edge cases covered
+- [ ] Zapp architecture review approved
+- [ ] Standard code review approved
+- [ ] CI/CD pipeline green
+- [ ] Manual security verification (if applicable)
+- [ ] Full test suite passes (no regressions)
+- [ ] PR merged
+
+**Approved by:** Leela
+
+---
+
+### Decision 7: Escalation & Risk Mitigation
+**Decision:** If Zapp is unavailable or review is blocked, escalate to Leela immediately. Daily standup includes Zapp review status.
+
+**Risks tracked:**
+- Zapp availability (schedule reviews upfront)
+- XSS pattern reuse across multiple components (scope creep in v0.3.0)
+- Key Vault integration complexity (pair with infra if needed)
+- Transitive dependency conflicts in #88 (full test suite mandatory)
+
+**Approved by:** Leela
+
+---
+
+## Appendix: Issue Triage Summary
+
+All 8 security issues were triaged by Zapp (Security Architect) and are ready for sprint execution:
+
+| # | Title | Severity | Assigned | Status |
+|---|-------|----------|----------|--------|
+| #81 | XSS in assistant chat message rendering | High | Fry | Ready |
+| #82 | XSS in CodeBlock/FileEditor highlight fallback | High | Fry | Ready |
+| #83 | Public AI endpoints lack auth and rate limiting | High | Bender | Ready |
+| #84 | /api/converse exposes full system prompt | Medium | Bender | Ready |
+| #85 | API handlers leak internal error details | Medium | Bender | Ready |
+| #86 | Missing Content-Security-Policy header | Medium | Fry | Ready |
+| #87 | Infra secrets not integrated with Key Vault | Medium | Bender | Ready |
+| #88 | Vulnerable transitive dev dependencies | Low | Hermes | Ready |
+
+**Total:** 8 issues, 39 story points, 3 agents, 2–3 week sprint
+
