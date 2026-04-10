@@ -17,6 +17,12 @@ import { isAllowedHost, blockedHostResponse } from "../lib/proxy-allowlist.js";
 
 const GITHUB_BASE = "https://github.com";
 
+/** Only these github.com paths may be proxied. */
+const ALLOWED_PATHS = new Set([
+  "login/device/code",
+  "login/oauth/access_token",
+]);
+
 app.http("github-oauth", {
   methods: ["POST"],
   authLevel: "anonymous",
@@ -26,6 +32,11 @@ app.http("github-oauth", {
     context: InvocationContext,
   ): Promise<HttpResponseInit> => {
     const upstreamPath = request.params["path"] ?? "";
+
+    if (!ALLOWED_PATHS.has(upstreamPath)) {
+      context.warn(`[github-oauth] blocked path: ${upstreamPath}`);
+      return { status: 403, jsonBody: { error: "Path not allowed" } };
+    }
 
     const upstreamUrl = new URL(`${GITHUB_BASE}/${upstreamPath}`);
     request.query.forEach((value, key) => {
@@ -62,7 +73,7 @@ app.http("github-oauth", {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       context.error(`[github-oauth] fetch error: ${message}`);
-      return { status: 502, jsonBody: { error: `Upstream unreachable: ${message}` } };
+      return { status: 502, jsonBody: { error: "Upstream unreachable" } };
     }
 
     const responseHeaders: Record<string, string> = {

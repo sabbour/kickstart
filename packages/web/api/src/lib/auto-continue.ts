@@ -45,7 +45,7 @@ export async function chatCompletionWithAutoContinue(
   let lastResult: ChatCompletionResult;
   let continuations = 0;
 
-  for (let round = 0; round <= maxRounds; round++) {
+  for (let round = 0; round < maxRounds; round++) {
     lastResult = await chatCompletion(workingMessages, options);
     accumulated += lastResult.content;
 
