@@ -26,6 +26,7 @@ import { chatCompletion, chatCompletionWithTools, getChatDeploymentName } from "
 import { checkContentSafety } from "../lib/content-safety.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
 import { safeErrorResponse, safeStreamError } from "../lib/error-response.js";
+import { chatCompletionWithAutoContinue, isTruncated } from "../lib/auto-continue.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -143,8 +144,23 @@ app.http("converse", {
         },
       );
 
+      // Auto-continue: if the response was truncated, request continuation
+      let finalContent = result.content;
+      if (isTruncated(result)) {
+        const continueMessages: import("../lib/openai-client.js").ChatMessage[] = [
+          ...messages,
+          { role: "assistant", content: result.content },
+        ];
+        const continued = await chatCompletionWithAutoContinue(
+          continueMessages,
+          { responseFormat: { type: "json_object" } },
+          { continuationPrompt: "Your previous response was cut off mid-JSON. Continue the JSON output exactly where you left off — do not repeat any content." },
+        );
+        finalContent = result.content + continued.content;
+      }
+
       // Parse the JSON envelope
-      const processed = processResponse(result.content);
+      const processed = processResponse(finalContent);
 
       addMessage(state.sessionId, "assistant", processed.message);
 
@@ -189,15 +205,27 @@ function handleStreaming(
           });
 
           if (probe.finishReason !== "tool_calls" || !probe.toolCalls?.length) {
-            // No more tool calls — stream the final content we already have
-            const chunks = probe.content.match(/.{1,50}/g) ?? [probe.content];
+            // Auto-continue: if truncated, keep requesting until complete
+            let fullContent = probe.content;
+            if (isTruncated(probe)) {
+              const contMessages = [...workingMessages, { role: "assistant" as const, content: probe.content }];
+              const contResult = await chatCompletionWithAutoContinue(
+                contMessages,
+                { responseFormat: { type: "json_object" } },
+                { continuationPrompt: "Your previous response was cut off mid-JSON. Continue the JSON output exactly where you left off — do not repeat any content." },
+              );
+              fullContent = probe.content + contResult.content;
+            }
+
+            // No more tool calls — stream the final content
+            const chunks = fullContent.match(/.{1,50}/g) ?? [fullContent];
             for (const chunk of chunks) {
               controller.enqueue(
                 encoder.encode(`event: chunk\ndata: ${JSON.stringify({ content: chunk })}\n\n`),
               );
             }
 
-            const processed = processResponse(probe.content);
+            const processed = processResponse(fullContent);
             addMessage(sessionId, "assistant", processed.message);
 
             controller.enqueue(
