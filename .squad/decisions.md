@@ -3776,3 +3776,77 @@ The Design Review ceremony is already in `ceremonies.md` but was being skipped. 
 **Status:** Policy effective for future releases
 
 ---
+
+---
+
+### Decision 17: No Agent Lockout on Reviewer Rejection
+**Date:** 2026-04-10  
+**By:** Ahmed Sabbour (User Directive)  
+**What:** When a reviewer requests changes, the original author should address the feedback and resubmit — not be locked out. The lockout protocol from squad.agent.md is overridden for this project.
+
+**Why:** The lockout pattern doesn't match real-world workflows where the author iterates on review feedback.
+
+**Status:** Team memory / override
+
+---
+
+### Decision 18: Work-in-Progress Issue Status Visibility
+**Date:** 2026-04-10  
+**By:** Ahmed Sabbour (User Directive)  
+**What:** When Ralph is working an issue (e.g., DP posted, review in progress, implementation started), the issue should be moved to "ready" or an equivalent in-progress state on GitHub. Issues shouldn't sit as "open/unstarted" when active work is happening.
+
+**Why:** Visibility into what's actively being worked on vs. what's truly idle.
+
+**Status:** Team memory / process improvement
+
+---
+
+### Decision 19: Azure A2UI Fat Component Patterns
+**Author:** Fry (Frontend Dev)  
+**Date:** 2026-07-27  
+**Status:** Implemented  
+**PR:** #104  
+**Issue:** #31  
+
+**Context:** Azure stub components needed to become self-managing ("fat") with real data fetching, auth flows, and security guardrails.
+
+**Decisions:**
+
+1. **Token metadata via React state** — Auth timestamps and subscription lists are tracked in `useState` after `authenticate()` resolves. Raw tokens are never exposed in UI. This keeps the connector API clean and follows the pattern already used by GitHubLoginCard.
+
+2. **Operation allowlisting on AzureAction** — AzureAction validates ARM paths against a hardcoded Set of ~14 known resource types. Arbitrary ARM paths are blocked. This addresses Zapp's security finding about LLM-supplied write paths.
+
+3. **Destructive operation confirmation** — DELETE operations require the user to type the resource name to confirm. Non-destructive operations (PUT/POST/PATCH) use a single-click confirm with action preview.
+
+4. **Cascading picker with auto-select** — AzureResourcePicker cascades subscription → resource group → resource. Single-item results are auto-selected to reduce UX friction. Pre-filled props (`subscriptionId`, `resourceGroup`) skip the corresponding dropdown.
+
+5. **Dynamic form fields by resource type** — AzureResourceForm generates type-specific fields (e.g., Kubernetes version for AKS, access tier for Storage) using string matching on the resource type name. Full ARM schema introspection deferred pending RBAC evaluation.
+
+**Impact:**
+- All 4 Azure A2UI components are now fat and production-ready
+- New core types (AzureSubscription, AzureLocation) and methods (listSubscriptions, listResourceGroups, listLocations) available for other consumers
+- azure-kit component registrations updated with full prop documentation
+
+---
+
+### Decision 20: GitHub A2UI Fat Component Security Patterns
+**Author:** Fry (Frontend Dev)  
+**Date:** 2026-04-12  
+**Status:** Implemented  
+**Related:** #32, DP v2 (Zapp-approved)  
+
+**Context:** GitHub fat components needed security guardrails matching Zapp's review conditions from the DP v2. These patterns are now established and should be followed for any future integration kit components.
+
+**Decisions:**
+
+1. **In-memory token storage only** — GitHub tokens are stored in React component state via `useState`, never in `localStorage` or `sessionStorage`. This matches Zapp's explicit security condition. Sign-out clears React state; the connector re-authenticates on next use.
+
+2. **Operation allowlisting for write components** — `GitHubAction` uses a `Set<string>` of allowed operation types. Any `operationType` prop not in the allowlist is blocked at the UI level before the user can click execute. Same pattern used for `AzureAction` with ARM resource types.
+
+3. **Protected-branch blocking** — Both `GitHubAction` and `GitHubCommit` block direct writes to `main`, `master`, and `production` branches. This is a client-side guard matching GitHub's server-side branch protection.
+
+4. **Typed confirmation for destructive operations** — DELETE methods require the user to type the exact resource name extracted from the API path. This follows the same state machine pattern used in `AzureAction`.
+
+5. **Rate-limit handling** — All GitHub API responses check `X-RateLimit-Remaining` and `X-RateLimit-Reset` headers. Rate-limited responses show a warning MessageBar with the reset time.
+
+**Impact:** These patterns are now the standard for any future integration kit components (e.g., if we add GitLab, Bitbucket, or other service packs). Security review should verify all new write-capable components follow these guardrails.

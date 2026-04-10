@@ -1,6 +1,6 @@
 {
   "name": "@kickstart/mcp-server",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP server for AKS Kickstart — exposes conversation tools and A2UI responses",
   "type": "module",
   "main": "dist/index.js",
