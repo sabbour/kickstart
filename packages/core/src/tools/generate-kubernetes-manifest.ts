@@ -30,6 +30,7 @@ export const generateKubernetesManifest: Tool<GenerateKubernetesManifestArgs> = 
   name: "generate_kubernetes_manifest",
   description:
     "Generate Kubernetes YAML manifests (Deployment, Service, optional Ingress) for deploying an application to AKS. Returns ready-to-apply YAML files.",
+  requireApproval: true,
   parameters: {
     type: "object",
     properties: {

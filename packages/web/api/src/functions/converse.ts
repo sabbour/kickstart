@@ -27,6 +27,7 @@ import { checkContentSafety } from "../lib/content-safety.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
 import { safeErrorResponse, safeStreamError } from "../lib/error-response.js";
 import { chatCompletionWithAutoContinue, isTruncated } from "../lib/auto-continue.js";
+import { sanitizeToolOutput } from "../lib/sanitize-tool-output.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -140,6 +141,9 @@ app.http("converse", {
         async (name, args) => {
           const tool = defaultRegistry.get(name);
           if (!tool) throw new Error(`Unknown tool: ${name}`);
+          if (tool.requireApproval) {
+            return { error: `Tool "${name}" requires user approval before execution.`, requiresApproval: true };
+          }
           return tool.execute(args);
         },
       );
@@ -273,28 +277,34 @@ function handleStreaming(
             tool_calls: probe.toolCalls,
           });
 
-          // Execute tools and append results
+          // Execute tools and append sanitized results
           for (const tc of probe.toolCalls) {
             let toolResult: unknown;
             try {
-              const args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
               const tool = defaultRegistry.get(tc.function.name);
               if (!tool) throw new Error(`Unknown tool: ${tc.function.name}`);
-              toolResult = await tool.execute(args);
+              if (tool.requireApproval) {
+                toolResult = { error: `Tool "${tc.function.name}" requires user approval before execution.`, requiresApproval: true };
+              } else {
+                const args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+                toolResult = await tool.execute(args);
+              }
             } catch (err) {
               toolResult = { error: err instanceof Error ? err.message : String(err) };
             }
 
+            const sanitized = sanitizeToolOutput(toolResult);
+
             controller.enqueue(
               encoder.encode(
-                `event: tool_result\ndata: ${JSON.stringify({ name: tc.function.name, result: toolResult })}\n\n`,
+                `event: tool_result\ndata: ${JSON.stringify({ name: tc.function.name, result: sanitized })}\n\n`,
               ),
             );
 
             workingMessages.push({
               role: "tool",
               tool_call_id: tc.id,
-              content: JSON.stringify(toolResult),
+              content: sanitized,
             });
           }
         }

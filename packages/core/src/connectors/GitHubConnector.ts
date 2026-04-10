@@ -26,9 +26,13 @@ export interface GitHubRepoOptions {
 }
 
 /**
- * Default GitHub OAuth scopes.
+ * Default GitHub OAuth scopes — read-only access.
+ * `read:user` grants access to the authenticated user's profile and public
+ * repo metadata, which is sufficient for Kickstart's read-only tools.
+ * Tools that need write access (e.g., creating repos) would require scope
+ * elevation to `public_repo` or `repo`.
  */
-const DEFAULT_GITHUB_SCOPES = ['repo', 'read:user'];
+const DEFAULT_GITHUB_SCOPES = ['read:user'];
 
 /**
  * Connector for the GitHub REST API.

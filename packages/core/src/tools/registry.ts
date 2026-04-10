@@ -48,6 +48,7 @@ export class ToolRegistry {
   /**
    * Execute a named tool, logging the call and result.
    * Throws if the tool is not registered or execution fails.
+   * Tools with `requireApproval: true` are blocked from automatic execution.
    */
   async execute(name: string, args: Record<string, unknown>): Promise<unknown> {
     const tool = this.tools.get(name);
@@ -55,6 +56,15 @@ export class ToolRegistry {
       logger.warn(`Tool not found: ${name}`);
       throw new Error(`Tool not registered: ${name}`);
     }
+    // Approval gate: block tools that require user confirmation
+    if (tool.requireApproval) {
+      logger.warn(`Tool "${name}" requires user approval — skipping automatic execution.`);
+      return {
+        error: `Tool "${name}" requires user approval before execution. This action was not performed automatically.`,
+        requiresApproval: true,
+      };
+    }
+
     logger.track('tool.call', { tool: name, args });
     try {
       const result = await tool.execute(args);

@@ -12,6 +12,8 @@ export { ToolRegistry, defaultRegistry } from "./registry.js";
 export { azureResourceList } from "./azure-resource-list.js";
 export { azureResourceGet } from "./azure-resource-get.js";
 export { githubRepoInfo } from "./github-repo-info.js";
+export { githubApiGet } from "./github-api-get.js";
+export { fetchWebpage } from "./fetch-webpage.js";
 export { generateKubernetesManifest } from "./generate-kubernetes-manifest.js";
 export { estimateCost } from "./estimate-cost.js";
 export { listArtifacts } from "./list-artifacts.js";
@@ -22,6 +24,8 @@ import { defaultRegistry } from "./registry.js";
 import { azureResourceList } from "./azure-resource-list.js";
 import { azureResourceGet } from "./azure-resource-get.js";
 import { githubRepoInfo } from "./github-repo-info.js";
+import { githubApiGet } from "./github-api-get.js";
+import { fetchWebpage } from "./fetch-webpage.js";
 import { generateKubernetesManifest } from "./generate-kubernetes-manifest.js";
 import { estimateCost } from "./estimate-cost.js";
 import { listArtifacts } from "./list-artifacts.js";
@@ -31,6 +35,8 @@ defaultRegistry.registerAll([
   azureResourceList,
   azureResourceGet,
   githubRepoInfo,
+  githubApiGet,
+  fetchWebpage,
   generateKubernetesManifest,
   estimateCost,
   listArtifacts,

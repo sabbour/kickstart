@@ -97,6 +97,8 @@ export type {
 
 // Tool registry
 export { ToolRegistry, defaultRegistry } from "./tools/registry.js";
+export { githubApiGet } from "./tools/github-api-get.js";
+export { fetchWebpage } from "./tools/fetch-webpage.js";
 export type { Tool, OpenAIToolDefinition, ToolCall, ToolCallResult } from "./tools/types.js";
 
 // Artifact store — generated files (K8s manifests, Dockerfiles, CI workflows, etc.)

@@ -2,10 +2,12 @@
  * @module @kickstart/core/tools/azure-resource-get
  *
  * Get details of a specific Azure resource by resource ID.
- * Stub implementation — real calls wired by APIConnector (B-11).
+ * Uses AzureARMConnector when authenticated; returns stub data otherwise.
  */
 
 import type { Tool } from "../types.js";
+import { defaultConnectorRegistry } from "../connectors/index.js";
+import type { AzureARMConnector } from "../connectors/index.js";
 
 interface AzureResourceGetArgs {
   resourceId: string;
@@ -33,7 +35,16 @@ export const azureResourceGet: Tool<AzureResourceGetArgs> = {
   },
 
   async execute(args: AzureResourceGetArgs): Promise<unknown> {
-    // Stub — APIConnector (B-11) will replace with real ARM calls
+    const arm = defaultConnectorRegistry.get("azure-arm") as AzureARMConnector | undefined;
+    if (arm && arm.isAuthenticated()) {
+      const resource = await arm.getResource(args.resourceId);
+      if (!resource) {
+        return { error: `Resource not found: ${args.resourceId}` };
+      }
+      return resource;
+    }
+
+    // Stub fallback for offline / unauthenticated development
     const parts = args.resourceId.split("/");
     const resourceName = parts[parts.length - 1] ?? "unknown";
     const resourceType = parts.length >= 9 ? `${parts[6]}/${parts[7]}` : "Unknown/Resource";
