@@ -30,11 +30,15 @@ npm install
 # Build all packages
 npm run build
 
-# Start the web frontend
-npx serve packages/web -l 4280
+# Start full-stack dev server (Vite + SWA CLI)
+npm run dev
+
+# Or frontend only (fast, no API needed)
+npm run dev:vite
 ```
 
-Open [http://localhost:4280](http://localhost:4280) to view the app.
+- **http://localhost:4280** — Full app (SWA CLI: frontend + API)
+- **http://localhost:5173** — Vite dev server (HMR, frontend only, demo mode)
 
 ## Project Structure
 
@@ -49,7 +53,7 @@ infra/            Azure infrastructure (Bicep templates)
 | Package | Description |
 |---------|-------------|
 | `@kickstart/core` | Conversation engine, A2UI component catalog, code generators |
-| `@kickstart/web` | Static frontend — HTML/CSS/JS portal-style UI |
+| `@kickstart/web` | React 19 frontend with Fluent UI 2, Vite 6 dev server |
 | `@kickstart/mcp-server` | Model Context Protocol server for tool integration |
 
 ## Development Workflow

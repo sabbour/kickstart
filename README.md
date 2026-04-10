@@ -8,6 +8,15 @@ Kickstart helps developers go from "I have an app" to "it's running on Azure" th
 📖 **Docs:** [sabbour.github.io/kickstart](https://sabbour.github.io/kickstart/)
 🎮 **Playground:** [/?playground](/?playground) — Explore the A2UI component library and demo scenarios
 
+## Features
+
+- **AI-guided landing page** — Track cards, framework pills, and an ✨ inspiration button that generates app ideas via AI
+- **A2UI component system** — 16 custom components + Fluent UI 2 styled vendor catalog, rendered from structured JSON returned by the LLM
+- **Component playground** — Interactive demo surface (`/?playground`) for exploring A2UI components and scenarios
+- **Azure Functions API** — Streaming conversation proxy, code generation (Codex), CORS proxies for ARM/GitHub/Pricing APIs
+- **MCP server** — IDE integration for VS Code Copilot and Claude Code via `@kickstart/mcp-server`
+- **Monorepo** — `packages/core` (engine), `packages/web` (React 19 + Vite 6), `packages/mcp-server` (MCP tools)
+
 ## Two Surfaces, One Engine
 
 | Surface | How it works | LLM |
