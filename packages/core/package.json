@@ -1,6 +1,6 @@
 {
   "name": "@kickstart/core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Kickstart conversation engine, A2UI catalog, and code generators",
   "type": "module",
   "main": "dist/index.js",

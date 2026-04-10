@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## 0.4.0
+
+### Knowledge & Prompts
+
+- **System prompt rules** — Self-contained components, JSON validation, no pre-selection, architect mindset (#6, #10, #11, #15)
+- **AKS Automatic knowledge block** — Detailed feature overview with YAML examples and pricing details (#7, #14)
+- **ARM PUT body templates** — Common Azure resources with body schema guidance for githubKit code generation (#8)
+- **Existing-repo analysis protocol** — Structured discovery of existing repos for githubKit Discover phase (#17)
+
+### Frontend
+
+- **Fluent UI v9 overhaul** — All 18 A2UI basic components upgraded to Fluent v9 with updated API surface (#57)
+- **New catalog components** — Table, Alert, Link with Fluent v9 integration and Storybook stories (#9)
+- **VS Code SVG icons** — Proper VS Code / VS Code Insiders logos, replacing generic icon placeholders (#106)
+- **Dark mode CSS removal** — Simplified docs site CSS, removed unused dark-mode-in-JS patterns (#55)
+
+### Docs
+
+- **README and architecture docs** — Updated for v0.3.0 patterns and A2UI component usage (#52)
+
 ## 0.3.0
 
 ### Features
