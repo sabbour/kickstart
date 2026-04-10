@@ -111,4 +111,4 @@ docs-site/        Docusaurus documentation site
 
 ## License
 
-Internal project — Microsoft.
+This project is licensed under the [MIT License](./LICENSE).
