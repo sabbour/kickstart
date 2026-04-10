@@ -76,8 +76,16 @@ export abstract class BaseConnector implements ConfigurableConnector {
   /**
    * Inject a strategy-aware auth provider.
    * Supports oauth2, api-key, and managed-identity strategies.
+   * Throws if the provider's kind doesn't match the configured auth strategy.
    */
   setAuthProvider(provider: AuthProvider): void {
+    if (this._auth.kind !== 'none' && provider.kind !== this._auth.kind) {
+      throw new ConnectorError(
+        `Auth provider kind "${provider.kind}" does not match configured auth strategy "${this._auth.kind}" for connector "${this.name}"`,
+        'AUTH_FAILED',
+        { retryable: false },
+      );
+    }
     this._authProvider = provider;
     this._tokenProvider = provider.kind === 'oauth2' ? provider.getToken.bind(provider) : null;
     this._cachedToken = null;

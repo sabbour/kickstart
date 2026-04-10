@@ -115,6 +115,7 @@ export type {
 // APIConnectors — authenticated API client adapters
 export type {
   APIConnector,
+  ConfigurableConnector,
   APIConnectorRequestOptions,
   HttpMethod,
   AuthStrategy,
