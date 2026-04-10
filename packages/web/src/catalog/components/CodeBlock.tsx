@@ -11,6 +11,7 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { CopyRegular, CheckmarkRegular } from '@fluentui/react-icons';
+import { sanitizeHtml } from '../../utils/sanitize';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
@@ -103,8 +104,8 @@ export const CodeBlock = createReactComponent(CodeBlockApi, ({ props }) => {
         return result.value;
       }
     } catch (error) {
-      // If highlighting fails, return original code
-      return props.code;
+      // If highlighting fails, HTML-escape the raw code to prevent XSS
+      return escapeHtml(props.code);
     }
   }, [props.code, props.language]);
 
@@ -136,8 +137,17 @@ export const CodeBlock = createReactComponent(CodeBlockApi, ({ props }) => {
         </div>
       )}
       <pre className={classes.codeContent}>
-        <code className={`hljs ${classes.codeElement}`} dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+        <code className={`hljs ${classes.codeElement}`} dangerouslySetInnerHTML={{ __html: sanitizeHtml(highlightedCode) }} />
       </pre>
     </Card>
   );
 });
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
