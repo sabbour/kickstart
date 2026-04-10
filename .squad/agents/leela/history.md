@@ -274,3 +274,41 @@ Completed full v0.2.0 milestone closeout:
 - Milestone v0.2.0 closed (14/14 issues)
 
 Key decision: Lead (Leela) will not write code in future — routing code fixes to Fry/Bender per charter boundaries.
+
+### 2026-04-10: v0.3.0 Sprint Retrospective Complete
+
+**v0.3.0 milestone shipped:** 8 issues, 6 PRs, 34 story points, 100% delivery in 2 working sessions.
+
+**Key process wins:**
+- **DP 3-step gate enforced:** 100% of issues had Design Proposal → Leela architecture review → Zapp security review → code
+- **Parallel work streams:** Bender (backend #25/#26/#30/#34/#37) and Fry (frontend #31/#32/#44) worked independently; no blocking dependencies in practice
+- **No-lockout directive:** Original authors handled all post-review feedback; no reassignment; no context loss
+- **Review quality improved:** Avg 1.75 rounds (down from v0.2.0's 2.0)
+- **Security gate perfect:** Zapp approved all critical changes; zero regressions
+
+**Technical foundation solid:**
+- **ServiceConnector pattern** (#25) — Auth + API management for all integrations (MSAL, GitHub OAuth, future Azure tools)
+- **ServicePack abstraction** (#30) — Extensible pack framework; foundation for all future component packs
+- **LLM tool system** (#26) — Function calling protocol ready for phase 2-4 expansion
+- **Fat A2UI packs** (#31/#32) — Azure (login, picker, query, forms) + GitHub (login, picker, repo info, write-with-confirm) shipping with self-managing auth
+- **Security hardening:** CORS allowlist, ARM path validation, GitHub intent allowlist, API rate limiting, auto-continue state safety
+
+**Metrics & lessons:**
+- **Story point accuracy:** 80% (v0.3.0 tracked properly; #30 ServicePack had more design overhead than estimated)
+- **Wall-clock vs calendar:** Sprint planned for 3 days over 2 weeks; delivered in 2 working sessions (1 day each) due to parallel work + reduced rework
+- **Review rounds:** 3 issues needed post-merge fixes (#31 ARM validation, #32 intent allowlist, #30 self-dep cycle); all addressed; no lockout
+- **DP compliance:** 8/8 issues (100%); DP gate will be standard for all future sprints
+- **No-lockout compliance:** 8/8 issues (100%); directive working; maintain for all future sprints
+
+**Action items captured:**
+- A1: Reduce review rounds to <1.5 by deepening DP security review (Zapp)
+- A2: Add ARM path validation + string allowlist linting rules (Hermes)
+- A3: Document ServicePack naming in architecture guide (Leela)
+- A4: Use "working sessions" + "session count" not calendar weeks for estimates (Leela)
+- A5: Update sprint plan template with DP checklist (Leela)
+- A6: Schedule external security audit post-v0.3.0 (Zapp)
+- A7: Monitor CSP violations + API rate limits in production (Bender)
+
+**Retrospective report:** `.squad/log/2026-04-10-sprint-retro-v0.3.0.md`
+
+**Next sprint:** v0.4.0 pending issue planning. Focus areas identified: (1) component streaming, (2) state interpolation, (3) MCP app UI prototype, (4) K8s validation rules.
