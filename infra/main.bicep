@@ -35,6 +35,9 @@ param openAiChatDeployment string = ''
 @description('Azure OpenAI Codex deployment name for code generation (e.g., gpt-5.3-codex)')
 param openAiCodexDeployment string = ''
 
+@description('Azure OpenAI deployment for inspiration generation (e.g., gpt-5.4-nano). Falls back to chat deployment if empty.')
+param openAiInspireDeployment string = ''
+
 // ── Static Web App ──────────────────────────────────────────────
 
 resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
@@ -68,6 +71,7 @@ resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = if (!empty(
     AZURE_OPENAI_ENDPOINT: openAiEndpoint
     AZURE_OPENAI_CHAT_DEPLOYMENT: openAiChatDeployment
     AZURE_OPENAI_CODEX_DEPLOYMENT: openAiCodexDeployment
+    AZURE_OPENAI_INSPIRE_DEPLOYMENT: openAiInspireDeployment
   }
 }
 
