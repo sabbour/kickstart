@@ -140,12 +140,11 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
     }
   };
 
-  // Auto-resize textarea
+  // Auto-resize textarea (reset to 0 so scrollHeight shrinks properly)
   useEffect(() => {
     if (inputRef.current) {
-      inputRef.current.style.height = '44px';
-      const scrollHeight = inputRef.current.scrollHeight;
-      inputRef.current.style.height = Math.min(scrollHeight, 200) + 'px';
+      inputRef.current.style.height = '0';
+      inputRef.current.style.height = Math.max(44, Math.min(inputRef.current.scrollHeight, 200)) + 'px';
     }
   }, [inputValue]);
 

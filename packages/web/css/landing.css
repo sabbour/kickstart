@@ -114,7 +114,7 @@
   transition: border-color var(--duration-fast), height var(--duration-fast);
   box-sizing: border-box;
   resize: none;
-  overflow-y: auto;
+  overflow-y: hidden;
 }
 
 .landing-hero-input-wrap input::placeholder,
