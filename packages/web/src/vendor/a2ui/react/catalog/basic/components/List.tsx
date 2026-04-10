@@ -19,22 +19,38 @@ import {createReactComponent} from '../../../adapter';
 import {ListApi} from '../../../../web_core/basic_catalog/index';
 import {ChildList} from './ChildList';
 import {mapAlign} from '../utils';
+import {makeStyles} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  horizontal: {
+    display: 'flex',
+    flexDirection: 'row',
+    overflowX: 'auto',
+    overflowY: 'hidden',
+    width: '100%',
+    margin: '0',
+    padding: '0',
+  },
+  vertical: {
+    display: 'flex',
+    flexDirection: 'column',
+    overflowX: 'hidden',
+    overflowY: 'auto',
+    width: '100%',
+    margin: '0',
+    padding: '0',
+  },
+});
 
 export const List = createReactComponent(ListApi, ({props, buildChild, context}) => {
+  const classes = useStyles();
   const isHorizontal = props.direction === 'horizontal';
-  const style: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: isHorizontal ? 'row' : 'column',
-    alignItems: mapAlign(props.align),
-    overflowX: isHorizontal ? 'auto' : 'hidden',
-    overflowY: isHorizontal ? 'hidden' : 'auto',
-    width: '100%',
-    margin: 0,
-    padding: 0,
-  };
 
   return (
-    <div style={style}>
+    <div
+      className={isHorizontal ? classes.horizontal : classes.vertical}
+      style={{alignItems: mapAlign(props.align)}}
+    >
       <ChildList childList={props.children} buildChild={buildChild} context={context} />
     </div>
   );

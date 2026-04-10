@@ -18,18 +18,29 @@ import {createReactComponent} from '../../../adapter';
 import {RowApi} from '../../../../web_core/basic_catalog/index';
 import {ChildList} from './ChildList';
 import {mapJustify, mapAlign} from '../utils';
+import {makeStyles, tokens} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: tokens.spacingHorizontalM,
+    width: '100%',
+    margin: '0',
+    padding: '0',
+  },
+});
 
 export const Row = createReactComponent(RowApi, ({props, buildChild, context}) => {
+  const classes = useStyles();
+
   return (
     <div
+      className={classes.root}
       style={{
-        display: 'flex',
-        flexDirection: 'row',
         justifyContent: mapJustify(props.justify),
         alignItems: mapAlign(props.align),
-        width: '100%',
-        margin: 0,
-        padding: 0,
       }}
     >
       <ChildList childList={props.children} buildChild={buildChild} context={context} />

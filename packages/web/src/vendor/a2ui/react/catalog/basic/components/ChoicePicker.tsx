@@ -17,15 +17,47 @@
 import React, {useState} from 'react';
 import {createReactComponent} from '../../../adapter';
 import {ChoicePickerApi} from '../../../../web_core/basic_catalog/index';
-import {LEAF_MARGIN, STANDARD_BORDER, STANDARD_RADIUS} from '../utils';
+import {
+  RadioGroup as FluentRadioGroup,
+  Radio,
+  Checkbox,
+  ToggleButton,
+  Input,
+  Label,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 
 // The type of an option is deeply nested into the ChoicePickerApi schema, and
 // it seems z.infer is not inferring it correctly (?). We use `any` for now.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type _Option = any;
 
-export const ChoicePicker = createReactComponent(ChoicePickerApi, ({props, context}) => {
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+    width: '100%',
+  },
+  chipContainer: {
+    display: 'flex',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: tokens.spacingHorizontalS,
+  },
+  listContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXS,
+  },
+});
+
+export const ChoicePicker = createReactComponent(ChoicePickerApi, ({props}) => {
   const [filter, setFilter] = useState('');
+  const classes = useStyles();
 
   const values = Array.isArray(props.value) ? props.value : [];
   const isMutuallyExclusive = props.variant === 'mutuallyExclusive';
@@ -48,73 +80,55 @@ export const ChoicePicker = createReactComponent(ChoicePickerApi, ({props, conte
       String(opt.label).toLowerCase().includes(filter.toLowerCase())
   );
 
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    margin: LEAF_MARGIN,
-    width: '100%',
-  };
-
-  const listStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: props.displayStyle === 'chips' ? 'row' : 'column',
-    flexWrap: props.displayStyle === 'chips' ? 'wrap' : 'nowrap',
-    gap: '8px',
-  };
-
   return (
-    <div style={containerStyle}>
-      {props.label && <strong style={{fontSize: '14px'}}>{props.label}</strong>}
+    <div className={classes.root}>
+      {props.label && <Label weight="semibold">{props.label}</Label>}
       {props.filterable && (
-        <input
-          type="text"
+        <Input
           placeholder="Filter options..."
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          style={{padding: '4px 8px', border: STANDARD_BORDER, borderRadius: STANDARD_RADIUS}}
+          onChange={(_e, data) => setFilter(data.value)}
         />
       )}
-      <div style={listStyle}>
-        {options.map((opt: _Option, i: number) => {
-          const isSelected = values.includes(opt.value);
-          if (props.displayStyle === 'chips') {
+
+      {props.displayStyle === 'chips' ? (
+        <div className={classes.chipContainer}>
+          {options.map((opt: _Option, i: number) => {
+            const isSelected = values.includes(opt.value);
             return (
-              <button
+              <ToggleButton
                 key={i}
+                checked={isSelected}
                 onClick={() => onToggle(opt.value)}
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: '16px',
-                  border: isSelected
-                    ? '1px solid var(--a2ui-primary-color, #007bff)'
-                    : STANDARD_BORDER,
-                  backgroundColor: isSelected ? 'var(--a2ui-primary-color, #007bff)' : '#fff',
-                  color: isSelected ? '#fff' : 'inherit',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                }}
+                shape="circular"
+                size="small"
               >
                 {opt.label}
-              </button>
+              </ToggleButton>
             );
-          }
-          return (
-            <label
+          })}
+        </div>
+      ) : isMutuallyExclusive ? (
+        <FluentRadioGroup
+          value={values[0] || ''}
+          onChange={(_e, data) => props.setValue([data.value])}
+        >
+          {options.map((opt: _Option, i: number) => (
+            <Radio key={i} value={opt.value} label={opt.label} />
+          ))}
+        </FluentRadioGroup>
+      ) : (
+        <div className={classes.listContainer}>
+          {options.map((opt: _Option, i: number) => (
+            <Checkbox
               key={i}
-              style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}
-            >
-              <input
-                type={isMutuallyExclusive ? 'radio' : 'checkbox'}
-                checked={isSelected}
-                onChange={() => onToggle(opt.value)}
-                name={isMutuallyExclusive ? `choice-${context.componentModel.id}` : undefined}
-              />
-              <span style={{fontSize: '14px'}}>{opt.label}</span>
-            </label>
-          );
-        })}
-      </div>
+              checked={values.includes(opt.value)}
+              label={opt.label}
+              onChange={() => onToggle(opt.value)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 });

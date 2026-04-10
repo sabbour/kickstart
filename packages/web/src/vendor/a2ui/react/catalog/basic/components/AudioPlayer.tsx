@@ -17,20 +17,29 @@
 import React from 'react';
 import {createReactComponent} from '../../../adapter';
 import {AudioPlayerApi} from '../../../../web_core/basic_catalog/index';
-import {getBaseLeafStyle} from '../utils';
+import {Caption1, makeStyles, tokens} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXS,
+    width: '100%',
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+  },
+  audio: {
+    width: '100%',
+  },
+});
 
 export const AudioPlayer = createReactComponent(AudioPlayerApi, ({props}) => {
-  const style: React.CSSProperties = {
-    ...getBaseLeafStyle(),
-    width: '100%',
-  };
+  const classes = useStyles();
 
   return (
-    <div style={{display: 'flex', flexDirection: 'column', gap: '4px', width: '100%'}}>
-      {props.description && (
-        <span style={{fontSize: '12px', color: '#666'}}>{props.description}</span>
-      )}
-      <audio src={props.url} controls style={style} />
+    <div className={classes.root}>
+      {props.description && <Caption1>{props.description}</Caption1>}
+      <audio src={props.url} controls className={classes.audio} />
     </div>
   );
 });

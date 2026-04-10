@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-import type React from 'react';
+import {tokens} from '@fluentui/react-components';
 
-/** Standard leaf margin from the implementation guide. */
-export const LEAF_MARGIN = '8px';
+/** Standard leaf margin using Fluent spacing token. */
+export const LEAF_MARGIN = tokens.spacingVerticalS;
 
-/** Standard internal padding for visually bounded containers. */
-export const CONTAINER_PADDING = '16px';
+/** Standard internal padding using Fluent spacing token. */
+export const CONTAINER_PADDING = tokens.spacingHorizontalL;
 
-/** Standard border for cards and inputs. */
-export const STANDARD_BORDER = '1px solid #ccc';
+/** Standard border using Fluent stroke token. */
+export const STANDARD_BORDER = `1px solid ${tokens.colorNeutralStroke1}`;
 
-/** Standard border radius. */
-export const STANDARD_RADIUS = '8px';
+/** Standard border radius using Fluent radius token. */
+export const STANDARD_RADIUS = tokens.borderRadiusMedium;
 
 export const mapJustify = (j?: string) => {
   switch (j) {
@@ -63,16 +63,3 @@ export const mapAlign = (a?: string) => {
       return 'stretch';
   }
 };
-
-export const getBaseLeafStyle = (): React.CSSProperties => ({
-  margin: LEAF_MARGIN,
-  boxSizing: 'border-box',
-});
-
-export const getBaseContainerStyle = (): React.CSSProperties => ({
-  margin: LEAF_MARGIN,
-  padding: CONTAINER_PADDING,
-  border: STANDARD_BORDER,
-  borderRadius: STANDARD_RADIUS,
-  boxSizing: 'border-box',
-});

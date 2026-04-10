@@ -14,65 +14,67 @@
  * limitations under the License.
  */
 
-import {useState} from 'react';
+import React, {useState} from 'react';
 import {createReactComponent} from '../../../adapter';
 import {ModalApi} from '../../../../web_core/basic_catalog/index';
+import {
+  Dialog,
+  DialogSurface,
+  DialogBody,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogTrigger,
+  Button,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import {DismissRegular} from '@fluentui/react-icons';
+
+const useStyles = makeStyles({
+  trigger: {
+    display: 'inline-block',
+  },
+  surface: {
+    maxWidth: '600px',
+    padding: tokens.spacingHorizontalXXL,
+  },
+});
 
 export const Modal = createReactComponent(ModalApi, ({props, buildChild}) => {
   const [isOpen, setIsOpen] = useState(false);
+  const classes = useStyles();
 
   return (
-    <>
-      <div onClick={() => setIsOpen(true)} style={{display: 'inline-block'}}>
-        {props.trigger ? buildChild(props.trigger) : null}
-      </div>
-      {isOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-          onClick={() => setIsOpen(false)}
-        >
-          <div
-            style={{
-              backgroundColor: '#fff',
-              padding: '24px',
-              borderRadius: '8px',
-              maxWidth: '90%',
-              maxHeight: '90%',
-              overflow: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{display: 'flex', justifyContent: 'flex-end'}}>
-              <button
-                onClick={() => setIsOpen(false)}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  fontSize: '20px',
-                  cursor: 'pointer',
-                  padding: '4px',
-                }}
-              >
-                &times;
-              </button>
-            </div>
-            <div style={{flex: 1}}>{props.content ? buildChild(props.content) : null}</div>
-          </div>
+    <Dialog open={isOpen} onOpenChange={(_e, data) => setIsOpen(data.open)}>
+      <DialogTrigger disableButtonEnhancement>
+        <div className={classes.trigger}>
+          {props.trigger ? buildChild(props.trigger) : null}
         </div>
-      )}
-    </>
+      </DialogTrigger>
+      <DialogSurface className={classes.surface}>
+        <DialogBody>
+          <DialogTitle
+            action={
+              <DialogTrigger action="close">
+                <Button
+                  appearance="subtle"
+                  aria-label="Close"
+                  icon={<DismissRegular />}
+                />
+              </DialogTrigger>
+            }
+          />
+          <DialogContent>
+            {props.content ? buildChild(props.content) : null}
+          </DialogContent>
+          <DialogActions>
+            <DialogTrigger disableButtonEnhancement>
+              <Button appearance="secondary">{'Close'}</Button>
+            </DialogTrigger>
+          </DialogActions>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
   );
 });

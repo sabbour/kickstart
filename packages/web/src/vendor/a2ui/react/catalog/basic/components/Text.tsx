@@ -17,30 +17,45 @@
 import React from 'react';
 import {createReactComponent} from '../../../adapter';
 import {TextApi} from '../../../../web_core/basic_catalog/index';
-import {getBaseLeafStyle} from '../utils';
+import {
+  Title1,
+  Title2,
+  Title3,
+  Subtitle1,
+  Subtitle2,
+  Caption1,
+  Body1,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  root: {
+    marginTop: tokens.spacingVerticalXS,
+    marginBottom: tokens.spacingVerticalXS,
+    display: 'inline-block',
+  },
+});
 
 export const Text = createReactComponent(TextApi, ({props}) => {
+  const classes = useStyles();
   const text = props.text ?? '';
-  const style: React.CSSProperties = {
-    ...getBaseLeafStyle(),
-    display: 'inline-block',
-  };
 
   switch (props.variant) {
     case 'h1':
-      return <h1 style={style}>{text}</h1>;
+      return <Title1 className={classes.root} block>{text}</Title1>;
     case 'h2':
-      return <h2 style={style}>{text}</h2>;
+      return <Title2 className={classes.root} block>{text}</Title2>;
     case 'h3':
-      return <h3 style={style}>{text}</h3>;
+      return <Title3 className={classes.root} block>{text}</Title3>;
     case 'h4':
-      return <h4 style={style}>{text}</h4>;
+      return <Subtitle1 className={classes.root} block>{text}</Subtitle1>;
     case 'h5':
-      return <h5 style={style}>{text}</h5>;
+      return <Subtitle2 className={classes.root} block>{text}</Subtitle2>;
     case 'caption':
-      return <caption style={{...style, color: '#666', textAlign: 'left'}}>{text}</caption>;
+      return <Caption1 className={classes.root}>{text}</Caption1>;
     case 'body':
     default:
-      return <span style={style}>{text}</span>;
+      return <Body1 className={classes.root}>{text}</Body1>;
   }
 });

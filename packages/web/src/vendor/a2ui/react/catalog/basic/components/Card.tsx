@@ -17,17 +17,23 @@
 import React from 'react';
 import {createReactComponent} from '../../../adapter';
 import {CardApi} from '../../../../web_core/basic_catalog/index';
-import {getBaseContainerStyle} from '../utils';
+import {Card as FluentCard, makeStyles, tokens} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  root: {
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+    padding: tokens.spacingHorizontalL,
+    width: '100%',
+  },
+});
 
 export const Card = createReactComponent(CardApi, ({props, buildChild}) => {
-  const style: React.CSSProperties = {
-    ...getBaseContainerStyle(),
-    backgroundColor: '#fff',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    width: '100%',
-    boxSizing: 'border-box',
-    maxWidth: '100%',
-  };
+  const classes = useStyles();
 
-  return <div style={style}>{props.child ? buildChild(props.child) : null}</div>;
+  return (
+    <FluentCard className={classes.root}>
+      {props.child ? buildChild(props.child) : null}
+    </FluentCard>
+  );
 });

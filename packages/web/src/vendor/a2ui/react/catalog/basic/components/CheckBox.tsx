@@ -17,41 +17,33 @@
 import React from 'react';
 import {createReactComponent} from '../../../adapter';
 import {CheckBoxApi} from '../../../../web_core/basic_catalog/index';
-import {LEAF_MARGIN} from '../utils';
+import {Checkbox, Field, makeStyles, tokens} from '@fluentui/react-components';
+import type {CheckboxOnChangeData} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  root: {
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+  },
+});
 
 export const CheckBox = createReactComponent(CheckBoxApi, ({props}) => {
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    props.setValue(e.target.checked);
-  };
+  const classes = useStyles();
 
-  const uniqueId = React.useId();
+  const onChange = (_ev: React.ChangeEvent<HTMLInputElement>, data: CheckboxOnChangeData) => {
+    props.setValue(!!data.checked);
+  };
 
   const hasError = props.validationErrors && props.validationErrors.length > 0;
 
   return (
-    <div style={{display: 'flex', flexDirection: 'column', margin: LEAF_MARGIN}}>
-      <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-        <input
-          id={uniqueId}
-          type="checkbox"
-          checked={!!props.value}
-          onChange={onChange}
-          style={{cursor: 'pointer', outline: hasError ? '1px solid red' : 'none'}}
-        />
-        {props.label && (
-          <label
-            htmlFor={uniqueId}
-            style={{cursor: 'pointer', color: hasError ? 'red' : 'inherit'}}
-          >
-            {props.label}
-          </label>
-        )}
-      </div>
-      {hasError && (
-        <span style={{fontSize: '12px', color: 'red', marginTop: '4px'}}>
-          {props.validationErrors?.[0]}
-        </span>
-      )}
+    <div className={classes.root}>
+      <Field
+        validationMessage={hasError ? props.validationErrors?.[0] : undefined}
+        validationState={hasError ? 'error' : 'none'}
+      >
+        <Checkbox checked={!!props.value} onChange={onChange} label={props.label || undefined} />
+      </Field>
     </div>
   );
 });

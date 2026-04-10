@@ -18,18 +18,28 @@ import {createReactComponent} from '../../../adapter';
 import {ColumnApi} from '../../../../web_core/basic_catalog/index';
 import {ChildList} from './ChildList';
 import {mapJustify, mapAlign} from '../utils';
+import {makeStyles, tokens} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    width: '100%',
+    margin: '0',
+    padding: '0',
+  },
+});
 
 export const Column = createReactComponent(ColumnApi, ({props, buildChild, context}) => {
+  const classes = useStyles();
+
   return (
     <div
+      className={classes.root}
       style={{
-        display: 'flex',
-        flexDirection: 'column',
         justifyContent: mapJustify(props.justify),
         alignItems: mapAlign(props.align),
-        width: '100%',
-        margin: 0,
-        padding: 0,
       }}
     >
       <ChildList childList={props.children} buildChild={buildChild} context={context} />

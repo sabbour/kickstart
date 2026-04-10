@@ -17,42 +17,48 @@
 import {useState} from 'react';
 import {createReactComponent} from '../../../adapter';
 import {TabsApi} from '../../../../web_core/basic_catalog/index';
-import {LEAF_MARGIN} from '../utils';
+import {TabList, Tab, makeStyles, tokens} from '@fluentui/react-components';
+import type {SelectTabData, SelectTabEvent} from '@fluentui/react-components';
 
 // The type of a tab is deeply nested into the TabsApi schema, and
 // it seems z.infer is not inferring it correctly (?). We use `any` for now.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type _Tab = any;
 
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%',
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+  },
+  content: {
+    flex: '1',
+  },
+});
+
 export const Tabs = createReactComponent(TabsApi, ({props, buildChild}) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const classes = useStyles();
 
   const tabs = props.tabs || [];
   const activeTab = tabs[selectedIndex];
 
+  const onTabSelect = (_event: SelectTabEvent, data: SelectTabData) => {
+    setSelectedIndex(data.value as number);
+  };
+
   return (
-    <div style={{display: 'flex', flexDirection: 'column', width: '100%', margin: LEAF_MARGIN}}>
-      <div style={{display: 'flex', borderBottom: '1px solid #ccc', marginBottom: '8px'}}>
+    <div className={classes.root}>
+      <TabList selectedValue={selectedIndex} onTabSelect={onTabSelect}>
         {tabs.map((tab: _Tab, i: number) => (
-          <button
-            key={i}
-            onClick={() => setSelectedIndex(i)}
-            style={{
-              padding: '8px 16px',
-              border: 'none',
-              background: 'none',
-              borderBottom:
-                selectedIndex === i ? '2px solid var(--a2ui-primary-color, #007bff)' : 'none',
-              fontWeight: selectedIndex === i ? 'bold' : 'normal',
-              cursor: 'pointer',
-              color: selectedIndex === i ? 'var(--a2ui-primary-color, #007bff)' : 'inherit',
-            }}
-          >
+          <Tab key={i} value={i}>
             {tab.title}
-          </button>
+          </Tab>
         ))}
-      </div>
-      <div style={{flex: 1}}>{activeTab ? buildChild(activeTab.child) : null}</div>
+      </TabList>
+      <div className={classes.content}>{activeTab ? buildChild(activeTab.child) : null}</div>
     </div>
   );
 });

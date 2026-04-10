@@ -17,23 +17,18 @@
 import React from 'react';
 import {createReactComponent} from '../../../adapter';
 import {DividerApi} from '../../../../web_core/basic_catalog/index';
-import {LEAF_MARGIN} from '../utils';
+import {Divider as FluentDivider, makeStyles, tokens} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  root: {
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+  },
+});
 
 export const Divider = createReactComponent(DividerApi, ({props}) => {
+  const classes = useStyles();
   const isVertical = props.axis === 'vertical';
-  const style: React.CSSProperties = {
-    margin: LEAF_MARGIN,
-    border: 'none',
-    backgroundColor: '#ccc',
-  };
 
-  if (isVertical) {
-    style.width = '1px';
-    style.height = '100%';
-  } else {
-    style.width = '100%';
-    style.height = '1px';
-  }
-
-  return <div style={style} />;
+  return <FluentDivider className={classes.root} vertical={isVertical} />;
 });
