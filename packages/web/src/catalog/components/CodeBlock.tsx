@@ -76,12 +76,12 @@ const useStyles = makeStyles({
     padding: tokens.spacingHorizontalM,
     margin: '0',
     overflowX: 'auto',
-    fontFamily: tokens.fontFamilyMonospace,
-    fontSize: '12px',
-    lineHeight: '18px',
-    backgroundColor: '#0d1117',
-    color: '#c9d1d9',
     borderRadius: '0',
+  },
+  codeElement: {
+    fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace',
+    fontSize: '13px',
+    lineHeight: '20px',
   },
 });
 
@@ -134,7 +134,7 @@ export const CodeBlock = createReactComponent(CodeBlockApi, ({ props }) => {
         </div>
       )}
       <pre className={classes.codeContent}>
-        <code className="hljs" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+        <code className={`hljs ${classes.codeElement}`} dangerouslySetInnerHTML={{ __html: highlightedCode }} />
       </pre>
     </Card>
   );
