@@ -3340,3 +3340,27 @@ All issues must have an Estimate field set during sprint planning. This enables 
 **D5: Feature PRs Include Test Updates**
 
 Feature PRs that change UI behavior must include Playwright test updates or explicitly flag test debt as a follow-up issue. No silent test breakage.
+
+---
+
+# Decision: Track and prioritize post-v0.2.0 security hardening before v0.3.0
+
+- **Author:** Zapp
+- **Date:** 2026-04-10
+- **Status:** Proposed
+
+## Context
+A full security audit was executed across API, AI/LLM integration, frontend rendering, infrastructure, and dependencies. Multiple exploitable or high-likelihood weaknesses were identified that materially affect security posture.
+
+## Decision
+Create and track explicit remediation work under a dedicated **Security** milestone with severity-tagged issues and OWASP mapping. Prioritize remediation in this order:
+1. Frontend XSS vectors (#81, #82)
+2. Public AI endpoint abuse controls (#83)
+3. Prompt and error-information exposure (#84, #85)
+4. Browser and infra hardening (#86, #87)
+5. Supply-chain cleanup (#88)
+
+## Consequences
+- Security debt is now visible and schedulable for v0.3.0 planning.
+- Release risk reduces by addressing exploitable client-side and API-surface vulnerabilities first.
+- Future security reviews should block release if High findings remain open.
