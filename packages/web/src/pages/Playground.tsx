@@ -206,13 +206,16 @@ const useStyles = makeStyles({
       bottom: 0,
       zIndex: 1000,
       transform: 'translateX(-100%)',
-      transition: 'transform 0.25s ease',
+      transition: 'transform 0.25s ease, visibility 0s 0.25s',
+      visibility: 'hidden' as const,
       boxShadow: 'none',
     },
   },
   sidebarOpen: {
     [`@media (max-width: ${SIDEBAR_COLLAPSED_BP})`]: {
       transform: 'translateX(0)',
+      transition: 'transform 0.25s ease, visibility 0s 0s',
+      visibility: 'visible' as const,
       boxShadow: tokens.shadow64,
     },
   },
