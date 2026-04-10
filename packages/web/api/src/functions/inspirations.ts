@@ -6,6 +6,11 @@
  *
  * If Azure OpenAI is configured, generates creative app ideas via LLM.
  * Otherwise, returns a shuffled subset of hardcoded fallback ideas.
+ *
+ * Environment variables:
+ *   AZURE_OPENAI_INSPIRE_DEPLOYMENT — Optional. Dedicated deployment for inspiration
+ *     generation (e.g., gpt-5.4-nano for fast/cheap calls). Falls back to
+ *     AZURE_OPENAI_CHAT_DEPLOYMENT → AZURE_OPENAI_DEPLOYMENT if not set.
  */
 
 import { app } from "@azure/functions";
@@ -147,8 +152,9 @@ function isOpenAIConfigured(): boolean {
 
 /** Generate ideas via Azure OpenAI (non-streaming). */
 async function generateIdeas(): Promise<InspirationIdea[]> {
-  const { chatCompletion } = await import("../lib/openai-client.js");
+  const { chatCompletion, getInspireDeploymentName } = await import("../lib/openai-client.js");
   const domain = randomDomainHint();
+  const inspireDeployment = getInspireDeploymentName();
 
   const result = await chatCompletion(
     [
@@ -161,7 +167,11 @@ async function generateIdeas(): Promise<InspirationIdea[]> {
         content: `Generate 1 creative app idea in the "${domain}" space that requires server-side deployment. Think web apps with APIs, AI agents, real-time services, data pipelines, or multi-tier architectures. Surprise me with something novel.`,
       },
     ],
-    { temperature: 1.2, maxTokens: 300 },
+    {
+      temperature: 1.2,
+      maxTokens: 300,
+      ...(inspireDeployment ? { deployment: inspireDeployment } : {}),
+    },
   );
 
   const parsed = JSON.parse(result.content) as InspirationIdea[];
@@ -204,8 +214,9 @@ app.http("inspirations", {
       if (isStreaming) {
         if (isOpenAIConfigured()) {
           // Stream from OpenAI
-          const { chatCompletionStream } = await import("../lib/openai-client.js");
+          const { chatCompletionStream, getInspireDeploymentName } = await import("../lib/openai-client.js");
           const domain = randomDomainHint();
+          const inspireDeployment = getInspireDeploymentName();
           
           const encoder = new TextEncoder();
           const stream = new ReadableStream({
@@ -222,7 +233,11 @@ app.http("inspirations", {
                       content: `Generate 1 creative app idea in the "${domain}" space that requires server-side deployment. Surprise me with something novel.`,
                     },
                   ],
-                  { temperature: 1.2, maxTokens: 200 },
+                  {
+                    temperature: 1.2,
+                    maxTokens: 200,
+                    ...(inspireDeployment ? { deployment: inspireDeployment } : {}),
+                  },
                 );
 
                 for await (const chunk of gen) {

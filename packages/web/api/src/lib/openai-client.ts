@@ -19,6 +19,8 @@ export interface ChatCompletionOptions {
   temperature?: number;
   maxTokens?: number;
   responseFormat?: { type: string };
+  /** Override the deployment name (e.g., for inspiration generation). */
+  deployment?: string;
 }
 
 export interface ChatCompletionResult {
@@ -82,6 +84,19 @@ export function getChatDeploymentName(): string {
   );
 }
 
+/**
+ * Return the deployment name to use for inspiration generation.
+ * Falls back: AZURE_OPENAI_INSPIRE_DEPLOYMENT → AZURE_OPENAI_CHAT_DEPLOYMENT → AZURE_OPENAI_DEPLOYMENT
+ */
+export function getInspireDeploymentName(): string {
+  return (
+    process.env.AZURE_OPENAI_INSPIRE_DEPLOYMENT ??
+    process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
+    process.env.AZURE_OPENAI_DEPLOYMENT ??
+    ""
+  );
+}
+
 /** Check whether at least one Azure OpenAI model is configured. */
 export function isConfigured(): boolean {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
@@ -107,11 +122,12 @@ export async function chatCompletion(
   options: ChatCompletionOptions = {},
 ): Promise<ChatCompletionResult> {
   const { endpoint, chatDeployment, apiKey } = getConfig();
-  if (!chatDeployment) {
+  const deployment = options.deployment || chatDeployment;
+  if (!deployment) {
     throw new Error("No chat deployment configured. Set AZURE_OPENAI_CHAT_DEPLOYMENT or AZURE_OPENAI_DEPLOYMENT.");
   }
 
-  const url = `${endpoint}/openai/deployments/${chatDeployment}/chat/completions?api-version=${CHAT_API_VERSION}`;
+  const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${CHAT_API_VERSION}`;
 
   const response = await fetch(url, {
     method: "POST",
@@ -203,11 +219,12 @@ export async function* chatCompletionStream(
   options: ChatCompletionOptions = {},
 ): AsyncGenerator<string> {
   const { endpoint, chatDeployment, apiKey } = getConfig();
-  if (!chatDeployment) {
+  const deployment = options.deployment || chatDeployment;
+  if (!deployment) {
     throw new Error("No chat deployment configured. Set AZURE_OPENAI_CHAT_DEPLOYMENT or AZURE_OPENAI_DEPLOYMENT.");
   }
 
-  const url = `${endpoint}/openai/deployments/${chatDeployment}/chat/completions?api-version=${CHAT_API_VERSION}`;
+  const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${CHAT_API_VERSION}`;
 
   const response = await fetch(url, {
     method: "POST",
