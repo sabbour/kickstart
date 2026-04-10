@@ -10,9 +10,15 @@
 // Shared types
 // ---------------------------------------------------------------------------
 
+import type { OpenAIToolDefinition, ToolCall } from "@kickstart/core";
+
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  /** Tool calls requested by the assistant (present when finish_reason is "tool_calls"). */
+  tool_calls?: ToolCall[];
+  /** The ID of the tool call this message is a response to (role: "tool" only). */
+  tool_call_id?: string;
 }
 
 export interface ChatCompletionOptions {
@@ -21,11 +27,15 @@ export interface ChatCompletionOptions {
   responseFormat?: { type: string };
   /** Override the deployment name (e.g., for inspiration generation). */
   deployment?: string;
+  /** Tool definitions in OpenAI function-calling format. */
+  tools?: OpenAIToolDefinition[];
 }
 
 export interface ChatCompletionResult {
   content: string;
   finishReason: string;
+  /** Tool calls requested by the LLM (present when finishReason is "tool_calls"). */
+  toolCalls?: ToolCall[];
 }
 
 export interface CodexCompletionOptions {
@@ -116,6 +126,7 @@ const CHAT_API_VERSION = "2024-12-01-preview";
 
 /**
  * Call Azure OpenAI Chat Completions (non-streaming).
+ * Supports function calling via the `tools` option.
  */
 export async function chatCompletion(
   messages: ChatMessage[],
@@ -129,19 +140,22 @@ export async function chatCompletion(
 
   const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${CHAT_API_VERSION}`;
 
+  const body: Record<string, unknown> = {
+    messages,
+    max_completion_tokens: options.maxTokens ?? 2048,
+    stream: false,
+  };
+  if (options.temperature !== undefined) body.temperature = options.temperature;
+  if (options.responseFormat) body.response_format = options.responseFormat;
+  if (options.tools?.length) body.tools = options.tools;
+
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "api-key": apiKey,
     },
-    body: JSON.stringify({
-      messages,
-      ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
-      ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
-      max_completion_tokens: options.maxTokens ?? 2048,
-      stream: false,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -150,12 +164,17 @@ export async function chatCompletion(
   }
 
   const data = (await response.json()) as {
-    choices: Array<{ message: { content: string }; finish_reason: string }>;
+    choices: Array<{
+      message: { content: string | null; tool_calls?: ToolCall[] };
+      finish_reason: string;
+    }>;
   };
 
+  const choice = data.choices[0];
   return {
-    content: data.choices[0].message.content,
-    finishReason: data.choices[0].finish_reason,
+    content: choice.message.content ?? "",
+    finishReason: choice.finish_reason,
+    toolCalls: choice.message.tool_calls,
   };
 }
 
@@ -163,7 +182,7 @@ export async function chatCompletion(
  * Call Azure OpenAI Chat Completions with automatic tool execution.
  *
  * Supports multi-step tool use: if the LLM requests tool calls, executes them
- * via the provided registry, appends results, and calls the LLM again — up to
+ * via the provided callback, appends results, and calls the LLM again — up to
  * maxToolRounds times — before returning the final text response.
  */
 export async function chatCompletionWithTools(
@@ -172,7 +191,7 @@ export async function chatCompletionWithTools(
   executeTool: (name: string, args: Record<string, unknown>) => Promise<unknown>,
   maxToolRounds = 5,
 ): Promise<ChatCompletionResult> {
-  const workingMessages = [...messages];
+  const workingMessages: ChatMessage[] = [...messages];
 
   for (let round = 0; round < maxToolRounds; round++) {
     const result = await chatCompletion(workingMessages, options);

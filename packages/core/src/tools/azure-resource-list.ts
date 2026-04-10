@@ -2,10 +2,12 @@
  * @module @kickstart/core/tools/azure-resource-list
  *
  * List Azure resources in a subscription or resource group.
- * Stub implementation — real calls wired by APIConnector (B-11).
+ * Uses AzureARMConnector when authenticated; returns stub data otherwise.
  */
 
 import type { Tool } from "../types.js";
+import { defaultConnectorRegistry } from "../connectors/index.js";
+import type { AzureARMConnector } from "../connectors/index.js";
 
 interface AzureResourceListArgs {
   subscriptionId: string;
@@ -37,7 +39,29 @@ export const azureResourceList: Tool<AzureResourceListArgs> = {
   },
 
   async execute(args: AzureResourceListArgs): Promise<unknown> {
-    // Stub — APIConnector (B-11) will replace with real ARM calls
+    const arm = defaultConnectorRegistry.get("azure-arm") as AzureARMConnector | undefined;
+    if (arm && arm.isAuthenticated()) {
+      let resources = await arm.listResources(args.subscriptionId);
+
+      if (args.resourceType) {
+        resources = resources.filter((r) => r.type === args.resourceType);
+      }
+      if (args.resourceGroup) {
+        const rgLower = args.resourceGroup.toLowerCase();
+        resources = resources.filter((r) =>
+          r.id.toLowerCase().includes(`/resourcegroups/${rgLower}/`),
+        );
+      }
+
+      return {
+        subscriptionId: args.subscriptionId,
+        resourceGroup: args.resourceGroup ?? null,
+        count: resources.length,
+        resources,
+      };
+    }
+
+    // Stub fallback for offline / unauthenticated development
     return {
       subscriptionId: args.subscriptionId,
       resourceGroup: args.resourceGroup ?? null,

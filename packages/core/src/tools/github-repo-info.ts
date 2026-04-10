@@ -2,10 +2,12 @@
  * @module @kickstart/core/tools/github-repo-info
  *
  * Get GitHub repository metadata (language, topics, CI setup, etc.).
- * Stub implementation — real calls wired by APIConnector (B-11).
+ * Uses GitHubConnector when authenticated; returns stub data otherwise.
  */
 
 import type { Tool } from "../types.js";
+import { defaultConnectorRegistry } from "../connectors/index.js";
+import type { GitHubConnector } from "../connectors/index.js";
 
 interface GitHubRepoInfoArgs {
   owner: string;
@@ -32,7 +34,20 @@ export const githubRepoInfo: Tool<GitHubRepoInfoArgs> = {
   },
 
   async execute(args: GitHubRepoInfoArgs): Promise<unknown> {
-    // Stub — APIConnector (B-11) will replace with real GitHub API calls
+    const gh = defaultConnectorRegistry.get("github") as GitHubConnector | undefined;
+    if (gh && gh.isAuthenticated()) {
+      const repo = await gh.getRepo(args.owner, args.repo);
+      return {
+        fullName: repo.full_name,
+        description: repo.description,
+        defaultBranch: repo.default_branch,
+        language: repo.language,
+        private: repo.private,
+        url: repo.html_url,
+      };
+    }
+
+    // Stub fallback for offline / unauthenticated development
     return {
       fullName: `${args.owner}/${args.repo}`,
       description: "Sample repository description",
