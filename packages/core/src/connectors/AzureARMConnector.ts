@@ -52,7 +52,7 @@ export class AzureARMConnector extends BaseConnector {
    * Returns stub data when not authenticated (local dev / stub mode).
    */
   async listResources(subscriptionId: string): Promise<AzureResource[]> {
-    if (!this.isAuthenticated()) {
+    if (this.isStubMode()) {
       return STUB_RESOURCES.map((r) => ({
         ...r,
         id: r.id.replace('{subscriptionId}', subscriptionId),
@@ -70,7 +70,7 @@ export class AzureARMConnector extends BaseConnector {
    * Returns stub data when not authenticated.
    */
   async getResource(resourceId: string): Promise<AzureResource | null> {
-    if (!this.isAuthenticated()) {
+    if (this.isStubMode()) {
       return STUB_RESOURCES.find((r) => r.id === resourceId) ?? STUB_RESOURCES[0];
     }
 
@@ -91,7 +91,7 @@ export class AzureARMConnector extends BaseConnector {
     resourceName: string,
     properties: Record<string, unknown>,
   ): Promise<AzureResource> {
-    if (!this.isAuthenticated()) {
+    if (this.isStubMode()) {
       return {
         id: `/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/${resourceType}/${resourceName}`,
         name: resourceName,

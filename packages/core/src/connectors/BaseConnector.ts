@@ -10,9 +10,10 @@
  */
 
 import type {
-  APIConnector,
+  AuthProvider,
   APIConnectorRequestOptions,
   AuthStrategy,
+  ConfigurableConnector,
   ConnectorConfig,
   CORSProxyConfig,
   HttpMethod,
@@ -26,22 +27,28 @@ import { withRetry } from './retry.js';
 /** Token expiry buffer — refresh 60 s before actual expiry. */
 const TOKEN_BUFFER_S = 60;
 
-export abstract class BaseConnector implements APIConnector {
+export abstract class BaseConnector implements ConfigurableConnector {
   abstract readonly name: string;
 
   private readonly _auth: AuthStrategy;
   private readonly _corsProxy?: CORSProxyConfig;
   private readonly _retryConfig: RetryConfig;
   private readonly _baseUrlOverride?: string;
+  private readonly _allowStubMode: boolean;
+  private readonly _allowedProxyHosts: string[];
 
   private _tokenProvider: TokenProvider | null = null;
+  private _authProvider: AuthProvider | null = null;
   private _cachedToken: TokenInfo | null = null;
+  private _cachedApiKey: string | null = null;
 
   constructor(config?: ConnectorConfig) {
     this._auth = config?.auth ?? { kind: 'none' };
     this._corsProxy = config?.corsProxy;
     this._retryConfig = { ...DEFAULT_RETRY_CONFIG, ...config?.retry };
     this._baseUrlOverride = config?.baseUrl;
+    this._allowStubMode = config?.allowStubMode ?? false;
+    this._allowedProxyHosts = config?.allowedProxyHosts ?? [];
   }
 
   /** The effective base URL (override > default). */
@@ -61,7 +68,20 @@ export abstract class BaseConnector implements APIConnector {
    */
   setTokenProvider(provider: TokenProvider): void {
     this._tokenProvider = provider;
-    this._cachedToken = null; // invalidate cache when provider changes
+    this._authProvider = { kind: 'oauth2', getToken: provider };
+    this._cachedToken = null;
+    this._cachedApiKey = null;
+  }
+
+  /**
+   * Inject a strategy-aware auth provider.
+   * Supports oauth2, api-key, and managed-identity strategies.
+   */
+  setAuthProvider(provider: AuthProvider): void {
+    this._authProvider = provider;
+    this._tokenProvider = provider.kind === 'oauth2' ? provider.getToken.bind(provider) : null;
+    this._cachedToken = null;
+    this._cachedApiKey = null;
   }
 
   /**
@@ -69,11 +89,40 @@ export abstract class BaseConnector implements APIConnector {
    * No-op if auth strategy is "none" or no provider has been set (stub mode).
    */
   async authenticate(): Promise<void> {
-    if (this._auth.kind === 'none' || !this._tokenProvider) return;
+    if (this._auth.kind === 'none') return;
 
-    const scopes = this._auth.kind === 'oauth2' ? this._auth.scopes : [];
+    if (!this._authProvider && !this._tokenProvider) {
+      if (this._allowStubMode) return;
+      throw new ConnectorError(
+        `Connector "${this.name}" has no auth provider and stub mode is not enabled`,
+        'STUB_MODE_DISABLED',
+        { retryable: false },
+      );
+    }
+
     try {
-      this._cachedToken = await this._tokenProvider(scopes);
+      if (this._authProvider) {
+        switch (this._authProvider.kind) {
+          case 'oauth2': {
+            const scopes = this._auth.kind === 'oauth2' ? this._auth.scopes : [];
+            this._cachedToken = await this._authProvider.getToken(scopes);
+            break;
+          }
+          case 'api-key': {
+            this._cachedApiKey = await this._authProvider.getApiKey();
+            break;
+          }
+          case 'managed-identity': {
+            const resource = this._auth.kind === 'managed-identity' ? this._auth.resource : '';
+            const clientId = this._auth.kind === 'managed-identity' ? this._auth.clientId : undefined;
+            this._cachedToken = await this._authProvider.getToken(resource, clientId);
+            break;
+          }
+        }
+      } else if (this._tokenProvider) {
+        const scopes = this._auth.kind === 'oauth2' ? this._auth.scopes : [];
+        this._cachedToken = await this._tokenProvider(scopes);
+      }
     } catch (error: unknown) {
       throw new ConnectorError('Failed to acquire token', 'AUTH_FAILED', {
         retryable: false,
@@ -84,8 +133,26 @@ export abstract class BaseConnector implements APIConnector {
 
   isAuthenticated(): boolean {
     if (this._auth.kind === 'none') return true;
+    if (this._auth.kind === 'api-key' && this._cachedApiKey) return true;
     if (!this._cachedToken) return false;
     return this._cachedToken.expiresAt > nowEpochS() + TOKEN_BUFFER_S;
+  }
+
+  /**
+   * Returns true when stub/offline mode is active.
+   * Stub mode requires explicit opt-in via `allowStubMode: true`.
+   * Throws ConnectorError if not authenticated and stub mode is disabled.
+   */
+  protected isStubMode(): boolean {
+    if (this.isAuthenticated()) return false;
+    if (this._authProvider || this._tokenProvider) return false;
+    if (this._allowStubMode) return true;
+    throw new ConnectorError(
+      `Connector "${this.name}" is not authenticated and stub mode is not enabled. ` +
+      'Configure an auth provider, or set allowStubMode: true in config for offline use.',
+      'STUB_MODE_DISABLED',
+      { retryable: false },
+    );
   }
 
   /** Returns the current cached token, or null if not authenticated. */
@@ -104,7 +171,7 @@ export abstract class BaseConnector implements APIConnector {
     options?: APIConnectorRequestOptions,
   ): Promise<Response> {
     // Auto-refresh token if expired
-    if (this._tokenProvider && !this.isAuthenticated()) {
+    if ((this._authProvider || this._tokenProvider) && !this.isAuthenticated()) {
       await this.authenticate();
     }
 
@@ -131,12 +198,49 @@ export abstract class BaseConnector implements APIConnector {
 
     if (!this._corsProxy) return directUrl;
 
+    this.validateProxyTarget(directUrl);
+
     if (this._corsProxy.useQueryParam) {
       return `${this._corsProxy.proxyBaseUrl}?url=${encodeURIComponent(directUrl)}`;
     }
 
     // Path-based proxy: strip the base URL and append to proxy base
     return `${this._corsProxy.proxyBaseUrl}${path}`;
+  }
+
+  /**
+   * Validate that the target URL host is in the allowed proxy hosts list.
+   * Automatically includes the connector's own base URL host(s).
+   */
+  private validateProxyTarget(targetUrl: string): void {
+    const allowedHosts = new Set(this._allowedProxyHosts);
+
+    // Auto-allow the connector's own base URL hosts
+    try { allowedHosts.add(new URL(this.defaultBaseUrl).hostname); } catch { /* skip */ }
+    if (this._baseUrlOverride) {
+      try { allowedHosts.add(new URL(this._baseUrlOverride).hostname); } catch { /* skip */ }
+    }
+
+    try {
+      const targetHost = new URL(targetUrl).hostname;
+      const isAllowed = [...allowedHosts].some(
+        (h) => targetHost === h || targetHost.endsWith(`.${h}`),
+      );
+      if (!isAllowed) {
+        throw new ConnectorError(
+          `Proxy target host "${targetHost}" is not in the allowed hosts list`,
+          'PROXY_HOST_BLOCKED',
+          { retryable: false },
+        );
+      }
+    } catch (error) {
+      if (error instanceof ConnectorError) throw error;
+      throw new ConnectorError(
+        `Invalid proxy target URL: ${targetUrl}`,
+        'BAD_REQUEST',
+        { retryable: false, cause: error },
+      );
+    }
   }
 
   // ── Header construction ──────────────────────────────────────────────────
@@ -152,13 +256,13 @@ export abstract class BaseConnector implements APIConnector {
     };
 
     // Auth header injection
-    const token = this.getToken();
-    if (token) {
-      if (this._auth.kind === 'api-key') {
-        const headerName = this._auth.headerName ?? 'Authorization';
-        const prefix = this._auth.prefix ? `${this._auth.prefix} ` : '';
-        headers[headerName] = `${prefix}${token}`;
-      } else {
+    if (this._auth.kind === 'api-key' && this._cachedApiKey) {
+      const headerName = this._auth.headerName ?? 'Authorization';
+      const prefix = this._auth.prefix ? `${this._auth.prefix} ` : '';
+      headers[headerName] = `${prefix}${this._cachedApiKey}`;
+    } else {
+      const token = this.getToken();
+      if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
     }

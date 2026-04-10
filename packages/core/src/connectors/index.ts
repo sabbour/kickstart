@@ -1,6 +1,7 @@
 // Core types
 export type {
   APIConnector,
+  ConfigurableConnector,
   APIConnectorRequestOptions,
   HttpMethod,
   AuthStrategy,
@@ -10,6 +11,10 @@ export type {
   NoAuthStrategy,
   TokenInfo,
   TokenProvider,
+  AuthProvider,
+  OAuth2AuthProvider,
+  APIKeyAuthProvider,
+  ManagedIdentityAuthProvider,
   RetryConfig,
   CORSProxyConfig,
   ConnectorConfig,

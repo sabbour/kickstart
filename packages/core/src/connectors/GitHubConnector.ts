@@ -65,7 +65,7 @@ export class GitHubConnector extends BaseConnector {
 
   /** Get metadata for a repository. Returns stub data when not authenticated. */
   async getRepo(owner: string, repo: string): Promise<GitHubRepo> {
-    if (!this.isAuthenticated()) {
+    if (this.isStubMode()) {
       return { ...STUB_REPO, name: repo, full_name: `${owner}/${repo}` };
     }
 
@@ -78,7 +78,7 @@ export class GitHubConnector extends BaseConnector {
    * Returns stub data when not authenticated.
    */
   async createRepo(name: string, options: GitHubRepoOptions = {}): Promise<GitHubRepo> {
-    if (!this.isAuthenticated()) {
+    if (this.isStubMode()) {
       return { ...STUB_REPO, name, full_name: `stub-user/${name}` };
     }
 
@@ -88,7 +88,7 @@ export class GitHubConnector extends BaseConnector {
 
   /** List branches for a repository. Returns stub data when not authenticated. */
   async listBranches(owner: string, repo: string): Promise<GitHubBranch[]> {
-    if (!this.isAuthenticated()) {
+    if (this.isStubMode()) {
       return STUB_BRANCHES;
     }
 

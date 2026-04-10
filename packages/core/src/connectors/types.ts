@@ -76,6 +76,35 @@ export interface TokenInfo {
  */
 export type TokenProvider = (scopes: string[]) => Promise<TokenInfo>;
 
+// ── Strategy-aware auth providers ────────────────────────────────────────────
+
+/** OAuth2 auth provider — acquires tokens via MSAL or similar. */
+export interface OAuth2AuthProvider {
+  readonly kind: 'oauth2';
+  getToken(scopes: string[]): Promise<TokenInfo>;
+}
+
+/** API key auth provider — returns a static or rotated key. */
+export interface APIKeyAuthProvider {
+  readonly kind: 'api-key';
+  getApiKey(): Promise<string>;
+}
+
+/** Managed Identity auth provider — acquires tokens from IMDS. */
+export interface ManagedIdentityAuthProvider {
+  readonly kind: 'managed-identity';
+  getToken(resource: string, clientId?: string): Promise<TokenInfo>;
+}
+
+/**
+ * Strategy-aware auth provider — discriminated union keyed by auth kind.
+ * Replaces the flat `TokenProvider` signature for non-OAuth2 strategies.
+ */
+export type AuthProvider =
+  | OAuth2AuthProvider
+  | APIKeyAuthProvider
+  | ManagedIdentityAuthProvider;
+
 // ── Retry configuration ──────────────────────────────────────────────────────
 
 export interface RetryConfig {
@@ -125,6 +154,16 @@ export interface ConnectorConfig {
   retry?: Partial<RetryConfig>;
   /** Base URL override (useful for testing / staging). */
   baseUrl?: string;
+  /**
+   * Explicitly allow stub/offline mode. When true, connectors return stub
+   * data if no auth provider is configured. Default: false (fail-closed).
+   */
+  allowStubMode?: boolean;
+  /**
+   * Additional allowed target hosts for CORS proxy URL rewriting.
+   * The connector's own base URL host is always allowed automatically.
+   */
+  allowedProxyHosts?: string[];
 }
 
 // ── Error handling ───────────────────────────────────────────────────────────
@@ -139,6 +178,8 @@ export type ConnectorErrorCode =
   | 'NOT_FOUND'
   | 'FORBIDDEN'
   | 'BAD_REQUEST'
+  | 'STUB_MODE_DISABLED'
+  | 'PROXY_HOST_BLOCKED'
   | 'UNKNOWN';
 
 export class ConnectorError extends Error {
@@ -183,4 +224,16 @@ export interface APIConnector {
     options?: APIConnectorRequestOptions,
   ): Promise<Response>;
   isAuthenticated(): boolean;
+}
+
+/**
+ * Extended connector interface for connectors that support auth configuration.
+ * Use this type when retrieving connectors from the registry to wire auth
+ * without downcasting.
+ */
+export interface ConfigurableConnector extends APIConnector {
+  /** Inject a legacy OAuth2 token provider. */
+  setTokenProvider(provider: TokenProvider): void;
+  /** Inject a strategy-aware auth provider. */
+  setAuthProvider(provider: AuthProvider): void;
 }
