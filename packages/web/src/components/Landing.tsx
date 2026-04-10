@@ -205,7 +205,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
   };
 
   return (
-    <div className={`landing-page${isHiding ? ' hiding' : ''}`}>
+    <div id="landing-page" className={`landing-page${isHiding ? ' hiding' : ''}`}>
       <div className="landing-inner">
         {/* Hero Input */}
         <div className="landing-hero">

@@ -304,6 +304,7 @@ export function App() {
             recentSessions={sessions.recentSessions}
             onResumeSession={handleResumeSession}
             onDeleteSession={sessions.deleteSession}
+            onClearAllSessions={sessions.clearAllSessions}
           />
         ) : (
           <ChatShell

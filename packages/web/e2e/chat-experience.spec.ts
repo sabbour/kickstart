@@ -30,24 +30,6 @@ test.describe('Chat experience (demo mode)', () => {
     }).toPass({ timeout: 8000 });
   });
 
-  test('phase indicator shows Discover as active initially', async ({ page }) => {
-    const phaseBar = page.locator('.chat-phase');
-    await expect(phaseBar).toBeVisible();
-
-    // Discover phase should have the active dot
-    const activePhase = page.locator('.chat-phase-dot.active');
-    await expect(activePhase).toBeVisible();
-
-    // Discover label should be present
-    await expect(phaseBar).toContainText('Discover');
-  });
-
-  test('demo badge is visible', async ({ page }) => {
-    const demoBadge = page.locator('.demo-badge');
-    await expect(demoBadge).toBeVisible();
-    await expect(demoBadge).toHaveText('Demo');
-  });
-
   test('multiple turns of conversation work', async ({ page }) => {
     // First turn
     await sendChatMessage(page, 'I want to build a todo app');

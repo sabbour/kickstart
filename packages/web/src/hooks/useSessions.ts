@@ -81,6 +81,11 @@ export function useSessions() {
     }
   }, [activeSessionId]);
 
+  const clearAllSessions = useCallback(() => {
+    setSessions([]);
+    setActiveSessionId(null);
+  }, []);
+
   const getActiveSession = useCallback((): Session | undefined => {
     return sessions.find(s => s.id === activeSessionId);
   }, [sessions, activeSessionId]);
@@ -96,6 +101,7 @@ export function useSessions() {
     updateMessage,
     updateSession,
     deleteSession,
+    clearAllSessions,
     getActiveSession,
     recentSessions,
   };

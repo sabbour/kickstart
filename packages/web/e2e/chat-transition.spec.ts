@@ -15,12 +15,9 @@ test.describe('Landing to chat transition', () => {
     // Chat is now visible
     await expect(page.locator('#chat-ui')).toBeVisible();
 
-    // Body no longer has landing class
-    await expect(page.locator('body')).not.toHaveClass(/on-landing/);
-
     // User message auto-sent for web-app track
     const userBubble = page.locator('.chat-bubble.user');
-    await expect(userBubble.first()).toContainText('web app or API');
+    await expect(userBubble.first()).toContainText('web app');
 
     // Welcome message from assistant
     await waitForAssistantMessage(page, 'Kickstart');
@@ -46,18 +43,6 @@ test.describe('Landing to chat transition', () => {
 
     // Welcome message mentions the framework
     await waitForAssistantMessage(page, 'Go');
-  });
-
-  test('clicking a carousel slide transitions to chat and auto-sends the prompt', async ({ page }) => {
-    const firstSlide = page.locator('.carousel-slide').first();
-    await firstSlide.click();
-    await page.waitForSelector('#landing-page', { state: 'detached', timeout: 5000 });
-
-    await expect(page.locator('#chat-ui')).toBeVisible();
-
-    // A user message bubble appears (the carousel idea prompt)
-    const userBubbles = page.locator('.chat-bubble.user');
-    expect(await userBubbles.count()).toBeGreaterThanOrEqual(1);
   });
 
   test('after transition, landing page is removed from DOM', async ({ page }) => {

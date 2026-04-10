@@ -19,10 +19,10 @@ export function SessionsSidebar({
   onNewSession,
 }: SessionsSidebarProps) {
   return (
-    <aside className={`sessions-sidebar${isOpen ? '' : ' hidden'}`} aria-label="Sessions">
+    <aside id="sessions-sidebar" className={`sessions-sidebar${isOpen ? '' : ' hidden'}`} aria-label="Sessions">
       <div className="sessions-header">
         <span>Sessions</span>
-        <button className="sessions-close-btn" onClick={onClose} aria-label="Close sessions" title="Close">
+        <button id="sessions-close-btn" className="sessions-close-btn" onClick={onClose} aria-label="Close sessions" title="Close">
           <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
             <path d="M4.09 4.22a.5.5 0 01.63-.06l.07.06L10 9.44l5.22-5.22a.5.5 0 01.63-.06l.07.06a.5.5 0 01.06.63l-.06.07L10.7 10.1l5.22 5.22a.5.5 0 01-.63.76l-.07-.06L10 10.8l-5.22 5.22a.5.5 0 01-.63.06l-.07-.06a.5.5 0 01-.06-.63l.06-.07 5.22-5.22-5.22-5.22a.5.5 0 01-.06-.63l.06-.07z" />
           </svg>

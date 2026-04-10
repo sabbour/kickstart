@@ -23,7 +23,7 @@ export function ChatShell({ messages, isStreaming, streamingText, streamingSurfa
   }, [messages, streamingText]);
 
   return (
-    <div className="chat-container">
+    <div id="chat-ui" className="chat-container">
       <div className="chat-messages">
         <div className="chat-messages-inner">
           <MessageList

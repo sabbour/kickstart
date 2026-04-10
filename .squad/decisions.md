@@ -1838,6 +1838,17 @@ Secondary issue: using the entire `useA2UI()` return object as a `useMemo` depen
 | **B-33** | **Theme customization system** | Fry | DONE-14 | 1 day | Fluent UI themes switchable, Dark mode support, branding overrides |
 | **B-34** | **Keyboard navigation & accessibility audit** | Hermes | B-12, B-14 | 2 days | A11y: Tab order, ARIA labels, screen reader support, WCAG 2.1 AA compliance |
 | **B-43** | **Bring back VSCode launch & MCP install buttons** | Fry | — | 1 day | Restore buttons to launch VSCode/VSCode Insiders and install the MCP server from the web UI |
+| **B-46** | **Fix "Clear all" sessions button** | Fry | — | 0.5 day | The Clear all button on landing page doesn't actually clear sessions. Debug clearAllSessions flow. |
+| **B-47** | **Hero input doesn't expand for long inspiration text** | Fry | — | 0.5 day | When generated idea is long, the hero input clips. Auto-expand or wrap properly. |
+| **B-48** | **Inspiration generates similar/duplicate ideas** | Bender | — | 0.5 day | Consecutive inspire clicks return very similar ideas. Ensure stateless calls with variety instructions. |
+| **B-49** | **Configurable inspiration model (gpt-5.4-nano)** | Bender | — | 0.5 day | Add AZURE_OPENAI_INSPIRE_DEPLOYMENT env var, default gpt-5.4-nano, fall back to chat deployment. |
+| **B-50** | **Streaming inspiration generation** | Bender+Fry | B-49 | 1-2 days | API streams response, frontend types text character-by-character into hero input. Partially scaffolded (chatCompletionStream exists). |
+| **B-51** | **Add playground link to README** | Leela | — | 0.5 day | Add section/link in README.md pointing to ?playground route. |
+| **B-52** | **Update README and docs for current architecture** | Leela | B-51 | 1-2 days | Review README.md and docs/ to reflect current features: landing page, playground, A2UI, inspiration API, etc. |
+| **B-53** | **Changesets & releases strategy** | Leela | — | 0.5 day | Changesets is installed. Decide: create changesets for session work, document release workflow, cut version if needed. |
+| **B-54** | **Remove dark mode from docs site** | Fry | — | 0.5 day | Docs site (Docusaurus) should be light-mode only, matching the app. Remove dark mode toggle/theme. |
+| **B-55** | **Set MIT license on project and docs** | Leela | — | 0.5 day | Add LICENSE file (MIT) to repo root, add license field to package.json, add license footer/page to docs site. |
+| **B-40** | **Cost estimation UI (CostEstimate component)** | Fry | B-19 | 2 days | Real-time pricing calculator, resource SKU selector, monthly projection |
 
 ---
 
@@ -1851,7 +1862,6 @@ Secondary issue: using the entire `useA2UI()` return object as a `useMemo` depen
 | **B-37** | **Artifact diff & merge UI** | Fry | B-17 | 2-3 days | Visual file diffs, merge conflicts, version history |
 | **B-38** | **Conversation branching & time travel** | Bender | B-17 | 2 days | Save checkpoints, rewind to earlier turn, explore alternatives |
 | **B-39** | **Plugin system (custom packs on demand)** | Leela | B-10 | 3-4 days | Dynamic pack loading, third-party extensions, marketplace discovery |
-| **B-40** | **Cost estimation UI (CostEstimate component)** | Fry | B-19 | 2 days | Real-time pricing calculator, resource SKU selector, monthly projection |
 | **B-41** | **Conversation collaboration (multi-user)** | Bender | DONE-6 | 2-3 weeks | Share sessions, real-time cursors, turn comments, approval workflows |
 | **B-42** | **K8s validation rules engine** | Hermes | B-18 | 2 days | 20+ validation rules, auto-fix suggestions, helm lint integration |
 | **B-44** | **Remote filesystem abstraction + Cloud Shell provider** | Bender | B-17 | 3-5 days | Filesystem abstraction layer (read/write/list/delete) with pluggable providers. Cloud Shell as first provider (terminal access, real file ops). Future providers: Codespaces, local FS. Replaces B-09 IndexedDB for real deployment scenarios. |

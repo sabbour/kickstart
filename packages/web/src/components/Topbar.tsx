@@ -16,6 +16,7 @@ export function Topbar({ onToggleSidebar, showSessionsToggle }: TopbarProps) {
       <div className="topbar-actions">
         {showSessionsToggle && (
           <button
+            id="topbar-sessions-toggle"
             className="topbar-btn"
             aria-label="Toggle sessions"
             title="Sessions"
