@@ -11,6 +11,7 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { useArtifacts } from '../../contexts/ArtifactContext';
+import { sanitizeHtml } from '../../utils/sanitize';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
@@ -144,7 +145,8 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
       }
       return hljs.highlightAuto(resolvedContent).value;
     } catch {
-      return resolvedContent;
+      // If highlighting fails, HTML-escape the raw content to prevent XSS
+      return escapeHtml(resolvedContent);
     }
   }, [resolvedContent, resolvedLanguage]);
 
@@ -170,7 +172,7 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
           </div>
         ) : isReadOnly ? (
           <pre className={classes.highlightView}>
-            <code dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+            <code dangerouslySetInnerHTML={{ __html: sanitizeHtml(highlightedCode) }} />
           </pre>
         ) : (
           <textarea
@@ -186,6 +188,15 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
     </Card>
   );
 });
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 function inferLanguage(fileName: string): string | undefined {
   const ext = fileName.split('.').pop()?.toLowerCase();

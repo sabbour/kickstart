@@ -5,6 +5,7 @@ import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-ty
 import { makeStyles, shorthands, tokens, Link } from '@fluentui/react-components';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { sanitizeHtml } from '../../utils/sanitize';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
@@ -223,7 +224,7 @@ export const Markdown = createReactComponent(MarkdownApi, ({ props }) => {
                 });
                 return (
                   <pre className={classes.pre}>
-                    <code className="hljs" dangerouslySetInnerHTML={{ __html: result.value }} />
+                    <code className="hljs" dangerouslySetInnerHTML={{ __html: sanitizeHtml(result.value) }} />
                   </pre>
                 );
               } catch (error) {
@@ -238,7 +239,7 @@ export const Markdown = createReactComponent(MarkdownApi, ({ props }) => {
                 const result = hljs.highlightAuto(String(children).replace(/\n$/, ''));
                 return (
                   <pre className={classes.pre}>
-                    <code className="hljs" dangerouslySetInnerHTML={{ __html: result.value }} />
+                    <code className="hljs" dangerouslySetInnerHTML={{ __html: sanitizeHtml(result.value) }} />
                   </pre>
                 );
               } catch (error) {

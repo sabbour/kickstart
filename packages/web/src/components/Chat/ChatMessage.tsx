@@ -1,6 +1,7 @@
 import React from 'react';
 import { BotSparkle24Regular } from '@fluentui/react-icons';
 import { A2UISurfaceWrapper } from '../A2UI/A2UISurfaceWrapper';
+import { sanitizeHtml } from '../../utils/sanitize';
 import type { ChatMessage as ChatMessageType } from '../../types';
 import type { SurfaceModel } from '../../vendor/a2ui/web_core/index';
 import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapter';
@@ -35,7 +36,7 @@ export function ChatMessage({ message, getSurface, isActive = true }: ChatMessag
       <div className="chat-bubble assistant">
         {/* Render text with basic markdown-like formatting */}
         {message.text && (
-          <div dangerouslySetInnerHTML={{ __html: formatText(message.text) }} />
+          <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(formatText(message.text)) }} />
         )}
 
         {/* Render A2UI surfaces inline */}
