@@ -463,6 +463,9 @@ const useStyles = makeStyles({
     paddingBottom: tokens.spacingVerticalM,
     paddingLeft: tokens.spacingHorizontalL,
     paddingRight: tokens.spacingHorizontalL,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
   },
   createChatFooter: {
     display: 'flex',
@@ -1338,7 +1341,7 @@ function PlaygroundInner() {
 
           {/* Pinned input bar */}
           <div className={classes.createInputBar}>
-            <div className={classes.createInputRow}>
+            <div className={classes.createInputRow} style={{ maxWidth: '600px', width: '100%' }}>
               <input
                 className={classes.createInput}
                 value={createPrompt}
@@ -1347,16 +1350,18 @@ function PlaygroundInner() {
                 aria-label="Continue the conversation"
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSend(createPrompt); }}
                 disabled={createStreaming.isStreaming}
+                style={{ paddingRight: '48px' }}
               />
-              <Button
-                appearance="primary"
-                shape="circular"
-                size="medium"
+              <button
+                className="hero-send-btn"
+                aria-label="Send"
+                title="Send"
                 onClick={() => handleCreateSend(createPrompt)}
                 disabled={!createPrompt.trim() || createStreaming.isStreaming}
+                style={{ position: 'absolute', right: '8px' }}
               >
-                Send
-              </Button>
+                <img src="assets/icons/commands/go.svg" width="16" height="16" alt="" />
+              </button>
             </div>
             <div className={classes.createChatFooter}>
               <span
