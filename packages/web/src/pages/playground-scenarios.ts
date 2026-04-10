@@ -385,6 +385,37 @@ const customArchitectureDiagram = (): A2uiMsg[] => {
   ] as A2uiComponent[]);
 };
 
+const customQuestionnaire = (): A2uiMsg[] => {
+  const sid = uid('questionnaire-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'q1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Questionnaire (Custom)', variant: 'h3' },
+    { id: 'q1', component: 'Questionnaire', questions: [
+      { id: 'app-name', label: 'What is your application name?', type: 'text', required: true },
+      { id: 'app-type', label: 'What type of application?', type: 'choice', required: true, choices: [
+        { id: 'web', label: 'Web Application' },
+        { id: 'api', label: 'REST API' },
+        { id: 'worker', label: 'Background Worker' },
+      ] },
+      { id: 'features', label: 'Which features do you need?', type: 'multiChoice', choices: [
+        { id: 'autoscale', label: 'Auto-scaling' },
+        { id: 'monitoring', label: 'Monitoring & Alerts' },
+        { id: 'ci-cd', label: 'CI/CD Pipeline' },
+        { id: 'secrets', label: 'Secret Management' },
+      ] },
+    ], submitLabel: 'Continue' },
+  ] as A2uiComponent[]);
+};
+
+const customMarkdown = (): A2uiMsg[] => {
+  const sid = uid('markdown-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'md1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Markdown (Custom)', variant: 'h3' },
+    { id: 'md1', component: 'Markdown', content: '## Deployment Summary\n\nYour application **web-app** is ready for deployment.\n\n### Resources Created\n\n| Resource | SKU | Region |\n|----------|-----|--------|\n| AKS Cluster | Standard | East US 2 |\n| Container Registry | Basic | East US 2 |\n| Key Vault | Standard | East US 2 |\n\n### Next Steps\n\n1. Review the generated manifests\n2. Configure environment variables\n3. Run `kubectl apply -f deployment.yaml`\n\n> **Note:** Auto-scaling is enabled with a minimum of 2 replicas.\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web-app\nspec:\n  replicas: 2\n```' },
+  ] as A2uiComponent[]);
+};
+
 // ---------------------------------------------------------------------------
 // Advanced Scenarios — Data Binding, Events, Lifecycle, Dynamic Patterns
 // ---------------------------------------------------------------------------
@@ -727,6 +758,8 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'ctrl-code',     label: 'CodeBlock',      description: 'Syntax-highlighted code',          group: 'Custom Controls', catalog: 'kickstart', generate: customCodeBlock },
   { id: 'ctrl-progress', label: 'ProgressSteps',  description: 'Multi-step progress tracker',      group: 'Custom Controls', catalog: 'kickstart', generate: customProgressSteps },
   { id: 'ctrl-arch',     label: 'ArchitectureDiagram', description: 'Mermaid-powered architecture diagram', group: 'Custom Controls', catalog: 'kickstart', generate: customArchitectureDiagram },
+  { id: 'ctrl-questionnaire', label: 'Questionnaire', description: 'Multi-question form with text/choice/multiChoice', group: 'Custom Controls', catalog: 'kickstart', generate: customQuestionnaire },
+  { id: 'ctrl-markdown', label: 'Markdown', description: 'Rich markdown with tables and code blocks', group: 'Custom Controls', catalog: 'kickstart', generate: customMarkdown },
   // Data Binding
   { id: 'data-basic',    label: 'Basic Data Binding',     description: 'Text components bound to data paths',        group: 'Data Binding',    generate: dataBindingBasic },
   { id: 'data-form',     label: 'Data-Bound Form',        description: 'Form fields with path bindings',             group: 'Data Binding',    generate: dataBindingForm },
