@@ -23,6 +23,7 @@ import {
 import type { PhaseItem } from "@kickstart/core";
 import { getSession, createSession, addMessage } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools, getChatDeploymentName } from "../lib/openai-client.js";
+import { checkContentSafety } from "../lib/content-safety.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -51,6 +52,12 @@ app.http("converse", {
 
       if (!body.message?.trim()) {
         return { status: 400, jsonBody: { error: "message is required" } };
+      }
+
+      // Content safety pre-flight check
+      const safetyResult = await checkContentSafety(body.message);
+      if (!safetyResult.safe) {
+        return { status: 400, jsonBody: { error: safetyResult.error } };
       }
 
       // Get or create session
