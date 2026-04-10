@@ -55,11 +55,10 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: tokens.spacingVerticalS,
-    paddingBottom: tokens.spacingVerticalS,
+    paddingTop: tokens.spacingVerticalXS,
+    paddingBottom: tokens.spacingVerticalXS,
     paddingLeft: tokens.spacingHorizontalL,
     paddingRight: tokens.spacingHorizontalL,
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground1,
     flexShrink: 0,
     gap: tokens.spacingHorizontalM,
@@ -1060,12 +1059,13 @@ function PlaygroundInner() {
       {/* ---- Top bar ---- */}
       <div className={classes.topbar}>
         <div className={classes.topbarLeft}>
-          <Subtitle2>A2UI Playground</Subtitle2>
+          <Caption1 style={{ fontWeight: 600, color: tokens.colorNeutralForeground2 }}>A2UI Playground</Caption1>
           <CounterBadge
             count={getCounter()}
             appearance="filled"
             color="brand"
             overflowCount={999}
+            size="small"
           />
         </div>
         {(activeTab === 'gallery' || activeTab === 'components') && (
@@ -1109,7 +1109,7 @@ function PlaygroundInner() {
           <Tab id="tab-gallery" value="gallery" aria-controls="panel-gallery">Ideas</Tab>
           <Tab id="tab-components" value="components" aria-controls="panel-components">Components</Tab>
           <Tab id="tab-icons" value="icons" aria-controls="panel-icons">Icons</Tab>
-          <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets">Widgets</Tab>
+          <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets" icon={<img src="assets/icons/fluent/card-ui.svg" width="16" height="16" alt="" />}>Widgets</Tab>
         </TabList>
       </div>
 
