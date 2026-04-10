@@ -10,6 +10,7 @@ import {
   Spinner,
   Badge,
   makeStyles,
+  shorthands,
   tokens,
 } from '@fluentui/react-components';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
@@ -59,8 +60,8 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
     width: '100%',
-    borderColor: tokens.colorBrandStroke1,
-    borderWidth: tokens.strokeWidthThick,
+    ...shorthands.borderColor(tokens.colorBrandStroke1),
+    ...shorthands.borderWidth(tokens.strokeWidthThick),
   },
   metaRow: {
     display: 'flex',
@@ -128,7 +129,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
               aria-selected={selected === resource.id}
             >
               <CardHeader
-                header={<Body2 weight="semibold">{resource.name}</Body2>}
+                header={<Body2 style={{ fontWeight: 600 }}>{resource.name}</Body2>}
                 description={
                   <Caption1>
                     {resourceGroupFromId(resource.id)} · {resource.location}

@@ -29,7 +29,7 @@ export const DateTimeInput = createReactComponent(DateTimeInputApi, ({props}) =>
     <div className={classes.root}>
       <Field label={props.label || undefined}>
         <Input
-          type={type}
+          type={type as 'text' | 'date' | 'time' | 'datetime-local'}
           value={props.value || ''}
           onChange={onChange}
           min={typeof props.min === 'string' ? props.min : undefined}

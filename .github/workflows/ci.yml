@@ -26,11 +26,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: TypeScript check (web)
-        run: cd packages/web && npx tsc --noEmit
-
       - name: Build core
         run: npm run build -w @kickstart/core
+
+      - name: TypeScript check (web)
+        run: cd packages/web && npx tsc --noEmit
 
       - name: Build API
         run: cd packages/web/api && npm run build

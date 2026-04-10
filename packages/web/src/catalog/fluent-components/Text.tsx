@@ -54,7 +54,8 @@ export const Text = createReactComponent(TextApi, ({props}) => {
   const raw = props.text ?? '';
   const content = parseInlineMarkdown(raw);
 
-  switch (props.variant) {
+  const variant = props.variant as string | undefined;
+  switch (variant) {
     case 'h1':
       return <Title1 className={classes.root} block>{content}</Title1>;
     case 'h2':

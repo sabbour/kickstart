@@ -5,6 +5,7 @@ import { DynamicStringSchema, ActionSchema } from '../../vendor/a2ui/web_core/sc
 import {
   Avatar,
   Body1,
+  Body1Strong,
   Body2,
   Button,
   Card,
@@ -88,7 +89,7 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
     return (
       <Card className={classes.root}>
         <CardHeader
-          header={<Body1 weight="semibold">Azure</Body1>}
+          header={<Body1Strong>Azure</Body1Strong>}
           description={
             <Caption1>
               <span className={classes.statusDot} />
@@ -99,7 +100,7 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
         <div className={classes.signedIn}>
           <Avatar name={displayName} size={36} color="brand" />
           <div className={classes.userInfo}>
-            <Body2 weight="semibold">{displayName}</Body2>
+            <Body2 style={{ fontWeight: 600 }}>{displayName}</Body2>
             <Caption1>Signed in to Azure</Caption1>
           </div>
         </div>
@@ -115,7 +116,7 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
   return (
     <Card className={classes.root}>
       <CardHeader
-        header={<Body1 weight="semibold">Azure</Body1>}
+        header={<Body1Strong>Azure</Body1Strong>}
         description={<Caption1>Sign in to access your Azure resources</Caption1>}
       />
       <div className={classes.actions}>

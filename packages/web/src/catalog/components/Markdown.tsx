@@ -2,7 +2,7 @@ import React from 'react';
 import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
-import { makeStyles, tokens, Link } from '@fluentui/react-components';
+import { makeStyles, shorthands, tokens, Link } from '@fluentui/react-components';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import hljs from 'highlight.js/lib/core';
@@ -168,23 +168,23 @@ const useStyles = makeStyles({
   },
   th: {
     backgroundColor: tokens.colorNeutralBackground3,
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: tokens.colorNeutralStroke1,
+    ...shorthands.borderWidth('1px'),
+    ...shorthands.borderStyle('solid'),
+    ...shorthands.borderColor(tokens.colorNeutralStroke1),
     padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalS}`,
     textAlign: 'left',
     fontWeight: tokens.fontWeightSemibold,
     color: tokens.colorNeutralForeground1,
   },
   td: {
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: tokens.colorNeutralStroke1,
+    ...shorthands.borderWidth('1px'),
+    ...shorthands.borderStyle('solid'),
+    ...shorthands.borderColor(tokens.colorNeutralStroke1),
     padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalS}`,
     color: tokens.colorNeutralForeground1,
   },
   hr: {
-    borderWidth: '0',
+    ...shorthands.borderWidth('0'),
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
     marginTop: tokens.spacingVerticalL,
     marginBottom: tokens.spacingVerticalL,
@@ -210,11 +210,13 @@ export const Markdown = createReactComponent(MarkdownApi, ({ props }) => {
           ul: ({ node, ...props }) => <ul className={classes.ul} {...props} />,
           ol: ({ node, ...props }) => <ol className={classes.ol} {...props} />,
           li: ({ node, ...props }) => <li className={classes.li} {...props} />,
-          code: ({ node, inline, className, children, ...props }) => {
+          code: ({ node, className, children, ...props }) => {
             const match = /language-(\w+)/.exec(className || '');
             const language = match ? match[1] : '';
+            // In react-markdown v9+, detect inline code by absence of language class
+            const isInline = !className;
             
-            if (!inline && language) {
+            if (!isInline && language) {
               try {
                 const result = hljs.highlight(String(children).replace(/\n$/, ''), {
                   language,
@@ -231,7 +233,7 @@ export const Markdown = createReactComponent(MarkdownApi, ({ props }) => {
                   </pre>
                 );
               }
-            } else if (!inline) {
+            } else if (!isInline) {
               try {
                 const result = hljs.highlightAuto(String(children).replace(/\n$/, ''));
                 return (

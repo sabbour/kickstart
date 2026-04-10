@@ -9,7 +9,7 @@ import {
   Card,
   CardHeader,
   Badge,
-  Body1,
+  Body1Strong,
   Caption1,
   makeStyles,
   tokens,
@@ -79,7 +79,7 @@ export const RadioGroup = createReactComponent(RadioGroupApi, ({ props }) => {
           aria-checked={selected === opt.id}
         >
           <CardHeader
-            header={<Body1 weight="semibold">{opt.label}</Body1>}
+            header={<Body1Strong>{String(opt.label)}</Body1Strong>}
             description={opt.description ? <Caption1>{opt.description}</Caption1> : undefined}
             action={
               opt.recommended ? (

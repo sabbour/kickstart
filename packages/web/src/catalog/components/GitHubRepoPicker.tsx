@@ -3,7 +3,6 @@ import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import { DynamicStringSchema, ActionSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
-  Body1,
   Body2,
   Caption1,
   Card,
@@ -12,6 +11,7 @@ import {
   Spinner,
   Badge,
   makeStyles,
+  shorthands,
   tokens,
 } from '@fluentui/react-components';
 import { Search20Regular, Star20Regular } from '@fluentui/react-icons';
@@ -90,8 +90,8 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
     width: '100%',
-    borderColor: tokens.colorBrandStroke1,
-    borderWidth: tokens.strokeWidthThick,
+    ...shorthands.borderColor(tokens.colorBrandStroke1),
+    ...shorthands.borderWidth(tokens.strokeWidthThick),
   },
   metaRow: {
     display: 'flex',
@@ -193,7 +193,7 @@ export const GitHubRepoPicker = createReactComponent(GitHubRepoPickerApi, ({ pro
               aria-selected={selected === repo.full_name}
             >
               <CardHeader
-                header={<Body2 weight="semibold">{repo.full_name}</Body2>}
+                header={<Body2 style={{ fontWeight: 600 }}>{repo.full_name}</Body2>}
                 description={
                   repo.description ? (
                     <Caption1>{repo.description}</Caption1>
