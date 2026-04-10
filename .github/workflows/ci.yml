@@ -4,6 +4,13 @@ on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '.squad/**'
+      - 'docs/**'
+      - 'docs-site/**'
+      - 'infra/**'
+      - '**.md'
+      - '.github/ISSUE_TEMPLATE/**'
 
 jobs:
   lint-build:
