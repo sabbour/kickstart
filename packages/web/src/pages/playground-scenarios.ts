@@ -291,6 +291,29 @@ const customFormGroup = (): A2uiMsg[] => {
   ] as A2uiComponent[]);
 };
 
+const customSteppedCarousel = (): A2uiMsg[] => {
+  const sid = uid('carousel-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'carousel1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'SteppedCarousel (Custom)', variant: 'h3' },
+    { id: 'carousel1', component: 'SteppedCarousel', steps: [
+      { title: 'Application Settings', child: 'sc-step1' },
+      { title: 'Scaling', child: 'sc-step2' },
+      { title: 'Review', child: 'sc-step3' },
+    ] },
+    { id: 'sc-step1', component: 'Column', children: ['sc-name', 'sc-region'], gap: 'small' },
+    { id: 'sc-name', component: 'TextField', label: 'App name', placeholder: 'my-app' },
+    { id: 'sc-region', component: 'ChoicePicker', label: 'Region', options: [
+      { value: 'eastus', label: 'East US' },
+      { value: 'westeu', label: 'West Europe' },
+    ], value: ['eastus'], variant: 'mutuallyExclusive', displayStyle: 'chips' },
+    { id: 'sc-step2', component: 'Column', children: ['sc-replicas'], gap: 'small' },
+    { id: 'sc-replicas', component: 'Slider', label: 'Replicas', value: 3, min: 1, max: 10 },
+    { id: 'sc-step3', component: 'Column', children: ['sc-summary'], gap: 'small' },
+    { id: 'sc-summary', component: 'Text', text: 'Review your settings and click Done to confirm.' },
+  ] as A2uiComponent[]);
+};
+
 const customCodeBlock = (): A2uiMsg[] => {
   const sid = uid('code-demo');
   return surface(sid, [
@@ -700,6 +723,7 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   // Custom Controls
   { id: 'ctrl-radio',    label: 'RadioGroup',     description: 'Radio options with descriptions',  group: 'Custom Controls', catalog: 'kickstart', generate: customRadioGroup },
   { id: 'ctrl-form',     label: 'FormGroup',      description: 'Stepped form sections',            group: 'Custom Controls', catalog: 'kickstart', generate: customFormGroup },
+  { id: 'ctrl-carousel', label: 'SteppedCarousel', description: 'Wizard-style stepped carousel',    group: 'Custom Controls', catalog: 'kickstart', generate: customSteppedCarousel },
   { id: 'ctrl-code',     label: 'CodeBlock',      description: 'Syntax-highlighted code',          group: 'Custom Controls', catalog: 'kickstart', generate: customCodeBlock },
   { id: 'ctrl-progress', label: 'ProgressSteps',  description: 'Multi-step progress tracker',      group: 'Custom Controls', catalog: 'kickstart', generate: customProgressSteps },
   { id: 'ctrl-arch',     label: 'ArchitectureDiagram', description: 'Mermaid-powered architecture diagram', group: 'Custom Controls', catalog: 'kickstart', generate: customArchitectureDiagram },

@@ -132,3 +132,20 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 **Handoff:** All branches merged to main. UI fully integrated with backend. Dark mode, persistence, streaming all working.
 
 **Next P3 priority:** Internationalization (i18n), service principal auth, advanced error recovery with retry strategies.
+
+### ArchitectureDiagram Fluent 2 Overhaul — 2026-07-18
+
+- **Mermaid `theme: 'base'` with `themeVariables`:** Switched from `neutral` to `base` theme to enable full color control. Hardcoded Fluent 2 light-theme hex values (not runtime tokens) since Mermaid config is static. Key colors: `#EBF3FC` (brandTint60) for node fills, `#B4D6FA` (brandTint40) for borders, `#616161` for edge lines.
+- **SVG post-processing for icons:** After `mermaid.render()`, `postProcessSvg()` injects `<image>` elements into `.node` groups by keyword-matching node labels against an `ICON_MAP`. Icons from `/assets/icons/fluent/`. Rect widths are expanded and `foreignObject` labels shifted right to make room. Available icons verified: `cloud-cube.svg`, `cube.svg`, `database.svg`, `globe.svg`, `cloud-archive.svg`, `person.svg`, `desktop-pulse.svg`, `network-check.svg`, `lock-shield.svg`, `key.svg`, `arrow-split.svg`, `box-multiple.svg`, `cloud.svg`.
+- **SVG post-processing for styling:** Rounded corners (`rx/ry=8`), thin strokes (`1.5px`), filter removal for flat Fluent look.
+- **Auto-sizing viewport:** Removed fixed `height: '400px'`. Now measures SVG `getBBox()` after render and clamps viewport height between 300–800px. Height is set via state, applied as inline style.
+- **Fit-and-center on render:** `fitAndCenter()` calculates scale to fit diagram width (capped at 1.5x) and centers with offset. Called via `requestAnimationFrame` after render. Reset button also calls `fitAndCenter()` instead of resetting to `scale=1, offset=0`.
+- **No TypeScript errors introduced.** Pre-existing errors in AzureLoginCard/AzureResourcePicker/CodeBlock are unrelated.
+
+### SteppedCarousel Component — $(date -u +%Y-%m-%dT%H:%MZ)
+
+- **New component: SteppedCarousel** — wizard-style stepped carousel showing one step at a time with Previous/Next navigation. Uses `useState` for step tracking, `buildChild()` for rendering step content, Fluent `Card`, `Button`, `Caption1`, `Subtitle2` + Fluent icons (`ChevronLeftRegular`, `ChevronRightRegular`, `CheckmarkRegular`).
+- **Step indicator pattern:** Horizontal row of 8px circle pills with Caption1 titles. Active = `colorBrandBackground`, completed = same at 0.5 opacity, upcoming = `colorNeutralStroke2`. Active title uses `colorBrandForeground1` + fontWeight 600.
+- **Schema design:** `steps` array of `{ title: DynamicStringSchema, child: ComponentIdSchema }` + optional `activeStep` number. Strict schema. Child references point to component IDs in the same surface.
+- **Playground scenario:** 3-step demo (Application Settings → Scaling → Review) registered in Custom Controls group. Uses `surface()` helper + `uid()` for unique surface IDs.
+- **Build verified:** Zero new TypeScript errors. Pre-existing errors in AzureLoginCard/AzureResourcePicker/CodeBlock are unrelated.

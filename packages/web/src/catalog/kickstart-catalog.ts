@@ -18,6 +18,7 @@ import { ArchitectureDiagram } from './components/ArchitectureDiagram';
 import { FileEditor } from './components/FileEditor';
 import { CostEstimate } from './components/CostEstimate';
 import { DeploymentProgress } from './components/DeploymentProgress';
+import { SteppedCarousel } from './components/SteppedCarousel';
 
 const kickstartComponents: ReactComponentImplementation[] = [
   ...Array.from(basicCatalog.components.values()),
@@ -38,6 +39,7 @@ const kickstartComponents: ReactComponentImplementation[] = [
   FileEditor,
   CostEstimate,
   DeploymentProgress,
+  SteppedCarousel,
 ];
 
 export const kickstartCatalog = new Catalog<ReactComponentImplementation>(
