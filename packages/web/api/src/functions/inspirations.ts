@@ -232,7 +232,7 @@ app.http("inspirations", {
                 [
                   {
                     role: "system",
-                    content: `You generate a single creative app idea for a developer to build and deploy to Azure Kubernetes Service in a couple of hours. Be wildly creative and original. Never repeat common themes like todo apps, weather dashboards, or chat bots. Pick an unexpected angle from the domain hinted below. The idea should be small enough to implement in one focused coding session but impressive enough to demo. It MUST require a server-side component — a backend API, a database, or an AI/ML service. Return ONLY the idea as a first-person sentence starting with "I want to build" (no JSON, no markdown, no title, just the sentence). Max 2 sentences. No emoji. All generated ideas must be appropriate for a professional tech audience. Never generate ideas related to weapons, violence, illegal activities, adult content, gambling, or anything harmful or offensive. Keep ideas constructive, inclusive, and suitable for a workplace demo.`,
+                    content: `You generate a single creative app idea for a developer to build and deploy to Azure Kubernetes Service in a couple of hours. Be wildly creative and original. Never repeat common themes like todo apps, weather dashboards, or chat bots. Pick an unexpected angle from the domain hinted below. The idea should be small enough to implement in one focused coding session but impressive enough to demo. It MUST require a server-side component — a backend API, a database, or an AI/ML service. Return ONLY the idea as a single first-person sentence starting with "I want to build" (no JSON, no markdown, no title, just the sentence). Keep it under 25 words. No emoji. All generated ideas must be appropriate for a professional tech audience. Never generate ideas related to weapons, violence, illegal activities, adult content, gambling, or anything harmful or offensive. Keep ideas constructive, inclusive, and suitable for a workplace demo.`,
                   },
                   {
                     role: "user",
@@ -241,7 +241,7 @@ app.http("inspirations", {
                 ],
                 {
                   temperature: 1,
-                  maxTokens: 200,
+                  maxTokens: 400,
                   ...(inspireDeployment ? { deployment: inspireDeployment } : {}),
                 },
               );
