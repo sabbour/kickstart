@@ -139,7 +139,7 @@ export { APIConnectorRegistry, defaultConnectorRegistry } from "./connectors/ind
 export { AzureARMConnector } from "./connectors/index.js";
 export type { AzureResource, AzureResourceGroup, AzureSubscription, AzureLocation } from "./connectors/index.js";
 export { GitHubConnector } from "./connectors/index.js";
-export type { GitHubRepo, GitHubBranch, GitHubRepoOptions } from "./connectors/index.js";
+export type { GitHubRepo, GitHubBranch, GitHubRepoOptions, GitHubUser, GitHubDeviceCodeResponse, GitHubPullRequest } from "./connectors/index.js";
 export { PricingConnector } from "./connectors/index.js";
 export type { ResourceCostInput, ResourceCostEstimate, CostEstimateResult } from "./connectors/index.js";
 
