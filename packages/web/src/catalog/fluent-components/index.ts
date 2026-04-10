@@ -17,6 +17,9 @@ import {CheckBox} from './CheckBox';
 import {ChoicePicker} from './ChoicePicker';
 import {Slider} from './Slider';
 import {DateTimeInput} from './DateTimeInput';
+import {Table} from './Table';
+import {Alert} from './Alert';
+import {Link} from './Link';
 
 export {Text} from './Text';
 export {Image} from './Image';
@@ -36,8 +39,11 @@ export {CheckBox} from './CheckBox';
 export {ChoicePicker} from './ChoicePicker';
 export {Slider} from './Slider';
 export {DateTimeInput} from './DateTimeInput';
+export {Table} from './Table';
+export {Alert} from './Alert';
+export {Link} from './Link';
 
-/** Fluent UI v9 overrides for all 18 basic catalog components. */
+/** Fluent UI v9 overrides for all 21 basic catalog components. */
 export const fluentOverrides: ReactComponentImplementation[] = [
   Text,
   Image,
@@ -57,4 +63,7 @@ export const fluentOverrides: ReactComponentImplementation[] = [
   ChoicePicker,
   Slider,
   DateTimeInput,
+  Table,
+  Alert,
+  Link,
 ];

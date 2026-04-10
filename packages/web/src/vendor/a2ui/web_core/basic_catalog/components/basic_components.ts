@@ -530,6 +530,75 @@ export const DateTimeInputApi = {
     .strict(),
 } satisfies ComponentApi;
 
+export const TableApi = {
+  name: 'Table',
+  schema: z
+    .object({
+      ...CommonProps,
+      columns: z
+        .array(DynamicStringSchema)
+        .min(1)
+        .describe('The column headers for the table.'),
+      rows: z
+        .array(z.array(DynamicStringSchema))
+        .describe(
+          'The table rows. Each row is an array of cell values matching the columns order.',
+        ),
+      caption: DynamicStringSchema.describe(
+        'An optional caption displayed above the table.',
+      ).optional(),
+    })
+    .strict()
+    .describe(
+      'A data table for displaying structured tabular data such as comparisons, resource listings, or configuration details.',
+    ),
+} satisfies ComponentApi;
+
+export const AlertApi = {
+  name: 'Alert',
+  schema: z
+    .object({
+      ...CommonProps,
+      message: DynamicStringSchema.describe('The alert message text.'),
+      severity: z
+        .enum(['info', 'warning', 'error', 'success'])
+        .default('info')
+        .describe('The severity level that determines the color and icon.')
+        .optional(),
+      dismissible: z
+        .boolean()
+        .default(false)
+        .describe('If true, the alert can be dismissed by the user.')
+        .optional(),
+      action: ActionSchema.optional(),
+    })
+    .strict()
+    .describe(
+      'A severity-colored banner for communicating status, feedback, or important information to the user.',
+    ),
+} satisfies ComponentApi;
+
+export const LinkApi = {
+  name: 'Link',
+  schema: z
+    .object({
+      ...CommonProps,
+      text: DynamicStringSchema.describe('The visible link text.'),
+      url: DynamicStringSchema.describe('The URL the link navigates to.'),
+      external: z
+        .boolean()
+        .default(false)
+        .describe(
+          'If true, the link opens in a new tab with noopener/noreferrer.',
+        )
+        .optional(),
+    })
+    .strict()
+    .describe(
+      'A hyperlink component for navigating to external URLs such as documentation, Codespaces, or dashboards.',
+    ),
+} satisfies ComponentApi;
+
 export const BASIC_COMPONENTS: ComponentApi[] = [
   TextApi,
   ImageApi,
@@ -549,4 +618,7 @@ export const BASIC_COMPONENTS: ComponentApi[] = [
   ChoicePickerApi,
   SliderApi,
   DateTimeInputApi,
+  TableApi,
+  AlertApi,
+  LinkApi,
 ];

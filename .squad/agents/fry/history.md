@@ -47,6 +47,8 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - B-27: Widgets localStorage persistence ✅ (pushed 2026-04-11)
 - B-29: Progressive component streaming ✅ (pushed 2026-04-11)
 - B-33: Theme customization system ✅ (pushed 2026-04-11)
+- #9: Table, Alert, Link catalog components ✅ (PR #111, 2026-07-17)
+- #106: VSCode/Insiders SVG icon fix ✅ (PR #111, 2026-07-17)
 
 ## Learnings
 
@@ -101,6 +103,15 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - `useArtifacts()` → `getArtifact(path)` returns `Artifact | null`; check for null before rendering artifact content.
 - Status badge components (GitHubAction) pair well with icon-only imports from `@fluentui/react-icons` — individual named imports avoid bundle bloat vs icon-set imports.
 - 4 new components (GitHubLoginCard, GitHubRepoPicker, GitHubAction, GitHubCommit) registered in kickstart-catalog.ts — total catalog now at 9 custom components + fluent overrides + basic catalog.
+
+### Table/Alert/Link Components + VSCode SVG Fix (#9, #106) — 2026-07-17
+
+- **New catalog components need dual registration:** API schema in `basic_components.ts`, raw fallback in `vendor/a2ui/react/catalog/basic/components/`, and Fluent override in `catalog/fluent-components/`. Both index files must be updated. The `kickstartCatalog` picks them up automatically via `basicCatalog.components` spread + `fluentOverrides`.
+- **Fluent Table pattern:** `<Table>`, `<TableHeader>`, `<TableHeaderCell>`, `<TableBody>`, `<TableRow>`, `<TableCell>` — all from `@fluentui/react-components`. Striped rows via alternating `colorNeutralBackground2`. No need for `DataGrid` unless sorting/selection is needed.
+- **MessageBar severity mapping:** Fluent `<MessageBar>` uses `intent` prop with values `info`/`warning`/`error`/`success` — maps 1:1 with our Alert severity schema. `<MessageBarActions>` with `containerAction` for dismiss button.
+- **Fluent Link external handling:** `<Link inline>` with `target="_blank"` + `rel="noopener noreferrer"` for external URLs. `<OpenRegular>` icon from `@fluentui/react-icons` as visual cue.
+- **VS Code branded SVGs:** Official VS Code logo uses multi-layer SVG with mask + 3 gradient paths (blue: #0065A9/#007ACC/#1F9CF0). Insiders uses green equivalent (#1A8A35/#24931E/#2FC44E). Use unique mask IDs (`vsc-mask` vs `vsci-mask`) when multiple SVGs on the same page.
+- **Flexible vs strict APIs:** Fluent override components use flexible (non-strict) zod schemas to tolerate LLM hallucinations. Vendor basic components use strict schemas. Both must define the same `name` field.
 
 ## Historical Context (Archived)
 
