@@ -17,14 +17,19 @@
 import React from 'react';
 import {createReactComponent} from '../../../adapter';
 import {VideoApi} from '../../../../web_core/basic_catalog/index';
-import {getBaseLeafStyle} from '../utils';
+import {makeStyles, tokens} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  root: {
+    width: '100%',
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+    aspectRatio: '16/9',
+  },
+});
 
 export const Video = createReactComponent(VideoApi, ({props}) => {
-  const style: React.CSSProperties = {
-    ...getBaseLeafStyle(),
-    width: '100%',
-    aspectRatio: '16/9',
-  };
+  const classes = useStyles();
 
-  return <video src={props.url} controls style={style} />;
+  return <video src={props.url} controls className={classes.root} />;
 });

@@ -17,23 +17,38 @@
 import React from 'react';
 import {createReactComponent} from '../../../adapter';
 import {IconApi} from '../../../../web_core/basic_catalog/index';
-import {getBaseLeafStyle} from '../utils';
+import {Body1, makeStyles, tokens} from '@fluentui/react-components';
 
-export const Icon = createReactComponent(IconApi, ({props}) => {
-  const iconName =
-    typeof props.name === 'string' ? props.name : (props.name as {path?: string})?.path;
-  const style: React.CSSProperties = {
-    ...getBaseLeafStyle(),
-    fontSize: '24px',
+const useStyles = makeStyles({
+  root: {
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: tokens.colorNeutralForeground1,
+  },
+  text: {
+    fontSize: tokens.fontSizeBase500,
     width: '24px',
     height: '24px',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-  };
+  },
+});
+
+export const Icon = createReactComponent(IconApi, ({props}) => {
+  const classes = useStyles();
+  const iconName =
+    typeof props.name === 'string' ? props.name : (props.name as {path?: string})?.path;
+
+  if (!iconName) {
+    return <Body1>{'?'}</Body1>;
+  }
 
   return (
-    <span className="material-symbols-outlined" style={style}>
+    <span className={`${classes.root} ${classes.text}`}>
       {iconName}
     </span>
   );

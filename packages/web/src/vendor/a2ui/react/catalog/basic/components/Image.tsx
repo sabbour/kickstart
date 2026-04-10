@@ -17,37 +17,69 @@
 import React from 'react';
 import {createReactComponent} from '../../../adapter';
 import {ImageApi} from '../../../../web_core/basic_catalog/index';
-import {getBaseLeafStyle} from '../utils';
+import {Image as FluentImage, makeStyles, tokens} from '@fluentui/react-components';
 
-export const Image = createReactComponent(ImageApi, ({props}) => {
-  const mapFit = (fit?: string): React.CSSProperties['objectFit'] => {
-    if (fit === 'scaleDown') return 'scale-down';
-    return (fit as React.CSSProperties['objectFit']) || 'fill';
-  };
-
-  const style: React.CSSProperties = {
-    ...getBaseLeafStyle(),
-    objectFit: mapFit(props.fit),
+const useStyles = makeStyles({
+  root: {
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+    display: 'block',
     width: '100%',
     height: 'auto',
-    display: 'block',
+  },
+  icon: {
+    width: '24px',
+    height: '24px',
+  },
+  avatar: {
+    width: '40px',
+    height: '40px',
+  },
+  smallFeature: {
+    maxWidth: '100px',
+  },
+  largeFeature: {
+    maxHeight: '400px',
+  },
+  header: {
+    height: '200px',
+  },
+});
+
+export const Image = createReactComponent(ImageApi, ({props}) => {
+  const classes = useStyles();
+
+  const mapFit = (fit?: string): 'none' | 'center' | 'contain' | 'cover' | 'default' => {
+    if (fit === 'scaleDown') return 'none';
+    if (fit === 'contain') return 'contain';
+    if (fit === 'cover') return 'cover';
+    if (fit === 'none') return 'none';
+    return 'default';
   };
 
+  let className = classes.root;
+  let shape: 'square' | 'circular' | 'rounded' | undefined;
+
   if (props.variant === 'icon') {
-    style.width = '24px';
-    style.height = '24px';
+    className = `${classes.root} ${classes.icon}`;
   } else if (props.variant === 'avatar') {
-    style.width = '40px';
-    style.height = '40px';
-    style.borderRadius = '50%';
+    className = `${classes.root} ${classes.avatar}`;
+    shape = 'circular';
   } else if (props.variant === 'smallFeature') {
-    style.maxWidth = '100px';
+    className = `${classes.root} ${classes.smallFeature}`;
   } else if (props.variant === 'largeFeature') {
-    style.maxHeight = '400px';
+    className = `${classes.root} ${classes.largeFeature}`;
   } else if (props.variant === 'header') {
-    style.height = '200px';
-    style.objectFit = 'cover';
+    className = `${classes.root} ${classes.header}`;
   }
 
-  return <img src={props.url} alt={props.description || ''} style={style} />;
+  return (
+    <FluentImage
+      className={className}
+      src={props.url}
+      alt={props.description || ''}
+      fit={mapFit(props.fit)}
+      shape={shape}
+    />
+  );
 });

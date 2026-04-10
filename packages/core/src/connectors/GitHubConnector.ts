@@ -44,6 +44,33 @@ export interface GitHubBranch {
   commit: { sha: string; url: string };
 }
 
+export interface GitHubTreeEntry {
+  path: string;
+  mode: string;
+  type: 'blob' | 'tree' | 'commit';
+  sha: string;
+  size?: number;
+  url: string;
+}
+
+export interface GitHubTree {
+  sha: string;
+  url: string;
+  tree: GitHubTreeEntry[];
+  truncated: boolean;
+}
+
+export interface GitHubFileContent {
+  name: string;
+  path: string;
+  sha: string;
+  size: number;
+  type: 'file' | 'dir';
+  content?: string;
+  encoding?: string;
+  html_url: string;
+}
+
 export interface GitHubRepoOptions {
   private?: boolean;
   description?: string;
@@ -145,6 +172,52 @@ export class GitHubConnector extends BaseConnector {
   }
 
   /**
+   * Get the full recursive file tree for a repository ref.
+   * Returns stub data when not authenticated.
+   */
+  async getTree(owner: string, repo: string, ref = 'HEAD'): Promise<GitHubTree> {
+    if (this.isStubMode()) {
+      return STUB_TREE;
+    }
+
+    const res = await this.request('GET', `/repos/${owner}/${repo}/git/trees/${ref}?recursive=1`);
+    return (await res.json()) as GitHubTree;
+  }
+
+  /**
+   * Read a single file's content from a repository.
+   * The GitHub Contents API returns base64-encoded content for files ≤ 100 MB.
+   * Returns the raw API response; callers decode base64.
+   * Returns stub data when not authenticated.
+   */
+  async getFileContent(
+    owner: string,
+    repo: string,
+    path: string,
+    ref?: string,
+  ): Promise<GitHubFileContent> {
+    if (this.isStubMode()) {
+      return {
+        name: path.split('/').pop() ?? path,
+        path,
+        sha: 'stub-sha',
+        size: 42,
+        type: 'file',
+        content: btoa('# stub file content'),
+        encoding: 'base64',
+        html_url: `https://github.com/${owner}/${repo}/blob/main/${path}`,
+      };
+    }
+
+    const query = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+    const res = await this.request(
+      'GET',
+      `/repos/${owner}/${repo}/contents/${path}${query}`,
+    );
+    return (await res.json()) as GitHubFileContent;
+  }
+
+  /**
    * Create a pull request on a repository.
    * Returns stub data when not authenticated.
    */
@@ -243,3 +316,16 @@ const STUB_BRANCHES: GitHubBranch[] = [
     },
   },
 ];
+
+const STUB_TREE: GitHubTree = {
+  sha: 'abc123',
+  url: 'https://api.github.com/repos/stub-user/my-app/git/trees/abc123',
+  tree: [
+    { path: 'package.json', mode: '100644', type: 'blob', sha: 'a1', size: 512, url: '' },
+    { path: 'Dockerfile', mode: '100644', type: 'blob', sha: 'a2', size: 256, url: '' },
+    { path: 'src', mode: '040000', type: 'tree', sha: 'a3', url: '' },
+    { path: 'src/index.ts', mode: '100644', type: 'blob', sha: 'a4', size: 1024, url: '' },
+    { path: '.github/workflows/ci.yml', mode: '100644', type: 'blob', sha: 'a5', size: 384, url: '' },
+  ],
+  truncated: false,
+};

@@ -17,41 +17,48 @@
 import React from 'react';
 import {createReactComponent} from '../../../adapter';
 import {SliderApi} from '../../../../web_core/basic_catalog/index';
-import {LEAF_MARGIN} from '../utils';
+import {
+  Slider as FluentSlider,
+  Label,
+  Body1,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import type {SliderOnChangeData} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXS,
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+    width: '100%',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+  },
+});
 
 export const Slider = createReactComponent(SliderApi, ({props}) => {
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    props.setValue(Number(e.target.value));
+  const classes = useStyles();
+
+  const onChange = (_ev: React.ChangeEvent<HTMLInputElement>, data: SliderOnChangeData) => {
+    props.setValue(data.value);
   };
 
-  const uniqueId = React.useId();
-
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px',
-        margin: LEAF_MARGIN,
-        width: '100%',
-      }}
-    >
-      <div style={{display: 'flex', justifyContent: 'space-between'}}>
-        {props.label && (
-          <label htmlFor={uniqueId} style={{fontSize: '14px', fontWeight: 'bold'}}>
-            {props.label}
-          </label>
-        )}
-        <span style={{fontSize: '12px', color: '#666'}}>{props.value}</span>
+    <div className={classes.root}>
+      <div className={classes.header}>
+        {props.label && <Label weight="semibold">{props.label}</Label>}
+        <Body1>{props.value}</Body1>
       </div>
-      <input
-        id={uniqueId}
-        type="range"
+      <FluentSlider
         min={props.min ?? 0}
         max={props.max}
         value={props.value ?? 0}
         onChange={onChange}
-        style={{width: '100%', cursor: 'pointer'}}
       />
     </div>
   );

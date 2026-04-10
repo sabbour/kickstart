@@ -17,31 +17,38 @@
 import React from 'react';
 import {createReactComponent} from '../../../adapter';
 import {ButtonApi} from '../../../../web_core/basic_catalog/index';
-import {LEAF_MARGIN} from '../utils';
+import {Button as FluentButton, makeStyles, tokens} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  root: {
+    marginTop: tokens.spacingVerticalXS,
+    marginBottom: tokens.spacingVerticalXS,
+  },
+});
 
 export const Button = createReactComponent(ButtonApi, ({props, buildChild}) => {
-  const style: React.CSSProperties = {
-    margin: LEAF_MARGIN,
-    padding: '8px 16px',
-    cursor: 'pointer',
-    border: props.variant === 'borderless' ? 'none' : '1px solid #ccc',
-    backgroundColor:
-      props.variant === 'primary'
-        ? 'var(--a2ui-primary-color, #007bff)'
-        : props.variant === 'borderless'
-          ? 'transparent'
-          : '#fff',
-    color: props.variant === 'primary' ? '#fff' : 'inherit',
-    borderRadius: '4px',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxSizing: 'border-box',
-  };
+  const classes = useStyles();
+
+  const appearance = (() => {
+    switch (props.variant) {
+      case 'primary':
+        return 'primary';
+      case 'borderless':
+        return 'transparent';
+      case 'default':
+      default:
+        return 'secondary';
+    }
+  })();
 
   return (
-    <button style={style} onClick={props.action} disabled={props.isValid === false}>
+    <FluentButton
+      className={classes.root}
+      appearance={appearance as 'primary' | 'transparent' | 'secondary'}
+      onClick={props.action}
+      disabled={props.isValid === false}
+    >
       {props.child ? buildChild(props.child) : null}
-    </button>
+    </FluentButton>
   );
 });

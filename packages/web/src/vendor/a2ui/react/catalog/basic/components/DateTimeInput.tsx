@@ -17,52 +17,42 @@
 import React from 'react';
 import {createReactComponent} from '../../../adapter';
 import {DateTimeInputApi} from '../../../../web_core/basic_catalog/index';
-import {LEAF_MARGIN, STANDARD_BORDER, STANDARD_RADIUS} from '../utils';
+import {Input, Field, makeStyles, tokens} from '@fluentui/react-components';
+import type {InputOnChangeData} from '@fluentui/react-components';
+
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%',
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalS,
+  },
+});
 
 export const DateTimeInput = createReactComponent(DateTimeInputApi, ({props}) => {
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    props.setValue(e.target.value);
-  };
+  const classes = useStyles();
 
-  const uniqueId = React.useId();
+  const onChange = (_ev: React.ChangeEvent<HTMLInputElement>, data: InputOnChangeData) => {
+    props.setValue(data.value);
+  };
 
   // Map enableDate/enableTime to input type
   let type = 'datetime-local';
   if (props.enableDate && !props.enableTime) type = 'date';
   if (!props.enableDate && props.enableTime) type = 'time';
 
-  const style: React.CSSProperties = {
-    padding: '8px',
-    width: '100%',
-    border: STANDARD_BORDER,
-    borderRadius: STANDARD_RADIUS,
-    boxSizing: 'border-box',
-  };
-
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px',
-        width: '100%',
-        margin: LEAF_MARGIN,
-      }}
-    >
-      {props.label && (
-        <label htmlFor={uniqueId} style={{fontSize: '14px', fontWeight: 'bold'}}>
-          {props.label}
-        </label>
-      )}
-      <input
-        id={uniqueId}
-        type={type}
-        style={style}
-        value={props.value || ''}
-        onChange={onChange}
-        min={typeof props.min === 'string' ? props.min : undefined}
-        max={typeof props.max === 'string' ? props.max : undefined}
-      />
+    <div className={classes.root}>
+      <Field label={props.label || undefined}>
+        <Input
+          type={type as 'text' | 'date' | 'time' | 'datetime-local'}
+          value={props.value || ''}
+          onChange={onChange}
+          min={typeof props.min === 'string' ? props.min : undefined}
+          max={typeof props.max === 'string' ? props.max : undefined}
+        />
+      </Field>
     </div>
   );
 });
