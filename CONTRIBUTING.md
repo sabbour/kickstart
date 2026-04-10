@@ -65,6 +65,16 @@ npm run lint
 npm test
 ```
 
+### Creating a Changeset
+
+Before merging a feature or fix branch, create a changeset to document changes for the next release:
+
+```bash
+npx changeset add
+```
+
+Follow the prompts to select which packages changed and the type of bump (major, minor, patch). Changesets are stored in `.changeset/` and are committed with your branch. When the maintainer is ready to cut a release, they'll run `changeset version` to bump versions and collate changes into CHANGELOG.md.
+
 ### Key Entry Points
 
 - **Web UI:** `packages/web/index.html`
