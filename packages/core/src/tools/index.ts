@@ -21,6 +21,10 @@ export { estimateCost } from "./estimate-cost.js";
 export { listArtifacts } from "./list-artifacts.js";
 export { getArtifact } from "./get-artifact.js";
 
+// Input validation
+export { validatePath, validateRef } from "./github-input-validation.js";
+export type { ValidationResult } from "./github-input-validation.js";
+
 // Bootstrap the default registry with all built-in tools
 import { defaultRegistry } from "./registry.js";
 import { azureResourceList } from "./azure-resource-list.js";

@@ -9,6 +9,8 @@
 import type { Tool } from "../types.js";
 import { defaultConnectorRegistry } from "../connectors/index.js";
 import type { GitHubConnector } from "../connectors/index.js";
+import { validateRef } from "./github-input-validation.js";
+import { gitHubRateLimiter } from "../connectors/github-rate-limit.js";
 
 interface GitHubRepoTreeArgs {
   owner: string;
@@ -70,6 +72,20 @@ export const githubRepoTree: Tool<GitHubRepoTreeArgs> = {
   },
 
   async execute(args: GitHubRepoTreeArgs): Promise<unknown> {
+    // Validate ref if provided
+    if (args.ref) {
+      const refCheck = validateRef(args.ref);
+      if (!refCheck.valid) {
+        return { error: `Invalid ref: ${refCheck.error}` };
+      }
+    }
+
+    // Pre-flight rate-limit check
+    const rateCheck = gitHubRateLimiter.check();
+    if (!rateCheck.allowed) {
+      return { error: rateCheck.warning };
+    }
+
     const gh = defaultConnectorRegistry.get("github") as
       | GitHubConnector
       | undefined;
@@ -113,7 +129,7 @@ export const githubRepoTree: Tool<GitHubRepoTreeArgs> = {
       )
       .map((entry) => entry.path);
 
-    return {
+    const result: Record<string, unknown> = {
       owner: args.owner,
       repo: args.repo,
       ref: args.ref ?? "HEAD",
@@ -122,5 +138,13 @@ export const githubRepoTree: Tool<GitHubRepoTreeArgs> = {
       keyFiles,
       truncated: treeData.truncated,
     };
+
+    // Surface rate-limit warnings to the LLM
+    const postCheck = gitHubRateLimiter.check();
+    if (postCheck.warning) {
+      result.rateLimitWarning = postCheck.warning;
+    }
+
+    return result;
   },
 };

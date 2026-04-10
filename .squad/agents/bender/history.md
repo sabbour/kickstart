@@ -613,3 +613,16 @@ Addressed Copilot review on PR #78 (data→context terminology fix). PR merged s
 - **ESLint rule:** `preserve-caught-error` requires `{ cause: err }` on re-thrown errors. Use eslint-disable comment for intentional `console.warn`.
 - **Test count:** 61 total (45 original + 16 new for security conditions), all passing.
 
+
+### 2025-07-26: Existing-Repo Analysis Protocol (#17, PR #110)
+
+- **Issue:** #17 — Add existing-repo analysis protocol to githubKit Discover phase
+- **PR:** #110 (draft)
+- **New tools:** `github_repo_tree` (recursive file tree + key-file detection), `github_repo_file_read` (file content reader with base64 decode)
+- **GitHubConnector additions:** `getTree(owner, repo, ref)` (Git Trees API, recursive), `getFileContent(owner, repo, path, ref)` (Contents API). Full stub/offline support for both.
+- **New types:** `GitHubTree`, `GitHubTreeEntry`, `GitHubFileContent` — exported from `connectors/index.ts`
+- **Key-file patterns:** 22 well-known files/dirs for deployment readiness detection (Dockerfile, package.json, go.mod, K8s manifests, CI workflows, etc.)
+- **Base64 portability:** Used `globalThis.atob()` instead of Node.js `Buffer` — core package targets `lib: ["ES2022", "DOM"]` with no `@types/node`
+- **Discover phase prompt:** Replaced single `github_repo_info` call with 4-step analysis protocol (metadata → file tree → read key manifests → summarize readiness). Max 5 file reads to stay within context limits.
+- **Registration:** Both tools in `githubKit.tools[]` and `defaultRegistry`. Exports in `tools/index.ts`.
+- **Test count:** 465 tests, all passing. Lint clean. Build clean.

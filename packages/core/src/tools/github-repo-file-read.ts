@@ -9,6 +9,8 @@
 import type { Tool } from "../types.js";
 import { defaultConnectorRegistry } from "../connectors/index.js";
 import type { GitHubConnector } from "../connectors/index.js";
+import { validatePath, validateRef } from "./github-input-validation.js";
+import { gitHubRateLimiter } from "../connectors/github-rate-limit.js";
 
 interface GitHubRepoFileReadArgs {
   owner: string;
@@ -59,6 +61,26 @@ export const githubRepoFileRead: Tool<GitHubRepoFileReadArgs> = {
   },
 
   async execute(args: GitHubRepoFileReadArgs): Promise<unknown> {
+    // Validate path — reject traversal, absolute paths, control chars
+    const pathCheck = validatePath(args.path);
+    if (!pathCheck.valid) {
+      return { error: `Invalid path: ${pathCheck.error}` };
+    }
+
+    // Validate ref if provided
+    if (args.ref) {
+      const refCheck = validateRef(args.ref);
+      if (!refCheck.valid) {
+        return { error: `Invalid ref: ${refCheck.error}` };
+      }
+    }
+
+    // Pre-flight rate-limit check
+    const rateCheck = gitHubRateLimiter.check();
+    if (!rateCheck.allowed) {
+      return { error: rateCheck.warning };
+    }
+
     const gh = defaultConnectorRegistry.get("github") as
       | GitHubConnector
       | undefined;
@@ -105,7 +127,7 @@ export const githubRepoFileRead: Tool<GitHubRepoFileReadArgs> = {
       const decoded = decodeBase64(file.content);
 
       if (decoded.length > MAX_INLINE_SIZE) {
-        return {
+        const truncResult: Record<string, unknown> = {
           owner: args.owner,
           repo: args.repo,
           path: args.path,
@@ -114,9 +136,12 @@ export const githubRepoFileRead: Tool<GitHubRepoFileReadArgs> = {
           totalSize: file.size,
           htmlUrl: file.html_url,
         };
+        const postCheck1 = gitHubRateLimiter.check();
+        if (postCheck1.warning) truncResult.rateLimitWarning = postCheck1.warning;
+        return truncResult;
       }
 
-      return {
+      const result: Record<string, unknown> = {
         owner: args.owner,
         repo: args.repo,
         path: args.path,
@@ -124,6 +149,12 @@ export const githubRepoFileRead: Tool<GitHubRepoFileReadArgs> = {
         size: file.size,
         htmlUrl: file.html_url,
       };
+
+      // Surface rate-limit warnings to the LLM
+      const postCheck2 = gitHubRateLimiter.check();
+      if (postCheck2.warning) result.rateLimitWarning = postCheck2.warning;
+
+      return result;
     } catch (err) {
       return {
         owner: args.owner,

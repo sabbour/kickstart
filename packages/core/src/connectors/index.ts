@@ -38,3 +38,7 @@ export { GitHubConnector } from './GitHubConnector.js';
 export type { GitHubRepo, GitHubBranch, GitHubRepoOptions, GitHubUser, GitHubDeviceCodeResponse, GitHubPullRequest, GitHubTree, GitHubTreeEntry, GitHubFileContent } from './GitHubConnector.js';
 export { PricingConnector } from './PricingConnector.js';
 export type { ResourceCostInput, ResourceCostEstimate, CostEstimateResult } from './PricingConnector.js';
+
+// Rate-limit tracker
+export { gitHubRateLimiter } from './github-rate-limit.js';
+export type { RateLimitState, RateLimitCheckResult } from './github-rate-limit.js';
