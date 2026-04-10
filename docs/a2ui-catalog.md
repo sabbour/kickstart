@@ -349,6 +349,35 @@ Multi-step deployment progress tracker with per-step status. Used during the Dep
 
 ---
 
+## Fat A2UI Components
+
+Starting in v0.3.0, Kickstart includes **fat components** — opinionated, self-managing implementations of common workflows with built-in authentication, validation, and security controls. These are registered as part of the `azure` and `github` IntegrationKits.
+
+### Azure Fat Components
+
+| Component | Purpose | Auth | Security |
+|-----------|---------|------|----------|
+| **AzureLoginCard** | Device code auth flow for Azure MSAL | MSAL | Token in memory; logout clears session |
+| **AzureResourcePicker** | Browse subscriptions and list resources | AzureARMConnector | Rate-limit handling; stub fallback |
+| **AzureResourceForm** | Collect deployment parameters and estimate cost | AzureARMConnector | Input validation; cost preview before submit |
+
+### GitHub Fat Components
+
+| Component | Purpose | Auth | Security |
+|-----------|---------|------|----------|
+| **GitHubLoginCard** | Device code auth flow for GitHub OAuth | GitHub OAuth | Token in memory; no localStorage |
+| **GitHubRepoPicker** | Search and select from user's repositories | GitHubConnector | Debounced search; pagination; rate-limit warnings |
+| **GitHubAction** | Execute allowlisted GitHub API operations | GitHubConnector | Operation allowlisting; typed confirmation for DELETE |
+| **GitHubCommit** | Create pull request with artifact selection | GitHubConnector | Branch validation; protected-branch guards; diff preview |
+
+**Key Security Features:**
+- **In-memory token storage** — No localStorage; tokens cleared on logout
+- **Operation allowlisting** — Write operations must be explicitly approved
+- **Typed confirmation** — DELETE and merge operations require developer confirmation
+- **Protected-branch blocking** — Cannot push to main/master/production
+
+---
+
 ## Vendor A2UI Basic Catalog (Fluent-Styled)
 
 The vendor A2UI v0.9 basic catalog provides standard primitives. Kickstart overrides all of these with Fluent 2 styled implementations in `packages/web/src/catalog/fluent-components/`:
