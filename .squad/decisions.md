@@ -1849,6 +1849,10 @@ Secondary issue: using the entire `useA2UI()` return object as a `useMemo` depen
 | **B-54** | **Remove dark mode from docs site** | Fry | — | 0.5 day | Docs site (Docusaurus) should be light-mode only, matching the app. Remove dark mode toggle/theme. |
 | **B-55** | **Set MIT license on project and docs** | Leela | — | 0.5 day | Add LICENSE file (MIT) to repo root, add license field to package.json, add license footer/page to docs site. |
 | **B-40** | **Cost estimation UI (CostEstimate component)** | Fry | B-19 | 2 days | Real-time pricing calculator, resource SKU selector, monthly projection |
+| **B-56** | **Consistent app title/header between landing and chat** | Fry | — | 0.5 day | Chat mode topbar title and branding should match landing page. Currently inconsistent after polish iterations. |
+| **B-57** | **Rework playground tab intro styling** | Fry | — | 0.5 day | The subtitle/intro text treatment on playground tabs needs redesign. Current Caption1 approach doesn't look right. |
+| **B-58** | **Add inspiration button to playground Create tab input** | Fry+Bender | B-49 | 0.5 day | The Create tab widget prompt input should have the same sparkle/inspire button as the landing page hero input. Reuse the same API + UX pattern. |
+| **B-59** | **Remove emoji from docs, use Fluent UI icons** | Fry | — | 1 day | Docs site uses emoji for visual cues. Replace with Fluent UI icons for consistency with the app directive (no emojis in UI). |
 
 ---
 
