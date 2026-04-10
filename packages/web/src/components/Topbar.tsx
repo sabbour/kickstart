@@ -11,7 +11,7 @@ export function Topbar({ onToggleSidebar, showSessionsToggle }: TopbarProps) {
     <header className="topbar" role="banner">
       <a className="topbar-brand" href="#/" aria-label="Kickstart — home">
         <img src="assets/icons/compute/aks-automatic.svg" alt="" width="24" height="24" />
-        <span>Kickstart on Azure Kubernetes Service (AKS)</span>
+        <span>Kickstart your app ideas on Azure</span>
       </a>
       <div className="topbar-actions">
         {showSessionsToggle && (

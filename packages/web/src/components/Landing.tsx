@@ -209,7 +209,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
       <div className="landing-inner">
         {/* Hero Input */}
         <div className="landing-hero">
-          <h1 className="landing-hero-title">What are you dreaming of building?</h1>
+          <h1 className="landing-hero-title">What would you like to build?</h1>
           <div className="landing-hero-input-wrap">
             <span className="hero-input-icon" aria-hidden="true">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
