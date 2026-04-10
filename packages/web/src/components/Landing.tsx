@@ -154,6 +154,13 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
     }
   }, []);
 
+  // Abort any in-flight streaming request on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   // Rotate placeholder inspiration
   useEffect(() => {
     const interval = setInterval(() => {
