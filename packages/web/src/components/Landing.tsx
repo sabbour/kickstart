@@ -71,18 +71,43 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
 
   const handleInspire= useCallback(async () => {
     setInspireLoading(true);
+    setInputValue(''); // Clear input before streaming
     try {
-      const res = await fetch('/api/inspirations');
+      const res = await fetch('/api/inspirations?stream=true');
       if (!res.ok) throw new Error('API error');
-      const ideas = await res.json();
-      if (Array.isArray(ideas) && ideas.length > 0) {
-        setInputValue(ideas[0].prompt);
-        inputRef.current?.focus();
-        return;
+      
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No reader available');
+      
+      const decoder = new TextDecoder();
+      let accumulatedText = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6); // Remove "data: " prefix
+            if (data === '[DONE]') {
+              setInspireLoading(false);
+              inputRef.current?.focus();
+              return;
+            }
+            accumulatedText += data;
+            setInputValue(accumulatedText);
+          }
+        }
       }
+      
+      setInspireLoading(false);
+      inputRef.current?.focus();
+      return;
     } catch {
       // Fallback: pick from local INSPIRATIONS array
-    } finally {
       setInspireLoading(false);
     }
     const pick = INSPIRATIONS[Math.floor(Math.random() * INSPIRATIONS.length)];
