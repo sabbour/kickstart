@@ -162,7 +162,7 @@ app.http("playground", {
       // Call Azure OpenAI with JSON mode
       const result = await chatCompletion(session.messages, {
         responseFormat: { type: "json_object" },
-        temperature: 0.7,
+        temperature: 1,
         maxTokens: 4096,
       });
 

@@ -1059,7 +1059,7 @@ function PlaygroundInner() {
       {/* ---- Top bar ---- */}
       <div className={classes.topbar}>
         <div className={classes.topbarLeft}>
-          <Caption1 style={{ fontWeight: 600, color: tokens.colorNeutralForeground2 }}>A2UI Playground</Caption1>
+          <Body1Strong style={{ color: tokens.colorNeutralForeground2 }}>A2UI Playground</Body1Strong>
           <CounterBadge
             count={getCounter()}
             appearance="filled"
@@ -1109,8 +1109,15 @@ function PlaygroundInner() {
           <Tab id="tab-gallery" value="gallery" aria-controls="panel-gallery">Ideas</Tab>
           <Tab id="tab-components" value="components" aria-controls="panel-components">Components</Tab>
           <Tab id="tab-icons" value="icons" aria-controls="panel-icons">Icons</Tab>
-          <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets" icon={<img src="assets/icons/fluent/card-ui.svg" width="16" height="16" alt="" />}>Widgets</Tab>
+          <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets">Widgets</Tab>
         </TabList>
+        <Caption1 style={{ color: tokens.colorNeutralForeground3, paddingTop: tokens.spacingVerticalXS, paddingBottom: tokens.spacingVerticalXS }}>
+          {activeTab === 'create' && 'Build A2UI components with AI'}
+          {activeTab === 'gallery' && 'Browse pre-built demo scenarios'}
+          {activeTab === 'components' && 'A2UI component reference'}
+          {activeTab === 'icons' && 'Fluent icon browser'}
+          {activeTab === 'widgets' && 'Your saved widget library'}
+        </Caption1>
       </div>
 
       {/* ---- Tab 1: Create (empty state — no messages yet) ---- */}
@@ -1515,7 +1522,7 @@ function PlaygroundInner() {
             {widgets.length === 0 ? (
               <div className={classes.emptyState}>
                 <div className={classes.emptyIcon}>
-                  <img src="/assets/icons/containers/container-registries.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
+                  <img src="/assets/icons/fluent/card-ui.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
                 </div>
                 <Body1Strong>No widgets yet</Body1Strong>
                 <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
