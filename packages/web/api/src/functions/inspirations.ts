@@ -104,6 +104,38 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+// Domain categories used to steer each inspiration call toward a different
+// industry/theme, preventing consecutive calls from producing similar ideas.
+const INSPIRATION_DOMAINS = [
+  "healthcare & biotech",
+  "education & e-learning",
+  "finance & fintech",
+  "gaming & entertainment",
+  "travel & hospitality",
+  "agriculture & food tech",
+  "sustainability & green energy",
+  "music & audio",
+  "fitness & wellness",
+  "logistics & supply chain",
+  "real estate & proptech",
+  "social impact & nonprofits",
+  "retail & e-commerce",
+  "sports & analytics",
+  "IoT & smart home",
+  "creative arts & design",
+  "legal & compliance",
+  "HR & recruitment",
+  "space & astronomy",
+  "pets & animal care",
+] as const;
+
+/** Pick a random domain hint to inject variety into each call. */
+function randomDomainHint(): string {
+  return INSPIRATION_DOMAINS[
+    Math.floor(Math.random() * INSPIRATION_DOMAINS.length)
+  ];
+}
+
 /** Check whether Azure OpenAI env vars are configured. */
 function isOpenAIConfigured(): boolean {
   return !!(
@@ -116,20 +148,20 @@ function isOpenAIConfigured(): boolean {
 /** Generate ideas via Azure OpenAI (non-streaming). */
 async function generateIdeas(): Promise<InspirationIdea[]> {
   const { chatCompletion } = await import("../lib/openai-client.js");
+  const domain = randomDomainHint();
 
   const result = await chatCompletion(
     [
       {
         role: "system",
-        content: `You generate a single creative app idea for a developer to build and deploy to Azure Kubernetes Service in a couple of hours. The idea should be small enough to implement in one focused coding session but impressive enough to demo. It MUST require a server-side component — a backend API, a database, or an AI/ML service. Return ONLY a JSON array with exactly 1 object containing "title" (short catchy name, max 8 words), "subtitle" (one-line description, max 12 words), and "prompt" (a first-person sentence starting with "I want to build"). No emoji. No markdown. Raw JSON only.`,
+        content: `You generate a single creative app idea for a developer to build and deploy to Azure Kubernetes Service in a couple of hours. Be wildly creative and original. Never repeat common themes like todo apps, weather dashboards, or chat bots. Pick an unexpected angle from the domain hinted below. The idea should be small enough to implement in one focused coding session but impressive enough to demo. It MUST require a server-side component — a backend API, a database, or an AI/ML service. Return ONLY a JSON array with exactly 1 object containing "title" (short catchy name, max 8 words), "subtitle" (one-line description, max 12 words), and "prompt" (a first-person sentence starting with "I want to build"). No emoji. No markdown. Raw JSON only.`,
       },
       {
         role: "user",
-        content:
-          "Generate 1 creative app idea that requires server-side deployment. Think web apps with APIs, AI agents, real-time services, data pipelines, or multi-tier architectures.",
+        content: `Generate 1 creative app idea in the "${domain}" space that requires server-side deployment. Think web apps with APIs, AI agents, real-time services, data pipelines, or multi-tier architectures. Surprise me with something novel.`,
       },
     ],
-    { temperature: 1.0, maxTokens: 300 },
+    { temperature: 1.2, maxTokens: 300 },
   );
 
   const parsed = JSON.parse(result.content) as InspirationIdea[];
@@ -173,6 +205,7 @@ app.http("inspirations", {
         if (isOpenAIConfigured()) {
           // Stream from OpenAI
           const { chatCompletionStream } = await import("../lib/openai-client.js");
+          const domain = randomDomainHint();
           
           const encoder = new TextEncoder();
           const stream = new ReadableStream({
@@ -182,15 +215,14 @@ app.http("inspirations", {
                   [
                     {
                       role: "system",
-                      content: `You generate a single creative app idea for a developer to build and deploy to Azure Kubernetes Service in a couple of hours. The idea should be small enough to implement in one focused coding session but impressive enough to demo. It MUST require a server-side component — a backend API, a database, or an AI/ML service. Return ONLY the idea as a first-person sentence starting with "I want to build" (no JSON, no markdown, no title, just the sentence). Max 2 sentences. No emoji.`,
+                      content: `You generate a single creative app idea for a developer to build and deploy to Azure Kubernetes Service in a couple of hours. Be wildly creative and original. Never repeat common themes like todo apps, weather dashboards, or chat bots. Pick an unexpected angle from the domain hinted below. The idea should be small enough to implement in one focused coding session but impressive enough to demo. It MUST require a server-side component — a backend API, a database, or an AI/ML service. Return ONLY the idea as a first-person sentence starting with "I want to build" (no JSON, no markdown, no title, just the sentence). Max 2 sentences. No emoji.`,
                     },
                     {
                       role: "user",
-                      content:
-                        "Generate 1 creative app idea that requires server-side deployment.",
+                      content: `Generate 1 creative app idea in the "${domain}" space that requires server-side deployment. Surprise me with something novel.`,
                     },
                   ],
-                  { temperature: 1.0, maxTokens: 200 },
+                  { temperature: 1.2, maxTokens: 200 },
                 );
 
                 for await (const chunk of gen) {
