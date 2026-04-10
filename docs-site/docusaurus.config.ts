@@ -101,7 +101,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Kickstart. Built with Docusaurus.`,
+      copyright: `Released under the MIT License. Copyright © ${new Date().getFullYear()} Microsoft Corporation. Built with Docusaurus.`,
     },
     prism: {
       theme: prismThemes.github,
