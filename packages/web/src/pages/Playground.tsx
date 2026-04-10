@@ -718,6 +718,65 @@ function PlaygroundInner() {
   const galleryRef = useRef<HTMLDivElement>(null);
   const [createMessages, setCreateMessages] = useState<ChatMessage[]>([]);
   const { widgets, addWidget, updateWidget, deleteWidget, duplicateWidget } = useWidgets();
+  const [inspireLoading, setInspireLoading] = useState(false);
+  const inspireAbortRef = useRef<AbortController | null>(null);
+
+  // Abort in-flight inspiration stream on unmount
+  useEffect(() => {
+    return () => { inspireAbortRef.current?.abort(); };
+  }, []);
+
+  const handleInspire = useCallback(async () => {
+    inspireAbortRef.current?.abort();
+    setInspireLoading(true);
+    setCreatePrompt('');
+
+    const controller = new AbortController();
+    inspireAbortRef.current = controller;
+
+    try {
+      const res = await fetch('/api/inspirations?stream=true', { signal: controller.signal });
+      if (!res.ok || !res.body) throw new Error('Streaming API error');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let accumulated = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') { setInspireLoading(false); return; }
+            if (data.startsWith('[ERROR]')) throw new Error(data.slice(8));
+            accumulated += data;
+            setCreatePrompt(accumulated);
+          }
+        }
+      }
+      setInspireLoading(false);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      setCreatePrompt('');
+      try {
+        const res = await fetch('/api/inspirations');
+        if (res.ok) {
+          const ideas = await res.json();
+          if (Array.isArray(ideas) && ideas.length > 0) {
+            setCreatePrompt(ideas[0].prompt);
+          }
+        }
+      } catch { /* ignore */ }
+      setInspireLoading(false);
+    } finally {
+      inspireAbortRef.current = null;
+    }
+  }, []);
 
   // Filter scenarios
   const filteredGalleryScenarios = useMemo(() => {
