@@ -1,5 +1,7 @@
-import type { ConnectorConfig } from './types.js';
+import type { ConnectorConfig, HttpMethod, APIConnectorRequestOptions } from './types.js';
 import { BaseConnector } from './BaseConnector.js';
+import { gitHubRateLimiter } from './github-rate-limit.js';
+import { ConnectorError } from './types.js';
 
 export interface GitHubRepo {
   id: number;
@@ -107,6 +109,30 @@ export class GitHubConnector extends BaseConnector {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
     };
+  }
+
+  /**
+   * Override request to enforce rate-limit guard and track response headers.
+   * Blocks requests when the GitHub rate-limit quota is exhausted.
+   */
+  override async request(
+    method: HttpMethod,
+    path: string,
+    body?: unknown,
+    options?: APIConnectorRequestOptions,
+  ): Promise<Response> {
+    const check = gitHubRateLimiter.check();
+    if (!check.allowed) {
+      throw new ConnectorError(
+        check.warning ?? 'GitHub API rate limit exhausted.',
+        'RATE_LIMITED',
+        { status: 429, retryable: true },
+      );
+    }
+
+    const response = await super.request(method, path, body, options);
+    gitHubRateLimiter.update(response);
+    return response;
   }
 
   // ── Domain methods ─────────────────────────────────────────────────────────
