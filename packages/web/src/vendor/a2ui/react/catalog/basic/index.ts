@@ -36,6 +36,9 @@ import {CheckBox} from './components/CheckBox';
 import {ChoicePicker} from './components/ChoicePicker';
 import {Slider} from './components/Slider';
 import {DateTimeInput} from './components/DateTimeInput';
+import {Table} from './components/Table';
+import {Alert} from './components/Alert';
+import {Link} from './components/Link';
 
 const basicComponents: ReactComponentImplementation[] = [
   Text,
@@ -56,6 +59,9 @@ const basicComponents: ReactComponentImplementation[] = [
   ChoicePicker,
   Slider,
   DateTimeInput,
+  Table,
+  Alert,
+  Link,
 ];
 
 export const basicCatalog = new Catalog<ReactComponentImplementation>(
@@ -83,4 +89,7 @@ export {
   ChoicePicker,
   Slider,
   DateTimeInput,
+  Table,
+  Alert,
+  Link,
 };
