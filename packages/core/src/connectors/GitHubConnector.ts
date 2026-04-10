@@ -26,9 +26,11 @@ export interface GitHubRepoOptions {
 }
 
 /**
- * Default GitHub OAuth scopes.
+ * Default GitHub OAuth scopes — minimal read-only access.
+ * `public_repo` grants read-only access to public repos. Full `repo` scope
+ * is only needed for write operations on private repositories.
  */
-const DEFAULT_GITHUB_SCOPES = ['repo', 'read:user'];
+const DEFAULT_GITHUB_SCOPES = ['public_repo', 'read:user'];
 
 /**
  * Connector for the GitHub REST API.

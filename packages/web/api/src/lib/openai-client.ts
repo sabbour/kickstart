@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import type { OpenAIToolDefinition, ToolCall } from "@kickstart/core";
+import { sanitizeToolOutput } from "./sanitize-tool-output.js";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -207,7 +208,7 @@ export async function chatCompletionWithTools(
       tool_calls: result.toolCalls,
     });
 
-    // Execute each requested tool and append results
+    // Execute each requested tool and append sanitized results
     for (const toolCall of result.toolCalls) {
       let toolResult: unknown;
       try {
@@ -220,7 +221,7 @@ export async function chatCompletionWithTools(
       workingMessages.push({
         role: "tool",
         tool_call_id: toolCall.id,
-        content: JSON.stringify(toolResult),
+        content: sanitizeToolOutput(toolResult),
       });
     }
   }

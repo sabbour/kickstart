@@ -16,6 +16,12 @@ export interface Tool<TArgs = Record<string, unknown>> {
     properties: Record<string, unknown>;
     required?: string[];
   };
+  /**
+   * When true, the tool requires explicit user approval before execution.
+   * Tools that modify state or access sensitive resources should set this.
+   * Default: false (auto-approved for read-only tools).
+   */
+  requireApproval?: boolean;
   /** Execute the tool and return a result the LLM can consume */
   execute(args: TArgs): Promise<unknown>;
 }

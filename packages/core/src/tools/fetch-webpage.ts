@@ -22,6 +22,50 @@ const ABSOLUTE_MAX_LENGTH = 32000;
 /** Request timeout in milliseconds. */
 const FETCH_TIMEOUT_MS = 15_000;
 
+// ---------------------------------------------------------------------------
+// SSRF protection — block requests to private/internal networks
+// ---------------------------------------------------------------------------
+
+function isPrivateIPv4(ip: string): boolean {
+  const parts = ip.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) {
+    return false;
+  }
+  const [a, b] = parts;
+  return (
+    a === 127 ||
+    a === 10 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254) ||
+    a === 0
+  );
+}
+
+function isPrivateIPv6(ip: string): boolean {
+  const normalized = ip.toLowerCase().replace(/^\[|]$/g, "");
+  if (normalized === "::1") return true;
+  if (/^f[cd]/.test(normalized)) return true;
+  if (normalized.startsWith("fe80")) return true;
+  const v4Mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (v4Mapped) return isPrivateIPv4(v4Mapped[1]);
+  return false;
+}
+
+const BLOCKED_HOSTNAMES = new Set([
+  "localhost",
+  "localhost.localdomain",
+  "metadata.google.internal",
+  "metadata.azure.internal",
+]);
+
+function isBlockedHost(hostname: string): boolean {
+  if (BLOCKED_HOSTNAMES.has(hostname.toLowerCase())) return true;
+  if (isPrivateIPv4(hostname)) return true;
+  if (isPrivateIPv6(hostname)) return true;
+  return false;
+}
+
 /**
  * Minimal HTML → plain text conversion.
  * Strips tags, decodes common entities, and collapses whitespace.
@@ -81,6 +125,11 @@ export const fetchWebpage: Tool<FetchWebpageArgs> = {
       return { error: `URL scheme "${parsed.protocol}" is not allowed. Use http or https.` };
     }
 
+    // SSRF protection: block private/internal hosts
+    if (isBlockedHost(parsed.hostname)) {
+      return { error: "Requests to private or internal network addresses are not allowed." };
+    }
+
     const maxLen = Math.min(args.maxLength ?? DEFAULT_MAX_LENGTH, ABSOLUTE_MAX_LENGTH);
 
     try {
@@ -98,6 +147,18 @@ export const fetchWebpage: Tool<FetchWebpageArgs> = {
       });
 
       clearTimeout(timeout);
+
+      // After redirect, validate the final URL is also not a private host
+      if (res.url && res.url !== args.url) {
+        try {
+          const redirected = new URL(res.url);
+          if (!ALLOWED_SCHEMES.includes(redirected.protocol) || isBlockedHost(redirected.hostname)) {
+            return { error: "Redirect to a private or internal network address is not allowed." };
+          }
+        } catch {
+          return { error: "Redirect resulted in an invalid URL." };
+        }
+      }
 
       if (!res.ok) {
         return {
