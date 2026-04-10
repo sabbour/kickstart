@@ -2977,6 +2977,25 @@ Public-facing LLM endpoints (inspirations, converse) could generate or respond t
 **Status:** Accepted
 
 Playground Create tab was calling `/api/converse`, which uses the full Kickstart onboarding engine (phases, kit skills, phase indicators). Wrong context — the playground needs free-form A2UI component generation, not an AKS deployment guide.
+## Merged from Inbox
+
+### 2026-04-10: A2UI Message Protocol for Dynamic Surfaces (Bender)
+
+When creating A2UI surfaces dynamically (e.g. from LLM responses), always use the two-message pattern:
+1. `{ version: 'v0.9', createSurface: { surfaceId, catalogId } }` — creates an empty surface
+2. `{ version: 'v0.9', updateComponents: { surfaceId, components: [...] } }` — adds components
+
+Never put a `body` field on `createSurface` — it is silently ignored. One component in the `updateComponents` array must have `id: "root"` — this is the renderer's entry point.
+
+### 2026-04-10: Content Safety Guardrails for LLM-Generated Content (Bender)
+
+Public-facing LLM endpoints (inspirations, converse) include two layers of defense:
+1. System prompt hardening — All inspiration generation prompts include a safety clause forbidding weapons, violence, illegal activities, adult content, gambling, and harmful/offensive ideas.
+2. User input pre-flight check — `content-safety.ts` performs lightweight LLM classification (`safe`/`unsafe`) on user messages before they reach the main converse flow.
+
+All agents adding new LLM prompts should include the safety clause.
+
+### 2026-04-10: Dedicated /api/playground Endpoint for A2UI Playground (Bender)
 
 Created a dedicated `POST /api/playground` endpoint with:
 - Its own system prompt focused on A2UI component design
@@ -2999,6 +3018,9 @@ Frontend `Playground.tsx` updated to call `/api/playground` with direct fetch in
 **Status:** Implemented
 
 Widget inspiration system (Ideas tab in Playground) was generating generic "chat-based AI assistant UX" component ideas. Too vague for one-shot component generation and not aligned with Kickstart's focus on Kubernetes/AKS deployment operations.
+Frontend `Playground.tsx` updated to call `/api/playground` with direct fetch instead of the SSE-based `useStreaming` hook.
+
+### 2026-04-10: Widget Inspiration Prompts — Dev/Deploy/Ops Focus (Bender)
 
 All widget inspiration prompts are now scoped exclusively to:
 1. Kubernetes deployment and operations (rollouts, scaling, pod health, events, logs)
@@ -3155,3 +3177,58 @@ PR preview environments still work — `pull_request` trigger is preserved for s
 **What:** When agent picks up work in Ralph loop, assign GitHub issue to @sabbour since AI agents have no GitHub accounts. Use `gh issue edit <number> --add-assignee sabbour`.
 **Why:** User request — agents can't be assigned issues directly, so use human owner's account.
 
+Prompts now include explicit instructions to specify A2UI component types, realistic sample data, interactions, and layout.
+
+### 2026-04-10: ArchitectureDiagram Fluent 2 Theme & Auto-sizing (Fry)
+
+ArchitectureDiagram now uses:
+1. Mermaid `base` theme with Fluent 2 `themeVariables` (hardcoded hex values, not runtime tokens)
+2. SVG post-processing for icon injection via keyword matching, rounded corners, thin strokes, flat styling
+3. Auto-sizing viewport (300–800px range based on SVG natural dimensions)
+4. Fit-and-center logic — diagram scales to fit container width and centers on render; reset button re-fits
+
+### 2026-04-10: SteppedCarousel component pattern (Fry)
+
+Created `SteppedCarousel` as a custom A2UI component using the `createReactComponent` pattern:
+- Client-side state only via `useState` — no server round-trip for step changes
+- Child-based content — each step references a `child` ComponentId for composable step content
+- No animation — simple content swap keeps it lightweight
+
+### 2026-04-10: PR + Tagged Release Workflow (Leela, Ahmed directive)
+
+All work flows through PRs:
+```
+squad/{issue}-{slug} → PR to main → merge → tag release → deploy to SWA
+```
+
+CI runs on every PR (lint, TypeScript check, build, unit tests, Playwright e2e). Production deploys trigger on version tags `v*` or manual dispatch. Each PR includes a changeset; release tags are created with `git tag v0.X.Y && git push --tags`.
+
+### 2026-04-10: Sprint Planning — Release Roadmap v0.2.0–v0.5.0 (Leela)
+
+Four milestones created mapping to tagged releases, grouping by Priority order, dependency chains, and agent capacity balance:
+
+- **v0.2.0 — Core Loop** (34 story points, 10 issues): End-to-end app functionality + release infra
+- **v0.3.0 — Feature Enrichment** (40 story points, 8 issues): API integrations + rich components
+- **v0.4.0 — Polish & Prompt Tuning** (17 story points, 12 issues): Prompt accuracy + UI polish
+- **v0.5.0 — Stretch** (68 story points, 18 issues): All P2 nice-to-have items
+
+### 2026-04-10: Project Board Fields Required on All Issues (Ralph directive)
+
+All GitHub issues must have:
+1. **Priority** — P0, P1, P2
+2. **Size** — XS, S, M, L, XL (story points)
+3. **Estimate** — Fibonacci points matching Size
+4. **Status** — Backlog → Ready → In progress → In review → Done
+
+Update Status as work progresses through lifecycle stages.
+
+### 2026-04-10: User directives (Ahmed Sabbour, Copilot captured)
+
+- **2026-04-10T06:03Z:** Use GitHub project board stages (Backlog → Ready → In progress → In review → Done) as agents work on items.
+- **2026-04-10T06:03Z:** Deploy from tagged releases only. Use PRs for work, no direct pushes to main.
+- **2026-04-10T06:08Z:** Use GitHub milestones tied to releases to group work by version.
+- **2026-04-10T06:08Z:** Investigate SWA slots for pre-prod/prod deployment (main = pre-prod, tags = prod).
+- **2026-04-10T06:08Z:** Track ALL work on GitHub Issues — GitHub is the source of truth, not in-memory state.
+- **2026-04-10T06:08Z:** For complex/stuck work, hire a 3rd-party "consultant" agent using gpt-5.4 model.
+- **2026-04-10T06:28Z:** Always set Estimate (1/2/3/5/8) and Priority (Critical/Important/Nice-to-have) on all issues. Update Status as work moves.
+- **2026-04-10T06:34Z:** Milestones must be set on all issues. Use sprint planning and sprint retro ceremonies. Derive roadmap from work item details.

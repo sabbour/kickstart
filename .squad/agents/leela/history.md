@@ -230,3 +230,12 @@ Core decisions preserved in `.squad/decisions.md` supersede archived entries. Th
 - **Release flow:** changeset per PR → `npx changeset version` → `git tag vX.Y.Z` → push tag → auto deploy.
 - **Infra + docs deploys unchanged:** Still trigger on push to main (path-scoped). Lower risk, no tag gate needed yet.
 - **Full decision:** `.squad/decisions/inbox/leela-pr-release-workflow.md`
+
+### 2025-07-27: Sprint Planning — Release Roadmap v0.2.0–v0.5.0
+- **4 milestones created:** v0.2.0 (34pt, 10 issues), v0.3.0 (40pt, 8 issues), v0.4.0 (17pt, 12 issues), v0.5.0 (68pt, 18 issues). Total: 159 story points across 48 issues.
+- **All 48 issues assigned to milestones.** No unassigned work remains.
+- **v0.2.0 P0 items moved to Ready** on the project board (#22, #23, #24, #53, #59). Items already in-progress (#2, #3, #27, #28, #29) left as-is.
+- **Two active PRs:** PR #65 (prompt knowledge batch → #3/#27/#28/#29) and PR #66 (questionnaire → #2) — both mergeable, both v0.2.0 scope.
+- **Key dependency chain:** #22→#23→#24 (action handler), #34→#25→#30→#31/#32 (ServiceConnector→ServicePack→fat components).
+- **Capacity balance:** v0.2.0 is Bender-heavy (core loop), v0.3.0 is balanced, v0.4.0 is light (prompt batch), v0.5.0 is stretch.
+- **Full decision:** `.squad/decisions/inbox/leela-sprint-planning-roadmap.md`
