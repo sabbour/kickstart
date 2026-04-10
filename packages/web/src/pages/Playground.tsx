@@ -91,12 +91,16 @@ const useStyles = makeStyles({
   },
   tabHint: {
     marginLeft: 'auto',
-    paddingBottom: tokens.spacingVerticalS,
-    paddingRight: tokens.spacingHorizontalXS,
-    color: tokens.colorNeutralForeground3,
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
+    paddingBottom: tokens.spacingVerticalSNudge,
+    color: tokens.colorNeutralForeground4,
+    fontSize: tokens.fontSizeBase100,
+    lineHeight: tokens.lineHeightBase100,
     whiteSpace: 'nowrap' as const,
+    '::before': {
+      content: '"·"',
+      marginRight: tokens.spacingHorizontalSNudge,
+      color: tokens.colorNeutralStroke2,
+    },
   },
   galleryCard: {
     backgroundColor: tokens.colorNeutralBackground1,
@@ -1043,6 +1047,7 @@ function PlaygroundInner() {
           <div className={classes.createHero}>
             <div className={classes.createHeading}>What would you like to build?</div>
             <div className={classes.createInputRow}>
+              {inspireLoading && <div className="hero-input-progress" />}
               <input
                 className={classes.createInput}
                 value={createPrompt}
@@ -1052,6 +1057,15 @@ function PlaygroundInner() {
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSend(createPrompt); }}
                 disabled={createStreaming.isStreaming}
               />
+              <button
+                className={`hero-inspire-btn${inspireLoading ? ' loading' : ''}`}
+                aria-label="Inspire me"
+                title="Inspire me"
+                onClick={handleInspire}
+                disabled={inspireLoading || createStreaming.isStreaming}
+              >
+                <Sparkle24Regular />
+              </button>
               <button
                 className="hero-send-btn"
                 aria-label="Create"
