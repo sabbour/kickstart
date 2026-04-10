@@ -16,9 +16,18 @@
  */
 
 import type { IntegrationKit } from './types.js';
+import type { KitAuthRequirement } from './types.js';
 import { Phase } from '../engine/types.js';
 import { githubRepoInfo } from '../tools/github-repo-info.js';
 import { GitHubConnector } from '../connectors/GitHubConnector.js';
+
+const githubAuth: KitAuthRequirement[] = [
+  {
+    provider: 'github-oauth',
+    scopes: ['repo', 'read:user'],
+    optional: false,
+  },
+];
 
 export const githubKit: IntegrationKit = {
   name: 'github',
@@ -125,4 +134,6 @@ export const githubKit: IntegrationKit = {
         '  - onSelect (optional action): Callback fired when the user selects a repository.',
     },
   ],
+
+  auth: githubAuth,
 };

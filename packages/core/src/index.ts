@@ -144,7 +144,7 @@ export { PricingConnector } from "./connectors/index.js";
 export type { ResourceCostInput, ResourceCostEstimate, CostEstimateResult } from "./connectors/index.js";
 
 // IntegrationKit system — composable bundles of tools, connectors, prompts, components
-export type { IntegrationKit, ComponentRegistration } from "./kits/index.js";
+export type { IntegrationKit, ComponentRegistration, KitAuthRequirement } from "./kits/index.js";
 export { IntegrationKitRegistry, defaultKitRegistry, registerKit } from "./kits/index.js";
 export { azureKit } from "./kits/index.js";
 export { githubKit } from "./kits/index.js";

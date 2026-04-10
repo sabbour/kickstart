@@ -602,3 +602,14 @@ Addressed Copilot review on PR #78 (data→context terminology fix). PR merged s
 
 **Handoff:** Security sprint complete. API endpoints hardened. No security regressions in full test suite (all handlers compliant).
 
+### 2025-07-25: ServicePack Security Conditions (Issue #30)
+
+- **Transactional register:** If `onActivate` throws, full rollback — tools, connectors, ownership maps, and kit entry are reverted. Previous kit is restored on re-register rollback.
+- **Transactional unregister:** If `onDeactivate` throws, kit stays registered — prevents partially torn-down state.
+- **Cycle detection:** DFS-based `detectCycle()` on `register()` catches circular dependency chains (A→B→A, A→B→C→A). Walks existing dependency graph from each declared dep.
+- **Auth schema validation:** `validateAuth()` runs before registration — rejects empty provider, empty scopes, scopes with empty strings. Warns on duplicate providers within same kit.
+- **Trust model:** Documented on `IntegrationKit` interface and `IntegrationKitRegistry` class JSDoc — kits are trusted first-party code, no sandboxing.
+- **ToolRegistry.unregister():** Added to support rollback (previously only APIConnectorRegistry had it).
+- **ESLint rule:** `preserve-caught-error` requires `{ cause: err }` on re-thrown errors. Use eslint-disable comment for intentional `console.warn`.
+- **Test count:** 61 total (45 original + 16 new for security conditions), all passing.
+

@@ -9,8 +9,10 @@ import { registerKit, azureKit, githubKit } from '@kickstart/core';
 
 // Register integration kits at startup — auto-wires tools + connectors into
 // their default registries so the engine can call them immediately.
-registerKit(azureKit);
-registerKit(githubKit);
+// Note: registerKit is async to support lifecycle hooks, but built-in kits
+// have no onActivate, so these resolve synchronously.
+void registerKit(azureKit);
+void registerKit(githubKit);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
