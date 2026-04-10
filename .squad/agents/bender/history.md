@@ -524,3 +524,13 @@ These capture foundational auth setup, monorepo structure, and Phase 1 architect
 - **Fix (frontend):** Replaced broken single-message pattern with proper `createSurface` → `updateComponents` two-message sequence. Added `normalizePlaygroundComponents()` safety-net transformer that handles both flat and nested LLM output, maps unknown type names to catalog equivalents (TextBlock→Text, Container→Column, etc.), converts nested children to ID references, and ensures a root component always exists.
 - **A2UI protocol rule:** `createSurface` only creates an empty surface. Components must be added via a separate `updateComponents` message. One component MUST have `id: "root"`.
 - **Key files:** `packages/web/src/pages/Playground.tsx`, `packages/web/api/src/functions/playground.ts`
+
+### 2025-07-25: Changesets & Release Strategy (#53)
+
+- **@changesets/cli** and **@changesets/changelog-github** installed as root devDependencies
+- **Config:** `.changeset/config.json` — GitHub changelog format, all 3 packages linked (versions stay in sync), access restricted (no npm publish)
+- **Scripts:** `npm run changeset`, `npm run changeset:version`, `npm run changeset:status` in root package.json
+- **Release flow:** PRs include changesets → merge to main → `npx changeset version` bumps versions + collates CHANGELOG.md → `git tag vX.Y.Z` → `deploy-swa.yml` triggers on `v*` tags
+- **CI:** Non-blocking `changeset status` step added to `.github/workflows/ci.yml` (warns if changeset missing, doesn't fail build)
+- **Docs:** `RELEASING.md` has the full workflow; `CONTRIBUTING.md` links to it
+- **Key files:** `.changeset/config.json`, `RELEASING.md`, `.github/workflows/ci.yml`, `package.json`

@@ -41,6 +41,10 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      - name: Changeset status
+        run: npx changeset status
+        continue-on-error: true
+
   e2e:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
