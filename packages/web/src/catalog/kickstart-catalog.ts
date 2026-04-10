@@ -14,6 +14,7 @@ import { GitHubCommit } from './components/GitHubCommit';
 import { AzureLoginCard } from './components/AzureLoginCard';
 import { AzureResourcePicker } from './components/AzureResourcePicker';
 import { AzureResourceForm } from './components/AzureResourceForm';
+import { AzureAction } from './components/AzureAction';
 import { ArchitectureDiagram } from './components/ArchitectureDiagram';
 import { FileEditor } from './components/FileEditor';
 import { CostEstimate } from './components/CostEstimate';
@@ -36,6 +37,7 @@ const kickstartComponents: ReactComponentImplementation[] = [
   AzureLoginCard,
   AzureResourcePicker,
   AzureResourceForm,
+  AzureAction,
   ArchitectureDiagram,
   FileEditor,
   CostEstimate,

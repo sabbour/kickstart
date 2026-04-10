@@ -15,7 +15,9 @@
  *
  * Component registrations (rendered by packages/web):
  *   - azureLoginCard       (MSAL sign-in card with subscription auto-select)
- *   - azureResourcePicker  (selectable card list populated from ARM at render time)
+ *   - azureResourcePicker  (cascading subscription → RG → resource selector)
+ *   - azureResourceForm    (dynamic ARM-driven form for resource creation)
+ *   - azureAction          (write-with-confirm pattern for ARM operations)
  */
 
 import type { IntegrationKit } from './types.js';
@@ -145,20 +147,51 @@ export const azureKit: IntegrationKit = {
     {
       type: 'azureLoginCard',
       description:
-        'MSAL sign-in card with automatic subscription selection.\n' +
+        'MSAL sign-in card with automatic subscription discovery.\n' +
         'Props:\n' +
         '  - displayName (optional string): Display name shown on the avatar and user info. Defaults to "Azure User".\n' +
+        '  - showTokenInfo (optional boolean): Show authentication timestamp. Never exposes raw tokens.\n' +
         '  - onSignIn (optional action): Callback fired after successful MSAL sign-in.\n' +
         '  - onSignOut (optional action): Callback fired when the user signs out.',
     },
     {
       type: 'azureResourcePicker',
       description:
-        'Selectable card list populated from ARM API at render time (resource names, types, groups, locations).\n' +
+        'Cascading subscription → resource group → resource selector with search/filter.\n' +
         'Props:\n' +
-        '  - subscriptionId (optional string): Azure subscription ID to list resources from. Falls back to a stub if omitted.\n' +
+        '  - subscriptionId (optional string): Pre-select a subscription. If omitted, shows subscription dropdown.\n' +
+        '  - resourceGroup (optional string): Pre-select a resource group. If omitted, shows resource group dropdown.\n' +
+        '  - resourceType (optional string): Filter resources by ARM type (e.g. "Microsoft.ContainerService/managedClusters").\n' +
         '  - label (optional string): Header text above the resource list. Defaults to "Select an Azure resource".\n' +
         '  - onSelect (optional action): Callback fired when the user selects a resource.',
+    },
+    {
+      type: 'azureResourceForm',
+      description:
+        'Dynamic form for creating Azure resources. Generates fields based on resource type.\n' +
+        'Props:\n' +
+        '  - title (optional string): Form title. Defaults to "Create Azure Resource".\n' +
+        '  - subscriptionId (optional string): Target subscription ID.\n' +
+        '  - resourceGroup (optional string): Target resource group name.\n' +
+        '  - resourceType (optional string): ARM resource type (e.g. "Microsoft.ContainerService/managedClusters").\n' +
+        '  - apiVersion (optional string): ARM API version for the resource type.',
+    },
+    {
+      type: 'azureAction',
+      description:
+        'Write-with-confirm pattern for ARM operations. Shows action preview before execution.\n' +
+        'Destructive operations (DELETE) require typing the resource name to confirm.\n' +
+        'Only allows operations targeting allowlisted ARM resource types.\n' +
+        'Props:\n' +
+        '  - title (string): Action title displayed in the card header.\n' +
+        '  - description (optional string): Description of what the action will do.\n' +
+        '  - method (enum: PUT|POST|PATCH|DELETE): HTTP method for the ARM operation.\n' +
+        '  - path (string): ARM resource path (e.g. "/subscriptions/{subId}/resourceGroups/{rg}/providers/...").\n' +
+        '  - body (optional object): Request body for PUT/POST/PATCH operations.\n' +
+        '  - apiVersion (optional string): ARM API version. Defaults to "2021-04-01".\n' +
+        '  - confirmLabel (optional string): Custom label for the confirm button.\n' +
+        '  - onSuccess (optional action): Callback fired on successful operation.\n' +
+        '  - onError (optional action): Callback fired on operation failure.',
     },
   ],
 
