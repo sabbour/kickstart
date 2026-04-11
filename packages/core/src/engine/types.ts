@@ -61,3 +61,30 @@ export type ConversationEvent =
   | { type: "RESET" }
   | { type: "USER_INPUT"; input: string }
   | { type: "PHASE_COMPLETE"; phase: Phase; data: Record<string, unknown> };
+
+// ---------------------------------------------------------------------------
+// Knowledge Skills (#33)
+// ---------------------------------------------------------------------------
+
+/** A discrete unit of domain knowledge injectable into the system prompt. */
+export interface Skill {
+  /** Unique skill identifier, e.g. "iac-bicep-modules" */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** Phases where this skill is relevant */
+  phases: Phase[];
+  /** Keywords that trigger this skill when found in conversation context */
+  keywords: string[];
+  /** The prompt content to inject */
+  content: string;
+  /** Priority — higher = injected first (default: 0) */
+  priority?: number;
+}
+
+/** Context passed through the skill resolver middleware chain. */
+export interface SkillResolverContext {
+  kits: import("../kits/types.js").IntegrationKit[];
+  conversationHistory?: string[];
+  activeSkillIds?: Set<string>;
+}

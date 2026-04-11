@@ -53,7 +53,10 @@ export {
   getCurrentPhase,
   canAdvance,
   resolveSkills,
+  resolveSkillsAsync,
+  resolveSkillsFromList,
   formatSkillsSection,
+  registerSkillMiddleware,
   AUTO_CONTINUE_PREFIXES,
   AUTO_CONTINUE_MAX_CONSECUTIVE,
   shouldAutoContinue,
@@ -70,6 +73,9 @@ export type {
   PhaseDefinition,
   ConversationEvent,
   ResolvedSkills,
+  Skill,
+  SkillResolverContext,
+  SkillResolverMiddleware,
 } from "./engine/index.js";
 
 // Generators

@@ -4,6 +4,8 @@ export type {
   ConversationState,
   PhaseDefinition,
   ConversationEvent,
+  Skill,
+  SkillResolverContext,
 } from "./types.js";
 
 export {
@@ -19,8 +21,14 @@ export {
   canAdvance,
 } from "./machine.js";
 
-export { resolveSkills, formatSkillsSection } from "./skill-resolver.js";
-export type { ResolvedSkills } from "./skill-resolver.js";
+export {
+  resolveSkills,
+  resolveSkillsAsync,
+  resolveSkillsFromList,
+  formatSkillsSection,
+  registerSkillMiddleware,
+} from "./skill-resolver.js";
+export type { ResolvedSkills, SkillResolverMiddleware } from "./skill-resolver.js";
 
 export {
   resolveDataPath,

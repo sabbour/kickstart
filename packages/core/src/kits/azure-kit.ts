@@ -23,6 +23,7 @@
 import type { IntegrationKit } from './types.js';
 import type { KitAuthRequirement } from './types.js';
 import { Phase } from '../engine/types.js';
+import type { Skill } from '../engine/types.js';
 import { azureResourceList } from '../tools/azure-resource-list.js';
 import { azureResourceGet } from '../tools/azure-resource-get.js';
 import { estimateCost } from '../tools/estimate-cost.js';
@@ -35,6 +36,181 @@ const azureAuth: KitAuthRequirement[] = [
     scopes: ['https://management.azure.com/.default'],
     optional: false,
   },
+];
+
+// ---------------------------------------------------------------------------
+// IaC Best Practice Skills (#21)
+//
+// Addresses Zapp's security review:
+//   - Explicit no-secret-output instruction in all IaC prompts
+//   - Least-privilege RBAC requirements in templates
+//   - Managed Identity + Key Vault preference over connection strings
+// ---------------------------------------------------------------------------
+
+const iacBicepModulesSkill: Skill = {
+  id: 'iac-bicep-modules',
+  name: 'Bicep Module Conventions',
+  phases: [Phase.Generate],
+  keywords: ['bicep', 'module', 'infrastructure', 'iac', 'template', 'arm'],
+  priority: 5,
+  content: `## Bicep Module Structure Conventions
+
+Follow these conventions when generating Bicep templates:
+
+- **File naming:** \`main.bicep\` as the entry point + child modules per resource group or logical scope (e.g. \`modules/aks.bicep\`, \`modules/acr.bicep\`)
+- **Parameters:** Every \`param\` declaration MUST have a \`@description()\` decorator explaining its purpose
+- **Outputs:** Declare \`output\` for resource IDs, endpoints, and connection info that downstream resources or CI/CD need
+- **Module composition:** Parent deploys child modules via the \`module\` keyword — never inline large resource blocks in main.bicep
+- **Naming convention:** \`resourceType-workloadName-environment\` (e.g. \`aks-myapp-prod\`, \`acr-myapp-dev\`)
+- **No hardcoded values:** Parameterize location, environment, naming prefix — never hardcode subscription IDs, tenant IDs, or resource names
+
+SECURITY: Never generate Bicep templates that output secrets, keys, or connection strings. Use \`@secure()\` on any param containing sensitive data. Never include literal secret values in any generated code or output.`,
+};
+
+const iacSecureDecoratorsSkill: Skill = {
+  id: 'iac-secure-decorators',
+  name: '@secure() Decorator Usage',
+  phases: [Phase.Generate, Phase.Review],
+  keywords: ['secure', 'secret', 'password', 'key', 'connection', 'credential'],
+  priority: 10,
+  content: `## @secure() Decorator and Secret Handling
+
+### Generate phase rules:
+- Mark ALL \`param\` declarations containing passwords, keys, connection strings, or credentials with \`@secure()\`
+- NEVER hardcode secrets — reference Key Vault via \`getSecret()\` or use Managed Identity
+- NEVER generate Bicep \`output\` blocks that expose secret values (passwords, keys, connection strings, SAS tokens)
+- Prefer Managed Identity + RBAC over connection string authentication for ALL Azure services
+- When a service supports Managed Identity (most do), generate the identity binding instead of asking for credentials
+
+### Review phase rules:
+- Flag any \`param\` with a name matching \`*password*\`, \`*secret*\`, \`*key*\`, \`*token*\`, or \`*connectionString*\` that lacks \`@secure()\` as a deployment improvement
+- Flag any \`output\` that exposes secret material — this is a security violation, not just a warning
+- Flag any use of connection strings when Managed Identity is available for that service
+- Verify Key Vault references use \`getSecret()\` not inline values
+
+### Managed Identity preference order:
+1. System-assigned managed identity (simplest — auto-created with resource)
+2. User-assigned managed identity (when identity must be shared across resources)
+3. Workload Identity Federation (for GitHub Actions OIDC — no stored secrets)
+4. Key Vault reference via \`getSecret()\` (when third-party credentials are unavoidable)
+5. NEVER: inline passwords, connection strings, or API keys in parameters or outputs`,
+};
+
+const iacDiagnosticSettingsSkill: Skill = {
+  id: 'iac-diagnostic-settings',
+  name: 'Diagnostic Settings',
+  phases: [Phase.Generate, Phase.Review],
+  keywords: ['diagnostic', 'logging', 'monitoring', 'log analytics', 'metrics', 'observability'],
+  priority: 3,
+  content: `## Diagnostic Settings for Azure Resources
+
+### Generate phase:
+For every Azure resource that supports diagnostic settings, generate a \`Microsoft.Insights/diagnosticSettings\` child resource:
+- Send ALL log categories to a Log Analytics workspace
+- Send ALL metrics to the same Log Analytics workspace
+- Retention: 30 days (configurable via parameter)
+- If a Log Analytics workspace exists (discovered via \`azure_resource_list\`), re-use it; otherwise generate one
+
+Example Bicep pattern:
+\`\`\`bicep
+resource diagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: 'diag-\${resourceName}'
+  scope: targetResource
+  properties: {
+    workspaceId: logAnalyticsWorkspace.id
+    logs: [for category in diagnosticLogCategories: {
+      category: category
+      enabled: true
+    }]
+    metrics: [{ category: 'AllMetrics', enabled: true }]
+  }
+}
+\`\`\`
+
+### Review phase:
+Validate that every generated resource with diagnostic capability has a corresponding \`diagnosticSettings\` child resource. Surface missing ones as deployment improvements.`,
+};
+
+const iacResourceTaggingSkill: Skill = {
+  id: 'iac-resource-tagging',
+  name: 'Resource Tagging Strategy',
+  phases: [Phase.Generate],
+  keywords: ['tag', 'tagging', 'label', 'metadata', 'environment', 'cost tracking'],
+  priority: 2,
+  content: `## Resource Tagging Strategy
+
+Apply mandatory tags to ALL generated Azure resources:
+
+| Tag | Value | Source |
+|-----|-------|--------|
+| \`environment\` | dev / staging / prod | Parameterized (default: dev) |
+| \`app\` | App name from Discover phase | \`appDefinition.name\` |
+| \`managedBy\` | \`kickstart\` | Constant |
+| \`createdAt\` | ISO 8601 timestamp of generation | \`utcNow()\` in Bicep |
+
+### Bicep pattern:
+\`\`\`bicep
+var defaultTags = {
+  environment: environment
+  app: appName
+  managedBy: 'kickstart'
+  createdAt: utcNow()
+}
+
+// At resource group level (inherited by child resources):
+resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+  tags: union(defaultTags, customTags)
+}
+
+// Override at individual resource level when needed:
+resource aks 'Microsoft.ContainerService/managedClusters@2025-03-01' = {
+  tags: union(defaultTags, { tier: 'compute' })
+}
+\`\`\`
+
+Use Bicep \`union()\` to merge default + custom tags. Never omit tags from generated resources.`,
+};
+
+const iacLeastPrivilegeRbacSkill: Skill = {
+  id: 'iac-least-privilege-rbac',
+  name: 'Least-Privilege RBAC',
+  phases: [Phase.Generate, Phase.Review],
+  keywords: ['rbac', 'role', 'permission', 'identity', 'access', 'authorization', 'privilege'],
+  priority: 10,
+  content: `## Least-Privilege RBAC Requirements
+
+### Generate phase:
+- ALWAYS scope role assignments to the narrowest resource possible — never subscription-level
+- Prefer resource-level scope > resource-group-level scope > subscription-level scope
+- Use built-in roles with minimum necessary permissions:
+  - AcrPull (7f951dda-4ed3-4680-a7ca-43fe172d538d) — read-only container images (NOT AcrPush unless CI/CD needs it)
+  - Key Vault Secrets User (4633458b-17de-408a-b874-0445c86b69e6) — read secrets only (NOT Key Vault Administrator)
+  - Storage Blob Data Reader (2a2b9908-6ea1-4ae2-8e65-a410df84e7d1) — read blobs only
+  - Monitoring Reader (43d0d8ad-25c7-4714-9337-8ba259a9fe05) — read metrics/logs only
+- NEVER assign Owner or Contributor at subscription scope in generated templates
+- NEVER assign write roles (Contributor, AcrPush, Key Vault Administrator) unless explicitly required by the workload
+- Role assignment \`name\` MUST be a deterministic GUID (hash of principalId + roleDefinitionId + scope)
+
+### Review phase:
+- Flag any subscription-scoped role assignment as a security concern
+- Flag any use of Owner role as a security concern
+- Flag any use of Contributor when a narrower built-in role exists
+- Verify all role assignments use the principle of least privilege
+
+### Managed Identity over shared credentials:
+For service-to-service auth, ALWAYS generate Managed Identity + RBAC role assignment instead of:
+- Connection strings
+- Shared access keys
+- API keys stored in app settings
+- Client secret credentials (use federated credentials for GitHub Actions OIDC)`,
+};
+
+const azureIacSkills: Skill[] = [
+  iacBicepModulesSkill,
+  iacSecureDecoratorsSkill,
+  iacDiagnosticSettingsSkill,
+  iacResourceTaggingSkill,
+  iacLeastPrivilegeRbacSkill,
 ];
 
 export const azureKit: IntegrationKit = {
@@ -394,4 +570,6 @@ Use estimate_cost tool for live pricing when available; these reference prices a
   ],
 
   auth: azureAuth,
+
+  skills: azureIacSkills,
 };
