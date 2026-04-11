@@ -1,7 +1,10 @@
 import React from 'react';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
 import {z} from 'zod';
-import {DynamicStringSchema} from '../../vendor/a2ui/web_core/schema/common-types';
+import {
+  DynamicStringSchema,
+  DynamicStringListSchema,
+} from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Combobox,
   Option,
@@ -21,7 +24,7 @@ const FlexibleMultiSelectApi = {
       value: DynamicStringSchema,
     })),
     placeholder: DynamicStringSchema.optional(),
-    selectedValues: z.array(DynamicStringSchema).optional(),
+    value: DynamicStringListSchema.optional(),
   }),
 };
 
@@ -36,12 +39,10 @@ const useStyles = makeStyles({
 export const MultiSelect = createReactComponent(FlexibleMultiSelectApi, ({props}) => {
   const classes = useStyles();
   const options = props.options ?? [];
-  const selected = Array.isArray(props.selectedValues) ? props.selectedValues : [];
+  const selected = Array.isArray(props.value) ? props.value : [];
 
   const onOptionSelect = (_ev: any, data: { selectedOptions: string[] }) => {
-    if (props.setValue) {
-      props.setValue(data.selectedOptions);
-    }
+    props.setValue(data.selectedOptions);
   };
 
   return (

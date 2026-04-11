@@ -29,9 +29,7 @@ export const Toggle = createReactComponent(FlexibleToggleApi, ({props}) => {
   const classes = useStyles();
 
   const onChange = (_ev: React.ChangeEvent<HTMLInputElement>, data: { checked: boolean }) => {
-    if (props.setValue) {
-      props.setValue(data.checked);
-    }
+    props.setChecked(data.checked);
   };
 
   return (
