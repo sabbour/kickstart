@@ -49,6 +49,9 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - B-33: Theme customization system ✅ (pushed 2026-04-11)
 - #9: Table, Alert, Link catalog components ✅ (PR #111, 2026-07-17)
 - #106: VSCode/Insiders SVG icon fix ✅ (PR #111, 2026-07-17)
+- #56: Inspiration button in Create tab follow-up input ✅ (PR #118, 2026-04-10)
+- #58: Clickable URLs in chat messages ✅ (PR #118, 2026-04-10)
+- #18: Badge, Accordion, Toggle, ComboBox, MultiSelect components ✅ (PR #118, 2026-04-10)
 
 ## Learnings
 
@@ -262,3 +265,12 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 ## Completed Tasks
 - #38: FileEditor Monaco + tabs, CostEstimate SKU + projection ✅ (PR #115, 2026-04-10)
 - #20: add-component.prompt.md ✅ (PR #115, 2026-04-10)
+
+### Frontend Wave 2 (#56, #58, #18) — 2026-04-10
+
+- **Multi-issue PR pattern:** Batching small related issues (3 frontend features) into one PR is efficient — keeps review scope manageable while reducing branch churn. Order by size: smallest first.
+- **URL linkification in two paths:** Chat HTML path uses regex→string→DOMPurify. A2UI Text path uses regex→React JSX (FluentLink). Never mix them — HTML path needs sanitization, JSX path is inherently safe.
+- **Strict URL allowlist:** `https?://` regex is the correct security boundary — blocks `javascript:`, `data:`, `vbscript:` by never matching them. No URL validation library needed for this pattern.
+- **ChildList pattern for nested components:** Accordion items use the same `ChildList` + `buildChild` pattern as Row/Column — not `context.renderChild()` which doesn't exist in the adapter.
+- **ComboBox vs MultiSelect split:** Two components is correct — LLM schema is simpler with distinct names. Fluent `Combobox` has a `multiselect` prop but separate APIs avoid prompt confusion.
+- **Stash across branches is dangerous:** `git stash` + `git stash pop` on a different branch silently merges working tree changes from the original branch. Always verify branch + diff before committing after stash operations.
