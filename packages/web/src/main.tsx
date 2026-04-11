@@ -5,7 +5,7 @@ import { APIConnectorProvider } from './contexts/APIConnectorContext';
 import { ArtifactProvider } from './contexts/ArtifactContext';
 import { VirtualFSProvider } from './contexts/VirtualFSContext';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { registerKit, azureKit, githubKit } from '@kickstart/core';
+import { registerKit, azureKit, githubKit, InMemoryArtifactStore } from '@kickstart/core';
 
 // Register integration kits at startup — auto-wires tools + connectors into
 // their default registries so the engine can call them immediately.
@@ -14,11 +14,14 @@ import { registerKit, azureKit, githubKit } from '@kickstart/core';
 void registerKit(azureKit);
 void registerKit(githubKit);
 
+// Session-scoped artifact store — one per page load, no singleton fallback.
+const sessionArtifactStore = new InMemoryArtifactStore();
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
       <APIConnectorProvider>
-        <ArtifactProvider>
+        <ArtifactProvider store={sessionArtifactStore}>
           <VirtualFSProvider>
             <App />
           </VirtualFSProvider>

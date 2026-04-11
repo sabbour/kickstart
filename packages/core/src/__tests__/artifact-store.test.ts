@@ -239,8 +239,96 @@ describe("Per-session artifact store isolation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// list_artifacts tool (with context injection)
+// Metadata size in quota (Issue #2)
 // ---------------------------------------------------------------------------
+
+describe("InMemoryArtifactStore — metadata counted in quota", () => {
+  it("metadata size contributes to total size tracking", () => {
+    const store = new InMemoryArtifactStore();
+    store.put("f.yaml", "tiny", { metadata: { generator: "k8s", data: "x".repeat(100) } });
+    // Content is 4 bytes, but metadata adds significant size
+    expect(store.currentSizeBytes).toBeGreaterThan(100);
+  });
+
+  it("throws when metadata alone would exceed quota", () => {
+    const store = new InMemoryArtifactStore({ maxSizeBytes: 50 });
+    const bigMeta = { data: "x".repeat(200) };
+    expect(() => store.put("m.yaml", "tiny", { metadata: bigMeta })).toThrow(
+      ArtifactQuotaExceededError,
+    );
+  });
+
+  it("metadata size freed on delete", () => {
+    const store = new InMemoryArtifactStore();
+    store.put("f.yaml", "x", { metadata: { big: "y".repeat(500) } });
+    const sizeWithMeta = store.currentSizeBytes;
+    expect(sizeWithMeta).toBeGreaterThan(500);
+    store.delete("f.yaml");
+    expect(store.currentSizeBytes).toBe(0);
+  });
+
+  it("metadata size freed on replace", () => {
+    const store = new InMemoryArtifactStore();
+    store.put("f.yaml", "x", { metadata: { big: "y".repeat(500) } });
+    const sizeBefore = store.currentSizeBytes;
+    store.put("f.yaml", "x"); // no metadata
+    expect(store.currentSizeBytes).toBeLessThan(sizeBefore);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Content sanitization (Issue #4)
+// ---------------------------------------------------------------------------
+
+describe("InMemoryArtifactStore — content sanitization", () => {
+  let store: InMemoryArtifactStore;
+
+  beforeEach(() => {
+    store = new InMemoryArtifactStore();
+  });
+
+  it("strips script tags from non-HTML artifacts", () => {
+    store.put("app.yaml", 'hello<script>alert("xss")</script>world');
+    expect(store.get("app.yaml")!.content).toBe("helloworld");
+  });
+
+  it("strips style tags from stored content", () => {
+    store.put("app.yaml", "before<style>body{}</style>after");
+    expect(store.get("app.yaml")!.content).toBe("beforeafter");
+  });
+
+  it("strips iframe tags from stored content", () => {
+    store.put("app.yaml", 'before<iframe src="evil"></iframe>after');
+    expect(store.get("app.yaml")!.content).toBe("beforeafter");
+  });
+
+  it("strips object/embed tags", () => {
+    store.put("f.json", '<object data="x"></object><embed src="y"></embed>');
+    const result = store.get("f.json")!.content;
+    expect(result).not.toContain("<object");
+    expect(result).not.toContain("<embed");
+  });
+
+  it("strips event handlers from stored content", () => {
+    store.put("app.yaml", '<div onload="evil()">ok</div>');
+    expect(store.get("app.yaml")!.content).not.toContain("onload");
+  });
+
+  it("preserves HTML content for html-language artifacts", () => {
+    store.put("page.html", '<script>valid()</script><p>hello</p>');
+    expect(store.get("page.html")!.content).toContain("<script>");
+  });
+
+  it("preserves XML content for xml-language artifacts", () => {
+    store.put("config.xml", '<object id="x"><embed /></object>');
+    expect(store.get("config.xml")!.content).toContain("<object");
+  });
+
+  it("sanitizes YAML artifacts with injected HTML", () => {
+    store.put("deploy.yaml", 'apiVersion: v1\nname: <script>bad</script>');
+    expect(store.get("deploy.yaml")!.content).not.toContain("<script>");
+  });
+});
 
 describe("list_artifacts tool", () => {
   let store: InMemoryArtifactStore;

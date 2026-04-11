@@ -24,7 +24,6 @@ import React, {
 } from 'react';
 import JSZip from 'jszip';
 import type { Artifact, ArtifactStore } from '@kickstart/core';
-import { defaultArtifactStore } from '@kickstart/core';
 
 interface ArtifactContextValue {
   /** Current snapshot of all stored artifacts. Refreshes after every tool call. */
@@ -45,10 +44,10 @@ const ArtifactContext = createContext<ArtifactContextValue | null>(null);
 interface ArtifactProviderProps {
   children: ReactNode;
   /**
-   * Optional: inject a custom ArtifactStore (useful in tests / Storybook).
-   * Defaults to `defaultArtifactStore` from @kickstart/core.
+   * Session-scoped ArtifactStore instance. Required — there is no singleton
+   * fallback. Callers must create and pass an InMemoryArtifactStore explicitly.
    */
-  store?: ArtifactStore;
+  store: ArtifactStore;
   /**
    * Polling interval in milliseconds for detecting new artifacts written by
    * backend tools. Defaults to 1000ms. Set to 0 to disable polling.
@@ -58,10 +57,15 @@ interface ArtifactProviderProps {
 
 export function ArtifactProvider({
   children,
-  store: externalStore,
+  store,
   pollIntervalMs = 1000,
 }: ArtifactProviderProps) {
-  const store = externalStore ?? defaultArtifactStore;
+  if (!store) {
+    throw new Error(
+      'ArtifactProvider requires a session-scoped `store` prop. ' +
+      'Create an InMemoryArtifactStore and pass it explicitly.',
+    );
+  }
   const [artifacts, setArtifacts] = useState<Artifact[]>(() => store.list());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 

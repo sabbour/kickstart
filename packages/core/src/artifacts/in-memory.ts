@@ -45,6 +45,21 @@ function contentSizeBytes(content: string): number {
   return new TextEncoder().encode(content).byteLength;
 }
 
+/** Compute total byte size of metadata using JSON serialization. */
+function metadataSizeBytes(metadata?: Record<string, unknown>): number {
+  if (metadata === undefined) return 0;
+  try {
+    return new TextEncoder().encode(JSON.stringify(metadata)).byteLength;
+  } catch {
+    return 256; // conservative fallback for non-serializable metadata
+  }
+}
+
+/** Compute total byte size of an artifact (content + metadata). */
+function artifactSizeBytes(content: string, metadata?: Record<string, unknown>): number {
+  return contentSizeBytes(content) + metadataSizeBytes(metadata);
+}
+
 /**
  * Convert a glob pattern to a RegExp.
  * Supports `*` (matches within a path segment) and `**` (matches across segments).
@@ -58,10 +73,37 @@ function globToRegExp(pattern: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
+// ---------------------------------------------------------------------------
+// Content sanitization — strip dangerous HTML/JS injection vectors on store.
+// Artifacts are code/config (YAML, Dockerfiles, etc.), not HTML documents.
+// ---------------------------------------------------------------------------
+
+/** Patterns that should never appear in stored artifact content. */
+const DANGEROUS_HTML_RE =
+  /<\s*\/?\s*(script|iframe|object|embed|form|input|link|meta|style|svg|base|applet)[^>]*>/gi;
+
+/**
+ * Sanitize artifact content: strip dangerous HTML tags and event handlers.
+ * Only applied to non-HTML artifacts (YAML, JSON, Dockerfiles, etc.).
+ */
+function sanitizeContent(content: string): string {
+  return content
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<object[\s\S]*?<\/object>/gi, "")
+    .replace(/<embed[\s\S]*?<\/embed>/gi, "")
+    .replace(DANGEROUS_HTML_RE, "")
+    .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, "");
+}
+
+/** Languages whose content legitimately contains HTML-like tags. */
+const HTML_LANGUAGES = new Set(["html", "svg", "xml"]);
+
 export class InMemoryArtifactStore implements ArtifactStore {
   private readonly store = new Map<string, Artifact>();
   private readonly quota: ArtifactStoreQuota;
-  /** Running total of content bytes for O(1) quota enforcement. */
+  /** Running total of content + metadata bytes for O(1) quota enforcement. */
   private totalSizeBytes = 0;
 
   constructor(quota?: Partial<ArtifactStoreQuota>) {
@@ -74,8 +116,13 @@ export class InMemoryArtifactStore implements ArtifactStore {
     metadata?: Omit<Partial<Artifact>, "path" | "content" | "createdAt" | "updatedAt">
   ): void {
     const existing = this.store.get(path);
-    const newSize = contentSizeBytes(content);
-    const oldSize = existing ? contentSizeBytes(existing.content) : 0;
+    const language = metadata?.language ?? existing?.language ?? inferLanguage(path);
+
+    // Sanitize content — skip for HTML/XML/SVG where tags are legitimate
+    const safeContent = HTML_LANGUAGES.has(language) ? content : sanitizeContent(content);
+
+    const newSize = artifactSizeBytes(safeContent, metadata?.metadata);
+    const oldSize = existing ? artifactSizeBytes(existing.content, existing.metadata) : 0;
 
     // Quota: artifact count (only enforced for new artifacts, not updates)
     if (!existing && this.store.size >= this.quota.maxArtifacts) {
@@ -91,8 +138,8 @@ export class InMemoryArtifactStore implements ArtifactStore {
     const now = new Date();
     this.store.set(path, {
       path,
-      content,
-      language: metadata?.language ?? existing?.language ?? inferLanguage(path),
+      content: safeContent,
+      language,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       metadata: metadata?.metadata,
@@ -115,7 +162,7 @@ export class InMemoryArtifactStore implements ArtifactStore {
   delete(path: string): void {
     const existing = this.store.get(path);
     if (existing) {
-      this.totalSizeBytes -= contentSizeBytes(existing.content);
+      this.totalSizeBytes -= artifactSizeBytes(existing.content, existing.metadata);
       this.store.delete(path);
     }
   }
@@ -138,7 +185,7 @@ export class InMemoryArtifactStore implements ArtifactStore {
     return this.store.size;
   }
 
-  /** Current total content size in bytes. */
+  /** Current total content + metadata size in bytes. */
   get currentSizeBytes(): number {
     return this.totalSizeBytes;
   }
