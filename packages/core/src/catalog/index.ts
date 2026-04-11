@@ -205,6 +205,61 @@ export interface DeploymentProgressComponent extends BaseComponent {
   steps: DeploymentStep[];
 }
 
+// ── New Fluent Components (5) — Issue #18 ───────────────────────────
+
+export interface BadgeComponent extends BaseComponent {
+  component: "Badge";
+  text?: string;
+  color?: "brand" | "danger" | "important" | "informative" | "severe" | "subtle" | "success" | "warning";
+  shape?: "circular" | "rounded" | "square";
+  size?: "tiny" | "small" | "medium" | "large" | "extra-large";
+  appearance?: "filled" | "ghost" | "outline" | "tint";
+  variant?: "badge" | "counter" | "presence";
+  count?: number;
+  status?: "available" | "away" | "busy" | "do-not-disturb" | "offline" | "out-of-office" | "unknown";
+}
+
+export interface AccordionItemDef {
+  title: string;
+  children: string[];
+}
+
+export interface AccordionComponent extends BaseComponent {
+  component: "Accordion";
+  items: AccordionItemDef[];
+  collapsible?: boolean;
+  multiple?: boolean;
+}
+
+export interface ToggleComponent extends BaseComponent {
+  component: "Toggle";
+  label?: string;
+  checked?: boolean;
+  disabled?: boolean;
+}
+
+export interface ComboBoxOption {
+  text: string;
+  value: string;
+}
+
+export interface ComboBoxComponent extends BaseComponent {
+  component: "ComboBox";
+  label?: string;
+  options: ComboBoxOption[];
+  placeholder?: string;
+  allowCustom?: boolean;
+  value?: string;
+}
+
+export interface MultiSelectComponent extends BaseComponent {
+  component: "MultiSelect";
+  label?: string;
+  options: ComboBoxOption[];
+  placeholder?: string;
+  selectedValues?: string[];
+}
+
 // ── Union Type ──────────────────────────────────────────────────────
 
 export type Component =
@@ -230,7 +285,12 @@ export type Component =
   | ArchitectureDiagramComponent
   | FileEditorComponent
   | AuthCardComponent
-  | DeploymentProgressComponent;
+  | DeploymentProgressComponent
+  | BadgeComponent
+  | AccordionComponent
+  | ToggleComponent
+  | ComboBoxComponent
+  | MultiSelectComponent;
 
 // ── A2UI v0.9 Document ──────────────────────────────────────────────
 

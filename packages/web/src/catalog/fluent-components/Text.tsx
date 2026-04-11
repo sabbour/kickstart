@@ -9,9 +9,11 @@ import {
   Subtitle2,
   Caption1,
   Body1,
+  Link as FluentLink,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
+import {OpenRegular} from '@fluentui/react-icons';
 
 const useStyles = makeStyles({
   root: {
@@ -19,13 +21,18 @@ const useStyles = makeStyles({
     marginBottom: tokens.spacingVerticalXS,
     display: 'inline-block',
   },
+  linkIcon: {
+    marginLeft: '2px',
+    fontSize: '12px',
+    verticalAlign: 'middle',
+  },
 });
 
-// Parse basic inline markdown: **bold** and *italic*
+// Parse basic inline markdown: **bold**, *italic*, and https?:// URLs
 function parseInlineMarkdown(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
-  // Match **bold** first, then *italic* (order matters)
-  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
+  // Match URLs first (strict http/https only), then **bold**, then *italic*
+  const regex = /(https?:\/\/[^\s*<>")\]]+|\*\*(.+?)\*\*|\*(.+?)\*)/g;
   let lastIndex = 0;
   let match;
   let key = 0;
@@ -34,7 +41,15 @@ function parseInlineMarkdown(text: string): React.ReactNode[] {
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
-    if (match[2]) {
+    if (match[0].startsWith('http')) {
+      const url = match[0];
+      parts.push(
+        <FluentLink key={key++} href={url} target="_blank" rel="noopener noreferrer" inline>
+          {url}
+          <OpenRegular style={{ marginLeft: 2, fontSize: 12 }} />
+        </FluentLink>
+      );
+    } else if (match[2]) {
       parts.push(<strong key={key++}>{match[2]}</strong>);
     } else if (match[3]) {
       parts.push(<em key={key++}>{match[3]}</em>);

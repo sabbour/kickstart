@@ -61,6 +61,8 @@ export function ChatMessage({ message, getSurface, isActive = true }: ChatMessag
 
 function formatText(text: string): string {
   return text
+    // URLs — strict http/https allowlist, reject javascript:/data:/malformed
+    .replace(/(https?:\/\/[^\s<>")\]]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
     // Bold
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     // Newlines to paragraphs

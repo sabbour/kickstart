@@ -9,345 +9,666 @@
       "type": "object",
       "description": "Every component has a unique id and a component type name.",
       "properties": {
-        "id": { "type": "string", "description": "Unique component identifier" },
-        "component": { "type": "string", "description": "Component type name from catalog" }
+        "id": {
+          "type": "string",
+          "description": "Unique component identifier"
+        },
+        "component": {
+          "type": "string",
+          "description": "Component type name from catalog"
+        }
       },
-      "required": ["id", "component"]
+      "required": [
+        "id",
+        "component"
+      ]
     },
-
     "Text": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Text" },
-            "text": { "type": "string" },
-            "variant": { "type": "string", "enum": ["h1", "h2", "h3", "body", "caption", "code"] }
+            "component": {
+              "const": "Text"
+            },
+            "text": {
+              "type": "string"
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "h1",
+                "h2",
+                "h3",
+                "body",
+                "caption",
+                "code"
+              ]
+            }
           },
-          "required": ["component", "text"]
+          "required": [
+            "component",
+            "text"
+          ]
         }
       ]
     },
-
     "Image": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Image" },
-            "src": { "type": "string", "format": "uri" },
-            "alt": { "type": "string" }
+            "component": {
+              "const": "Image"
+            },
+            "src": {
+              "type": "string",
+              "format": "uri"
+            },
+            "alt": {
+              "type": "string"
+            }
           },
-          "required": ["component", "src", "alt"]
+          "required": [
+            "component",
+            "src",
+            "alt"
+          ]
         }
       ]
     },
-
     "Icon": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Icon" },
-            "name": { "type": "string" },
-            "size": { "type": "string" }
+            "component": {
+              "const": "Icon"
+            },
+            "name": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string"
+            }
           },
-          "required": ["component", "name"]
+          "required": [
+            "component",
+            "name"
+          ]
         }
       ]
     },
-
     "Video": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Video" },
-            "src": { "type": "string", "format": "uri" }
+            "component": {
+              "const": "Video"
+            },
+            "src": {
+              "type": "string",
+              "format": "uri"
+            }
           },
-          "required": ["component", "src"]
+          "required": [
+            "component",
+            "src"
+          ]
         }
       ]
     },
-
     "AudioPlayer": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "AudioPlayer" },
-            "src": { "type": "string", "format": "uri" }
+            "component": {
+              "const": "AudioPlayer"
+            },
+            "src": {
+              "type": "string",
+              "format": "uri"
+            }
           },
-          "required": ["component", "src"]
+          "required": [
+            "component",
+            "src"
+          ]
         }
       ]
     },
-
     "Row": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Row" },
-            "children": { "type": "array", "items": { "type": "string" }, "description": "Array of child component ids" },
-            "gap": { "type": "string" },
-            "justify": { "type": "string", "enum": ["start", "center", "end", "spaceBetween", "spaceAround"] },
-            "align": { "type": "string", "enum": ["start", "center", "end", "stretch"] },
-            "wrap": { "type": "boolean" }
+            "component": {
+              "const": "Row"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Array of child component ids"
+            },
+            "gap": {
+              "type": "string"
+            },
+            "justify": {
+              "type": "string",
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "spaceBetween",
+                "spaceAround"
+              ]
+            },
+            "align": {
+              "type": "string",
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "stretch"
+              ]
+            },
+            "wrap": {
+              "type": "boolean"
+            }
           },
-          "required": ["component", "children"]
+          "required": [
+            "component",
+            "children"
+          ]
         }
       ]
     },
-
     "Column": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Column" },
-            "children": { "type": "array", "items": { "type": "string" } },
-            "gap": { "type": "string" }
+            "component": {
+              "const": "Column"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "gap": {
+              "type": "string"
+            }
           },
-          "required": ["component", "children"]
+          "required": [
+            "component",
+            "children"
+          ]
         }
       ]
     },
-
     "List": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "List" },
-            "children": { "type": "array", "items": { "type": "string" } },
-            "ordered": { "type": "boolean", "default": false }
+            "component": {
+              "const": "List"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ordered": {
+              "type": "boolean",
+              "default": false
+            }
           },
-          "required": ["component", "children"]
+          "required": [
+            "component",
+            "children"
+          ]
         }
       ]
     },
-
     "Card": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Card" },
-            "children": { "type": "array", "items": { "type": "string" } }
+            "component": {
+              "const": "Card"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           },
-          "required": ["component", "children"]
+          "required": [
+            "component",
+            "children"
+          ]
         }
       ]
     },
-
     "Tabs": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Tabs" },
+            "component": {
+              "const": "Tabs"
+            },
             "tabs": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "label": { "type": "string" },
-                  "children": { "type": "array", "items": { "type": "string" } }
+                  "label": {
+                    "type": "string"
+                  },
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
                 },
-                "required": ["label", "children"]
+                "required": [
+                  "label",
+                  "children"
+                ]
               }
             }
           },
-          "required": ["component", "tabs"]
+          "required": [
+            "component",
+            "tabs"
+          ]
         }
       ]
     },
-
     "Divider": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Divider" }
+            "component": {
+              "const": "Divider"
+            }
           },
-          "required": ["component"]
+          "required": [
+            "component"
+          ]
         }
       ]
     },
-
     "Modal": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Modal" },
-            "child": { "type": "string", "description": "Single child component id" },
-            "title": { "type": "string" },
-            "open": { "type": "boolean", "default": false }
+            "component": {
+              "const": "Modal"
+            },
+            "child": {
+              "type": "string",
+              "description": "Single child component id"
+            },
+            "title": {
+              "type": "string"
+            },
+            "open": {
+              "type": "boolean",
+              "default": false
+            }
           },
-          "required": ["component", "child", "title"]
+          "required": [
+            "component",
+            "child",
+            "title"
+          ]
         }
       ]
     },
-
     "Button": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Button" },
-            "child": { "type": "string", "description": "Label component id" },
-            "variant": { "type": "string", "enum": ["primary", "secondary", "outline", "danger", "ghost"] },
-            "disabled": { "type": "boolean", "default": false },
+            "component": {
+              "const": "Button"
+            },
+            "child": {
+              "type": "string",
+              "description": "Label component id"
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "secondary",
+                "outline",
+                "danger",
+                "ghost"
+              ]
+            },
+            "disabled": {
+              "type": "boolean",
+              "default": false
+            },
             "action": {
               "type": "object",
               "properties": {
                 "event": {
                   "type": "object",
                   "properties": {
-                    "name": { "type": "string" },
-                    "data": { "type": "object" }
+                    "name": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    }
                   },
-                  "required": ["name"]
+                  "required": [
+                    "name"
+                  ]
                 }
               }
             }
           },
-          "required": ["component", "child", "action"]
+          "required": [
+            "component",
+            "child",
+            "action"
+          ]
         }
       ]
     },
-
     "TextField": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "TextField" },
-            "label": { "type": "string" },
-            "placeholder": { "type": "string" },
-            "value": { "type": "string" },
-            "action": { "type": "object" }
+            "component": {
+              "const": "TextField"
+            },
+            "label": {
+              "type": "string"
+            },
+            "placeholder": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            },
+            "action": {
+              "type": "object"
+            }
           },
-          "required": ["component", "label"]
+          "required": [
+            "component",
+            "label"
+          ]
         }
       ]
     },
-
     "CheckBox": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "CheckBox" },
-            "label": { "type": "string" },
-            "checked": { "type": "boolean", "default": false },
-            "action": { "type": "object" }
+            "component": {
+              "const": "CheckBox"
+            },
+            "label": {
+              "type": "string"
+            },
+            "checked": {
+              "type": "boolean",
+              "default": false
+            },
+            "action": {
+              "type": "object"
+            }
           },
-          "required": ["component", "label"]
+          "required": [
+            "component",
+            "label"
+          ]
         }
       ]
     },
-
     "ChoicePicker": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "ChoicePicker" },
-            "label": { "type": "string" },
+            "component": {
+              "const": "ChoicePicker"
+            },
+            "label": {
+              "type": "string"
+            },
             "options": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "label": { "type": "string" },
-                  "value": { "type": "string" }
+                  "label": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
                 },
-                "required": ["label", "value"]
+                "required": [
+                  "label",
+                  "value"
+                ]
               }
             },
-            "action": { "type": "object" }
+            "action": {
+              "type": "object"
+            }
           },
-          "required": ["component", "label", "options"]
+          "required": [
+            "component",
+            "label",
+            "options"
+          ]
         }
       ]
     },
-
     "Slider": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "Slider" },
-            "label": { "type": "string" },
-            "min": { "type": "number" },
-            "max": { "type": "number" },
-            "value": { "type": "number" },
-            "action": { "type": "object" }
+            "component": {
+              "const": "Slider"
+            },
+            "label": {
+              "type": "string"
+            },
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "value": {
+              "type": "number"
+            },
+            "action": {
+              "type": "object"
+            }
           },
-          "required": ["component", "label", "min", "max"]
+          "required": [
+            "component",
+            "label",
+            "min",
+            "max"
+          ]
         }
       ]
     },
-
     "DateTimeInput": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "DateTimeInput" },
-            "label": { "type": "string" },
-            "value": { "type": "string", "format": "date-time" }
+            "component": {
+              "const": "DateTimeInput"
+            },
+            "label": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string",
+              "format": "date-time"
+            }
           },
-          "required": ["component", "label"]
+          "required": [
+            "component",
+            "label"
+          ]
         }
       ]
     },
-
     "CostEstimate": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "CostEstimate" },
+            "component": {
+              "const": "CostEstimate"
+            },
             "items": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "name": { "type": "string" },
-                  "sku": { "type": "string" },
-                  "monthlyCost": { "type": "number" }
+                  "name": {
+                    "type": "string"
+                  },
+                  "sku": {
+                    "type": "string"
+                  },
+                  "monthlyCost": {
+                    "type": "number"
+                  }
                 },
-                "required": ["name", "sku", "monthlyCost"]
+                "required": [
+                  "name",
+                  "sku",
+                  "monthlyCost"
+                ]
               }
             },
-            "total": { "type": "number" },
-            "currency": { "type": "string", "default": "USD" }
+            "total": {
+              "type": "number"
+            },
+            "currency": {
+              "type": "string",
+              "default": "USD"
+            }
           },
-          "required": ["component", "items", "total", "currency"]
+          "required": [
+            "component",
+            "items",
+            "total",
+            "currency"
+          ]
         }
       ]
     },
-
     "ArchitectureDiagram": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "ArchitectureDiagram" },
+            "component": {
+              "const": "ArchitectureDiagram"
+            },
             "nodes": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "id": { "type": "string" },
-                  "label": { "type": "string" },
-                  "type": { "type": "string", "enum": ["compute", "database", "cache", "network", "storage", "ai", "messaging"] }
+                  "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "compute",
+                      "database",
+                      "cache",
+                      "network",
+                      "storage",
+                      "ai",
+                      "messaging"
+                    ]
+                  }
                 },
-                "required": ["id", "label", "type"]
+                "required": [
+                  "id",
+                  "label",
+                  "type"
+                ]
               }
             },
             "edges": {
@@ -355,104 +676,491 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "from": { "type": "string" },
-                  "to": { "type": "string" }
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  }
                 },
-                "required": ["from", "to"]
+                "required": [
+                  "from",
+                  "to"
+                ]
               }
             }
           },
-          "required": ["component", "nodes", "edges"]
+          "required": [
+            "component",
+            "nodes",
+            "edges"
+          ]
         }
       ]
     },
-
     "FileEditor": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "FileEditor" },
-            "filename": { "type": "string" },
-            "language": { "type": "string" },
-            "content": { "type": "string" }
+            "component": {
+              "const": "FileEditor"
+            },
+            "filename": {
+              "type": "string"
+            },
+            "language": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            }
           },
-          "required": ["component", "filename", "language", "content"]
+          "required": [
+            "component",
+            "filename",
+            "language",
+            "content"
+          ]
         }
       ]
     },
-
     "AuthCard": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "AuthCard" },
-            "provider": { "type": "string", "enum": ["azure", "github"] },
-            "title": { "type": "string" },
-            "description": { "type": "string" }
+            "component": {
+              "const": "AuthCard"
+            },
+            "provider": {
+              "type": "string",
+              "enum": [
+                "azure",
+                "github"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
           },
-          "required": ["component", "provider", "title"]
+          "required": [
+            "component",
+            "provider",
+            "title"
+          ]
         }
       ]
     },
-
     "DeploymentProgress": {
       "allOf": [
-        { "$ref": "#/$defs/BaseComponent" },
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
         {
           "properties": {
-            "component": { "const": "DeploymentProgress" },
+            "component": {
+              "const": "DeploymentProgress"
+            },
             "steps": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "id": { "type": "string" },
-                  "label": { "type": "string" },
-                  "status": { "type": "string", "enum": ["pending", "running", "complete", "error", "skipped"] }
+                  "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "running",
+                      "complete",
+                      "error",
+                      "skipped"
+                    ]
+                  }
                 },
-                "required": ["id", "label", "status"]
+                "required": [
+                  "id",
+                  "label",
+                  "status"
+                ]
               }
             }
           },
-          "required": ["component", "steps"]
+          "required": [
+            "component",
+            "steps"
+          ]
         }
       ]
     },
-
     "Component": {
       "oneOf": [
-        { "$ref": "#/$defs/Text" },
-        { "$ref": "#/$defs/Image" },
-        { "$ref": "#/$defs/Icon" },
-        { "$ref": "#/$defs/Video" },
-        { "$ref": "#/$defs/AudioPlayer" },
-        { "$ref": "#/$defs/Row" },
-        { "$ref": "#/$defs/Column" },
-        { "$ref": "#/$defs/List" },
-        { "$ref": "#/$defs/Card" },
-        { "$ref": "#/$defs/Tabs" },
-        { "$ref": "#/$defs/Divider" },
-        { "$ref": "#/$defs/Modal" },
-        { "$ref": "#/$defs/Button" },
-        { "$ref": "#/$defs/TextField" },
-        { "$ref": "#/$defs/CheckBox" },
-        { "$ref": "#/$defs/ChoicePicker" },
-        { "$ref": "#/$defs/Slider" },
-        { "$ref": "#/$defs/DateTimeInput" },
-        { "$ref": "#/$defs/CostEstimate" },
-        { "$ref": "#/$defs/ArchitectureDiagram" },
-        { "$ref": "#/$defs/FileEditor" },
-        { "$ref": "#/$defs/AuthCard" },
-        { "$ref": "#/$defs/DeploymentProgress" }
+        {
+          "$ref": "#/$defs/Text"
+        },
+        {
+          "$ref": "#/$defs/Image"
+        },
+        {
+          "$ref": "#/$defs/Icon"
+        },
+        {
+          "$ref": "#/$defs/Video"
+        },
+        {
+          "$ref": "#/$defs/AudioPlayer"
+        },
+        {
+          "$ref": "#/$defs/Row"
+        },
+        {
+          "$ref": "#/$defs/Column"
+        },
+        {
+          "$ref": "#/$defs/List"
+        },
+        {
+          "$ref": "#/$defs/Card"
+        },
+        {
+          "$ref": "#/$defs/Tabs"
+        },
+        {
+          "$ref": "#/$defs/Divider"
+        },
+        {
+          "$ref": "#/$defs/Modal"
+        },
+        {
+          "$ref": "#/$defs/Button"
+        },
+        {
+          "$ref": "#/$defs/TextField"
+        },
+        {
+          "$ref": "#/$defs/CheckBox"
+        },
+        {
+          "$ref": "#/$defs/ChoicePicker"
+        },
+        {
+          "$ref": "#/$defs/Slider"
+        },
+        {
+          "$ref": "#/$defs/DateTimeInput"
+        },
+        {
+          "$ref": "#/$defs/CostEstimate"
+        },
+        {
+          "$ref": "#/$defs/ArchitectureDiagram"
+        },
+        {
+          "$ref": "#/$defs/FileEditor"
+        },
+        {
+          "$ref": "#/$defs/AuthCard"
+        },
+        {
+          "$ref": "#/$defs/DeploymentProgress"
+        },
+        {
+          "$ref": "#/$defs/Badge"
+        },
+        {
+          "$ref": "#/$defs/Accordion"
+        },
+        {
+          "$ref": "#/$defs/Toggle"
+        },
+        {
+          "$ref": "#/$defs/ComboBox"
+        },
+        {
+          "$ref": "#/$defs/MultiSelect"
+        }
+      ]
+    },
+    "Badge": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
+        {
+          "properties": {
+            "component": {
+              "const": "Badge"
+            },
+            "text": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string",
+              "enum": [
+                "brand",
+                "danger",
+                "important",
+                "informative",
+                "severe",
+                "subtle",
+                "success",
+                "warning"
+              ]
+            },
+            "shape": {
+              "type": "string",
+              "enum": [
+                "circular",
+                "rounded",
+                "square"
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "extra-large"
+              ]
+            },
+            "appearance": {
+              "type": "string",
+              "enum": [
+                "filled",
+                "ghost",
+                "outline",
+                "tint"
+              ]
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "badge",
+                "counter",
+                "presence"
+              ]
+            },
+            "count": {
+              "type": "number"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "available",
+                "away",
+                "busy",
+                "do-not-disturb",
+                "offline",
+                "out-of-office",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "component"
+          ]
+        }
+      ]
+    },
+    "Accordion": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
+        {
+          "properties": {
+            "component": {
+              "const": "Accordion"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "title",
+                  "children"
+                ]
+              }
+            },
+            "collapsible": {
+              "type": "boolean",
+              "default": true
+            },
+            "multiple": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "component",
+            "items"
+          ]
+        }
+      ]
+    },
+    "Toggle": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
+        {
+          "properties": {
+            "component": {
+              "const": "Toggle"
+            },
+            "label": {
+              "type": "string"
+            },
+            "checked": {
+              "type": "boolean",
+              "default": false
+            },
+            "disabled": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "component"
+          ]
+        }
+      ]
+    },
+    "ComboBox": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
+        {
+          "properties": {
+            "component": {
+              "const": "ComboBox"
+            },
+            "label": {
+              "type": "string"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text",
+                  "value"
+                ]
+              }
+            },
+            "placeholder": {
+              "type": "string"
+            },
+            "allowCustom": {
+              "type": "boolean",
+              "default": false
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "component",
+            "options"
+          ]
+        }
+      ]
+    },
+    "MultiSelect": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/BaseComponent"
+        },
+        {
+          "properties": {
+            "component": {
+              "const": "MultiSelect"
+            },
+            "label": {
+              "type": "string"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text",
+                  "value"
+                ]
+              }
+            },
+            "placeholder": {
+              "type": "string"
+            },
+            "selectedValues": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "component",
+            "options"
+          ]
+        }
       ]
     }
   },
-
   "properties": {
-    "version": { "type": "string", "const": "0.9" },
-    "root": { "$ref": "#/$defs/Component" }
+    "version": {
+      "type": "string",
+      "const": "0.9"
+    },
+    "root": {
+      "$ref": "#/$defs/Component"
+    }
   },
-  "required": ["version", "root"]
+  "required": [
+    "version",
+    "root"
+  ]
 }
