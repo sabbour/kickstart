@@ -171,21 +171,24 @@ export const CostEstimate = createReactComponent(CostEstimateApi, ({ props, cont
   const [sliderMonths, setSliderMonths] = useState(props.projectionMonths ?? 1);
 
   const handleSkuChange = useCallback((resourceIndex: number, skuValue: string) => {
-    setSkuSelections(prev => ({ ...prev, [resourceIndex]: skuValue }));
-    // Dispatch SKU change to backend
     const resource = resources[resourceIndex];
-    if (resource) {
-      context.dispatchAction({
-        event: {
-          name: 'cost-estimate:sku-change',
-          context: {
-            resourceName: typeof resource.name === 'string' ? resource.name : '',
-            selectedSku: skuValue,
-            resourceIndex,
-          },
+    if (!resource) return;
+
+    // Allowlist guard: only dispatch values present in skuOptions (Zapp PR #115 review)
+    const allowed = resource.skuOptions?.map(o => (typeof o.value === 'string' ? o.value : '')) ?? [];
+    if (!allowed.includes(skuValue)) return;
+
+    setSkuSelections(prev => ({ ...prev, [resourceIndex]: skuValue }));
+    context.dispatchAction({
+      event: {
+        name: 'cost-estimate:sku-change',
+        context: {
+          resourceName: typeof resource.name === 'string' ? resource.name : '',
+          selectedSku: skuValue,
+          resourceIndex,
         },
-      });
-    }
+      },
+    });
   }, [resources, context]);
 
   // Compute effective monthly estimates considering SKU selections

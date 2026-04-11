@@ -39,21 +39,7 @@ hljs.registerLanguage('bash', bash);
 hljs.registerLanguage('dockerfile', dockerfile);
 hljs.registerLanguage('go', go);
 
-// Monaco CDN worker strategy — configure loader to use CDN before any Monaco import.
-// This avoids the Vite worker bundling issue Leela flagged:
-// without this, Monaco loads but language services silently fail.
-let monacoConfigured = false;
-function ensureMonacoWorkerConfig() {
-  if (monacoConfigured) return;
-  monacoConfigured = true;
-  import('@monaco-editor/react').then(({ loader }) => {
-    loader.config({
-      paths: {
-        vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs',
-      },
-    });
-  });
-}
+import { ensureMonacoLocal } from './monaco-local-setup';
 
 // Lazy-load the Monaco Editor component (code-split by Vite automatically)
 const MonacoEditor = lazy(() =>
@@ -243,7 +229,7 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
   const [monacoReady, setMonacoReady] = useState(false);
   useEffect(() => {
     if (!isReadOnly) {
-      ensureMonacoWorkerConfig();
+      ensureMonacoLocal();
       setMonacoReady(true);
     }
   }, [isReadOnly]);
