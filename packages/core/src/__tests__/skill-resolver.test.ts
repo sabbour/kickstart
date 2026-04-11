@@ -13,7 +13,13 @@
 
 import { describe, it, expect } from "vitest";
 import { Phase } from "../engine/types.js";
-import { resolveSkills, formatSkillsSection } from "../engine/skill-resolver.js";
+import type { Skill } from "../engine/types.js";
+import {
+  resolveSkills,
+  resolveSkillsAsync,
+  resolveSkillsFromList,
+  formatSkillsSection,
+} from "../engine/skill-resolver.js";
 import { buildSystemPrompt } from "../prompts/system-prompt.js";
 import type { IntegrationKit } from "../kits/types.js";
 
@@ -35,6 +41,18 @@ function makeTool(toolName: string) {
     description: `Description of ${toolName}`,
     parameters: { type: "object" as const, properties: {} },
     execute: async () => ({}),
+  };
+}
+
+function makeSkill(id: string, overrides: Partial<Skill> = {}): Skill {
+  return {
+    id,
+    name: `Skill ${id}`,
+    phases: [Phase.Generate],
+    keywords: [id],
+    content: `Content for ${id}`,
+    priority: 0,
+    ...overrides,
   };
 }
 
@@ -325,5 +343,186 @@ describe("githubKit phasePrompts", () => {
       p.toLowerCase().includes("oidc")
     );
     expect(hasOIDC).toBe(true);
+  });
+});
+
+// ── Skill type (#33) ────────────────────────────────────────────────────────
+
+describe("resolveSkills — typed Skill objects", () => {
+  it("injects skill content for matching phase", () => {
+    const skill = makeSkill("test-skill", {
+      phases: [Phase.Generate],
+      content: "Generate Bicep modules",
+    });
+    const kit = makeKit("skill-kit", { skills: [skill] });
+
+    const result = resolveSkills(Phase.Generate, [kit]);
+    expect(result.prompts.some((p) => p.includes("Generate Bicep modules"))).toBe(true);
+  });
+
+  it("does not inject skill content for non-matching phase", () => {
+    const skill = makeSkill("gen-only", {
+      phases: [Phase.Generate],
+      content: "Generate-only content",
+    });
+    const kit = makeKit("skill-kit", { skills: [skill] });
+
+    const result = resolveSkills(Phase.Discover, [kit]);
+    expect(result.prompts.some((p) => p.includes("Generate-only content"))).toBe(false);
+  });
+
+  it("respects priority — higher priority skills appear first", () => {
+    const lowPriority = makeSkill("low", {
+      phases: [Phase.Generate],
+      content: "LOW_PRIORITY_CONTENT",
+      priority: 1,
+    });
+    const highPriority = makeSkill("high", {
+      phases: [Phase.Generate],
+      content: "HIGH_PRIORITY_CONTENT",
+      priority: 10,
+    });
+    const kit = makeKit("priority-kit", { skills: [lowPriority, highPriority] });
+
+    const result = resolveSkills(Phase.Generate, [kit]);
+    const highIdx = result.prompts.findIndex((p) => p.includes("HIGH_PRIORITY_CONTENT"));
+    const lowIdx = result.prompts.findIndex((p) => p.includes("LOW_PRIORITY_CONTENT"));
+    expect(highIdx).toBeLessThan(lowIdx);
+  });
+
+  it("skills coexist with phasePrompts", () => {
+    const skill = makeSkill("coexist", {
+      phases: [Phase.Generate],
+      content: "Skill content here",
+    });
+    const kit = makeKit("mixed-kit", {
+      skills: [skill],
+      phasePrompts: { [Phase.Generate]: ["Legacy phase prompt"] },
+    });
+
+    const result = resolveSkills(Phase.Generate, [kit]);
+    expect(result.prompts.some((p) => p.includes("Skill content here"))).toBe(true);
+    expect(result.prompts.some((p) => p.includes("Legacy phase prompt"))).toBe(true);
+  });
+});
+
+// ── resolveSkillsFromList ────────────────────────────────────────────────────
+
+describe("resolveSkillsFromList", () => {
+  it("resolves skills from a flat list", () => {
+    const skills: Skill[] = [
+      makeSkill("direct-a", { phases: [Phase.Generate], content: "Direct A" }),
+      makeSkill("direct-b", { phases: [Phase.Review], content: "Direct B" }),
+    ];
+
+    const genResult = resolveSkillsFromList(Phase.Generate, skills);
+    expect(genResult.prompts.some((p) => p.includes("Direct A"))).toBe(true);
+    expect(genResult.prompts.some((p) => p.includes("Direct B"))).toBe(false);
+
+    const revResult = resolveSkillsFromList(Phase.Review, skills);
+    expect(revResult.prompts.some((p) => p.includes("Direct B"))).toBe(true);
+  });
+});
+
+// ── resolveSkillsAsync ───────────────────────────────────────────────────────
+
+describe("resolveSkillsAsync", () => {
+  it("returns same results as sync version", async () => {
+    const skill = makeSkill("async-test", {
+      phases: [Phase.Generate],
+      content: "Async skill content",
+    });
+    const kit = makeKit("async-kit", { skills: [skill] });
+
+    const syncResult = resolveSkills(Phase.Generate, [kit]);
+    const asyncResult = await resolveSkillsAsync(Phase.Generate, [kit]);
+
+    expect(asyncResult.prompts).toEqual(syncResult.prompts);
+    expect(asyncResult.availableTools).toEqual(syncResult.availableTools);
+  });
+});
+
+// ── IaC Best Practices (#21) ────────────────────────────────────────────────
+
+describe("azureKit IaC skills (#21)", () => {
+  it("has skills array defined", async () => {
+    const { azureKit } = await import("../kits/azure-kit.js");
+    expect(azureKit.skills).toBeDefined();
+    expect(azureKit.skills!.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("includes Bicep module conventions skill for Generate phase", async () => {
+    const { azureKit } = await import("../kits/azure-kit.js");
+    const result = resolveSkills(Phase.Generate, [azureKit]);
+    const hasBicep = result.prompts.some((p) =>
+      p.includes("Bicep Module Structure Conventions")
+    );
+    expect(hasBicep).toBe(true);
+  });
+
+  it("includes @secure() decorator skill for Generate and Review", async () => {
+    const { azureKit } = await import("../kits/azure-kit.js");
+
+    for (const phase of [Phase.Generate, Phase.Review]) {
+      const result = resolveSkills(phase, [azureKit]);
+      const hasSecure = result.prompts.some((p) =>
+        p.includes("@secure()") && p.includes("Secret Handling")
+      );
+      expect(hasSecure).toBe(true);
+    }
+  });
+
+  it("includes diagnostic settings skill for Generate phase", async () => {
+    const { azureKit } = await import("../kits/azure-kit.js");
+    const result = resolveSkills(Phase.Generate, [azureKit]);
+    const hasDiag = result.prompts.some((p) =>
+      p.includes("Diagnostic Settings")
+    );
+    expect(hasDiag).toBe(true);
+  });
+
+  it("includes resource tagging skill for Generate phase", async () => {
+    const { azureKit } = await import("../kits/azure-kit.js");
+    const result = resolveSkills(Phase.Generate, [azureKit]);
+    const hasTags = result.prompts.some((p) =>
+      p.includes("Resource Tagging Strategy")
+    );
+    expect(hasTags).toBe(true);
+  });
+
+  it("includes least-privilege RBAC skill (Zapp requirement)", async () => {
+    const { azureKit } = await import("../kits/azure-kit.js");
+    const result = resolveSkills(Phase.Generate, [azureKit]);
+    const hasRbac = result.prompts.some((p) =>
+      p.includes("Least-Privilege RBAC")
+    );
+    expect(hasRbac).toBe(true);
+  });
+
+  it("@secure() skill contains no-secret-output instruction (Zapp requirement)", async () => {
+    const { azureKit } = await import("../kits/azure-kit.js");
+    const secureSkill = azureKit.skills!.find((s) => s.id === "iac-secure-decorators");
+    expect(secureSkill).toBeDefined();
+    expect(secureSkill!.content).toContain("NEVER generate Bicep");
+    expect(secureSkill!.content).toContain("output");
+    expect(secureSkill!.content).toContain("secret");
+  });
+
+  it("RBAC skill enforces least-privilege and managed identity (Zapp requirement)", async () => {
+    const { azureKit } = await import("../kits/azure-kit.js");
+    const rbacSkill = azureKit.skills!.find((s) => s.id === "iac-least-privilege-rbac");
+    expect(rbacSkill).toBeDefined();
+    expect(rbacSkill!.content).toContain("narrowest resource possible");
+    expect(rbacSkill!.content).toContain("NEVER assign Owner");
+    expect(rbacSkill!.content).toContain("Managed Identity");
+  });
+
+  it("IaC skills are not injected in Discover phase", async () => {
+    const { azureKit } = await import("../kits/azure-kit.js");
+    const result = resolveSkills(Phase.Discover, [azureKit]);
+    const hasIac = result.prompts.some((p) =>
+      p.includes("Bicep Module") || p.includes("Least-Privilege RBAC")
+    );
+    expect(hasIac).toBe(false);
   });
 });

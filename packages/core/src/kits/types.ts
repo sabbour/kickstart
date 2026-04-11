@@ -97,6 +97,14 @@ export interface IntegrationKit {
   /** Optional A2UI component registrations (frontend-only) */
   components?: ComponentRegistration[];
 
+  /**
+   * Typed skill definitions — structured domain knowledge injected per-phase.
+   * When present, skills are resolved alongside (not replacing) `phasePrompts`
+   * and flat `prompts`.  Skills provide keyword-based activation, priority
+   * ordering, and per-phase filtering.
+   */
+  skills?: import("../engine/types.js").Skill[];
+
   // ── ServicePack extensions (issue #30) ───────────────────────────────
 
   /** Declarative auth requirements — web layer uses these to wire providers */
