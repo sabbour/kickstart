@@ -248,3 +248,17 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - **Artifact selection checklist pattern:** GitHubCommit uses a Set<string> in useState for selected file paths. Select All / Select None helpers. Each artifact shows a Checkbox, file icon, monospace path, and byte size. Click path to toggle diff preview (first 500 chars).
 - **Multi-step commit flow:** Three states: selecting (artifact checklist) → configuring (branch, PR title/body) → executing → success/error. Branch name validation rejects Git-unsafe characters, double dots, spaces, and protected branch names.
 - **Core connector expansion:** Added listUserRepos (paginated), getAuthenticatedUser, and createPullRequest to GitHubConnector. All return stub data in isStubMode(). New exported types: GitHubUser, GitHubDeviceCodeResponse, GitHubPullRequest. Also extended GitHubRepo with optional stargazers_count and updated_at.
+
+### FileEditor + CostEstimate + add-component prompt (#38 + #20) — 2026-04-10
+
+- **Monaco CDN worker strategy:** Vite does not bundle Monaco workers out of the box. Used `@monaco-editor/react`'s `loader.config({ paths: { vs: CDN_URL } })` to point at jsdelivr CDN — this gives full IntelliSense/syntax validation without a Vite plugin. Singleton config guard (`monacoConfigured` flag) prevents re-initialization.
+- **Monaco lazy-load via React.lazy + Suspense:** `const MonacoEditor = lazy(() => import('@monaco-editor/react'))` — Vite automatically code-splits. Show `<Spinner label="Loading editor…" />` as fallback. Only triggers when `readOnly=false` and `monacoReady` state is true.
+- **Multi-file tabs pattern:** Added optional `files: z.array(FileEntrySchema)` prop. When present, renders Fluent `<TabList>` above editor. `activeTab` state clamped on file list changes. Single-file mode (original props) remains backward-compatible — no breaking schema changes.
+- **CostEstimate SKU selector:** Added `skuOptions` per resource row with `z.array(SkuOptionSchema)`. When present, renders Fluent `<Select>` in a dedicated SKU column. Selection tracked via `skuSelections` state (keyed by resource index). SKU change dispatched via `context.dispatchAction({ event: { name: 'cost-estimate:sku-change', context: { ... } } })`.
+- **CostEstimate projection slider:** `showProjectionSlider` boolean enables a Fluent `<Slider>` (1–36 months). Projection footer row shows `total × months`. Slider state local; `projectionMonths` prop provides a static default when slider is not shown.
+- **add-component.prompt.md:** Created `.github/prompts/add-component.prompt.md` with `mode: agent`. Encodes all conventions: `createReactComponent`, `DynamicStringSchema`, `makeStyles`+tokens, `.strict()`, `sanitizeHtml`, lazy loading singleton, `context.dispatchAction`. Reference table covers CodeBlock → ArchitectureDiagram complexity spectrum.
+- **PR #115** opened as draft. Closes #38 and #20.
+
+## Completed Tasks
+- #38: FileEditor Monaco + tabs, CostEstimate SKU + projection ✅ (PR #115, 2026-04-10)
+- #20: add-component.prompt.md ✅ (PR #115, 2026-04-10)
