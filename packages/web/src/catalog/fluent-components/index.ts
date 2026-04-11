@@ -20,6 +20,11 @@ import {DateTimeInput} from './DateTimeInput';
 import {Table} from './Table';
 import {Alert} from './Alert';
 import {Link} from './Link';
+import {Badge} from './Badge';
+import {Accordion} from './Accordion';
+import {Toggle} from './Toggle';
+import {ComboBox} from './ComboBox';
+import {MultiSelect} from './MultiSelect';
 
 export {Text} from './Text';
 export {Image} from './Image';
@@ -42,8 +47,13 @@ export {DateTimeInput} from './DateTimeInput';
 export {Table} from './Table';
 export {Alert} from './Alert';
 export {Link} from './Link';
+export {Badge} from './Badge';
+export {Accordion} from './Accordion';
+export {Toggle} from './Toggle';
+export {ComboBox} from './ComboBox';
+export {MultiSelect} from './MultiSelect';
 
-/** Fluent UI v9 overrides for all 21 basic catalog components. */
+/** Fluent UI v9 overrides for all 26 basic catalog components. */
 export const fluentOverrides: ReactComponentImplementation[] = [
   Text,
   Image,
@@ -66,4 +76,9 @@ export const fluentOverrides: ReactComponentImplementation[] = [
   Table,
   Alert,
   Link,
+  Badge,
+  Accordion,
+  Toggle,
+  ComboBox,
+  MultiSelect,
 ];

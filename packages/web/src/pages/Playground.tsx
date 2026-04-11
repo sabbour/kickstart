@@ -1663,6 +1663,16 @@ function PlaygroundInner() {
           {/* Pinned input bar */}
           <div className={classes.createInputBar}>
             <div className={classes.createInputRow} style={{ maxWidth: '600px', width: '100%' }}>
+              {inspireLoading && <div className="hero-input-progress" />}
+              <button
+                className={`hero-inspire-btn${inspireLoading ? ' loading' : ''}`}
+                aria-label="Inspire me"
+                title="Inspire me"
+                onClick={handleInspire}
+                disabled={inspireLoading || createLoading}
+              >
+                <Sparkle24Regular />
+              </button>
               <input
                 className={classes.createInput}
                 value={createPrompt}
@@ -1671,7 +1681,7 @@ function PlaygroundInner() {
                 aria-label="Continue the conversation"
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSend(createPrompt); }}
                 disabled={createLoading}
-                style={{ paddingRight: '48px' }}
+                style={{ paddingRight: '48px', paddingLeft: '40px' }}
               />
               <button
                 className="hero-send-btn"
