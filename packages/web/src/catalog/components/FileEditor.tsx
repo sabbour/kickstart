@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, lazy, Suspense } from 'react';
 import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
@@ -6,7 +6,11 @@ import {
   Body1Strong,
   Caption1,
   Card,
+  Spinner,
+  Tab,
+  TabList,
   makeStyles,
+  mergeClasses,
   shorthands,
   tokens,
 } from '@fluentui/react-components';
@@ -35,6 +39,34 @@ hljs.registerLanguage('bash', bash);
 hljs.registerLanguage('dockerfile', dockerfile);
 hljs.registerLanguage('go', go);
 
+// Monaco CDN worker strategy — configure loader to use CDN before any Monaco import.
+// This avoids the Vite worker bundling issue Leela flagged:
+// without this, Monaco loads but language services silently fail.
+let monacoConfigured = false;
+function ensureMonacoWorkerConfig() {
+  if (monacoConfigured) return;
+  monacoConfigured = true;
+  import('@monaco-editor/react').then(({ loader }) => {
+    loader.config({
+      paths: {
+        vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs',
+      },
+    });
+  });
+}
+
+// Lazy-load the Monaco Editor component (code-split by Vite automatically)
+const MonacoEditor = lazy(() =>
+  import('@monaco-editor/react').then((mod) => ({ default: mod.default }))
+);
+
+const FileEntrySchema = z.object({
+  fileName: DynamicStringSchema,
+  content: DynamicStringSchema.optional(),
+  language: DynamicStringSchema.optional(),
+  artifactPath: DynamicStringSchema.optional(),
+});
+
 const FileEditorApi = {
   name: 'FileEditor',
   schema: z.object({
@@ -43,8 +75,21 @@ const FileEditorApi = {
     language: DynamicStringSchema.optional(),
     readOnly: z.boolean().optional(),
     artifactPath: DynamicStringSchema.optional(),
+    files: z.array(FileEntrySchema).optional(),
   }).strict(),
 };
+
+/** Map Monaco language IDs from our shorthand names */
+function toMonacoLanguage(lang: string | undefined): string | undefined {
+  if (!lang) return undefined;
+  const map: Record<string, string> = {
+    js: 'javascript', jsx: 'javascript',
+    ts: 'typescript', tsx: 'typescript',
+    py: 'python', yml: 'yaml',
+    sh: 'bash', html: 'xml',
+  };
+  return map[lang] ?? lang;
+}
 
 const useStyles = makeStyles({
   root: {
@@ -77,11 +122,18 @@ const useStyles = makeStyles({
     borderRadius: tokens.borderRadiusMedium,
     fontFamily: tokens.fontFamilyBase,
   },
+  tabBar: {
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderBottomWidth: tokens.strokeWidthThin,
+    borderBottomStyle: 'solid',
+    borderBottomColor: tokens.colorNeutralStroke2,
+    paddingLeft: tokens.spacingHorizontalS,
+    paddingRight: tokens.spacingHorizontalS,
+  },
   editorWrapper: {
     position: 'relative',
     backgroundColor: tokens.colorNeutralBackground1,
   },
-  // Read-only: highlighted code view
   highlightView: {
     margin: '0',
     padding: tokens.spacingHorizontalM,
@@ -93,7 +145,6 @@ const useStyles = makeStyles({
     maxHeight: '400px',
     overflowY: 'auto',
   },
-  // Editable: plain textarea styled to look like a code editor
   textarea: {
     width: '100%',
     minHeight: '200px',
@@ -110,6 +161,13 @@ const useStyles = makeStyles({
     boxSizing: 'border-box',
     display: 'block',
   },
+  monacoLoading: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '200px',
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
   empty: {
     padding: tokens.spacingHorizontalM,
     color: tokens.colorNeutralForeground3,
@@ -122,19 +180,49 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
   const classes = useStyles();
   const { getArtifact } = useArtifacts();
 
-  // Resolve content: artifactPath takes priority over inline content prop
+  // Build the file list — multi-file mode (files prop) or single-file mode
+  const fileEntries = useMemo(() => {
+    if (props.files && props.files.length > 0) {
+      return props.files;
+    }
+    // Single-file fallback
+    if (props.fileName || props.content || props.artifactPath) {
+      return [{
+        fileName: props.fileName ?? '',
+        content: props.content,
+        language: props.language,
+        artifactPath: props.artifactPath,
+      }];
+    }
+    return [];
+  }, [props.files, props.fileName, props.content, props.language, props.artifactPath]);
+
+  const [activeTab, setActiveTab] = useState(0);
+  const isMultiFile = fileEntries.length > 1;
+
+  // Clamp active tab to valid range when file list changes
+  useEffect(() => {
+    if (activeTab >= fileEntries.length && fileEntries.length > 0) {
+      setActiveTab(0);
+    }
+  }, [fileEntries.length, activeTab]);
+
+  const activeFile = fileEntries[activeTab] ?? fileEntries[0];
+
+  // Resolve content for the active file
   const resolvedContent = useMemo(() => {
-    if (props.artifactPath) {
-      const artifact = getArtifact(props.artifactPath);
+    if (!activeFile) return null;
+    if (activeFile.artifactPath) {
+      const artifact = getArtifact(activeFile.artifactPath);
       return artifact ? artifact.content : null;
     }
-    return props.content ?? null;
-  }, [props.artifactPath, props.content, getArtifact]);
+    return activeFile.content ?? null;
+  }, [activeFile, getArtifact]);
 
-  const resolvedFileName = props.fileName ??
-    (props.artifactPath ? props.artifactPath.split('/').pop() : undefined);
+  const resolvedFileName = activeFile?.fileName ??
+    (activeFile?.artifactPath ? activeFile.artifactPath.split('/').pop() : undefined);
 
-  const resolvedLanguage = props.language ??
+  const resolvedLanguage = activeFile?.language ??
     (resolvedFileName ? inferLanguage(resolvedFileName) : undefined);
 
   const highlightedCode = useMemo(() => {
@@ -145,16 +233,42 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
       }
       return hljs.highlightAuto(resolvedContent).value;
     } catch {
-      // If highlighting fails, HTML-escape the raw content to prevent XSS
       return escapeHtml(resolvedContent);
     }
   }, [resolvedContent, resolvedLanguage]);
 
-  const isReadOnly = props.readOnly !== false; // default to read-only
+  const isReadOnly = props.readOnly !== false;
+
+  // Trigger Monaco CDN config eagerly when editable mode is requested
+  const [monacoReady, setMonacoReady] = useState(false);
+  useEffect(() => {
+    if (!isReadOnly) {
+      ensureMonacoWorkerConfig();
+      setMonacoReady(true);
+    }
+  }, [isReadOnly]);
 
   return (
     <Card className={classes.root}>
-      {(resolvedFileName || resolvedLanguage) && (
+      {/* Tab bar for multi-file mode */}
+      {isMultiFile && (
+        <div className={classes.tabBar}>
+          <TabList
+            selectedValue={String(activeTab)}
+            onTabSelect={(_, data) => setActiveTab(Number(data.value))}
+            size="small"
+          >
+            {fileEntries.map((file, i) => {
+              const label = file.fileName ||
+                (file.artifactPath ? file.artifactPath.split('/').pop() : `File ${i + 1}`);
+              return <Tab key={i} value={String(i)}>{label}</Tab>;
+            })}
+          </TabList>
+        </div>
+      )}
+
+      {/* Single-file header (shown when not in multi-file tab mode) */}
+      {!isMultiFile && (resolvedFileName || resolvedLanguage) && (
         <div className={classes.header}>
           <div className={classes.fileInfo}>
             {resolvedFileName && <Body1Strong>{resolvedFileName}</Body1Strong>}
@@ -163,17 +277,41 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
           {isReadOnly && <span className={classes.readOnlyBadge}>read-only</span>}
         </div>
       )}
+
       <div className={classes.editorWrapper}>
         {resolvedContent === null ? (
           <div className={classes.empty}>
-            {props.artifactPath
-              ? `Artifact not found: ${props.artifactPath}`
+            {activeFile?.artifactPath
+              ? `Artifact not found: ${activeFile.artifactPath}`
               : 'No content provided.'}
           </div>
         ) : isReadOnly ? (
           <pre className={classes.highlightView}>
             <code dangerouslySetInnerHTML={{ __html: sanitizeHtml(highlightedCode) }} />
           </pre>
+        ) : monacoReady ? (
+          <Suspense
+            fallback={
+              <div className={classes.monacoLoading}>
+                <Spinner size="small" label="Loading editor…" />
+              </div>
+            }
+          >
+            <MonacoEditor
+              height="300px"
+              language={toMonacoLanguage(resolvedLanguage)}
+              value={resolvedContent}
+              options={{
+                readOnly: false,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                fontSize: 13,
+                lineNumbers: 'on',
+                wordWrap: 'on',
+                automaticLayout: true,
+              }}
+            />
+          </Suspense>
         ) : (
           <textarea
             className={classes.textarea}
