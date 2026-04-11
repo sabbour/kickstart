@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, lazy, Suspense } from 'react';
 import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
-import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
+import { DynamicStringSchema, type DynamicString } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Body1Strong,
   Caption1,
@@ -198,17 +198,18 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
   // Resolve content for the active file
   const resolvedContent = useMemo(() => {
     if (!activeFile) return null;
-    if (activeFile.artifactPath) {
-      const artifact = getArtifact(activeFile.artifactPath);
+    const artifactPath = str(activeFile.artifactPath);
+    if (artifactPath) {
+      const artifact = getArtifact(artifactPath);
       return artifact ? artifact.content : null;
     }
-    return activeFile.content ?? null;
+    return str(activeFile.content) ?? null;
   }, [activeFile, getArtifact]);
 
-  const resolvedFileName = activeFile?.fileName ??
-    (activeFile?.artifactPath ? activeFile.artifactPath.split('/').pop() : undefined);
+  const resolvedFileName = str(activeFile?.fileName) ??
+    (activeFile?.artifactPath ? str(activeFile.artifactPath)?.split('/').pop() : undefined);
 
-  const resolvedLanguage = activeFile?.language ??
+  const resolvedLanguage = str(activeFile?.language) ??
     (resolvedFileName ? inferLanguage(resolvedFileName) : undefined);
 
   const highlightedCode = useMemo(() => {
@@ -245,8 +246,8 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
             size="small"
           >
             {fileEntries.map((file, i) => {
-              const label = file.fileName ||
-                (file.artifactPath ? file.artifactPath.split('/').pop() : `File ${i + 1}`);
+              const label = str(file.fileName) ||
+                (file.artifactPath ? str(file.artifactPath)?.split('/').pop() : `File ${i + 1}`);
               return <Tab key={i} value={String(i)}>{label}</Tab>;
             })}
           </TabList>
@@ -320,6 +321,12 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+/** Coerce a DynamicString to a plain string (data-binding / function-call objects resolve to ''). */
+function str(value: DynamicString | null | undefined): string | undefined {
+  if (value == null) return undefined;
+  return typeof value === 'string' ? value : '';
 }
 
 function inferLanguage(fileName: string): string | undefined {
