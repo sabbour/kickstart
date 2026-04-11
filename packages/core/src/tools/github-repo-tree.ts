@@ -6,7 +6,7 @@
  * project structure before reading individual files.
  */
 
-import type { Tool } from "../types.js";
+import type { Tool, ToolContext } from "../types.js";
 import { defaultConnectorRegistry } from "../connectors/index.js";
 import type { GitHubConnector } from "../connectors/index.js";
 import { validateRef } from "./github-input-validation.js";
@@ -71,7 +71,7 @@ export const githubRepoTree: Tool<GitHubRepoTreeArgs> = {
     required: ["owner", "repo"],
   },
 
-  async execute(args: GitHubRepoTreeArgs): Promise<unknown> {
+  async execute(args: GitHubRepoTreeArgs, _context: ToolContext): Promise<unknown> {
     // Validate ref if provided
     if (args.ref) {
       const refCheck = validateRef(args.ref);

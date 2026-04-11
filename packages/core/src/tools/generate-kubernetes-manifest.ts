@@ -5,10 +5,9 @@
  * Delegates to the existing generateKubernetesManifests generator.
  */
 
-import type { Tool } from "../types.js";
+import type { Tool, ToolContext } from "../types.js";
 import { generateKubernetesManifests } from "../generators/index.js";
 import type { AppDefinition, AzureContext } from "../types.js";
-import { defaultArtifactStore } from "../artifacts/index.js";
 
 interface GenerateKubernetesManifestArgs {
   appName: string;
@@ -94,7 +93,7 @@ export const generateKubernetesManifest: Tool<GenerateKubernetesManifestArgs> = 
     required: ["appName", "runtime", "port"],
   },
 
-  async execute(args: GenerateKubernetesManifestArgs): Promise<unknown> {
+  async execute(args: GenerateKubernetesManifestArgs, context: ToolContext): Promise<unknown> {
     // Coerce appName to string — prevents TypeError if LLM passes a number
     const safeAppName = typeof args.appName === "string" ? args.appName : String(args.appName ?? "app");
 
@@ -121,9 +120,9 @@ export const generateKubernetesManifest: Tool<GenerateKubernetesManifestArgs> = 
 
     const output = generateKubernetesManifests({ app, azure });
 
-    // Persist each generated file into the shared artifact store
+    // Persist each generated file into the session-scoped artifact store
     for (const file of output.files) {
-      defaultArtifactStore.put(file.path, file.content, {
+      context.artifactStore.put(file.path, file.content, {
         language: file.language,
         metadata: { generator: output.generator, appName: safeAppName },
       });

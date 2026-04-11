@@ -4,6 +4,16 @@
  * Tool interface and OpenAI function-calling format types.
  */
 
+import type { ArtifactStore } from "../artifacts/types.js";
+
+/**
+ * Execution context injected into every tool call.
+ * Provides the session-scoped artifact store — no singleton fallback.
+ */
+export interface ToolContext {
+  artifactStore: ArtifactStore;
+}
+
 /** A callable tool exposed to the LLM via function calling. */
 export interface Tool<TArgs = Record<string, unknown>> {
   /** Unique tool name — must be a valid function identifier */
@@ -23,7 +33,7 @@ export interface Tool<TArgs = Record<string, unknown>> {
    */
   requireApproval?: boolean;
   /** Execute the tool and return a result the LLM can consume */
-  execute(args: TArgs): Promise<unknown>;
+  execute(args: TArgs, context: ToolContext): Promise<unknown>;
 }
 
 /** OpenAI function-calling tool definition format */

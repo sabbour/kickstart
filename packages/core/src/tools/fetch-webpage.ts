@@ -5,7 +5,7 @@
  * Used by the LLM to read documentation, READMEs, and other web resources.
  */
 
-import type { Tool } from "../types.js";
+import type { Tool, ToolContext } from "../types.js";
 
 interface FetchWebpageArgs {
   url: string;
@@ -113,7 +113,7 @@ export const fetchWebpage: Tool<FetchWebpageArgs> = {
     required: ["url"],
   },
 
-  async execute(args: FetchWebpageArgs): Promise<unknown> {
+  async execute(args: FetchWebpageArgs, _context: ToolContext): Promise<unknown> {
     // Validate URL scheme
     let parsed: URL;
     try {

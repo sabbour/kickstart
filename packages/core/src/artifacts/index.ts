@@ -6,5 +6,6 @@
  * and downloaded by the user.
  */
 
-export type { Artifact, ArtifactStore } from "./types.js";
+export type { Artifact, ArtifactStore, ArtifactStoreQuota } from "./types.js";
+export { ArtifactQuotaExceededError, DEFAULT_ARTIFACT_QUOTA } from "./types.js";
 export { InMemoryArtifactStore, defaultArtifactStore } from "./in-memory.js";

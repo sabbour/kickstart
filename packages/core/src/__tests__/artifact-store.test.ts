@@ -5,10 +5,17 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { InMemoryArtifactStore, defaultArtifactStore } from "../artifacts/index.js";
+import { InMemoryArtifactStore } from "../artifacts/index.js";
+import { ArtifactQuotaExceededError } from "../artifacts/types.js";
 import { listArtifacts } from "../tools/list-artifacts.js";
 import { getArtifact } from "../tools/get-artifact.js";
 import { generateKubernetesManifest } from "../tools/generate-kubernetes-manifest.js";
+import type { ToolContext } from "../tools/types.js";
+
+/** Create a ToolContext wrapping a given store. */
+function ctx(store: InMemoryArtifactStore): ToolContext {
+  return { artifactStore: store };
+}
 
 // ---------------------------------------------------------------------------
 // InMemoryArtifactStore
@@ -130,47 +137,153 @@ describe("InMemoryArtifactStore", () => {
 });
 
 // ---------------------------------------------------------------------------
-// list_artifacts tool
+// Quota enforcement
+// ---------------------------------------------------------------------------
+
+describe("InMemoryArtifactStore — quota enforcement", () => {
+  it("throws when max artifact count exceeded", () => {
+    const store = new InMemoryArtifactStore({ maxArtifacts: 2 });
+    store.put("a.yaml", "a");
+    store.put("b.yaml", "b");
+    expect(() => store.put("c.yaml", "c")).toThrowError(ArtifactQuotaExceededError);
+  });
+
+  it("allows updating existing artifact within count limit", () => {
+    const store = new InMemoryArtifactStore({ maxArtifacts: 1 });
+    store.put("a.yaml", "v1");
+    // Updating existing path should NOT count as a new artifact
+    expect(() => store.put("a.yaml", "v2")).not.toThrow();
+    expect(store.get("a.yaml")!.content).toBe("v2");
+  });
+
+  it("throws when max size exceeded", () => {
+    const store = new InMemoryArtifactStore({ maxSizeBytes: 10 });
+    store.put("a.yaml", "12345"); // 5 bytes
+    expect(() => store.put("b.yaml", "123456")).toThrowError(ArtifactQuotaExceededError); // 6 bytes, total 11 > 10
+  });
+
+  it("accounts for update size delta correctly", () => {
+    const store = new InMemoryArtifactStore({ maxSizeBytes: 20 });
+    store.put("a.yaml", "1234567890"); // 10 bytes
+    // Replacing with smaller content should free space
+    store.put("a.yaml", "12345"); // 5 bytes — total now 5
+    expect(store.currentSizeBytes).toBe(5);
+    // Now we can add more
+    store.put("b.yaml", "1234567890"); // 10 bytes — total 15, under 20
+    expect(store.currentSizeBytes).toBe(15);
+  });
+
+  it("delete reduces tracked size", () => {
+    const store = new InMemoryArtifactStore({ maxSizeBytes: 20 });
+    store.put("a.yaml", "1234567890"); // 10 bytes
+    store.delete("a.yaml");
+    expect(store.currentSizeBytes).toBe(0);
+    // Can now add the full quota
+    store.put("b.yaml", "12345678901234567890"); // 20 bytes
+    expect(store.size).toBe(1);
+  });
+
+  it("clear resets size tracking", () => {
+    const store = new InMemoryArtifactStore({ maxSizeBytes: 20 });
+    store.put("a.yaml", "1234567890");
+    store.clear();
+    expect(store.currentSizeBytes).toBe(0);
+  });
+
+  it("error contains correct reason and values", () => {
+    const store = new InMemoryArtifactStore({ maxArtifacts: 1 });
+    store.put("a.yaml", "a");
+    try {
+      store.put("b.yaml", "b");
+      expect.unreachable("should have thrown");
+    } catch (e) {
+      expect(e).toBeInstanceOf(ArtifactQuotaExceededError);
+      const err = e as ArtifactQuotaExceededError;
+      expect(err.reason).toBe("max_artifacts");
+      expect(err.limit).toBe(1);
+      expect(err.current).toBe(1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Session isolation
+// ---------------------------------------------------------------------------
+
+describe("Per-session artifact store isolation", () => {
+  it("separate store instances do not share artifacts", () => {
+    const storeA = new InMemoryArtifactStore();
+    const storeB = new InMemoryArtifactStore();
+
+    storeA.put("deployment.yaml", "session-a-content");
+    storeB.put("service.yaml", "session-b-content");
+
+    expect(storeA.get("service.yaml")).toBeNull();
+    expect(storeB.get("deployment.yaml")).toBeNull();
+    expect(storeA.size).toBe(1);
+    expect(storeB.size).toBe(1);
+  });
+
+  it("clearing one store does not affect another", () => {
+    const storeA = new InMemoryArtifactStore();
+    const storeB = new InMemoryArtifactStore();
+
+    storeA.put("a.yaml", "a");
+    storeB.put("b.yaml", "b");
+    storeA.clear();
+
+    expect(storeA.size).toBe(0);
+    expect(storeB.size).toBe(1);
+    expect(storeB.get("b.yaml")!.content).toBe("b");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// list_artifacts tool (with context injection)
 // ---------------------------------------------------------------------------
 
 describe("list_artifacts tool", () => {
+  let store: InMemoryArtifactStore;
+
   beforeEach(() => {
-    defaultArtifactStore.clear();
+    store = new InMemoryArtifactStore();
   });
 
   it("returns count and artifact list", async () => {
-    defaultArtifactStore.put("k8s/deployment.yaml", "content");
-    const result = (await listArtifacts.execute({})) as { count: number; artifacts: unknown[] };
+    store.put("k8s/deployment.yaml", "content");
+    const result = (await listArtifacts.execute({}, ctx(store))) as { count: number; artifacts: unknown[] };
     expect(result.count).toBe(1);
     expect(result.artifacts).toHaveLength(1);
   });
 
   it("returns zero artifacts when store is empty", async () => {
-    const result = (await listArtifacts.execute({})) as { count: number; artifacts: unknown[] };
+    const result = (await listArtifacts.execute({}, ctx(store))) as { count: number; artifacts: unknown[] };
     expect(result.count).toBe(0);
     expect(result.artifacts).toHaveLength(0);
   });
 
   it("filters by glob", async () => {
-    defaultArtifactStore.put("k8s/deployment.yaml", "");
-    defaultArtifactStore.put("Dockerfile", "");
-    const result = (await listArtifacts.execute({ glob: "k8s/**" })) as { count: number };
+    store.put("k8s/deployment.yaml", "");
+    store.put("Dockerfile", "");
+    const result = (await listArtifacts.execute({ glob: "k8s/**" }, ctx(store))) as { count: number };
     expect(result.count).toBe(1);
   });
 });
 
 // ---------------------------------------------------------------------------
-// get_artifact tool
+// get_artifact tool (with context injection)
 // ---------------------------------------------------------------------------
 
 describe("get_artifact tool", () => {
+  let store: InMemoryArtifactStore;
+
   beforeEach(() => {
-    defaultArtifactStore.clear();
+    store = new InMemoryArtifactStore();
   });
 
   it("returns found artifact with content", async () => {
-    defaultArtifactStore.put("k8s/service.yaml", "apiVersion: v1");
-    const result = (await getArtifact.execute({ path: "k8s/service.yaml" })) as {
+    store.put("k8s/service.yaml", "apiVersion: v1");
+    const result = (await getArtifact.execute({ path: "k8s/service.yaml" }, ctx(store))) as {
       found: boolean;
       content: string;
       language: string;
@@ -181,7 +294,7 @@ describe("get_artifact tool", () => {
   });
 
   it("returns found: false for missing path", async () => {
-    const result = (await getArtifact.execute({ path: "does-not-exist.yaml" })) as {
+    const result = (await getArtifact.execute({ path: "does-not-exist.yaml" }, ctx(store))) as {
       found: boolean;
     };
     expect(result.found).toBe(false);
@@ -189,12 +302,14 @@ describe("get_artifact tool", () => {
 });
 
 // ---------------------------------------------------------------------------
-// generate_kubernetes_manifest stores artifacts
+// generate_kubernetes_manifest stores artifacts (with context injection)
 // ---------------------------------------------------------------------------
 
 describe("generate_kubernetes_manifest stores artifacts", () => {
+  let store: InMemoryArtifactStore;
+
   beforeEach(() => {
-    defaultArtifactStore.clear();
+    store = new InMemoryArtifactStore();
   });
 
   it("puts generated files into the artifact store", async () => {
@@ -202,8 +317,8 @@ describe("generate_kubernetes_manifest stores artifacts", () => {
       appName: "my-app",
       runtime: "node",
       port: 3000,
-    });
-    const artifacts = defaultArtifactStore.list();
+    }, ctx(store));
+    const artifacts = store.list();
     expect(artifacts.length).toBeGreaterThan(0);
     const paths = artifacts.map((a) => a.path);
     expect(paths.some((p) => p.includes("deployment"))).toBe(true);
@@ -214,8 +329,8 @@ describe("generate_kubernetes_manifest stores artifacts", () => {
       appName: "test-app",
       runtime: "python",
       port: 8080,
-    });
-    for (const a of defaultArtifactStore.list()) {
+    }, ctx(store));
+    for (const a of store.list()) {
       expect(a.language).toBe("yaml");
     }
   });
@@ -225,8 +340,8 @@ describe("generate_kubernetes_manifest stores artifacts", () => {
       appName: "meta-app",
       runtime: "go",
       port: 9090,
-    });
-    const artifact = defaultArtifactStore.list()[0];
+    }, ctx(store));
+    const artifact = store.list()[0];
     expect(artifact.metadata?.appName).toBe("meta-app");
   });
 });

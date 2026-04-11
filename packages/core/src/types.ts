@@ -4,8 +4,8 @@
  * Shared types across the Kickstart platform.
  */
 
-// Re-export Tool so that ./tools/* can import from "../types.js"
-export type { Tool } from "./tools/types.js";
+// Re-export Tool and ToolContext so that ./tools/* can import from "../types.js"
+export type { Tool, ToolContext } from "./tools/types.js";
 
 /** Azure subscription and resource context for a deployment. */
 export interface AzureContext {
@@ -77,6 +77,8 @@ export interface SessionState {
   githubContext?: Partial<GitHubContext>;
   /** Raw conversation messages for LLM context */
   messages: ConversationMessage[];
+  /** Per-session artifact storage — each session gets its own store */
+  artifactStore?: import("./artifacts/types.js").ArtifactStore;
 }
 
 /** A single message in the conversation history. */

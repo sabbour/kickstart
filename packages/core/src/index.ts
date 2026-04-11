@@ -99,10 +99,11 @@ export type {
 export { ToolRegistry, defaultRegistry } from "./tools/registry.js";
 export { githubApiGet } from "./tools/github-api-get.js";
 export { fetchWebpage } from "./tools/fetch-webpage.js";
-export type { Tool, OpenAIToolDefinition, ToolCall, ToolCallResult } from "./tools/types.js";
+export type { Tool, ToolContext, OpenAIToolDefinition, ToolCall, ToolCallResult } from "./tools/types.js";
 
 // Artifact store — generated files (K8s manifests, Dockerfiles, CI workflows, etc.)
-export type { Artifact, ArtifactStore } from "./artifacts/index.js";
+export type { Artifact, ArtifactStore, ArtifactStoreQuota } from "./artifacts/index.js";
+export { ArtifactQuotaExceededError, DEFAULT_ARTIFACT_QUOTA } from "./artifacts/index.js";
 export { InMemoryArtifactStore, defaultArtifactStore } from "./artifacts/index.js";
 
 // Services (response processing)

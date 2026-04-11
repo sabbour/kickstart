@@ -15,12 +15,18 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { ToolRegistry } from "../tools/registry.js";
-import type { Tool, ToolCall, ToolCallResult } from "../tools/types.js";
+import type { Tool, ToolContext, ToolCall, ToolCallResult } from "../tools/types.js";
 import { generateKubernetesManifest } from "../tools/generate-kubernetes-manifest.js";
 import { azureResourceList } from "../tools/azure-resource-list.js";
 import { estimateCost } from "../tools/estimate-cost.js";
+import { InMemoryArtifactStore } from "../artifacts/index.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Create a fresh ToolContext for tests. */
+function testCtx(): ToolContext {
+  return { artifactStore: new InMemoryArtifactStore() };
+}
 
 /** Build a minimal valid stub Tool for registry tests. */
 function makeTool(
@@ -94,14 +100,14 @@ describe("Tool interface contract", () => {
 
   it("execute returns a Promise", async () => {
     const tool = makeTool("promise_tool");
-    const result = tool.execute({ input: "test" });
+    const result = tool.execute({ input: "test" }, testCtx());
     expect(result).toBeInstanceOf(Promise);
     await result; // must resolve, not reject
   });
 
   it("execute resolves to a non-undefined result", async () => {
     const tool = makeTool("result_tool");
-    const result = await tool.execute({ input: "x" });
+    const result = await tool.execute({ input: "x" }, testCtx());
     expect(result).not.toBeUndefined();
   });
 
@@ -231,31 +237,31 @@ describe("Tool execution", () => {
   describe("stub tool with valid args", () => {
     it("returns the expected result object", async () => {
       const tool = makeTool("stub_exec");
-      const result = await tool.execute({ input: "hello" });
+      const result = await tool.execute({ input: "hello" }, testCtx());
       expect(result).toEqual({ result: "stub_exec-result" });
     });
 
     it("execute is called with the provided args", async () => {
       const tool = makeTool("arg_check");
-      await tool.execute({ input: "passed-value" });
-      expect(tool.execute).toHaveBeenCalledWith({ input: "passed-value" });
+      await tool.execute({ input: "passed-value" }, testCtx());
+      expect(tool.execute).toHaveBeenCalledWith({ input: "passed-value" }, expect.any(Object));
     });
   });
 
   describe("missing required args — graceful handling (TDD targets)", () => {
     it("execute with empty args object does not throw", async () => {
       // Stubs may return degraded results but must not crash
-      await expect(azureResourceList.execute({} as any)).resolves.toBeDefined();
+      await expect(azureResourceList.execute({} as any, testCtx())).resolves.toBeDefined();
     });
 
     it("execute with null arg values does not throw", async () => {
-      await expect(azureResourceList.execute({ subscriptionId: null as any })).resolves.toBeDefined();
+      await expect(azureResourceList.execute({ subscriptionId: null as any }, testCtx())).resolves.toBeDefined();
     });
 
     it("execute with missing required args returns an error indicator OR degrades gracefully", async () => {
       // A well-implemented tool should either return { error: ... } or throw a typed error.
       // Stub currently returns data with undefined fields — this test documents the expected contract.
-      const result = await azureResourceList.execute({} as any) as Record<string, unknown>;
+      const result = await azureResourceList.execute({} as any, testCtx()) as Record<string, unknown>;
       // Must return either a result object or an error field — not undefined
       expect(result).not.toBeUndefined();
     });
@@ -268,7 +274,7 @@ describe("Tool execution", () => {
           region: "eastus",
           nodeCount: "three" as any,
           vmSize: "Standard_D4s_v3",
-        }),
+        }, testCtx()),
       ).resolves.toBeDefined();
     });
 
@@ -278,7 +284,7 @@ describe("Tool execution", () => {
           appName: 42 as any,
           runtime: "node",
           port: 3000,
-        }),
+        }, testCtx()),
       ).resolves.toBeDefined();
     });
   });
@@ -376,12 +382,12 @@ describe("OpenAI integration format", () => {
       const call1 = makeToolCall("counter", { step: 1 });
       history.push({ role: "assistant", content: null });
 
-      const result1 = await registry.get("counter")!.execute(JSON.parse(call1.function.arguments));
+      const result1 = await registry.get("counter")!.execute(JSON.parse(call1.function.arguments), testCtx());
       history.push({ role: "tool", tool_call_id: call1.id, name: "counter", content: JSON.stringify(result1) });
 
       // Turn 2 — assistant requests second tool call
       const call2 = makeToolCall("counter", { step: 2 });
-      const result2 = await registry.get("counter")!.execute(JSON.parse(call2.function.arguments));
+      const result2 = await registry.get("counter")!.execute(JSON.parse(call2.function.arguments), testCtx());
       history.push({ role: "tool", tool_call_id: call2.id, name: "counter", content: JSON.stringify(result2) });
 
       // Final — assistant synthesises answer
@@ -417,7 +423,7 @@ describe("generate_kubernetes_manifest tool", () => {
 
   it("execute with minimal valid args resolves without throwing", async () => {
     await expect(
-      generateKubernetesManifest.execute({ appName: "my-app", runtime: "node", port: 3000 }),
+      generateKubernetesManifest.execute({ appName: "my-app", runtime: "node", port: 3000 }, testCtx()),
     ).resolves.toBeDefined();
   });
 
@@ -426,7 +432,7 @@ describe("generate_kubernetes_manifest tool", () => {
       appName: "my-app",
       runtime: "node",
       port: 3000,
-    }) as { files: unknown[] };
+    }, testCtx()) as { files: unknown[] };
     expect(Array.isArray(result.files)).toBe(true);
     expect(result.files.length).toBeGreaterThan(0);
   });
@@ -436,7 +442,7 @@ describe("generate_kubernetes_manifest tool", () => {
       appName: "my-app",
       runtime: "node",
       port: 3000,
-    }) as { files: Array<{ path: string; language: string; content: string }> };
+    }, testCtx()) as { files: Array<{ path: string; language: string; content: string }> };
     for (const file of result.files) {
       expect(typeof file.path).toBe("string");
       expect(typeof file.language).toBe("string");
@@ -449,7 +455,7 @@ describe("generate_kubernetes_manifest tool", () => {
       appName: "yaml-app",
       runtime: "python",
       port: 8000,
-    }) as { files: Array<{ content: string }> };
+    }, testCtx()) as { files: Array<{ content: string }> };
     for (const file of result.files) {
       expect(file.content.trim().length).toBeGreaterThan(0);
     }
@@ -460,7 +466,7 @@ describe("generate_kubernetes_manifest tool", () => {
       appName: "test-webapp",
       runtime: "node",
       port: 8080,
-    }) as { files: Array<{ content: string }> };
+    }, testCtx()) as { files: Array<{ content: string }> };
     const allContent = result.files.map((f) => f.content).join("\n");
     expect(allContent).toContain("test-webapp");
   });
@@ -471,7 +477,7 @@ describe("generate_kubernetes_manifest tool", () => {
       runtime: "go",
       port: 8080,
       needsIngress: true,
-    }) as { files: Array<{ path: string }> };
+    }, testCtx()) as { files: Array<{ path: string }> };
     const paths = result.files.map((f) => f.path);
     expect(paths.some((p) => p.toLowerCase().includes("ingress"))).toBe(true);
   });
@@ -488,21 +494,21 @@ describe("azure_resource_list tool", () => {
 
   it("execute with valid subscriptionId resolves", async () => {
     await expect(
-      azureResourceList.execute({ subscriptionId: "00000000-0000-0000-0000-000000000000" }),
+      azureResourceList.execute({ subscriptionId: "00000000-0000-0000-0000-000000000000" }, testCtx()),
     ).resolves.toBeDefined();
   });
 
   it("result contains a resources array", async () => {
     const result = await azureResourceList.execute({
       subscriptionId: "00000000-0000-0000-0000-000000000000",
-    }) as { resources: unknown[] };
+    }, testCtx()) as { resources: unknown[] };
     expect(Array.isArray(result.resources)).toBe(true);
   });
 
   it("each resource has id, name, type, and location", async () => {
     const result = await azureResourceList.execute({
       subscriptionId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-    }) as { resources: Array<{ id: string; name: string; type: string; location: string }> };
+    }, testCtx()) as { resources: Array<{ id: string; name: string; type: string; location: string }> };
     for (const resource of result.resources) {
       expect(typeof resource.id).toBe("string");
       expect(typeof resource.name).toBe("string");
@@ -513,7 +519,7 @@ describe("azure_resource_list tool", () => {
 
   it("result reflects the provided subscriptionId", async () => {
     const subId = "12345678-abcd-1234-efgh-000000000000";
-    const result = await azureResourceList.execute({ subscriptionId: subId }) as { subscriptionId: string };
+    const result = await azureResourceList.execute({ subscriptionId: subId }, testCtx()) as { subscriptionId: string };
     expect(result.subscriptionId).toBe(subId);
   });
 });
@@ -531,7 +537,7 @@ describe("estimate_cost tool", () => {
 
   it("execute with valid args resolves", async () => {
     await expect(
-      estimateCost.execute({ region: "eastus", nodeCount: 3, vmSize: "Standard_D4s_v3" }),
+      estimateCost.execute({ region: "eastus", nodeCount: 3, vmSize: "Standard_D4s_v3" }, testCtx()),
     ).resolves.toBeDefined();
   });
 
@@ -540,7 +546,7 @@ describe("estimate_cost tool", () => {
       region: "eastus",
       nodeCount: 3,
       vmSize: "Standard_D4s_v3",
-    }) as { estimatedMonthlyTotal: number };
+    }, testCtx()) as { estimatedMonthlyTotal: number };
     expect(typeof result.estimatedMonthlyTotal).toBe("number");
     expect(result.estimatedMonthlyTotal).toBeGreaterThan(0);
   });
@@ -550,7 +556,7 @@ describe("estimate_cost tool", () => {
       region: "eastus",
       nodeCount: 2,
       vmSize: "Standard_B2s",
-    }) as { breakdown: Record<string, unknown> };
+    }, testCtx()) as { breakdown: Record<string, unknown> };
     expect(result.breakdown).toBeDefined();
     expect(typeof result.breakdown).toBe("object");
   });
@@ -560,7 +566,7 @@ describe("estimate_cost tool", () => {
       region: "westeurope",
       nodeCount: 2,
       vmSize: "Standard_D2s_v3",
-    }) as { breakdown: { compute: unknown; networking: unknown; storage: unknown; database: unknown } };
+    }, testCtx()) as { breakdown: { compute: unknown; networking: unknown; storage: unknown; database: unknown } };
     expect(result.breakdown.compute).toBeDefined();
     expect(result.breakdown.networking).toBeDefined();
     expect(result.breakdown.storage).toBeDefined();
@@ -572,18 +578,18 @@ describe("estimate_cost tool", () => {
       region: "eastus",
       nodeCount: 1,
       vmSize: "Standard_B2s",
-    }) as { currency: string };
+    }, testCtx()) as { currency: string };
     expect(result.currency).toBe("USD");
   });
 
   it("higher nodeCount produces a higher compute cost", async () => {
     const small = await estimateCost.execute({
       region: "eastus", nodeCount: 1, vmSize: "Standard_D4s_v3",
-    }) as { breakdown: { compute: { monthlyCost: number } } };
+    }, testCtx()) as { breakdown: { compute: { monthlyCost: number } } };
 
     const large = await estimateCost.execute({
       region: "eastus", nodeCount: 5, vmSize: "Standard_D4s_v3",
-    }) as { breakdown: { compute: { monthlyCost: number } } };
+    }, testCtx()) as { breakdown: { compute: { monthlyCost: number } } };
 
     expect(large.breakdown.compute.monthlyCost).toBeGreaterThan(small.breakdown.compute.monthlyCost);
   });
@@ -592,12 +598,12 @@ describe("estimate_cost tool", () => {
     const withDb = await estimateCost.execute({
       region: "eastus", nodeCount: 2, vmSize: "Standard_D4s_v3",
       needsDatabase: true, databaseType: "postgres",
-    }) as { breakdown: { database: { monthlyCost: number } } };
+    }, testCtx()) as { breakdown: { database: { monthlyCost: number } } };
 
     const withoutDb = await estimateCost.execute({
       region: "eastus", nodeCount: 2, vmSize: "Standard_D4s_v3",
       needsDatabase: false,
-    }) as { breakdown: { database: { monthlyCost: number } } };
+    }, testCtx()) as { breakdown: { database: { monthlyCost: number } } };
 
     expect(withDb.breakdown.database.monthlyCost).toBeGreaterThan(
       withoutDb.breakdown.database.monthlyCost,

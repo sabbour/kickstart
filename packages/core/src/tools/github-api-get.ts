@@ -5,7 +5,7 @@
  * Uses GitHubConnector when authenticated; returns an error otherwise.
  */
 
-import type { Tool } from "../types.js";
+import type { Tool, ToolContext } from "../types.js";
 import { defaultConnectorRegistry } from "../connectors/index.js";
 
 interface GitHubApiGetArgs {
@@ -34,7 +34,7 @@ export const githubApiGet: Tool<GitHubApiGetArgs> = {
     required: ["path"],
   },
 
-  async execute(args: GitHubApiGetArgs): Promise<unknown> {
+  async execute(args: GitHubApiGetArgs, _context: ToolContext): Promise<unknown> {
     const gh = defaultConnectorRegistry.get("github");
     if (!gh || !gh.isAuthenticated()) {
       return {

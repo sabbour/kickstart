@@ -5,7 +5,7 @@
  * Uses AzureARMConnector when authenticated; returns stub data otherwise.
  */
 
-import type { Tool } from "../types.js";
+import type { Tool, ToolContext } from "../types.js";
 import { defaultConnectorRegistry } from "../connectors/index.js";
 import type { AzureARMConnector } from "../connectors/index.js";
 
@@ -34,7 +34,7 @@ export const azureResourceGet: Tool<AzureResourceGetArgs> = {
     required: ["resourceId"],
   },
 
-  async execute(args: AzureResourceGetArgs): Promise<unknown> {
+  async execute(args: AzureResourceGetArgs, _context: ToolContext): Promise<unknown> {
     const arm = defaultConnectorRegistry.get("azure-arm") as AzureARMConnector | undefined;
     if (arm && arm.isAuthenticated()) {
       const resource = await arm.getResource(args.resourceId);
