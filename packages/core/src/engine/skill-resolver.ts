@@ -288,7 +288,7 @@ export function resolveSkills(
 
   // Inline skill resolution: phase filter → keyword activation → priority sort
   const allSkills = collectSkills(kits);
-  let activeSkills = allSkills.filter((s) => s.phases.includes(phase));
+  const activeSkills = allSkills.filter((s) => s.phases.includes(phase));
 
   // Keyword activation from conversation history
   if (conversationHistory && conversationHistory.length > 0) {

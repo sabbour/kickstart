@@ -641,3 +641,17 @@ Addressed Copilot review on PR #78 (data→context terminology fix). PR merged s
 - **ToolRegistry:** `execute()` now requires `ToolContext` as third parameter, passed through to `tool.execute()`.
 - **Tests:** Added quota enforcement tests (count/size limits, update delta, delete tracking), session isolation tests, context injection tests. All 506 tests pass, zero new lint errors.
 - **Key decisions respected:** D:2026-04-10 Artifact Store Singleton Pattern — singleton remains for web, per-session is additive for MCP.
+
+### 2026-04-10: Knowledge Skills Middleware + IaC Best Practices (#21, #33)
+
+- **Skill type (#33):** Added `Skill` interface to `engine/types.ts` — id, name, phases[], keywords[], content, priority. `SkillResolverContext` for middleware state.
+- **Async middleware chain (#33):** Three default middleware — PhaseFilterMiddleware (filters by skill.phases), KeywordActivationMiddleware (scans conversation history for keywords), PriorityOrderMiddleware (sorts by priority desc). Signature is async from day one per Leela's note — future TokenBudgetMiddleware can do async work without breaking change.
+- **Sync facade preserved:** `resolveSkills()` signature unchanged — new third param `conversationHistory?` is optional. Zero changes needed in `converse.ts`. Inline skill resolution for sync path (no Promise microtask issues). Async path uses full middleware chain via `resolveSkillsAsync()`.
+- **IntegrationKit.skills field:** Optional `skills?: Skill[]` on IntegrationKit. Skills coexist with `phasePrompts` and `prompts` — they're prepended (higher signal).
+- **IaC Skills (#21):** 5 typed Skill objects in azureKit: iac-bicep-modules (priority 5, Generate), iac-secure-decorators (priority 10, Generate+Review), iac-diagnostic-settings (priority 3, Generate+Review), iac-resource-tagging (priority 2, Generate), iac-least-privilege-rbac (priority 10, Generate+Review).
+- **Zapp concerns addressed:** (1) No-secret-output — iac-secure-decorators explicitly says "NEVER generate Bicep output blocks that expose secret values." (2) Least-privilege RBAC — iac-least-privilege-rbac enforces narrowest scope, lists specific built-in role IDs, bans Owner/Contributor at subscription scope. (3) Managed Identity preference over connection strings enforced in both skills.
+- **Security model (Zapp):** Skills are first-party only. `registerSkillMiddleware()` is for internal use. Keyword activation only toggles predefined skill IDs — no raw user text injected into system prompts.
+- **New exports:** `resolveSkillsAsync`, `resolveSkillsFromList`, `registerSkillMiddleware`, `SkillResolverMiddleware` type, `Skill` type, `SkillResolverContext` type.
+- **Tests:** 15 new tests (43 total in skill-resolver.test.ts). Covers typed skills, phase filtering, priority ordering, skill+phasePrompt coexistence, resolveSkillsFromList, resolveSkillsAsync, and all 5 IaC skills including Zapp requirement assertions.
+- **PR:** #119 (draft) — squad/21-33-knowledge-skills branch.
+- **Key files:** `packages/core/src/engine/types.ts`, `packages/core/src/engine/skill-resolver.ts`, `packages/core/src/kits/types.ts`, `packages/core/src/kits/azure-kit.ts`, `packages/core/src/__tests__/skill-resolver.test.ts`
