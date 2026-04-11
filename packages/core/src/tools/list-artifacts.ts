@@ -5,8 +5,7 @@
  * by a glob pattern. Used by the LLM and UI to enumerate generated files.
  */
 
-import type { Tool } from "../types.js";
-import { defaultArtifactStore } from "../artifacts/index.js";
+import type { Tool, ToolContext } from "../types.js";
 
 interface ListArtifactsArgs {
   glob?: string;
@@ -28,8 +27,8 @@ export const listArtifacts: Tool<ListArtifactsArgs> = {
     required: [],
   },
 
-  async execute(args: ListArtifactsArgs): Promise<unknown> {
-    const artifacts = defaultArtifactStore.list(args.glob);
+  async execute(args: ListArtifactsArgs, context: ToolContext): Promise<unknown> {
+    const artifacts = context.artifactStore.list(args.glob);
     return {
       count: artifacts.length,
       artifacts: artifacts.map((a) => ({

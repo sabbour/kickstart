@@ -3,9 +3,11 @@
  *
  * InMemoryArtifactStore — default artifact store implementation.
  * Holds all artifacts in a Map; no persistence across page reloads.
+ * Supports per-session quota enforcement to prevent memory DoS.
  */
 
-import type { Artifact, ArtifactStore } from "./types.js";
+import type { Artifact, ArtifactStore, ArtifactStoreQuota } from "./types.js";
+import { ArtifactQuotaExceededError, DEFAULT_ARTIFACT_QUOTA } from "./types.js";
 
 /** Infer language from a file path extension. */
 function inferLanguage(path: string): string {
@@ -38,6 +40,26 @@ function inferLanguage(path: string): string {
   return map[ext] ?? "plaintext";
 }
 
+/** Measure content size in bytes (UTF-8). */
+function contentSizeBytes(content: string): number {
+  return new TextEncoder().encode(content).byteLength;
+}
+
+/** Compute total byte size of metadata using JSON serialization. */
+function metadataSizeBytes(metadata?: Record<string, unknown>): number {
+  if (metadata === undefined) return 0;
+  try {
+    return new TextEncoder().encode(JSON.stringify(metadata)).byteLength;
+  } catch {
+    return 256; // conservative fallback for non-serializable metadata
+  }
+}
+
+/** Compute total byte size of an artifact (content + metadata). */
+function artifactSizeBytes(content: string, metadata?: Record<string, unknown>): number {
+  return contentSizeBytes(content) + metadataSizeBytes(metadata);
+}
+
 /**
  * Convert a glob pattern to a RegExp.
  * Supports `*` (matches within a path segment) and `**` (matches across segments).
@@ -51,8 +73,42 @@ function globToRegExp(pattern: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
+// ---------------------------------------------------------------------------
+// Content sanitization — strip dangerous HTML/JS injection vectors on store.
+// Artifacts are code/config (YAML, Dockerfiles, etc.), not HTML documents.
+// ---------------------------------------------------------------------------
+
+/** Patterns that should never appear in stored artifact content. */
+const DANGEROUS_HTML_RE =
+  /<\s*\/?\s*(script|iframe|object|embed|form|input|link|meta|style|svg|base|applet)[^>]*>/gi;
+
+/**
+ * Sanitize artifact content: strip dangerous HTML tags and event handlers.
+ * Only applied to non-HTML artifacts (YAML, JSON, Dockerfiles, etc.).
+ */
+function sanitizeContent(content: string): string {
+  return content
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<object[\s\S]*?<\/object>/gi, "")
+    .replace(/<embed[\s\S]*?<\/embed>/gi, "")
+    .replace(DANGEROUS_HTML_RE, "")
+    .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, "");
+}
+
+/** Languages whose content legitimately contains HTML-like tags. */
+const HTML_LANGUAGES = new Set(["html", "svg", "xml"]);
+
 export class InMemoryArtifactStore implements ArtifactStore {
   private readonly store = new Map<string, Artifact>();
+  private readonly quota: ArtifactStoreQuota;
+  /** Running total of content + metadata bytes for O(1) quota enforcement. */
+  private totalSizeBytes = 0;
+
+  constructor(quota?: Partial<ArtifactStoreQuota>) {
+    this.quota = { ...DEFAULT_ARTIFACT_QUOTA, ...quota };
+  }
 
   put(
     path: string,
@@ -60,15 +116,36 @@ export class InMemoryArtifactStore implements ArtifactStore {
     metadata?: Omit<Partial<Artifact>, "path" | "content" | "createdAt" | "updatedAt">
   ): void {
     const existing = this.store.get(path);
+    const language = metadata?.language ?? existing?.language ?? inferLanguage(path);
+
+    // Sanitize content — skip for HTML/XML/SVG where tags are legitimate
+    const safeContent = HTML_LANGUAGES.has(language) ? content : sanitizeContent(content);
+
+    const newSize = artifactSizeBytes(safeContent, metadata?.metadata);
+    const oldSize = existing ? artifactSizeBytes(existing.content, existing.metadata) : 0;
+
+    // Quota: artifact count (only enforced for new artifacts, not updates)
+    if (!existing && this.store.size >= this.quota.maxArtifacts) {
+      throw new ArtifactQuotaExceededError("max_artifacts", this.quota.maxArtifacts, this.store.size);
+    }
+
+    // Quota: total content size
+    const projectedSize = this.totalSizeBytes - oldSize + newSize;
+    if (projectedSize > this.quota.maxSizeBytes) {
+      throw new ArtifactQuotaExceededError("max_size", this.quota.maxSizeBytes, projectedSize);
+    }
+
     const now = new Date();
     this.store.set(path, {
       path,
-      content,
-      language: metadata?.language ?? existing?.language ?? inferLanguage(path),
+      content: safeContent,
+      language,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       metadata: metadata?.metadata,
     });
+
+    this.totalSizeBytes = projectedSize;
   }
 
   get(path: string): Artifact | null {
@@ -83,7 +160,11 @@ export class InMemoryArtifactStore implements ArtifactStore {
   }
 
   delete(path: string): void {
-    this.store.delete(path);
+    const existing = this.store.get(path);
+    if (existing) {
+      this.totalSizeBytes -= artifactSizeBytes(existing.content, existing.metadata);
+      this.store.delete(path);
+    }
   }
 
   export(): Record<string, string> {
@@ -96,13 +177,22 @@ export class InMemoryArtifactStore implements ArtifactStore {
 
   clear(): void {
     this.store.clear();
+    this.totalSizeBytes = 0;
   }
 
-  /** Number of stored artifacts (useful in tests). */
+  /** Number of stored artifacts. */
   get size(): number {
     return this.store.size;
   }
+
+  /** Current total content + metadata size in bytes. */
+  get currentSizeBytes(): number {
+    return this.totalSizeBytes;
+  }
 }
 
-/** Singleton default artifact store. Shared by all tools in the same process. */
+/**
+ * Singleton default artifact store for web (single session per page load).
+ * MCP server MUST NOT use this — each session gets its own InMemoryArtifactStore.
+ */
 export const defaultArtifactStore = new InMemoryArtifactStore();

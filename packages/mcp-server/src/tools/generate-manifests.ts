@@ -156,6 +156,18 @@ export async function handleGenerateManifests(
   const ghOutput = generateGitHubActionsWorkflow(input);
   const allOutputs: GeneratorOutput[] = [k8sOutput, ghOutput];
 
+  // Write generated files to the session's artifact store
+  if (session.artifactStore) {
+    for (const output of allOutputs) {
+      for (const file of output.files) {
+        session.artifactStore.put(file.path, file.content, {
+          language: file.language,
+          metadata: { generator: output.generator },
+        });
+      }
+    }
+  }
+
   // Validate K8s manifests against deployment safeguards
   const safeguardResults = validateManifests(k8sOutput.files, app.resourceTier ?? "standard");
   const failures = safeguardResults.filter((r) => !r.passed);

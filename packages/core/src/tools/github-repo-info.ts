@@ -5,7 +5,7 @@
  * Uses GitHubConnector when authenticated; returns stub data otherwise.
  */
 
-import type { Tool } from "../types.js";
+import type { Tool, ToolContext } from "../types.js";
 import { defaultConnectorRegistry } from "../connectors/index.js";
 import type { GitHubConnector } from "../connectors/index.js";
 
@@ -33,7 +33,7 @@ export const githubRepoInfo: Tool<GitHubRepoInfoArgs> = {
     required: ["owner", "repo"],
   },
 
-  async execute(args: GitHubRepoInfoArgs): Promise<unknown> {
+  async execute(args: GitHubRepoInfoArgs, _context: ToolContext): Promise<unknown> {
     const gh = defaultConnectorRegistry.get("github") as GitHubConnector | undefined;
     if (gh && gh.isAuthenticated()) {
       const repo = await gh.getRepo(args.owner, args.repo);

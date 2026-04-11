@@ -626,3 +626,18 @@ Addressed Copilot review on PR #78 (data→context terminology fix). PR merged s
 - **Discover phase prompt:** Replaced single `github_repo_info` call with 4-step analysis protocol (metadata → file tree → read key manifests → summarize readiness). Max 5 file reads to stay within context limits.
 - **Registration:** Both tools in `githubKit.tools[]` and `defaultRegistry`. Exports in `tools/index.ts`.
 - **Test count:** 465 tests, all passing. Lint clean. Build clean.
+
+### 2025-07-26: Per-Session Artifact Store with Quota Enforcement (#35)
+
+- **Issue:** #35 — feat: Implement artifact store (B-17)
+- **PR:** #116 (draft)
+- **DP v2:** Posted on issue addressing Zapp's security review and Leela's architecture feedback
+- **ToolContext pattern:** Added `ToolContext` interface (required, not optional) with `artifactStore: ArtifactStore`. All 11 core tools updated. Eliminates singleton fallback branches.
+- **Quota enforcement:** `ArtifactStoreQuota` interface with `maxArtifacts` (100) and `maxSizeBytes` (10MB). `InMemoryArtifactStore.put()` throws `ArtifactQuotaExceededError` at write time. Running total tracked for O(1) enforcement.
+- **Session isolation:** MCP server creates per-session `InMemoryArtifactStore` in `handleKickstart`. No singleton fallback in any tool — strict fail-closed isolation.
+- **MCP manifest writing:** `handleGenerateManifests` now writes generated K8s manifests + GitHub Actions workflows to `session.artifactStore`.
+- **SessionState:** Added optional `artifactStore?: ArtifactStore` field. Web frontend continues to use `defaultArtifactStore` singleton (one session per page load).
+- **Size measurement:** Used `new TextEncoder().encode(content).byteLength` instead of `Buffer` — core package has no `@types/node`.
+- **ToolRegistry:** `execute()` now requires `ToolContext` as third parameter, passed through to `tool.execute()`.
+- **Tests:** Added quota enforcement tests (count/size limits, update delta, delete tracking), session isolation tests, context injection tests. All 506 tests pass, zero new lint errors.
+- **Key decisions respected:** D:2026-04-10 Artifact Store Singleton Pattern — singleton remains for web, per-session is additive for MCP.

@@ -6,7 +6,7 @@
  * Dockerfiles, package.json, K8s manifests, and CI workflows.
  */
 
-import type { Tool } from "../types.js";
+import type { Tool, ToolContext } from "../types.js";
 import { defaultConnectorRegistry } from "../connectors/index.js";
 import type { GitHubConnector } from "../connectors/index.js";
 import { validatePath, validateRef } from "./github-input-validation.js";
@@ -60,7 +60,7 @@ export const githubRepoFileRead: Tool<GitHubRepoFileReadArgs> = {
     required: ["owner", "repo", "path"],
   },
 
-  async execute(args: GitHubRepoFileReadArgs): Promise<unknown> {
+  async execute(args: GitHubRepoFileReadArgs, _context: ToolContext): Promise<unknown> {
     // Validate path — reject traversal, absolute paths, control chars
     const pathCheck = validatePath(args.path);
     if (!pathCheck.valid) {

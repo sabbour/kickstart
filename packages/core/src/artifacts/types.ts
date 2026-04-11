@@ -20,11 +20,39 @@ export interface Artifact {
   metadata?: Record<string, unknown>;
 }
 
+/** Per-session quota limits for artifact storage. */
+export interface ArtifactStoreQuota {
+  /** Maximum number of artifacts allowed in this store. */
+  maxArtifacts: number;
+  /** Maximum total content size in bytes across all artifacts. */
+  maxSizeBytes: number;
+}
+
+/** Default quota: 100 artifacts, 10 MB total content. */
+export const DEFAULT_ARTIFACT_QUOTA: ArtifactStoreQuota = {
+  maxArtifacts: 100,
+  maxSizeBytes: 10 * 1024 * 1024,
+};
+
+/** Thrown when an artifact write would exceed the store's quota. */
+export class ArtifactQuotaExceededError extends Error {
+  constructor(
+    public readonly reason: "max_artifacts" | "max_size",
+    public readonly limit: number,
+    public readonly current: number,
+  ) {
+    const what = reason === "max_artifacts" ? "artifact count" : "total size (bytes)";
+    super(`Artifact quota exceeded: ${what} limit is ${limit}, current is ${current}`);
+    this.name = "ArtifactQuotaExceededError";
+  }
+}
+
 /** Interface for an artifact store — read/write generated files. */
 export interface ArtifactStore {
   /**
    * Store an artifact. Creates or replaces the file at `path`.
    * `language` defaults to the file extension if omitted.
+   * Throws `ArtifactQuotaExceededError` if the write would exceed quota limits.
    */
   put(
     path: string,

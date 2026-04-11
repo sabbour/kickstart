@@ -5,7 +5,7 @@
  * IntegrationKits (B-10) register their own tools here.
  */
 
-import type { Tool, OpenAIToolDefinition } from "./types.js";
+import type { Tool, ToolContext, OpenAIToolDefinition } from "./types.js";
 import { logger } from "../telemetry/index.js";
 
 export class ToolRegistry {
@@ -50,7 +50,7 @@ export class ToolRegistry {
    * Throws if the tool is not registered or execution fails.
    * Tools with `requireApproval: true` are blocked from automatic execution.
    */
-  async execute(name: string, args: Record<string, unknown>): Promise<unknown> {
+  async execute(name: string, args: Record<string, unknown>, context: ToolContext): Promise<unknown> {
     const tool = this.tools.get(name);
     if (!tool) {
       logger.warn(`Tool not found: ${name}`);
@@ -67,7 +67,7 @@ export class ToolRegistry {
 
     logger.track('tool.call', { tool: name, args });
     try {
-      const result = await tool.execute(args);
+      const result = await tool.execute(args, context);
       logger.track('tool.result', { tool: name, result });
       return result;
     } catch (err) {

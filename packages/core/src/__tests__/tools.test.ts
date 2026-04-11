@@ -12,6 +12,13 @@ import { githubRepoInfo } from "../tools/github-repo-info.js";
 import { generateKubernetesManifest } from "../tools/generate-kubernetes-manifest.js";
 import { estimateCost } from "../tools/estimate-cost.js";
 import { defaultRegistry } from "../tools/index.js";
+import { InMemoryArtifactStore } from "../artifacts/index.js";
+import type { ToolContext } from "../tools/types.js";
+
+/** Shared test context with a fresh artifact store. */
+function testCtx(): ToolContext {
+  return { artifactStore: new InMemoryArtifactStore() };
+}
 
 // ---------------------------------------------------------------------------
 // ToolRegistry
@@ -104,7 +111,7 @@ describe("azure_resource_list tool", () => {
   it("returns a stub resource list with correct shape", async () => {
     const result = (await azureResourceList.execute({
       subscriptionId: "sub-123",
-    })) as Record<string, unknown>;
+    }, testCtx())) as Record<string, unknown>;
     expect(result.subscriptionId).toBe("sub-123");
     expect(Array.isArray(result.resources)).toBe(true);
     expect(result._stub).toBe(true);
@@ -114,7 +121,7 @@ describe("azure_resource_list tool", () => {
     const result = (await azureResourceList.execute({
       subscriptionId: "sub-123",
       resourceGroup: "my-rg",
-    })) as Record<string, unknown>;
+    }, testCtx())) as Record<string, unknown>;
     expect(result.resourceGroup).toBe("my-rg");
   });
 
@@ -131,7 +138,7 @@ describe("azure_resource_get tool", () => {
   it("returns resource details for a given resource ID", async () => {
     const resourceId =
       "/subscriptions/sub-123/resourceGroups/my-rg/providers/Microsoft.ContainerService/managedClusters/my-aks";
-    const result = (await azureResourceGet.execute({ resourceId })) as Record<string, unknown>;
+    const result = (await azureResourceGet.execute({ resourceId }, testCtx())) as Record<string, unknown>;
     expect(result.id).toBe(resourceId);
     expect(result.name).toBe("my-aks");
     expect(result._stub).toBe(true);
@@ -151,7 +158,7 @@ describe("github_repo_info tool", () => {
     const result = (await githubRepoInfo.execute({
       owner: "myorg",
       repo: "myapp",
-    })) as Record<string, unknown>;
+    }, testCtx())) as Record<string, unknown>;
     expect(result.fullName).toBe("myorg/myapp");
     expect(result.url).toContain("github.com/myorg/myapp");
     expect(result._stub).toBe(true);
@@ -173,7 +180,7 @@ describe("generate_kubernetes_manifest tool", () => {
       appName: "my-api",
       runtime: "node",
       port: 3000,
-    })) as Record<string, unknown>;
+    }, testCtx())) as Record<string, unknown>;
     expect(Array.isArray(result.files)).toBe(true);
     const files = result.files as Array<{ path: string; content: string }>;
     expect(files.length).toBeGreaterThanOrEqual(2);
@@ -188,7 +195,7 @@ describe("generate_kubernetes_manifest tool", () => {
       port: 8080,
       needsIngress: true,
       customDomain: "myapp.example.com",
-    })) as Record<string, unknown>;
+    }, testCtx())) as Record<string, unknown>;
     const files = result.files as Array<{ path: string; content: string }>;
     expect(files.some((f) => f.path.includes("ingress"))).toBe(true);
     const ingress = files.find((f) => f.path.includes("ingress"))!;
@@ -201,7 +208,7 @@ describe("generate_kubernetes_manifest tool", () => {
       runtime: "python",
       port: 5000,
       resourceTier: "production",
-    })) as Record<string, unknown>;
+    }, testCtx())) as Record<string, unknown>;
     const files = result.files as Array<{ path: string; content: string }>;
     const deployment = files.find((f) => f.path.includes("deployment"))!;
     expect(deployment.content).toContain("replicas: 3");
@@ -224,7 +231,7 @@ describe("estimate_cost tool", () => {
       region: "eastus",
       nodeCount: 3,
       vmSize: "Standard_D4s_v3",
-    })) as Record<string, unknown>;
+    }, testCtx())) as Record<string, unknown>;
     expect(result.region).toBe("eastus");
     expect(result.currency).toBe("USD");
     expect(result.breakdown).toBeDefined();
@@ -240,14 +247,14 @@ describe("estimate_cost tool", () => {
       vmSize: "Standard_D4s_v3",
       needsDatabase: true,
       databaseType: "postgres",
-    })) as Record<string, unknown>;
+    }, testCtx())) as Record<string, unknown>;
 
     const withoutDb = (await estimateCost.execute({
       region: "eastus",
       nodeCount: 2,
       vmSize: "Standard_D4s_v3",
       needsDatabase: false,
-    })) as Record<string, unknown>;
+    }, testCtx())) as Record<string, unknown>;
 
     expect(
       (withDb.estimatedMonthlyTotal as number) >

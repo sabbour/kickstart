@@ -19,8 +19,9 @@ import {
   buildSystemPrompt,
   resolveSkills,
   defaultKitRegistry,
+  InMemoryArtifactStore,
 } from "@kickstart/core";
-import type { PhaseItem } from "@kickstart/core";
+import type { PhaseItem, ToolContext } from "@kickstart/core";
 import { getSession, createSession, addMessage } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools, getChatDeploymentName } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
@@ -126,8 +127,13 @@ app.http("converse", {
         .get("accept")
         ?.includes("text/event-stream");
 
+      // Create a session-scoped ToolContext for artifact isolation
+      const toolContext: ToolContext = {
+        artifactStore: new InMemoryArtifactStore(),
+      };
+
       if (wantsStream) {
-        return handleStreaming(messages, state.sessionId, engineState, phaseA2ui, context);
+        return handleStreaming(messages, state.sessionId, engineState, phaseA2ui, context, toolContext);
       }
 
       // Non-streaming: call OpenAI with JSON object format + tool support
@@ -144,7 +150,7 @@ app.http("converse", {
           if (tool.requireApproval) {
             return { error: `Tool "${name}" requires user approval before execution.`, requiresApproval: true };
           }
-          return tool.execute(args);
+          return tool.execute(args, toolContext);
         },
       );
 
@@ -190,6 +196,7 @@ function handleStreaming(
   engineState: { currentPhase: string },
   phaseA2ui: object[],
   context: InvocationContext,
+  toolContext: ToolContext,
 ): HttpResponseInit {
   const encoder = new TextEncoder();
 
@@ -287,7 +294,7 @@ function handleStreaming(
                 toolResult = { error: `Tool "${tc.function.name}" requires user approval before execution.`, requiresApproval: true };
               } else {
                 const args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
-                toolResult = await tool.execute(args);
+                toolResult = await tool.execute(args, toolContext);
               }
             } catch (err) {
               toolResult = { error: err instanceof Error ? err.message : String(err) };

@@ -14,6 +14,7 @@ import {
   getPhaseDefinition,
   buildSystemPrompt,
   DEPLOYMENT_SAFEGUARDS,
+  InMemoryArtifactStore,
 } from "@kickstart/core";
 import type {
   SessionState,
@@ -73,6 +74,7 @@ export async function handleKickstart(
     updatedAt: now,
     appDefinition: {},
     messages: [],
+    artifactStore: new InMemoryArtifactStore(),
   };
 
   if (initialMessage) {

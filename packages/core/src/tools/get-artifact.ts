@@ -4,8 +4,7 @@
  * get_artifact — retrieve the full content of a specific generated artifact by path.
  */
 
-import type { Tool } from "../types.js";
-import { defaultArtifactStore } from "../artifacts/index.js";
+import type { Tool, ToolContext } from "../types.js";
 
 interface GetArtifactArgs {
   path: string;
@@ -26,8 +25,8 @@ export const getArtifact: Tool<GetArtifactArgs> = {
     required: ["path"],
   },
 
-  async execute(args: GetArtifactArgs): Promise<unknown> {
-    const artifact = defaultArtifactStore.get(args.path);
+  async execute(args: GetArtifactArgs, context: ToolContext): Promise<unknown> {
+    const artifact = context.artifactStore.get(args.path);
     if (!artifact) {
       return { found: false, path: args.path };
     }

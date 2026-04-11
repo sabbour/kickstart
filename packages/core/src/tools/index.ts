@@ -5,7 +5,7 @@
  * IntegrationKits (B-10) register their own tools via `defaultRegistry.register()`.
  */
 
-export type { Tool, OpenAIToolDefinition, ToolCall, ToolCallResult } from "./types.js";
+export type { Tool, ToolContext, OpenAIToolDefinition, ToolCall, ToolCallResult } from "./types.js";
 export { ToolRegistry, defaultRegistry } from "./registry.js";
 
 // Built-in tool definitions

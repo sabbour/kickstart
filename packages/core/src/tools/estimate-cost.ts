@@ -5,7 +5,7 @@
  * Stub implementation — real pricing calls wired by APIConnector (B-11).
  */
 
-import type { Tool } from "../types.js";
+import type { Tool, ToolContext } from "../types.js";
 
 interface EstimateCostArgs {
   region: string;
@@ -77,7 +77,7 @@ export const estimateCost: Tool<EstimateCostArgs> = {
     required: ["region", "nodeCount", "vmSize"],
   },
 
-  async execute(args: EstimateCostArgs): Promise<unknown> {
+  async execute(args: EstimateCostArgs, _context: ToolContext): Promise<unknown> {
     // Stub — APIConnector (B-11) will replace with real Azure Pricing API calls
     const hourlyVm = VM_HOURLY_COST[args.vmSize] ?? 0.192;
     const monthlyCompute = hourlyVm * args.nodeCount * 730; // 730h/month
