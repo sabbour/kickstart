@@ -962,6 +962,170 @@ const dynamicComplexDashboard = (): A2uiMsg[] => {
   ];
 };
 
+// --- Additional A2UI component demos (completeness) ---
+
+const contentIcon = (): A2uiMsg[] => {
+  const sid = uid('icon-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'icon-row'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Icon Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Displays Fluent icons by name or path.', variant: 'body2' },
+    { id: 'icon-row', component: 'Row', children: ['ic1', 'ic2', 'ic3', 'ic4'], gap: 'medium' },
+    { id: 'ic1', component: 'Icon', name: 'home' },
+    { id: 'ic2', component: 'Icon', name: 'settings' },
+    { id: 'ic3', component: 'Icon', name: 'search' },
+    { id: 'ic4', component: 'Icon', name: 'add' },
+  ] as A2uiComponent[]);
+};
+
+const contentVideo = (): A2uiMsg[] => {
+  const sid = uid('video-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'vid1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Video Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'HTML5 video player with native controls.', variant: 'body2' },
+    { id: 'vid1', component: 'Video', url: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4' },
+  ] as A2uiComponent[]);
+};
+
+const contentAudioPlayer = (): A2uiMsg[] => {
+  const sid = uid('audio-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'audio1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'AudioPlayer Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'HTML5 audio player with optional description.', variant: 'body2' },
+    { id: 'audio1', component: 'AudioPlayer', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', description: 'Sample audio track — SoundHelix Song 1' },
+  ] as A2uiComponent[]);
+};
+
+const contentBadge = (): A2uiMsg[] => {
+  const sid = uid('badge-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'row1', 'row2', 'row3'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Badge Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Badge, CounterBadge, and PresenceBadge variants with color options.', variant: 'body2' },
+    { id: 'row1', component: 'Row', children: ['b1', 'b2', 'b3', 'b4'], gap: 'small' },
+    { id: 'b1', component: 'Badge', text: 'New', color: 'brand' },
+    { id: 'b2', component: 'Badge', text: 'Warning', color: 'warning' },
+    { id: 'b3', component: 'Badge', text: 'Error', color: 'danger' },
+    { id: 'b4', component: 'Badge', text: 'Success', color: 'success' },
+    { id: 'row2', component: 'Row', children: ['bc1', 'bc2'], gap: 'small' },
+    { id: 'bc1', component: 'Badge', variant: 'counter', count: 5, color: 'brand' },
+    { id: 'bc2', component: 'Badge', variant: 'counter', count: 99, color: 'important' },
+    { id: 'row3', component: 'Row', children: ['bp1', 'bp2', 'bp3'], gap: 'small' },
+    { id: 'bp1', component: 'Badge', variant: 'presence', status: 'available' },
+    { id: 'bp2', component: 'Badge', variant: 'presence', status: 'busy' },
+    { id: 'bp3', component: 'Badge', variant: 'presence', status: 'away' },
+  ] as A2uiComponent[]);
+};
+
+const contentAlert = (): A2uiMsg[] => {
+  const sid = uid('alert-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'a1', 'a2', 'a3', 'a4'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Alert Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'MessageBar-based alerts with four severity levels and optional dismiss action.', variant: 'body2' },
+    { id: 'a1', component: 'Alert', message: 'Deployment completed successfully.', severity: 'success' },
+    { id: 'a2', component: 'Alert', message: 'Your cluster will restart in 15 minutes.', severity: 'warning' },
+    { id: 'a3', component: 'Alert', message: 'Failed to connect to Azure subscription.', severity: 'error', dismissible: true },
+    { id: 'a4', component: 'Alert', message: 'New Kubernetes version 1.30 is available.', severity: 'info' },
+  ] as A2uiComponent[]);
+};
+
+const contentLink = (): A2uiMsg[] => {
+  const sid = uid('link-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'l1', 'l2', 'l3'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Link Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Inline and external links with optional open-in-new-tab behavior.', variant: 'body2' },
+    { id: 'l1', component: 'Link', text: 'AKS Documentation', url: 'https://learn.microsoft.com/azure/aks/' },
+    { id: 'l2', component: 'Link', text: 'GitHub Repository (opens in new tab)', url: 'https://github.com', external: true },
+    { id: 'l3', component: 'Link', text: 'Kubernetes.io', url: 'https://kubernetes.io', external: true },
+  ] as A2uiComponent[]);
+};
+
+const contentTable = (): A2uiMsg[] => {
+  const sid = uid('table-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'tbl1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Table Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Responsive data table with sortable columns and caption.', variant: 'body2' },
+    { id: 'tbl1', component: 'Table',
+      caption: 'AKS Node Pool Configuration',
+      columns: ['Pool Name', 'VM Size', 'Nodes', 'Status'],
+      rows: [
+        ['system', 'Standard_D4s_v3', '3', 'Ready'],
+        ['user-cpu', 'Standard_D8s_v3', '5', 'Ready'],
+        ['gpu', 'Standard_NC6s_v3', '2', 'Scaling'],
+      ] },
+  ] as A2uiComponent[]);
+};
+
+const inputToggle = (): A2uiMsg[] => {
+  const sid = uid('toggle-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 't1', 't2', 't3'], gap: 'small' },
+    { id: 'heading', component: 'Text', text: 'Toggle Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'On/off switch control built on Fluent UI Switch.', variant: 'body2' },
+    { id: 't1', component: 'Toggle', label: 'Enable auto-scaling', checked: true },
+    { id: 't2', component: 'Toggle', label: 'Enable HTTPS only', checked: true },
+    { id: 't3', component: 'Toggle', label: 'Enable preview environments', checked: false },
+  ] as A2uiComponent[]);
+};
+
+const inputAccordion = (): A2uiMsg[] => {
+  const sid = uid('accordion-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'acc1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Accordion Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Collapsible sections, supports single or multiple open panels.', variant: 'body2' },
+    { id: 'acc1', component: 'Accordion', multiple: true, items: [
+      { title: 'Networking', children: ['acc-net'] },
+      { title: 'Security', children: ['acc-sec'] },
+      { title: 'Monitoring', children: ['acc-mon'] },
+    ] },
+    { id: 'acc-net', component: 'Text', text: 'Configure load balancers, ingress controllers, and network policies for your AKS cluster.', variant: 'body2' },
+    { id: 'acc-sec', component: 'Text', text: 'Set up RBAC, pod security policies, and managed identity integration.', variant: 'body2' },
+    { id: 'acc-mon', component: 'Text', text: 'Enable Azure Monitor, Container Insights, and log analytics workspace.', variant: 'body2' },
+  ] as A2uiComponent[]);
+};
+
+const inputComboBox = (): A2uiMsg[] => {
+  const sid = uid('combobox-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'cb1', 'cb2'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'ComboBox Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Searchable dropdown with optional custom value entry.', variant: 'body2' },
+    { id: 'cb1', component: 'ComboBox', label: 'Kubernetes version', placeholder: 'Select version', options: [
+      { text: '1.30.x', value: '1.30' },
+      { text: '1.29.x', value: '1.29' },
+      { text: '1.28.x', value: '1.28' },
+      { text: '1.27.x', value: '1.27' },
+    ] },
+    { id: 'cb2', component: 'ComboBox', label: 'Custom region', placeholder: 'Type or select', allowCustom: true, options: [
+      { text: 'East US', value: 'eastus' },
+      { text: 'West Europe', value: 'westeurope' },
+      { text: 'Southeast Asia', value: 'southeastasia' },
+    ] },
+  ] as A2uiComponent[]);
+};
+
+const inputMultiSelect = (): A2uiMsg[] => {
+  const sid = uid('multiselect-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'ms1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'MultiSelect Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Multi-value dropdown for selecting multiple options.', variant: 'body2' },
+    { id: 'ms1', component: 'MultiSelect', label: 'Node pool features', placeholder: 'Select features', options: [
+      { text: 'Spot instances', value: 'spot' },
+      { text: 'Auto-scaling', value: 'autoscale' },
+      { text: 'GPU support', value: 'gpu' },
+      { text: 'Confidential computing', value: 'confidential' },
+      { text: 'Proximity placement', value: 'proximity' },
+    ] },
+  ] as A2uiComponent[]);
+};
+
 // ---------------------------------------------------------------------------
 // Control scenarios assembled
 // ---------------------------------------------------------------------------
@@ -977,6 +1141,13 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   // Content
   { id: 'ctrl-text',     label: 'Text',           description: 'All text variants h1–overline',   group: 'Content',         catalog: 'a2ui',      generate: contentText },
   { id: 'ctrl-image',    label: 'Image',          description: 'Image with placeholder',          group: 'Content',         catalog: 'a2ui',      generate: contentImage },
+  { id: 'ctrl-icon',     label: 'Icon',           description: 'Fluent icons by name or path',    group: 'Content',         catalog: 'a2ui',      generate: contentIcon },
+  { id: 'ctrl-video',    label: 'Video',          description: 'HTML5 video player',              group: 'Content',         catalog: 'a2ui',      generate: contentVideo },
+  { id: 'ctrl-audio',    label: 'AudioPlayer',    description: 'HTML5 audio player',              group: 'Content',         catalog: 'a2ui',      generate: contentAudioPlayer },
+  { id: 'ctrl-badge',    label: 'Badge',          description: 'Status badges and counters',      group: 'Content',         catalog: 'a2ui',      generate: contentBadge },
+  { id: 'ctrl-alert',    label: 'Alert',          description: 'Info/warning/error/success alerts', group: 'Content',       catalog: 'a2ui',      generate: contentAlert },
+  { id: 'ctrl-link',     label: 'Link',           description: 'Inline and external links',       group: 'Content',         catalog: 'a2ui',      generate: contentLink },
+  { id: 'ctrl-table',    label: 'Table',          description: 'Data table with columns and rows', group: 'Content',        catalog: 'a2ui',      generate: contentTable },
   // Inputs
   { id: 'ctrl-button',   label: 'Button',         description: 'Primary / outlined / text',       group: 'Inputs',          catalog: 'a2ui',      generate: inputButton },
   { id: 'ctrl-textfield',label: 'TextField',      description: 'Text input with label',           group: 'Inputs',          catalog: 'a2ui',      generate: inputTextField },
@@ -985,6 +1156,10 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'ctrl-slider',   label: 'Slider',         description: 'Range slider control',            group: 'Inputs',          catalog: 'a2ui',      generate: inputSlider },
   { id: 'ctrl-datetime', label: 'DateTimeInput',  description: 'Date and time picker',            group: 'Inputs',          catalog: 'a2ui',      generate: inputDateTime },
   { id: 'ctrl-modal',    label: 'Modal',          description: 'Modal dialog with trigger',       group: 'Inputs',          catalog: 'a2ui',      generate: inputModal },
+  { id: 'ctrl-toggle',   label: 'Toggle',         description: 'On/off switch control',           group: 'Inputs',          catalog: 'a2ui',      generate: inputToggle },
+  { id: 'ctrl-accordion',label: 'Accordion',      description: 'Collapsible content sections',    group: 'Inputs',          catalog: 'a2ui',      generate: inputAccordion },
+  { id: 'ctrl-combobox', label: 'ComboBox',       description: 'Searchable dropdown selector',    group: 'Inputs',          catalog: 'a2ui',      generate: inputComboBox },
+  { id: 'ctrl-multiselect', label: 'MultiSelect', description: 'Multi-value dropdown',            group: 'Inputs',          catalog: 'a2ui',      generate: inputMultiSelect },
   // Custom Controls
   { id: 'ctrl-radio',    label: 'RadioGroup',     description: 'Radio options with descriptions',  group: 'Custom Controls', catalog: 'kickstart', generate: customRadioGroup },
   { id: 'ctrl-form',     label: 'FormGroup',      description: 'Stepped form sections',            group: 'Custom Controls', catalog: 'kickstart', generate: customFormGroup },

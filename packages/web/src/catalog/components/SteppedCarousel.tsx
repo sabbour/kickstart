@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import {
@@ -29,6 +29,8 @@ const SteppedCarouselApi = {
     activeStep: z.number().optional(),
   }).strict(),
 };
+
+const TRANSITION_MS = 300;
 
 const useStyles = makeStyles({
   root: {
@@ -65,7 +67,22 @@ const useStyles = makeStyles({
   pillUpcoming: {
     backgroundColor: tokens.colorNeutralStroke2,
   },
-  body: {
+  panelTrack: {
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  panelSlider: {
+    display: 'flex',
+    transitionProperty: 'transform',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: `${TRANSITION_MS}ms`,
+    '@media (prefers-reduced-motion: reduce)': {
+      transitionDuration: '0ms',
+    },
+  },
+  panel: {
+    width: '100%',
+    flexShrink: 0,
     marginTop: tokens.spacingVerticalM,
     marginBottom: tokens.spacingVerticalM,
   },
@@ -90,6 +107,15 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
   const activeStepData = props.steps[clampedStep];
   const isFirst = clampedStep === 0;
   const isLast = clampedStep === totalSteps - 1;
+
+  // Track height for smooth resize during transitions
+  const panelRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [trackHeight, setTrackHeight] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const el = panelRefs.current[clampedStep];
+    if (el) setTrackHeight(el.scrollHeight);
+  }, [clampedStep]);
 
   return (
     <Card className={classes.root}>
@@ -121,9 +147,29 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
       {/* Active step title */}
       <Subtitle2>{activeStepData?.title}</Subtitle2>
 
-      {/* Active step content */}
-      <div className={classes.body} role="tabpanel" aria-live="polite" aria-label={`Step ${clampedStep + 1}: ${activeStepData?.title}`}>
-        {activeStepData?.child ? buildChild(activeStepData.child) : null}
+      {/* Sliding panel track */}
+      <div
+        className={classes.panelTrack}
+        style={{ height: trackHeight }}
+        role="tabpanel"
+        aria-live="polite"
+        aria-label={`Step ${clampedStep + 1}: ${activeStepData?.title}`}
+      >
+        <div
+          className={classes.panelSlider}
+          style={{ transform: `translateX(-${clampedStep * 100}%)` }}
+        >
+          {props.steps.map((step, i) => (
+            <div
+              key={i}
+              className={classes.panel}
+              ref={(el) => { panelRefs.current[i] = el; }}
+              aria-hidden={i !== clampedStep}
+            >
+              {step.child ? buildChild(step.child) : null}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Navigation footer */}

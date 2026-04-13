@@ -643,6 +643,41 @@ body.on-landing #topbar-sessions-toggle {
   text-decoration: underline;
 }
 
+/* ---------- Dark mode: invert hero background SVG ---------- */
+[data-theme="dark"] .landing-page {
+  background-image: url('../assets/hero-bg.svg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  filter: none;
+}
+
+/* Use a pseudo-element so we can invert just the SVG without affecting children */
+.landing-page {
+  position: relative;
+}
+
+.landing-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  background-color: transparent;
+  z-index: 0;
+  pointer-events: none;
+  filter: none;
+  transition: filter var(--duration-normal) var(--easing-ease);
+}
+
+[data-theme="dark"] .landing-page::before {
+  filter: invert(0.85) hue-rotate(180deg);
+}
+
+.landing-page > * {
+  position: relative;
+  z-index: 1;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
   .landing-page {

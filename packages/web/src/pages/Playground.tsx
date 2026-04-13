@@ -13,6 +13,7 @@ import {
   MessageBar, MessageBarBody,
   TabList, Tab, Input,
   Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions,
+  Toaster, useToastController, useId, Toast, ToastTitle, ToastBody,
   makeStyles, tokens,
 } from '@fluentui/react-components';
 import {
@@ -21,6 +22,7 @@ import {
   CardUi24Regular, Navigation24Regular,
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
+import type { A2UIOptions } from '../hooks/useA2UI';
 import { WidgetsProvider, useWidgets } from '../hooks/useWidgets';
 import { useDebug } from '../contexts/DebugContext';
 import { getDemoResponse, resetDemoState } from '../services/demo-scenarios';
@@ -29,6 +31,7 @@ import { DebugPanel } from '../components/Chat/DebugPanel';
 import type { A2uiMsg, ChatMessage, DebugMetadata } from '../types';
 import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
+import type { A2uiClientAction } from '../vendor/a2ui/web_core/schema/client-to-server';
 import {
   KICKSTART_SCENARIOS,
   CONTROL_SCENARIOS,
@@ -752,11 +755,12 @@ class GalleryCardErrorBoundary extends React.Component<
 interface GalleryCardProps {
   scenario: ScenarioDef;
   onCardClick: (scenario: ScenarioDef, surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>) => void;
+  a2uiOptions?: A2UIOptions;
 }
 
-const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
+const GalleryCard = memo(({ scenario, onCardClick, a2uiOptions }: GalleryCardProps) => {
   const classes = useStyles();
-  const { surfaces, processMessages, processor } = useA2UI();
+  const { surfaces, processMessages, processor } = useA2UI(a2uiOptions);
 
   // Process scenario messages in useEffect.
   // Cleanup deletes surfaces so React 19 Strict Mode double-fire doesn't crash.
@@ -831,11 +835,12 @@ interface WidgetCardProps {
   onWidgetClick: (widgetId: string) => void;
   onDuplicate: (widgetId: string) => void;
   onDelete: (widgetId: string) => void;
+  a2uiOptions?: A2UIOptions;
 }
 
-const WidgetCard = memo(({ widget, onWidgetClick, onDuplicate, onDelete }: WidgetCardProps) => {
+const WidgetCard = memo(({ widget, onWidgetClick, onDuplicate, onDelete, a2uiOptions }: WidgetCardProps) => {
   const classes = useStyles();
-  const { surfaces, processMessages, processor } = useA2UI();
+  const { surfaces, processMessages, processor } = useA2UI(a2uiOptions);
 
   useEffect(() => {
     const createdIds = processMessages(widget.messages);
@@ -887,10 +892,11 @@ WidgetCard.displayName = 'WidgetCard';
 // ---- WidgetPreview Component (for dialog) ----
 interface WidgetPreviewProps {
   widget: { id: string; name: string; createdAt: number; messages: A2uiMsg[] };
+  a2uiOptions?: A2UIOptions;
 }
 
-const WidgetPreview = memo(({ widget }: WidgetPreviewProps) => {
-  const { surfaces, processMessages, processor } = useA2UI();
+const WidgetPreview = memo(({ widget, a2uiOptions }: WidgetPreviewProps) => {
+  const { surfaces, processMessages, processor } = useA2UI(a2uiOptions);
 
   useEffect(() => {
     const createdIds = processMessages(widget.messages);
@@ -932,6 +938,29 @@ const ICON_SECTIONS = [
 function PlaygroundInner() {
   const classes = useStyles();
   const { debugEnabled, toggleDebug } = useDebug();
+  const toasterId = useId('playground-toaster');
+  const { dispatchToast } = useToastController(toasterId);
+
+  // Shared action handler for A2UI surfaces — gives visible feedback on button clicks
+  const playgroundActionHandler = useCallback((action: A2uiClientAction) => {
+    const evt = (action as any).event;
+    const fn = (action as any).functionCall;
+    const actionName = evt?.name || fn?.call || 'unknown';
+    dispatchToast(
+      <Toast>
+        <ToastTitle>Action triggered: {actionName}</ToastTitle>
+        {evt?.context && (
+          <ToastBody>
+            {JSON.stringify(evt.context, null, 2).slice(0, 200)}
+          </ToastBody>
+        )}
+      </Toast>,
+      { position: 'bottom-end', intent: 'info', timeout: 3000 },
+    );
+  }, [dispatchToast]);
+
+  const a2uiOpts: A2UIOptions = useMemo(() => ({ actionHandler: playgroundActionHandler }), [playgroundActionHandler]);
+
   const [activeTab, setActiveTab] = useState<'create' | 'gallery' | 'components' | 'icons' | 'widgets'>('gallery');
   const [filterQuery, setFilterQuery] = useState('');
   const [iconFilter, setIconFilter] = useState('');
@@ -947,8 +976,8 @@ function PlaygroundInner() {
   const [selectedWidget, setSelectedWidget] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<'preview' | 'json'>('preview');
   const customCounter = useRef(0);
-  const customA2ui = useA2UI(); // For custom JSON editor
-  const createA2ui = useA2UI(); // For Create tab chat
+  const customA2ui = useA2UI(a2uiOpts); // For custom JSON editor
+  const createA2ui = useA2UI(a2uiOpts); // For Create tab chat
   const [createLoading, setCreateLoading] = useState(false);
   const createSessionIdRef = useRef<string | undefined>(undefined);
   const createEndRef = useRef<HTMLDivElement>(null);
@@ -1780,7 +1809,7 @@ function PlaygroundInner() {
           <div className="playground-gallery" ref={galleryRef} onKeyDown={handleGalleryKeyDown}>
             {filteredGalleryScenarios.map(scenario => (
               <GalleryCardErrorBoundary key={scenario.id} label={scenario.label}>
-                <GalleryCard scenario={scenario} onCardClick={handleCardClick} />
+                <GalleryCard scenario={scenario} onCardClick={handleCardClick} a2uiOptions={a2uiOpts} />
               </GalleryCardErrorBoundary>
             ))}
           </div>
@@ -1799,7 +1828,7 @@ function PlaygroundInner() {
                 <div className="playground-gallery">
                   {groupScenarios.map(scenario => (
                     <GalleryCardErrorBoundary key={scenario.id} label={scenario.label}>
-                      <GalleryCard scenario={scenario} onCardClick={handleCardClick} />
+                      <GalleryCard scenario={scenario} onCardClick={handleCardClick} a2uiOptions={a2uiOpts} />
                     </GalleryCardErrorBoundary>
                   ))}
                 </div>
@@ -1915,6 +1944,7 @@ function PlaygroundInner() {
                     onWidgetClick={handleWidgetClick}
                     onDuplicate={duplicateWidget}
                     onDelete={deleteWidget}
+                    a2uiOptions={a2uiOpts}
                   />
                 ))}
               </div>
@@ -1970,7 +2000,7 @@ function PlaygroundInner() {
                     {selectedWidget && (() => {
                       const widget = widgets.find(w => w.id === selectedWidget);
                       if (!widget) return null;
-                      return <WidgetPreview widget={widget} />;
+                      return <WidgetPreview widget={widget} a2uiOptions={a2uiOpts} />;
                     })()}
                   </div>
                 ) : (
@@ -1986,6 +2016,7 @@ function PlaygroundInner() {
           </DialogBody>
         </DialogSurface>
       </Dialog>
+      <Toaster toasterId={toasterId} />
         </div>{/* end mainContent */}
       </div>{/* end shellRow */}
     </div>
