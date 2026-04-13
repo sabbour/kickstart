@@ -3850,3 +3850,53 @@ The Design Review ceremony is already in `ceremonies.md` but was being skipped. 
 5. **Rate-limit handling** — All GitHub API responses check `X-RateLimit-Remaining` and `X-RateLimit-Reset` headers. Rate-limited responses show a warning MessageBar with the reset time.
 
 **Impact:** These patterns are now the standard for any future integration kit components (e.g., if we add GitLab, Bitbucket, or other service packs). Security review should verify all new write-capable components follow these guardrails.
+
+---
+
+### Decision: Theme System Architecture
+**Author:** Fry (Frontend Dev)  
+**Date:** 2026-04-13  
+**Status:** Approved (PR #129)  
+**Issue:** #42  
+
+**Context:** Theme customization system needed dark mode support with user preference persistence.
+
+**Decisions:**
+1. **Three-state ThemeMode** — `light | dark | system`. The `system` mode uses `matchMedia(prefers-color-scheme: dark)` and updates live when OS preference changes.
+2. **resolvedTheme pattern** — Context exposes both `theme` (user choice) and `resolvedTheme` (actual light/dark). FluentProvider and CSS `data-theme` attribute use `resolvedTheme`.
+3. **Default to system** — New users get OS-matching theme without action. Returning users get their saved preference from localStorage.
+4. **Inline SVG icons** — ThemeToggle uses inline SVG (sun/moon/monitor) to avoid Fluent icon package dependency.
+
+**Impact:** All components inheriting from FluentProvider automatically get themed tokens. CSS custom properties in theme.css continue to work via `data-theme` attribute on `<html>`.
+
+---
+
+### Decision: resolvedTheme Pattern as Standard
+**Author:** Leela (Lead)  
+**Date:** 2026-04-13  
+**Status:** Approved  
+**Issue:** #42 | **PR:** #129  
+
+**Context:** Fry's theme system introduces a `resolvedTheme` pattern — separating user preference (`theme`: light/dark/system) from the rendered value (`resolvedTheme`: light/dark). This is a clean abstraction.
+
+**Decision:** The `resolvedTheme` pattern should be the standard approach for any user setting that includes a "system/auto" option. Components rendering visual state use the resolved value; UI showing the current setting uses the raw preference.
+
+**Also:** `useSyncExternalStore` is the preferred hook for subscribing to browser APIs (matchMedia, ResizeObserver, etc.) — prefer over manual useEffect+useState patterns.
+
+**Impact:** Future settings with auto/system modes should follow this pattern. Document in architecture guide when next updated.
+
+---
+
+### Decision: Rules Engine Architecture Approved
+**Author:** Leela (Lead)  
+**Date:** 2026-04-13  
+**Status:** Approved  
+**Issue:** #49 | **PR:** #128  
+
+**Decision:** The RulesEngine composition pattern (wrapping ValidationEngine) is the approved architecture for rule metadata, categorized filtering, and AKS constraint mapping. ALL_RULES serves as the canonical rule registry.
+
+**Follow-up items:**
+1. Fix container-port-names (DS014) regex to accept any valid port name, not just protocol prefixes.
+2. Address cross-branch contamination process: PRs should only contain changes related to their issue.
+
+**Status:** Approved — merge when ready.
