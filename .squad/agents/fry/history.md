@@ -301,3 +301,12 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - **Layout shift prevention:** `contain: inline-size` on the streaming bubble prevents width recalculations. `will-change: transform, opacity` hints for GPU compositing. `overflow-anchor: auto` keeps scroll position stable.
 - **Architecture insight:** The `streamingSurfaceIdsRef` (authoritative list for completed message) is separate from the progressive queue's `visibleIds` (what's rendered now). Ref collects ALL, queue reveals incrementally. On completion, `flush()` shows remaining, then ref contents go into the finalized `ChatMessage.surfaceIds`.
 - **PR #126** opened as draft. Closes #40.
+### IndexedDB Virtual Filesystem (#39) — 2026-04-12
+
+- **IDB schema upgrade pattern:** Bump `IDB_VERSION` to 2 and guard `onupgradeneeded` with `!db.objectStoreNames.contains(STORE)` to avoid errors on re-open. Existing v1 records (path+content only) are migrated lazily in `getFile()`/`readAll()` by filling defaults for missing fields.
+- **VFSFile records:** Store `{ path, content, language, createdAt, updatedAt }` — richer than the original `{ path, content }`. Language is auto-detected from extension/filename maps shared with VirtualFileSystem.
+- **buildFileTree utility:** Standalone function (not class method) that converts `VFSFile[]` → hierarchical `FileTreeNode[]`. Reuses the same dir-first + alpha sort pattern from VirtualFileSystem.tree().
+- **VirtualFSContext expanded:** Context now exposes `fileRecords: VFSFile[]`, `tree: FileTreeNode[]`, and `files: string[]` (derived). Tree is memoized from `fileRecords` so it only rebuilds when files change.
+- **In-memory → IndexedDB sync bridge:** `useEffect` subscribes to the in-memory `VirtualFileSystem` and writes "complete" files to `VirtualFS` (IndexedDB). This gives persistence without changing the streaming pipeline.
+- **FileTreePanel Fluent rewrite:** Full `makeStyles` + tokens. Hierarchical tree with Fluent icons (`FolderRegular`, `DocumentRegular`, chevrons). Monaco lazy-loaded via `React.lazy` + `Suspense`. Toolbar with copy/download/delete.
+- **Monaco fallback:** `hljs` highlight + `sanitizeHtml()` for code preview when Monaco hasn't finished loading. Same pattern as the catalog FileEditor component.
