@@ -17,6 +17,7 @@ import {
   namespaceSetValidator,
   replicaCountValidator,
   imagePullPolicyValidator,
+  ALL_RULES,
 } from "../validation/index.js";
 
 // ---------------------------------------------------------------------------
@@ -33,9 +34,6 @@ kind: Deployment
 metadata:
   name: my-app
   namespace: my-app
-  labels:
-    app: my-app
-    version: v1.0.0
 spec:
   replicas: 2
   selector:
@@ -55,8 +53,8 @@ spec:
           image: myregistry.azurecr.io/my-app:v1.0.0
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 3000
-              name: http
+            - name: http
+              containerPort: 3000
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -236,7 +234,7 @@ describe("ValidationEngine", () => {
 // ---------------------------------------------------------------------------
 
 describe("createDefaultValidationEngine", () => {
-  it("registers all 23 built-in validators", () => {
+  it("registers all validators from ALL_RULES", () => {
     const engine = createDefaultValidationEngine();
     const names = engine.registeredValidators.map((v) => v.name);
     expect(names).toContain("resource-limits");
@@ -246,7 +244,7 @@ describe("createDefaultValidationEngine", () => {
     expect(names).toContain("namespace-set");
     expect(names).toContain("replica-count");
     expect(names).toContain("image-pull-policy");
-    expect(engine.registeredValidators).toHaveLength(23);
+    expect(engine.registeredValidators).toHaveLength(ALL_RULES.length);
   });
 
   it("each call returns a fresh independent engine", () => {
@@ -868,8 +866,8 @@ describe("default engine — full deployment validation", () => {
     );
     expect(report.hasErrors).toBe(false);
     expect(report.hasWarnings).toBe(false);
-    // All 23 validators ran
-    expect(report.results).toHaveLength(23);
+    expect(report.results).toHaveLength(ALL_RULES.length);
+    expect(report.results.every((r) => r.passed)).toBe(true);
   });
 
   it("errors and warnings are detected on a minimal bad Deployment", () => {

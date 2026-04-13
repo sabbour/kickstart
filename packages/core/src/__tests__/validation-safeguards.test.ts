@@ -12,6 +12,7 @@ import { ValidationEngine } from "../validation/engine.js";
 import {
   createDefaultValidationEngine,
   validateAndFixArtifacts,
+  ALL_RULES,
 } from "../validation/index.js";
 import { runAsNonRootValidator } from "../validation/validators/run-as-non-root.js";
 import { noPrivilegeEscalationValidator } from "../validation/validators/no-privilege-escalation.js";
@@ -38,9 +39,6 @@ kind: Deployment
 metadata:
   name: my-app
   namespace: my-app
-  labels:
-    app: my-app
-    version: v1.0.0
 spec:
   replicas: 2
   selector:
@@ -59,8 +57,8 @@ spec:
         - name: my-app
           image: myregistry.azurecr.io/my-app:v1.0.0
           ports:
-            - containerPort: 3000
-              name: http
+            - name: http
+              containerPort: 3000
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -728,10 +726,10 @@ describe("ValidationEngine.applyAutoFixes", () => {
 // ---------------------------------------------------------------------------
 
 describe("createDefaultValidationEngine (full DS coverage)", () => {
-  it("registers all 23 validators", () => {
+  it("registers all validators from ALL_RULES", () => {
     const engine = createDefaultValidationEngine();
-    // 7 original + 9 DS003-DS013 + 7 DS014-DS020 = 23
-    expect(engine.registeredValidators.length).toBe(23);
+    // 7 original + 16 DS validators = 23
+    expect(engine.registeredValidators.length).toBe(ALL_RULES.length);
   });
 
   it("validates a fully hardened Deployment with zero errors", () => {

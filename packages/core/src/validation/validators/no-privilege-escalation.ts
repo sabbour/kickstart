@@ -28,6 +28,9 @@ export const noPrivilegeEscalationValidator: Validator = {
     }
 
     const content = artifact.content;
+    // TODO: This regex checks if ANY container has allowPrivilegeEscalation: false.
+    // It should verify ALL containers have it set to false. Requires YAML parsing
+    // or a more sophisticated regex approach to iterate over each container block.
     const hasExplicitFalse =
       /^\s+allowPrivilegeEscalation:\s*false\s*$/m.test(content);
 

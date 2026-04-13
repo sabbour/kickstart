@@ -43,8 +43,8 @@ export interface Validator {
   validate(artifact: Artifact): ValidationResult;
   /**
    * Optional auto-fix: given the artifact content, return corrected content
-   * or null if no fix is applicable. Only adds security-hardening fields —
-   * never removes existing configuration.
+   * or null if no fix is applicable. May add missing fields and may also
+   * mutate existing insecure values to safer ones.
    */
   autoFix?(content: string): string | null;
 }
