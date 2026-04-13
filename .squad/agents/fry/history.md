@@ -283,3 +283,13 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - **SVG icon toggle in Topbar:** ThemeToggle uses inline SVG icons (sun/moon/monitor) rather than Fluent icon imports to avoid bundle size. Reuses existing `topbar-btn` class for consistent styling.
 - **CSS transition for theme switch:** Added `transition: background-color, color` on html/body/.app-shell using existing `--duration-normal` and `--easing-ease` tokens.
 - **PR #129** opened as draft. Closes #42.
+### State Binding & Data Interpolation (#41, B-30) — 2026-07-28
+
+- **Default value in `resolveDataPath`:** Added optional third parameter `defaultValue` — returned only when the resolved value is `undefined` (not for other falsy values like `0`, `""`, `false`). Backward compatible; all existing callers unaffected.
+- **`{{/path|default}}` pipe syntax in `interpolateTemplate`:** First `|` splits path from fallback. If path resolves to `undefined`/`null`, the fallback text is used. Allows `|` in the default text itself (only first pipe splits). Empty default (`{{/path|}}`) produces empty string.
+- **`resolveChainedPointer` for pointer-to-pointer indirection:** Follows string values that start with `/` as further pointer lookups. Uses a `Set<string>` visited tracker for cycle detection + `maxDepth` cap (default 5). Returns `defaultValue` on cycles or depth exceeded.
+- **`resolveBindings` for batch resolution:** Resolves `Record<string, BindingDescriptor>` in one call — each descriptor has `path` + optional `defaultValue`. Used for cross-component data coordination.
+- **`analyzeSharedBindings` for data flow analysis:** Takes `Record<string, ComponentBindingMap>` (reads/writes per component). Returns `sharedPaths` (written by one component, read by a *different* one), `producers`, `consumers`. Self-reads excluded. Useful for debugging and playground visualization.
+- **Key files:** `packages/core/src/engine/data-binding.ts` (enhanced), `packages/core/src/engine/index.ts` (new exports), `packages/core/src/__tests__/data-binding.test.ts` (55 tests).
+- **No vendor layer changes:** All work in Kickstart's own core engine. A2UI vendor `DataModel`/`DataContext`/`GenericBinder` unchanged.
+- **Test count:** 588 passing (533 existing + 55 new).
