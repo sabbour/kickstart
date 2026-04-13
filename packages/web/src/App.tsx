@@ -8,6 +8,7 @@ import { FileEditor } from './components/FileEditor/FileEditor';
 import { Playground } from './pages/Playground';
 import { useA2UI } from './hooks/useA2UI';
 import { useActionDispatch } from './hooks/useActionDispatch';
+import { useProgressiveQueue } from './hooks/useProgressiveQueue';
 import { useSessions } from './hooks/useSessions';
 import { useStreaming } from './hooks/useStreaming';
 import { useMockStreaming } from './hooks/useMockStreaming';
@@ -47,6 +48,7 @@ export function App() {
   const sessions = useSessions();
   const streaming = useStreaming();
   const mockStreaming = useMockStreaming();
+  const progressiveQueue = useProgressiveQueue();
 
   // Single VFS instance for the app lifetime
   const fs = useMemo(() => new VirtualFileSystem(), []);
@@ -54,8 +56,7 @@ export function App() {
   // Messages for the active session
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // Surface IDs that arrive progressively during the active stream
-  const [streamingSurfaceIds, setStreamingSurfaceIds] = useState<string[]>([]);
+  // Surface IDs revealed progressively via the queue
   const streamingSurfaceIdsRef = useRef<string[]>([]);
 
   // Check API availability on mount (skip in mock mode — already true)
@@ -111,7 +112,7 @@ export function App() {
 
     // Reset streaming surface IDs for the new turn
     streamingSurfaceIdsRef.current = [];
-    setStreamingSurfaceIds([]);
+    progressiveQueue.reset();
 
     // Use mock streaming when ?mock is active, real streaming otherwise
     if (mockEnabled) {
@@ -121,15 +122,16 @@ export function App() {
           const newIds = a2ui.processMessages(msgs);
           if (newIds.length > 0) {
             streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
-            setStreamingSurfaceIds([...streamingSurfaceIdsRef.current]);
+            progressiveQueue.enqueue(newIds);
           }
         },
         onPhase: () => {},
         onComplete: (fullText, model) => {
+          progressiveQueue.flush();
           const collectedIds = streamingSurfaceIdsRef.current;
           const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
           streamingSurfaceIdsRef.current = [];
-          setStreamingSurfaceIds([]);
+          progressiveQueue.reset();
           const assistantMsg: ChatMessage = {
             id: `msg-${Date.now()}-assistant`,
             role: 'assistant',
@@ -143,7 +145,7 @@ export function App() {
         },
         onError: (error) => {
           streamingSurfaceIdsRef.current = [];
-          setStreamingSurfaceIds([]);
+          progressiveQueue.reset();
           const errorMsg: ChatMessage = {
             id: `msg-${Date.now()}-error`,
             role: 'assistant',
@@ -165,7 +167,7 @@ export function App() {
           const newIds = a2ui.processMessages(msgs);
           if (newIds.length > 0) {
             streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
-            setStreamingSurfaceIds([...streamingSurfaceIdsRef.current]);
+            progressiveQueue.enqueue(newIds);
           }
         },
         onPhase: () => {},
@@ -174,10 +176,11 @@ export function App() {
           if (receivedSessionId && !activeSession?.backendSessionId) {
             sessions.updateSession(sessionId!, { backendSessionId: receivedSessionId });
           }
+          progressiveQueue.flush();
           const collectedIds = streamingSurfaceIdsRef.current;
           const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
           streamingSurfaceIdsRef.current = [];
-          setStreamingSurfaceIds([]);
+          progressiveQueue.reset();
           const assistantMsg: ChatMessage = {
             id: `msg-${Date.now()}-assistant`,
             role: 'assistant',
@@ -191,7 +194,7 @@ export function App() {
         },
         onError: (error) => {
           streamingSurfaceIdsRef.current = [];
-          setStreamingSurfaceIds([]);
+          progressiveQueue.reset();
           const errorMsg: ChatMessage = {
             id: `msg-${Date.now()}-error`,
             role: 'assistant',
@@ -203,7 +206,7 @@ export function App() {
         },
       });
     }
-  }, [sessions, streaming, mockStreaming, a2ui, isApiAvailable, resetConsecutiveCount]);
+  }, [sessions, streaming, mockStreaming, a2ui, isApiAvailable, resetConsecutiveCount, progressiveQueue]);
 
   const handleStartChat = useCallback((prompt: string) => {
     a2ui.reset();
@@ -319,7 +322,7 @@ export function App() {
             messages={messages}
             isStreaming={isStreaming}
             streamingText={currentStreamText}
-            streamingSurfaceIds={streamingSurfaceIds}
+            streamingSurfaceIds={progressiveQueue.visibleIds}
             onSend={handleSendMessage}
             getSurface={a2ui.getSurface}
           />

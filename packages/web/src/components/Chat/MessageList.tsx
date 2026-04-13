@@ -46,11 +46,15 @@ export function MessageList({ messages, isStreaming, streamingText, streamingSur
                 <span className="streaming-cursor" />
               </>
             )}
-            {streamingSurfaceIds?.map(surfaceId => {
+            {streamingSurfaceIds?.map((surfaceId, index) => {
               const surface = getSurface(surfaceId);
               if (!surface) return null;
               return (
-                <div key={surfaceId} className="a2ui-component a2ui-component--entering">
+                <div
+                  key={surfaceId}
+                  className="a2ui-component a2ui-component--entering"
+                  style={{ '--enter-index': index } as React.CSSProperties}
+                >
                   <A2UISurfaceWrapper surface={surface} isActive={true} />
                 </div>
               );
