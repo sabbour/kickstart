@@ -274,3 +274,12 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - **ChildList pattern for nested components:** Accordion items use the same `ChildList` + `buildChild` pattern as Row/Column — not `context.renderChild()` which doesn't exist in the adapter.
 - **ComboBox vs MultiSelect split:** Two components is correct — LLM schema is simpler with distinct names. Fluent `Combobox` has a `multiselect` prop but separate APIs avoid prompt confusion.
 - **Stash across branches is dangerous:** `git stash` + `git stash pop` on a different branch silently merges working tree changes from the original branch. Always verify branch + diff before committing after stash operations.
+
+
+### Theme Customization System (#42) — 2026-07-27
+
+- **Three-state theme with system default:** Extended ThemeMode to `'light' | 'dark' | 'system'`. Default is `'system'` which reads `prefers-color-scheme` via `matchMedia`. Live OS preference tracking uses `useSyncExternalStore` for concurrent-safe subscription to `matchMedia('(prefers-color-scheme: dark)')`.
+- **resolvedTheme pattern:** Context exposes both `theme` (user preference) and `resolvedTheme` (actual light/dark). Components that need the visual theme use `resolvedTheme`; UI that shows the current setting uses `theme`.
+- **SVG icon toggle in Topbar:** ThemeToggle uses inline SVG icons (sun/moon/monitor) rather than Fluent icon imports to avoid bundle size. Reuses existing `topbar-btn` class for consistent styling.
+- **CSS transition for theme switch:** Added `transition: background-color, color` on html/body/.app-shell using existing `--duration-normal` and `--easing-ease` tokens.
+- **PR #129** opened as draft. Closes #42.
