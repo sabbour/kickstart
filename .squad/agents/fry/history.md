@@ -274,3 +274,12 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - **ChildList pattern for nested components:** Accordion items use the same `ChildList` + `buildChild` pattern as Row/Column — not `context.renderChild()` which doesn't exist in the adapter.
 - **ComboBox vs MultiSelect split:** Two components is correct — LLM schema is simpler with distinct names. Fluent `Combobox` has a `multiselect` prop but separate APIs avoid prompt confusion.
 - **Stash across branches is dangerous:** `git stash` + `git stash pop` on a different branch silently merges working tree changes from the original branch. Always verify branch + diff before committing after stash operations.
+
+### Progressive Component Streaming (#40) — 2026-07-27
+
+- **Timer-based progressive queue pattern:** `useProgressiveQueue` hook accepts surface IDs and reveals them one at a time with configurable stagger delay (150ms). Uses refs for queue/visible state to avoid stale closures in timer callbacks. Provides `flush()` for instant reveal of remaining items on stream completion.
+- **Mock streaming surface stagger:** Break A2UI message batches into per-surface groups (keyed by `createSurface`), emit each group with 200ms delay. First surface emits immediately; rest stagger via `setTimeout` chain.
+- **CSS stagger via custom property:** `--enter-index` set per component in JSX, used in CSS as `animation-delay: calc(var(--enter-index) * 60ms)`. Avoids needing `:nth-child` which doesn't work with dynamically-added elements.
+- **Layout shift prevention:** `contain: inline-size` on the streaming bubble prevents width recalculations. `will-change: transform, opacity` hints for GPU compositing. `overflow-anchor: auto` keeps scroll position stable.
+- **Architecture insight:** The `streamingSurfaceIdsRef` (authoritative list for completed message) is separate from the progressive queue's `visibleIds` (what's rendered now). Ref collects ALL, queue reveals incrementally. On completion, `flush()` shows remaining, then ref contents go into the finalized `ChatMessage.surfaceIds`.
+- **PR #126** opened as draft. Closes #40.
