@@ -5,13 +5,17 @@
  */
 
 import type { ArtifactStore } from "../artifacts/types.js";
+import type { FileSystemProvider } from "../filesystem/types.js";
 
 /**
  * Execution context injected into every tool call.
  * Provides the session-scoped artifact store — no singleton fallback.
+ * Optionally provides a filesystem provider for real file I/O.
  */
 export interface ToolContext {
   artifactStore: ArtifactStore;
+  /** Active filesystem provider (Cloud Shell, local, etc.).  Undefined in web-only contexts. */
+  fileSystem?: FileSystemProvider;
 }
 
 /** A callable tool exposed to the LLM via function calling. */
