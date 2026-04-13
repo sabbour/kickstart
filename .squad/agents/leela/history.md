@@ -367,3 +367,41 @@ Key decision: Lead (Leela) will not write code in future — routing code fixes 
 **PR:** https://github.com/sabbour/kickstart/pull/109
 
 All DP reviewers approved; implementation complete per scope.
+
+### 2026-07-28: PR #128 Review — K8s Rules Engine (#49)
+
+**Status:** ✅ Approved | **Author:** Hermes (Tester)
+
+**Architecture review findings:**
+- RulesEngine composition over ValidationEngine is clean — no inheritance, no breaking changes
+- Type layering (types → rule-types → rules-engine) well-separated
+- ALL_RULES canonical registry is a good single-source-of-truth pattern
+- 7 new validators (DS014–DS020) match DP spec exactly; 23 total, 665 tests pass
+- AKS constraint mapping covers 4 families correctly
+
+**Non-blocking observations:**
+- container-port-names (DS014) has a regex false-positive bug — only matches protocol-prefix names, not arbitrary valid names like `api` or `metrics`. Follow-up fix recommended.
+- drop-all-capabilities (DS015) autoFix injects `runAsNonRoot: true` — cross-concern with run-as-non-root validator but pragmatic for PSS Restricted bootstrap.
+- 10 unrelated web files (Fry's progressive-rendering work) bundled in this PR — process feedback given to split in future.
+
+**Learnings:**
+- Regex-based YAML parsing is accumulating tech debt across all validators — worth scheduling a structured parser migration in a future sprint.
+- Cross-branch contamination (mixing Fry's web changes with Hermes's core changes) is a process gap to address in next retro.
+
+### 2026-07-28: PR #129 Review — Theme System (#42)
+
+**Status:** ✅ Approved (with one fix) | **Author:** Fry (Frontend Dev)
+
+**Architecture review findings:**
+- Three-state theme (`light | dark | system`) with `resolvedTheme` pattern is the correct abstraction — user preference vs. rendered theme cleanly separated.
+- `useSyncExternalStore` for `matchMedia` subscription is React 18 best practice — concurrent-safe, correct subscribe/snapshot/serverSnapshot.
+- Inline SVG icons for ThemeToggle avoids unnecessary Fluent icon dependency.
+- CSS transitions use existing design tokens (`--duration-normal`, `--easing-ease`) — consistent with the design system.
+- Scope discipline: 7 files, 128 additions, faithful to DP spec.
+
+**Required fix before merge:**
+- `useTheme()` null guard was removed. With `strict: true`, returning `ctx` (which is `ThemeContextValue | null`) as `ThemeContextValue` is a type safety issue. The error message is also valuable DX. Guard must be restored.
+
+**Learnings:**
+- `resolvedTheme` pattern (user pref vs. rendered value) is reusable for any setting that has a "system/auto" option — worth documenting as a standard pattern.
+- `useSyncExternalStore` is the right tool for any browser API subscription (matchMedia, ResizeObserver, IntersectionObserver) — prefer over manual useEffect+useState.
