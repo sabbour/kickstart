@@ -52,8 +52,17 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - #56: Inspiration button in Create tab follow-up input ✅ (PR #118, 2026-04-10)
 - #58: Clickable URLs in chat messages ✅ (PR #118, 2026-04-10)
 - #18: Badge, Accordion, Toggle, ComboBox, MultiSelect components ✅ (PR #118, 2026-04-10)
+- Debug mode toggle & per-message debug panel (v0.5.2) ✅ (squad/debug-mode-ui, 2026-04-13)
 
 ## Learnings
+
+### Debug Mode UI (v0.5.2) — 2026-04-13
+
+- **Griffel borderWidth shorthand:** `borderWidth: 0` in `makeStyles` fails TypeScript — Griffel requires longhand (`borderTopWidth`, `borderRightWidth`, etc.) with string values, not numbers. Same lesson as `borderColor` shorthand from earlier.
+- **DebugContext pattern:** URL param (`?debug=true`) + keyboard shortcut (`Ctrl+Shift+D`) + localStorage persistence. `readInitialDebugState()` checks URL first, then localStorage, returns boolean. Same `useState(() => init())` lazy-init pattern as ThemeContext.
+- **apiFetch debug header injection:** Added optional `debugMode` third param to `apiFetch()` — uses `new Headers(init?.headers)` to clone and append without mutating the caller's headers. Backward-compatible: existing callers ignore the new param.
+- **Streaming debug metadata capture:** `useStreaming.send()` takes optional `debugMode` 4th param. When true, accumulates `renderDecisions` from SSE events and bundles `DebugMetadata` in `onComplete` callback. Mock streaming path unaffected — different callback interface.
+- **Graceful missing data:** DebugPanel shows "Not available" for any missing field. No crashes if backend hasn't shipped debug fields yet — the `debugInfo` property is optional throughout the chain.
 
 ### P2 Polish Batch (B-27, B-29, B-33) — 2026-04-11
 
