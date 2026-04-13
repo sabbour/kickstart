@@ -43,6 +43,8 @@ export const Slider = createReactComponent(SliderApi, ({props}) => {
         max={props.max}
         value={props.value ?? 0}
         onChange={onChange}
+        aria-label={props.label || props.accessibility?.label || 'Slider'}
+        aria-valuetext={`${props.value}`}
       />
     </div>
   );

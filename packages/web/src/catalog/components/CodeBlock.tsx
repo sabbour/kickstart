@@ -131,12 +131,13 @@ export const CodeBlock = createReactComponent(CodeBlockApi, ({ props }) => {
             icon={copied ? <CheckmarkRegular /> : <CopyRegular />}
             onClick={handleCopy}
             size="small"
+            aria-label={copied ? 'Copied to clipboard' : 'Copy code to clipboard'}
           >
             {copied ? 'Copied' : 'Copy'}
           </Button>
         </div>
       )}
-      <pre className={classes.codeContent}>
+      <pre className={classes.codeContent} role="region" aria-label={`Code block${props.language ? `: ${props.language}` : ''}${props.filename ? ` — ${props.filename}` : ''}`}>
         <code className={`hljs ${classes.codeElement}`} dangerouslySetInnerHTML={{ __html: sanitizeHtml(highlightedCode) }} />
       </pre>
     </Card>

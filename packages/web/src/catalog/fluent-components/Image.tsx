@@ -61,7 +61,7 @@ export const Image = createReactComponent(ImageApi, ({props}) => {
     <FluentImage
       className={className}
       src={props.url}
-      alt={props.description || ''}
+      alt={props.accessibility?.label || props.description || ''}
       fit={mapFit(props.fit)}
       shape={shape}
     />

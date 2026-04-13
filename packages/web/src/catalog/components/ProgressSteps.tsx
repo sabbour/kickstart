@@ -80,19 +80,36 @@ export const ProgressSteps = createReactComponent(ProgressStepsApi, ({ props }) 
     }
   };
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'complete': return 'Complete';
+      case 'error': return 'Error';
+      case 'active': return 'In progress';
+      default: return 'Pending';
+    }
+  };
+
   return (
-    <div className={classes.root}>
+    <ol className={classes.root} role="list" aria-label="Progress steps">
       {steps.map((step, i) => (
-        <div key={step.id} className={classes.step}>
-          <div className={`${classes.dot} ${getDotClass(step.status)}`}>
+        <li
+          key={step.id}
+          className={classes.step}
+          aria-current={step.status === 'active' ? 'step' : undefined}
+        >
+          <div
+            className={`${classes.dot} ${getDotClass(step.status)}`}
+            aria-label={`Step ${i + 1}: ${getStatusText(step.status)}`}
+            role="img"
+          >
             {step.status === 'complete' && '✓'}
             {step.status === 'error' && '✕'}
             {step.status === 'active' && '●'}
             {step.status === 'pending' && (i + 1)}
           </div>
           <Caption1>{step.label}</Caption1>
-        </div>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 });

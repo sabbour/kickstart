@@ -49,6 +49,7 @@ export const Badge = createReactComponent(FlexibleBadgeApi, ({props}) => {
         shape={props.shape as any}
         size={props.size as any}
         appearance={props.appearance as any}
+        aria-label={props.accessibility?.label || `${props.count ?? 0} items`}
       />
     );
   }
@@ -59,6 +60,7 @@ export const Badge = createReactComponent(FlexibleBadgeApi, ({props}) => {
         className={classes.root}
         status={props.status as any ?? 'available'}
         size={props.size as any}
+        aria-label={props.accessibility?.label || `Status: ${props.status ?? 'available'}`}
       />
     );
   }

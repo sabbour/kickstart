@@ -60,6 +60,7 @@ const useStyles = makeStyles({
 export const RadioGroup = createReactComponent(RadioGroupApi, ({ props }) => {
   const [selected, setSelected] = useState(props.value || '');
   const classes = useStyles();
+  const options = props.options || [];
 
   const handleSelect = (id: string) => {
     setSelected(id);
@@ -68,15 +69,39 @@ export const RadioGroup = createReactComponent(RadioGroupApi, ({ props }) => {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent, idx: number) => {
+    let nextIdx = idx;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      nextIdx = (idx + 1) % options.length;
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      nextIdx = (idx - 1 + options.length) % options.length;
+    } else if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      handleSelect(options[idx].id);
+      return;
+    } else {
+      return;
+    }
+    handleSelect(options[nextIdx].id);
+    const container = (e.currentTarget as HTMLElement).parentElement;
+    const cards = container?.querySelectorAll('[role="radio"]');
+    (cards?.[nextIdx] as HTMLElement)?.focus();
+  };
+
   return (
-    <div className={classes.root}>
-      {(props.options || []).map((opt) => (
+    <div className={classes.root} role="radiogroup" aria-label="Options">
+      {options.map((opt, idx) => (
         <Card
           key={opt.id}
           className={selected === opt.id ? classes.selectedCard : classes.card}
           onClick={() => handleSelect(opt.id)}
+          onKeyDown={(e) => handleKeyDown(e, idx)}
           role="radio"
           aria-checked={selected === opt.id}
+          aria-label={String(opt.label)}
+          tabIndex={selected === opt.id || (!selected && idx === 0) ? 0 : -1}
         >
           <CardHeader
             header={<Body1Strong>{String(opt.label)}</Body1Strong>}

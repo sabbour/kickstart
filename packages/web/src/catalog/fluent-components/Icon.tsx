@@ -32,6 +32,8 @@ export const Icon = createReactComponent(IconApi, ({props}) => {
   const classes = useStyles();
   const iconName =
     typeof props.name === 'string' ? props.name : (props.name as {path?: string})?.path;
+  const a11yLabel = props.accessibility?.label;
+  const isDecorative = !a11yLabel;
 
   if (!iconName) {
     return <Body1>?</Body1>;
@@ -41,7 +43,7 @@ export const Icon = createReactComponent(IconApi, ({props}) => {
   const FluentIcon = getFluentIcon(iconName);
   if (FluentIcon) {
     return (
-      <span className={classes.root}>
+      <span className={classes.root} aria-hidden={isDecorative} aria-label={a11yLabel || undefined} role={a11yLabel ? 'img' : undefined}>
         <FluentIcon fontSize={24} />
       </span>
     );
@@ -50,15 +52,15 @@ export const Icon = createReactComponent(IconApi, ({props}) => {
   // SVG path-based icons (from /assets/icons/...)
   if (iconName.startsWith('/')) {
     return (
-      <span className={classes.root}>
-        <img src={iconName} alt={iconName.split('/').pop() || 'icon'} className={classes.img} />
+      <span className={classes.root} aria-hidden={isDecorative} aria-label={a11yLabel || undefined} role={a11yLabel ? 'img' : undefined}>
+        <img src={iconName} alt={a11yLabel || iconName.split('/').pop() || 'icon'} className={classes.img} />
       </span>
     );
   }
 
   // Text-based fallback (Material Symbols via CSS class, or plain text)
   return (
-    <span className={`${classes.root} ${classes.text}`}>
+    <span className={`${classes.root} ${classes.text}`} aria-hidden={isDecorative} aria-label={a11yLabel || undefined} role={a11yLabel ? 'img' : undefined}>
       {iconName}
     </span>
   );

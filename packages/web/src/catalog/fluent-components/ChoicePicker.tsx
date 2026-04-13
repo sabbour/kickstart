@@ -67,6 +67,7 @@ export const ChoicePicker = createReactComponent(ChoicePickerApi, ({props}) => {
       {props.filterable && (
         <Input
           placeholder="Filter options..."
+          aria-label="Filter options"
           value={filter}
           onChange={(_e, data) => setFilter(data.value)}
         />

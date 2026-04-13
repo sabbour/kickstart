@@ -106,23 +106,27 @@ export const Questionnaire = createReactComponent(QuestionnaireApi, ({ props }) 
 
         return (
           <div key={qId} className={classes.question}>
-            <Label className={classes.label}>
+            <Label className={classes.label} htmlFor={`q-${qId}`}>
               {qLabel}
-              {q.required && <span className={classes.required}>*</span>}
+              {q.required && <span className={classes.required} aria-hidden="true">*</span>}
             </Label>
 
             {qType === 'text' && (
               <Input
+                id={`q-${qId}`}
                 style={{ width: '100%' }}
                 value={(answers[qId] as string) || ''}
                 onChange={(_e, data) => updateAnswer(qId, data.value)}
+                aria-required={q.required || undefined}
               />
             )}
 
             {qType === 'choice' && q.choices && (
               <FluentRadioGroup
+                id={`q-${qId}`}
                 value={(answers[qId] as string) || ''}
                 onChange={(_e, data) => updateAnswer(qId, data.value)}
+                aria-required={q.required || undefined}
               >
                 {q.choices.map((c) => (
                   <Radio
