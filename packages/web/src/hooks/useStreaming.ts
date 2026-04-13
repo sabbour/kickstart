@@ -68,6 +68,8 @@ export function useStreaming() {
             const event: StreamEvent = JSON.parse(data);
 
             if (event.error) {
+              await reader.cancel();
+              controller.abort();
               callbacks.onError(event.error);
               return;
             }

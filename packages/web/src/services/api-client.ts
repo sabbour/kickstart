@@ -3,7 +3,7 @@
 
 export class SessionExpiredError extends Error {
   constructor() {
-    super('Your session has expired. Please refresh the page to sign in again.');
+    super('Your session has expired. Please sign in again. You may be redirected to the login page.');
     this.name = 'SessionExpiredError';
   }
 }
