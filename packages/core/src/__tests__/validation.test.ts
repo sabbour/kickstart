@@ -43,12 +43,17 @@ spec:
       labels:
         app: my-app
     spec:
+      securityContext:
+        runAsNonRoot: true
       containers:
         - name: my-app
           image: myregistry.azurecr.io/my-app:v1.0.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
           resources:
             requests:
               cpu: "100m"
@@ -232,7 +237,7 @@ describe("createDefaultValidationEngine", () => {
     expect(names).toContain("namespace-set");
     expect(names).toContain("replica-count");
     expect(names).toContain("image-pull-policy");
-    expect(engine.registeredValidators).toHaveLength(7);
+    expect(engine.registeredValidators).toHaveLength(16);
   });
 
   it("each call returns a fresh independent engine", () => {
@@ -854,8 +859,8 @@ describe("default engine — full deployment validation", () => {
     );
     expect(report.hasErrors).toBe(false);
     expect(report.hasWarnings).toBe(false);
-    // All 7 validators ran
-    expect(report.results).toHaveLength(7);
+    // All 16 validators ran
+    expect(report.results).toHaveLength(16);
   });
 
   it("errors and warnings are detected on a minimal bad Deployment", () => {
