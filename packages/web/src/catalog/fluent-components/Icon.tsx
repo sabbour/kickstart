@@ -32,7 +32,7 @@ export const Icon = createReactComponent(IconApi, ({props}) => {
   const classes = useStyles();
   const iconName =
     typeof props.name === 'string' ? props.name : (props.name as {path?: string})?.path;
-  const a11yLabel = props.accessibility?.label;
+  const a11yLabel = typeof props.accessibility?.label === 'string' ? props.accessibility.label : undefined;
   const isDecorative = !a11yLabel;
 
   if (!iconName) {

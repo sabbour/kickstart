@@ -44,7 +44,7 @@ export const List = createReactComponent(ListApi, ({props, buildChild, context})
       className={isHorizontal ? classes.horizontal : classes.vertical}
       style={{alignItems: mapAlign(props.align)}}
       role="list"
-      aria-label={props.accessibility?.label || undefined}
+      aria-label={typeof props.accessibility?.label === 'string' ? props.accessibility.label : undefined}
     >
       <ChildList childList={props.children} buildChild={buildChild} context={context} />
     </div>
