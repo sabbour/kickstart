@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## 0.5.3
+
+### Bug Fixes
+
+- **Debug panel model leak** — Model name no longer shown as plain text outside the debug panel; only visible inside the expandable accordion
+- **Render decisions populated** — Fixed `renderDecisions` nesting bug (was inside `debug` object, now top-level in SSE data) and type mismatch (objects → formatted strings). Debug panel now shows actual A2UI pipeline decisions per message.
+
 ## 0.5.2
 
 ### Features
