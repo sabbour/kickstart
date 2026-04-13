@@ -6,11 +6,11 @@ export type ResolvedTheme = 'light' | 'dark';
 interface ThemeContextValue {
   /** User-selected preference (light, dark, or system). */
   theme: ThemeMode;
-  /** Resolved to light or dark — accounts for OS preference when theme is system. */
+  /** Resolved to light or dark — accounts for OS preference when theme is 'system'. */
   resolvedTheme: ResolvedTheme;
   /** Set a specific theme mode. */
   setTheme: (mode: ThemeMode) => void;
-  /** Cycle through light, dark, system. */
+  /** Cycle through light → dark → system. */
   toggleTheme: () => void;
 }
 
@@ -42,7 +42,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeMode>(readSavedTheme);
 
-  // Track OS preference reactively so system mode updates live.
+  // Track OS preference reactively so 'system' mode updates live.
   const systemPreference = useSyncExternalStore(
     subscribeToMediaQuery,
     getSystemPreference,

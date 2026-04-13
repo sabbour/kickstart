@@ -20,7 +20,7 @@ export function ChatShell({ messages, isStreaming, streamingText, streamingSurfa
   // Auto-scroll to bottom on new messages or streaming updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingText]);
+  }, [messages, streamingText, streamingSurfaceIds]);
 
   return (
     <div id="chat-ui" className="chat-container">

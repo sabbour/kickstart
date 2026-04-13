@@ -68,4 +68,25 @@ export class ValidationEngine {
   validateAll(artifacts: Artifact[]): ArtifactValidationReport[] {
     return artifacts.map((a) => this.validateArtifact(a));
   }
+
+  /**
+   * Apply all applicable auto-fixes to an artifact's content.
+   * Chains fixes from all registered validators that provide an `autoFix` method.
+   * Returns the fixed content, or the original content if no fixes were applied.
+   */
+  applyAutoFixes(artifact: Artifact): { content: string; appliedFixes: string[] } {
+    let content = artifact.content;
+    const appliedFixes: string[] = [];
+
+    for (const validator of this._validators) {
+      if (typeof validator.autoFix !== "function") continue;
+      const fixed = validator.autoFix(content);
+      if (fixed !== null && fixed !== content) {
+        content = fixed;
+        appliedFixes.push(validator.name);
+      }
+    }
+
+    return { content, appliedFixes };
+  }
 }

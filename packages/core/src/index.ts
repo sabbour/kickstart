@@ -163,7 +163,15 @@ export type {
   Validator,
   ArtifactValidationReport,
 } from "./validation/index.js";
-export { ValidationEngine, createDefaultValidationEngine } from "./validation/index.js";
+export type {
+  RuleCategory,
+  AksConstraintFamily,
+  ValidationRule,
+  CategorisedValidationReport,
+  RulesEngineSummary,
+} from "./validation/index.js";
+export { ValidationEngine, createDefaultValidationEngine, validateAndFixArtifacts } from "./validation/index.js";
+export { RulesEngine, createDefaultRulesEngine, ALL_RULES } from "./validation/index.js";
 export { resourceLimitsValidator } from "./validation/index.js";
 export { noLatestTagValidator } from "./validation/index.js";
 export { healthProbesValidator } from "./validation/index.js";
@@ -171,6 +179,22 @@ export { noPrivilegedValidator } from "./validation/index.js";
 export { namespaceSetValidator } from "./validation/index.js";
 export { replicaCountValidator } from "./validation/index.js";
 export { imagePullPolicyValidator } from "./validation/index.js";
+export { runAsNonRootValidator } from "./validation/index.js";
+export { noPrivilegeEscalationValidator } from "./validation/index.js";
+export { noHostNetworkingValidator } from "./validation/index.js";
+export { readOnlyRootFsValidator } from "./validation/index.js";
+export { gatewayApiIngressValidator } from "./validation/index.js";
+export { noImagePullSecretsValidator } from "./validation/index.js";
+export { resourceQuotasValidator } from "./validation/index.js";
+export { networkPoliciesValidator } from "./validation/index.js";
+export { podDisruptionBudgetValidator } from "./validation/index.js";
+export { containerPortNamesValidator } from "./validation/index.js";
+export { dropAllCapabilitiesValidator } from "./validation/index.js";
+export { noHostPidValidator } from "./validation/index.js";
+export { noHostIpcValidator } from "./validation/index.js";
+export { serviceAccountTokenValidator } from "./validation/index.js";
+export { labelRequirementsValidator } from "./validation/index.js";
+export { topologySpreadConstraintsValidator } from "./validation/index.js";
 
 // Telemetry — structured logger with in-memory ring buffer
 export { Logger, logger, getLogEntries } from "./telemetry/index.js";

@@ -55,14 +55,13 @@ export function sendMock(
       const delay = 30 + Math.random() * 20;
       setTimeout(tick, delay);
     } else {
-      // Streaming complete — emit remaining events
-      if (response.a2uiMessages.length > 0) {
-        callbacks.onA2UI(response.a2uiMessages);
-      }
-      if (response.phase) {
-        callbacks.onPhase(response.phase);
-      }
-      callbacks.onComplete(accumulated, MOCK_MODEL);
+      // Streaming complete — emit A2UI surfaces progressively (one at a time)
+      emitSurfacesProgressively(response.a2uiMessages, signal, callbacks, () => {
+        if (response.phase) {
+          callbacks.onPhase(response.phase);
+        }
+        callbacks.onComplete(accumulated, MOCK_MODEL);
+      });
     }
   };
 
@@ -80,4 +79,59 @@ export function isMockMode(): boolean {
 /** Whether ?playground is present in the current URL. */
 export function isPlaygroundMode(): boolean {
   return new URLSearchParams(window.location.search).has('playground');
+}
+
+const SURFACE_STAGGER_MS = 200;
+
+/**
+ * Emit A2UI messages surface-by-surface with staggered timing.
+ * Groups each createSurface + its updateComponents into a pair,
+ * then emits one pair at a time with a delay between them.
+ */
+function emitSurfacesProgressively(
+  messages: A2uiMsg[],
+  signal: AbortSignal,
+  callbacks: MockStreamCallbacks,
+  onDone: () => void,
+): void {
+  if (messages.length === 0) {
+    onDone();
+    return;
+  }
+
+  // Group messages into per-surface batches (createSurface + updateComponents)
+  const batches: A2uiMsg[][] = [];
+  let currentBatch: A2uiMsg[] = [];
+
+  for (const msg of messages) {
+    if (msg.createSurface && currentBatch.length > 0) {
+      batches.push(currentBatch);
+      currentBatch = [];
+    }
+    currentBatch.push(msg);
+  }
+  if (currentBatch.length > 0) {
+    batches.push(currentBatch);
+  }
+
+  let batchIdx = 0;
+  const emitNext = () => {
+    if (signal.aborted) return;
+    if (batchIdx >= batches.length) {
+      onDone();
+      return;
+    }
+
+    callbacks.onA2UI(batches[batchIdx]);
+    batchIdx++;
+
+    if (batchIdx < batches.length) {
+      setTimeout(emitNext, SURFACE_STAGGER_MS);
+    } else {
+      onDone();
+    }
+  };
+
+  // Emit the first surface immediately, rest with stagger
+  emitNext();
 }

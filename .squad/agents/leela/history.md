@@ -405,3 +405,20 @@ All DP reviewers approved; implementation complete per scope.
 **Learnings:**
 - `resolvedTheme` pattern (user pref vs. rendered value) is reusable for any setting that has a "system/auto" option — worth documenting as a standard pattern.
 - `useSyncExternalStore` is the right tool for any browser API subscription (matchMedia, ResizeObserver, IntersectionObserver) — prefer over manual useEffect+useState.
+### 2026-07-27: DP Review #40 + PR #126 Review (Component Streaming)
+
+**DP #40 — Progressive Rendering:** ✅ Approved
+- Three-layer pipeline (useProgressiveQueue hook, mock streaming stagger, CSS --enter-index) is architecturally sound
+- Clean separation: ref collects ALL IDs authoritatively, queue state drives incremental render
+- No security concerns — no new data inputs, existing A2UI pipeline used throughout
+
+**PR #126 — Request Changes (scope creep):**
+- Progressive rendering code (commit 76fb803) is clean and ready to merge
+- PR also bundles validation safeguards DS001–DS013 (commit d023d31, issue #36) — ~1500 lines of unrelated work
+- Requested Fry split #36 into its own PR with separate DP review
+- Once split, progressive rendering PR can be approved immediately
+
+**Learnings:**
+- Always check commit list on multi-commit PRs for scope violations — file count (23 files) was the first red flag
+- Validation safeguards are Bender's domain (#36) not Fry's — routing violation on top of scope creep
+- The `useProgressiveQueue` pattern (timer + refs to avoid stale closures) is a good reusable hook pattern for any future staggered UI reveals

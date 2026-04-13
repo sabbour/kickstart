@@ -293,3 +293,11 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - **Key files:** `packages/core/src/engine/data-binding.ts` (enhanced), `packages/core/src/engine/index.ts` (new exports), `packages/core/src/__tests__/data-binding.test.ts` (55 tests).
 - **No vendor layer changes:** All work in Kickstart's own core engine. A2UI vendor `DataModel`/`DataContext`/`GenericBinder` unchanged.
 - **Test count:** 588 passing (533 existing + 55 new).
+### Progressive Component Streaming (#40) — 2026-07-27
+
+- **Timer-based progressive queue pattern:** `useProgressiveQueue` hook accepts surface IDs and reveals them one at a time with configurable stagger delay (150ms). Uses refs for queue/visible state to avoid stale closures in timer callbacks. Provides `flush()` for instant reveal of remaining items on stream completion.
+- **Mock streaming surface stagger:** Break A2UI message batches into per-surface groups (keyed by `createSurface`), emit each group with 200ms delay. First surface emits immediately; rest stagger via `setTimeout` chain.
+- **CSS stagger via custom property:** `--enter-index` set per component in JSX, used in CSS as `animation-delay: calc(var(--enter-index) * 60ms)`. Avoids needing `:nth-child` which doesn't work with dynamically-added elements.
+- **Layout shift prevention:** `contain: inline-size` on the streaming bubble prevents width recalculations. `will-change: transform, opacity` hints for GPU compositing. `overflow-anchor: auto` keeps scroll position stable.
+- **Architecture insight:** The `streamingSurfaceIdsRef` (authoritative list for completed message) is separate from the progressive queue's `visibleIds` (what's rendered now). Ref collects ALL, queue reveals incrementally. On completion, `flush()` shows remaining, then ref contents go into the finalized `ChatMessage.surfaceIds`.
+- **PR #126** opened as draft. Closes #40.

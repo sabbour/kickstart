@@ -3900,3 +3900,38 @@ The Design Review ceremony is already in `ceremonies.md` but was being skipped. 
 2. Address cross-branch contamination process: PRs should only contain changes related to their issue.
 
 **Status:** Approved — merge when ready.
+### Decision: Progressive Component Rendering — DP Approved, PR Scope Split Required
+**Author:** Leela (Lead)
+**Date:** 2026-07-27
+**Status:** Pending split
+**PR:** #126
+**Issue:** #40
+
+**Context:** Fry's DP for progressive component rendering (#40) proposes a three-layer pipeline: `useProgressiveQueue` hook (150ms stagger), mock streaming surface stagger (200ms), CSS `--enter-index` animation with layout shift prevention.
+
+**Decisions:**
+
+1. **DP architecture approved** — The three-layer approach is clean, follows existing patterns, introduces no new security surface. The `useProgressiveQueue` hook with refs for stale closure avoidance is the standard pattern for future staggered UI reveals.
+
+2. **PR #126 requires scope split** — The PR bundles validation safeguards (issue #36, commit d023d31, ~1500 lines) with progressive rendering (#40). Per DP compliance policy, each PR maps to one issue. Fry must split #36 into its own branch/PR with its own DP review cycle.
+
+3. **`--enter-index` is the standard for animated component entry** — Any future A2UI component rendering path should use the `a2ui-component--entering` class with `--enter-index` CSS custom property for consistent staggered appearance.
+
+**Impact:** PR #126 blocked until #36 work is extracted. Progressive rendering code itself is approved and can merge once isolated.
+### Decision: Progressive Component Rendering Pattern
+**Author:** Fry (Frontend Dev)
+**Date:** 2026-07-27
+**Status:** Implemented
+**PR:** #126
+**Issue:** #40
+
+**Context:** Components were rendered all at once after the LLM response completed, creating a jarring UX.
+
+**Decision:**
+1. **Timer-based progressive queue** — `useProgressiveQueue` hook sits between `onA2UI` and render state. Incoming surface IDs are queued and revealed one-at-a-time with a 150ms stagger delay. This pattern is independent of the streaming source (works for both mock and real SSE).
+
+2. **Mock streaming stagger** — `sendMock()` emits each surface's A2UI message pair individually with 200ms delays, rather than dumping all at end. Groups by `createSurface` boundaries.
+
+3. **CSS stagger via `--enter-index`** — Each component receives a `--enter-index` CSS custom property. Animation delay is `calc(var(--enter-index) * 60ms)`. This is the standard approach for any future animated component entry.
+
+**Impact:** Any future A2UI component rendering path should use the `a2ui-component--entering` class with `--enter-index` for consistent progressive appearance.
