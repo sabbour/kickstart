@@ -28,6 +28,9 @@ export const runAsNonRootValidator: Validator = {
     }
 
     const content = artifact.content;
+    // TODO: This regex checks if ANY container/pod has runAsNonRoot: true.
+    // It should verify ALL containers have it set. Requires YAML parsing
+    // or a more sophisticated regex approach to iterate over each container block.
     const hasRunAsNonRoot = /^\s+runAsNonRoot:\s*true\s*$/m.test(content);
 
     if (!hasRunAsNonRoot) {
