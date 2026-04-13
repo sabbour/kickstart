@@ -40,6 +40,7 @@ import {
   type IconEntry,
 } from './playground-icons';
 import { getFluentIcon } from '../catalog/icons/fluent-icons';
+import { apiFetch } from '../services/api-client';
 
 // ── LLM → A2UI component normalizer ─────────────────────────────────────
 // The LLM may output components in two formats:
@@ -971,7 +972,7 @@ function PlaygroundInner() {
     inspireAbortRef.current = controller;
 
     try {
-      const res = await fetch('/api/inspirations/widgets?stream=true', { signal: controller.signal });
+      const res = await apiFetch('/api/inspirations/widgets?stream=true', { signal: controller.signal });
       if (!res.ok || !res.body) throw new Error('Streaming API error');
 
       const reader = res.body.getReader();
@@ -1000,7 +1001,7 @@ function PlaygroundInner() {
       if (err instanceof Error && err.name === 'AbortError') return;
       setCreatePrompt('');
       try {
-        const res = await fetch('/api/inspirations/widgets');
+        const res = await apiFetch('/api/inspirations/widgets');
         if (res.ok) {
           const ideas = await res.json();
           if (Array.isArray(ideas) && ideas.length > 0) {
@@ -1153,7 +1154,7 @@ function PlaygroundInner() {
     setCreateLoading(true);
 
     try {
-      const res = await fetch('/api/playground', {
+      const res = await apiFetch('/api/playground', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

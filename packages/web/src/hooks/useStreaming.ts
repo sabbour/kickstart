@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import type { StreamEvent, A2uiMsg } from '../types';
+import { apiFetch, SessionExpiredError } from '../services/api-client';
 
 interface StreamCallbacks {
   onDelta: (text: string) => void;
@@ -30,7 +31,7 @@ export function useStreaming() {
     let lastSessionId: string | undefined;
 
     try {
-      const res = await fetch('/api/converse', {
+      const res = await apiFetch('/api/converse', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -66,6 +67,11 @@ export function useStreaming() {
           try {
             const event: StreamEvent = JSON.parse(data);
 
+            if (event.error) {
+              callbacks.onError(event.error);
+              return;
+            }
+
             if (event.delta) {
               accumulated += event.delta;
               setStreamText(accumulated);
@@ -99,9 +105,13 @@ export function useStreaming() {
 
       callbacks.onComplete(accumulated, lastModel, lastSessionId);
     } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        callbacks.onError(err.message || 'Connection failed');
+      if (err.name === 'AbortError') return;
+      if (err instanceof SessionExpiredError) {
+        callbacks.onError(err.message);
+        window.location.href = '/.auth/login/aad?post_login_redirect_uri=/';
+        return;
       }
+      callbacks.onError(err.message || 'Connection failed');
     } finally {
       setIsStreaming(false);
       abortRef.current = null;

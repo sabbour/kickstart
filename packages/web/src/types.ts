@@ -59,6 +59,7 @@ export interface A2uiComponent {
 }
 
 export interface StreamEvent {
+  error?: string;
   delta?: string;
   content?: string;
   a2ui?: A2uiMsg[];
