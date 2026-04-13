@@ -12,9 +12,10 @@ interface MessageListProps {
   streamingText: string;
   streamingSurfaceIds?: string[];
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
+  debugEnabled?: boolean;
 }
 
-export function MessageList({ messages, isStreaming, streamingText, streamingSurfaceIds, getSurface }: MessageListProps) {
+export function MessageList({ messages, isStreaming, streamingText, streamingSurfaceIds, getSurface, debugEnabled }: MessageListProps) {
   const lastIndex = messages.length - 1;
   const hasStreamingSurfaces = (streamingSurfaceIds?.length ?? 0) > 0;
 
@@ -26,6 +27,7 @@ export function MessageList({ messages, isStreaming, streamingText, streamingSur
           message={msg}
           getSurface={getSurface}
           isActive={index === lastIndex}
+          debugEnabled={debugEnabled}
         />
       ))}
 

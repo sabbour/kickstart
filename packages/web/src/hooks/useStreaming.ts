@@ -1,12 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
-import type { StreamEvent, A2uiMsg } from '../types';
+import type { StreamEvent, A2uiMsg, DebugMetadata } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
 
 interface StreamCallbacks {
   onDelta: (text: string) => void;
   onA2UI: (messages: A2uiMsg[]) => void;
   onPhase: (phase: string) => void;
-  onComplete: (fullText: string, model?: string, sessionId?: string) => void;
+  onComplete: (fullText: string, model?: string, sessionId?: string, debugInfo?: DebugMetadata) => void;
   onError: (error: string) => void;
 }
 
@@ -18,7 +18,8 @@ export function useStreaming() {
   const send = useCallback(async (
     message: string,
     sessionId: string | undefined,
-    callbacks: StreamCallbacks
+    callbacks: StreamCallbacks,
+    debugMode?: boolean,
   ) => {
     setIsStreaming(true);
     setStreamText('');
@@ -29,6 +30,7 @@ export function useStreaming() {
     let accumulated = '';
     let lastModel: string | undefined;
     let lastSessionId: string | undefined;
+    const renderDecisions: string[] = [];
 
     try {
       const res = await apiFetch('/api/converse', {
@@ -39,7 +41,7 @@ export function useStreaming() {
         },
         body: JSON.stringify({ sessionId, message, stream: true }),
         signal: controller.signal,
-      });
+      }, debugMode);
 
       if (!res.ok) {
         throw new Error(`API error: ${res.status}`);
@@ -101,11 +103,24 @@ export function useStreaming() {
             if (event.sessionId) {
               lastSessionId = event.sessionId;
             }
+
+            if (event.renderDecisions) {
+              renderDecisions.push(...event.renderDecisions);
+            }
           } catch { /* skip malformed JSON */ }
         }
       }
 
-      callbacks.onComplete(accumulated, lastModel, lastSessionId);
+      // Build debug info when debug mode is active
+      const debugInfo: DebugMetadata | undefined = debugMode
+        ? {
+            model: lastModel,
+            rawResponse: accumulated,
+            renderDecisions: renderDecisions.length > 0 ? renderDecisions : undefined,
+          }
+        : undefined;
+
+      callbacks.onComplete(accumulated, lastModel, lastSessionId, debugInfo);
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       if (err instanceof SessionExpiredError) {

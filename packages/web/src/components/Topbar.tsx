@@ -1,5 +1,6 @@
 import React from 'react';
 import { ThemeToggle } from './ThemeToggle';
+import { useDebug } from '../contexts/DebugContext';
 
 interface TopbarProps {
   onToggleSidebar: () => void;
@@ -8,12 +9,24 @@ interface TopbarProps {
 }
 
 export function Topbar({ onToggleSidebar, showSessionsToggle }: TopbarProps) {
+  const { debugEnabled, toggleDebug } = useDebug();
+
   return (
     <header className="topbar" role="banner">
       <a className="topbar-brand" href="#/" aria-label="Kickstart — home">
         <span>Kickstart your app ideas on Azure</span>
       </a>
       <div className="topbar-actions">
+        {debugEnabled && (
+          <button
+            className="topbar-btn topbar-debug-badge"
+            aria-label="Debug mode active — click to disable"
+            title="Debug mode ON (Ctrl+Shift+D to toggle)"
+            onClick={toggleDebug}
+          >
+            🐛 Debug
+          </button>
+        )}
         {showSessionsToggle && (
           <button
             id="topbar-sessions-toggle"
