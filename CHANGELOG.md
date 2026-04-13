@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## 0.5.1
+
+### Bug Fixes
+
+- **Footer version display** — Version now injected from `package.json` at build time via Vite `define()`, replacing hardcoded `v0.1.0` (#133)
+
+### Features
+
+- **IndexedDB virtual filesystem** — File tree panel with Monaco editor, virtual FS backed by IndexedDB (#125)
+
 ## 0.5.0
 
 ### Validation & Security
