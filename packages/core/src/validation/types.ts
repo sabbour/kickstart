@@ -41,6 +41,12 @@ export interface Validator {
    * (e.g. a Dockerfile when this rule only applies to K8s Deployments).
    */
   validate(artifact: Artifact): ValidationResult;
+  /**
+   * Optional auto-fix: given the artifact content, return corrected content
+   * or null if no fix is applicable. Only adds security-hardening fields —
+   * never removes existing configuration.
+   */
+  autoFix?(content: string): string | null;
 }
 
 /** All validation results for a single artifact. */
