@@ -655,3 +655,12 @@ Addressed Copilot review on PR #78 (data→context terminology fix). PR merged s
 - **Tests:** 15 new tests (43 total in skill-resolver.test.ts). Covers typed skills, phase filtering, priority ordering, skill+phasePrompt coexistence, resolveSkillsFromList, resolveSkillsAsync, and all 5 IaC skills including Zapp requirement assertions.
 - **PR:** #119 (draft) — squad/21-33-knowledge-skills branch.
 - **Key files:** `packages/core/src/engine/types.ts`, `packages/core/src/engine/skill-resolver.ts`, `packages/core/src/kits/types.ts`, `packages/core/src/kits/azure-kit.ts`, `packages/core/src/__tests__/skill-resolver.test.ts`
+
+### 2026-07-27: LLM Endpoint Files Request Regression (#117, PR #121)
+
+- **Issue:** #117 — LLM endpoints firing a spurious "files request" alongside every LLM call
+- **Root cause:** PR #116 added `list_artifacts` and `get_artifact` to `defaultRegistry.registerAll()` in `tools/index.ts`. Since `converse.ts` sends all registered tools to the LLM via `defaultRegistry.toOpenAIFormat()`, the LLM was calling `list_artifacts` on every conversation turn.
+- **Fix:** Removed `list_artifacts` and `get_artifact` from the default registry bootstrap. They remain exported as named exports for programmatic use but are no longer sent to the LLM as callable tools. Tool count reduced from 11 to 9.
+- **Key file:** `packages/core/src/tools/index.ts` (lines 28-53)
+- **Lesson:** Be cautious about adding tools to `defaultRegistry` — every tool there gets sent to the LLM on every converse call. Artifact management tools should be registered on-demand or phase-gated, not globally.
+- **Tests:** All 533 tests pass, build clean.
