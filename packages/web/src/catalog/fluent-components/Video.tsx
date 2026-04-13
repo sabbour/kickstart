@@ -20,6 +20,7 @@ export const Video = createReactComponent(VideoApi, ({props}) => {
       src={props.url}
       controls
       className={classes.root}
+      aria-label={typeof props.accessibility?.label === 'string' ? props.accessibility.label : 'Video player'}
     />
   );
 });

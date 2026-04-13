@@ -3935,3 +3935,112 @@ The Design Review ceremony is already in `ceremonies.md` but was being skipped. 
 3. **CSS stagger via `--enter-index`** — Each component receives a `--enter-index` CSS custom property. Animation delay is `calc(var(--enter-index) * 60ms)`. This is the standard approach for any future animated component entry.
 
 **Impact:** Any future A2UI component rendering path should use the `a2ui-component--entering` class with `--enter-index` for consistent progressive appearance.
+### Decision: A2UI Component Accessibility Patterns
+**Author:** Hermes (Tester)
+**Date:** 2026-07-27
+**Issue:** #43
+**PR:** #124
+**Status:** Implemented
+
+**Context:** WCAG 2.1 AA audit revealed that the A2UI schema defines `accessibility.label` and `accessibility.description` on all components via CommonProps, but no component consumed these props. Additionally, custom interactive components (RadioGroup, ProgressSteps) lacked keyboard navigation and semantic roles.
+
+**Decisions:**
+
+1. **accessibility.label passthrough** — All components that render standalone elements (Icon, Image, Video, AudioPlayer, List) must read `props.accessibility?.label` and apply it as `aria-label`. Decorative elements default to `aria-hidden="true"`.
+
+2. **Custom interactive components use WAI-ARIA patterns** — RadioGroup uses the roving tabIndex pattern (first item tabIndex=0, rest -1, arrow keys cycle). ProgressSteps uses semantic `<ol>/<li>` with `aria-current="step"`.
+
+3. **Dynamic content needs `aria-live`** — Components that update in real-time (DeploymentProgress, SteppedCarousel content area) must include `aria-live="polite"` regions.
+
+4. **Form label association** — All form components must connect labels to inputs via `htmlFor`/`id`. Required fields use `aria-required` and decorative asterisks are `aria-hidden="true"`.
+
+5. **External link context** — Links opening in new windows must include visually-hidden "(opens in new window)" text and `aria-hidden="true"` on the external icon.
+
+**Impact:** All future A2UI components must follow these patterns. The a11y test suite (`packages/web/src/__tests__/a11y-components.test.ts`) validates these patterns statically.
+# Decision: IndexedDB VFS Architecture (Dual Filesystem + Sync Bridge)
+
+**Author:** Fry (Frontend Dev)
+**Date:** 2026-04-12
+**Status:** Implemented
+**Issue:** #39
+
+## Context
+
+The app has two virtual filesystems with different lifecycle concerns:
+1. **VirtualFileSystem** (in-memory) — tracks streaming state ("generating" vs "complete"), used for real-time file generation feedback during conversation.
+2. **VirtualFS** (IndexedDB) — persistent storage that survives page reloads.
+
+## Decision
+
+Keep both filesystems. Add a sync bridge in `App.tsx` that auto-persists "complete" files from the in-memory FS to IndexedDB. The UI shows both:
+- In-memory `FileEditor` for streaming feedback (generating state)
+- IndexedDB `FileTreePanel` for persistent file browsing with Monaco
+
+## Rationale
+
+- Merging into one system would complicate the streaming pipeline (can't await IndexedDB during synchronous useSyncExternalStore updates).
+- The sync bridge is a clean one-way flow: in-memory → IndexedDB on completion.
+- Session clear/new wipes both stores to prevent stale data.
+
+## Files Affected
+
+- `packages/web/src/services/virtual-fs.ts` — VFSFile records, buildFileTree, clear()
+- `packages/web/src/contexts/VirtualFSContext.tsx` — tree + fileRecords exposure
+- `packages/web/src/components/FileTreePanel.tsx` — Fluent UI panel with Monaco
+- `packages/web/src/App.tsx` — sync bridge + dual panel rendering
+### Decision: A2UI Schema Props Require Type Narrowing for Native HTML Attributes
+**Author:** Leela (Lead)
+**Date:** 2026-07-27
+**Issue:** #43
+**PR:** #124
+**Status:** Pending (fix required)
+
+**Context:** The A2UI schema defines `accessibility.label` and `accessibility.description` as union types (`string | { path: string } | { call: string; args: Record<string, any>; returnType: string }`) to support dynamic resolution. When components pass these props directly to native HTML attributes like `aria-label`, TypeScript rejects the assignment because React expects `string | undefined`.
+
+**Decision:** All A2UI components that consume `props.accessibility?.label` (or any other union-typed schema prop) for native HTML attributes must narrow the type first:
+
+```tsx
+const a11yLabel = typeof props.accessibility?.label === 'string'
+  ? props.accessibility.label
+  : undefined;
+```
+
+A shared utility (`resolveA11yLabel`) should be considered if this pattern appears in 5+ components.
+
+**Impact:** Applies to all current and future A2UI components consuming CommonProps. Hermes to fix in PR #124; pattern to be documented in component guidelines.
+# Decision: IndexedDB VFS Dual-Filesystem Architecture Approved
+
+**Author:** Leela (Lead)
+**Date:** 2026-04-13
+**Status:** Approved
+**Issue:** #39
+**PR:** #125
+
+## Context
+
+Fry proposed a dual-filesystem architecture: in-memory VirtualFileSystem for streaming state and IndexedDB VirtualFS for persistence, connected by a one-way sync bridge.
+
+## Decision
+
+Architecture approved. The dual-FS approach is correct because:
+1. In-memory FS uses synchronous useSyncExternalStore — cannot await IndexedDB in the streaming hot path.
+2. One-way sync (in-memory to IndexedDB on "complete") avoids bidirectional state conflicts.
+3. IDB v2 schema with lazy v1 record migration avoids destructive store rewrites.
+
+## Impact
+
+- Sets precedent for future persistence layers: keep streaming/real-time state separate from durable storage.
+- buildFileTree() utility is reusable for any future file-browsing UI.
+- Sync bridge pattern (subscribe + idempotent put) can be reused for other in-memory to persistent flows.
+
+
+
+
+---
+---
+---
+---
+
+
+
+

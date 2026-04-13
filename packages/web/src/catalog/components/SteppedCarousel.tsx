@@ -94,15 +94,15 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
   return (
     <Card className={classes.root}>
       {/* Step indicator bar */}
-      <div className={classes.indicators}>
+      <div className={classes.indicators} role="tablist" aria-label="Carousel steps">
         {props.steps.map((step, i) => {
           let pillClass = classes.pillUpcoming;
           if (i === clampedStep) pillClass = classes.pillActive;
           else if (i < clampedStep) pillClass = classes.pillCompleted;
 
           return (
-            <div key={i} className={classes.indicator}>
-              <div className={`${classes.pill} ${pillClass}`} />
+            <div key={i} className={classes.indicator} role="tab" aria-selected={i === clampedStep} aria-label={`Step ${i + 1}: ${step.title}`}>
+              <div className={`${classes.pill} ${pillClass}`} aria-hidden="true" />
               <Caption1
                 style={{
                   color: i === clampedStep
@@ -122,7 +122,7 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
       <Subtitle2>{activeStepData?.title}</Subtitle2>
 
       {/* Active step content */}
-      <div className={classes.body}>
+      <div className={classes.body} role="tabpanel" aria-live="polite" aria-label={`Step ${clampedStep + 1}: ${activeStepData?.title}`}>
         {activeStepData?.child ? buildChild(activeStepData.child) : null}
       </div>
 
@@ -137,6 +137,7 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
           icon={<ChevronLeftRegular />}
           disabled={isFirst}
           onClick={() => setCurrentStep(s => Math.max(0, s - 1))}
+          aria-label="Go to previous step"
         >
           Previous
         </Button>
@@ -148,6 +149,7 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
           onClick={() => {
             if (!isLast) setCurrentStep(s => s + 1);
           }}
+          aria-label={isLast ? 'Complete carousel' : 'Go to next step'}
         >
           {isLast ? 'Done' : 'Next'}
         </Button>

@@ -45,7 +45,14 @@ export const Link = createReactComponent(FlexibleLinkApi, ({props}) => {
       inline
     >
       {props.text ?? ''}
-      {isExternal && <OpenRegular className={classes.icon} />}
+      {isExternal && (
+        <>
+          <OpenRegular className={classes.icon} aria-hidden="true" />
+          <span style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0,0,0,0)' }}>
+            (opens in new window)
+          </span>
+        </>
+      )}
     </FluentLink>
   );
 });

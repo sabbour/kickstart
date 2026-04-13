@@ -155,6 +155,15 @@ export const DeploymentProgress = createReactComponent(DeploymentProgressApi, ({
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'complete': return 'Complete';
+      case 'error': return 'Error';
+      case 'running': return 'In progress';
+      default: return 'Pending';
+    }
+  };
+
   return (
     <Card className={classes.root}>
       <div className={classes.header}>
@@ -164,15 +173,16 @@ export const DeploymentProgress = createReactComponent(DeploymentProgressApi, ({
         <Subtitle2>{props.title ?? 'Deployment Progress'}</Subtitle2>
       </div>
 
-      <div className={classes.stepList}>
+      <div className={classes.stepList} role="list" aria-label="Deployment steps" aria-live="polite">
         {steps.map((step, i) => {
           const isLast = i === steps.length - 1;
           return (
             <div
               key={step.id}
               className={`${classes.step} ${!isLast ? classes.stepWithConnector : ''}`}
+              role="listitem"
             >
-              <div className={classes.iconWrapper}>
+              <div className={classes.iconWrapper} aria-label={getStatusLabel(step.status)} role="img">
                 {getStatusIcon(step.status)}
               </div>
               <div className={classes.stepContent}>

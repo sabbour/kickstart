@@ -25,7 +25,12 @@ export const AudioPlayer = createReactComponent(AudioPlayerApi, ({props}) => {
       {props.description && (
         <Caption1>{props.description}</Caption1>
       )}
-      <audio src={props.url} controls className={classes.audio} />
+      <audio
+        src={props.url}
+        controls
+        className={classes.audio}
+        aria-label={typeof props.accessibility?.label === 'string' ? props.accessibility.label : (typeof props.description === 'string' ? props.description : 'Audio player')}
+      />
     </div>
   );
 });
