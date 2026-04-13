@@ -107,6 +107,14 @@
   --file-viewer-width: 420px;
 }
 
+/* Smooth transition when switching themes */
+html,
+body,
+.app-shell {
+  transition: background-color var(--duration-normal) var(--easing-ease),
+              color var(--duration-normal) var(--easing-ease);
+}
+
 /* ==========================================================================
    Dark theme overrides (activated via data-theme="dark" on <html>)
    ========================================================================== */

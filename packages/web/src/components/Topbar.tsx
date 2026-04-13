@@ -1,4 +1,5 @@
 import React from 'react';
+import { ThemeToggle } from './ThemeToggle';
 
 interface TopbarProps {
   onToggleSidebar: () => void;
@@ -26,6 +27,7 @@ export function Topbar({ onToggleSidebar, showSessionsToggle }: TopbarProps) {
             </svg>
           </button>
         )}
+        <ThemeToggle />
         <button className="topbar-user" aria-label="Sign in">
           <span className="topbar-avatar">?</span>
           <span>Sign in</span>

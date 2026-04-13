@@ -27,8 +27,8 @@ function msgId(role: string) {
 }
 
 export function App() {
-  const { theme } = useTheme();
-  const fluentTheme = theme === 'dark' ? webDarkTheme : webLightTheme;
+  const { resolvedTheme } = useTheme();
+  const fluentTheme = resolvedTheme === 'dark' ? webDarkTheme : webLightTheme;
 
   const [mode, setMode] = useState<AppMode>(playgroundEnabled ? 'chat' : 'landing');
   const [sidebarOpen, setSidebarOpen] = useState(false);
