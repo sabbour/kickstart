@@ -15,6 +15,7 @@ import {
   Spinner,
   Tooltip,
   makeStyles,
+  shorthands,
   tokens,
 } from '@fluentui/react-components';
 import {
@@ -57,9 +58,7 @@ const useStyles = makeStyles({
     paddingBottom: tokens.spacingVerticalS,
     paddingLeft: tokens.spacingHorizontalM,
     paddingRight: tokens.spacingHorizontalS,
-    borderBottomWidth: tokens.strokeWidthThin,
-    borderBottomStyle: 'solid',
-    borderBottomColor: tokens.colorNeutralStroke2,
+    ...shorthands.borderBottom(tokens.strokeWidthThin, 'solid', tokens.colorNeutralStroke2),
   },
   headerActions: {
     display: 'flex',
@@ -70,9 +69,7 @@ const useStyles = makeStyles({
     maxHeight: '40%',
     overflowY: 'auto',
     overflowX: 'hidden',
-    borderBottomWidth: tokens.strokeWidthThin,
-    borderBottomStyle: 'solid',
-    borderBottomColor: tokens.colorNeutralStroke2,
+    ...shorthands.borderBottom(tokens.strokeWidthThin, 'solid', tokens.colorNeutralStroke2),
   },
   treeNode: {
     display: 'flex',
@@ -82,7 +79,7 @@ const useStyles = makeStyles({
     paddingBottom: '3px',
     paddingRight: tokens.spacingHorizontalS,
     cursor: 'pointer',
-    borderWidth: '0',
+    ...shorthands.border('0'),
     backgroundColor: 'transparent',
     color: tokens.colorNeutralForeground1,
     fontFamily: tokens.fontFamilyBase,
@@ -125,9 +122,7 @@ const useStyles = makeStyles({
     paddingLeft: tokens.spacingHorizontalM,
     paddingRight: tokens.spacingHorizontalS,
     backgroundColor: tokens.colorNeutralBackground3,
-    borderBottomWidth: tokens.strokeWidthThin,
-    borderBottomStyle: 'solid',
-    borderBottomColor: tokens.colorNeutralStroke2,
+    ...shorthands.borderBottom(tokens.strokeWidthThin, 'solid', tokens.colorNeutralStroke2),
   },
   codeFileInfo: {
     display: 'flex',
