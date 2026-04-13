@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkle24Regular } from '@fluentui/react-icons';
 import type { Session } from '../types';
+import { apiFetch } from '../services/api-client';
 
 const INSPIRATIONS = [
   "Movie night pick that settles disputes",
@@ -74,7 +75,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
     setInspireLoading(true);
     setInputValue(''); // Clear input before streaming
     try {
-      const res = await fetch('/api/inspirations?stream=true');
+      const res = await apiFetch('/api/inspirations?stream=true');
       if (!res.ok) throw new Error('API error');
       
       const reader = res.body?.getReader();
