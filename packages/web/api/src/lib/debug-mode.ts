@@ -41,29 +41,37 @@ export interface DebugMetadata {
  * @param rawContent - The raw LLM output before processing
  * @param a2uiCount  - Number of A2UI messages extracted
  * @param hadExplicitA2UI - Whether the LLM returned explicit A2UI JSON
+ * @param currentPhase - Current conversation phase name
  */
 export function buildConverseDebugMeta(
   model: string,
   rawContent: string,
   a2uiCount: number,
   hadExplicitA2UI: boolean,
+  currentPhase?: string,
 ): DebugMetadata {
   const renderDecisions: RenderDecision[] = [];
 
+  // Phase indicator is always injected
+  renderDecisions.push({
+    type: "phase_indicator",
+    detail: `ConversationPhase component added for phase: ${currentPhase ?? "unknown"}`,
+  });
+
   if (hadExplicitA2UI) {
     renderDecisions.push({
-      type: "a2ui-parsed",
-      detail: `LLM returned structured JSON envelope with ${a2uiCount} A2UI message(s)`,
+      type: "a2ui_parsed",
+      detail: `LLM returned structured JSON envelope with ${a2uiCount} A2UI component(s)`,
     });
   } else if (a2uiCount > 0) {
     renderDecisions.push({
-      type: "component-inferred",
+      type: "component_inferred",
       detail: `No explicit A2UI block; ${a2uiCount} component(s) inferred from response text`,
     });
   } else {
     renderDecisions.push({
-      type: "text-only",
-      detail: "Plain text response — no A2UI components generated",
+      type: "no_a2ui",
+      detail: "Text-only response, no A2UI components generated",
     });
   }
 
@@ -81,7 +89,17 @@ export function buildGenerateDebugMeta(
     model,
     rawContent,
     renderDecisions: [
-      { type: "codex-generation", detail: `Code generated via ${model}` },
+      { type: "codex_generation", detail: `Code generated via ${model}` },
+      { type: "no_a2ui", detail: "Code generation endpoint — no A2UI rendering" },
     ],
   };
+}
+
+/**
+ * Format render decisions as plain strings for SSE transmission.
+ * The frontend expects `renderDecisions: string[]` at the top level
+ * of SSE event data payloads.
+ */
+export function formatRenderDecisions(decisions: RenderDecision[]): string[] {
+  return decisions.map((d) => `[${d.type}] ${d.detail}`);
 }
