@@ -655,3 +655,21 @@ Addressed Copilot review on PR #78 (data→context terminology fix). PR merged s
 - **Tests:** 15 new tests (43 total in skill-resolver.test.ts). Covers typed skills, phase filtering, priority ordering, skill+phasePrompt coexistence, resolveSkillsFromList, resolveSkillsAsync, and all 5 IaC skills including Zapp requirement assertions.
 - **PR:** #119 (draft) — squad/21-33-knowledge-skills branch.
 - **Key files:** `packages/core/src/engine/types.ts`, `packages/core/src/engine/skill-resolver.ts`, `packages/core/src/kits/types.ts`, `packages/core/src/kits/azure-kit.ts`, `packages/core/src/__tests__/skill-resolver.test.ts`
+
+
+### 2026-07-27: Filesystem Abstraction + Cloud Shell Provider (#47, PR #123)
+
+- **Issue:** #47 - feat: Remote filesystem abstraction + Cloud Shell provider
+- **PR:** #123 (draft)
+- **New module:** packages/core/src/filesystem/ - pluggable file I/O abstraction
+- **FileSystemProvider interface:** read(path), write(path, content), list(directory), delete(path), exists(path) - all async, text-only, forward-slash relative paths.
+- **InMemoryFileSystemProvider:** Zero-dependency implementation for tests and web frontend. Supports directory listing with child-directory deduplication.
+- **CloudShellProvider:** Connector-backed provider using APIConnector for authenticated Cloud Shell REST API calls. Routes through /api/fs/{basePath}/{path}. 404 on read throws FileNotFoundError; 404 on delete is a no-op.
+- **FileSystemProviderRegistry:** register(), setActive(), active getter, auto-activates first registered provider.
+- **Path sanitisation:** sanitizePath() rejects .. traversal, absolute paths, backslashes, and empty paths.
+- **ToolContext extension:** Added optional fileSystem?: FileSystemProvider to ToolContext.
+- **Four LLM tools:** fs_read (no approval), fs_write (approval required), fs_list (no approval), fs_delete (approval required).
+- **Decision:** Filesystem is infrastructure, not an IntegrationKit. Tools registered directly in default registry.
+- **Decision:** ToolContext.fileSystem is optional because web-only contexts don't have real filesystems.
+- **Test count:** 41 new tests (574 total), all passing. Build clean.
+- **Key files:** packages/core/src/filesystem/types.ts, in-memory-provider.ts, cloud-shell-provider.ts, registry.ts, tools/fs-*.ts
