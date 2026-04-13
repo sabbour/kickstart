@@ -5,18 +5,20 @@
  *
  * Validates generated Kubernetes manifests and other deployment artifacts
  * against deployment safeguards before the user deploys. Each validator
- * maps to one or more DEPLOYMENT_SAFEGUARDS rules (DS001–DS020).
- *
- * The `RulesEngine` layer adds rule metadata (category, tags, AKS constraint
- * mapping) on top of the core `ValidationEngine` for discovery and reporting.
+ * maps to one or more DEPLOYMENT_SAFEGUARDS rules (DS001–DS013).
  *
  * @example
  * ```ts
- * import { createDefaultRulesEngine } from "@kickstart/core";
+ * import { ValidationEngine, resourceLimitsValidator, noLatestTagValidator } from "@kickstart/core";
  *
- * const engine = createDefaultRulesEngine();
- * const securityRules = engine.getByCategory("security");
- * const report = engine.validateWithCategories(myArtifact);
+ * const engine = new ValidationEngine();
+ * engine.register(resourceLimitsValidator);
+ * engine.register(noLatestTagValidator);
+ *
+ * const report = engine.validateArtifact(myArtifact);
+ * if (report.hasErrors) {
+ *   console.error("Deployment blocked — fix errors first.");
+ * }
  * ```
  */
 
@@ -27,16 +29,7 @@ export type {
   ArtifactValidationReport,
 } from "./types.js";
 
-export type {
-  RuleCategory,
-  AksConstraintFamily,
-  ValidationRule,
-  CategorisedValidationReport,
-  RulesEngineSummary,
-} from "./rule-types.js";
-
 export { ValidationEngine } from "./engine.js";
-export { RulesEngine } from "./rules-engine.js";
 
 // Individual validators — DS001–DS006
 export { resourceLimitsValidator } from "./validators/resource-limits.js";
@@ -47,7 +40,7 @@ export { namespaceSetValidator } from "./validators/namespace-set.js";
 export { replicaCountValidator } from "./validators/replica-count.js";
 export { imagePullPolicyValidator } from "./validators/image-pull-policy.js";
 
-// AKS Automatic safeguards — DS003–DS005, DS007–DS013
+// New validators — DS003–DS005, DS007–DS013
 export { runAsNonRootValidator } from "./validators/run-as-non-root.js";
 export { noPrivilegeEscalationValidator } from "./validators/no-privilege-escalation.js";
 export { noHostNetworkingValidator } from "./validators/no-host-networking.js";
@@ -58,19 +51,8 @@ export { resourceQuotasValidator } from "./validators/resource-quotas.js";
 export { networkPoliciesValidator } from "./validators/network-policies.js";
 export { podDisruptionBudgetValidator } from "./validators/pod-disruption-budget.js";
 
-// Rules engine validators — DS014–DS020
-export { containerPortNamesValidator } from "./validators/container-port-names.js";
-export { dropAllCapabilitiesValidator } from "./validators/drop-all-capabilities.js";
-export { noHostPidValidator } from "./validators/no-host-pid.js";
-export { noHostIpcValidator } from "./validators/no-host-ipc.js";
-export { serviceAccountTokenValidator } from "./validators/service-account-token.js";
-export { labelRequirementsValidator } from "./validators/label-requirements.js";
-export { topologySpreadConstraintsValidator } from "./validators/topology-spread-constraints.js";
-
 import type { ArtifactStore } from "../artifacts/types.js";
 import { ValidationEngine } from "./engine.js";
-import { RulesEngine } from "./rules-engine.js";
-import type { ValidationRule } from "./rule-types.js";
 import { resourceLimitsValidator } from "./validators/resource-limits.js";
 import { noLatestTagValidator } from "./validators/no-latest-tag.js";
 import { healthProbesValidator } from "./validators/health-probes.js";
@@ -87,44 +69,7 @@ import { noImagePullSecretsValidator } from "./validators/no-image-pull-secrets.
 import { resourceQuotasValidator } from "./validators/resource-quotas.js";
 import { networkPoliciesValidator } from "./validators/network-policies.js";
 import { podDisruptionBudgetValidator } from "./validators/pod-disruption-budget.js";
-import { containerPortNamesValidator } from "./validators/container-port-names.js";
-import { dropAllCapabilitiesValidator } from "./validators/drop-all-capabilities.js";
-import { noHostPidValidator } from "./validators/no-host-pid.js";
-import { noHostIpcValidator } from "./validators/no-host-ipc.js";
-import { serviceAccountTokenValidator } from "./validators/service-account-token.js";
-import { labelRequirementsValidator } from "./validators/label-requirements.js";
-import { topologySpreadConstraintsValidator } from "./validators/topology-spread-constraints.js";
 import type { ArtifactValidationReport } from "./types.js";
-
-/**
- * All built-in rules with their category, tags, and AKS constraint metadata.
- * This is the canonical rule registry — add new validators here.
- */
-export const ALL_RULES: readonly ValidationRule[] = [
-  { validator: resourceLimitsValidator, category: "reliability", tags: ["container", "resources"], aksConstraint: "resource-management", autoFixAvailable: false },
-  { validator: noLatestTagValidator, category: "best-practices", tags: ["container", "image"], autoFixAvailable: false },
-  { validator: healthProbesValidator, category: "reliability", tags: ["container", "probes"], autoFixAvailable: false },
-  { validator: noPrivilegedValidator, category: "security", tags: ["container", "security-context"], aksConstraint: "pod-security-standards", autoFixAvailable: false },
-  { validator: namespaceSetValidator, category: "best-practices", tags: ["metadata"], autoFixAvailable: false },
-  { validator: replicaCountValidator, category: "reliability", tags: ["pod-spec", "ha"], autoFixAvailable: false },
-  { validator: imagePullPolicyValidator, category: "best-practices", tags: ["container", "image"], autoFixAvailable: false },
-  { validator: runAsNonRootValidator, category: "security", tags: ["pod-spec", "security-context"], aksConstraint: "pod-security-standards", autoFixAvailable: true },
-  { validator: noPrivilegeEscalationValidator, category: "security", tags: ["container", "security-context"], aksConstraint: "pod-security-standards", autoFixAvailable: true },
-  { validator: noHostNetworkingValidator, category: "security", tags: ["pod-spec", "networking"], aksConstraint: "pod-security-standards", autoFixAvailable: true },
-  { validator: readOnlyRootFsValidator, category: "security", tags: ["container", "security-context"], autoFixAvailable: false },
-  { validator: gatewayApiIngressValidator, category: "networking", tags: ["ingress", "gateway-api"], aksConstraint: "managed-gateway", autoFixAvailable: false },
-  { validator: noImagePullSecretsValidator, category: "security", tags: ["pod-spec", "secrets"], aksConstraint: "workload-identity", autoFixAvailable: false },
-  { validator: resourceQuotasValidator, category: "reliability", tags: ["namespace", "resources"], aksConstraint: "resource-management", autoFixAvailable: false },
-  { validator: networkPoliciesValidator, category: "networking", tags: ["namespace", "networking"], autoFixAvailable: false },
-  { validator: podDisruptionBudgetValidator, category: "reliability", tags: ["pod-spec", "ha"], autoFixAvailable: false },
-  { validator: containerPortNamesValidator, category: "best-practices", tags: ["container", "networking"], autoFixAvailable: false },
-  { validator: dropAllCapabilitiesValidator, category: "security", tags: ["container", "security-context"], aksConstraint: "pod-security-standards", autoFixAvailable: true },
-  { validator: noHostPidValidator, category: "security", tags: ["pod-spec", "security-context"], aksConstraint: "pod-security-standards", autoFixAvailable: true },
-  { validator: noHostIpcValidator, category: "security", tags: ["pod-spec", "security-context"], aksConstraint: "pod-security-standards", autoFixAvailable: true },
-  { validator: serviceAccountTokenValidator, category: "security", tags: ["pod-spec", "workload-identity"], aksConstraint: "workload-identity", autoFixAvailable: true },
-  { validator: labelRequirementsValidator, category: "best-practices", tags: ["metadata", "observability"], autoFixAvailable: false },
-  { validator: topologySpreadConstraintsValidator, category: "reliability", tags: ["pod-spec", "ha"], autoFixAvailable: false },
-];
 
 /**
  * A pre-configured ValidationEngine with all built-in validators registered.
@@ -133,21 +78,24 @@ export const ALL_RULES: readonly ValidationRule[] = [
  */
 export function createDefaultValidationEngine(): ValidationEngine {
   const engine = new ValidationEngine();
-  for (const rule of ALL_RULES) {
-    engine.register(rule.validator);
-  }
-  return engine;
-}
-
-/**
- * A pre-configured RulesEngine with all built-in rules registered.
- * Provides categorised validation, AKS constraint mapping, and discovery APIs.
- */
-export function createDefaultRulesEngine(): RulesEngine {
-  const engine = new RulesEngine();
-  for (const rule of ALL_RULES) {
-    engine.register(rule);
-  }
+  // Original validators
+  engine.register(resourceLimitsValidator);
+  engine.register(noLatestTagValidator);
+  engine.register(healthProbesValidator);
+  engine.register(noPrivilegedValidator);
+  engine.register(namespaceSetValidator);
+  engine.register(replicaCountValidator);
+  engine.register(imagePullPolicyValidator);
+  // AKS Automatic safeguards (DS003–DS005, DS007–DS013)
+  engine.register(runAsNonRootValidator);
+  engine.register(noPrivilegeEscalationValidator);
+  engine.register(noHostNetworkingValidator);
+  engine.register(readOnlyRootFsValidator);
+  engine.register(gatewayApiIngressValidator);
+  engine.register(noImagePullSecretsValidator);
+  engine.register(resourceQuotasValidator);
+  engine.register(networkPoliciesValidator);
+  engine.register(podDisruptionBudgetValidator);
   return engine;
 }
 

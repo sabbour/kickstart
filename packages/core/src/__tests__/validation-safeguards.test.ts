@@ -38,9 +38,6 @@ kind: Deployment
 metadata:
   name: my-app
   namespace: my-app
-  labels:
-    app: my-app
-    version: v1.0.0
 spec:
   replicas: 2
   selector:
@@ -50,9 +47,7 @@ spec:
     metadata:
       labels:
         app: my-app
-        version: v1.0.0
     spec:
-      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
       containers:
@@ -60,13 +55,9 @@ spec:
           image: myregistry.azurecr.io/my-app:v1.0.0
           ports:
             - containerPort: 3000
-              name: http
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
           resources:
             requests:
               cpu: "100m"
@@ -728,10 +719,10 @@ describe("ValidationEngine.applyAutoFixes", () => {
 // ---------------------------------------------------------------------------
 
 describe("createDefaultValidationEngine (full DS coverage)", () => {
-  it("registers all 23 validators", () => {
+  it("registers all 16 validators", () => {
     const engine = createDefaultValidationEngine();
-    // 7 original + 9 DS003-DS013 + 7 DS014-DS020 = 23
-    expect(engine.registeredValidators.length).toBe(23);
+    // 7 original + 9 new = 16
+    expect(engine.registeredValidators.length).toBe(16);
   });
 
   it("validates a fully hardened Deployment with zero errors", () => {
