@@ -681,3 +681,15 @@ Addressed Copilot review on PR #78 (data→context terminology fix). PR merged s
 - **Decision:** ToolContext.fileSystem is optional because web-only contexts don't have real filesystems.
 - **Test count:** 41 new tests (574 total), all passing. Build clean.
 - **Key files:** packages/core/src/filesystem/types.ts, in-memory-provider.ts, cloud-shell-provider.ts, registry.ts, tools/fs-*.ts
+
+### 2025-07-25: Debug Metadata for SSE Streaming (v0.5.2)
+
+- **Feature:** Added opt-in debug metadata to SSE streaming and JSON responses
+- **Activation:** `x-kickstart-debug: true` header OR `?debug=true` query param
+- **Debug payload:** `{ model, rawContent, renderDecisions[] }` — model deployment name, raw LLM output, and rendering decisions array
+- **Backward compatible:** Debug fields only appear when explicitly requested; default responses unchanged
+- **New file:** `packages/web/api/src/lib/debug-mode.ts` — `isDebugMode()`, `buildConverseDebugMeta()`, `buildGenerateDebugMeta()`
+- **New export:** `getCodexDeploymentName()` in `openai-client.ts` (mirrors existing `getChatDeploymentName()`)
+- **Converse endpoint:** Debug in both SSE `done` event and non-streaming JSON response
+- **Generate endpoint:** Debug in both SSE `done` event and non-streaming JSON response
+- **PR:** #135

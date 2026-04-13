@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## 0.5.2
+
+### Features
+
+- **Debug mode** — Toggle with `?debug=true` URL param or `Ctrl+Shift+D`; shows 🐛 badge when active
+- **Per-message debug panel** — Expandable debug section below each assistant message showing model name, raw LLM response, and rendering engine decisions
+- **Debug metadata API** — SSE endpoints include `model`, `rawContent`, and `renderDecisions` when `x-kickstart-debug: true` header or `?debug=true` query param is set
+
 ## 0.5.1
 
 ### Bug Fixes

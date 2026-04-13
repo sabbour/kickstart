@@ -29,6 +29,8 @@ import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
 import { safeErrorResponse, safeStreamError } from "../lib/error-response.js";
 import { chatCompletionWithAutoContinue, isTruncated } from "../lib/auto-continue.js";
 import { sanitizeToolOutput } from "../lib/sanitize-tool-output.js";
+import { isDebugMode, buildConverseDebugMeta } from "../lib/debug-mode.js";
+import type { DebugMetadata } from "../lib/debug-mode.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -127,13 +129,16 @@ app.http("converse", {
         .get("accept")
         ?.includes("text/event-stream");
 
+      // Check if debug metadata is requested
+      const debugMode = isDebugMode(request);
+
       // Create a session-scoped ToolContext for artifact isolation
       const toolContext: ToolContext = {
         artifactStore: new InMemoryArtifactStore(),
       };
 
       if (wantsStream) {
-        return handleStreaming(messages, state.sessionId, engineState, phaseA2ui, context, toolContext);
+        return handleStreaming(messages, state.sessionId, engineState, phaseA2ui, context, toolContext, debugMode);
       }
 
       // Non-streaming: call OpenAI with JSON object format + tool support
@@ -182,6 +187,17 @@ app.http("converse", {
         a2ui: [...phaseA2ui, ...processed.a2uiMessages],
       };
 
+      // Attach debug metadata when requested
+      if (debugMode) {
+        const hadExplicitA2UI = processed.a2uiMessages.length > 0;
+        (responseBody as unknown as Record<string, unknown>).debug = buildConverseDebugMeta(
+          getChatDeploymentName(),
+          finalContent,
+          processed.a2uiMessages.length,
+          hadExplicitA2UI,
+        );
+      }
+
       return { status: 200, jsonBody: responseBody };
     } catch (err) {
       return safeErrorResponse(err, context, "Converse error");
@@ -197,6 +213,7 @@ function handleStreaming(
   phaseA2ui: object[],
   context: InvocationContext,
   toolContext: ToolContext,
+  debugMode: boolean,
 ): HttpResponseInit {
   const encoder = new TextEncoder();
 
@@ -253,14 +270,26 @@ function handleStreaming(
             }
 
             const phaseDef = getPhaseDefinition(engineState.currentPhase as import("@kickstart/core").Phase);
+            const donePayload: Record<string, unknown> = {
+              sessionId,
+              phase: engineState.currentPhase,
+              phaseLabel: phaseDef.label,
+              model: getChatDeploymentName(),
+            };
+
+            if (debugMode) {
+              const hadExplicitA2UI = processed.a2uiMessages.length > 0;
+              donePayload.debug = buildConverseDebugMeta(
+                getChatDeploymentName(),
+                fullContent,
+                processed.a2uiMessages.length,
+                hadExplicitA2UI,
+              );
+            }
+
             controller.enqueue(
               encoder.encode(
-                `event: done\ndata: ${JSON.stringify({
-                  sessionId,
-                  phase: engineState.currentPhase,
-                  phaseLabel: phaseDef.label,
-                  model: getChatDeploymentName(),
-                })}\n\n`,
+                `event: done\ndata: ${JSON.stringify(donePayload)}\n\n`,
               ),
             );
 

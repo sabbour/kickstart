@@ -108,6 +108,15 @@ export function getInspireDeploymentName(): string {
   );
 }
 
+/** Return the codex deployment name (for UI model indicator). */
+export function getCodexDeploymentName(): string {
+  return (
+    process.env.AZURE_OPENAI_CODEX_DEPLOYMENT ??
+    process.env.AZURE_OPENAI_DEPLOYMENT ??
+    "unknown"
+  );
+}
+
 /** Check whether at least one Azure OpenAI model is configured. */
 export function isConfigured(): boolean {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;

@@ -15,6 +15,7 @@ import { useStreaming } from './hooks/useStreaming';
 import { useMockStreaming } from './hooks/useMockStreaming';
 import { useAPIConnectorRegistry } from './contexts/APIConnectorContext';
 import { useTheme } from './contexts/ThemeContext';
+import { useDebug } from './contexts/DebugContext';
 import { useVirtualFS } from './contexts/VirtualFSContext';
 import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
@@ -31,6 +32,7 @@ function msgId(role: string) {
 
 export function App() {
   const { resolvedTheme } = useTheme();
+  const { debugEnabled } = useDebug();
   const fluentTheme = resolvedTheme === 'dark' ? webDarkTheme : webLightTheme;
 
   const [mode, setMode] = useState<AppMode>(playgroundEnabled ? 'chat' : 'landing');
@@ -196,7 +198,7 @@ export function App() {
           }
         },
         onPhase: () => {},
-        onComplete: (fullText, model, receivedSessionId) => {
+        onComplete: (fullText, model, receivedSessionId, debugInfo) => {
           // Store the backend session ID on first response
           if (receivedSessionId && !activeSession?.backendSessionId) {
             sessions.updateSession(sessionId!, { backendSessionId: receivedSessionId });
@@ -213,6 +215,7 @@ export function App() {
             model,
             surfaceIds,
             timestamp: Date.now(),
+            debugInfo,
           };
           setMessages(prev => [...prev, assistantMsg]);
           sessions.addMessage(sessionId!, assistantMsg);
@@ -229,9 +232,9 @@ export function App() {
           setMessages(prev => [...prev, errorMsg]);
           sessions.addMessage(sessionId!, errorMsg);
         },
-      });
+      }, debugEnabled);
     }
-  }, [sessions, streaming, mockStreaming, a2ui, isApiAvailable, resetConsecutiveCount, progressiveQueue]);
+  }, [sessions, streaming, mockStreaming, a2ui, isApiAvailable, resetConsecutiveCount, progressiveQueue, debugEnabled]);
 
   const handleStartChat = useCallback((prompt: string) => {
     a2ui.reset();
@@ -356,6 +359,7 @@ export function App() {
             streamingSurfaceIds={progressiveQueue.visibleIds}
             onSend={handleSendMessage}
             getSurface={a2ui.getSurface}
+            debugEnabled={debugEnabled}
           />
         )}
       </Layout>

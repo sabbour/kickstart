@@ -18,9 +18,11 @@ import {
   codexCompletion,
   codexCompletionStream,
   isConfigured,
+  getCodexDeploymentName,
 } from "../lib/openai-client.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
 import { safeErrorResponse, safeStreamError } from "../lib/error-response.js";
+import { isDebugMode, buildGenerateDebugMeta } from "../lib/debug-mode.js";
 import type { ChatMessage } from "../lib/openai-client.js";
 
 type GenerateType =
@@ -102,8 +104,10 @@ app.http("generate", {
         .get("accept")
         ?.includes("text/event-stream");
 
+      const debugMode = isDebugMode(request);
+
       if (wantsStream) {
-        return handleCodexStreaming(input, instructions, type, context);
+        return handleCodexStreaming(input, instructions, type, context, debugMode);
       }
 
       const result = await codexCompletion(input, {
@@ -112,11 +116,18 @@ app.http("generate", {
         maxOutputTokens: 4096,
       });
 
-      const responseBody: GenerateResponse = {
+      const responseBody: Record<string, unknown> = {
         type,
         code: result.content,
         responseId: result.responseId,
       };
+
+      if (debugMode) {
+        responseBody.debug = buildGenerateDebugMeta(
+          getCodexDeploymentName(),
+          result.content,
+        );
+      }
 
       return { status: 200, jsonBody: responseBody };
     } catch (err) {
@@ -131,6 +142,7 @@ function handleCodexStreaming(
   instructions: string,
   type: GenerateType,
   context: InvocationContext,
+  debugMode: boolean,
 ): HttpResponseInit {
   const encoder = new TextEncoder();
   let fullContent = "";
@@ -149,9 +161,22 @@ function handleCodexStreaming(
           );
         }
 
+        const donePayload: Record<string, unknown> = {
+          done: true,
+          type,
+          length: fullContent.length,
+        };
+
+        if (debugMode) {
+          donePayload.debug = buildGenerateDebugMeta(
+            getCodexDeploymentName(),
+            fullContent,
+          );
+        }
+
         controller.enqueue(
           encoder.encode(
-            `data: ${JSON.stringify({ done: true, type, length: fullContent.length })}\n\n`,
+            `data: ${JSON.stringify(donePayload)}\n\n`,
           ),
         );
         controller.close();

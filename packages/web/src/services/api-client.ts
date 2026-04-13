@@ -14,9 +14,16 @@ export class SessionExpiredError extends Error {
  * Uses `redirect: 'manual'` to prevent the browser from silently following
  * SWA's 401→302 auth redirect to Azure AD. Without this, the cross-origin
  * redirect fails with a CORS error that surfaces as "Failed to fetch".
+ *
+ * When `debugMode` is true, adds the `x-kickstart-debug: true` header so
+ * the backend returns debug metadata in the SSE stream.
  */
-export async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(url, { ...init, redirect: 'manual' });
+export async function apiFetch(url: string, init?: RequestInit, debugMode?: boolean): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  if (debugMode) {
+    headers.set('x-kickstart-debug', 'true');
+  }
+  const res = await fetch(url, { ...init, headers, redirect: 'manual' });
 
   if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
     throw new SessionExpiredError();

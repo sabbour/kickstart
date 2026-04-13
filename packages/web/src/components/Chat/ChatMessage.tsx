@@ -1,6 +1,7 @@
 import React from 'react';
 import { BotSparkle24Regular } from '@fluentui/react-icons';
 import { A2UISurfaceWrapper } from '../A2UI/A2UISurfaceWrapper';
+import { DebugPanel } from './DebugPanel';
 import { sanitizeHtml } from '../../utils/sanitize';
 import type { ChatMessage as ChatMessageType } from '../../types';
 import type { SurfaceModel } from '../../vendor/a2ui/web_core/index';
@@ -11,9 +12,11 @@ interface ChatMessageProps {
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
   /** When false, A2UI surfaces in this message are dimmed and non-interactive. Defaults to true. */
   isActive?: boolean;
+  /** When true, show the debug panel below assistant messages. */
+  debugEnabled?: boolean;
 }
 
-export function ChatMessage({ message, getSurface, isActive = true }: ChatMessageProps) {
+export function ChatMessage({ message, getSurface, isActive = true, debugEnabled = false }: ChatMessageProps) {
   if (message.role === 'user') {
     if (message.isAutoContinue) {
       return (
@@ -54,6 +57,9 @@ export function ChatMessage({ message, getSurface, isActive = true }: ChatMessag
         {message.model && (
           <span className="model-indicator">{message.model}</span>
         )}
+
+        {/* Debug panel — shown only when debug mode is active */}
+        {debugEnabled && <DebugPanel debugInfo={message.debugInfo} />}
       </div>
     </div>
   );
