@@ -25,7 +25,12 @@ export { getArtifact } from "./get-artifact.js";
 export { validatePath, validateRef } from "./github-input-validation.js";
 export type { ValidationResult } from "./github-input-validation.js";
 
-// Bootstrap the default registry with all built-in tools
+// Bootstrap the default registry with all built-in tools.
+// NOTE: list_artifacts and get_artifact are intentionally excluded from the
+// default set sent to the LLM. Including them caused the LLM to call
+// list_artifacts on every turn ("files request" regression — #117). These
+// tools are still exported for programmatic use and can be registered
+// on-demand when artifact enumeration is needed.
 import { defaultRegistry } from "./registry.js";
 import { azureResourceList } from "./azure-resource-list.js";
 import { azureResourceGet } from "./azure-resource-get.js";
@@ -36,8 +41,6 @@ import { githubApiGet } from "./github-api-get.js";
 import { fetchWebpage } from "./fetch-webpage.js";
 import { generateKubernetesManifest } from "./generate-kubernetes-manifest.js";
 import { estimateCost } from "./estimate-cost.js";
-import { listArtifacts } from "./list-artifacts.js";
-import { getArtifact } from "./get-artifact.js";
 
 defaultRegistry.registerAll([
   azureResourceList,
@@ -49,6 +52,4 @@ defaultRegistry.registerAll([
   fetchWebpage,
   generateKubernetesManifest,
   estimateCost,
-  listArtifacts,
-  getArtifact,
 ]);
