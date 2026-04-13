@@ -157,7 +157,7 @@ export function interpolateTemplate(template: string, dataModel: Record<string, 
     // Split on first '|' for default value syntax
     const pipeIdx = expr.indexOf('|');
     const path = pipeIdx >= 0 ? expr.slice(0, pipeIdx).trim() : expr;
-    const fallback = pipeIdx >= 0 ? expr.slice(pipeIdx + 1) : undefined;
+    const fallback = pipeIdx >= 0 ? expr.slice(pipeIdx + 1).trim() : undefined;
 
     const value = resolveDataPath(path, dataModel);
     if (value === undefined || value === null) {
@@ -209,19 +209,19 @@ export function resolveBindings(
 export function analyzeSharedBindings(
   components: Record<string, ComponentBindingMap>,
 ): SharedBindingAnalysis {
-  const allWriters = new Map<string, string[]>();
-  const allReaders = new Map<string, string[]>();
+  const allWriters = new Map<string, Set<string>>();
+  const allReaders = new Map<string, Set<string>>();
 
   for (const [componentId, map] of Object.entries(components)) {
     for (const path of map.writes) {
-      const list = allWriters.get(path) ?? [];
-      list.push(componentId);
-      allWriters.set(path, list);
+      const set = allWriters.get(path) ?? new Set<string>();
+      set.add(componentId);
+      allWriters.set(path, set);
     }
     for (const path of map.reads) {
-      const list = allReaders.get(path) ?? [];
-      list.push(componentId);
-      allReaders.set(path, list);
+      const set = allReaders.get(path) ?? new Set<string>();
+      set.add(componentId);
+      allReaders.set(path, set);
     }
   }
 
@@ -230,12 +230,12 @@ export function analyzeSharedBindings(
   const consumers: Record<string, string[]> = {};
 
   for (const [path, writers] of allWriters) {
-    const readers = allReaders.get(path) ?? [];
+    const readers = allReaders.get(path) ?? new Set<string>();
     // Shared = written by someone AND read by a *different* component
-    const crossReaders = readers.filter(r => !writers.includes(r));
+    const crossReaders = Array.from(readers).filter(r => !writers.has(r));
     if (crossReaders.length > 0) {
       sharedPaths.push(path);
-      producers[path] = writers;
+      producers[path] = Array.from(writers);
       consumers[path] = crossReaders;
     }
   }
