@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## 0.5.0
+
+### Validation & Security
+
+- **K8s validation engine** — 23 validators (DS001–DS020) with auto-fix engine, post-generation injection, and `RulesEngine` categorized filtering (#127, #128)
+- **Full DS001–DS013 safeguards** — Resource limits, no-latest-tag, health probes, no-privileged, namespace, replicas, image-pull-policy, run-as-non-root, no-privilege-escalation, no-host-networking, read-only-root-fs, gateway-api-ingress, no-image-pull-secrets (#36)
+- **Rules engine validators DS014–DS020** — Container port names, drop-all-capabilities, label requirements, no-host-IPC/PID, service account token, topology spread constraints (#49)
+
+### Frontend
+
+- **State binding & data interpolation** — JSON Pointer resolution with defaults, template interpolation with `{{/path|fallback}}` syntax, chained pointer resolution with cycle detection, batch binding, cross-component data flow analysis (#122)
+- **Theme system** — Three-state dark/light/system mode with `useSyncExternalStore`, live OS preference tracking, `ThemeToggle` component, smooth CSS transitions (#129)
+- **WCAG 2.1 AA accessibility** — Audited 46 A2UI components, fixed 15 across 16 files with ARIA labels, keyboard nav, roving tabIndex, aria-live regions (#124)
+- **Frontend Wave 2** — Inspiration button, URL links, 5 new Fluent components (#118)
+- **FileEditor + CostEstimate** — Monaco tabs, SKU selector with cost projection (#115)
+
+### Backend & Infrastructure
+
+- **Remote filesystem abstraction** — Pluggable `FileSystemProvider` interface with `InMemoryFileSystemProvider`, `CloudShellProvider`, path sanitization, 4 LLM tools (`fs_read/write/list/delete`) (#123)
+- **Knowledge skills middleware** — Async middleware chain for skill resolution with 5 IaC best-practice skills (Bicep modules, secure decorators, diagnostic settings, resource tagging, RBAC) (#119)
+- **Artifact store** — Per-session `InMemoryArtifactStore` with quota enforcement (100 artifacts / 10MB), `ToolContext` pattern (#116)
+
+### Bug Fixes
+
+- **Failed-to-fetch auth fix** — `apiFetch()` wrapper with `redirect: 'manual'` prevents SWA auth redirect CORS failures, `SessionExpiredError` with auto-redirect (#131)
+
+### Docs & Tooling
+
+- **A2UI v0.9 component authoring skill** — SKILL.md for agent-authored components (#113)
+- **Copilot coding agent instructions** — Squad-aware `copilot-instructions.md` with capability profile (#120)
+
 ## 0.4.0
 
 ### Knowledge & Prompts
