@@ -1371,7 +1371,7 @@ function PlaygroundInner() {
 
           <div className={classes.sidebarFooter}>
             <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-              v{(window as any).__BUILD_VERSION__ || '0.0.0'} · {(window as any).__BUILD_SHA__ || 'dev'}
+              v{__BUILD_VERSION__} · {(window as any).__BUILD_SHA__ || 'dev'}
             </Caption1>
           </div>
         </aside>

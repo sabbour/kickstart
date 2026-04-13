@@ -310,7 +310,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
           </div>
           <div className="landing-footer-meta">
             <span className="landing-footer-version">
-              Kickstart Preview v{(window as any).__BUILD_VERSION__ || '0.1.0'}
+              Kickstart Preview v{__BUILD_VERSION__}
               {(window as any).__BUILD_SHA__ && (window as any).__BUILD_SHA__ !== 'dev'
                 ? ` · ${(window as any).__BUILD_SHA__}`
                 : ' · dev'}
