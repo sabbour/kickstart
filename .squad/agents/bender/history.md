@@ -98,6 +98,14 @@
 - **A2UI Catalog:** All 17 components documented with JSON examples and property tables from `kickstart-catalog.json`. Standard (6): Text, Button, TextField, Row, Column, Card. Kickstart Custom (7): ConversationPhase, CodeBlock, ResourcePicker, DeploymentProgress, ArchitectureDiagram, CostEstimate, HandoffCard. GitHub (4): RepoPicker, WorkflowStatus, CodespaceLink, AppOverview. Includes step-by-step guide for adding new components.
 - **Prompt Architecture:** Three-layer architecture (Layer 1 Azure Skills future, Layer 2 system prompt, Layer 3 phase prompts). All 6 phase prompt summaries with template variables and exit conditions. Full DS001–DS013 safeguard table. `buildSystemPrompt()` flow and `interpolate()` mechanics documented.
 - **Deployment:** Bicep template walkthrough, both GitHub Actions workflows (deploy-swa.yml and deploy-infra.yml), OIDC auth for infra, Entra app registration setup, all secrets/env vars, local dev instructions with SWA CLI.
+
+### 2026-04-13: SWA Auth Redirect CORS Fix (#130)
+
+- **Root cause:** When SWA auth cookies expire, API `fetch()` calls receive a 302 redirect to Azure AD's login page. The browser follows this cross-origin redirect silently, and Azure AD doesn't return CORS headers, so `fetch()` throws `TypeError: Failed to fetch` — an opaque error.
+- **Fix pattern:** `apiFetch()` wrapper in `api-client.ts` sets `redirect: 'manual'` on all authenticated API calls, preventing the browser from following cross-origin redirects. Detects opaque redirect responses and throws `SessionExpiredError` with a clear message.
+- **SSE error gap:** The `StreamEvent` interface was missing an `error` field, causing server-side streaming errors to be silently swallowed. Added `error` field and early-return handling in `useStreaming.ts`.
+- **Key files:** `packages/web/src/services/api-client.ts` (apiFetch, SessionExpiredError), `packages/web/src/hooks/useStreaming.ts`, `packages/web/src/types.ts`
+- **Lesson:** Any SWA app with `responseOverrides.401.redirect` will cause CORS failures for `fetch()` API calls when auth expires. Always use `redirect: 'manual'` for authenticated API endpoints.
 - **Cross-referencing:** All 5 docs link to each other where relevant.
 - **Key lesson:** The task description said 7 standard components including "Tabs" but the actual catalog has 6 (no Tabs). Always document from source code, not specs.
 
