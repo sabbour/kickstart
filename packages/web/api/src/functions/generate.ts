@@ -22,7 +22,7 @@ import {
 } from "../lib/openai-client.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
 import { safeErrorResponse, safeStreamError } from "../lib/error-response.js";
-import { isDebugMode, buildGenerateDebugMeta } from "../lib/debug-mode.js";
+import { isDebugMode, buildGenerateDebugMeta, formatRenderDecisions } from "../lib/debug-mode.js";
 import type { ChatMessage } from "../lib/openai-client.js";
 
 type GenerateType =
@@ -123,10 +123,12 @@ app.http("generate", {
       };
 
       if (debugMode) {
-        responseBody.debug = buildGenerateDebugMeta(
+        const debugMeta = buildGenerateDebugMeta(
           getCodexDeploymentName(),
           result.content,
         );
+        responseBody.debug = debugMeta;
+        responseBody.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
       }
 
       return { status: 200, jsonBody: responseBody };
@@ -168,10 +170,12 @@ function handleCodexStreaming(
         };
 
         if (debugMode) {
-          donePayload.debug = buildGenerateDebugMeta(
+          const debugMeta = buildGenerateDebugMeta(
             getCodexDeploymentName(),
             fullContent,
           );
+          donePayload.debug = debugMeta;
+          donePayload.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
         }
 
         controller.enqueue(

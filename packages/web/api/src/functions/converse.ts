@@ -29,7 +29,7 @@ import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
 import { safeErrorResponse, safeStreamError } from "../lib/error-response.js";
 import { chatCompletionWithAutoContinue, isTruncated } from "../lib/auto-continue.js";
 import { sanitizeToolOutput } from "../lib/sanitize-tool-output.js";
-import { isDebugMode, buildConverseDebugMeta } from "../lib/debug-mode.js";
+import { isDebugMode, buildConverseDebugMeta, formatRenderDecisions } from "../lib/debug-mode.js";
 import type { DebugMetadata } from "../lib/debug-mode.js";
 
 interface ConverseRequest {
@@ -190,12 +190,16 @@ app.http("converse", {
       // Attach debug metadata when requested
       if (debugMode) {
         const hadExplicitA2UI = processed.a2uiMessages.length > 0;
-        (responseBody as unknown as Record<string, unknown>).debug = buildConverseDebugMeta(
+        const debugMeta = buildConverseDebugMeta(
           getChatDeploymentName(),
           finalContent,
           processed.a2uiMessages.length,
           hadExplicitA2UI,
+          engineState.currentPhase,
         );
+        (responseBody as unknown as Record<string, unknown>).debug = debugMeta;
+        (responseBody as unknown as Record<string, unknown>).renderDecisions =
+          formatRenderDecisions(debugMeta.renderDecisions);
       }
 
       return { status: 200, jsonBody: responseBody };
@@ -279,12 +283,15 @@ function handleStreaming(
 
             if (debugMode) {
               const hadExplicitA2UI = processed.a2uiMessages.length > 0;
-              donePayload.debug = buildConverseDebugMeta(
+              const debugMeta = buildConverseDebugMeta(
                 getChatDeploymentName(),
                 fullContent,
                 processed.a2uiMessages.length,
                 hadExplicitA2UI,
+                engineState.currentPhase,
               );
+              donePayload.debug = debugMeta;
+              donePayload.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
             }
 
             controller.enqueue(
