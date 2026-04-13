@@ -9,6 +9,7 @@
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+
 ### 2026-04-08: Kickstart Architecture Foundation
 - **Rename:** Project is "Imagine" → "Kickstart". Repo will move to sabbour/kickstart.
 - **Dual surface:** Web (SWA + Portal Prototyper) and MCP (tools + future App UI). If we host it, we provide the LLM. If MCP, user's LLM.
@@ -25,37 +26,6 @@
 - **Ahmed's model preference:** claude-opus-4.6 for code, claude-haiku-4.5 for non-code.
 - **Phase 1 defers:** cost estimation, Mermaid diagrams, K8s validation, MCP App UI, conversation phases 5-8, Codespaces integration.
 
-### 2025-07-25: Docs structure and architecture diagrams
-- Created `docs/architecture.md` with 7 Mermaid diagrams: system overview (C4-style), web flow sequence, IDE/MCP flow sequence, 6-phase conversation pipeline, A2UI rendering pipeline, 3-layer prompt architecture, and deployment architecture.
-- Created `docs/README.md` as index linking to architecture, contributing, and infra docs.
-- Created root `README.md` with project description, dual-surface concept, quick start, tech stack table, and links to docs.
-- A2UI catalog has 17 components (7 standard, 6 Kickstart, 4 GitHub). Catalog schema uses JSON Schema draft/2020-12.
-- 6-phase engine confirmed: Discover→Design→Generate→Review→Handoff→Deploy. K8s hidden in phases 1-3, visible in 4-6.
-- Deployment safeguards DS001–DS013 enforced across all phases via Layer 2 system prompt.
-
-### 2025-07-25: Spark-like UX Evolution Scoping
-- **Key insight:** Kickstart ≠ Spark. Spark generates full runnable apps; Kickstart generates infrastructure (Bicep, Dockerfiles, Helm, GH Actions) and deploys to AKS. "Preview" = architecture diagram + deployment plan, not a running app.
-- **Landing page** already Spark-like (carousel, track cards, framework pills, IDE links). Gap: needs a hero text input above everything — single biggest UX win.
-- **Split-view layout** (chat left, file-viewer right) already exists in `core.css`. File viewer is `<aside class="file-viewer">` toggled by `files:generated` EventBus event.
-- **File generation display** only in sidebar today. P0: add in-chat file chips with progressive status.
-- **No code view toggle** exists. P1: add Preview|Code toggle in right panel header.
-- **No deploy button.** P1: add Deploy CTA in topbar, maps to Spark's "Publish" but targets AKS.
-- **Spark tabs** (Iterate/Theme/Data/Prompts/Assets): Theme irrelevant (infra not UI). Prompts already exists as debug toggle. Assets (upload Dockerfiles/manifests) is P2.
-- **P0 is ~11 hours, all vanilla JS.** Hero input, file chips, sparkle loading, preview rename. No framework change needed.
-- **Key files touched:** `index.html` (hero input), `landing.css` (input styles), `components.css` (file chips, sparkle), `app.js` (hero handler, file chip rendering), `components.js` (new factories).
-- **Ahmed preference:** claude-opus-4.6 for code, claude-haiku-4.5 for non-code (confirmed still active).
-
-### 2025-07-26: Smart Control Pack Patterns — Deep Dive into adaptive-ui-framework
-- **Source repos analyzed:** `sabbour/adaptive-ui-framework` (core + pack system), `sabbour/adaptive-ui-azure-pack`, `sabbour/adaptive-ui-github-pack`, `sabbour/adaptive-ui-try-aks` (app).
-- **14 patterns catalogued:** Pack Registration (P01), Self-Managing Login (P02), Data-Fetching Picker (P03), Write-with-Confirm (P04), LLM Inference-Time Tools (P05), Knowledge Skills Resolver (P06), Disabled Context (P07), State-as-Token (P08), CORS Proxy (P09), Artifact-Aware Components (P10), Auto-Continue (P11), ARM Introspection (P12), Client-Side Validation + Auto-Fix (P13), Intent Resolvers (P14).
-- **Azure Pack:** 4 components (azureLogin, azureResourceForm, azurePicker, azureQuery), 2 tools (azure_arm_get, azure_pricing), skills resolver (ARM templates + AKS Automatic knowledge), MSAL auth, 27 diagram icons.
-- **GitHub Pack:** 6 components (githubLogin, githubPicker, githubQuery, githubRepoInfo, githubCreatePR, githubSetSecret), 1 tool (github_api_get), OAuth Device Flow + PAT auth.
-- **App Layer:** ArchitectureDiagram (Mermaid+ELK+icons+pan/zoom), CostEstimate, CompactCodeBlock, DevEnvironmentCard, K8sValidator (13 rules + auto-fix), SafeguardsChecker, DiagramBuilder.
-- **Key architecture insight:** The old framework's power comes from 3 layers A2UI doesn't have: (1) ServicePack bundling (components + prompts + tools + auth), (2) ServiceConnector (auth token management separate from UI state), (3) orchestration middleware (skills resolvers, tool executors, artifact store). All 3 must be built in Kickstart's app layer.
-- **A2UI mapping:** All pack components → fat A2UI custom components via `createReactComponent()`. Auth → ServiceConnector (React Context). Tools → Kickstart orchestration layer. Skills → phase engine middleware. Artifacts → Kickstart core store.
-- **8 gaps identified:** No pack system (G01), no service layer (G02), no tool system (G03), no prompt injection (G04), no artifact store (G05), no past-turn isolation (G06), no auto-continue (G07), no state interpolation (G08, but JSON Pointers cover it).
-- **Migration estimate:** ~16.5 developer-days for full pack port. P0 = auth connectors + CORS proxy (3.5 days). P1 = core pickers, loginCards, GitHub commit, validator (5.5 days). P2 = ARM forms, diagrams, write actions (6 days). P3 = tool ports, diagram builder, intent resolvers (2.5 days).
-- **Full decision:** `.squad/decisions/inbox/leela-pack-architecture.md`
 
 ### 2026-04-08: Spark-like UX Roadmap — P0/P1/P2 Prioritization
 
@@ -68,19 +38,6 @@
 - **Key distinction:** Spark publishes running apps. Kickstart generates infrastructure (Bicep, Dockerfiles, Helm, GH Actions) and deploys to AKS. Preview = architecture diagram + deployment plan + IaC files, not a running app. UX must reflect this.
 - **Next:** Fry assigned P0 in background mode. P1 is one sprint after P0 ships. P2 depends on GitHub OAuth and MCP App UI (deferred features).
 
-### 2025-07-25: Rendering Architecture Decision — Kill the Regex
-- **Root cause confirmed:** `response-processor.ts` regex `A2UI_FENCE_RE` requires closing `~~~` at exact string end. Any trailing LLM content = silent extraction failure. Components vanish, raw JSON shows as chat text.
-- **Heuristic fallback only covers 2/6 phases** (discover, design). Generate/Review/Handoff/Deploy get zero components on regex failure — exactly the phases where components matter most.
-- **adaptive-ui comparison:** adaptive-ui uses NO regex. Entire LLM response is a JSON `AdaptiveUISpec`. Renderer consumes directly. That's why Ahmed got better results — the framework makes failure impossible.
-- **Decision: Option C — Structured JSON Envelope.** 3-phase migration:
-  - Phase 1 (1-2 days): Fix regex + expand heuristics to all 6 phases. Ship immediately.
-  - Phase 2 (1-2 weeks): Switch to `response_format: json_object`. LLM outputs `{ message, components, stateUpdates }`. Incremental JSON streaming for text. Eliminates regex entirely. Adds state management.
-  - Phase 3 (1 week): Component streaming (components appear one-by-one like Spark files). State binding (`{{state.runtime}}`). Auto-continue for phase transitions.
-- **a2ui-renderer.js is PRESERVED.** All 17 component renderers unchanged. Only the extraction layer changes (regex → JSON parse).
-- **A2UI vs adaptive-ui verdict:** A2UI architecture was the right choice (MCP integration, multi-surface, catalog model). Implementation was wrong (fenced blocks in markdown). Fix = adopt adaptive-ui's structured JSON pattern into A2UI's component model. Best of both.
-- **Key pipeline files:** `response-processor.ts` (extraction), `converse.ts` (streaming SSE), `api-client.js` (client stream reader), `engine.js` (state machine), `a2ui-renderer.js` (DOM rendering), `system-prompt.ts` (LLM instructions), `phases.ts` (phase prompts with ~~~a2ui examples).
-- **Full decision:** `.squad/decisions/inbox/leela-rendering-architecture.md`
-- **SUPERSEDED:** This decision was obsoleted by `leela-pragmatic-a2ui-react.md` after discovery that A2UI React renderer already exists.
 
 ### 2026-04-08: Pragmatic A2UI v0.9 React Adoption — The Shortest Path
 - **Discovery:** `@a2ui/react` v0.9 renderer ALREADY EXISTS at `renderers/react/src/v0_9/`. Apache 2.0 licensed, production-ready, 18 basic components implemented.
@@ -96,8 +53,10 @@
 - **Supersedes:** `.squad/decisions/inbox/leela-rendering-architecture.md` (Option C). Previous decision assumed vanilla JS rendering + JSON extraction. Now we're adopting React renderer entirely.
 - **Full decision:** `.squad/decisions/inbox/leela-pragmatic-a2ui-react.md`
 
+
 ### 2026-04-08: Two-Repo Strategy — sabbour/a2ui Fork + sabbour/kickstart App
 - **Pattern:** Mirrors adaptive-ui-framework + adaptive-ui-try-aks split. Framework extensions in fork, app-specific code in Kickstart.
+
 
 ### 2026-04-09: Consolidated Backlog Audit — Single Source of Truth
 - **Finding:** Three disconnected tracking systems (SQL todos, decisions.md R-items, untracked Playground work) caused duplication + gaps. No single source of truth.
@@ -117,20 +76,6 @@
 - **Why NOT submodules:** Pain. Why NOT GitHub Packages now: Overkill for prototype. Why NOT vendoring: Drift risk.
 - **Full decision:** `.squad/decisions/inbox/leela-two-repo-strategy.md`
 
-### 2025-07-25: Trip Notebook Smart Control Patterns Research
-- **Repo analyzed:** `sabbour/adaptive-ui-trip-notebook` — AI travel planning assistant with 3 packs, 11 smart controls, 7 tools.
-- **Three packs:** `@sabbour/adaptive-ui-travel-data-pack` (weather, country info, currency, checklists, budget), `@sabbour/adaptive-ui-google-maps-pack` (maps, places search, nearby, photo cards), `@sabbour/adaptive-ui-google-flights-pack` (flight search, flight cards with protobuf URL encoding).
-- **Key pattern: Component-Autonomous Fetching** — Components like weatherCard/countryInfoCard call APIs themselves at render time. LLM provides minimal props (city name), component handles loading/error/display. Saves tokens, enables real-time data.
-- **Key pattern: Dual-Entry API** — Every external API has BOTH a tool (LLM calls for reasoning) AND a component (visual, client-side fetch). System prompt instructs when to use each. Optimizes token usage.
-- **Key pattern: Artifact Extraction Pipeline** — App walks AdaptiveUISpec layout tree after each LLM response, extracts structured data (places, flights, budget items, itinerary days, photos) into typed artifacts. Enables second-panel aggregation.
-- **Key pattern: Cross-Component State Binding** — `bind` prop + `{{state.key}}` interpolation enables implicit communication. Selecting a hotel auto-updates restaurant search location. Eliminates need for LLM-orchestrated multi-step updates.
-- **Key pattern: Graceful Degradation Chain** — FlightSearch: live results → link-only → error banner. Three tiers. Every component that calls external APIs needs this.
-- **Key pattern: Artifact-Driven Side Panel** — TripNotebook subscribes to artifact store, categorizes by filename prefix convention (flight-*, budget-*, itinerary-day-*), renders in tabbed interface. Decouples data production from consumption.
-- **Key pattern: Protobuf URL Construction** — Custom minimal protobuf encoder for Google Flights deep links. Pattern for services with binary/encoded URL parameters.
-- **Key pattern: HTML Scraping as API** — Flights pack parses Google Flights HTML via CORS proxy when no official API exists. Fallback pattern for APIs that don't have official endpoints.
-- **Kickstart implications:** (1) Components should fetch their own data for real-time display (e.g., AKS cluster status polling), (2) Every Azure/GitHub API needs both tool + component entry points, (3) Artifact prefix convention enables dashboard panel aggregation, (4) State binding enables cross-phase data flow in 6-phase conversation, (5) All external API components need 4-tier degradation (rich → cached → link → error).
-- **Recommended Kickstart packs:** azure-pack (cluster status, cost, deployment), github-pack (repo, workflow, PR), iac-pack (file editor, manifest preview, architecture diagram), auth-pack (Entra app, RBAC, secrets).
-- **Full decision:** `.squad/decisions/inbox/leela-trip-notebook-patterns.md`
 
 ### 2026-04-09: Pack Research Synthesis — Architecture Foundation Approved
 - **Two research initiatives completed:** (1) adaptive-ui-try-aks pack inventory (14 patterns, 9 A2UI recommendations), (2) adaptive-ui-trip-notebook pattern analysis (7 new patterns, 4 Kickstart packs).
@@ -142,17 +87,6 @@
 - **Architecture ready for buildout:** Foundation stone is ServiceConnector (auth token management outside UI state). Once connectors exist, fat components can register and orchestrator can wire tools. All subsequent packs follow same pattern.
 - **Decisions merged:** leela-pack-architecture.md + leela-trip-notebook-patterns.md appended to `.squad/decisions.md`.
 
-### 2025-07-26: A2UI Actions System Analysis — Gap Analysis & Implementation Path
-- **A2UI v0.9 action model:** Two-tier system — Events (agent-side, carry name/surfaceId/context with resolved JSON Pointer values) and Functions (local renderer-only, openUrl + validation + math/string ops). Data Model Sync sends full UI state with every message. Write contract guarantees synchronous local updates. Sandboxed execution prevents arbitrary code injection.
-- **Critical finding — ACTION DEAD-END:** `useA2UI.ts` wires the MessageProcessor action handler to `console.log` only. A2UI events fire correctly through the full vendor pipeline (ComponentContext → SurfaceModel → SurfaceGroupModel → MessageProcessor) but produce zero effect. Every interactive component is decorative.
-- **No action endpoint:** Backend `converse.ts` only accepts chat messages (`{ sessionId, message }`). No way to receive structured A2UI action events.
-- **Hybrid action mismatch:** `response-processor.ts` generates buttons with non-standard `action: "reply"` format that bypasses A2UI ActionSchema entirely. Two incompatible action systems coexist.
-- **6 major gaps identified:** G1 (action dead-end), G2 (no action endpoint), G3 (hybrid action mismatch), G4 (no tool system), G5 (no service layer), G6 (no pack system).
-- **Key architectural insight:** A2UI's `action.event` system IS the ServicePack action bus. Event name = action type, context = payload, action handler = router to pack logic. This is structurally identical to adaptive-ui-framework's `handleAction` switch but using A2UI native plumbing.
-- **5-phase implementation path:** (1) Wire action loop + backend endpoint (2-3 days), (2) Tool system with tool-call loop (3-4 days), (3) ServiceConnector + auth (3-4 days), (4) Pack system (2-3 days), (5) Rich interactions — artifacts, auto-continue, disabled context (2-3 days). Total ~12-17 days.
-- **Phase 1 is critical path.** Everything builds on a working action loop. Without it, no ServicePack, no tools, no auth can function.
-- **adaptive-ui-framework action types mapped:** sendPrompt → event with prompt in context, setState → local data model update, navigate → openUrl function, submit → event with serialized state, custom → pack-specific event handler.
-- **Full decision:** `.squad/decisions/inbox/leela-a2ui-actions-analysis.md`
 
 ### 2026-04-09: Naming Proposal Approved — APIConnector + IntegrationKit
 
@@ -162,83 +96,7 @@
 - **Cross-team alignment:** Bender and Fry briefed. Will refactor codebase in B-11/B-10 PRs.
 - **Backlog consolidated:** Merged all scattered SQL todos, R-items, G-items, and untracked work into single-source-of-truth backlog (leela-consolidated-backlog.md). 45 total items, 68-day estimate, P0–P3 + Ops prioritized. Critical path: B-23–B-25 (action loop) 9 days.
 
-### 2025-07-26: IntegrationKit Abstraction (B-10)
 
-- **Name:** `IntegrationKit` (renamed from ServicePack per user directive). Lives in `packages/core/src/kits/`.
-- **Interface:** `{ name, description, tools: Tool<any>[], connectors: APIConnector[], prompts?: string[], components?: ComponentRegistration[] }`. `components` is frontend-only — core records type identifiers, web binds React components.
-- **Registry pattern:** `IntegrationKitRegistry` mirrors `ToolRegistry` / `APIConnectorRegistry`. `registerKit(kit)` is the public API; delegates to `defaultKitRegistry`. On register, auto-wires tools → `ToolRegistry`, connectors → `APIConnectorRegistry`.
-- **Typed constraint:** `tools: Tool<any>[]` required (not `Tool[]`) because individual tool files type their args as specific interfaces, not `Record<string, unknown>`. The `Tool<any>` escape hatch matches `ToolRegistry`'s existing pattern.
-- **AzureKit:** azure_resource_list + azure_resource_get + estimate_cost tools; AzureARMConnector + PricingConnector; 4 system-prompt augmentations (AKS Automatic preference, resource discovery, cost transparency, K8s abstraction); azureLoginCard + azureResourcePicker component registrations.
-- **GitHubKit:** github_repo_info tool; GitHubConnector; 3 system-prompt augmentations (repo-first detection, CI/CD OIDC wiring, branch strategy); githubLoginCard + githubRepoPicker component registrations.
-- **App startup wiring:** `registerKit(azureKit); registerKit(githubKit)` called in `packages/web/src/main.tsx` before ReactDOM render. Kits push into `defaultRegistry` (tools) and `defaultConnectorRegistry` (connectors) — both singletons available to engine + MCP.
-- **Tests:** 23 contract tests in `integration-kit.test.ts`, all green alongside existing 286 tests (309 total).
-- **Commit:** `c7b99ac` on main.
-
----
-
-## [ARCHIVE SUMMARY] Pre-2026-04-09 Architecture & Decisions
-
-The learnings in this file through 2026-04-09 capture foundational architecture (monorepo, toolchain, auth setup, backlog consolidation). When file size exceeds 50KB, consider archiving older entries (pre-April 2026) to `history-archive.md` while keeping recent named-decision entries (B-10/B-11 naming, consolidated backlog, etc.).
-
-Core decisions preserved in `.squad/decisions.md` supersede archived entries. This history is Leela's decision ledger; archive only when approaching 75KB to preserve recent context.
-
-## 2026-04-09T22:32Z — P0–P2 Wave Complete Handoff
-
-**Items owned:** B-10 (1 core item) + code review + architecture direction for all 29 items across P0–P2
-
-**Key contributions:**
-- **B-10 IntegrationKit abstraction:** Unified interface for cloud platforms. Two implementations: AzureKit (MSAL auth, ARM tools, Azure pricing, skill resolver) + GitHubKit (Device Flow auth, GitHub tools, repo browsing). Decouples chat engine from platform-specific logic. 309 tests passing.
-
-**Decision leadership:** Merged 6 architectural decisions to canonical registry.
-- B-25 handleAction (Bender): unified action model
-- B-11 API routing (Bender): api: convention
-- B-17 artifact singleton (Bender): pattern
-- B-16 CORS proxy (Bender): auth policies
-- B-15 phasePrompts (Bender): skill resolver
-- B-10 IntegrationKit (Leela): abstraction layer
-
-**Code review notes:** All P0–P2 branches reviewed for:
-- Architectural coherence (decisions matched code)
-- Test coverage (all PRs require 85%+ coverage)
-- No regressions (423 tests baseline maintained)
-- Documentation (decisions recorded, history updated)
-
-**Pattern learnings:**
-- IntegrationKit as contract enables clean multi-platform support. Prevents monolithic chat engine.
-- Decision-driven code reviews: Refer to canonical registry when evaluating PRs.
-- Three-phase plan (P0 architecture, P1 features, P2 polish) proved effective for parallel work.
-
-**Team performance:** 29 items shipped with zero regressions. Handoff ready for QA.
-
-**Next P3 priority:** Advanced auth (service principal, ADFS, Enterprise GitHub), offline mode (local code generation), analytics/telemetry, internationalization (i18n).
-
-**Closing notes:** System is stable on main. All decisions recorded. Ready for production deployment decision. Consider P3 scope: either expand platform support (Oracle Cloud, AWS) or deepen AKS Automatic guidance (Workload Identity, gateway API setup, cost optimization).
-
-### B-97 — Docs site update (2025-01)
-
-- Audited docs/ and docs-site/ against the actual codebase before writing — always read source files first.
-- Architecture has diverged significantly from early docs: IntegrationKit+APIConnector pattern, ToolRegistry (7 tools), ValidationEngine (7 validators), ArtifactStore, Skill Resolver, and React 19 + Vite 6 frontend.
-- Kickstart catalog has 16 custom components (not the 4 or 17 in older docs): RadioGroup, FormGroup, CodeBlock, ProgressSteps, Markdown + 4 GitHub + 3 Azure + 4 deployment components.
-- API surface grew from 1 endpoint (/api/chat) to 7: converse, action, generate, health, arm-proxy, github-proxy, pricing-proxy.
-- Created docs/development.md (new) with npm run dev, npx vitest run, npx playwright test, and build commands.
-- Updated both docs/ (authoritative) and docs-site/ (Docusaurus) in the same commit.
-
-### 2025-07-27: PR + Tagged Release Workflow
-- **Branch protection enabled:** Main branch requires PRs. 0 approvers (agents are the team), admins not exempt. No direct pushes.
-- **SWA deploy now tag-gated:** `deploy-swa.yml` triggers on `push: tags: ['v*']` instead of `push: branches: [main]`. PR preview environments preserved via `pull_request` trigger.
-- **CI is PR-only:** `ci.yml` removed `push: branches: [main]` trigger — runs only on PRs. Added TypeScript check step (`npx tsc --noEmit`).
-- **Release flow:** changeset per PR → `npx changeset version` → `git tag vX.Y.Z` → push tag → auto deploy.
-- **Infra + docs deploys unchanged:** Still trigger on push to main (path-scoped). Lower risk, no tag gate needed yet.
-- **Full decision:** `.squad/decisions/inbox/leela-pr-release-workflow.md`
-
-### 2025-07-27: Sprint Planning — Release Roadmap v0.2.0–v0.5.0
-- **4 milestones created:** v0.2.0 (34pt, 10 issues), v0.3.0 (40pt, 8 issues), v0.4.0 (17pt, 12 issues), v0.5.0 (68pt, 18 issues). Total: 159 story points across 48 issues.
-- **All 48 issues assigned to milestones.** No unassigned work remains.
-- **v0.2.0 P0 items moved to Ready** on the project board (#22, #23, #24, #53, #59). Items already in-progress (#2, #3, #27, #28, #29) left as-is.
-- **Two active PRs:** PR #65 (prompt knowledge batch → #3/#27/#28/#29) and PR #66 (questionnaire → #2) — both mergeable, both v0.2.0 scope.
-- **Key dependency chain:** #22→#23→#24 (action handler), #34→#25→#30→#31/#32 (ServiceConnector→ServicePack→fat components).
-- **Capacity balance:** v0.2.0 is Bender-heavy (core loop), v0.3.0 is balanced, v0.4.0 is light (prompt batch), v0.5.0 is stretch.
-- **Full decision:** `.squad/decisions/inbox/leela-sprint-planning-roadmap.md`
 ### 2026-04-10: Consolidated process directives into reusable skill
 - **Created `.squad/skills/pr-workflow/SKILL.md`** — single reference for the full issue→PR→review→merge lifecycle
 - Consolidated 12 inbox directives (draft PRs, rebase-only, copilot review API, CI gates, board updates, sprint cycles, model pref) into one actionable document
@@ -247,12 +105,6 @@ Core decisions preserved in `.squad/decisions.md` supersede archived entries. Th
 - Inbox files left intact per protocol — Scribe handles cleanup
 - **Decision:** `.squad/decisions/inbox/leela-process-optimization.md`
 
-### 2025-07-28: PR #76 Review Feedback — Sidebar Layout
-- Addressed Copilot review comments on PR #76 (squad/59-playground-sidebar)
-- **Comment 1 (Theater/Tutorial):** PR description was stale — referenced coming-soon Theater/Tutorial items that Fry already removed per #79. Updated PR description to reflect current state.
-- **Comment 2 (Accessibility):** Added `aria-expanded={sidebarOpen}` and `aria-controls="playground-sidebar"` to mobile nav button; added `id="playground-sidebar"` to sidebar `<aside>`. Button now toggles open/close.
-- Replied to both review comments, pushed fix, requested fresh Copilot review.
-- Lint and build both clean after changes.
 
 ### 2026-04-10: Sprint Retro & Release v0.2.0
 - **Retro conducted:** 12 issues closed, 11 PRs merged in one sprint session. Report at `.squad/log/2026-04-10-sprint-retro-v0.2.0.md`.
@@ -261,6 +113,7 @@ Core decisions preserved in `.squad/decisions.md` supersede archived entries. Th
 - **Changeset GitHub token:** `@changesets/changelog-github` requires `GITHUB_TOKEN` env var — fails without it. Must export before running `npx changeset version`.
 - **Tag update after squash-merge:** When using squash-merge PRs, the pre-push tag points at the wrong commit. Must `git tag -d` + re-tag + force-push after merge.
 - **Key retro decisions:** (1) Lead must never be routed to write code, (2) Copilot reviewer can't APPROVED — adjust branch protection, (3) force-push noise should be minimized, (4) story point estimates mandatory, (5) feature PRs must include test updates.
+
 
 ### 2026-04-10: v0.2.0 Release & Sprint Retro Complete
 
@@ -274,6 +127,7 @@ Completed full v0.2.0 milestone closeout:
 - Milestone v0.2.0 closed (14/14 issues)
 
 Key decision: Lead (Leela) will not write code in future — routing code fixes to Fry/Bender per charter boundaries.
+
 
 ### 2026-04-10: v0.3.0 Sprint Retrospective Complete
 
@@ -312,6 +166,7 @@ Key decision: Lead (Leela) will not write code in future — routing code fixes 
 **Retrospective report:** `.squad/log/2026-04-10-sprint-retro-v0.3.0.md`
 
 **Next sprint:** v0.4.0 pending issue planning. Focus areas identified: (1) component streaming, (2) state interpolation, (3) MCP app UI prototype, (4) K8s validation rules.
+
 
 ### 2026-04-10: v0.4.0 Sprint Planning Complete
 
@@ -368,6 +223,7 @@ Key decision: Lead (Leela) will not write code in future — routing code fixes 
 
 All DP reviewers approved; implementation complete per scope.
 
+
 ### 2026-07-28: PR #128 Review — K8s Rules Engine (#49)
 
 **Status:** ✅ Approved | **Author:** Hermes (Tester)
@@ -388,6 +244,7 @@ All DP reviewers approved; implementation complete per scope.
 - Regex-based YAML parsing is accumulating tech debt across all validators — worth scheduling a structured parser migration in a future sprint.
 - Cross-branch contamination (mixing Fry's web changes with Hermes's core changes) is a process gap to address in next retro.
 
+
 ### 2026-07-28: PR #129 Review — Theme System (#42)
 
 **Status:** ✅ Approved (with one fix) | **Author:** Fry (Frontend Dev)
@@ -405,6 +262,7 @@ All DP reviewers approved; implementation complete per scope.
 **Learnings:**
 - `resolvedTheme` pattern (user pref vs. rendered value) is reusable for any setting that has a "system/auto" option — worth documenting as a standard pattern.
 - `useSyncExternalStore` is the right tool for any browser API subscription (matchMedia, ResizeObserver, IntersectionObserver) — prefer over manual useEffect+useState.
+
 ### 2026-07-27: DP Review #40 + PR #126 Review (Component Streaming)
 
 **DP #40 — Progressive Rendering:** ✅ Approved
@@ -422,6 +280,7 @@ All DP reviewers approved; implementation complete per scope.
 - Always check commit list on multi-commit PRs for scope violations — file count (23 files) was the first red flag
 - Validation safeguards are Bender's domain (#36) not Fry's — routing violation on top of scope creep
 - The `useProgressiveQueue` pattern (timer + refs to avoid stale closures) is a good reusable hook pattern for any future staggered UI reveals
+
 ### 2026-04-13: Issue #39 DP Review + PR #125 Code Review
 
 **Issue:** #39 — feat: Build IndexedDB virtual filesystem
