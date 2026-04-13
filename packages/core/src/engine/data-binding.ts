@@ -6,18 +6,61 @@
  */
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/**
+ * Describes a single named data binding with an optional default value.
+ */
+export interface BindingDescriptor {
+  /** JSON Pointer path into the data model. */
+  path: string;
+  /** Fallback value returned when the pointer resolves to `undefined`. */
+  defaultValue?: unknown;
+}
+
+/**
+ * Describes which data-model paths a component reads from and writes to.
+ */
+export interface ComponentBindingMap {
+  /** JSON Pointer paths this component reads. */
+  reads: string[];
+  /** JSON Pointer paths this component writes. */
+  writes: string[];
+}
+
+/**
+ * Result of {@link analyzeSharedBindings}: which paths are shared and
+ * which components produce/consume them.
+ */
+export interface SharedBindingAnalysis {
+  /** Paths that are written by at least one component and read by another. */
+  sharedPaths: string[];
+  /** Map of shared path → component IDs that write to it. */
+  producers: Record<string, string[]>;
+  /** Map of shared path → component IDs that read from it. */
+  consumers: Record<string, string[]>;
+}
+
+// ---------------------------------------------------------------------------
 // resolveDataPath — JSON Pointer (RFC 6901) resolution
 // ---------------------------------------------------------------------------
 
 /**
  * Resolves a JSON Pointer path against a data model.
+ * Returns `defaultValue` (or `undefined`) when the path cannot be resolved.
  *
  * Examples:
  *   resolveDataPath('/user/name', { user: { name: 'Alice' } }) → 'Alice'
  *   resolveDataPath('/items/0', { items: ['a', 'b'] })         → 'a'
  *   resolveDataPath('/', { key: 'val' })                       → { key: 'val' }
+ *   resolveDataPath('/missing', {}, 'fallback')                → 'fallback'
  */
-export function resolveDataPath(path: string, dataModel: Record<string, unknown>): unknown {
+export function resolveDataPath(
+  path: string,
+  dataModel: Record<string, unknown>,
+  defaultValue?: unknown,
+): unknown {
   if (!path || path === '/') return dataModel;
 
   const normalized = path.startsWith('/') ? path.slice(1) : path;
@@ -25,7 +68,7 @@ export function resolveDataPath(path: string, dataModel: Record<string, unknown>
 
   let current: unknown = dataModel;
   for (const rawSegment of segments) {
-    if (current === null || current === undefined) return undefined;
+    if (current === null || current === undefined) return defaultValue;
     // RFC 6901: ~1 → '/', ~0 → '~'
     const segment = rawSegment.replace(/~1/g, '/').replace(/~0/g, '~');
     if (Array.isArray(current)) {
@@ -34,11 +77,60 @@ export function resolveDataPath(path: string, dataModel: Record<string, unknown>
     } else if (typeof current === 'object') {
       current = (current as Record<string, unknown>)[segment];
     } else {
-      return undefined;
+      return defaultValue;
     }
   }
 
-  return current;
+  return current === undefined ? defaultValue : current;
+}
+
+// ---------------------------------------------------------------------------
+// resolveChainedPointer — follow pointer-to-pointer references
+// ---------------------------------------------------------------------------
+
+const DEFAULT_MAX_CHAIN_DEPTH = 5;
+
+/**
+ * Resolves a JSON Pointer path that may point to another pointer string.
+ * Follows the chain until a non-pointer value is reached or `maxDepth` is hit.
+ *
+ * Example:
+ *   const model = {
+ *     config: { activeProfile: '/profiles/prod' },
+ *     profiles: { prod: { replicas: 3 } },
+ *   };
+ *   resolveChainedPointer('/config/activeProfile', model) → { replicas: 3 }
+ */
+export function resolveChainedPointer(
+  path: string,
+  dataModel: Record<string, unknown>,
+  options?: { maxDepth?: number; defaultValue?: unknown },
+): unknown {
+  const maxDepth = options?.maxDepth ?? DEFAULT_MAX_CHAIN_DEPTH;
+  const visited = new Set<string>();
+  let currentPath = path;
+
+  for (let depth = 0; depth <= maxDepth; depth++) {
+    if (visited.has(currentPath)) {
+      // Circular reference — stop and return default
+      return options?.defaultValue;
+    }
+    visited.add(currentPath);
+
+    const value = resolveDataPath(currentPath, dataModel);
+    if (value === undefined) return options?.defaultValue;
+
+    // If the resolved value is itself a JSON Pointer string, follow it
+    if (typeof value === 'string' && value.startsWith('/')) {
+      currentPath = value;
+      continue;
+    }
+
+    return value;
+  }
+
+  // Max depth exceeded
+  return options?.defaultValue;
 }
 
 // ---------------------------------------------------------------------------
@@ -47,20 +139,109 @@ export function resolveDataPath(path: string, dataModel: Record<string, unknown>
 
 /**
  * Replaces `{{/json/pointer}}` placeholders in a string with resolved values
- * from the data model. Unresolved paths are left as-is.
+ * from the data model. Supports `{{/path|default}}` syntax — the first `|`
+ * separates the pointer from the fallback text. Unresolved paths without a
+ * default are left as-is.
  *
- * Example:
+ * Examples:
  *   interpolateTemplate('Hello {{/user/name}}!', { user: { name: 'Alice' } })
  *   → 'Hello Alice!'
+ *
+ *   interpolateTemplate('Hi {{/user/name|stranger}}!', {})
+ *   → 'Hi stranger!'
  */
 export function interpolateTemplate(template: string, dataModel: Record<string, unknown>): string {
-  return template.replace(/\{\{([^}]+)\}\}/g, (_match, rawPath: string) => {
-    const path = rawPath.trim();
+  return template.replace(/\{\{([^}]+)\}\}/g, (_match, rawExpr: string) => {
+    const expr = rawExpr.trim();
+
+    // Split on first '|' for default value syntax
+    const pipeIdx = expr.indexOf('|');
+    const path = pipeIdx >= 0 ? expr.slice(0, pipeIdx).trim() : expr;
+    const fallback = pipeIdx >= 0 ? expr.slice(pipeIdx + 1) : undefined;
+
     const value = resolveDataPath(path, dataModel);
-    if (value === undefined || value === null) return _match;
+    if (value === undefined || value === null) {
+      return fallback !== undefined ? fallback : _match;
+    }
     if (typeof value === 'object') return JSON.stringify(value);
     return String(value);
   });
+}
+
+// ---------------------------------------------------------------------------
+// resolveBindings — batch-resolve named bindings with defaults
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolves multiple named data bindings in one call.
+ * Each binding specifies a JSON Pointer path and an optional default value.
+ *
+ * Example:
+ *   resolveBindings(
+ *     { name: { path: '/user/name', defaultValue: 'Anonymous' },
+ *       region: { path: '/config/region' } },
+ *     { user: { name: 'Alice' } }
+ *   ) → { name: 'Alice', region: undefined }
+ */
+export function resolveBindings(
+  bindings: Record<string, BindingDescriptor>,
+  dataModel: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, descriptor] of Object.entries(bindings)) {
+    result[key] = resolveDataPath(descriptor.path, dataModel, descriptor.defaultValue);
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// analyzeSharedBindings — cross-component binding analysis
+// ---------------------------------------------------------------------------
+
+/**
+ * Analyzes a set of component binding maps to find shared data paths.
+ * A path is "shared" when at least one component writes to it and at least
+ * one *different* component reads from it.
+ *
+ * Useful for debugging data flow, building dependency graphs, and
+ * visualizing cross-component relationships in the playground.
+ */
+export function analyzeSharedBindings(
+  components: Record<string, ComponentBindingMap>,
+): SharedBindingAnalysis {
+  const allWriters = new Map<string, string[]>();
+  const allReaders = new Map<string, string[]>();
+
+  for (const [componentId, map] of Object.entries(components)) {
+    for (const path of map.writes) {
+      const list = allWriters.get(path) ?? [];
+      list.push(componentId);
+      allWriters.set(path, list);
+    }
+    for (const path of map.reads) {
+      const list = allReaders.get(path) ?? [];
+      list.push(componentId);
+      allReaders.set(path, list);
+    }
+  }
+
+  const sharedPaths: string[] = [];
+  const producers: Record<string, string[]> = {};
+  const consumers: Record<string, string[]> = {};
+
+  for (const [path, writers] of allWriters) {
+    const readers = allReaders.get(path) ?? [];
+    // Shared = written by someone AND read by a *different* component
+    const crossReaders = readers.filter(r => !writers.includes(r));
+    if (crossReaders.length > 0) {
+      sharedPaths.push(path);
+      producers[path] = writers;
+      consumers[path] = crossReaders;
+    }
+  }
+
+  sharedPaths.sort();
+  return { sharedPaths, producers, consumers };
 }
 
 // ---------------------------------------------------------------------------
