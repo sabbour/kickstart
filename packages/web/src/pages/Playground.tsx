@@ -22,9 +22,11 @@ import {
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import { WidgetsProvider, useWidgets } from '../hooks/useWidgets';
+import { useDebug } from '../contexts/DebugContext';
 import { getDemoResponse, resetDemoState } from '../services/demo-scenarios';
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
-import type { A2uiMsg, ChatMessage } from '../types';
+import { DebugPanel } from '../components/Chat/DebugPanel';
+import type { A2uiMsg, ChatMessage, DebugMetadata } from '../types';
 import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
 import {
@@ -920,6 +922,7 @@ const ICON_SECTIONS = [
 
 function PlaygroundInner() {
   const classes = useStyles();
+  const { debugEnabled, toggleDebug } = useDebug();
   const [activeTab, setActiveTab] = useState<'create' | 'gallery' | 'components' | 'icons' | 'widgets'>('gallery');
   const [filterQuery, setFilterQuery] = useState('');
   const [iconFilter, setIconFilter] = useState('');
@@ -972,7 +975,7 @@ function PlaygroundInner() {
     inspireAbortRef.current = controller;
 
     try {
-      const res = await apiFetch('/api/inspirations/widgets?stream=true', { signal: controller.signal });
+      const res = await apiFetch('/api/inspirations/widgets?stream=true', { signal: controller.signal }, debugEnabled);
       if (!res.ok || !res.body) throw new Error('Streaming API error');
 
       const reader = res.body.getReader();
@@ -1001,7 +1004,7 @@ function PlaygroundInner() {
       if (err instanceof Error && err.name === 'AbortError') return;
       setCreatePrompt('');
       try {
-        const res = await apiFetch('/api/inspirations/widgets');
+        const res = await apiFetch('/api/inspirations/widgets', undefined, debugEnabled);
         if (res.ok) {
           const ideas = await res.json();
           if (Array.isArray(ideas) && ideas.length > 0) {
@@ -1013,7 +1016,7 @@ function PlaygroundInner() {
     } finally {
       inspireAbortRef.current = null;
     }
-  }, []);
+  }, [debugEnabled]);
 
   // Filter scenarios
   const filteredGalleryScenarios = useMemo(() => {
@@ -1161,14 +1164,21 @@ function PlaygroundInner() {
           sessionId: createSessionIdRef.current,
           message: text,
         }),
-      });
+      }, debugEnabled);
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `API error: ${res.status}` }));
         throw new Error(err.error || `API error: ${res.status}`);
       }
 
-      const data = await res.json() as { sessionId: string; message: string; a2ui?: object[] };
+      const data = await res.json() as {
+        sessionId: string;
+        message: string;
+        a2ui?: object[];
+        model?: string;
+        rawResponse?: string;
+        renderDecisions?: string[];
+      };
 
       if (data.sessionId && !createSessionIdRef.current) {
         createSessionIdRef.current = data.sessionId;
@@ -1176,15 +1186,32 @@ function PlaygroundInner() {
 
       // Process A2UI components through the surface system
       let surfaceIds: string[] | undefined;
+      let a2uiMessages: A2uiMsg[] | undefined;
       if (data.a2ui && data.a2ui.length > 0) {
         const surfaceId = `pg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const components = normalizePlaygroundComponents(data.a2ui as any[]);
-        const a2uiMessages: A2uiMsg[] = [
+        a2uiMessages = [
           { version: 'v0.9', createSurface: { surfaceId, catalogId: 'kickstart' } },
           { version: 'v0.9', updateComponents: { surfaceId, components } },
         ];
         surfaceIds = createA2ui.processMessages(a2uiMessages);
+
+        // Save the A2UI spec as a widget and navigate to Widgets
+        const widgetName = text.length > 40 ? text.slice(0, 40) + '…' : text;
+        const widgetId = addWidget(widgetName, a2uiMessages);
+        // Defer navigation so the widget list re-renders first
+        setTimeout(() => {
+          setActiveTab('widgets');
+          setSelectedWidget(widgetId);
+          setDetailTab('preview');
+          setDialogOpen(true);
+        }, 0);
       }
+
+      // Capture debug metadata when debug mode is on
+      const debugInfo: DebugMetadata | undefined = debugEnabled
+        ? { model: data.model, rawResponse: data.rawResponse, renderDecisions: data.renderDecisions }
+        : undefined;
 
       const assistantMsg: ChatMessage = {
         id: `create-${Date.now()}-assistant`,
@@ -1192,6 +1219,7 @@ function PlaygroundInner() {
         text: data.message,
         surfaceIds: surfaceIds && surfaceIds.length > 0 ? surfaceIds : undefined,
         timestamp: Date.now(),
+        debugInfo,
       };
       setCreateMessages(prev => [...prev, assistantMsg]);
     } catch (err: any) {
@@ -1205,7 +1233,7 @@ function PlaygroundInner() {
     } finally {
       setCreateLoading(false);
     }
-  }, [createLoading, createA2ui]);
+  }, [createLoading, createA2ui, debugEnabled, addWidget]);
 
   // Handle clear all
   const handleClearAll = useCallback(() => {
@@ -1370,6 +1398,21 @@ function PlaygroundInner() {
           )}
 
           <div className={classes.sidebarFooter}>
+            {debugEnabled && (
+              <button
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: tokens.fontSizeBase200, color: tokens.colorPaletteYellowForeground1,
+                  padding: `${tokens.spacingVerticalXXS} 0`, marginBottom: tokens.spacingVerticalXS,
+                }}
+                aria-label="Debug mode active — click to disable"
+                title="Debug mode ON (Ctrl+Shift+D to toggle)"
+                onClick={toggleDebug}
+              >
+                🐛 Debug
+              </button>
+            )}
             <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
               v{__BUILD_VERSION__} · {(window as any).__BUILD_SHA__ || 'dev'}
             </Caption1>
@@ -1593,6 +1636,10 @@ function PlaygroundInner() {
                     </div>
                   ) : null;
                 })}
+                {/* Debug panel — shown only when debug mode is active on assistant messages */}
+                {debugEnabled && msg.role === 'assistant' && (
+                  <DebugPanel debugInfo={msg.debugInfo} />
+                )}
               </div>
             ))}
 

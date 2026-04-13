@@ -15,7 +15,7 @@ export interface Widget {
 
 interface WidgetsContextValue {
   widgets: Widget[];
-  addWidget: (name: string, messages: A2uiMsg[]) => void;
+  addWidget: (name: string, messages: A2uiMsg[]) => string;
   updateWidget: (id: string, messages: A2uiMsg[]) => void;
   deleteWidget: (id: string) => void;
   duplicateWidget: (id: string) => void;
@@ -41,14 +41,11 @@ export function WidgetsProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
   }, [widgets]);
 
-  const addWidget = useCallback((name: string, messages: A2uiMsg[]) => {
-    const newWidget: Widget = {
-      id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name,
-      createdAt: Date.now(),
-      messages,
-    };
+  const addWidget = useCallback((name: string, messages: A2uiMsg[]): string => {
+    const id = `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newWidget: Widget = { id, name, createdAt: Date.now(), messages };
     setWidgets(prev => [...prev, newWidget]);
+    return id;
   }, []);
 
   const updateWidget = useCallback((id: string, messages: A2uiMsg[]) => {
