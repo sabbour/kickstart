@@ -48,7 +48,7 @@ export const resourceQuotasValidator: Validator = {
     return {
       passed: false,
       message:
-        "Production-tier Deployment detected but no ResourceQuota found. Add a ResourceQuota to limit namespace resource consumption.",
+        "Production-tier Deployment detected. Ensure the namespace defines an appropriate ResourceQuota to limit resource consumption.",
       severity: "warning",
       fix: "Create a ResourceQuota manifest in the same namespace to cap CPU, memory, and pod count.",
     };

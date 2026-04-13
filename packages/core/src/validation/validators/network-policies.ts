@@ -43,7 +43,7 @@ export const networkPoliciesValidator: Validator = {
     return {
       passed: false,
       message:
-        "Production-tier Deployment detected but no NetworkPolicy found. Add a NetworkPolicy to restrict pod-to-pod traffic.",
+        "Production-tier Deployment detected. Ensure the namespace defines a NetworkPolicy to restrict pod-to-pod traffic.",
       severity: "warning",
       fix: "Create a NetworkPolicy manifest that defines ingress/egress rules for this Deployment's pods.",
     };

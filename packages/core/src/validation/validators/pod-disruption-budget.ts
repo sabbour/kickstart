@@ -43,7 +43,7 @@ export const podDisruptionBudgetValidator: Validator = {
     return {
       passed: false,
       message:
-        "Production-tier Deployment detected but no PodDisruptionBudget found. Add a PDB to maintain availability during disruptions.",
+        "Production-tier Deployment detected. Ensure a PodDisruptionBudget is defined to maintain availability during disruptions.",
       severity: "warning",
       fix: "Create a PodDisruptionBudget with minAvailable or maxUnavailable matching your replica count.",
     };

@@ -73,10 +73,11 @@ export const noPrivilegeEscalationValidator: Validator = {
       );
     }
 
-    // Add to existing container securityContext
-    if (/^\s+securityContext:/m.test(content)) {
+    // Add to existing container-level securityContext (must be indented under containers)
+    // Match container securityContext that is at least 6 spaces deep (under spec.containers)
+    if (/^\s{6,}securityContext:\s*$/m.test(content)) {
       return content.replace(
-        /^(\s+)(securityContext:\s*)$/m,
+        /^(\s{6,})(securityContext:\s*)$/m,
         "$1$2\n$1  allowPrivilegeEscalation: false",
       );
     }
