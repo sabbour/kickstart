@@ -32,7 +32,12 @@ export class CloudShellProvider implements FileSystemProvider {
     const base = this.basePath.endsWith("/")
       ? this.basePath.slice(0, -1)
       : this.basePath;
-    return `${base}/${safe}`;
+    // Encode each segment while preserving forward slashes
+    const encoded = safe
+      .split("/")
+      .map((seg) => encodeURIComponent(seg))
+      .join("/");
+    return `${base}/${encoded}`;
   }
 
   async read(path: string): Promise<string> {
@@ -49,8 +54,8 @@ export class CloudShellProvider implements FileSystemProvider {
 
   async write(path: string, content: string): Promise<void> {
     const fullPath = this.resolve(path);
-    const res = await this.connector.request("PUT", `/api/fs${fullPath}`, content, {
-      headers: { "Content-Type": "text/plain" },
+    const res = await this.connector.request("PUT", `/api/fs${fullPath}`, { content }, {
+      headers: { "Content-Type": "application/json" },
     });
     if (!res.ok) {
       throw new Error(`Cloud Shell write failed: ${res.status} ${res.statusText}`);

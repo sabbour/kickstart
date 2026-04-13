@@ -59,8 +59,8 @@ describe("sanitizePath", () => {
     expect(() => sanitizePath("   ")).toThrow(InvalidPathError);
   });
 
-  it("allows single-dot segments (current dir marker)", () => {
-    expect(sanitizePath("./a/b")).toBe("./a/b");
+  it("filters out single-dot segments (current dir marker)", () => {
+    expect(sanitizePath("./a/b")).toBe("a/b");
   });
 });
 

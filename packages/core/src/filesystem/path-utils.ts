@@ -33,10 +33,10 @@ export function sanitizePath(raw: string): string {
     throw new InvalidPathError(raw, "absolute paths are not allowed");
   }
 
-  // Collapse duplicate slashes and trim trailing slash
+  // Collapse duplicate slashes, filter out single-dot segments, and trim trailing slash
   const normalised = raw
     .split("/")
-    .filter((seg) => seg.length > 0)
+    .filter((seg) => seg.length > 0 && seg !== ".")
     .join("/");
 
   // Reject traversal
