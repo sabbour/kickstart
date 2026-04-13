@@ -53,11 +53,6 @@ export function ChatMessage({ message, getSurface, isActive = true, debugEnabled
           );
         })}
 
-        {/* Model indicator */}
-        {message.model && (
-          <span className="model-indicator">{message.model}</span>
-        )}
-
         {/* Debug panel — shown only when debug mode is active */}
         {debugEnabled && <DebugPanel debugInfo={message.debugInfo} />}
       </div>
