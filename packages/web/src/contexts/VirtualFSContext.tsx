@@ -50,9 +50,14 @@ export function VirtualFSProvider({ children, store: externalStore }: VirtualFSP
   const mountedRef = useRef(true);
 
   const refresh = useCallback(() => {
-    fs.readAll().then((records) => {
-      if (mountedRef.current) setFileRecords(records);
-    });
+    fs.readAll()
+      .then((records) => {
+        if (mountedRef.current) setFileRecords(records);
+      })
+      .catch((err) => {
+        console.error('[VirtualFS] readAll failed:', err);
+        if (mountedRef.current) setFileRecords([]);
+      });
   }, [fs]);
 
   useEffect(() => {

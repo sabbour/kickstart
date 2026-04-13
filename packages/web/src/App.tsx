@@ -56,15 +56,22 @@ export function App() {
   const fs = useMemo(() => new VirtualFileSystem(), []);
 
   // IndexedDB-backed persistent filesystem (provided via context)
-  const { fs: vfs } = useVirtualFS();
+  const { fs: vfs, files: vfsFiles } = useVirtualFS();
 
-  // Sync in-memory VFS → IndexedDB when files complete
+  // Sync in-memory VFS → IndexedDB when files complete (with deduplication)
+  const lastPersistedRef = useRef<Map<string, string>>(new Map());
   useEffect(() => {
     const unsub = fs.subscribe(() => {
       const snapshot = fs.getSnapshot();
       for (const file of snapshot) {
         if (file.status === 'complete') {
-          void vfs.writeFile(file.path, file.content, file.language);
+          const prev = lastPersistedRef.current.get(file.path);
+          if (prev !== file.content) {
+            lastPersistedRef.current.set(file.path, file.content);
+            vfs.writeFile(file.path, file.content, file.language).catch((err) => {
+              console.error(`[VFS sync] failed to persist ${file.path}:`, err);
+            });
+          }
         }
       }
     });
@@ -285,7 +292,6 @@ export function App() {
   const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
   const currentStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
-  const { files: vfsFiles } = useVirtualFS();
   const hasFiles = fsFiles.length > 0 || vfsFiles.length > 0;
 
   // Playground mode — standalone A2UI test harness
