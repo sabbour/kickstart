@@ -311,14 +311,23 @@ export class VirtualFS {
     this.dbPromise = openIDB();
   }
 
+  private normalizePath(raw: string): string {
+    return raw
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '')
+      .replace(/\/+/g, '/')
+      .replace(/\/+$/, '');
+  }
+
   async writeFile(path: string, content: string, language?: string): Promise<void> {
+    const normalized = this.normalizePath(path);
     const db = await this.dbPromise;
     const now = Date.now();
-    const existing = await this.getFile(path).catch(() => null);
+    const existing = await this.getFile(normalized).catch(() => null);
     const record: VFSFile = {
-      path,
+      path: normalized,
       content,
-      language: language ?? detectLang(path),
+      language: language ?? detectLang(normalized),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -344,14 +353,20 @@ export class VirtualFS {
       req.onsuccess = () => {
         if (req.result) {
           const raw = req.result as Record<string, unknown>;
-          // Migrate v1 records (path+content only) to full VFSFile shape
-          resolve({
+          const needsMigration = !raw.language || !raw.createdAt || !raw.updatedAt;
+          const migrated: VFSFile = {
             path: raw.path as string,
             content: raw.content as string,
             language: (raw.language as string) ?? detectLang(raw.path as string),
-            createdAt: (raw.createdAt as number) ?? Date.now(),
-            updatedAt: (raw.updatedAt as number) ?? Date.now(),
-          });
+            createdAt: (raw.createdAt as number) ?? 0,
+            updatedAt: (raw.updatedAt as number) ?? 0,
+          };
+          // Persist migrated record so v1 files get stable metadata
+          if (needsMigration) {
+            const writeTx = db.transaction(IDB_STORE, 'readwrite');
+            writeTx.objectStore(IDB_STORE).put(migrated);
+          }
+          resolve(migrated);
         } else {
           reject(new Error(`File not found: ${path}`));
         }
@@ -384,8 +399,8 @@ export class VirtualFS {
           path: raw.path as string,
           content: raw.content as string,
           language: (raw.language as string) ?? detectLang(raw.path as string),
-          createdAt: (raw.createdAt as number) ?? Date.now(),
-          updatedAt: (raw.updatedAt as number) ?? Date.now(),
+          createdAt: (raw.createdAt as number) ?? 0,
+          updatedAt: (raw.updatedAt as number) ?? 0,
         }));
         resolve(records.sort((a, b) => a.path.localeCompare(b.path)));
       };

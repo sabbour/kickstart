@@ -6,7 +6,7 @@
  * file, download-all ZIP, and delete actions.
  */
 
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Body1Strong,
   Button,
@@ -33,6 +33,24 @@ import type { FileTreeNode, VFSFile } from '../services/virtual-fs';
 import { ensureMonacoLocal } from '../catalog/components/monaco-local-setup';
 import { sanitizeHtml } from '../utils/sanitize';
 import hljs from 'highlight.js/lib/core';
+import javascript from 'highlight.js/lib/languages/javascript';
+import typescript from 'highlight.js/lib/languages/typescript';
+import json from 'highlight.js/lib/languages/json';
+import xml from 'highlight.js/lib/languages/xml';
+import css from 'highlight.js/lib/languages/css';
+import markdown from 'highlight.js/lib/languages/markdown';
+import yaml from 'highlight.js/lib/languages/yaml';
+import bash from 'highlight.js/lib/languages/bash';
+
+hljs.registerLanguage('javascript', javascript);
+hljs.registerLanguage('typescript', typescript);
+hljs.registerLanguage('json', json);
+hljs.registerLanguage('xml', xml);
+hljs.registerLanguage('html', xml);
+hljs.registerLanguage('css', css);
+hljs.registerLanguage('markdown', markdown);
+hljs.registerLanguage('yaml', yaml);
+hljs.registerLanguage('bash', bash);
 
 const MonacoEditor = lazy(() =>
   import('@monaco-editor/react').then((mod) => ({ default: mod.default }))
@@ -226,6 +244,10 @@ function TreeNodeItem({
         onClick={handleClick}
         title={node.path}
         type="button"
+        role="treeitem"
+        aria-expanded={node.isDirectory ? expanded : undefined}
+        aria-level={depth + 1}
+        aria-selected={isSelected}
       >
         {ChevronIcon && (
           <span className={classes.treeIcon}>
@@ -238,15 +260,19 @@ function TreeNodeItem({
         </span>
         <span className={classes.treeName}>{node.name}</span>
       </button>
-      {node.isDirectory && expanded && node.children?.map((child) => (
-        <TreeNodeItem
-          key={child.path}
-          node={child}
-          depth={depth + 1}
-          selectedPath={selectedPath}
-          onSelectFile={onSelectFile}
-        />
-      ))}
+      {node.isDirectory && expanded && (
+        <div role="group">
+          {node.children?.map((child) => (
+            <TreeNodeItem
+              key={child.path}
+              node={child}
+              depth={depth + 1}
+              selectedPath={selectedPath}
+              onSelectFile={onSelectFile}
+            />
+          ))}
+        </div>
+      )}
     </>
   );
 }
@@ -282,8 +308,11 @@ export function FileTreePanel({ onOpenFile }: FileTreePanelProps) {
   // Monaco setup
   const [monacoReady, setMonacoReady] = useState(false);
   useEffect(() => {
-    ensureMonacoLocal();
-    setMonacoReady(true);
+    let disposed = false;
+    Promise.resolve(ensureMonacoLocal())
+      .then(() => { if (!disposed) setMonacoReady(true); })
+      .catch(() => { if (!disposed) setMonacoReady(false); });
+    return () => { disposed = true; };
   }, []);
 
   const handleSelectFile = useCallback(
@@ -313,12 +342,21 @@ export function FileTreePanel({ onOpenFile }: FileTreePanelProps) {
     }
   }, [fs, files, selectedPath]);
 
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Cleanup copy timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
+
   const handleCopy = useCallback(async () => {
     if (!selectedFile) return;
     try {
       await navigator.clipboard.writeText(selectedFile.content);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // Fallback for non-secure contexts
       const ta = document.createElement('textarea');
@@ -328,7 +366,7 @@ export function FileTreePanel({ onOpenFile }: FileTreePanelProps) {
       document.execCommand('copy');
       document.body.removeChild(ta);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     }
   }, [selectedFile]);
 
