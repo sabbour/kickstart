@@ -32,9 +32,17 @@ export type { ResolvedSkills, SkillResolverMiddleware } from "./skill-resolver.j
 
 export {
   resolveDataPath,
+  resolveChainedPointer,
   interpolateTemplate,
   createDefaultValues,
   interpolateA2UIMessage,
+  resolveBindings,
+  analyzeSharedBindings,
+} from "./data-binding.js";
+export type {
+  BindingDescriptor,
+  ComponentBindingMap,
+  SharedBindingAnalysis,
 } from "./data-binding.js";
 
 export {
