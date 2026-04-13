@@ -113,58 +113,20 @@ jobs:
 
             core.info(`Issue #${issue.number} assigned to ${assignedMember.name} (${assignedMember.role})`);
 
-      # Assign @copilot using PAT (required for coding agent).
-      # Triggers when squad:copilot is the label being added, OR when a
-      # squad:{member} label is added and the issue already has squad:copilot
-      # (so the agent gets the member charter even if labels are added in
-      # different order).
+      # Separate step: assign @copilot using PAT (required for coding agent)
       - name: Assign @copilot coding agent
-        if: >-
-          github.event.label.name == 'squad:copilot'
-          || (startsWith(github.event.label.name, 'squad:')
-              && contains(join(github.event.issue.labels.*.name, ','), 'squad:copilot'))
+        if: github.event.label.name == 'squad:copilot'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
           script: |
-            const fs = require('fs');
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const issue_number = context.payload.issue.number;
-            const issue = context.payload.issue;
 
             // Get the default branch name (main, master, etc.)
             const { data: repoData } = await github.rest.repos.get({ owner, repo });
             const baseBranch = repoData.default_branch;
-
-            // Build issue-specific custom instructions
-            // Check if any squad:{member} labels exist (besides squad:copilot)
-            const squadLabels = (issue.labels || [])
-              .map(l => l.name)
-              .filter(n => n.startsWith('squad:') && n !== 'squad:copilot');
-
-            let customInstructions = '';
-            if (squadLabels.length > 0) {
-              // Use the first squad:{member} label; additional labels are ignored
-              const memberName = squadLabels[0].replace('squad:', '');
-              // Sanitise: allow only lowercase letters, digits, and hyphens to prevent path traversal
-              if (!/^[a-z0-9-]+$/.test(memberName)) {
-                core.warning(`Ignoring invalid squad member name: "${memberName}"`);
-              } else {
-                const charterPath = `.squad/agents/${memberName}/charter.md`;
-                if (fs.existsSync(charterPath)) {
-                  const charter = fs.readFileSync(charterPath, 'utf8');
-                  customInstructions = [
-                    `This issue is routed to squad member "${memberName}".`,
-                    `Work in their domain voice. Their charter:`,
-                    '',
-                    charter
-                  ].join('\n');
-                } else {
-                  customInstructions = `This issue is routed to squad member "${memberName}". Read their charter at ${charterPath} if it exists.`;
-                }
-              }
-            }
 
             try {
               await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
@@ -175,7 +137,7 @@ jobs:
                 agent_assignment: {
                   target_repo: `${owner}/${repo}`,
                   base_branch: baseBranch,
-                  custom_instructions: customInstructions,
+                  custom_instructions: '',
                   custom_agent: '',
                   model: ''
                 },
@@ -183,7 +145,7 @@ jobs:
                   'X-GitHub-Api-Version': '2022-11-28'
                 }
               });
-              core.info(`Assigned copilot-swe-agent to issue #${issue_number} (base: ${baseBranch}, instructions: ${customInstructions ? 'yes' : 'none'})`);
+              core.info(`Assigned copilot-swe-agent to issue #${issue_number} (base: ${baseBranch})`);
             } catch (err) {
               core.warning(`Assignment with agent_assignment failed: ${err.message}`);
               // Fallback: try without agent_assignment

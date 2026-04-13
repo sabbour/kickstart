@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## [0.5.5] - 2026-04-13
+
+### Added
+
+- **Dark mode hero background SVG** — New `hero-bg-dark.svg` with deep navy/indigo palette, CSS swap via `[data-theme="dark"]`
+- **Squad extension package** — New `.squad/extensions/kickstart-aks-dev/` with 6 skills (A2UI components, debug mode, PR workflow, release process, SWA deployment, testing strategy), 2 ceremonies (design review, retrospective), and 1 directives file (project conventions)
+
+### Fixed
+
+- **CSP violation: CDN script removal** — Removed dead `@fluentui/web-components` CDN script from `index.html` (app uses npm `@fluentui/react-components` instead)
+- **CSP violation: inline BUILD_SHA migration** — Migrated inline `__BUILD_SHA__` script to Vite `define()` — no more `unsafe-inline` needed
+- **Dead CI step removed** — Removed "Stamp build metadata" step from `deploy-swa.yml` (both `sed` commands replaced by Vite define)
+- **Dead E2E route handler** — Removed unpkg route handler from `helpers.ts`
+
+### Changed
+
+- **Squad framework upgraded** — Updated to v0.9.1-build.6
+- **Decisions archived** — `decisions.md` archived (213KB → 90KB), agent histories summarized
+
 ## 0.5.3
 
 ### Bug Fixes

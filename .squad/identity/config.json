@@ -1,0 +1,33 @@
+{
+  "tier": "per-role",
+  "apps": {
+    "frontend": {
+      "appId": 3369254,
+      "appSlug": "sabbour-squad-frontend",
+      "installationId": 123734028,
+      "roleSlug": "frontend",
+      "tier": "per-role"
+    },
+    "backend": {
+      "appId": 3369262,
+      "appSlug": "sabbour-squad-backend",
+      "installationId": 123734137,
+      "roleSlug": "backend",
+      "tier": "per-role"
+    },
+    "tester": {
+      "appId": 3369268,
+      "appSlug": "sabbour-squad-tester",
+      "installationId": 123734232,
+      "roleSlug": "tester",
+      "tier": "per-role"
+    },
+    "lead": {
+      "appId": 3340358,
+      "appSlug": "sabbour-squad-lead",
+      "installationId": 122992338,
+      "roleSlug": "lead",
+      "tier": "per-role"
+    }
+  }
+}

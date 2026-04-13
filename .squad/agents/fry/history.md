@@ -327,3 +327,9 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - **In-memory → IndexedDB sync bridge:** `useEffect` subscribes to the in-memory `VirtualFileSystem` and writes "complete" files to `VirtualFS` (IndexedDB). This gives persistence without changing the streaming pipeline.
 - **FileTreePanel Fluent rewrite:** Full `makeStyles` + tokens. Hierarchical tree with Fluent icons (`FolderRegular`, `DocumentRegular`, chevrons). Monaco lazy-loaded via `React.lazy` + `Suspense`. Toolbar with copy/download/delete.
 - **Monaco fallback:** `hljs` highlight + `sanitizeHtml()` for code preview when Monaco hasn't finished loading. Same pattern as the catalog FileEditor component.
+
+
+### 2026-04-13 — Dark mode hero background SVG
+- Created `packages/web/public/assets/hero-bg-dark.svg` — a super-dark variant of the landing hero background using deep navy (#0a0f1a), indigo (#0d0b1a), and purple (#120e1e) gradients. Same 3-layer structure (base linear gradient + two radial glows) as the light version, but genuinely dark instead of inverted.
+- Updated `packages/web/css/landing.css` with a `[data-theme="dark"] .landing-page` rule that swaps `background-image` to the dark SVG. The existing `background` shorthand on `.landing-page` still provides `center/cover no-repeat` and the fallback color, so the dark override only needs to replace the image.
+- Theme attribute is applied on `<html>` by `ThemeContext.tsx` (line 55: `document.documentElement.setAttribute('data-theme', resolved)`).

@@ -32,11 +32,6 @@ export const test = base.extend<{ mockAuth: void }>({
       route.fulfill({ status: 503, contentType: 'text/plain', body: 'No backend' }),
     );
 
-    // Intercept Fluent UI CDN — not needed for functional tests
-    await page.route('**/unpkg.com/@fluentui/**', route =>
-      route.fulfill({ status: 200, contentType: 'application/javascript', body: '/* noop */' }),
-    );
-
     await use();
   }, { auto: true }],
 });

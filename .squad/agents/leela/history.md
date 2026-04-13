@@ -292,3 +292,24 @@ All DP reviewers approved; implementation complete per scope.
 **PR Review:** Approved. 680 additions, 83 deletions across 6 files. Implementation matches DP precisely. Fluent UI compliance verified (makeStyles + tokens). Security: sanitizeHtml() on hljs fallback, Monaco read-only, no raw innerHTML. 580 tests pass, zero type errors.
 
 **Minor notes (non-blocking):** Sync bridge iterates all files per VFS notification (O(n) per event, acceptable at current scale). document.execCommand copy fallback is deprecated but fine for compat.
+
+---
+
+### 2026-04-13T22:32:25Z: Extension Package — kickstart-aks-dev
+
+**Task:** Review all squad processes and package as a Squad Extension.
+
+**What I did:**
+- Read and analyzed: `decisions.md` (4046 lines, 213 entries), 13 inbox files, `ceremonies.md` (4 ceremonies), `skills/pr-workflow/SKILL.md`, `routing.md`, `team.md`
+- Extracted 6 skills, 3 ceremonies (design-review, retrospective with sprint planning), and 1 consolidated directives file
+- Created extension at `.squad/extensions/kickstart-aks-dev/` with README
+- Wrote decision inbox entry at `.squad/decisions/inbox/leela-extension-package.md`
+
+**Key files:**
+- `.squad/extensions/kickstart-aks-dev/README.md`
+- `.squad/extensions/kickstart-aks-dev/skills/{pr-workflow,release-process,swa-deployment,debug-mode,a2ui-components,testing-strategy}.md`
+- `.squad/extensions/kickstart-aks-dev/ceremonies/{design-review,retrospective}.md`
+- `.squad/extensions/kickstart-aks-dev/directives/project-conventions.md`
+- `.squad/decisions/inbox/leela-extension-package.md`
+
+**Findings:** ~150 early decisions are pre-A2UI and could be archived. 13 inbox files need Scribe merge. Some date inconsistencies in inbox files (2025 dates on 2026 features).
