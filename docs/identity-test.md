@@ -17,3 +17,4 @@ proving that per-role identity resolution works correctly.
 | Lead | sabbour-squad-lead[bot] | ⬜ |
 Backend bot was here — 2026-04-13T23:26:46Z
 Tester bot was here — 2026-04-13T23:26:49Z
+Lead bot was here — 2026-04-13T23:26:51Z
