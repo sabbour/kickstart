@@ -11,10 +11,15 @@ proving that per-role identity resolution works correctly.
 
 | Role | Bot Account | Status |
 |------|-------------|--------|
-| Frontend | sabbour-squad-frontend[bot] | ⬜ |
-| Backend | sabbour-squad-backend[bot] | ⬜ |
-| Tester | sabbour-squad-tester[bot] | ⬜ |
-| Lead | sabbour-squad-lead[bot] | ⬜ |
-Backend bot was here — 2026-04-13T23:26:46Z
-Tester bot was here — 2026-04-13T23:26:49Z
-Lead bot was here — 2026-04-13T23:26:51Z
+| Frontend | sabbour-squad-frontend[bot] | Done |
+| Backend | sabbour-squad-backend[bot] | Done |
+| Tester | sabbour-squad-tester[bot] | Done |
+| Lead | sabbour-squad-lead[bot] | Done |
+
+## Test Results
+
+- Parallel token resolution (all 4 roles simultaneously) - PASS
+- Commits from 4 different bot accounts - PASS
+- PR creation as a bot (gh pr create with --repo flag required) - PASS
+- PR reviews from 3 different bots in parallel - PASS
+- Review addressing and follow-up commit - PASS
