@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## 0.5.4
+
+### Features
+
+- **Debug mode in Prototype** — 🐛 badge, DebugPanel, and debug header now work in the Playground experience
+- **Create → A2UI widget** — Create flow outputs A2UI component spec, adds to Widgets tab, navigates there
+- **GitHub + Azure components** — 11 new integration components: GitHub LoginCard/RepoPicker/Action/Commit, Azure LoginCard/ResourcePicker/ResourceForm/Action, DeploymentProgress, CostEstimate, FileEditor
+- **Catalog completeness** — 11 additional missing components added: Icon, Video, AudioPlayer, Badge, Alert, Link, Table, Toggle, Accordion, ComboBox, MultiSelect
+
+### Bug Fixes
+
+- **A2UI JSON view data bindings** — `normalizePlaygroundComponents` now preserves `dataBinding`, `state`, `action`, and `template` fields
+- **Button actions → real handlers** — All interactive elements fire visible Fluent UI toasts instead of silent `console.log`
+- **Dark mode SVG** — Background SVG inverted via `filter: invert(0.85) hue-rotate(180deg)` on `[data-theme="dark"]`
+
+### Improvements
+
+- **SteppedCarousel animation** — Smooth `translateX` slide transitions (~300ms) with `prefers-reduced-motion` support
+
 ## 0.5.3
 
 ### Bug Fixes
