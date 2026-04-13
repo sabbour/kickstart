@@ -48,6 +48,7 @@ export interface A2uiMsg {
   createSurface?: {
     surfaceId: string;
     catalogId: string;
+    sendDataModel?: boolean;
   };
   updateComponents?: {
     surfaceId: string;

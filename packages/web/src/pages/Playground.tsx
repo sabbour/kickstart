@@ -89,6 +89,15 @@ function normalizePlaygroundComponents(raw: any[]): any[] {
       if (k !== 'id' && k !== 'component') comp[k] = v;
     }
 
+    // Preserve top-level A2UI fields (dataBinding, state, action, template, etc.)
+    // that the LLM may place outside of `props`
+    const STRUCTURAL_KEYS = new Set(['type', 'id', 'props', 'children']);
+    for (const [k, v] of Object.entries(node)) {
+      if (!STRUCTURAL_KEYS.has(k) && !(k in comp)) {
+        comp[k] = v;
+      }
+    }
+
     // Handle special type conversions
     if (node.type === 'Action.Submit' || node.type === 'Action.OpenUrl') {
       const label = props.title || 'Action';
@@ -175,7 +184,7 @@ function normalizePlaygroundComponents(raw: any[]): any[] {
 
 // Scenario grouping for tabs
 const GALLERY_GROUPS = ['Kickstart Scenarios', 'Data Binding', 'Events & Actions', 'Surface Lifecycle', 'Dynamic Patterns'];
-const COMPONENT_GROUPS = ['Layout', 'Content', 'Inputs', 'Custom Controls'];
+const COMPONENT_GROUPS = ['Layout', 'Content', 'Inputs', 'Custom Controls', 'GitHub Integration', 'Azure Integration', 'Deployment & Output'];
 
 const GALLERY_SCENARIOS = [...KICKSTART_SCENARIOS, ...CONTROL_SCENARIOS].filter(s => GALLERY_GROUPS.includes(s.group));
 const COMPONENT_SCENARIOS = CONTROL_SCENARIOS.filter(s => COMPONENT_GROUPS.includes(s.group));
