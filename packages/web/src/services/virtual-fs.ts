@@ -15,6 +15,7 @@ export interface FileTreeNode {
   isDirectory: boolean;
   children?: FileTreeNode[];
   file?: VirtualFile;
+  vfsFile?: VFSFile;
 }
 
 const EXTENSION_LANGUAGES: Record<string, string> = {
@@ -215,25 +216,91 @@ export class VirtualFileSystem {
 // VirtualFS — IndexedDB-backed persistent virtual filesystem
 // ---------------------------------------------------------------------------
 
+/** A persisted file record stored in IndexedDB. */
+export interface VFSFile {
+  path: string;
+  content: string;
+  language: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 const IDB_NAME = 'kickstart-vfs';
-const IDB_VERSION = 1;
+const IDB_VERSION = 2;
 const IDB_STORE = 'files';
 
 function openIDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(IDB_NAME, IDB_VERSION);
     req.onupgradeneeded = () => {
-      req.result.createObjectStore(IDB_STORE, { keyPath: 'path' });
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE, { keyPath: 'path' });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
+/** Detect language from a file path for persisted records. */
+function detectLang(path: string): string {
+  const filename = path.split('/').pop() ?? '';
+  if (FILENAME_LANGUAGES[filename]) return FILENAME_LANGUAGES[filename];
+  const ext = filename.includes('.') ? filename.split('.').pop()!.toLowerCase() : '';
+  return EXTENSION_LANGUAGES[ext] ?? 'plaintext';
+}
+
+/** Build a hierarchical FileTreeNode[] from a flat list of VFSFile records. */
+export function buildFileTree(files: VFSFile[]): FileTreeNode[] {
+  const root: FileTreeNode = { name: '/', path: '', isDirectory: true, children: [] };
+  const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path));
+
+  for (const file of sorted) {
+    const parts = file.path.split('/');
+    let current = root;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLast = i === parts.length - 1;
+      const partPath = parts.slice(0, i + 1).join('/');
+
+      if (isLast) {
+        current.children!.push({
+          name: part,
+          path: partPath,
+          isDirectory: false,
+          vfsFile: file,
+        });
+      } else {
+        let dir = current.children!.find((c) => c.isDirectory && c.name === part);
+        if (!dir) {
+          dir = { name: part, path: partPath, isDirectory: true, children: [] };
+          current.children!.push(dir);
+        }
+        current = dir;
+      }
+    }
+  }
+
+  sortTree(root.children!);
+  return root.children!;
+}
+
+function sortTree(nodes: FileTreeNode[]): void {
+  nodes.sort((a, b) => {
+    if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  for (const node of nodes) {
+    if (node.children) sortTree(node.children);
+  }
+}
+
 /**
  * IndexedDB-backed virtual filesystem.
  *
- * Files are stored as `{ path, content }` records in an IDB object store.
+ * Files are stored as `VFSFile` records with path, content, language, and timestamps.
  * All methods are async. Subscribe to change notifications via `subscribe()`.
  */
 export class VirtualFS {
@@ -244,11 +311,20 @@ export class VirtualFS {
     this.dbPromise = openIDB();
   }
 
-  async writeFile(path: string, content: string): Promise<void> {
+  async writeFile(path: string, content: string, language?: string): Promise<void> {
     const db = await this.dbPromise;
+    const now = Date.now();
+    const existing = await this.getFile(path).catch(() => null);
+    const record: VFSFile = {
+      path,
+      content,
+      language: language ?? detectLang(path),
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).put({ path, content });
+      tx.objectStore(IDB_STORE).put(record);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -256,13 +332,29 @@ export class VirtualFS {
   }
 
   async readFile(path: string): Promise<string> {
+    const file = await this.getFile(path);
+    return file.content;
+  }
+
+  async getFile(path: string): Promise<VFSFile> {
     const db = await this.dbPromise;
     return new Promise((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, 'readonly');
       const req = tx.objectStore(IDB_STORE).get(path);
       req.onsuccess = () => {
-        if (req.result) resolve((req.result as { path: string; content: string }).content);
-        else reject(new Error(`File not found: ${path}`));
+        if (req.result) {
+          const raw = req.result as Record<string, unknown>;
+          // Migrate v1 records (path+content only) to full VFSFile shape
+          resolve({
+            path: raw.path as string,
+            content: raw.content as string,
+            language: (raw.language as string) ?? detectLang(raw.path as string),
+            createdAt: (raw.createdAt as number) ?? Date.now(),
+            updatedAt: (raw.updatedAt as number) ?? Date.now(),
+          });
+        } else {
+          reject(new Error(`File not found: ${path}`));
+        }
       };
       req.onerror = () => reject(req.error);
     });
@@ -276,6 +368,26 @@ export class VirtualFS {
       req.onsuccess = () => {
         const keys = req.result as string[];
         resolve(dir ? keys.filter((k) => k.startsWith(dir)) : keys);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  /** Fetch all stored file records with full metadata. */
+  async readAll(): Promise<VFSFile[]> {
+    const db = await this.dbPromise;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).getAll();
+      req.onsuccess = () => {
+        const records = (req.result as Record<string, unknown>[]).map((raw) => ({
+          path: raw.path as string,
+          content: raw.content as string,
+          language: (raw.language as string) ?? detectLang(raw.path as string),
+          createdAt: (raw.createdAt as number) ?? Date.now(),
+          updatedAt: (raw.updatedAt as number) ?? Date.now(),
+        }));
+        resolve(records.sort((a, b) => a.path.localeCompare(b.path)));
       };
       req.onerror = () => reject(req.error);
     });
@@ -302,17 +414,21 @@ export class VirtualFS {
     });
   }
 
+  /** Remove all stored files. */
+  async clear(): Promise<void> {
+    const db = await this.dbPromise;
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    this.notify();
+  }
+
   async exportZip(): Promise<Blob> {
     const { default: JSZip } = await import('jszip');
-    const db = await this.dbPromise;
-    const records: Array<{ path: string; content: string }> = await new Promise(
-      (resolve, reject) => {
-        const tx = db.transaction(IDB_STORE, 'readonly');
-        const req = tx.objectStore(IDB_STORE).getAll();
-        req.onsuccess = () => resolve(req.result as Array<{ path: string; content: string }>);
-        req.onerror = () => reject(req.error);
-      },
-    );
+    const records = await this.readAll();
     const zip = new JSZip();
     for (const { path, content } of records) {
       zip.file(path, content);

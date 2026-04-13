@@ -1,43 +1,354 @@
 /**
- * FileTreePanel — persistent file tree backed by VirtualFSContext (IndexedDB).
+ * FileTreePanel — persistent file browser backed by VirtualFSContext (IndexedDB).
  *
- * Renders a list of all files in the VirtualFS. Clicking a file shows its
- * content in an inline preview and calls `onOpenFile` so the parent can show
- * it in the main FileEditor as well.
- *
- * A "Download All" button exports every stored file as a single ZIP archive.
+ * Renders a hierarchical file tree with collapsible directories. Clicking a file
+ * opens it in a Monaco-powered code view. Toolbar provides copy, download single
+ * file, download-all ZIP, and delete actions.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Body1Strong,
+  Button,
+  Caption1,
+  Card,
+  Spinner,
+  Tooltip,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import {
+  ArrowDownloadRegular,
+  CopyRegular,
+  DeleteRegular,
+  DocumentRegular,
+  FolderOpenRegular,
+  FolderRegular,
+  ChevronDownRegular,
+  ChevronRightRegular,
+} from '@fluentui/react-icons';
 import { useVirtualFS } from '../contexts/VirtualFSContext';
+import type { FileTreeNode, VFSFile } from '../services/virtual-fs';
+import { ensureMonacoLocal } from '../catalog/components/monaco-local-setup';
+import { sanitizeHtml } from '../utils/sanitize';
+import hljs from 'highlight.js/lib/core';
+
+const MonacoEditor = lazy(() =>
+  import('@monaco-editor/react').then((mod) => ({ default: mod.default }))
+);
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    overflow: 'hidden',
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalS,
+    borderBottomWidth: tokens.strokeWidthThin,
+    borderBottomStyle: 'solid',
+    borderBottomColor: tokens.colorNeutralStroke2,
+  },
+  headerActions: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalXS,
+  },
+  treeContainer: {
+    flex: '0 0 auto',
+    maxHeight: '40%',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    borderBottomWidth: tokens.strokeWidthThin,
+    borderBottomStyle: 'solid',
+    borderBottomColor: tokens.colorNeutralStroke2,
+  },
+  treeNode: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    paddingTop: '3px',
+    paddingBottom: '3px',
+    paddingRight: tokens.spacingHorizontalS,
+    cursor: 'pointer',
+    borderWidth: '0',
+    backgroundColor: 'transparent',
+    color: tokens.colorNeutralForeground1,
+    fontFamily: tokens.fontFamilyBase,
+    fontSize: tokens.fontSizeBase200,
+    width: '100%',
+    textAlign: 'left' as const,
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
+  },
+  treeNodeSelected: {
+    backgroundColor: tokens.colorNeutralBackground1Selected,
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Selected,
+    },
+  },
+  treeIcon: {
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  treeName: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  },
+  codeContainer: {
+    flex: '1 1 auto',
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  codeHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: tokens.spacingVerticalXS,
+    paddingBottom: tokens.spacingVerticalXS,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalS,
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderBottomWidth: tokens.strokeWidthThin,
+    borderBottomStyle: 'solid',
+    borderBottomColor: tokens.colorNeutralStroke2,
+  },
+  codeFileInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    overflow: 'hidden',
+  },
+  codeActions: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalXS,
+    flexShrink: 0,
+  },
+  codeBody: {
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflow: 'auto',
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  codeView: {
+    margin: '0',
+    padding: tokens.spacingHorizontalM,
+    fontFamily: tokens.fontFamilyMonospace,
+    fontSize: '12px',
+    lineHeight: '18px',
+    whiteSpace: 'pre-wrap' as const,
+    wordBreak: 'break-all' as const,
+  },
+  monacoLoading: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '200px',
+  },
+  empty: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    gap: tokens.spacingVerticalS,
+    color: tokens.colorNeutralForeground3,
+    padding: tokens.spacingHorizontalL,
+    textAlign: 'center' as const,
+  },
+  emptyIcon: {
+    fontSize: '32px',
+    opacity: 0.5,
+  },
+  langBadge: {
+    fontSize: tokens.fontSizeBase100,
+    color: tokens.colorNeutralForeground3,
+    backgroundColor: tokens.colorNeutralBackground4,
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    paddingLeft: tokens.spacingHorizontalXS,
+    paddingRight: tokens.spacingHorizontalXS,
+    borderRadius: tokens.borderRadiusMedium,
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Tree node component
+// ---------------------------------------------------------------------------
+
+function TreeNodeItem({
+  node,
+  depth,
+  selectedPath,
+  onSelectFile,
+}: {
+  node: FileTreeNode;
+  depth: number;
+  selectedPath?: string;
+  onSelectFile: (path: string) => void;
+}) {
+  const classes = useStyles();
+  const [expanded, setExpanded] = useState(depth < 2);
+
+  const handleClick = useCallback(() => {
+    if (node.isDirectory) {
+      setExpanded((prev) => !prev);
+    } else {
+      onSelectFile(node.path);
+    }
+  }, [node, onSelectFile]);
+
+  const isSelected = !node.isDirectory && node.path === selectedPath;
+
+  const DirIcon = node.isDirectory
+    ? expanded ? FolderOpenRegular : FolderRegular
+    : DocumentRegular;
+  const ChevronIcon = node.isDirectory
+    ? expanded ? ChevronDownRegular : ChevronRightRegular
+    : null;
+
+  return (
+    <>
+      <button
+        className={`${classes.treeNode} ${isSelected ? classes.treeNodeSelected : ''}`}
+        style={{ paddingLeft: `${8 + depth * 16}px` }}
+        onClick={handleClick}
+        title={node.path}
+        type="button"
+      >
+        {ChevronIcon && (
+          <span className={classes.treeIcon}>
+            <ChevronIcon fontSize={12} />
+          </span>
+        )}
+        {!ChevronIcon && <span style={{ width: 12 }} />}
+        <span className={classes.treeIcon}>
+          <DirIcon fontSize={16} />
+        </span>
+        <span className={classes.treeName}>{node.name}</span>
+      </button>
+      {node.isDirectory && expanded && node.children?.map((child) => (
+        <TreeNodeItem
+          key={child.path}
+          node={child}
+          depth={depth + 1}
+          selectedPath={selectedPath}
+          onSelectFile={onSelectFile}
+        />
+      ))}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main panel
+// ---------------------------------------------------------------------------
 
 interface FileTreePanelProps {
-  /**
-   * Called when the user clicks a file in the panel.
-   * Receives the path and the full text content.
-   */
   onOpenFile?: (path: string, content: string) => void;
 }
 
+/** Map our language names to Monaco language IDs. */
+function toMonacoLanguage(lang: string | undefined): string | undefined {
+  if (!lang) return undefined;
+  const map: Record<string, string> = {
+    js: 'javascript', jsx: 'javascript',
+    ts: 'typescript', tsx: 'typescript',
+    py: 'python', yml: 'yaml',
+    sh: 'bash', shell: 'bash',
+  };
+  return map[lang] ?? lang;
+}
+
 export function FileTreePanel({ onOpenFile }: FileTreePanelProps) {
-  const { fs, files } = useVirtualFS();
+  const classes = useStyles();
+  const { fs, files, tree } = useVirtualFS();
   const [selectedPath, setSelectedPath] = useState<string | undefined>();
-  const [previewContent, setPreviewContent] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<VFSFile | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Monaco setup
+  const [monacoReady, setMonacoReady] = useState(false);
+  useEffect(() => {
+    ensureMonacoLocal();
+    setMonacoReady(true);
+  }, []);
 
   const handleSelectFile = useCallback(
     async (path: string) => {
       try {
-        const content = await fs.readFile(path);
+        const file = await fs.getFile(path);
         setSelectedPath(path);
-        setPreviewContent(content);
-        onOpenFile?.(path, content);
+        setSelectedFile(file);
+        onOpenFile?.(path, file.content);
       } catch {
-        // file may have been deleted between render and click
+        // file may have been deleted
       }
     },
     [fs, onOpenFile],
   );
+
+  // Re-fetch selected file when files change (content may have updated)
+  useEffect(() => {
+    if (selectedPath && files.includes(selectedPath)) {
+      fs.getFile(selectedPath).then(setSelectedFile).catch(() => {
+        setSelectedPath(undefined);
+        setSelectedFile(null);
+      });
+    } else if (selectedPath && !files.includes(selectedPath)) {
+      setSelectedPath(undefined);
+      setSelectedFile(null);
+    }
+  }, [fs, files, selectedPath]);
+
+  const handleCopy = useCallback(async () => {
+    if (!selectedFile) return;
+    try {
+      await navigator.clipboard.writeText(selectedFile.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for non-secure contexts
+      const ta = document.createElement('textarea');
+      ta.value = selectedFile.content;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [selectedFile]);
+
+  const handleDownloadFile = useCallback(() => {
+    if (!selectedFile) return;
+    const blob = new Blob([selectedFile.content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = selectedFile.path.split('/').pop() ?? 'file';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [selectedFile]);
 
   const handleDownloadAll = useCallback(async () => {
     if (files.length === 0 || isDownloading) return;
@@ -57,45 +368,142 @@ export function FileTreePanel({ onOpenFile }: FileTreePanelProps) {
     }
   }, [fs, files.length, isDownloading]);
 
+  const handleDeleteFile = useCallback(async () => {
+    if (!selectedPath) return;
+    await fs.deleteFile(selectedPath);
+    setSelectedPath(undefined);
+    setSelectedFile(null);
+  }, [fs, selectedPath]);
+
+  // Highlight code for read-only fallback view
+  const highlightedCode = useMemo(() => {
+    if (!selectedFile) return '';
+    try {
+      if (selectedFile.language && hljs.getLanguage(selectedFile.language)) {
+        return hljs.highlight(selectedFile.content, { language: selectedFile.language }).value;
+      }
+      return hljs.highlightAuto(selectedFile.content).value;
+    } catch {
+      return escapeHtml(selectedFile.content);
+    }
+  }, [selectedFile]);
+
   if (files.length === 0) return null;
 
   return (
-    <aside className="file-editor" aria-label="Persistent files">
-      <div className="file-tree">
-        <div className="file-tree-header">
-          <span>Files</span>
-          <button
-            type="button"
-            className="file-tree-download-btn"
-            onClick={handleDownloadAll}
-            disabled={isDownloading || files.length === 0}
-            title="Download all files as ZIP"
-          >
-            {isDownloading ? '…' : '⬇ Download All'}
-          </button>
-        </div>
-        <div className="file-tree-list">
-          {files.map((path) => (
-            <button
-              key={path}
-              type="button"
-              className={`file-tree-item${selectedPath === path ? ' selected' : ''}`}
-              onClick={() => handleSelectFile(path)}
-              title={path}
-            >
-              <span className="file-tree-icon">📄</span>
-              <span className="file-tree-name">{path.split('/').pop() ?? path}</span>
-            </button>
-          ))}
+    <Card className={classes.root}>
+      {/* Header */}
+      <div className={classes.header}>
+        <Body1Strong>Files ({files.length})</Body1Strong>
+        <div className={classes.headerActions}>
+          <Tooltip content="Download all as ZIP" relationship="label">
+            <Button
+              appearance="subtle"
+              size="small"
+              icon={<ArrowDownloadRegular />}
+              onClick={handleDownloadAll}
+              disabled={isDownloading || files.length === 0}
+            />
+          </Tooltip>
         </div>
       </div>
-      {selectedPath && previewContent && (
-        <div className="code-view" aria-label={`Preview: ${selectedPath}`}>
-          <pre className="code-view-pre">
-            <code>{previewContent}</code>
-          </pre>
-        </div>
-      )}
-    </aside>
+
+      {/* Tree */}
+      <div className={classes.treeContainer} role="tree" aria-label="File tree">
+        {tree.map((node) => (
+          <TreeNodeItem
+            key={node.path}
+            node={node}
+            depth={0}
+            selectedPath={selectedPath}
+            onSelectFile={handleSelectFile}
+          />
+        ))}
+      </div>
+
+      {/* Code view */}
+      <div className={classes.codeContainer}>
+        {selectedFile ? (
+          <>
+            <div className={classes.codeHeader}>
+              <div className={classes.codeFileInfo}>
+                <Caption1>{selectedFile.path}</Caption1>
+                <span className={classes.langBadge}>{selectedFile.language}</span>
+              </div>
+              <div className={classes.codeActions}>
+                <Tooltip content={copied ? 'Copied!' : 'Copy'} relationship="label">
+                  <Button
+                    appearance="subtle"
+                    size="small"
+                    icon={<CopyRegular />}
+                    onClick={handleCopy}
+                  />
+                </Tooltip>
+                <Tooltip content="Download file" relationship="label">
+                  <Button
+                    appearance="subtle"
+                    size="small"
+                    icon={<ArrowDownloadRegular />}
+                    onClick={handleDownloadFile}
+                  />
+                </Tooltip>
+                <Tooltip content="Delete file" relationship="label">
+                  <Button
+                    appearance="subtle"
+                    size="small"
+                    icon={<DeleteRegular />}
+                    onClick={handleDeleteFile}
+                  />
+                </Tooltip>
+              </div>
+            </div>
+            <div className={classes.codeBody}>
+              {monacoReady ? (
+                <Suspense
+                  fallback={
+                    <div className={classes.monacoLoading}>
+                      <Spinner size="small" label="Loading editor…" />
+                    </div>
+                  }
+                >
+                  <MonacoEditor
+                    height="100%"
+                    language={toMonacoLanguage(selectedFile.language)}
+                    value={selectedFile.content}
+                    options={{
+                      readOnly: true,
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                      fontSize: 13,
+                      lineNumbers: 'on',
+                      wordWrap: 'on',
+                      automaticLayout: true,
+                    }}
+                  />
+                </Suspense>
+              ) : (
+                <pre className={classes.codeView}>
+                  <code dangerouslySetInnerHTML={{ __html: sanitizeHtml(highlightedCode) }} />
+                </pre>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className={classes.empty}>
+            <DocumentRegular className={classes.emptyIcon} />
+            <Caption1>Select a file to view</Caption1>
+          </div>
+        )}
+      </div>
+    </Card>
   );
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }

@@ -5,6 +5,7 @@ import { Landing } from './components/Landing';
 import { ChatShell } from './components/Chat/ChatShell';
 import { SessionsSidebar } from './components/Sidebar/SessionsSidebar';
 import { FileEditor } from './components/FileEditor/FileEditor';
+import { FileTreePanel } from './components/FileTreePanel';
 import { Playground } from './pages/Playground';
 import { useA2UI } from './hooks/useA2UI';
 import { useActionDispatch } from './hooks/useActionDispatch';
@@ -14,6 +15,7 @@ import { useStreaming } from './hooks/useStreaming';
 import { useMockStreaming } from './hooks/useMockStreaming';
 import { useAPIConnectorRegistry } from './contexts/APIConnectorContext';
 import { useTheme } from './contexts/ThemeContext';
+import { useVirtualFS } from './contexts/VirtualFSContext';
 import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
@@ -52,6 +54,22 @@ export function App() {
 
   // Single VFS instance for the app lifetime
   const fs = useMemo(() => new VirtualFileSystem(), []);
+
+  // IndexedDB-backed persistent filesystem (provided via context)
+  const { fs: vfs } = useVirtualFS();
+
+  // Sync in-memory VFS → IndexedDB when files complete
+  useEffect(() => {
+    const unsub = fs.subscribe(() => {
+      const snapshot = fs.getSnapshot();
+      for (const file of snapshot) {
+        if (file.status === 'complete') {
+          void vfs.writeFile(file.path, file.content, file.language);
+        }
+      }
+    });
+    return unsub;
+  }, [fs, vfs]);
 
   // Messages for the active session
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -211,6 +229,7 @@ export function App() {
   const handleStartChat = useCallback((prompt: string) => {
     a2ui.reset();
     fs.clear();
+    void vfs.clear();
     setSelectedFile(undefined);
     setMessages([]);
     setMode('chat');
@@ -231,25 +250,27 @@ export function App() {
       // Send via real API
       handleSendMessage(prompt);
     }, 100);
-  }, [sessions, a2ui, handleSendMessage, fs]);
+  }, [sessions, a2ui, handleSendMessage, fs, vfs]);
 
   const handleClearAllSessions = useCallback(() => {
     sessions.clearAllSessions();
     setMessages([]);
     a2ui.reset();
     fs.clear();
+    void vfs.clear();
     setSelectedFile(undefined);
-  }, [sessions, a2ui, fs]);
+  }, [sessions, a2ui, fs, vfs]);
 
   const handleNewSession = useCallback(() => {
     a2ui.reset();
     fs.clear();
+    void vfs.clear();
     setSelectedFile(undefined);
     setMessages([]);
     setMode('landing');
     document.body.classList.add('on-landing');
     sessions.setActiveSessionId(null);
-  }, [a2ui, sessions, fs]);
+  }, [a2ui, sessions, fs, vfs]);
 
   const handleResumeSession = useCallback((sessionId: string) => {
     sessions.setActiveSessionId(sessionId);
@@ -264,7 +285,8 @@ export function App() {
   const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
   const currentStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
-  const hasFiles = fsFiles.length > 0;
+  const { files: vfsFiles } = useVirtualFS();
+  const hasFiles = fsFiles.length > 0 || vfsFiles.length > 0;
 
   // Playground mode — standalone A2UI test harness
   if (playgroundEnabled) {
@@ -302,11 +324,14 @@ export function App() {
           />
         ) : undefined}
         fileEditor={mode === 'chat' ? (
-          <FileEditor
-            fs={fs}
-            selectedPath={selectedFile}
-            onSelectFile={setSelectedFile}
-          />
+          <>
+            <FileEditor
+              fs={fs}
+              selectedPath={selectedFile}
+              onSelectFile={setSelectedFile}
+            />
+            <FileTreePanel />
+          </>
         ) : undefined}
       >
         {mode === 'landing' ? (

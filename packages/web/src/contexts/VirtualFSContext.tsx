@@ -8,7 +8,7 @@
  *     <App />
  *   </VirtualFSProvider>
  *
- *   const { fs, files, refresh } = useVirtualFS();
+ *   const { fs, files, fileRecords, tree, refresh } = useVirtualFS();
  */
 
 import React, {
@@ -21,13 +21,17 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import { VirtualFS } from '../services/virtual-fs';
+import { VirtualFS, buildFileTree, type VFSFile, type FileTreeNode } from '../services/virtual-fs';
 
 interface VirtualFSContextValue {
   /** The IndexedDB-backed VirtualFS instance. */
   fs: VirtualFS;
   /** Current snapshot of all stored file paths. Updates after every write/delete. */
   files: string[];
+  /** Current snapshot of all stored file records with metadata. */
+  fileRecords: VFSFile[];
+  /** Hierarchical tree built from fileRecords. */
+  tree: FileTreeNode[];
   /** Manually trigger a refresh of the file list. */
   refresh: () => void;
 }
@@ -42,12 +46,12 @@ interface VirtualFSProviderProps {
 
 export function VirtualFSProvider({ children, store: externalStore }: VirtualFSProviderProps) {
   const fs = useMemo(() => externalStore ?? new VirtualFS(), [externalStore]);
-  const [files, setFiles] = useState<string[]>([]);
+  const [fileRecords, setFileRecords] = useState<VFSFile[]>([]);
   const mountedRef = useRef(true);
 
   const refresh = useCallback(() => {
-    fs.listFiles().then((list) => {
-      if (mountedRef.current) setFiles(list);
+    fs.readAll().then((records) => {
+      if (mountedRef.current) setFileRecords(records);
     });
   }, [fs]);
 
@@ -61,8 +65,11 @@ export function VirtualFSProvider({ children, store: externalStore }: VirtualFSP
     };
   }, [fs, refresh]);
 
+  const files = useMemo(() => fileRecords.map((r) => r.path), [fileRecords]);
+  const tree = useMemo(() => buildFileTree(fileRecords), [fileRecords]);
+
   return (
-    <VirtualFSContext.Provider value={{ fs, files, refresh }}>
+    <VirtualFSContext.Provider value={{ fs, files, fileRecords, tree, refresh }}>
       {children}
     </VirtualFSContext.Provider>
   );
