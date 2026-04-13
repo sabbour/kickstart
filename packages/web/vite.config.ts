@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [react()],
   define: {
     __BUILD_VERSION__: JSON.stringify(rootPkg.version),
+    __BUILD_SHA__: JSON.stringify(process.env.GITHUB_SHA?.substring(0, 7) || 'dev'),
   },
   resolve: {
     alias: {

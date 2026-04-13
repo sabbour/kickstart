@@ -1414,7 +1414,7 @@ function PlaygroundInner() {
               </button>
             )}
             <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-              v{__BUILD_VERSION__} · {(window as any).__BUILD_SHA__ || 'dev'}
+              v{__BUILD_VERSION__} · {__BUILD_SHA__ || 'dev'}
             </Caption1>
           </div>
         </aside>

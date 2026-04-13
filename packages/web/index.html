@@ -9,9 +9,6 @@
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 
-  <!-- Fluent 2 Web Components (CDN, zero-dep) -->
-  <script type="module" src="https://unpkg.com/@fluentui/web-components"></script>
-
   <!-- Styles -->
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/core.css">
@@ -25,11 +22,6 @@
 <div id="root"></div>
 
   <!-- React app renders the full UI into #root -->
-
-  <!-- Build metadata — SHA replaced by CI pipeline at deploy time -->
-  <script>
-    window.__BUILD_SHA__ = 'dev';
-  </script>
 
   <!-- App entry point (ES modules) -->
   <script type="module" src="/src/main.tsx"></script>

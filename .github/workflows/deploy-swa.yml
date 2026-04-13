@@ -43,13 +43,6 @@ jobs:
           npm run build -w @kickstart/core
           npm run build -w @kickstart/api
 
-      - name: Stamp build metadata
-        run: |
-          SHORT_SHA="${GITHUB_SHA:0:7}"
-          PKG_VERSION=$(node -p "require('./packages/web/package.json').version")
-          sed -i "s|window.__BUILD_SHA__ = 'dev';|window.__BUILD_SHA__ = '${SHORT_SHA}';|" packages/web/index.html
-          sed -i "s|window.__BUILD_VERSION__ = '0.1.0';|window.__BUILD_VERSION__ = '${PKG_VERSION}';|" packages/web/index.html
-
       - name: Build web app (Vite)
         run: cd packages/web && npx vite build
 

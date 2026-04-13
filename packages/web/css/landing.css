@@ -16,6 +16,10 @@
   animation: landingFadeIn var(--duration-normal) var(--easing-ease-out);
 }
 
+[data-theme="dark"] .landing-page {
+  background-image: url('../assets/hero-bg-dark.svg');
+}
+
 @keyframes landingFadeIn {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
