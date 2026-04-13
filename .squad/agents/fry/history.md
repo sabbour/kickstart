@@ -53,8 +53,16 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - #58: Clickable URLs in chat messages ✅ (PR #118, 2026-04-10)
 - #18: Badge, Accordion, Toggle, ComboBox, MultiSelect components ✅ (PR #118, 2026-04-10)
 - Debug mode toggle & per-message debug panel (v0.5.2) ✅ (squad/debug-mode-ui, 2026-04-13)
+- Playground debug mode + create-to-widget flow ✅ (PR #137, squad/prototype-debug-create)
 
 ## Learnings
+
+### Playground Debug + Create-to-Widget — PR #137
+
+- **Debug mode in Playground:** Reused `useDebug` + `DebugPanel` from the main chat — the `DebugProvider` is already in `main.tsx` above both the Landing and Playground code paths, so `useDebug()` just works in Playground without any provider changes.
+- **apiFetch debugMode param:** The existing `apiFetch(url, init, debugMode)` third parameter is the cleanest pattern for injecting the `x-kickstart-debug` header — no need to manually construct Headers in each call site.
+- **addWidget return value:** Changed `addWidget` from `void` to returning the widget ID string. This is backward-compatible — existing callers that ignore the return value are unaffected. Needed for "create → navigate to widget" flow.
+- **Deferred navigation after state update:** Used `setTimeout(() => setActiveTab('widgets'), 0)` to defer tab switch after `addWidget`. Without deferral, React's state batching means the widget list hasn't re-rendered yet when we try to open the detail dialog, causing the widget lookup to fail.
 
 ### Debug Mode UI (v0.5.2) — 2026-04-13
 
