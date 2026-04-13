@@ -33,6 +33,9 @@ kind: Deployment
 metadata:
   name: my-app
   namespace: my-app
+  labels:
+    app: my-app
+    version: v1.0.0
 spec:
   replicas: 2
   selector:
@@ -42,7 +45,9 @@ spec:
     metadata:
       labels:
         app: my-app
+        version: v1.0.0
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
       containers:
@@ -51,9 +56,13 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
+              name: http
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           resources:
             requests:
               cpu: "100m"
@@ -227,7 +236,7 @@ describe("ValidationEngine", () => {
 // ---------------------------------------------------------------------------
 
 describe("createDefaultValidationEngine", () => {
-  it("registers all 7 built-in validators", () => {
+  it("registers all 23 built-in validators", () => {
     const engine = createDefaultValidationEngine();
     const names = engine.registeredValidators.map((v) => v.name);
     expect(names).toContain("resource-limits");
@@ -237,7 +246,7 @@ describe("createDefaultValidationEngine", () => {
     expect(names).toContain("namespace-set");
     expect(names).toContain("replica-count");
     expect(names).toContain("image-pull-policy");
-    expect(engine.registeredValidators).toHaveLength(16);
+    expect(engine.registeredValidators).toHaveLength(23);
   });
 
   it("each call returns a fresh independent engine", () => {
@@ -859,8 +868,8 @@ describe("default engine — full deployment validation", () => {
     );
     expect(report.hasErrors).toBe(false);
     expect(report.hasWarnings).toBe(false);
-    // All 16 validators ran
-    expect(report.results).toHaveLength(16);
+    // All 23 validators ran
+    expect(report.results).toHaveLength(23);
   });
 
   it("errors and warnings are detected on a minimal bad Deployment", () => {
