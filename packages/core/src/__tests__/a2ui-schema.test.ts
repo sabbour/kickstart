@@ -128,11 +128,32 @@ describe("COMPONENT_SCHEMA_REGISTRY", () => {
     expect(result.success).toBe(true);
   });
 
+  it("validates a Button with label instead of child", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["Button"].safeParse({
+      id: "btn1",
+      component: "Button",
+      label: "Click me",
+      variant: "primary",
+      action: { event: { name: "click" } },
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("rejects a Button without required action", () => {
     const result = COMPONENT_SCHEMA_REGISTRY["Button"].safeParse({
       id: "btn1",
       component: "Button",
-      child: "label-id",
+      label: "Click me",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a Button with neither child nor label", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["Button"].safeParse({
+      id: "btn1",
+      component: "Button",
+      variant: "primary",
+      action: { event: { name: "click" } },
     });
     expect(result.success).toBe(false);
   });

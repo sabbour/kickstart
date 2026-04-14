@@ -21,6 +21,7 @@ import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
 import type { AppMode, ChatMessage } from './types';
+import type { A2uiClientAction } from './vendor/a2ui/web_core/schema/client-to-server';
 
 const mockEnabled = isMockMode();
 const playgroundEnabled = isPlaygroundMode();
@@ -305,6 +306,13 @@ export function App() {
     }
   }, [sessions]);
 
+  // Convert A2UI component actions into user messages sent back to the conversation
+  const handleA2UIAction = useCallback((action: A2uiClientAction) => {
+    const label = action.context?.label ?? action.context?.value ?? action.name;
+    const text = `[Selected: ${label}]`;
+    handleSendMessage(text);
+  }, [handleSendMessage]);
+
   const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
   const currentStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
@@ -388,6 +396,7 @@ export function App() {
             currentPhase={currentPhase}
             onSend={handleSendMessage}
             getSurface={a2ui.getSurface}
+            onAction={handleA2UIAction}
             debugEnabled={debugEnabled}
           />
         )}

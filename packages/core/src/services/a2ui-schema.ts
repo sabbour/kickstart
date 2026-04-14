@@ -242,14 +242,18 @@ const ButtonPropsSchema = z
   .object({
     id: boundedString,
     component: z.literal("Button"),
-    child: dynamicString,
+    child: dynamicString.optional(),
+    label: dynamicString.optional(),
     variant: z
       .enum(["primary", "secondary", "outline", "danger", "ghost"])
       .optional(),
     disabled: z.boolean().optional(),
     action: actionSchema,
   })
-  .strip();
+  .strip()
+  .refine((data) => data.child !== undefined || data.label !== undefined, {
+    message: "Button must have at least one of 'child' or 'label'",
+  });
 
 const TextFieldPropsSchema = z
   .object({
