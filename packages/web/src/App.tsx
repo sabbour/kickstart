@@ -4,8 +4,7 @@ import { Layout } from './components/Layout';
 import { Landing } from './components/Landing';
 import { ChatShell } from './components/Chat/ChatShell';
 import { SessionsSidebar } from './components/Sidebar/SessionsSidebar';
-import { FileEditor } from './components/FileEditor/FileEditor';
-import { FileTreePanel } from './components/FileTreePanel';
+import { FileManager } from './components/FileManager';
 import { Playground } from './pages/Playground';
 import { useA2UI } from './hooks/useA2UI';
 import { useActionDispatch } from './hooks/useActionDispatch';
@@ -39,7 +38,6 @@ export function App() {
   const [mode, setMode] = useState<AppMode>(playgroundEnabled ? 'chat' : 'landing');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(mockEnabled ? true : null);
-  const [selectedFile, setSelectedFile] = useState<string | undefined>();
   const [filePanelOpen, setFilePanelOpen] = useState(true);
 
   const connectorRegistry = useAPIConnectorRegistry();
@@ -268,7 +266,6 @@ export function App() {
     a2ui.reset();
     fs.clear();
     void vfs.clear();
-    setSelectedFile(undefined);
     setMessages([]);
     setMode('chat');
     document.body.classList.remove('on-landing');
@@ -296,14 +293,12 @@ export function App() {
     a2ui.reset();
     fs.clear();
     void vfs.clear();
-    setSelectedFile(undefined);
   }, [sessions, a2ui, fs, vfs]);
 
   const handleNewSession = useCallback(() => {
     a2ui.reset();
     fs.clear();
     void vfs.clear();
-    setSelectedFile(undefined);
     setMessages([]);
     setMode('landing');
     document.body.classList.add('on-landing');
@@ -384,14 +379,7 @@ export function App() {
           />
         ) : undefined}
         fileEditor={mode === 'chat' ? (
-          <>
-            <FileEditor
-              fs={fs}
-              selectedPath={selectedFile}
-              onSelectFile={setSelectedFile}
-            />
-            <FileTreePanel />
-          </>
+          <FileManager streamingFiles={fsFiles} />
         ) : undefined}
       >
         {mode === 'landing' ? (
