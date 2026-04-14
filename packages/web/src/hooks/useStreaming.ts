@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { StreamEvent, A2uiMsg, DebugMetadata } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
+import { adaptA2uiMessage } from '../utils/a2ui-adapter';
 
 interface StreamCallbacks {
   onDelta: (text: string) => void;
@@ -77,7 +78,7 @@ export function useStreaming() {
           try {
             // Handle typed SSE events (e.g. `event: a2ui`)
             if (currentEventType === 'a2ui') {
-              const a2uiMsg: A2uiMsg = JSON.parse(data);
+              const a2uiMsg = adaptA2uiMessage(JSON.parse(data));
               callbacks.onA2UI([a2uiMsg]);
               currentEventType = '';
               continue;
@@ -139,7 +140,7 @@ export function useStreaming() {
           accumulated = envelope.message;
         }
         if (Array.isArray(envelope?.a2ui) && envelope.a2ui.length > 0) {
-          callbacks.onA2UI(envelope.a2ui);
+          callbacks.onA2UI(envelope.a2ui.map(adaptA2uiMessage));
         }
       } catch { /* accumulated is plain text, not JSON — expected for non-envelope responses */ }
 

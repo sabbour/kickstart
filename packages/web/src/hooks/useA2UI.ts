@@ -5,6 +5,7 @@ import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter'
 import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
 import type { A2uiClientAction } from '../vendor/a2ui/web_core/schema/client-to-server';
 import type { A2uiMsg } from '../types';
+import { adaptA2uiMessage } from '../utils/a2ui-adapter';
 import type { ActionHandler } from './useActionDispatch';
 
 export interface A2UIOptions {
@@ -71,13 +72,14 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   const processor = processorRef.current;
 
   const processMessages = useCallback((msgs: A2uiMsg[]): string[] => {
+    const adapted = msgs.map(adaptA2uiMessage);
     const surfaceIds: string[] = [];
-    for (const msg of msgs) {
+    for (const msg of adapted) {
       if (msg.createSurface) {
         surfaceIds.push(msg.createSurface.surfaceId);
       }
     }
-    processor.processMessages(msgs as any);
+    processor.processMessages(adapted as any);
     return surfaceIds;
   }, [processor]);
 
