@@ -40,7 +40,7 @@ function categorize(actionName: string): ActionCategory {
 /**
  * Translates an A2UI action into a human-readable message suitable for
  * re-prompting the LLM. Prefers showing the selected value over raw
- * action metadata so the chat bubble reads naturally (e.g. "I chose Web API").
+ * action metadata so the chat bubble reads naturally (e.g. "Web API").
  *
  * Priority order:
  *   1. `selectedLabel` — the human-readable label of the chosen option
@@ -57,7 +57,7 @@ function actionToMessage(action: A2uiClientAction): string {
   if (context && typeof context === 'object') {
     // 1. Prefer selectedLabel — human-readable chosen option (injected by enriched components)
     if (typeof context.selectedLabel === 'string' && context.selectedLabel) {
-      return `I chose ${context.selectedLabel}`;
+      return context.selectedLabel;
     }
 
     // 2. Prefer value / selectedValue — the user's actual selection
@@ -65,7 +65,7 @@ function actionToMessage(action: A2uiClientAction): string {
     if (rawValue !== undefined && rawValue !== null && rawValue !== '') {
       const valueStr = Array.isArray(rawValue) ? rawValue.join(', ') : String(rawValue);
       if (valueStr) {
-        return `I chose ${valueStr}`;
+        return valueStr;
       }
     }
 
@@ -79,11 +79,11 @@ function actionToMessage(action: A2uiClientAction): string {
       }
     }
     if (contextParts.length > 0) {
-      return `I chose ${cleanName} (${contextParts.join(', ')})`;
+      return `${cleanName} (${contextParts.join(', ')})`;
     }
   }
 
-  return `I chose ${cleanName}`;
+  return cleanName;
 }
 
 /**
