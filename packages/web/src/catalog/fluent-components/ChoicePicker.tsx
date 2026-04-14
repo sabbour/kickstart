@@ -67,7 +67,8 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
   const classes = useStyles();
 
   const values = Array.isArray(props.value) ? props.value : [];
-  const isMutuallyExclusive = props.variant === 'mutuallyExclusive';
+  const variant = props.variant ?? 'mutuallyExclusive';
+  const isMutuallyExclusive = variant === 'mutuallyExclusive';
 
   const fireAction = () => {
     if (typeof props.action === 'function') {

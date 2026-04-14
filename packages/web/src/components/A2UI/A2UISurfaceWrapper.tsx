@@ -9,7 +9,7 @@ interface A2UISurfaceWrapperProps {
   /** When false, the surface is dimmed and non-interactive (past-turn isolation). Defaults to true. */
   isActive?: boolean;
   /** Optional callback invoked when any component in this surface dispatches an action. */
-  onAction?: (action: A2uiClientAction) => void;
+  onAction?: (action: A2uiClientAction) => void | Promise<void>;
 }
 
 export function A2UISurfaceWrapper({ surface, isActive = true, onAction }: A2UISurfaceWrapperProps) {
