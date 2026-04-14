@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect, useRef, useMemo} from 'react';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
 import {z} from 'zod';
 import {
@@ -14,11 +14,18 @@ import {
   ToggleButton,
   Input,
   Label,
+  Button,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
+import { ArrowRight16Regular } from '@fluentui/react-icons';
+import { useMessageText } from '../../contexts/MessageTextContext';
 
 type _Option = any;
+
+/** Delay in ms before the Continue button appears so the user sees options first. */
+const CONTINUE_BUTTON_DELAY_MS = 1500;
 
 // Extend the vendor ChoicePickerApi with an optional action that fires on selection change
 const FlexibleChoicePickerApi = {
@@ -40,6 +47,26 @@ const FlexibleChoicePickerApi = {
   }),
 };
 
+/**
+ * Returns the best-guess option index by checking whether the surrounding
+ * assistant message text mentions any of the option labels. Falls back to 0
+ * (first option) if no match is found.
+ */
+export function getBestGuessIndex(
+  options: Array<{ label: unknown; value: string }>,
+  messageText: string,
+): number {
+  if (options.length === 0) return -1;
+  if (!messageText) return 0;
+
+  const lower = messageText.toLowerCase();
+  for (let i = 0; i < options.length; i++) {
+    const label = String(options[i].label).toLowerCase();
+    if (label && lower.includes(label)) return i;
+  }
+  return 0;
+}
+
 const useStyles = makeStyles({
   root: {
     display: 'flex',
@@ -60,15 +87,38 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: tokens.spacingVerticalXS,
   },
+  continueWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    marginTop: tokens.spacingVerticalXS,
+    opacity: 0,
+    transform: 'translateY(4px)',
+    transitionProperty: 'opacity, transform',
+    transitionDuration: tokens.durationNormal,
+    transitionTimingFunction: tokens.curveEasyEase,
+  },
+  continueVisible: {
+    opacity: 1,
+    transform: 'translateY(0)',
+  },
+  continueHint: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground3,
+  },
 });
 
 export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({props}) => {
   const [filter, setFilter] = useState('');
+  const [showContinue, setShowContinue] = useState(false);
+  const hasFiredContinueRef = useRef(false);
   const classes = useStyles();
+  const messageText = useMessageText();
 
   const values = Array.isArray(props.value) ? props.value : [];
   const variant = props.variant ?? 'mutuallyExclusive';
   const isMutuallyExclusive = variant === 'mutuallyExclusive';
+  const hasAction = typeof props.action === 'function';
 
   const fireAction = () => {
     if (typeof props.action === 'function') {
@@ -99,6 +149,28 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
       filter === '' ||
       String(opt.label).toLowerCase().includes(filter.toLowerCase())
   );
+
+  // Reveal the Continue button after a brief delay — only for mutually-exclusive pickers with an action
+  useEffect(() => {
+    if (!hasAction || !isMutuallyExclusive || options.length === 0) return;
+    const timer = setTimeout(() => setShowContinue(true), CONTINUE_BUTTON_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [hasAction, isMutuallyExclusive, options.length]);
+
+  const bestGuessIdx = useMemo(
+    () => getBestGuessIndex(options, messageText),
+    [options, messageText],
+  );
+
+  const bestGuessLabel = bestGuessIdx >= 0 ? String(options[bestGuessIdx]?.label ?? '') : '';
+
+  const handleContinue = () => {
+    if (hasFiredContinueRef.current || bestGuessIdx < 0) return;
+    hasFiredContinueRef.current = true;
+    const chosen = options[bestGuessIdx];
+    props.setValue([chosen.value]);
+    fireAction();
+  };
 
   return (
     <div className={classes.root}>
@@ -148,6 +220,27 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
               onChange={() => onToggle(opt.value)}
             />
           ))}
+        </div>
+      )}
+
+      {/* Continue button — auto-selects best-guess option and fires the action */}
+      {hasAction && isMutuallyExclusive && options.length > 0 && (
+        <div
+          className={mergeClasses(classes.continueWrapper, showContinue && classes.continueVisible)}
+          aria-hidden={!showContinue}
+        >
+          <Button
+            appearance="subtle"
+            size="small"
+            icon={<ArrowRight16Regular />}
+            iconPosition="after"
+            onClick={handleContinue}
+            disabled={!showContinue}
+            aria-label={`Continue with ${bestGuessLabel}`}
+          >
+            Continue{bestGuessLabel ? ` with ${bestGuessLabel}` : ''}
+          </Button>
+          <span className={classes.continueHint}>best guess</span>
         </div>
       )}
     </div>

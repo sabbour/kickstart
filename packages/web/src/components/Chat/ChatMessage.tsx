@@ -2,6 +2,7 @@ import React from 'react';
 import { BotSparkle24Regular } from '@fluentui/react-icons';
 import { A2UISurfaceWrapper } from '../A2UI/A2UISurfaceWrapper';
 import { DebugPanel } from './DebugPanel';
+import { MessageTextProvider } from '../../contexts/MessageTextContext';
 import { sanitizeHtml } from '../../utils/sanitize';
 import type { ChatMessage as ChatMessageType } from '../../types';
 import type { SurfaceModel } from '../../vendor/a2ui/web_core/index';
@@ -48,16 +49,19 @@ export function ChatMessage({ message, getSurface, isActive = true, onAction, de
           <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(formatText(message.text)) }} />
         )}
 
-        {/* Render A2UI surfaces inline */}
-        {message.surfaceIds?.map(surfaceId => {
-          const surface = getSurface(surfaceId);
-          if (!surface) return null;
-          return (
-            <div key={surfaceId} className="a2ui-component">
-              <A2UISurfaceWrapper surface={surface} isActive={isActive} onAction={onAction} />
-            </div>
-          );
-        })}
+        {/* Provide assistant message text to A2UI components for best-guess auto-selection */}
+        <MessageTextProvider value={message.text || ''}>
+          {/* Render A2UI surfaces inline */}
+          {message.surfaceIds?.map(surfaceId => {
+            const surface = getSurface(surfaceId);
+            if (!surface) return null;
+            return (
+              <div key={surfaceId} className="a2ui-component">
+                <A2UISurfaceWrapper surface={surface} isActive={isActive} onAction={onAction} />
+              </div>
+            );
+          })}
+        </MessageTextProvider>
 
         {/* Debug panel — shown only when debug mode is active */}
         {debugEnabled && <DebugPanel debugInfo={message.debugInfo} />}
