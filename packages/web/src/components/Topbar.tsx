@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ThemeToggle } from './ThemeToggle';
 import { useDebug } from '../contexts/DebugContext';
+
+interface AuthUser {
+  userDetails: string;
+  identityProvider: string;
+}
 
 interface TopbarProps {
   onToggleSidebar: () => void;
@@ -19,6 +24,19 @@ export function Topbar({
   onToggleFilePanel,
 }: TopbarProps) {
   const { debugEnabled, toggleDebug } = useDebug();
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    fetch('/.auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        const principal = data?.clientPrincipal;
+        if (principal?.userDetails) {
+          setUser({ userDetails: principal.userDetails, identityProvider: principal.identityProvider });
+        }
+      })
+      .catch(() => { /* not authenticated or auth endpoint unavailable */ });
+  }, []);
 
   return (
     <header className="topbar" role="banner">
@@ -63,28 +81,44 @@ export function Topbar({
           </button>
         )}
         <ThemeToggle />
-        <button
-          className="topbar-signin"
-          aria-label="Sign in with Microsoft"
-          onClick={() => {
-            window.location.href = '/.auth/login/aad?post_login_redirect_uri=/';
-          }}
-        >
-          <svg
-            className="topbar-signin-logo"
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 21 21"
-            aria-hidden="true"
+        {user ? (
+          <div className="topbar-signin" role="group" aria-label="User menu">
+            <span className="topbar-avatar" aria-hidden="true">
+              {user.userDetails.charAt(0).toUpperCase()}
+            </span>
+            <span className="topbar-user-name">{user.userDetails}</span>
+            <a
+              href="/.auth/logout?post_logout_redirect_uri=/"
+              className="topbar-signout-link"
+              aria-label="Sign out"
+            >
+              Sign out
+            </a>
+          </div>
+        ) : (
+          <button
+            className="topbar-signin"
+            aria-label="Sign in with Microsoft"
+            onClick={() => {
+              window.location.href = '/.auth/login/aad?post_login_redirect_uri=/';
+            }}
           >
-            <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-            <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-            <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-          </svg>
-          <span>Sign in with Microsoft</span>
-        </button>
+            <svg
+              className="topbar-signin-logo"
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 21 21"
+              aria-hidden="true"
+            >
+              <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+              <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+              <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+              <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+            </svg>
+            <span>Sign in with Microsoft</span>
+          </button>
+        )}
       </div>
     </header>
   );

@@ -161,6 +161,18 @@ html, body {
   flex-shrink: 0;
 }
 
+.topbar-signout-link {
+  font-size: var(--font-size-100);
+  color: var(--color-neutral-foreground-3);
+  text-decoration: none;
+  margin-left: var(--spacing-xs);
+}
+
+.topbar-signout-link:hover {
+  color: var(--color-brand-primary);
+  text-decoration: underline;
+}
+
 .topbar-avatar {
   width: 28px;
   height: 28px;
