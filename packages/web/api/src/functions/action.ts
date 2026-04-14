@@ -24,7 +24,8 @@ import {
 } from "@kickstart/core";
 import type { Phase, PhaseItem } from "@kickstart/core";
 import type { A2UIMessage } from "@kickstart/core";
-import { getSession, addMessage } from "../lib/session-store.js";
+import { getSession, hydrateSession, addMessage } from "../lib/session-store.js";
+import type { ClientMessage } from "../lib/session-store.js";
 import { chatCompletion, getChatDeploymentName } from "../lib/openai-client.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
 import { safeErrorResponse } from "../lib/error-response.js";
@@ -49,10 +50,14 @@ interface ActionRequest {
     phase?: string;
     [key: string]: unknown;
   };
+  /** Client-side message history for session rehydration after cold starts. */
+  messages?: ClientMessage[];
 }
 
 interface ActionResponse {
   success: boolean;
+  /** Resolved session ID — may differ from the request after rehydration. */
+  sessionId?: string;
   /** Human-readable LLM reply (reply / navigate actions). */
   message?: string;
   /** Current phase after processing. */
@@ -206,20 +211,25 @@ app.http("action", {
         return { status: 400, jsonBody: { error: "action.name is required" } };
       }
 
-      // --- Resolve session ---
-      const session = getSession(body.sessionId);
+      // --- Resolve session (hydrate from client history on cold start) ---
+      let session = getSession(body.sessionId);
       if (!session) {
-        return {
-          status: 404,
-          jsonBody: { error: `Session not found: ${body.sessionId}` },
-        };
+        if (body.messages?.length) {
+          session = hydrateSession(body.messages);
+        } else {
+          return {
+            status: 404,
+            jsonBody: { error: `Session not found: ${body.sessionId}` },
+          };
+        }
       }
 
       const { engineState } = session;
+      const sessionId = session.state.sessionId;
       const category = categorize(body.action.name);
 
       context.log(
-        `[action] session=${body.sessionId} action="${body.action.name}" category=${category}`,
+        `[action] session=${sessionId} action="${body.action.name}" category=${category}`,
       );
 
       // --- Route by action category ---
@@ -228,6 +238,7 @@ app.http("action", {
         // Stubbed until APIConnector (B-11) ships
         const response: ActionResponse = {
           success: false,
+          sessionId,
           status: "not_implemented",
           message: "API actions require APIConnector (B-11)",
           phase: engineState.currentPhase,
@@ -242,7 +253,7 @@ app.http("action", {
         const navMessage = `${baseMessage} — User is requesting to navigate to the "${targetPhase}" phase. Please acknowledge and guide them accordingly.`;
 
         const llmResult = await callLLM(
-          body.sessionId,
+          sessionId,
           navMessage,
           engineState,
           context,
@@ -250,6 +261,7 @@ app.http("action", {
 
         const response: ActionResponse = {
           success: true,
+          sessionId,
           message: llmResult.message,
           phase: llmResult.phase,
           a2uiMessages: llmResult.a2uiMessages,
@@ -261,7 +273,7 @@ app.http("action", {
       // Default: reply — translate to message and re-prompt LLM
       const userMessage = actionToMessage(body.action);
       const llmResult = await callLLM(
-        body.sessionId,
+        sessionId,
         userMessage,
         engineState,
         context,
@@ -269,6 +281,7 @@ app.http("action", {
 
       const response: ActionResponse = {
         success: true,
+        sessionId,
         message: llmResult.message,
         phase: llmResult.phase,
         a2uiMessages: llmResult.a2uiMessages,

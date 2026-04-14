@@ -52,8 +52,9 @@ export const KICKSTART_SCENARIOS: ScenarioDef[] = [
   { id: 'config',      label: 'Configure Form',   description: 'FormGroup + ProgressSteps',    group: 'Kickstart Scenarios', keyword: 'config' },
   { id: 'code',        label: 'Code Preview',     description: 'CodeBlock components',         group: 'Kickstart Scenarios', keyword: 'code' },
   { id: 'filegen',     label: 'File Generation',  description: 'File cards list',              group: 'Kickstart Scenarios', keyword: 'generate' },
-  { id: 'review',      label: 'Review',           description: 'Deploy config form',           group: 'Kickstart Scenarios', keyword: 'review' },
-  { id: 'deploy',      label: 'Deploy Success',   description: 'ProgressSteps + endpoints',    group: 'Kickstart Scenarios', keyword: 'deploy' },
+  { id: 'review',      label: 'Review',           description: 'Tabs + CostEstimate + Accordion + Badge safeguards',  group: 'Kickstart Scenarios', keyword: 'review' },
+  { id: 'handoff',     label: 'Handoff',          description: 'ProgressSteps + repo card + Codespaces link',         group: 'Kickstart Scenarios', keyword: 'handoff' },
+  { id: 'deploy',      label: 'Deploy Progress',  description: 'DeploymentProgress with 7 resource steps',            group: 'Kickstart Scenarios', keyword: 'deploy' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -729,6 +730,562 @@ const dynamicComplexDashboard = (): A2uiMsg[] => {
 };
 
 // ---------------------------------------------------------------------------
+// File Operations Scenarios — FileEditor component demos
+// ---------------------------------------------------------------------------
+
+const fileEditorSingleFile = (): A2uiMsg[] => {
+  const sid = uid('file-single');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'editor'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'FileEditor — Single File', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'A single file with syntax highlighting and read-only mode.', variant: 'body2' },
+    { id: 'editor', component: 'FileEditor',
+      filename: 'deployment.yaml',
+      language: 'yaml',
+      readOnly: true,
+      content: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kickstart-web
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kickstart-web
+  template:
+    metadata:
+      labels:
+        app: kickstart-web
+    spec:
+      containers:
+        - name: web
+          image: myregistry.azurecr.io/kickstart:latest
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"`,
+    },
+  ] as A2uiComponent[]);
+};
+
+const fileEditorMultiFile = (): A2uiMsg[] => {
+  const sid = uid('file-multi');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'editor'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'FileEditor — Multi-File Tabs', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Multiple files in a tabbed editor. Click tabs to switch between files.', variant: 'body2' },
+    { id: 'editor', component: 'FileEditor',
+      files: [
+        {
+          filename: 'server.ts',
+          language: 'typescript',
+          content: `import express from 'express';
+import { config } from './config';
+
+const app = express();
+app.use(express.json());
+
+app.get('/health', (_req, res) => {
+  res.json({ status: 'healthy', uptime: process.uptime() });
+});
+
+app.listen(config.port, () => {
+  console.log(\`Server running on port \${config.port}\`);
+});`,
+        },
+        {
+          filename: 'config.ts',
+          language: 'typescript',
+          content: `export const config = {
+  port: parseInt(process.env.PORT || '3000', 10),
+  database: process.env.DATABASE_URL || 'postgres://localhost:5432/mydb',
+  redis: process.env.REDIS_URL || 'redis://localhost:6379',
+  logLevel: process.env.LOG_LEVEL || 'info',
+};`,
+        },
+        {
+          filename: 'Dockerfile',
+          language: 'dockerfile',
+          content: `FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --production
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+EXPOSE 3000
+CMD ["node", "dist/server.js"]`,
+        },
+      ],
+    },
+  ] as A2uiComponent[]);
+};
+
+const fileEditorCreateFlow = (): A2uiMsg[] => {
+  const sid = uid('file-create');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'progress', 'editor', 'actions'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'File Create Workflow', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Simulates a file generation step — files are created and shown in the editor with a progress tracker.', variant: 'body2' },
+    { id: 'progress', component: 'ProgressSteps', steps: [
+      { id: 'scaffold', label: 'Scaffold project', status: 'complete' },
+      { id: 'generate', label: 'Generate files', status: 'active' },
+      { id: 'review', label: 'Review output', status: 'pending' },
+    ] },
+    { id: 'editor', component: 'FileEditor',
+      files: [
+        {
+          filename: 'package.json',
+          language: 'json',
+          content: `{
+  "name": "kickstart-app",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/express": "^4.17.21",
+    "tsx": "^4.7.0"
+  }
+}`,
+        },
+        {
+          filename: 'tsconfig.json',
+          language: 'json',
+          content: `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"]
+}`,
+        },
+      ],
+    },
+    { id: 'actions', component: 'Row', children: ['accept-btn', 'edit-btn'], gap: 'medium' },
+    { id: 'accept-btn', component: 'Button', child: 'accept-label', variant: 'primary', action: { event: { name: 'accept-files' } } },
+    { id: 'accept-label', component: 'Text', text: 'Accept All' },
+    { id: 'edit-btn', component: 'Button', child: 'edit-label', variant: 'outlined', action: { event: { name: 'edit-files' } } },
+    { id: 'edit-label', component: 'Text', text: 'Edit Before Saving' },
+  ] as A2uiComponent[]);
+};
+
+const fileEditorEditDeleteFlow = (): A2uiMsg[] => {
+  const sidA = uid('file-edit-a');
+  const sidB = uid('file-edit-b');
+  return [
+    // First surface: original file
+    { version: 'v0.9', createSurface: { surfaceId: sidA, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sidA, components: [
+      { id: 'root', component: 'Column', children: ['heading', 'desc', 'editor'], gap: 'medium' },
+      { id: 'heading', component: 'Text', text: 'Edit & Delete — Before', variant: 'h3' },
+      { id: 'desc', component: 'Text', text: 'Original file content before modifications.', variant: 'body2' },
+      { id: 'editor', component: 'FileEditor',
+        filename: 'src/routes.ts',
+        language: 'typescript',
+        readOnly: true,
+        content: `import { Router } from 'express';
+
+const router = Router();
+
+router.get('/api/users', (_req, res) => {
+  res.json([{ id: 1, name: 'Alice' }]);
+});
+
+export default router;`,
+      },
+    ] } } as A2uiMsg,
+    // Second surface: modified file
+    { version: 'v0.9', createSurface: { surfaceId: sidB, catalogId: CATALOG_ID } } as A2uiMsg,
+    { version: 'v0.9', updateComponents: { surfaceId: sidB, components: [
+      { id: 'root', component: 'Column', children: ['heading', 'desc', 'editor', 'actions'], gap: 'medium' },
+      { id: 'heading', component: 'Text', text: 'Edit & Delete — After', variant: 'h3' },
+      { id: 'desc', component: 'Text', text: 'Updated file with new endpoints added. The old temp file was deleted.', variant: 'body2' },
+      { id: 'editor', component: 'FileEditor',
+        filename: 'src/routes.ts',
+        language: 'typescript',
+        content: `import { Router } from 'express';
+import { db } from './database';
+
+const router = Router();
+
+router.get('/api/users', async (_req, res) => {
+  const users = await db.query('SELECT * FROM users');
+  res.json(users.rows);
+});
+
+router.post('/api/users', async (req, res) => {
+  const { name, email } = req.body;
+  const result = await db.query(
+    'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
+    [name, email]
+  );
+  res.status(201).json(result.rows[0]);
+});
+
+router.delete('/api/users/:id', async (req, res) => {
+  await db.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+  res.status(204).send();
+});
+
+export default router;`,
+      },
+      { id: 'actions', component: 'Row', children: ['save-btn', 'revert-btn'], gap: 'medium' },
+      { id: 'save-btn', component: 'Button', child: 'save-label', variant: 'primary', action: { event: { name: 'save-file' } } },
+      { id: 'save-label', component: 'Text', text: 'Save Changes' },
+      { id: 'revert-btn', component: 'Button', child: 'revert-label', variant: 'outlined', action: { event: { name: 'revert-file' } } },
+      { id: 'revert-label', component: 'Text', text: 'Revert' },
+    ] } } as A2uiMsg,
+  ];
+};
+
+// ---------------------------------------------------------------------------
+// CostEstimate Scenario — Azure pricing breakdown
+// ---------------------------------------------------------------------------
+
+const costEstimateScenario = (): A2uiMsg[] => {
+  const sid = uid('cost-estimate');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'estimate'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'CostEstimate — Azure Pricing', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Estimated monthly cost breakdown for a typical AKS deployment. Adjust SKUs and projection period with the interactive controls.', variant: 'body2' },
+    { id: 'estimate', component: 'CostEstimate',
+      title: 'Estimated Monthly Cost',
+      currency: 'USD',
+      showProjectionSlider: true,
+      projectionMonths: 12,
+      resources: [
+        { name: 'AKS Cluster (Standard)', sku: 'Standard_D4s_v5', monthlyEstimate: 280.32,
+          skuOptions: [
+            { label: 'Standard_D2s_v5 (2 vCPU, 8 GB)', value: 'Standard_D2s_v5', monthlyEstimate: 140.16 },
+            { label: 'Standard_D4s_v5 (4 vCPU, 16 GB)', value: 'Standard_D4s_v5', monthlyEstimate: 280.32 },
+            { label: 'Standard_D8s_v5 (8 vCPU, 32 GB)', value: 'Standard_D8s_v5', monthlyEstimate: 560.64 },
+          ],
+        },
+        { name: 'Azure Container Registry', sku: 'Basic', monthlyEstimate: 5.00,
+          pricingTiers: [
+            { label: 'Basic', monthlyEstimate: 5.00 },
+            { label: 'Standard', monthlyEstimate: 20.00 },
+            { label: 'Premium', monthlyEstimate: 50.00 },
+          ],
+        },
+        { name: 'Azure SQL Database', sku: 'Standard S1', monthlyEstimate: 30.00 },
+        { name: 'Azure Key Vault', sku: 'Standard', monthlyEstimate: 0.03 },
+        { name: 'Azure Monitor (Log Analytics)', sku: 'Pay-as-you-go', monthlyEstimate: 12.50 },
+      ],
+      total: 327.85,
+      source: 'stub',
+    },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
+// Multi-Phase Demo Scenarios — Discover → Design → Generate → Review → Deploy
+// ---------------------------------------------------------------------------
+
+const phaseDiscoverScenario = (): A2uiMsg[] => {
+  const sid = uid('phase-discover');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'progress', 'desc', 'questionnaire'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Phase: Discover', variant: 'h3' },
+    { id: 'progress', component: 'ProgressSteps', steps: [
+      { id: 'discover', label: 'Discover', status: 'active' },
+      { id: 'design', label: 'Design', status: 'pending' },
+      { id: 'generate', label: 'Generate', status: 'pending' },
+      { id: 'review', label: 'Review', status: 'pending' },
+      { id: 'deploy', label: 'Deploy', status: 'pending' },
+    ] },
+    { id: 'desc', component: 'Text', text: 'Tell me about the application you want to build. I\'ll ask a few questions to understand your requirements before designing the architecture.', variant: 'body1' },
+    { id: 'questionnaire', component: 'Questionnaire', questions: [
+      { id: 'app-type', label: 'What kind of application are you building?', type: 'choice', required: true, choices: [
+        { id: 'web', label: 'Web Application' },
+        { id: 'api', label: 'REST API / Microservices' },
+        { id: 'fullstack', label: 'Full-Stack (Frontend + Backend)' },
+      ] },
+      { id: 'scale', label: 'What scale do you expect?', type: 'choice', required: true, choices: [
+        { id: 'small', label: 'Small (< 100 users)' },
+        { id: 'medium', label: 'Medium (100–10k users)' },
+        { id: 'large', label: 'Large (10k+ users)' },
+      ] },
+      { id: 'features', label: 'Which features matter most?', type: 'multiChoice', choices: [
+        { id: 'auth', label: 'Authentication & Authorization' },
+        { id: 'db', label: 'Database / Data Storage' },
+        { id: 'cache', label: 'Caching Layer' },
+        { id: 'cicd', label: 'CI/CD Pipeline' },
+        { id: 'monitoring', label: 'Monitoring & Alerts' },
+      ] },
+    ], submitLabel: 'Start Designing' },
+  ] as A2uiComponent[]);
+};
+
+const phaseDesignScenario = (): A2uiMsg[] => {
+  const sid = uid('phase-design');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'progress', 'desc', 'arch-diagram', 'services-tabs'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Phase: Design', variant: 'h3' },
+    { id: 'progress', component: 'ProgressSteps', steps: [
+      { id: 'discover', label: 'Discover', status: 'complete' },
+      { id: 'design', label: 'Design', status: 'active' },
+      { id: 'generate', label: 'Generate', status: 'pending' },
+      { id: 'review', label: 'Review', status: 'pending' },
+      { id: 'deploy', label: 'Deploy', status: 'pending' },
+    ] },
+    { id: 'desc', component: 'Text', text: 'Based on your requirements, here\'s the proposed architecture for your full-stack application on AKS.', variant: 'body1' },
+    { id: 'arch-diagram', component: 'ArchitectureDiagram',
+      title: 'Proposed Architecture',
+      description: 'Full-stack application with microservices on AKS',
+      diagram: `graph LR
+  Client([Browser]) --> AGIC[App Gateway]
+  AGIC --> FE[React Frontend]
+  AGIC --> API[Node.js API]
+  API --> PG[(PostgreSQL)]
+  API --> Redis[(Redis Cache)]
+  API --> SB[Service Bus]
+  SB --> Worker[Worker Pod]
+  Worker --> Blob[(Blob Storage)]
+  subgraph AKS Cluster
+    FE
+    API
+    Worker
+  end
+  subgraph Azure PaaS
+    PG
+    Redis
+    SB
+    Blob
+  end`,
+    },
+    { id: 'services-tabs', component: 'Tabs', tabs: [
+      { title: 'Frontend', child: 'svc-frontend' },
+      { title: 'API', child: 'svc-api' },
+      { title: 'Database', child: 'svc-db' },
+    ] },
+    { id: 'svc-frontend', component: 'Column', children: ['fe-title', 'fe-desc'], gap: 'small' },
+    { id: 'fe-title', component: 'Text', text: 'React Frontend', variant: 'subtitle1' },
+    { id: 'fe-desc', component: 'Text', text: 'Static React SPA served via Nginx container. Auto-scaled 2–5 replicas. Assets cached via CDN.', variant: 'body2' },
+    { id: 'svc-api', component: 'Column', children: ['api-title', 'api-desc'], gap: 'small' },
+    { id: 'api-title', component: 'Text', text: 'Node.js REST API', variant: 'subtitle1' },
+    { id: 'api-desc', component: 'Text', text: 'Express.js API with OpenAPI spec. Connects to PostgreSQL and Redis. Horizontal pod autoscaler 2–8 replicas.', variant: 'body2' },
+    { id: 'svc-db', component: 'Column', children: ['db-title', 'db-desc'], gap: 'small' },
+    { id: 'db-title', component: 'Text', text: 'Azure Database for PostgreSQL', variant: 'subtitle1' },
+    { id: 'db-desc', component: 'Text', text: 'Flexible Server, General Purpose tier, 4 vCores. Automatic backups with 7-day retention. Private endpoint access only.', variant: 'body2' },
+  ] as A2uiComponent[]);
+};
+
+const phaseGenerateScenario = (): A2uiMsg[] => {
+  const sid = uid('phase-generate');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'progress', 'desc', 'editor'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Phase: Generate', variant: 'h3' },
+    { id: 'progress', component: 'ProgressSteps', steps: [
+      { id: 'discover', label: 'Discover', status: 'complete' },
+      { id: 'design', label: 'Design', status: 'complete' },
+      { id: 'generate', label: 'Generate', status: 'active' },
+      { id: 'review', label: 'Review', status: 'pending' },
+      { id: 'deploy', label: 'Deploy', status: 'pending' },
+    ] },
+    { id: 'desc', component: 'Text', text: 'Generating infrastructure-as-code and application scaffolding based on your approved design.', variant: 'body1' },
+    { id: 'editor', component: 'FileEditor',
+      files: [
+        {
+          filename: 'infra/main.bicep',
+          language: 'plaintext',
+          content: `targetScope = 'resourceGroup'
+
+param location string = resourceGroup().location
+param appName string = 'kickstart-app'
+
+module aks 'modules/aks.bicep' = {
+  name: 'aks-deploy'
+  params: {
+    location: location
+    clusterName: '\${appName}-aks'
+    nodeCount: 3
+    vmSize: 'Standard_D4s_v5'
+  }
+}
+
+module acr 'modules/acr.bicep' = {
+  name: 'acr-deploy'
+  params: {
+    location: location
+    registryName: '\${appName}acr'
+  }
+}
+
+module postgres 'modules/postgres.bicep' = {
+  name: 'postgres-deploy'
+  params: {
+    location: location
+    serverName: '\${appName}-pgdb'
+    skuName: 'Standard_D4s_v3'
+  }
+}`,
+        },
+        {
+          filename: '.github/workflows/deploy.yml',
+          language: 'yaml',
+          content: `name: Build & Deploy
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: kickstartacr.azurecr.io/app:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/k8s-deploy@v5
+        with:
+          namespace: production
+          manifests: k8s/
+          images: kickstartacr.azurecr.io/app:latest`,
+        },
+        {
+          filename: 'k8s/deployment.yaml',
+          language: 'yaml',
+          content: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kickstart-web
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kickstart-web
+  template:
+    metadata:
+      labels:
+        app: kickstart-web
+    spec:
+      containers:
+        - name: web
+          image: kickstartacr.azurecr.io/app:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: database-url`,
+        },
+      ],
+    },
+  ] as A2uiComponent[]);
+};
+
+const phaseReviewScenario = (): A2uiMsg[] => {
+  const sid = uid('phase-review');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'progress', 'desc', 'cost', 'checklist-card', 'actions'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Phase: Review', variant: 'h3' },
+    { id: 'progress', component: 'ProgressSteps', steps: [
+      { id: 'discover', label: 'Discover', status: 'complete' },
+      { id: 'design', label: 'Design', status: 'complete' },
+      { id: 'generate', label: 'Generate', status: 'complete' },
+      { id: 'review', label: 'Review', status: 'active' },
+      { id: 'deploy', label: 'Deploy', status: 'pending' },
+    ] },
+    { id: 'desc', component: 'Text', text: 'Review deployment safeguards, estimated costs, and best-practice checks before proceeding to deploy.', variant: 'body1' },
+    { id: 'cost', component: 'CostEstimate',
+      title: 'Monthly Cost Estimate',
+      currency: 'USD',
+      resources: [
+        { name: 'AKS Cluster (3 nodes)', sku: 'Standard_D4s_v5', monthlyEstimate: 840.96 },
+        { name: 'Container Registry', sku: 'Basic', monthlyEstimate: 5.00 },
+        { name: 'PostgreSQL Flexible Server', sku: 'GP_Standard_D4s_v3', monthlyEstimate: 295.00 },
+        { name: 'Redis Cache', sku: 'C1 Standard', monthlyEstimate: 81.76 },
+        { name: 'Log Analytics', sku: 'Pay-as-you-go', monthlyEstimate: 12.50 },
+      ],
+      total: 1235.22,
+      source: 'stub',
+    },
+    { id: 'checklist-card', component: 'Card', child: 'checklist-col' },
+    { id: 'checklist-col', component: 'Column', children: ['ck-title', 'ck1', 'ck2', 'ck3', 'ck4', 'ck5'], gap: 'small' },
+    { id: 'ck-title', component: 'Text', text: 'Deployment Safeguard Checks', variant: 'subtitle1' },
+    { id: 'ck1', component: 'CheckBox', label: '✅ HTTPS-only ingress configured', value: true },
+    { id: 'ck2', component: 'CheckBox', label: '✅ Network policies applied', value: true },
+    { id: 'ck3', component: 'CheckBox', label: '✅ Secrets stored in Key Vault', value: true },
+    { id: 'ck4', component: 'CheckBox', label: '⚠️ Autoscaler max replicas set to 8 (consider increasing for production)', value: true },
+    { id: 'ck5', component: 'CheckBox', label: '✅ Resource quotas defined', value: true },
+    { id: 'actions', component: 'Row', children: ['deploy-btn', 'back-btn'], gap: 'medium' },
+    { id: 'deploy-btn', component: 'Button', child: 'deploy-label', variant: 'primary', action: { event: { name: 'approve-deploy' } } },
+    { id: 'deploy-label', component: 'Text', text: 'Approve & Deploy' },
+    { id: 'back-btn', component: 'Button', child: 'back-label', variant: 'outlined', action: { event: { name: 'back-to-generate' } } },
+    { id: 'back-label', component: 'Text', text: 'Back to Generate' },
+  ] as A2uiComponent[]);
+};
+
+const phaseDeployScenario = (): A2uiMsg[] => {
+  const sid = uid('phase-deploy');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'progress', 'desc', 'deployment', 'summary-card'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Phase: Deploy', variant: 'h3' },
+    { id: 'progress', component: 'ProgressSteps', steps: [
+      { id: 'discover', label: 'Discover', status: 'complete' },
+      { id: 'design', label: 'Design', status: 'complete' },
+      { id: 'generate', label: 'Generate', status: 'complete' },
+      { id: 'review', label: 'Review', status: 'complete' },
+      { id: 'deploy', label: 'Deploy', status: 'active' },
+    ] },
+    { id: 'desc', component: 'Text', text: 'Deploying your application to Azure. Resource provisioning in progress.', variant: 'body1' },
+    { id: 'deployment', component: 'DeploymentProgress',
+      title: 'Deployment Progress',
+      overallStatus: 'running',
+      steps: [
+        { id: 'rg', label: 'Create Resource Group', status: 'complete', detail: 'kickstart-app-rg created', timestamp: '14:23:01' },
+        { id: 'acr', label: 'Provision Container Registry', status: 'complete', detail: 'kickstartappacr.azurecr.io ready', timestamp: '14:23:45' },
+        { id: 'aks', label: 'Provision AKS Cluster', status: 'complete', detail: '3-node cluster provisioned', timestamp: '14:28:12' },
+        { id: 'pg', label: 'Provision PostgreSQL', status: 'running', detail: 'Creating flexible server...', timestamp: '14:28:30' },
+        { id: 'build', label: 'Build & Push Container Image', status: 'pending' },
+        { id: 'deploy', label: 'Deploy to AKS', status: 'pending' },
+        { id: 'dns', label: 'Configure DNS & TLS', status: 'pending' },
+      ],
+    },
+    { id: 'summary-card', component: 'Card', child: 'summary-col' },
+    { id: 'summary-col', component: 'Column', children: ['sum-title', 'sum-endpoint', 'sum-repo', 'sum-note'], gap: 'small' },
+    { id: 'sum-title', component: 'Text', text: 'Deployment Summary', variant: 'subtitle1' },
+    { id: 'sum-endpoint', component: 'Text', text: '🌐 Endpoint: https://kickstart-app.eastus2.cloudapp.azure.com (pending DNS)', variant: 'body2' },
+    { id: 'sum-repo', component: 'Text', text: '📦 Repository: github.com/contoso/kickstart-app', variant: 'body2' },
+    { id: 'sum-note', component: 'Text', text: '⏱️ Estimated remaining: ~4 minutes', variant: 'caption' },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
 // Integration Kit Scenarios — exercise Azure & GitHub kit components
 // ---------------------------------------------------------------------------
 
@@ -800,6 +1357,258 @@ const kitMultiProvider = (): A2uiMsg[] => {
 };
 
 // ---------------------------------------------------------------------------
+// Missing Layout scenarios
+// ---------------------------------------------------------------------------
+
+const layoutAccordion = (): A2uiMsg[] => {
+  const sid = uid('accordion-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'acc1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Accordion Component', variant: 'h3' },
+    { id: 'acc1', component: 'Accordion', items: [
+      { title: 'What is auto-scaling?', children: ['acc-body1'] },
+      { title: 'How do health checks work?', children: ['acc-body2'] },
+      { title: 'What happens during zero-downtime deploys?', children: ['acc-body3'] },
+    ], collapsible: true, multiple: true },
+    { id: 'acc-body1', component: 'Text', text: 'Auto-scaling automatically adjusts the number of running instances based on CPU, memory, or custom metrics. When demand increases, new replicas are spun up within seconds.', variant: 'body1' },
+    { id: 'acc-body2', component: 'Text', text: 'Health checks run HTTP probes against /healthz every 10 seconds. If a container fails 3 consecutive checks, it is restarted automatically by the orchestrator.', variant: 'body1' },
+    { id: 'acc-body3', component: 'Text', text: 'During a rolling update, new pods are created before old ones are terminated. Traffic is only routed to healthy instances, ensuring zero downtime for end users.', variant: 'body1' },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
+// Missing Content scenarios
+// ---------------------------------------------------------------------------
+
+const contentAlert = (): A2uiMsg[] => {
+  const sid = uid('alert-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'a-info', 'a-success', 'a-warning', 'a-error'], gap: 'small' },
+    { id: 'heading', component: 'Text', text: 'Alert Severities', variant: 'h3' },
+    { id: 'a-info', component: 'Alert', message: 'Your application is running on 3 replicas.', severity: 'info' },
+    { id: 'a-success', component: 'Alert', message: 'Deployment completed successfully in 42 seconds.', severity: 'success' },
+    { id: 'a-warning', component: 'Alert', message: 'SSL certificate expires in 14 days. Renew soon.', severity: 'warning' },
+    { id: 'a-error', component: 'Alert', message: 'Database connection failed — check credentials.', severity: 'error' },
+  ] as A2uiComponent[]);
+};
+
+const contentBadge = (): A2uiMsg[] => {
+  const sid = uid('badge-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'badge-row1', 'badge-row2'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Badge Variants', variant: 'h3' },
+    { id: 'badge-row1', component: 'Row', children: ['b-brand', 'b-success', 'b-warning', 'b-danger', 'b-info'], gap: 'small' },
+    { id: 'b-brand', component: 'Badge', text: 'Production', color: 'brand', appearance: 'filled' },
+    { id: 'b-success', component: 'Badge', text: 'Healthy', color: 'success', appearance: 'filled' },
+    { id: 'b-warning', component: 'Badge', text: 'Degraded', color: 'warning', appearance: 'filled' },
+    { id: 'b-danger', component: 'Badge', text: 'Critical', color: 'danger', appearance: 'filled' },
+    { id: 'b-info', component: 'Badge', text: 'Preview', color: 'informative', appearance: 'tint' },
+    { id: 'badge-row2', component: 'Row', children: ['b-counter-label', 'b-counter', 'b-presence-label', 'b-presence'], gap: 'small' },
+    { id: 'b-counter-label', component: 'Text', text: 'Counter:', variant: 'body1' },
+    { id: 'b-counter', component: 'Badge', variant: 'counter', count: 42 },
+    { id: 'b-presence-label', component: 'Text', text: 'Presence:', variant: 'body1' },
+    { id: 'b-presence', component: 'Badge', variant: 'presence', status: 'available' },
+  ] as A2uiComponent[]);
+};
+
+const contentIcon = (): A2uiMsg[] => {
+  const sid = uid('icon-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'icon-row'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Icon Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Supports Fluent icon names, SVG paths, and Material Symbols.', variant: 'body2' },
+    { id: 'icon-row', component: 'Row', children: ['ic-check', 'ic-warning', 'ic-info', 'ic-cloud'], gap: 'medium' },
+    { id: 'ic-check', component: 'Icon', name: 'checkmark-circle', accessibility: { label: 'Success' } },
+    { id: 'ic-warning', component: 'Icon', name: 'warning', accessibility: { label: 'Warning' } },
+    { id: 'ic-info', component: 'Icon', name: 'info', accessibility: { label: 'Info' } },
+    { id: 'ic-cloud', component: 'Icon', name: 'cloud', accessibility: { label: 'Cloud' } },
+  ] as A2uiComponent[]);
+};
+
+const contentLink = (): A2uiMsg[] => {
+  const sid = uid('link-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'l1', 'l2', 'l3'], gap: 'small' },
+    { id: 'heading', component: 'Text', text: 'Link Component', variant: 'h3' },
+    { id: 'l1', component: 'Link', text: 'Azure Portal', url: 'https://portal.azure.com', external: true },
+    { id: 'l2', component: 'Link', text: 'GitHub Documentation', url: 'https://docs.github.com', external: true },
+    { id: 'l3', component: 'Link', text: 'Kickstart README', url: '#' },
+  ] as A2uiComponent[]);
+};
+
+const contentTable = (): A2uiMsg[] => {
+  const sid = uid('table-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'tbl1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Table Component', variant: 'h3' },
+    { id: 'tbl1', component: 'Table', caption: 'Service inventory', columns: ['Service', 'Region', 'Status', 'Replicas'], rows: [
+      ['web-api', 'East US 2', 'Running', '3'],
+      ['worker', 'East US 2', 'Running', '2'],
+      ['cache', 'East US 2', 'Degraded', '1'],
+      ['db-proxy', 'East US 2', 'Running', '1'],
+    ] },
+  ] as A2uiComponent[]);
+};
+
+const contentAudioPlayer = (): A2uiMsg[] => {
+  const sid = uid('audio-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'audio1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'AudioPlayer Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'HTML5 audio player with native browser controls and optional description caption.', variant: 'body2' },
+    { id: 'audio1', component: 'AudioPlayer', url: 'https://www2.cs.uic.edu/~i101/SoundFiles/StarWars60.wav', description: 'Sample audio clip' },
+  ] as A2uiComponent[]);
+};
+
+const contentVideo = (): A2uiMsg[] => {
+  const sid = uid('video-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'video1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Video Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'HTML5 video player with 16:9 aspect ratio and native controls.', variant: 'body2' },
+    { id: 'video1', component: 'Video', url: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4', accessibility: { label: 'Sample video' } },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
+// Missing Input scenarios
+// ---------------------------------------------------------------------------
+
+const inputComboBox = (): A2uiMsg[] => {
+  const sid = uid('combobox-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'cb1', 'cb2'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'ComboBox Component', variant: 'h3' },
+    { id: 'cb1', component: 'ComboBox', label: 'Azure Region', options: [
+      { text: 'East US', value: 'eastus' },
+      { text: 'East US 2', value: 'eastus2' },
+      { text: 'West US 2', value: 'westus2' },
+      { text: 'West Europe', value: 'westeurope' },
+      { text: 'North Europe', value: 'northeurope' },
+    ], placeholder: 'Search regions...' },
+    { id: 'cb2', component: 'ComboBox', label: 'Custom tag', options: [
+      { text: 'v1.0', value: 'v1.0' },
+      { text: 'v2.0', value: 'v2.0' },
+      { text: 'latest', value: 'latest' },
+    ], placeholder: 'Enter or select version...', allowCustom: true },
+  ] as A2uiComponent[]);
+};
+
+const inputMultiSelect = (): A2uiMsg[] => {
+  const sid = uid('multiselect-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'ms1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'MultiSelect Component', variant: 'h3' },
+    { id: 'ms1', component: 'MultiSelect', label: 'Enable features', options: [
+      { text: 'Auto-scaling', value: 'autoscale' },
+      { text: 'Health checks', value: 'health' },
+      { text: 'CI/CD pipeline', value: 'cicd' },
+      { text: 'Log analytics', value: 'logs' },
+      { text: 'Monitoring alerts', value: 'alerts' },
+    ], placeholder: 'Select features...', value: ['autoscale', 'health'] },
+  ] as A2uiComponent[]);
+};
+
+const inputToggle = (): A2uiMsg[] => {
+  const sid = uid('toggle-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'tog1', 'tog2', 'tog3'], gap: 'small' },
+    { id: 'heading', component: 'Text', text: 'Toggle Component', variant: 'h3' },
+    { id: 'tog1', component: 'Toggle', label: 'Enable public endpoint', checked: true },
+    { id: 'tog2', component: 'Toggle', label: 'Enable HTTPS only', checked: true },
+    { id: 'tog3', component: 'Toggle', label: 'Enable preview environments', checked: false },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
+// Domain: GitHub Components
+// ---------------------------------------------------------------------------
+
+const domainGitHubLogin = (): A2uiMsg[] => {
+  const sid = uid('gh-login-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-login'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'GitHubLoginCard', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'GitHub authentication card with device code flow. Sign in to connect your repositories.', variant: 'body2' },
+    { id: 'gh-login', component: 'GitHubLoginCard' },
+  ] as A2uiComponent[]);
+};
+
+const domainGitHubRepoPicker = (): A2uiMsg[] => {
+  const sid = uid('gh-repo-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-picker'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'GitHubRepoPicker', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Search and select a GitHub repository with pagination, language badges, and metadata. Requires GitHub authentication.', variant: 'body2' },
+    { id: 'gh-picker', component: 'GitHubRepoPicker', placeholder: 'Search repositories...' },
+  ] as A2uiComponent[]);
+};
+
+const domainGitHubAction = (): A2uiMsg[] => {
+  const sid = uid('gh-action-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-action'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'GitHubAction', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Execute a GitHub API action with built-in safety: operation allowlist, branch protection, and destructive confirmation.', variant: 'body2' },
+    { id: 'gh-action', component: 'GitHubAction', title: 'Create feature branch', description: 'Creates a new branch from main for the feature implementation.', method: 'POST', path: '/repos/demo-org/demo-repo/git/refs', operationType: 'git/refs/create', body: { ref: 'refs/heads/feature/new-api', sha: 'abc123' } },
+  ] as A2uiComponent[]);
+};
+
+const domainGitHubCommit = (): A2uiMsg[] => {
+  const sid = uid('gh-commit-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-commit'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'GitHubCommit', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Multi-step pull request creation wizard: select artifacts, configure branch name, title, and body.', variant: 'body2' },
+    { id: 'gh-commit', component: 'GitHubCommit', suggestedBranchName: 'feature/add-api-endpoints', suggestedTitle: 'Add REST API endpoints', suggestedBody: 'Implements CRUD endpoints for the user service.' },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
+// Domain: Azure Components
+// ---------------------------------------------------------------------------
+
+const domainAzureLogin = (): A2uiMsg[] => {
+  const sid = uid('az-login-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-login'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'AzureLoginCard', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Azure MSAL authentication card. Sign in to manage your Azure subscriptions and resources.', variant: 'body2' },
+    { id: 'az-login', component: 'AzureLoginCard' },
+  ] as A2uiComponent[]);
+};
+
+const domainAzureResourcePicker = (): A2uiMsg[] => {
+  const sid = uid('az-picker-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-picker'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'AzureResourcePicker', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Cascading dropdowns: subscription → resource group → resource. Requires Azure authentication.', variant: 'body2' },
+    { id: 'az-picker', component: 'AzureResourcePicker', label: 'Select a resource' },
+  ] as A2uiComponent[]);
+};
+
+const domainAzureResourceForm = (): A2uiMsg[] => {
+  const sid = uid('az-form-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-form'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'AzureResourceForm', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Dynamic resource creation form with type-specific fields (Kubernetes version, admin user, access tier, etc.). Requires Azure authentication.', variant: 'body2' },
+    { id: 'az-form', component: 'AzureResourceForm', title: 'Create Kubernetes Cluster', resourceType: 'Microsoft.ContainerService/managedClusters' },
+  ] as A2uiComponent[]);
+};
+
+const domainAzureAction = (): A2uiMsg[] => {
+  const sid = uid('az-action-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-action'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'AzureAction', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Execute an Azure ARM API action with resource type allowlist, path validation, and destructive confirmation.', variant: 'body2' },
+    { id: 'az-action', component: 'AzureAction', title: 'Scale AKS cluster', description: 'Updates the node count for the default node pool.', method: 'PATCH', path: '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/Microsoft.ContainerService/managedClusters/my-cluster', body: { properties: { agentPoolProfiles: [{ name: 'default', count: 5 }] } } },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
 // Control scenarios assembled
 // ---------------------------------------------------------------------------
 
@@ -811,9 +1620,17 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'ctrl-card',     label: 'Card',           description: 'Content card wrapper',            group: 'Layout',          catalog: 'a2ui',      generate: layoutCard },
   { id: 'ctrl-tabs',     label: 'Tabs',           description: 'Tabbed content panels',           group: 'Layout',          catalog: 'a2ui',      generate: layoutTabs },
   { id: 'ctrl-divider',  label: 'Divider',        description: 'Horizontal separator',            group: 'Layout',          catalog: 'a2ui',      generate: layoutDivider },
+  { id: 'ctrl-accordion', label: 'Accordion',     description: 'Collapsible FAQ sections',        group: 'Layout',          catalog: 'a2ui',      generate: layoutAccordion },
   // Content
   { id: 'ctrl-text',     label: 'Text',           description: 'All text variants h1–overline',   group: 'Content',         catalog: 'a2ui',      generate: contentText },
   { id: 'ctrl-image',    label: 'Image',          description: 'Image with placeholder',          group: 'Content',         catalog: 'a2ui',      generate: contentImage },
+  { id: 'ctrl-alert',    label: 'Alert',          description: 'Info / success / warning / error', group: 'Content',        catalog: 'a2ui',      generate: contentAlert },
+  { id: 'ctrl-badge',    label: 'Badge',          description: 'Status, counter, and presence badges', group: 'Content',    catalog: 'a2ui',      generate: contentBadge },
+  { id: 'ctrl-icon',     label: 'Icon',           description: 'Fluent icon display',             group: 'Content',         catalog: 'a2ui',      generate: contentIcon },
+  { id: 'ctrl-link',     label: 'Link',           description: 'Hyperlinks with external indicator', group: 'Content',      catalog: 'a2ui',      generate: contentLink },
+  { id: 'ctrl-table',    label: 'Table',          description: 'Striped data table with caption', group: 'Content',         catalog: 'a2ui',      generate: contentTable },
+  { id: 'ctrl-audio',    label: 'AudioPlayer',    description: 'HTML5 audio with controls',       group: 'Content',         catalog: 'a2ui',      generate: contentAudioPlayer },
+  { id: 'ctrl-video',    label: 'Video',          description: 'HTML5 video with 16:9 player',    group: 'Content',         catalog: 'a2ui',      generate: contentVideo },
   // Inputs
   { id: 'ctrl-button',   label: 'Button',         description: 'Primary / outlined / text',       group: 'Inputs',          catalog: 'a2ui',      generate: inputButton },
   { id: 'ctrl-textfield',label: 'TextField',      description: 'Text input with label',           group: 'Inputs',          catalog: 'a2ui',      generate: inputTextField },
@@ -822,6 +1639,9 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'ctrl-slider',   label: 'Slider',         description: 'Range slider control',            group: 'Inputs',          catalog: 'a2ui',      generate: inputSlider },
   { id: 'ctrl-datetime', label: 'DateTimeInput',  description: 'Date and time picker',            group: 'Inputs',          catalog: 'a2ui',      generate: inputDateTime },
   { id: 'ctrl-modal',    label: 'Modal',          description: 'Modal dialog with trigger',       group: 'Inputs',          catalog: 'a2ui',      generate: inputModal },
+  { id: 'ctrl-combobox', label: 'ComboBox',       description: 'Dropdown with search and custom entry', group: 'Inputs',    catalog: 'a2ui',      generate: inputComboBox },
+  { id: 'ctrl-multiselect', label: 'MultiSelect', description: 'Multi-value dropdown',            group: 'Inputs',          catalog: 'a2ui',      generate: inputMultiSelect },
+  { id: 'ctrl-toggle',   label: 'Toggle',         description: 'On/off switch control',           group: 'Inputs',          catalog: 'a2ui',      generate: inputToggle },
   // Custom Controls
   { id: 'ctrl-radio',    label: 'RadioGroup',     description: 'Radio options with descriptions',  group: 'Custom Controls', catalog: 'kickstart', generate: customRadioGroup },
   { id: 'ctrl-form',     label: 'FormGroup',      description: 'Stepped form sections',            group: 'Custom Controls', catalog: 'kickstart', generate: customFormGroup },
@@ -852,15 +1672,43 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'kit-azure-auth',    label: 'Azure AuthCard',         description: 'Azure MSAL sign-in via kit registration',  group: 'Integration Kits', catalog: 'kickstart', generate: kitAzureAuth },
   { id: 'kit-github-auth',   label: 'GitHub AuthCard',        description: 'GitHub OAuth sign-in via kit registration', group: 'Integration Kits', catalog: 'kickstart', generate: kitGitHubAuth },
   { id: 'kit-multi-provider', label: 'Multi-Provider Sign-In', description: 'Azure + GitHub AuthCards side by side',    group: 'Integration Kits', catalog: 'kickstart', generate: kitMultiProvider },
+  // File Operations
+  { id: 'file-single',       label: 'Single File',            description: 'FileEditor with syntax-highlighted YAML',       group: 'File Operations', catalog: 'kickstart', generate: fileEditorSingleFile },
+  { id: 'file-multi',        label: 'Multi-File Tabs',        description: 'Tabbed FileEditor with TS + Dockerfile',        group: 'File Operations', catalog: 'kickstart', generate: fileEditorMultiFile },
+  { id: 'file-create',       label: 'Create Workflow',        description: 'File generation with progress tracker',         group: 'File Operations', catalog: 'kickstart', generate: fileEditorCreateFlow },
+  { id: 'file-edit-delete',  label: 'Edit & Delete',          description: 'Before/after file edit with dual surfaces',     group: 'File Operations', catalog: 'kickstart', generate: fileEditorEditDeleteFlow },
+  // Cost Estimate
+  { id: 'cost-estimate',     label: 'CostEstimate',           description: 'Azure pricing breakdown with SKU options',      group: 'Cost Estimate',   catalog: 'kickstart', generate: costEstimateScenario },
+  // Multi-Phase Demo
+  { id: 'phase-discover',    label: 'Discover Phase',         description: 'Questionnaire for application requirements',    group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDiscoverScenario },
+  { id: 'phase-design',      label: 'Design Phase',           description: 'Architecture diagram + service breakdown',      group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDesignScenario },
+  { id: 'phase-generate',    label: 'Generate Phase',         description: 'IaC + CI/CD + K8s manifests in FileEditor',     group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseGenerateScenario },
+  { id: 'phase-review',      label: 'Review Phase',           description: 'Cost estimate + deployment safeguard checks',   group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseReviewScenario },
+  { id: 'phase-deploy',      label: 'Deploy Phase',           description: 'DeploymentProgress with live provisioning',     group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDeployScenario },
+  // GitHub Components
+  { id: 'ctrl-gh-login',   label: 'GitHubLoginCard',    description: 'Device code authentication flow',      group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubLogin },
+  { id: 'ctrl-gh-repo',    label: 'GitHubRepoPicker',   description: 'Repository search and selection',      group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubRepoPicker },
+  { id: 'ctrl-gh-action',  label: 'GitHubAction',       description: 'Safe GitHub API operations',           group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubAction },
+  { id: 'ctrl-gh-commit',  label: 'GitHubCommit',       description: 'PR creation wizard',                   group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubCommit },
+  // Azure Components
+  { id: 'ctrl-az-login',   label: 'AzureLoginCard',     description: 'MSAL authentication with subscriptions', group: 'Azure Components', catalog: 'kickstart', generate: domainAzureLogin },
+  { id: 'ctrl-az-picker',  label: 'AzureResourcePicker', description: 'Cascading resource selection',         group: 'Azure Components', catalog: 'kickstart', generate: domainAzureResourcePicker },
+  { id: 'ctrl-az-form',    label: 'AzureResourceForm',  description: 'Dynamic resource creation form',       group: 'Azure Components', catalog: 'kickstart', generate: domainAzureResourceForm },
+  { id: 'ctrl-az-action',  label: 'AzureAction',        description: 'Safe ARM API operations',              group: 'Azure Components', catalog: 'kickstart', generate: domainAzureAction },
 ];
 
 /** All scenario groups in display order */
 export const SCENARIO_GROUPS = [
   'Kickstart Scenarios',
+  'Multi-Phase Demo',
+  'File Operations',
+  'Cost Estimate',
   'Layout',
   'Content',
   'Inputs',
   'Custom Controls',
+  'GitHub Components',
+  'Azure Components',
   'Integration Kits',
   'Data Binding',
   'Events & Actions',

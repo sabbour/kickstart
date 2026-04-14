@@ -40,38 +40,50 @@ function categorize(actionName: string): ActionCategory {
 /**
  * Translates an A2UI action into a human-readable message suitable for
  * re-prompting the LLM. Prefers showing the selected value over raw
- * action metadata so the chat bubble reads naturally (e.g. "Selected: Web API").
+ * action metadata so the chat bubble reads naturally (e.g. "Web API").
+ *
+ * Priority order:
+ *   1. `selectedLabel` — the human-readable label of the chosen option
+ *   2. `value` / `selectedValue` — the machine value of the selection
+ *   3. A compact summary of non-internal context keys
+ *   4. The clean action name as a last resort
  */
 function actionToMessage(action: A2uiClientAction): string {
   const { name, context } = action;
 
   // Strip any routing prefix for the message
-  const cleanName = name.replace(/^(navigate:|nav:|api:)/, '');
+  const cleanName = name.replace(/^(navigate:|nav:|api:|complete:|continue:)/, '');
 
-  // Try to extract a meaningful selection value from context
   if (context && typeof context === 'object') {
-    // Prefer 'value' (the user's actual selection) over 'label' (component title)
+    // 1. Prefer selectedLabel — human-readable chosen option (injected by enriched components)
+    if (typeof context.selectedLabel === 'string' && context.selectedLabel) {
+      return context.selectedLabel;
+    }
+
+    // 2. Prefer value / selectedValue — the user's actual selection
     const rawValue = context.value ?? context.selectedValue;
     if (rawValue !== undefined && rawValue !== null && rawValue !== '') {
       const valueStr = Array.isArray(rawValue) ? rawValue.join(', ') : String(rawValue);
       if (valueStr) {
-        return `[Selected: ${valueStr}]`;
+        return valueStr;
       }
     }
 
-    // Fallback: build context summary from all key-value pairs
+    // 3. Build a compact summary from non-internal context keys
+    const INTERNAL_KEYS = new Set(['label', 'selectedLabel', 'value', 'selectedValue']);
     const contextParts: string[] = [];
     for (const [key, value] of Object.entries(context)) {
+      if (INTERNAL_KEYS.has(key)) continue;
       if (value !== undefined && value !== null && value !== '') {
         contextParts.push(`${key}: ${String(value)}`);
       }
     }
     if (contextParts.length > 0) {
-      return `[Action: ${cleanName}] ${contextParts.join(', ')}`;
+      return `${cleanName} (${contextParts.join(', ')})`;
     }
   }
 
-  return `[Action: ${cleanName}]`;
+  return cleanName;
 }
 
 /**

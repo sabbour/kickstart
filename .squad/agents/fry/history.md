@@ -51,16 +51,20 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - (2026-04-14) The accumulated stream content can be either plain text OR a JSON envelope `{message, a2ui, actions}`. After stream completion, always try parsing as JSON to extract structured data before passing to `onComplete`.
 - (2026-04-14) LLM acknowledgment behavior (Badge "Got it" cards) is driven entirely by phase prompt text in `packages/core/src/engine/phases.ts`. To add or remove conversational behaviors, edit `promptTemplate` strings — no TypeScript logic changes needed. The system-prompt.ts few-shot examples did NOT contain this pattern.
 - (2026-04-14) Navigation uses hash-based routing via `useNavigation` hook in `packages/web/src/hooks/useNavigation.ts`. URL pattern: `#session/{id}` for chat, `#` for landing. All nav actions in App.tsx go through `nav.pushSession()`, `nav.pushLanding()`, or `nav.replaceCurrent()`. Deep links are restored via `pendingDeepLink` state on mount.
+- (2026-04-14) A2UI action closures created by GenericBinder (`generic-binder.ts` ACTION case) only resolve DataBindings that exist in the raw action JSON. If the LLM defines static context (e.g. `{ label: "Runtime" }`) without DataBindings for the selected value, the user's actual selection won't be in the action context. Components must enrich the context themselves using `context.componentModel.properties.action` (raw def) + `context.dataContext.resolveAction()` + manual value injection.
+- (2026-04-14) `DataContext.resolveAction()` in `data-context.ts:283` is the official API for resolving an Action's DataBindings. It resolves each value in `event.context` one level deep via `resolveDynamicValue`. Use it instead of duplicating the GenericBinder's `resolveDeepSync` logic.
 
 ## Work Log
 - (2026-04-14 11:02) Wave 1: Fixed #166 A2UI rendering blocker → PR #179 opened. SSE parser fixes in useStreaming.ts complete.
 - (2026-04-14 12:30) P0 fix: #192 A2UI component interactivity broken — ChoicePicker/CheckBox/Toggle/ComboBox/MultiSelect lacked ActionSchema in schemas, so LLM-provided actions were treated as static objects instead of callable closures. Added FlexibleApis with action support + onAction callback on A2UISurfaceWrapper → PR #195 opened.
 - (2026-04-14 16:42) Prompt fix: Removed "Got it" acknowledgment cards from DISCOVER and DESIGN phase prompts. Prompt-only change in `packages/core/src/engine/phases.ts`.
 - (2026-04-14 17:01) Browser back button: Added `useNavigation` hook with hash-based History API routing (`#session/{id}`). Wired into App.tsx for all nav paths. Deep link support included. → PR #211 opened.
+- (2026-04-14 17:32) Action display bug: ChoicePicker/RadioGroup actions only sent LLM's static context (e.g. `{ label: "Runtime" }`), not the user's actual selection. Enriched both components to inject `value` + `selectedLabel` into action context via `context.dataContext.resolveAction()`. Fixed `actionToMessage` to show "I chose Java / Spring" instead of `[Action: pick-runtime] label: Runtime`. → PR #214 opened.
 
-## 2026-04-14 Round 2: Frontend Fixes + Navigation
+## Round 5: DP Expansion (#188) + Implementation
 
-- **PR #214**: Fixed A2UI action display bug. ChoicePicker/RadioGroup now inject selectedLabel into action context.
-- **Hash-based navigation**: Implemented History API support for browser back button (#169). Uses `#session/{id}` pattern.
-- **Footer update**: Coordinated with Bender on version-SHA display.
-- **Team status**: Awaiting review on PR #214; navigation feature documented in decisions.md.
+**2026-04-14**
+- Expanded demo scenarios DP for issue #188 with interactive patterns
+- Post-approval, implemented #188 scenarios in PR #219
+- PR #219 merged to main
+- Total scope: 5 new demo scenarios, updated UI components, test coverage added

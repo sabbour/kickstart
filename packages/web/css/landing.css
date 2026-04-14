@@ -255,6 +255,31 @@
   100% { transform: translateX(-100%); }
 }
 
+/* ---------- Tour Prompt ---------- */
+.landing-tour-prompt {
+  text-align: center;
+}
+
+.landing-tour-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xxs);
+  background: none;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-m);
+  border-radius: var(--radius-medium);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-200);
+  color: var(--color-neutral-foreground-3);
+  cursor: pointer;
+  transition: color var(--duration-fast), background var(--duration-fast);
+}
+
+.landing-tour-link:hover {
+  color: var(--color-brand-primary);
+  background: var(--color-neutral-background-1-hover, rgba(0,0,0,0.03));
+}
+
 /* ---------- Framework Section ---------- */
 .framework-section {
   display: flex;

@@ -26,7 +26,7 @@ import markdown from 'highlight.js/lib/languages/markdown';
 import dockerfile from 'highlight.js/lib/languages/dockerfile';
 import yaml from 'highlight.js/lib/languages/yaml';
 import go from 'highlight.js/lib/languages/go';
-import 'highlight.js/styles/vs.css';
+import 'highlight.js/styles/github-dark.css';
 
 // Register highlight.js languages
 hljs.registerLanguage('javascript', javascript);

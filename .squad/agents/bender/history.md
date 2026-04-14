@@ -38,11 +38,20 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - Concurrent git operations from multiple agents cause `index.lock` contention -- use retry loops with lock removal for shared repos.
 - (2026-04-14 17:44) System prompt's ABSOLUTE RULES section had a passive question→component hint that the LLM ignored for binary/either-or questions. Fixed by adding explicit NON-NEGOTIABLE rules, an "Either/or" row in the component selection table, and two new examples (Buttons-in-Row + RadioGroup) for 2-option questions. PR #213.
 - LLM examples are the strongest prompt steering mechanism — the model follows demonstrated patterns over stated rules. If a pattern has no example, the LLM will default to plain text. Always add an example for every major component pattern.
+- (2026-04-14 17:44) Updated DP on #186 (Public Copilot Skills) to address Zapp's security review: added SHA-only immutable pinning (no branches/tags), prompt-injection defense-in-depth (delimiter sandboxing + automated policy scanning + content hashing), full provenance metadata on every public skill, and fail-closed sync pipeline with size/timeout/policy controls. Tagged Zapp for re-review.
+- When ingesting third-party content into LLM system prompts, defense-in-depth requires structural isolation (delimiters + preamble), automated policy scanning (directive detection), and content hashing — HTML stripping alone is insufficient against prompt injection.
+- (2026-04-14 17:44) Final DP hardening on #186: addressed Zapp's 3 remaining concerns — (1) commit signature verification + trusted org allowlist + optional Sigstore attestation for supply chain authenticity, (2) executable code-fence patterns escalated from warn→reject + structured JSON representation instead of raw markdown in prompts, (3) explicit no-runtime-fetch invariant with zero network imports in skill loader + ESLint guard. Tagged Zapp for final sign-off.
+- Supply chain security for third-party content requires authenticity verification beyond SHA integrity — verified commit signatures (git verify-commit / GitHub API verification) plus trusted org allowlists are the minimum; Sigstore attestations add CI provenance.
+- For prompt-injection defense, transforming third-party content into a constrained structured representation (JSON with extracted facts only) is stronger than delimiter sandboxing around raw markdown — the LLM never sees free-form prose it could interpret as instructions.
+- (2026-04-14 17:44) Implemented #186 (Public Copilot Skills): 10 new files in packages/core/src/skills/ with full build-time sync pipeline, zero-network runtime loader, policy scanner, frontmatter parser, phase mapper, knowledge extractor. 60 tests. PR #227.
+- Core package (packages/core) is browser-compatible — uses "lib": ["ES2022", "DOM"] with no @types/node. Use Web Crypto API (crypto.subtle) and atob() instead of Node.js crypto and Buffer. Accept data as parameters rather than reading filesystem directly.
 
-## 2026-04-14 Round 2: Infrastructure + Bug Fixes
+## Round 5: Multi-Round DP Cycle (#186) + Implementation (Pending)
 
-- **PR #213**: Fixed missing choice components in system prompt. Root cause identified and fixed purely additively.
-- **Approved by Leela**: Set to auto-merge.
-- **SWA automation**: Implemented continuous deployment on main + version-SHA footer (PR #177).
-- **Project board triage**: Implemented auto-assignment workflow for issues.
-- **Team notes**: Coordinated with Fry on footer components; ensured Leela's approval before merge.
+**2026-04-14**
+- Updated DP #186 addressing Zapp security concerns (round 2)
+- Received round 3 feedback from Zapp (3 remaining concerns)
+- Final DP update (#186 round 3) addressing all security issues
+- DP #186 approved by Zapp for implementation
+- Implemented public Copilot skills (10 files, 60 tests) in PR #227
+- Implementation PR awaiting code review

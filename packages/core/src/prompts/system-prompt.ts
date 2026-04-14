@@ -64,6 +64,12 @@ export interface SystemPromptContext {
    * Merged with the base catalog when generating the §5 component catalog.
    */
   kitComponentEntries?: ComponentCatalogEntry[];
+  /**
+   * Pre-formatted Copilot extension skills prompt section.
+   * When non-empty, appended after Available Capabilities so the LLM
+   * can suggest relevant public Copilot extensions to the user.
+   */
+  copilotSkillsPrompt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +100,13 @@ Progressive discovery over multiple turns:
 
 Use conversational text to EXPLAIN, then ask. When the user is vague, pick the best default and explain WHY.
 Ask 1-2 focused follow-up questions per turn. Never a long checklist.
+
+PHASE TRANSITIONS — PRODUCE, DON'T NARRATE:
+NEVER respond with just an announcement like "Now let's move to the design phase" or "I'll design the architecture next." Every response MUST include actionable A2UI content — a question, a component, or a Button to advance. When a phase is complete:
+- Summarize what was gathered/decided in a Card.
+- Include a primary Button with a complete:navigate:{nextPhase} action so the user can proceed.
+- NEVER leave the user in a dead-end requiring them to manually prompt "go ahead."
+A response that only narrates intent without producing content or an interactive component is a critical failure.
 
 ## 2a. ARCHITECT MINDSET
 
@@ -506,6 +519,11 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
   if (context.kitPrompts && context.kitPrompts.length > 0) {
     const capabilities = context.kitPrompts.map((p) => p.trim()).join("\n\n");
     parts.push(`\n## Available Capabilities\n\n${capabilities}`);
+  }
+
+  // Copilot extension skills — suggest public extensions when relevant
+  if (context.copilotSkillsPrompt) {
+    parts.push(`\n${context.copilotSkillsPrompt}`);
   }
 
   return parts.join("\n\n");

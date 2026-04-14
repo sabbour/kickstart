@@ -14,8 +14,9 @@
 - 2026-04-10: Security hardening backlog now tracked in Security milestone issues #81-#88 with severity and OWASP mapping.
 - 2026-04-10: DP #30 (IntegrationKit lifecycle/dependency/auth extension) approved with conditions requiring transactional lifecycle rollback, cycle detection on re-registration, explicit auth schema validation, and documented trusted-kit boundary.
 
-## 2026-04-14 Round 2: DP Security Review
+## Round 5: Multi-Round Security Reviews
 
-- **Reviewed DPs #186 & #187**: #187 approved (low risk), #186 flagged with High/Medium concerns.
-- **#186 blockers**: Immutable source pinning, prompt-safety validation, fail-closed + provenance.
-- **Coordination**: Communicated security requirements to Leela; provided detailed guidance for Phase 1 hardening.
+**2026-04-14**
+- Security review of DP #188 (demo scenarios) — approved
+- Re-review of DP #186 (round 2) — identified 3 concerns
+- Final review and sign-off on DP #186 (round 3) — approved for implementation

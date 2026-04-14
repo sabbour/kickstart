@@ -66,6 +66,10 @@ export {
   interpolateTemplate,
   createDefaultValues,
   interpolateA2UIMessage,
+  CopilotSkillsRegistry,
+  defaultCopilotSkillsRegistry,
+  AZURE_COPILOT_SKILLS,
+  formatCopilotSkillsPrompt,
 } from "./engine/index.js";
 export type {
   PhaseStatus,
@@ -76,6 +80,8 @@ export type {
   Skill,
   SkillResolverContext,
   SkillResolverMiddleware,
+  CopilotSkill,
+  ResolvedCopilotSkills,
 } from "./engine/index.js";
 
 // Generators
@@ -179,6 +185,30 @@ export type { IntegrationKit, ComponentRegistration, KitAuthRequirement } from "
 export { IntegrationKitRegistry, defaultKitRegistry, registerKit } from "./kits/index.js";
 export { azureKit } from "./kits/index.js";
 export { githubKit } from "./kits/index.js";
+
+// Public Copilot skills — build-time bundled external skill consumption (#186)
+export type {
+  PublicSkillSource,
+  PublicSkillsConfig,
+  SkillProvenance,
+  SkillKnowledgeBlock,
+  PolicyViolation,
+  PublicSkillsLockfile,
+  LockfileSkillEntry,
+} from "./skills/index.js";
+export {
+  loadPublicSkills,
+  loadPublicSkillKit,
+  createPublicSkillKit,
+  syncPublicSkills,
+  validateConfig as validatePublicSkillsConfig,
+  scanSkillPolicy,
+  parseSkillMd,
+  classifyToPhases,
+  PUBLIC_SKILL_PRIORITY,
+  POLICY_VERSION,
+  SHA_PATTERN,
+} from "./skills/index.js";
 
 // Validation — client-side artifact validation against deployment safeguards
 export type {

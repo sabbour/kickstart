@@ -31,6 +31,14 @@ export {
 export type { ResolvedSkills, SkillResolverMiddleware } from "./skill-resolver.js";
 
 export {
+  CopilotSkillsRegistry,
+  defaultCopilotSkillsRegistry,
+  AZURE_COPILOT_SKILLS,
+  formatCopilotSkillsPrompt,
+} from "./copilot-skills-registry.js";
+export type { CopilotSkill, ResolvedCopilotSkills } from "./copilot-skills-registry.js";
+
+export {
   resolveDataPath,
   resolveChainedPointer,
   interpolateTemplate,

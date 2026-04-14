@@ -1,10 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ThemeToggle } from './ThemeToggle';
 import { useDebug } from '../contexts/DebugContext';
 
 interface AuthUser {
   userDetails: string;
   identityProvider: string;
+}
+
+/** Extract a display-friendly name from an email or raw identifier. */
+function getDisplayName(userDetails: string): string {
+  const local = userDetails.includes('@')
+    ? userDetails.split('@')[0]
+    : userDetails;
+  return local
+    .toLowerCase()
+    .replace(/[._-]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .trim();
+}
+
+/** First letter for the avatar circle, derived from an already-computed display name. */
+function getInitial(displayName: string): string {
+  return displayName.charAt(0).toUpperCase();
 }
 
 interface TopbarProps {
@@ -42,7 +59,7 @@ export function Topbar({
   return (
     <header className="topbar" role="banner">
       <a className="topbar-brand" href="#/" aria-label="Kickstart — home">
-        <span>Kickstart your app ideas on Azure</span>
+        <span className="sr-only">Home</span>
       </a>
       <div className="topbar-actions">
         {debugEnabled && (
@@ -95,19 +112,7 @@ export function Topbar({
         )}
         <ThemeToggle />
         {user ? (
-          <div className="topbar-signin" role="group" aria-label="User menu">
-            <span className="topbar-avatar" aria-hidden="true">
-              {user.userDetails.charAt(0).toUpperCase()}
-            </span>
-            <span className="topbar-user-name">{user.userDetails}</span>
-            <a
-              href="/.auth/logout?post_logout_redirect_uri=/"
-              className="topbar-signout-link"
-              aria-label="Sign out"
-            >
-              Sign out
-            </a>
-          </div>
+          <UserMenu user={user} />
         ) : (
           <button
             className="topbar-signin"
@@ -134,5 +139,50 @@ export function Topbar({
         )}
       </div>
     </header>
+  );
+}
+
+/* ── Authenticated user menu ─────────────────────────────────────────── */
+function UserMenu({ user }: { user: AuthUser }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const displayName = getDisplayName(user.userDetails);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div className="topbar-user-menu" ref={ref}>
+      <button
+        className="topbar-user-trigger"
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label={`User menu for ${displayName}`}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className="topbar-avatar" aria-hidden="true">
+          {getInitial(displayName)}
+        </span>
+        <span className="topbar-user-name">{displayName}</span>
+      </button>
+
+      {open && (
+        <div className="topbar-user-dropdown">
+          <span className="topbar-user-dropdown-email">{user.userDetails}</span>
+          <a
+            href="/.auth/logout?post_logout_redirect_uri=/"
+            className="topbar-user-dropdown-signout"
+          >
+            Sign out
+          </a>
+        </div>
+      )}
+    </div>
   );
 }

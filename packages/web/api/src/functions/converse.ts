@@ -22,7 +22,8 @@ import {
   InMemoryArtifactStore,
 } from "@kickstart/core";
 import type { PhaseItem, ToolContext } from "@kickstart/core";
-import { getSession, createSession, addMessage } from "../lib/session-store.js";
+import { getSession, createSession, hydrateSession, addMessage } from "../lib/session-store.js";
+import type { ClientMessage } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools, getChatDeploymentName } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
@@ -35,6 +36,8 @@ import type { DebugMetadata } from "../lib/debug-mode.js";
 interface ConverseRequest {
   sessionId?: string;
   message: string;
+  /** Client-side message history for session rehydration after cold starts. */
+  messages?: ClientMessage[];
 }
 
 interface ConverseResponse {
@@ -66,18 +69,44 @@ app.http("converse", {
         return { status: 400, jsonBody: { error: "message is required" } };
       }
 
-      // Content safety pre-flight check
+      // Content safety pre-flight check on the current message
       const safetyResult = await checkContentSafety(body.message);
       if (!safetyResult.safe) {
         return { status: 400, jsonBody: { error: safetyResult.error } };
       }
 
-      // Get or create session
+      // Hard cap on rehydration history length to prevent abuse.
+      const MAX_REHYDRATION_MESSAGES = 50;
+      if (body.messages && body.messages.length > MAX_REHYDRATION_MESSAGES) {
+        return {
+          status: 400,
+          jsonBody: { error: `messages array exceeds maximum of ${MAX_REHYDRATION_MESSAGES}` },
+        };
+      }
+
+      // Safety-check ALL client-provided messages in the rehydration history
+      // (both user and assistant roles) — without this, a client could send a
+      // safe `message` but smuggle unsafe content through `body.messages`.
+      if (body.messages?.length) {
+        for (const msg of body.messages) {
+          if (!msg.content?.trim()) continue;
+          const historySafety = await checkContentSafety(msg.content);
+          if (!historySafety.safe) {
+            return { status: 400, jsonBody: { error: historySafety.error } };
+          }
+        }
+      }
+
+      // Get or create session — if the in-memory session is gone but the
+      // client sent its message history, hydrate a new session from it so
+      // the LLM retains full conversational context across cold starts.
       let session = body.sessionId
         ? getSession(body.sessionId)
         : undefined;
       if (!session) {
-        session = createSession();
+        session = body.messages?.length
+          ? hydrateSession(body.messages)
+          : createSession();
       }
 
       const { state, engineState } = session;

@@ -8,9 +8,10 @@ import {
   DialogActions,
   Button,
 } from '@fluentui/react-components';
-import { Sparkle24Regular } from '@fluentui/react-icons';
+import { Sparkle24Regular, Map16Regular } from '@fluentui/react-icons';
 import type { Session } from '../types';
 import { apiFetch } from '../services/api-client';
+import { OnboardingTour, resetOnboardingTour } from './OnboardingTour';
 
 const INSPIRATIONS = [
   "Movie night pick that settles disputes",
@@ -178,6 +179,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
 
   return (
     <div id="landing-page" className={`landing-page${isHiding ? ' hiding' : ''}`}>
+      <OnboardingTour />
       <div className="landing-inner">
         {/* Hero Input */}
         <div className="landing-hero">
@@ -226,6 +228,14 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
               <img src="assets/icons/commands/go.svg" width="16" height="16" alt="" />
             </button>
           </div>
+        </div>
+
+        {/* Tour prompt */}
+        <div className="landing-tour-prompt">
+          <button className="landing-tour-link" onClick={resetOnboardingTour}>
+            <Map16Regular />
+            New here? Take a tour
+          </button>
         </div>
 
         {/* Track Cards */}

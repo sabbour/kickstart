@@ -77,6 +77,43 @@ export function createSession(): ApiSession {
   return session;
 }
 
+/**
+ * Client-provided message for session hydration.
+ * Only role + content — the server never trusts client timestamps or system prompts.
+ */
+export interface ClientMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/**
+ * Create a new session and seed it with client-provided conversation history.
+ * Used when the in-memory session has been lost (cold start / scale event)
+ * but the client still holds the message history in React state.
+ *
+ * System messages are always rebuilt server-side — client-sent system
+ * messages are silently dropped.
+ */
+export function hydrateSession(clientMessages: ClientMessage[]): ApiSession {
+  const session = createSession();
+  const now = new Date().toISOString();
+
+  for (const msg of clientMessages) {
+    // Only allow user/assistant — never trust client-sent system prompts
+    if (msg.role !== "user" && msg.role !== "assistant") continue;
+    if (!msg.content) continue;
+
+    session.state.messages.push({
+      role: msg.role,
+      content: msg.content,
+      timestamp: now,
+    });
+  }
+
+  session.state.updatedAt = now;
+  return session;
+}
+
 /** Append a message to the session's history. */
 export function addMessage(
   sessionId: string,
