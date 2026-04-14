@@ -23,6 +23,9 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - v0.4.0 tool system: Function calling protocol, multi-round loops, streaming SSE events
 - v0.3.0 service layer: APIConnector auth abstraction, IntegrationKit packs, CORS proxies
 
+## Work Log
+- (2026-04-14 11:02) Wave 1: SWA continuous deploy + version footer → PR #177 opened. Auto-deploy from main, version shows SHA.
+
 ## Learnings
 - SWA deploy workflow (`deploy-swa.yml`) needs explicit `push → branches: [main]` trigger — tag-only triggers mean no continuous deployment from main.
 - `__BUILD_VERSION__` in `vite.config.ts` can embed git SHA via `execSync('git rev-parse --short HEAD')` — works both locally and in CI without relying on `GITHUB_SHA` env var.

@@ -174,7 +174,7 @@ function normalizePlaygroundComponents(raw: any[]): any[] {
 }
 
 // Scenario grouping for tabs
-const GALLERY_GROUPS = ['Kickstart Scenarios', 'Data Binding', 'Events & Actions', 'Surface Lifecycle', 'Dynamic Patterns'];
+const GALLERY_GROUPS = ['Kickstart Scenarios', 'Data Binding', 'Events & Actions', 'Surface Lifecycle', 'Dynamic Patterns', 'Integration Kits'];
 const COMPONENT_GROUPS = ['Layout', 'Content', 'Inputs', 'Custom Controls'];
 
 const GALLERY_SCENARIOS = [...KICKSTART_SCENARIOS, ...CONTROL_SCENARIOS].filter(s => GALLERY_GROUPS.includes(s.group));

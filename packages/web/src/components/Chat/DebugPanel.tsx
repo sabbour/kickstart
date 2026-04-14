@@ -129,9 +129,9 @@ export function DebugPanel({ debugInfo }: DebugPanelProps) {
           {/* Raw LLM Response */}
           <div className={styles.section}>
             <Text className={styles.sectionLabel}>Raw LLM Response</Text>
-            {debugInfo?.rawResponse ? (
+            {(debugInfo?.rawContent ?? debugInfo?.rawResponse) ? (
               <code className={codeBlockClass}>
-                {debugInfo.rawResponse}
+                {debugInfo?.rawContent ?? debugInfo?.rawResponse}
               </code>
             ) : (
               <Text className={styles.notAvailable} size={200}>Not available</Text>

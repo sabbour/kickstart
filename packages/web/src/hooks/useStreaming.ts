@@ -129,15 +129,17 @@ export function useStreaming() {
         }
       }
 
-      // Extract A2UI from the accumulated JSON envelope (chunks build a full response)
+      // Preserve the raw accumulated content before envelope extraction
+      const rawContent = accumulated;
+
+      // Extract message/A2UI from the accumulated JSON envelope
       try {
         const envelope = JSON.parse(accumulated);
-        if (envelope?.a2ui && Array.isArray(envelope.a2ui) && envelope.a2ui.length > 0) {
+        if (typeof envelope?.message === 'string') {
+          accumulated = envelope.message;
+        }
+        if (Array.isArray(envelope?.a2ui) && envelope.a2ui.length > 0) {
           callbacks.onA2UI(envelope.a2ui);
-          // Use the text message from the envelope if present
-          if (typeof envelope.message === 'string') {
-            accumulated = envelope.message;
-          }
         }
       } catch { /* accumulated is plain text, not JSON — expected for non-envelope responses */ }
 
@@ -146,6 +148,7 @@ export function useStreaming() {
         ? {
             model: lastModel,
             rawResponse: accumulated,
+            rawContent: rawContent !== accumulated ? rawContent : undefined,
             renderDecisions: renderDecisions.length > 0 ? renderDecisions : undefined,
           }
         : undefined;

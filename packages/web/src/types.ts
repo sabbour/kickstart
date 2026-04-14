@@ -5,6 +5,8 @@ export interface DebugMetadata {
   model?: string;
   /** Raw LLM response text before rendering. */
   rawResponse?: string;
+  /** Full JSON envelope content before message extraction. */
+  rawContent?: string;
   /** Rendering engine decisions (component choices, catalog, degradation). */
   renderDecisions?: string[];
 }
