@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { MessageProcessor, Catalog } from '../vendor/a2ui/web_core/index';
 import { kickstartCatalog } from '../catalog/kickstart-catalog';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
@@ -22,6 +22,7 @@ export interface A2UIHandle {
 
 export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   const processorRef = useRef<MessageProcessor<ReactComponentImplementation> | null>(null);
+  const subscriptionsRef = useRef<Array<{ unsubscribe(): void }>>([]);
   const [surfaces, setSurfaces] = useState<Map<string, SurfaceModel<ReactComponentImplementation>>>(new Map());
 
   // Keep a stable ref to the handler so the MessageProcessor (created once)
@@ -47,26 +48,39 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
     // useEffect cleanups run in registration order, so useA2UI's cleanup
     // (unsubscribe) fires BEFORE the consumer's cleanup (deleteSurface).
     // That leaves disposed surfaces in React state because onSurfaceDeleted
-    // has no listener. By subscribing here and never unsubscribing, the
-    // listener stays active through StrictMode cleanup/remount cycles.
-    proc.onSurfaceCreated((surface) => {
-      setSurfaces(prev => {
-        const next = new Map(prev);
-        next.set(surface.id, surface);
-        return next;
-      });
-    });
+    // has no listener. By subscribing here, the listener stays active through
+    // StrictMode cleanup/remount cycles. Subscriptions are stored so they can
+    // be cleaned up on final unmount to prevent memory leaks.
+    subscriptionsRef.current.push(
+      proc.onSurfaceCreated((surface) => {
+        setSurfaces(prev => {
+          const next = new Map(prev);
+          next.set(surface.id, surface);
+          return next;
+        });
+      })
+    );
 
-    proc.onSurfaceDeleted((id) => {
-      setSurfaces(prev => {
-        const next = new Map(prev);
-        next.delete(id);
-        return next;
-      });
-    });
+    subscriptionsRef.current.push(
+      proc.onSurfaceDeleted((id) => {
+        setSurfaces(prev => {
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
+      })
+    );
 
     processorRef.current = proc;
   }
+
+  // Clean up subscriptions on final unmount to prevent memory leaks.
+  // In StrictMode dev double-mount, the ref-init block does not re-run so
+  // subscriptions persist through the cycle — this is intentional (see above).
+  useEffect(() => {
+    const subs = subscriptionsRef.current;
+    return () => { for (const s of subs) s.unsubscribe(); };
+  }, []);
 
   const processor = processorRef.current;
 

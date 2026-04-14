@@ -6,7 +6,14 @@ const STORAGE_KEY = 'kickstart-sessions';
 function loadSessions(): Session[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed: Session[] = JSON.parse(raw);
+    // Deduplicate by session ID (defensive against stale duplicates in storage)
+    const seen = new Set<string>();
+    return parsed.filter(s => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
   } catch {
     return [];
   }

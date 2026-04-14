@@ -21,6 +21,7 @@ import {
 } from '@fluentui/react-components';
 import { ArrowRight16Regular } from '@fluentui/react-icons';
 import { useMessageText } from '../../contexts/MessageTextContext';
+import { sanitizeActionContext } from '../../utils/sanitize-action-context';
 
 type _Option = any;
 
@@ -124,7 +125,8 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
   // Local selection state — gives immediate visual feedback before the data
   // model round-trips and the surface is dimmed by the action handler.
   const [localValues, setLocalValues] = useState<string[]>(values);
-  useEffect(() => { setLocalValues(values); }, [values.join(',')]);
+  const valuesKey = JSON.stringify(values);
+  useEffect(() => { setLocalValues(values); }, [valuesKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const displayValues = hasFiredActionRef.current ? localValues : values;
 
   /**
@@ -140,13 +142,14 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
     if (rawAction && typeof rawAction === 'object' && 'event' in rawAction && rawAction.event) {
       const selectedOpt = options.find(opt => selectedVals.includes(opt.value));
       const resolved = context.dataContext.resolveAction(rawAction);
+      const safeContext = sanitizeActionContext(resolved.event.context);
       context.dispatchAction({
         event: {
           ...resolved.event,
           context: {
-            ...resolved.event.context,
+            ...safeContext,
             value: selectedVals.length === 1 ? selectedVals[0] : selectedVals,
-            selectedLabel: selectedOpt ? String(selectedOpt.label) : undefined,
+            selectedLabel: selectedOpt ? String(selectedOpt.label).slice(0, 200) : undefined,
           },
         },
       });

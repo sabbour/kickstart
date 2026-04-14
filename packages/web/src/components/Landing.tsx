@@ -82,11 +82,23 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
   const [inspireLoading, setInspireLoading] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
 
-  const handleInspire= useCallback(async () => {
+  const inspireAbortRef = useRef<AbortController | null>(null);
+
+  // Cleanup inspire stream on unmount
+  useEffect(() => {
+    return () => { inspireAbortRef.current?.abort(); };
+  }, []);
+
+  const handleInspire = useCallback(async () => {
+    // Abort any in-flight inspire stream
+    inspireAbortRef.current?.abort();
+    const controller = new AbortController();
+    inspireAbortRef.current = controller;
+
     setInspireLoading(true);
     setInputValue(''); // Clear input before streaming
     try {
-      const res = await apiFetch('/api/inspirations?stream=true');
+      const res = await apiFetch('/api/inspirations?stream=true', { signal: controller.signal });
       if (!res.ok) throw new Error('API error');
       
       const reader = res.body?.getReader();
@@ -95,31 +107,42 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
       const decoder = new TextDecoder();
       let accumulatedText = '';
       
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6); // Remove "data: " prefix
-            if (data === '[DONE]') {
-              setInspireLoading(false);
-              inputRef.current?.focus();
-              return;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6); // Remove "data: " prefix
+              if (data === '[DONE]') {
+                // Flush any remaining bytes from the decoder
+                decoder.decode(undefined, { stream: false });
+                setInspireLoading(false);
+                inputRef.current?.focus();
+                return;
+              }
+              accumulatedText += data;
+              setInputValue(accumulatedText);
             }
-            accumulatedText += data;
-            setInputValue(accumulatedText);
           }
         }
+      } finally {
+        reader.releaseLock();
       }
+      // Flush remaining bytes after stream ends normally
+      decoder.decode(undefined, { stream: false });
       
       setInspireLoading(false);
       inputRef.current?.focus();
       return;
-    } catch {
+    } catch (err) {
+      if (controller.signal.aborted) return; // Component unmounted or new request
+      // eslint-disable-next-line no-console
+      console.warn('[Landing] inspire stream error:', err);
       // Fallback: pick from local INSPIRATIONS array
       setInspireLoading(false);
     }
