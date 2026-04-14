@@ -148,65 +148,172 @@ const FILE_GENERATION: DemoResponse = {
   ]),
 };
 
-const REVIEW: DemoResponse = {
-  text: "Everything looks great! Here's your deployment summary. Review the details below and hit **Deploy** when you're ready.",
+const REVIEW_EXPANDED: DemoResponse = {
+  text: "I've completed the deployment review. Architecture, cost estimates, and best-practice checks are all below — expand each tab for details. When you're satisfied, hit **Approve** to proceed.",
   phase: 'review',
   model: 'gpt-5.3-chat',
-  typingDelay: 1400,
+  typingDelay: 1800,
   a2uiMessages: surface('review-surface', [
-    { id: 'root', component: 'Column', children: ['review-card'] },
-    { id: 'review-card', component: 'Card', child: 'review-inner' },
-    { id: 'review-inner', component: 'Column', children: ['rev-title', 'divider', 'picker', 'tf', 'deploy-row'], gap: 'medium' },
-    { id: 'rev-title', component: 'Text', text: 'Deployment Configuration', variant: 'h2' },
-    { id: 'divider', component: 'Divider' },
-    { id: 'picker', component: 'ChoicePicker', label: 'Region', options: [
-      { id: 'eastus', label: 'East US' },
-      { id: 'westus3', label: 'West US 3' },
-      { id: 'westeurope', label: 'West Europe' },
-      { id: 'southeastasia', label: 'Southeast Asia' },
-    ], value: 'eastus' },
-    { id: 'tf', component: 'TextField', label: 'App Name', value: 'my-awesome-app', placeholder: 'Enter your app name' },
-    { id: 'deploy-row', component: 'Row', children: ['deploy-btn', 'cancel-btn'], gap: 'small' },
-    { id: 'deploy-btn', component: 'Button', child: 'deploy-text', variant: 'primary',
-      action: { event: { name: 'deploy' } } },
-    { id: 'deploy-text', component: 'Text', text: 'Deploy to AKS' },
-    { id: 'cancel-btn', component: 'Button', child: 'cancel-text', variant: 'outlined',
-      action: { event: { name: 'cancel-deploy' } } },
-    { id: 'cancel-text', component: 'Text', text: 'Go back' },
+    { id: 'root', component: 'Column', children: ['rev-title', 'rev-tabs', 'rev-divider', 'rev-actions'], gap: 'medium' },
+    { id: 'rev-title', component: 'Text', text: 'Deployment Review', variant: 'h2' },
+    { id: 'rev-tabs', component: 'Tabs', children: ['tab-arch', 'tab-cost', 'tab-bp', 'tab-warn'] },
+
+    // Tab 1: Architecture recap
+    { id: 'tab-arch', component: 'Column', children: ['arch-diagram'], label: 'Architecture' },
+    { id: 'arch-diagram', component: 'ArchitectureDiagram', title: 'System Architecture',
+      diagram: `graph LR
+  User-->|HTTPS|AppGW[App Gateway]
+  AppGW-->FE[web-frontend]
+  AppGW-->API[api-server]
+  API-->Cosmos[(Cosmos DB)]
+  API-->Redis[(Redis Cache)]
+  subgraph AKS Automatic
+    FE
+    API
+  end`,
+    },
+
+    // Tab 2: Cost Estimate
+    { id: 'tab-cost', component: 'Column', children: ['cost-est'], label: 'Cost Estimate' },
+    { id: 'cost-est', component: 'CostEstimate', title: 'Estimated Monthly Cost',
+      currency: 'USD',
+      total: 140,
+      resources: [
+        { name: 'AKS Automatic', sku: 'Standard', monthlyEstimate: 72 },
+        { name: 'Container Registry', sku: 'Basic', monthlyEstimate: 5 },
+        { name: 'Cosmos DB', sku: 'Serverless', monthlyEstimate: 25 },
+        { name: 'Cache for Redis', sku: 'Basic C0', monthlyEstimate: 16 },
+        { name: 'Application Gateway', sku: 'Standard v2', monthlyEstimate: 22 },
+      ],
+    },
+
+    // Tab 3: Best Practices
+    { id: 'tab-bp', component: 'Column', children: ['bp-card'], label: 'Best Practices' },
+    { id: 'bp-card', component: 'Card', child: 'bp-inner' },
+    { id: 'bp-inner', component: 'Column', children: ['bp-accordion'], gap: 'small' },
+    { id: 'bp-accordion', component: 'Accordion', sections: [
+      { id: 'bp-health', title: 'Health Checks', badge: { text: 'Passing', variant: 'success' },
+        content: 'Liveness and readiness probes configured on all containers. HTTP health endpoint at `/healthz` responds in <50ms.' },
+      { id: 'bp-scale', title: 'Auto-scaling', badge: { text: 'Configured', variant: 'success' },
+        content: 'Horizontal Pod Autoscaler set to 2–10 replicas based on CPU utilization (70% target). AKS node auto-provisioning enabled.' },
+      { id: 'bp-limits', title: 'Resource Limits', badge: { text: 'Set', variant: 'success' },
+        content: 'CPU: 100m request / 500m limit. Memory: 128Mi request / 256Mi limit. Prevents noisy-neighbour issues in shared cluster.' },
+      { id: 'bp-secure', title: 'Secure Defaults', badge: { text: 'Enforced', variant: 'success' },
+        content: 'Non-root container user. Secrets in Key Vault (not env vars). TLS termination at Application Gateway. Network policies restrict pod-to-pod traffic.' },
+    ] },
+
+    // Tab 4: Warnings
+    { id: 'tab-warn', component: 'Column', children: ['warn-card'], label: 'Warnings' },
+    { id: 'warn-card', component: 'Card', child: 'warn-inner' },
+    { id: 'warn-inner', component: 'Column', children: ['warn-list'], gap: 'small' },
+    { id: 'warn-list', component: 'List', children: ['warn-1', 'warn-2'], variant: 'unordered' },
+    { id: 'warn-1', component: 'Row', children: ['w1-badge', 'w1-text'], gap: 'small' },
+    { id: 'w1-badge', component: 'Badge', text: 'Info', variant: 'warning' },
+    { id: 'w1-text', component: 'Text', text: 'Consider adding a CDN for static assets to reduce latency for global users.' },
+    { id: 'warn-2', component: 'Row', children: ['w2-badge', 'w2-text'], gap: 'small' },
+    { id: 'w2-badge', component: 'Badge', text: 'Info', variant: 'warning' },
+    { id: 'w2-text', component: 'Text', text: 'Redis password rotation is not configured — consider enabling Azure Key Vault integration.' },
+
+    // Actions
+    { id: 'rev-divider', component: 'Divider' },
+    { id: 'rev-actions', component: 'Row', children: ['approve-btn', 'modify-btn'], gap: 'small' },
+    { id: 'approve-btn', component: 'Button', child: 'approve-text', variant: 'primary',
+      action: { event: { name: 'approve-review' } } },
+    { id: 'approve-text', component: 'Text', text: 'Approve and continue' },
+    { id: 'modify-btn', component: 'Button', child: 'modify-text', variant: 'outlined',
+      action: { event: { name: 'modify-review' } } },
+    { id: 'modify-text', component: 'Text', text: 'Change something' },
   ]),
 };
 
-const DEPLOY_SUCCESS: DemoResponse = {
-  text: "**Deployment complete!** Your app is live. Here are your endpoints and next steps.",
+const HANDOFF: DemoResponse = {
+  text: "Your code is on GitHub! I've created the repository, pushed all generated files, and set up a CI/CD pipeline. Every push to `main` will automatically build, test, and deploy.",
+  phase: 'handoff',
+  model: 'gpt-5.3-chat',
+  typingDelay: 1600,
+  a2uiMessages: surface('handoff-surface', [
+    { id: 'root', component: 'Column', children: ['ho-title', 'ho-progress', 'ho-repo-card', 'ho-next-card'], gap: 'medium' },
+    { id: 'ho-title', component: 'Text', text: 'Get Your Code on GitHub', variant: 'h2' },
+    { id: 'ho-progress', component: 'ProgressSteps', steps: [
+      { id: 'create-repo', label: 'Create Repo', status: 'complete' },
+      { id: 'push-code', label: 'Push Code', status: 'complete' },
+      { id: 'setup-cicd', label: 'Setup CI/CD', status: 'complete' },
+      { id: 'ready', label: 'Ready!', status: 'active' },
+    ] },
+
+    // Repository info card
+    { id: 'ho-repo-card', component: 'Card', child: 'ho-repo-inner' },
+    { id: 'ho-repo-inner', component: 'Column', children: ['repo-header', 'repo-divider', 'repo-details'], gap: 'small' },
+    { id: 'repo-header', component: 'Row', children: ['repo-badge', 'repo-name'], gap: 'small' },
+    { id: 'repo-badge', component: 'Badge', text: 'Created', variant: 'success' },
+    { id: 'repo-name', component: 'Text', text: 'my-awesome-app', variant: 'subtitle1' },
+    { id: 'repo-divider', component: 'Divider' },
+    { id: 'repo-details', component: 'List', children: ['rd-1', 'rd-2', 'rd-3', 'rd-4'], variant: 'unordered' },
+    { id: 'rd-1', component: 'Text', text: '**Repository:** github.example.com/you/my-awesome-app' },
+    { id: 'rd-2', component: 'Text', text: '**Branch:** main (protected)' },
+    { id: 'rd-3', component: 'Text', text: '**CI/CD:** GitHub Actions workflow active' },
+    { id: 'rd-4', component: 'Text', text: '**Files:** 6 files pushed (Dockerfile, manifests, workflow, Bicep, app code, config)' },
+
+    // Next steps card
+    { id: 'ho-next-card', component: 'Card', child: 'ho-next-inner' },
+    { id: 'ho-next-inner', component: 'Column', children: ['next-md', 'next-divider', 'next-actions'], gap: 'small' },
+    { id: 'next-md', component: 'Markdown', content: 'Your code is on GitHub with CI/CD ready. Every push to `main` triggers **build → test → deploy**.' },
+    { id: 'next-divider', component: 'Divider' },
+    { id: 'next-actions', component: 'Row', children: ['codespace-btn', 'deploy-btn'], gap: 'small' },
+    { id: 'codespace-btn', component: 'Button', child: 'cs-text', variant: 'primary',
+      action: { event: { name: 'open-codespace' } } },
+    { id: 'cs-text', component: 'Text', text: 'Open in Codespaces' },
+    { id: 'deploy-btn', component: 'Button', child: 'deploy-text', variant: 'outlined',
+      action: { event: { name: 'start-deploy' } } },
+    { id: 'deploy-text', component: 'Text', text: 'Deploy now' },
+  ]),
+};
+
+const DEPLOY_PROGRESS: DemoResponse = {
+  text: "**Deployment complete!** All 7 resources provisioned successfully. Your app is live and ready for traffic.",
   phase: 'deploy',
   model: 'gpt-5.3-chat',
   typingDelay: 2500,
   a2uiMessages: surface('deploy-surface', [
-    { id: 'root', component: 'Column', children: ['progress', 'success-card', 'next-card'] },
-    { id: 'progress', component: 'ProgressSteps', steps: [
-      { id: 'build', label: 'Build', status: 'complete' },
-      { id: 'push', label: 'Push to ACR', status: 'complete' },
-      { id: 'deploy', label: 'Deploy to AKS', status: 'complete' },
-      { id: 'verify', label: 'Health Check', status: 'complete' },
-    ] },
+    { id: 'root', component: 'Column', children: ['deploy-progress', 'success-card', 'whats-next'], gap: 'medium' },
+
+    // Deployment progress with 7 resource provisioning steps
+    { id: 'deploy-progress', component: 'DeploymentProgress',
+      title: 'Deploying to AKS Automatic',
+      overallStatus: 'complete',
+      steps: [
+        { id: 'rg', label: 'Create resource group', status: 'complete', detail: 'my-app-rg (East US)', timestamp: '0:02' },
+        { id: 'acr', label: 'Provision container registry', status: 'complete', detail: 'myappacr.azurecr.example', timestamp: '0:15' },
+        { id: 'aks', label: 'Create AKS Automatic cluster', status: 'complete', detail: 'my-app-aks (3 nodes)', timestamp: '2:30' },
+        { id: 'cosmos', label: 'Provision Cosmos DB', status: 'complete', detail: 'Serverless, NoSQL API', timestamp: '1:45' },
+        { id: 'build', label: 'Build & push container image', status: 'complete', detail: 'myappacr.azurecr.example/my-app:abc1234', timestamp: '0:40' },
+        { id: 'deploy', label: 'Deploy to cluster', status: 'complete', detail: '2/2 replicas ready', timestamp: '0:20' },
+        { id: 'dns', label: 'Configure DNS & TLS', status: 'complete', detail: 'my-awesome-app.aks.example', timestamp: '0:30' },
+      ],
+    },
+
+    // Success summary card
     { id: 'success-card', component: 'Card', child: 'success-inner' },
-    { id: 'success-inner', component: 'Column', children: ['check-title', 'divider1', 'endpoints'], gap: 'small' },
-    { id: 'check-title', component: 'Text', text: 'Deployment Successful', variant: 'h2' },
-    { id: 'divider1', component: 'Divider' },
-    { id: 'endpoints', component: 'List', children: ['ep1', 'ep2', 'ep3'], variant: 'unordered' },
-    { id: 'ep1', component: 'Text', text: '**App URL:** https://my-awesome-app.aksauto.io' },
-    { id: 'ep2', component: 'Text', text: '**API Endpoint:** https://api.my-awesome-app.aksauto.io' },
-    { id: 'ep3', component: 'Text', text: '**GitHub Repo:** github.com/you/my-awesome-app' },
-    { id: 'next-card', component: 'Card', child: 'next-inner' },
-    { id: 'next-inner', component: 'Column', children: ['next-title', 'next-list', 'codespace-btn'], gap: 'small' },
-    { id: 'next-title', component: 'Text', text: 'Next Steps', variant: 'subtitle1' },
-    { id: 'next-list', component: 'List', children: ['ns1', 'ns2', 'ns3'], variant: 'ordered' },
-    { id: 'ns1', component: 'Text', text: 'Open in GitHub Codespaces to start coding' },
-    { id: 'ns2', component: 'Text', text: 'Push a commit to trigger your CI/CD pipeline' },
-    { id: 'ns3', component: 'Text', text: 'Add a custom domain in the Azure Portal' },
-    { id: 'codespace-btn', component: 'Button', child: 'cs-text', variant: 'primary',
-      action: { event: { name: 'open-codespace' } } },
-    { id: 'cs-text', component: 'Text', text: 'Open in Codespaces' },
+    { id: 'success-inner', component: 'Column', children: ['success-header', 'success-divider', 'success-endpoints'], gap: 'small' },
+    { id: 'success-header', component: 'Row', children: ['live-badge', 'live-title'], gap: 'small' },
+    { id: 'live-badge', component: 'Badge', text: 'Live', variant: 'success' },
+    { id: 'live-title', component: 'Text', text: 'Your app is running', variant: 'h2' },
+    { id: 'success-divider', component: 'Divider' },
+    { id: 'success-endpoints', component: 'List', children: ['ep-app', 'ep-api', 'ep-gh', 'ep-portal'], variant: 'unordered' },
+    { id: 'ep-app', component: 'Text', text: '**App URL:** https://my-awesome-app.aks.example' },
+    { id: 'ep-api', component: 'Text', text: '**API:** https://api.my-awesome-app.aks.example' },
+    { id: 'ep-gh', component: 'Text', text: '**GitHub:** github.example.com/you/my-awesome-app' },
+    { id: 'ep-portal', component: 'Text', text: '**Azure Portal:** portal.azure.example → my-app-rg' },
+
+    // What's Next accordion
+    { id: 'whats-next', component: 'Accordion', sections: [
+      { id: 'wn-monitor', title: 'Set up monitoring',
+        content: 'Azure Monitor is pre-configured. View dashboards in the Azure Portal for request metrics, latency percentiles, and error rates.' },
+      { id: 'wn-domain', title: 'Add a custom domain',
+        content: 'Point your DNS CNAME to `my-awesome-app.aks.example` and the TLS certificate auto-renews via cert-manager.' },
+      { id: 'wn-scale', title: 'Scale your app',
+        content: 'Auto-scaling is active (2–10 replicas). Adjust thresholds in `deployment.yaml` or through the Azure Portal.' },
+    ] },
   ]),
 };
 
@@ -302,8 +409,9 @@ spec:
 };
 
 const SCENARIOS: { match: RegExp | null; response: DemoResponse }[] = [
-  { match: /deploy|ship|launch|go live/i, response: DEPLOY_SUCCESS },
-  { match: /review|summary|ready|looks good/i, response: REVIEW },
+  { match: /deploy|ship|launch|go live/i, response: DEPLOY_PROGRESS },
+  { match: /review|summary|ready|looks good/i, response: REVIEW_EXPANDED },
+  { match: /handoff|github|repo|push|codespace/i, response: HANDOFF },
   { match: /code|preview|dockerfile|yaml|file/i, response: CODE_PREVIEW },
   { match: /config|form|setup|step/i, response: CONFIGURE_FORM },
   { match: /generat|scaffold|create/i, response: FILE_GENERATION },
@@ -323,7 +431,7 @@ export function getDemoResponse(userMessage: string): DemoResponse {
   }
 
   // Cycle through scenarios for subsequent turns
-  const scenarioFlow = [ARCHITECTURE, DESIGN_DETAIL, CONFIGURE_FORM, CODE_PREVIEW, FILE_GENERATION, REVIEW, DEPLOY_SUCCESS];
+  const scenarioFlow = [ARCHITECTURE, DESIGN_DETAIL, CONFIGURE_FORM, CODE_PREVIEW, FILE_GENERATION, REVIEW_EXPANDED, HANDOFF, DEPLOY_PROGRESS];
   
   // Check keyword matches first
   for (const scenario of SCENARIOS) {

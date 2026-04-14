@@ -52,8 +52,9 @@ export const KICKSTART_SCENARIOS: ScenarioDef[] = [
   { id: 'config',      label: 'Configure Form',   description: 'FormGroup + ProgressSteps',    group: 'Kickstart Scenarios', keyword: 'config' },
   { id: 'code',        label: 'Code Preview',     description: 'CodeBlock components',         group: 'Kickstart Scenarios', keyword: 'code' },
   { id: 'filegen',     label: 'File Generation',  description: 'File cards list',              group: 'Kickstart Scenarios', keyword: 'generate' },
-  { id: 'review',      label: 'Review',           description: 'Deploy config form',           group: 'Kickstart Scenarios', keyword: 'review' },
-  { id: 'deploy',      label: 'Deploy Success',   description: 'ProgressSteps + endpoints',    group: 'Kickstart Scenarios', keyword: 'deploy' },
+  { id: 'review',      label: 'Review',           description: 'Tabs + CostEstimate + Accordion + Badge safeguards',  group: 'Kickstart Scenarios', keyword: 'review' },
+  { id: 'handoff',     label: 'Handoff',          description: 'ProgressSteps + repo card + Codespaces link',         group: 'Kickstart Scenarios', keyword: 'handoff' },
+  { id: 'deploy',      label: 'Deploy Progress',  description: 'DeploymentProgress with 7 resource steps',            group: 'Kickstart Scenarios', keyword: 'deploy' },
 ];
 
 // ---------------------------------------------------------------------------
