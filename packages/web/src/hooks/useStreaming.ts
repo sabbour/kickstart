@@ -52,6 +52,8 @@ export function useStreaming() {
 
       const decoder = new TextDecoder();
       let buffer = '';
+      // Track the SSE event type so typed events (e.g. `event: a2ui`) are routed correctly
+      let currentEventType = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -62,12 +64,28 @@ export function useStreaming() {
         buffer = lines.pop() || '';
 
         for (const line of lines) {
+          // Track SSE event type field
+          if (line.startsWith('event: ')) {
+            currentEventType = line.slice(7).trim();
+            continue;
+          }
+
           if (!line.startsWith('data: ')) continue;
           const data = line.slice(6).trim();
           if (data === '[DONE]') continue;
 
           try {
+            // Handle typed SSE events (e.g. `event: a2ui`)
+            if (currentEventType === 'a2ui') {
+              const a2uiMsg: A2uiMsg = JSON.parse(data);
+              callbacks.onA2UI([a2uiMsg]);
+              currentEventType = '';
+              continue;
+            }
+
             const event: StreamEvent = JSON.parse(data);
+            // Reset event type after consuming a data line
+            currentEventType = '';
 
             if (event.error) {
               await reader.cancel();
@@ -110,6 +128,18 @@ export function useStreaming() {
           } catch { /* skip malformed JSON */ }
         }
       }
+
+      // Extract A2UI from the accumulated JSON envelope (chunks build a full response)
+      try {
+        const envelope = JSON.parse(accumulated);
+        if (envelope?.a2ui && Array.isArray(envelope.a2ui) && envelope.a2ui.length > 0) {
+          callbacks.onA2UI(envelope.a2ui);
+          // Use the text message from the envelope if present
+          if (typeof envelope.message === 'string') {
+            accumulated = envelope.message;
+          }
+        }
+      } catch { /* accumulated is plain text, not JSON — expected for non-envelope responses */ }
 
       // Build debug info when debug mode is active
       const debugInfo: DebugMetadata | undefined = debugMode
