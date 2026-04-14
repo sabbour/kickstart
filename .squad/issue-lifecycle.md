@@ -263,10 +263,32 @@ Working as {member} ({role})
 - **CI failure** → `ciFailure`
 
 **When changes are requested:**
-1. Agent addresses feedback
-2. Commits fixes to the same branch
-3. Pushes updates
-4. Requests re-review
+1. **Post an acknowledgment comment on the PR** (using bot identity) before making any changes
+2. Agent addresses feedback
+3. Commits fixes to the same branch
+4. Pushes updates
+5. Posts a completion comment summarizing what was changed
+6. Requests re-review
+
+**Feedback acknowledgment (GitHub — using bot identity):**
+
+```bash
+TOKEN=$(node --input-type=module -e "import{pathToFileURL}from'node:url';const{resolveToken,clearTokenCache}=await import(pathToFileURL('{team_root}/packages/squad-sdk/dist/identity/tokens.js').href);clearTokenCache();const t=await resolveToken('{team_root}','{role_slug}');if(t)process.stdout.write(t);else process.exit(1)")
+
+# Before making changes
+GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
+  --body "🔧 **{AgentName}** ({Role}) is addressing review feedback.
+⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# After pushing changes
+GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
+  --body "✅ **{AgentName}** addressed the feedback.
+⏱️ Completed: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+**Changes:** {summary}
+Ready for re-review."
+```
+
+> Falls back to default `gh` auth if bot token fails. Never skip the comment.
 
 **Update workflow:**
 ```bash
@@ -349,6 +371,44 @@ When spawning an agent to work on an issue, include this context block:
 
 **Your task:**
 {specific directive to the agent}
+
+**Project Board IDs** (for moving issue on the board):
+- Project Node ID: `{project-node-id}`
+- Item Node ID: `{item-node-id}`
+- Status Field ID: `{status-field-id}`
+- "In Progress" Option ID: `{in-progress-option-id}`
+- "Done" Option ID: `{done-option-id}`
+
+## WORK START PROTOCOL
+
+🚀 **Before writing any code**, you MUST:
+
+1. **Post a start comment on the issue** using your bot identity:
+   ```bash
+   TOKEN=$(node --input-type=module -e "import{pathToFileURL}from'node:url';const{resolveToken,clearTokenCache}=await import(pathToFileURL('{team_root}/packages/squad-sdk/dist/identity/tokens.js').href);clearTokenCache();const t=await resolveToken('{team_root}','{role_slug}');if(t)process.stdout.write(t);else process.exit(1)")
+   GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
+     --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
+   ⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+   🌿 Branch: \`squad/{issue-number}-{slug}\`"
+   ```
+
+2. **Move the issue to "In Progress" on the project board:**
+   ```bash
+   GH_TOKEN=$TOKEN gh api graphql -f query='
+     mutation { updateProjectV2ItemFieldValue(input: {
+       projectId: "{project-node-id}", itemId: "{item-node-id}",
+       fieldId: "{status-field-id}",
+       value: { singleSelectOptionId: "{in-progress-option-id}" }
+     }) { projectV2Item { id } } }'
+   ```
+
+> Falls back to default `gh` auth if bot token fails. Do NOT block work.
+
+## FEEDBACK ACKNOWLEDGMENT PROTOCOL
+
+📝 **If this is a feedback round** (addressing PR review or issue comments):
+1. Post `🔧 {Name} is addressing review feedback...` on the PR/issue BEFORE changes
+2. Post `✅ {Name} addressed the feedback` with summary AFTER pushing
 
 ## TIME TRACKING
 
