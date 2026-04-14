@@ -47,7 +47,7 @@ const MonacoEditor = lazy(() =>
 );
 
 const FileEntrySchema = z.object({
-  fileName: DynamicStringSchema,
+  filename: DynamicStringSchema,
   content: DynamicStringSchema.optional(),
   language: DynamicStringSchema.optional(),
   artifactPath: DynamicStringSchema.optional(),
@@ -56,7 +56,7 @@ const FileEntrySchema = z.object({
 const FileEditorApi = {
   name: 'FileEditor',
   schema: z.object({
-    fileName: DynamicStringSchema.optional(),
+    filename: DynamicStringSchema.optional(),
     content: DynamicStringSchema.optional(),
     language: DynamicStringSchema.optional(),
     readOnly: z.boolean().optional(),
@@ -172,16 +172,16 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
       return props.files;
     }
     // Single-file fallback
-    if (props.fileName || props.content || props.artifactPath) {
+    if (props.filename || props.content || props.artifactPath) {
       return [{
-        fileName: props.fileName ?? '',
+        filename: props.filename ?? '',
         content: props.content,
         language: props.language,
         artifactPath: props.artifactPath,
       }];
     }
     return [];
-  }, [props.files, props.fileName, props.content, props.language, props.artifactPath]);
+  }, [props.files, props.filename, props.content, props.language, props.artifactPath]);
 
   const [activeTab, setActiveTab] = useState(0);
   const isMultiFile = fileEntries.length > 1;
@@ -206,7 +206,7 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
     return str(activeFile.content) ?? null;
   }, [activeFile, getArtifact]);
 
-  const resolvedFileName = str(activeFile?.fileName) ??
+  const resolvedFileName = str(activeFile?.filename) ??
     (activeFile?.artifactPath ? str(activeFile.artifactPath)?.split('/').pop() : undefined);
 
   const resolvedLanguage = str(activeFile?.language) ??
@@ -246,7 +246,7 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
             size="small"
           >
             {fileEntries.map((file, i) => {
-              const label = str(file.fileName) ||
+              const label = str(file.filename) ||
                 (file.artifactPath ? str(file.artifactPath)?.split('/').pop() : `File ${i + 1}`);
               return <Tab key={i} value={String(i)}>{label}</Tab>;
             })}
