@@ -95,11 +95,15 @@ export {
   DEPLOYMENT_SAFEGUARDS,
   buildSystemPrompt,
   sanitizePromptValue,
+  BASE_COMPONENT_CATALOG,
+  generateComponentCatalogSection,
 } from "./prompts/index.js";
 export type {
   DeploymentSafeguard,
   SafeguardSeverity,
   SystemPromptContext,
+  ComponentCatalogEntry,
+  ComponentCategory,
 } from "./prompts/index.js";
 
 // Tool registry

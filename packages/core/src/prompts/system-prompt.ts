@@ -12,6 +12,11 @@
 import { Phase } from "../engine/types.js";
 import { getPhaseDefinition } from "../engine/phases.js";
 import type { AppDefinition, AzureContext, GitHubContext } from "../types.js";
+import {
+  generateComponentCatalogSection,
+  BASE_COMPONENT_CATALOG,
+} from "./component-catalog.js";
+import type { ComponentCatalogEntry } from "./component-catalog.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,6 +59,11 @@ export interface SystemPromptContext {
    * section after the phase-specific (Layer 3) instructions.
    */
   kitPrompts?: string[];
+  /**
+   * A2UI component catalog entries contributed by IntegrationKits.
+   * Merged with the base catalog when generating the §5 component catalog.
+   */
+  kitComponentEntries?: ComponentCatalogEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -158,47 +168,7 @@ When you show an AuthCard or DeploymentProgress (while actively running), it MUS
 ### No Pre-Selection
 Do NOT pre-select any option in ChoicePicker, CheckBox, or DateTimeInput components. Present all options with no default selected — let the user make the choice. Exception: Slider components MAY have a sensible default (e.g., replicas: 2) when the default aligns with a best practice you've stated in the message text.
 
-## 5. A2UI COMPONENT CATALOG
-
-You have 28 components. Use them aggressively — every turn should use 3-8 components for a rich experience.
-
-### Layout Components
-- Row: {"id":"r1","component":"Row","children":["a","b"],"gap":"8px","justify":"spaceBetween","wrap":true}
-- Column: {"id":"c1","component":"Column","children":["a","b"],"gap":"16px"}
-- List: {"id":"l1","component":"List","children":["i1","i2"],"ordered":false}
-- Card: {"id":"card1","component":"Card","children":["title","body"]}
-- Tabs: {"id":"tabs1","component":"Tabs","tabs":[{"label":"Overview","children":["ov1"]},{"label":"Details","children":["d1"]}]}
-- Divider: {"id":"div1","component":"Divider"}
-- Modal: {"id":"m1","component":"Modal","child":"content","title":"Confirm","open":false}
-- Accordion: {"id":"acc1","component":"Accordion","items":[{"title":"What is auto-scaling?","children":["acc-body1"]},{"title":"How do health checks work?","children":["acc-body2"]}],"collapsible":true,"multiple":true}
-
-### Content Components
-- Text: {"id":"t1","component":"Text","text":"Hello World","variant":"h1"} (variants: h1, h2, h3, body, caption, code)
-- Markdown: {"id":"md1","component":"Markdown","content":"### Features\\n- Auto-scaling\\n- Health checks\\n- Zero-downtime deploys"}
-- Image: {"id":"img1","component":"Image","src":"https://...","alt":"diagram"}
-- Icon: {"id":"ic1","component":"Icon","name":"check-circle","size":"24px"}
-- Badge: {"id":"b1","component":"Badge","text":"Recommended","color":"success","appearance":"filled"} (colors: brand, danger, important, informative, severe, subtle, success, warning)
-
-### Input Components
-- Button: {"id":"btn1","component":"Button","label":"Select Node.js","variant":"primary","action":{"event":{"name":"select","context":{"label":"Select Node.js","value":"node"}}}}
-  Variants: primary, secondary, outline, danger, ghost. Use "label" for inline text.
-- TextField: {"id":"tf1","component":"TextField","label":"App Name","placeholder":"my-app","action":{"event":{"name":"set-name","context":{"label":"App Name"}}}}
-- CheckBox: {"id":"cb1","component":"CheckBox","label":"Enable auto-scaling","action":{"event":{"name":"toggle","context":{"label":"Enable auto-scaling"}}}}
-- ChoicePicker: {"id":"cp1","component":"ChoicePicker","label":"Runtime","options":[{"label":"Node.js","value":"node"},{"label":"Python","value":"python"},{"label":".NET","value":"dotnet"},{"label":"Java","value":"java"},{"label":"Go","value":"go"}],"action":{"event":{"name":"pick-runtime","context":{"label":"Runtime"}}}}
-- RadioGroup: {"id":"rg1","component":"RadioGroup","label":"Database","options":[{"label":"PostgreSQL","value":"postgres","description":"Best for relational data"},{"label":"Cosmos DB","value":"cosmos","description":"Best for document/NoSQL data","recommended":true}],"action":{"event":{"name":"pick-db","context":{"label":"Database"}}}}
-- Slider: {"id":"s1","component":"Slider","label":"Replicas","min":1,"max":10,"value":2,"action":{"event":{"name":"set-replicas","context":{"label":"Replicas"}}}}
-- Toggle: {"id":"tog1","component":"Toggle","label":"Enable public URL","checked":false}
-- ComboBox: {"id":"cb1","component":"ComboBox","label":"Azure Region","options":[{"text":"East US","value":"eastus"},{"text":"West Europe","value":"westeurope"}],"placeholder":"Search regions...","allowCustom":false}
-- MultiSelect: {"id":"ms1","component":"MultiSelect","label":"Features","options":[{"text":"Auto-scaling","value":"autoscale"},{"text":"Health checks","value":"health"},{"text":"CI/CD pipeline","value":"cicd"}],"placeholder":"Select features..."}
-- DateTimeInput: {"id":"dt1","component":"DateTimeInput","label":"Deploy after","value":"2025-01-01T09:00:00Z"}
-
-### Kickstart Domain Components
-- CostEstimate: {"id":"cost1","component":"CostEstimate","items":[{"name":"App Platform","sku":"Standard","monthlyCost":116.80},{"name":"Database","sku":"PostgreSQL B1ms","monthlyCost":12.40}],"total":129.20,"currency":"USD"}
-- ArchitectureDiagram: {"id":"arch1","component":"ArchitectureDiagram","nodes":[{"id":"api","label":"Web API","type":"compute"},{"id":"db","label":"PostgreSQL","type":"database"}],"edges":[{"from":"api","to":"db"}]}
-  Node types: compute, database, cache, network, storage, ai, messaging
-- FileEditor: {"id":"fe1","component":"FileEditor","filename":"Dockerfile","language":"dockerfile","content":"FROM node:20-alpine\\nWORKDIR /app\\nCOPY . .\\nRUN npm ci\\nCMD [\\"node\\",\\"server.js\\"]"}
-- AuthCard: {"id":"auth1","component":"AuthCard","provider":"azure","title":"Sign in to Azure","description":"Connect your Azure account to deploy"}
-- DeploymentProgress: {"id":"dp1","component":"DeploymentProgress","steps":[{"id":"s1","label":"Build image","status":"complete"},{"id":"s2","label":"Push to registry","status":"running"},{"id":"s3","label":"Deploy","status":"pending"}]}
+{{componentCatalog}}
 
 ## 5a. COMPONENT SELECTION GUIDE — When to Use What
 
@@ -468,6 +438,10 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
   // Assemble template variables from context
   const vars: Record<string, string> = {
     safeguards: formatSafeguards(DEPLOYMENT_SAFEGUARDS),
+    componentCatalog: generateComponentCatalogSection(
+      BASE_COMPONENT_CATALOG,
+      context.kitComponentEntries ?? [],
+    ),
     ...(context.templateVars
       ? Object.fromEntries(
           Object.entries(context.templateVars).map(([k, v]) => [

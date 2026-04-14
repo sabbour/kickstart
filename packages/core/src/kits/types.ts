@@ -18,6 +18,7 @@
 import type { Tool } from '../tools/types.js';
 import type { APIConnector } from '../connectors/types.js';
 import type { Phase } from '../engine/types.js';
+import type { ComponentCategory } from '../prompts/component-catalog.js';
 
 /**
  * A lightweight descriptor for a UI component contributed by a kit.
@@ -30,6 +31,18 @@ export interface ComponentRegistration {
   type: string;
   /** Human-readable description of what this component renders */
   description: string;
+  /**
+   * Optional prompt metadata -- when present, the component is included
+   * in the dynamically generated A2UI component catalog.
+   */
+  promptMeta?: {
+    /** Category grouping for the prompt catalog */
+    category: ComponentCategory;
+    /** JSON example string shown to the LLM */
+    example: string;
+    /** Optional notes appended after the example */
+    notes?: string;
+  };
 }
 
 /**

@@ -27,6 +27,7 @@
  */
 
 import type { IntegrationKit } from './types.js';
+import type { ComponentCatalogEntry } from '../prompts/component-catalog.js';
 import { ToolRegistry, defaultRegistry } from '../tools/registry.js';
 import { APIConnectorRegistry, defaultConnectorRegistry } from '../connectors/registry.js';
 
@@ -281,6 +282,28 @@ export class IntegrationKitRegistry {
    */
   getConnectorOwner(connectorName: string): string | undefined {
     return this.connectorOwners.get(connectorName);
+  }
+
+  /**
+   * Collect component catalog entries from all registered kits that provide
+   * `promptMeta` on their component registrations. Used to dynamically
+   * inject kit-contributed components into the system prompt §5 catalog.
+   */
+  getComponentCatalogEntries(): ComponentCatalogEntry[] {
+    const entries: ComponentCatalogEntry[] = [];
+    for (const kit of this.kits.values()) {
+      for (const comp of kit.components ?? []) {
+        if (comp.promptMeta) {
+          entries.push({
+            type: comp.type,
+            category: comp.promptMeta.category,
+            example: comp.promptMeta.example,
+            notes: comp.promptMeta.notes,
+          });
+        }
+      }
+    }
+    return entries;
   }
 
   /**
