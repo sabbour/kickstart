@@ -11,7 +11,7 @@ import {
 import { Sparkle24Regular } from '@fluentui/react-icons';
 import type { Session } from '../types';
 import { apiFetch } from '../services/api-client';
-import { OnboardingTour } from './OnboardingTour';
+import { OnboardingTour, resetOnboardingTour } from './OnboardingTour';
 
 const INSPIRATIONS = [
   "Movie night pick that settles disputes",
@@ -330,6 +330,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
               >{__BUILD_SHA__}</a>
             </span>
             <a className="landing-footer-link" href="?playground">Playground</a>
+            <button className="landing-footer-link landing-footer-restart-tour" onClick={resetOnboardingTour}>Restart Tour</button>
           </div>
         </footer>
 

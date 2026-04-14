@@ -10,6 +10,8 @@ interface TourStep {
   position: 'bottom' | 'top' | 'left' | 'right';
 }
 
+const TOUR_RESTART_EVENT = 'kickstart-tour-restart';
+
 const STEPS: TourStep[] = [
   {
     selector: '.landing-hero-input-wrap',
@@ -30,9 +32,9 @@ const STEPS: TourStep[] = [
     position: 'top',
   },
   {
-    selector: '.landing-footer-meta',
-    title: 'Explore the Playground',
-    body: 'Curious what Kickstart can render? Open the Playground to browse interactive UI components.',
+    selector: '.landing-ide',
+    title: 'Use your IDE with MCP',
+    body: 'Use Visual Studio Code to create your apps using the MCP server. Click the VS Code button to install the Kickstart MCP extension.',
     position: 'top',
   },
 ];
@@ -87,6 +89,16 @@ export function OnboardingTour() {
     // Small delay so Landing elements are mounted
     const timer = setTimeout(() => setActive(true), 600);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Listen for restart event
+  useEffect(() => {
+    const onRestart = () => {
+      setStep(0);
+      setActive(true);
+    };
+    window.addEventListener(TOUR_RESTART_EVENT, onRestart);
+    return () => window.removeEventListener(TOUR_RESTART_EVENT, onRestart);
   }, []);
 
   // Measure target element whenever step changes
@@ -208,7 +220,8 @@ export function OnboardingTour() {
   );
 }
 
-/** Reset the tour so it shows again on next page load. */
+/** Reset and immediately relaunch the onboarding tour. */
 export function resetOnboardingTour() {
   localStorage.removeItem(STORAGE_KEY);
+  window.dispatchEvent(new CustomEvent(TOUR_RESTART_EVENT));
 }
