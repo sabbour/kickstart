@@ -319,11 +319,12 @@ export function App() {
     );
   };
 
-  // Convert A2UI component actions into user messages sent back to the conversation
+  // Convert A2UI component actions into user messages sent back to the conversation.
+  // Fire-and-forget — never block the UI thread on the streaming response.
   const handleA2UIAction = useCallback((action: A2uiClientAction) => {
     const label = getSelectionLabel(action);
     const text = `[Selected: ${label}]`;
-    handleSendMessage(text);
+    void handleSendMessage(text).catch(() => {});
   }, [handleSendMessage]);
 
   const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
