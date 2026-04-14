@@ -21,7 +21,7 @@ import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
 import type { AppMode, ChatMessage, A2uiMsg } from './types';
-import type { A2uiClientAction } from './vendor/a2ui/web_core/schema/client-to-server';
+// A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
 const mockEnabled = isMockMode();
 const playgroundEnabled = isPlaygroundMode();
@@ -327,27 +327,6 @@ export function App() {
     }
   }, [sessions, a2ui]);
 
-  // Extract a human-readable label from an A2UI action, checking context then data as fallback
-  const getSelectionLabel = (action: A2uiClientAction): string => {
-    const ctx = action.context as Record<string, unknown> | undefined;
-    const data = (action as Record<string, unknown>).data as Record<string, unknown> | undefined;
-    return (
-      (ctx?.label as string) ??
-      (ctx?.value as string) ??
-      (data?.label as string) ??
-      (data?.value as string) ??
-      action.name
-    );
-  };
-
-  // Convert A2UI component actions into user messages sent back to the conversation.
-  // Fire-and-forget — never block the UI thread on the streaming response.
-  const handleA2UIAction = useCallback((action: A2uiClientAction) => {
-    const label = getSelectionLabel(action);
-    const text = `[Selected: ${label}]`;
-    void handleSendMessage(text).catch(() => {});
-  }, [handleSendMessage]);
-
   const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
   const currentStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
@@ -432,7 +411,6 @@ export function App() {
             currentPhase={currentPhase}
             onSend={handleSendMessage}
             getSurface={a2ui.getSurface}
-            onAction={handleA2UIAction}
             debugEnabled={debugEnabled}
           />
         )}

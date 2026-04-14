@@ -6,21 +6,16 @@ import { MessageTextProvider } from '../../contexts/MessageTextContext';
 import { sanitizeHtml } from '../../utils/sanitize';
 import type { ChatMessage as ChatMessageType } from '../../types';
 import type { SurfaceModel } from '../../vendor/a2ui/web_core/index';
-import type { A2uiClientAction } from '../../vendor/a2ui/web_core/schema/client-to-server';
 import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapter';
 
 interface ChatMessageProps {
   message: ChatMessageType;
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
-  /** When false, A2UI surfaces in this message are dimmed and non-interactive. Defaults to true. */
   isActive?: boolean;
-  /** Optional callback invoked when any component in this message dispatches an action. */
-  onAction?: (action: A2uiClientAction) => void | Promise<void>;
-  /** When true, show the debug panel below assistant messages. */
   debugEnabled?: boolean;
 }
 
-export function ChatMessage({ message, getSurface, isActive = true, onAction, debugEnabled = false }: ChatMessageProps) {
+export function ChatMessage({ message, getSurface, isActive = true, debugEnabled = false }: ChatMessageProps) {
   if (message.role === 'user') {
     if (message.isAutoContinue) {
       return (
@@ -57,7 +52,7 @@ export function ChatMessage({ message, getSurface, isActive = true, onAction, de
             if (!surface) return null;
             return (
               <div key={surfaceId} className="a2ui-component">
-                <A2UISurfaceWrapper surface={surface} isActive={isActive} onAction={onAction} />
+                <A2UISurfaceWrapper surface={surface} isActive={isActive} />
               </div>
             );
           })}

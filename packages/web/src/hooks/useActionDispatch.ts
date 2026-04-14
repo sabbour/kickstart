@@ -39,7 +39,8 @@ function categorize(actionName: string): ActionCategory {
 
 /**
  * Translates an A2UI action into a human-readable message suitable for
- * re-prompting the LLM. The LLM stays in full control of state transitions.
+ * re-prompting the LLM. Prefers showing the selected value over raw
+ * action metadata so the chat bubble reads naturally (e.g. "Selected: Web API").
  */
 function actionToMessage(action: A2uiClientAction): string {
   const { name, context } = action;
@@ -47,18 +48,27 @@ function actionToMessage(action: A2uiClientAction): string {
   // Strip any routing prefix for the message
   const cleanName = name.replace(/^(navigate:|nav:|api:)/, '');
 
-  // Build context summary from key-value pairs
-  const contextParts: string[] = [];
+  // Try to extract a meaningful selection value from context
   if (context && typeof context === 'object') {
+    // Prefer 'value' (the user's actual selection) over 'label' (component title)
+    const rawValue = context.value ?? context.selectedValue;
+    if (rawValue !== undefined && rawValue !== null && rawValue !== '') {
+      const valueStr = Array.isArray(rawValue) ? rawValue.join(', ') : String(rawValue);
+      if (valueStr) {
+        return `[Selected: ${valueStr}]`;
+      }
+    }
+
+    // Fallback: build context summary from all key-value pairs
+    const contextParts: string[] = [];
     for (const [key, value] of Object.entries(context)) {
       if (value !== undefined && value !== null && value !== '') {
         contextParts.push(`${key}: ${String(value)}`);
       }
     }
-  }
-
-  if (contextParts.length > 0) {
-    return `[Action: ${cleanName}] ${contextParts.join(', ')}`;
+    if (contextParts.length > 0) {
+      return `[Action: ${cleanName}] ${contextParts.join(', ')}`;
+    }
   }
 
   return `[Action: ${cleanName}]`;
