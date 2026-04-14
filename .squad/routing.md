@@ -28,6 +28,15 @@ How to decide who handles what.
 3. Members can reassign by removing their label and adding another member's label.
 4. The `squad` label is the "inbox" — untriaged issues waiting for Lead review.
 
+
+### Triage Checklist (Lead)
+
+When triaging an issue in-session, the Lead must:
+1. ✅ Assign `squad:{member}` label
+2. ✅ Set a milestone (or explicitly mark as "Backlog" if unplanned)
+3. ✅ Verify issue is on the project board
+4. ✅ Post triage comment with rationale
+
 ## Rules
 
 1. **Eager by default** — spawn all agents who could usefully start work, including anticipatory downstream work.

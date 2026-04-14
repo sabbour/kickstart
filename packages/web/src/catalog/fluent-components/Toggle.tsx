@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {
   DynamicStringSchema,
   DynamicBooleanSchema,
+  ActionSchema,
 } from '../../vendor/a2ui/web_core/schema/common-types';
 import {Switch, Field, makeStyles, tokens} from '@fluentui/react-components';
 
@@ -15,6 +16,7 @@ const FlexibleToggleApi = {
     label: DynamicStringSchema.optional(),
     checked: DynamicBooleanSchema.optional(),
     disabled: z.boolean().optional(),
+    action: ActionSchema.optional(),
   }),
 };
 
@@ -30,6 +32,9 @@ export const Toggle = createReactComponent(FlexibleToggleApi, ({props}) => {
 
   const onChange = (_ev: React.ChangeEvent<HTMLInputElement>, data: { checked: boolean }) => {
     props.setChecked(data.checked);
+    if (typeof props.action === 'function') {
+      (props.action as () => void)();
+    }
   };
 
   return (

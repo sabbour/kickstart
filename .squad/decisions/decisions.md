@@ -155,4 +155,31 @@ This is a focused bug-fix sprint with a single critical blocker (#166). Wave 1 m
 **Decision:** SWA should always run the latest version on "main" — no more waiting for release tags to see changes. The version shown in the footer should be something meaningful (e.g., git SHA, build date, or "dev-{sha}") rather than requiring a semver bump.  
 **Rationale:** User request — the current release-then-deploy cycle is too slow for iterating and testing. Continuous deployment from main is needed for demo readiness.
 
+**Implementation details:**
+1. **Push-to-main trigger** — `deploy-swa.yml` now triggers on `push → branches: [main]` with path filters (`packages/**`, `package.json`, `package-lock.json`, `tsconfig.json`). Tag-based releases still trigger deployment as before.
+2. **Unified version string** — `__BUILD_VERSION__` is now `{semver}-{shortSHA}` (e.g. `0.5.6-abc1234`). Git SHA is resolved via `git rev-parse --short HEAD` at build time, falling back to `GITHUB_SHA` env var, then `dev`.
+3. **Footer simplification** — Landing and Playground footers show the unified version string instead of version + SHA separately. Every build is uniquely identifiable.
+
+**Impact:** Every push to `main` that touches package code auto-deploys to SWA. Release workflow unchanged — tag pushes still work. Fry: footer components (`Landing.tsx`, `Playground.tsx`) now use `__BUILD_VERSION__` only (SHA embedded).
+
+---
+
+### Agent time tracking per issue
+
+**Date:** 2026-04-14T12:56:33Z  
+**By:** Ahmed Sabbour (via Copilot)  
+**Directive:** Agents must track how much time they spent working on each issue — total time, and time spent addressing feedback separately. This data should surface in Sprint Retro ceremonies and feed into Sprint Planning for estimation calibration. The goal is to correlate feature size with implementation time.
+
+**Rationale:** User request — captured for team memory and process improvement.
+
+---
+
+### Issue comment + board state on work start
+
+**Date:** 2026-04-14T12:58:00Z  
+**By:** Ahmed Sabbour (via Copilot)  
+**Directive:** When an agent starts working on an issue, it must immediately post a comment on the issue and move it to "In Progress" on the project board. Use the GitHub App identity (bot token) for these API calls so the comment appears as the agent's bot identity, not the human user.
+
+**Rationale:** User request — captured for team memory.
+
 ---

@@ -1,7 +1,7 @@
 import React from 'react';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
 import {z} from 'zod';
-import {DynamicStringSchema} from '../../vendor/a2ui/web_core/schema/common-types';
+import {DynamicStringSchema, ActionSchema} from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Combobox,
   Option,
@@ -23,6 +23,7 @@ const FlexibleComboBoxApi = {
     placeholder: DynamicStringSchema.optional(),
     allowCustom: z.boolean().optional(),
     value: DynamicStringSchema.optional(),
+    action: ActionSchema.optional(),
   }),
 };
 
@@ -41,6 +42,9 @@ export const ComboBox = createReactComponent(FlexibleComboBoxApi, ({props}) => {
   const onOptionSelect = (_ev: any, data: { optionValue?: string }) => {
     if (props.setValue && data.optionValue) {
       props.setValue(data.optionValue);
+    }
+    if (typeof props.action === 'function') {
+      (props.action as () => void)();
     }
   };
 
