@@ -729,6 +729,77 @@ const dynamicComplexDashboard = (): A2uiMsg[] => {
 };
 
 // ---------------------------------------------------------------------------
+// Integration Kit Scenarios — exercise Azure & GitHub kit components
+// ---------------------------------------------------------------------------
+
+const kitAzureAuth = (): A2uiMsg[] => {
+  const sid = uid('kit-azure-auth');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'auth-card', 'note'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Azure Integration Kit — AuthCard', variant: 'h3' },
+    {
+      id: 'desc',
+      component: 'Text',
+      text: 'The AuthCard component is registered by the Azure kit. It renders an MSAL sign-in card that integrates with the azure-arm connector. In offline mode the card uses stub data.',
+      variant: 'body2',
+    },
+    { id: 'auth-card', component: 'AuthCard', provider: 'azure' },
+    {
+      id: 'note',
+      component: 'Text',
+      text: 'Kit: azure · Connector: azure-arm · Auth: azure-msal',
+      variant: 'caption',
+    },
+  ] as A2uiComponent[]);
+};
+
+const kitGitHubAuth = (): A2uiMsg[] => {
+  const sid = uid('kit-github-auth');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'auth-card', 'note'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'GitHub Integration Kit — AuthCard', variant: 'h3' },
+    {
+      id: 'desc',
+      component: 'Text',
+      text: 'The GitHub kit registers an AuthCard with the github-oauth provider. It renders an OAuth Device Flow sign-in card that connects to the GitHub connector.',
+      variant: 'body2',
+    },
+    { id: 'auth-card', component: 'AuthCard', provider: 'github' },
+    {
+      id: 'note',
+      component: 'Text',
+      text: 'Kit: github · Connector: github · Auth: github-oauth',
+      variant: 'caption',
+    },
+  ] as A2uiComponent[]);
+};
+
+const kitMultiProvider = (): A2uiMsg[] => {
+  const sid = uid('kit-multi-provider');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'cards-row', 'status-card'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Multi-Provider Sign-In', variant: 'h3' },
+    {
+      id: 'desc',
+      component: 'Text',
+      text: 'Both Azure and GitHub kits registered side-by-side. Each AuthCard connects to its own connector and auth provider independently.',
+      variant: 'body2',
+    },
+    { id: 'cards-row', component: 'Row', children: ['azure-card', 'github-card'], gap: 'medium' },
+    { id: 'azure-card', component: 'AuthCard', provider: 'azure', title: 'Azure', description: 'Connect your Azure subscription' },
+    { id: 'github-card', component: 'AuthCard', provider: 'github', title: 'GitHub', description: 'Connect your source repository' },
+    { id: 'status-card', component: 'Card', children: ['status-col'], title: 'Connection Status' },
+    { id: 'status-col', component: 'Column', children: ['status-note'], gap: 'small' },
+    {
+      id: 'status-note',
+      component: 'Text',
+      text: 'Sign in to both providers to enable the full Kickstart workflow — Azure for infrastructure, GitHub for source code.',
+      variant: 'body2',
+    },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
 // Control scenarios assembled
 // ---------------------------------------------------------------------------
 
@@ -777,6 +848,10 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'dyn-nested',    label: 'Nested Data Scopes',     description: 'Components with nested path bindings',       group: 'Dynamic Patterns', generate: dynamicNestedScopes },
   { id: 'dyn-conditional', label: 'Conditional Content',  description: 'Feature flags with data binding',            group: 'Dynamic Patterns', generate: dynamicConditionalContent },
   { id: 'dyn-dashboard', label: 'Complex Dashboard',      description: 'Multi-tab dashboard with data binding',      group: 'Dynamic Patterns', generate: dynamicComplexDashboard },
+  // Integration Kits
+  { id: 'kit-azure-auth',    label: 'Azure AuthCard',         description: 'Azure MSAL sign-in via kit registration',  group: 'Integration Kits', catalog: 'kickstart', generate: kitAzureAuth },
+  { id: 'kit-github-auth',   label: 'GitHub AuthCard',        description: 'GitHub OAuth sign-in via kit registration', group: 'Integration Kits', catalog: 'kickstart', generate: kitGitHubAuth },
+  { id: 'kit-multi-provider', label: 'Multi-Provider Sign-In', description: 'Azure + GitHub AuthCards side by side',    group: 'Integration Kits', catalog: 'kickstart', generate: kitMultiProvider },
 ];
 
 /** All scenario groups in display order */
@@ -786,6 +861,7 @@ export const SCENARIO_GROUPS = [
   'Content',
   'Inputs',
   'Custom Controls',
+  'Integration Kits',
   'Data Binding',
   'Events & Actions',
   'Surface Lifecycle',
