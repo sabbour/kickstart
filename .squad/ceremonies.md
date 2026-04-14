@@ -59,14 +59,15 @@
 
 **Agenda:**
 1. Review completed work from previous sprint/milestone
-2. Assess open issues by priority (P0 → P1 → P2) and estimate
-3. Group issues into milestones aligned with semver releases
-4. Set milestone on each issue via GitHub API
-5. Identify dependencies and blockers
-6. Assign sprint capacity per agent based on estimates
-7. Output: milestone roadmap with release targets
+2. **Historical time analysis:** Read orchestration logs from the previous sprint to compute actual durations per issue — total time, feedback time, and implementation-only time. Group by issue size/complexity to build a reference table (e.g., "small fix ≈ 5 min, medium feature ≈ 25 min, large feature ≈ 60+ min")
+3. Assess open issues by priority (P0 → P1 → P2) and estimate — **calibrate estimates against historical time data** from step 2. Compare proposed estimates with actual durations of similar past issues
+4. Group issues into milestones aligned with semver releases
+5. Set milestone on each issue via GitHub API
+6. Identify dependencies and blockers
+7. Assign sprint capacity per agent based on **time-calibrated estimates**
+8. Output: milestone roadmap with release targets and time budget
 
-**Artifacts:** Create a GitHub Discussion (or milestone comment) linking to the sprint plan. Include the sprint goal, issue list, wave breakdown, and capacity estimates.
+**Artifacts:** Create a GitHub Discussion (or milestone comment) linking to the sprint plan. Include the sprint goal, issue list, wave breakdown, capacity estimates, and a **time reference table** showing historical size→duration data from past sprints.
 
 ---
 
@@ -86,9 +87,19 @@
 1. What shipped? (milestone summary)
 2. What slipped? (issues that moved between milestones)
 3. Velocity check: estimated vs actual story points
-4. Wall-clock time vs estimates (per issue and per wave)
-5. What went well?
-6. What should change?
-7. Action items for next sprint
+4. **⏱️ Time analysis** — read orchestration logs and PR descriptions from this sprint to compile:
+   - Per-issue time breakdown: implementation time vs feedback time vs total time
+   - Per-agent time totals (who spent how much time)
+   - Issue size → actual duration mapping (build the reference table for Sprint Planning)
+   - Feedback overhead ratio: what % of total time was spent addressing review feedback
+   - Outliers: issues that took significantly longer or shorter than expected — root-cause why
+5. **Size calibration** — classify completed issues into size buckets (S/M/L/XL) and compute median duration per bucket. Compare against previous sprint's reference table to track estimation accuracy over time
+6. What went well?
+7. What should change?
+8. Action items for next sprint
 
-**Artifacts:** Create a GitHub Discussion (or milestone comment) with the retro summary, including wall-clock vs estimate analysis and velocity metrics.
+**Artifacts:** Create a GitHub Discussion (or milestone comment) with the retro summary, including:
+- Time breakdown table (issue # | title | size | impl time | feedback time | total time | estimate | delta)
+- Size→duration reference table (updated with this sprint's data)
+- Feedback overhead analysis
+- Estimation accuracy trend (if prior sprint data exists)

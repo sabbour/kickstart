@@ -115,14 +115,49 @@ gh issue view {number} --json number,title,body,labels,assignees
 az boards work-item show --id {id} --output json
 ```
 
-### 2. Branch Creation (Start Work)
+### 2. Branch Creation & Work Start
 
 **Trigger:** Agent accepts issue assignment and begins work.
 
 **Actions:**
 1. Ensure working on latest base branch (usually `main` or `dev`)
 2. Create feature branch using Squad naming convention
-3. Transition issue to `inProgress` state
+3. **Post a start comment on the issue** (using GitHub App identity)
+4. **Move the issue to "In Progress" on the project board** (using GitHub App identity)
+5. Transition issue to `inProgress` state
+
+**Start comment and board transition (GitHub — using bot identity):**
+
+Agents MUST use their GitHub App token for these calls so the comment appears as the bot, not the human user.
+
+```bash
+# Resolve bot token (see GIT IDENTITY in spawn prompt)
+TOKEN=$(node --input-type=module -e "import{pathToFileURL}from'node:url';const{resolveToken,clearTokenCache}=await import(pathToFileURL('{team_root}/packages/squad-sdk/dist/identity/tokens.js').href);clearTokenCache();const t=await resolveToken('{team_root}','{role_slug}');if(t)process.stdout.write(t);else process.exit(1)")
+
+# Post start comment on the issue
+GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
+  --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
+⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+🌿 Branch: \`squad/{issue-number}-{slug}\`"
+
+# Move issue to "In Progress" on the project board
+# Use the GitHub Projects GraphQL API to update the status field
+GH_TOKEN=$TOKEN gh api graphql -f query='
+  mutation {
+    updateProjectV2ItemFieldValue(
+      input: {
+        projectId: "{project-node-id}"
+        itemId: "{item-node-id}"
+        fieldId: "{status-field-id}"
+        value: { singleSelectOptionId: "{in-progress-option-id}" }
+      }
+    ) { projectV2Item { id } }
+  }'
+```
+
+> **Fallback:** If bot token resolution fails, fall back to default `gh` auth. Do NOT block work because identity failed — post the comment with whatever auth is available.
+
+> **Board IDs:** The coordinator resolves project/item/field/option IDs before spawning and passes them in the ISSUE CONTEXT block. See spawn prompt additions below.
 
 **Branch creation commands:**
 
@@ -207,6 +242,11 @@ Closes #{issue-number}
 
 ## Testing
 {how this was tested}
+
+## Time Spent
+- Implementation: {X} min
+- Feedback rounds: {Y} min ({N} rounds)
+- Total: {Z} min
 
 {If working as a squad member:}
 Working as {member} ({role})
@@ -310,6 +350,26 @@ When spawning an agent to work on an issue, include this context block:
 **Your task:**
 {specific directive to the agent}
 
+## TIME TRACKING
+
+⏱️ **You MUST track time spent on this issue.** The coordinator records spawn and completion timestamps in the orchestration log. Your responsibilities:
+
+1. **Note your start** — at the very beginning of your work, before any file reads or code changes, output:
+   `⏱️ STARTED: {ISO 8601 UTC timestamp}`
+2. **Note your finish** — as the last thing before your final summary, output:
+   `⏱️ COMPLETED: {ISO 8601 UTC timestamp}`
+3. **If this is a feedback round** (addressing PR review comments), additionally output:
+   `⏱️ FEEDBACK_ROUND: yes`
+4. **Include time in your PR description** — add a `## Time Spent` section:
+   ```
+   ## Time Spent
+   - Implementation: {X} min
+   - Feedback rounds: {Y} min (N rounds)
+   - Total: {Z} min
+   ```
+
+This data feeds Sprint Retro velocity analysis and Sprint Planning estimation.
+
 **After completing work:**
 1. Commit with message referencing issue number
 2. Push branch
@@ -317,7 +377,7 @@ When spawning an agent to work on an issue, include this context block:
    ```
    gh pr create --title "{title}" --body "Closes #{number}\n\n{description}" --head squad/{issue-number}-{slug} --base {base-branch}
    ```
-4. Report PR URL to coordinator
+4. Report PR URL and time spent to coordinator
 ```
 
 ## Ralph's Role in Issue Lifecycle

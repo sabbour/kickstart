@@ -12,6 +12,11 @@
 | **Why chosen** | {Routing rationale — what in the request matched this agent} |
 | **Mode** | {`background` / `sync`} |
 | **Why this mode** | {Brief reason — e.g., "No hard data dependencies" or "User needs to approve architecture"} |
+| **Issue** | {#{number} or "n/a" if not issue-driven} |
+| **Spawned at** | {ISO 8601 UTC timestamp — when the agent was dispatched} |
+| **Completed at** | {ISO 8601 UTC timestamp — when results were collected} |
+| **Duration (min)** | {elapsed minutes, rounded to 1 decimal} |
+| **Is feedback round** | {yes / no — "yes" if this spawn addresses PR review feedback} |
 | **Files authorized to read** | {Exact file paths the agent was told to read} |
 | **File(s) agent must produce** | {Exact file paths the agent is expected to create or modify} |
 | **Outcome** | {Completed / Rejected by {Reviewer} / Escalated} |
