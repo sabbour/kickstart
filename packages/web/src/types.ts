@@ -24,6 +24,8 @@ export interface ChatMessage {
   isAutoContinue?: boolean;
   /** Debug metadata captured when debug mode is active. */
   debugInfo?: DebugMetadata;
+  /** Raw A2UI messages that produced the surfaces for this message (used to rehydrate on reload). */
+  a2uiMessages?: A2uiMsg[];
 }
 
 export interface Session {
