@@ -186,6 +186,30 @@ export { IntegrationKitRegistry, defaultKitRegistry, registerKit } from "./kits/
 export { azureKit } from "./kits/index.js";
 export { githubKit } from "./kits/index.js";
 
+// Public Copilot skills — build-time bundled external skill consumption (#186)
+export type {
+  PublicSkillSource,
+  PublicSkillsConfig,
+  SkillProvenance,
+  SkillKnowledgeBlock,
+  PolicyViolation,
+  PublicSkillsLockfile,
+  LockfileSkillEntry,
+} from "./skills/index.js";
+export {
+  loadPublicSkills,
+  loadPublicSkillKit,
+  createPublicSkillKit,
+  syncPublicSkills,
+  validateConfig as validatePublicSkillsConfig,
+  scanSkillPolicy,
+  parseSkillMd,
+  classifyToPhases,
+  PUBLIC_SKILL_PRIORITY,
+  POLICY_VERSION,
+  SHA_PATTERN,
+} from "./skills/index.js";
+
 // Validation — client-side artifact validation against deployment safeguards
 export type {
   ValidationSeverity,
