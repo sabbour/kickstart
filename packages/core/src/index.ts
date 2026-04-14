@@ -94,6 +94,7 @@ export {
   KICKSTART_SYSTEM_PROMPT,
   DEPLOYMENT_SAFEGUARDS,
   buildSystemPrompt,
+  sanitizePromptValue,
 } from "./prompts/index.js";
 export type {
   DeploymentSafeguard,
@@ -120,6 +121,17 @@ export type {
   A2UIMessageType,
   Action,
 } from "./services/index.js";
+
+// A2UI schema validation (Issue #153)
+export {
+  PAYLOAD_LIMITS,
+  KNOWN_COMPONENT_TYPES,
+  COMPONENT_SCHEMA_REGISTRY,
+  A2UIMessageSchema,
+  ActionSchema,
+  checkDepth,
+} from "./services/index.js";
+export type { KnownComponentType } from "./services/index.js";
 
 // APIConnectors — authenticated API client adapters
 export type {

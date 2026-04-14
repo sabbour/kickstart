@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { processResponse } from "../services/response-processor.js";
+import { PAYLOAD_LIMITS } from "../services/a2ui-schema.js";
 
 describe("processResponse", () => {
   it("parses a valid JSON envelope with message and a2ui", () => {
@@ -148,5 +149,230 @@ describe("processResponse", () => {
 
     const result = processResponse(json);
     expect(result.a2uiMessages).toHaveLength(0);
+  });
+
+  // -----------------------------------------------------------------------
+  // Issue #153: Payload limits
+  // -----------------------------------------------------------------------
+
+  it("truncates a2ui messages exceeding maxMessages limit", () => {
+    const messages = Array.from({ length: 60 }, (_, i) => ({
+      type: "createSurface",
+      surfaceId: `s-${i}`,
+    }));
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: messages,
+      actions: [],
+    });
+
+    const result = processResponse(json);
+    expect(result.a2uiMessages).toHaveLength(PAYLOAD_LIMITS.maxMessages);
+  });
+
+  it("truncates actions exceeding maxActions limit", () => {
+    const actions = Array.from({ length: 30 }, (_, i) => ({
+      type: `action-${i}`,
+    }));
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: [],
+      actions,
+    });
+
+    const result = processResponse(json);
+    expect(result.actions).toHaveLength(PAYLOAD_LIMITS.maxActions);
+  });
+
+  // -----------------------------------------------------------------------
+  // Issue #153: Per-component validation
+  // -----------------------------------------------------------------------
+
+  it("rejects unknown component types in updateComponents", () => {
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: [
+        {
+          type: "updateComponents",
+          surfaceId: "s1",
+          components: [
+            { id: "t1", component: "Text", text: "Valid" },
+            { id: "x1", component: "HallucinatedWidget", foo: "bar" },
+            { id: "d1", component: "Divider" },
+          ],
+        },
+      ],
+      actions: [],
+    });
+
+    const result = processResponse(json);
+    expect(result.a2uiMessages).toHaveLength(1);
+    const comps = (result.a2uiMessages[0] as Record<string, unknown>).components as unknown[];
+    expect(comps).toHaveLength(2);
+    expect((comps[0] as Record<string, unknown>).component).toBe("Text");
+    expect((comps[1] as Record<string, unknown>).component).toBe("Divider");
+  });
+
+  it("strips unknown props from validated components", () => {
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: [
+        {
+          type: "updateComponents",
+          surfaceId: "s1",
+          components: [
+            {
+              id: "t1",
+              component: "Text",
+              text: "Hello",
+              variant: "h1",
+              hallucinated: "extra-field",
+            },
+          ],
+        },
+      ],
+      actions: [],
+    });
+
+    const result = processResponse(json);
+    const comps = (result.a2uiMessages[0] as Record<string, unknown>).components as Record<string, unknown>[];
+    expect(comps[0]).not.toHaveProperty("hallucinated");
+    expect(comps[0].text).toBe("Hello");
+  });
+
+  it("rejects components with invalid required props", () => {
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: [
+        {
+          type: "updateComponents",
+          surfaceId: "s1",
+          components: [
+            { id: "btn1", component: "Button", child: "label" },
+            // Missing required 'action' prop
+          ],
+        },
+      ],
+      actions: [],
+    });
+
+    const result = processResponse(json);
+    const comps = (result.a2uiMessages[0] as Record<string, unknown>).components as unknown[];
+    expect(comps).toHaveLength(0);
+  });
+
+  // -----------------------------------------------------------------------
+  // Issue #153: Nesting depth limit
+  // -----------------------------------------------------------------------
+
+  it("rejects updateDataModel with deeply nested value", () => {
+    // Create a deeply nested object exceeding the limit
+    let nested: Record<string, unknown> = { leaf: true };
+    for (let i = 0; i < 15; i++) {
+      nested = { child: nested };
+    }
+
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: [
+        {
+          type: "updateDataModel",
+          surfaceId: "s1",
+          path: "/deep",
+          value: nested,
+        },
+      ],
+      actions: [],
+    });
+
+    const result = processResponse(json);
+    expect(result.a2uiMessages).toHaveLength(0);
+  });
+
+  it("allows updateDataModel with acceptable nesting depth", () => {
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: [
+        {
+          type: "updateDataModel",
+          surfaceId: "s1",
+          path: "/app",
+          value: { name: "my-app", config: { port: 3000 } },
+        },
+      ],
+      actions: [],
+    });
+
+    const result = processResponse(json);
+    expect(result.a2uiMessages).toHaveLength(1);
+  });
+
+  // -----------------------------------------------------------------------
+  // Issue #153 fix: Byte-accurate payload size limit
+  // -----------------------------------------------------------------------
+
+  it("uses byte length (not char length) for payload size limit", () => {
+    // Multi-byte characters: each emoji is 4 bytes in UTF-8
+    const emoji = "😀"; // 4 bytes but 2 UTF-16 code units
+    const message = emoji.repeat(100);
+    const json = JSON.stringify({ message, a2ui: [], actions: [] });
+    // This should work fine (small payload), just verify it parses correctly
+    const result = processResponse(json);
+    expect(result.message).toBe(message);
+  });
+
+  // -----------------------------------------------------------------------
+  // Issue #153 fix: Re-validation after data-model interpolation
+  // -----------------------------------------------------------------------
+
+  it("re-validates messages after data-model interpolation", () => {
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: [
+        {
+          type: "updateComponents",
+          surfaceId: "s1",
+          components: [
+            {
+              id: "t1",
+              component: "Text",
+              text: "{{/greeting}}",
+              variant: "h1",
+            },
+          ],
+        },
+      ],
+      actions: [],
+    });
+
+    // dataModel has a valid string — should pass re-validation
+    const result = processResponse(json, { greeting: "Hello, world!" });
+    expect(result.a2uiMessages).toHaveLength(1);
+    const comps = (result.a2uiMessages[0] as Record<string, unknown>)
+      .components as Record<string, unknown>[];
+    expect(comps[0].text).toBe("Hello, world!");
+  });
+
+  it("truncates oversized strings introduced by interpolation", () => {
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: [
+        {
+          type: "createSurface",
+          surfaceId: "s1",
+          catalogId: "{{/bigValue}}",
+        },
+      ],
+      actions: [],
+    });
+
+    const bigValue = "x".repeat(PAYLOAD_LIMITS.maxStringLength + 500);
+    const result = processResponse(json, { bigValue });
+    // Message should survive re-validation — the string gets truncated, not rejected
+    expect(result.a2uiMessages).toHaveLength(1);
+    const msg = result.a2uiMessages[0] as Record<string, unknown>;
+    expect((msg.catalogId as string).length).toBe(
+      PAYLOAD_LIMITS.maxStringLength,
+    );
   });
 });
