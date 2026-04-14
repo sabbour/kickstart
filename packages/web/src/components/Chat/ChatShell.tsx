@@ -3,6 +3,7 @@ import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import type { ChatMessage } from '../../types';
 import type { SurfaceModel } from '../../vendor/a2ui/web_core/index';
+import type { A2uiClientAction } from '../../vendor/a2ui/web_core/schema/client-to-server';
 import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapter';
 
 const PHASE_LABELS: Record<string, string> = {
@@ -23,10 +24,11 @@ interface ChatShellProps {
   currentPhase?: string | null;
   onSend: (text: string) => void;
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
+  onAction?: (action: A2uiClientAction) => void | Promise<void>;
   debugEnabled?: boolean;
 }
 
-export function ChatShell({ messages, isStreaming, streamingText, streamingSurfaceIds, currentPhase, onSend, getSurface, debugEnabled }: ChatShellProps) {
+export function ChatShell({ messages, isStreaming, streamingText, streamingSurfaceIds, currentPhase, onSend, getSurface, onAction, debugEnabled }: ChatShellProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages or streaming updates
@@ -61,6 +63,7 @@ export function ChatShell({ messages, isStreaming, streamingText, streamingSurfa
             streamingText={streamingText}
             streamingSurfaceIds={streamingSurfaceIds}
             getSurface={getSurface}
+            onAction={onAction}
             debugEnabled={debugEnabled}
           />
           <div ref={messagesEndRef} />
