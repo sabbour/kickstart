@@ -69,10 +69,32 @@ app.http("converse", {
         return { status: 400, jsonBody: { error: "message is required" } };
       }
 
-      // Content safety pre-flight check
+      // Content safety pre-flight check on the current message
       const safetyResult = await checkContentSafety(body.message);
       if (!safetyResult.safe) {
         return { status: 400, jsonBody: { error: safetyResult.error } };
+      }
+
+      // Hard cap on rehydration history length to prevent abuse.
+      const MAX_REHYDRATION_MESSAGES = 50;
+      if (body.messages && body.messages.length > MAX_REHYDRATION_MESSAGES) {
+        return {
+          status: 400,
+          jsonBody: { error: `messages array exceeds maximum of ${MAX_REHYDRATION_MESSAGES}` },
+        };
+      }
+
+      // Safety-check ALL client-provided messages in the rehydration history
+      // (both user and assistant roles) — without this, a client could send a
+      // safe `message` but smuggle unsafe content through `body.messages`.
+      if (body.messages?.length) {
+        for (const msg of body.messages) {
+          if (!msg.content?.trim()) continue;
+          const historySafety = await checkContentSafety(msg.content);
+          if (!historySafety.safe) {
+            return { status: 400, jsonBody: { error: historySafety.error } };
+          }
+        }
       }
 
       // Get or create session — if the in-memory session is gone but the

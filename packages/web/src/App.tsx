@@ -260,7 +260,7 @@ export function App() {
           setMessages(prev => [...prev, errorMsg]);
           sessions.addMessage(sessionId!, errorMsg);
         },
-      }, debugEnabled, messages);
+      }, debugEnabled, activeSession?.messages ?? []);
     }
   }, [sessions, streaming, mockStreaming, a2ui, isApiAvailable, resetConsecutiveCount, progressiveQueue, debugEnabled]);
 

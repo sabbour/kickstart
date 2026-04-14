@@ -56,6 +56,8 @@ interface ActionRequest {
 
 interface ActionResponse {
   success: boolean;
+  /** Resolved session ID — may differ from the request after rehydration. */
+  sessionId?: string;
   /** Human-readable LLM reply (reply / navigate actions). */
   message?: string;
   /** Current phase after processing. */
@@ -236,6 +238,7 @@ app.http("action", {
         // Stubbed until APIConnector (B-11) ships
         const response: ActionResponse = {
           success: false,
+          sessionId,
           status: "not_implemented",
           message: "API actions require APIConnector (B-11)",
           phase: engineState.currentPhase,
@@ -258,6 +261,7 @@ app.http("action", {
 
         const response: ActionResponse = {
           success: true,
+          sessionId,
           message: llmResult.message,
           phase: llmResult.phase,
           a2uiMessages: llmResult.a2uiMessages,
@@ -277,6 +281,7 @@ app.http("action", {
 
       const response: ActionResponse = {
         success: true,
+        sessionId,
         message: llmResult.message,
         phase: llmResult.phase,
         a2uiMessages: llmResult.a2uiMessages,
