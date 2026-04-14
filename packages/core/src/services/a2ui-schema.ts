@@ -242,7 +242,8 @@ const ButtonPropsSchema = z
   .object({
     id: boundedString,
     component: z.literal("Button"),
-    child: dynamicString,
+    child: dynamicString.optional(),
+    label: dynamicString.optional(),
     variant: z
       .enum(["primary", "secondary", "outline", "danger", "ghost"])
       .optional(),
