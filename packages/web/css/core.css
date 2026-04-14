@@ -127,6 +127,40 @@ html, body {
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* Microsoft sign-in button (pill-shaped, white bg, works in light & dark) */
+.topbar-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  padding: 6px 16px;
+  border-radius: var(--radius-circular);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-neutral-stroke-2);
+  background: var(--color-neutral-background-1);
+  color: var(--color-neutral-foreground-1);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: box-shadow var(--duration-fast) var(--easing-ease),
+              border-color var(--duration-fast) var(--easing-ease);
+}
+
+.topbar-signin:hover {
+  border-color: var(--color-neutral-stroke-1);
+  box-shadow: var(--shadow-4);
+}
+
+.topbar-signin:active {
+  box-shadow: none;
+}
+
+.topbar-signin-logo {
+  flex-shrink: 0;
+}
+
 .topbar-avatar {
   width: 28px;
   height: 28px;

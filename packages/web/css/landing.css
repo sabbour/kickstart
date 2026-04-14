@@ -11,13 +11,13 @@
   flex: 1;
   overflow-y: auto;
   padding: var(--spacing-xxxl) var(--spacing-l);
-  background: url('../assets/hero-bg.svg') center/cover no-repeat,
+  background: url('/assets/hero-bg.svg') center/cover no-repeat,
               var(--color-neutral-background-2);
   animation: landingFadeIn var(--duration-normal) var(--easing-ease-out);
 }
 
 [data-theme="dark"] .landing-page {
-  background-image: url('../assets/hero-bg-dark.svg');
+  background-image: url('/assets/hero-bg-dark.svg');
 }
 
 @keyframes landingFadeIn {
