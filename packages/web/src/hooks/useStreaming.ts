@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import type { StreamEvent, A2uiMsg, DebugMetadata } from '../types';
+import type { StreamEvent, A2uiMsg, DebugMetadata, ChatMessage } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
 
 interface StreamCallbacks {
@@ -69,6 +69,8 @@ export function useStreaming() {
     sessionId: string | undefined,
     callbacks: StreamCallbacks,
     debugMode?: boolean,
+    /** Full message history for session rehydration on cold starts. */
+    chatHistory?: ChatMessage[],
   ) => {
     setIsStreaming(true);
     setStreamText('');
@@ -86,13 +88,24 @@ export function useStreaming() {
     const renderDecisions: string[] = [];
 
     try {
+      // Build client message history for rehydration (strip system messages
+      // and A2UI JSON — the server builds its own system prompt).
+      const clientMessages = chatHistory
+        ?.filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({ role: m.role, content: m.text }));
+
       const res = await apiFetch('/api/converse', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
         },
-        body: JSON.stringify({ sessionId, message, stream: true }),
+        body: JSON.stringify({
+          sessionId,
+          message,
+          stream: true,
+          ...(clientMessages?.length ? { messages: clientMessages } : {}),
+        }),
         signal: controller.signal,
       }, debugMode);
 

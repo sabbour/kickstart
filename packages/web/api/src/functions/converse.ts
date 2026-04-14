@@ -22,7 +22,8 @@ import {
   InMemoryArtifactStore,
 } from "@kickstart/core";
 import type { PhaseItem, ToolContext } from "@kickstart/core";
-import { getSession, createSession, addMessage } from "../lib/session-store.js";
+import { getSession, createSession, hydrateSession, addMessage } from "../lib/session-store.js";
+import type { ClientMessage } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools, getChatDeploymentName } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
@@ -35,6 +36,8 @@ import type { DebugMetadata } from "../lib/debug-mode.js";
 interface ConverseRequest {
   sessionId?: string;
   message: string;
+  /** Client-side message history for session rehydration after cold starts. */
+  messages?: ClientMessage[];
 }
 
 interface ConverseResponse {
@@ -72,12 +75,16 @@ app.http("converse", {
         return { status: 400, jsonBody: { error: safetyResult.error } };
       }
 
-      // Get or create session
+      // Get or create session — if the in-memory session is gone but the
+      // client sent its message history, hydrate a new session from it so
+      // the LLM retains full conversational context across cold starts.
       let session = body.sessionId
         ? getSession(body.sessionId)
         : undefined;
       if (!session) {
-        session = createSession();
+        session = body.messages?.length
+          ? hydrateSession(body.messages)
+          : createSession();
       }
 
       const { state, engineState } = session;
