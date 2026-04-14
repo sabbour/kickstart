@@ -18,6 +18,7 @@ interface TopbarProps {
 
 export function Topbar({
   onToggleSidebar,
+  onNewSession,
   showSessionsToggle,
   showFilePanelToggle,
   filePanelOpen,
@@ -52,6 +53,18 @@ export function Topbar({
             onClick={toggleDebug}
           >
             🐛 Debug
+          </button>
+        )}
+        {showSessionsToggle && (
+          <button
+            className="topbar-btn"
+            aria-label="Back to home"
+            title="Home"
+            onClick={onNewSession}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M10 2.69l7 6.3V17a1 1 0 01-1 1h-4v-5a1 1 0 00-1-1H9a1 1 0 00-1 1v5H4a1 1 0 01-1-1V8.99l7-6.3zm0-1.39a1 1 0 00-.67.26l-7.5 6.75A1 1 0 001.5 9v8.5A1.5 1.5 0 003 19h4.5a1.5 1.5 0 001.5-1.5V14h2v3.5a1.5 1.5 0 001.5 1.5H17a1.5 1.5 0 001.5-1.5V9a1 1 0 00-.33-.69l-7.5-6.75A1 1 0 0010 1.3z" />
+            </svg>
           </button>
         )}
         {showFilePanelToggle && (

@@ -379,6 +379,7 @@ export function App() {
             activeSessionId={sessions.activeSessionId}
             onSelectSession={handleResumeSession}
             onNewSession={handleNewSession}
+            onDeleteSession={sessions.deleteSession}
           />
         ) : undefined}
         fileEditor={mode === 'chat' ? (
