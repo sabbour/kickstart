@@ -78,8 +78,8 @@ export function synthesizeNavigationPrompt(
   }
 
   if (contextParts.length > 0) {
-    return `User is ready to move to ${phase} (${contextParts.join(", ")}). Continue the conversation.`;
+    return `User is ready to move to ${phase} (${contextParts.join(", ")}). Produce the first ${phase} phase content now — do NOT announce the phase, just start it.`;
   }
 
-  return `User is ready to move to ${phase}. Continue the conversation.`;
+  return `User is ready to move to ${phase}. Produce the first ${phase} phase content now — do NOT announce the phase, just start it.`;
 }
