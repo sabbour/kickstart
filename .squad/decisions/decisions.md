@@ -173,3 +173,13 @@ This is a focused bug-fix sprint with a single critical blocker (#166). Wave 1 m
 **Rationale:** User request — captured for team memory and process improvement.
 
 ---
+
+### Issue comment + board state on work start
+
+**Date:** 2026-04-14T12:58:00Z  
+**By:** Ahmed Sabbour (via Copilot)  
+**Directive:** When an agent starts working on an issue, it must immediately post a comment on the issue and move it to "In Progress" on the project board. Use the GitHub App identity (bot token) for these API calls so the comment appears as the agent's bot identity, not the human user.
+
+**Rationale:** User request — captured for team memory.
+
+---
