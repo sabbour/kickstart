@@ -111,7 +111,9 @@ const useStyles = makeStyles({
 export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({props}) => {
   const [filter, setFilter] = useState('');
   const [showContinue, setShowContinue] = useState(false);
+  const [hasContinued, setHasContinued] = useState(false);
   const hasFiredContinueRef = useRef(false);
+  const hasFiredActionRef = useRef(false);
   const classes = useStyles();
   const messageText = useMessageText();
 
@@ -120,7 +122,15 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
   const isMutuallyExclusive = variant === 'mutuallyExclusive';
   const hasAction = typeof props.action === 'function';
 
+  // Local selection state — gives immediate visual feedback before the data
+  // model round-trips and the surface is dimmed by the action handler.
+  const [localValues, setLocalValues] = useState<string[]>(values);
+  useEffect(() => { setLocalValues(values); }, [values.join(',')]);
+  const displayValues = hasFiredActionRef.current ? localValues : values;
+
   const fireAction = () => {
+    if (hasFiredActionRef.current) return;
+    hasFiredActionRef.current = true;
     if (typeof props.action === 'function') {
       (props.action as () => void)();
     }
@@ -128,17 +138,20 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
 
   const onToggle = (val: string) => {
     if (isMutuallyExclusive) {
+      setLocalValues([val]);
       props.setValue([val]);
     } else {
       const newValues = values.includes(val)
         ? values.filter((v: string) => v !== val)
         : [...values, val];
+      setLocalValues(newValues);
       props.setValue(newValues);
     }
     fireAction();
   };
 
   const onRadioChange = (_e: unknown, data: { value: string }) => {
+    setLocalValues([data.value]);
     props.setValue([data.value]);
     fireAction();
   };
@@ -165,9 +178,11 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
   const bestGuessLabel = bestGuessIdx >= 0 ? String(options[bestGuessIdx]?.label ?? '') : '';
 
   const handleContinue = () => {
-    if (hasFiredContinueRef.current || bestGuessIdx < 0) return;
+    if (hasFiredContinueRef.current || hasFiredActionRef.current || bestGuessIdx < 0) return;
     hasFiredContinueRef.current = true;
+    setHasContinued(true);
     const chosen = options[bestGuessIdx];
+    setLocalValues([chosen.value]);
     props.setValue([chosen.value]);
     fireAction();
   };
@@ -187,7 +202,7 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
       {props.displayStyle === 'chips' ? (
         <div className={classes.chipContainer}>
           {options.map((opt: _Option, i: number) => {
-            const isSelected = values.includes(opt.value);
+            const isSelected = displayValues.includes(opt.value);
             return (
               <ToggleButton
                 key={i}
@@ -203,7 +218,7 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
         </div>
       ) : isMutuallyExclusive ? (
         <FluentRadioGroup
-          value={values[0] || ''}
+          value={displayValues[0] || ''}
           onChange={onRadioChange}
         >
           {options.map((opt: _Option, i: number) => (
@@ -215,7 +230,7 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
           {options.map((opt: _Option, i: number) => (
             <Checkbox
               key={i}
-              checked={values.includes(opt.value)}
+              checked={displayValues.includes(opt.value)}
               label={opt.label}
               onChange={() => onToggle(opt.value)}
             />
@@ -224,18 +239,15 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
       )}
 
       {/* Continue button — auto-selects best-guess option and fires the action */}
-      {hasAction && isMutuallyExclusive && options.length > 0 && (
-        <div
-          className={mergeClasses(classes.continueWrapper, showContinue && classes.continueVisible)}
-          aria-hidden={!showContinue}
-        >
+      {hasAction && isMutuallyExclusive && options.length > 0 && showContinue && (
+        <div className={mergeClasses(classes.continueWrapper, classes.continueVisible)}>
           <Button
             appearance="subtle"
             size="small"
             icon={<ArrowRight16Regular />}
             iconPosition="after"
             onClick={handleContinue}
-            disabled={!showContinue}
+            disabled={hasContinued}
             aria-label={`Continue with ${bestGuessLabel}`}
           >
             Continue{bestGuessLabel ? ` with ${bestGuessLabel}` : ''}
