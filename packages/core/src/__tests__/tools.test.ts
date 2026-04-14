@@ -237,7 +237,7 @@ describe("estimate_cost tool", () => {
     expect(result.breakdown).toBeDefined();
     expect(typeof result.estimatedMonthlyTotal).toBe("number");
     expect((result.estimatedMonthlyTotal as number)).toBeGreaterThan(0);
-    expect(result._stub).toBe(true);
+    expect(result.source).toBe("stub");
   });
 
   it("adds database cost when needsDatabase is true", async () => {
