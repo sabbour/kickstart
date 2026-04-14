@@ -11,6 +11,16 @@ export {
   sanitizePromptValue,
 } from "./system-prompt.js";
 
+export {
+  BASE_COMPONENT_CATALOG,
+  generateComponentCatalogSection,
+} from "./component-catalog.js";
+
+export type {
+  ComponentCatalogEntry,
+  ComponentCategory,
+} from "./component-catalog.js";
+
 export type {
   DeploymentSafeguard,
   SafeguardSeverity,
