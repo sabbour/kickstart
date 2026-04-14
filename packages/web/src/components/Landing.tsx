@@ -8,7 +8,7 @@ import {
   DialogActions,
   Button,
 } from '@fluentui/react-components';
-import { Sparkle24Regular } from '@fluentui/react-icons';
+import { Sparkle24Regular, Map16Regular } from '@fluentui/react-icons';
 import type { Session } from '../types';
 import { apiFetch } from '../services/api-client';
 import { OnboardingTour, resetOnboardingTour } from './OnboardingTour';
@@ -230,6 +230,14 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
           </div>
         </div>
 
+        {/* Tour prompt */}
+        <div className="landing-tour-prompt">
+          <button className="landing-tour-link" onClick={resetOnboardingTour}>
+            <Map16Regular />
+            New here? Take a tour
+          </button>
+        </div>
+
         {/* Track Cards */}
         <div className="landing-tracks">
           {TRACKS.map(track => (
@@ -330,7 +338,6 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
               >{__BUILD_SHA__}</a>
             </span>
             <a className="landing-footer-link" href="?playground">Playground</a>
-            <button className="landing-footer-link landing-footer-restart-tour" onClick={resetOnboardingTour}>Restart Tour</button>
           </div>
         </footer>
 
