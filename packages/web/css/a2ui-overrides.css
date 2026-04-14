@@ -608,6 +608,22 @@
   50% { box-shadow: 0 0 0 8px rgba(0, 120, 212, 0.12); }
 }
 
+/* ---------- CodeBlock dark-mode fix ---------- */
+/* In dark mode --color-neutral-background-inverted flips to light,
+   but code blocks should always stay dark. Pin them explicitly. */
+[data-theme="dark"] .kickstart-code-block {
+  background: var(--color-neutral-background-dark) !important;
+}
+
+[data-theme="dark"] .kickstart-code-header {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .kickstart-code-content {
+  color: #d4d4d4 !important;
+}
+
 /* ---------- Assistant avatar ---------- */
 .assistant-avatar {
   flex-shrink: 0;
