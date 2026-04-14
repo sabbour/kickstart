@@ -177,7 +177,7 @@ function validateA2UIMessages(raw: unknown): A2UIMessage[] {
         errors: result.error.issues.map((i) => i.message),
         input:
           typeof item === "object" && item !== null
-            ? (item as Record<string, unknown>).version
+            ? Object.keys(item as Record<string, unknown>).filter(k => k !== "version").join(", ")
             : typeof item,
       });
       continue;
