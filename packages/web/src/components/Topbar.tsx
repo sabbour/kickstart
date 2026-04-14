@@ -6,9 +6,18 @@ interface TopbarProps {
   onToggleSidebar: () => void;
   onNewSession: () => void;
   showSessionsToggle: boolean;
+  showFilePanelToggle?: boolean;
+  filePanelOpen?: boolean;
+  onToggleFilePanel?: () => void;
 }
 
-export function Topbar({ onToggleSidebar, showSessionsToggle }: TopbarProps) {
+export function Topbar({
+  onToggleSidebar,
+  showSessionsToggle,
+  showFilePanelToggle,
+  filePanelOpen,
+  onToggleFilePanel,
+}: TopbarProps) {
   const { debugEnabled, toggleDebug } = useDebug();
 
   return (
@@ -25,6 +34,19 @@ export function Topbar({ onToggleSidebar, showSessionsToggle }: TopbarProps) {
             onClick={toggleDebug}
           >
             🐛 Debug
+          </button>
+        )}
+        {showFilePanelToggle && (
+          <button
+            className={`topbar-btn${filePanelOpen ? ' active' : ''}`}
+            aria-label={filePanelOpen ? 'Hide files panel' : 'Show files panel'}
+            aria-pressed={filePanelOpen}
+            title={filePanelOpen ? 'Hide files' : 'Show files'}
+            onClick={onToggleFilePanel}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M2 4.5A1.5 1.5 0 013.5 3h4.293a1.5 1.5 0 011.06.44l.708.706a.5.5 0 00.353.147H16.5A1.5 1.5 0 0118 5.793V15.5a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 012 15.5v-11zM3.5 4a.5.5 0 00-.5.5v11a.5.5 0 00.5.5h13a.5.5 0 00.5-.5V5.793a.5.5 0 00-.5-.5H9.914a1.5 1.5 0 01-1.06-.44l-.708-.706A.5.5 0 007.793 4H3.5z" />
+            </svg>
           </button>
         )}
         {showSessionsToggle && (

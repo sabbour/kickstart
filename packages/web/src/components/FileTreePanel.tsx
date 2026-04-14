@@ -4,6 +4,9 @@
  * Renders a hierarchical file tree with collapsible directories. Clicking a file
  * opens it in a Monaco-powered code view. Toolbar provides copy, download single
  * file, download-all ZIP, and delete actions.
+ *
+ * Users can create new files and import files. Monaco editor is writable with
+ * debounced IndexedDB persistence.
  */
 
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,6 +15,17 @@ import {
   Button,
   Caption1,
   Card,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
+  DialogTrigger,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
   Spinner,
   Tooltip,
   makeStyles,
@@ -19,7 +33,9 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import {
+  AddRegular,
   ArrowDownloadRegular,
+  ArrowUploadRegular,
   CopyRegular,
   DeleteRegular,
   DocumentRegular,
@@ -30,8 +46,10 @@ import {
 } from '@fluentui/react-icons';
 import { useVirtualFS } from '../contexts/VirtualFSContext';
 import type { FileTreeNode, VFSFile } from '../services/virtual-fs';
+import { VFSError } from '../services/virtual-fs';
 import { ensureMonacoLocal } from '../catalog/components/monaco-local-setup';
 import { sanitizeHtml } from '../utils/sanitize';
+import { normalizePath, validatePath } from '../utils/path-validation';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
@@ -189,6 +207,11 @@ const useStyles = makeStyles({
     fontSize: '32px',
     opacity: 0.5,
   },
+  emptyActions: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalS,
+    marginTop: tokens.spacingVerticalM,
+  },
   langBadge: {
     fontSize: tokens.fontSizeBase100,
     color: tokens.colorNeutralForeground3,
@@ -198,6 +221,12 @@ const useStyles = makeStyles({
     paddingLeft: tokens.spacingHorizontalXS,
     paddingRight: tokens.spacingHorizontalXS,
     borderRadius: tokens.borderRadiusMedium,
+  },
+  errorBar: {
+    marginTop: tokens.spacingVerticalXS,
+    marginBottom: tokens.spacingVerticalXS,
+    marginLeft: tokens.spacingHorizontalS,
+    marginRight: tokens.spacingHorizontalS,
   },
 });
 
