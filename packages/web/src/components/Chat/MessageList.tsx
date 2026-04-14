@@ -4,7 +4,6 @@ import { TypingIndicator } from './TypingIndicator';
 import { A2UISurfaceWrapper } from '../A2UI/A2UISurfaceWrapper';
 import type { ChatMessage as ChatMessageType } from '../../types';
 import type { SurfaceModel } from '../../vendor/a2ui/web_core/index';
-import type { A2uiClientAction } from '../../vendor/a2ui/web_core/schema/client-to-server';
 import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapter';
 
 interface MessageListProps {
@@ -13,11 +12,10 @@ interface MessageListProps {
   streamingText: string;
   streamingSurfaceIds?: string[];
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
-  onAction?: (action: A2uiClientAction) => void | Promise<void>;
   debugEnabled?: boolean;
 }
 
-export function MessageList({ messages, isStreaming, streamingText, streamingSurfaceIds, getSurface, onAction, debugEnabled }: MessageListProps) {
+export function MessageList({ messages, isStreaming, streamingText, streamingSurfaceIds, getSurface, debugEnabled }: MessageListProps) {
   const lastIndex = messages.length - 1;
   const hasStreamingSurfaces = (streamingSurfaceIds?.length ?? 0) > 0;
 
@@ -29,7 +27,6 @@ export function MessageList({ messages, isStreaming, streamingText, streamingSur
           message={msg}
           getSurface={getSurface}
           isActive={index === lastIndex}
-          onAction={onAction}
           debugEnabled={debugEnabled}
         />
       ))}
@@ -60,7 +57,7 @@ export function MessageList({ messages, isStreaming, streamingText, streamingSur
                   className="a2ui-component a2ui-component--entering"
                   style={{ '--enter-index': index } as React.CSSProperties}
                 >
-                  <A2UISurfaceWrapper surface={surface} isActive={true} onAction={onAction} />
+                  <A2UISurfaceWrapper surface={surface} isActive={true} />
                 </div>
               );
             })}
