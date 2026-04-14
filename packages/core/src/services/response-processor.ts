@@ -86,15 +86,16 @@ export function processResponse(
 ): ProcessedResponse {
   const raw = jsonString;
 
-  // Payload size limit check (byte-accurate)
-  const payloadBytes = Buffer.byteLength(jsonString, "utf8");
+  // Payload size limit check (byte-accurate, browser-safe)
+  const encoder = new TextEncoder();
+  const encoded = encoder.encode(jsonString);
+  const payloadBytes = encoded.length;
   if (payloadBytes > PAYLOAD_LIMITS.maxPayloadBytes) {
     logger.warn(
       `processResponse: payload size ${payloadBytes} bytes exceeds limit ${PAYLOAD_LIMITS.maxPayloadBytes}, truncating`,
     );
-    // Truncate to maxPayloadBytes using byte-safe slicing
-    const buf = Buffer.from(jsonString, "utf8");
-    jsonString = buf.subarray(0, PAYLOAD_LIMITS.maxPayloadBytes).toString("utf8");
+    const decoder = new TextDecoder("utf-8", { fatal: false });
+    jsonString = decoder.decode(encoded.subarray(0, PAYLOAD_LIMITS.maxPayloadBytes));
   }
 
   // Attempt JSON parse
