@@ -11,6 +11,7 @@ import {
 import { Sparkle24Regular } from '@fluentui/react-icons';
 import type { Session } from '../types';
 import { apiFetch } from '../services/api-client';
+import { OnboardingTour } from './OnboardingTour';
 
 const INSPIRATIONS = [
   "Movie night pick that settles disputes",
@@ -178,6 +179,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
 
   return (
     <div id="landing-page" className={`landing-page${isHiding ? ' hiding' : ''}`}>
+      <OnboardingTour />
       <div className="landing-inner">
         {/* Hero Input */}
         <div className="landing-hero">
