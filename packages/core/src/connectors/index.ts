@@ -37,7 +37,15 @@ export type { AzureResource, AzureResourceGroup, AzureSubscription, AzureLocatio
 export { GitHubConnector } from './GitHubConnector.js';
 export type { GitHubRepo, GitHubBranch, GitHubRepoOptions, GitHubUser, GitHubDeviceCodeResponse, GitHubPullRequest, GitHubTree, GitHubTreeEntry, GitHubFileContent } from './GitHubConnector.js';
 export { PricingConnector } from './PricingConnector.js';
-export type { ResourceCostInput, ResourceCostEstimate, CostEstimateResult } from './PricingConnector.js';
+export type {
+  ResourceCostInput,
+  ResourceCostEstimate,
+  CostEstimateResult,
+  RetailPriceItem,
+  RetailPricesResponse,
+  RetailPriceQuery,
+  VmPriceResult,
+} from './PricingConnector.js';
 
 // Rate-limit tracker
 export { gitHubRateLimiter } from './github-rate-limit.js';

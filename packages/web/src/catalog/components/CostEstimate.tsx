@@ -22,11 +22,17 @@ const SkuOptionSchema = z.object({
   monthlyEstimate: z.number(),
 });
 
+const PricingTierSchema = z.object({
+  label: DynamicStringSchema,
+  monthlyEstimate: z.number(),
+}).strict();
+
 const ResourceRowSchema = z.object({
   name: DynamicStringSchema,
   sku: DynamicStringSchema.optional(),
   monthlyEstimate: z.number(),
   skuOptions: z.array(SkuOptionSchema).optional(),
+  pricingTiers: z.array(PricingTierSchema).optional(),
 });
 
 const CostEstimateApi = {
@@ -38,6 +44,7 @@ const CostEstimateApi = {
     title: DynamicStringSchema.optional(),
     projectionMonths: z.number().optional(),
     showProjectionSlider: z.boolean().optional(),
+    source: z.enum(['live', 'stub']).optional(),
   }).strict(),
 };
 
@@ -159,6 +166,22 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
     textAlign: 'center' as const,
   },
+  pricingTiers: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalXS,
+    flexWrap: 'wrap' as const,
+    marginTop: tokens.spacingVerticalXXS,
+  },
+  tierBadge: {
+    fontSize: tokens.fontSizeBase100,
+    color: tokens.colorNeutralForeground3,
+    fontFamily: tokens.fontFamilyMonospace,
+  },
+  sourceLabel: {
+    fontSize: tokens.fontSizeBase100,
+    color: tokens.colorNeutralForeground3,
+    marginLeft: 'auto',
+  },
 });
 
 export const CostEstimate = createReactComponent(CostEstimateApi, ({ props, context }) => {
@@ -227,6 +250,11 @@ export const CostEstimate = createReactComponent(CostEstimateApi, ({ props, cont
       <div className={classes.header}>
         <MoneyRegular />
         <Subtitle2>{props.title ?? 'Estimated Monthly Cost'}</Subtitle2>
+        {props.source && (
+          <Caption1 className={classes.sourceLabel}>
+            {props.source === 'live' ? '● Live pricing' : '○ Estimated'}
+          </Caption1>
+        )}
       </div>
 
       {resources.length === 0 ? (
@@ -281,6 +309,15 @@ export const CostEstimate = createReactComponent(CostEstimateApi, ({ props, cont
                   )}
                   <td className={`${classes.td} ${classes.tdRight}`}>
                     {formatCost(resource.monthlyEstimate)}
+                    {origResource?.pricingTiers && origResource.pricingTiers.length > 0 && (
+                      <div className={classes.pricingTiers}>
+                        {origResource.pricingTiers.map((tier, j) => (
+                          <span key={j} className={classes.tierBadge}>
+                            {typeof tier.label === 'string' ? tier.label : ''}: {formatCost(tier.monthlyEstimate)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </td>
                 </tr>
               );

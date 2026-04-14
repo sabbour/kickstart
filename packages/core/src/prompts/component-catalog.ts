@@ -169,7 +169,7 @@ export const BASE_COMPONENT_CATALOG: readonly ComponentCatalogEntry[] = [
   {
     type: "CostEstimate",
     category: "domain",
-    example: '{"id":"cost1","component":"CostEstimate","items":[{"name":"App Platform","sku":"Standard","monthlyCost":116.80},{"name":"Database","sku":"PostgreSQL B1ms","monthlyCost":12.40}],"total":129.20,"currency":"USD"}',
+    example: '{"id":"cost1","component":"CostEstimate","resources":[{"name":"App Platform","sku":"Standard","monthlyEstimate":116.80,"pricingTiers":[{"label":"Reserved 1yr","monthlyEstimate":80.30},{"label":"Reserved 3yr","monthlyEstimate":55.48}]},{"name":"Database","sku":"PostgreSQL B1ms","monthlyEstimate":12.40}],"total":129.20,"currency":"USD","source":"live"}',
   },
   {
     type: "ArchitectureDiagram",

@@ -164,7 +164,15 @@ export type { AzureResource, AzureResourceGroup, AzureSubscription, AzureLocatio
 export { GitHubConnector } from "./connectors/index.js";
 export type { GitHubRepo, GitHubBranch, GitHubRepoOptions, GitHubUser, GitHubDeviceCodeResponse, GitHubPullRequest } from "./connectors/index.js";
 export { PricingConnector } from "./connectors/index.js";
-export type { ResourceCostInput, ResourceCostEstimate, CostEstimateResult } from "./connectors/index.js";
+export type {
+  ResourceCostInput,
+  ResourceCostEstimate,
+  CostEstimateResult,
+  RetailPriceItem,
+  RetailPricesResponse,
+  RetailPriceQuery,
+  VmPriceResult,
+} from "./connectors/index.js";
 
 // IntegrationKit system — composable bundles of tools, connectors, prompts, components
 export type { IntegrationKit, ComponentRegistration, KitAuthRequirement } from "./kits/index.js";
