@@ -1,5 +1,42 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import type { VirtualFile } from '../../services/virtual-fs';
+import { sanitizeHtml } from '../../utils/sanitize';
+import hljs from 'highlight.js/lib/core';
+import javascript from 'highlight.js/lib/languages/javascript';
+import typescript from 'highlight.js/lib/languages/typescript';
+import python from 'highlight.js/lib/languages/python';
+import java from 'highlight.js/lib/languages/java';
+import csharp from 'highlight.js/lib/languages/csharp';
+import json from 'highlight.js/lib/languages/json';
+import xml from 'highlight.js/lib/languages/xml';
+import css from 'highlight.js/lib/languages/css';
+import bashLang from 'highlight.js/lib/languages/bash';
+import markdown from 'highlight.js/lib/languages/markdown';
+import dockerfile from 'highlight.js/lib/languages/dockerfile';
+import yaml from 'highlight.js/lib/languages/yaml';
+import go from 'highlight.js/lib/languages/go';
+import 'highlight.js/styles/github-dark.css';
+
+hljs.registerLanguage('javascript', javascript);
+hljs.registerLanguage('js', javascript);
+hljs.registerLanguage('typescript', typescript);
+hljs.registerLanguage('ts', typescript);
+hljs.registerLanguage('python', python);
+hljs.registerLanguage('java', java);
+hljs.registerLanguage('csharp', csharp);
+hljs.registerLanguage('json', json);
+hljs.registerLanguage('xml', xml);
+hljs.registerLanguage('html', xml);
+hljs.registerLanguage('css', css);
+hljs.registerLanguage('bash', bashLang);
+hljs.registerLanguage('shell', bashLang);
+hljs.registerLanguage('sh', bashLang);
+hljs.registerLanguage('markdown', markdown);
+hljs.registerLanguage('md', markdown);
+hljs.registerLanguage('dockerfile', dockerfile);
+hljs.registerLanguage('yaml', yaml);
+hljs.registerLanguage('yml', yaml);
+hljs.registerLanguage('go', go);
 
 interface CodeViewProps {
   file?: VirtualFile;
@@ -54,6 +91,19 @@ export function CodeView({ file }: CodeViewProps) {
   const lines = file.content.split('\n');
   const isGenerating = file.status === 'generating';
 
+  const highlightedHtml = useMemo(() => {
+    try {
+      if (file.language && hljs.getLanguage(file.language)) {
+        return hljs.highlight(file.content, { language: file.language }).value;
+      }
+      return hljs.highlightAuto(file.content).value;
+    } catch {
+      return escapeHtml(file.content);
+    }
+  }, [file.content, file.language]);
+
+  const highlightedLines = highlightedHtml.split('\n');
+
   return (
     <div className={`code-view${isGenerating ? ' generating' : ''}`}>
       <div className="code-view-header">
@@ -82,11 +132,11 @@ export function CodeView({ file }: CodeViewProps) {
       </div>
       <div className="code-view-body">
         <pre className="code-view-pre">
-          <code>
-            {lines.map((line, i) => (
+          <code className="hljs">
+            {highlightedLines.map((lineHtml, i) => (
               <div key={i} className="code-line">
                 <span className="code-line-number">{i + 1}</span>
-                <span className="code-line-content">{line}</span>
+                <span className="code-line-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(lineHtml) }} />
               </div>
             ))}
           </code>
@@ -100,4 +150,11 @@ export function CodeView({ file }: CodeViewProps) {
       )}
     </div>
   );
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
