@@ -13,7 +13,7 @@
  *   - GitHubConnector    (GitHub REST API with OAuth Device Flow + PAT auth)
  *
  * Component registrations (rendered by packages/web):
- *   - githubLoginCard    (OAuth Device Flow sign-in card)
+ *   - AuthCard            (OAuth Device Flow sign-in card, provider: "github")
  *   - githubRepoPicker   (repository picker with search and client-side filtering)
  */
 
@@ -147,14 +147,13 @@ export const githubKit: IntegrationKit = {
 
   components: [
     {
-      type: 'githubLoginCard',
+      type: 'AuthCard',
       description:
-        'OAuth Device Flow sign-in card with token confirmation.\n' +
+        'GitHub sign-in card (provider: "github"). Uses OAuth Device Flow.\n' +
         'Props:\n' +
-        '  - username (optional string): GitHub username shown on the avatar and user info when signed in.\n' +
-        '  - avatarUrl (optional string): URL of the user\'s GitHub avatar image.\n' +
-        '  - onSignIn (optional action): Callback fired after successful GitHub OAuth sign-in.\n' +
-        '  - onSignOut (optional action): Callback fired when the user signs out.',
+        '  - provider (required string): Must be "github".\n' +
+        '  - title (optional string): Card heading. Defaults to "GitHub".\n' +
+        '  - description (optional string): Subheading text.',
     },
     {
       type: 'githubRepoPicker',

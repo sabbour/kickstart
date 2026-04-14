@@ -375,10 +375,10 @@ describe('azureKit', () => {
     }
   });
 
-  it('registers component types for azureLoginCard and azureResourcePicker', () => {
+  it('registers component types for AuthCard and azureResourcePicker', () => {
     expect(azureKit.components).toBeDefined();
     const types = azureKit.components!.map((c) => c.type);
-    expect(types).toContain('azureLoginCard');
+    expect(types).toContain('AuthCard');
     expect(types).toContain('azureResourcePicker');
   });
 
@@ -432,10 +432,10 @@ describe('githubKit', () => {
     }
   });
 
-  it('registers component types for githubLoginCard and githubRepoPicker', () => {
+  it('registers component types for AuthCard and githubRepoPicker', () => {
     expect(githubKit.components).toBeDefined();
     const types = githubKit.components!.map((c) => c.type);
-    expect(types).toContain('githubLoginCard');
+    expect(types).toContain('AuthCard');
     expect(types).toContain('githubRepoPicker');
   });
 

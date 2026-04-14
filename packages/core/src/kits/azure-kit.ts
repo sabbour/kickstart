@@ -14,7 +14,7 @@
  *   - PricingConnector     (Azure Retail Pricing API, no auth required)
  *
  * Component registrations (rendered by packages/web):
- *   - azureLoginCard       (MSAL sign-in card with subscription auto-select)
+ *   - AuthCard             (MSAL sign-in card, provider: "azure")
  *   - azureResourcePicker  (cascading subscription → RG → resource selector)
  *   - azureResourceForm    (dynamic ARM-driven form for resource creation)
  *   - azureAction          (write-with-confirm pattern for ARM operations)
@@ -519,14 +519,13 @@ Use estimate_cost tool for live pricing when available; these reference prices a
 
   components: [
     {
-      type: 'azureLoginCard',
+      type: 'AuthCard',
       description:
-        'MSAL sign-in card with automatic subscription discovery.\n' +
+        'Azure sign-in card (provider: "azure"). Uses MSAL with automatic subscription discovery.\n' +
         'Props:\n' +
-        '  - displayName (optional string): Display name shown on the avatar and user info. Defaults to "Azure User".\n' +
-        '  - showTokenInfo (optional boolean): Show authentication timestamp. Never exposes raw tokens.\n' +
-        '  - onSignIn (optional action): Callback fired after successful MSAL sign-in.\n' +
-        '  - onSignOut (optional action): Callback fired when the user signs out.',
+        '  - provider (required string): Must be "azure".\n' +
+        '  - title (optional string): Card heading. Defaults to "Azure".\n' +
+        '  - description (optional string): Subheading text.',
     },
     {
       type: 'azureResourcePicker',

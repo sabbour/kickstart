@@ -11,6 +11,7 @@ import { GitHubLoginCard } from './components/GitHubLoginCard';
 import { GitHubRepoPicker } from './components/GitHubRepoPicker';
 import { GitHubAction } from './components/GitHubAction';
 import { GitHubCommit } from './components/GitHubCommit';
+import { AuthCard } from './components/AuthCard';
 import { AzureLoginCard } from './components/AzureLoginCard';
 import { AzureResourcePicker } from './components/AzureResourcePicker';
 import { AzureResourceForm } from './components/AzureResourceForm';
@@ -30,6 +31,7 @@ const kickstartComponents: ReactComponentImplementation[] = [
   CodeBlock,
   ProgressSteps,
   Markdown,
+  AuthCard,
   GitHubLoginCard,
   GitHubRepoPicker,
   GitHubAction,
