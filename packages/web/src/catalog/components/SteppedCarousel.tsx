@@ -30,6 +30,16 @@ const SteppedCarouselApi = {
   }).strict(),
 };
 
+const slideFromRight = {
+  from: { opacity: 0, transform: 'translateX(24px)' },
+  to: { opacity: 1, transform: 'translateX(0)' },
+};
+
+const slideFromLeft = {
+  from: { opacity: 0, transform: 'translateX(-24px)' },
+  to: { opacity: 1, transform: 'translateX(0)' },
+};
+
 const useStyles = makeStyles({
   root: {
     marginTop: tokens.spacingVerticalS,
@@ -68,9 +78,18 @@ const useStyles = makeStyles({
   body: {
     marginTop: tokens.spacingVerticalM,
     marginBottom: tokens.spacingVerticalM,
-    transitionProperty: 'opacity, transform',
-    transitionDuration: tokens.durationNormal,
-    transitionTimingFunction: tokens.curveEasyEase,
+  },
+  bodyEnterNext: {
+    animationName: slideFromRight,
+    animationDuration: tokens.durationNormal,
+    animationTimingFunction: tokens.curveEasyEase,
+    animationFillMode: 'both',
+  },
+  bodyEnterPrev: {
+    animationName: slideFromLeft,
+    animationDuration: tokens.durationNormal,
+    animationTimingFunction: tokens.curveEasyEase,
+    animationFillMode: 'both',
   },
   footer: {
     display: 'flex',
@@ -88,6 +107,7 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
   const classes = useStyles();
   const initialStep = props.activeStep ?? 0;
   const [currentStep, setCurrentStep] = useState(initialStep);
+  const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const totalSteps = props.steps.length;
   const clampedStep = Math.max(0, Math.min(currentStep, totalSteps - 1));
   const activeStepData = props.steps[clampedStep];
@@ -124,8 +144,14 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
       {/* Active step title */}
       <Subtitle2>{activeStepData?.title}</Subtitle2>
 
-      {/* Active step content */}
-      <div className={classes.body} role="tabpanel" aria-live="polite" aria-label={`Step ${clampedStep + 1}: ${activeStepData?.title}`}>
+      {/* Active step content — key forces remount so CSS animation replays */}
+      <div
+        key={clampedStep}
+        className={`${classes.body} ${direction === 'next' ? classes.bodyEnterNext : classes.bodyEnterPrev}`}
+        role="tabpanel"
+        aria-live="polite"
+        aria-label={`Step ${clampedStep + 1}: ${activeStepData?.title}`}
+      >
         {activeStepData?.child ? buildChild(activeStepData.child) : null}
       </div>
 
@@ -139,7 +165,10 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
           appearance="subtle"
           icon={<ChevronLeftRegular />}
           disabled={isFirst}
-          onClick={() => setCurrentStep(s => Math.max(0, s - 1))}
+          onClick={() => {
+            setDirection('prev');
+            setCurrentStep(s => Math.max(0, s - 1));
+          }}
           aria-label="Go to previous step"
         >
           Previous
@@ -150,7 +179,10 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
           icon={isLast ? <CheckmarkRegular /> : <ChevronRightRegular />}
           iconPosition="after"
           onClick={() => {
-            if (!isLast) setCurrentStep(s => s + 1);
+            if (!isLast) {
+              setDirection('next');
+              setCurrentStep(s => s + 1);
+            }
           }}
           aria-label={isLast ? 'Complete carousel' : 'Go to next step'}
         >
