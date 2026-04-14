@@ -49,7 +49,9 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 ## Learnings
 - (2026-04-14) SSE parsing in `useStreaming.ts` must handle both `event:` type lines and `data:` lines. The backend sends A2UI via typed SSE events (`event: a2ui\ndata: {...}`) AND inside a JSON envelope in the accumulated chunk content. Both paths must route to `callbacks.onA2UI()`.
 - (2026-04-14) The accumulated stream content can be either plain text OR a JSON envelope `{message, a2ui, actions}`. After stream completion, always try parsing as JSON to extract structured data before passing to `onComplete`.
+- (2026-04-14) LLM acknowledgment behavior (Badge "Got it" cards) is driven entirely by phase prompt text in `packages/core/src/engine/phases.ts`. To add or remove conversational behaviors, edit `promptTemplate` strings — no TypeScript logic changes needed. The system-prompt.ts few-shot examples did NOT contain this pattern.
 
 ## Work Log
 - (2026-04-14 11:02) Wave 1: Fixed #166 A2UI rendering blocker → PR #179 opened. SSE parser fixes in useStreaming.ts complete.
 - (2026-04-14 12:30) P0 fix: #192 A2UI component interactivity broken — ChoicePicker/CheckBox/Toggle/ComboBox/MultiSelect lacked ActionSchema in schemas, so LLM-provided actions were treated as static objects instead of callable closures. Added FlexibleApis with action support + onAction callback on A2UISurfaceWrapper → PR #195 opened.
+- (2026-04-14 16:42) Prompt fix: Removed "Got it" acknowledgment cards from DISCOVER and DESIGN phase prompts. Prompt-only change in `packages/core/src/engine/phases.ts`.
