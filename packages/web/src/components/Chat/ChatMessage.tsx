@@ -37,6 +37,9 @@ export function ChatMessage({ message, getSurface, isActive = true, debugEnabled
     <div className="chat-bubble-row">
       <BotSparkle24Regular className="assistant-avatar" />
       <div className="chat-bubble assistant">
+        {message.phase && (
+          <span className="chat-message-phase-badge">{message.phase}</span>
+        )}
         {/* Render text with basic markdown-like formatting */}
         {message.text && (
           <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(formatText(message.text)) }} />

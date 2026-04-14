@@ -84,6 +84,10 @@ export function App() {
   // Messages for the active session
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
+  // Current conversation phase from SSE events
+  const [currentPhase, setCurrentPhase] = useState<string | null>(null);
+  const currentPhaseRef = useRef<string | null>(null);
+
   // Surface IDs revealed progressively via the queue
   const streamingSurfaceIdsRef = useRef<string[]>([]);
 
@@ -153,8 +157,11 @@ export function App() {
             progressiveQueue.enqueue(newIds);
           }
         },
-        onPhase: () => {},
+        onPhase: (phase) => { setCurrentPhase(phase); currentPhaseRef.current = phase; },
         onComplete: (fullText, model) => {
+          const phase = currentPhaseRef.current || undefined;
+          setCurrentPhase(null);
+          currentPhaseRef.current = null;
           progressiveQueue.flush();
           const collectedIds = streamingSurfaceIdsRef.current;
           const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
@@ -166,6 +173,7 @@ export function App() {
             text: fullText,
             model,
             surfaceIds,
+            phase,
             timestamp: Date.now(),
           };
           setMessages(prev => [...prev, assistantMsg]);
@@ -198,8 +206,11 @@ export function App() {
             progressiveQueue.enqueue(newIds);
           }
         },
-        onPhase: () => {},
+        onPhase: (phase) => { setCurrentPhase(phase); currentPhaseRef.current = phase; },
         onComplete: (fullText, model, receivedSessionId, debugInfo) => {
+          const phase = currentPhaseRef.current || undefined;
+          setCurrentPhase(null);
+          currentPhaseRef.current = null;
           // Store the backend session ID on first response
           if (receivedSessionId && !activeSession?.backendSessionId) {
             sessions.updateSession(sessionId!, { backendSessionId: receivedSessionId });
@@ -215,6 +226,7 @@ export function App() {
             text: fullText,
             model,
             surfaceIds,
+            phase,
             timestamp: Date.now(),
             debugInfo,
           };
@@ -337,7 +349,7 @@ export function App() {
         showSessionsToggle={mode === 'chat'}
         hasFiles={hasFiles && filePanelOpen}
         showFilePanel={mode === 'chat' && filePanelOpen}
-        onToggleFilePanel={mode === 'chat' ? handleToggleFilePanel : undefined}
+        onToggleFilePanel={mode === 'chat' && hasFiles ? handleToggleFilePanel : undefined}
         sidebar={mode === 'chat' ? (
           <SessionsSidebar
             isOpen={sidebarOpen}
@@ -373,6 +385,7 @@ export function App() {
             isStreaming={isStreaming}
             streamingText={currentStreamText}
             streamingSurfaceIds={progressiveQueue.visibleIds}
+            currentPhase={currentPhase}
             onSend={handleSendMessage}
             getSurface={a2ui.getSurface}
             debugEnabled={debugEnabled}

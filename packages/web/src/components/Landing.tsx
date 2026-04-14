@@ -1,4 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Dialog,
+  DialogSurface,
+  DialogBody,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+} from '@fluentui/react-components';
 import { Sparkle24Regular } from '@fluentui/react-icons';
 import type { Session } from '../types';
 import { apiFetch } from '../services/api-client';
@@ -70,6 +79,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [inspireLoading, setInspireLoading] = useState(false);
+  const [showClearDialog, setShowClearDialog] = useState(false);
 
   const handleInspire= useCallback(async () => {
     setInspireLoading(true);
@@ -310,7 +320,12 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
           </div>
           <div className="landing-footer-meta">
             <span className="landing-footer-version">
-              Kickstart Preview v{__BUILD_VERSION__}
+              Kickstart Preview v{__BUILD_VERSION__.replace(`-${__BUILD_SHA__}`, '')}-<a
+                href={`https://github.com/sabbour/kickstart/commit/${__BUILD_SHA_FULL__}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="landing-footer-sha"
+              >{__BUILD_SHA__}</a>
             </span>
             <a className="landing-footer-link" href="?playground">Playground</a>
           </div>
@@ -321,8 +336,22 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
           <div className="recent-sessions-section">
             <div className="recent-sessions-header">
               <span className="recent-sessions-label">Recent</span>
-              <button className="recent-sessions-clear" onClick={onClearAllSessions}>Clear all</button>
+              <button className="recent-sessions-clear" onClick={() => setShowClearDialog(true)}>Clear all</button>
             </div>
+            <Dialog open={showClearDialog} onOpenChange={(_e, data) => setShowClearDialog(data.open)}>
+              <DialogSurface>
+                <DialogBody>
+                  <DialogTitle>Clear all sessions?</DialogTitle>
+                  <DialogContent>
+                    This will permanently delete all your recent sessions. This action cannot be undone.
+                  </DialogContent>
+                  <DialogActions>
+                    <Button appearance="secondary" onClick={() => setShowClearDialog(false)}>Cancel</Button>
+                    <Button appearance="primary" onClick={() => { onClearAllSessions(); setShowClearDialog(false); }}>Clear all</Button>
+                  </DialogActions>
+                </DialogBody>
+              </DialogSurface>
+            </Dialog>
             <div className="recent-sessions-list">
               {recentSessions.map(session => (
                 <div

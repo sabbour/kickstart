@@ -14,13 +14,23 @@ function getShortSha(): string {
   }
 }
 
+function getFullSha(): string {
+  try {
+    return execSync('git rev-parse HEAD', { encoding: 'utf-8' }).trim();
+  } catch {
+    return process.env.GITHUB_SHA || 'dev';
+  }
+}
+
 const shortSha = getShortSha();
+const fullSha = getFullSha();
 
 export default defineConfig({
   plugins: [react()],
   define: {
     __BUILD_VERSION__: JSON.stringify(`${rootPkg.version}-${shortSha}`),
     __BUILD_SHA__: JSON.stringify(shortSha),
+    __BUILD_SHA_FULL__: JSON.stringify(fullSha),
   },
   resolve: {
     alias: {

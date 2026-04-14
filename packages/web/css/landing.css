@@ -647,6 +647,16 @@ body.on-landing #topbar-sessions-toggle {
   text-decoration: underline;
 }
 
+.landing-footer-sha {
+  color: var(--color-neutral-foreground-4);
+  text-decoration: none;
+}
+
+.landing-footer-sha:hover {
+  color: var(--color-brand-primary);
+  text-decoration: underline;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
   .landing-page {
