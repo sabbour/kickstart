@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## [0.5.6] - 2026-04-14
+
+### Fixed
+
+- **Sign-in button** — Topbar sign-in now redirects to AAD login with Microsoft branding (#158)
+- **SVG backgrounds** — Fixed CSS paths for light/dark hero backgrounds in chat UI (#159)
+- **Dark mode playground** — Replaced hardcoded hex colors with theme variables, fixed code block inversion (#161)
+- **IndexedDB filesystem** — File tree panel now visible with create/edit/navigate, path validation + quota limits (#147)
+- **System prompts** — Redesigned phase prompts to enforce A2UI component output every turn (#145)
+- **Prompt injection boundary** — Added boundary markers + A2UI payload validation in response processor (#153)
+- **CodeBlock styling** — Added syntax highlighting with highlight.js + fixed thick black border (#148)
+- **FileEditor prop** — Aligned schema prop `fileName` → `filename` to match core catalog (#141)
+- **AuthCard adapter** — Added adapter dispatching to Azure/GitHub login providers (#150)
+- **Integration Kit scenarios** — Added Azure/GitHub AuthCard playground scenarios (#142)
+
 ## [0.5.5] - 2026-04-13
 
 ### Added
