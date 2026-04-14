@@ -12,6 +12,7 @@ import { Sparkle24Regular, Map16Regular } from '@fluentui/react-icons';
 import type { Session } from '../types';
 import { apiFetch } from '../services/api-client';
 import { OnboardingTour, resetOnboardingTour } from './OnboardingTour';
+import { useDebug } from '../contexts/DebugContext';
 
 const INSPIRATIONS = [
   "Movie night pick that settles disputes",
@@ -81,6 +82,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [inspireLoading, setInspireLoading] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const { debugEnabled } = useDebug();
 
   const handleInspire= useCallback(async () => {
     setInspireLoading(true);
@@ -328,17 +330,19 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
           <div className="landing-footer-disclaimer">
             Kickstart uses AI. Check for mistakes.
           </div>
-          <div className="landing-footer-meta">
-            <span className="landing-footer-version">
-              Kickstart Preview v{__BUILD_VERSION__.replace(`-${__BUILD_SHA__}`, '')}-<a
-                href={`https://github.com/sabbour/kickstart/commit/${__BUILD_SHA_FULL__}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="landing-footer-sha"
-              >{__BUILD_SHA__}</a>
-            </span>
-            <a className="landing-footer-link" href="?playground">Playground</a>
-          </div>
+          {debugEnabled && (
+            <div className="landing-footer-meta">
+              <span className="landing-footer-version">
+                Kickstart Preview v{__BUILD_VERSION__.replace(`-${__BUILD_SHA__}`, '')}-<a
+                  href={`https://github.com/sabbour/kickstart/commit/${__BUILD_SHA_FULL__}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="landing-footer-sha"
+                >{__BUILD_SHA__}</a>
+              </span>
+              <a className="landing-footer-link" href="?playground">Playground</a>
+            </div>
+          )}
         </footer>
 
         {/* Recent Sessions */}
