@@ -329,6 +329,82 @@ html, body {
   min-width: 0;
 }
 
+/* Session item layout — title fills space, delete stays right */
+.session-item {
+  position: relative;
+}
+
+.session-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-delete-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-neutral-foreground-3);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-small);
+  flex-shrink: 0;
+  transition: color var(--duration-fast), background var(--duration-fast);
+}
+
+.session-item:hover .session-delete-btn {
+  display: flex;
+}
+
+.session-delete-btn:hover {
+  color: var(--color-palette-red-foreground-1, #d13438);
+  background: var(--color-neutral-background-3);
+}
+
+/* Delete confirmation row */
+.session-confirm-delete {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  width: 100%;
+  font-size: var(--font-size-100);
+}
+
+.session-confirm-label {
+  flex: 1;
+  color: var(--color-palette-red-foreground-1, #d13438);
+  font-weight: var(--font-weight-semibold);
+}
+
+.session-confirm-yes,
+.session-confirm-no {
+  background: none;
+  border: 1px solid var(--color-neutral-stroke-2);
+  border-radius: var(--radius-small);
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: var(--font-size-100);
+  color: var(--color-neutral-foreground-1);
+}
+
+.session-confirm-yes {
+  color: var(--color-palette-red-foreground-1, #d13438);
+  border-color: var(--color-palette-red-foreground-1, #d13438);
+}
+
+.session-confirm-yes:hover {
+  background: var(--color-palette-red-foreground-1, #d13438);
+  color: #fff;
+}
+
+.session-confirm-no:hover {
+  background: var(--color-neutral-background-3);
+}
+
 /* --- File viewer sidebar --- */
 .file-viewer {
   width: var(--file-viewer-width);
