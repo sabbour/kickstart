@@ -108,7 +108,7 @@ const useStyles = makeStyles({
   },
 });
 
-export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({props}) => {
+export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({props, context}) => {
   const [filter, setFilter] = useState('');
   const [showContinue, setShowContinue] = useState(false);
   const hasFiredContinueRef = useRef(false);
@@ -127,32 +127,55 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
   useEffect(() => { setLocalValues(values); }, [values.join(',')]);
   const displayValues = hasFiredActionRef.current ? localValues : values;
 
-  const fireAction = () => {
+  /**
+   * Dispatches the action with the selected value and label injected into the
+   * event context, so the chat bubble and LLM receive the user's actual choice
+   * instead of raw action metadata.
+   */
+  const fireAction = (selectedVals: string[]) => {
     if (hasFiredActionRef.current) return;
     hasFiredActionRef.current = true;
-    if (typeof props.action === 'function') {
+
+    const rawAction = context.componentModel.properties.action;
+    if (rawAction && typeof rawAction === 'object' && 'event' in rawAction && rawAction.event) {
+      const selectedOpt = options.find(opt => selectedVals.includes(opt.value));
+      const resolved = context.dataContext.resolveAction(rawAction);
+      context.dispatchAction({
+        event: {
+          ...resolved.event,
+          context: {
+            ...resolved.event.context,
+            value: selectedVals.length === 1 ? selectedVals[0] : selectedVals,
+            selectedLabel: selectedOpt ? String(selectedOpt.label) : undefined,
+          },
+        },
+      });
+    } else if (typeof props.action === 'function') {
       (props.action as () => void)();
     }
   };
 
   const onToggle = (val: string) => {
+    let newVals: string[];
     if (isMutuallyExclusive) {
-      setLocalValues([val]);
-      props.setValue([val]);
+      newVals = [val];
+      setLocalValues(newVals);
+      props.setValue(newVals);
     } else {
-      const newValues = values.includes(val)
+      newVals = values.includes(val)
         ? values.filter((v: string) => v !== val)
         : [...values, val];
-      setLocalValues(newValues);
-      props.setValue(newValues);
+      setLocalValues(newVals);
+      props.setValue(newVals);
     }
-    fireAction();
+    fireAction(newVals);
   };
 
   const onRadioChange = (_e: unknown, data: { value: string }) => {
-    setLocalValues([data.value]);
-    props.setValue([data.value]);
-    fireAction();
+    const newVals = [data.value];
+    setLocalValues(newVals);
+    props.setValue(newVals);
+    fireAction(newVals);
   };
 
   const options = (props.options || []).filter(
@@ -180,9 +203,10 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
     if (hasFiredContinueRef.current || hasFiredActionRef.current || bestGuessIdx < 0) return;
     hasFiredContinueRef.current = true;
     const chosen = options[bestGuessIdx];
-    setLocalValues([chosen.value]);
-    props.setValue([chosen.value]);
-    fireAction();
+    const newVals = [chosen.value];
+    setLocalValues(newVals);
+    props.setValue(newVals);
+    fireAction(newVals);
   };
 
   return (
