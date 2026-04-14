@@ -215,6 +215,37 @@ describe("processResponse", () => {
     expect((comps[1] as Record<string, unknown>).component).toBe("Divider");
   });
 
+  it("preserves Markdown components in updateComponents (regression)", () => {
+    const json = JSON.stringify({
+      message: "Thanks for the info!",
+      a2ui: [
+        { version: "v0.9", createSurface: { surfaceId: "msg-4", catalogId: "kickstart" } },
+        {
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "msg-4",
+            components: [
+              { id: "root", component: "Column", children: ["summary-card"], gap: "16px" },
+              { id: "summary-card", component: "Card", children: ["summary-col"] },
+              { id: "summary-col", component: "Column", children: ["title", "summary-md"] },
+              { id: "title", component: "Text", text: "Application summary", variant: "h2" },
+              { id: "summary-md", component: "Markdown", content: "**App type:** Full-stack web application" },
+            ],
+          },
+        },
+      ],
+      actions: [],
+    });
+
+    const result = processResponse(json);
+    expect(result.a2uiMessages).toHaveLength(2);
+    const comps = result.a2uiMessages[1].updateComponents!.components as Record<string, unknown>[];
+    expect(comps).toHaveLength(5);
+    const markdownComp = comps.find(c => c.component === "Markdown");
+    expect(markdownComp).toBeDefined();
+    expect(markdownComp!.content).toBe("**App type:** Full-stack web application");
+  });
+
   it("strips unknown props from validated components", () => {
     const json = JSON.stringify({
       message: "test",
