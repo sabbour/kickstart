@@ -58,18 +58,21 @@ describe("PAYLOAD_LIMITS", () => {
 // ---------------------------------------------------------------------------
 
 describe("KNOWN_COMPONENT_TYPES", () => {
-  it("contains exactly 28 types", () => {
-    expect(KNOWN_COMPONENT_TYPES.size).toBe(28);
+  it("contains exactly 46 types", () => {
+    expect(KNOWN_COMPONENT_TYPES.size).toBe(46);
   });
 
   it("includes all expected component types", () => {
     const expected = [
-      "Accordion", "ArchitectureDiagram", "AudioPlayer", "AuthCard",
-      "Badge", "Button", "Card", "CheckBox", "ChoicePicker", "Column",
-      "ComboBox", "CostEstimate", "DateTimeInput", "DeploymentProgress",
-      "Divider", "FileEditor", "Icon", "Image", "List", "Modal",
-      "MultiSelect", "Row", "Slider", "Tabs", "Text", "TextField",
-      "Toggle", "Video",
+      "Accordion", "Alert", "ArchitectureDiagram", "AudioPlayer", "AuthCard",
+      "AzureAction", "AzureLoginCard", "AzureResourceForm", "AzureResourcePicker",
+      "Badge", "Button", "Card", "CheckBox", "ChoicePicker", "CodeBlock",
+      "Column", "ComboBox", "CostEstimate", "DateTimeInput", "DeploymentProgress",
+      "Divider", "FileEditor", "FormGroup", "GitHubAction", "GitHubCommit",
+      "GitHubLoginCard", "GitHubRepoPicker", "Icon", "Image", "Link", "List",
+      "Markdown", "Modal", "MultiSelect", "ProgressSteps", "Questionnaire",
+      "RadioGroup", "Row", "Slider", "SteppedCarousel", "Tabs", "Table",
+      "Text", "TextField", "Toggle", "Video",
     ];
     for (const t of expected) {
       expect(KNOWN_COMPONENT_TYPES.has(t as never)).toBe(true);
@@ -229,6 +232,76 @@ describe("COMPONENT_SCHEMA_REGISTRY", () => {
       component: "AuthCard",
       provider: "azure",
       title: "Sign in",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("validates Markdown component", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["Markdown"].safeParse({
+      id: "md1",
+      component: "Markdown",
+      content: "**Bold** text with *italics*",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects Markdown without required content", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["Markdown"].safeParse({
+      id: "md1",
+      component: "Markdown",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("validates CodeBlock component", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["CodeBlock"].safeParse({
+      id: "cb1",
+      component: "CodeBlock",
+      code: "console.log('hello')",
+      language: "javascript",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("validates Table component", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["Table"].safeParse({
+      id: "tbl1",
+      component: "Table",
+      columns: ["Name", "Value"],
+      rows: [["key", "val"]],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("validates Alert component", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["Alert"].safeParse({
+      id: "alert1",
+      component: "Alert",
+      message: "Something happened",
+      severity: "warning",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("validates Link component", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["Link"].safeParse({
+      id: "lnk1",
+      component: "Link",
+      text: "Click here",
+      url: "https://example.com",
+      external: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("validates ProgressSteps component", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["ProgressSteps"].safeParse({
+      id: "ps1",
+      component: "ProgressSteps",
+      steps: [
+        { id: "s1", label: "Init", status: "complete" },
+        { id: "s2", label: "Build", status: "active" },
+      ],
     });
     expect(result.success).toBe(true);
   });

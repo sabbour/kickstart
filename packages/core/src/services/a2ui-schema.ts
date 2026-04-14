@@ -55,14 +55,20 @@ export function checkDepth(
 
 export const KNOWN_COMPONENT_TYPES = new Set([
   "Accordion",
+  "Alert",
   "ArchitectureDiagram",
   "AudioPlayer",
   "AuthCard",
+  "AzureAction",
+  "AzureLoginCard",
+  "AzureResourceForm",
+  "AzureResourcePicker",
   "Badge",
   "Button",
   "Card",
   "CheckBox",
   "ChoicePicker",
+  "CodeBlock",
   "Column",
   "ComboBox",
   "CostEstimate",
@@ -70,14 +76,26 @@ export const KNOWN_COMPONENT_TYPES = new Set([
   "DeploymentProgress",
   "Divider",
   "FileEditor",
+  "FormGroup",
+  "GitHubAction",
+  "GitHubCommit",
+  "GitHubLoginCard",
+  "GitHubRepoPicker",
   "Icon",
   "Image",
+  "Link",
   "List",
+  "Markdown",
   "Modal",
   "MultiSelect",
+  "ProgressSteps",
+  "Questionnaire",
+  "RadioGroup",
   "Row",
   "Slider",
+  "SteppedCarousel",
   "Tabs",
+  "Table",
   "Text",
   "TextField",
   "Toggle",
@@ -393,6 +411,236 @@ const DeploymentProgressPropsSchema = z
   })
   .strip();
 
+// Basic catalog components (missing from original set)
+
+const AlertPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("Alert"),
+    message: dynamicString,
+    severity: z.enum(["info", "warning", "error", "success"]).optional(),
+    dismissible: z.boolean().optional(),
+    action: actionSchema.optional(),
+  })
+  .strip();
+
+const LinkPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("Link"),
+    text: dynamicString,
+    url: dynamicString,
+    external: z.boolean().optional(),
+  })
+  .strip();
+
+const TablePropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("Table"),
+    columns: z.array(dynamicString),
+    rows: z.array(z.array(dynamicString)).optional(),
+    caption: dynamicString.optional(),
+  })
+  .strip();
+
+// Custom Kickstart components (missing from original set)
+
+const MarkdownPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("Markdown"),
+    content: dynamicString,
+  })
+  .strip();
+
+const CodeBlockPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("CodeBlock"),
+    code: dynamicString,
+    language: dynamicString.optional(),
+    filename: dynamicString.optional(),
+  })
+  .strip();
+
+const ProgressStepsPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("ProgressSteps"),
+    steps: z.array(
+      z.object({
+        id: boundedString,
+        label: dynamicString,
+        status: z.enum(["pending", "active", "complete", "error"]),
+      }),
+    ),
+  })
+  .strip();
+
+const RadioGroupPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("RadioGroup"),
+    options: z.array(
+      z.object({
+        id: boundedString,
+        label: dynamicString,
+        description: dynamicString.optional(),
+        recommended: z.boolean().optional(),
+      }),
+    ),
+    value: dynamicString.optional(),
+    action: actionSchema,
+  })
+  .strip();
+
+const FormGroupPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("FormGroup"),
+    title: dynamicString,
+    step: z.number().optional(),
+    child: boundedString,
+  })
+  .strip();
+
+const GitHubLoginCardPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("GitHubLoginCard"),
+    username: dynamicString.optional(),
+    avatarUrl: dynamicString.optional(),
+    onSignIn: actionSchema.optional(),
+    onSignOut: actionSchema.optional(),
+  })
+  .strip();
+
+const GitHubRepoPickerPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("GitHubRepoPicker"),
+    placeholder: dynamicString.optional(),
+    selectedRepo: dynamicString.optional(),
+    onSelect: actionSchema.optional(),
+  })
+  .strip();
+
+const GitHubActionPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("GitHubAction"),
+    title: dynamicString,
+    description: dynamicString.optional(),
+    method: z.enum(["POST", "PUT", "PATCH", "DELETE"]),
+    path: dynamicString,
+    operationType: dynamicString,
+    body: z.record(z.unknown()).optional(),
+    confirmLabel: dynamicString.optional(),
+    onSuccess: actionSchema.optional(),
+    onError: actionSchema.optional(),
+  })
+  .strip();
+
+const GitHubCommitPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("GitHubCommit"),
+    repoFullName: dynamicString.optional(),
+    defaultBranch: dynamicString.optional(),
+    suggestedBranchName: dynamicString.optional(),
+    suggestedTitle: dynamicString.optional(),
+    suggestedBody: dynamicString.optional(),
+    onSuccess: actionSchema.optional(),
+    onError: actionSchema.optional(),
+  })
+  .strip();
+
+const AzureLoginCardPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("AzureLoginCard"),
+    displayName: dynamicString.optional(),
+    showTokenInfo: z.boolean().optional(),
+    onSignIn: actionSchema.optional(),
+    onSignOut: actionSchema.optional(),
+  })
+  .strip();
+
+const AzureResourcePickerPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("AzureResourcePicker"),
+    subscriptionId: dynamicString.optional(),
+    resourceGroup: dynamicString.optional(),
+    resourceType: dynamicString.optional(),
+    label: dynamicString.optional(),
+    onSelect: actionSchema.optional(),
+  })
+  .strip();
+
+const AzureResourceFormPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("AzureResourceForm"),
+    title: dynamicString.optional(),
+    subscriptionId: dynamicString.optional(),
+    resourceGroup: dynamicString.optional(),
+    resourceType: dynamicString.optional(),
+    apiVersion: dynamicString.optional(),
+  })
+  .strip();
+
+const AzureActionPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("AzureAction"),
+    title: dynamicString,
+    description: dynamicString.optional(),
+    method: z.enum(["PUT", "POST", "PATCH", "DELETE"]),
+    path: dynamicString,
+    body: z.record(z.unknown()).optional(),
+    apiVersion: dynamicString.optional(),
+    confirmLabel: dynamicString.optional(),
+    onSuccess: actionSchema.optional(),
+    onError: actionSchema.optional(),
+  })
+  .strip();
+
+const SteppedCarouselStepSchema = z.object({
+  title: dynamicString,
+  child: boundedString,
+});
+
+const SteppedCarouselPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("SteppedCarousel"),
+    steps: z.array(SteppedCarouselStepSchema),
+    activeStep: z.number().optional(),
+  })
+  .strip();
+
+const QuestionDefSchema = z.object({
+  id: boundedString,
+  label: dynamicString,
+  type: z.enum(["text", "choice", "multiChoice"]).optional(),
+  choices: z
+    .array(z.object({ id: boundedString, label: dynamicString }))
+    .optional(),
+  required: z.boolean().optional(),
+});
+
+const QuestionnairePropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("Questionnaire"),
+    questions: z.array(QuestionDefSchema),
+    submitLabel: dynamicString.optional(),
+    onSubmit: actionSchema.optional(),
+  })
+  .strip();
+
 // New Fluent Components (5)
 
 const BadgePropsSchema = z
@@ -496,14 +744,20 @@ const MultiSelectPropsSchema = z
  */
 export const COMPONENT_SCHEMA_REGISTRY: Record<string, z.ZodType> = {
   Accordion: AccordionPropsSchema,
+  Alert: AlertPropsSchema,
   ArchitectureDiagram: ArchitectureDiagramPropsSchema,
   AudioPlayer: AudioPlayerPropsSchema,
   AuthCard: AuthCardPropsSchema,
+  AzureAction: AzureActionPropsSchema,
+  AzureLoginCard: AzureLoginCardPropsSchema,
+  AzureResourceForm: AzureResourceFormPropsSchema,
+  AzureResourcePicker: AzureResourcePickerPropsSchema,
   Badge: BadgePropsSchema,
   Button: ButtonPropsSchema,
   Card: CardPropsSchema,
   CheckBox: CheckBoxPropsSchema,
   ChoicePicker: ChoicePickerPropsSchema,
+  CodeBlock: CodeBlockPropsSchema,
   Column: ColumnPropsSchema,
   ComboBox: ComboBoxPropsSchema,
   CostEstimate: CostEstimatePropsSchema,
@@ -511,14 +765,26 @@ export const COMPONENT_SCHEMA_REGISTRY: Record<string, z.ZodType> = {
   DeploymentProgress: DeploymentProgressPropsSchema,
   Divider: DividerPropsSchema,
   FileEditor: FileEditorPropsSchema,
+  FormGroup: FormGroupPropsSchema,
+  GitHubAction: GitHubActionPropsSchema,
+  GitHubCommit: GitHubCommitPropsSchema,
+  GitHubLoginCard: GitHubLoginCardPropsSchema,
+  GitHubRepoPicker: GitHubRepoPickerPropsSchema,
   Icon: IconPropsSchema,
   Image: ImagePropsSchema,
+  Link: LinkPropsSchema,
   List: ListPropsSchema,
+  Markdown: MarkdownPropsSchema,
   Modal: ModalPropsSchema,
   MultiSelect: MultiSelectPropsSchema,
+  ProgressSteps: ProgressStepsPropsSchema,
+  Questionnaire: QuestionnairePropsSchema,
+  RadioGroup: RadioGroupPropsSchema,
   Row: RowPropsSchema,
   Slider: SliderPropsSchema,
+  SteppedCarousel: SteppedCarouselPropsSchema,
   Tabs: TabsPropsSchema,
+  Table: TablePropsSchema,
   Text: TextPropsSchema,
   TextField: TextFieldPropsSchema,
   Toggle: TogglePropsSchema,
