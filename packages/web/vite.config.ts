@@ -2,14 +2,25 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
+import { execSync } from 'child_process';
 
 const rootPkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
+
+function getShortSha(): string {
+  try {
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+  } catch {
+    return process.env.GITHUB_SHA?.substring(0, 7) || 'dev';
+  }
+}
+
+const shortSha = getShortSha();
 
 export default defineConfig({
   plugins: [react()],
   define: {
-    __BUILD_VERSION__: JSON.stringify(rootPkg.version),
-    __BUILD_SHA__: JSON.stringify(process.env.GITHUB_SHA?.substring(0, 7) || 'dev'),
+    __BUILD_VERSION__: JSON.stringify(`${rootPkg.version}-${shortSha}`),
+    __BUILD_SHA__: JSON.stringify(shortSha),
   },
   resolve: {
     alias: {

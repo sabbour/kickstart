@@ -311,9 +311,6 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
           <div className="landing-footer-meta">
             <span className="landing-footer-version">
               Kickstart Preview v{__BUILD_VERSION__}
-              {__BUILD_SHA__ && __BUILD_SHA__ !== 'dev'
-                ? ` · ${__BUILD_SHA__}`
-                : ' · dev'}
             </span>
             <a className="landing-footer-link" href="?playground">Playground</a>
           </div>
