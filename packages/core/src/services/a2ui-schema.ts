@@ -50,7 +50,7 @@ export function checkDepth(
 }
 
 // ---------------------------------------------------------------------------
-// Known component types (46)
+// Known component types (28)
 // ---------------------------------------------------------------------------
 
 export const KNOWN_COMPONENT_TYPES = new Set([
