@@ -113,6 +113,7 @@ const actionSchema = z
     event: z.object({
       name: z.string(),
       data: z.record(z.unknown()).optional(),
+      context: z.record(z.unknown()).optional(),
     }),
   })
   .passthrough();

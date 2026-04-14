@@ -306,9 +306,22 @@ export function App() {
     }
   }, [sessions]);
 
+  // Extract a human-readable label from an A2UI action, checking context then data as fallback
+  const getSelectionLabel = (action: A2uiClientAction): string => {
+    const ctx = action.context as Record<string, unknown> | undefined;
+    const data = (action as Record<string, unknown>).data as Record<string, unknown> | undefined;
+    return (
+      (ctx?.label as string) ??
+      (ctx?.value as string) ??
+      (data?.label as string) ??
+      (data?.value as string) ??
+      action.name
+    );
+  };
+
   // Convert A2UI component actions into user messages sent back to the conversation
   const handleA2UIAction = useCallback((action: A2uiClientAction) => {
-    const label = action.context?.label ?? action.context?.value ?? action.name;
+    const label = getSelectionLabel(action);
     const text = `[Selected: ${label}]`;
     handleSendMessage(text);
   }, [handleSendMessage]);
