@@ -252,72 +252,88 @@ describe("COMPONENT_SCHEMA_REGISTRY", () => {
 describe("A2UIMessageSchema", () => {
   it("validates createSurface message", () => {
     const result = A2UIMessageSchema.safeParse({
-      type: "createSurface",
-      surfaceId: "msg-1",
-      catalogId: "kickstart",
+      version: "v0.9",
+      createSurface: {
+        surfaceId: "msg-1",
+        catalogId: "kickstart",
+      },
     });
     expect(result.success).toBe(true);
   });
 
   it("validates updateComponents message", () => {
     const result = A2UIMessageSchema.safeParse({
-      type: "updateComponents",
-      surfaceId: "msg-1",
-      components: [
-        { id: "t1", component: "Text", text: "Hi" },
-      ],
+      version: "v0.9",
+      updateComponents: {
+        surfaceId: "msg-1",
+        components: [
+          { id: "t1", component: "Text", text: "Hi" },
+        ],
+      },
     });
     expect(result.success).toBe(true);
   });
 
   it("validates updateDataModel message", () => {
     const result = A2UIMessageSchema.safeParse({
-      type: "updateDataModel",
-      surfaceId: "msg-1",
-      path: "/app/name",
-      value: "my-app",
+      version: "v0.9",
+      updateDataModel: {
+        surfaceId: "msg-1",
+        path: "/app/name",
+        value: "my-app",
+      },
     });
     expect(result.success).toBe(true);
   });
 
   it("validates deleteSurface message", () => {
     const result = A2UIMessageSchema.safeParse({
-      type: "deleteSurface",
-      surfaceId: "msg-1",
+      version: "v0.9",
+      deleteSurface: {
+        surfaceId: "msg-1",
+      },
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects unknown message type", () => {
+  it("rejects unknown message type (no recognized key)", () => {
     const result = A2UIMessageSchema.safeParse({
-      type: "destroySurface",
-      surfaceId: "msg-1",
+      version: "v0.9",
+      destroySurface: {
+        surfaceId: "msg-1",
+      },
     });
     expect(result.success).toBe(false);
   });
 
   it("rejects empty surfaceId", () => {
     const result = A2UIMessageSchema.safeParse({
-      type: "createSurface",
-      surfaceId: "",
+      version: "v0.9",
+      createSurface: {
+        surfaceId: "",
+      },
     });
     expect(result.success).toBe(false);
   });
 
   it("rejects updateDataModel with invalid path (no leading /)", () => {
     const result = A2UIMessageSchema.safeParse({
-      type: "updateDataModel",
-      surfaceId: "msg-1",
-      path: "app/name",
-      value: "x",
+      version: "v0.9",
+      updateDataModel: {
+        surfaceId: "msg-1",
+        path: "app/name",
+        value: "x",
+      },
     });
     expect(result.success).toBe(false);
   });
 
   it("strips unknown fields from createSurface", () => {
     const result = A2UIMessageSchema.safeParse({
-      type: "createSurface",
-      surfaceId: "msg-1",
+      version: "v0.9",
+      createSurface: {
+        surfaceId: "msg-1",
+      },
       unknownField: "bad",
     });
     expect(result.success).toBe(true);
@@ -327,13 +343,15 @@ describe("A2UIMessageSchema", () => {
   it("truncates oversized strings instead of rejecting", () => {
     const longText = "a".repeat(PAYLOAD_LIMITS.maxStringLength + 100);
     const result = A2UIMessageSchema.safeParse({
-      type: "createSurface",
-      surfaceId: "msg-1",
-      catalogId: longText,
+      version: "v0.9",
+      createSurface: {
+        surfaceId: "msg-1",
+        catalogId: longText,
+      },
     });
     expect(result.success).toBe(true);
-    const data = (result as { success: true; data: Record<string, unknown> }).data;
-    expect((data.catalogId as string).length).toBe(PAYLOAD_LIMITS.maxStringLength);
+    const data = (result as { success: true; data: { createSurface: Record<string, unknown> } }).data;
+    expect((data.createSurface.catalogId as string).length).toBe(PAYLOAD_LIMITS.maxStringLength);
   });
 
   it("trims components array to maxComponents instead of rejecting", () => {
@@ -343,13 +361,15 @@ describe("A2UIMessageSchema", () => {
       text: `Item ${i}`,
     }));
     const result = A2UIMessageSchema.safeParse({
-      type: "updateComponents",
-      surfaceId: "msg-1",
-      components,
+      version: "v0.9",
+      updateComponents: {
+        surfaceId: "msg-1",
+        components,
+      },
     });
     expect(result.success).toBe(true);
-    const data = (result as { success: true; data: { components: unknown[] } }).data;
-    expect(data.components).toHaveLength(PAYLOAD_LIMITS.maxComponents);
+    const data = (result as { success: true; data: { updateComponents: { components: unknown[] } } }).data;
+    expect(data.updateComponents.components).toHaveLength(PAYLOAD_LIMITS.maxComponents);
   });
 });
 

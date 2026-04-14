@@ -528,11 +528,13 @@ const surfaceIdField = boundedStringNonEmpty;
 
 const CreateSurfaceMessageSchema = z
   .object({
-    type: z.literal("createSurface"),
-    surfaceId: surfaceIdField,
-    catalogId: boundedString.optional(),
-    theme: z.record(z.unknown()).optional(),
-    sendDataModel: z.boolean().optional(),
+    version: z.literal("v0.9"),
+    createSurface: z.object({
+      surfaceId: surfaceIdField,
+      catalogId: boundedString.optional(),
+      theme: z.record(z.unknown()).optional(),
+      sendDataModel: z.boolean().optional(),
+    }),
   })
   .strip();
 
@@ -544,36 +546,43 @@ const ComponentEntrySchema = z.object({
 
 const UpdateComponentsMessageSchema = z
   .object({
-    type: z.literal("updateComponents"),
-    surfaceId: surfaceIdField,
-    components: z.array(ComponentEntrySchema).transform((arr) =>
-      arr.length > PAYLOAD_LIMITS.maxComponents
-        ? arr.slice(0, PAYLOAD_LIMITS.maxComponents)
-        : arr,
-    ),
+    version: z.literal("v0.9"),
+    updateComponents: z.object({
+      surfaceId: surfaceIdField,
+      components: z.array(ComponentEntrySchema).transform((arr) =>
+        arr.length > PAYLOAD_LIMITS.maxComponents
+          ? arr.slice(0, PAYLOAD_LIMITS.maxComponents)
+          : arr,
+      ),
+    }),
   })
   .strip();
 
 const UpdateDataModelMessageSchema = z
   .object({
-    type: z.literal("updateDataModel"),
-    surfaceId: surfaceIdField,
-    path: boundedStringPath,
-    value: z.unknown(),
+    version: z.literal("v0.9"),
+    updateDataModel: z.object({
+      surfaceId: surfaceIdField,
+      path: boundedStringPath,
+      value: z.unknown(),
+    }),
   })
   .strip();
 
 const DeleteSurfaceMessageSchema = z
   .object({
-    type: z.literal("deleteSurface"),
-    surfaceId: surfaceIdField,
+    version: z.literal("v0.9"),
+    deleteSurface: z.object({
+      surfaceId: surfaceIdField,
+    }),
   })
   .strip();
 
 /**
- * Discriminated union of all A2UI v0.9 message types.
+ * Union of all A2UI v0.9 message types (nested wire format).
+ * Discriminated by key presence (createSurface | updateComponents | …).
  */
-export const A2UIMessageSchema = z.discriminatedUnion("type", [
+export const A2UIMessageSchema = z.union([
   CreateSurfaceMessageSchema,
   UpdateComponentsMessageSchema,
   UpdateDataModelMessageSchema,
