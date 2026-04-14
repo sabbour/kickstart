@@ -55,6 +55,7 @@ export function VirtualFSProvider({ children, store: externalStore }: VirtualFSP
         if (mountedRef.current) setFileRecords(records);
       })
       .catch((err) => {
+        // eslint-disable-next-line no-console
         console.error('[VirtualFS] readAll failed:', err);
         if (mountedRef.current) setFileRecords([]);
       });

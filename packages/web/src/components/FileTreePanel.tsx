@@ -4,6 +4,9 @@
  * Renders a hierarchical file tree with collapsible directories. Clicking a file
  * opens it in a Monaco-powered code view. Toolbar provides copy, download single
  * file, download-all ZIP, and delete actions.
+ *
+ * Users can create new files and import files. Monaco editor is writable with
+ * debounced IndexedDB persistence.
  */
 
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -189,6 +192,11 @@ const useStyles = makeStyles({
     fontSize: '32px',
     opacity: 0.5,
   },
+  emptyActions: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalS,
+    marginTop: tokens.spacingVerticalM,
+  },
   langBadge: {
     fontSize: tokens.fontSizeBase100,
     color: tokens.colorNeutralForeground3,
@@ -198,6 +206,12 @@ const useStyles = makeStyles({
     paddingLeft: tokens.spacingHorizontalXS,
     paddingRight: tokens.spacingHorizontalXS,
     borderRadius: tokens.borderRadiusMedium,
+  },
+  errorBar: {
+    marginTop: tokens.spacingVerticalXS,
+    marginBottom: tokens.spacingVerticalXS,
+    marginLeft: tokens.spacingHorizontalS,
+    marginRight: tokens.spacingHorizontalS,
   },
 });
 

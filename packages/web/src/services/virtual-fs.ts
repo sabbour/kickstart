@@ -1,5 +1,7 @@
 // Virtual Filesystem — in-memory file store for the Spark code generation experience
 
+import { normalizePath as validateAndNormalize } from '../utils/path-validation';
+
 export interface VirtualFile {
   path: string;
   content: string;
@@ -297,11 +299,33 @@ function sortTree(nodes: FileTreeNode[]): void {
   }
 }
 
+/** Errors thrown by VirtualFS for security-related rejections. */
+export class VFSError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+  ) {
+    super(message);
+    this.name = 'VFSError';
+  }
+}
+
+// --- Resource limits ---
+const MAX_FILE_SIZE = 5 * 1024 * 1024;       // 5 MB per file
+const MAX_TOTAL_QUOTA = 50 * 1024 * 1024;     // 50 MB total
+const MAX_FILE_COUNT = 500;
+
 /**
  * IndexedDB-backed virtual filesystem.
  *
  * Files are stored as `VFSFile` records with path, content, language, and timestamps.
  * All methods are async. Subscribe to change notifications via `subscribe()`.
+ *
+ * Security controls:
+ * - All paths validated via `normalizePath()` (rejects traversal, absolute, control chars)
+ * - Per-file size limit: 5 MB
+ * - Total quota: 50 MB
+ * - Max file count: 500
  */
 export class VirtualFS {
   private readonly dbPromise: Promise<IDBDatabase>;
@@ -311,19 +335,55 @@ export class VirtualFS {
     this.dbPromise = openIDB();
   }
 
-  private normalizePath(raw: string): string {
-    return raw
-      .replace(/\\/g, '/')
-      .replace(/^\/+/, '')
-      .replace(/\/+/g, '/')
-      .replace(/\/+$/, '');
+  private securePath(raw: string): string {
+    const validated = validateAndNormalize(raw);
+    if (!validated) {
+      throw new VFSError(`Invalid file path: ${raw}`, 'INVALID_PATH');
+    }
+    return validated;
   }
 
   async writeFile(path: string, content: string, language?: string): Promise<void> {
-    const normalized = this.normalizePath(path);
+    const normalized = this.securePath(path);
+
+    // Enforce per-file size limit
+    const encoder = new TextEncoder();
+    const contentSize = encoder.encode(content).byteLength;
+    if (contentSize > MAX_FILE_SIZE) {
+      throw new VFSError(
+        `File too large — maximum ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)} MB`,
+        'FILE_TOO_LARGE',
+      );
+    }
+
     const db = await this.dbPromise;
+
+    // Check quota and file count
+    const allRecords = await this._readAllRaw(db);
+    const existingIdx = allRecords.findIndex((r) => r.path === normalized);
+    const isNew = existingIdx === -1;
+    if (isNew && allRecords.length >= MAX_FILE_COUNT) {
+      throw new VFSError(
+        `File limit reached — maximum ${MAX_FILE_COUNT} files`,
+        'FILE_COUNT_EXCEEDED',
+      );
+    }
+    // Calculate total size (excluding current file if it exists)
+    let totalSize = 0;
+    for (const rec of allRecords) {
+      if (rec.path !== normalized) {
+        totalSize += encoder.encode(rec.content).byteLength;
+      }
+    }
+    if (totalSize + contentSize > MAX_TOTAL_QUOTA) {
+      throw new VFSError(
+        `Storage quota exceeded — maximum ${(MAX_TOTAL_QUOTA / 1024 / 1024).toFixed(0)} MB total`,
+        'QUOTA_EXCEEDED',
+      );
+    }
+
     const now = Date.now();
-    const existing = await this.getFile(normalized).catch(() => null);
+    const existing = existingIdx !== -1 ? allRecords[existingIdx] : null;
     const record: VFSFile = {
       path: normalized,
       content,
@@ -346,10 +406,11 @@ export class VirtualFS {
   }
 
   async getFile(path: string): Promise<VFSFile> {
+    const normalized = this.securePath(path);
     const db = await this.dbPromise;
     return new Promise((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, 'readonly');
-      const req = tx.objectStore(IDB_STORE).get(path);
+      const req = tx.objectStore(IDB_STORE).get(normalized);
       req.onsuccess = () => {
         if (req.result) {
           const raw = req.result as Record<string, unknown>;
@@ -368,7 +429,7 @@ export class VirtualFS {
           }
           resolve(migrated);
         } else {
-          reject(new Error(`File not found: ${path}`));
+          reject(new Error(`File not found: ${normalized}`));
         }
       };
       req.onerror = () => reject(req.error);
@@ -381,7 +442,15 @@ export class VirtualFS {
       const tx = db.transaction(IDB_STORE, 'readonly');
       const req = tx.objectStore(IDB_STORE).getAllKeys();
       req.onsuccess = () => {
-        const keys = req.result as string[];
+        const keys = (req.result as string[]).filter((k) => {
+          // Integrity boundary: exclude paths that fail validation
+          if (validateAndNormalize(k) === null) {
+            // eslint-disable-next-line no-console
+            console.warn('[VirtualFS] Excluding invalid path from listing:', k);
+            return false;
+          }
+          return true;
+        });
         resolve(dir ? keys.filter((k) => k.startsWith(dir)) : keys);
       };
       req.onerror = () => reject(req.error);
@@ -391,17 +460,33 @@ export class VirtualFS {
   /** Fetch all stored file records with full metadata. */
   async readAll(): Promise<VFSFile[]> {
     const db = await this.dbPromise;
+    return this._readAllRaw(db);
+  }
+
+  /** Internal: read all records with integrity validation. */
+  private async _readAllRaw(db: IDBDatabase): Promise<VFSFile[]> {
     return new Promise((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, 'readonly');
       const req = tx.objectStore(IDB_STORE).getAll();
       req.onsuccess = () => {
-        const records = (req.result as Record<string, unknown>[]).map((raw) => ({
-          path: raw.path as string,
-          content: raw.content as string,
-          language: (raw.language as string) ?? detectLang(raw.path as string),
-          createdAt: (raw.createdAt as number) ?? 0,
-          updatedAt: (raw.updatedAt as number) ?? 0,
-        }));
+        const records = (req.result as Record<string, unknown>[])
+          .filter((raw) => {
+            // Integrity boundary: skip records with invalid paths
+            const valid = validateAndNormalize(raw.path as string);
+            if (!valid) {
+              // eslint-disable-next-line no-console
+              console.warn('[VirtualFS] Excluding corrupt record:', raw.path);
+              return false;
+            }
+            return true;
+          })
+          .map((raw) => ({
+            path: raw.path as string,
+            content: raw.content as string,
+            language: (raw.language as string) ?? detectLang(raw.path as string),
+            createdAt: (raw.createdAt as number) ?? 0,
+            updatedAt: (raw.updatedAt as number) ?? 0,
+          }));
         resolve(records.sort((a, b) => a.path.localeCompare(b.path)));
       };
       req.onerror = () => reject(req.error);
@@ -409,10 +494,11 @@ export class VirtualFS {
   }
 
   async deleteFile(path: string): Promise<void> {
+    const normalized = this.securePath(path);
     const db = await this.dbPromise;
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).delete(path);
+      tx.objectStore(IDB_STORE).delete(normalized);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -420,10 +506,11 @@ export class VirtualFS {
   }
 
   async exists(path: string): Promise<boolean> {
+    const normalized = this.securePath(path);
     const db = await this.dbPromise;
     return new Promise((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, 'readonly');
-      const req = tx.objectStore(IDB_STORE).count(IDBKeyRange.only(path));
+      const req = tx.objectStore(IDB_STORE).count(IDBKeyRange.only(normalized));
       req.onsuccess = () => resolve(req.result > 0);
       req.onerror = () => reject(req.error);
     });
@@ -446,7 +533,14 @@ export class VirtualFS {
     const records = await this.readAll();
     const zip = new JSZip();
     for (const { path, content } of records) {
-      zip.file(path, content);
+      // Defense-in-depth: re-validate every path before adding to ZIP
+      const safe = validateAndNormalize(path);
+      if (!safe) {
+        // eslint-disable-next-line no-console
+        console.warn('[VirtualFS] Skipping invalid path during ZIP export:', path);
+        continue;
+      }
+      zip.file(safe, content);
     }
     return zip.generateAsync({ type: 'blob' });
   }

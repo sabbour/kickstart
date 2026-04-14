@@ -39,6 +39,7 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(mockEnabled ? true : null);
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
+  const [filePanelOpen, setFilePanelOpen] = useState(true);
 
   const connectorRegistry = useAPIConnectorRegistry();
 
@@ -297,6 +298,19 @@ export function App() {
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
   const hasFiles = fsFiles.length > 0 || vfsFiles.length > 0;
 
+  // Auto-show file panel when files appear
+  const hadFilesRef = useRef(false);
+  useEffect(() => {
+    if (hasFiles && !hadFilesRef.current) {
+      setFilePanelOpen(true);
+    }
+    hadFilesRef.current = hasFiles;
+  }, [hasFiles]);
+
+  const handleToggleFilePanel = useCallback(() => {
+    setFilePanelOpen((prev) => !prev);
+  }, []);
+
   // Playground mode — standalone A2UI test harness
   if (playgroundEnabled) {
     return (
@@ -321,7 +335,9 @@ export function App() {
         onToggleSidebar={() => setSidebarOpen(prev => !prev)}
         onNewSession={handleNewSession}
         showSessionsToggle={mode === 'chat'}
-        hasFiles={hasFiles}
+        hasFiles={hasFiles && filePanelOpen}
+        showFilePanel={mode === 'chat' && filePanelOpen}
+        onToggleFilePanel={mode === 'chat' ? handleToggleFilePanel : undefined}
         sidebar={mode === 'chat' ? (
           <SessionsSidebar
             isOpen={sidebarOpen}
