@@ -1,5 +1,11 @@
 # @kickstart/web
 
+## 0.5.7
+
+### Patch Changes
+
+- [#184](https://github.com/sabbour/kickstart/pull/184) [`566dbd6`](https://github.com/sabbour/kickstart/commit/566dbd6b0168af8a33e5758ddacbf81b85cd8548) Thanks [@sabbour](https://github.com/sabbour)! - Adopt official A2UI v0.9 nested wire format end-to-end. The `A2UIMessage` type shape changed from flat `{type, surfaceId, ...}` to nested `{version: "v0.9", createSurface: {...}}`.
+
 ## 0.2.0
 
 ### Minor Changes
