@@ -64,6 +64,12 @@ export interface SystemPromptContext {
    * Merged with the base catalog when generating the §5 component catalog.
    */
   kitComponentEntries?: ComponentCatalogEntry[];
+  /**
+   * Pre-formatted Copilot extension skills prompt section.
+   * When non-empty, appended after Available Capabilities so the LLM
+   * can suggest relevant public Copilot extensions to the user.
+   */
+  copilotSkillsPrompt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -506,6 +512,11 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
   if (context.kitPrompts && context.kitPrompts.length > 0) {
     const capabilities = context.kitPrompts.map((p) => p.trim()).join("\n\n");
     parts.push(`\n## Available Capabilities\n\n${capabilities}`);
+  }
+
+  // Copilot extension skills — suggest public extensions when relevant
+  if (context.copilotSkillsPrompt) {
+    parts.push(`\n${context.copilotSkillsPrompt}`);
   }
 
   return parts.join("\n\n");
