@@ -1,3 +1,287 @@
+# Decision: Continuous SWA deployment from main + version-SHA footer
+
+**Author:** Bender (Backend Dev)
+**Date:** 2026-04-14
+**PR:** #177
+
+## Context
+
+SWA deployment only triggered on release tags (`v*`) and PRs, meaning changes merged to `main` didn't deploy until a release was cut. Ahmed needed immediate deployment on every merge.
+
+## Decisions
+
+1. **Push-to-main trigger** — `deploy-swa.yml` now triggers on `push → branches: [main]` with path filters (`packages/**`, `package.json`, `package-lock.json`, `tsconfig.json`). Tag-based releases still trigger deployment as before.
+
+2. **Unified version string** — `__BUILD_VERSION__` is now `{semver}-{shortSHA}` (e.g. `0.5.6-abc1234`). Git SHA is resolved via `git rev-parse --short HEAD` at build time, falling back to `GITHUB_SHA` env var, then `dev`.
+
+3. **Footer simplification** — Landing and Playground footers show the unified version string instead of version + SHA separately. Every build is uniquely identifiable.
+
+## Impact
+
+- Every push to `main` that touches package code auto-deploys to SWA
+- Release workflow unchanged — tag pushes still work
+- Fry: footer components (`Landing.tsx`, `Playground.tsx`) now use `__BUILD_VERSION__` only (SHA embedded)
+# Decision: Roadmap Gap Analysis — v0.6.0 / v1.0.0 / Backlog
+
+**Author:** Leela (Lead)
+**Date:** 2026-04-14
+**Status:** Proposed
+
+## Context
+
+Holistic analysis of the Kickstart project (v0.5.6) to identify features, improvements, and gaps for a compelling AI-guided AKS onboarding experience. Compared against competitive tools (Azure Portal AI, Copilot for Azure, GitHub Copilot). Excludes items already tracked in open issues (#46, #167–#186).
+
+---
+
+## Proposed Enhancements
+
+### Category 1: Conversation Engine & Intelligence
+
+#### 1. `feat: Server-side session persistence (Cosmos DB or Table Storage)`
+Sessions are in-memory with 1hr TTL — restart kills everything. Users can't resume onboarding across devices or browser sessions. This is the single biggest gap for a production experience.
+- **Priority:** P0 critical
+- **Milestone:** v0.6.0
+
+#### 2. `feat: Real Azure Pricing API integration for cost estimation`
+`estimateCost` tool returns hardcoded stub data. Users need accurate, real-time pricing to make deployment decisions. The PricingConnector and `/api/pricing-proxy` already exist — just need to wire them.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 3. `feat: Bicep/Terraform infrastructure code generation`
+Only K8s manifests and GitHub Actions are generated. The system prompt references Bicep in demo scenarios but there's no generator. Users expect a complete "push and deploy" package including infrastructure-as-code.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 4. `feat: Dockerfile generation from app analysis`
+The generate phase shows a Dockerfile in demo scenarios but the actual generator only covers K8s manifests and GitHub Actions. Adding a Dockerfile generator closes the "zero to deployed" artifact gap.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 5. `feat: Phase back-navigation — allow users to revisit earlier phases`
+The phase machine only supports ADVANCE and SKIP. Users can't go back to change their app description or architecture decisions without starting over. Competitive tools all support non-linear navigation.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 6. `feat: Conversation branching — explore alternate architectures`
+Users should be able to fork a conversation to compare two architecture options (e.g., Cosmos DB vs PostgreSQL) without losing progress. "What if" exploration is a killer feature for design decisions.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v1.0.0
+
+#### 7. `feat: Multi-turn context window management and summarization`
+Long conversations will exceed token limits. Need a summarization strategy that compresses earlier phases into a context summary while keeping recent turns verbatim.
+- **Priority:** P1 important
+- **Milestone:** v1.0.0
+
+---
+
+### Category 2: UX & Frontend
+
+#### 8. `feat: Guided onboarding tour for first-time users`
+No explanation of what Kickstart does, how phases work, or what to expect. First-time users land on a chat and don't know what to type. A lightweight coach-mark tour (3-4 steps) would dramatically improve activation.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 9. `feat: Progress sidebar showing phase journey and collected data`
+Users have no visibility into what the AI knows about their app or how far along they are. A persistent sidebar showing phase progress + collected data (app name, runtime, services, etc.) creates transparency and trust.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 10. `feat: Artifact download as ZIP bundle`
+Users can view generated files and push to GitHub, but can't download everything as a local ZIP. Not everyone wants to create a repo immediately — some want to inspect locally first.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v0.6.0
+
+#### 11. `feat: Conversation export (share link or markdown)`
+No way to share a completed onboarding session with a teammate for review. Export as markdown or a shareable read-only link would enable team collaboration.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v1.0.0
+
+#### 12. `feat: Keyboard shortcuts for power users`
+No keyboard shortcuts beyond Ctrl+Shift+D (debug). Common shortcuts: Enter to send, Cmd+K for new session, Escape to cancel, arrow keys for navigation. Power users expect this.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v0.6.0
+
+#### 13. `feat: Mobile-responsive layout for tablet/phone`
+The chat interface likely works on mobile but A2UI components (tables, architecture diagrams, file editors) probably don't. Azure Portal's mobile story is weak — this is a differentiation opportunity.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v1.0.0
+
+#### 14. `feat: User feedback mechanism (thumbs up/down per response)`
+No way to collect signal on response quality. Even a simple thumbs up/down with optional text would enable prompt tuning and identify failure modes.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+---
+
+### Category 3: Code Generation & Artifacts
+
+#### 15. `feat: Docker Compose generation for local development`
+Users need to test locally before deploying. A Docker Compose file with the app + its dependencies (database, cache, etc.) lets users validate their architecture locally.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v0.6.0
+
+#### 16. `feat: Helm chart generation as alternative to raw manifests`
+Many teams use Helm for K8s packaging. Offering Helm chart generation alongside raw manifests addresses a large segment of enterprise users.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v1.0.0
+
+#### 17. `feat: Kustomize overlay generation for multi-environment deployments`
+Production users need dev/staging/prod configurations. Kustomize overlays are the AKS-recommended approach for environment-specific manifest management.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v1.0.0
+
+#### 18. `feat: Manifest validation against live AKS cluster`
+The 20 deployment safeguards validate statically. Connecting to a real cluster (via user's Azure creds) to validate namespace availability, RBAC, quotas, and API versions would catch real deployment issues.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v1.0.0
+
+---
+
+### Category 4: Observability & Telemetry
+
+#### 19. `feat: Application Insights integration for production telemetry`
+The telemetry module is an in-memory ring buffer. No production observability — can't track usage, errors, latency, or conversation completion rates. App Insights is the natural fit given the Azure stack.
+- **Priority:** P0 critical
+- **Milestone:** v0.6.0
+
+#### 20. `feat: Conversation analytics dashboard (completion rates, drop-off phases)`
+Once telemetry exists, need a dashboard showing: sessions started, phase completion funnel, average time per phase, common drop-off points. This drives product decisions.
+- **Priority:** P1 important
+- **Milestone:** v1.0.0
+
+#### 21. `feat: Structured error tracking with source maps (Sentry or App Insights)`
+Frontend errors in production are invisible. Source-mapped error tracking catches component rendering failures, API errors, and streaming issues in real deployments.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+---
+
+### Category 5: Testing
+
+#### 22. `feat: React component unit tests with Testing Library`
+The web package has only 1 unit test file (a11y audit). Zero component-level tests for ChatShell, MessageList, Landing, A2UISurfaceWrapper, or any hook. This is the biggest testing gap.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 23. `feat: Automated accessibility testing with axe-core in CI`
+The a11y audit is a static source analysis. Runtime axe-core tests catch actual DOM accessibility violations. Should run as part of E2E suite against rendered components.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 24. `feat: API function integration tests`
+No tests for the 11 Azure Functions API endpoints. Conversation flow, action routing, code generation, and proxy endpoints need integration tests with mocked Azure OpenAI responses.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 25. `feat: Visual regression testing for A2UI components`
+49+ components with no visual regression baseline. A Playwright screenshot comparison or Chromatic integration would catch unintended UI changes.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v1.0.0
+
+#### 26. `chore: Test coverage reporting and thresholds in CI`
+No coverage measurement. Add coverage to vitest config with minimum thresholds (e.g., 70% core, 50% web) to prevent regression.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v0.6.0
+
+---
+
+### Category 6: DevEx & Build
+
+#### 27. `feat: Storybook for A2UI component development and documentation`
+49+ components with no isolated development environment. Storybook enables component development without running the full app, serves as living documentation, and enables visual testing.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v1.0.0
+
+#### 28. `chore: Bundle analysis and size budgets in CI`
+No bundle size tracking. Vite's built-in analyzer + a CI check would catch unexpected bundle growth (Monaco Editor alone is likely a big chunk).
+- **Priority:** P2 nice-to-have
+- **Milestone:** v0.6.0
+
+#### 29. `feat: OpenAPI specification for Azure Functions API`
+11 API endpoints with no machine-readable spec. An OpenAPI spec enables auto-generated client SDKs, Swagger UI for testing, and API documentation.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v1.0.0
+
+#### 30. `chore: Route-based code splitting for web app`
+Only 2 components use React.lazy(). The Playground, FileTreePanel, and Monaco Editor should be lazy-loaded. Reduces initial bundle size significantly.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v0.6.0
+
+---
+
+### Category 7: Security & Compliance
+
+#### 31. `feat: Content Security Policy headers for Static Web App`
+No CSP configuration. The SWA should have strict CSP headers blocking inline scripts, restricting font/image sources, and preventing XSS vectors.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 32. `feat: Per-user rate limiting on API endpoints`
+Rate limiter exists (`rate-limiter.ts`) but it's unclear if it's per-user or global. Per-user rate limiting prevents abuse and ensures fair usage in multi-tenant deployments.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 33. `feat: Audit logging for sensitive operations (GitHub push, Azure resource creation)`
+No audit trail for destructive or sensitive operations. When a user pushes code to GitHub or creates Azure resources, that should be logged with user identity and timestamp.
+- **Priority:** P1 important
+- **Milestone:** v1.0.0
+
+---
+
+### Category 8: Deployment & Infrastructure
+
+#### 34. `feat: Staging environment with separate Azure OpenAI quota`
+Single environment (dev). No staging for testing deployments before production. Separate Azure OpenAI quota prevents staging traffic from impacting production.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 35. `feat: Infrastructure monitoring and alerting (Azure Monitor)`
+No monitoring or alerting configured. Need alerts for: API error rate spikes, latency degradation, Azure OpenAI quota exhaustion, SWA availability.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 36. `feat: Database backend for session persistence (CosmosDB or Table Storage)`
+Companion to item #1. The infra template needs a database resource for session storage. Cosmos DB serverless is the natural fit — low cost at low volume, scales with usage.
+- **Priority:** P0 critical
+- **Milestone:** v0.6.0
+
+---
+
+### Category 9: Content & Onboarding Quality
+
+#### 37. `feat: Expanded demo scenarios covering all 6 phases`
+Only 4 demo scenarios exist (WELCOME, ARCHITECTURE, DESIGN_DETAIL, FILE_GENERATION). Missing: REVIEW phase demo, HANDOFF phase demo, DEPLOY phase demo. Demo mode should showcase the full journey.
+- **Priority:** P1 important
+- **Milestone:** v0.6.0
+
+#### 38. `feat: Template library — pre-built architectures for common patterns`
+Instead of starting from scratch every time, offer templates: "Node.js API + PostgreSQL", "Python ML service + Redis", "Java Spring Boot + CosmosDB". Reduces time-to-value dramatically.
+- **Priority:** P1 important
+- **Milestone:** v1.0.0
+
+#### 39. `feat: "Bring your own repo" — analyze existing codebase for AKS readiness`
+Currently starts from a blank slate. Enterprise users have existing apps they want to containerize. Analyzing a GitHub repo to detect runtime, dependencies, and port would be a premium feature.
+- **Priority:** P2 nice-to-have
+- **Milestone:** v1.0.0
+
+#### 40. `feat: Multi-language system prompt and UI localization`
+English-only. No i18n framework. For global Azure adoption, at minimum Japanese, Chinese, Korean, Spanish, Portuguese, and German would be expected.
+- **Priority:** P2 nice-to-have
+- **Milestone:** Backlog
+
+---
+
+## Priority Summary
+
+| Priority | Count | Key Items |
+|----------|-------|-----------|
+| **P0** | 3 | Session persistence (#1, #36), Production telemetry (#19) |
+| **P1** | 18 | Real pricing (#2), Bicep gen (#3), Dockerfile gen (#4), Phase navigation (#5), Onboarding tour (#8), Progress sidebar (#9), Feedback (#14), App Insights (#19), Error tracking (#21), Component tests (#22), a11y automation (#23), API tests (#24), CSP (#31), Rate limiting (#32), Staging env (#34), Monitoring (#35), Demo scenarios (#37), Templates (#38) |
+| **P2** | 19 | Branching (#6), ZIP download (#10), Export (#11), Shortcuts (#12), Mobile (#13), Docker Compose (#15), Helm (#16), Kustomize (#17), Cluster validation (#18), Analytics dashboard (#20), Visual regression (#25), Coverage (#26), Storybook (#27), Bundle budgets (#28), OpenAPI (#29), Code splitting (#30), Audit logging (#33), Bring-your-own-repo (#39), i18n (#40) |
+
+## Impact
+
+This analysis establishes the roadmap backlog for v0.6.0 and v1.0.0. Items should be converted to GitHub issues with DPs before implementation. P0 items should be tackled first — without session persistence and production telemetry, Kickstart cannot be used in a real onboarding scenario.
 # Decision: Debug Mode UI Architecture
 
 **Author:** Fry (Frontend Dev)
