@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeToggle } from './ThemeToggle';
 import { useDebug } from '../contexts/DebugContext';
+import { useTour } from '../contexts/TourContext';
 
 interface AuthUser {
   userDetails: string;
@@ -25,6 +26,7 @@ export function Topbar({
   onToggleFilePanel,
 }: TopbarProps) {
   const { debugEnabled, toggleDebug } = useDebug();
+  const { startTour } = useTour();
   const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
@@ -93,6 +95,16 @@ export function Topbar({
             </svg>
           </button>
         )}
+        <button
+          className="topbar-btn"
+          aria-label="Show tour"
+          title="Show tour"
+          onClick={startTour}
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10 2a8 8 0 110 16 8 8 0 010-16zm0 1a7 7 0 100 14 7 7 0 000-14zm0 10.5a.75.75 0 110 1.5.75.75 0 010-1.5zm0-8a2.75 2.75 0 012.75 2.75c0 1.01-.577 1.676-1.188 2.258l-.142.133c-.52.488-.92.876-.92 1.609a.5.5 0 01-1 0c0-1.12.614-1.817 1.207-2.388l.154-.145c.493-.464.889-.843.889-1.467A1.75 1.75 0 0010 6.5a1.75 1.75 0 00-1.75 1.75.5.5 0 01-1 0A2.75 2.75 0 0110 5.5z" />
+          </svg>
+        </button>
         <ThemeToggle />
         {user ? (
           <div className="topbar-signin" role="group" aria-label="User menu">

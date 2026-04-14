@@ -6,6 +6,7 @@ import { ArtifactProvider } from './contexts/ArtifactContext';
 import { VirtualFSProvider } from './contexts/VirtualFSContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { DebugProvider } from './contexts/DebugContext';
+import { TourProvider } from './contexts/TourContext';
 import { registerKit, azureKit, githubKit, InMemoryArtifactStore } from '@kickstart/core';
 
 // Register integration kits at startup — auto-wires tools + connectors into
@@ -22,13 +23,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
       <DebugProvider>
-        <APIConnectorProvider>
-          <ArtifactProvider store={sessionArtifactStore}>
-            <VirtualFSProvider>
-              <App />
-            </VirtualFSProvider>
-          </ArtifactProvider>
-        </APIConnectorProvider>
+        <TourProvider>
+          <APIConnectorProvider>
+            <ArtifactProvider store={sessionArtifactStore}>
+              <VirtualFSProvider>
+                <App />
+              </VirtualFSProvider>
+            </ArtifactProvider>
+          </APIConnectorProvider>
+        </TourProvider>
       </DebugProvider>
     </ThemeProvider>
   </React.StrictMode>

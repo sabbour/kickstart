@@ -20,6 +20,7 @@ import { useVirtualFS } from './contexts/VirtualFSContext';
 import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
+import { OnboardingTour } from './components/Tour/OnboardingTour';
 import type { AppMode, ChatMessage, A2uiMsg } from './types';
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
@@ -395,24 +396,30 @@ export function App() {
         ) : undefined}
       >
         {mode === 'landing' ? (
-          <Landing
-            onStartChat={handleStartChat}
-            recentSessions={sessions.recentSessions}
-            onResumeSession={handleResumeSession}
-            onDeleteSession={sessions.deleteSession}
-            onClearAllSessions={handleClearAllSessions}
-          />
+          <>
+            <Landing
+              onStartChat={handleStartChat}
+              recentSessions={sessions.recentSessions}
+              onResumeSession={handleResumeSession}
+              onDeleteSession={sessions.deleteSession}
+              onClearAllSessions={handleClearAllSessions}
+            />
+            <OnboardingTour mode="landing" />
+          </>
         ) : (
-          <ChatShell
-            messages={messages}
-            isStreaming={isStreaming}
-            streamingText={currentStreamText}
-            streamingSurfaceIds={progressiveQueue.visibleIds}
-            currentPhase={currentPhase}
-            onSend={handleSendMessage}
-            getSurface={a2ui.getSurface}
-            debugEnabled={debugEnabled}
-          />
+          <>
+            <ChatShell
+              messages={messages}
+              isStreaming={isStreaming}
+              streamingText={currentStreamText}
+              streamingSurfaceIds={progressiveQueue.visibleIds}
+              currentPhase={currentPhase}
+              onSend={handleSendMessage}
+              getSurface={a2ui.getSurface}
+              debugEnabled={debugEnabled}
+            />
+            <OnboardingTour mode="chat" />
+          </>
         )}
       </Layout>
     </FluentProvider>
