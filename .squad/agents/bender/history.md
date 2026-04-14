@@ -38,3 +38,11 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - Concurrent git operations from multiple agents cause `index.lock` contention -- use retry loops with lock removal for shared repos.
 - (2026-04-14 17:44) System prompt's ABSOLUTE RULES section had a passive question→component hint that the LLM ignored for binary/either-or questions. Fixed by adding explicit NON-NEGOTIABLE rules, an "Either/or" row in the component selection table, and two new examples (Buttons-in-Row + RadioGroup) for 2-option questions. PR #213.
 - LLM examples are the strongest prompt steering mechanism — the model follows demonstrated patterns over stated rules. If a pattern has no example, the LLM will default to plain text. Always add an example for every major component pattern.
+
+## 2026-04-14 Round 2: Infrastructure + Bug Fixes
+
+- **PR #213**: Fixed missing choice components in system prompt. Root cause identified and fixed purely additively.
+- **Approved by Leela**: Set to auto-merge.
+- **SWA automation**: Implemented continuous deployment on main + version-SHA footer (PR #177).
+- **Project board triage**: Implemented auto-assignment workflow for issues.
+- **Team notes**: Coordinated with Fry on footer components; ensured Leela's approval before merge.

@@ -13,3 +13,9 @@
 - 2026-04-10: `/api/converse` currently exposes full system prompts to clients on new sessions; treat system prompts as sensitive control-plane data.
 - 2026-04-10: Security hardening backlog now tracked in Security milestone issues #81-#88 with severity and OWASP mapping.
 - 2026-04-10: DP #30 (IntegrationKit lifecycle/dependency/auth extension) approved with conditions requiring transactional lifecycle rollback, cycle detection on re-registration, explicit auth schema validation, and documented trusted-kit boundary.
+
+## 2026-04-14 Round 2: DP Security Review
+
+- **Reviewed DPs #186 & #187**: #187 approved (low risk), #186 flagged with High/Medium concerns.
+- **#186 blockers**: Immutable source pinning, prompt-safety validation, fail-closed + provenance.
+- **Coordination**: Communicated security requirements to Leela; provided detailed guidance for Phase 1 hardening.

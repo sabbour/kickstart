@@ -57,3 +57,10 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - (2026-04-14 12:30) P0 fix: #192 A2UI component interactivity broken — ChoicePicker/CheckBox/Toggle/ComboBox/MultiSelect lacked ActionSchema in schemas, so LLM-provided actions were treated as static objects instead of callable closures. Added FlexibleApis with action support + onAction callback on A2UISurfaceWrapper → PR #195 opened.
 - (2026-04-14 16:42) Prompt fix: Removed "Got it" acknowledgment cards from DISCOVER and DESIGN phase prompts. Prompt-only change in `packages/core/src/engine/phases.ts`.
 - (2026-04-14 17:01) Browser back button: Added `useNavigation` hook with hash-based History API routing (`#session/{id}`). Wired into App.tsx for all nav paths. Deep link support included. → PR #211 opened.
+
+## 2026-04-14 Round 2: Frontend Fixes + Navigation
+
+- **PR #214**: Fixed A2UI action display bug. ChoicePicker/RadioGroup now inject selectedLabel into action context.
+- **Hash-based navigation**: Implemented History API support for browser back button (#169). Uses `#session/{id}` pattern.
+- **Footer update**: Coordinated with Bender on version-SHA display.
+- **Team status**: Awaiting review on PR #214; navigation feature documented in decisions.md.
