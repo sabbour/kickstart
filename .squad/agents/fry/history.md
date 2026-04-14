@@ -54,6 +54,8 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - (2026-04-14) A2UI action closures created by GenericBinder (`generic-binder.ts` ACTION case) only resolve DataBindings that exist in the raw action JSON. If the LLM defines static context (e.g. `{ label: "Runtime" }`) without DataBindings for the selected value, the user's actual selection won't be in the action context. Components must enrich the context themselves using `context.componentModel.properties.action` (raw def) + `context.dataContext.resolveAction()` + manual value injection.
 - (2026-04-14) `DataContext.resolveAction()` in `data-context.ts:283` is the official API for resolving an Action's DataBindings. It resolves each value in `event.context` one level deep via `resolveDynamicValue`. Use it instead of duplicating the GenericBinder's `resolveDeepSync` logic.
 - (2026-04-14) `a2ui-overrides.css` generic element-level CSS with `!important` was the root cause of Playground components rendering as plain HTML. All catalog components are Fluent UI v9 React with Griffel — never add `!important` element-level overrides inside `.a2ui-surface-wrapper`. Target component-specific classes or use Griffel `makeStyles` instead.
+- (2026-04-14) DebugMetadata.rawContent captures the accumulated SSE text, NOT the full structured response. A2UI messages arrive via separate SSE events and must be collected separately into a `fullEnvelope` for debugging. Three A2UI sources: typed SSE events, inline `event.a2ui`, and JSON envelope post-parse.
+- (2026-04-14) Action dispatch observability uses an `onDebugAction` callback on `useActionDispatch` that feeds into DebugContext's `actionLog`. This avoids coupling the vendor A2UI layer to debug concerns.
 
 ## Work Log
 - (2026-04-14 14:35) CSS override bug: Removed ~600 lines of `!important` element-level overrides from `a2ui-overrides.css` that were fighting Fluent UI v9 Griffel styles. Switched CodeBlock highlight.js theme to `github.css`. → PR #242 opened.
@@ -95,6 +97,7 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - Post-approval, implemented #188 scenarios in PR #219
 - PR #219 merged to main
 - Total scope: 5 new demo scenarios, updated UI components, test coverage added
+- (2026-04-14 17:44) Debug panel fix: Full A2UI JSON envelope + action context logging. 7-file change across types, useStreaming, DebugContext, useActionDispatch, App, ChatMessage, DebugPanel. Collapsible sections + JSON syntax highlighting. → PR #216 opened.
 
 ## 2026-04-14 Round 2: Frontend Fixes + Navigation
 
