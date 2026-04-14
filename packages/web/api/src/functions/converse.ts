@@ -69,10 +69,24 @@ app.http("converse", {
         return { status: 400, jsonBody: { error: "message is required" } };
       }
 
-      // Content safety pre-flight check
+      // Content safety pre-flight check on the current message
       const safetyResult = await checkContentSafety(body.message);
       if (!safetyResult.safe) {
         return { status: 400, jsonBody: { error: safetyResult.error } };
+      }
+
+      // Also check all user-role messages in the rehydration history —
+      // without this, a client could send a safe `message` but smuggle
+      // unsafe content through `body.messages`.
+      if (body.messages?.length) {
+        for (const msg of body.messages) {
+          if (msg.role !== "user") continue;
+          if (!msg.content?.trim()) continue;
+          const historySafety = await checkContentSafety(msg.content);
+          if (!historySafety.safe) {
+            return { status: 400, jsonBody: { error: historySafety.error } };
+          }
+        }
       }
 
       // Get or create session — if the in-memory session is gone but the
