@@ -52,8 +52,18 @@ jobs:
         run: npx changeset status
         continue-on-error: true
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            packages/core/dist/
+            packages/web/dist/
+          retention-days: 1
+
   e2e:
     name: Playwright E2E Tests
+    needs: lint-build
     runs-on: ubuntu-latest
 
     steps:
@@ -69,11 +79,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build core
-        run: npm run build -w @kickstart/core
-
-      - name: Build web app (Vite)
-        run: cd packages/web && npx vite build
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps

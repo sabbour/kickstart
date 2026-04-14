@@ -30,3 +30,6 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - SWA deploy workflow (`deploy-swa.yml`) needs explicit `push → branches: [main]` trigger — tag-only triggers mean no continuous deployment from main.
 - `__BUILD_VERSION__` in `vite.config.ts` can embed git SHA via `execSync('git rev-parse --short HEAD')` — works both locally and in CI without relying on `GITHUB_SHA` env var.
 - Footer version display should use a single unified string (`version-sha`) rather than showing version and SHA separately — reduces redundancy and makes each build uniquely identifiable at a glance.
+- CI artifact sharing: `upload-artifact@v4` preserves relative paths from the repo root. `download-artifact@v4` restores them to the workspace root by default — no `path:` override needed when the upload paths already match the expected directory structure.
+- `retention-days: 1` on CI build artifacts keeps storage lean — these are ephemeral build outputs only needed for the duration of the workflow run.
+- Making the `e2e` job depend on `lint-build` via `needs:` eliminates redundant core + web builds. The e2e job still needs `npm ci` for runtime deps and Playwright browser installs.
