@@ -5,6 +5,8 @@ export interface DebugMetadata {
   model?: string;
   /** Raw LLM response text before rendering. */
   rawResponse?: string;
+  /** Raw chunk content accumulated from SSE chunk events (before envelope extraction). */
+  rawContent?: string;
   /** Rendering engine decisions (component choices, catalog, degradation). */
   renderDecisions?: string[];
 }

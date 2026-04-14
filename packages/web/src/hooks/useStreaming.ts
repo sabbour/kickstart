@@ -28,6 +28,8 @@ export function useStreaming() {
     abortRef.current = controller;
 
     let accumulated = '';
+    let rawAccumulated = '';
+    let sawTypedA2ui = false;
     let lastModel: string | undefined;
     let lastSessionId: string | undefined;
     const renderDecisions: string[] = [];
@@ -79,13 +81,11 @@ export function useStreaming() {
             if (currentEventType === 'a2ui') {
               const a2uiMsg: A2uiMsg = JSON.parse(data);
               callbacks.onA2UI([a2uiMsg]);
-              currentEventType = '';
+              sawTypedA2ui = true;
               continue;
             }
 
             const event: StreamEvent = JSON.parse(data);
-            // Reset event type after consuming a data line
-            currentEventType = '';
 
             if (event.error) {
               await reader.cancel();
@@ -101,13 +101,12 @@ export function useStreaming() {
             }
 
             if (event.content) {
-              accumulated = event.content;
-              setStreamText(accumulated);
-              callbacks.onDelta(accumulated);
+              rawAccumulated += event.content;
             }
 
             if (event.a2ui && event.a2ui.length > 0) {
               callbacks.onA2UI(event.a2ui);
+              sawTypedA2ui = true;
             }
 
             if (event.phase) {
@@ -125,19 +124,22 @@ export function useStreaming() {
             if (event.renderDecisions) {
               renderDecisions.push(...event.renderDecisions);
             }
-          } catch { /* skip malformed JSON */ }
+          } catch { /* skip malformed JSON */ } finally {
+            currentEventType = '';
+          }
         }
       }
 
       // Extract A2UI from the accumulated JSON envelope (chunks build a full response)
+      const envelopeSource = rawAccumulated || accumulated;
       try {
-        const envelope = JSON.parse(accumulated);
-        if (envelope?.a2ui && Array.isArray(envelope.a2ui) && envelope.a2ui.length > 0) {
+        const envelope = JSON.parse(envelopeSource);
+        if (!sawTypedA2ui && envelope?.a2ui && Array.isArray(envelope.a2ui) && envelope.a2ui.length > 0) {
           callbacks.onA2UI(envelope.a2ui);
-          // Use the text message from the envelope if present
-          if (typeof envelope.message === 'string') {
-            accumulated = envelope.message;
-          }
+        }
+        // Use the text message from the envelope if present
+        if (typeof envelope.message === 'string') {
+          accumulated = envelope.message;
         }
       } catch { /* accumulated is plain text, not JSON — expected for non-envelope responses */ }
 
@@ -146,6 +148,7 @@ export function useStreaming() {
         ? {
             model: lastModel,
             rawResponse: accumulated,
+            rawContent: envelopeSource !== accumulated ? envelopeSource : undefined,
             renderDecisions: renderDecisions.length > 0 ? renderDecisions : undefined,
           }
         : undefined;
