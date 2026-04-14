@@ -57,14 +57,30 @@ const useStyles = makeStyles({
   },
 });
 
-export const RadioGroup = createReactComponent(RadioGroupApi, ({ props }) => {
+export const RadioGroup = createReactComponent(RadioGroupApi, ({ props, context }) => {
   const [selected, setSelected] = useState(props.value || '');
   const classes = useStyles();
   const options = props.options || [];
 
   const handleSelect = (id: string) => {
     setSelected(id);
-    if (props.action) {
+
+    // Dispatch enriched action with selected value and label in context
+    const rawAction = context.componentModel.properties.action;
+    if (rawAction && typeof rawAction === 'object' && 'event' in rawAction && rawAction.event) {
+      const selectedOpt = options.find(opt => opt.id === id);
+      const resolved = context.dataContext.resolveAction(rawAction);
+      context.dispatchAction({
+        event: {
+          ...resolved.event,
+          context: {
+            ...resolved.event.context,
+            value: id,
+            selectedLabel: selectedOpt ? String(selectedOpt.label) : undefined,
+          },
+        },
+      });
+    } else if (props.action) {
       (props.action as () => void)();
     }
   };
