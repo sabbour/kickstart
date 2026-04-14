@@ -66,6 +66,10 @@ export {
   interpolateTemplate,
   createDefaultValues,
   interpolateA2UIMessage,
+  CopilotSkillsRegistry,
+  defaultCopilotSkillsRegistry,
+  AZURE_COPILOT_SKILLS,
+  formatCopilotSkillsPrompt,
 } from "./engine/index.js";
 export type {
   PhaseStatus,
@@ -76,6 +80,8 @@ export type {
   Skill,
   SkillResolverContext,
   SkillResolverMiddleware,
+  CopilotSkill,
+  ResolvedCopilotSkills,
 } from "./engine/index.js";
 
 // Generators
