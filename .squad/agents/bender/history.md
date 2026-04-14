@@ -36,3 +36,5 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - For user-owned projects (not repo projects), `COPILOT_ASSIGN_TOKEN` PAT with `project` scope is required -- `repository-projects: write` permission alone is insufficient.
 - WSL on Windows (`/mnt/c/`) has line ending issues -- files may be CRLF or LF depending on git config. Always detect EOL before doing byte-level edits.
 - Concurrent git operations from multiple agents cause `index.lock` contention -- use retry loops with lock removal for shared repos.
+- (2026-04-14 17:44) System prompt's ABSOLUTE RULES section had a passive question→component hint that the LLM ignored for binary/either-or questions. Fixed by adding explicit NON-NEGOTIABLE rules, an "Either/or" row in the component selection table, and two new examples (Buttons-in-Row + RadioGroup) for 2-option questions. PR #213.
+- LLM examples are the strongest prompt steering mechanism — the model follows demonstrated patterns over stated rules. If a pattern has no example, the LLM will default to plain text. Always add an example for every major component pattern.
