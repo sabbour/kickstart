@@ -25,7 +25,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 24px;
-  background: #f5f5f5;
+  background: var(--color-neutral-background-3);
 }
 
 .playground-gallery {
@@ -60,7 +60,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 40px 20px;
-  background: var(--color-bg-secondary, #f8f8f8);
+  background: var(--color-neutral-background-2);
 }
 
 /* ---- Rendered Custom Surfaces ---- */
