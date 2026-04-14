@@ -26,7 +26,7 @@ import markdown from 'highlight.js/lib/languages/markdown';
 import dockerfile from 'highlight.js/lib/languages/dockerfile';
 import yaml from 'highlight.js/lib/languages/yaml';
 import go from 'highlight.js/lib/languages/go';
-import 'highlight.js/styles/github-dark.css';
+import 'highlight.js/styles/vs.css';
 
 // Register highlight.js languages
 hljs.registerLanguage('javascript', javascript);
@@ -60,6 +60,10 @@ const useStyles = makeStyles({
     width: '100%',
     padding: '0',
     overflow: 'hidden',
+    borderTopWidth: '0',
+    borderRightWidth: '0',
+    borderBottomWidth: '0',
+    borderLeftWidth: '0',
   },
   header: {
     display: 'flex',
@@ -78,8 +82,6 @@ const useStyles = makeStyles({
     margin: '0',
     overflowX: 'auto',
     borderRadius: '0',
-    backgroundColor: '#0d1117',
-    color: '#c9d1d9',
   },
   codeElement: {
     fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace',
