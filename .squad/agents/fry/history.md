@@ -90,3 +90,15 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
   - Status: In queue for next sprint
 
 **Summary:** 2 PRs fixed and merged, 2 visual consistency issues addressed in PR #256, styling directives documented for team
+**2026-04-14**
+- Expanded demo scenarios DP for issue #188 with interactive patterns
+- Post-approval, implemented #188 scenarios in PR #219
+- PR #219 merged to main
+- Total scope: 5 new demo scenarios, updated UI components, test coverage added
+
+## 2026-04-14 Round 2: Frontend Fixes + Navigation
+
+- **PR #214**: Fixed A2UI action display bug. ChoicePicker/RadioGroup now inject selectedLabel into action context.
+- **Hash-based navigation**: Implemented History API support for browser back button (#169). Uses `#session/{id}` pattern.
+- **Footer update**: Coordinated with Bender on version-SHA display.
+- **Team status**: Awaiting review on PR #214; navigation feature documented in decisions.md.

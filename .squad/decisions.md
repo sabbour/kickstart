@@ -49,6 +49,11 @@ Agents must create branch + draft PR immediately after DP approval, BEFORE writi
 
 **Sequence:** DP approved → create branch → push empty commit → open draft PR → implement → push commits → mark PR ready for review.
 ## 4. User Directives (April 2026)
+=== bender-continuous-deploy.md ===
+
+---
+
+# Decision: Continuous SWA deployment from main + version-SHA footer
 
 ### 2026-04-14T13:00:43Z: Stop deploying PRs to SWA
 **By:** Ahmed Sabbour (via Copilot)
@@ -88,6 +93,45 @@ Agents must create branch + draft PR immediately after DP approval, BEFORE writi
 
 ### Project Board Auto-Assignment in Triage
 **Author:** Bender (Backend Dev)
+=== bender-project-board-triage.md ===
+---
+
+# Decision: Project board auto-assignment in triage pipeline
+
+**Date:** 2026-04-14T13:04:54.232Z
+**Author:** Bender (Backend Dev)
+**Status:** Implemented
+
+## Context
+
+Issues created by Ahmed were not being added to the GitHub project board
+(https://github.com/users/sabbour/projects/3) or assigned milestones.
+
+## Decision
+
+1. **Project board:** All three triage workflows (squad-triage, squad-heartbeat,
+   squad-issue-assign) now add issues to the project board automatically using
+   the GraphQL `addProjectV2ItemById` mutation via `COPILOT_ASSIGN_TOKEN`.
+
+2. **Milestones:** NOT auto-assigned. Milestones require judgment (which release?
+   which sprint?). The Lead must assign milestones during in-session triage per
+   the new Triage Checklist in routing.md.
+
+3. **Graceful fallback:** All project board operations are wrapped in try/catch --
+   if the API call fails, the workflow logs a warning but does not fail.
+
+## Affected Files
+
+- `.github/workflows/squad-triage.yml`
+- `.github/workflows/squad-heartbeat.yml`
+- `.github/workflows/squad-issue-assign.yml`
+- `.squad/routing.md`
+
+=== bender-remove-pr-preview-deploys.md ===
+---
+
+# Decision: Remove PR preview deployments from SWA workflow
+
 **Date:** 2026-04-14
 **Status:** Implemented
 
@@ -95,6 +139,46 @@ Agents must create branch + draft PR immediately after DP approval, BEFORE writi
 - Milestones NOT auto-assigned (require human judgment)
 - Graceful fallback: failed API calls log warnings but don't fail workflow
 - Affected: `squad-triage.yml`, `squad-heartbeat.yml`, `squad-issue-assign.yml`
+## Context
+
+SWA auth relies on domain filtering — staging preview URLs break login.
+
+## Decision
+
+Removed pull_request trigger, close_staging job, and pull-requests:write permission.
+
+## Consequences
+
+PRs no longer trigger SWA deployments, saving CI minutes.
+
+=== copilot-directive-2026-04-14T130043Z.md ===
+---
+
+### 2026-04-14T13:00:43Z: User directive — Stop deploying PRs to SWA
+
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Stop deploying pull requests to Azure Static Web Apps. Domain filtering breaks the login mechanisms (SWA auth requires the correct domain), making PR preview deployments useless and a waste of CI time.
+**Why:** User request — captured for team memory
+
+=== copilot-directive-2026-04-14T130530Z.md ===
+---
+
+### 2026-04-14T13:05:30Z: User directive — Comment when addressing feedback
+
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Whenever an agent starts addressing PR review feedback or issue feedback, it must post an acknowledgment comment on the PR or issue (using its bot identity) before making changes. This makes the feedback loop visible to humans watching the repo.
+**Why:** User request — captured for team memory
+
+=== copilot-directive-2026-04-14T192924Z.md ===
+### 2026-04-14T19:29:24Z: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Drop the "I chose" prefix from button click / ChoicePicker selection messages. The user message should just say the selected value (e.g., "Selected: Web API / REST service"), not "I chose: ...".
+**Why:** User request — captured for team memory
+
+=== fry-browser-back-button.md ===
+---
+
+# Decision: Hash-based Navigation with History API
 
 ### Hash-Based Navigation with History API
 **Author:** Fry (Frontend Dev)
@@ -106,3 +190,52 @@ Agents must create branch + draft PR immediately after DP approval, BEFORE writi
 - Centralised `useNavigation` hook for all history management
 - Deep-link support: users can bookmark `#session/{id}` URLs
 - All future navigation paths should follow this pattern
+---
+
+# Decision: DP Reviews — Public Skills (#186) and Onboarding Tour (#187)
+
+**Author:** Leela (Lead)
+**Date:** 2026-04-14
+
+## Context
+
+Two Design Proposals reviewed and approved with conditions.
+
+## Decisions
+
+### DP #186 — Public Copilot Skill Support
+1. **Build-time bundling via CLI command** — `npm run sync-public-skills` fetches SKILL.md files, parses to Skill[], commits output. No Vite plugin, no runtime fetch.
+2. **Virtual IntegrationKit pattern** — public skills wrapped in a kit registered via `registerKit()`. Zero changes to `resolveSkills()` or `buildSystemPrompt()`.
+3. **Phase auto-mapping** — use `classifyPrompt()` heuristics with `phaseOverrides` config as escape hatch.
+4. **Reference sub-docs ignored** — only SKILL.md body (≤500 tokens) ingested. Sub-docs are a follow-up.
+5. **Public skill priority: -5** — first-party kit skills win on conflict.
+6. **Config in packages/web only** — IDE consumes public skills natively via extensions.
+7. **Namespace prefix mandatory** — `ghca:{skill-name}` format to prevent ID collisions.
+8. **Use existing YAML parser** — no custom frontmatter-parser module.
+
+### DP #187 — Guided Onboarding Tour
+1. **Option A: split tour** — steps 1-2 on Landing, steps 3-4 triggered on first chat entry. Minimal state machine (currentStep + mode check).
+2. **Standalone TourContext** — follows DebugContext/ThemeContext pattern. No UserPreferencesContext consolidation yet.
+3. **No clickable example prompts in tour** — tour explains and points; user interacts with actual UI. Clickable prompts are a separate Landing enhancement.
+4. **requestIdleCallback for auto-start** — not a fixed setTimeout delay.
+5. **4 steps maximum** — scope locked. Expansion requires a new issue.
+6. **Existing CSS targets** — use `.landing-hero`, `.landing-tracks`, `.chat-phase`, `.chat-input-area` directly. No new classes on existing components.
+
+---
+
+# Zapp Security Decision — Public Skills Trust Boundary
+
+**Date:** 2026-04-14T17:32:34.141Z  
+**Author:** Zapp (Security Architect)  
+**Scope:** DP #186 public Copilot skill ingestion
+
+## Decision
+Public skill ingestion is approved in principle only if external skill sources are treated as untrusted content crossing into control-plane prompt assembly.
+
+## Required Controls
+1. **Immutable source pinning**: production configs must pin each source to a commit SHA (or signed immutable tag), not moving branches like `main`.
+2. **Prompt-safety validation**: imported `SKILL.md` content must pass policy checks aimed at instruction-level prompt injection; HTML/script stripping alone is insufficient.
+3. **Fail-closed + provenance**: sync must fail on parse/policy violations and persist source provenance (`repo`, `sha`, `path`, `fetchedAt`) for audit/incident response.
+
+## Rationale
+The feature introduces a new supply-chain ingress path and trust-boundary crossing from third-party markdown into system prompt context. These controls preserve deterministic builds while reducing tampering and prompt-injection risk to an acceptable level.

@@ -55,3 +55,11 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - DP #186 approved by Zapp for implementation
 - Implemented public Copilot skills (10 files, 60 tests) in PR #227
 - Implementation PR awaiting code review
+
+## 2026-04-14 Round 2: Infrastructure + Bug Fixes
+
+- **PR #213**: Fixed missing choice components in system prompt. Root cause identified and fixed purely additively.
+- **Approved by Leela**: Set to auto-merge.
+- **SWA automation**: Implemented continuous deployment on main + version-SHA footer (PR #177).
+- **Project board triage**: Implemented auto-assignment workflow for issues.
+- **Team notes**: Coordinated with Fry on footer components; ensured Leela's approval before merge.
