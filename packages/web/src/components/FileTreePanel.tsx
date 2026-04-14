@@ -15,17 +15,6 @@ import {
   Button,
   Caption1,
   Card,
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogContent,
-  DialogSurface,
-  DialogTitle,
-  DialogTrigger,
-  Field,
-  Input,
-  MessageBar,
-  MessageBarBody,
   Spinner,
   Tooltip,
   makeStyles,
@@ -33,9 +22,7 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import {
-  AddRegular,
   ArrowDownloadRegular,
-  ArrowUploadRegular,
   CopyRegular,
   DeleteRegular,
   DocumentRegular,
@@ -46,10 +33,8 @@ import {
 } from '@fluentui/react-icons';
 import { useVirtualFS } from '../contexts/VirtualFSContext';
 import type { FileTreeNode, VFSFile } from '../services/virtual-fs';
-import { VFSError } from '../services/virtual-fs';
 import { ensureMonacoLocal } from '../catalog/components/monaco-local-setup';
 import { sanitizeHtml } from '../utils/sanitize';
-import { normalizePath, validatePath } from '../utils/path-validation';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';

@@ -11,7 +11,7 @@ const MAX_SEGMENT_LENGTH = 255;
 const MAX_PATH_DEPTH = 15;
 
 /** Only alphanumeric, dot, dash, underscore, and forward slash. */
-const SEGMENT_ALLOWLIST = /^[a-zA-Z0-9._\-]+$/;
+const SEGMENT_ALLOWLIST = /^[a-zA-Z0-9._-]+$/;
 
 /** Control characters: codepoints < 0x20, DEL (0x7F), and null bytes. */
 const CONTROL_CHARS = /[\x00-\x1f\x7f]/;

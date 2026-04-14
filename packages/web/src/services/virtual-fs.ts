@@ -445,6 +445,7 @@ export class VirtualFS {
         const keys = (req.result as string[]).filter((k) => {
           // Integrity boundary: exclude paths that fail validation
           if (validateAndNormalize(k) === null) {
+            // eslint-disable-next-line no-console
             console.warn('[VirtualFS] Excluding invalid path from listing:', k);
             return false;
           }
@@ -473,6 +474,7 @@ export class VirtualFS {
             // Integrity boundary: skip records with invalid paths
             const valid = validateAndNormalize(raw.path as string);
             if (!valid) {
+              // eslint-disable-next-line no-console
               console.warn('[VirtualFS] Excluding corrupt record:', raw.path);
               return false;
             }
@@ -534,6 +536,7 @@ export class VirtualFS {
       // Defense-in-depth: re-validate every path before adding to ZIP
       const safe = validateAndNormalize(path);
       if (!safe) {
+        // eslint-disable-next-line no-console
         console.warn('[VirtualFS] Skipping invalid path during ZIP export:', path);
         continue;
       }
