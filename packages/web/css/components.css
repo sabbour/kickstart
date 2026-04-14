@@ -77,6 +77,10 @@
   letter-spacing: 0.02em;
 }
 
+.chat-bubble.assistant:has(.chat-message-phase-badge) {
+  padding-top: 2px;
+}
+
 /* --- Messages area (centered, ChatGPT-style) --- */
 .chat-messages {
   flex: 1;
