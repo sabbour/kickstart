@@ -24,9 +24,15 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - v0.3.0 service layer: APIConnector auth abstraction, IntegrationKit packs, CORS proxies
 
 ## Work Log
+
+- (2026-04-14 13:04) Triage pipeline fix: added project board assignment to squad-triage.yml, squad-heartbeat.yml, squad-issue-assign.yml. Added triage checklist to routing.md.
 - (2026-04-14 11:02) Wave 1: SWA continuous deploy + version footer → PR #177 opened. Auto-deploy from main, version shows SHA.
 
 ## Learnings
 - SWA deploy workflow (`deploy-swa.yml`) needs explicit `push → branches: [main]` trigger — tag-only triggers mean no continuous deployment from main.
 - `__BUILD_VERSION__` in `vite.config.ts` can embed git SHA via `execSync('git rev-parse --short HEAD')` — works both locally and in CI without relying on `GITHUB_SHA` env var.
 - Footer version display should use a single unified string (`version-sha`) rather than showing version and SHA separately — reduces redundancy and makes each build uniquely identifiable at a glance.
+- GitHub Projects V2 API requires GraphQL (`addProjectV2ItemById` mutation) -- REST API does not support user-level projects. Must discover project node ID first via `user(login).projectV2(number)` query.
+- For user-owned projects (not repo projects), `COPILOT_ASSIGN_TOKEN` PAT with `project` scope is required -- `repository-projects: write` permission alone is insufficient.
+- WSL on Windows (`/mnt/c/`) has line ending issues -- files may be CRLF or LF depending on git config. Always detect EOL before doing byte-level edits.
+- Concurrent git operations from multiple agents cause `index.lock` contention -- use retry loops with lock removal for shared repos.
