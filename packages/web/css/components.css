@@ -8,6 +8,12 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  background: url('/assets/hero-bg.svg') center/cover no-repeat,
+              var(--color-neutral-background-2);
+}
+
+[data-theme="dark"] .chat-container {
+  background-image: url('/assets/hero-bg-dark.svg');
 }
 
 /* --- Phase indicator (subtle, at top of chat) --- */
