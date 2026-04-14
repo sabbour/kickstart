@@ -58,9 +58,7 @@ export function Topbar({
 
   return (
     <header className="topbar" role="banner">
-      <a className="topbar-brand" href="#/" aria-label="Kickstart — home">
-        <span className="sr-only">Home</span>
-      </a>
+      <a className="topbar-brand" href="#/" aria-label="Kickstart — home" />
       <div className="topbar-actions">
         {debugEnabled && (
           <button
