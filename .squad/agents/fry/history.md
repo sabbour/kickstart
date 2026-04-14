@@ -23,4 +23,27 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - v0.4.0 theme system: dark mode toggle, system preference detection, CSS variable overrides
 - v0.3.0 fat components: Azure/GitHub packs, auth flows, picker patterns, action dispatching
 
+## Current Sprint: v0.5.7
+
+**Sprint Goal:** Fix critical A2UI rendering blocker (#166) + 8 P1/P2 UI/UX bugs.
+
+**Wave 1 (Critical Blocker):**
+- #166: Fix SSE parser in `useStreaming.ts` to accumulate JSON envelope for `a2ui` array (4–6 hrs). Backend confirmed working; frontend-only fix.
+
+**Wave 2 (P1 Quick Fixes, parallel):**
+- #167: Verify `highlight.js` CSS bundling in prod (1–2 hrs, fast-track).
+- #168: Add CSS transitions to `SteppedCarousel` panel (1–2 hrs, fast-track).
+- #170: Add `'Integration Kits'` to sidebar config (30 min, fast-track).
+- #171: Wire Files/Folder button toggle (1 hr, fast-track).
+
+**Wave 3 (P1 Logic Fixes, after Wave 1):**
+- #169: Fix auth state propagation to sign-in button (4–6 hrs).
+- #172: Add "Clear All" confirmation dialog (3–4 hrs).
+
+**Wave 4 (P2 Enhancements, lower priority):**
+- #173: Add Home button to header (1–2 hrs, fast-track).
+- #174: File operations scenarios in Playground (4–6 hrs).
+
+**Key Notes:** #166 is a critical blocker preventing rich component rendering. All other work is independent. Fast-track approved for 5 CSS/config items (skip DP ceremony). Success = all P0 + P1 closed; P2 best-effort.
+
 ## Learnings
