@@ -1357,6 +1357,258 @@ const kitMultiProvider = (): A2uiMsg[] => {
 };
 
 // ---------------------------------------------------------------------------
+// Missing Layout scenarios
+// ---------------------------------------------------------------------------
+
+const layoutAccordion = (): A2uiMsg[] => {
+  const sid = uid('accordion-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'acc1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Accordion Component', variant: 'h3' },
+    { id: 'acc1', component: 'Accordion', items: [
+      { title: 'What is auto-scaling?', children: ['acc-body1'] },
+      { title: 'How do health checks work?', children: ['acc-body2'] },
+      { title: 'What happens during zero-downtime deploys?', children: ['acc-body3'] },
+    ], collapsible: true, multiple: true },
+    { id: 'acc-body1', component: 'Text', text: 'Auto-scaling automatically adjusts the number of running instances based on CPU, memory, or custom metrics. When demand increases, new replicas are spun up within seconds.', variant: 'body1' },
+    { id: 'acc-body2', component: 'Text', text: 'Health checks run HTTP probes against /healthz every 10 seconds. If a container fails 3 consecutive checks, it is restarted automatically by the orchestrator.', variant: 'body1' },
+    { id: 'acc-body3', component: 'Text', text: 'During a rolling update, new pods are created before old ones are terminated. Traffic is only routed to healthy instances, ensuring zero downtime for end users.', variant: 'body1' },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
+// Missing Content scenarios
+// ---------------------------------------------------------------------------
+
+const contentAlert = (): A2uiMsg[] => {
+  const sid = uid('alert-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'a-info', 'a-success', 'a-warning', 'a-error'], gap: 'small' },
+    { id: 'heading', component: 'Text', text: 'Alert Severities', variant: 'h3' },
+    { id: 'a-info', component: 'Alert', message: 'Your application is running on 3 replicas.', severity: 'info' },
+    { id: 'a-success', component: 'Alert', message: 'Deployment completed successfully in 42 seconds.', severity: 'success' },
+    { id: 'a-warning', component: 'Alert', message: 'SSL certificate expires in 14 days. Renew soon.', severity: 'warning' },
+    { id: 'a-error', component: 'Alert', message: 'Database connection failed — check credentials.', severity: 'error' },
+  ] as A2uiComponent[]);
+};
+
+const contentBadge = (): A2uiMsg[] => {
+  const sid = uid('badge-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'badge-row1', 'badge-row2'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Badge Variants', variant: 'h3' },
+    { id: 'badge-row1', component: 'Row', children: ['b-brand', 'b-success', 'b-warning', 'b-danger', 'b-info'], gap: 'small' },
+    { id: 'b-brand', component: 'Badge', text: 'Production', color: 'brand', appearance: 'filled' },
+    { id: 'b-success', component: 'Badge', text: 'Healthy', color: 'success', appearance: 'filled' },
+    { id: 'b-warning', component: 'Badge', text: 'Degraded', color: 'warning', appearance: 'filled' },
+    { id: 'b-danger', component: 'Badge', text: 'Critical', color: 'danger', appearance: 'filled' },
+    { id: 'b-info', component: 'Badge', text: 'Preview', color: 'informative', appearance: 'tint' },
+    { id: 'badge-row2', component: 'Row', children: ['b-counter-label', 'b-counter', 'b-presence-label', 'b-presence'], gap: 'small' },
+    { id: 'b-counter-label', component: 'Text', text: 'Counter:', variant: 'body1' },
+    { id: 'b-counter', component: 'Badge', variant: 'counter', count: 42 },
+    { id: 'b-presence-label', component: 'Text', text: 'Presence:', variant: 'body1' },
+    { id: 'b-presence', component: 'Badge', variant: 'presence', status: 'available' },
+  ] as A2uiComponent[]);
+};
+
+const contentIcon = (): A2uiMsg[] => {
+  const sid = uid('icon-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'icon-row'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Icon Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Supports Fluent icon names, SVG paths, and Material Symbols.', variant: 'body2' },
+    { id: 'icon-row', component: 'Row', children: ['ic-check', 'ic-warning', 'ic-info', 'ic-cloud'], gap: 'medium' },
+    { id: 'ic-check', component: 'Icon', name: 'checkmark-circle', accessibility: { label: 'Success' } },
+    { id: 'ic-warning', component: 'Icon', name: 'warning', accessibility: { label: 'Warning' } },
+    { id: 'ic-info', component: 'Icon', name: 'info', accessibility: { label: 'Info' } },
+    { id: 'ic-cloud', component: 'Icon', name: 'cloud', accessibility: { label: 'Cloud' } },
+  ] as A2uiComponent[]);
+};
+
+const contentLink = (): A2uiMsg[] => {
+  const sid = uid('link-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'l1', 'l2', 'l3'], gap: 'small' },
+    { id: 'heading', component: 'Text', text: 'Link Component', variant: 'h3' },
+    { id: 'l1', component: 'Link', text: 'Azure Portal', url: 'https://portal.azure.com', external: true },
+    { id: 'l2', component: 'Link', text: 'GitHub Documentation', url: 'https://docs.github.com', external: true },
+    { id: 'l3', component: 'Link', text: 'Kickstart README', url: '#' },
+  ] as A2uiComponent[]);
+};
+
+const contentTable = (): A2uiMsg[] => {
+  const sid = uid('table-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'tbl1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Table Component', variant: 'h3' },
+    { id: 'tbl1', component: 'Table', caption: 'Service inventory', columns: ['Service', 'Region', 'Status', 'Replicas'], rows: [
+      ['web-api', 'East US 2', 'Running', '3'],
+      ['worker', 'East US 2', 'Running', '2'],
+      ['cache', 'East US 2', 'Degraded', '1'],
+      ['db-proxy', 'East US 2', 'Running', '1'],
+    ] },
+  ] as A2uiComponent[]);
+};
+
+const contentAudioPlayer = (): A2uiMsg[] => {
+  const sid = uid('audio-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'audio1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'AudioPlayer Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'HTML5 audio player with native browser controls and optional description caption.', variant: 'body2' },
+    { id: 'audio1', component: 'AudioPlayer', url: 'https://www2.cs.uic.edu/~i101/SoundFiles/StarWars60.wav', description: 'Sample audio clip' },
+  ] as A2uiComponent[]);
+};
+
+const contentVideo = (): A2uiMsg[] => {
+  const sid = uid('video-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'video1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'Video Component', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'HTML5 video player with 16:9 aspect ratio and native controls.', variant: 'body2' },
+    { id: 'video1', component: 'Video', url: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4', accessibility: { label: 'Sample video' } },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
+// Missing Input scenarios
+// ---------------------------------------------------------------------------
+
+const inputComboBox = (): A2uiMsg[] => {
+  const sid = uid('combobox-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'cb1', 'cb2'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'ComboBox Component', variant: 'h3' },
+    { id: 'cb1', component: 'ComboBox', label: 'Azure Region', options: [
+      { text: 'East US', value: 'eastus' },
+      { text: 'East US 2', value: 'eastus2' },
+      { text: 'West US 2', value: 'westus2' },
+      { text: 'West Europe', value: 'westeurope' },
+      { text: 'North Europe', value: 'northeurope' },
+    ], placeholder: 'Search regions...' },
+    { id: 'cb2', component: 'ComboBox', label: 'Custom tag', options: [
+      { text: 'v1.0', value: 'v1.0' },
+      { text: 'v2.0', value: 'v2.0' },
+      { text: 'latest', value: 'latest' },
+    ], placeholder: 'Enter or select version...', allowCustom: true },
+  ] as A2uiComponent[]);
+};
+
+const inputMultiSelect = (): A2uiMsg[] => {
+  const sid = uid('multiselect-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'ms1'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'MultiSelect Component', variant: 'h3' },
+    { id: 'ms1', component: 'MultiSelect', label: 'Enable features', options: [
+      { text: 'Auto-scaling', value: 'autoscale' },
+      { text: 'Health checks', value: 'health' },
+      { text: 'CI/CD pipeline', value: 'cicd' },
+      { text: 'Log analytics', value: 'logs' },
+      { text: 'Monitoring alerts', value: 'alerts' },
+    ], placeholder: 'Select features...', value: ['autoscale', 'health'] },
+  ] as A2uiComponent[]);
+};
+
+const inputToggle = (): A2uiMsg[] => {
+  const sid = uid('toggle-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'tog1', 'tog2', 'tog3'], gap: 'small' },
+    { id: 'heading', component: 'Text', text: 'Toggle Component', variant: 'h3' },
+    { id: 'tog1', component: 'Toggle', label: 'Enable public endpoint', checked: true },
+    { id: 'tog2', component: 'Toggle', label: 'Enable HTTPS only', checked: true },
+    { id: 'tog3', component: 'Toggle', label: 'Enable preview environments', checked: false },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
+// Domain: GitHub Components
+// ---------------------------------------------------------------------------
+
+const domainGitHubLogin = (): A2uiMsg[] => {
+  const sid = uid('gh-login-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-login'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'GitHubLoginCard', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'GitHub authentication card with device code flow. Sign in to connect your repositories.', variant: 'body2' },
+    { id: 'gh-login', component: 'GitHubLoginCard' },
+  ] as A2uiComponent[]);
+};
+
+const domainGitHubRepoPicker = (): A2uiMsg[] => {
+  const sid = uid('gh-repo-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-picker'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'GitHubRepoPicker', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Search and select a GitHub repository with pagination, language badges, and metadata. Requires GitHub authentication.', variant: 'body2' },
+    { id: 'gh-picker', component: 'GitHubRepoPicker', placeholder: 'Search repositories...' },
+  ] as A2uiComponent[]);
+};
+
+const domainGitHubAction = (): A2uiMsg[] => {
+  const sid = uid('gh-action-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-action'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'GitHubAction', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Execute a GitHub API action with built-in safety: operation allowlist, branch protection, and destructive confirmation.', variant: 'body2' },
+    { id: 'gh-action', component: 'GitHubAction', title: 'Create feature branch', description: 'Creates a new branch from main for the feature implementation.', method: 'POST', path: '/repos/demo-org/demo-repo/git/refs', operationType: 'git/refs/create', body: { ref: 'refs/heads/feature/new-api', sha: 'abc123' } },
+  ] as A2uiComponent[]);
+};
+
+const domainGitHubCommit = (): A2uiMsg[] => {
+  const sid = uid('gh-commit-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-commit'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'GitHubCommit', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Multi-step pull request creation wizard: select artifacts, configure branch name, title, and body.', variant: 'body2' },
+    { id: 'gh-commit', component: 'GitHubCommit', suggestedBranchName: 'feature/add-api-endpoints', suggestedTitle: 'Add REST API endpoints', suggestedBody: 'Implements CRUD endpoints for the user service.' },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
+// Domain: Azure Components
+// ---------------------------------------------------------------------------
+
+const domainAzureLogin = (): A2uiMsg[] => {
+  const sid = uid('az-login-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-login'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'AzureLoginCard', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Azure MSAL authentication card. Sign in to manage your Azure subscriptions and resources.', variant: 'body2' },
+    { id: 'az-login', component: 'AzureLoginCard' },
+  ] as A2uiComponent[]);
+};
+
+const domainAzureResourcePicker = (): A2uiMsg[] => {
+  const sid = uid('az-picker-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-picker'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'AzureResourcePicker', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Cascading dropdowns: subscription → resource group → resource. Requires Azure authentication.', variant: 'body2' },
+    { id: 'az-picker', component: 'AzureResourcePicker', label: 'Select a resource' },
+  ] as A2uiComponent[]);
+};
+
+const domainAzureResourceForm = (): A2uiMsg[] => {
+  const sid = uid('az-form-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-form'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'AzureResourceForm', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Dynamic resource creation form with type-specific fields (Kubernetes version, admin user, access tier, etc.). Requires Azure authentication.', variant: 'body2' },
+    { id: 'az-form', component: 'AzureResourceForm', title: 'Create Kubernetes Cluster', resourceType: 'Microsoft.ContainerService/managedClusters' },
+  ] as A2uiComponent[]);
+};
+
+const domainAzureAction = (): A2uiMsg[] => {
+  const sid = uid('az-action-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-action'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'AzureAction', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Execute an Azure ARM API action with resource type allowlist, path validation, and destructive confirmation.', variant: 'body2' },
+    { id: 'az-action', component: 'AzureAction', title: 'Scale AKS cluster', description: 'Updates the node count for the default node pool.', method: 'PATCH', path: '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/Microsoft.ContainerService/managedClusters/my-cluster', body: { properties: { agentPoolProfiles: [{ name: 'default', count: 5 }] } } },
+  ] as A2uiComponent[]);
+};
+
+// ---------------------------------------------------------------------------
 // Control scenarios assembled
 // ---------------------------------------------------------------------------
 
@@ -1368,9 +1620,17 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'ctrl-card',     label: 'Card',           description: 'Content card wrapper',            group: 'Layout',          catalog: 'a2ui',      generate: layoutCard },
   { id: 'ctrl-tabs',     label: 'Tabs',           description: 'Tabbed content panels',           group: 'Layout',          catalog: 'a2ui',      generate: layoutTabs },
   { id: 'ctrl-divider',  label: 'Divider',        description: 'Horizontal separator',            group: 'Layout',          catalog: 'a2ui',      generate: layoutDivider },
+  { id: 'ctrl-accordion', label: 'Accordion',     description: 'Collapsible FAQ sections',        group: 'Layout',          catalog: 'a2ui',      generate: layoutAccordion },
   // Content
   { id: 'ctrl-text',     label: 'Text',           description: 'All text variants h1–overline',   group: 'Content',         catalog: 'a2ui',      generate: contentText },
   { id: 'ctrl-image',    label: 'Image',          description: 'Image with placeholder',          group: 'Content',         catalog: 'a2ui',      generate: contentImage },
+  { id: 'ctrl-alert',    label: 'Alert',          description: 'Info / success / warning / error', group: 'Content',        catalog: 'a2ui',      generate: contentAlert },
+  { id: 'ctrl-badge',    label: 'Badge',          description: 'Status, counter, and presence badges', group: 'Content',    catalog: 'a2ui',      generate: contentBadge },
+  { id: 'ctrl-icon',     label: 'Icon',           description: 'Fluent icon display',             group: 'Content',         catalog: 'a2ui',      generate: contentIcon },
+  { id: 'ctrl-link',     label: 'Link',           description: 'Hyperlinks with external indicator', group: 'Content',      catalog: 'a2ui',      generate: contentLink },
+  { id: 'ctrl-table',    label: 'Table',          description: 'Striped data table with caption', group: 'Content',         catalog: 'a2ui',      generate: contentTable },
+  { id: 'ctrl-audio',    label: 'AudioPlayer',    description: 'HTML5 audio with controls',       group: 'Content',         catalog: 'a2ui',      generate: contentAudioPlayer },
+  { id: 'ctrl-video',    label: 'Video',          description: 'HTML5 video with 16:9 player',    group: 'Content',         catalog: 'a2ui',      generate: contentVideo },
   // Inputs
   { id: 'ctrl-button',   label: 'Button',         description: 'Primary / outlined / text',       group: 'Inputs',          catalog: 'a2ui',      generate: inputButton },
   { id: 'ctrl-textfield',label: 'TextField',      description: 'Text input with label',           group: 'Inputs',          catalog: 'a2ui',      generate: inputTextField },
@@ -1379,6 +1639,9 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'ctrl-slider',   label: 'Slider',         description: 'Range slider control',            group: 'Inputs',          catalog: 'a2ui',      generate: inputSlider },
   { id: 'ctrl-datetime', label: 'DateTimeInput',  description: 'Date and time picker',            group: 'Inputs',          catalog: 'a2ui',      generate: inputDateTime },
   { id: 'ctrl-modal',    label: 'Modal',          description: 'Modal dialog with trigger',       group: 'Inputs',          catalog: 'a2ui',      generate: inputModal },
+  { id: 'ctrl-combobox', label: 'ComboBox',       description: 'Dropdown with search and custom entry', group: 'Inputs',    catalog: 'a2ui',      generate: inputComboBox },
+  { id: 'ctrl-multiselect', label: 'MultiSelect', description: 'Multi-value dropdown',            group: 'Inputs',          catalog: 'a2ui',      generate: inputMultiSelect },
+  { id: 'ctrl-toggle',   label: 'Toggle',         description: 'On/off switch control',           group: 'Inputs',          catalog: 'a2ui',      generate: inputToggle },
   // Custom Controls
   { id: 'ctrl-radio',    label: 'RadioGroup',     description: 'Radio options with descriptions',  group: 'Custom Controls', catalog: 'kickstart', generate: customRadioGroup },
   { id: 'ctrl-form',     label: 'FormGroup',      description: 'Stepped form sections',            group: 'Custom Controls', catalog: 'kickstart', generate: customFormGroup },
@@ -1422,6 +1685,16 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'phase-generate',    label: 'Generate Phase',         description: 'IaC + CI/CD + K8s manifests in FileEditor',     group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseGenerateScenario },
   { id: 'phase-review',      label: 'Review Phase',           description: 'Cost estimate + deployment safeguard checks',   group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseReviewScenario },
   { id: 'phase-deploy',      label: 'Deploy Phase',           description: 'DeploymentProgress with live provisioning',     group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDeployScenario },
+  // GitHub Components
+  { id: 'ctrl-gh-login',   label: 'GitHubLoginCard',    description: 'Device code authentication flow',      group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubLogin },
+  { id: 'ctrl-gh-repo',    label: 'GitHubRepoPicker',   description: 'Repository search and selection',      group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubRepoPicker },
+  { id: 'ctrl-gh-action',  label: 'GitHubAction',       description: 'Safe GitHub API operations',           group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubAction },
+  { id: 'ctrl-gh-commit',  label: 'GitHubCommit',       description: 'PR creation wizard',                   group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubCommit },
+  // Azure Components
+  { id: 'ctrl-az-login',   label: 'AzureLoginCard',     description: 'MSAL authentication with subscriptions', group: 'Azure Components', catalog: 'kickstart', generate: domainAzureLogin },
+  { id: 'ctrl-az-picker',  label: 'AzureResourcePicker', description: 'Cascading resource selection',         group: 'Azure Components', catalog: 'kickstart', generate: domainAzureResourcePicker },
+  { id: 'ctrl-az-form',    label: 'AzureResourceForm',  description: 'Dynamic resource creation form',       group: 'Azure Components', catalog: 'kickstart', generate: domainAzureResourceForm },
+  { id: 'ctrl-az-action',  label: 'AzureAction',        description: 'Safe ARM API operations',              group: 'Azure Components', catalog: 'kickstart', generate: domainAzureAction },
 ];
 
 /** All scenario groups in display order */
@@ -1434,6 +1707,8 @@ export const SCENARIO_GROUPS = [
   'Content',
   'Inputs',
   'Custom Controls',
+  'GitHub Components',
+  'Azure Components',
   'Integration Kits',
   'Data Binding',
   'Events & Actions',
