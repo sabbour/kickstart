@@ -20,7 +20,7 @@ import { useVirtualFS } from './contexts/VirtualFSContext';
 import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
-import type { AppMode, ChatMessage } from './types';
+import type { AppMode, ChatMessage, A2uiMsg } from './types';
 import type { A2uiClientAction } from './vendor/a2ui/web_core/schema/client-to-server';
 
 const mockEnabled = isMockMode();
@@ -92,6 +92,9 @@ export function App() {
   // Surface IDs revealed progressively via the queue
   const streamingSurfaceIdsRef = useRef<string[]>([]);
 
+  // Raw A2UI messages accumulated during streaming (for session persistence)
+  const streamingA2UIMessagesRef = useRef<A2uiMsg[]>([]);
+
   // Check API availability on mount (skip in mock mode — already true)
   useEffect(() => {
     if (!mockEnabled) {
@@ -145,6 +148,7 @@ export function App() {
 
     // Reset streaming surface IDs for the new turn
     streamingSurfaceIdsRef.current = [];
+    streamingA2UIMessagesRef.current = [];
     progressiveQueue.reset();
 
     // Use mock streaming when ?mock is active, real streaming otherwise
@@ -152,6 +156,7 @@ export function App() {
       mockStreaming.send(text, sessionId, {
         onDelta: () => {},
         onA2UI: (msgs) => {
+          streamingA2UIMessagesRef.current = [...streamingA2UIMessagesRef.current, ...msgs];
           const newIds = a2ui.processMessages(msgs);
           if (newIds.length > 0) {
             streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
@@ -166,7 +171,9 @@ export function App() {
           progressiveQueue.flush();
           const collectedIds = streamingSurfaceIdsRef.current;
           const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
+          const a2uiMessages = streamingA2UIMessagesRef.current.length > 0 ? [...streamingA2UIMessagesRef.current] : undefined;
           streamingSurfaceIdsRef.current = [];
+          streamingA2UIMessagesRef.current = [];
           progressiveQueue.reset();
           const assistantMsg: ChatMessage = {
             id: `msg-${Date.now()}-assistant`,
@@ -176,12 +183,14 @@ export function App() {
             surfaceIds,
             phase,
             timestamp: Date.now(),
+            a2uiMessages,
           };
           setMessages(prev => [...prev, assistantMsg]);
           sessions.addMessage(sessionId!, assistantMsg);
         },
         onError: (error) => {
           streamingSurfaceIdsRef.current = [];
+          streamingA2UIMessagesRef.current = [];
           progressiveQueue.reset();
           const errorMsg: ChatMessage = {
             id: `msg-${Date.now()}-error`,
@@ -201,6 +210,7 @@ export function App() {
       streaming.send(text, backendSessionId, {
         onDelta: () => {},
         onA2UI: (msgs) => {
+          streamingA2UIMessagesRef.current = [...streamingA2UIMessagesRef.current, ...msgs];
           const newIds = a2ui.processMessages(msgs);
           if (newIds.length > 0) {
             streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
@@ -219,7 +229,9 @@ export function App() {
           progressiveQueue.flush();
           const collectedIds = streamingSurfaceIdsRef.current;
           const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
+          const a2uiMessages = streamingA2UIMessagesRef.current.length > 0 ? [...streamingA2UIMessagesRef.current] : undefined;
           streamingSurfaceIdsRef.current = [];
+          streamingA2UIMessagesRef.current = [];
           progressiveQueue.reset();
           const assistantMsg: ChatMessage = {
             id: `msg-${Date.now()}-assistant`,
@@ -230,12 +242,14 @@ export function App() {
             phase,
             timestamp: Date.now(),
             debugInfo,
+            a2uiMessages,
           };
           setMessages(prev => [...prev, assistantMsg]);
           sessions.addMessage(sessionId!, assistantMsg);
         },
         onError: (error) => {
           streamingSurfaceIdsRef.current = [];
+          streamingA2UIMessagesRef.current = [];
           progressiveQueue.reset();
           const errorMsg: ChatMessage = {
             id: `msg-${Date.now()}-error`,
@@ -300,11 +314,18 @@ export function App() {
     sessions.setActiveSessionId(sessionId);
     const session = sessions.sessions.find(s => s.id === sessionId);
     if (session) {
+      // Rehydrate A2UI surfaces from stored messages so components render after reload
+      a2ui.reset();
+      for (const msg of session.messages) {
+        if (msg.a2uiMessages && msg.a2uiMessages.length > 0) {
+          a2ui.processMessages(msg.a2uiMessages);
+        }
+      }
       setMessages(session.messages);
       setMode('chat');
       document.body.classList.remove('on-landing');
     }
-  }, [sessions]);
+  }, [sessions, a2ui]);
 
   // Extract a human-readable label from an A2UI action, checking context then data as fallback
   const getSelectionLabel = (action: A2uiClientAction): string => {
