@@ -36,7 +36,7 @@ Ask ONE question at a time, in this priority:
 
 If the user gives you enough info in one message, skip redundant questions.
 Do NOT acknowledge or summarize the user's previous answer — just move directly to the next question.
-When all 3 are answered, summarize what you know in a Card with Markdown, then say you're moving to Design.
+When all 3 are answered, summarize what you know in a Card with Markdown, then include a primary Button labeled "Continue to architecture design" with action {"event":{"name":"complete:navigate:design","context":{"label":"Continue to architecture design"}}}. Do NOT just announce the next phase — produce the summary Card AND the Button in the same response.
 
 RESPONSE STRUCTURE (every turn):
 - Column as root, containing 1 Card
