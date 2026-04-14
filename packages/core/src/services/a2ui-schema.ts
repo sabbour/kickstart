@@ -91,7 +91,19 @@ export type KnownComponentType =
 // Shared Zod helpers
 // ---------------------------------------------------------------------------
 
-const boundedString = z.string().max(PAYLOAD_LIMITS.maxStringLength);
+/** Truncate a string to the configured max length instead of rejecting. */
+const truncateToLimit = (s: string): string =>
+  s.length > PAYLOAD_LIMITS.maxStringLength
+    ? s.slice(0, PAYLOAD_LIMITS.maxStringLength)
+    : s;
+
+const boundedString = z.string().transform(truncateToLimit);
+
+/** Bounded string that must be non-empty (validated before truncation). */
+const boundedStringNonEmpty = z.string().min(1).transform(truncateToLimit);
+
+/** Bounded string that must start with "/" (validated before truncation). */
+const boundedStringPath = z.string().startsWith("/").transform(truncateToLimit);
 
 /** For dynamic props that can be string or object (DataBinding/FunctionCall). */
 const dynamicString = z.union([boundedString, z.record(z.unknown())]);
@@ -512,7 +524,7 @@ export const COMPONENT_SCHEMA_REGISTRY: Record<string, z.ZodType> = {
 // A2UI message schemas
 // ---------------------------------------------------------------------------
 
-const surfaceIdField = boundedString.min(1);
+const surfaceIdField = boundedStringNonEmpty;
 
 const CreateSurfaceMessageSchema = z
   .object({
@@ -526,7 +538,7 @@ const CreateSurfaceMessageSchema = z
 
 /** Schema for a single component within an updateComponents message. */
 const ComponentEntrySchema = z.object({
-  id: boundedString.min(1),
+  id: boundedStringNonEmpty,
   component: boundedString,
 }).passthrough();
 
@@ -534,7 +546,11 @@ const UpdateComponentsMessageSchema = z
   .object({
     type: z.literal("updateComponents"),
     surfaceId: surfaceIdField,
-    components: z.array(ComponentEntrySchema).max(PAYLOAD_LIMITS.maxComponents),
+    components: z.array(ComponentEntrySchema).transform((arr) =>
+      arr.length > PAYLOAD_LIMITS.maxComponents
+        ? arr.slice(0, PAYLOAD_LIMITS.maxComponents)
+        : arr,
+    ),
   })
   .strip();
 
@@ -542,7 +558,7 @@ const UpdateDataModelMessageSchema = z
   .object({
     type: z.literal("updateDataModel"),
     surfaceId: surfaceIdField,
-    path: boundedString.startsWith("/"),
+    path: boundedStringPath,
     value: z.unknown(),
   })
   .strip();
@@ -567,6 +583,6 @@ export const A2UIMessageSchema = z.discriminatedUnion("type", [
 /** Schema for an action in the actions array. */
 export const ActionSchema = z
   .object({
-    type: boundedString.min(1),
+    type: boundedStringNonEmpty,
   })
   .passthrough();

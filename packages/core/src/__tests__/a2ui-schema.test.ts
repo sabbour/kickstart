@@ -323,6 +323,34 @@ describe("A2UIMessageSchema", () => {
     expect(result.success).toBe(true);
     expect((result as { success: true; data: Record<string, unknown> }).data).not.toHaveProperty("unknownField");
   });
+
+  it("truncates oversized strings instead of rejecting", () => {
+    const longText = "a".repeat(PAYLOAD_LIMITS.maxStringLength + 100);
+    const result = A2UIMessageSchema.safeParse({
+      type: "createSurface",
+      surfaceId: "msg-1",
+      catalogId: longText,
+    });
+    expect(result.success).toBe(true);
+    const data = (result as { success: true; data: Record<string, unknown> }).data;
+    expect((data.catalogId as string).length).toBe(PAYLOAD_LIMITS.maxStringLength);
+  });
+
+  it("trims components array to maxComponents instead of rejecting", () => {
+    const components = Array.from({ length: PAYLOAD_LIMITS.maxComponents + 50 }, (_, i) => ({
+      id: `c-${i}`,
+      component: "Text",
+      text: `Item ${i}`,
+    }));
+    const result = A2UIMessageSchema.safeParse({
+      type: "updateComponents",
+      surfaceId: "msg-1",
+      components,
+    });
+    expect(result.success).toBe(true);
+    const data = (result as { success: true; data: { components: unknown[] } }).data;
+    expect(data.components).toHaveLength(PAYLOAD_LIMITS.maxComponents);
+  });
 });
 
 // ---------------------------------------------------------------------------

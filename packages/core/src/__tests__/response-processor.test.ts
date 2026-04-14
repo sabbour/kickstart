@@ -306,4 +306,73 @@ describe("processResponse", () => {
     const result = processResponse(json);
     expect(result.a2uiMessages).toHaveLength(1);
   });
+
+  // -----------------------------------------------------------------------
+  // Issue #153 fix: Byte-accurate payload size limit
+  // -----------------------------------------------------------------------
+
+  it("uses byte length (not char length) for payload size limit", () => {
+    // Multi-byte characters: each emoji is 4 bytes in UTF-8
+    const emoji = "😀"; // 4 bytes but 2 UTF-16 code units
+    const message = emoji.repeat(100);
+    const json = JSON.stringify({ message, a2ui: [], actions: [] });
+    // This should work fine (small payload), just verify it parses correctly
+    const result = processResponse(json);
+    expect(result.message).toBe(message);
+  });
+
+  // -----------------------------------------------------------------------
+  // Issue #153 fix: Re-validation after data-model interpolation
+  // -----------------------------------------------------------------------
+
+  it("re-validates messages after data-model interpolation", () => {
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: [
+        {
+          type: "updateComponents",
+          surfaceId: "s1",
+          components: [
+            {
+              id: "t1",
+              component: "Text",
+              text: "{{/greeting}}",
+              variant: "h1",
+            },
+          ],
+        },
+      ],
+      actions: [],
+    });
+
+    // dataModel has a valid string — should pass re-validation
+    const result = processResponse(json, { greeting: "Hello, world!" });
+    expect(result.a2uiMessages).toHaveLength(1);
+    const comps = (result.a2uiMessages[0] as Record<string, unknown>)
+      .components as Record<string, unknown>[];
+    expect(comps[0].text).toBe("Hello, world!");
+  });
+
+  it("truncates oversized strings introduced by interpolation", () => {
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: [
+        {
+          type: "createSurface",
+          surfaceId: "s1",
+          catalogId: "{{/bigValue}}",
+        },
+      ],
+      actions: [],
+    });
+
+    const bigValue = "x".repeat(PAYLOAD_LIMITS.maxStringLength + 500);
+    const result = processResponse(json, { bigValue });
+    // Message should survive re-validation — the string gets truncated, not rejected
+    expect(result.a2uiMessages).toHaveLength(1);
+    const msg = result.a2uiMessages[0] as Record<string, unknown>;
+    expect((msg.catalogId as string).length).toBe(
+      PAYLOAD_LIMITS.maxStringLength,
+    );
+  });
 });

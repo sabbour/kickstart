@@ -86,12 +86,15 @@ export function processResponse(
 ): ProcessedResponse {
   const raw = jsonString;
 
-  // Payload size limit check
-  if (jsonString.length > PAYLOAD_LIMITS.maxPayloadBytes) {
+  // Payload size limit check (byte-accurate)
+  const payloadBytes = Buffer.byteLength(jsonString, "utf8");
+  if (payloadBytes > PAYLOAD_LIMITS.maxPayloadBytes) {
     logger.warn(
-      `processResponse: payload size ${jsonString.length} exceeds limit ${PAYLOAD_LIMITS.maxPayloadBytes}, truncating`,
+      `processResponse: payload size ${payloadBytes} bytes exceeds limit ${PAYLOAD_LIMITS.maxPayloadBytes}, truncating`,
     );
-    jsonString = jsonString.slice(0, PAYLOAD_LIMITS.maxPayloadBytes);
+    // Truncate to maxPayloadBytes using byte-safe slicing
+    const buf = Buffer.from(jsonString, "utf8");
+    jsonString = buf.subarray(0, PAYLOAD_LIMITS.maxPayloadBytes).toString("utf8");
   }
 
   // Attempt JSON parse
@@ -117,9 +120,12 @@ export function processResponse(
 
   // Extract and validate A2UI messages via Zod schemas
   const rawA2UI = validateA2UIMessages(envelope.a2ui);
-  // Interpolate data paths in component props when a data model is provided
+  // Interpolate data paths in component props when a data model is provided,
+  // then re-validate to ensure interpolated values still meet constraints
   const a2uiMessages = dataModel
-    ? rawA2UI.map((msg) => interpolateA2UIMessage(msg, dataModel))
+    ? revalidateAfterInterpolation(
+        rawA2UI.map((msg) => interpolateA2UIMessage(msg, dataModel)),
+      )
     : rawA2UI;
 
   // Extract and validate actions
@@ -263,5 +269,50 @@ function validateActions(raw: unknown): Action[] {
     valid.push(result.data as Action);
   }
 
+  return valid;
+}
+
+/**
+ * Re-validate A2UI messages after data-model interpolation.
+ * Interpolation can introduce values that violate schema limits
+ * (e.g. a dataModel string that exceeds maxStringLength), so we
+ * re-parse each message through the Zod schemas and drop any that
+ * now fail validation.
+ */
+function revalidateAfterInterpolation(messages: A2UIMessage[]): A2UIMessage[] {
+  const valid: A2UIMessage[] = [];
+  for (const msg of messages) {
+    const result = A2UIMessageSchema.safeParse(msg);
+    if (!result.success) {
+      logger.warn(
+        "processResponse: A2UI message failed re-validation after interpolation",
+        {
+          errors: result.error.issues.map((i) => i.message),
+          type: msg.type,
+        },
+      );
+      continue;
+    }
+
+    let validated = result.data as A2UIMessage;
+
+    // Re-run per-component validation for updateComponents messages
+    if (validated.type === "updateComponents") {
+      validated = validateComponentsInMessage(validated);
+    }
+
+    // Re-check depth for updateDataModel values
+    if (validated.type === "updateDataModel") {
+      const value = (validated as Record<string, unknown>).value;
+      if (!checkDepth(value, PAYLOAD_LIMITS.maxNestingDepth)) {
+        logger.warn(
+          "processResponse: updateDataModel value exceeds nesting depth after interpolation, skipping",
+        );
+        continue;
+      }
+    }
+
+    valid.push(validated);
+  }
   return valid;
 }
