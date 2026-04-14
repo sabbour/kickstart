@@ -7,13 +7,15 @@ describe("processResponse", () => {
     const json = JSON.stringify({
       message: "Hello, let me help you deploy your app.",
       a2ui: [
-        { type: "createSurface", surfaceId: "msg-1", catalogId: "kickstart" },
+        { version: "v0.9", createSurface: { surfaceId: "msg-1", catalogId: "kickstart" } },
         {
-          type: "updateComponents",
-          surfaceId: "msg-1",
-          components: [
-            { id: "t1", component: "Text", text: "Welcome", variant: "h1" },
-          ],
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "msg-1",
+            components: [
+              { id: "t1", component: "Text", text: "Welcome", variant: "h1" },
+            ],
+          },
         },
       ],
       actions: [],
@@ -22,8 +24,8 @@ describe("processResponse", () => {
     const result = processResponse(json);
     expect(result.message).toBe("Hello, let me help you deploy your app.");
     expect(result.a2uiMessages).toHaveLength(2);
-    expect(result.a2uiMessages[0].type).toBe("createSurface");
-    expect(result.a2uiMessages[1].type).toBe("updateComponents");
+    expect(result.a2uiMessages[0].createSurface).toBeDefined();
+    expect(result.a2uiMessages[1].updateComponents).toBeDefined();
     expect(result.actions).toHaveLength(0);
     expect(result.raw).toBe(json);
   });
@@ -51,7 +53,7 @@ describe("processResponse", () => {
   it("handles missing message field gracefully", () => {
     const json = JSON.stringify({
       a2ui: [
-        { type: "createSurface", surfaceId: "msg-1", catalogId: "kickstart" },
+        { version: "v0.9", createSurface: { surfaceId: "msg-1", catalogId: "kickstart" } },
       ],
       actions: [],
     });
@@ -65,20 +67,20 @@ describe("processResponse", () => {
     const json = JSON.stringify({
       message: "Mixed bag.",
       a2ui: [
-        { type: "createSurface", surfaceId: "msg-1" },
-        { type: "invalidType", surfaceId: "msg-1" },
-        { type: "updateComponents" }, // missing surfaceId
+        { version: "v0.9", createSurface: { surfaceId: "msg-1" } },
+        { version: "v0.9", invalidType: { surfaceId: "msg-1" } },
+        { version: "v0.9", updateComponents: {} }, // missing surfaceId
         "not an object",
         null,
-        { type: "updateDataModel", surfaceId: "msg-1", path: "/x", value: 42 },
+        { version: "v0.9", updateDataModel: { surfaceId: "msg-1", path: "/x", value: 42 } },
       ],
       actions: [],
     });
 
     const result = processResponse(json);
     expect(result.a2uiMessages).toHaveLength(2);
-    expect(result.a2uiMessages[0].type).toBe("createSurface");
-    expect(result.a2uiMessages[1].type).toBe("updateDataModel");
+    expect(result.a2uiMessages[0].createSurface).toBeDefined();
+    expect(result.a2uiMessages[1].updateDataModel).toBeDefined();
   });
 
   it("handles JSON array (not an object) as plain text", () => {
@@ -92,22 +94,20 @@ describe("processResponse", () => {
     const json = JSON.stringify({
       message: "",
       a2ui: [
-        { type: "createSurface", surfaceId: "s1" },
-        { type: "updateComponents", surfaceId: "s1", components: [] },
-        { type: "updateDataModel", surfaceId: "s1", path: "/x", value: "y" },
-        { type: "deleteSurface", surfaceId: "s1" },
+        { version: "v0.9", createSurface: { surfaceId: "s1" } },
+        { version: "v0.9", updateComponents: { surfaceId: "s1", components: [] } },
+        { version: "v0.9", updateDataModel: { surfaceId: "s1", path: "/x", value: "y" } },
+        { version: "v0.9", deleteSurface: { surfaceId: "s1" } },
       ],
       actions: [],
     });
 
     const result = processResponse(json);
     expect(result.a2uiMessages).toHaveLength(4);
-    expect(result.a2uiMessages.map((m) => m.type)).toEqual([
-      "createSurface",
-      "updateComponents",
-      "updateDataModel",
-      "deleteSurface",
-    ]);
+    expect(result.a2uiMessages[0].createSurface).toBeDefined();
+    expect(result.a2uiMessages[1].updateComponents).toBeDefined();
+    expect(result.a2uiMessages[2].updateDataModel).toBeDefined();
+    expect(result.a2uiMessages[3].deleteSurface).toBeDefined();
   });
 
   it("validates actions array", () => {
@@ -143,7 +143,7 @@ describe("processResponse", () => {
   it("rejects a2ui messages with empty surfaceId", () => {
     const json = JSON.stringify({
       message: "test",
-      a2ui: [{ type: "createSurface", surfaceId: "" }],
+      a2ui: [{ version: "v0.9", createSurface: { surfaceId: "" } }],
       actions: [],
     });
 
@@ -157,8 +157,8 @@ describe("processResponse", () => {
 
   it("truncates a2ui messages exceeding maxMessages limit", () => {
     const messages = Array.from({ length: 60 }, (_, i) => ({
-      type: "createSurface",
-      surfaceId: `s-${i}`,
+      version: "v0.9",
+      createSurface: { surfaceId: `s-${i}` },
     }));
     const json = JSON.stringify({
       message: "test",
@@ -193,13 +193,15 @@ describe("processResponse", () => {
       message: "test",
       a2ui: [
         {
-          type: "updateComponents",
-          surfaceId: "s1",
-          components: [
-            { id: "t1", component: "Text", text: "Valid" },
-            { id: "x1", component: "HallucinatedWidget", foo: "bar" },
-            { id: "d1", component: "Divider" },
-          ],
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "s1",
+            components: [
+              { id: "t1", component: "Text", text: "Valid" },
+              { id: "x1", component: "HallucinatedWidget", foo: "bar" },
+              { id: "d1", component: "Divider" },
+            ],
+          },
         },
       ],
       actions: [],
@@ -207,7 +209,7 @@ describe("processResponse", () => {
 
     const result = processResponse(json);
     expect(result.a2uiMessages).toHaveLength(1);
-    const comps = (result.a2uiMessages[0] as Record<string, unknown>).components as unknown[];
+    const comps = result.a2uiMessages[0].updateComponents!.components as unknown[];
     expect(comps).toHaveLength(2);
     expect((comps[0] as Record<string, unknown>).component).toBe("Text");
     expect((comps[1] as Record<string, unknown>).component).toBe("Divider");
@@ -218,24 +220,26 @@ describe("processResponse", () => {
       message: "test",
       a2ui: [
         {
-          type: "updateComponents",
-          surfaceId: "s1",
-          components: [
-            {
-              id: "t1",
-              component: "Text",
-              text: "Hello",
-              variant: "h1",
-              hallucinated: "extra-field",
-            },
-          ],
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "s1",
+            components: [
+              {
+                id: "t1",
+                component: "Text",
+                text: "Hello",
+                variant: "h1",
+                hallucinated: "extra-field",
+              },
+            ],
+          },
         },
       ],
       actions: [],
     });
 
     const result = processResponse(json);
-    const comps = (result.a2uiMessages[0] as Record<string, unknown>).components as Record<string, unknown>[];
+    const comps = result.a2uiMessages[0].updateComponents!.components as Record<string, unknown>[];
     expect(comps[0]).not.toHaveProperty("hallucinated");
     expect(comps[0].text).toBe("Hello");
   });
@@ -245,19 +249,21 @@ describe("processResponse", () => {
       message: "test",
       a2ui: [
         {
-          type: "updateComponents",
-          surfaceId: "s1",
-          components: [
-            { id: "btn1", component: "Button", child: "label" },
-            // Missing required 'action' prop
-          ],
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "s1",
+            components: [
+              { id: "btn1", component: "Button", child: "label" },
+              // Missing required 'action' prop
+            ],
+          },
         },
       ],
       actions: [],
     });
 
     const result = processResponse(json);
-    const comps = (result.a2uiMessages[0] as Record<string, unknown>).components as unknown[];
+    const comps = result.a2uiMessages[0].updateComponents!.components as unknown[];
     expect(comps).toHaveLength(0);
   });
 
@@ -276,10 +282,12 @@ describe("processResponse", () => {
       message: "test",
       a2ui: [
         {
-          type: "updateDataModel",
-          surfaceId: "s1",
-          path: "/deep",
-          value: nested,
+          version: "v0.9",
+          updateDataModel: {
+            surfaceId: "s1",
+            path: "/deep",
+            value: nested,
+          },
         },
       ],
       actions: [],
@@ -294,10 +302,12 @@ describe("processResponse", () => {
       message: "test",
       a2ui: [
         {
-          type: "updateDataModel",
-          surfaceId: "s1",
-          path: "/app",
-          value: { name: "my-app", config: { port: 3000 } },
+          version: "v0.9",
+          updateDataModel: {
+            surfaceId: "s1",
+            path: "/app",
+            value: { name: "my-app", config: { port: 3000 } },
+          },
         },
       ],
       actions: [],
@@ -330,16 +340,18 @@ describe("processResponse", () => {
       message: "test",
       a2ui: [
         {
-          type: "updateComponents",
-          surfaceId: "s1",
-          components: [
-            {
-              id: "t1",
-              component: "Text",
-              text: "{{/greeting}}",
-              variant: "h1",
-            },
-          ],
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "s1",
+            components: [
+              {
+                id: "t1",
+                component: "Text",
+                text: "{{/greeting}}",
+                variant: "h1",
+              },
+            ],
+          },
         },
       ],
       actions: [],
@@ -348,8 +360,7 @@ describe("processResponse", () => {
     // dataModel has a valid string — should pass re-validation
     const result = processResponse(json, { greeting: "Hello, world!" });
     expect(result.a2uiMessages).toHaveLength(1);
-    const comps = (result.a2uiMessages[0] as Record<string, unknown>)
-      .components as Record<string, unknown>[];
+    const comps = result.a2uiMessages[0].updateComponents!.components as Record<string, unknown>[];
     expect(comps[0].text).toBe("Hello, world!");
   });
 
@@ -358,9 +369,11 @@ describe("processResponse", () => {
       message: "test",
       a2ui: [
         {
-          type: "createSurface",
-          surfaceId: "s1",
-          catalogId: "{{/bigValue}}",
+          version: "v0.9",
+          createSurface: {
+            surfaceId: "s1",
+            catalogId: "{{/bigValue}}",
+          },
         },
       ],
       actions: [],
@@ -370,8 +383,8 @@ describe("processResponse", () => {
     const result = processResponse(json, { bigValue });
     // Message should survive re-validation — the string gets truncated, not rejected
     expect(result.a2uiMessages).toHaveLength(1);
-    const msg = result.a2uiMessages[0] as Record<string, unknown>;
-    expect((msg.catalogId as string).length).toBe(
+    const msg = result.a2uiMessages[0];
+    expect((msg.createSurface!.catalogId as string).length).toBe(
       PAYLOAD_LIMITS.maxStringLength,
     );
   });

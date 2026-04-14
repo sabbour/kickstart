@@ -33,11 +33,22 @@ export type A2UIMessageType =
   | "updateDataModel"
   | "deleteSurface";
 
-/** A single A2UI v0.9 message. */
+/** A single A2UI v0.9 message (official nested wire format). */
 export interface A2UIMessage {
-  type: A2UIMessageType;
-  surfaceId: string;
-  [key: string]: unknown;
+  version: "v0.9";
+  createSurface?: { surfaceId: string; catalogId?: string; theme?: Record<string, unknown>; sendDataModel?: boolean };
+  updateComponents?: { surfaceId: string; components: unknown[] };
+  updateDataModel?: { surfaceId: string; path: string; value: unknown };
+  deleteSurface?: { surfaceId: string };
+}
+
+/** Determine which message type a nested A2UI message represents. */
+function getA2UIMessageType(msg: A2UIMessage): A2UIMessageType | undefined {
+  if (msg.createSurface) return "createSurface";
+  if (msg.updateComponents) return "updateComponents";
+  if (msg.updateDataModel) return "updateDataModel";
+  if (msg.deleteSurface) return "deleteSurface";
+  return undefined;
 }
 
 /** An action the frontend should execute. */
@@ -166,22 +177,23 @@ function validateA2UIMessages(raw: unknown): A2UIMessage[] {
         errors: result.error.issues.map((i) => i.message),
         input:
           typeof item === "object" && item !== null
-            ? (item as Record<string, unknown>).type
+            ? (item as Record<string, unknown>).version
             : typeof item,
       });
       continue;
     }
 
     let msg = result.data as A2UIMessage;
+    const msgType = getA2UIMessageType(msg);
 
     // Per-component validation for updateComponents messages
-    if (msg.type === "updateComponents") {
+    if (msgType === "updateComponents") {
       msg = validateComponentsInMessage(msg);
     }
 
     // Depth check for updateDataModel values
-    if (msg.type === "updateDataModel") {
-      const value = (msg as Record<string, unknown>).value;
+    if (msgType === "updateDataModel") {
+      const value = msg.updateDataModel!.value;
       if (!checkDepth(value, PAYLOAD_LIMITS.maxNestingDepth)) {
         logger.warn(
           `processResponse: updateDataModel value exceeds nesting depth limit ${PAYLOAD_LIMITS.maxNestingDepth}, skipping`,
@@ -202,7 +214,7 @@ function validateA2UIMessages(raw: unknown): A2UIMessage[] {
  * against their per-component schema. Invalid components are skipped.
  */
 function validateComponentsInMessage(msg: A2UIMessage): A2UIMessage {
-  const components = (msg as Record<string, unknown>).components;
+  const components = msg.updateComponents?.components;
   if (!Array.isArray(components)) return msg;
 
   const validated: unknown[] = [];
@@ -242,13 +254,14 @@ function validateComponentsInMessage(msg: A2UIMessage): A2UIMessage {
       }
       validated.push(result.data);
     } else {
-      // Shouldn't happen since KNOWN_COMPONENT_TYPES and registry are in sync,
-      // but if it does, pass through with basic validation
       validated.push(comp);
     }
   }
 
-  return { ...msg, components: validated } as A2UIMessage;
+  return {
+    ...msg,
+    updateComponents: { ...msg.updateComponents!, components: validated },
+  };
 }
 
 function validateActions(raw: unknown): Action[] {
@@ -289,22 +302,23 @@ function revalidateAfterInterpolation(messages: A2UIMessage[]): A2UIMessage[] {
         "processResponse: A2UI message failed re-validation after interpolation",
         {
           errors: result.error.issues.map((i) => i.message),
-          type: msg.type,
+          type: getA2UIMessageType(msg),
         },
       );
       continue;
     }
 
     let validated = result.data as A2UIMessage;
+    const validatedType = getA2UIMessageType(validated);
 
     // Re-run per-component validation for updateComponents messages
-    if (validated.type === "updateComponents") {
+    if (validatedType === "updateComponents") {
       validated = validateComponentsInMessage(validated);
     }
 
     // Re-check depth for updateDataModel values
-    if (validated.type === "updateDataModel") {
-      const value = (validated as Record<string, unknown>).value;
+    if (validatedType === "updateDataModel") {
+      const value = validated.updateDataModel!.value;
       if (!checkDepth(value, PAYLOAD_LIMITS.maxNestingDepth)) {
         logger.warn(
           "processResponse: updateDataModel value exceeds nesting depth after interpolation, skipping",
