@@ -52,6 +52,8 @@ html, body {
   text-decoration: none;
   color: inherit;
   cursor: pointer;
+  min-width: 36px;
+  min-height: 36px;
 }
 
 .topbar-brand img {
@@ -161,17 +163,6 @@ html, body {
   flex-shrink: 0;
 }
 
-.topbar-signout-link {
-  font-size: var(--font-size-100);
-  color: var(--color-neutral-foreground-3);
-  text-decoration: none;
-  margin-left: var(--spacing-xs);
-}
-
-.topbar-signout-link:hover {
-  color: var(--color-brand-primary);
-  text-decoration: underline;
-}
 
 .topbar-avatar {
   width: 30px;

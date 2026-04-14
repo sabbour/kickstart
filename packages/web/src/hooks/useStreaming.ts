@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { StreamEvent, A2uiMsg, DebugMetadata, ChatMessage } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
 
@@ -90,9 +90,19 @@ export function useStreaming() {
     try {
       // Build client message history for rehydration (strip system messages
       // and A2UI JSON — the server builds its own system prompt).
+      // Filter assistant messages to only model-produced ones (m.model present)
+      // to prevent client-generated error bubbles from spoofing assistant turns.
       const clientMessages = chatHistory
-        ?.filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => ({ role: m.role, content: m.text }));
+        ?.filter((m) => {
+          const text = m.text?.trim();
+          if (!text) return false;
+          if (m.role === 'user') return true;
+          return m.role === 'assistant' && Boolean(m.model);
+        })
+        .map((m) => ({
+          role: m.role === 'user' ? 'user' as const : 'assistant' as const,
+          content: m.text.trim(),
+        }));
 
       const res = await apiFetch('/api/converse', {
         method: 'POST',
@@ -278,6 +288,11 @@ export function useStreaming() {
       abortRef.current = null;
     }
   }, [updateRevealTarget, cancelReveal]);
+
+  // Cancel any in-flight rAF on unmount to avoid setState on an unmounted component
+  useEffect(() => {
+    return () => cancelReveal();
+  }, [cancelReveal]);
 
   const abort = useCallback(() => {
     abortRef.current?.abort();

@@ -13,15 +13,15 @@ function getDisplayName(userDetails: string): string {
     ? userDetails.split('@')[0]
     : userDetails;
   return local
+    .toLowerCase()
     .replace(/[._-]/g, ' ')
     .replace(/\b\w/g, c => c.toUpperCase())
     .trim();
 }
 
-/** First letter for the avatar circle. */
-function getInitial(userDetails: string): string {
-  const name = getDisplayName(userDetails);
-  return name.charAt(0).toUpperCase();
+/** First letter for the avatar circle, derived from an already-computed display name. */
+function getInitial(displayName: string): string {
+  return displayName.charAt(0).toUpperCase();
 }
 
 interface TopbarProps {
@@ -59,7 +59,7 @@ export function Topbar({
   return (
     <header className="topbar" role="banner">
       <a className="topbar-brand" href="#/" aria-label="Kickstart — home">
-        <span>Kickstart your app ideas on Azure</span>
+        <span className="sr-only">Home</span>
       </a>
       <div className="topbar-actions">
         {debugEnabled && (
@@ -167,18 +167,17 @@ function UserMenu({ user }: { user: AuthUser }) {
         onClick={() => setOpen(o => !o)}
       >
         <span className="topbar-avatar" aria-hidden="true">
-          {getInitial(user.userDetails)}
+          {getInitial(displayName)}
         </span>
         <span className="topbar-user-name">{displayName}</span>
       </button>
 
       {open && (
-        <div className="topbar-user-dropdown" role="menu">
+        <div className="topbar-user-dropdown">
           <span className="topbar-user-dropdown-email">{user.userDetails}</span>
           <a
             href="/.auth/logout?post_logout_redirect_uri=/"
             className="topbar-user-dropdown-signout"
-            role="menuitem"
           >
             Sign out
           </a>
