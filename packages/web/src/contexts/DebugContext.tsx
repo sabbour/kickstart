@@ -21,12 +21,9 @@ interface DebugContextValue {
 const DebugContext = createContext<DebugContextValue | null>(null);
 
 function readInitialDebugState(): boolean {
-  // URL param takes priority
-  if (typeof window !== 'undefined') {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('debug') === 'true') return true;
-  }
-  // Then localStorage
+  // Debug mode can only be activated via localStorage (set by keyboard shortcut).
+  // URL query-param activation is intentionally disabled to prevent
+  // casual client-side exposure of raw LLM output (security audit #235).
   if (typeof window !== 'undefined') {
     return localStorage.getItem(STORAGE_KEY) === 'true';
   }

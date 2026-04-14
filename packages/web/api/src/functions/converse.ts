@@ -5,7 +5,14 @@
  *
  * Accepts a user message, manages session state, calls Azure OpenAI with
  * response_format: json_object, and returns the response as typed SSE events.
- * The LLM outputs a JSON envelope: { message, a2ui, actions }.
+ * The LLM outputs a JSON envelope: { message, a2ui, actions, phaseComplete, filesComplete }.
+ *
+ * Artifact summary injection: every turn, the harness scans previously generated
+ * FileEditor components and appends a summary to the system prompt so the LLM
+ * has running context of what files/resources exist.
+ *
+ * Implicit state flags: the LLM can signal phaseComplete (advance phase) and
+ * filesComplete (auto-continue file generation) without explicit user action.
  */
 
 import { app } from "@azure/functions";
@@ -20,10 +27,11 @@ import {
   resolveSkills,
   defaultKitRegistry,
   InMemoryArtifactStore,
+  handleImplicitFlags,
 } from "@kickstart/core";
-import type { PhaseItem, ToolContext } from "@kickstart/core";
+import type { PhaseItem, ToolContext, ConversationState } from "@kickstart/core";
 import { getSession, createSession, hydrateSession, addMessage } from "../lib/session-store.js";
-import type { ClientMessage } from "../lib/session-store.js";
+import type { ClientMessage, GeneratedArtifact } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools, getChatDeploymentName } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
@@ -119,10 +127,15 @@ app.http("converse", {
       // injected, even as the conversation advances through phases.
       const currentPhase = engineState.currentPhase as Phase;
       const resolvedSkills = resolveSkills(currentPhase, defaultKitRegistry.getAll());
+
+      // Build artifact summary from files generated in previous turns
+      const artifactSummary = buildArtifactSummary(session.generatedArtifacts);
+
       const freshSystemPrompt = buildSystemPrompt({
         phase: currentPhase,
         appDefinition: state.appDefinition,
         kitPrompts: resolvedSkills.prompts,
+        artifactSummary: artifactSummary || undefined,
       });
 
       // Build messages array for OpenAI, replacing the stored system prompt

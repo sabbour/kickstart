@@ -7,6 +7,7 @@ import {
   synthesizeNavigationPrompt,
   AUTO_CONTINUE_MAX_CONSECUTIVE,
 } from '@kickstart/core';
+import { sanitizeActionContext } from '../utils/sanitize-action-context';
 
 /**
  * Action routing categories.
@@ -69,10 +70,11 @@ function actionToMessage(action: A2uiClientAction): string {
       }
     }
 
-    // 3. Build a compact summary from non-internal context keys
+    // 3. Build a compact summary from non-internal context keys (sanitized)
     const INTERNAL_KEYS = new Set(['label', 'selectedLabel', 'value', 'selectedValue']);
+    const safeCtx = sanitizeActionContext(context);
     const contextParts: string[] = [];
-    for (const [key, value] of Object.entries(context)) {
+    for (const [key, value] of Object.entries(safeCtx)) {
       if (INTERNAL_KEYS.has(key)) continue;
       if (value !== undefined && value !== null && value !== '') {
         contextParts.push(`${key}: ${String(value)}`);
@@ -220,10 +222,11 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
 
       case 'navigate': {
         const phase = action.name.replace(/^(navigate:|nav:)/, '');
+        const safeContext = sanitizeActionContext(action.context);
         // Fire optional navigate callback for any local side effects
-        optionsRef.current.onNavigate?.(phase, action.context ?? {});
+        optionsRef.current.onNavigate?.(phase, safeContext);
         // Phase transitions auto-continue
-        const message = synthesizeNavigationPrompt(phase, action.context ?? {});
+        const message = synthesizeNavigationPrompt(phase, safeContext);
         logDebug(message);
         dispatchAutoContinue(message);
         break;
@@ -238,9 +241,10 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
           optionsRef.current.onSendMessage(message);
           break;
         }
+        const safeContext = sanitizeActionContext(action.context);
         const message = synthesizeContinuationPrompt({
           name: action.name,
-          context: action.context ?? {},
+          context: safeContext,
         });
         logDebug(message);
         dispatchAutoContinue(message);

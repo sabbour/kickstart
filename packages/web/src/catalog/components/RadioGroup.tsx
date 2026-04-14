@@ -14,6 +14,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
+import { sanitizeActionContext } from '../../utils/sanitize-action-context';
 
 const RadioGroupApi = {
   name: 'RadioGroup',
@@ -70,13 +71,14 @@ export const RadioGroup = createReactComponent(RadioGroupApi, ({ props, context 
     if (rawAction && typeof rawAction === 'object' && 'event' in rawAction && rawAction.event) {
       const selectedOpt = options.find(opt => opt.id === id);
       const resolved = context.dataContext.resolveAction(rawAction);
+      const safeContext = sanitizeActionContext(resolved.event.context);
       context.dispatchAction({
         event: {
           ...resolved.event,
           context: {
-            ...resolved.event.context,
+            ...safeContext,
             value: id,
-            selectedLabel: selectedOpt ? String(selectedOpt.label) : undefined,
+            selectedLabel: selectedOpt ? String(selectedOpt.label).slice(0, 200) : undefined,
           },
         },
       });

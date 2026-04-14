@@ -124,3 +124,33 @@ export function canAdvance(
     state.phaseStatus[state.currentPhase] === "active" && !state.isComplete
   );
 }
+
+/**
+ * Implicit state flags parsed from LLM response JSON.
+ * These drive auto-transitions without explicit user action.
+ */
+export interface ImplicitFlags {
+  /** When true, advance to the next phase automatically. */
+  phaseComplete?: boolean;
+  /** During Generate phase: false = more files remain (auto-continue),
+   *  true = last batch, null = not applicable. */
+  filesComplete?: boolean | null;
+}
+
+/**
+ * Handle implicit state flags from the LLM response.
+ * - phaseComplete: true → advance to next phase (same as ADVANCE event)
+ * - filesComplete is informational only — the harness uses it to trigger
+ *   auto-continue messages, not state machine transitions.
+ *
+ * Returns the (possibly advanced) state.
+ */
+export function handleImplicitFlags(
+  state: ConversationState,
+  flags: ImplicitFlags,
+): ConversationState {
+  if (flags.phaseComplete === true && canAdvance(state)) {
+    return transition(state, { type: "ADVANCE" });
+  }
+  return state;
+}
