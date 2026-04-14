@@ -148,6 +148,16 @@ describe("COMPONENT_SCHEMA_REGISTRY", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects a Button with neither child nor label", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["Button"].safeParse({
+      id: "btn1",
+      component: "Button",
+      variant: "primary",
+      action: { event: { name: "click" } },
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("validates ChoicePicker with options", () => {
     const result = COMPONENT_SCHEMA_REGISTRY["ChoicePicker"].safeParse({
       id: "cp1",

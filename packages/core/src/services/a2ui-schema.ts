@@ -250,7 +250,10 @@ const ButtonPropsSchema = z
     disabled: z.boolean().optional(),
     action: actionSchema,
   })
-  .strip();
+  .strip()
+  .refine((data) => data.child !== undefined || data.label !== undefined, {
+    message: "Button must have at least one of 'child' or 'label'",
+  });
 
 const TextFieldPropsSchema = z
   .object({
