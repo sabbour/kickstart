@@ -146,16 +146,6 @@
 
 /* ─── Responsive ─── */
 
-/* ─── Restart Tour Button (in footer) ─── */
-
-button.landing-footer-restart-tour {
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-}
-
 /* ─── Responsive ─── */
 
 @media (max-width: 600px) {
