@@ -75,12 +75,20 @@ app.http("converse", {
         return { status: 400, jsonBody: { error: safetyResult.error } };
       }
 
-      // Also check all user-role messages in the rehydration history —
-      // without this, a client could send a safe `message` but smuggle
-      // unsafe content through `body.messages`.
+      // Hard cap on rehydration history length to prevent abuse.
+      const MAX_REHYDRATION_MESSAGES = 50;
+      if (body.messages && body.messages.length > MAX_REHYDRATION_MESSAGES) {
+        return {
+          status: 400,
+          jsonBody: { error: `messages array exceeds maximum of ${MAX_REHYDRATION_MESSAGES}` },
+        };
+      }
+
+      // Safety-check ALL client-provided messages in the rehydration history
+      // (both user and assistant roles) — without this, a client could send a
+      // safe `message` but smuggle unsafe content through `body.messages`.
       if (body.messages?.length) {
         for (const msg of body.messages) {
-          if (msg.role !== "user") continue;
           if (!msg.content?.trim()) continue;
           const historySafety = await checkContentSafety(msg.content);
           if (!historySafety.safe) {

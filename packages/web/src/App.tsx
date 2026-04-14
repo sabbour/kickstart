@@ -6,8 +6,6 @@ import { ChatShell } from './components/Chat/ChatShell';
 import { SessionsSidebar } from './components/Sidebar/SessionsSidebar';
 import { FileEditor } from './components/FileEditor/FileEditor';
 import { FileTreePanel } from './components/FileTreePanel';
-import { FileManagerSidebar } from './components/FileManager/FileManagerSidebar';
-import { FileViewer } from './components/FileManager/FileViewer';
 import { Playground } from './pages/Playground';
 import { useA2UI } from './hooks/useA2UI';
 import { useActionDispatch } from './hooks/useActionDispatch';
@@ -43,8 +41,6 @@ export function App() {
   const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(mockEnabled ? true : null);
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
   const [filePanelOpen, setFilePanelOpen] = useState(true);
-  const [fileSidebarOpen, setFileSidebarOpen] = useState(false);
-  const [viewerFile, setViewerFile] = useState<string | undefined>();
 
   const connectorRegistry = useAPIConnectorRegistry();
 
@@ -64,7 +60,7 @@ export function App() {
   const fs = useMemo(() => new VirtualFileSystem(), []);
 
   // IndexedDB-backed persistent filesystem (provided via context)
-  const { fs: vfs, files: vfsFiles, fileRecords: vfsFileRecords } = useVirtualFS();
+  const { fs: vfs, files: vfsFiles } = useVirtualFS();
 
   // Sync in-memory VFS → IndexedDB when files complete (with deduplication)
   const lastPersistedRef = useRef<Map<string, string>>(new Map());
@@ -273,7 +269,6 @@ export function App() {
     fs.clear();
     void vfs.clear();
     setSelectedFile(undefined);
-    setViewerFile(undefined);
     setMessages([]);
     setMode('chat');
     document.body.classList.remove('on-landing');
@@ -302,7 +297,6 @@ export function App() {
     fs.clear();
     void vfs.clear();
     setSelectedFile(undefined);
-    setViewerFile(undefined);
   }, [sessions, a2ui, fs, vfs]);
 
   const handleNewSession = useCallback(() => {
@@ -310,7 +304,6 @@ export function App() {
     fs.clear();
     void vfs.clear();
     setSelectedFile(undefined);
-    setViewerFile(undefined);
     setMessages([]);
     setMode('landing');
     document.body.classList.add('on-landing');
@@ -339,77 +332,18 @@ export function App() {
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
   const hasFiles = fsFiles.length > 0 || vfsFiles.length > 0;
 
-  // Auto-show file sidebar when files appear
+  // Auto-show file panel when files appear
   const hadFilesRef = useRef(false);
   useEffect(() => {
     if (hasFiles && !hadFilesRef.current) {
       setFilePanelOpen(true);
-      setFileSidebarOpen(true);
     }
     hadFilesRef.current = hasFiles;
   }, [hasFiles]);
 
   const handleToggleFilePanel = useCallback(() => {
-    setFileSidebarOpen((prev) => !prev);
     setFilePanelOpen((prev) => !prev);
   }, []);
-
-  // Handle file selection from the sidebar — open in the viewer
-  const handleViewerSelectFile = useCallback(async (path: string) => {
-    setViewerFile(path);
-  }, []);
-
-  const handleCloseViewer = useCallback(() => {
-    setViewerFile(undefined);
-  }, []);
-
-  // Download all files as ZIP
-  const [isZipDownloading, setIsZipDownloading] = useState(false);
-  const handleDownloadAllZip = useCallback(async () => {
-    if (isZipDownloading) return;
-    setIsZipDownloading(true);
-    try {
-      const blob = await vfs.exportZip();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = 'kickstart-files.zip';
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
-    } finally {
-      setIsZipDownloading(false);
-    }
-  }, [vfs, isZipDownloading]);
-
-  // Delete selected file from IndexedDB VFS
-  const handleDeleteViewerFile = useCallback(async () => {
-    if (!viewerFile) return;
-    await vfs.deleteFile(viewerFile);
-    setViewerFile(undefined);
-  }, [vfs, viewerFile]);
-
-  // Resolve the file for the viewer from either streaming or persisted VFS
-  const viewerStreamingFile = useMemo(
-    () => viewerFile ? fs.read(viewerFile) : undefined,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [viewerFile, fsFiles],
-  );
-  const [viewerPersistedFile, setViewerPersistedFile] = useState<import('./services/virtual-fs').VFSFile | null>(null);
-  useEffect(() => {
-    if (!viewerFile) {
-      setViewerPersistedFile(null);
-      return;
-    }
-    if (viewerStreamingFile) {
-      setViewerPersistedFile(null);
-      return;
-    }
-    vfs.getFile(viewerFile)
-      .then(setViewerPersistedFile)
-      .catch(() => setViewerPersistedFile(null));
-  }, [viewerFile, viewerStreamingFile, vfs, vfsFiles]);
 
   // Playground mode — standalone A2UI test harness
   if (playgroundEnabled) {
@@ -437,8 +371,6 @@ export function App() {
         showSessionsToggle={mode === 'chat'}
         hasFiles={hasFiles && filePanelOpen}
         showFilePanel={mode === 'chat' && filePanelOpen}
-        showFileSidebar={mode === 'chat' && fileSidebarOpen}
-        showFileViewer={mode === 'chat' && !!viewerFile}
         onToggleFilePanel={mode === 'chat' && hasFiles ? handleToggleFilePanel : undefined}
         sidebar={mode === 'chat' ? (
           <SessionsSidebar
@@ -449,25 +381,6 @@ export function App() {
             onSelectSession={handleResumeSession}
             onNewSession={handleNewSession}
             onDeleteSession={sessions.deleteSession}
-          />
-        ) : undefined}
-        fileManagerSidebar={mode === 'chat' ? (
-          <FileManagerSidebar
-            streamingFiles={fsFiles}
-            persistedFiles={vfsFileRecords}
-            selectedPath={viewerFile}
-            onSelectFile={handleViewerSelectFile}
-            onClose={() => setFileSidebarOpen(false)}
-            onDownloadAll={hasFiles ? handleDownloadAllZip : undefined}
-            isDownloading={isZipDownloading}
-          />
-        ) : undefined}
-        fileViewer={mode === 'chat' && viewerFile ? (
-          <FileViewer
-            streamingFile={viewerStreamingFile}
-            persistedFile={viewerPersistedFile}
-            onClose={handleCloseViewer}
-            onDelete={handleDeleteViewerFile}
           />
         ) : undefined}
         fileEditor={mode === 'chat' ? (
