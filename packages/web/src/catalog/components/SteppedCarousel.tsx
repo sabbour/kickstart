@@ -68,6 +68,9 @@ const useStyles = makeStyles({
   body: {
     marginTop: tokens.spacingVerticalM,
     marginBottom: tokens.spacingVerticalM,
+    transitionProperty: 'opacity, transform',
+    transitionDuration: tokens.durationNormal,
+    transitionTimingFunction: tokens.curveEasyEase,
   },
   footer: {
     display: 'flex',
