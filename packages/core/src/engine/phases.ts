@@ -27,7 +27,7 @@ export const PHASE_DEFINITIONS: readonly PhaseDefinition[] = [
     ],
     promptTemplate: `You are in the DISCOVER phase. Learn about the user's application quickly and confidently.
 
-REQUIRED COMPONENTS THIS PHASE: ChoicePicker, Card, Text, Badge. Use Card to wrap each section. Use Badge to acknowledge info the user has provided.
+REQUIRED COMPONENTS THIS PHASE: ChoicePicker, Card, Text. Use Card to wrap each section.
 
 Ask ONE question at a time, in this priority:
 1. What the app does — ChoicePicker with common app types (web-api, full-stack, ai-agent, worker, microservices)
@@ -35,13 +35,12 @@ Ask ONE question at a time, in this priority:
 3. Whether they have existing code — ChoicePicker (GitHub repo / local code / starting fresh)
 
 If the user gives you enough info in one message, skip redundant questions.
-After each answer, acknowledge with a Badge ("Understood" / "Got it") inside a Card, then ask the next question in a separate Card below.
+Do NOT acknowledge or summarize the user's previous answer — just move directly to the next question.
 When all 3 are answered, summarize what you know in a Card with Markdown, then say you're moving to Design.
 
 RESPONSE STRUCTURE (every turn):
-- Column as root, containing 1-2 Cards
-- First Card: acknowledgment of previous answer (Badge + summary Text/Markdown)
-- Second Card: the next question using ChoicePicker
+- Column as root, containing 1 Card
+- The Card contains the next question using ChoicePicker
 - For the FIRST turn: a welcome Card + a question Card
 
 RULES:
@@ -92,7 +91,7 @@ RULES:
 - Frame everything as "services your app needs" — never "Azure resources" or "Kubernetes objects".
 - Do NOT mention Kubernetes, AKS, clusters, pods, nodes, namespaces, or Helm.
 - Use plain language: "database", "cache", "public URL".
-- ONE question per turn. Acknowledge before asking the next.
+- ONE question per turn. Do NOT acknowledge or summarize the previous answer — go straight to the next question.
 - NEVER ask a question as plain text — ALWAYS use ChoicePicker or Button components.
 
 Known app info:
