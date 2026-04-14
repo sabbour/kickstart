@@ -11,6 +11,8 @@ import { useA2UI } from './hooks/useA2UI';
 import { useActionDispatch } from './hooks/useActionDispatch';
 import { useProgressiveQueue } from './hooks/useProgressiveQueue';
 import { useSessions } from './hooks/useSessions';
+import { useNavigation } from './hooks/useNavigation';
+import type { NavState } from './hooks/useNavigation';
 import { useStreaming } from './hooks/useStreaming';
 import { useMockStreaming } from './hooks/useMockStreaming';
 import { useAPIConnectorRegistry } from './contexts/APIConnectorContext';
@@ -62,6 +64,10 @@ export function App() {
   // IndexedDB-backed persistent filesystem (provided via context)
   const { fs: vfs, files: vfsFiles } = useVirtualFS();
 
+  // Navigation: ref breaks circular dependency between nav callbacks and handlers
+  const navHandlerRef = useRef<(state: NavState) => void>(() => {});
+  const nav = useNavigation((state) => navHandlerRef.current(state));
+
   // Sync in-memory VFS → IndexedDB when files complete (with deduplication)
   const lastPersistedRef = useRef<Map<string, string>>(new Map());
   useEffect(() => {
@@ -110,14 +116,14 @@ export function App() {
     }
   }, [sessions.activeSessionId]);
 
-  const handleSendMessage = useCallback(async (text: string, isAutoContinue = false) => {
+  const handleSendMessage = useCallback(async (text: string, isAutoContinue = false, explicitSessionId?: string) => {
     // Manual messages reset the consecutive auto-continue counter
     if (!isAutoContinue) {
       resetConsecutiveCount();
     }
 
-    // Ensure we have an active session
-    let sessionId = sessions.activeSessionId;
+    // Ensure we have an active session (use explicit ID to avoid stale closure)
+    let sessionId = explicitSessionId ?? sessions.activeSessionId;
     if (!sessionId) {
       const newSession = sessions.createSession(text);
       sessionId = newSession.id;
@@ -273,22 +279,11 @@ export function App() {
     setMode('chat');
     document.body.classList.remove('on-landing');
 
-    // Create session and send first message after brief delay
+    // Create session and send — pass explicit ID to avoid stale-closure duplicate
     const session = sessions.createSession(prompt);
-    setTimeout(() => {
-      const userMsg: ChatMessage = {
-        id: `msg-${Date.now()}-user`,
-        role: 'user',
-        text: prompt,
-        timestamp: Date.now(),
-      };
-      setMessages([userMsg]);
-      sessions.addMessage(session.id, userMsg);
-
-      // Send via real API
-      handleSendMessage(prompt);
-    }, 100);
-  }, [sessions, a2ui, handleSendMessage, fs, vfs]);
+    nav.pushSession(session.id);
+    handleSendMessage(prompt, false, session.id);
+  }, [sessions, a2ui, handleSendMessage, fs, vfs, nav.pushSession]);
 
   const handleClearAllSessions = useCallback(() => {
     sessions.clearAllSessions();
@@ -299,7 +294,7 @@ export function App() {
     setSelectedFile(undefined);
   }, [sessions, a2ui, fs, vfs]);
 
-  const handleNewSession = useCallback(() => {
+  const handleNewSession = useCallback((pushHistory = true) => {
     a2ui.reset();
     fs.clear();
     void vfs.clear();
@@ -308,9 +303,12 @@ export function App() {
     setMode('landing');
     document.body.classList.add('on-landing');
     sessions.setActiveSessionId(null);
-  }, [a2ui, sessions, fs, vfs]);
+    if (pushHistory) {
+      nav.pushLanding();
+    }
+  }, [a2ui, sessions, fs, vfs, nav.pushLanding]);
 
-  const handleResumeSession = useCallback((sessionId: string) => {
+  const handleResumeSession = useCallback((sessionId: string, pushHistory = true) => {
     sessions.setActiveSessionId(sessionId);
     const session = sessions.sessions.find(s => s.id === sessionId);
     if (session) {
@@ -324,8 +322,34 @@ export function App() {
       setMessages(session.messages);
       setMode('chat');
       document.body.classList.remove('on-landing');
+      if (pushHistory) {
+        nav.pushSession(sessionId);
+      }
     }
-  }, [sessions, a2ui]);
+  }, [sessions, a2ui, nav.pushSession]);
+
+  // Wire up popstate -> handler dispatch (updated every render via ref)
+  navHandlerRef.current = (state: NavState) => {
+    if (state.view === 'landing') {
+      handleNewSession(false);
+    } else if (state.view === 'session' && state.sessionId) {
+      handleResumeSession(state.sessionId, false);
+    }
+  };
+
+  // On mount, restore session from URL if deep-linked
+  useEffect(() => {
+    const initial = nav.getInitialState();
+    if (initial.view === 'session' && initial.sessionId) {
+      const session = sessions.sessions.find(s => s.id === initial.sessionId);
+      if (session) {
+        handleResumeSession(initial.sessionId, false);
+      } else {
+        nav.replaceCurrent({ view: 'landing' });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
   const currentStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
