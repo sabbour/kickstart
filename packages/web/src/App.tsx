@@ -319,7 +319,6 @@ export function App() {
     sessions.setActiveSessionId(sessionId);
     const session = sessions.sessions.find(s => s.id === sessionId);
     if (session) {
-      // Rehydrate A2UI surfaces from stored messages so components render after reload
       a2ui.reset();
       for (const msg of session.messages) {
         if (msg.a2uiMessages && msg.a2uiMessages.length > 0) {
@@ -416,6 +415,23 @@ export function App() {
   const handleDismissViewer = useCallback(() => {
     setViewerFile(undefined);
   }, []);
+
+  // Wire navigation handler (popstate / initial deep-link)
+  navHandlerRef.current = (state: NavState) => {
+    if (state.view === 'session' && state.sessionId) {
+      handleResumeSession(state.sessionId, false);
+    } else {
+      handleNewSession(false);
+    }
+  };
+
+  // Restore deep-link on mount (e.g. #session/<id>)
+  useEffect(() => {
+    const initial = nav.getInitialState();
+    if (initial.view === 'session' && initial.sessionId) {
+      handleResumeSession(initial.sessionId, false);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Playground mode — standalone A2UI test harness
   if (playgroundEnabled) {
