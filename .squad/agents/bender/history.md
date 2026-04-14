@@ -24,3 +24,6 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - v0.3.0 service layer: APIConnector auth abstraction, IntegrationKit packs, CORS proxies
 
 ## Learnings
+- SWA deploy workflow (`deploy-swa.yml`) needs explicit `push → branches: [main]` trigger — tag-only triggers mean no continuous deployment from main.
+- `__BUILD_VERSION__` in `vite.config.ts` can embed git SHA via `execSync('git rev-parse --short HEAD')` — works both locally and in CI without relying on `GITHUB_SHA` env var.
+- Footer version display should use a single unified string (`version-sha`) rather than showing version and SHA separately — reduces redundancy and makes each build uniquely identifiable at a glance.
