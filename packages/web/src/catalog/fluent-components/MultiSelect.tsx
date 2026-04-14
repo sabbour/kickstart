@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {
   DynamicStringSchema,
   DynamicStringListSchema,
+  ActionSchema,
 } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Combobox,
@@ -25,6 +26,7 @@ const FlexibleMultiSelectApi = {
     })),
     placeholder: DynamicStringSchema.optional(),
     value: DynamicStringListSchema.optional(),
+    action: ActionSchema.optional(),
   }),
 };
 
@@ -43,6 +45,9 @@ export const MultiSelect = createReactComponent(FlexibleMultiSelectApi, ({props}
 
   const onOptionSelect = (_ev: any, data: { selectedOptions: string[] }) => {
     props.setValue(data.selectedOptions);
+    if (typeof props.action === 'function') {
+      (props.action as () => void)();
+    }
   };
 
   return (
