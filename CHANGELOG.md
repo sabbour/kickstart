@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## [0.5.7] - 2026-04-14
+
+### Added
+
+- **Continuous SWA deployment** — Merge to `main` now auto-deploys to Azure Static Web Apps; version-SHA footer link added (#177)
+
+### Fixed
+
+- **A2UI v0.9 wire format (P0)** — Adopted official nested wire format (`{version:"v0.9", createSurface:{...}}`) end-to-end, fixing all A2UI component rendering (#166, #184)
+- **A2UI interactivity** — Interactive components (ChoicePicker, CheckBox, Toggle, ComboBox, MultiSelect) now fire action events via `ActionSchema`; `onAction` callback wired through component chain (#192, #195)
+- **SSE event parsing** — Fixed sticky `eventType` bug, JSON envelope extraction, and duplicate A2UI message accumulation (#179, #180)
+- **Integration Kit visibility** — Kit card carousel animation and debug panel fixes (#168, #170, #175)
+- **Version SHA footer** — Topbar footer now shows clickable commit SHA linking to GitHub (#181)
+- **Auth-aware sign-in** — Sign-in button reflects authentication state (#169)
+- **Clear All confirmation** — Added confirmation dialog before clearing all sessions (#172)
+- **Folder icon** — Restored files/folder icon in sidebar (#171)
+- **Phase indicator** — Added visual phase progress indicator (#182)
+
 ## [0.5.6] - 2026-04-14
 
 ### Fixed
