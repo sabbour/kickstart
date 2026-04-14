@@ -8,6 +8,7 @@ export {
   KICKSTART_SYSTEM_PROMPT,
   DEPLOYMENT_SAFEGUARDS,
   buildSystemPrompt,
+  sanitizePromptValue,
 } from "./system-prompt.js";
 
 export type {
