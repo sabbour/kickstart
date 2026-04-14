@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
+import type { ActionDebugEvent } from '../types';
 
 const STORAGE_KEY = 'kickstart-debug';
 
@@ -9,6 +10,12 @@ interface DebugContextValue {
   toggleDebug: () => void;
   /** Explicitly set debug mode. */
   setDebugEnabled: (enabled: boolean) => void;
+  /** Chronological log of A2UI action dispatches (visible in debug panel). */
+  actionLog: ActionDebugEvent[];
+  /** Append an action event to the log. */
+  logAction: (event: ActionDebugEvent) => void;
+  /** Clear the action log (e.g. on session reset). */
+  clearActionLog: () => void;
 }
 
 const DebugContext = createContext<DebugContextValue | null>(null);
@@ -28,6 +35,8 @@ function readInitialDebugState(): boolean {
 
 export function DebugProvider({ children }: { children: ReactNode }) {
   const [debugEnabled, setDebugState] = useState(readInitialDebugState);
+  const actionLogRef = useRef<ActionDebugEvent[]>([]);
+  const [actionLog, setActionLog] = useState<ActionDebugEvent[]>([]);
 
   // Persist to localStorage
   useEffect(() => {
@@ -54,8 +63,18 @@ export function DebugProvider({ children }: { children: ReactNode }) {
     setDebugState(enabled);
   }, []);
 
+  const logAction = useCallback((event: ActionDebugEvent) => {
+    actionLogRef.current = [...actionLogRef.current, event];
+    setActionLog(actionLogRef.current);
+  }, []);
+
+  const clearActionLog = useCallback(() => {
+    actionLogRef.current = [];
+    setActionLog([]);
+  }, []);
+
   return (
-    <DebugContext.Provider value={{ debugEnabled, toggleDebug, setDebugEnabled }}>
+    <DebugContext.Provider value={{ debugEnabled, toggleDebug, setDebugEnabled, actionLog, logAction, clearActionLog }}>
       {children}
     </DebugContext.Provider>
   );

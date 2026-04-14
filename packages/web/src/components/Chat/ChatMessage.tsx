@@ -59,7 +59,7 @@ export function ChatMessage({ message, getSurface, isActive = true, debugEnabled
         </MessageTextProvider>
 
         {/* Debug panel — shown only when debug mode is active */}
-        {debugEnabled && <DebugPanel debugInfo={message.debugInfo} />}
+        {debugEnabled && <DebugPanel debugInfo={message.debugInfo} surfaceIds={message.surfaceIds} />}
       </div>
     </div>
   );
