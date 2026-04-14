@@ -4133,3 +4133,103 @@ The CI pipeline used `sed` to replace values in inline scripts at deploy time.
 
 ## Convention
 When adding new build-time constants, add them to `vite.config.ts` `define` block and declare the type in `src/vite-env.d.ts`. Never use inline `<script>` tags in `index.html`.
+
+**Next Steps:** Submit revised DP v3 addressing critical gaps. Zapp will re-review before Phase 1 begins.
+### 2026-04-14T09:12:02.022Z: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Finish all remaining v0.5.6 issues (#147, #158, #159, #161) and docs update FIRST, then run ceremonies (retro/planning) BEFORE starting work on #46.
+**Why:** User request — captured for team memory
+### 2026-04-14T07:27:27.935Z: User directive — update docs after sprint
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Update the docs after the v0.5.6 sprint work is all done
+**Why:** User request — documentation needs to reflect all the bug fixes and changes made during v0.5.6
+### 2026-04-14T06:31:19.532Z: User directive — no agent lockout
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Do NOT enforce reviewer rejection lockout. The original author CAN revise their own work after a rejection. Skip the lockout protocol entirely.
+**Why:** User directive — the lockout rule adds unnecessary friction for this team's workflow. Original authors have the best context to address review feedback.
+### 2026-04-14T09:28:47.967Z: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Track and capture cycle times for each task (DP→review→implement→review→merge) for the sprint retro. Ahmed wants to discuss how long the ceremony pipeline takes per issue.
+**Why:** User request — retro needs data on where time is spent to improve process efficiency
+# Decision: Sprint Retrospective — v0.5.6 Bug Sprint
+
+**Date:** 2026-04-14  
+**Author:** Leela (Lead)  
+**Status:** Accepted  
+**Ceremony:** Sprint Retrospective
+
+---
+
+## 1. What Happened (Facts Only)
+
+**Sprint scope:** 10 issues closed (8 bug fixes, 1 security hardening, 1 feature). Two agents active: Fry (8 issues), Bender (2 issues).
+
+### Cycle Time Observations
+
+| Bucket | Issues | Avg Time | Notes |
+|--------|--------|----------|-------|
+| Fast (< 5 min) | #148, #141 | ~3 min | Simple fixes — rename, CSS tweak |
+| Medium (5–10 min) | #150, #145, #142, #158/#159 | ~7 min | Required DP cycle or combining issues |
+| Slow (> 10 min) | #153, #161, #147 | 11–25 min | Bloated context, complex scope, or multi-round review |
+
+**Key facts:**
+- **~9 min gap** between DP approval and PR appearing on GitHub. No visibility to Ahmed during agent implementation phase. This was the biggest user-facing pain point.
+- **287 KB total context** agents read at spawn: `decisions.md` = 90 KB, `fry/history.md` = 42 KB, `bender/history.md` = 42 KB. This is 3–4× the recommended ceiling.
+- **#161 (dark mode CSS)** — a CSS-only fix took ~11 min from DP approval to PR. Root cause: agent spent most of that time reading bloated history before writing 20 lines of CSS.
+- **#153 (prompt injection)** — slowest issue. Multiple review rounds, Zapp requested changes, `Buffer→TextEncoder` browser compat fix discovered during review. Correct outcome, but costly.
+- **#147 (IndexedDB filesystem)** — 25 min, justified by complexity (security controls, quota management, encryption-at-rest considerations).
+- **PRs #158/#159 combined** into PR #162. Good instinct — related fixes shipped together.
+- **Agents skipped DP step** early in the sprint until a directive was captured enforcing it.
+- **Agent lockout protocol fired incorrectly** — Ahmed explicitly overrode it ("didn't I say not to do so?").
+- **Identity token path was wrong** at sprint start — manually fixed, then corrected by Squad upgrade.
+- **Parallel agent work** on the same repo checkout caused git conflicts (shared working tree).
+
+**What went well:**
+- Bot identity system working — reviews posted as `sabbour-squad-lead[bot]`.
+- Parallel reviewer spawning effective — reviewers + implementation ran simultaneously.
+- 10 issues closed in one session — highest throughput sprint to date.
+- Security gate caught real issues: `Buffer` usage in browser (Node-only API), path traversal risks.
+
+---
+
+## 2. Root Cause Analysis
+
+### RCA-1: Agent spawn time dominated by context reading
+- **Symptom:** 9 min gap between DP approval and PR.
+- **Root cause:** Agents read 287 KB of history/decisions at spawn. At ~500 tokens/KB, that's ~143K tokens of context before a single line of code. LLM inference on that volume is slow and expensive.
+- **Why it grew:** Scribe summarization threshold is 15 KB, but files grew past 40 KB. Compaction runs after sprints, not before. Agents start with accumulated cruft from previous sprints.
+
+### RCA-2: Process ceremony too heavy for trivial fixes
+- **Symptom:** CSS-only change (#161) went through full DP → architecture review → security review → code → PR review pipeline.
+- **Root cause:** No fast-track path for changes below a complexity threshold. Every issue got the same ceremony regardless of risk or size.
+
+### RCA-3: No progress visibility during implementation
+- **Symptom:** Ahmed frustrated by silence between DP approval and PR appearing.
+- **Root cause:** Agents create branch + commits + PR as a batch at the end. No draft PR or branch push happens early. GitHub shows nothing until the agent is completely done.
+
+### RCA-4: Shared working tree causes git conflicts
+- **Symptom:** Parallel agents stepping on each other's git state.
+- **Root cause:** All agents share the same `main` checkout. No worktree isolation between parallel agent runs.
+
+### RCA-5: Stale directives not loaded at sprint start
+- **Symptom:** Agents skipped DP step; lockout protocol fired incorrectly.
+- **Root cause:** Directives captured mid-sprint aren't retroactively applied to already-running agents. New agents pick them up, but running ones don't re-read context.
+
+---
+
+## 3. What Should Change
+
+### C1: Pre-sprint context compaction ("the nap")
+Run aggressive history compaction BEFORE sprints, not just after. Target: each history file ≤ 10 KB, decisions.md ≤ 30 KB. Agents should start clean.
+
+**Rule:** Before any sprint, Scribe runs compaction. If total context > 50 KB, sprint does not start.
+
+### C2: Fast-track path for trivial changes
+Define a "trivial change" gate: CSS-only, typo fix, config change, rename, or single-file change with no logic. Trivial changes skip DP architecture review and security review. They still need code review (one reviewer, not two).
+
+**Threshold:** ≤ 1 file changed, no new dependencies, no API surface change, no security-relevant code.
+
+### C3: Draft PR within 30 seconds
+Agents must create branch + draft PR immediately after DP approval, BEFORE writing code. This gives Ahmed a GitHub URL to watch within 30 seconds. Commits are pushed incrementally as work progresses.
+
+**Sequence:** DP approved → create branch → push empty commit → open draft PR → implement → push commits → mark PR ready for review.

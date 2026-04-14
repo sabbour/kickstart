@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## [0.6.0] - 2026-04-14
+
+### Added
+
+- **Guided onboarding tour** — 4-step tooltip tour for first-time users with SVG spotlight overlay, skip/next navigation, and localStorage persistence (#187)
+- **Public Copilot skill system** — Build-time bundling pipeline for public Copilot extension skills with security policy, frontmatter parsing, knowledge extraction, and phase mapping (#186)
+- **Copilot Skills Registry** — 5 pre-configured Azure extension skills (AKS, App Service, Functions, Container Apps, Azure SQL) with keyword-based resolution from conversation history (#186)
+- **Browser back button** — Hash-based navigation with History API; deep links via `#session/{id}`, back button returns to landing (#211)
+- **Azure Retail Pricing API** — Live Azure pricing data integration for CostEstimate component (#189)
+- **Continue button** — Auto-selection affordance for ChoicePicker with Continue button (#190)
+- **Expanded playground** — 10 new scenarios: file operations (single/multi-file editors, create/edit/delete), cost estimate, and full multi-phase demo (Discover → Design → Generate → Review → Deploy) (#174, #188)
+- **Dynamic A2UI catalog** — Component catalog auto-generated in system prompt from Zod schemas, keeping LLM examples in sync with code (#185)
+
+### Fixed
+
+- **UI freeze after selection** — Removed `pointerEvents: 'none'` on past messages that trapped cursor after clicking A2UI components (#205)
+- **ChoicePicker visual selection** — Radio buttons and checkboxes now visually fill on click; single clean chat message instead of duplicates (#208)
+- **A2UI surfaces lost on reload** — Raw A2UI messages persisted and replayed on session resume; FileEditor highlighting restored (#193, #200)
+- **Interactive choice components** — LLM now always uses Buttons/RadioGroup/ChoicePicker for questions with finite options (#213)
+- **Action context enrichment** — Selection messages show human-readable values (e.g., "Web API") instead of raw metadata (#214)
+- **Debug panel raw JSON** — Shows parsed LLM output instead of JSON envelope (#198)
+- **Selection message text** — Removed "I chose" prefix; shows just the selected value (#224)
+- **CodeBlock + Home + Delete** — Syntax highlighting with highlight.js, home button navigation, session delete (#167, #173, #178)
+- **Heartbeat workflow** — Added missing `github-token` input to `actions/github-script@v7` (#226)
+
 ## [0.5.7] - 2026-04-14
 
 ### Added
