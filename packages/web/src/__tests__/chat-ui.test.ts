@@ -3,9 +3,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatMessage as ChatMessageView } from '../components/Chat/ChatMessage';
 import { ChatShell } from '../components/Chat/ChatShell';
+import { DebugPanel } from '../components/Chat/DebugPanel';
 import type { ChatMessage, TokenUsageSummary } from '../types';
 import { GENERATE_PROGRESS_TITLE, getLatestConversationPhase, rebuildChatSessionState } from '../utils/chat-a2ui';
 import { summarizeTokenUsage } from '../utils/chat-usage';
+import { A2uiSurface, basicCatalog } from '../vendor/a2ui/react';
+import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
+import { MessageProcessor } from '../vendor/a2ui/web_core/index';
+import type { A2uiMessage } from '../vendor/a2ui/web_core/schema/server-to-client';
 
 const debugState = vi.hoisted(() => ({
   actionLog: [] as Array<{
@@ -117,7 +122,7 @@ describe('chat/debug UI regressions', () => {
       text: '',
       timestamp: 1,
       debugInfo: {
-        model: 'gpt-5.3-chat',
+        model: 'gpt-5.4-mini',
         rawResponse: '{}',
       },
     });
@@ -128,7 +133,7 @@ describe('chat/debug UI regressions', () => {
     expect(markup).not.toContain('Deploy now');
   });
 
-  it('renders action events once in the separate chat-level debug log', () => {
+  it('does not render the separate action timeline in chat shell debug mode', () => {
     debugState.actionLog = [{
       timestamp: 1,
       actionName: 'deploy-now',
@@ -152,23 +157,22 @@ describe('chat/debug UI regressions', () => {
       },
     ], null, true);
 
-    expect(markup).toContain('data-testid="chat-debug-action-log"');
-    expect(markup).toContain('Action timeline (1)');
-    expect(markup).toContain('deploy-now');
-    expect(markup).toContain('Deploy now');
-    expect((markup.match(/data-testid="chat-debug-action-log"/g) ?? []).length).toBe(1);
+    expect(markup).not.toContain('data-testid="chat-debug-action-log"');
+    expect(markup).not.toContain('Action timeline');
+    expect(markup).not.toContain('deploy-now');
+    expect(markup).not.toContain('Deploy now');
   });
 
-  it('renders a compact token tracker from persisted assistant usage', () => {
+  it('shows the token tracker only while debug mode is enabled', () => {
     const messages: ChatMessage[] = [
       {
         id: 'assistant-1',
         role: 'assistant',
         text: '',
-        model: 'gpt-5.3-chat',
+        model: 'gpt-5.4-mini',
         timestamp: 1,
         usage: {
-          model: 'gpt-5.3-chat',
+          model: 'gpt-5.4-mini',
           inputTokens: 120,
           outputTokens: 45,
           totalTokens: 165,
@@ -181,10 +185,10 @@ describe('chat/debug UI regressions', () => {
         id: 'assistant-2',
         role: 'assistant',
         text: '',
-        model: 'gpt-5.3-chat',
+        model: 'gpt-5.4-mini',
         timestamp: 2,
         usage: {
-          model: 'gpt-5.3-chat',
+          model: 'gpt-5.4-mini',
           inputTokens: 80,
           outputTokens: 30,
           totalTokens: 110,
@@ -196,7 +200,8 @@ describe('chat/debug UI regressions', () => {
     ];
 
     const usageSummary = summarizeTokenUsage(messages);
-    const markup = renderChatShell(messages, null, false, usageSummary);
+    const defaultMarkup = renderChatShell(messages, null, false, usageSummary);
+    const debugMarkup = renderChatShell(messages, null, true, usageSummary);
 
     expect(usageSummary?.session).toMatchObject({
       inputTokens: 200,
@@ -205,12 +210,74 @@ describe('chat/debug UI regressions', () => {
       turnCount: 2,
       estimatedCostUsd: 0.03,
     });
-    expect(markup).toContain('data-testid="chat-usage-tracker"');
-    expect(markup).toContain('▲ 80');
-    expect(markup).toContain('▼ 30');
-    expect(markup).toContain('Σ 200 / 75');
-    expect(markup).toContain('~$0.03');
-    expect(markup).toContain('gpt-5.3-chat');
+    expect(defaultMarkup).not.toContain('data-testid="chat-usage-tracker"');
+    expect(debugMarkup).toContain('data-testid="chat-usage-tracker"');
+    expect(debugMarkup).toContain('▲ 80');
+    expect(debugMarkup).toContain('▼ 30');
+    expect(debugMarkup).toContain('Σ 200 / 75');
+    expect(debugMarkup).toContain('~$0.03');
+    expect(debugMarkup).toContain('gpt-5.4-mini');
+  });
+
+  it('renders a copy button in the expanded debug panel', () => {
+    const useStateSpy = vi.spyOn(React, 'useState');
+    const mockSetExpanded: React.Dispatch<React.SetStateAction<unknown>> = () => undefined;
+    useStateSpy.mockReturnValueOnce([true, mockSetExpanded] as ReturnType<typeof React.useState>);
+
+    const markup = renderToStaticMarkup(
+      React.createElement(DebugPanel, {
+        debugInfo: {
+          model: 'gpt-5.4-mini',
+          rawResponse: '{"message":"hello"}',
+        },
+      }),
+    );
+
+    useStateSpy.mockRestore();
+
+    expect(markup).toContain('Copy response');
+  });
+
+  it('shows a warning for missing referenced components while debug mode is enabled', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const processor = new MessageProcessor<ReactComponentImplementation>(
+      [basicCatalog],
+      () => undefined,
+    );
+
+    const surfaceMessages: A2uiMessage[] = [
+      {
+        version: 'v0.9',
+        createSurface: { surfaceId: 'msg-1', catalogId: basicCatalog.id },
+      },
+      {
+        version: 'v0.9',
+        updateComponents: {
+          surfaceId: 'msg-1',
+          components: [
+            { id: 'root', component: 'Column', children: ['diagram'], gap: '12px' },
+          ],
+        },
+      },
+    ];
+
+    processor.processMessages(surfaceMessages);
+
+    const surface = processor.model.getSurface('msg-1');
+    expect(surface).toBeDefined();
+
+    const markup = renderToStaticMarkup(
+      React.createElement(A2uiSurface, {
+        surface: surface!,
+      }),
+    );
+
+    expect(markup).toContain('Missing component: diagram');
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[A2UI] Referenced component "diagram" is not available on surface "msg-1"',
+    );
+
+    warnSpy.mockRestore();
   });
 });
 

@@ -1,9 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
-import { DebugActionLog } from './DebugActionLog';
 import { TokenUsageTracker } from './TokenUsageTracker';
-import { useDebug } from '../../contexts/DebugContext';
 import type { ChatMessage, TokenUsageSummary } from '../../types';
 import type { SurfaceModel } from '../../vendor/a2ui/web_core/index';
 import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapter';
@@ -23,12 +21,11 @@ interface ChatShellProps {
 
 export function ChatShell({ messages, isStreaming, streamingText, streamingSurfaceIds, currentPhase, onSend, getSurface, debugEnabled, usageSummary }: ChatShellProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { actionLog } = useDebug();
 
   // Auto-scroll to bottom on new messages or streaming updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingText, streamingSurfaceIds, actionLog.length]);
+  }, [messages, streamingText, streamingSurfaceIds]);
 
   const activePhaseIndex = currentPhase ? CONVERSATION_PHASE_ORDER.indexOf(currentPhase as typeof CONVERSATION_PHASE_ORDER[number]) : -1;
   const showPhaseBar = Boolean(currentPhase) && activePhaseIndex !== -1;
@@ -60,14 +57,13 @@ export function ChatShell({ messages, isStreaming, streamingText, streamingSurfa
             getSurface={getSurface}
             debugEnabled={debugEnabled}
           />
-          {debugEnabled && actionLog.length > 0 && <DebugActionLog />}
           <div ref={messagesEndRef} />
         </div>
       </div>
       <ChatInput
         onSend={onSend}
         disabled={isStreaming}
-        statusBar={usageSummary ? <TokenUsageTracker usage={usageSummary} /> : undefined}
+        statusBar={debugEnabled && usageSummary ? <TokenUsageTracker usage={usageSummary} /> : undefined}
       />
     </div>
   );

@@ -118,7 +118,7 @@ interface ConverseResponse {
   ],
   "usage": {
     "turn": {
-      "model": "gpt-5.3-chat",
+      "model": "gpt-5.4-mini",
       "inputTokens": 412,
       "outputTokens": 138,
       "totalTokens": 550,
@@ -238,8 +238,8 @@ The API requires Azure OpenAI connection settings, plus optional pricing inputs 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI resource endpoint URL | `https://my-openai.openai.azure.com` |
-| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Chat model deployment name | `gpt-5.3-chat` |
-| `AZURE_OPENAI_CODEX_DEPLOYMENT` | Codex model deployment name | `gpt-5.3-codex` |
+| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Chat model deployment name | `gpt-5.4-mini` |
+| `AZURE_OPENAI_CODEX_DEPLOYMENT` | Codex model deployment name | `gpt-5.4` |
 | `AZURE_OPENAI_DEPLOYMENT` | Legacy fallback deployment name | `gpt-4o` |
 | `AZURE_OPENAI_API_KEY` | API key for the Azure OpenAI resource | `abc123...` |
 | `AZURE_OPENAI_CHAT_INPUT_PRICE_PER_1K_USD` | Optional estimated chat input-token price | `0.0015` |
@@ -406,7 +406,7 @@ Supports streaming via `Accept: text/event-stream` — same SSE format as `/api/
 
 | Variable | Description |
 |----------|-------------|
-| `AZURE_OPENAI_CODEX_DEPLOYMENT` | Codex model deployment name (e.g. `gpt-5.3-codex`) |
+| `AZURE_OPENAI_CODEX_DEPLOYMENT` | Codex model deployment name (e.g. `gpt-5.4`) |
 
 ---
 

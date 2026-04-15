@@ -11,7 +11,7 @@
 import { getDemoResponse, resetDemoState } from './demo-scenarios';
 import type { A2uiMsg, A2uiPayloadItem } from '../types';
 
-const MOCK_MODEL = 'gpt-5.3-chat (mock)';
+const MOCK_MODEL = 'gpt-5.4-mini (mock)';
 
 interface MockStreamCallbacks {
   onDelta: (text: string) => void;
