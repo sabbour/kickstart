@@ -20,16 +20,22 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { Search20Regular } from '@fluentui/react-icons';
-import { useAPIConnector } from '../../contexts/APIConnectorContext';
 import { useConversationSession } from '../../contexts/ConversationSessionContext';
 import type {
-  AzureARMConnector,
   AzureLocation,
   AzureResource,
   AzureSubscription,
   AzureResourceGroup,
 } from '@kickstart/core';
 import { getAzureSession } from '../../services/azure-auth';
+import {
+  AZURE_DISCOVERY_FALLBACK_MESSAGE,
+  AzureDiscoveryUnavailableError,
+  listAzureLocations,
+  listAzureResourceGroups,
+  listAzureResources,
+  listAzureSubscriptions,
+} from '../../services/azure-resources';
 import {
   persistAzureTarget,
   startAzureDeployment,
@@ -104,6 +110,8 @@ const STUB_RESOURCES: AzureResource[] = [
   },
 ];
 
+const NO_SUBSCRIPTIONS_MESSAGE = 'No Azure subscriptions were returned for this Microsoft account.';
+
 const useStyles = makeStyles({
   root: {
     marginTop: tokens.spacingVerticalS,
@@ -176,7 +184,6 @@ const ALLOW_FALLBACK_DATA = isMockMode() || isPlaygroundMode();
 
 export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, ({ props, context }) => {
   const classes = useStyles();
-  const connector = useAPIConnector('azure-arm') as AzureARMConnector | undefined;
   const { backendSessionId } = useConversationSession();
 
   const label = props.label ? String(props.label) : 'Choose your Azure deployment target';
@@ -202,15 +209,23 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
   const [selected, setSelected] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | undefined>();
+  const [notice, setNotice] = useState<string | undefined>();
+  const [subscriptionDiscoveryUnavailable, setSubscriptionDiscoveryUnavailable] = useState(false);
+  const [resourceGroupDiscoveryUnavailable, setResourceGroupDiscoveryUnavailable] = useState(false);
+  const [locationDiscoveryUnavailable, setLocationDiscoveryUnavailable] = useState(false);
+
+  const selectedSubscriptionId = selectedSubId.trim();
+  const selectedLocationValue = selectedLocation.trim();
+  const normalizedSelectedRg = selectedRg.trim();
 
   const selectedSubscription = useMemo(
-    () => subscriptions.find((sub) => sub.subscriptionId === selectedSubId),
-    [selectedSubId, subscriptions],
+    () => subscriptions.find((sub) => sub.subscriptionId === selectedSubscriptionId),
+    [selectedSubscriptionId, subscriptions],
   );
 
   const selectedResourceGroupName = resourceGroupMode === 'new'
     ? newResourceGroup.trim()
-    : selectedRg;
+    : normalizedSelectedRg;
 
   useEffect(() => {
     let cancelled = false;
@@ -218,32 +233,43 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     async function loadSubscriptions() {
       setLoadingSubs(true);
       setError(undefined);
+      setNotice(undefined);
+      setSubscriptionDiscoveryUnavailable(false);
 
       try {
-        if (!connector) {
-          throw new Error('Azure sign-in is unavailable in this environment.');
-        }
-
-        const session = await getAzureSession(connector);
+        const session = await getAzureSession();
         if (!session.configured) {
-          throw new Error(session.error ?? 'Azure sign-in is not configured on the server.');
+          throw new Error(session.error ?? 'Azure sign-in is unavailable in this environment.');
         }
         if (!session.authenticated) {
           throw new Error('Sign in to Azure before choosing a deployment target.');
         }
 
+        const nextSubscriptions = await listAzureSubscriptions();
         if (cancelled) return;
-        setSubscriptions(session.subscriptions);
-        if (!presetSubId && session.subscriptions.length === 1) {
-          setSelectedSubId(session.subscriptions[0].subscriptionId);
+
+        setSubscriptions(nextSubscriptions);
+        if (!presetSubId && nextSubscriptions.length === 1) {
+          setSelectedSubId(nextSubscriptions[0].subscriptionId);
+        }
+        if (!presetSubId && nextSubscriptions.length === 0) {
+          setNotice(NO_SUBSCRIPTIONS_MESSAGE);
         }
       } catch (loadError) {
         if (cancelled) return;
+
         if (ALLOW_FALLBACK_DATA) {
           setSubscriptions(STUB_SUBSCRIPTIONS);
           if (!presetSubId && STUB_SUBSCRIPTIONS.length === 1) {
             setSelectedSubId(STUB_SUBSCRIPTIONS[0].subscriptionId);
           }
+          return;
+        }
+
+        if (loadError instanceof AzureDiscoveryUnavailableError) {
+          setSubscriptions([]);
+          setSubscriptionDiscoveryUnavailable(true);
+          setNotice(AZURE_DISCOVERY_FALLBACK_MESSAGE);
         } else {
           setSubscriptions([]);
           setError(sanitizeAzureUiErrorMessage(loadError, 'target-load'));
@@ -260,71 +286,113 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     return () => {
       cancelled = true;
     };
-  }, [connector, presetSubId]);
+  }, [presetSubId]);
 
   useEffect(() => {
-    if (!selectedSubId) {
+    if (!selectedSubscriptionId) {
       setResourceGroups([]);
       setLocations([]);
+      setResources([]);
+      setSelected('');
       setSelectedRg('');
       setNewResourceGroup('');
+      setSelectedLocation('');
+      setResourceGroupDiscoveryUnavailable(false);
+      setLocationDiscoveryUnavailable(false);
       return;
     }
 
     let cancelled = false;
 
-    setSelectedRg(presetRg ?? '');
-    setNewResourceGroup('');
-    setSelectedLocation('');
-    setResourceGroupMode('existing');
-
     async function loadTargetContext() {
       setLoadingRgs(true);
       setLoadingLocations(isDeploymentTargetMode);
+      setError(undefined);
+      setSelected('');
+      setSelectedRg('');
+      setNewResourceGroup('');
+      setSelectedLocation('');
+      setResourceGroupMode('existing');
+      setResourceGroupDiscoveryUnavailable(false);
+      setLocationDiscoveryUnavailable(false);
 
       try {
-        if (!connector) {
-          throw new Error('Azure sign-in is unavailable in this environment.');
-        }
-
-        const [nextResourceGroups, nextLocations] = await Promise.all([
-          connector.listResourceGroups(selectedSubId),
-          isDeploymentTargetMode ? connector.listLocations(selectedSubId) : Promise.resolve([] as AzureLocation[]),
+        const [resourceGroupsResult, locationsResult] = await Promise.allSettled([
+          listAzureResourceGroups(selectedSubscriptionId),
+          isDeploymentTargetMode ? listAzureLocations(selectedSubscriptionId) : Promise.resolve([] as AzureLocation[]),
         ]);
 
         if (cancelled) return;
 
+        let nextResourceGroups: AzureResourceGroup[] = [];
+        let nextLocations: AzureLocation[] = [];
+        let nextNotice = subscriptionDiscoveryUnavailable ? AZURE_DISCOVERY_FALLBACK_MESSAGE : undefined;
+        let nextError: string | undefined;
+
+        if (resourceGroupsResult.status === 'fulfilled') {
+          nextResourceGroups = resourceGroupsResult.value;
+        } else if (resourceGroupsResult.reason instanceof AzureDiscoveryUnavailableError) {
+          setResourceGroupDiscoveryUnavailable(true);
+          nextNotice = AZURE_DISCOVERY_FALLBACK_MESSAGE;
+        } else {
+          nextError = sanitizeAzureUiErrorMessage(resourceGroupsResult.reason, 'target-load');
+        }
+
+        if (locationsResult.status === 'fulfilled') {
+          nextLocations = locationsResult.value;
+        } else if (locationsResult.reason instanceof AzureDiscoveryUnavailableError) {
+          setLocationDiscoveryUnavailable(true);
+          nextNotice = AZURE_DISCOVERY_FALLBACK_MESSAGE;
+        } else if (!nextError) {
+          nextError = sanitizeAzureUiErrorMessage(locationsResult.reason, 'target-load');
+        }
+
         setResourceGroups(nextResourceGroups);
         setLocations(nextLocations);
-        setSelectedLocation((previous) => previous || nextLocations[0]?.name || '');
+        setNotice(nextError ? undefined : nextNotice);
+        setError(nextError);
+
+        const defaultLocation = nextLocations[0]?.name ?? '';
 
         if (presetRg) {
           const presetMatch = nextResourceGroups.find((rg) => rg.name.toLowerCase() === presetRg.toLowerCase());
           if (presetMatch) {
             setResourceGroupMode('existing');
             setSelectedRg(presetMatch.name);
-            setSelectedLocation((previous) => previous || presetMatch.location || nextLocations[0]?.name || '');
-          } else {
-            setResourceGroupMode('new');
-            setNewResourceGroup(presetRg);
+            setSelectedLocation(presetMatch.location || defaultLocation);
+            return;
           }
-        } else if (nextResourceGroups.length === 0) {
+
           setResourceGroupMode('new');
-        } else if (nextResourceGroups.length === 1) {
-          setSelectedRg(nextResourceGroups[0].name);
-          setSelectedLocation((previous) => previous || nextResourceGroups[0].location || nextLocations[0]?.name || '');
+          setNewResourceGroup(presetRg);
+          setSelectedLocation(defaultLocation);
+          return;
         }
+
+        if (nextResourceGroups.length === 0) {
+          setResourceGroupMode('new');
+          setSelectedLocation(defaultLocation);
+          return;
+        }
+
+        if (nextResourceGroups.length === 1) {
+          setSelectedRg(nextResourceGroups[0].name);
+          setSelectedLocation(nextResourceGroups[0].location || defaultLocation);
+          return;
+        }
+
+        setSelectedLocation(defaultLocation);
       } catch (loadError) {
         if (cancelled) return;
 
         if (ALLOW_FALLBACK_DATA) {
           const fallbackResourceGroups = STUB_RESOURCE_GROUPS.map((rg) => ({
             ...rg,
-            id: rg.id.replace('{subscriptionId}', selectedSubId),
+            id: rg.id.replace('{subscriptionId}', selectedSubscriptionId),
           }));
           setResourceGroups(fallbackResourceGroups);
           setLocations(STUB_LOCATIONS);
-          setSelectedLocation((previous) => previous || STUB_LOCATIONS[0]?.name || '');
+          setSelectedLocation(STUB_LOCATIONS[0]?.name ?? '');
           if (fallbackResourceGroups.length === 1) {
             setSelectedRg(fallbackResourceGroups[0].name);
           }
@@ -346,34 +414,34 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     return () => {
       cancelled = true;
     };
-  }, [connector, isDeploymentTargetMode, presetRg, selectedSubId]);
+  }, [isDeploymentTargetMode, presetRg, selectedSubscriptionId, subscriptionDiscoveryUnavailable]);
 
   useEffect(() => {
-    if (!isDeploymentTargetMode || !selectedRg || resourceGroupMode !== 'existing') return;
+    if (!isDeploymentTargetMode || !normalizedSelectedRg || resourceGroupMode !== 'existing') return;
 
-    const matchingGroup = resourceGroups.find((rg) => rg.name === selectedRg);
+    const matchingGroup = resourceGroups.find((rg) => rg.name === normalizedSelectedRg);
     if (matchingGroup?.location) {
       setSelectedLocation((previous) => previous || matchingGroup.location);
     }
-  }, [isDeploymentTargetMode, resourceGroupMode, resourceGroups, selectedRg]);
+  }, [isDeploymentTargetMode, normalizedSelectedRg, resourceGroupMode, resourceGroups]);
 
   const fetchResources = useCallback(async () => {
-    if (!selectedSubId || isDeploymentTargetMode) return;
+    if (!selectedSubscriptionId || isDeploymentTargetMode) return;
 
     setLoadingResources(true);
     setError(undefined);
     try {
-      if (!connector) {
-        throw new Error('Azure sign-in is unavailable in this environment.');
-      }
-
-      const allResources = await connector.listResources(selectedSubId);
+      const allResources = await listAzureResources({
+        subscriptionId: selectedSubscriptionId,
+        resourceGroup: normalizedSelectedRg || undefined,
+        resourceType: resourceTypeFilter,
+      });
       setResources(allResources);
     } catch (loadError) {
       if (ALLOW_FALLBACK_DATA) {
         setResources(STUB_RESOURCES.map((resource) => ({
           ...resource,
-          id: resource.id.replace('{subscriptionId}', selectedSubId),
+          id: resource.id.replace('{subscriptionId}', selectedSubscriptionId),
         })));
       } else {
         setError(sanitizeAzureUiErrorMessage(loadError, 'resource-load'));
@@ -382,18 +450,18 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     } finally {
       setLoadingResources(false);
     }
-  }, [connector, isDeploymentTargetMode, selectedSubId]);
+  }, [isDeploymentTargetMode, normalizedSelectedRg, resourceTypeFilter, selectedSubscriptionId]);
 
   useEffect(() => {
-    if (!isDeploymentTargetMode && selectedSubId) {
+    if (!isDeploymentTargetMode && selectedSubscriptionId) {
       void fetchResources();
     }
-  }, [fetchResources, isDeploymentTargetMode, selectedSubId]);
+  }, [fetchResources, isDeploymentTargetMode, selectedSubscriptionId]);
 
   const filteredResources = useMemo(() => {
     let result = resources;
-    if (selectedRg) {
-      result = result.filter((resource) => resourceGroupFromId(resource.id).toLowerCase() === selectedRg.toLowerCase());
+    if (normalizedSelectedRg) {
+      result = result.filter((resource) => resourceGroupFromId(resource.id).toLowerCase() === normalizedSelectedRg.toLowerCase());
     }
     if (resourceTypeFilter) {
       result = result.filter((resource) => resource.type.toLowerCase() === resourceTypeFilter.toLowerCase());
@@ -406,7 +474,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
         || resource.location.toLowerCase().includes(query));
     }
     return result;
-  }, [resourceTypeFilter, resources, searchQuery, selectedRg]);
+  }, [normalizedSelectedRg, resourceTypeFilter, resources, searchQuery]);
 
   const dispatchSelection = useCallback((payload: Record<string, unknown>) => {
     const rawAction = context.componentModel.properties.onSelect;
@@ -437,7 +505,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
       value: resource.id,
       selectedValue: resource.id,
       selectedLabel: resource.name,
-      subscriptionId: selectedSubId,
+      subscriptionId: selectedSubscriptionId,
       subscriptionName: selectedSubscription?.displayName,
       resourceGroup: resourceGroupFromId(resource.id),
       resourceId: resource.id,
@@ -453,7 +521,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
       return;
     }
 
-    if (!selectedSubId || !selectedResourceGroupName || !selectedLocation) {
+    if (!selectedSubscriptionId || !selectedResourceGroupName || !selectedLocationValue) {
       setError('Choose a subscription, resource group, and region before continuing.');
       return;
     }
@@ -463,12 +531,12 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
 
     try {
       await persistAzureTarget(backendSessionId, {
-        subscriptionId: selectedSubId,
+        subscriptionId: selectedSubscriptionId,
         subscriptionName: selectedSubscription?.displayName,
         resourceGroup: selectedResourceGroupName,
         resourceGroupName: selectedResourceGroupName,
         resourceGroupMode,
-        location: selectedLocation,
+        location: selectedLocationValue,
       });
 
       const deployment = await startAzureDeployment(backendSessionId);
@@ -477,16 +545,16 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
       }
 
       dispatchSelection({
-        value: `${selectedSubId}/${selectedResourceGroupName}/${selectedLocation}`,
-        selectedValue: `${selectedSubId}/${selectedResourceGroupName}/${selectedLocation}`,
-        selectedLabel: `${selectedSubscription?.displayName ?? selectedSubId} · ${selectedResourceGroupName} · ${selectedLocation}`,
+        value: `${selectedSubscriptionId}/${selectedResourceGroupName}/${selectedLocationValue}`,
+        selectedValue: `${selectedSubscriptionId}/${selectedResourceGroupName}/${selectedLocationValue}`,
+        selectedLabel: `${selectedSubscription?.displayName ?? selectedSubscriptionId} · ${selectedResourceGroupName} · ${selectedLocationValue}`,
         runId: deployment.runId,
         status: deployment.status,
-        subscriptionId: selectedSubId,
+        subscriptionId: selectedSubscriptionId,
         subscriptionName: selectedSubscription?.displayName,
         resourceGroup: selectedResourceGroupName,
         resourceGroupMode,
-        location: selectedLocation,
+        location: selectedLocationValue,
       });
     } catch (deploymentError) {
       setError(sanitizeAzureUiErrorMessage(deploymentError, 'deployment-start'));
@@ -497,22 +565,27 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     backendSessionId,
     dispatchSelection,
     resourceGroupMode,
-    selectedLocation,
+    selectedLocationValue,
     selectedResourceGroupName,
-    selectedSubId,
     selectedSubscription?.displayName,
+    selectedSubscriptionId,
   ]);
 
   const canStartDeployment = Boolean(
     backendSessionId
-    && selectedSubId
+    && selectedSubscriptionId
     && selectedResourceGroupName
-    && selectedLocation
+    && selectedLocationValue
     && !loadingSubs
     && !loadingRgs
     && !loadingLocations
     && !savingTarget,
   );
+
+  const showManualSubscriptionInput = subscriptionDiscoveryUnavailable
+    || (Boolean(presetSubId) && subscriptions.length === 0);
+  const showSubscriptionSelect = !showManualSubscriptionInput && subscriptions.length > 0;
+  const showNoSubscriptionsMessage = !showManualSubscriptionInput && subscriptions.length === 0;
 
   if (isDeploymentTargetMode) {
     return (
@@ -523,6 +596,14 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
           <Field label="Subscription" className={classes.cascadeField}>
             {loadingSubs ? (
               <Spinner size="tiny" label="Loading subscriptions…" />
+            ) : showManualSubscriptionInput ? (
+              <Input
+                placeholder="00000000-0000-0000-0000-000000000000"
+                value={selectedSubId}
+                onChange={(_, data) => setSelectedSubId(data.value)}
+              />
+            ) : showNoSubscriptionsMessage ? (
+              <Caption1>{NO_SUBSCRIPTIONS_MESSAGE}</Caption1>
             ) : (
               <Select
                 value={selectedSubId}
@@ -542,7 +623,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
             <Select
               value={resourceGroupMode}
               onChange={(_, data) => setResourceGroupMode(data.value === 'new' ? 'new' : 'existing')}
-              disabled={resourceGroups.length === 0}
+              disabled={!selectedSubscriptionId}
             >
               <option value="existing">Use existing resource group</option>
               <option value="new">Create a new resource group</option>
@@ -552,6 +633,12 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
           <Field label="Region" className={classes.cascadeField}>
             {loadingLocations ? (
               <Spinner size="tiny" label="Loading regions…" />
+            ) : locationDiscoveryUnavailable || locations.length === 0 ? (
+              <Input
+                placeholder="eastus"
+                value={selectedLocation}
+                onChange={(_, data) => setSelectedLocation(data.value)}
+              />
             ) : (
               <Select
                 value={selectedLocation}
@@ -568,12 +655,18 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
           </Field>
         </div>
 
-        {resourceGroupMode === 'new' || resourceGroups.length === 0 ? (
-          <Field label="New resource group name">
+        {resourceGroupMode === 'new' || resourceGroups.length === 0 || resourceGroupDiscoveryUnavailable ? (
+          <Field label={resourceGroupMode === 'new' ? 'New resource group name' : 'Resource group name'}>
             <Input
               placeholder="kickstart-rg"
-              value={newResourceGroup}
-              onChange={(_, data) => setNewResourceGroup(data.value)}
+              value={resourceGroupMode === 'new' ? newResourceGroup : selectedRg}
+              onChange={(_, data) => {
+                if (resourceGroupMode === 'new') {
+                  setNewResourceGroup(data.value);
+                } else {
+                  setSelectedRg(data.value);
+                }
+              }}
             />
           </Field>
         ) : (
@@ -596,20 +689,26 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
           </Field>
         )}
 
+        {notice && (
+          <MessageBar intent="warning" style={{ marginTop: tokens.spacingVerticalS }}>
+            <MessageBarBody>{notice}</MessageBarBody>
+          </MessageBar>
+        )}
+
         {error && (
           <MessageBar intent="error" style={{ marginTop: tokens.spacingVerticalS }}>
             <MessageBarBody>{error}</MessageBarBody>
           </MessageBar>
         )}
 
-        {(selectedSubId || selectedResourceGroupName || selectedLocation) && (
+        {(selectedSubscriptionId || selectedResourceGroupName || selectedLocationValue) && (
           <Body2 className={classes.summary}>
             Deploy to{' '}
-            <strong>{selectedSubscription?.displayName ?? selectedSubId ?? '—'}</strong>
+            <strong>{selectedSubscription?.displayName ?? selectedSubscriptionId ?? '—'}</strong>
             {' · '}
             <strong>{selectedResourceGroupName || '—'}</strong>
             {' · '}
-            <strong>{selectedLocation || '—'}</strong>
+            <strong>{selectedLocationValue || '—'}</strong>
           </Body2>
         )}
 
@@ -627,19 +726,27 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     );
   }
 
-  const showSubDropdown = !presetSubId && subscriptions.length > 1;
-  const showRgDropdown = !presetRg && resourceGroups.length > 0;
+  const showSubDropdown = !presetSubId && showSubscriptionSelect && subscriptions.length > 1;
+  const showManualSubscriptionField = !presetSubId && showManualSubscriptionInput;
+  const showRgDropdown = !presetRg && resourceGroups.length > 0 && !resourceGroupDiscoveryUnavailable;
+  const showManualRgField = !presetRg && resourceGroupDiscoveryUnavailable;
 
   return (
     <div className={classes.root}>
       <Caption1 className={classes.label}>{label}</Caption1>
 
-      {(showSubDropdown || showRgDropdown) && (
+      {(showSubDropdown || showManualSubscriptionField || showRgDropdown || showManualRgField) && (
         <div className={classes.cascadeRow}>
-          {showSubDropdown && (
+          {(showSubDropdown || showManualSubscriptionField) && (
             <Field label="Subscription" className={classes.cascadeField}>
               {loadingSubs ? (
                 <Spinner size="tiny" label="Loading…" />
+              ) : showManualSubscriptionField ? (
+                <Input
+                  placeholder="00000000-0000-0000-0000-000000000000"
+                  value={selectedSubId}
+                  onChange={(_, data) => setSelectedSubId(data.value)}
+                />
               ) : (
                 <Select
                   value={selectedSubId}
@@ -656,10 +763,16 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
             </Field>
           )}
 
-          {showRgDropdown && (
+          {(showRgDropdown || showManualRgField) && (
             <Field label="Resource group" className={classes.cascadeField}>
               {loadingRgs ? (
                 <Spinner size="tiny" label="Loading…" />
+              ) : showManualRgField ? (
+                <Input
+                  placeholder="my-resource-group"
+                  value={selectedRg}
+                  onChange={(_, data) => setSelectedRg(data.value)}
+                />
               ) : (
                 <Select
                   value={selectedRg}
@@ -678,7 +791,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
         </div>
       )}
 
-      {selectedSubId && (
+      {selectedSubscriptionId && (
         <div className={classes.searchRow}>
           <Input
             contentBefore={<Search20Regular />}
@@ -688,6 +801,12 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
             style={{ width: '100%' }}
           />
         </div>
+      )}
+
+      {notice && (
+        <MessageBar intent="warning" style={{ marginBottom: tokens.spacingVerticalS }}>
+          <MessageBarBody>{notice}</MessageBarBody>
+        </MessageBar>
       )}
 
       {error && (
@@ -700,7 +819,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
         <div className={classes.spinnerRow}>
           <Spinner size="small" label="Loading resources…" />
         </div>
-      ) : !selectedSubId ? (
+      ) : !selectedSubscriptionId ? (
         <Caption1 className={classes.emptyText}>Select a subscription to browse resources.</Caption1>
       ) : filteredResources.length === 0 ? (
         <Caption1 className={classes.emptyText}>No resources found.</Caption1>

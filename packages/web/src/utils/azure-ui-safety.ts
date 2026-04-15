@@ -16,6 +16,8 @@ export type AzureUiErrorScope =
 const SAFE_UI_MESSAGES = new Set([
   'Azure sign-in is not configured on the server.',
   'Azure sign-in is unavailable in this environment.',
+  'Azure target discovery is not available yet. Enter the deployment target manually.',
+  'No Azure subscriptions were returned for this Microsoft account.',
   'Choose a subscription, resource group, and region before continuing.',
   'Sign in to Azure before continuing.',
   'Sign in to Azure before choosing a deployment target.',

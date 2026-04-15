@@ -189,7 +189,10 @@ export async function persistAzureTarget(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...payload,
+      createIfMissing: payload.resourceGroupMode === 'new',
+    }),
   });
 
   await readJsonOrThrow(response, 'target-save');

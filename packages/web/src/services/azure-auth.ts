@@ -1,24 +1,5 @@
-import {
-  BrowserCacheLocation,
-  InteractionRequiredAuthError,
-  PublicClientApplication,
-  type AccountInfo,
-  type AuthenticationResult,
-} from '@azure/msal-browser';
-import type { AzureARMConnector, AzureSubscription } from '@kickstart/core';
-import { apiFetch } from './api-client';
-import { sanitizeAzureUiErrorMessage } from '../utils/azure-ui-safety';
-
-const DEFAULT_ARM_SCOPE = 'https://management.azure.com/.default';
-
-export interface AzureAuthConfig {
-  configured: boolean;
-  clientId?: string;
-  tenantId?: string;
-  authority?: string;
-  redirectUri?: string;
-  scopes: string[];
-}
+import type { AzureSubscription } from '@kickstart/core';
+import { listAzureSubscriptions } from './azure-resources';
 
 export interface AzureUserSummary {
   name?: string;
@@ -34,302 +15,165 @@ export interface AzureAuthSessionState {
   error?: string;
 }
 
-let configPromise: Promise<AzureAuthConfig> | null = null;
-let clientPromise: Promise<PublicClientApplication | null> | null = null;
-let activeAccount: AccountInfo | null = null;
-
-function readString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
-}
-
-function readStringArray(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const strings = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
-  return strings.length > 0 ? strings : undefined;
-}
+const AZURE_LOGIN_PATH = '/.auth/login/aad';
+const AZURE_LOGOUT_PATH = '/.auth/logout';
+const AZURE_IDENTITY_PROVIDERS = new Set(['aad', 'azureactivedirectory', 'entra', 'microsoft']);
+const AZURE_SIGNIN_UNAVAILABLE = 'Azure sign-in is unavailable in this environment.';
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === 'object' ? value as Record<string, unknown> : undefined;
 }
 
-function normalizeConfig(body: unknown): AzureAuthConfig {
-  const root = asRecord(body) ?? {};
-  const nested = asRecord(root.auth) ?? asRecord(root.msal) ?? root;
-  const clientId = readString(nested.clientId) ?? readString(nested.applicationId) ?? readString(root.clientId);
-  const tenantId = readString(nested.tenantId) ?? readString(nested.directoryId) ?? readString(root.tenantId);
-  const scopes = readStringArray(nested.scopes) ?? readStringArray(root.scopes) ?? [DEFAULT_ARM_SCOPE];
-  const redirectUri = readString(nested.redirectUri) ?? readString(root.redirectUri) ?? window.location.origin;
-  const authority = readString(nested.authority)
-    ?? readString(root.authority)
-    ?? (tenantId ? `https://login.microsoftonline.com/${tenantId}` : undefined);
-  const configured = typeof nested.configured === 'boolean'
-    ? nested.configured
-    : typeof root.configured === 'boolean'
-      ? root.configured
-      : Boolean(clientId);
-
-  return {
-    configured,
-    clientId,
-    tenantId,
-    authority,
-    redirectUri,
-    scopes,
-  };
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-function toUserSummary(account: AccountInfo | null, tenantId?: string): AzureUserSummary | undefined {
-  if (!account) return undefined;
-  return {
-    name: account.name ?? undefined,
-    username: account.username || undefined,
-    tenantId: account.tenantId ?? tenantId,
-  };
-}
+function readClaim(principal: Record<string, unknown>, claimType: string): string | undefined {
+  const claims = Array.isArray(principal.userClaims) ? principal.userClaims : [];
 
-function toTokenInfo(result: AuthenticationResult) {
-  return {
-    accessToken: result.accessToken,
-    expiresAt: result.expiresOn
-      ? Math.floor(result.expiresOn.getTime() / 1000)
-      : Math.floor(Date.now() / 1000) + 3600,
-  };
-}
-
-function setPreferredAccount(client: PublicClientApplication, account: AccountInfo | null) {
-  activeAccount = account;
-  if (account) {
-    client.setActiveAccount(account);
-  }
-}
-
-function getPreferredAccount(client: PublicClientApplication): AccountInfo | null {
-  const current = activeAccount ?? client.getActiveAccount() ?? client.getAllAccounts()[0] ?? null;
-  if (current) {
-    setPreferredAccount(client, current);
-  }
-  return current;
-}
-
-function isInteractionError(error: unknown): boolean {
-  return error instanceof InteractionRequiredAuthError
-    || (error instanceof Error && typeof (error as Error & { errorCode?: unknown }).errorCode === 'string'
-      && String((error as Error & { errorCode?: unknown }).errorCode).includes('interaction_required'));
-}
-
-function toSafeAzureError(error: unknown, scope: 'auth-config' | 'auth-session' | 'auth-signin' | 'auth-signout'): Error {
-  return new Error(sanitizeAzureUiErrorMessage(error, scope), {
-    cause: error instanceof Error ? error : undefined,
-  });
-}
-
-export async function getAzureAuthConfig(): Promise<AzureAuthConfig> {
-  configPromise ??= (async () => {
-    const response = await apiFetch('/api/azure-auth/config');
-    const body = await response.json().catch(() => undefined);
-    if (!response.ok) {
-      throw new Error(sanitizeAzureUiErrorMessage(body, 'auth-config'));
-    }
-    return normalizeConfig(body);
-  })();
-
-  return configPromise;
-}
-
-async function getMsalClient(): Promise<PublicClientApplication | null> {
-  clientPromise ??= (async () => {
-    const config = await getAzureAuthConfig();
-    if (!config.configured || !config.clientId) {
-      return null;
-    }
-
-    const client = new PublicClientApplication({
-      auth: {
-        clientId: config.clientId,
-        authority: config.authority,
-        redirectUri: config.redirectUri,
-      },
-      cache: {
-        cacheLocation: BrowserCacheLocation.MemoryStorage,
-      },
-    });
-
-    await client.initialize();
-    const redirectResult = await client.handleRedirectPromise().catch(() => null);
-    setPreferredAccount(client, redirectResult?.account ?? getPreferredAccount(client));
-    return client;
-  })();
-
-  return clientPromise;
-}
-
-async function acquireAzureToken(scopes: string[], interactive: boolean): Promise<AuthenticationResult> {
-  const client = await getMsalClient();
-  if (!client) {
-    throw new Error('Azure sign-in is not configured on the server.');
-  }
-
-  const requestedScopes = scopes.length > 0 ? scopes : (await getAzureAuthConfig()).scopes;
-  const account = getPreferredAccount(client);
-
-  if (account) {
-    try {
-      const silentResult = await client.acquireTokenSilent({
-        account,
-        scopes: requestedScopes,
-      });
-      setPreferredAccount(client, silentResult.account ?? account);
-      return silentResult;
-    } catch (error) {
-      if (!interactive || !isInteractionError(error)) {
-        throw toSafeAzureError(error, 'auth-session');
-      }
-
-      const popupResult = await client.acquireTokenPopup({
-        account,
-        scopes: requestedScopes,
-      });
-      setPreferredAccount(client, popupResult.account ?? account);
-      return popupResult;
+  for (const claim of claims) {
+    const record = asRecord(claim);
+    if (readString(record?.typ)?.toLowerCase() === claimType.toLowerCase()) {
+      return readString(record?.val);
     }
   }
 
-  if (!interactive) {
-    throw new Error('Sign in to Azure before continuing.');
-  }
-
-  const loginResult = await client.loginPopup({
-    scopes: requestedScopes,
-    prompt: 'select_account',
-  }).catch((error) => {
-    throw toSafeAzureError(error, 'auth-signin');
-  });
-  const resolvedAccount = loginResult.account ?? getPreferredAccount(client);
-  if (!resolvedAccount) {
-    throw new Error('Azure sign-in did not return an account.');
-  }
-
-  setPreferredAccount(client, resolvedAccount);
-
-  if (loginResult.accessToken) {
-    return loginResult;
-  }
-
-  const tokenResult = await client.acquireTokenSilent({
-    account: resolvedAccount,
-    scopes: requestedScopes,
-  }).catch((error) => {
-    throw toSafeAzureError(error, 'auth-session');
-  });
-  setPreferredAccount(client, tokenResult.account ?? resolvedAccount);
-  return tokenResult;
+  return undefined;
 }
 
-export async function ensureAzureConnectorConfigured(
-  connector?: AzureARMConnector,
-): Promise<AzureAuthConfig> {
-  const config = await getAzureAuthConfig();
-
-  if (connector && config.configured) {
-    connector.setTokenProvider(async (scopes) => {
-      const result = await acquireAzureToken(scopes, false);
-      return toTokenInfo(result);
-    });
+function getCurrentRelativeUrl(): string {
+  if (typeof window === 'undefined') {
+    return '/';
   }
 
-  return config;
+  return `${window.location.pathname || '/'}${window.location.search}${window.location.hash}`;
 }
 
-export async function getAzureSession(
-  connector?: AzureARMConnector,
-): Promise<AzureAuthSessionState> {
-  const config = await ensureAzureConnectorConfigured(connector);
-  if (!config.configured) {
-    return {
-      configured: false,
-      authenticated: false,
-      subscriptions: [],
-      error: 'Azure sign-in is not configured on the server.',
-    };
-  }
+function normalizeRedirectUri(value: string): string {
+  if (!value) return '/';
+  if (value.startsWith('/')) return value;
 
-  const client = await getMsalClient();
-  const account = client ? getPreferredAccount(client) : null;
-  if (!account) {
-    return {
-      configured: true,
-      authenticated: false,
-      subscriptions: [],
-    };
+  if (typeof window === 'undefined') {
+    return value.startsWith('http') ? '/' : `/${value.replace(/^\/+/, '')}`;
   }
 
   try {
-    await acquireAzureToken(config.scopes, false);
-    const subscriptions = connector ? await connector.listSubscriptions() : [];
+    const parsed = new URL(value, window.location.origin);
+    return `${parsed.pathname || '/'}${parsed.search}${parsed.hash}`;
+  } catch {
+    return '/';
+  }
+}
+
+function buildRedirectUrl(path: string, paramName: string, redirectUri: string): string {
+  return `${path}?${paramName}=${encodeURIComponent(normalizeRedirectUri(redirectUri))}`;
+}
+
+function parseClientPrincipal(body: unknown): Record<string, unknown> | undefined {
+  const root = Array.isArray(body) ? body[0] : body;
+  return asRecord(asRecord(root)?.clientPrincipal);
+}
+
+function isAzureIdentityProvider(provider?: string): boolean {
+  return !provider || AZURE_IDENTITY_PROVIDERS.has(provider.toLowerCase());
+}
+
+function toUserSummary(principal: Record<string, unknown>): AzureUserSummary {
+  const username = readString(principal.userDetails)
+    ?? readClaim(principal, 'preferred_username')
+    ?? readClaim(principal, 'email')
+    ?? readClaim(principal, 'emails');
+
+  return {
+    name: readClaim(principal, 'name') ?? username,
+    username,
+    tenantId: readClaim(principal, 'tid') ?? readString(principal.tenantId),
+  };
+}
+
+function unavailableSessionState(): AzureAuthSessionState {
+  return {
+    configured: false,
+    authenticated: false,
+    subscriptions: [],
+    error: AZURE_SIGNIN_UNAVAILABLE,
+  };
+}
+
+async function loadSubscriptionsIfAvailable(): Promise<AzureSubscription[]> {
+  try {
+    return await listAzureSubscriptions();
+  } catch {
+    return [];
+  }
+}
+
+export async function getAzureSession(): Promise<AzureAuthSessionState> {
+  try {
+    const response = await fetch('/.auth/me', {
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return unavailableSessionState();
+    }
+
+    const body = await response.json().catch(() => undefined);
+    const principal = parseClientPrincipal(body);
+    if (!principal) {
+      return {
+        configured: true,
+        authenticated: false,
+        subscriptions: [],
+      };
+    }
+
+    const user = toUserSummary(principal);
+    const hasIdentity = Boolean(
+      user.username
+      || user.name
+      || readString(principal.userId),
+    );
+
+    if (!hasIdentity || !isAzureIdentityProvider(readString(principal.identityProvider))) {
+      return {
+        configured: true,
+        authenticated: false,
+        user,
+        subscriptions: [],
+      };
+    }
+
     return {
       configured: true,
       authenticated: true,
-      user: toUserSummary(account, config.tenantId),
-      subscriptions,
+      user,
+      subscriptions: await loadSubscriptionsIfAvailable(),
     };
-  } catch (error) {
-    return {
-      configured: true,
-      authenticated: false,
-      user: toUserSummary(account, config.tenantId),
-      subscriptions: [],
-      error: sanitizeAzureUiErrorMessage(error, 'auth-session'),
-    };
+  } catch {
+    return unavailableSessionState();
   }
 }
 
-export async function signInToAzure(
-  connector?: AzureARMConnector,
-): Promise<AzureAuthSessionState> {
-  const config = await ensureAzureConnectorConfigured(connector);
-  if (!config.configured || !connector) {
-    return {
-      configured: false,
-      authenticated: false,
-      subscriptions: [],
-      error: 'Azure sign-in is not configured on the server.',
-    };
-  }
+export function getAzureSignInUrl(postLoginRedirectUri = getCurrentRelativeUrl()): string {
+  return buildRedirectUrl(AZURE_LOGIN_PATH, 'post_login_redirect_uri', postLoginRedirectUri);
+}
 
-  try {
-    await acquireAzureToken(config.scopes, true);
-    await connector.authenticate();
-    const subscriptions = await connector.listSubscriptions();
-    const client = await getMsalClient();
-    const account = client ? getPreferredAccount(client) : null;
-
-    return {
-      configured: true,
-      authenticated: connector.isAuthenticated(),
-      user: toUserSummary(account, config.tenantId),
-      subscriptions,
-    };
-  } catch (error) {
-    throw toSafeAzureError(error, 'auth-signin');
+export function redirectToAzureSignIn(postLoginRedirectUri = getCurrentRelativeUrl()): void {
+  if (typeof window !== 'undefined') {
+    window.location.assign(getAzureSignInUrl(postLoginRedirectUri));
   }
 }
 
-export async function signOutAzure(connector?: AzureARMConnector): Promise<void> {
-  const client = await getMsalClient();
-  try {
-    if (client) {
-      const account = getPreferredAccount(client);
-      await client.logoutPopup({
-        account: account ?? undefined,
-        mainWindowRedirectUri: window.location.href,
-      });
-      setPreferredAccount(client, null);
-    }
+export function getAzureSignOutUrl(postLogoutRedirectUri = getCurrentRelativeUrl()): string {
+  return buildRedirectUrl(AZURE_LOGOUT_PATH, 'post_logout_redirect_uri', postLogoutRedirectUri);
+}
 
-    if (connector) {
-      await ensureAzureConnectorConfigured(connector);
-    }
-  } catch (error) {
-    throw toSafeAzureError(error, 'auth-signout');
+export function redirectToAzureSignOut(postLogoutRedirectUri = getCurrentRelativeUrl()): void {
+  if (typeof window !== 'undefined') {
+    window.location.assign(getAzureSignOutUrl(postLogoutRedirectUri));
   }
 }

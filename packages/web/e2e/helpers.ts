@@ -1,29 +1,16 @@
 import { test as base, type Page } from '@playwright/test';
 
 /**
- * Shared test fixture that mocks MSAL and forces demo mode
- * so the app renders without authentication or a real API backend.
+ * Shared test fixture that mocks SWA auth endpoints and forces demo mode
+ * so the app renders without a real API backend.
  */
 export const test = base.extend<{ mockAuth: void }>({
   mockAuth: [async ({ page }, use) => {
-    // Intercept MSAL CDN — return a lightweight mock so the
-    // real MSAL library never loads (avoids Entra redirects).
-    await page.route('**/msal-browser*', route =>
+    await page.route('**/.auth/me', route =>
       route.fulfill({
         status: 200,
-        contentType: 'application/javascript',
-        body: `
-          window.msal = {
-            PublicClientApplication: class {
-              async handleRedirectPromise() { return null; }
-              getAllAccounts() { return []; }
-              async loginPopup() { return { account: { name: 'Test User', username: 'test@example.com' } }; }
-              async logoutPopup() {}
-              async acquireTokenSilent() { return { accessToken: 'mock-token' }; }
-              async acquireTokenPopup() { return { accessToken: 'mock-token' }; }
-            },
-          };
-        `,
+        contentType: 'application/json',
+        body: '{}',
       }),
     );
 

@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { createReactComponent } from "../../vendor/a2ui/react/adapter";
-import { z } from "zod";
-import { DynamicStringSchema, type DynamicString } from "../../vendor/a2ui/web_core/schema/common-types";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createReactComponent } from '../../vendor/a2ui/react/adapter';
+import { z } from 'zod';
+import { DynamicStringSchema, type DynamicString } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Avatar,
   Body1Strong,
@@ -15,27 +15,24 @@ import {
   Spinner,
   makeStyles,
   tokens,
-} from "@fluentui/react-components";
-import type { AzureARMConnector } from "@kickstart/core";
-import { useAPIConnector } from "../../contexts/APIConnectorContext";
+} from '@fluentui/react-components';
 import {
   getGitHubSession,
   signInWithGitHubPopup,
   signOutGitHub,
   type GitHubSessionState,
-} from "../../services/github-handoff";
+} from '../../services/github-handoff';
 import {
   getAzureSession,
-  signInToAzure,
-  signOutAzure,
+  redirectToAzureSignIn,
+  redirectToAzureSignOut,
   type AzureAuthSessionState,
-} from "../../services/azure-auth";
-import { sanitizeAzureUiErrorMessage } from "../../utils/azure-ui-safety";
+} from '../../services/azure-auth';
 
 const AuthCardApi = {
-  name: "AuthCard",
+  name: 'AuthCard',
   schema: z.object({
-    provider: z.enum(["azure", "github"]),
+    provider: z.enum(['azure', 'github']),
     title: DynamicStringSchema.optional(),
     description: DynamicStringSchema.optional(),
   }).strict(),
@@ -46,58 +43,52 @@ const useStyles = makeStyles({
     marginTop: tokens.spacingVerticalS,
     marginBottom: tokens.spacingVerticalS,
     padding: tokens.spacingHorizontalL,
-    width: "100%",
+    width: '100%',
   },
   statusDot: {
-    width: "8px",
-    height: "8px",
+    width: '8px',
+    height: '8px',
     borderRadius: tokens.borderRadiusCircular,
     backgroundColor: tokens.colorPaletteGreenBackground3,
-    display: "inline-block",
+    display: 'inline-block',
     marginRight: tokens.spacingHorizontalXS,
   },
   actions: {
-    display: "flex",
+    display: 'flex',
     gap: tokens.spacingHorizontalS,
     marginTop: tokens.spacingVerticalS,
   },
   connectedUser: {
-    display: "flex",
-    alignItems: "center",
+    display: 'flex',
+    alignItems: 'center',
     gap: tokens.spacingHorizontalM,
     marginTop: tokens.spacingVerticalS,
   },
   userMeta: {
-    display: "flex",
-    flexDirection: "column",
+    display: 'flex',
+    flexDirection: 'column',
     gap: tokens.spacingVerticalXXS,
   },
 });
 
 function str(value: DynamicString | null | undefined): string | undefined {
   if (value == null) return undefined;
-  return typeof value === "string" ? value : "";
+  return typeof value === 'string' ? value : '';
 }
 
-const CONNECTOR_NAME: Record<"azure" | "github", string> = {
-  azure: "azure-arm",
-  github: "github",
+const DEFAULT_TITLE: Record<'azure' | 'github', string> = {
+  azure: 'Azure',
+  github: 'GitHub',
 };
 
-const DEFAULT_TITLE: Record<"azure" | "github", string> = {
-  azure: "Azure",
-  github: "GitHub",
-};
-
-const DEFAULT_DESCRIPTION: Record<"azure" | "github", string> = {
-  azure: "Sign in to access your Azure deployment target.",
-  github: "Connect your GitHub account so you can choose an owner and repository for these generated files.",
+const DEFAULT_DESCRIPTION: Record<'azure' | 'github', string> = {
+  azure: 'Continue with your existing Microsoft Entra session to unlock Azure deployment.',
+  github: 'Connect your GitHub account so you can choose an owner and repository for these generated files.',
 };
 
 export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) => {
   const classes = useStyles();
-  const connector = useAPIConnector(CONNECTOR_NAME[props.provider]);
-  const azureConnector = props.provider === "azure" ? connector as AzureARMConnector | undefined : undefined;
+  const azureContinuationRef = useRef<string | undefined>(undefined);
 
   const [loading, setLoading] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
@@ -119,7 +110,7 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
     } catch (err) {
       setGitHubSession(null);
       setAuthenticated(false);
-      setError(err instanceof Error ? err.message : "Unable to check GitHub sign-in status.");
+      setError(err instanceof Error ? err.message : 'Unable to check GitHub sign-in status.');
     } finally {
       setChecking(false);
     }
@@ -128,21 +119,21 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
   const refreshAzureSession = useCallback(async () => {
     setChecking(true);
     try {
-      const session = await getAzureSession(azureConnector);
+      const session = await getAzureSession();
       setAzureSession(session);
       setAuthenticated(session.authenticated);
       setError(session.error);
     } catch (err) {
       setAzureSession(null);
       setAuthenticated(false);
-      setError(sanitizeAzureUiErrorMessage(err, "auth-session"));
+      setError(err instanceof Error ? err.message : 'Unable to check Azure sign-in status.');
     } finally {
       setChecking(false);
     }
-  }, [azureConnector]);
+  }, []);
 
   useEffect(() => {
-    if (props.provider === "github") {
+    if (props.provider === 'github') {
       void refreshGitHubSession();
       return;
     }
@@ -155,10 +146,10 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
 
     context.dispatchAction({
       event: {
-        name: "continue:azure-auth-complete",
+        name: 'continue:azure-auth-complete',
         context: {
-          provider: "azure",
-          displayName: session.user?.name ?? session.user?.username ?? "Azure user",
+          provider: 'azure',
+          displayName: session.user?.name ?? session.user?.username ?? 'Azure user',
           tenantId: session.user?.tenantId,
           subscriptionCount: session.subscriptions.length,
         },
@@ -166,83 +157,93 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
     });
   }, [context]);
 
+  useEffect(() => {
+    if (props.provider !== 'azure') {
+      azureContinuationRef.current = undefined;
+      return;
+    }
+
+    if (!azureSession?.authenticated) {
+      azureContinuationRef.current = undefined;
+      return;
+    }
+
+    const continuationKey = `${azureSession.user?.username ?? azureSession.user?.name ?? 'azure-user'}:${azureSession.user?.tenantId ?? 'unknown-tenant'}`;
+    if (azureContinuationRef.current === continuationKey) {
+      return;
+    }
+
+    azureContinuationRef.current = continuationKey;
+    handleAzureContinue(azureSession);
+  }, [azureSession, handleAzureContinue, props.provider]);
+
   const handleSignIn = useCallback(async () => {
+    if (props.provider === 'azure') {
+      redirectToAzureSignIn();
+      return;
+    }
+
     setLoading(true);
     setError(undefined);
 
     try {
-      if (props.provider === "github") {
-        const session = await signInWithGitHubPopup();
-        setGitHubSession(session);
-        setAuthenticated(session.authenticated);
-        setError(session.error);
-      } else {
-        const session = await signInToAzure(azureConnector);
-        setAzureSession(session);
-        setAuthenticated(session.authenticated);
-        setError(session.error);
-        handleAzureContinue(session);
-      }
+      const session = await signInWithGitHubPopup();
+      setGitHubSession(session);
+      setAuthenticated(session.authenticated);
+      setError(session.error);
     } catch (err) {
       setAuthenticated(false);
-      setError(props.provider === "azure"
-        ? sanitizeAzureUiErrorMessage(err, "auth-signin")
-        : err instanceof Error
-          ? err.message
-          : "Sign-in failed");
+      setError(err instanceof Error ? err.message : 'Sign-in failed');
     } finally {
       setLoading(false);
     }
-  }, [azureConnector, handleAzureContinue, props.provider]);
+  }, [props.provider]);
 
   const handleSignOut = useCallback(async () => {
+    if (props.provider === 'azure') {
+      redirectToAzureSignOut();
+      return;
+    }
+
     setLoading(true);
     setError(undefined);
 
     try {
-      if (props.provider === "github") {
-        await signOutGitHub();
-        setGitHubSession((previous) => previous
-          ? { ...previous, authenticated: false, viewer: undefined, owners: [] }
-          : null);
-      } else {
-        await signOutAzure(azureConnector);
-        setAzureSession((previous) => previous
-          ? { ...previous, authenticated: false, subscriptions: [], error: undefined }
-          : null);
-      }
+      await signOutGitHub();
+      setGitHubSession((previous) => previous
+        ? { ...previous, authenticated: false, viewer: undefined, owners: [] }
+        : null);
       setAuthenticated(false);
     } catch (err) {
-      setError(props.provider === "azure"
-        ? sanitizeAzureUiErrorMessage(err, "auth-signout")
-        : err instanceof Error
-          ? err.message
-          : "Sign-out failed");
+      setError(err instanceof Error ? err.message : 'Sign-out failed');
     } finally {
       setLoading(false);
     }
-  }, [azureConnector, props.provider]);
+  }, [props.provider]);
 
   const summary = useMemo(() => {
-    if (props.provider === "azure") {
+    if (props.provider === 'azure') {
+      const subscriptionCount = azureSession?.subscriptions.length ?? 0;
       return {
-        name: azureSession?.user?.name || azureSession?.user?.username || "Azure account",
-        caption: `${azureSession?.subscriptions.length ?? 0} subscription${azureSession?.subscriptions.length === 1 ? "" : "s"} available`,
+        name: azureSession?.user?.name || azureSession?.user?.username || 'Azure account',
+        caption: subscriptionCount > 0
+          ? `${subscriptionCount} subscription${subscriptionCount === 1 ? '' : 's'} available`
+          : 'Microsoft Entra session ready',
         avatarImage: undefined,
       };
     }
 
     return {
-      name: githubSession?.viewer?.name || githubSession?.viewer?.login || "GitHub account",
-      caption: `${githubSession?.owners.length ?? 0} account${githubSession?.owners.length === 1 ? "" : "s"} available`,
+      name: githubSession?.viewer?.name || githubSession?.viewer?.login || 'GitHub account',
+      caption: `${githubSession?.owners.length ?? 0} account${githubSession?.owners.length === 1 ? '' : 's'} available`,
       avatarImage: githubSession?.viewer?.avatarUrl,
     };
   }, [azureSession, githubSession, props.provider]);
 
   const signInDisabled = loading
     || checking
-    || (props.provider === "github" && githubSession?.configured === false)
-    || (props.provider === "azure" && azureSession?.configured === false);
+    || (props.provider === 'github' && githubSession?.configured === false)
+    || (props.provider === 'azure' && azureSession?.configured === false);
 
   if (authenticated) {
     return (
@@ -262,7 +263,7 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
             image={summary.avatarImage ? { src: summary.avatarImage } : undefined}
             name={summary.name}
             size={36}
-            color={props.provider === "azure" ? "brand" : undefined}
+            color={props.provider === 'azure' ? 'brand' : undefined}
           />
           <div className={classes.userMeta}>
             <Body2 style={{ fontWeight: 600 }}>
@@ -274,7 +275,7 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
 
         <div className={classes.actions}>
           <Button appearance="subtle" size="small" onClick={() => void handleSignOut()} disabled={loading}>
-            Disconnect
+            {props.provider === 'azure' ? 'Sign out' : 'Disconnect'}
           </Button>
         </div>
       </Card>
@@ -300,18 +301,20 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
           icon={loading || checking ? <Spinner size="tiny" /> : undefined}
         >
           {loading || checking
-            ? "Checking sign-in…"
-            : `Sign in to ${title}`}
+            ? 'Checking sign-in…'
+            : props.provider === 'azure'
+              ? 'Continue with Microsoft'
+              : `Sign in to ${title}`}
         </Button>
       </div>
-      {props.provider === "azure" && azureSession?.configured === false && (
+      {props.provider === 'azure' && azureSession?.configured === false && (
         <Caption1
           style={{
             color: tokens.colorNeutralForeground3,
             marginTop: tokens.spacingVerticalXS,
           }}
         >
-          Azure sign-in is unavailable until the backend auth configuration is ready.
+          Azure sign-in is only available in the deployed app with Static Web Apps auth enabled.
         </Caption1>
       )}
     </Card>
