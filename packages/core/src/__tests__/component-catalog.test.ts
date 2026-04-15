@@ -58,7 +58,7 @@ describe("generateComponentCatalogSection", () => {
     const section = generateComponentCatalogSection();
     expect(section).toContain("variants: h1, h2, h3, body, caption, code");
     expect(section).toContain("Variants: primary, secondary, outline, danger, ghost");
-    expect(section).toContain("Node types: compute, database, cache, network, storage, ai, messaging");
+    expect(section).toContain("Prefer the `diagram` prop (raw Mermaid) over `nodes/edges`");
   });
 
   it("merges kit entries and updates component count", () => {
@@ -271,15 +271,13 @@ describe("BASE_COMPONENT_CATALOG", () => {
 
   it("every entry has valid JSON in its example", () => {
     for (const entry of BASE_COMPONENT_CATALOG) {
-      const normalized = entry.example.replace(/\\\\/g, "\\");
-      expect(() => JSON.parse(normalized)).not.toThrow();
+      expect(() => JSON.parse(entry.example)).not.toThrow();
     }
   });
 
   it("every example includes the matching component type", () => {
     for (const entry of BASE_COMPONENT_CATALOG) {
-      const normalized = entry.example.replace(/\\\\/g, "\\");
-      const parsed = JSON.parse(normalized);
+      const parsed = JSON.parse(entry.example);
       expect(parsed.component).toBe(entry.type);
     }
   });

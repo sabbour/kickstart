@@ -829,6 +829,15 @@
             "component": {
               "const": "ArchitectureDiagram"
             },
+            "diagram": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
             "nodes": {
               "type": "array",
               "items": {
@@ -855,8 +864,7 @@
                 },
                 "required": [
                   "id",
-                  "label",
-                  "type"
+                  "label"
                 ]
               }
             },
@@ -870,6 +878,9 @@
                   },
                   "to": {
                     "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -880,9 +891,20 @@
             }
           },
           "required": [
-            "component",
-            "nodes",
-            "edges"
+            "component"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "diagram"
+              ]
+            },
+            {
+              "required": [
+                "nodes",
+                "edges"
+              ]
+            }
           ]
         }
       ]

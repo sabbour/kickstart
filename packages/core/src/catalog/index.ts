@@ -241,18 +241,22 @@ export interface CostEstimateComponent extends BaseComponent, CostEstimateProps 
 export interface ArchNode {
   id: string;
   label: string;
-  type: "compute" | "database" | "cache" | "network" | "storage" | "ai" | "messaging";
+  type?: "compute" | "database" | "cache" | "network" | "storage" | "ai" | "messaging";
 }
 
 export interface ArchEdge {
   from: string;
   to: string;
+  label?: string;
 }
 
 export interface ArchitectureDiagramComponent extends BaseComponent {
   component: "ArchitectureDiagram";
-  nodes: ArchNode[];
-  edges: ArchEdge[];
+  diagram?: string;
+  title?: string;
+  description?: string;
+  nodes?: ArchNode[];
+  edges?: ArchEdge[];
 }
 
 export interface FileEditorComponent extends BaseComponent {

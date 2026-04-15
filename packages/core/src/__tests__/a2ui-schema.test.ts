@@ -187,6 +187,27 @@ describe("COMPONENT_SCHEMA_REGISTRY", () => {
     expect(result.success).toBe(true);
   });
 
+  it("validates ArchitectureDiagram with diagram, title, and description", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["ArchitectureDiagram"].safeParse({
+      id: "arch2",
+      component: "ArchitectureDiagram",
+      title: "Proposed Architecture",
+      description: "AKS Automatic with nested namespace resources",
+      diagram:
+        'graph TD\\n  subgraph AKS["%%icon:azure/aks%%AKS Automatic"]\\n    subgraph NS["%%icon:k8s/ns%%namespace: app"]\\n      DEP["%%icon:k8s/deploy%%Deployment<br/>app<br/>2-10 replicas"]\\n    end\\n  end',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects ArchitectureDiagram without diagram or nodes and edges", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["ArchitectureDiagram"].safeParse({
+      id: "arch3",
+      component: "ArchitectureDiagram",
+      title: "Incomplete architecture",
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("validates CostEstimate with resources, monthlyEstimate, and pricing metadata", () => {
     const result = COMPONENT_SCHEMA_REGISTRY["CostEstimate"].safeParse({
       id: "cost1",

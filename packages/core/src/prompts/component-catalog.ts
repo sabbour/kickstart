@@ -175,13 +175,13 @@ export const BASE_COMPONENT_CATALOG: readonly ComponentCatalogEntry[] = [
   {
     type: "ArchitectureDiagram",
     category: "domain",
-    example: '{"id":"arch1","component":"ArchitectureDiagram","nodes":[{"id":"api","label":"Web API","type":"compute"},{"id":"db","label":"PostgreSQL","type":"database"}],"edges":[{"from":"api","to":"db"}]}',
-    notes: 'Node types: compute, database, cache, network, storage, ai, messaging. For design-step architecture, prefer the `diagram` prop (raw Mermaid) over `nodes/edges` — it supports subgraphs, dashed edges, and replica annotations.\n  Diagram example: {"id":"arch2","component":"ArchitectureDiagram","diagram":"graph TD\\\\n  subgraph AKS[\\\\\\"AKS Automatic\\\\\\"]\\\\n    API[\\\\\\"Node.js API<br/>&#40;2-10 replicas&#41;\\\\\\"]\\\\n  end\\\\n  ACR[\\\\\\"Container Registry\\\\\\"] -.->|image pull| API\\\\n  API -->|Workload Identity| KV[\\\\\\"Key Vault\\\\\\"]"}',
+    example: '{"id":"arch1","component":"ArchitectureDiagram","title":"Proposed Architecture","description":"AKS Automatic with grouped platform resources","diagram":"graph TD\\\\n  subgraph AKS[\\\\\\"%%icon:azure/aks%%AKS Automatic\\\\\\"]\\\\n    subgraph NS[\\\\\\"%%icon:k8s/ns%%namespace: app\\\\\\"]\\\\n      DEP[\\\\\\"%%icon:k8s/deploy%%Deployment<br/>web<br/>2-10 replicas\\\\\\"]\\\\n      SVC[\\\\\\"%%icon:k8s/svc%%Service<br/>web\\\\\\"]\\\\n      SA[\\\\\\"%%icon:k8s/sa%%ServiceAccount<br/>workload identity\\\\\\"]\\\\n      HPA[\\\\\\"%%icon:k8s/hpa%%HPA<br/>cpu 70%\\\\\\"]\\\\n      SVC --> DEP\\\\n      HPA -.-> DEP\\\\n      DEP --> SA\\\\n    end\\\\n  end\\\\n  ACR[\\\\\\"%%icon:azure/acr%%ACR<br/>app:sha\\\\\\"] -.->|image pull| DEP\\\\n  DEP -->|Workload Identity| KV[\\\\\\"%%icon:azure/key-vault%%Key Vault\\\\\\"]"}',
+    notes: 'Prefer the `diagram` prop (raw Mermaid) over `nodes/edges` — it supports nested subgraphs, ELK layout, multiline subtitles, and strict `%%icon:name%%` placeholders. Use available shared icon keys like `azure/aks`, `azure/acr`, `azure/postgresql`, `azure/key-vault`, `k8s/ns`, `k8s/deploy`, `k8s/svc`, `k8s/sa`, and `k8s/hpa`. If an icon is not available, omit the placeholder and keep the text label. `nodes/edges` remain as a legacy fallback for simple graphs.',
   },
   {
     type: "FileEditor",
     category: "domain",
-    example: '{"id":"fe1","component":"FileEditor","filename":"Dockerfile","language":"dockerfile","content":"FROM node:20-alpine\\\\nWORKDIR /app\\\\nCOPY . .\\\\nRUN npm ci\\\\nCMD [\\\\"node\\\\",\\\\"server.js\\\\"]"}',
+    example: '{"id":"fe1","component":"FileEditor","filename":"Dockerfile","language":"dockerfile","content":"FROM node:20-alpine\\\\nWORKDIR /app\\\\nCOPY . .\\\\nRUN npm ci\\\\nCMD node server.js"}',
   },
   {
     type: "AuthCard",
