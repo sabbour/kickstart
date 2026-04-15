@@ -64,7 +64,7 @@ app.http("arm-proxy", {
       Accept: request.headers.get("accept") ?? "application/json",
     };
 
-    let body: BodyInit | undefined;
+    let body: ArrayBuffer | undefined;
     if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
       body = await request.arrayBuffer();
     }

@@ -61,6 +61,7 @@ The SWA auth config in `staticwebapp.config.json` references these app settings 
 | Setting Name | How It's Set |
 |-------------|------------|
 | `AZURE_CLIENT_ID` | Bicep parameter (`entraClientId`) — not a secret |
+| `AZURE_TENANT_ID` | Derived from `subscription().tenantId` in Bicep — not a secret |
 | `AZURE_CLIENT_SECRET` | Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`) |
 | `AZURE_OPENAI_API_KEY` | Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`) |
 | `AZURE_OPENAI_ENDPOINT` | Bicep parameter — not a secret |
