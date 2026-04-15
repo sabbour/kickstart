@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FLUENT_DIR = resolve(__dirname, '../catalog/fluent-components');
 const CATALOG_DIR = resolve(__dirname, '../catalog/components');
+const FILE_MANAGER_DIR = resolve(__dirname, '../components/FileManager');
 
 function readComponent(dir: string, name: string): string {
   return readFileSync(resolve(dir, `${name}.tsx`), 'utf-8');
@@ -146,6 +147,21 @@ describe('Fluent components — ARIA compliance', () => {
   });
 });
 
+describe('Workspace surfaces — ARIA compliance', () => {
+  describe('FileManagerSidebar', () => {
+    const src = readFileSync(resolve(FILE_MANAGER_DIR, 'FileManagerSidebar.tsx'), 'utf-8');
+
+    it('announces streamed files via a polite live region', () => {
+      expect(src).toContain('role="status"');
+      expect(src).toContain('aria-live="polite"');
+    });
+
+    it('labels the workspace tree for screen readers', () => {
+      expect(src).toContain('aria-label="Workspace files"');
+    });
+  });
+});
+
 // ─── Catalog Components ──────────────────────────────────────────────
 
 describe('Catalog components — ARIA compliance', () => {
@@ -242,9 +258,9 @@ describe('Catalog components — ARIA compliance', () => {
       expect(src).toContain('aria-live="polite"');
     });
 
-    it('status icons have role="img" and aria-label', () => {
-      expect(src).toContain('role="img"');
-      expect(src).toMatch(/aria-label=\{getStatusLabel/);
+    it('step items expose accessible status labels while icons remain decorative', () => {
+      expect(src).toContain('aria-label={getAccessibleStepLabel(step)}');
+      expect(src).toContain('aria-hidden="true"');
     });
   });
 

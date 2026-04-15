@@ -1,8 +1,16 @@
-import type { A2uiComponent, A2uiMsg, A2uiPayloadItem, ChatMessage, ConversationPhaseId } from '../types';
+import type {
+  A2uiComponent,
+  A2uiMsg,
+  A2uiPayloadItem,
+  ChatMessage,
+  ConversationPhaseId,
+  SetupGenerationEvent,
+} from '../types';
 
 const PHASE_COMPONENT_NAME = 'ConversationPhase';
 const PHASE_SURFACE_ID = 'phase-indicator';
 const SURFACE_SCOPE_SEPARATOR = '::';
+const STEPWISE_SETUP_SURFACE_SUFFIX = 'setup-progress';
 
 const PHASE_ALIASES = {
   discover: 'discover',
@@ -79,6 +87,228 @@ export interface PreparedChatA2ui {
   renderableMessages: A2uiMsg[];
   files: GeneratedChatFile[];
   phase: ConversationPhaseId | null;
+}
+
+interface StepwiseSetupStepState {
+  id: string;
+  label: string;
+  sequence: number;
+  status: 'pending' | 'running' | 'complete' | 'error' | 'skipped';
+  detail?: string;
+}
+
+export interface StepwiseSetupState {
+  steps: StepwiseSetupStepState[];
+  statusText: string;
+  errorCode?: string;
+  errorMessage?: string;
+  recoverableError?: boolean;
+}
+
+export interface PreparedStepwiseSetup {
+  renderableMessages: A2uiMsg[];
+  files: GeneratedChatFile[];
+  phase: 'generate';
+  statusText: string;
+  state: StepwiseSetupState;
+}
+
+export function createStepwiseSetupState(): StepwiseSetupState {
+  return {
+    steps: [],
+    statusText: 'Preparing project setup…',
+  };
+}
+
+export function getStepwiseSetupSurfaceId(turnId: string): string {
+  return `${turnId}${SURFACE_SCOPE_SEPARATOR}${STEPWISE_SETUP_SURFACE_SUFFIX}`;
+}
+
+export function getSetupEventKey(event: SetupGenerationEvent): string {
+  switch (event.type) {
+    case 'step_start':
+      return `step_start:${event.stepId}:${event.sequence}`;
+    case 'file_generated':
+      return `file_generated:${event.stepId}:${event.path}:${event.sha256}`;
+    case 'step_complete':
+      return `step_complete:${event.stepId}:${event.filesCount}:${event.totalBytes}`;
+    case 'step_error':
+      return `step_error:${event.stepId}:${event.code}:${event.message}`;
+    default:
+      return JSON.stringify(event);
+  }
+}
+
+export function redactSetupEvent(event: SetupGenerationEvent): SetupGenerationEvent {
+  if (event.type !== 'file_generated') {
+    return event;
+  }
+
+  const { content: _content, ...metadataOnly } = event;
+  return metadataOnly;
+}
+
+export function applyStepwiseSetupEvent(
+  state: StepwiseSetupState,
+  event: SetupGenerationEvent,
+): StepwiseSetupState {
+  const steps = state.steps.map((step) => ({ ...step }));
+
+  switch (event.type) {
+    case 'step_start': {
+      const step = upsertStep(steps, event.stepId, {
+        label: event.label,
+        sequence: event.sequence,
+      });
+      step.status = 'running';
+      step.detail = 'Generating…';
+
+      return {
+        steps: sortStepwiseSetupSteps(steps),
+        statusText: `Generating ${step.label}…`,
+      };
+    }
+
+    case 'file_generated': {
+      const step = upsertStep(steps, event.stepId);
+      if (step.status === 'running' && !step.detail) {
+        step.detail = 'Generating…';
+      }
+      const basename = event.path.split('/').pop() ?? event.path;
+      const nextState: StepwiseSetupState = {
+        steps: sortStepwiseSetupSteps(steps),
+        statusText: `${basename} added to the workspace.`,
+      };
+
+      if (state.errorMessage) {
+        nextState.errorCode = state.errorCode;
+        nextState.errorMessage = state.errorMessage;
+        nextState.recoverableError = state.recoverableError;
+      }
+
+      return nextState;
+    }
+
+    case 'step_complete': {
+      const step = upsertStep(steps, event.stepId);
+      step.status = 'complete';
+      step.detail = formatStepCompletionDetail(event.filesCount, event.totalBytes);
+
+      return {
+        steps: sortStepwiseSetupSteps(steps),
+        statusText: buildStepCompletionStatus(step.label, event.filesCount),
+      };
+    }
+
+    case 'step_error': {
+      const step = upsertStep(steps, event.stepId);
+      step.status = 'error';
+      step.detail = event.message;
+
+      return {
+        steps: sortStepwiseSetupSteps(steps),
+        statusText: buildStepErrorStatus(step.label, event.message),
+        errorCode: event.code,
+        errorMessage: event.message,
+        recoverableError: event.recoverable,
+      };
+    }
+  }
+}
+
+export function buildStepwiseSetupMessages(
+  state: StepwiseSetupState,
+  turnId: string,
+  options: {
+    includeCreateSurface?: boolean;
+    final?: boolean;
+  } = {},
+): A2uiMsg[] {
+  if (state.steps.length === 0) {
+    return [];
+  }
+
+  const surfaceId = getStepwiseSetupSurfaceId(turnId);
+  const overallStatus = getStepwiseOverallStatus(state, options.final ?? false);
+  const statusMessage = state.errorMessage
+    ? buildStepwiseRecoveryStatus(state)
+    : ((options.final ?? false) ? buildFinalStepwiseStatus(state) : state.statusText);
+  const components: A2uiComponent[] = [{
+    id: STEPWISE_SETUP_SURFACE_SUFFIX,
+    component: 'DeploymentProgress',
+    title: GENERATE_PROGRESS_TITLE,
+    overallStatus,
+    statusMessage,
+    ...(state.errorMessage ? {
+      errorCode: state.errorCode,
+      errorMessage: state.errorMessage,
+    } : {}),
+    steps: state.steps.map((step) => ({
+      id: step.id,
+      label: step.label,
+      status: step.status,
+      ...(step.detail ? { detail: step.detail } : {}),
+    })),
+  }];
+
+  const messages: A2uiMsg[] = [];
+  if (options.includeCreateSurface ?? true) {
+    messages.push({
+      version: 'v0.9',
+      createSurface: {
+        surfaceId,
+        catalogId: 'kickstart',
+      },
+    });
+  }
+  messages.push({
+    version: 'v0.9',
+    updateComponents: {
+      surfaceId,
+      components,
+    },
+  });
+  return messages;
+}
+
+export function prepareStepwiseSetup(
+  events: readonly SetupGenerationEvent[],
+  turnId: string,
+  options: {
+    final?: boolean;
+  } = {},
+): PreparedStepwiseSetup {
+  const files: GeneratedChatFile[] = [];
+  const seenEvents = new Set<string>();
+  let state = createStepwiseSetupState();
+
+  for (const event of events) {
+    const key = getSetupEventKey(event);
+    if (seenEvents.has(key)) {
+      continue;
+    }
+    seenEvents.add(key);
+
+    state = applyStepwiseSetupEvent(state, event);
+    if (event.type === 'file_generated' && typeof event.content === 'string') {
+      files.push({
+        path: event.path,
+        content: event.content,
+        language: event.language,
+      });
+    }
+  }
+
+  return {
+    renderableMessages: buildStepwiseSetupMessages(state, turnId, {
+      includeCreateSurface: true,
+      final: options.final,
+    }),
+    files,
+    phase: 'generate',
+    statusText: (options.final ?? false) ? buildFinalStepwiseStatus(state) : state.statusText,
+    state,
+  };
 }
 
 export function normalizeConversationPhase(phase: string | null | undefined): ConversationPhaseId | null {
@@ -273,7 +503,7 @@ export function prepareChatA2uiPayload(
 }
 
 export function rebuildChatSessionState(
-  messages: readonly Pick<ChatMessage, 'id' | 'a2uiMessages' | 'phase'>[],
+  messages: readonly Pick<ChatMessage, 'id' | 'a2uiMessages' | 'phase' | 'model' | 'setupEvents'>[],
   options: Omit<PrepareChatA2uiOptions, 'currentPhase'> = {},
 ): Omit<PreparedChatA2ui, 'storedMessages'> {
   const renderableMessages: A2uiMsg[] = [];
@@ -282,19 +512,31 @@ export function rebuildChatSessionState(
 
   for (const message of messages) {
     const fallbackPhase: ConversationPhaseId | null = normalizeConversationPhase(message.phase) ?? phase;
-    if (!message.a2uiMessages?.length) {
-      phase = fallbackPhase;
+
+    if (message.a2uiMessages?.length) {
+      const prepared = prepareChatA2ui(message.a2uiMessages, message.id, {
+        ...options,
+        currentPhase: fallbackPhase,
+      });
+
+      renderableMessages.push(...prepared.renderableMessages);
+      files.push(...prepared.files);
+      phase = prepared.phase ?? fallbackPhase;
+    }
+
+    if (message.setupEvents?.length) {
+      const preparedSetup = prepareStepwiseSetup(message.setupEvents, message.id, {
+        final: Boolean(message.model),
+      });
+      renderableMessages.push(...preparedSetup.renderableMessages);
+      files.push(...preparedSetup.files);
+      phase = preparedSetup.phase;
       continue;
     }
 
-    const prepared = prepareChatA2ui(message.a2uiMessages, message.id, {
-      ...options,
-      currentPhase: fallbackPhase,
-    });
-
-    renderableMessages.push(...prepared.renderableMessages);
-    files.push(...prepared.files);
-    phase = prepared.phase ?? fallbackPhase;
+    if (!message.a2uiMessages?.length) {
+      phase = fallbackPhase;
+    }
   }
 
   return { renderableMessages, files, phase };
@@ -311,6 +553,10 @@ export function getLatestConversationPhase(messages: readonly ChatMessage[]): Co
 
     const debugPhase = extractConversationPhase(message.debugInfo?.fullEnvelope?.a2ui ?? []);
     if (debugPhase) return debugPhase;
+
+    if (message.setupEvents?.length) {
+      return 'generate';
+    }
   }
 
   return null;
@@ -388,6 +634,138 @@ function buildGeneratedFileSummary(component: A2uiComponent): A2uiComponent[] {
     text: formatFileWorkspaceSummary(entries),
     variant: 'body2',
   } as A2uiComponent];
+}
+
+function upsertStep(
+  steps: StepwiseSetupStepState[],
+  stepId: string,
+  overrides: Partial<Omit<StepwiseSetupStepState, 'id'>> = {},
+): StepwiseSetupStepState {
+  let step = steps.find((candidate) => candidate.id === stepId);
+  if (!step) {
+    step = {
+      id: stepId,
+      label: overrides.label ?? getSetupStepLabel(stepId),
+      sequence: overrides.sequence ?? steps.length + 1,
+      status: overrides.status ?? 'pending',
+      ...(overrides.detail ? { detail: overrides.detail } : {}),
+    };
+    steps.push(step);
+  } else {
+    if (overrides.label) {
+      step.label = overrides.label;
+    }
+    if (overrides.sequence !== undefined) {
+      step.sequence = overrides.sequence;
+    }
+    if (overrides.status) {
+      step.status = overrides.status;
+    }
+    if ('detail' in overrides) {
+      step.detail = overrides.detail;
+    }
+  }
+
+  return step;
+}
+
+function sortStepwiseSetupSteps(steps: StepwiseSetupStepState[]): StepwiseSetupStepState[] {
+  return [...steps].sort((left, right) => {
+    if (left.sequence !== right.sequence) {
+      return left.sequence - right.sequence;
+    }
+    return left.label.localeCompare(right.label);
+  });
+}
+
+function getSetupStepLabel(stepId: string): string {
+  const knownLabels: Record<string, string> = {
+    'app-scaffolding': 'App scaffolding',
+    'dockerfile': 'Dockerfile',
+    'deployment-config': 'Deployment config',
+    'ci-cd': 'CI/CD',
+    'service-connections': 'Service connections',
+  };
+
+  if (knownLabels[stepId]) {
+    return knownLabels[stepId];
+  }
+
+  return stepId
+    .split(/[-_]/g)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
+}
+
+function formatStepCompletionDetail(filesCount: number, totalBytes: number): string {
+  if (filesCount <= 0) {
+    return 'Complete';
+  }
+
+  const fileLabel = filesCount === 1 ? '1 file added' : `${filesCount} files added`;
+  return totalBytes > 0
+    ? `${fileLabel} • ${formatByteSize(totalBytes)}`
+    : fileLabel;
+}
+
+function formatByteSize(totalBytes: number): string {
+  if (totalBytes < 1024) {
+    return `${totalBytes} B`;
+  }
+
+  if (totalBytes < 1024 * 1024) {
+    return `${(totalBytes / 1024).toFixed(1).replace(/\.0$/, '')} KB`;
+  }
+
+  return `${(totalBytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')} MB`;
+}
+
+function buildStepCompletionStatus(label: string, filesCount: number): string {
+  if (filesCount <= 0) {
+    return `${label} complete.`;
+  }
+
+  return `${label} complete — ${filesCount === 1 ? '1 file added' : `${filesCount} files added`} to the workspace.`;
+}
+
+function buildStepErrorStatus(label: string, message: string): string {
+  return `${label} needs attention. ${message}`;
+}
+
+function buildStepwiseRecoveryStatus(state: StepwiseSetupState): string {
+  if (!state.errorMessage) {
+    return state.statusText;
+  }
+
+  return state.recoverableError
+    ? 'Retry this step or stop generation. Earlier workspace files are still available.'
+    : 'This step stopped. Earlier workspace files are still available.';
+}
+
+function buildFinalStepwiseStatus(state: StepwiseSetupState): string {
+  if (state.errorMessage) {
+    return state.statusText || state.errorMessage;
+  }
+
+  return state.steps.length > 0
+    ? 'Project setup complete. Generated files are ready in the workspace.'
+    : state.statusText;
+}
+
+function getStepwiseOverallStatus(
+  state: StepwiseSetupState,
+  final: boolean,
+): 'idle' | 'running' | 'complete' | 'error' {
+  if (state.errorMessage) {
+    return 'error';
+  }
+
+  if (state.steps.length === 0) {
+    return 'idle';
+  }
+
+  return final ? 'complete' : 'running';
 }
 
 function extractFileEntries(

@@ -118,6 +118,17 @@ const useStyles = makeStyles({
     paddingTop: tokens.spacingVerticalXXL,
     color: tokens.colorNeutralForeground3,
   },
+  srOnly: {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    padding: '0',
+    margin: '-1px',
+    overflow: 'hidden',
+    clipPath: 'inset(50%)',
+    border: '0',
+    whiteSpace: 'nowrap',
+  },
 });
 
 /* ------------------------------------------------------------------ */
@@ -162,6 +173,30 @@ function buildMergedTree(
   }
   annotate(tree);
   return tree;
+}
+
+function collectFilePaths(nodes: FileTreeNode[]): string[] {
+  const paths: string[] = [];
+  for (const node of nodes) {
+    if (node.isDirectory) {
+      paths.push(...collectFilePaths(node.children ?? []));
+      continue;
+    }
+    paths.push(node.path);
+  }
+  return paths;
+}
+
+function buildWorkspaceAnnouncement(paths: string[]): string {
+  if (paths.length === 0) {
+    return '';
+  }
+
+  if (paths.length === 1) {
+    return `${paths[0]} added to workspace`;
+  }
+
+  return `${paths.length} new files added to workspace`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -282,11 +317,15 @@ export function FileManagerSidebar({
   onDismiss,
 }: FileManagerSidebarProps) {
   const styles = useStyles();
+  const [workspaceAnnouncement, setWorkspaceAnnouncement] = React.useState('');
+  const previousPathsRef = React.useRef<string[]>([]);
+  const isInitialRenderRef = React.useRef(true);
 
   const tree = useMemo(
     () => buildMergedTree(streamingFiles, persistedFiles),
     [streamingFiles, persistedFiles],
   );
+  const mergedFilePaths = useMemo(() => collectFilePaths(tree), [tree]);
 
   // Count all leaf (non-directory) files
   const fileCount = useMemo(() => {
@@ -319,6 +358,22 @@ export function FileManagerSidebar({
     });
   }, [tree]);
 
+  React.useEffect(() => {
+    if (isInitialRenderRef.current) {
+      isInitialRenderRef.current = false;
+      previousPathsRef.current = mergedFilePaths;
+      return;
+    }
+
+    const previousPaths = new Set(previousPathsRef.current);
+    const addedPaths = mergedFilePaths.filter((path) => !previousPaths.has(path));
+    previousPathsRef.current = mergedFilePaths;
+
+    if (addedPaths.length > 0) {
+      setWorkspaceAnnouncement(buildWorkspaceAnnouncement(addedPaths));
+    }
+  }, [mergedFilePaths]);
+
   const handleToggleFolder = useCallback((path: string) => {
     setExpandedFolders((prev) => {
       const next = new Set(prev);
@@ -330,6 +385,14 @@ export function FileManagerSidebar({
 
   return (
     <div className={styles.root} data-testid="file-manager-sidebar">
+      <div
+        className={styles.srOnly}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {workspaceAnnouncement}
+      </div>
       <div className={styles.header}>
         <Text className={styles.headerTitle} size={300}>
           Files{fileCount > 0 ? ` (${fileCount})` : ''}
@@ -340,6 +403,7 @@ export function FileManagerSidebar({
               appearance="subtle"
               size="small"
               icon={<ArrowDownloadRegular />}
+              aria-label="Download workspace as ZIP"
               title="Download ZIP"
               onClick={onDownloadZip}
             />
@@ -348,6 +412,7 @@ export function FileManagerSidebar({
             appearance="subtle"
             size="small"
             icon={<DismissRegular />}
+            aria-label="Close workspace file panel"
             title="Close file panel"
             onClick={onDismiss}
           />
@@ -359,7 +424,7 @@ export function FileManagerSidebar({
           <Text size={200}>No files yet</Text>
         </div>
       ) : (
-        <ul className={styles.treeList} role="tree">
+        <ul className={styles.treeList} role="tree" aria-label="Workspace files">
           {tree.map((node) => (
             <SidebarTreeNode
               key={node.path}

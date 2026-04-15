@@ -221,9 +221,16 @@ export interface VFSFile {
   updatedAt: number;
 }
 
+interface WorkspaceSnapshotRecord {
+  sessionId: string;
+  files: VFSFile[];
+  updatedAt: number;
+}
+
 const IDB_NAME = 'kickstart-vfs';
-const IDB_VERSION = 2;
+const IDB_VERSION = 3;
 const IDB_STORE = 'files';
+const WORKSPACE_SNAPSHOT_STORE = 'workspace-snapshots';
 
 function openIDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -232,6 +239,9 @@ function openIDB(): Promise<IDBDatabase> {
       const db = req.result;
       if (!db.objectStoreNames.contains(IDB_STORE)) {
         db.createObjectStore(IDB_STORE, { keyPath: 'path' });
+      }
+      if (!db.objectStoreNames.contains(WORKSPACE_SNAPSHOT_STORE)) {
+        db.createObjectStore(WORKSPACE_SNAPSHOT_STORE, { keyPath: 'sessionId' });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -544,6 +554,102 @@ export class VirtualFS {
     return () => {
       this.listeners.delete(listener);
     };
+  }
+
+  async saveWorkspaceSnapshot(sessionId: string, files: VFSFile[]): Promise<void> {
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedSessionId) {
+      return;
+    }
+
+    const sanitizedFiles = files.map((file) => {
+      const safePath = this.securePath(file.path);
+      return {
+        path: safePath,
+        content: file.content,
+        language: file.language ?? detectLang(safePath),
+        createdAt: file.createdAt,
+        updatedAt: file.updatedAt,
+      } satisfies VFSFile;
+    });
+
+    const db = await this.dbPromise;
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(WORKSPACE_SNAPSHOT_STORE, 'readwrite');
+      tx.objectStore(WORKSPACE_SNAPSHOT_STORE).put({
+        sessionId: normalizedSessionId,
+        files: sanitizedFiles,
+        updatedAt: Date.now(),
+      } satisfies WorkspaceSnapshotRecord);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async loadWorkspaceSnapshot(sessionId: string): Promise<VFSFile[]> {
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedSessionId) {
+      return [];
+    }
+
+    const db = await this.dbPromise;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(WORKSPACE_SNAPSHOT_STORE, 'readonly');
+      const req = tx.objectStore(WORKSPACE_SNAPSHOT_STORE).get(normalizedSessionId);
+      req.onsuccess = () => {
+        const record = req.result as WorkspaceSnapshotRecord | undefined;
+        if (!record || !Array.isArray(record.files)) {
+          resolve([]);
+          return;
+        }
+
+        resolve(
+          record.files
+            .map((file) => {
+              const safePath = validateAndNormalize(file.path);
+              if (!safePath) {
+                return null;
+              }
+
+              return {
+                path: safePath,
+                content: file.content,
+                language: file.language ?? detectLang(safePath),
+                createdAt: file.createdAt ?? 0,
+                updatedAt: file.updatedAt ?? 0,
+              } satisfies VFSFile;
+            })
+            .filter((file): file is VFSFile => file !== null)
+            .sort((left, right) => left.path.localeCompare(right.path)),
+        );
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async deleteWorkspaceSnapshot(sessionId: string): Promise<void> {
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedSessionId) {
+      return;
+    }
+
+    const db = await this.dbPromise;
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(WORKSPACE_SNAPSHOT_STORE, 'readwrite');
+      tx.objectStore(WORKSPACE_SNAPSHOT_STORE).delete(normalizedSessionId);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async clearWorkspaceSnapshots(): Promise<void> {
+    const db = await this.dbPromise;
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(WORKSPACE_SNAPSHOT_STORE, 'readwrite');
+      tx.objectStore(WORKSPACE_SNAPSHOT_STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
   }
 
   private notify(): void {

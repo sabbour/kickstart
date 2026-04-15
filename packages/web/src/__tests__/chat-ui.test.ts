@@ -377,4 +377,71 @@ describe('chat file workspace rehydration', () => {
     expect(secondSession.renderableMessages[0].createSurface?.surfaceId).toBe('assistant-turn-9::msg-2');
     expect(secondSession.renderableMessages[1].updateComponents?.surfaceId).toBe('assistant-turn-9::msg-2');
   });
+
+  it('restores stepwise setup progress from persisted stream metadata without replaying inline files', () => {
+    const restored = rebuildChatSessionState([
+      {
+        id: 'assistant-turn-10',
+        model: 'gpt-5.4-mini',
+        phase: 'generate',
+        setupEvents: [
+          {
+            type: 'step_start',
+            stepId: 'dockerfile',
+            label: 'Dockerfile',
+            sequence: 1,
+          },
+          {
+            type: 'file_generated',
+            stepId: 'dockerfile',
+            path: 'Dockerfile',
+            language: 'dockerfile',
+            byteLength: 19,
+            sha256: 'sha-dockerfile',
+          },
+          {
+            type: 'step_complete',
+            stepId: 'dockerfile',
+            filesCount: 1,
+            totalBytes: 19,
+          },
+        ],
+      },
+    ]);
+
+    expect(restored.phase).toBe('generate');
+    expect(restored.files).toEqual([]);
+    expect(restored.renderableMessages).toEqual([
+      {
+        version: 'v0.9',
+        createSurface: {
+          surfaceId: 'assistant-turn-10::setup-progress',
+          catalogId: 'kickstart',
+        },
+      },
+      {
+        version: 'v0.9',
+        updateComponents: {
+          surfaceId: 'assistant-turn-10::setup-progress',
+          components: [
+            {
+              id: 'setup-progress',
+              component: 'DeploymentProgress',
+              title: GENERATE_PROGRESS_TITLE,
+              overallStatus: 'complete',
+              statusMessage: 'Project setup complete. Generated files are ready in the workspace.',
+              steps: [
+                {
+                  id: 'dockerfile',
+                  label: 'Dockerfile',
+                  status: 'complete',
+                  detail: '1 file added • 19 B',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+  });
 });

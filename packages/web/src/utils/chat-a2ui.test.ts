@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { ChatMessage, A2uiPayloadItem } from '../types';
+import type { ChatMessage, A2uiPayloadItem, SetupGenerationEvent } from '../types';
 import {
   GENERATE_PROGRESS_TITLE,
   getLatestConversationPhase,
+  prepareStepwiseSetup,
   prepareChatA2ui,
   prepareChatA2uiPayload,
+  redactSetupEvent,
   rebuildChatSessionState,
 } from './chat-a2ui';
 
@@ -369,6 +371,108 @@ describe('rebuildChatSessionState', () => {
   });
 });
 
+describe('prepareStepwiseSetup', () => {
+  const stepwiseEvents: SetupGenerationEvent[] = [
+    {
+      type: 'step_start',
+      stepId: 'dockerfile',
+      label: 'Dockerfile',
+      sequence: 1,
+    },
+    {
+      type: 'file_generated',
+      stepId: 'dockerfile',
+      path: 'Dockerfile',
+      language: 'dockerfile',
+      content: 'FROM node:20-alpine',
+      byteLength: 19,
+      sha256: 'sha-dockerfile',
+    },
+    {
+      type: 'step_complete',
+      stepId: 'dockerfile',
+      filesCount: 1,
+      totalBytes: 19,
+    },
+  ];
+
+  it('uses file_generated content for live workspace writes while keeping chat progress-only', () => {
+    const prepared = prepareStepwiseSetup(stepwiseEvents, 'assistant-turn-stepwise', {
+      final: false,
+    });
+
+    expect(prepared.phase).toBe('generate');
+    expect(prepared.statusText).toBe('Dockerfile complete — 1 file added to the workspace.');
+    expect(prepared.files).toEqual([
+      {
+        path: 'Dockerfile',
+        content: 'FROM node:20-alpine',
+        language: 'dockerfile',
+      },
+    ]);
+    expect(prepared.renderableMessages).toEqual([
+      {
+        version: 'v0.9',
+        createSurface: {
+          surfaceId: 'assistant-turn-stepwise::setup-progress',
+          catalogId: 'kickstart',
+        },
+      },
+      {
+        version: 'v0.9',
+        updateComponents: {
+          surfaceId: 'assistant-turn-stepwise::setup-progress',
+          components: [
+            {
+              id: 'setup-progress',
+              component: 'DeploymentProgress',
+              title: GENERATE_PROGRESS_TITLE,
+              overallStatus: 'running',
+              statusMessage: 'Dockerfile complete — 1 file added to the workspace.',
+              steps: [
+                {
+                  id: 'dockerfile',
+                  label: 'Dockerfile',
+                  status: 'complete',
+                  detail: '1 file added • 19 B',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it('replays persisted stepwise metadata without resurrecting files outside the workspace snapshot', () => {
+    const persistedEvents = stepwiseEvents.map((event) => redactSetupEvent(event));
+    const prepared = prepareStepwiseSetup(persistedEvents, 'assistant-turn-stepwise', {
+      final: true,
+    });
+
+    expect(prepared.files).toEqual([]);
+    expect(prepared.renderableMessages[1].updateComponents).toMatchObject({
+      surfaceId: 'assistant-turn-stepwise::setup-progress',
+      components: [
+        {
+          id: 'setup-progress',
+          component: 'DeploymentProgress',
+          title: GENERATE_PROGRESS_TITLE,
+          overallStatus: 'complete',
+          statusMessage: 'Project setup complete. Generated files are ready in the workspace.',
+          steps: [
+            {
+              id: 'dockerfile',
+              label: 'Dockerfile',
+              status: 'complete',
+            },
+          ],
+        },
+      ],
+    });
+  });
+});
+
 describe('getLatestConversationPhase', () => {
   it('recovers the persisted phase from stored A2UI payload when the message field is empty', () => {
     const messages: ChatMessage[] = [
@@ -425,5 +529,24 @@ describe('getLatestConversationPhase', () => {
     ];
 
     expect(getLatestConversationPhase(messages)).toBe('review');
+  });
+
+  it('treats persisted stepwise setup events as generate phase progress', () => {
+    const messages: ChatMessage[] = [
+      {
+        id: 'assistant-turn-8',
+        role: 'assistant',
+        text: 'Project setup is running.',
+        timestamp: 0,
+        setupEvents: [{
+          type: 'step_start',
+          stepId: 'dockerfile',
+          label: 'Dockerfile',
+          sequence: 1,
+        }],
+      },
+    ];
+
+    expect(getLatestConversationPhase(messages)).toBe('generate');
   });
 });

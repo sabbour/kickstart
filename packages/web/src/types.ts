@@ -31,6 +31,44 @@ export interface DebugMetadata {
   };
 }
 
+export interface SetupStepStartEvent {
+  type: 'step_start';
+  stepId: string;
+  label: string;
+  sequence: number;
+}
+
+export interface SetupFileGeneratedEvent {
+  type: 'file_generated';
+  stepId: string;
+  path: string;
+  language: string;
+  content?: string;
+  byteLength: number;
+  sha256: string;
+}
+
+export interface SetupStepCompleteEvent {
+  type: 'step_complete';
+  stepId: string;
+  filesCount: number;
+  totalBytes: number;
+}
+
+export interface SetupStepErrorEvent {
+  type: 'step_error';
+  stepId: string;
+  code: 'codex_timeout' | 'codex_error' | 'validation_failed' | 'quota_exceeded' | 'connection_interrupted' | string;
+  message: string;
+  recoverable: boolean;
+}
+
+export type SetupGenerationEvent =
+  | SetupStepStartEvent
+  | SetupFileGeneratedEvent
+  | SetupStepCompleteEvent
+  | SetupStepErrorEvent;
+
 export type UsageCostStatus = 'estimated' | 'unavailable';
 
 export interface TokenUsageSnapshot {
@@ -93,6 +131,8 @@ export interface ChatMessage {
   debugInfo?: DebugMetadata;
   /** Raw A2UI messages that produced the surfaces for this message (used to rehydrate on reload). */
   a2uiMessages?: A2uiPayloadItem[];
+  /** Persisted stepwise setup stream metadata for workspace/progress rehydration. */
+  setupEvents?: SetupGenerationEvent[];
   /** Token usage captured for this assistant turn. */
   usage?: TokenUsageSnapshot;
 }
