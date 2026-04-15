@@ -3,7 +3,6 @@ import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
-  Body1,
   Body2,
   Button,
   Caption1,
@@ -18,19 +17,17 @@ import {
   ArrowResetRegular,
 } from '@fluentui/react-icons';
 
-// Fluent 2 light theme color constants for Mermaid config (must be static strings)
-const FLUENT = {
-  brandPrimary: '#0078D4',
-  brandTint60: '#EBF3FC',
-  brandTint40: '#B4D6FA',
-  neutralBg1: '#FFFFFF',
-  neutralBg3: '#F5F5F5',
-  neutralFg1: '#242424',
-  neutralFg2: '#424242',
-  neutralFg3: '#616161',
-  neutralStroke1: '#D1D1D1',
-  neutralStroke2: '#E0E0E0',
-  fontFamily: '"Segoe UI Variable", "Segoe UI", system-ui, sans-serif',
+// Azure Portal color constants for Mermaid config (aligned with try-aks reference)
+const AZURE = {
+  themePrimary: '#0078d4',
+  neutralPrimary: '#292827',
+  neutralSecondary: '#646464',
+  neutralTertiaryAlt: '#a19f9d',
+  neutralLighter: '#f3f2f1',
+  neutralLight: '#e1dfdd',
+  neutralLighterAlt: '#faf9f8',
+  white: '#ffffff',
+  fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
 } as const;
 
 // Icon keyword mapping — keys are lowercase search terms, values are icon filenames
@@ -84,10 +81,15 @@ const useStyles = makeStyles({
     padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
     borderBottomWidth: tokens.strokeWidthThin,
     borderBottomStyle: 'solid',
-    borderBottomColor: tokens.colorNeutralStroke2,
+    borderBottomColor: '#e1dfdd',
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalXS,
+    backgroundColor: '#faf9f8',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#292827',
+    letterSpacing: '0.01em',
   },
   toolbar: {
     display: 'flex',
@@ -106,6 +108,8 @@ const useStyles = makeStyles({
     cursor: 'grab',
     backgroundColor: tokens.colorNeutralBackground1,
     userSelect: 'none',
+    boxShadow: '0 1.6px 3.6px rgba(0,0,0,0.132), 0 0.3px 0.9px rgba(0,0,0,0.108)',
+    border: '1px solid #e1dfdd',
   },
   viewportGrabbing: {
     cursor: 'grabbing',
@@ -153,36 +157,32 @@ function loadMermaid(): Promise<typeof import('mermaid')> {
           startOnLoad: false,
           theme: 'base',
           securityLevel: 'loose',
-          fontFamily: FLUENT.fontFamily,
+          fontFamily: AZURE.fontFamily,
           themeVariables: {
-            // Node styling
-            primaryColor: FLUENT.brandTint60,
-            primaryBorderColor: FLUENT.brandTint40,
-            primaryTextColor: FLUENT.neutralFg1,
-            secondaryColor: FLUENT.neutralBg3,
-            secondaryBorderColor: FLUENT.neutralStroke2,
-            secondaryTextColor: FLUENT.neutralFg2,
-            tertiaryColor: FLUENT.neutralBg1,
-            tertiaryBorderColor: FLUENT.neutralStroke1,
-            tertiaryTextColor: FLUENT.neutralFg2,
-            // Lines and edges
-            lineColor: FLUENT.neutralFg3,
-            // Text
-            fontFamily: FLUENT.fontFamily,
+            primaryColor: AZURE.white,
+            primaryBorderColor: AZURE.themePrimary,
+            primaryTextColor: AZURE.neutralPrimary,
+            lineColor: AZURE.neutralTertiaryAlt,
+            secondaryColor: AZURE.neutralLighter,
+            secondaryBorderColor: AZURE.neutralLight,
+            tertiaryColor: AZURE.neutralLighterAlt,
             fontSize: '13px',
-            // Background
-            background: FLUENT.neutralBg1,
-            mainBkg: FLUENT.brandTint60,
-            nodeBorder: FLUENT.brandTint40,
-            // Cluster / subgraph styling
-            clusterBkg: FLUENT.neutralBg3,
-            clusterBorder: FLUENT.neutralStroke2,
-            // Edge label
-            edgeLabelBackground: FLUENT.neutralBg1,
-            // Notes
-            noteBkgColor: '#FFF8E1',
-            noteBorderColor: '#FFB900',
-            noteTextColor: FLUENT.neutralFg1,
+            fontFamily: AZURE.fontFamily,
+            background: AZURE.white,
+            mainBkg: AZURE.white,
+            nodeBorder: AZURE.themePrimary,
+            clusterBkg: AZURE.neutralLighter,
+            clusterBorder: AZURE.neutralLight,
+            titleColor: AZURE.neutralPrimary,
+            edgeLabelBackground: AZURE.white,
+          },
+          flowchart: {
+            htmlLabels: true,
+            curve: 'basis',
+            padding: 12,
+            nodeSpacing: 80,
+            rankSpacing: 90,
+            useMaxWidth: false,
           },
         });
         mermaidInstance = m;
@@ -194,22 +194,80 @@ function loadMermaid(): Promise<typeof import('mermaid')> {
   });
 }
 
-/** Post-process the rendered SVG to apply Fluent 2 styling and inject icons. */
-function postProcessSvg(svgEl: SVGSVGElement): void {
-  // Apply rounded corners to all rect elements in nodes
-  svgEl.querySelectorAll('.node rect, .node polygon').forEach((el) => {
-    if (el.tagName === 'rect') {
-      el.setAttribute('rx', '8');
-      el.setAttribute('ry', '8');
-      // Soften stroke
-      el.setAttribute('stroke-width', '1.5');
-    }
-  });
+/** Raise cluster labels above edges so they aren't occluded. */
+function raiseClusterLabels(svg: SVGSVGElement): void {
+  const overlay = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  overlay.setAttribute('class', 'cluster-label-overlay');
+  overlay.setAttribute('pointer-events', 'none');
+  svg.appendChild(overlay);
+  svg.querySelectorAll('.cluster-label').forEach((el) => overlay.appendChild(el));
+}
 
-  // Clean up edges — thin, consistent strokes
-  svgEl.querySelectorAll('.edge path, .flowchart-link').forEach((el) => {
-    (el as SVGElement).style.strokeWidth = '1.5';
-  });
+/** Pre-process mermaid source to escape brackets/parens (try-aks approach). */
+function preprocessDiagram(source: string): string {
+  let processed = source;
+  // Wrap unquoted bracket labels containing parens in quotes
+  processed = processed.replace(
+    /\[([^\]"]*\([^\]]*)\]/g,
+    (_match, label) => `["${label}"]`,
+  );
+  // HTML-encode parentheses inside quoted bracket labels
+  processed = processed.replace(
+    /\["([^"]*)"\]/g,
+    (_match, label: string) => `["${label.split('(').join('&#40;').split(')').join('&#41;')}"]`,
+  );
+  // Fix subgraph labels with parens
+  processed = processed.replace(
+    /subgraph\s+(\w+)\[([^\]"]*\([^\]]*)\]/g,
+    (_match, id, label: string) =>
+      `subgraph ${id}["${label.split('(').join('&#40;').split(')').join('&#41;')}"]`,
+  );
+  return processed;
+}
+
+/** Post-process the rendered SVG: embed try-aks CSS styles, inject icons, raise cluster labels. */
+function postProcessSvg(svgEl: SVGSVGElement): void {
+  // Embed try-aks CSS rules as a <style> element in the SVG
+  const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+  styleEl.textContent = `
+    .cluster rect {
+      rx: 0 !important;
+      ry: 0 !important;
+      stroke-dasharray: none !important;
+      fill: #f3f2f1 !important;
+      stroke: #e1dfdd !important;
+      stroke-width: 1 !important;
+    }
+    .cluster-label {
+      overflow: visible !important;
+      white-space: nowrap;
+      font-weight: 600;
+      font-size: 15px;
+      color: #646464;
+      padding-top: 13px;
+    }
+    .edge path, .flowchart-link {
+      stroke-width: 1.5;
+      stroke: #a19f9d;
+    }
+    .edgeLabel {
+      font-family: 'Segoe UI Light';
+      font-size: 13px;
+      background-color: #ffffff;
+      padding: 2px 6px;
+      color: #646464;
+    }
+    .nodeLabel, .node .label {
+      font-family: 'Segoe UI';
+      font-weight: 500;
+      text-align: center;
+    }
+    .node rect {
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.06));
+      stroke-width: 1.5;
+    }
+  `;
+  svgEl.insertBefore(styleEl, svgEl.firstChild);
 
   // Inject Fluent icons into matching nodes
   svgEl.querySelectorAll('.node').forEach((nodeGroup) => {
@@ -223,7 +281,6 @@ function postProcessSvg(svgEl: SVGSVGElement): void {
     const ICON_SIZE = 18;
     const ICON_PADDING = 4;
 
-    // Find the rect to position the icon relative to it
     const rect = nodeGroup.querySelector('rect');
     if (!rect) return;
 
@@ -231,7 +288,6 @@ function postProcessSvg(svgEl: SVGSVGElement): void {
     const rectY = parseFloat(rect.getAttribute('y') || '0');
     const rectH = parseFloat(rect.getAttribute('height') || '0');
 
-    // Place icon at left inside the node, vertically centered
     const iconX = rectX + ICON_PADDING + 4;
     const iconY = rectY + (rectH - ICON_SIZE) / 2;
 
@@ -246,26 +302,21 @@ function postProcessSvg(svgEl: SVGSVGElement): void {
     imageEl.setAttribute('class', 'fluent-icon');
     nodeGroup.insertBefore(imageEl, nodeGroup.firstChild);
 
-    // Widen the rect to accommodate the icon and shift label text right
     const rectW = parseFloat(rect.getAttribute('width') || '0');
     const extraWidth = ICON_SIZE + ICON_PADDING * 2;
     rect.setAttribute('width', String(rectW + extraWidth));
     rect.setAttribute('x', String(rectX - extraWidth / 2));
 
-    // Shift label text to make room
     const foreignObj = nodeGroup.querySelector('foreignObject');
     if (foreignObj) {
       const foX = parseFloat(foreignObj.getAttribute('x') || '0');
       foreignObj.setAttribute('x', String(foX + extraWidth / 2));
     }
-    // Also shift image to match the updated rect
     imageEl.setAttribute('x', String(rectX - extraWidth / 2 + ICON_PADDING + 4));
   });
 
-  // Remove default Mermaid box-shadow / filter effects for a flatter Fluent look
-  svgEl.querySelectorAll('.node').forEach((node) => {
-    (node as SVGElement).style.filter = 'none';
-  });
+  // Raise cluster labels above edges
+  raiseClusterLabels(svgEl);
 }
 
 let diagramCounter = 0;
@@ -316,7 +367,7 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
 
     loadMermaid().then(async (m) => {
       try {
-        const { svg } = await m.default.render(id, props.diagram);
+        const { svg } = await m.default.render(id, preprocessDiagram(props.diagram));
         if (container) {
           container.innerHTML = svg;
           const svgEl = container.querySelector('svg');

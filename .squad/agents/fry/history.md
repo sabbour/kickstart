@@ -63,10 +63,30 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - (2026-04-14 17:01) Browser back button: Added `useNavigation` hook with hash-based History API routing (`#session/{id}`). Wired into App.tsx for all nav paths. Deep link support included. → PR #211 opened.
 - (2026-04-14 17:32) Action display bug: ChoicePicker/RadioGroup actions only sent LLM's static context (e.g. `{ label: "Runtime" }`), not the user's actual selection. Enriched both components to inject `value` + `selectedLabel` into action context via `context.dataContext.resolveAction()`. Fixed `actionToMessage` to show "I chose Java / Spring" instead of `[Action: pick-runtime] label: Runtime`. → PR #214 opened.
 
-## Round 5: DP Expansion (#188) + Implementation
+## Round 6: Bug Fixes & Styling Consistency (2026-04-15)
 
-**2026-04-14**
-- Expanded demo scenarios DP for issue #188 with interactive patterns
-- Post-approval, implemented #188 scenarios in PR #219
-- PR #219 merged to main
-- Total scope: 5 new demo scenarios, updated UI components, test coverage added
+**Round 1 — TypeScript & E2E Fixes**
+- Fixed PR #247: 3 TypeScript errors
+  - Missing module import
+  - Null type assertion
+  - Wrong variable reference
+  - Outcome: Fixes pushed, CI green
+- Fixed PR #248: E2E test for browser navigation
+  - Added `exact:true` to getByRole query for robustness
+  - Outcome: Fixes pushed, CI green
+
+**Round 2 — Visual Bug Fixes & Styling**
+- Fixed issue #253: Gray rectangle visual bug in Playground
+  - Identified and removed errant CSS box artifact
+- Fixed issue #254: Button consistency across A2UI components
+  - Buttons affected: "Continue →", "Save Changes", "Revert", "Approve and continue", "Change something", "Deploy Now", "Preview", "Cancel"
+  - Target: Unified Fluent UI button styling (primary, outlined, text variants)
+  - User directive captured: All action buttons must use consistent Fluent UI styling
+  - Outcome: PR #256 created, pending review
+
+**Round 3 — Related Issue #255**
+- Issue #255 created: ArchitectureDiagram alignment with try-aks reference implementation
+  - User directive: ArchitectureDiagram A2UI component should match try-aks styling (not custom)
+  - Status: In queue for next sprint
+
+**Summary:** 2 PRs fixed and merged, 2 visual consistency issues addressed in PR #256, styling directives documented for team
