@@ -51,8 +51,8 @@ The API needs Azure OpenAI to power the conversation engine. Create `packages/we
     "AzureWebJobsStorage": "",
     "AZURE_OPENAI_ENDPOINT": "https://<your-resource>.openai.azure.com",
     "AZURE_OPENAI_API_KEY": "<your-api-key>",
-    "AZURE_OPENAI_DEPLOYMENT": "gpt-4o",
-    "AZURE_OPENAI_CODEX_DEPLOYMENT": "gpt-5.3-codex",
+    "AZURE_OPENAI_CHAT_DEPLOYMENT": "gpt-5.4-mini",
+    "AZURE_OPENAI_CODEX_DEPLOYMENT": "gpt-5.4",
     "AZURE_CLIENT_ID": "<your-entra-client-id>",
     "AZURE_TENANT_ID": "<your-entra-tenant-id>",
     "AZURE_CLIENT_SECRET": "<your-client-secret>"

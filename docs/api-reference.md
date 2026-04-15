@@ -24,6 +24,8 @@ The Kickstart web surface exposes API endpoints through Azure Static Web Apps (S
 
 Main LLM proxy endpoint. Accepts a user message, manages session state, calls Azure OpenAI, and returns the response with conversation phase metadata.
 
+**Router behavior:** trusted server-owned `generate` turns use `AZURE_OPENAI_CODEX_DEPLOYMENT` (for example `gpt-5.4`). All other phases — and any client-rehydrated/untrusted phase state — stay on `AZURE_OPENAI_CHAT_DEPLOYMENT` (for example `gpt-5.4-mini`).
+
 **Source:** [`packages/web/api/src/functions/converse.ts`](../packages/web/api/src/functions/converse.ts)
 
 ### Request
@@ -118,7 +120,7 @@ interface ConverseResponse {
   ],
   "usage": {
     "turn": {
-      "model": "gpt-5.3-chat",
+      "model": "gpt-5.4-mini",
       "inputTokens": 412,
       "outputTokens": 138,
       "totalTokens": 550,
@@ -238,8 +240,8 @@ The API requires Azure OpenAI connection settings, plus optional pricing inputs 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI resource endpoint URL | `https://my-openai.openai.azure.com` |
-| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Chat model deployment name | `gpt-5.3-chat` |
-| `AZURE_OPENAI_CODEX_DEPLOYMENT` | Codex model deployment name | `gpt-5.3-codex` |
+| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Chat model deployment name | `gpt-5.4-mini` |
+| `AZURE_OPENAI_CODEX_DEPLOYMENT` | Generate/coding deployment name | `gpt-5.4` |
 | `AZURE_OPENAI_DEPLOYMENT` | Legacy fallback deployment name | `gpt-4o` |
 | `AZURE_OPENAI_API_KEY` | API key for the Azure OpenAI resource | `abc123...` |
 | `AZURE_OPENAI_CHAT_INPUT_PRICE_PER_1K_USD` | Optional estimated chat input-token price | `0.0015` |
@@ -259,9 +261,9 @@ Default parameters:
 - `temperature`: 0.7
 - `max_tokens`: 2048
 
-If any variable is missing, the API throws:
+If configuration is missing, the API throws:
 ```
-Missing Azure OpenAI configuration. Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT, and AZURE_OPENAI_API_KEY.
+Missing Azure OpenAI configuration. Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and at least one deployment (AZURE_OPENAI_CHAT_DEPLOYMENT, AZURE_OPENAI_CODEX_DEPLOYMENT, or AZURE_OPENAI_DEPLOYMENT as fallback).
 ```
 
 ---
@@ -292,7 +294,8 @@ npm run build -w @kickstart/api
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "AzureWebJobsStorage": "",
     "AZURE_OPENAI_ENDPOINT": "https://your-resource.openai.azure.com",
-    "AZURE_OPENAI_DEPLOYMENT": "gpt-4o",
+    "AZURE_OPENAI_CHAT_DEPLOYMENT": "gpt-5.4-mini",
+    "AZURE_OPENAI_CODEX_DEPLOYMENT": "gpt-5.4",
     "AZURE_OPENAI_API_KEY": "your-key-here"
   }
 }
@@ -406,7 +409,7 @@ Supports streaming via `Accept: text/event-stream` — same SSE format as `/api/
 
 | Variable | Description |
 |----------|-------------|
-| `AZURE_OPENAI_CODEX_DEPLOYMENT` | Codex model deployment name (e.g. `gpt-5.3-codex`) |
+| `AZURE_OPENAI_CODEX_DEPLOYMENT` | Generate/coding deployment name (e.g. `gpt-5.4`) |
 
 ---
 

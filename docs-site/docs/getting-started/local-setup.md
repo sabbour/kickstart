@@ -28,16 +28,24 @@ The root `npm install` installs dependencies for all workspace packages (`packag
 
 ### 2. Configure environment variables
 
-Create a `.env` file in `packages/web/` (or set these in your shell):
+Create `packages/web/api/local.settings.json`:
 
-```bash
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_OPENAI_API_KEY=your-api-key
-AZURE_OPENAI_DEPLOYMENT=your-gpt-deployment-name
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "",
+    "AZURE_OPENAI_ENDPOINT": "https://your-resource.openai.azure.com/",
+    "AZURE_OPENAI_API_KEY": "your-api-key",
+    "AZURE_OPENAI_CHAT_DEPLOYMENT": "gpt-5.4-mini",
+    "AZURE_OPENAI_CODEX_DEPLOYMENT": "gpt-5.4"
+  }
+}
 ```
 
 :::caution
-Never commit `.env` files to source control. The `.gitignore` already excludes them.
+Never commit `local.settings.json` files to source control. The repo already ignores them.
 :::
 
 ### 3. Start the development server
@@ -69,4 +77,4 @@ func --version
 
 ### OpenAI errors
 
-Verify your environment variables are set and the deployment name matches an existing GPT deployment in your Azure OpenAI resource.
+Verify your local settings file is present and both deployment names match real Azure OpenAI deployments in your resource.

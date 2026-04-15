@@ -13,7 +13,7 @@ function surface(surfaceId: string, components: A2uiComponent[]): A2uiMsg[] {
 const WELCOME: DemoResponse = {
   text: "Welcome to **Kickstart**! I help you deploy apps to AKS Automatic — fast, opinionated, and without the Kubernetes complexity.\n\nPick a track to get started, or just describe what you want to build.",
   phase: 'discover',
-  model: 'gpt-5.3-chat',
+  model: 'gpt-5.4-mini',
   typingDelay: 1200,
   a2uiMessages: surface('welcome-surface', [
     { id: 'root', component: 'Column', children: ['title-text', 'radio-group'] },
@@ -33,7 +33,7 @@ const WELCOME: DemoResponse = {
 const ARCHITECTURE: DemoResponse = {
   text: "Great choice! I'll set you up with a modern stack optimized for AKS Automatic. Here's the architecture I'm proposing — you can adjust anything before we start generating.",
   phase: 'design',
-  model: 'gpt-5.3-chat',
+  model: 'gpt-5.4-mini',
   typingDelay: 1800,
   a2uiMessages: surface('arch-surface', [
     { id: 'root', component: 'Column', children: ['arch-tabs', 'actions-row'], gap: 'medium' },
@@ -107,7 +107,7 @@ const ARCHITECTURE: DemoResponse = {
 const DESIGN_DETAIL: DemoResponse = {
   text: "Here's the detailed architecture breakdown. I've chosen components that optimize for developer experience and production readiness on AKS Automatic.",
   phase: 'design',
-  model: 'gpt-5.3-chat',
+  model: 'gpt-5.4-mini',
   typingDelay: 1500,
   a2uiMessages: surface('detail-surface', [
     { id: 'root', component: 'Column', children: ['tabs'] },
@@ -150,7 +150,7 @@ const DESIGN_DETAIL: DemoResponse = {
 const FILE_GENERATION: DemoResponse = {
   text: "I'm generating your project files. Each file is production-ready with best practices baked in.",
   phase: 'generate',
-  model: 'gpt-5.3-chat',
+  model: 'gpt-5.4',
   typingDelay: 2000,
   a2uiMessages: surface('files-surface', [
     { id: 'root', component: 'Column', children: ['files-title', 'file-cards'], gap: 'small' },
@@ -187,7 +187,7 @@ const FILE_GENERATION: DemoResponse = {
 const REVIEW_EXPANDED: DemoResponse = {
   text: "I've completed the deployment review. Architecture, cost estimates, and best-practice checks are all below — expand each tab for details. When you're satisfied, hit **Approve** to proceed.",
   phase: 'review',
-  model: 'gpt-5.3-chat',
+  model: 'gpt-5.4-mini',
   typingDelay: 1800,
   a2uiMessages: surface('review-surface', [
     { id: 'root', component: 'Column', children: ['rev-title', 'rev-tabs', 'rev-divider', 'rev-actions'], gap: 'medium' },
@@ -286,7 +286,7 @@ const REVIEW_EXPANDED: DemoResponse = {
 const SESSION_COMPLETE: DemoResponse = {
   text: "Your deployment package is complete and ready to use. All files have been generated and validated against production best practices.",
   phase: 'review',
-  model: 'gpt-5.3-chat',
+  model: 'gpt-5.4-mini',
   typingDelay: 1400,
   a2uiMessages: surface('complete-surface', [
     { id: 'root', component: 'Column', children: ['complete-title', 'complete-card', 'summary-card'], gap: 'medium' },
@@ -329,7 +329,7 @@ const SESSION_COMPLETE: DemoResponse = {
 const CONFIGURE_FORM: DemoResponse = {
   text: "Let's configure your app. Fill in the details below — I'll handle the rest.",
   phase: 'generate',
-  model: 'gpt-5.3-chat',
+  model: 'gpt-5.4',
   typingDelay: 1500,
   a2uiMessages: surface('config-surface', [
     { id: 'root', component: 'Column', children: ['progress', 'form1', 'form2'] },
@@ -362,7 +362,7 @@ const CONFIGURE_FORM: DemoResponse = {
 const CODE_PREVIEW: DemoResponse = {
   text: "Here are the key files I generated for your app. Everything is production-ready with best practices baked in.",
   phase: 'generate',
-  model: 'gpt-5.3-chat',
+  model: 'gpt-5.4',
   typingDelay: 1800,
   a2uiMessages: surface('code-surface', [
     { id: 'root', component: 'Column', children: ['code-title', 'dockerfile-block', 'deployment-block'] },

@@ -58,7 +58,8 @@ The API needs Azure OpenAI credentials to power the conversation engine. Edit `p
     "AzureWebJobsStorage": "",
     "AZURE_OPENAI_ENDPOINT": "https://<your-resource>.openai.azure.com",
     "AZURE_OPENAI_API_KEY": "<your-api-key>",
-    "AZURE_OPENAI_DEPLOYMENT": "gpt-4o",
+    "AZURE_OPENAI_CHAT_DEPLOYMENT": "gpt-5.4-mini",
+    "AZURE_OPENAI_CODEX_DEPLOYMENT": "gpt-5.4",
     "AZURE_CLIENT_ID": "e71a23c6-aeb4-459a-88fc-07ff96fc9b92",
     "AZURE_TENANT_ID": "d91aa5af-8c1e-442c-b77c-0b92988b387b",
     "AZURE_CLIENT_SECRET": "<your-client-secret>"

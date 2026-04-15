@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import {
   makeStyles, tokens,
+  Button,
   Text,
 } from '@fluentui/react-components';
+import { CheckmarkRegular, CopyRegular } from '@fluentui/react-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { DebugMetadata } from '../../types';
 
@@ -17,6 +19,12 @@ const useStyles = makeStyles({
     borderTopStyle: 'solid',
     borderTopColor: tokens.colorNeutralStroke2,
     paddingTop: tokens.spacingVerticalXS,
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalS,
   },
   toggle: {
     display: 'inline-flex',
@@ -78,6 +86,11 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground2,
     marginBottom: tokens.spacingVerticalXXS,
     fontSize: tokens.fontSizeBase200,
+  },
+  sectionActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: tokens.spacingVerticalXS,
   },
   codeBlock: {
     display: 'block',
@@ -185,22 +198,57 @@ function CollapsibleSection({ label, defaultOpen = false, children, styles: s }:
 
 export function DebugPanel({ debugInfo }: DebugPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
   const styles = useStyles();
   const { resolvedTheme } = useTheme();
 
   const codeBlockClass = `${styles.codeBlock} ${resolvedTheme === 'dark' ? styles.codeBlockDark : styles.codeBlockLight}`;
+  const copyPayload = getCopyPayload(debugInfo);
+
+  const handleCopy = async () => {
+    if (!copyPayload) {
+      return;
+    }
+
+    if (!navigator.clipboard) {
+      // eslint-disable-next-line no-console
+      console.warn('[DebugPanel] Clipboard API unavailable while copying LLM response.');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(copyPayload);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn('[DebugPanel] Failed to copy LLM response.', error);
+    }
+  };
 
   return (
     <div className={styles.container}>
-      <button
-        className={styles.toggle}
-        onClick={() => setIsExpanded(prev => !prev)}
-        aria-expanded={isExpanded}
-        aria-label="Toggle debug panel"
-      >
-        <span>{isExpanded ? '▼' : '▶'}</span>
-        <span>Debug</span>
-      </button>
+      <div className={styles.header}>
+        <button
+          className={styles.toggle}
+          onClick={() => setIsExpanded(prev => !prev)}
+          aria-expanded={isExpanded}
+          aria-label="Toggle debug panel"
+        >
+          <span>{isExpanded ? '▼' : '▶'}</span>
+          <span>Debug</span>
+        </button>
+        {copyPayload && (
+          <Button
+            size="small"
+            appearance="secondary"
+            icon={copied ? <CheckmarkRegular /> : <CopyRegular />}
+            onClick={handleCopy}
+          >
+            {copied ? 'Copied' : 'Copy response'}
+          </Button>
+        )}
+      </div>
 
       {isExpanded && (
         <div className={styles.panel}>
@@ -233,6 +281,27 @@ export function DebugPanel({ debugInfo }: DebugPanelProps) {
       )}
     </div>
   );
+}
+
+function getCopyPayload(debugInfo?: DebugMetadata): string | null {
+  if (!debugInfo) {
+    return null;
+  }
+
+  if (debugInfo.fullEnvelope) {
+    return JSON.stringify(debugInfo.fullEnvelope, null, 2);
+  }
+
+  const rawPayload = debugInfo.rawContent ?? debugInfo.rawResponse;
+  if (!rawPayload) {
+    return null;
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(rawPayload), null, 2);
+  } catch {
+    return rawPayload;
+  }
 }
 
 /** Try to parse as JSON and pretty-print; fall back to raw text with highlighting attempt. */

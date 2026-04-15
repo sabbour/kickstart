@@ -41,7 +41,7 @@ function formatInteger(value: number): string {
 
 function formatCost(usage: TokenUsageSummary): string {
   if (usage.session.costStatus !== 'estimated' || usage.session.estimatedCostUsd === undefined) {
-    return 'Cost —';
+    return 'Cost unavailable';
   }
 
   const digits = usage.session.estimatedCostUsd < 0.01 ? 4 : 2;

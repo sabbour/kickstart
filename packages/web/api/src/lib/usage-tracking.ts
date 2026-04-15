@@ -37,6 +37,8 @@ interface TokenPriceConfig {
   outputPricePer1kUsd: number;
 }
 
+export type UsagePricingGroup = "chat" | "generate";
+
 export function normalizeChatUsage(raw?: RawChatUsage | null): ChatUsage | undefined {
   if (!raw) return undefined;
 
@@ -73,16 +75,23 @@ export function sumChatUsage(
 export function buildTurnUsage(
   model: string,
   usage?: ChatUsage,
-  recordedAt = new Date().toISOString(),
+  options: {
+    recordedAt?: string;
+    pricingGroup?: UsagePricingGroup;
+  } = {},
 ): TurnUsage | undefined {
   if (!usage) return undefined;
 
-  const estimatedCostUsd = estimateUsageCostUsd(model, usage);
+  const estimatedCostUsd = estimateUsageCostUsd(
+    model,
+    usage,
+    options.pricingGroup,
+  );
 
   return {
     ...usage,
     model,
-    recordedAt,
+    recordedAt: options.recordedAt ?? new Date().toISOString(),
     ...(estimatedCostUsd !== undefined ? { estimatedCostUsd } : {}),
     costStatus: estimatedCostUsd !== undefined ? "estimated" : "unavailable",
   };
@@ -137,8 +146,12 @@ export function buildUsageSummary(
   };
 }
 
-function estimateUsageCostUsd(model: string, usage: ChatUsage): number | undefined {
-  const pricing = resolveTokenPriceConfig(model);
+function estimateUsageCostUsd(
+  model: string,
+  usage: ChatUsage,
+  pricingGroup?: UsagePricingGroup,
+): number | undefined {
+  const pricing = resolveTokenPriceConfig(model, pricingGroup);
   if (!pricing) return undefined;
 
   const inputCost = (usage.inputTokens / 1000) * pricing.inputPricePer1kUsd;
@@ -146,11 +159,21 @@ function estimateUsageCostUsd(model: string, usage: ChatUsage): number | undefin
   return roundUsd(inputCost + outputCost);
 }
 
-function resolveTokenPriceConfig(model: string): TokenPriceConfig | undefined {
+function resolveTokenPriceConfig(
+  model: string,
+  pricingGroup?: UsagePricingGroup,
+): TokenPriceConfig | undefined {
   const upperModel = model.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  const routedPrefix = pricingGroup === "generate"
+    ? "AZURE_OPENAI_CODEX"
+    : pricingGroup === "chat"
+      ? "AZURE_OPENAI_CHAT"
+      : model.toLowerCase().includes("codex")
+        ? "AZURE_OPENAI_CODEX"
+        : "AZURE_OPENAI_CHAT";
   const candidatePrefixes = [
     `AZURE_OPENAI_USAGE_${upperModel}`,
-    model.toLowerCase().includes("codex") ? "AZURE_OPENAI_CODEX" : "AZURE_OPENAI_CHAT",
+    routedPrefix,
     "AZURE_OPENAI",
   ];
 

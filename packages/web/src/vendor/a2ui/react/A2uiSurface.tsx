@@ -18,6 +18,7 @@ import React, {useSyncExternalStore, memo, useMemo, useCallback} from 'react';
 import {type SurfaceModel, ComponentContext, type ComponentModel} from '../web_core/index';
 import type {ReactComponentImplementation} from './adapter';
 import {Warning20Filled} from '@fluentui/react-icons';
+import {useDebug} from '../../../contexts/DebugContext';
 
 const ResolvedChild = memo(
   ({
@@ -68,6 +69,8 @@ export const DeferredChild: React.FC<{
   id: string;
   basePath: string;
 }> = memo(({surface, id, basePath}) => {
+  const {debugEnabled} = useDebug();
+
   // 1. Subscribe specifically to this component's existence
   const store = useMemo(() => {
     let version = 0;
@@ -99,11 +102,19 @@ export const DeferredChild: React.FC<{
     };
   }, [surface, id]);
 
-  useSyncExternalStore(store.subscribe, store.getSnapshot);
+  useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
 
   const componentModel = surface.componentsModel.get(id);
 
   if (!componentModel) {
+    if (debugEnabled) {
+      console.warn(`[A2UI] Referenced component "${id}" is not available on surface "${surface.id}"`);
+      return (
+        <div style={{color: '#d4820c', padding: '4px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px'}}>
+          <Warning20Filled /> Missing component: {id}
+        </div>
+      );
+    }
     return <div style={{color: 'gray', padding: '4px'}}>[Loading {id}...]</div>;
   }
 
