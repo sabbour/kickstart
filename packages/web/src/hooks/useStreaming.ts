@@ -103,6 +103,7 @@ export function useStreaming() {
         .map((m) => ({
           role: m.role === 'user' ? 'user' as const : 'assistant' as const,
           content: m.text.trim(),
+          ...(m.phase ? { phase: m.phase } : {}),
         }));
 
       const res = await apiFetch('/api/converse', {

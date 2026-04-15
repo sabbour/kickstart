@@ -49,17 +49,18 @@ describe("getPhaseDefinition", () => {
 });
 
 describe("phase chain", () => {
-  it("each phase's nextPhase matches the next phase in order (up to Review)", () => {
-    const activeChain = [Phase.Discover, Phase.Design, Phase.Generate, Phase.Review];
+  it("each phase's nextPhase matches the next phase in order through Handoff", () => {
+    const activeChain = [
+      Phase.Discover,
+      Phase.Design,
+      Phase.Generate,
+      Phase.Review,
+      Phase.Handoff,
+    ];
     for (let i = 0; i < activeChain.length - 1; i++) {
       const def = getPhaseDefinition(activeChain[i]);
       expect(def.nextPhase).toBe(activeChain[i + 1]);
     }
-  });
-
-  it("Review (terminal active phase) has nextPhase = null", () => {
-    const def = getPhaseDefinition(Phase.Review);
-    expect(def.nextPhase).toBeNull();
   });
 
   it("Deploy (future phase) has nextPhase = null", () => {

@@ -375,11 +375,12 @@ describe('azureKit', () => {
     }
   });
 
-  it('registers component types for AuthCard and azureResourcePicker', () => {
+  it('registers component types for the Azure auth and resource flow', () => {
     expect(azureKit.components).toBeDefined();
     const types = azureKit.components!.map((c) => c.type);
     expect(types).toContain('AuthCard');
-    expect(types).toContain('azureResourcePicker');
+    expect(types).toContain('AzureResourcePicker');
+    expect(types).toContain('AzureAction');
   });
 
   it('declares azure-msal auth requirement', () => {
