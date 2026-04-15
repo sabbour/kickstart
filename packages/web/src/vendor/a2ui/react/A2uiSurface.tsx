@@ -109,7 +109,15 @@ export const DeferredChild: React.FC<{
   const compImpl = surface.catalog.components.get(componentModel.type);
 
   if (!compImpl) {
-    return <div style={{color: 'red'}}>Unknown component: {componentModel.type}</div>;
+    console.warn(`[A2UI] No renderer registered for component type "${componentModel.type}" (id: ${id})`);
+    if (process.env.NODE_ENV !== 'production') {
+      return (
+        <div style={{color: '#d4820c', padding: '4px', fontSize: '12px'}}>
+          ⚠️ Unknown component: {componentModel.type}
+        </div>
+      );
+    }
+    return null;
   }
 
   return (
