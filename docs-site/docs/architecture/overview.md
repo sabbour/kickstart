@@ -46,10 +46,9 @@ kickstart/
 │       ├─ /api/converse  → Azure OpenAI proxy            │
 │       ├─ /api/action    → A2UI action processing        │
 │       ├─ /api/generate  → Codex code generation         │
-│       ├─ /api/arm-proxy → Azure Resource Manager proxy  │
 │       ├─ /api/github-proxy → GitHub API proxy           │
 │       ├─ /api/pricing-proxy → Azure Pricing API proxy   │
-│       └─ /api/health    → Health check                  │
+│       └─ /api/health       → Health check               │
 └────────────────────┬────────────────────────────────────┘
                      │ HTTPS
 ┌────────────────────▼────────────────────────────────────┐
@@ -73,7 +72,7 @@ kickstart/
 - `/api/converse` — conversation proxy to Azure OpenAI
 - `/api/action` — A2UI action event processing
 - `/api/generate` — Codex-powered code generation
-- `/api/arm-proxy`, `/api/github-proxy`, `/api/pricing-proxy` — CORS proxies
+- `/api/github-proxy`, `/api/pricing-proxy` — CORS proxies
 - `/api/health` — health check
 
 ### Core Engine (`@kickstart/core`)

@@ -1,5 +1,6 @@
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { requireServerAzureAccessToken } from "../lib/azure-auth.js";
 import {
   getAzureDeploymentStatus,
   startAzureDeployment,
@@ -15,19 +16,6 @@ import {
 
 const DEPLOY_START_RATE_LIMIT = { maxRequests: 5, windowMs: 60_000 };
 const DEPLOY_POLL_RATE_LIMIT = { maxRequests: 60, windowMs: 60_000 };
-
-function requireBearerToken(request: HttpRequest): string {
-  const authHeader = request.headers.get("authorization")?.trim();
-  if (!authHeader?.toLowerCase().startsWith("bearer ")) {
-    throw new AzureApiError(
-      401,
-      "azure_bearer_token_required",
-      "A real Azure access token is required for deployment operations.",
-    );
-  }
-
-  return authHeader.slice("Bearer ".length).trim();
-}
 
 app.http("azure-deployments-start", {
   methods: ["POST"],
@@ -62,7 +50,7 @@ app.http("azure-deployments-start", {
       }
       adoptSessionPrincipal(session, principalId);
 
-      const accessToken = requireBearerToken(request);
+      const accessToken = requireServerAzureAccessToken(request);
       const body = (await request.json()) as {
         deploymentName?: unknown;
         mainFile?: unknown;
@@ -119,7 +107,7 @@ app.http("azure-deployments-status", {
         throw new AzureApiError(403, "principal_required", "Sign in to Kickstart before checking deployment progress.");
       }
 
-      const accessToken = requireBearerToken(request);
+      const accessToken = requireServerAzureAccessToken(request);
       const runId = request.params["runId"] ?? "";
       const result = await getAzureDeploymentStatus(accessToken, principalId, runId);
       return {

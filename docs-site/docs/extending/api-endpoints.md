@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # API Endpoints
 
-Kickstart's backend runs on **Azure Functions v4** (Node.js), deployed as managed functions inside an Azure Static Web App. Endpoints handle LLM conversations, code generation, A2UI action processing, and proxy routes to external APIs.
+ Kickstart's backend runs on **Azure Functions v4** (Node.js), deployed as managed functions inside an Azure Static Web App. Endpoints handle LLM conversations, code generation, A2UI action processing, and selected proxy routes to external APIs.
 
 This guide covers the endpoint pattern, SSE streaming, shared utilities, and how to add a new endpoint.
 
@@ -51,7 +51,6 @@ app.http("functionName", {
 | `action` | POST | `/api/action` | JSON | A2UI action event processing |
 | `generate` | POST | `/api/generate` | SSE or JSON | Codex-powered code generation |
 | `health` | GET | `/api/health` | JSON | Health check (`{ status: "ok" }`) |
-| `arm-proxy` | Various | `/api/arm-proxy/*` | JSON | Azure Resource Manager CORS proxy |
 | `github-proxy` | Various | `/api/github-proxy/*` | JSON | GitHub API CORS proxy |
 | `pricing-proxy` | Various | `/api/pricing-proxy/*` | JSON | Azure Pricing API CORS proxy |
 | `inspirations` | GET | `/api/inspirations` | JSON | App inspiration templates |

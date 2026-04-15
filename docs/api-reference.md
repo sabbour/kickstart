@@ -1,6 +1,6 @@
 # Kickstart API Reference
 
-The Kickstart web surface exposes API endpoints through Azure Static Web Apps (SWA) managed Functions. These endpoints handle conversation, action processing, code generation, CORS proxying for Azure and GitHub APIs, and health checks.
+The Kickstart web surface exposes API endpoints through Azure Static Web Apps (SWA) managed Functions. These endpoints handle conversation, action processing, code generation, selected proxy routes, and health checks.
 
 > **Related docs:** [Prompt Architecture](./prompt-architecture.md) for system prompt details · [Deployment Guide](./deployment.md) for hosting setup
 
@@ -14,7 +14,6 @@ The Kickstart web surface exposes API endpoints through Azure Static Web Apps (S
 | `/api/action` | `POST` | A2UI action event processing |
 | `/api/generate` | `POST` | Code generation (Codex model) |
 | `/api/health` | `GET` | Health check |
-| `/api/arm-proxy/{*path}` | `ANY` | CORS proxy → Azure Resource Manager |
 | `/api/github-proxy/{*path}` | `ANY` | CORS proxy → GitHub REST API |
 | `/api/pricing-proxy` | `GET` | CORS proxy → Azure Retail Prices API |
 
@@ -375,26 +374,6 @@ Supports streaming via `Accept: text/event-stream` — same SSE format as `/api/
 Health check. Returns `{ "status": "ok" }` with HTTP 200. Used by Azure Static Web Apps and monitoring tools.
 
 **Source:** [`packages/web/api/src/functions/health.ts`](../packages/web/api/src/functions/health.ts)
-
----
-
-## `ANY /api/arm-proxy/{*path}`
-
-CORS proxy for the Azure Resource Manager API. Forwards requests to `management.azure.com`, passing the caller's `Authorization` header and all query parameters. Injects a default `api-version` if the caller omits one.
-
-**Source:** [`packages/web/api/src/functions/arm-proxy.ts`](../packages/web/api/src/functions/arm-proxy.ts)
-
-Supported methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.
-
-Rate-limit response headers are forwarded from ARM: `x-ratelimit-*`, `retry-after`, `x-ms-ratelimit-*`, `x-ms-request-id`, `x-ms-correlation-request-id`.
-
-**Example:**
-
-```bash
-# List AKS clusters in a subscription
-curl http://localhost:4280/api/arm-proxy/subscriptions/{subId}/providers/Microsoft.ContainerService/managedClusters \
-  -H "Authorization: Bearer <token>"
-```
 
 ---
 

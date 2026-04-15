@@ -447,7 +447,6 @@ The Kickstart web API runs on Azure Functions (Node.js). Each endpoint is a sepa
 | `packages/web/api/src/functions/action.ts` | Button click / form submission handler |
 | `packages/web/api/src/functions/generate.ts` | Code generation (Codex) endpoint |
 | `packages/web/api/src/functions/health.ts` | Health check |
-| `packages/web/api/src/functions/arm-proxy.ts` | CORS proxy for Azure Resource Manager |
 | `packages/web/api/src/lib/session-store.ts` | In-memory session store |
 | `packages/web/api/src/lib/rate-limiter.ts` | Per-IP rate limiting |
 | `packages/web/api/src/lib/error-response.ts` | Safe error response utilities |

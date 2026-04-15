@@ -299,7 +299,7 @@ Connectors are registered in `APIConnectorRegistry` and are shared across tools 
 
 ## CORS Proxy Security
 
-The web API provides CORS proxy endpoints (`/api/arm-proxy`, `/api/github-proxy`, `/api/pricing-proxy`) to allow the browser to access external APIs. These proxies enforce strict security controls:
+The web API provides CORS proxy endpoints (`/api/github-proxy`, `/api/pricing-proxy`) to allow the browser to access external APIs. These proxies enforce strict security controls:
 
 | Control | Purpose |
 |---------|---------|

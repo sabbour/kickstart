@@ -1,5 +1,6 @@
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { requireServerAzureAccessToken } from "../lib/azure-auth.js";
 import { persistAzureTarget } from "../lib/azure-deployments.js";
 import { AzureApiError, azureErrorResponse } from "../lib/azure-errors.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
@@ -9,19 +10,6 @@ import {
   getSession,
   isSessionOwnedBy,
 } from "../lib/session-store.js";
-
-function requireBearerToken(request: HttpRequest): string {
-  const authHeader = request.headers.get("authorization")?.trim();
-  if (!authHeader?.toLowerCase().startsWith("bearer ")) {
-    throw new AzureApiError(
-      401,
-      "azure_bearer_token_required",
-      "A real Azure access token is required for target selection.",
-    );
-  }
-
-  return authHeader.slice("Bearer ".length).trim();
-}
 
 app.http("azure-target", {
   methods: ["PUT"],
@@ -52,7 +40,7 @@ app.http("azure-target", {
       }
       adoptSessionPrincipal(session, principalId);
 
-      const accessToken = requireBearerToken(request);
+      const accessToken = requireServerAzureAccessToken(request);
       const body = (await request.json()) as {
         subscriptionId?: unknown;
         resourceGroup?: unknown;

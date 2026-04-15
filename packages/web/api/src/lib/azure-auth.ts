@@ -1,39 +1,58 @@
+import type { HttpRequest } from "@azure/functions";
 import { AzureApiError } from "./azure-errors.js";
 
-const DEFAULT_CLIENT_ID = "e71a23c6-aeb4-459a-88fc-07ff96fc9b92";
-const DEFAULT_TENANT_ID = "d91aa5af-8c1e-442c-b77c-0b92988b387b";
-const DEFAULT_ARM_SCOPE = "https://management.azure.com/user_impersonation";
+const SWA_AAD_ACCESS_TOKEN_HEADER = "x-ms-token-aad-access-token";
+const SWA_LOGIN_PATH = "/.auth/login/aad";
+
+const SWA_ARM_BLOCKER_MESSAGE = [
+  "Azure Static Web Apps built-in auth only gives this API the SWA principal headers.",
+  "It does not provide a backend-usable delegated Azure Resource Manager token in the current architecture.",
+  "Kickstart removed the rejected browser-bearer path, so real Azure deployment is blocked until the auth host supports server-side OBO or the product explicitly moves to app-owned Azure credentials.",
+].join(" ");
 
 export interface AzureAuthConfigResponse {
-  clientId: string;
-  tenantId: string;
-  authority: string;
-  scopes: string[];
-  armProxyBaseUrl: string;
+  authMode: "swa";
+  loginPath: string;
+  deploymentEnabled: boolean;
+  blockerCode?: string;
+  blocker?: string;
 }
 
-export function loadAzureAuthConfig(): AzureAuthConfigResponse {
-  const clientId = process.env.AZURE_CLIENT_ID?.trim() || DEFAULT_CLIENT_ID;
-  const tenantId = process.env.AZURE_TENANT_ID?.trim() || DEFAULT_TENANT_ID;
+export function loadAzureAuthConfig(request: HttpRequest): AzureAuthConfigResponse {
+  const delegatedAccessToken = request.headers.get(SWA_AAD_ACCESS_TOKEN_HEADER)?.trim();
 
-  if (!clientId || !tenantId) {
+  if (!delegatedAccessToken) {
+    return {
+      authMode: "swa",
+      loginPath: SWA_LOGIN_PATH,
+      deploymentEnabled: false,
+      blockerCode: "swa_delegated_arm_unavailable",
+      blocker: SWA_ARM_BLOCKER_MESSAGE,
+    };
+  }
+
+  return {
+    authMode: "swa",
+    loginPath: SWA_LOGIN_PATH,
+    deploymentEnabled: true,
+  };
+}
+
+export function requireServerAzureAccessToken(request: HttpRequest): string {
+  const accessToken = request.headers.get(SWA_AAD_ACCESS_TOKEN_HEADER)?.trim();
+  if (!accessToken) {
     throw new AzureApiError(
-      503,
-      "azure_auth_not_configured",
-      "Azure authentication is not configured on the server.",
+      501,
+      "swa_delegated_arm_unavailable",
+      SWA_ARM_BLOCKER_MESSAGE,
       undefined,
       false,
       [
-        "Set AZURE_CLIENT_ID and AZURE_TENANT_ID in the Static Web App application settings.",
+        "Move the Azure auth flow to a host that supports server-side OBO / provider token headers.",
+        "Or explicitly switch to app-owned Azure credentials if user-delegated ARM access is no longer required.",
       ],
     );
   }
 
-  return {
-    clientId,
-    tenantId,
-    authority: `https://login.microsoftonline.com/${tenantId}`,
-    scopes: [process.env.AZURE_ARM_SCOPE?.trim() || DEFAULT_ARM_SCOPE],
-    armProxyBaseUrl: "/api/arm-proxy",
-  };
+  return accessToken;
 }
