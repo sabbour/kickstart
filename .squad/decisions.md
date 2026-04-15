@@ -49,11 +49,11 @@ Agents must create branch + draft PR immediately after DP approval, BEFORE writi
 
 **Sequence:** DP approved → create branch → push empty commit → open draft PR → implement → push commits → mark PR ready for review.
 ## 4. User Directives (April 2026)
-=== bender-continuous-deploy.md ===
 
----
-
-# Decision: Continuous SWA deployment from main + version-SHA footer
+### 2026-04-15T10:11:35Z: Burn down in-flight work, then stop for process reset
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Finish current in-flight issues without interruption, then stop and rebuild the operating system. The missed sprint-start ceremony and process drift are not acceptable.
+**Status:** Active — squad in burndown mode before ceremony/system review
 
 ### 2026-04-14T13:00:43Z: Stop deploying PRs to SWA
 **By:** Ahmed Sabbour (via Copilot)
