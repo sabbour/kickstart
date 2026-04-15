@@ -269,7 +269,7 @@ app.http("converse", {
 
       addMessage(state.sessionId, "assistant", processed.message);
 
-      const usageSummary = finalizeUsage(state.sessionId, modelRoute.model, turnUsage);
+      const usageSummary = finalizeUsage(state.sessionId, modelRoute, turnUsage);
 
       const responseBody: ConverseResponse = {
         sessionId: state.sessionId,
@@ -408,7 +408,7 @@ function handleStreaming(
             }
 
             addMessage(sessionId, "assistant", processed.message);
-            const usageSummary = finalizeUsage(sessionId, modelRoute.model, accumulatedUsage);
+            const usageSummary = finalizeUsage(sessionId, modelRoute, accumulatedUsage);
 
             controller.enqueue(
               encoder.encode(
@@ -537,10 +537,12 @@ function handleStreaming(
 
 function finalizeUsage(
   sessionId: string,
-  model: string,
+  modelRoute: ConverseModelRoute,
   usage?: ChatUsage,
 ): UsageSummary | undefined {
-  const turnUsage = buildTurnUsage(model, usage);
+  const turnUsage = buildTurnUsage(modelRoute.model, usage, {
+    pricingGroup: modelRoute.pricingGroup,
+  });
   if (!turnUsage) return undefined;
   return recordUsage(sessionId, turnUsage);
 }

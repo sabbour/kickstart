@@ -11,8 +11,6 @@
 import { getDemoResponse, resetDemoState } from './demo-scenarios';
 import type { A2uiMsg, A2uiPayloadItem } from '../types';
 
-const MOCK_MODEL = 'gpt-5.4-mini (mock)';
-
 interface MockStreamCallbacks {
   onDelta: (text: string) => void;
   onA2UI: (messages: A2uiPayloadItem[]) => void;
@@ -60,7 +58,10 @@ export function sendMock(
         if (response.phase) {
           callbacks.onPhase(response.phase);
         }
-        callbacks.onComplete(accumulated, MOCK_MODEL);
+        callbacks.onComplete(
+          accumulated,
+          response.model ? `${response.model} (mock)` : 'mock',
+        );
       });
     }
   };

@@ -561,4 +561,81 @@ describe("converse model routing", () => {
       phase: Phase.Generate,
     });
   });
+
+  it("uses generate pricing for trusted gpt-5.4 turns", async () => {
+    const originalEnv: Record<string, string | undefined> = {
+      AZURE_OPENAI_CHAT_INPUT_PRICE_PER_1K_USD:
+        process.env.AZURE_OPENAI_CHAT_INPUT_PRICE_PER_1K_USD,
+      AZURE_OPENAI_CHAT_OUTPUT_PRICE_PER_1K_USD:
+        process.env.AZURE_OPENAI_CHAT_OUTPUT_PRICE_PER_1K_USD,
+      AZURE_OPENAI_CODEX_INPUT_PRICE_PER_1K_USD:
+        process.env.AZURE_OPENAI_CODEX_INPUT_PRICE_PER_1K_USD,
+      AZURE_OPENAI_CODEX_OUTPUT_PRICE_PER_1K_USD:
+        process.env.AZURE_OPENAI_CODEX_OUTPUT_PRICE_PER_1K_USD,
+    };
+
+    process.env.AZURE_OPENAI_CHAT_INPUT_PRICE_PER_1K_USD = "0.001";
+    process.env.AZURE_OPENAI_CHAT_OUTPUT_PRICE_PER_1K_USD = "0.002";
+    process.env.AZURE_OPENAI_CODEX_INPUT_PRICE_PER_1K_USD = "0.01";
+    process.env.AZURE_OPENAI_CODEX_OUTPUT_PRICE_PER_1K_USD = "0.02";
+
+    try {
+      const session = createSession();
+      setSessionPhase(session, Phase.Generate);
+
+      chatCompletionWithTools.mockResolvedValueOnce({
+        content: JSON.stringify({
+          message: "Generate pricing response",
+          a2ui: [],
+          actions: [],
+          phaseComplete: false,
+          filesComplete: null,
+        }),
+        finishReason: "stop",
+        usage: {
+          inputTokens: 1000,
+          outputTokens: 500,
+          totalTokens: 1500,
+        },
+      });
+
+      const response = await converseHandler(
+        createRequest({
+          sessionId: session.state.sessionId,
+          message: "Generate the files",
+        }),
+        createContext(),
+      ) as {
+        status: number;
+        jsonBody: {
+          model?: string;
+          usage?: {
+            turn: { estimatedCostUsd?: number; costStatus: string };
+            session: { estimatedCostUsd?: number; costStatus: string };
+          };
+        };
+      };
+
+      expect(response.status).toBe(200);
+      expect(response.jsonBody.model).toBe("gpt-5.4");
+      expect(response.jsonBody.usage).toMatchObject({
+        turn: {
+          estimatedCostUsd: 0.02,
+          costStatus: "estimated",
+        },
+        session: {
+          estimatedCostUsd: 0.02,
+          costStatus: "estimated",
+        },
+      });
+    } finally {
+      for (const [key, value] of Object.entries(originalEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  });
 });

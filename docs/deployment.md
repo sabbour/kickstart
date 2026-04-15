@@ -228,7 +228,9 @@ Set these in the Azure Static Web App **Application Settings** (Azure Portal →
 | Variable | Description |
 |----------|-------------|
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI resource endpoint (e.g., `https://my-openai.openai.azure.com`) |
-| `AZURE_OPENAI_DEPLOYMENT` | Model deployment name (e.g., `gpt-4o`) |
+| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Chat deployment for discover/design/review/handoff/deploy turns (e.g., `gpt-5.4-mini`) |
+| `AZURE_OPENAI_CODEX_DEPLOYMENT` | Generate deployment for trusted `generate` turns (e.g., `gpt-5.4`) |
+| `AZURE_OPENAI_DEPLOYMENT` | Optional legacy fallback when explicit chat/coding deployments are not set |
 | `AZURE_OPENAI_API_KEY` | API key for the Azure OpenAI resource |
 
 ### GitHub Secrets
@@ -317,7 +319,8 @@ cat > packages/web/api/local.settings.json << 'EOF'
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "AzureWebJobsStorage": "",
     "AZURE_OPENAI_ENDPOINT": "https://your-resource.openai.azure.com",
-    "AZURE_OPENAI_DEPLOYMENT": "gpt-4o",
+    "AZURE_OPENAI_CHAT_DEPLOYMENT": "gpt-5.4-mini",
+    "AZURE_OPENAI_CODEX_DEPLOYMENT": "gpt-5.4",
     "AZURE_OPENAI_API_KEY": "your-key-here"
   }
 }

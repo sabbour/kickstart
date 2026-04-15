@@ -7,6 +7,7 @@ import {
 export interface ConverseModelRoute {
   deployment: string;
   model: string;
+  pricingGroup: "chat" | "generate";
 }
 
 const KNOWN_PHASES = new Set(Object.values(Phase));
@@ -19,16 +20,21 @@ export function normalizeConversePhase(
   return KNOWN_PHASES.has(phase as Phase) ? (phase as Phase) : undefined;
 }
 
-/** Route converse requests by trusted server phase. */
+/**
+ * Route real converse traffic by trusted server phase.
+ * Trusted Generate turns use the coding deployment (for example gpt-5.4);
+ * every other turn — including client-rehydrated phases — fails closed to the
+ * chat deployment (for example gpt-5.4-mini).
+ */
 export function resolveConverseModelRoute(
   phase: string | null | undefined,
   options: { trustedPhase?: boolean } = {},
 ): ConverseModelRoute {
   if (options.trustedPhase && normalizeConversePhase(phase) === Phase.Generate) {
     const model = getGenerateDeploymentName();
-    return { deployment: model, model };
+    return { deployment: model, model, pricingGroup: "generate" };
   }
 
   const model = getChatDeploymentName();
-  return { deployment: model, model };
+  return { deployment: model, model, pricingGroup: "chat" };
 }

@@ -150,7 +150,7 @@ const DESIGN_DETAIL: DemoResponse = {
 const FILE_GENERATION: DemoResponse = {
   text: "I'm generating your project files. Each file is production-ready with best practices baked in.",
   phase: 'generate',
-  model: 'gpt-5.4-mini',
+  model: 'gpt-5.4',
   typingDelay: 2000,
   a2uiMessages: surface('files-surface', [
     { id: 'root', component: 'Column', children: ['files-title', 'file-cards'], gap: 'small' },
@@ -329,7 +329,7 @@ const SESSION_COMPLETE: DemoResponse = {
 const CONFIGURE_FORM: DemoResponse = {
   text: "Let's configure your app. Fill in the details below — I'll handle the rest.",
   phase: 'generate',
-  model: 'gpt-5.4-mini',
+  model: 'gpt-5.4',
   typingDelay: 1500,
   a2uiMessages: surface('config-surface', [
     { id: 'root', component: 'Column', children: ['progress', 'form1', 'form2'] },
@@ -362,7 +362,7 @@ const CONFIGURE_FORM: DemoResponse = {
 const CODE_PREVIEW: DemoResponse = {
   text: "Here are the key files I generated for your app. Everything is production-ready with best practices baked in.",
   phase: 'generate',
-  model: 'gpt-5.4-mini',
+  model: 'gpt-5.4',
   typingDelay: 1800,
   a2uiMessages: surface('code-surface', [
     { id: 'root', component: 'Column', children: ['code-title', 'dockerfile-block', 'deployment-block'] },

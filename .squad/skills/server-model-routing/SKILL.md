@@ -1,7 +1,7 @@
 ---
 name: server-model-routing
 description: Server-side allowlist routing for multi-model backend conversation flows
-last_updated: 2026-04-15T15:20:19+00:00
+last_updated: 2026-04-15T19:24:36.732Z
 ---
 
 # Server Model Routing
@@ -27,3 +27,10 @@ Use this pattern when a backend conversation endpoint needs different LLM deploy
 - Trusted phase flag: `packages/web/api/src/lib/session-store.ts`
 - Endpoint wiring: `packages/web/api/src/functions/converse.ts`
 - Tests: `packages/web/api/src/functions/converse.test.ts`
+
+## Regression checklist
+
+- Assert the non-streaming route matrix across all server phases: discover/design/review/handoff/deploy → chat model, generate → coding model.
+- Assert unknown or invalid server phases fail closed to the chat model.
+- Assert client-rehydrated phase metadata never upgrades routing: hydrated sessions must keep `routingPhaseTrusted = false` and stay on chat deployment even if history says `generate`.
+- Assert streaming generate requests use the same routed deployment in the probe/final flow and surface the routed model in the SSE `done` payload.
