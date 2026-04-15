@@ -4,6 +4,7 @@ import {
   transition,
   getCurrentPhase,
   canAdvance,
+  handleImplicitFlags,
 } from "../engine/machine.js";
 import { Phase } from "../engine/types.js";
 import type { ConversationState as _ConversationState } from "../engine/types.js";
@@ -171,5 +172,71 @@ describe("full journey", () => {
     }
 
     expect(state.isComplete).toBe(true);
+  });
+});
+
+describe("handleImplicitFlags", () => {
+  it("phaseComplete: true advances when current phase is active", () => {
+    const state = createInitialState();
+    expect(state.currentPhase).toBe(Phase.Discover);
+
+    const result = handleImplicitFlags(state, { phaseComplete: true });
+    expect(result.currentPhase).toBe(Phase.Design);
+    expect(result.phaseStatus[Phase.Discover]).toBe("complete");
+    expect(result.phaseStatus[Phase.Design]).toBe("active");
+  });
+
+  it("phaseComplete: false does not advance", () => {
+    const state = createInitialState();
+    const result = handleImplicitFlags(state, { phaseComplete: false });
+    expect(result.currentPhase).toBe(Phase.Discover);
+    expect(result.phaseStatus[Phase.Discover]).toBe("active");
+  });
+
+  it("does not advance when isComplete is true", () => {
+    let state = createInitialState();
+    // Advance through all phases so isComplete = true
+    for (let i = 0; i < 6; i++) {
+      state = transition(state, { type: "ADVANCE" });
+    }
+    expect(state.isComplete).toBe(true);
+
+    const result = handleImplicitFlags(state, { phaseComplete: true });
+    expect(result.isComplete).toBe(true);
+    // State should be unchanged — no further advancement
+    expect(result.currentPhase).toBe(state.currentPhase);
+  });
+
+  it("does not advance when current phase is not active", () => {
+    const state = createInitialState();
+    // Skip Discover to make it "skipped" (not active)
+    const skipped = transition(state, { type: "SKIP" });
+    expect(skipped.currentPhase).toBe(Phase.Design);
+
+    // Now artificially set Design to "pending" to test the guard
+    // (canAdvance checks for "active" status)
+    const rigged = { ...skipped, phaseStatus: { ...skipped.phaseStatus } };
+    rigged.phaseStatus[Phase.Design] = "pending";
+
+    const result = handleImplicitFlags(rigged, { phaseComplete: true });
+    // Should not advance because current phase is not "active"
+    expect(result.currentPhase).toBe(Phase.Design);
+  });
+
+  it("filesComplete does not affect state", () => {
+    const state = createInitialState();
+    const resultFalse = handleImplicitFlags(state, { filesComplete: false });
+    expect(resultFalse.currentPhase).toBe(Phase.Discover);
+    expect(resultFalse).toEqual(state);
+
+    const resultTrue = handleImplicitFlags(state, { filesComplete: true });
+    expect(resultTrue.currentPhase).toBe(Phase.Discover);
+    expect(resultTrue).toEqual(state);
+  });
+
+  it("returns original state reference when no flags trigger advancement", () => {
+    const state = createInitialState();
+    const result = handleImplicitFlags(state, {});
+    expect(result).toBe(state);
   });
 });

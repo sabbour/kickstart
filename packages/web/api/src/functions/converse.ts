@@ -236,6 +236,11 @@ app.http("converse", {
         session.engineState = handleImplicitFlags(session.engineState, flags);
       }
 
+      // Rebuild phase indicator after implicit advance so the UI stays in sync
+      const activePhaseA2ui = flags.phaseComplete
+        ? buildPhaseIndicator(session.engineState)
+        : phaseA2ui;
+
       addMessage(state.sessionId, "assistant", processed.message);
 
       const responseBody: ConverseResponse = {
@@ -243,7 +248,7 @@ app.http("converse", {
         phase: session.engineState.currentPhase,
         message: processed.message,
         model: getChatDeploymentName(),
-        a2ui: [...phaseA2ui, ...processed.a2uiMessages],
+        a2ui: [...activePhaseA2ui, ...processed.a2uiMessages],
       };
 
       // Include auto-continue signal when more files are pending
@@ -274,11 +279,33 @@ app.http("converse", {
   },
 });
 
+/** Build a fresh ConversationPhase A2UI indicator from the current engine state. */
+function buildPhaseIndicator(engineState: ConversationState): object[] {
+  const phases: PhaseItem[] = getPhaseOrder().map((phase) => ({
+    id: phase,
+    label: getPhaseDefinition(phase).label,
+    status:
+      engineState.phaseStatus[phase] === "active"
+        ? ("active" as const)
+        : engineState.phaseStatus[phase] === "complete"
+          ? ("complete" as const)
+          : ("pending" as const),
+  }));
+  return [
+    {
+      type: "ConversationPhase",
+      id: "phase-indicator",
+      phases,
+      currentPhase: engineState.currentPhase,
+    },
+  ];
+}
+
 /** Handle SSE streaming response with typed events. */
 function handleStreaming(
   messages: import("../lib/openai-client.js").ChatMessage[],
   sessionId: string,
-  initialEngineState: { currentPhase: string },
+  initialEngineState: ConversationState,
   phaseA2ui: object[],
   context: InvocationContext,
   toolContext: ToolContext,
@@ -337,11 +364,11 @@ function handleStreaming(
             const flags = extractImplicitFlags(fullContent);
             if (flags.phaseComplete || flags.filesComplete !== null) {
               const updated = handleImplicitFlags(
-                engineState as ConversationState,
+                engineState,
                 flags,
               );
               updateEngineState(updated);
-              engineState = { currentPhase: updated.currentPhase };
+              engineState = updated;
             }
 
             addMessage(sessionId, "assistant", processed.message);
@@ -352,7 +379,12 @@ function handleStreaming(
               ),
             );
 
-            const allA2ui = [...phaseA2ui, ...processed.a2uiMessages];
+            // Rebuild phase indicator after implicit advance so the SSE
+            // response reflects the current phase, not the stale pre-flag one.
+            const activePhaseA2ui = flags.phaseComplete
+              ? buildPhaseIndicator(engineState)
+              : phaseA2ui;
+            const allA2ui = [...activePhaseA2ui, ...processed.a2uiMessages];
             for (const msg of allA2ui) {
               controller.enqueue(
                 encoder.encode(`event: a2ui\ndata: ${JSON.stringify(msg)}\n\n`),
