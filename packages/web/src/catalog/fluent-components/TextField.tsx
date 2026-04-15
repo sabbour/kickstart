@@ -19,11 +19,11 @@ export const TextField = createReactComponent(TextFieldApi, ({props}) => {
   const [localValue, setLocalValue] = useState(props.value || '');
   const userEdited = useRef(false);
 
-  // Sync from external prop changes only when the user hasn't edited
+  // Sync from external prop changes and clear the local edit lock once applied
   useEffect(() => {
-    if (!userEdited.current) {
-      setLocalValue(props.value || '');
-    }
+    const nextValue = props.value || '';
+    setLocalValue(currentValue => (currentValue === nextValue ? currentValue : nextValue));
+    userEdited.current = false;
   }, [props.value]);
 
   const isLong = props.variant === 'longText';
