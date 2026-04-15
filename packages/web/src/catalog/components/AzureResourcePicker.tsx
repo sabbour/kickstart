@@ -36,6 +36,7 @@ import {
 } from '../../services/azure-deployments';
 import { isMockMode, isPlaygroundMode } from '../../services/mock-streaming';
 import { sanitizeActionContext } from '../../utils/sanitize-action-context';
+import { sanitizeAzureUiErrorMessage } from '../../utils/azure-ui-safety';
 
 const AzureResourcePickerApi = {
   name: 'AzureResourcePicker',
@@ -56,10 +57,6 @@ function friendlyType(type: string): string {
 function resourceGroupFromId(id: string): string {
   const match = id.match(/resourceGroups\/([^/]+)/i);
   return match?.[1] ?? '—';
-}
-
-function readErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }
 
 const STUB_SUBSCRIPTIONS: AzureSubscription[] = [
@@ -249,7 +246,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
           }
         } else {
           setSubscriptions([]);
-          setError(readErrorMessage(loadError, 'Failed to load Azure subscriptions.'));
+          setError(sanitizeAzureUiErrorMessage(loadError, 'target-load'));
         }
       } finally {
         if (!cancelled) {
@@ -334,7 +331,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
         } else {
           setResourceGroups([]);
           setLocations([]);
-          setError(readErrorMessage(loadError, 'Failed to load Azure resource groups.'));
+          setError(sanitizeAzureUiErrorMessage(loadError, 'target-load'));
         }
       } finally {
         if (!cancelled) {
@@ -379,7 +376,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
           id: resource.id.replace('{subscriptionId}', selectedSubId),
         })));
       } else {
-        setError(readErrorMessage(loadError, 'Failed to load Azure resources.'));
+        setError(sanitizeAzureUiErrorMessage(loadError, 'resource-load'));
         setResources([]);
       }
     } finally {
@@ -490,7 +487,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
         location: selectedLocation,
       });
     } catch (deploymentError) {
-      setError(readErrorMessage(deploymentError, 'Unable to start the Azure deployment.'));
+      setError(sanitizeAzureUiErrorMessage(deploymentError, 'deployment-start'));
     } finally {
       setSavingTarget(false);
     }

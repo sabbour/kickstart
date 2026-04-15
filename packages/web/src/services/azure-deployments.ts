@@ -1,4 +1,12 @@
 import { apiFetch } from './api-client';
+import {
+  sanitizeAzureDeploymentErrorMessage,
+  sanitizeAzureDeploymentStatusMessage,
+  sanitizeAzureDeploymentStepDetail,
+  sanitizeAzureDeploymentStepLabel,
+  sanitizeAzureExternalUrl,
+  sanitizeAzureUiErrorMessage,
+} from '../utils/azure-ui-safety';
 
 export type DeploymentStepStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped';
 export type AzureDeploymentStatus = 'idle' | 'queued' | 'running' | 'succeeded' | 'failed';
@@ -32,22 +40,12 @@ export interface AzureTargetPayload {
   location: string;
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === 'object' ? value as Record<string, unknown> : undefined;
-}
-
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
 }
 
-function readErrorMessage(body: unknown, fallback: string): string {
-  const record = asRecord(body);
-  const direct = readString(record?.error);
-  const nestedError = asRecord(record?.error);
-  return direct
-    ?? readString(record?.message)
-    ?? readString(nestedError?.message)
-    ?? fallback;
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : undefined;
 }
 
 function normalizeStepStatus(value: unknown): DeploymentStepStatus {
@@ -107,14 +105,17 @@ function normalizeSteps(value: unknown): AzureDeploymentStep[] {
   return value
     .map((item, index) => {
       const step = asRecord(item);
-      const label = readString(step?.label) ?? readString(step?.name);
+      const label = sanitizeAzureDeploymentStepLabel(
+        readString(step?.label) ?? readString(step?.name),
+        `Deployment step ${index + 1}`,
+      );
       if (!step || !label) return null;
 
       return {
         id: readString(step.id) ?? `step-${index + 1}`,
         label,
         status: normalizeStepStatus(step.status),
-        detail: readString(step.detail) ?? readString(step.message),
+        detail: sanitizeAzureDeploymentStepDetail(readString(step.detail) ?? readString(step.message)),
         timestamp: readString(step.timestamp) ?? readString(step.updatedAt),
       } satisfies AzureDeploymentStep;
     })
@@ -135,22 +136,28 @@ function normalizeDeployment(body: unknown): AzureDeploymentRun {
     runId,
     status: normalizeStatus(payload.status ?? payload.state ?? payload.overallStatus),
     steps: normalizeSteps(payload.steps ?? asRecord(payload.progress)?.steps),
-    statusMessage: readString(payload.statusMessage) ?? readString(payload.message),
-    appUrl: readString(payload.appUrl)
-      ?? readString(payload.url)
-      ?? readString(payload.endpointUrl)
-      ?? readString(payload.liveUrl),
-    portalUrl: readString(payload.portalUrl) ?? readString(payload.azurePortalUrl),
-    errorCode: readString(payload.errorCode) ?? readString(error?.code),
-    errorMessage: readString(payload.errorMessage) ?? readString(error?.message),
+    statusMessage: sanitizeAzureDeploymentStatusMessage(
+      readString(payload.statusMessage) ?? readString(payload.message),
+      payload.status ?? payload.state ?? payload.overallStatus,
+    ),
+    appUrl: sanitizeAzureExternalUrl(
+      readString(payload.appUrl)
+        ?? readString(payload.url)
+        ?? readString(payload.endpointUrl)
+        ?? readString(payload.liveUrl),
+      'app',
+    ),
+    portalUrl: sanitizeAzureExternalUrl(readString(payload.portalUrl) ?? readString(payload.azurePortalUrl), 'portal'),
+    errorCode: undefined,
+    errorMessage: sanitizeAzureDeploymentErrorMessage(readString(payload.errorCode) ?? readString(error?.code), readString(payload.errorMessage) ?? readString(error?.message)),
     lastUpdated: readString(payload.lastUpdated) ?? readString(payload.updatedAt),
   };
 }
 
-async function readJsonOrThrow(response: Response, fallback: string): Promise<unknown> {
+async function readJsonOrThrow(response: Response, scope: 'cost-gate' | 'target-save' | 'deployment-start' | 'deployment-status'): Promise<unknown> {
   const body = await response.json().catch(() => undefined);
   if (!response.ok) {
-    throw new Error(readErrorMessage(body, fallback));
+    throw new Error(sanitizeAzureUiErrorMessage(body, scope));
   }
   return body;
 }
@@ -167,7 +174,7 @@ export async function approveCostGate(
     body: JSON.stringify(payload ?? {}),
   });
 
-  await readJsonOrThrow(response, 'Unable to record deployment cost approval.').catch((error) => {
+  await readJsonOrThrow(response, 'cost-gate').catch((error) => {
     if (response.status === 204) return;
     throw error;
   });
@@ -185,7 +192,7 @@ export async function persistAzureTarget(
     body: JSON.stringify(payload),
   });
 
-  await readJsonOrThrow(response, 'Unable to save the Azure deployment target.');
+  await readJsonOrThrow(response, 'target-save');
 }
 
 export async function startAzureDeployment(sessionId: string): Promise<AzureDeploymentRun> {
@@ -196,12 +203,12 @@ export async function startAzureDeployment(sessionId: string): Promise<AzureDepl
     },
     body: JSON.stringify({}),
   });
-  const body = await readJsonOrThrow(response, 'Unable to start the Azure deployment.');
+  const body = await readJsonOrThrow(response, 'deployment-start');
   return normalizeDeployment(body);
 }
 
 export async function getAzureDeployment(runId: string): Promise<AzureDeploymentRun> {
   const response = await apiFetch(`/api/azure-deployments/${encodeURIComponent(runId)}`);
-  const body = await readJsonOrThrow(response, 'Unable to load deployment progress.');
+  const body = await readJsonOrThrow(response, 'deployment-status');
   return normalizeDeployment(body);
 }

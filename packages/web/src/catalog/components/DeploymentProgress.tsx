@@ -21,6 +21,14 @@ import {
   CircleRegular,
 } from '@fluentui/react-icons';
 import { getAzureDeployment, type AzureDeploymentRun, type AzureDeploymentStep } from '../../services/azure-deployments';
+import {
+  sanitizeAzureDeploymentErrorMessage,
+  sanitizeAzureDeploymentStatusMessage,
+  sanitizeAzureDeploymentStepDetail,
+  sanitizeAzureDeploymentStepLabel,
+  sanitizeAzureExternalUrl,
+  sanitizeAzureUiErrorMessage,
+} from '../../utils/azure-ui-safety';
 
 const DeploymentStepSchema = z.object({
   id: z.string(),
@@ -191,21 +199,32 @@ function isTerminalRun(status: 'idle' | 'running' | 'complete' | 'error'): boole
   return status === 'complete' || status === 'error';
 }
 
-function readErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unable to refresh deployment status.';
+function sanitizeSteps(steps: AzureDeploymentStep[]): AzureDeploymentStep[] {
+  return steps.map((step, index) => ({
+    ...step,
+    label: sanitizeAzureDeploymentStepLabel(step.label, `Deployment step ${index + 1}`),
+    detail: sanitizeAzureDeploymentStepDetail(step.detail),
+  }));
 }
 
 function buildMergedState(props: Record<string, unknown>, deployment: AzureDeploymentRun | null) {
   const baseSteps = Array.isArray(props.steps) ? props.steps as AzureDeploymentStep[] : [];
+  const status = deployment?.status ?? props.overallStatus ?? 'idle';
   return {
     runId: deployment?.runId ?? readString(props.runId),
-    steps: deployment?.steps.length ? deployment.steps : baseSteps,
-    overallStatus: normalizeOverallStatus(deployment?.status ?? props.overallStatus ?? 'idle'),
-    statusMessage: deployment?.statusMessage ?? readString(props.statusMessage),
-    appUrl: deployment?.appUrl ?? readString(props.appUrl),
-    portalUrl: deployment?.portalUrl ?? readString(props.portalUrl),
-    errorCode: deployment?.errorCode ?? readString(props.errorCode),
-    errorMessage: deployment?.errorMessage ?? readString(props.errorMessage),
+    steps: sanitizeSteps(deployment?.steps.length ? deployment.steps : baseSteps),
+    overallStatus: normalizeOverallStatus(status),
+    statusMessage: sanitizeAzureDeploymentStatusMessage(
+      deployment?.statusMessage ?? readString(props.statusMessage),
+      status,
+    ),
+    appUrl: sanitizeAzureExternalUrl(deployment?.appUrl ?? readString(props.appUrl), 'app'),
+    portalUrl: sanitizeAzureExternalUrl(deployment?.portalUrl ?? readString(props.portalUrl), 'portal'),
+    errorCode: undefined,
+    errorMessage: sanitizeAzureDeploymentErrorMessage(
+      deployment?.errorCode ?? readString(props.errorCode),
+      deployment?.errorMessage ?? readString(props.errorMessage),
+    ),
     lastUpdated: deployment?.lastUpdated ?? readString(props.lastUpdated),
   };
 }
@@ -246,7 +265,7 @@ export const DeploymentProgress = createReactComponent(DeploymentProgressApi, ({
         }
       } catch (error) {
         if (cancelled) return;
-        setPollError(readErrorMessage(error));
+        setPollError(sanitizeAzureUiErrorMessage(error, 'deployment-status'));
         setLoading(false);
         timeoutId = window.setTimeout(() => {
           void refresh();
@@ -368,7 +387,6 @@ export const DeploymentProgress = createReactComponent(DeploymentProgressApi, ({
           {merged.errorMessage && (
             <MessageBar intent="error">
               <MessageBarBody>
-                {merged.errorCode ? `${merged.errorCode}: ` : ''}
                 {merged.errorMessage}
               </MessageBarBody>
             </MessageBar>

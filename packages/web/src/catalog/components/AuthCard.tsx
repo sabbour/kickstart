@@ -30,6 +30,7 @@ import {
   signOutAzure,
   type AzureAuthSessionState,
 } from "../../services/azure-auth";
+import { sanitizeAzureUiErrorMessage } from "../../utils/azure-ui-safety";
 
 const AuthCardApi = {
   name: "AuthCard",
@@ -134,7 +135,7 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
     } catch (err) {
       setAzureSession(null);
       setAuthenticated(false);
-      setError(err instanceof Error ? err.message : "Unable to check Azure sign-in status.");
+      setError(sanitizeAzureUiErrorMessage(err, "auth-session"));
     } finally {
       setChecking(false);
     }
@@ -184,7 +185,11 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
       }
     } catch (err) {
       setAuthenticated(false);
-      setError(err instanceof Error ? err.message : "Sign-in failed");
+      setError(props.provider === "azure"
+        ? sanitizeAzureUiErrorMessage(err, "auth-signin")
+        : err instanceof Error
+          ? err.message
+          : "Sign-in failed");
     } finally {
       setLoading(false);
     }
@@ -208,7 +213,11 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
       }
       setAuthenticated(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign-out failed");
+      setError(props.provider === "azure"
+        ? sanitizeAzureUiErrorMessage(err, "auth-signout")
+        : err instanceof Error
+          ? err.message
+          : "Sign-out failed");
     } finally {
       setLoading(false);
     }

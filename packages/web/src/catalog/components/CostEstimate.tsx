@@ -18,6 +18,7 @@ import {
 import { MoneyRegular } from '@fluentui/react-icons';
 import { useConversationSession } from '../../contexts/ConversationSessionContext';
 import { approveCostGate } from '../../services/azure-deployments';
+import { sanitizeAzureUiErrorMessage } from '../../utils/azure-ui-safety';
 
 const SkuOptionSchema = z.object({
   label: DynamicStringSchema,
@@ -288,7 +289,7 @@ export const CostEstimate = createReactComponent(CostEstimateApi, ({ props, cont
         },
       });
     } catch (error) {
-      setGateError(error instanceof Error ? error.message : 'Unable to record cost approval.');
+      setGateError(sanitizeAzureUiErrorMessage(error, 'cost-gate'));
     } finally {
       setApproving(false);
     }
