@@ -27,8 +27,11 @@ import type { A2UIMessage } from "@kickstart/core";
 import { getSession, hydrateSession, addMessage } from "../lib/session-store.js";
 import type { ClientMessage } from "../lib/session-store.js";
 import { chatCompletion, getChatDeploymentName } from "../lib/openai-client.js";
+import { checkContentSafety } from "../lib/content-safety.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
 import { safeErrorResponse } from "../lib/error-response.js";
+
+const MAX_REHYDRATION_MESSAGES = 50;
 
 // ---------------------------------------------------------------------------
 // Request / response types
@@ -209,6 +212,26 @@ app.http("action", {
 
       if (!body.action?.name?.trim()) {
         return { status: 400, jsonBody: { error: "action.name is required" } };
+      }
+
+      // Hard cap on rehydration history length to prevent abuse.
+      if (body.messages && body.messages.length > MAX_REHYDRATION_MESSAGES) {
+        return {
+          status: 400,
+          jsonBody: { error: `messages array exceeds maximum of ${MAX_REHYDRATION_MESSAGES}` },
+        };
+      }
+
+      // Safety-check ALL client-provided messages in the rehydration history
+      // so a safe action payload cannot smuggle unsafe content through replayed history.
+      if (body.messages?.length) {
+        for (const msg of body.messages) {
+          if (!msg.content?.trim()) continue;
+          const historySafety = await checkContentSafety(msg.content);
+          if (!historySafety.safe) {
+            return { status: 400, jsonBody: { error: historySafety.error } };
+          }
+        }
       }
 
       // --- Resolve session (hydrate from client history on cold start) ---
