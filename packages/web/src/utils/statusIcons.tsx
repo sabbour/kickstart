@@ -24,7 +24,7 @@ const sortedEmoji = Object.keys(emojiIconMap).sort((a, b) => b.length - a.length
  * corresponding Fluent UI icon component. Returns the original string
  * unchanged if no known emoji prefix is found.
  */
-export function replaceStatusEmoji(text: string): React.ReactNode {
+export function replaceStatusEmoji(text: string): string | JSX.Element {
   for (const emoji of sortedEmoji) {
     if (text.startsWith(emoji)) {
       const rest = text.slice(emoji.length).trimStart();
