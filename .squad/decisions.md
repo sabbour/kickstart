@@ -48,121 +48,61 @@ Define a "trivial change" gate: CSS-only, typo fix, config change, rename, or si
 Agents must create branch + draft PR immediately after DP approval, BEFORE writing code. This gives Ahmed a GitHub URL to watch within 30 seconds. Commits are pushed incrementally as work progresses.
 
 **Sequence:** DP approved → create branch → push empty commit → open draft PR → implement → push commits → mark PR ready for review.
-=== bender-continuous-deploy.md ===
-# Decision: Continuous SWA deployment from main + version-SHA footer
+## 4. User Directives (April 2026)
 
+### 2026-04-14T13:00:43Z: Stop deploying PRs to SWA
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Stop deploying pull requests to Azure Static Web Apps. Domain filtering breaks the login mechanisms (SWA auth requires the correct domain), making PR preview deployments useless and a waste of CI time.
+**Status:** Implemented in bender-remove-pr-preview-deploys.md
+
+### 2026-04-14T13:05:30Z: Comment when addressing feedback
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Whenever an agent starts addressing PR review feedback or issue feedback, it must post an acknowledgment comment on the PR or issue (using its bot identity) before making changes. This makes the feedback loop visible to humans watching the repo.
+
+### 2026-04-14T21:38:43Z: Enforce PR review feedback gate
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Stop skipping PR review feedback comments and stop skipping asking for reviews. All PRs must have Copilot review comments addressed before merging. Do not auto-merge without checking for and resolving review feedback first.
+**Why:** The team has been shipping shoddy work by bypassing the review gate.
+
+### 2026-04-15T01:44:20Z: ArchitectureDiagram styling alignment
+**By:** Ahmed Sabbour (via Copilot)
+**What:** The ArchitectureDiagram A2UI component should follow the directive and styling from the try-aks app implementation, not custom styling.
+**Status:** Linked to Issue #255
+
+### 2026-04-15T01:44:20Z: Button styling consistency
+**By:** Ahmed Sabbour (via Copilot)
+**What:** All action buttons rendered by A2UI components must use consistent Fluent UI button styling. Currently "Continue →", "Save Changes", "Revert", "Approve and continue", "Change something", "Deploy Now", "Preview", and "Cancel" buttons are visually inconsistent with the properly-styled "Submit" and "Format Date" buttons. Every button must follow the same Fluent UI appearance rules (primary, outlined, text variants).
+**Status:** Linked to Issue #254
+
+## 5. Decisions from Recent Sprints
+
+### Continuous SWA Deployment + Version Footer
 **Author:** Bender (Backend Dev)
 **Date:** 2026-04-14
 **PR:** #177
-
-## Context
-
-SWA deployment only triggered on release tags (`v*`) and PRs, meaning changes merged to `main` didn't deploy until a release was cut. Ahmed needed immediate deployment on every merge.
-
-## Decisions
-
-1. **Push-to-main trigger** — `deploy-swa.yml` now triggers on `push → branches: [main]` with path filters (`packages/**`, `package.json`, `package-lock.json`, `tsconfig.json`). Tag-based releases still trigger deployment as before.
-
-2. **Unified version string** — `__BUILD_VERSION__` is now `{semver}-{shortSHA}` (e.g. `0.5.6-abc1234`). Git SHA is resolved via `git rev-parse --short HEAD` at build time, falling back to `GITHUB_SHA` env var, then `dev`.
-
-3. **Footer simplification** — Landing and Playground footers show the unified version string instead of version + SHA separately. Every build is uniquely identifiable.
-
-## Impact
+**Status:** Implemented
 
 - Every push to `main` that touches package code auto-deploys to SWA
-- Release workflow unchanged — tag pushes still work
-- Fry: footer components (`Landing.tsx`, `Playground.tsx`) now use `__BUILD_VERSION__` only (SHA embedded)
+- Unified version string: `{semver}-{shortSHA}` (e.g., `0.5.6-abc1234`)
+- Landing and Playground footers show unified version
 
-=== bender-project-board-triage.md ===
-# Decision: Project board auto-assignment in triage pipeline
-
-**Date:** 2026-04-14T13:04:54.232Z
+### Project Board Auto-Assignment in Triage
 **Author:** Bender (Backend Dev)
-**Status:** Implemented
-
-## Context
-
-Issues created by Ahmed were not being added to the GitHub project board
-(https://github.com/users/sabbour/projects/3) or assigned milestones.
-
-## Decision
-
-1. **Project board:** All three triage workflows (squad-triage, squad-heartbeat,
-   squad-issue-assign) now add issues to the project board automatically using
-   the GraphQL `addProjectV2ItemById` mutation via `COPILOT_ASSIGN_TOKEN`.
-
-2. **Milestones:** NOT auto-assigned. Milestones require judgment (which release?
-   which sprint?). The Lead must assign milestones during in-session triage per
-   the new Triage Checklist in routing.md.
-
-3. **Graceful fallback:** All project board operations are wrapped in try/catch --
-   if the API call fails, the workflow logs a warning but does not fail.
-
-## Affected Files
-
-- `.github/workflows/squad-triage.yml`
-- `.github/workflows/squad-heartbeat.yml`
-- `.github/workflows/squad-issue-assign.yml`
-- `.squad/routing.md`
-
-=== bender-remove-pr-preview-deploys.md ===
-# Decision: Remove PR preview deployments from SWA workflow
-
 **Date:** 2026-04-14
-**Author:** Bender (Backend Dev)
 **Status:** Implemented
 
-## Context
+- Issues auto-added to GitHub project board via `addProjectV2ItemById`
+- Milestones NOT auto-assigned (require human judgment)
+- Graceful fallback: failed API calls log warnings but don't fail workflow
+- Affected: `squad-triage.yml`, `squad-heartbeat.yml`, `squad-issue-assign.yml`
 
-SWA auth relies on domain filtering — staging preview URLs break login.
-
-## Decision
-
-Removed pull_request trigger, close_staging job, and pull-requests:write permission.
-
-## Consequences
-
-PRs no longer trigger SWA deployments, saving CI minutes.
-
-=== copilot-directive-2026-04-14T130043Z.md ===
-### 2026-04-14T13:00:43Z: User directive — Stop deploying PRs to SWA
-
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Stop deploying pull requests to Azure Static Web Apps. Domain filtering breaks the login mechanisms (SWA auth requires the correct domain), making PR preview deployments useless and a waste of CI time.
-**Why:** User request — captured for team memory
-
-=== copilot-directive-2026-04-14T130530Z.md ===
-### 2026-04-14T13:05:30Z: User directive — Comment when addressing feedback
-
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Whenever an agent starts addressing PR review feedback or issue feedback, it must post an acknowledgment comment on the PR or issue (using its bot identity) before making changes. This makes the feedback loop visible to humans watching the repo.
-**Why:** User request — captured for team memory
-
-=== copilot-directive-2026-04-14T192924Z.md ===
-### 2026-04-14T19:29:24Z: User directive
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Drop the "I chose" prefix from button click / ChoicePicker selection messages. The user message should just say the selected value (e.g., "Selected: Web API / REST service"), not "I chose: ...".
-**Why:** User request — captured for team memory
-
-=== fry-browser-back-button.md ===
-# Decision: Hash-based Navigation with History API
-
+### Hash-Based Navigation with History API
 **Author:** Fry (Frontend Dev)
-**Date:** 2026-04-14T17:01:56.521Z
-**Context:** Browser back button support for session navigation
+**Date:** 2026-04-14
+**Context:** Browser back button support
 
-## Decision
-
-Use **hash-based routing** (`#session/{id}`) with the History API (`pushState`/`popstate`) for client-side navigation between the landing page and chat sessions.
-
-## Rationale
-
-1. **Hash routing over path routing** — avoids server-side configuration changes. The SWA (Static Web App) doesn't need catch-all redirect rules since the hash never hits the server.
-2. **Single `useNavigation` hook** — centralises all history management so every nav path goes through the same API (`pushSession`, `pushLanding`, `replaceCurrent`).
-3. **Deep-link support** — users can bookmark or share `#session/{id}` URLs. On load, the app restores the session from localStorage if available, or falls back to landing.
-
-## Implications
-
-- All future navigation paths (e.g., settings page, playground) should follow the same hash pattern through the `useNavigation` hook.
-- Session IDs appear in the URL — they're opaque random strings so this is fine for now, but if we ever use meaningful IDs we should consider privacy implications.
-
+- Hash routing (`#session/{id}`) with History API (`pushState`/`popstate`)
+- Avoids server-side SWA configuration changes
+- Centralised `useNavigation` hook for all history management
+- Deep-link support: users can bookmark `#session/{id}` URLs
+- All future navigation paths should follow this pattern

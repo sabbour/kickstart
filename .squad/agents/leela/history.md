@@ -31,11 +31,21 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - Reviewed and approved DP #188 (expanded demo scenarios)
 - Approved Fry's implementation readiness for issue #188
 
-## 2026-04-15 PR Review: File Manager Sidebar (#252)
+## 2026-04-15 PR Review & Merge Sprint
 
-- **Reviewed and merged PR #252** (feat: file manager sidebar with tree view and file viewer, closes #201)
+**Round 1 — File Manager Sidebar Merge**
+- Reviewed and merged PR #252 (feat: file manager sidebar with tree view and file viewer, closes #201)
 - Architecture: FileManagerSidebar + FileViewer components in `packages/web/src/components/FileManager/`
 - Follows existing patterns: Griffel, Fluent UI, barrel exports, VirtualFS context consumption
 - Noted non-blocking issue: highlight.js language registrations duplicated between ChatMarkdown and FileViewer — candidate for shared `hljs-setup.ts` module
 - Layout.tsx extended with additive optional props (`fileManagerSidebar`, `fileViewer`, `showFileSidebar`, `showFileViewer`)
 - Key files: `FileManagerSidebar.tsx`, `FileViewer.tsx`, `index.ts` barrel, Layout.tsx, App.tsx
+- Outcome: Squash-merged, CI green
+
+**Round 2 — Bug Fix Reviews & Merges**
+- Reviewed and merged PR #247 (3 TypeScript fixes: missing module, null type, wrong variable)
+  - Outcome: Merged, CI green
+- Reviewed and merged PR #248 (E2E test fix: added exact:true to getByRole)
+  - Outcome: Merged (already merged by CI automation), CI green
+
+**Summary:** 3 PRs merged, 5 issues closed (includes #201 via #252), CI maintained at green
