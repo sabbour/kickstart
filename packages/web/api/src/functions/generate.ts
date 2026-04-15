@@ -1,10 +1,12 @@
 /**
  * @module @kickstart/api/functions/generate
  *
- * POST /api/generate — Code generation endpoint powered by the Codex model
+ * POST /api/generate — Code generation endpoint powered by the configured
+ * coding deployment
  * (Azure OpenAI Responses API).
  *
- * Accepts a prompt + optional type hint, calls gpt-5.3-codex, and returns
+ * Accepts a prompt + optional type hint, calls the configured coding model
+ * deployment (for example gpt-5.4), and returns
  * generated code. Supports SSE streaming via Accept: text/event-stream.
  */
 

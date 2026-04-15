@@ -29,10 +29,10 @@ param customDomainHostname string = ''
 @description('Azure OpenAI endpoint (e.g., https://<name>.openai.azure.com/). Leave empty to skip.')
 param openAiEndpoint string = ''
 
-@description('Azure OpenAI chat deployment name (e.g., gpt-5.3-chat)')
+@description('Azure OpenAI non-coding chat deployment name (e.g., gpt-5.4-mini)')
 param openAiChatDeployment string = ''
 
-@description('Azure OpenAI Codex deployment name for code generation (e.g., gpt-5.3-codex)')
+@description('Azure OpenAI coding/generate deployment name (e.g., gpt-5.4)')
 param openAiCodexDeployment string = ''
 
 @description('Azure OpenAI deployment for inspiration generation (e.g., gpt-5.4-nano). Falls back to chat deployment if empty.')

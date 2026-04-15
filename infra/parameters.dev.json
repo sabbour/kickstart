@@ -27,10 +27,10 @@
       "value": "https://<your-openai-resource>.openai.azure.com/"
     },
     "openAiChatDeployment": {
-      "value": "gpt-5.3-chat"
+      "value": "gpt-5.4-mini"
     },
     "openAiCodexDeployment": {
-      "value": "gpt-5.3-codex"
+      "value": "gpt-5.4"
     },
     "keyVaultName": {
       "value": "kv-kickstart-dev"

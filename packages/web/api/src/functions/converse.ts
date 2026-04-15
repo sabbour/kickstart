@@ -36,7 +36,7 @@ import {
   extractArtifactsFromA2UI, upsertArtifact,
 } from "../lib/session-store.js";
 import type { ClientMessage, GeneratedArtifact } from "../lib/session-store.js";
-import { chatCompletion, chatCompletionWithTools, getChatDeploymentName } from "../lib/openai-client.js";
+import { chatCompletion, chatCompletionWithTools } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
 import { safeErrorResponse, safeStreamError } from "../lib/error-response.js";
@@ -46,6 +46,11 @@ import { isDebugMode, buildConverseDebugMeta, formatRenderDecisions } from "../l
 import type { DebugMetadata } from "../lib/debug-mode.js";
 import { buildTurnUsage, sumChatUsage } from "../lib/usage-tracking.js";
 import type { UsageSummary, ChatUsage } from "../lib/usage-tracking.js";
+import {
+  normalizeConversePhase,
+  resolveConverseModelRoute,
+} from "../lib/converse-model-router.js";
+import type { ConverseModelRoute } from "../lib/converse-model-router.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -78,6 +83,12 @@ interface StreamDonePayload {
   autoContinuePrompt?: string;
   debug?: DebugMetadata;
   renderDecisions?: string[];
+}
+
+function getSafeCurrentPhase(
+  engineState: Pick<ConversationState, "currentPhase">,
+): Phase {
+  return normalizeConversePhase(engineState.currentPhase) ?? Phase.Discover;
 }
 
 app.http("converse", {
@@ -154,8 +165,11 @@ app.http("converse", {
       // Resolve kit skills for the current phase and build a fresh system prompt.
       // This ensures the LLM always has the correct phase-specific capabilities
       // injected, even as the conversation advances through phases.
-      const currentPhase = engineState.currentPhase as Phase;
+      const currentPhase = getSafeCurrentPhase(engineState);
       const resolvedSkills = resolveSkills(currentPhase, defaultKitRegistry.getAll());
+      const modelRoute = resolveConverseModelRoute(currentPhase, {
+        trustedPhase: session.routingPhaseTrusted,
+      });
 
 
       // Build artifact summary from files generated in previous turns
@@ -190,7 +204,7 @@ app.http("converse", {
 
       if (wantsStream) {
         return handleStreaming(
-          messages, state.sessionId, engineState, context,
+          messages, state.sessionId, engineState, modelRoute, context,
           toolContext, debugMode, session.generatedArtifacts,
           (newState) => { session.engineState = newState; },
         );
@@ -203,6 +217,7 @@ app.http("converse", {
         {
           responseFormat: { type: "json_object" },
           tools: toolDefs,
+          deployment: modelRoute.deployment,
         },
         async (name, args) => {
           const tool = defaultRegistry.get(name);
@@ -224,7 +239,10 @@ app.http("converse", {
         ];
         const continued = await chatCompletionWithAutoContinue(
           continueMessages,
-          { responseFormat: { type: "json_object" } },
+          {
+            responseFormat: { type: "json_object" },
+            deployment: modelRoute.deployment,
+          },
           { continuationPrompt: "Your previous response was cut off mid-JSON. Continue the JSON output exactly where you left off — do not repeat any content." },
         );
         finalContent = result.content + continued.content;
@@ -251,13 +269,13 @@ app.http("converse", {
 
       addMessage(state.sessionId, "assistant", processed.message);
 
-      const usageSummary = finalizeUsage(state.sessionId, getChatDeploymentName(), turnUsage);
+      const usageSummary = finalizeUsage(state.sessionId, modelRoute.model, turnUsage);
 
       const responseBody: ConverseResponse = {
         sessionId: state.sessionId,
-        phase: session.engineState.currentPhase,
+        phase: getSafeCurrentPhase(session.engineState),
         message: processed.message,
-        model: getChatDeploymentName(),
+        model: modelRoute.model,
         a2ui: [...phaseA2ui, ...processed.a2uiMessages],
         ...(usageSummary ? { usage: usageSummary } : {}),
       };
@@ -272,7 +290,7 @@ app.http("converse", {
       if (debugMode) {
         const hadExplicitA2UI = processed.a2uiMessages.length > 0;
         const debugMeta = buildConverseDebugMeta(
-          getChatDeploymentName(),
+          modelRoute.model,
           finalContent,
           processed.a2uiMessages.length,
           hadExplicitA2UI,
@@ -291,6 +309,7 @@ app.http("converse", {
 
 /** Build a fresh ConversationPhase A2UI indicator from the current engine state. */
 function buildPhaseIndicator(engineState: ConversationState): object[] {
+  const currentPhase = getSafeCurrentPhase(engineState);
   const phases: PhaseItem[] = getPhaseOrder().map((phase) => ({
     id: phase,
     label: getPhaseDefinition(phase).label,
@@ -306,7 +325,7 @@ function buildPhaseIndicator(engineState: ConversationState): object[] {
       type: "ConversationPhase",
       id: "phase-indicator",
       phases,
-      currentPhase: engineState.currentPhase,
+      currentPhase,
     },
   ];
 }
@@ -316,6 +335,7 @@ function handleStreaming(
   messages: import("../lib/openai-client.js").ChatMessage[],
   sessionId: string,
   initialEngineState: ConversationState,
+  modelRoute: ConverseModelRoute,
   context: InvocationContext,
   toolContext: ToolContext,
   debugMode: boolean,
@@ -339,6 +359,7 @@ function handleStreaming(
           const probe = await chatCompletion(workingMessages, {
             responseFormat: { type: "json_object" },
             tools: toolDefs,
+            deployment: modelRoute.deployment,
           });
           accumulatedUsage = sumChatUsage(accumulatedUsage, probe.usage);
 
@@ -349,7 +370,10 @@ function handleStreaming(
               const contMessages = [...workingMessages, { role: "assistant" as const, content: probe.content }];
               const contResult = await chatCompletionWithAutoContinue(
                 contMessages,
-                { responseFormat: { type: "json_object" } },
+                {
+                  responseFormat: { type: "json_object" },
+                  deployment: modelRoute.deployment,
+                },
                 { continuationPrompt: "Your previous response was cut off mid-JSON. Continue the JSON output exactly where you left off — do not repeat any content." },
               );
               fullContent = probe.content + contResult.content;
@@ -384,7 +408,7 @@ function handleStreaming(
             }
 
             addMessage(sessionId, "assistant", processed.message);
-            const usageSummary = finalizeUsage(sessionId, getChatDeploymentName(), accumulatedUsage);
+            const usageSummary = finalizeUsage(sessionId, modelRoute.model, accumulatedUsage);
 
             controller.enqueue(
               encoder.encode(
@@ -402,12 +426,13 @@ function handleStreaming(
               );
             }
 
-            const phaseDef = getPhaseDefinition(engineState.currentPhase as import("@kickstart/core").Phase);
+            const currentPhase = getSafeCurrentPhase(engineState);
+            const phaseDef = getPhaseDefinition(currentPhase);
             const donePayload: StreamDonePayload = {
               sessionId,
-              phase: engineState.currentPhase,
+              phase: currentPhase,
               phaseLabel: phaseDef.label,
-              model: getChatDeploymentName(),
+              model: modelRoute.model,
               ...(usageSummary ? { usage: usageSummary } : {}),
             };
 
@@ -420,7 +445,7 @@ function handleStreaming(
             if (debugMode) {
               const hadExplicitA2UI = processed.a2uiMessages.length > 0;
               const debugMeta = buildConverseDebugMeta(
-                getChatDeploymentName(),
+                modelRoute.model,
                 fullContent,
                 processed.a2uiMessages.length,
                 hadExplicitA2UI,
