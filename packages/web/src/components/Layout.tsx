@@ -8,8 +8,12 @@ interface LayoutProps {
   showSessionsToggle: boolean;
   sidebar?: React.ReactNode;
   fileEditor?: React.ReactNode;
+  fileManagerSidebar?: React.ReactNode;
+  fileViewer?: React.ReactNode;
   hasFiles?: boolean;
   showFilePanel?: boolean;
+  showFileSidebar?: boolean;
+  showFileViewer?: boolean;
   onToggleFilePanel?: () => void;
   children: React.ReactNode;
 }
@@ -21,8 +25,12 @@ export function Layout({
   showSessionsToggle,
   sidebar,
   fileEditor,
+  fileManagerSidebar,
+  fileViewer,
   hasFiles,
   showFilePanel,
+  showFileSidebar,
+  showFileViewer,
   onToggleFilePanel,
   children,
 }: LayoutProps) {
@@ -38,10 +46,12 @@ export function Layout({
       />
       <div className={`app-layout${hasFiles ? ' has-files' : ''}`}>
         {sidebar}
+        {showFileSidebar && fileManagerSidebar}
         <main className="chat-main" role="main">
           {children}
         </main>
         {showFilePanel && fileEditor}
+        {showFileViewer && fileViewer}
       </div>
     </div>
   );
