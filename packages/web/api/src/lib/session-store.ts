@@ -76,6 +76,8 @@ export interface ApiSession {
   usageHistory: TurnUsage[];
   /** SWA principal that owns this session. */
   principalId?: string;
+  /** Only server-owned phase state may escalate routing to codex. */
+  routingPhaseTrusted: boolean;
   /** Thin deployment state for the real Azure happy path. */
   deployState: DeployState;
   /** Per-session CostEstimate pricing cache keyed by normalized pricing request. */
@@ -150,6 +152,7 @@ export function createSession(principalId?: string): ApiSession {
     generatedArtifacts: [],
     usageHistory: [],
     principalId,
+    routingPhaseTrusted: true,
     deployState: {
       stage: "idle",
       updatedAt: now,
@@ -202,6 +205,7 @@ function restoreEngineStateFromHistory(clientMessages: ClientMessage[]): Convers
 export function hydrateSession(clientMessages: ClientMessage[], principalId?: string): ApiSession {
   const session = createSession(principalId);
   const now = new Date().toISOString();
+  session.routingPhaseTrusted = false;
 
   for (const msg of clientMessages) {
     // Only allow user/assistant — never trust client-sent system prompts

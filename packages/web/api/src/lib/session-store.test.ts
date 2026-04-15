@@ -7,6 +7,7 @@ describe("session-store phase hydration", () => {
     const session = createSession("principal-123");
     expect(session.engineState.currentPhase).toBe(Phase.Discover);
     expect(session.state.currentPhase).toBe(Phase.Discover);
+    expect(session.routingPhaseTrusted).toBe(true);
   });
 
   it("rehydrates the current phase from client history", () => {
@@ -20,6 +21,7 @@ describe("session-store phase hydration", () => {
 
     expect(session.engineState.currentPhase).toBe(Phase.Deploy);
     expect(session.state.currentPhase).toBe(Phase.Deploy);
+    expect(session.routingPhaseTrusted).toBe(false);
     expect(session.engineState.phaseStatus[Phase.Discover]).toBe("complete");
     expect(session.engineState.phaseStatus[Phase.Design]).toBe("complete");
     expect(session.engineState.phaseStatus[Phase.Generate]).toBe("complete");
@@ -36,5 +38,6 @@ describe("session-store phase hydration", () => {
 
     expect(session.engineState.currentPhase).toBe(Phase.Discover);
     expect(session.state.currentPhase).toBe(Phase.Discover);
+    expect(session.routingPhaseTrusted).toBe(false);
   });
 });

@@ -9,6 +9,8 @@ const registerHttpHandler = vi.fn((name: string, config: { handler: (request: un
 
 const chatCompletionWithTools = vi.fn();
 const chatCompletion = vi.fn();
+const chatCompletionWithAutoContinue = vi.fn(async () => ({ content: "" }));
+const isTruncated = vi.fn(() => false);
 
 vi.mock("@azure/functions", () => ({
   app: {
@@ -20,6 +22,7 @@ vi.mock("../lib/openai-client.js", () => ({
   chatCompletion,
   chatCompletionWithTools,
   getChatDeploymentName: () => "test-chat-model",
+  getCodexDeploymentName: () => "test-codex-model",
 }));
 
 vi.mock("../lib/content-safety.js", () => ({
@@ -38,8 +41,8 @@ vi.mock("../lib/rate-limiter.js", () => ({
 }));
 
 vi.mock("../lib/auto-continue.js", () => ({
-  chatCompletionWithAutoContinue: vi.fn(async () => ({ content: "" })),
-  isTruncated: vi.fn(() => false),
+  chatCompletionWithAutoContinue,
+  isTruncated,
 }));
 
 let converseHandler: (request: unknown, context: unknown) => Promise<unknown>;
@@ -56,6 +59,10 @@ beforeAll(async () => {
 beforeEach(() => {
   chatCompletionWithTools.mockReset();
   chatCompletion.mockReset();
+  chatCompletionWithAutoContinue.mockReset();
+  chatCompletionWithAutoContinue.mockResolvedValue({ content: "" });
+  isTruncated.mockReset();
+  isTruncated.mockReturnValue(false);
 });
 
 function createRequest(
@@ -84,6 +91,14 @@ function createContext(): { log: ReturnType<typeof vi.fn>; error: ReturnType<typ
     log: vi.fn(),
     error: vi.fn(),
   };
+}
+
+function setSessionPhase(
+  session: { engineState: { currentPhase: string }; state: { currentPhase: string } },
+  phase: Phase,
+): void {
+  session.engineState.currentPhase = phase;
+  session.state.currentPhase = phase;
 }
 
 async function readStream(body: ReadableStream<Uint8Array>): Promise<string> {
@@ -374,5 +389,175 @@ describe("converse usage tracking", () => {
       },
     });
     expect(getSession(session.state.sessionId)?.usageHistory).toHaveLength(1);
+  });
+});
+
+describe("converse model routing", () => {
+  it.each([
+    [Phase.Discover, "test-chat-model"],
+    [Phase.Design, "test-chat-model"],
+    [Phase.Generate, "test-codex-model"],
+    [Phase.Review, "test-chat-model"],
+    [Phase.Handoff, "test-chat-model"],
+    [Phase.Deploy, "test-chat-model"],
+  ])("routes %s turns to %s in non-streaming mode", async (phase, expectedModel) => {
+    const session = createSession();
+    setSessionPhase(session, phase);
+
+    chatCompletionWithTools.mockResolvedValueOnce({
+      content: JSON.stringify({
+        message: "Routing test response",
+        a2ui: [],
+        actions: [],
+        phaseComplete: false,
+        filesComplete: null,
+      }),
+      finishReason: "stop",
+    });
+
+    const response = await converseHandler(
+      createRequest({
+        sessionId: session.state.sessionId,
+        message: "Keep going",
+      }),
+      createContext(),
+    ) as { status: number; jsonBody: { model?: string } };
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody.model).toBe(expectedModel);
+    expect(chatCompletionWithTools.mock.calls[0]?.[1]).toMatchObject({
+      deployment: expectedModel,
+    });
+  });
+
+  it("fails closed to chat for unknown server phases", async () => {
+    const session = createSession();
+    session.engineState.currentPhase = "ship-it" as Phase;
+    session.state.currentPhase = "ship-it" as Phase;
+
+    chatCompletionWithTools.mockResolvedValueOnce({
+      content: JSON.stringify({
+        message: "Fallback route response",
+        a2ui: [],
+        actions: [],
+        phaseComplete: false,
+        filesComplete: null,
+      }),
+      finishReason: "stop",
+    });
+
+    const response = await converseHandler(
+      createRequest({
+        sessionId: session.state.sessionId,
+        message: "Keep going",
+      }),
+      createContext(),
+    ) as { status: number; jsonBody: { model?: string } };
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody.model).toBe("test-chat-model");
+    expect(chatCompletionWithTools.mock.calls[0]?.[1]).toMatchObject({
+      deployment: "test-chat-model",
+    });
+  });
+
+  it("keeps client-rehydrated phase injection on the default chat model", async () => {
+    chatCompletionWithTools
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          message: "Still working through that flow.",
+          a2ui: [],
+          actions: [],
+          phaseComplete: false,
+          filesComplete: null,
+        }),
+        finishReason: "stop",
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          message: "Second turn, still chat-routed.",
+          a2ui: [],
+          actions: [],
+          phaseComplete: false,
+          filesComplete: null,
+        }),
+        finishReason: "stop",
+      });
+
+    const firstResponse = await converseHandler(
+      createRequest({
+        message: "Continue generating",
+        messages: [
+          {
+            role: "assistant",
+            content: "Here are some generated files.",
+            phase: Phase.Generate,
+          },
+        ],
+      }),
+      createContext(),
+    ) as { status: number; jsonBody: { sessionId: string; model?: string } };
+
+    expect(firstResponse.status).toBe(200);
+    expect(firstResponse.jsonBody.model).toBe("test-chat-model");
+    expect(chatCompletionWithTools.mock.calls[0]?.[1]).toMatchObject({
+      deployment: "test-chat-model",
+    });
+
+    const secondResponse = await converseHandler(
+      createRequest({
+        sessionId: firstResponse.jsonBody.sessionId,
+        message: "Keep going",
+      }),
+      createContext(),
+    ) as { status: number; jsonBody: { model?: string } };
+
+    expect(secondResponse.status).toBe(200);
+    expect(secondResponse.jsonBody.model).toBe("test-chat-model");
+    expect(chatCompletionWithTools.mock.calls[1]?.[1]).toMatchObject({
+      deployment: "test-chat-model",
+    });
+  });
+
+  it("routes streaming generate turns to codex", async () => {
+    const session = createSession();
+    setSessionPhase(session, Phase.Generate);
+
+    chatCompletion.mockResolvedValueOnce({
+      content: JSON.stringify({
+        message: "Streaming routed through codex.",
+        a2ui: [],
+        actions: [],
+        phaseComplete: false,
+        filesComplete: null,
+      }),
+      finishReason: "stop",
+    });
+
+    const response = await converseHandler(
+      createRequest(
+        {
+          sessionId: session.state.sessionId,
+          message: "Generate the next batch",
+        },
+        { accept: "text/event-stream" },
+      ),
+      createContext(),
+    ) as { status: number; body: ReadableStream<Uint8Array> };
+
+    expect(response.status).toBe(200);
+    expect(chatCompletion.mock.calls[0]?.[1]).toMatchObject({
+      deployment: "test-codex-model",
+    });
+
+    const events = parseSseEvents(await readStream(response.body));
+    const donePayload = JSON.parse(
+      events.find((event) => event.event === "done")?.data ?? "{}",
+    ) as { model?: string; phase?: string };
+
+    expect(donePayload).toMatchObject({
+      model: "test-codex-model",
+      phase: Phase.Generate,
+    });
   });
 });
