@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
 import {TextFieldApi} from '../../vendor/a2ui/web_core/basic_catalog/index';
 import {Input, Textarea, Field, makeStyles, tokens} from '@fluentui/react-components';
@@ -16,6 +16,15 @@ const useStyles = makeStyles({
 
 export const TextField = createReactComponent(TextFieldApi, ({props}) => {
   const classes = useStyles();
+  const [localValue, setLocalValue] = useState(props.value || '');
+  const userEdited = useRef(false);
+
+  // Sync from external prop changes only when the user hasn't edited
+  useEffect(() => {
+    if (!userEdited.current) {
+      setLocalValue(props.value || '');
+    }
+  }, [props.value]);
 
   const isLong = props.variant === 'longText';
   const type =
@@ -24,10 +33,14 @@ export const TextField = createReactComponent(TextFieldApi, ({props}) => {
   const hasError = props.validationErrors && props.validationErrors.length > 0;
 
   const onInputChange = (_ev: React.ChangeEvent<HTMLInputElement>, data: InputOnChangeData) => {
+    userEdited.current = true;
+    setLocalValue(data.value);
     props.setValue(data.value);
   };
 
   const onTextareaChange = (_ev: React.ChangeEvent<HTMLTextAreaElement>, data: TextareaOnChangeData) => {
+    userEdited.current = true;
+    setLocalValue(data.value);
     props.setValue(data.value);
   };
 
@@ -40,13 +53,13 @@ export const TextField = createReactComponent(TextFieldApi, ({props}) => {
       >
         {isLong ? (
           <Textarea
-            value={props.value || ''}
+            value={localValue}
             onChange={onTextareaChange}
           />
         ) : (
           <Input
             type={type}
-            value={props.value || ''}
+            value={localValue}
             onChange={onInputChange}
           />
         )}
