@@ -12,6 +12,12 @@ import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
 import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 
+declare global {
+  interface Window {
+    MonacoEnvironment?: monaco.Environment;
+  }
+}
+
 let configured = false;
 
 export function ensureMonacoLocal() {
