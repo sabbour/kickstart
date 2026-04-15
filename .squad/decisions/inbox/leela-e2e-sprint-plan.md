@@ -50,9 +50,10 @@ A user walks through Kickstart from "describe your app" to "PR created on a real
 | # | Issue | Type | Depends on | Notes |
 |---|-------|------|------------|-------|
 | 5 | **#265** — File manager experience | Feature | #298 | Wire generated files into FileManagerSidebar, compact file list in chat. Independent of auth flow. |
-| 6 | **#273** — Architecture diagram (ELK + icons) | Feature | none | Self-contained component. ELK layout engine, Azure icons, zoom. Can start immediately. |
-| 7 | **#299** — Debug action-event placement | Bug | none | Move debug output to separate panel. Quick fix, 1 session. |
-| 8 | **#296** — Subtitle 1 title sweep | Bug | none | Typography normalization across 11 components. Quick fix, 1 session. |
+| 6 | **#300** — Architecture diagram prompt-layer depth | Feature | none | Prompt-only fix: make LLM produce diagrams with AKS subgraphs, ACR, Key Vault, Gateway, GitHub Actions. No component API changes. Quick win — ships before #273 and improves current Mermaid rendering immediately. |
+| 7 | **#273** — Architecture diagram (ELK + icons) | Feature | none | Self-contained component. ELK layout engine, Azure icons, zoom. Can start immediately. #300 (prompt depth) should land first — ELK rendering benefits from richer diagram input. |
+| 8 | **#299** — Debug action-event placement | Bug | none | Move debug output to separate panel. Quick fix, 1 session. |
+| 9 | **#296** — Subtitle 1 title sweep | Bug | none | Typography normalization across 11 components. Quick fix, 1 session. |
 
 ### TIER 4 — Deferred (next sprint, after E2E works)
 
@@ -71,7 +72,8 @@ A user walks through Kickstart from "describe your app" to "PR created on a real
   ├── #274 (GitHub OAuth) ──────┤── #271 (deployment unblocked)
   ├── #265 (file manager)       │
   │                             │
-  #273 (arch diagram) ─────────(independent)
+  #300 (arch diagram prompt) ──(independent, land before #273)
+  #273 (arch diagram ELK) ────(independent, benefits from #300)
   #299 (debug placement) ──────(independent)
   #296 (subtitle sweep) ───────(independent)
 ```
@@ -82,7 +84,7 @@ Once #298 lands, three tracks can run simultaneously:
 
 - **Track A (Flow):** #275 → #271 — Bender (prompt/backend) + Fry (frontend)
 - **Track B (GitHub):** #274 — Bender (OAuth backend) + Fry (A2UI components) + Zapp (security review)
-- **Track C (Polish):** #265, #273, #296, #299 — Fry (can be interleaved between Track A/B frontend work)
+- **Track C (Polish):** #300, #265, #273, #296, #299 — #300 is prompt-only (Bender), rest is Fry (interleaved between Track A/B frontend work)
 
 Track A and Track B converge at #271 (deployment unblocked).
 
@@ -95,7 +97,8 @@ Track A and Track B converge at #271 (deployment unblocked).
 | Issue | Assignee | Work |
 |-------|----------|------|
 | **#298** | **Fry** | Fix surface ownership in useA2UI/useStreaming, restore phase bar rendering, add turn-scoped surface IDs |
-| **#273** | **Fry** (can start in parallel — independent) | Begin ELK layout engine swap, Azure icon integration |
+| **#300** | **Bender** | Prompt-layer depth fix: update system-prompt.ts, component-catalog.ts, demo-scenarios.ts. No component changes. Reference: `/mnt/c/Users/asabbour/Git/adaptive-ui` (Try-AKS checkout). |
+| **#273** | **Fry** (can start in parallel — independent) | Begin ELK layout engine swap, Azure icon integration. Reference: `/mnt/c/Users/asabbour/Git/adaptive-ui` |
 | **#296** | **Fry** or **@copilot** | Subtitle 1 sweep — 11 files, mechanical change. Good candidate for coding agent with Fry review. |
 | **#299** | **Fry** or **@copilot** | Debug panel extraction — small, well-scoped. Good candidate for coding agent with Fry review. |
 
@@ -112,7 +115,7 @@ Track A and Track B converge at #271 (deployment unblocked).
 | Issue | Assignee | Work |
 |-------|----------|------|
 | **#271** | **Bender** + **Fry** | Verify #274 + #275 resolve the dead end. Register minimal AuthCard component. Update prompt to end flow at PR creation. |
-| **#273** | **Fry** (continued) | Finish ELK diagram if not done in Phase 1 |
+| **#273** | **Fry** (continued) | Finish ELK diagram if not done in Phase 1. #300 prompt depth should be merged by now — ELK rendering benefits from richer input. |
 | All | **Hermes** | E2E test pass: full flow from app description → file generation → GitHub repo creation → PR |
 | All | **Zapp** | Security review of #274 OAuth implementation |
 
@@ -134,6 +137,8 @@ Track A and Track B converge at #271 (deployment unblocked).
 4. **#272 and #277 are deferred** — not demo blockers per their own descriptions.
 5. **#296 and #299 are coding agent candidates** — mechanical, well-scoped, Fry reviews.
 6. **Zapp mandatory on #274** — OAuth is a security boundary crossing.
+7. **#300 lands before #273** — prompt depth improves current Mermaid rendering immediately; ELK swap (#273) benefits from richer diagram input.
+8. **Try-AKS reference checkout** is at `/mnt/c/Users/asabbour/Git/adaptive-ui` — use for #273, #274, #275, #300 reference implementations.
 
 ---
 
@@ -154,7 +159,7 @@ A human can:
 1. Open Kickstart, describe an app
 2. See progressive guided conversation (one step at a time)
 3. See generated files in file manager sidebar (not dumped as code blocks)
-4. See architecture diagram with proper layout
+4. See architecture diagram with AKS subgraphs, ACR, Key Vault, Gateway (not flat 4-node graph)
 5. Sign in to GitHub with real OAuth
 6. Select a real org, create a real repo
 7. Commit generated files to the repo

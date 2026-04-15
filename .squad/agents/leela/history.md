@@ -65,7 +65,9 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - **Deferred:** #272 (live pricing) and #277 (token tracker) — both self-described as non-blockers
 - **Coding agent candidates:** #296 (subtitle sweep) and #299 (debug placement) — mechanical, well-scoped
 - **Zapp mandatory** on #274 — OAuth is security-critical per routing rules
-- **3 parallel tracks** after #298: Flow (#275→#271), GitHub (#274), Polish (#265/#273/#296/#299)
+- **3 parallel tracks** after #298: Flow (#275→#271), GitHub (#274), Polish (#300/#265/#273/#296/#299)
+- **#300 added** (arch diagram prompt depth) — prompt-only fix, lands before #273 (ELK engine). Bender owns prompt changes.
+- **Try-AKS reference path corrected** to `/mnt/c/Users/asabbour/Git/adaptive-ui`
 - **Key files:** Sprint plan at `.squad/decisions/inbox/leela-e2e-sprint-plan.md`
 
 ## 2026-04-15 Architecture Diagram Depth Decision
