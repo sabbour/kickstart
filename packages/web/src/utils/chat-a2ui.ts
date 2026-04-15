@@ -281,7 +281,7 @@ export function rebuildChatSessionState(
   let phase: ConversationPhaseId | null = null;
 
   for (const message of messages) {
-    const fallbackPhase = normalizeConversationPhase(message.phase) ?? phase;
+    const fallbackPhase: ConversationPhaseId | null = normalizeConversationPhase(message.phase) ?? phase;
     if (!message.a2uiMessages?.length) {
       phase = fallbackPhase;
       continue;
@@ -372,7 +372,8 @@ function renderComponentsForChat(
     }
 
     if (phase === 'generate' && isDeploymentProgressComponent(component)) {
-      return [{ ...component, title: GENERATE_PROGRESS_TITLE } as A2uiComponent];
+      const progressComponent = component as A2uiComponent;
+      return [{ ...progressComponent, title: GENERATE_PROGRESS_TITLE }];
     }
 
     return [component];

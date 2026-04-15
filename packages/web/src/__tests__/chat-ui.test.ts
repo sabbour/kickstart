@@ -68,6 +68,10 @@ describe('chat/debug UI regressions', () => {
             type: 'ConversationPhase',
             id: 'phase-indicator',
             currentPhase: 'build',
+            phases: [
+              { id: 'discover', label: 'Discover', status: 'complete' },
+              { id: 'build', label: 'Build', status: 'active' },
+            ],
           },
         ],
       },

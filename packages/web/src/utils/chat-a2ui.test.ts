@@ -15,8 +15,8 @@ describe('prepareChatA2uiPayload', () => {
         id: 'phase-indicator',
         currentPhase: 'discover',
         phases: [
-          { id: 'discover', status: 'active' },
-          { id: 'design', status: 'pending' },
+          { id: 'discover', label: 'Discover', status: 'active' },
+          { id: 'design', label: 'Design', status: 'pending' },
         ],
       },
       {
@@ -236,6 +236,9 @@ describe('getLatestConversationPhase', () => {
             type: 'ConversationPhase',
             id: 'phase-indicator',
             currentPhase: 'review',
+            phases: [
+              { id: 'review', label: 'Review', status: 'active' },
+            ],
           },
         ],
       },
@@ -265,6 +268,9 @@ describe('getLatestConversationPhase', () => {
                 type: 'ConversationPhase',
                 id: 'phase-indicator',
                 currentPhase: 'validate',
+                phases: [
+                  { id: 'validate', label: 'Validate', status: 'active' },
+                ],
               },
             ],
           },
