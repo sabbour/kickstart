@@ -109,7 +109,7 @@ describe("component definitions", () => {
 });
 
 describe("custom Kickstart components", () => {
-  it("ArchitectureDiagram has nodes and edges properties", () => {
+  it("ArchitectureDiagram exposes diagram-first props plus legacy nodes and edges", () => {
     const catalog = loadCatalog();
     const defs = catalog["$defs"] as Record<string, Record<string, unknown>>;
     const allOf = defs["ArchitectureDiagram"]["allOf"] as Array<
@@ -118,6 +118,9 @@ describe("custom Kickstart components", () => {
     const props = (allOf[1] as Record<string, unknown>)[
       "properties"
     ] as Record<string, unknown>;
+    expect(props).toHaveProperty("diagram");
+    expect(props).toHaveProperty("title");
+    expect(props).toHaveProperty("description");
     expect(props).toHaveProperty("nodes");
     expect(props).toHaveProperty("edges");
   });

@@ -43,18 +43,37 @@ const ARCHITECTURE: DemoResponse = {
     { id: 'tab-arch', component: 'Column', children: ['arch-diagram'], label: 'Architecture' },
     { id: 'arch-diagram', component: 'ArchitectureDiagram',
       title: 'Proposed Architecture',
+      description: 'AKS Automatic with a grouped namespace, managed services, and registry-backed icons.',
       diagram: `graph TD
-  User(("User")) -->|HTTPS| GW{{"Gateway (Istio)"}}
+  User(("User")) -->|HTTPS| GW["Gateway API<br/>approuting-istio"]
 
-  subgraph AKS["AKS Automatic"]
-    GW --> API["Node.js + Express<br/>(2-10 replicas)"]
+  subgraph CI["GitHub Actions"]
+    GHA["GitHub Actions<br/>build + push"]
   end
 
-  ACR["Container Registry"] -.->|image pull| API
-  API --> DB[("Azure Cosmos DB")]
-  API -->|Workload Identity| KV["Key Vault"]
+  subgraph Azure["Azure Services"]
+    ACR["%%icon:azure/acr%%ACR<br/>webappacr<br/>web-app:latest"]
+    DB["%%icon:azure/cosmos-db%%Cosmos DB<br/>serverless"]
+    KV["%%icon:azure/key-vault%%Key Vault<br/>app secrets"]
+  end
 
-  GHA["GitHub Actions"] -.->|build and push| ACR`,
+  subgraph AKS["%%icon:azure/aks%%AKS Automatic"]
+    subgraph NS["%%icon:k8s/ns%%namespace: web-app"]
+      Route["HTTPRoute<br/>/ → api"]
+      SVC["%%icon:k8s/svc%%Service<br/>api"]
+      DEP["%%icon:k8s/deploy%%Deployment<br/>Node.js + Express<br/>(2-10 replicas)"]
+      SA["%%icon:k8s/sa%%ServiceAccount<br/>workload identity"]
+      HPA["%%icon:k8s/hpa%%HPA<br/>cpu 70%"]
+      GW --> Route --> SVC --> DEP
+      DEP --> SA
+      HPA -.-> DEP
+    end
+  end
+
+  ACR -.->|image pull| DEP
+  DEP --> DB
+  DEP -->|Workload Identity| KV
+  GHA -.->|build and push| ACR`,
     },
 
     // Tab 2: Cost Estimate
@@ -178,16 +197,39 @@ const REVIEW_EXPANDED: DemoResponse = {
     // Tab 1: Architecture recap
     { id: 'tab-arch', component: 'Column', children: ['arch-diagram'], label: 'Architecture' },
     { id: 'arch-diagram', component: 'ArchitectureDiagram', title: 'System Architecture',
+      description: 'Grouped runtime view with AKS Automatic, namespace boundaries, and managed dependencies.',
       diagram: `graph LR
-  User-->|HTTPS|AppGW[App Gateway]
-  AppGW-->FE[web-frontend]
-  AppGW-->API[api-server]
-  API-->Cosmos[(Cosmos DB)]
-  API-->Redis[(Redis Cache)]
-  subgraph AKS Automatic
-    FE
-    API
-  end`,
+  User-->|HTTPS|GW[Gateway API<br/>approuting-istio]
+
+  subgraph ci["GitHub Actions"]
+    GHA["GitHub Actions<br/>build + push"]
+  end
+
+  subgraph azure["Azure Services"]
+    ACR["%%icon:azure/acr%%ACR<br/>webappacr<br/>web-app:sha"]
+    Cosmos["%%icon:azure/cosmos-db%%Cosmos DB<br/>serverless"]
+    Redis["%%icon:azure/redis%%Redis Cache<br/>C0"]
+    KV["%%icon:azure/key-vault%%Key Vault<br/>runtime secrets"]
+  end
+
+  subgraph aks["%%icon:azure/aks%%AKS Automatic"]
+    subgraph ns["%%icon:k8s/ns%%namespace: web-app"]
+      Route["HTTPRoute<br/>/ → web"]
+      SVC["%%icon:k8s/svc%%Service<br/>web"]
+      DEP["%%icon:k8s/deploy%%Deployment<br/>web-frontend<br/>3 replicas"]
+      SA["%%icon:k8s/sa%%ServiceAccount<br/>workload identity"]
+      HPA["%%icon:k8s/hpa%%HPA<br/>requests/sec"]
+      GW --> Route --> SVC --> DEP
+      DEP --> SA
+      HPA -.-> DEP
+    end
+  end
+
+  ACR -.->|image pull| DEP
+  DEP --> Cosmos
+  DEP --> Redis
+  DEP -->|Workload Identity| KV
+  GHA -.->|build and push| ACR`,
     },
 
     // Tab 2: Cost Estimate

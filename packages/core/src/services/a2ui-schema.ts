@@ -434,22 +434,40 @@ const ArchNodeSchema = z.object({
     "storage",
     "ai",
     "messaging",
-  ]),
+  ]).optional(),
 });
 
 const ArchEdgeSchema = z.object({
   from: boundedString,
   to: boundedString,
+  label: dynamicString.optional(),
 });
 
 const ArchitectureDiagramPropsSchema = z
   .object({
     id: boundedString,
     component: z.literal("ArchitectureDiagram"),
-    nodes: z.array(ArchNodeSchema),
-    edges: z.array(ArchEdgeSchema),
+    diagram: dynamicString.optional(),
+    title: dynamicString.optional(),
+    description: dynamicString.optional(),
+    nodes: z.array(ArchNodeSchema).optional(),
+    edges: z.array(ArchEdgeSchema).optional(),
   })
-  .strip();
+  .strip()
+  .superRefine((value, ctx) => {
+    const hasDiagram =
+      typeof value.diagram === "string" && value.diagram.trim().length > 0;
+    const hasLegacyNodes =
+      Array.isArray(value.nodes) && Array.isArray(value.edges);
+
+    if (!hasDiagram && !hasLegacyNodes) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "ArchitectureDiagram requires `diagram` or both `nodes` and `edges`.",
+      });
+    }
+  });
 
 const FileEditorPropsSchema = z
   .object({

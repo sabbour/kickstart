@@ -355,27 +355,33 @@ const customArchitectureDiagram = (): A2uiMsg[] => {
     { id: 'heading', component: 'Text', text: 'Architecture Diagram', variant: 'h3' },
     { id: 'ad1', component: 'ArchitectureDiagram',
       title: 'AKS Application Architecture',
-      description: 'Typical microservice deployment on Azure Kubernetes Service',
+      description: 'ELK-rendered AKS Automatic diagram with grouped Azure and Kubernetes resources',
       diagram: `graph LR
-  Client([Client]) --> Ingress[Ingress Controller]
-  Ingress --> FE[Frontend Pod]
-  Ingress --> API[API Pod]
-  API --> DB[(Azure SQL)]
-  API --> Cache[(Redis Cache)]
-  API --> Queue[Service Bus]
-  Queue --> Worker[Worker Pod]
-  Worker --> Storage[(Blob Storage)]
-  subgraph AKS Cluster
-    Ingress
-    FE
-    API
-    Worker
+  Client([Client]) --> GW[Gateway API<br/>approuting-istio]
+
+  subgraph cicd[GitHub Actions]
+    GHA[GitHub Actions<br/>build + push]
   end
-  subgraph Azure Services
-    DB
-    Cache
-    Queue
-    Storage
+
+  subgraph azure[Azure Services]
+    ACR[%%icon:azure/acr%%ACR<br/>microserviceacr<br/>web-app:sha]
+    DB[%%icon:azure/sql%%Azure SQL<br/>serverless]
+    Cache[%%icon:azure/redis%%Redis Cache<br/>shared sessions]
+    Queue[Service Bus]
+    Storage[%%icon:azure/storage%%Blob Storage<br/>uploads]
+  end
+
+  subgraph aks[%%icon:azure/aks%%AKS Automatic]
+    subgraph ns[%%icon:k8s/ns%%namespace: microservice-app]
+      Route[HTTPRoute<br/>/ → api]
+      SVC[%%icon:k8s/svc%%Service<br/>api]
+      DEP[%%icon:k8s/deploy%%Deployment<br/>API + Worker<br/>2-10 replicas]
+      SA[%%icon:k8s/sa%%ServiceAccount<br/>workload identity]
+      HPA[%%icon:k8s/hpa%%HPA<br/>queue depth]
+      GW --> Route --> SVC --> DEP
+      DEP --> SA
+      HPA -.-> DEP
+    end
   end` },
   ] as A2uiComponent[]);
 };
@@ -1046,27 +1052,43 @@ const phaseDesignScenario = (): A2uiMsg[] => {
     { id: 'desc', component: 'Text', text: 'Based on your requirements, here\'s the proposed architecture for your full-stack application on AKS.', variant: 'body1' },
     { id: 'arch-diagram', component: 'ArchitectureDiagram',
       title: 'Proposed Architecture',
-      description: 'Full-stack application with microservices on AKS',
+      description: 'Full-stack application grouped by AKS namespace and Azure dependencies',
       diagram: `graph LR
-  Client([Browser]) --> AGIC[App Gateway]
-  AGIC --> FE[React Frontend]
-  AGIC --> API[Node.js API]
-  API --> PG[(PostgreSQL)]
-  API --> Redis[(Redis Cache)]
-  API --> SB[Service Bus]
-  SB --> Worker[Worker Pod]
-  Worker --> Blob[(Blob Storage)]
-  subgraph AKS Cluster
-    FE
-    API
-    Worker
+  Client([Browser]) --> GW[Gateway API<br/>approuting-istio]
+
+  subgraph cicd[GitHub Actions]
+    GHA[GitHub Actions<br/>build + push]
   end
-  subgraph Azure PaaS
-    PG
-    Redis
-    SB
-    Blob
-  end`,
+
+  subgraph azure[Azure Services]
+    ACR[%%icon:azure/acr%%ACR<br/>fullstackacr<br/>frontend:sha]
+    PG[%%icon:azure/postgresql%%PostgreSQL<br/>Flexible Server]
+    Redis[%%icon:azure/redis%%Redis Cache<br/>Basic C0]
+    SB[Service Bus]
+    Blob[%%icon:azure/storage%%Blob Storage<br/>assets]
+    KV[%%icon:azure/key-vault%%Key Vault<br/>app secrets]
+  end
+
+  subgraph aks[%%icon:azure/aks%%AKS Automatic]
+    subgraph ns[%%icon:k8s/ns%%namespace: full-stack-app]
+      Route[HTTPRoute<br/>/ → web]
+      SVC[%%icon:k8s/svc%%Service<br/>web]
+      DEP[%%icon:k8s/deploy%%Deployment<br/>React + Node API<br/>2-10 replicas]
+      SA[%%icon:k8s/sa%%ServiceAccount<br/>workload identity]
+      HPA[%%icon:k8s/hpa%%HPA<br/>cpu 70%]
+      GW --> Route --> SVC --> DEP
+      DEP --> SA
+      HPA -.-> DEP
+    end
+  end
+
+  ACR -.->|image pull| DEP
+  DEP --> PG
+  DEP --> Redis
+  DEP --> SB
+  DEP --> Blob
+  DEP -->|Workload Identity| KV
+  GHA -.->|build + push| ACR`,
     },
     { id: 'services-tabs', component: 'Tabs', tabs: [
       { title: 'Frontend', child: 'svc-frontend' },
@@ -1636,7 +1658,7 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'ctrl-carousel', label: 'SteppedCarousel', description: 'Wizard-style stepped carousel',    group: 'Custom Controls', catalog: 'kickstart', generate: customSteppedCarousel },
   { id: 'ctrl-code',     label: 'CodeBlock',      description: 'Syntax-highlighted code',          group: 'Custom Controls', catalog: 'kickstart', generate: customCodeBlock },
   { id: 'ctrl-progress', label: 'ProgressSteps',  description: 'Multi-step progress tracker',      group: 'Custom Controls', catalog: 'kickstart', generate: customProgressSteps },
-  { id: 'ctrl-arch',     label: 'ArchitectureDiagram', description: 'Mermaid-powered architecture diagram', group: 'Custom Controls', catalog: 'kickstart', generate: customArchitectureDiagram },
+  { id: 'ctrl-arch',     label: 'ArchitectureDiagram', description: 'ELK Mermaid architecture diagram with Azure/Kubernetes grouping', group: 'Custom Controls', catalog: 'kickstart', generate: customArchitectureDiagram },
   { id: 'ctrl-questionnaire', label: 'Questionnaire', description: 'Multi-question form with text/choice/multiChoice', group: 'Custom Controls', catalog: 'kickstart', generate: customQuestionnaire },
   { id: 'ctrl-markdown', label: 'Markdown', description: 'Rich markdown with tables and code blocks', group: 'Custom Controls', catalog: 'kickstart', generate: customMarkdown },
   // Data Binding

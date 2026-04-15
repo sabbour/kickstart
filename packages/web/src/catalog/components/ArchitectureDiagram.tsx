@@ -1,64 +1,41 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Body2,
-  Button,
   Caption1,
   Card,
-  Subtitle1,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
+import { getDiagramIconRegistry } from '@sabbour/adaptive-ui-core';
+import { registerAzureDiagramIcons } from '@sabbour/adaptive-ui-azure-pack/diagram-icons';
+import buildingCloudIcon from '@sabbour/adaptive-ui-core/icons/fluent/building-cloud.svg?url';
+import designIdeasIcon from '@sabbour/adaptive-ui-core/icons/fluent/design-ideas.svg?url';
 import {
-  ZoomInRegular,
-  ZoomOutRegular,
-  ArrowResetRegular,
-} from '@fluentui/react-icons';
+  DiagramEdge,
+  DiagramNode,
+  nodesToMermaid,
+  renderArchitectureDiagramSvg,
+} from './architectureDiagramUtils';
 
-// Azure Portal color constants for Mermaid config (aligned with try-aks reference)
 const AZURE = {
   themePrimary: '#0078d4',
   neutralPrimary: '#292827',
   neutralSecondary: '#646464',
   neutralTertiaryAlt: '#a19f9d',
-  neutralLighter: '#f3f2f1',
   neutralLight: '#e1dfdd',
+  neutralLighter: '#f3f2f1',
   neutralLighterAlt: '#faf9f8',
   white: '#ffffff',
   fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
 } as const;
 
-// Icon keyword mapping — keys are lowercase search terms, values are icon filenames
-const ICON_MAP: Array<{ keywords: string[]; icon: string }> = [
-  { keywords: ['aks', 'kubernetes', 'k8s'], icon: 'cloud-cube.svg' },
-  { keywords: ['container', 'docker', 'pod'], icon: 'cube.svg' },
-  { keywords: ['database', 'db', 'sql', 'cosmos', 'postgres', 'mysql', 'mongo'], icon: 'database.svg' },
-  { keywords: ['api', 'gateway', 'endpoint', 'rest'], icon: 'globe.svg' },
-  { keywords: ['storage', 'blob', 'file', 'disk'], icon: 'cloud-archive.svg' },
-  { keywords: ['user', 'client', 'browser', 'customer'], icon: 'person.svg' },
-  { keywords: ['monitor', 'log', 'telemetry', 'insight', 'observ'], icon: 'desktop-pulse.svg' },
-  { keywords: ['network', 'vnet', 'subnet', 'dns', 'private endpoint'], icon: 'network-check.svg' },
-  { keywords: ['security', 'auth', 'key vault', 'keyvault', 'identity', 'rbac'], icon: 'lock-shield.svg' },
-  { keywords: ['key', 'secret', 'certificate', 'cert'], icon: 'key.svg' },
-  { keywords: ['load balancer', 'traffic', 'ingress', 'balancer'], icon: 'arrow-split.svg' },
-  { keywords: ['registry', 'acr', 'image registry'], icon: 'box-multiple.svg' },
-  { keywords: ['cloud', 'azure'], icon: 'cloud.svg' },
-];
-
-function matchIcon(label: string): string | null {
-  const lower = label.toLowerCase();
-  for (const entry of ICON_MAP) {
-    if (entry.keywords.some((kw) => lower.includes(kw))) {
-      return entry.icon;
-    }
-  }
-  return null;
-}
-
-const VIEWPORT_MIN_HEIGHT = 300;
+const VIEWPORT_MIN_HEIGHT = 320;
 const VIEWPORT_MAX_HEIGHT = 800;
+const MIN_SCALE = 0.2;
+const MAX_SCALE = 5;
 
 const NodeSchema = z.object({
   id: z.string(),
@@ -71,43 +48,6 @@ const EdgeSchema = z.object({
   to: z.string(),
   label: z.string().optional(),
 });
-
-type DiagramNode = z.infer<typeof NodeSchema>;
-type DiagramEdge = z.infer<typeof EdgeSchema>;
-
-/** Map node type to Mermaid shape syntax */
-function nodeToMermaid(node: DiagramNode): string {
-  const escaped = node.label.replace(/"/g, '#quot;');
-  switch (node.type) {
-    case 'database':
-      return `  ${node.id}[("${escaped}")]`;
-    case 'network':
-      return `  ${node.id}{{"${escaped}"}}`;
-    case 'messaging':
-      return `  ${node.id}[/"${escaped}"/]`;
-    case 'storage':
-      return `  ${node.id}[["${escaped}"]]`;
-    case 'compute':
-    default:
-      return `  ${node.id}["${escaped}"]`;
-  }
-}
-
-/** Convert structured nodes/edges to a Mermaid flowchart string */
-function nodesToMermaid(nodes: DiagramNode[], edges: DiagramEdge[]): string {
-  const lines: string[] = ['graph TD'];
-  for (const node of nodes) {
-    lines.push(nodeToMermaid(node));
-  }
-  for (const edge of edges) {
-    if (edge.label) {
-      lines.push(`  ${edge.from} -->|${edge.label}| ${edge.to}`);
-    } else {
-      lines.push(`  ${edge.from} --> ${edge.to}`);
-    }
-  }
-  return lines.join('\n');
-}
 
 const ArchitectureDiagramApi = {
   name: 'ArchitectureDiagram',
@@ -127,84 +67,180 @@ const useStyles = makeStyles({
     width: '100%',
     overflow: 'hidden',
     padding: '0',
+    backgroundColor: '#ffffff',
   },
   header: {
-    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: tokens.spacingHorizontalM,
+    padding: '14px 20px',
     borderBottomWidth: tokens.strokeWidthThin,
     borderBottomStyle: 'solid',
     borderBottomColor: '#e1dfdd',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXS,
     backgroundColor: '#faf9f8',
-    fontSize: '13px',
-    fontWeight: '600',
-    color: '#292827',
     letterSpacing: '0.01em',
   },
-  toolbar: {
+  titleGroup: {
     display: 'flex',
-    justifyContent: 'flex-end',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+    minWidth: '0',
+  },
+  titleRow: {
+    display: 'flex',
+    alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
-    padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalM}`,
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderBottomWidth: tokens.strokeWidthThin,
-    borderBottomStyle: 'solid',
-    borderBottomColor: tokens.colorNeutralStroke2,
+    minWidth: '0',
+  },
+  headerIcon: {
+    width: '16px',
+    height: '16px',
+    flexShrink: 0,
+    filter: 'brightness(0) saturate(100%) invert(28%) sepia(98%) saturate(1624%) hue-rotate(196deg) brightness(96%) contrast(101%)',
+  },
+  title: {
+    fontSize: '16px',
+    fontWeight: 600,
+    lineHeight: '22px',
+    color: '#292827',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  description: {
+    color: '#646464',
+    marginLeft: '24px',
+  },
+  controls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    flexShrink: 0,
+  },
+  controlButton: {
+    width: '28px',
+    height: '28px',
+    border: '1px solid #e1dfdd',
+    borderRadius: '2px',
+    backgroundColor: '#ffffff',
+    color: '#646464',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    lineHeight: 1,
+    padding: 0,
+    ':disabled': {
+      cursor: 'not-allowed',
+      opacity: 0.6,
+    },
+  },
+  actionButton: {
+    minWidth: '0',
+    width: 'auto',
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    fontSize: '12px',
+  },
+  percentage: {
+    minWidth: '36px',
+    textAlign: 'center',
+    fontSize: '11px',
+    lineHeight: '16px',
+    color: '#646464',
+    fontFamily: tokens.fontFamilyMonospace,
+  },
+  diagramArea: {
+    padding: '24px',
+    backgroundColor: '#ffffff',
   },
   viewport: {
     width: '100%',
     overflow: 'hidden',
     position: 'relative',
     cursor: 'grab',
-    backgroundColor: tokens.colorNeutralBackground1,
     userSelect: 'none',
-    boxShadow: '0 1.6px 3.6px rgba(0,0,0,0.132), 0 0.3px 0.9px rgba(0,0,0,0.108)',
     border: '1px solid #e1dfdd',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 1.6px 3.6px rgba(0,0,0,0.132), 0 0.3px 0.9px rgba(0,0,0,0.108)',
   },
   viewportGrabbing: {
     cursor: 'grabbing',
   },
   canvas: {
     position: 'absolute',
-    top: '0',
-    left: '0',
+    top: 0,
+    left: 0,
     transformOrigin: '0 0',
   },
   fallback: {
-    padding: tokens.spacingHorizontalM,
-    backgroundColor: tokens.colorNeutralBackground2,
+    padding: '16px 20px',
+    backgroundColor: '#fdd8db',
+    border: '1px solid #a4262c',
+    borderRadius: '2px',
+    color: '#a4262c',
+    lineHeight: 1.5,
   },
-  fallbackLabel: {
-    color: tokens.colorNeutralForeground3,
+  fallbackTitle: {
+    display: 'block',
     marginBottom: tokens.spacingVerticalXS,
+    color: '#a4262c',
   },
   rawCode: {
     fontFamily: tokens.fontFamilyMonospace,
     fontSize: '12px',
     lineHeight: '18px',
     whiteSpace: 'pre-wrap',
-    color: tokens.colorNeutralForeground1,
-    margin: '0',
+    margin: 0,
     overflowX: 'auto',
+  },
+  emptyState: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: tokens.spacingVerticalXS,
+    minHeight: '220px',
+    color: '#646464',
+    textAlign: 'center',
+  },
+  emptyStateIcon: {
+    width: '32px',
+    height: '32px',
+    opacity: 0.5,
+    filter: 'brightness(0) saturate(100%) invert(28%) sepia(98%) saturate(1624%) hue-rotate(196deg) brightness(96%) contrast(101%)',
   },
 });
 
-let mermaidInstance: typeof import('mermaid') | null = null;
-let mermaidLoading = false;
-let mermaidCallbacks: Array<(m: typeof import('mermaid')) => void> = [];
+type MermaidModule = typeof import('mermaid');
+type MermaidApi = MermaidModule['default'];
 
-function loadMermaid(): Promise<typeof import('mermaid')> {
-  return new Promise((resolve) => {
-    if (mermaidInstance) {
-      resolve(mermaidInstance);
-      return;
-    }
-    mermaidCallbacks.push(resolve);
-    if (!mermaidLoading) {
-      mermaidLoading = true;
-      import('mermaid').then((m) => {
-        m.default.initialize({
+let mermaidPromise: Promise<MermaidApi> | null = null;
+let iconsRegistered = false;
+let diagramCounter = 0;
+
+function ensureDiagramIconsRegistered() {
+  if (!iconsRegistered) {
+    registerAzureDiagramIcons();
+    iconsRegistered = true;
+  }
+}
+
+function loadMermaid(): Promise<MermaidApi> {
+  if (!mermaidPromise) {
+    mermaidPromise = Promise.all([
+      import('mermaid'),
+      import('@mermaid-js/layout-elk'),
+    ])
+      .then(([mermaidModule, elkModule]) => {
+        const mermaid = mermaidModule.default as MermaidApi & {
+          registerLayoutLoaders?: (loaders: unknown) => void;
+        };
+
+        mermaid.registerLayoutLoaders?.(elkModule.default);
+        mermaid.initialize({
           startOnLoad: false,
           theme: 'base',
           securityLevel: 'antiscript',
@@ -234,306 +270,207 @@ function loadMermaid(): Promise<typeof import('mermaid')> {
             nodeSpacing: 80,
             rankSpacing: 90,
             useMaxWidth: false,
+            defaultRenderer: 'elk',
           },
         });
-        mermaidInstance = m;
-        const cbs = mermaidCallbacks;
-        mermaidCallbacks = [];
-        cbs.forEach((cb) => cb(m));
+
+        return mermaid;
+      })
+      .catch((error) => {
+        mermaidPromise = null;
+        throw error;
       });
-    }
-  });
+  }
+
+  return mermaidPromise;
 }
 
-/** Raise cluster labels above edges so they aren't occluded. */
 function raiseClusterLabels(svg: SVGSVGElement): void {
   const overlay = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   overlay.setAttribute('class', 'cluster-label-overlay');
   overlay.setAttribute('pointer-events', 'none');
   svg.appendChild(overlay);
-  svg.querySelectorAll('.cluster-label').forEach((el) => overlay.appendChild(el));
+
+  svg.querySelectorAll('.cluster-label').forEach((element) => {
+    overlay.appendChild(element);
+  });
 }
 
-/**
- * Sanitize a raw Mermaid diagram string from an untrusted source (LLM output).
- *
- * Uses single-character encoding rather than multi-character removal to avoid
- * the incomplete-multi-character-sanitization class of bypass (e.g. a nested
- * tag like `<sc<x>ript>` that reassembles after stripping `<x>`).
- *
- * Strategy: preserve `<br/>` (needed for multi-line node labels) via a null-
- * byte placeholder, then encode every remaining `<` to `&lt;`.  Once `<` is
- * encoded, no HTML tag — and therefore no event handler or dangerous URI in
- * an attribute value — can reach Mermaid's htmlLabels renderer.
- *
- * Note: `<-->` bidirectional Mermaid arrows are not used in `graph TD`
- * architecture diagrams, so encoding `<` has no practical syntax impact.
- */
-function sanitizeDiagramInput(source: string): string {
-  const BR = '\u0000BR\u0000';
-  return source
-    .replace(/<br\s*\/?>/gi, BR)   // protect <br/> — needed for multi-line labels
-    .replace(/</g, '&lt;')         // encode all other '<' (single-char, no bypass risk)
-    .replace(new RegExp(BR, 'g'), '<br/>');
-}
-
-/**
- * Safely insert a Mermaid-rendered SVG string into a container element.
- *
- * Uses an inert <template> element to parse without script execution or
- * resource loading, then walks the resulting DOM to strip any remaining
- * event-handler attributes and <script> elements before appending to the
- * live document.
- */
 function insertSvgSafely(container: HTMLElement, svg: string): void {
-  const tpl = document.createElement('template');
-  tpl.innerHTML = svg;
+  const template = document.createElement('template');
+  template.innerHTML = svg;
 
-  // Strip <script> elements
-  tpl.content.querySelectorAll('script').forEach((s) => s.remove());
-
-  // Strip on* event-handler attributes from every element
-  tpl.content.querySelectorAll('*').forEach((el) => {
-    Array.from(el.attributes).forEach((attr) => {
-      if (attr.name.toLowerCase().startsWith('on')) {
-        el.removeAttribute(attr.name);
+  template.content.querySelectorAll('script').forEach((script) => script.remove());
+  template.content.querySelectorAll('*').forEach((element) => {
+    Array.from(element.attributes).forEach((attribute) => {
+      if (attribute.name.toLowerCase().startsWith('on')) {
+        element.removeAttribute(attribute.name);
       }
     });
   });
 
   container.innerHTML = '';
-  container.appendChild(tpl.content);
+  container.appendChild(template.content);
 }
 
+function measureSvg(svg: SVGSVGElement): { width: number; height: number } {
+  try {
+    const bounds = svg.getBBox();
+    if (bounds.width > 0 && bounds.height > 0) {
+      return {
+        width: bounds.width + bounds.x * 2,
+        height: bounds.height + bounds.y * 2,
+      };
+    }
+  } catch {
+    // Ignore measurement fallback and use the SVG viewBox/attributes below.
+  }
 
-function preprocessDiagram(source: string): string {
-  let processed = source;
-  // Wrap unquoted bracket labels containing parens in quotes
-  processed = processed.replace(
-    /\[([^\]"]*\([^\]]*)\]/g,
-    (_match, label) => `["${label}"]`,
-  );
-  // HTML-encode parentheses inside quoted bracket labels
-  processed = processed.replace(
-    /\["([^"]*)"\]/g,
-    (_match, label: string) => `["${label.split('(').join('&#40;').split(')').join('&#41;')}"]`,
-  );
-  // Fix subgraph labels with parens
-  processed = processed.replace(
-    /subgraph\s+(\w+)\[([^\]"]*\([^\]]*)\]/g,
-    (_match, id, label: string) =>
-      `subgraph ${id}["${label.split('(').join('&#40;').split(')').join('&#41;')}"]`,
-  );
-  return processed;
+  const width = parseFloat(svg.getAttribute('width') || '0') || svg.viewBox.baseVal.width || 800;
+  const height = parseFloat(svg.getAttribute('height') || '0') || svg.viewBox.baseVal.height || 400;
+  return { width, height };
 }
-
-/** Post-process the rendered SVG: embed try-aks CSS styles, inject icons, raise cluster labels. */
-function postProcessSvg(svgEl: SVGSVGElement): void {
-  // Embed try-aks CSS rules as a <style> element in the SVG
-  const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-  styleEl.textContent = `
-    .cluster rect {
-      rx: 0 !important;
-      ry: 0 !important;
-      stroke-dasharray: none !important;
-      fill: #f3f2f1 !important;
-      stroke: #e1dfdd !important;
-      stroke-width: 1 !important;
-    }
-    .cluster-label {
-      overflow: visible !important;
-      white-space: nowrap;
-      font-weight: 600;
-      font-size: 15px;
-      color: #646464;
-      padding-top: 13px;
-    }
-    .edge path, .flowchart-link {
-      stroke-width: 1.5;
-      stroke: #a19f9d;
-    }
-    .edgeLabel {
-      font-family: 'Segoe UI Light';
-      font-size: 13px;
-      background-color: #ffffff;
-      padding: 2px 6px;
-      color: #646464;
-    }
-    .nodeLabel, .node .label {
-      font-family: 'Segoe UI';
-      font-weight: 500;
-      text-align: center;
-    }
-    .node rect {
-      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.06));
-      stroke-width: 1.5;
-    }
-  `;
-  svgEl.insertBefore(styleEl, svgEl.firstChild);
-
-  // Inject Fluent icons into matching nodes
-  svgEl.querySelectorAll('.node').forEach((nodeGroup) => {
-    const labelEl = nodeGroup.querySelector('.nodeLabel, .label');
-    if (!labelEl) return;
-    const labelText = labelEl.textContent?.trim() || '';
-    const iconFile = matchIcon(labelText);
-    if (!iconFile) return;
-
-    const iconUrl = `/assets/icons/fluent/${iconFile}`;
-    const ICON_SIZE = 18;
-    const ICON_PADDING = 4;
-
-    const rect = nodeGroup.querySelector('rect');
-    if (!rect) return;
-
-    const rectX = parseFloat(rect.getAttribute('x') || '0');
-    const rectY = parseFloat(rect.getAttribute('y') || '0');
-    const rectH = parseFloat(rect.getAttribute('height') || '0');
-
-    const iconX = rectX + ICON_PADDING + 4;
-    const iconY = rectY + (rectH - ICON_SIZE) / 2;
-
-    const ns = 'http://www.w3.org/2000/svg';
-    const xlinkNs = 'http://www.w3.org/1999/xlink';
-    const imageEl = document.createElementNS(ns, 'image');
-    imageEl.setAttributeNS(xlinkNs, 'href', iconUrl);
-    imageEl.setAttribute('x', String(iconX));
-    imageEl.setAttribute('y', String(iconY));
-    imageEl.setAttribute('width', String(ICON_SIZE));
-    imageEl.setAttribute('height', String(ICON_SIZE));
-    imageEl.setAttribute('class', 'fluent-icon');
-    nodeGroup.insertBefore(imageEl, nodeGroup.firstChild);
-
-    const rectW = parseFloat(rect.getAttribute('width') || '0');
-    const extraWidth = ICON_SIZE + ICON_PADDING * 2;
-    rect.setAttribute('width', String(rectW + extraWidth));
-    rect.setAttribute('x', String(rectX - extraWidth / 2));
-
-    const foreignObj = nodeGroup.querySelector('foreignObject');
-    if (foreignObj) {
-      const foX = parseFloat(foreignObj.getAttribute('x') || '0');
-      foreignObj.setAttribute('x', String(foX + extraWidth / 2));
-    }
-    imageEl.setAttribute('x', String(rectX - extraWidth / 2 + ICON_PADDING + 4));
-  });
-
-  // Raise cluster labels above edges
-  raiseClusterLabels(svgEl);
-}
-
-let diagramCounter = 0;
 
 export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, ({ props }) => {
   const classes = useStyles();
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const [renderError, setRenderError] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [isRendering, setIsRendering] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(VIEWPORT_MIN_HEIGHT);
+  const [renderVersion, setRenderVersion] = useState(0);
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const offsetAtDragStart = useRef({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [viewportHeight, setViewportHeight] = useState(VIEWPORT_MIN_HEIGHT);
   const diagramSize = useRef({ width: 0, height: 0 });
 
-  // Resolve diagram string: use `diagram` prop directly, or convert nodes/edges
   const resolvedDiagram = props.diagram
     ? props.diagram
     : props.nodes && props.edges
-      ? nodesToMermaid(props.nodes, props.edges)
+      ? nodesToMermaid(props.nodes as DiagramNode[], props.edges as DiagramEdge[])
       : undefined;
 
-  /** Fit the diagram to the viewport width and center it. */
+  const hasDiagram = Boolean(resolvedDiagram?.trim());
+  const headerTitle = props.title || 'Solution Architecture';
+
+  const resolveIconUrl = useCallback((key: string) => {
+    ensureDiagramIconsRegistered();
+    return getDiagramIconRegistry().get(key) ?? null;
+  }, []);
+
   const fitAndCenter = useCallback(() => {
-    const viewportEl = viewportRef.current;
-    if (!viewportEl || diagramSize.current.width === 0) return;
+    const viewport = viewportRef.current;
+    if (!viewport || diagramSize.current.width === 0 || diagramSize.current.height === 0) {
+      return;
+    }
 
-    const vw = viewportEl.clientWidth;
-    const vh = viewportEl.clientHeight || viewportHeight;
-    const dw = diagramSize.current.width;
-    const dh = diagramSize.current.height;
-
-    // Scale to fit width, but cap so the diagram isn't too large vertically
-    const fitScale = Math.min(vw / dw, vh / dh, 1.5);
-    const clampedScale = Math.max(0.3, Math.min(3, fitScale));
-
-    // Center the diagram in the viewport
-    const scaledW = dw * clampedScale;
-    const scaledH = dh * clampedScale;
-    const cx = Math.max(0, (vw - scaledW) / 2);
-    const cy = Math.max(0, (vh - scaledH) / 2);
+    const viewportWidth = viewport.clientWidth;
+    const viewportHeightValue = viewport.clientHeight || viewportHeight;
+    const { width, height } = diagramSize.current;
+    const fitScale = Math.min((viewportWidth - 48) / width, (viewportHeightValue - 48) / height, 1);
+    const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fitScale));
+    const scaledWidth = width * clampedScale;
+    const scaledHeight = height * clampedScale;
 
     setScale(clampedScale);
-    setOffset({ x: cx, y: cy });
+    setOffset({
+      x: Math.max(0, (viewportWidth - scaledWidth) / 2),
+      y: Math.max(0, (viewportHeightValue - scaledHeight) / 2),
+    });
   }, [viewportHeight]);
 
   useEffect(() => {
-    if (!resolvedDiagram || !containerRef.current) return;
+    if (!hasDiagram || !resolvedDiagram || !containerRef.current) {
+      return;
+    }
 
+    let cancelled = false;
     const container = containerRef.current;
     const id = `mermaid-diagram-${++diagramCounter}`;
 
-    loadMermaid().then(async (m) => {
-      try {
-        const { svg } = await m.default.render(id, preprocessDiagram(sanitizeDiagramInput(resolvedDiagram)));
-        if (container) {
-          insertSvgSafely(container, svg);
-          const svgEl = container.querySelector('svg');
-          if (svgEl) {
-            // Post-process for Fluent 2 styling and icons
-            postProcessSvg(svgEl);
+    setIsRendering(true);
 
-            // Measure natural SVG dimensions for auto-sizing
-            const bbox = svgEl.getBBox();
-            const svgW = bbox.width + bbox.x * 2 || svgEl.viewBox?.baseVal?.width || 800;
-            const svgH = bbox.height + bbox.y * 2 || svgEl.viewBox?.baseVal?.height || 400;
-            diagramSize.current = { width: svgW, height: svgH };
+    loadMermaid()
+      .then(async (mermaid) => {
+        const svgMarkup = await renderArchitectureDiagramSvg(
+          mermaid.render.bind(mermaid),
+          id,
+          resolvedDiagram,
+          resolveIconUrl,
+        );
 
-            // Auto-size viewport height
-            const naturalH = Math.min(VIEWPORT_MAX_HEIGHT, Math.max(VIEWPORT_MIN_HEIGHT, svgH + 40));
-            setViewportHeight(naturalH);
-
-            // Make SVG fill its container
-            svgEl.removeAttribute('height');
-            svgEl.setAttribute('width', String(svgW));
-            svgEl.style.maxWidth = 'none';
-            svgEl.style.height = 'auto';
-            svgEl.style.overflow = 'visible';
-          }
-          setRenderError(false);
-
-          // Defer fit-and-center so viewport has the updated height
-          requestAnimationFrame(() => {
-            fitAndCenter();
-          });
+        if (cancelled) {
+          return;
         }
-      } catch {
-        setRenderError(true);
-      }
-    });
-  }, [resolvedDiagram, fitAndCenter]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setScale((s) => Math.min(3, Math.max(0.3, s + delta)));
+        insertSvgSafely(container, svgMarkup);
+        const svg = container.querySelector('svg');
+        if (svg instanceof SVGSVGElement) {
+          raiseClusterLabels(svg);
+
+          const { width, height } = measureSvg(svg);
+          diagramSize.current = { width, height };
+
+          setViewportHeight(Math.min(VIEWPORT_MAX_HEIGHT, Math.max(VIEWPORT_MIN_HEIGHT, height + 48)));
+
+          svg.removeAttribute('height');
+          svg.setAttribute('width', String(width));
+          svg.style.maxWidth = 'none';
+          svg.style.height = 'auto';
+          svg.style.overflow = 'visible';
+        }
+
+        setRenderError(null);
+        requestAnimationFrame(() => {
+          if (!cancelled) {
+            fitAndCenter();
+          }
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setRenderError(error instanceof Error ? error.message : 'Failed to render diagram');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsRendering(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fitAndCenter, hasDiagram, renderVersion, resolveIconUrl, resolvedDiagram]);
+
+  const handleWheel = useCallback((event: React.WheelEvent) => {
+    event.preventDefault();
+    const factor = event.deltaY > 0 ? 0.9 : 1.1;
+    setScale((currentScale) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, currentScale * factor)));
   }, []);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((event: React.MouseEvent) => {
+    if (event.button !== 0) {
+      return;
+    }
+
     dragging.current = true;
     setIsDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY };
+    dragStart.current = { x: event.clientX, y: event.clientY };
     offsetAtDragStart.current = { ...offset };
   }, [offset]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragging.current) return;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
+  const handleMouseMove = useCallback((event: React.MouseEvent) => {
+    if (!dragging.current) {
+      return;
+    }
+
     setOffset({
-      x: offsetAtDragStart.current.x + dx,
-      y: offsetAtDragStart.current.y + dy,
+      x: offsetAtDragStart.current.x + (event.clientX - dragStart.current.x),
+      y: offsetAtDragStart.current.y + (event.clientY - dragStart.current.y),
     });
   }, []);
 
@@ -542,34 +479,52 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
     setIsDragging(false);
   }, []);
 
-  const zoomIn = () => setScale((s) => Math.min(3, s + 0.2));
-  const zoomOut = () => setScale((s) => Math.max(0.3, s - 0.2));
+  const zoomOut = () => setScale((currentScale) => Math.max(MIN_SCALE, currentScale * 0.8));
+  const zoomIn = () => setScale((currentScale) => Math.min(MAX_SCALE, currentScale * 1.2));
   const resetView = () => fitAndCenter();
+  const regenerateDiagram = () => setRenderVersion((currentVersion) => currentVersion + 1);
 
   return (
     <Card className={classes.root}>
-      {(props.title || props.description) && (
-        <div className={classes.header}>
-          {props.title && <Subtitle1>{props.title}</Subtitle1>}
-          {props.description && <Body2>{props.description}</Body2>}
-        </div>
-      )}
-
-      {renderError ? (
-        <div className={classes.fallback}>
-          <Caption1 className={classes.fallbackLabel}>
-            Diagram rendering unavailable — raw Mermaid source:
-          </Caption1>
-          <pre className={classes.rawCode}>{resolvedDiagram}</pre>
-        </div>
-      ) : (
-        <>
-          <div className={classes.toolbar}>
-            <Button appearance="subtle" size="small" icon={<ZoomInRegular />} onClick={zoomIn} title="Zoom in" />
-            <Button appearance="subtle" size="small" icon={<ZoomOutRegular />} onClick={zoomOut} title="Zoom out" />
-            <Button appearance="subtle" size="small" icon={<ArrowResetRegular />} onClick={resetView} title="Reset view" />
-            <Caption1>{Math.round(scale * 100)}%</Caption1>
+      <div className={classes.header}>
+        <div className={classes.titleGroup}>
+          <div className={classes.titleRow}>
+            <img src={buildingCloudIcon} alt="" className={classes.headerIcon} />
+            <div className={classes.title}>{headerTitle}</div>
           </div>
+          {props.description && <Body2 className={classes.description}>{props.description}</Body2>}
+        </div>
+        <div className={classes.controls}>
+          <button type="button" className={classes.controlButton} onClick={zoomOut} aria-label="Zoom out" title="Zoom out">
+            −
+          </button>
+          <div className={classes.percentage}>{Math.round(scale * 100)}%</div>
+          <button type="button" className={classes.controlButton} onClick={zoomIn} aria-label="Zoom in" title="Zoom in">
+            +
+          </button>
+          <button type="button" className={`${classes.controlButton} ${classes.actionButton}`} onClick={resetView} aria-label="Reset view" title="Reset view">
+            Reset
+          </button>
+          <button
+            type="button"
+            className={`${classes.controlButton} ${classes.actionButton}`}
+            onClick={regenerateDiagram}
+            aria-label="Regenerate layout"
+            title="Regenerate layout"
+            disabled={isRendering || !hasDiagram}
+          >
+            {isRendering ? 'Rendering' : 'Regenerate'}
+          </button>
+        </div>
+      </div>
+
+      <div className={classes.diagramArea}>
+        {renderError ? (
+          <div className={classes.fallback}>
+            <Caption1 className={classes.fallbackTitle}>Diagram error: {renderError}</Caption1>
+            {resolvedDiagram && <pre className={classes.rawCode}>{resolvedDiagram}</pre>}
+          </div>
+        ) : hasDiagram ? (
           <div
             ref={viewportRef}
             className={`${classes.viewport} ${isDragging ? classes.viewportGrabbing : ''}`}
@@ -581,15 +536,21 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
             onMouseLeave={handleMouseUp}
           >
             <div
+              ref={containerRef}
               className={classes.canvas}
               style={{
                 transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                transition: isDragging ? 'none' : 'transform 0.1s ease-out',
               }}
-              ref={containerRef}
             />
           </div>
-        </>
-      )}
+        ) : (
+          <div className={classes.emptyState}>
+            <img src={designIdeasIcon} alt="" className={classes.emptyStateIcon} />
+            <Body2>Architecture diagram will appear here as you design your solution.</Body2>
+          </div>
+        )}
+      </div>
     </Card>
   );
 });

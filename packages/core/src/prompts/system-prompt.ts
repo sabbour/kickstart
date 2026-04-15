@@ -124,15 +124,17 @@ Ask ONE service question per turn (skip if already answered):
 After gathering answers, present ONE architecture review step:
 - Show ONE ArchitectureDiagram using the \`diagram\` prop (raw Mermaid string). Follow these rules exactly:
   - Always use \`graph TD\` layout.
-  - Always wrap all compute workloads in \`subgraph AKS["AKS Automatic"]\`.
-  - Always include \`ACR["Container Registry"] -.->|image pull| <AppNode>\`.
-  - Always include \`<AppNode> -->|Workload Identity| KV["Key Vault"]\`.
-  - Always include \`GHA["GitHub Actions"] -.->|build and push| ACR\`.
-  - If public URL = yes: add \`User(("User")) -->|HTTPS| GW{{"Gateway (Istio)"}}\` with GW inside the AKS subgraph.
-  - Annotate compute replicas inline: \`["App Name<br/>(2-10 replicas)"]\`.
-  - Managed Azure services (DB, cache, queue) go OUTSIDE the AKS subgraph.
-  - If Kubernetes AI Toolkit Operator (KAITO) selected: place \`KAITO["KAITO Model Service<br/>(GPU-accelerated)"]\` INSIDE the AKS subgraph.
-  - NEVER show: VNet, subnets, node pools, or K8s-internal objects (Services, Deployments, ConfigMaps, Secrets).
+  - Always model AKS as nested group boundaries: \`subgraph AKS["%%icon:azure/aks%%AKS Automatic"]\` and inside it \`subgraph NS["%%icon:k8s/ns%%namespace: <app-name>"]\`.
+  - Always include \`ACR["%%icon:azure/acr%%ACR<br/><registry-name><br/><image:tag>"] -.->|image pull| <DeploymentNode>\`.
+  - Always include \`<DeploymentNode> -->|Workload Identity| KV["%%icon:azure/key-vault%%Key Vault<br/>app secrets"]\`.
+  - Always include \`GHA["GitHub Actions<br/>build + push"] -.->|build and push| ACR\`.
+  - If public URL = yes: add \`User(("User")) -->|HTTPS| GW["Gateway API<br/>approuting-istio"]\` and \`Route["HTTPRoute<br/>/ → <service-name>"]\` inside the namespace.
+  - Inside the namespace, show the app workload as \`Deployment\`, \`Service\`, \`ServiceAccount\`, and \`HPA\`. \`PDB\` is optional, but include it for critical web/API workloads.
+  - Use multiline subtitles with \`<br/>\` for replicas, image tags, class names, and other short annotations.
+  - Prefer shared icon placeholders on supported resources (\`azure/aks\`, \`azure/acr\`, \`azure/postgresql\`, \`azure/redis\`, \`azure/key-vault\`, \`azure/cognitive-services\`, \`k8s/ns\`, \`k8s/deploy\`, \`k8s/svc\`, \`k8s/sa\`, \`k8s/hpa\`). If a matching shared icon does not exist, omit the placeholder and keep the plain-text label.
+  - Managed Azure services (DB, cache, queue, AI) go OUTSIDE the AKS subgraph, grouped under an outer boundary like \`Azure Services\` when helpful.
+  - If Kubernetes AI Toolkit Operator (KAITO) selected: place \`KAITO["KAITO Model Service<br/>GPU-accelerated"]\` INSIDE the namespace.
+  - NEVER show: VNet, subnets, node pools, ConfigMaps, or Secrets.
 - Explain WHY this architecture fits the app before showing the diagram.
 - Include one primary Button to approve the architecture and one secondary Button to revise it.
 - Do NOT show cost estimates, best-practice summaries, or deployment/auth components in the same turn as the architecture diagram. Cost review happens later in REVIEW.
@@ -309,7 +311,7 @@ Study these examples carefully. Every response you give should match this level 
           { "id": "arch-card", "component": "Card", "children": ["arch-col"] },
           { "id": "arch-col", "component": "Column", "children": ["arch-why", "arch"], "gap": "12px" },
           { "id": "arch-why", "component": "Markdown", "content": "**Why this shape works:** it keeps the API, data, and ingress concerns separate so the app can scale cleanly as traffic grows." },
-          { "id": "arch", "component": "ArchitectureDiagram", "diagram": "graph TD\\n  User((\\"User\\")) -->|HTTPS| GW{{\\"Gateway (Istio)\\"}}\\n\\n  subgraph AKS[\\"AKS Automatic\\"]\\n    GW --> API[\\"Node.js API<br/>&#40;2-10 replicas&#41;\\"]\\n  end\\n\\n  ACR[\\"Container Registry\\"] -.->|image pull| API\\n  API --> DB[(\\"Azure Database for PostgreSQL\\")]\\n  API --> Cache[(\\"Azure Cache for Redis\\")]\\n  API -->|Workload Identity| KV[\\"Key Vault\\"]\\n\\n  GHA[\\"GitHub Actions\\"] -.->|build and push| ACR" },
+          { "id": "arch", "component": "ArchitectureDiagram", "title": "Proposed Architecture", "description": "AKS Automatic with a grouped namespace and managed Azure services.", "diagram": "graph TD\\n  User((\\"User\\")) -->|HTTPS| GW[\\"Gateway API<br/>approuting-istio\\"]\\n\\n  subgraph CI[\\"GitHub Actions\\"]\\n    GHA[\\"GitHub Actions<br/>build + push\\"]\\n  end\\n\\n  subgraph Azure[\\"Azure Services\\"]\\n    ACR[\\"%%icon:azure/acr%%ACR<br/>assessmentdriftradaracr<br/>assessment-drift-radar:sha\\"]\\n    DB[\\"%%icon:azure/postgresql%%PostgreSQL<br/>Flexible Server\\"]\\n    Cache[\\"%%icon:azure/redis%%Redis Cache<br/>shared session state\\"]\\n    KV[\\"%%icon:azure/key-vault%%Key Vault<br/>app secrets\\"]\\n  end\\n\\n  subgraph AKS[\\"%%icon:azure/aks%%AKS Automatic\\"]\\n    subgraph NS[\\"%%icon:k8s/ns%%namespace: assessment-drift-radar\\"]\\n      Route[\\"HTTPRoute<br/>/ → web\\"]\\n      SVC[\\"%%icon:k8s/svc%%Service<br/>web\\"]\\n      DEP[\\"%%icon:k8s/deploy%%Deployment<br/>web<br/>&#40;2-10 replicas&#41;\\"]\\n      SA[\\"%%icon:k8s/sa%%ServiceAccount<br/>workload identity\\"]\\n      HPA[\\"%%icon:k8s/hpa%%HPA<br/>cpu 70%\\"]\\n      GW --> Route --> SVC --> DEP\\n      DEP --> SA\\n      HPA -.-> DEP\\n    end\\n  end\\n\\n  ACR -.->|image pull| DEP\\n  DEP --> DB\\n  DEP --> Cache\\n  DEP -->|Workload Identity| KV\\n  GHA -.->|build and push| ACR" },
           { "id": "actions-row", "component": "Row", "children": ["approve-btn", "change-btn"], "gap": "8px" },
           { "id": "approve-btn", "component": "Button", "label": "Looks good, let's build it", "variant": "primary", "action": { "event": { "name": "approve-architecture", "context": { "label": "Approve architecture" } } } },
           { "id": "change-btn", "component": "Button", "label": "I'd like to change something", "variant": "secondary", "action": { "event": { "name": "modify-architecture", "context": { "label": "Change architecture" } } } }
