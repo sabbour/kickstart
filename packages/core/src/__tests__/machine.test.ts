@@ -4,6 +4,7 @@ import {
   transition,
   getCurrentPhase,
   canAdvance,
+  handleImplicitFlags,
 } from "../engine/machine.js";
 import { Phase } from "../engine/types.js";
 import type { ConversationState as _ConversationState } from "../engine/types.js";
@@ -171,5 +172,149 @@ describe("full journey", () => {
     }
 
     expect(state.isComplete).toBe(true);
+  });
+});
+
+describe("handleImplicitFlags", () => {
+  it("phaseComplete: true advances when current phase is active", () => {
+    const state = createInitialState();
+    expect(state.currentPhase).toBe(Phase.Discover);
+
+    const result = handleImplicitFlags(state, { phaseComplete: true });
+    expect(result.currentPhase).toBe(Phase.Design);
+    expect(result.phaseStatus[Phase.Discover]).toBe("complete");
+    expect(result.phaseStatus[Phase.Design]).toBe("active");
+  });
+
+  it("phaseComplete: false does not advance", () => {
+    const state = createInitialState();
+    const result = handleImplicitFlags(state, { phaseComplete: false });
+    expect(result.currentPhase).toBe(Phase.Discover);
+    expect(result.phaseStatus[Phase.Discover]).toBe("active");
+  });
+
+  it("does not advance when isComplete is true", () => {
+    let state = createInitialState();
+    // Advance through all phases so isComplete = true
+    for (let i = 0; i < 6; i++) {
+      state = transition(state, { type: "ADVANCE" });
+    }
+    expect(state.isComplete).toBe(true);
+
+    const result = handleImplicitFlags(state, { phaseComplete: true });
+    expect(result.isComplete).toBe(true);
+    // State should be unchanged — no further advancement
+    expect(result.currentPhase).toBe(state.currentPhase);
+  });
+
+  it("does not advance when current phase is not active", () => {
+    const state = createInitialState();
+    // Skip Discover to make it "skipped" (not active)
+    const skipped = transition(state, { type: "SKIP" });
+    expect(skipped.currentPhase).toBe(Phase.Design);
+
+    // Now artificially set Design to "pending" to test the guard
+    // (canAdvance checks for "active" status)
+    const rigged = { ...skipped, phaseStatus: { ...skipped.phaseStatus } };
+    rigged.phaseStatus[Phase.Design] = "pending";
+
+    const result = handleImplicitFlags(rigged, { phaseComplete: true });
+    // Should not advance because current phase is not "active"
+    expect(result.currentPhase).toBe(Phase.Design);
+  });
+
+  it("filesComplete does not affect state", () => {
+    const state = createInitialState();
+    const resultFalse = handleImplicitFlags(state, { filesComplete: false });
+    expect(resultFalse.currentPhase).toBe(Phase.Discover);
+    expect(resultFalse).toEqual(state);
+
+    const resultTrue = handleImplicitFlags(state, { filesComplete: true });
+    expect(resultTrue.currentPhase).toBe(Phase.Discover);
+    expect(resultTrue).toEqual(state);
+  });
+
+  it("returns original state reference when no flags trigger advancement", () => {
+    const state = createInitialState();
+    const result = handleImplicitFlags(state, {});
+    expect(result).toBe(state);
+  });
+
+  it("handles empty flags object (no phaseComplete, no filesComplete)", () => {
+    const state = createInitialState();
+    const result = handleImplicitFlags(state, {});
+    expect(result.currentPhase).toBe(Phase.Discover);
+    expect(result.phaseStatus[Phase.Discover]).toBe("active");
+    expect(result).toBe(state);
+  });
+
+  it("handles undefined phaseComplete gracefully", () => {
+    const state = createInitialState();
+    const result = handleImplicitFlags(state, { phaseComplete: undefined });
+    expect(result.currentPhase).toBe(Phase.Discover);
+    expect(result).toBe(state);
+  });
+
+  it("handles null filesComplete without affecting state", () => {
+    const state = createInitialState();
+    const result = handleImplicitFlags(state, { filesComplete: null });
+    expect(result.currentPhase).toBe(Phase.Discover);
+    expect(result).toBe(state);
+  });
+
+  it("advances through multiple phases sequentially with repeated phaseComplete", () => {
+    let state = createInitialState();
+    expect(state.currentPhase).toBe(Phase.Discover);
+
+    state = handleImplicitFlags(state, { phaseComplete: true });
+    expect(state.currentPhase).toBe(Phase.Design);
+
+    state = handleImplicitFlags(state, { phaseComplete: true });
+    expect(state.currentPhase).toBe(Phase.Generate);
+
+    state = handleImplicitFlags(state, { phaseComplete: true });
+    expect(state.currentPhase).toBe(Phase.Review);
+  });
+
+  it("stops advancing after reaching the final phase", () => {
+    let state = createInitialState();
+    // Advance through all phases to completion
+    for (let i = 0; i < 6; i++) {
+      state = transition(state, { type: "ADVANCE" });
+    }
+    expect(state.isComplete).toBe(true);
+
+    // Further phaseComplete calls should be no-ops
+    const result1 = handleImplicitFlags(state, { phaseComplete: true });
+    expect(result1).toBe(state);
+
+    const result2 = handleImplicitFlags(state, { phaseComplete: true, filesComplete: false });
+    expect(result2).toBe(state);
+  });
+
+  it("phaseComplete combined with filesComplete only affects phase, not files", () => {
+    const state = createInitialState();
+    const result = handleImplicitFlags(state, { phaseComplete: true, filesComplete: false });
+    expect(result.currentPhase).toBe(Phase.Design);
+    expect(result.phaseStatus[Phase.Discover]).toBe("complete");
+    // filesComplete doesn't change state machine — harness handles it
+  });
+
+  it("does not advance from a skipped phase", () => {
+    const state = createInitialState();
+    const skipped = transition(state, { type: "SKIP" });
+    expect(skipped.currentPhase).toBe(Phase.Design);
+    expect(skipped.phaseStatus[Phase.Design]).toBe("active");
+
+    // Now skip Design too — its status becomes "skipped", move to Generate
+    const doubleSkipped = transition(skipped, { type: "SKIP" });
+    expect(doubleSkipped.currentPhase).toBe(Phase.Generate);
+
+    // Manually set Generate to "pending" to test guard
+    const rigged = { ...doubleSkipped, phaseStatus: { ...doubleSkipped.phaseStatus } };
+    rigged.phaseStatus[Phase.Generate] = "pending";
+
+    const result = handleImplicitFlags(rigged, { phaseComplete: true });
+    expect(result.currentPhase).toBe(Phase.Generate); // no advance — not active
   });
 });
