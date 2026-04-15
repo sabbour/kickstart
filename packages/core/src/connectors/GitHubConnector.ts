@@ -1,4 +1,9 @@
-import type { ConnectorConfig, HttpMethod, APIConnectorRequestOptions } from './types.js';
+import type {
+  APIConnectorRequestOptions,
+  ConnectorConfig,
+  ConnectorErrorCode,
+  HttpMethod,
+} from './types.js';
 import { BaseConnector } from './BaseConnector.js';
 import { gitHubRateLimiter } from './github-rate-limit.js';
 import { ConnectorError } from './types.js';
@@ -38,6 +43,30 @@ export interface GitHubPullRequest {
   state: string;
   head: { ref: string; sha: string };
   base: { ref: string };
+}
+
+export interface GitHubCommitFile {
+  path: string;
+  content: string;
+}
+
+export interface GitHubCommitPullRequestInput {
+  owner: string;
+  repo: string;
+  title: string;
+  head: string;
+  base: string;
+  body?: string;
+  commitMessage?: string;
+  files: GitHubCommitFile[];
+}
+
+export interface GitHubCommitPullRequestResult {
+  pullRequest: GitHubPullRequest;
+  commitSha: string;
+  committedFilesCount: number;
+  headBranch: string;
+  baseBranch: string;
 }
 
 export interface GitHubBranch {
@@ -80,10 +109,28 @@ export interface GitHubRepoOptions {
   gitignore_template?: string;
 }
 
+export interface GitHubConnectorConfig extends ConnectorConfig {
+  serverBaseUrl?: string;
+}
+
+interface GitHubErrorResponse {
+  error?: string;
+  message?: string;
+}
+
 /**
  * Default GitHub OAuth scopes — read-only access.
  */
 const DEFAULT_GITHUB_SCOPES = ['read:user'];
+
+function connectorErrorCodeForStatus(status: number): ConnectorErrorCode {
+  if (status === 400) return 'BAD_REQUEST';
+  if (status === 403) return 'FORBIDDEN';
+  if (status === 404) return 'NOT_FOUND';
+  if (status === 429) return 'RATE_LIMITED';
+  if (status >= 500) return 'SERVER_ERROR';
+  return 'UNKNOWN';
+}
 
 /**
  * Connector for the GitHub REST API.
@@ -94,13 +141,19 @@ const DEFAULT_GITHUB_SCOPES = ['read:user'];
  */
 export class GitHubConnector extends BaseConnector {
   readonly name = 'github';
+  private readonly serverBaseUrl: string | null;
 
   protected get defaultBaseUrl(): string {
     return 'https://api.github.com';
   }
 
-  constructor(config?: ConnectorConfig) {
-    super(config ?? { auth: { kind: 'oauth2', scopes: DEFAULT_GITHUB_SCOPES } });
+  constructor(config?: GitHubConnectorConfig) {
+    const { serverBaseUrl, auth, ...rest } = config ?? {};
+    super({
+      ...rest,
+      auth: auth ?? { kind: 'oauth2', scopes: DEFAULT_GITHUB_SCOPES },
+    } as ConnectorConfig);
+    this.serverBaseUrl = serverBaseUrl ? serverBaseUrl.replace(/\/+$/, '') : null;
   }
 
   /** GitHub-specific headers (Accept, API version). */
@@ -133,6 +186,73 @@ export class GitHubConnector extends BaseConnector {
     const response = await super.request(method, path, body, options);
     gitHubRateLimiter.update(response);
     return response;
+  }
+
+  private ensureAuthenticatedWritePath(): void {
+    try {
+      if (this.isStubMode()) {
+        throw new ConnectorError(
+          'GitHub write operations require authenticated GitHub access or the server-owned handoff endpoints.',
+          'STUB_MODE_DISABLED',
+          { retryable: false },
+        );
+      }
+    } catch (error) {
+      if (error instanceof ConnectorError && error.code === 'STUB_MODE_DISABLED') {
+        throw new ConnectorError(
+          'GitHub write operations require authenticated GitHub access or the server-owned handoff endpoints.',
+          'STUB_MODE_DISABLED',
+          { retryable: false },
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  private requireServerBaseUrl(): string {
+    if (!this.serverBaseUrl) {
+      throw new ConnectorError(
+        'GitHub handoff writes are not configured. Set serverBaseUrl to the server-owned GitHub API.',
+        'BAD_REQUEST',
+        { retryable: false },
+      );
+    }
+
+    return this.serverBaseUrl;
+  }
+
+  private async requestServerJson<T>(path: string, body: unknown): Promise<T> {
+    const response = await fetch(`${this.requireServerBaseUrl()}${path}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      redirect: 'manual',
+    });
+
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      throw new ConnectorError(
+        'GitHub session expired. Please sign in again.',
+        'AUTH_FAILED',
+        { retryable: false, status: response.status },
+      );
+    }
+
+    const responseBody = await response.json().catch(() => undefined) as GitHubErrorResponse | undefined;
+    if (!response.ok) {
+      throw new ConnectorError(
+        responseBody?.error
+          ?? responseBody?.message
+          ?? `GitHub request failed (${response.status})`,
+        connectorErrorCodeForStatus(response.status),
+        { retryable: response.status >= 500, status: response.status },
+      );
+    }
+
+    return responseBody as T;
   }
 
   // ── Domain methods ─────────────────────────────────────────────────────────
@@ -245,7 +365,7 @@ export class GitHubConnector extends BaseConnector {
 
   /**
    * Create a pull request on a repository.
-   * Returns stub data when not authenticated.
+   * Fails closed when the connector is not authenticated.
    */
   async createPullRequest(
     owner: string,
@@ -255,16 +375,7 @@ export class GitHubConnector extends BaseConnector {
     base: string,
     body?: string,
   ): Promise<GitHubPullRequest> {
-    if (this.isStubMode()) {
-      return {
-        number: 1,
-        html_url: `https://github.com/${owner}/${repo}/pull/1`,
-        title,
-        state: 'open',
-        head: { ref: head, sha: 'abc1234' },
-        base: { ref: base },
-      };
-    }
+    this.ensureAuthenticatedWritePath();
 
     const res = await this.request('POST', `/repos/${owner}/${repo}/pulls`, {
       title,
@@ -273,6 +384,24 @@ export class GitHubConnector extends BaseConnector {
       body,
     });
     return (await res.json()) as GitHubPullRequest;
+  }
+
+  /**
+   * Commit selected files on a feature branch, then open a pull request via the
+   * server-owned GitHub handoff endpoint.
+   */
+  async commitFilesAndCreatePullRequest(
+    input: GitHubCommitPullRequestInput,
+  ): Promise<GitHubCommitPullRequestResult> {
+    if (!input.files.length) {
+      throw new ConnectorError(
+        'Select at least one file to commit.',
+        'BAD_REQUEST',
+        { retryable: false },
+      );
+    }
+
+    return this.requestServerJson<GitHubCommitPullRequestResult>('/pulls', input);
   }
 }
 

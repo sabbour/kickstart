@@ -51,7 +51,10 @@ export function APIConnectorProvider({
         proxyBaseUrl: '/api/arm-proxy',
       },
     }));
-    r.register(new GitHubConnector());
+    r.register(new GitHubConnector({
+      auth: { kind: 'oauth2', scopes: ['read:user'] },
+      serverBaseUrl: '/api/github',
+    }));
     r.register(new PricingConnector());
     return r;
   }, [externalRegistry]);
@@ -61,7 +64,7 @@ export function APIConnectorProvider({
   useEffect(() => {
     for (const name of registry.names()) {
       const connector = registry.get(name);
-      if (connector && !connector.isAuthenticated()) {
+      if (connector && connector.name !== 'github' && !connector.isAuthenticated()) {
         connector.authenticate().catch(() => {
           // Intentionally silent — stub connectors warn inside authenticate()
         });

@@ -204,20 +204,18 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
       return;
     }
 
+    if (selectedArtifacts.length === 0) {
+      setError('Select at least one file to commit.');
+      return;
+    }
+
     setState('executing');
     setError(undefined);
     setResultMessage('');
 
     try {
       if (!connector) {
-        // Stub mode
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        const stubUrl = `https://github.com/${repoFullName || 'stub-user/my-app'}/pull/1`;
-        setState('success');
-        setPrUrl(stubUrl);
-        setResultMessage('Pull request created successfully (stub mode)');
-        if (props.onSuccess) (props.onSuccess as () => void)();
-        return;
+        throw new Error('GitHub pull request creation is unavailable. Refresh the page and try again.');
       }
 
       const [owner, repo] = repoFullName.split('/');
@@ -228,18 +226,25 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
       const fileList = selectedArtifacts.map((a) => `- \`${a.path}\``).join('\n');
       const prBodyFull = `${prBody}\n\n---\n\n**Files included (${selectedArtifacts.length}):**\n${fileList}`;
 
-      const pr = await connector.createPullRequest(
+      const result = await connector.commitFilesAndCreatePullRequest({
         owner,
         repo,
-        prTitle,
-        branchName,
-        defaultBranch,
-        prBodyFull,
-      );
+        title: prTitle,
+        head: branchName,
+        base: defaultBranch,
+        body: prBodyFull,
+        commitMessage: prTitle,
+        files: selectedArtifacts.map((artifact) => ({
+          path: artifact.path,
+          content: artifact.content,
+        })),
+      });
 
       setState('success');
-      setPrUrl(pr.html_url);
-      setResultMessage(`Pull request #${pr.number}  created successfully`);
+      setPrUrl(result.pullRequest.html_url);
+      setResultMessage(
+        `Committed ${result.committedFilesCount} file${result.committedFilesCount === 1 ? '' : 's'} and opened pull request #${result.pullRequest.number}.`,
+      );
       if (props.onSuccess) (props.onSuccess as () => void)();
     } catch (err) {
       setState('error');
@@ -302,10 +307,10 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
       <Card className={classes.root}>
         <CardHeader
           header={<Subtitle1>Creating Pull Request\u2026</Subtitle1>}
-          description={<Caption1>Pushing {selectedArtifacts.length} files to {branchName}</Caption1>}
+          description={<Caption1>Committing {selectedArtifacts.length} files to {branchName}</Caption1>}
         />
         <div className={classes.actions} style={{ justifyContent: 'center' }}>
-          <Spinner size="small" label="Creating branch and pull request\u2026" />
+          <Spinner size="small" label="Creating commit and pull request\u2026" />
         </div>
       </Card>
     );
@@ -384,12 +389,6 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
             Create pull request
           </Button>
         </div>
-
-        {!connector && (
-          <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
-            Running in offline mode \u2014 PR creation will be simulated
-          </Caption1>
-        )}
       </Card>
     );
   }
