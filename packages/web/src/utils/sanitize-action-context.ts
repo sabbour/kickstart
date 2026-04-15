@@ -26,6 +26,9 @@ const ALLOWED_KEYS = new Set([
   'option',
   'choice',
   'name',
+  'owner',
+  'repo',
+  'visibility',
 ]);
 
 /**

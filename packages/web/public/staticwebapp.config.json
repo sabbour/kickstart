@@ -20,6 +20,10 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/api/github-auth/callback",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/inspirations",
       "allowedRoles": ["authenticated"]
     },

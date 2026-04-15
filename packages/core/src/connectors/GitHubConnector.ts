@@ -88,7 +88,7 @@ const DEFAULT_GITHUB_SCOPES = ['read:user'];
 /**
  * Connector for the GitHub REST API.
  *
- * Auth: OAuth2 via GitHub Device Flow or PAT (injected with `setTokenProvider()`).
+ * Auth: OAuth2 via an injected token provider.
  * When no token provider is set, domain methods return stub data so
  * the app can function offline during local development.
  */

@@ -236,6 +236,17 @@ describe("COMPONENT_SCHEMA_REGISTRY", () => {
     expect(result.success).toBe(true);
   });
 
+  it("validates GitHubRepoPicker with owner and create props", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["GitHubRepoPicker"].safeParse({
+      id: "ghp1",
+      component: "GitHubRepoPicker",
+      owner: "sabbour",
+      suggestedName: "my-kickstart-app",
+      allowCreate: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("validates Markdown component", () => {
     const result = COMPONENT_SCHEMA_REGISTRY["Markdown"].safeParse({
       id: "md1",
