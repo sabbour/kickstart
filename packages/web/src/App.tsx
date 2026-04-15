@@ -31,6 +31,7 @@ import {
   prepareChatA2ui,
   rebuildChatSessionState,
 } from './utils/chat-a2ui';
+import { summarizeTokenUsage } from './utils/chat-usage';
 import type { AppMode, ChatMessage, A2uiPayloadItem, ConversationPhaseId } from './types';
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
@@ -315,7 +316,7 @@ export function App() {
         onDelta: () => {},
         onA2UI: handleIncomingA2UI,
         onPhase: (phase) => setConversationPhase(phase),
-        onComplete: (fullText, model, receivedSessionId, debugInfo) => {
+        onComplete: (fullText, model, receivedSessionId, debugInfo, usage) => {
           const phase = currentPhaseRef.current || undefined;
           // Store the backend session ID on first response
           if (receivedSessionId && !activeSession?.backendSessionId) {
@@ -338,6 +339,7 @@ export function App() {
             timestamp: Date.now(),
             debugInfo,
             a2uiMessages,
+            ...(usage ? { usage: usage.turn } : {}),
           };
           setMessages(prev => [...prev, assistantMsg]);
           sessions.addMessage(sessionId!, assistantMsg);
@@ -442,6 +444,7 @@ export function App() {
 
   const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
   const currentStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
+  const usageSummary = useMemo(() => summarizeTokenUsage(messages), [messages]);
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
   const hasFiles = fsFiles.length > 0 || vfsFiles.length > 0;
   const activeSession = sessions.getActiveSession();
@@ -622,6 +625,7 @@ export function App() {
               onSend={handleSendMessage}
               getSurface={a2ui.getSurface}
               debugEnabled={debugEnabled}
+              usageSummary={usageSummary}
             />
           )}
         </Layout>

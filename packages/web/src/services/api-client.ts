@@ -44,6 +44,7 @@ export interface ConversationResponse {
   message: string;
   a2ui?: unknown[];
   model?: string;
+  usage?: import('../types').TokenUsageSummary;
 }
 
 export async function healthCheck(): Promise<boolean> {

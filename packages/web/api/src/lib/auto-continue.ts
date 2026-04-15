@@ -10,6 +10,8 @@
 
 import type { ChatMessage, ChatCompletionResult, ChatCompletionOptions } from "./openai-client.js";
 import { chatCompletion } from "./openai-client.js";
+import { sumChatUsage } from "./usage-tracking.js";
+import type { ChatUsage } from "./usage-tracking.js";
 
 /** Options for the auto-continue wrapper. */
 export interface AutoContinueOptions {
@@ -44,15 +46,18 @@ export async function chatCompletionWithAutoContinue(
   let accumulated = "";
   let lastResult: ChatCompletionResult;
   let continuations = 0;
+  let accumulatedUsage: ChatUsage | undefined;
 
   for (let round = 0; round < maxRounds; round++) {
     lastResult = await chatCompletion(workingMessages, options);
     accumulated += lastResult.content;
+    accumulatedUsage = sumChatUsage(accumulatedUsage, lastResult.usage);
 
     if (lastResult.finishReason !== "length") {
       return {
         content: accumulated,
         finishReason: lastResult.finishReason,
+        usage: accumulatedUsage,
         continuations,
       };
     }
@@ -67,6 +72,7 @@ export async function chatCompletionWithAutoContinue(
   return {
     content: accumulated,
     finishReason: "length",
+    usage: accumulatedUsage,
     continuations,
   };
 }

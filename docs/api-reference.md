@@ -72,6 +72,24 @@ interface ConverseResponse {
   phase: string;           // Current phase: "discover" | "design" | "generate" | "review" | "handoff" | "deploy"
   message: string;         // LLM-generated response text
   a2ui?: object[];         // A2UI components (ConversationPhase indicator)
+  usage?: {
+    turn: {
+      model: string;
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      estimatedCostUsd?: number;
+      costStatus: "estimated" | "unavailable";
+    };
+    session: {
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      turnCount: number;
+      estimatedCostUsd?: number;
+      costStatus: "estimated" | "unavailable";
+    };
+  };
   systemPrompt?: string;   // Only returned on the first message of a new session
 }
 ```
@@ -98,6 +116,22 @@ interface ConverseResponse {
       "currentPhase": "discover"
     }
   ],
+  "usage": {
+    "turn": {
+      "model": "gpt-5.3-chat",
+      "inputTokens": 412,
+      "outputTokens": 138,
+      "totalTokens": 550,
+      "costStatus": "unavailable"
+    },
+    "session": {
+      "inputTokens": 412,
+      "outputTokens": 138,
+      "totalTokens": 550,
+      "turnCount": 1,
+      "costStatus": "unavailable"
+    }
+  },
   "systemPrompt": "You are **Kickstart**, a friendly..."
 }
 ```
@@ -129,7 +163,7 @@ data: {"done":true,"sessionId":"...","phase":"discover","phaseLabel":"Discover",
 | Event | Fields | Description |
 |-------|--------|-------------|
 | Content chunk | `{ content: string }` | Partial LLM output as it arrives |
-| Final event | `{ done: true, sessionId, phase, phaseLabel, a2ui }` | Metadata sent after all content |
+| Final event | `{ done: true, sessionId, phase, phaseLabel, usage }` | Metadata sent after all content |
 | Error | `{ error: string }` | Sent if an error occurs mid-stream |
 
 **Response headers for streaming:**
@@ -199,13 +233,19 @@ interface ApiSession {
 
 ## Environment Variables
 
-The API requires three environment variables to connect to Azure OpenAI:
+The API requires Azure OpenAI connection settings, plus optional pricing inputs if you want estimated per-turn/session cost totals:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI resource endpoint URL | `https://my-openai.openai.azure.com` |
-| `AZURE_OPENAI_DEPLOYMENT` | Model deployment name | `gpt-4o` |
+| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Chat model deployment name | `gpt-5.3-chat` |
+| `AZURE_OPENAI_CODEX_DEPLOYMENT` | Codex model deployment name | `gpt-5.3-codex` |
+| `AZURE_OPENAI_DEPLOYMENT` | Legacy fallback deployment name | `gpt-4o` |
 | `AZURE_OPENAI_API_KEY` | API key for the Azure OpenAI resource | `abc123...` |
+| `AZURE_OPENAI_CHAT_INPUT_PRICE_PER_1K_USD` | Optional estimated chat input-token price | `0.0015` |
+| `AZURE_OPENAI_CHAT_OUTPUT_PRICE_PER_1K_USD` | Optional estimated chat output-token price | `0.0060` |
+| `AZURE_OPENAI_CODEX_INPUT_PRICE_PER_1K_USD` | Optional estimated codex input-token price | `0.0015` |
+| `AZURE_OPENAI_CODEX_OUTPUT_PRICE_PER_1K_USD` | Optional estimated codex output-token price | `0.0060` |
 
 **Source:** [`packages/web/api/src/lib/openai-client.ts`](../packages/web/api/src/lib/openai-client.ts)
 

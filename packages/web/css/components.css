@@ -257,6 +257,35 @@
   padding: var(--spacing-m) var(--spacing-l) var(--spacing-l);
 }
 
+.chat-usage-tracker {
+  max-width: var(--chat-max-width);
+  margin: 0 auto var(--spacing-s);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-s);
+  flex-wrap: wrap;
+  font-size: var(--font-size-200);
+  color: var(--color-neutral-foreground-3);
+}
+
+.chat-usage-segment {
+  white-space: nowrap;
+}
+
+.chat-usage-segment--muted {
+  color: var(--color-neutral-foreground-disabled);
+}
+
+.chat-usage-divider {
+  color: var(--color-neutral-foreground-disabled);
+}
+
+.chat-usage-model {
+  color: var(--color-neutral-foreground-2);
+  font-weight: var(--font-weight-semibold);
+}
+
 .chat-input-inner {
   max-width: var(--chat-max-width);
   margin: 0 auto;

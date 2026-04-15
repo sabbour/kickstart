@@ -32,7 +32,7 @@ import {
 import type { PhaseItem, ToolContext, ConversationState } from "@kickstart/core";
 import {
   getSession, createSession, getPrincipalId, hydrateSession, addMessage,
-  adoptSessionPrincipal, isSessionOwnedBy,
+  adoptSessionPrincipal, isSessionOwnedBy, recordUsage,
   extractArtifactsFromA2UI, upsertArtifact,
 } from "../lib/session-store.js";
 import type { ClientMessage, GeneratedArtifact } from "../lib/session-store.js";
@@ -44,6 +44,8 @@ import { chatCompletionWithAutoContinue, isTruncated } from "../lib/auto-continu
 import { sanitizeToolOutput } from "../lib/sanitize-tool-output.js";
 import { isDebugMode, buildConverseDebugMeta, formatRenderDecisions } from "../lib/debug-mode.js";
 import type { DebugMetadata } from "../lib/debug-mode.js";
+import { buildTurnUsage, sumChatUsage } from "../lib/usage-tracking.js";
+import type { UsageSummary, ChatUsage } from "../lib/usage-tracking.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -58,6 +60,7 @@ interface ConverseResponse {
   message: string;
   model?: string;
   a2ui?: object[];
+  usage?: UsageSummary;
   autoContinue?: boolean;
   autoContinuePrompt?: string;
   debug?: DebugMetadata;
@@ -70,6 +73,7 @@ interface StreamDonePayload {
   phase: string;
   phaseLabel: string;
   model?: string;
+  usage?: UsageSummary;
   autoContinue?: boolean;
   autoContinuePrompt?: string;
   debug?: DebugMetadata;
@@ -212,6 +216,7 @@ app.http("converse", {
 
       // Auto-continue: if the response was truncated, request continuation
       let finalContent = result.content;
+      let turnUsage = result.usage;
       if (isTruncated(result)) {
         const continueMessages: import("../lib/openai-client.js").ChatMessage[] = [
           ...messages,
@@ -223,6 +228,7 @@ app.http("converse", {
           { continuationPrompt: "Your previous response was cut off mid-JSON. Continue the JSON output exactly where you left off — do not repeat any content." },
         );
         finalContent = result.content + continued.content;
+        turnUsage = sumChatUsage(turnUsage, continued.usage);
       }
 
       // Parse the JSON envelope
@@ -245,12 +251,15 @@ app.http("converse", {
 
       addMessage(state.sessionId, "assistant", processed.message);
 
+      const usageSummary = finalizeUsage(state.sessionId, getChatDeploymentName(), turnUsage);
+
       const responseBody: ConverseResponse = {
         sessionId: state.sessionId,
         phase: session.engineState.currentPhase,
         message: processed.message,
         model: getChatDeploymentName(),
         a2ui: [...phaseA2ui, ...processed.a2uiMessages],
+        ...(usageSummary ? { usage: usageSummary } : {}),
       };
 
       // Include auto-continue signal when more files are pending
@@ -315,6 +324,7 @@ function handleStreaming(
 ): HttpResponseInit {
   const encoder = new TextEncoder();
   let engineState = initialEngineState;
+  let accumulatedUsage: ChatUsage | undefined;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -330,6 +340,7 @@ function handleStreaming(
             responseFormat: { type: "json_object" },
             tools: toolDefs,
           });
+          accumulatedUsage = sumChatUsage(accumulatedUsage, probe.usage);
 
           if (probe.finishReason !== "tool_calls" || !probe.toolCalls?.length) {
             // Auto-continue: if truncated, keep requesting until complete
@@ -342,6 +353,7 @@ function handleStreaming(
                 { continuationPrompt: "Your previous response was cut off mid-JSON. Continue the JSON output exactly where you left off — do not repeat any content." },
               );
               fullContent = probe.content + contResult.content;
+              accumulatedUsage = sumChatUsage(accumulatedUsage, contResult.usage);
             }
 
             // No more tool calls — stream the final content
@@ -372,6 +384,7 @@ function handleStreaming(
             }
 
             addMessage(sessionId, "assistant", processed.message);
+            const usageSummary = finalizeUsage(sessionId, getChatDeploymentName(), accumulatedUsage);
 
             controller.enqueue(
               encoder.encode(
@@ -395,6 +408,7 @@ function handleStreaming(
               phase: engineState.currentPhase,
               phaseLabel: phaseDef.label,
               model: getChatDeploymentName(),
+              ...(usageSummary ? { usage: usageSummary } : {}),
             };
 
             // Signal auto-continue for file generation
@@ -494,6 +508,16 @@ function handleStreaming(
     },
     body: stream,
   };
+}
+
+function finalizeUsage(
+  sessionId: string,
+  model: string,
+  usage?: ChatUsage,
+): UsageSummary | undefined {
+  const turnUsage = buildTurnUsage(model, usage);
+  if (!turnUsage) return undefined;
+  return recordUsage(sessionId, turnUsage);
 }
 
 // ---------------------------------------------------------------------------

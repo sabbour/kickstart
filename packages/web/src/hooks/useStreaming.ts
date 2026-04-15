@@ -1,12 +1,24 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { StreamEvent, A2uiPayloadItem, DebugMetadata, ChatMessage } from '../types';
+import type {
+  StreamEvent,
+  A2uiPayloadItem,
+  DebugMetadata,
+  ChatMessage,
+  TokenUsageSummary,
+} from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
 
 interface StreamCallbacks {
   onDelta: (text: string) => void;
   onA2UI: (messages: A2uiPayloadItem[]) => void;
   onPhase: (phase: string) => void;
-  onComplete: (fullText: string, model?: string, sessionId?: string, debugInfo?: DebugMetadata) => void;
+  onComplete: (
+    fullText: string,
+    model?: string,
+    sessionId?: string,
+    debugInfo?: DebugMetadata,
+    usage?: TokenUsageSummary,
+  ) => void;
   onError: (error: string) => void;
 }
 
@@ -85,26 +97,28 @@ export function useStreaming() {
     let displayText = '';
     let lastModel: string | undefined;
     let lastSessionId: string | undefined;
-      let lastPhase: string | undefined;
-      const debugA2uiMessages: A2uiPayloadItem[] = [];
+    let lastPhase: string | undefined;
+    let lastUsage: TokenUsageSummary | undefined;
+    const debugA2uiMessages: A2uiPayloadItem[] = [];
 
     try {
       // Build client message history for rehydration (strip system messages
       // and A2UI JSON — the server builds its own system prompt).
       // Filter assistant messages to only model-produced ones (m.model present)
       // to prevent client-generated error bubbles from spoofing assistant turns.
-      const clientMessages = chatHistory
-        ?.filter((m) => {
-          const text = m.text?.trim();
-          if (!text) return false;
-          if (m.role === 'user') return true;
-          return m.role === 'assistant' && Boolean(m.model);
-        })
-        .map((m) => ({
-          role: m.role === 'user' ? 'user' as const : 'assistant' as const,
-          content: m.text.trim(),
-          ...(m.phase ? { phase: m.phase } : {}),
-        }));
+        const clientMessages = chatHistory
+          ?.filter((m) => {
+            const text = m.text?.trim();
+            if (!text) return false;
+            if (m.role === 'user') return true;
+            return m.role === 'assistant' && Boolean(m.model);
+          })
+          .map((m) => ({
+            role: m.role === 'user' ? 'user' as const : 'assistant' as const,
+            content: m.text.trim(),
+            ...(m.phase ? { phase: m.phase } : {}),
+            ...(m.usage ? { usage: m.usage } : {}),
+          }));
 
       const res = await apiFetch('/api/converse', {
         method: 'POST',
@@ -190,6 +204,9 @@ export function useStreaming() {
                 lastPhase = parsed.phase;
                 callbacks.onPhase(parsed.phase);
               }
+              if (parsed.usage) {
+                lastUsage = parsed.usage as TokenUsageSummary;
+              }
               currentEventType = '';
               continue;
             }
@@ -233,6 +250,10 @@ export function useStreaming() {
 
             if (event.sessionId) {
               lastSessionId = event.sessionId;
+            }
+
+            if (event.usage) {
+              lastUsage = event.usage;
             }
 
           } catch { /* skip malformed JSON */ }
@@ -279,11 +300,12 @@ export function useStreaming() {
               a2ui: debugA2uiMessages.length > 0 ? debugA2uiMessages : undefined,
               model: lastModel,
               phase: lastPhase,
+              usage: lastUsage,
             },
           }
         : undefined;
 
-      callbacks.onComplete(finalText, lastModel, lastSessionId, debugInfo);
+      callbacks.onComplete(finalText, lastModel, lastSessionId, debugInfo, lastUsage);
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       cancelReveal();

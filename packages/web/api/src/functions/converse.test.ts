@@ -237,3 +237,142 @@ describe("converse phase progression", () => {
     );
   });
 });
+
+describe("converse usage tracking", () => {
+  it("returns turn and session token totals for non-streaming responses", async () => {
+    const session = createSession();
+
+    chatCompletionWithTools
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          message: "First reply",
+          a2ui: [],
+          actions: [],
+          phaseComplete: false,
+          filesComplete: null,
+        }),
+        finishReason: "stop",
+        usage: {
+          inputTokens: 120,
+          outputTokens: 45,
+          totalTokens: 165,
+        },
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          message: "Second reply",
+          a2ui: [],
+          actions: [],
+          phaseComplete: false,
+          filesComplete: null,
+        }),
+        finishReason: "stop",
+        usage: {
+          inputTokens: 80,
+          outputTokens: 30,
+          totalTokens: 110,
+        },
+      });
+
+    const firstResponse = await converseHandler(
+      createRequest({
+        sessionId: session.state.sessionId,
+        message: "Hello",
+      }),
+      createContext(),
+    ) as { status: number; jsonBody: { usage?: { turn: Record<string, unknown>; session: Record<string, unknown> } } };
+
+    expect(firstResponse.status).toBe(200);
+    expect(firstResponse.jsonBody.usage).toMatchObject({
+      turn: {
+        model: "test-chat-model",
+        inputTokens: 120,
+        outputTokens: 45,
+        totalTokens: 165,
+        costStatus: "unavailable",
+      },
+      session: {
+        inputTokens: 120,
+        outputTokens: 45,
+        totalTokens: 165,
+        turnCount: 1,
+        costStatus: "unavailable",
+      },
+    });
+    expect(getSession(session.state.sessionId)?.usageHistory).toHaveLength(1);
+
+    const secondResponse = await converseHandler(
+      createRequest({
+        sessionId: session.state.sessionId,
+        message: "And again",
+      }),
+      createContext(),
+    ) as { status: number; jsonBody: { usage?: { session: Record<string, unknown> } } };
+
+    expect(secondResponse.status).toBe(200);
+    expect(secondResponse.jsonBody.usage?.session).toMatchObject({
+      inputTokens: 200,
+      outputTokens: 75,
+      totalTokens: 275,
+      turnCount: 2,
+      costStatus: "unavailable",
+    });
+    expect(getSession(session.state.sessionId)?.usageHistory).toHaveLength(2);
+  });
+
+  it("emits usage metadata in the streaming done payload", async () => {
+    const session = createSession();
+
+    chatCompletion.mockResolvedValueOnce({
+      content: JSON.stringify({
+        message: "Streaming reply",
+        a2ui: [],
+        actions: [],
+        phaseComplete: false,
+        filesComplete: null,
+      }),
+      finishReason: "stop",
+      usage: {
+        inputTokens: 95,
+        outputTokens: 35,
+        totalTokens: 130,
+      },
+    });
+
+    const response = await converseHandler(
+      createRequest(
+        {
+          sessionId: session.state.sessionId,
+          message: "Stream it",
+        },
+        { accept: "text/event-stream" },
+      ),
+      createContext(),
+    ) as { status: number; body: ReadableStream<Uint8Array> };
+
+    expect(response.status).toBe(200);
+
+    const events = parseSseEvents(await readStream(response.body));
+    const donePayload = JSON.parse(
+      events.find((event) => event.event === "done")?.data ?? "{}",
+    ) as { usage?: { turn: Record<string, unknown>; session: Record<string, unknown> } };
+
+    expect(donePayload.usage).toMatchObject({
+      turn: {
+        model: "test-chat-model",
+        inputTokens: 95,
+        outputTokens: 35,
+        totalTokens: 130,
+        costStatus: "unavailable",
+      },
+      session: {
+        inputTokens: 95,
+        outputTokens: 35,
+        totalTokens: 130,
+        turnCount: 1,
+        costStatus: "unavailable",
+      },
+    });
+    expect(getSession(session.state.sessionId)?.usageHistory).toHaveLength(1);
+  });
+});

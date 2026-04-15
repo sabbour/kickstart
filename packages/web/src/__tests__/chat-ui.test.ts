@@ -3,8 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatMessage as ChatMessageView } from '../components/Chat/ChatMessage';
 import { ChatShell } from '../components/Chat/ChatShell';
-import type { ChatMessage } from '../types';
+import type { ChatMessage, TokenUsageSummary } from '../types';
 import { GENERATE_PROGRESS_TITLE, getLatestConversationPhase, rebuildChatSessionState } from '../utils/chat-a2ui';
+import { summarizeTokenUsage } from '../utils/chat-usage';
 
 const debugState = vi.hoisted(() => ({
   actionLog: [] as Array<{
@@ -41,7 +42,12 @@ function renderChatMessage(message: ChatMessage, debugEnabled = true): string {
   );
 }
 
-function renderChatShell(messages: ChatMessage[], currentPhase: string | null, debugEnabled = false): string {
+function renderChatShell(
+  messages: ChatMessage[],
+  currentPhase: string | null,
+  debugEnabled = false,
+  usageSummary?: TokenUsageSummary | null,
+): string {
   return renderToStaticMarkup(
     React.createElement(ChatShell, {
       messages,
@@ -51,6 +57,7 @@ function renderChatShell(messages: ChatMessage[], currentPhase: string | null, d
       onSend: () => undefined,
       getSurface: () => undefined,
       debugEnabled,
+      usageSummary,
     }),
   );
 }
@@ -150,6 +157,60 @@ describe('chat/debug UI regressions', () => {
     expect(markup).toContain('deploy-now');
     expect(markup).toContain('Deploy now');
     expect((markup.match(/data-testid="chat-debug-action-log"/g) ?? []).length).toBe(1);
+  });
+
+  it('renders a compact token tracker from persisted assistant usage', () => {
+    const messages: ChatMessage[] = [
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        text: '',
+        model: 'gpt-5.3-chat',
+        timestamp: 1,
+        usage: {
+          model: 'gpt-5.3-chat',
+          inputTokens: 120,
+          outputTokens: 45,
+          totalTokens: 165,
+          recordedAt: '2026-04-15T00:00:00.000Z',
+          estimatedCostUsd: 0.01,
+          costStatus: 'estimated',
+        },
+      },
+      {
+        id: 'assistant-2',
+        role: 'assistant',
+        text: '',
+        model: 'gpt-5.3-chat',
+        timestamp: 2,
+        usage: {
+          model: 'gpt-5.3-chat',
+          inputTokens: 80,
+          outputTokens: 30,
+          totalTokens: 110,
+          recordedAt: '2026-04-15T00:01:00.000Z',
+          estimatedCostUsd: 0.02,
+          costStatus: 'estimated',
+        },
+      },
+    ];
+
+    const usageSummary = summarizeTokenUsage(messages);
+    const markup = renderChatShell(messages, null, false, usageSummary);
+
+    expect(usageSummary?.session).toMatchObject({
+      inputTokens: 200,
+      outputTokens: 75,
+      totalTokens: 275,
+      turnCount: 2,
+      estimatedCostUsd: 0.03,
+    });
+    expect(markup).toContain('data-testid="chat-usage-tracker"');
+    expect(markup).toContain('▲ 80');
+    expect(markup).toContain('▼ 30');
+    expect(markup).toContain('Σ 200 / 75');
+    expect(markup).toContain('~$0.03');
+    expect(markup).toContain('gpt-5.3-chat');
   });
 });
 

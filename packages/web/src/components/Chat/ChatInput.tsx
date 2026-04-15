@@ -3,9 +3,10 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 interface ChatInputProps {
   onSend: (text: string) => void;
   disabled?: boolean;
+  statusBar?: React.ReactNode;
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, statusBar }: ChatInputProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -37,6 +38,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
 
   return (
     <div className="chat-input-area">
+      {statusBar}
       <div className="chat-input-inner">
         <textarea
           ref={textareaRef}

@@ -27,7 +27,34 @@ export interface DebugMetadata {
     a2ui?: A2uiPayloadItem[];
     model?: string;
     phase?: string;
+    usage?: TokenUsageSummary;
   };
+}
+
+export type UsageCostStatus = 'estimated' | 'unavailable';
+
+export interface TokenUsageSnapshot {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  recordedAt: string;
+  estimatedCostUsd?: number;
+  costStatus: UsageCostStatus;
+}
+
+export interface SessionUsageTotals {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  turnCount: number;
+  estimatedCostUsd?: number;
+  costStatus: UsageCostStatus;
+}
+
+export interface TokenUsageSummary {
+  turn: TokenUsageSnapshot;
+  session: SessionUsageTotals;
 }
 
 export type ConversationPhaseId =
@@ -66,6 +93,8 @@ export interface ChatMessage {
   debugInfo?: DebugMetadata;
   /** Raw A2UI messages that produced the surfaces for this message (used to rehydrate on reload). */
   a2uiMessages?: A2uiPayloadItem[];
+  /** Token usage captured for this assistant turn. */
+  usage?: TokenUsageSnapshot;
 }
 
 export interface Session {
@@ -123,4 +152,5 @@ export interface StreamEvent {
   phase?: string;
   model?: string;
   sessionId?: string;
+  usage?: TokenUsageSummary;
 }
