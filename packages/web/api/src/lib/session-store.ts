@@ -100,6 +100,15 @@ export interface ClientMessage {
   content: string;
 }
 
+/** Client-provided artifact metadata for session rehydration.
+ *  Validated/sanitized on ingress — only metadata, never file content. */
+export interface ClientArtifact {
+  filename: string;
+  language: string;
+  bicepResources?: string[];
+  k8sResources?: string[];
+}
+
 /**
  * Create a new session and seed it with client-provided conversation history.
  * Used when the in-memory session has been lost (cold start / scale event)
@@ -107,8 +116,14 @@ export interface ClientMessage {
  *
  * System messages are always rebuilt server-side — client-sent system
  * messages are silently dropped.
+ *
+ * If `clientArtifacts` is provided, the session's generatedArtifacts are
+ * populated directly from it instead of trying to parse assistant message JSON.
  */
-export function hydrateSession(clientMessages: ClientMessage[]): ApiSession {
+export function hydrateSession(
+  clientMessages: ClientMessage[],
+  clientArtifacts?: ClientArtifact[],
+): ApiSession {
   const session = createSession();
   const now = new Date().toISOString();
 
@@ -122,15 +137,86 @@ export function hydrateSession(clientMessages: ClientMessage[]): ApiSession {
       content: msg.content,
       timestamp: now,
     });
+  }
 
-    // Rebuild generatedArtifacts from assistant messages containing FileEditor components
-    if (msg.role === "assistant") {
-      rebuildArtifactsFromMessage(msg.content, session.generatedArtifacts);
+  // Restore artifact tracking from client-provided metadata (preferred),
+  // falling back to parsing assistant messages (legacy, rarely succeeds).
+  if (clientArtifacts?.length) {
+    session.generatedArtifacts = sanitizeClientArtifacts(clientArtifacts);
+  } else {
+    for (const msg of clientMessages) {
+      if (msg.role === "assistant" && msg.content) {
+        rebuildArtifactsFromMessage(msg.content, session.generatedArtifacts);
+      }
     }
   }
 
   session.state.updatedAt = now;
   return session;
+}
+
+/** Max length for a single artifact filename from client. */
+const MAX_FILENAME_LENGTH = 256;
+/** Max combined resource entries per artifact from client. */
+const MAX_RESOURCES_PER_ARTIFACT = 20;
+
+/** Sanitize and cap client-provided artifact metadata. */
+function sanitizeClientArtifacts(raw: ClientArtifact[]): GeneratedArtifact[] {
+  const seen = new Set<string>();
+  const result: GeneratedArtifact[] = [];
+
+  for (const a of raw) {
+    if (result.length >= MAX_TRACKED_ARTIFACTS) break;
+    if (typeof a.filename !== "string" || !a.filename.trim()) continue;
+
+    const filename = a.filename.trim().slice(0, MAX_FILENAME_LENGTH);
+    if (seen.has(filename)) continue;
+    seen.add(filename);
+
+    const language = typeof a.language === "string" && a.language.trim()
+      ? a.language.trim()
+      : inferLanguage(filename);
+    const bicepResources = sanitizeResourceList(a.bicepResources);
+    const k8sResources = sanitizeResourceList(a.k8sResources);
+
+    result.push({
+      filename,
+      language,
+      bicepResources: bicepResources.slice(0, MAX_RESOURCES_PER_ARTIFACT),
+      k8sResources: k8sResources.slice(0, MAX_RESOURCES_PER_ARTIFACT),
+    });
+  }
+
+  return result;
+}
+
+/** Validate a resource list — keep only non-empty strings. */
+function sanitizeResourceList(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    .map((s) => s.trim().slice(0, 200));
+}
+
+/**
+ * Build a human-readable summary of generated artifacts for injection into the
+ * system prompt. Returns empty string if no artifacts exist.
+ */
+export function buildArtifactSummary(artifacts: GeneratedArtifact[]): string {
+  if (!artifacts.length) return "";
+
+  const lines: string[] = ["## Previously generated files"];
+  for (const a of artifacts) {
+    let line = `- ${a.filename} (${a.language})`;
+    if (a.bicepResources.length > 0) {
+      line += ` — Bicep resources: ${a.bicepResources.join(", ")}`;
+    }
+    if (a.k8sResources.length > 0) {
+      line += ` — K8s resources: ${a.k8sResources.join(", ")}`;
+    }
+    lines.push(line);
+  }
+  return lines.join("\n");
 }
 
 /** Max number of artifacts tracked to prevent unbounded growth. */

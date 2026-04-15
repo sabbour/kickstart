@@ -32,9 +32,9 @@ import {
 import type { PhaseItem, ToolContext, ConversationState } from "@kickstart/core";
 import {
   getSession, createSession, hydrateSession, addMessage,
-  extractArtifactsFromA2UI, upsertArtifact,
+  extractArtifactsFromA2UI, upsertArtifact, buildArtifactSummary,
 } from "../lib/session-store.js";
-import type { ClientMessage, GeneratedArtifact } from "../lib/session-store.js";
+import type { ClientMessage, GeneratedArtifact, ClientArtifact } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools, getChatDeploymentName } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
@@ -49,6 +49,8 @@ interface ConverseRequest {
   message: string;
   /** Client-side message history for session rehydration after cold starts. */
   messages?: ClientMessage[];
+  /** Client-side artifact metadata for restoring artifact tracking after cold starts. */
+  generatedArtifacts?: ClientArtifact[];
 }
 
 interface ConverseResponse {
@@ -116,7 +118,7 @@ app.http("converse", {
         : undefined;
       if (!session) {
         session = body.messages?.length
-          ? hydrateSession(body.messages)
+          ? hydrateSession(body.messages, body.generatedArtifacts)
           : createSession();
       }
 
@@ -476,31 +478,8 @@ function handleStreaming(
 }
 
 // ---------------------------------------------------------------------------
-// Artifact summary — gives the LLM running context of what's been generated
+// Artifact summary — buildArtifactSummary is imported from session-store.ts
 // ---------------------------------------------------------------------------
-
-/**
- * Build a text summary of generated artifacts for injection into the system prompt.
- * Uses pre-extracted metadata — no content re-scanning needed.
- */
-function buildArtifactSummary(artifacts: GeneratedArtifact[]): string {
-  if (artifacts.length === 0) return "";
-
-  const lines: string[] = [];
-  lines.push("Files generated so far: " + artifacts.map((a) => a.filename).join(", "));
-
-  const bicepResources = artifacts.flatMap((a) => a.bicepResources);
-  if (bicepResources.length > 0) {
-    lines.push("Azure resources declared: " + bicepResources.join(", "));
-  }
-
-  const k8sResources = artifacts.flatMap((a) => a.k8sResources);
-  if (k8sResources.length > 0) {
-    lines.push("Kubernetes resources declared: " + k8sResources.join(", "));
-  }
-
-  return lines.join("\n");
-}
 
 // ---------------------------------------------------------------------------
 // Implicit state flags — parsed from LLM JSON response

@@ -106,6 +106,10 @@ export function useStreaming() {
           content: m.text.trim(),
         }));
 
+      // Extract generated artifact metadata from A2UI messages in chat history
+      // so the server can restore artifact tracking without parsing full JSON.
+      const generatedArtifacts = extractArtifactMetadata(chatHistory);
+
       const res = await apiFetch('/api/converse', {
         method: 'POST',
         headers: {
@@ -117,6 +121,7 @@ export function useStreaming() {
           message,
           stream: true,
           ...(clientMessages?.length ? { messages: clientMessages } : {}),
+          ...(generatedArtifacts.length ? { generatedArtifacts } : {}),
         }),
         signal: controller.signal,
       }, debugMode);
@@ -314,4 +319,36 @@ export function useStreaming() {
   }, [cancelReveal]);
 
   return { send, isStreaming, streamText, abort };
+}
+
+/** Artifact metadata shape sent to the server for rehydration (no file content). */
+interface ArtifactMeta {
+  filename: string;
+  language: string;
+}
+
+/**
+ * Scan chat history A2UI messages for FileEditor components and extract
+ * metadata (filename, language). Deduplicates by filename — last wins.
+ */
+function extractArtifactMetadata(chatHistory?: ChatMessage[]): ArtifactMeta[] {
+  if (!chatHistory?.length) return [];
+
+  const map = new Map<string, ArtifactMeta>();
+
+  for (const msg of chatHistory) {
+    if (!msg.a2uiMessages) continue;
+    for (const a2ui of msg.a2uiMessages) {
+      if (!a2ui.updateComponents?.components) continue;
+      for (const comp of a2ui.updateComponents.components) {
+        if (comp.component === 'FileEditor' && typeof comp.filename === 'string') {
+          const filename = comp.filename;
+          const language = typeof comp.language === 'string' ? comp.language : '';
+          map.set(filename, { filename, language });
+        }
+      }
+    }
+  }
+
+  return Array.from(map.values());
 }
