@@ -1,4 +1,6 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import type { AzureContext } from "@kickstart/core";
 import {
   createResourceGroup,
@@ -24,7 +26,14 @@ const RESOURCE_GROUP_RE = /^[-\w.()]{1,90}$/;
 const DEPLOYMENT_NAME_RE = /^[A-Za-z0-9._()\-]{1,64}$/;
 const HEALTH_CHECK_TIMEOUT_MS = 10_000;
 const HEALTH_CHECK_GRACE_MS = 15 * 60 * 1000;
+const HEALTH_CHECK_REDIRECT_LIMIT = 5;
 const RUN_ID_TTL_MS = 2 * 60 * 60 * 1000;
+const BLOCKED_HEALTH_HOSTNAMES = new Set([
+  "localhost",
+  "localhost.localdomain",
+  "metadata.google.internal",
+  "metadata.azure.internal",
+]);
 
 export interface CostGateInput {
   estimatedMonthlyTotal: number;
@@ -91,6 +100,11 @@ interface DeploymentRunPayload {
 interface HealthCheckResult {
   status: "pending" | "complete" | "error";
   detail?: string;
+}
+
+interface AppUrlResolution {
+  appUrl?: string;
+  blocked?: boolean;
 }
 
 function requireFiniteNumber(value: unknown, fieldName: string): number {
@@ -237,27 +251,95 @@ function extractOutputValue(
   return outputs?.[key]?.value;
 }
 
-function normalizeUrl(value: unknown): string | undefined {
+function isPrivateIPv4(ip: string): boolean {
+  const parts = ip.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part) || part < 0 || part > 255)) {
+    return false;
+  }
+
+  const [a, b] = parts;
+  return (
+    a === 127
+    || a === 10
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || (a === 169 && b === 254)
+    || a === 0
+  );
+}
+
+function isPrivateIPv6(ip: string): boolean {
+  const normalized = ip.toLowerCase().replace(/^\[|]$/g, "");
+  if (normalized === "::1") return true;
+  if (/^f[cd]/.test(normalized)) return true;
+  if (normalized.startsWith("fe80")) return true;
+  const v4Mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (v4Mapped) return isPrivateIPv4(v4Mapped[1]);
+  return false;
+}
+
+function isBlockedHealthHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  if (BLOCKED_HEALTH_HOSTNAMES.has(normalized)) return true;
+  if (
+    normalized.endsWith(".localhost")
+    || normalized.endsWith(".local")
+    || normalized.endsWith(".internal")
+    || normalized.endsWith(".home.arpa")
+  ) {
+    return true;
+  }
+  if (isPrivateIPv4(normalized)) return true;
+  if (isPrivateIPv6(normalized)) return true;
+  return false;
+}
+
+function isSafePublicHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  if (!normalized) return false;
+  if (isBlockedHealthHost(normalized)) return false;
+  if (!isIP(normalized) && !normalized.includes(".")) return false;
+  return true;
+}
+
+function normalizeAppUrlCandidate(value: unknown): AppUrlResolution {
   if (typeof value !== "string" || !value.trim()) {
-    return undefined;
+    return {};
   }
 
   const trimmed = value.trim();
-  if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed;
+  const candidate = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : /^[a-z0-9][a-z0-9.-]+$/i.test(trimmed)
+      ? `https://${trimmed}`
+      : undefined;
+
+  if (!candidate) {
+    return {};
   }
 
-  if (/^[a-z0-9][a-z0-9.-]+$/i.test(trimmed)) {
-    return `https://${trimmed}`;
+  try {
+    const parsed = new URL(candidate);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return {};
+    }
+    if (parsed.username || parsed.password) {
+      return { blocked: true };
+    }
+    return isSafePublicHostname(parsed.hostname) ? { appUrl: candidate } : { blocked: true };
+  } catch {
+    return {};
   }
+}
 
-  return undefined;
+export function normalizePublicAppUrl(value: unknown): string | undefined {
+  return normalizeAppUrlCandidate(value).appUrl;
 }
 
 function extractAppUrl(
   outputs: Record<string, { value?: unknown }> | undefined,
   preferredOutput?: string,
-): string | undefined {
+): AppUrlResolution {
   const candidates = [
     preferredOutput,
     "appUrl",
@@ -268,14 +350,18 @@ function extractAppUrl(
     "fqdn",
   ].filter((value): value is string => Boolean(value));
 
+  let blocked = false;
   for (const candidate of candidates) {
-    const normalized = normalizeUrl(extractOutputValue(outputs, candidate));
-    if (normalized) {
+    const normalized = normalizeAppUrlCandidate(extractOutputValue(outputs, candidate));
+    if (normalized.appUrl) {
       return normalized;
+    }
+    if (normalized.blocked) {
+      blocked = true;
     }
   }
 
-  return undefined;
+  return blocked ? { blocked: true } : {};
 }
 
 function summarizeOperations(operations: ArmDeploymentOperation[]): string | undefined {
@@ -325,13 +411,59 @@ function extractDeploymentError(deployment: ArmDeploymentInfo): DeploymentErrorP
   );
 }
 
-async function runHealthCheck(appUrl: string, healthCheckPath: string, startedAt: string): Promise<HealthCheckResult> {
-  try {
-    const response = await fetch(new URL(healthCheckPath, appUrl), {
+async function assertPublicHealthCheckUrl(url: URL): Promise<void> {
+  if (!["http:", "https:"].includes(url.protocol)) {
+    throw new Error("Health check target must use HTTP or HTTPS.");
+  }
+
+  if (!isSafePublicHostname(url.hostname)) {
+    throw new Error("Health check target must resolve to a public application endpoint.");
+  }
+
+  if (isIP(url.hostname)) {
+    return;
+  }
+
+  const resolved = await lookup(url.hostname, { all: true, verbatim: true });
+  if (!resolved.length || resolved.some((entry) => isPrivateIPv4(entry.address) || isPrivateIPv6(entry.address))) {
+    throw new Error("Health check target must resolve to a public application endpoint.");
+  }
+}
+
+async function fetchHealthCheckResponse(appUrl: string, healthCheckPath: string): Promise<Response> {
+  let target = new URL(healthCheckPath, appUrl);
+
+  for (let redirectCount = 0; redirectCount <= HEALTH_CHECK_REDIRECT_LIMIT; redirectCount += 1) {
+    await assertPublicHealthCheckUrl(target);
+
+    const response = await fetch(target, {
       method: "GET",
       signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS),
-      redirect: "follow",
+      redirect: "manual",
     });
+
+    if (response.status < 300 || response.status >= 400) {
+      return response;
+    }
+
+    const location = response.headers.get("location");
+    if (!location) {
+      return response;
+    }
+
+    if (redirectCount === HEALTH_CHECK_REDIRECT_LIMIT) {
+      throw new Error("Health check exceeded the maximum redirect limit.");
+    }
+
+    target = new URL(location, target);
+  }
+
+  throw new Error("Health check exceeded the maximum redirect limit.");
+}
+
+async function runHealthCheck(appUrl: string, healthCheckPath: string, startedAt: string): Promise<HealthCheckResult> {
+  try {
+    const response = await fetchHealthCheckResponse(appUrl, healthCheckPath);
 
     if (response.status >= 200 && response.status < 400) {
       return {
@@ -559,7 +691,8 @@ export async function getAzureDeploymentStatus(
 
   const provisioningState = deployment.properties?.provisioningState;
   const deploymentError = extractDeploymentError(deployment);
-  const appUrl = extractAppUrl(deployment.properties?.outputs, run.appUrlOutput);
+  const appUrlResolution = extractAppUrl(deployment.properties?.outputs, run.appUrlOutput);
+  const appUrl = appUrlResolution.appUrl;
   const health = appUrl
     ? await runHealthCheck(appUrl, run.healthCheckPath, run.startedAt)
     : { status: "pending" as const };
@@ -597,11 +730,15 @@ export async function getAzureDeploymentStatus(
       label: "Resolve application URL",
       status: appUrl
         ? "complete"
+        : appUrlResolution.blocked
+          ? "error"
         : provisioningState === "Succeeded"
           ? "error"
           : "pending",
       detail: appUrl
         ? `Resolved ${appUrl}`
+        : appUrlResolution.blocked
+          ? "Deployment output resolved to a private or unsafe URL and was rejected."
         : provisioningState === "Succeeded"
           ? "Deployment succeeded, but no app URL output was found."
           : "Waiting for deployment outputs.",
@@ -621,6 +758,17 @@ export async function getAzureDeploymentStatus(
   ];
 
   const derivedError = deploymentError
+    || (
+      appUrlResolution.blocked
+        ? deploymentErrorPayload(
+          "unsafe_app_url",
+          "Deployment completed, but the app URL output pointed to a private or unsafe endpoint.",
+          [
+            "Update the Bicep outputs so appUrl/applicationUrl/url/defaultHostname resolves to a public HTTPS hostname.",
+          ],
+        )
+        : undefined
+    )
     || (
       provisioningState === "Succeeded" && !appUrl
         ? deploymentErrorPayload(
