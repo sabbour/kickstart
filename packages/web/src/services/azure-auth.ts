@@ -96,7 +96,7 @@ async function listAzureSubscriptions(connector?: AzureARMConnector): Promise<Az
     if (error instanceof Error && error.message.trim()) {
       throw error;
     }
-    throw new Error('Unable to load Azure subscriptions.');
+    throw new Error('Unable to load Azure subscriptions.', { cause: error });
   }
 }
 
