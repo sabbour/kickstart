@@ -408,7 +408,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     return result;
   }, [resourceTypeFilter, resources, searchQuery, selectedRg]);
 
-  const dispatchResolvedAction = useCallback((actionName: string, payload: Record<string, unknown>) => {
+  const dispatchSelection = useCallback((payload: Record<string, unknown>) => {
     const rawAction = context.componentModel.properties.onSelect;
 
     if (rawAction && typeof rawAction === 'object' && 'event' in rawAction && rawAction.event) {
@@ -426,17 +426,15 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
       return;
     }
 
-    context.dispatchAction({
-      event: {
-        name: actionName,
-        context: payload,
-      },
-    });
-  }, [context]);
+    if (props.onSelect) {
+      (props.onSelect as () => void)();
+    }
+  }, [context, props.onSelect]);
 
   const handleSelectResource = (resource: AzureResource) => {
     setSelected(resource.id);
-    dispatchResolvedAction('azure-resource-selected', {
+    dispatchSelection({
+      value: resource.id,
       selectedValue: resource.id,
       selectedLabel: resource.name,
       subscriptionId: selectedSubId,
@@ -478,12 +476,16 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
         throw new Error('The backend started the deployment without returning a runId.');
       }
 
-      dispatchResolvedAction('continue:azure-deployment-started', {
+      dispatchSelection({
+        value: `${selectedSubId}/${selectedResourceGroupName}/${selectedLocation}`,
+        selectedValue: `${selectedSubId}/${selectedResourceGroupName}/${selectedLocation}`,
+        selectedLabel: `${selectedSubscription?.displayName ?? selectedSubId} · ${selectedResourceGroupName} · ${selectedLocation}`,
         runId: deployment.runId,
         status: deployment.status,
         subscriptionId: selectedSubId,
         subscriptionName: selectedSubscription?.displayName,
         resourceGroup: selectedResourceGroupName,
+        resourceGroupMode,
         location: selectedLocation,
       });
     } catch (deploymentError) {
@@ -493,7 +495,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     }
   }, [
     backendSessionId,
-    dispatchResolvedAction,
+    dispatchSelection,
     resourceGroupMode,
     selectedLocation,
     selectedResourceGroupName,
