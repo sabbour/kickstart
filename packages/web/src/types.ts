@@ -14,31 +14,6 @@ export interface ActionDebugEvent {
   outboundMessage: string;
 }
 
-export type ConversationPhaseId =
-  | 'discover'
-  | 'design'
-  | 'generate'
-  | 'review'
-  | 'handoff'
-  | 'deploy';
-
-export interface ConversationPhaseStep {
-  id?: string;
-  label?: string;
-  status?: string;
-}
-
-export interface ConversationPhasePayload {
-  id?: string;
-  type: 'ConversationPhase';
-  component?: 'ConversationPhase';
-  currentPhase?: string;
-  phases?: ConversationPhaseStep[];
-  [key: string]: unknown;
-}
-
-export type A2uiPayloadItem = A2uiMsg | ConversationPhasePayload;
-
 export interface DebugMetadata {
   /** Model name used for this response (e.g., "gpt-4o"). */
   model?: string;
@@ -55,6 +30,27 @@ export interface DebugMetadata {
   };
 }
 
+export type ConversationPhaseId =
+  | 'discover'
+  | 'design'
+  | 'generate'
+  | 'review'
+  | 'handoff'
+  | 'deploy';
+
+export interface ConversationPhaseStep {
+  id: string;
+  label: string;
+  status: 'pending' | 'active' | 'complete';
+}
+
+export interface ConversationPhasePayload {
+  type: 'ConversationPhase';
+  id: string;
+  phases: ConversationPhaseStep[];
+  currentPhase: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -68,7 +64,7 @@ export interface ChatMessage {
   isAutoContinue?: boolean;
   /** Debug metadata captured when debug mode is active. */
   debugInfo?: DebugMetadata;
-  /** Raw/scoped A2UI payload items for this turn (used to rehydrate on reload). */
+  /** Raw A2UI messages that produced the surfaces for this message (used to rehydrate on reload). */
   a2uiMessages?: A2uiPayloadItem[];
 }
 
@@ -116,6 +112,8 @@ export interface A2uiComponent {
   component: string;
   [key: string]: unknown;
 }
+
+export type A2uiPayloadItem = A2uiMsg | ConversationPhasePayload;
 
 export interface StreamEvent {
   error?: string;

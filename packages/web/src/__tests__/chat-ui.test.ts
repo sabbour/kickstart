@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ChatMessage as ChatMessageView } from '../components/Chat/ChatMessage';
 import { ChatShell } from '../components/Chat/ChatShell';
 import type { ChatMessage } from '../types';
-import { getLatestConversationPhase } from '../utils/chat-a2ui';
+import { GENERATE_PROGRESS_TITLE, getLatestConversationPhase, rebuildChatSessionState } from '../utils/chat-a2ui';
 
 const debugState = vi.hoisted(() => ({
   actionLog: [] as Array<{
@@ -68,6 +68,10 @@ describe('chat/debug UI regressions', () => {
             type: 'ConversationPhase',
             id: 'phase-indicator',
             currentPhase: 'build',
+            phases: [
+              { id: 'discover', label: 'Discover', status: 'complete' },
+              { id: 'build', label: 'Build', status: 'active' },
+            ],
           },
         ],
       },
@@ -146,5 +150,103 @@ describe('chat/debug UI regressions', () => {
     expect(markup).toContain('deploy-now');
     expect(markup).toContain('Deploy now');
     expect((markup.match(/data-testid="chat-debug-action-log"/g) ?? []).length).toBe(1);
+  });
+});
+
+describe('chat file workspace rehydration', () => {
+  it('rebuilds the selected session workspace without leaking files across sessions', () => {
+    const firstSession = rebuildChatSessionState([
+      {
+        id: 'assistant-turn-8',
+        a2uiMessages: [
+          {
+            type: 'ConversationPhase' as const,
+            id: 'phase-indicator',
+            currentPhase: 'generate',
+            phases: [
+              { id: 'discover', label: 'Discover', status: 'complete' as const },
+              { id: 'generate', label: 'Generate', status: 'active' as const },
+            ],
+          },
+          {
+            version: 'v0.9' as const,
+            createSurface: { surfaceId: 'msg-1', catalogId: 'kickstart' },
+          },
+          {
+            version: 'v0.9' as const,
+            updateComponents: {
+              surfaceId: 'msg-1',
+              components: [
+                {
+                  id: 'progress',
+                  component: 'DeploymentProgress',
+                  steps: [{ id: 'dockerfile', label: 'Dockerfile', status: 'complete' }],
+                },
+                {
+                  id: 'file',
+                  component: 'FileEditor',
+                  artifactPath: 'artifacts/Dockerfile',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ], {
+      resolveArtifactContent: (artifactPath) => artifactPath === 'artifacts/Dockerfile'
+        ? 'FROM node:20-alpine'
+        : null,
+    });
+
+    expect(firstSession.files).toEqual([
+      {
+        path: 'artifacts/Dockerfile',
+        content: 'FROM node:20-alpine',
+        language: 'dockerfile',
+      },
+    ]);
+    expect(firstSession.renderableMessages[0].createSurface?.surfaceId).toBe('assistant-turn-8::msg-1');
+    expect(firstSession.renderableMessages[1].updateComponents?.surfaceId).toBe('assistant-turn-8::msg-1');
+    expect(firstSession.renderableMessages[1].updateComponents?.components[0]).toMatchObject({
+      id: 'progress',
+      title: GENERATE_PROGRESS_TITLE,
+    });
+
+    const secondSession = rebuildChatSessionState([
+      {
+        id: 'assistant-turn-9',
+        a2uiMessages: [
+          {
+            version: 'v0.9' as const,
+            createSurface: { surfaceId: 'msg-2', catalogId: 'kickstart' },
+          },
+          {
+            version: 'v0.9' as const,
+            updateComponents: {
+              surfaceId: 'msg-2',
+              components: [
+                {
+                  id: 'file',
+                  component: 'FileEditor',
+                  filename: 'k8s/deployment.yaml',
+                  language: 'yaml',
+                  content: 'apiVersion: apps/v1',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+
+    expect(secondSession.files).toEqual([
+      {
+        path: 'k8s/deployment.yaml',
+        content: 'apiVersion: apps/v1',
+        language: 'yaml',
+      },
+    ]);
+    expect(secondSession.renderableMessages[0].createSurface?.surfaceId).toBe('assistant-turn-9::msg-2');
+    expect(secondSession.renderableMessages[1].updateComponents?.surfaceId).toBe('assistant-turn-9::msg-2');
   });
 });
