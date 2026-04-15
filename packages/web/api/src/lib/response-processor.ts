@@ -196,7 +196,7 @@ function inferDesignComponents(
         wrap: true,
         children: [
           btn("Azure OpenAI", "I want to use Azure OpenAI"),
-          btn("Self-hosted model (KAITO)", "I want to self-host an open model with KAITO"),
+          btn("Self-hosted models with Kubernetes AI Toolkit Operator (KAITO)", "I want to self-host an open model with the Kubernetes AI Toolkit Operator (KAITO)"),
           btn("No AI features", "No AI/LLM features needed"),
         ],
       },

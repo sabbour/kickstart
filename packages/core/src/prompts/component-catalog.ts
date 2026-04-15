@@ -175,7 +175,7 @@ export const BASE_COMPONENT_CATALOG: readonly ComponentCatalogEntry[] = [
     type: "ArchitectureDiagram",
     category: "domain",
     example: '{"id":"arch1","component":"ArchitectureDiagram","nodes":[{"id":"api","label":"Web API","type":"compute"},{"id":"db","label":"PostgreSQL","type":"database"}],"edges":[{"from":"api","to":"db"}]}',
-    notes: "Node types: compute, database, cache, network, storage, ai, messaging",
+    notes: 'Node types: compute, database, cache, network, storage, ai, messaging. For design-step architecture, prefer the `diagram` prop (raw Mermaid) over `nodes/edges` — it supports subgraphs, dashed edges, and replica annotations.\n  Diagram example: {"id":"arch2","component":"ArchitectureDiagram","diagram":"graph TD\\\\n  subgraph AKS[\\\\\\"AKS Automatic\\\\\\"]\\\\n    API[\\\\\\"Node.js API<br/>&#40;2-10 replicas&#41;\\\\\\"]\\\\n  end\\\\n  ACR[\\\\\\"Container Registry\\\\\\"] -.->|image pull| API\\\\n  API -->|Workload Identity| KV[\\\\\\"Key Vault\\\\\\"]"}',
   },
   {
     type: "FileEditor",
