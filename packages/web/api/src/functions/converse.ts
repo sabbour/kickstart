@@ -128,6 +128,7 @@ app.http("converse", {
       const currentPhase = engineState.currentPhase as Phase;
       const resolvedSkills = resolveSkills(currentPhase, defaultKitRegistry.getAll());
 
+
       // Build artifact summary from files generated in previous turns
       const artifactSummary = buildArtifactSummary(session.generatedArtifacts);
 
@@ -180,7 +181,11 @@ app.http("converse", {
       };
 
       if (wantsStream) {
-        return handleStreaming(messages, state.sessionId, engineState, phaseA2ui, context, toolContext, debugMode);
+        return handleStreaming(
+          messages, state.sessionId, engineState, phaseA2ui, context,
+          toolContext, debugMode, session.generatedArtifacts,
+          (newState) => { session.engineState = newState; },
+        );
       }
 
       // Non-streaming: call OpenAI with JSON object format + tool support
@@ -219,15 +224,33 @@ app.http("converse", {
       // Parse the JSON envelope
       const processed = processResponse(finalContent);
 
+      // Extract generated artifacts from FileEditor components and track them
+      const newArtifacts = extractArtifactsFromA2UI(processed.a2uiMessages);
+      for (const art of newArtifacts) {
+        upsertArtifact(session.generatedArtifacts, art);
+      }
+
+      // Handle implicit state flags from LLM response
+      const flags = extractImplicitFlags(finalContent);
+      if (flags.phaseComplete || flags.filesComplete !== null) {
+        session.engineState = handleImplicitFlags(session.engineState, flags);
+      }
+
       addMessage(state.sessionId, "assistant", processed.message);
 
       const responseBody: ConverseResponse = {
         sessionId: state.sessionId,
-        phase: engineState.currentPhase,
+        phase: session.engineState.currentPhase,
         message: processed.message,
         model: getChatDeploymentName(),
         a2ui: [...phaseA2ui, ...processed.a2uiMessages],
       };
+
+      // Include auto-continue signal when more files are pending
+      if (flags.filesComplete === false) {
+        (responseBody as unknown as Record<string, unknown>).autoContinue = true;
+        (responseBody as unknown as Record<string, unknown>).autoContinuePrompt = "Generate next set of files";
+      }
 
       // Attach debug metadata when requested
       if (debugMode) {
@@ -237,7 +260,7 @@ app.http("converse", {
           finalContent,
           processed.a2uiMessages.length,
           hadExplicitA2UI,
-          engineState.currentPhase,
+          session.engineState.currentPhase,
         );
         (responseBody as unknown as Record<string, unknown>).debug = debugMeta;
         (responseBody as unknown as Record<string, unknown>).renderDecisions =
@@ -255,13 +278,16 @@ app.http("converse", {
 function handleStreaming(
   messages: import("../lib/openai-client.js").ChatMessage[],
   sessionId: string,
-  engineState: { currentPhase: string },
+  initialEngineState: { currentPhase: string },
   phaseA2ui: object[],
   context: InvocationContext,
   toolContext: ToolContext,
   debugMode: boolean,
+  sessionArtifacts: GeneratedArtifact[],
+  updateEngineState: (newState: ConversationState) => void,
 ): HttpResponseInit {
   const encoder = new TextEncoder();
+  let engineState = initialEngineState;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -300,6 +326,24 @@ function handleStreaming(
             }
 
             const processed = processResponse(fullContent);
+
+            // Track generated artifacts from this turn
+            const newArtifacts = extractArtifactsFromA2UI(processed.a2uiMessages);
+            for (const art of newArtifacts) {
+              upsertArtifact(sessionArtifacts, art);
+            }
+
+            // Handle implicit state flags
+            const flags = extractImplicitFlags(fullContent);
+            if (flags.phaseComplete || flags.filesComplete !== null) {
+              const updated = handleImplicitFlags(
+                engineState as ConversationState,
+                flags,
+              );
+              updateEngineState(updated);
+              engineState = { currentPhase: updated.currentPhase };
+            }
+
             addMessage(sessionId, "assistant", processed.message);
 
             controller.enqueue(
@@ -322,6 +366,12 @@ function handleStreaming(
               phaseLabel: phaseDef.label,
               model: getChatDeploymentName(),
             };
+
+            // Signal auto-continue for file generation
+            if (flags.filesComplete === false) {
+              donePayload.autoContinue = true;
+              donePayload.autoContinuePrompt = "Generate next set of files";
+            }
 
             if (debugMode) {
               const hadExplicitA2UI = processed.a2uiMessages.length > 0;
@@ -414,4 +464,109 @@ function handleStreaming(
     },
     body: stream,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Artifact summary — gives the LLM running context of what's been generated
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a text summary of generated artifacts for injection into the system prompt.
+ * Modeled after Try-AKS's buildArtifactSummary pattern.
+ */
+function buildArtifactSummary(artifacts: GeneratedArtifact[]): string {
+  if (artifacts.length === 0) return "";
+
+  const lines: string[] = [];
+  lines.push("Files generated so far: " + artifacts.map((a) => a.filename).join(", "));
+
+  // Extract Bicep resources
+  const bicepResources: string[] = [];
+  for (const a of artifacts) {
+    if (!a.filename.endsWith(".bicep")) continue;
+    const re = /resource\s+(\w+)\s+'(Microsoft\.[^'@]+)@/g;
+    let m;
+    while ((m = re.exec(a.content)) !== null) {
+      bicepResources.push(`${m[1]} (${m[2]})`);
+    }
+  }
+  if (bicepResources.length > 0) {
+    lines.push("Azure resources declared: " + bicepResources.join(", "));
+  }
+
+  // Extract K8s resources
+  const k8sResources: string[] = [];
+  for (const a of artifacts) {
+    if (!(a.filename.endsWith(".yaml") || a.filename.endsWith(".yml"))) continue;
+    const docs = a.content.split(/^---$/m);
+    for (const doc of docs) {
+      const kindMatch = doc.match(/kind:\s*(\w+)/);
+      const nameMatch = doc.match(/name:\s*["']?([a-z0-9][-a-z0-9]*)["']?/m);
+      if (kindMatch) {
+        k8sResources.push(kindMatch[1] + (nameMatch ? ": " + nameMatch[1] : ""));
+      }
+    }
+  }
+  if (k8sResources.length > 0) {
+    lines.push("Kubernetes resources declared: " + k8sResources.join(", "));
+  }
+
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Implicit state flags — parsed from LLM JSON response
+// ---------------------------------------------------------------------------
+
+interface ParsedImplicitFlags {
+  phaseComplete: boolean;
+  filesComplete: boolean | null;
+}
+
+/** Extract phaseComplete/filesComplete from the raw LLM JSON envelope. */
+function extractImplicitFlags(rawJson: string): ParsedImplicitFlags {
+  try {
+    const parsed = JSON.parse(rawJson) as Record<string, unknown>;
+    return {
+      phaseComplete: parsed.phaseComplete === true,
+      filesComplete: typeof parsed.filesComplete === "boolean" ? parsed.filesComplete : null,
+    };
+  } catch {
+    return { phaseComplete: false, filesComplete: null };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Artifact extraction from A2UI messages
+// ---------------------------------------------------------------------------
+
+/** Extract FileEditor filenames and content from A2UI updateComponents messages. */
+function extractArtifactsFromA2UI(
+  a2uiMessages: Array<{ updateComponents?: { components: unknown[] } }>,
+): GeneratedArtifact[] {
+  const artifacts: GeneratedArtifact[] = [];
+  for (const msg of a2uiMessages) {
+    if (!msg.updateComponents?.components) continue;
+    for (const comp of msg.updateComponents.components) {
+      const c = comp as Record<string, unknown>;
+      if (
+        c.component === "FileEditor" &&
+        typeof c.filename === "string" &&
+        typeof c.content === "string"
+      ) {
+        artifacts.push({ filename: c.filename, content: c.content });
+      }
+    }
+  }
+  return artifacts;
+}
+
+/** Upsert an artifact into the list — replace if same filename exists. */
+function upsertArtifact(list: GeneratedArtifact[], artifact: GeneratedArtifact): void {
+  const idx = list.findIndex((a) => a.filename === artifact.filename);
+  if (idx >= 0) {
+    list[idx] = artifact;
+  } else {
+    list.push(artifact);
+  }
 }
