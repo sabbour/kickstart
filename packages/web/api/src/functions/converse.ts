@@ -146,27 +146,6 @@ app.http("converse", {
         content: idx === 0 && m.role === "system" ? freshSystemPrompt : m.content,
       }));
 
-      // Build A2UI phase indicator
-      const phases: PhaseItem[] = getPhaseOrder().map((phase) => ({
-        id: phase,
-        label: getPhaseDefinition(phase).label,
-        status:
-          engineState.phaseStatus[phase] === "active"
-            ? ("active" as const)
-            : engineState.phaseStatus[phase] === "complete"
-              ? ("complete" as const)
-              : ("pending" as const),
-      }));
-
-      const phaseA2ui = [
-        {
-          type: "ConversationPhase",
-          id: "phase-indicator",
-          phases,
-          currentPhase: engineState.currentPhase,
-        },
-      ];
-
       // Check if client wants SSE streaming
       const wantsStream = request.headers
         .get("accept")
@@ -182,7 +161,7 @@ app.http("converse", {
 
       if (wantsStream) {
         return handleStreaming(
-          messages, state.sessionId, engineState, phaseA2ui, context,
+          messages, state.sessionId, engineState, context,
           toolContext, debugMode, session.generatedArtifacts,
           (newState) => { session.engineState = newState; },
         );
@@ -236,10 +215,8 @@ app.http("converse", {
         session.engineState = handleImplicitFlags(session.engineState, flags);
       }
 
-      // Rebuild phase indicator after implicit advance so the UI stays in sync
-      const activePhaseA2ui = flags.phaseComplete
-        ? buildPhaseIndicator(session.engineState)
-        : phaseA2ui;
+      // Compute phase indicator AFTER implicit flags so UI and metadata are consistent
+      const phaseA2ui = buildPhaseIndicator(session.engineState);
 
       addMessage(state.sessionId, "assistant", processed.message);
 
@@ -248,7 +225,7 @@ app.http("converse", {
         phase: session.engineState.currentPhase,
         message: processed.message,
         model: getChatDeploymentName(),
-        a2ui: [...activePhaseA2ui, ...processed.a2uiMessages],
+        a2ui: [...phaseA2ui, ...processed.a2uiMessages],
       };
 
       // Include auto-continue signal when more files are pending
@@ -306,7 +283,6 @@ function handleStreaming(
   messages: import("../lib/openai-client.js").ChatMessage[],
   sessionId: string,
   initialEngineState: ConversationState,
-  phaseA2ui: object[],
   context: InvocationContext,
   toolContext: ToolContext,
   debugMode: boolean,
@@ -379,12 +355,10 @@ function handleStreaming(
               ),
             );
 
-            // Rebuild phase indicator after implicit advance so the SSE
+            // Compute phase indicator AFTER implicit flags so the SSE
             // response reflects the current phase, not the stale pre-flag one.
-            const activePhaseA2ui = flags.phaseComplete
-              ? buildPhaseIndicator(engineState)
-              : phaseA2ui;
-            const allA2ui = [...activePhaseA2ui, ...processed.a2uiMessages];
+            const currentPhaseA2ui = buildPhaseIndicator(engineState);
+            const allA2ui = [...currentPhaseA2ui, ...processed.a2uiMessages];
             for (const msg of allA2ui) {
               controller.enqueue(
                 encoder.encode(`event: a2ui\ndata: ${JSON.stringify(msg)}\n\n`),
@@ -504,7 +478,7 @@ function handleStreaming(
 
 /**
  * Build a text summary of generated artifacts for injection into the system prompt.
- * Modeled after Try-AKS's buildArtifactSummary pattern.
+ * Uses pre-extracted metadata — no content re-scanning needed.
  */
 function buildArtifactSummary(artifacts: GeneratedArtifact[]): string {
   if (artifacts.length === 0) return "";
@@ -512,33 +486,12 @@ function buildArtifactSummary(artifacts: GeneratedArtifact[]): string {
   const lines: string[] = [];
   lines.push("Files generated so far: " + artifacts.map((a) => a.filename).join(", "));
 
-  // Extract Bicep resources
-  const bicepResources: string[] = [];
-  for (const a of artifacts) {
-    if (!a.filename.endsWith(".bicep")) continue;
-    const re = /resource\s+(\w+)\s+'(Microsoft\.[^'@]+)@/g;
-    let m;
-    while ((m = re.exec(a.content)) !== null) {
-      bicepResources.push(`${m[1]} (${m[2]})`);
-    }
-  }
+  const bicepResources = artifacts.flatMap((a) => a.bicepResources);
   if (bicepResources.length > 0) {
     lines.push("Azure resources declared: " + bicepResources.join(", "));
   }
 
-  // Extract K8s resources
-  const k8sResources: string[] = [];
-  for (const a of artifacts) {
-    if (!(a.filename.endsWith(".yaml") || a.filename.endsWith(".yml"))) continue;
-    const docs = a.content.split(/^---$/m);
-    for (const doc of docs) {
-      const kindMatch = doc.match(/kind:\s*(\w+)/);
-      const nameMatch = doc.match(/name:\s*["']?([a-z0-9][-a-z0-9]*)["']?/m);
-      if (kindMatch) {
-        k8sResources.push(kindMatch[1] + (nameMatch ? ": " + nameMatch[1] : ""));
-      }
-    }
-  }
+  const k8sResources = artifacts.flatMap((a) => a.k8sResources);
   if (k8sResources.length > 0) {
     lines.push("Kubernetes resources declared: " + k8sResources.join(", "));
   }
@@ -572,7 +525,7 @@ function extractImplicitFlags(rawJson: string): ParsedImplicitFlags {
 // Artifact extraction from A2UI messages
 // ---------------------------------------------------------------------------
 
-/** Extract FileEditor filenames and content from A2UI updateComponents messages. */
+/** Extract FileEditor metadata from A2UI updateComponents messages. */
 function extractArtifactsFromA2UI(
   a2uiMessages: Array<{ updateComponents?: { components: unknown[] } }>,
 ): GeneratedArtifact[] {
@@ -583,22 +536,62 @@ function extractArtifactsFromA2UI(
       const c = comp as Record<string, unknown>;
       if (
         c.component === "FileEditor" &&
-        typeof c.filename === "string" &&
-        typeof c.content === "string"
+        typeof c.filename === "string"
       ) {
-        artifacts.push({ filename: c.filename, content: c.content });
+        const filename = c.filename;
+        const language = typeof c.language === "string" ? c.language : "";
+        const content = typeof c.content === "string" ? c.content : "";
+
+        // Extract resource info at upsert time, discard full content
+        const bicepResources: string[] = [];
+        const k8sResources: string[] = [];
+
+        if (filename.endsWith(".bicep")) {
+          const re = /resource\s+(\w+)\s+'(Microsoft\.[^'@]+)@/g;
+          let m;
+          while ((m = re.exec(content)) !== null) {
+            bicepResources.push(`${m[1]} (${m[2]})`);
+          }
+        }
+        if (filename.endsWith(".yaml") || filename.endsWith(".yml")) {
+          const docs = content.split(/^---$/m);
+          for (const doc of docs) {
+            const kindMatch = doc.match(/kind:\s*(\w+)/);
+            const nameMatch = doc.match(/name:\s*["']?([a-z0-9][-a-z0-9]*)["']?/m);
+            if (kindMatch) {
+              k8sResources.push(kindMatch[1] + (nameMatch ? ": " + nameMatch[1] : ""));
+            }
+          }
+        }
+
+        artifacts.push({ filename, language: language || inferLanguage(filename), bicepResources, k8sResources });
       }
     }
   }
   return artifacts;
 }
 
+/** Infer language from filename extension. */
+function inferLanguage(filename: string): string {
+  const ext = filename.split(".").pop() ?? "";
+  const langMap: Record<string, string> = {
+    ts: "typescript", js: "javascript", py: "python", go: "go",
+    rs: "rust", java: "java", cs: "csharp", bicep: "bicep",
+    yaml: "yaml", yml: "yaml", json: "json", md: "markdown",
+    dockerfile: "dockerfile", sh: "shell",
+  };
+  return langMap[ext.toLowerCase()] ?? ext;
+}
+
+/** Max tracked artifacts to prevent unbounded growth. */
+const MAX_TRACKED_ARTIFACTS = 50;
+
 /** Upsert an artifact into the list — replace if same filename exists. */
 function upsertArtifact(list: GeneratedArtifact[], artifact: GeneratedArtifact): void {
   const idx = list.findIndex((a) => a.filename === artifact.filename);
   if (idx >= 0) {
     list[idx] = artifact;
-  } else {
+  } else if (list.length < MAX_TRACKED_ARTIFACTS) {
     list.push(artifact);
   }
 }

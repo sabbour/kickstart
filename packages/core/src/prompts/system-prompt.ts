@@ -209,6 +209,7 @@ ABSOLUTE RULES:
 - "a2ui" (array, required, NEVER empty): A2UI v0.9 messages for rich interactive UI.
 - "actions" (array): reserved for future use. Always empty array [].
 - "phaseComplete" (boolean, optional): set to true when the current step's goals are met and the user should advance to the next step. Default false.
+  IMPORTANT: Only set phaseComplete to true in the turn AFTER the user confirms they want to proceed — never in the same turn where you present confirmation buttons ("Looks good" / "Change something"). If you set phaseComplete: true alongside choice buttons, the phase advances before the user can respond.
 - "filesComplete" (boolean or null, optional): used during GENERATE step only. Set to false while more files remain to generate. Set to true on the last file-generation turn. null or omitted in other steps.
 - The ENTIRE response must be parseable JSON. No text outside the JSON object.
 - Before sending your response, VALIDATE your JSON: count every \`{\` and \`}\`, every \`[\` and \`]\`. They must match. Check that all strings are properly escaped (use \\\\n for newlines, \\\\" for quotes inside strings).
