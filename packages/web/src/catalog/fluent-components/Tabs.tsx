@@ -2,6 +2,7 @@ import React, {useState} from 'react';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
 import {z} from 'zod';
 import {
+  ComponentIdSchema,
   DynamicStringSchema,
   ChildListSchema,
 } from '../../vendor/a2ui/web_core/schema/common-types';
@@ -21,10 +22,12 @@ const KickstartTabsApi = {
     accessibility: z.any().optional(),
     weight: z.number().optional(),
     tabs: z.array(z.object({
-      label: DynamicStringSchema,
+      label: DynamicStringSchema.optional(),
       title: DynamicStringSchema.optional(),
-      child: z.string().optional(),
+      child: ComponentIdSchema.optional(),
       children: ChildListSchema.optional(),
+    }).refine((tab) => tab.label != null || tab.title != null, {
+      message: 'Each tab must provide at least one of "label" or "title".',
     })).min(1),
   }),
 };
