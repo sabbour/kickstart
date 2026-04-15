@@ -60,13 +60,64 @@ function matchIcon(label: string): string | null {
 const VIEWPORT_MIN_HEIGHT = 300;
 const VIEWPORT_MAX_HEIGHT = 800;
 
+const NodeSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  type: z.string().optional(),
+});
+
+const EdgeSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  label: z.string().optional(),
+});
+
+type DiagramNode = z.infer<typeof NodeSchema>;
+type DiagramEdge = z.infer<typeof EdgeSchema>;
+
+/** Map node type to Mermaid shape syntax */
+function nodeToMermaid(node: DiagramNode): string {
+  const escaped = node.label.replace(/"/g, '#quot;');
+  switch (node.type) {
+    case 'database':
+      return `  ${node.id}[("${escaped}")]`;
+    case 'network':
+      return `  ${node.id}{{"${escaped}"}}`;
+    case 'messaging':
+      return `  ${node.id}[/"${escaped}"/]`;
+    case 'storage':
+      return `  ${node.id}[["${escaped}"]]`;
+    case 'compute':
+    default:
+      return `  ${node.id}["${escaped}"]`;
+  }
+}
+
+/** Convert structured nodes/edges to a Mermaid flowchart string */
+function nodesToMermaid(nodes: DiagramNode[], edges: DiagramEdge[]): string {
+  const lines: string[] = ['graph TD'];
+  for (const node of nodes) {
+    lines.push(nodeToMermaid(node));
+  }
+  for (const edge of edges) {
+    if (edge.label) {
+      lines.push(`  ${edge.from} -->|${edge.label}| ${edge.to}`);
+    } else {
+      lines.push(`  ${edge.from} --> ${edge.to}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 const ArchitectureDiagramApi = {
   name: 'ArchitectureDiagram',
   schema: z.object({
-    diagram: DynamicStringSchema,
+    diagram: DynamicStringSchema.optional(),
+    nodes: z.array(NodeSchema).optional(),
+    edges: z.array(EdgeSchema).optional(),
     title: DynamicStringSchema.optional(),
     description: DynamicStringSchema.optional(),
-  }).strict(),
+  }),
 };
 
 const useStyles = makeStyles({
@@ -335,6 +386,13 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
   const [viewportHeight, setViewportHeight] = useState(VIEWPORT_MIN_HEIGHT);
   const diagramSize = useRef({ width: 0, height: 0 });
 
+  // Resolve diagram string: use `diagram` prop directly, or convert nodes/edges
+  const resolvedDiagram = props.diagram
+    ? props.diagram
+    : props.nodes && props.edges
+      ? nodesToMermaid(props.nodes, props.edges)
+      : undefined;
+
   /** Fit the diagram to the viewport width and center it. */
   const fitAndCenter = useCallback(() => {
     const viewportEl = viewportRef.current;
@@ -360,14 +418,14 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
   }, [viewportHeight]);
 
   useEffect(() => {
-    if (!props.diagram || !containerRef.current) return;
+    if (!resolvedDiagram || !containerRef.current) return;
 
     const container = containerRef.current;
     const id = `mermaid-diagram-${++diagramCounter}`;
 
     loadMermaid().then(async (m) => {
       try {
-        const { svg } = await m.default.render(id, preprocessDiagram(props.diagram));
+        const { svg } = await m.default.render(id, preprocessDiagram(resolvedDiagram));
         if (container) {
           container.innerHTML = svg;
           const svgEl = container.querySelector('svg');
@@ -403,7 +461,7 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
         setRenderError(true);
       }
     });
-  }, [props.diagram, fitAndCenter]);
+  }, [resolvedDiagram, fitAndCenter]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -451,7 +509,7 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
           <Caption1 className={classes.fallbackLabel}>
             Diagram rendering unavailable — raw Mermaid source:
           </Caption1>
-          <pre className={classes.rawCode}>{props.diagram}</pre>
+          <pre className={classes.rawCode}>{resolvedDiagram}</pre>
         </div>
       ) : (
         <>
