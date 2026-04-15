@@ -55,6 +55,11 @@ export function App() {
     onAutoContinue: (msg) => handleSendMessage(msg, true),
     connectorRegistry,
     onDebugAction: debugEnabled ? (evt) => logAction({ ...evt, timestamp: Date.now() }) : undefined,
+    onClientAction: (operation) => {
+      if (operation === 'download-project') {
+        handleDownloadZip();
+      }
+    },
   });
 
   const a2ui = useA2UI({ actionHandler });

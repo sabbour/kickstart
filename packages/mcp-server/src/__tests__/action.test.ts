@@ -153,19 +153,19 @@ describe("handleAction", () => {
 
   // ── Full journey through all phases ───────────────────────────
 
-  it("advancing through all phases eventually marks conversation complete", async () => {
+  it("advancing through active phases eventually marks conversation complete", async () => {
     const session = createSessionAtPhase("s-journey", Phase.Discover);
     sessions.set("s-journey", session);
 
-    // Advance through all 6 phases (Discover → Deploy → complete)
-    const phases = [Phase.Discover, Phase.Design, Phase.Generate, Phase.Review, Phase.Handoff, Phase.Deploy];
+    // Advance through 4 active phases (Discover → Design → Generate → Review → complete)
+    const phases = [Phase.Discover, Phase.Design, Phase.Generate, Phase.Review];
     for (const _phase of phases) {
       await handleAction(sessions, "s-journey", "advance");
     }
 
     const result = await handleAction(sessions, "s-journey", "advance");
     const text = (result.content[0] as { type: "text"; text: string }).text;
-    // After completing Deploy, should show completion or stay at Deploy
+    // After completing Review, should show completion or stay at Review
     expect(text).toBeTruthy();
   });
 });

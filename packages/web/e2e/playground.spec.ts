@@ -504,14 +504,14 @@ test.describe('Playground', () => {
     // --- Keyboard shortcuts ---
 
     test('Ctrl+K focuses gallery search input', async ({ page }) => {
-      // Ensure no input is focused
-      await page.locator('body').click();
+      // Focus a reliable non-input target — clicking body is flaky in headless CI
+      await page.getByRole('tab', { name: 'Ideas' }).focus();
       await page.keyboard.press('Control+k');
       await expect(page.getByPlaceholder('Filter scenarios...')).toBeFocused();
     });
 
     test('/ key focuses gallery search input', async ({ page }) => {
-      await page.locator('body').click();
+      await page.getByRole('tab', { name: 'Ideas' }).focus();
       await page.keyboard.press('/');
       await expect(page.getByPlaceholder('Filter scenarios...')).toBeFocused();
     });

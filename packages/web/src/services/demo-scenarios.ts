@@ -222,92 +222,46 @@ const REVIEW_EXPANDED: DemoResponse = {
   ]),
 };
 
-const HANDOFF: DemoResponse = {
-  text: "Your code is on GitHub! I've created the repository, pushed all generated files, and set up a CI/CD pipeline. Every push to `main` will automatically build, test, and deploy.",
-  phase: 'handoff',
+const SESSION_COMPLETE: DemoResponse = {
+  text: "Your deployment package is complete and ready to use. All files have been generated and validated against production best practices.",
+  phase: 'review',
   model: 'gpt-5.3-chat',
-  typingDelay: 1600,
-  a2uiMessages: surface('handoff-surface', [
-    { id: 'root', component: 'Column', children: ['ho-title', 'ho-progress', 'ho-repo-card', 'ho-next-card'], gap: 'medium' },
-    { id: 'ho-title', component: 'Text', text: 'Get Your Code on GitHub', variant: 'h2' },
-    { id: 'ho-progress', component: 'ProgressSteps', steps: [
-      { id: 'create-repo', label: 'Create Repo', status: 'complete' },
-      { id: 'push-code', label: 'Push Code', status: 'complete' },
-      { id: 'setup-cicd', label: 'Setup CI/CD', status: 'complete' },
-      { id: 'ready', label: 'Ready!', status: 'active' },
+  typingDelay: 1400,
+  a2uiMessages: surface('complete-surface', [
+    { id: 'root', component: 'Column', children: ['complete-title', 'complete-card', 'summary-card'], gap: 'medium' },
+    { id: 'complete-title', component: 'Text', text: 'Session Complete', variant: 'subtitle1' },
+
+    // Completion status card
+    { id: 'complete-card', component: 'Card', child: 'complete-inner' },
+    { id: 'complete-inner', component: 'Column', children: ['complete-header', 'complete-divider', 'complete-steps'], gap: 'small' },
+    { id: 'complete-header', component: 'Row', children: ['done-badge', 'done-title'], gap: 'small' },
+    { id: 'done-badge', component: 'Badge', text: 'Complete', variant: 'success' },
+    { id: 'done-title', component: 'Text', text: 'Deployment package ready', variant: 'subtitle1' },
+    { id: 'complete-divider', component: 'Divider' },
+    { id: 'complete-steps', component: 'ProgressSteps', steps: [
+      { id: 'discover', label: 'Discover', status: 'complete' },
+      { id: 'design', label: 'Design', status: 'complete' },
+      { id: 'generate', label: 'Generate', status: 'complete' },
+      { id: 'review', label: 'Review', status: 'complete' },
     ] },
 
-    // Repository info card
-    { id: 'ho-repo-card', component: 'Card', child: 'ho-repo-inner' },
-    { id: 'ho-repo-inner', component: 'Column', children: ['repo-header', 'repo-divider', 'repo-details'], gap: 'small' },
-    { id: 'repo-header', component: 'Row', children: ['repo-badge', 'repo-name'], gap: 'small' },
-    { id: 'repo-badge', component: 'Badge', text: 'Created', variant: 'success' },
-    { id: 'repo-name', component: 'Text', text: 'my-awesome-app', variant: 'subtitle1' },
-    { id: 'repo-divider', component: 'Divider' },
-    { id: 'repo-details', component: 'List', children: ['rd-1', 'rd-2', 'rd-3', 'rd-4'], variant: 'unordered' },
-    { id: 'rd-1', component: 'Text', text: '**Repository:** github.example.com/you/my-awesome-app' },
-    { id: 'rd-2', component: 'Text', text: '**Branch:** main (protected)' },
-    { id: 'rd-3', component: 'Text', text: '**CI/CD:** GitHub Actions workflow active' },
-    { id: 'rd-4', component: 'Text', text: '**Files:** 6 files pushed (Dockerfile, manifests, workflow, Bicep, app code, config)' },
-
-    // Next steps card
-    { id: 'ho-next-card', component: 'Card', child: 'ho-next-inner' },
-    { id: 'ho-next-inner', component: 'Column', children: ['next-md', 'next-divider', 'next-actions'], gap: 'small' },
-    { id: 'next-md', component: 'Markdown', content: 'Your code is on GitHub with CI/CD ready. Every push to `main` triggers **build → test → deploy**.' },
-    { id: 'next-divider', component: 'Divider' },
-    { id: 'next-actions', component: 'Row', children: ['codespace-btn', 'deploy-btn'], gap: 'small' },
-    { id: 'codespace-btn', component: 'Button', label: 'Open in Codespaces', variant: 'primary',
-      action: { event: { name: 'open-codespace' } } },
-    { id: 'deploy-btn', component: 'Button', label: 'Deploy now', variant: 'outlined',
-      action: { event: { name: 'start-deploy' } } },
-  ]),
-};
-
-const DEPLOY_PROGRESS: DemoResponse = {
-  text: "**Deployment complete!** All 7 resources provisioned successfully. Your app is live and ready for traffic.",
-  phase: 'deploy',
-  model: 'gpt-5.3-chat',
-  typingDelay: 2500,
-  a2uiMessages: surface('deploy-surface', [
-    { id: 'root', component: 'Column', children: ['deploy-progress', 'success-card', 'whats-next'], gap: 'medium' },
-
-    // Deployment progress with 7 resource provisioning steps
-    { id: 'deploy-progress', component: 'DeploymentProgress',
-      title: 'Deploying to AKS Automatic',
-      overallStatus: 'complete',
-      steps: [
-        { id: 'rg', label: 'Create resource group', status: 'complete', detail: 'my-app-rg (East US)', timestamp: '0:02' },
-        { id: 'acr', label: 'Provision container registry', status: 'complete', detail: 'myappacr.azurecr.example', timestamp: '0:15' },
-        { id: 'aks', label: 'Create AKS Automatic cluster', status: 'complete', detail: 'my-app-aks (3 nodes)', timestamp: '2:30' },
-        { id: 'cosmos', label: 'Provision Cosmos DB', status: 'complete', detail: 'Serverless, NoSQL API', timestamp: '1:45' },
-        { id: 'build', label: 'Build & push container image', status: 'complete', detail: 'myappacr.azurecr.example/my-app:abc1234', timestamp: '0:40' },
-        { id: 'deploy', label: 'Deploy to cluster', status: 'complete', detail: '2/2 replicas ready', timestamp: '0:20' },
-        { id: 'dns', label: 'Configure DNS & TLS', status: 'complete', detail: 'my-awesome-app.aks.example', timestamp: '0:30' },
-      ],
-    },
-
-    // Success summary card
-    { id: 'success-card', component: 'Card', child: 'success-inner' },
-    { id: 'success-inner', component: 'Column', children: ['success-header', 'success-divider', 'success-endpoints'], gap: 'small' },
-    { id: 'success-header', component: 'Row', children: ['live-badge', 'live-title'], gap: 'small' },
-    { id: 'live-badge', component: 'Badge', text: 'Live', variant: 'success' },
-    { id: 'live-title', component: 'Text', text: 'Your app is running', variant: 'h2' },
-    { id: 'success-divider', component: 'Divider' },
-    { id: 'success-endpoints', component: 'List', children: ['ep-app', 'ep-api', 'ep-gh', 'ep-portal'], variant: 'unordered' },
-    { id: 'ep-app', component: 'Text', text: '**App URL:** https://my-awesome-app.aks.example' },
-    { id: 'ep-api', component: 'Text', text: '**API:** https://api.my-awesome-app.aks.example' },
-    { id: 'ep-gh', component: 'Text', text: '**GitHub:** github.example.com/you/my-awesome-app' },
-    { id: 'ep-portal', component: 'Text', text: '**Azure Portal:** portal.azure.example → my-app-rg' },
-
-    // What's Next accordion
-    { id: 'whats-next', component: 'Accordion', sections: [
-      { id: 'wn-monitor', title: 'Set up monitoring',
-        content: 'Azure Monitor is pre-configured. View dashboards in the Azure Portal for request metrics, latency percentiles, and error rates.' },
-      { id: 'wn-domain', title: 'Add a custom domain',
-        content: 'Point your DNS CNAME to `my-awesome-app.aks.example` and the TLS certificate auto-renews via cert-manager.' },
-      { id: 'wn-scale', title: 'Scale your app',
-        content: 'Auto-scaling is active (2–10 replicas). Adjust thresholds in `deployment.yaml` or through the Azure Portal.' },
-    ] },
+    // What was generated
+    { id: 'summary-card', component: 'Card', child: 'summary-inner' },
+    { id: 'summary-inner', component: 'Column', children: ['summary-title', 'summary-divider', 'summary-list', 'summary-divider2', 'summary-actions'], gap: 'small' },
+    { id: 'summary-title', component: 'Text', text: 'What was generated', variant: 'subtitle1' },
+    { id: 'summary-divider', component: 'Divider' },
+    { id: 'summary-list', component: 'List', children: ['sf-1', 'sf-2', 'sf-3', 'sf-4', 'sf-5'], variant: 'unordered' },
+    { id: 'sf-1', component: 'Text', text: '**Dockerfile** — multi-stage build, non-root user, health check' },
+    { id: 'sf-2', component: 'Text', text: '**deployment.yaml** — AKS manifests, HPA, PDB, resource limits' },
+    { id: 'sf-3', component: 'Text', text: '**.github/workflows/deploy.yml** — build, test, and deploy pipeline' },
+    { id: 'sf-4', component: 'Text', text: '**infra/main.bicep** — AKS Automatic + ACR + backing services' },
+    { id: 'sf-5', component: 'Text', text: '**.env.template** — secrets template (use Key Vault for real values)' },
+    { id: 'summary-divider2', component: 'Divider' },
+    { id: 'summary-actions', component: 'Row', children: ['download-btn', 'new-project-btn'], gap: 'small' },
+    { id: 'download-btn', component: 'Button', label: 'Download files', variant: 'primary',
+      action: { event: { name: 'client:download-project' } } },
+    { id: 'new-project-btn', component: 'Button', label: 'Start a new project', variant: 'outlined',
+      action: { event: { name: 'start-new-project' } } },
   ]),
 };
 
@@ -322,7 +276,7 @@ const CONFIGURE_FORM: DemoResponse = {
       { id: 'info', label: 'App Info', status: 'active' },
       { id: 'infra', label: 'Infrastructure', status: 'pending' },
       { id: 'cicd', label: 'CI/CD', status: 'pending' },
-      { id: 'done', label: 'Deploy', status: 'pending' },
+      { id: 'done', label: 'Review', status: 'pending' },
     ] },
     { id: 'form1', component: 'FormGroup', title: 'Application Details', step: 1, child: 'form1-inner' },
     { id: 'form1-inner', component: 'Column', children: ['app-name', 'app-region'] },
@@ -402,9 +356,7 @@ spec:
 };
 
 const SCENARIOS: { match: RegExp | null; response: DemoResponse }[] = [
-  { match: /deploy|ship|launch|go live/i, response: DEPLOY_PROGRESS },
-  { match: /review|summary|ready|looks good/i, response: REVIEW_EXPANDED },
-  { match: /handoff|github|repo|push|codespace/i, response: HANDOFF },
+  { match: /review|summary|ready|looks good|complete|done/i, response: REVIEW_EXPANDED },
   { match: /code|preview|dockerfile|yaml|file/i, response: CODE_PREVIEW },
   { match: /config|form|setup|step/i, response: CONFIGURE_FORM },
   { match: /generat|scaffold|create/i, response: FILE_GENERATION },
@@ -439,7 +391,7 @@ export function getDemoResponse(userMessage: string): DemoResponse {
   }
 
   // Cycle through scenarios for subsequent turns
-  const scenarioFlow = [ARCHITECTURE, DESIGN_DETAIL, CONFIGURE_FORM, CODE_PREVIEW, FILE_GENERATION, REVIEW_EXPANDED, HANDOFF, DEPLOY_PROGRESS];
+  const scenarioFlow = [ARCHITECTURE, DESIGN_DETAIL, CONFIGURE_FORM, CODE_PREVIEW, FILE_GENERATION, REVIEW_EXPANDED, SESSION_COMPLETE];
   
   // Check keyword matches first
   for (const scenario of SCENARIOS) {

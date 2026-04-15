@@ -14,9 +14,9 @@ export enum Phase {
   Generate = "generate",
   /** Validate manifests, show cost estimate */
   Review = "review",
-  /** Push to GitHub, open in Codespaces */
+  /** @deprecated Not yet implemented — flow currently ends at Review. */
   Handoff = "handoff",
-  /** Optional: deploy from Codespaces/CI */
+  /** @deprecated Not yet implemented — flow currently ends at Review. */
   Deploy = "deploy",
 }
 
