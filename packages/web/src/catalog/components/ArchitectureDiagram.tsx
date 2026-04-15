@@ -207,7 +207,7 @@ function loadMermaid(): Promise<typeof import('mermaid')> {
         m.default.initialize({
           startOnLoad: false,
           theme: 'base',
-          securityLevel: 'loose',
+          securityLevel: 'antiscript',
           fontFamily: AZURE.fontFamily,
           themeVariables: {
             primaryColor: AZURE.white,
@@ -254,7 +254,57 @@ function raiseClusterLabels(svg: SVGSVGElement): void {
   svg.querySelectorAll('.cluster-label').forEach((el) => overlay.appendChild(el));
 }
 
-/** Pre-process mermaid source to escape brackets/parens (try-aks approach). */
+/**
+ * Sanitize a raw Mermaid diagram string from an untrusted source (LLM output).
+ *
+ * Strategy: allowlist `<br/>` and `<br>` (needed for multi-line node labels),
+ * then strip every other HTML tag plus event-handler attributes and dangerous
+ * URI schemes.  This runs BEFORE Mermaid parses the source, giving us control
+ * over what HTML can reach the renderer even when `htmlLabels` is enabled.
+ */
+function sanitizeDiagramInput(source: string): string {
+  // Preserve <br/> / <br> by swapping to a safe placeholder
+  const BR = '\u0000BR\u0000';
+  let safe = source.replace(/<br\s*\/?>/gi, BR);
+  // Strip all remaining HTML tags
+  safe = safe.replace(/<[^>]*>/g, '');
+  // Strip event-handler attributes that may survive tag stripping (e.g. inside Mermaid label syntax)
+  safe = safe.replace(/\bon\w+\s*=/gi, '');
+  // Strip javascript: and data: URI schemes
+  safe = safe.replace(/javascript\s*:/gi, '').replace(/data\s*:/gi, '');
+  // Restore <br/>
+  return safe.replace(new RegExp(BR, 'g'), '<br/>');
+}
+
+/**
+ * Safely insert a Mermaid-rendered SVG string into a container element.
+ *
+ * Uses an inert <template> element to parse without script execution or
+ * resource loading, then walks the resulting DOM to strip any remaining
+ * event-handler attributes and <script> elements before appending to the
+ * live document.
+ */
+function insertSvgSafely(container: HTMLElement, svg: string): void {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = svg;
+
+  // Strip <script> elements
+  tpl.content.querySelectorAll('script').forEach((s) => s.remove());
+
+  // Strip on* event-handler attributes from every element
+  tpl.content.querySelectorAll('*').forEach((el) => {
+    Array.from(el.attributes).forEach((attr) => {
+      if (attr.name.toLowerCase().startsWith('on')) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+
+  container.innerHTML = '';
+  container.appendChild(tpl.content);
+}
+
+
 function preprocessDiagram(source: string): string {
   let processed = source;
   // Wrap unquoted bracket labels containing parens in quotes
@@ -425,9 +475,9 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
 
     loadMermaid().then(async (m) => {
       try {
-        const { svg } = await m.default.render(id, preprocessDiagram(resolvedDiagram));
+        const { svg } = await m.default.render(id, preprocessDiagram(sanitizeDiagramInput(resolvedDiagram)));
         if (container) {
-          container.innerHTML = svg;
+          insertSvgSafely(container, svg);
           const svgEl = container.querySelector('svg');
           if (svgEl) {
             // Post-process for Fluent 2 styling and icons
