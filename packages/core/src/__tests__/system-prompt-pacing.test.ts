@@ -234,4 +234,40 @@ describe("System Prompt — Pacing Directives (Gate A1)", () => {
       ).toBe(true);
     });
   });
+
+  describe("Progressive flow regression guards", () => {
+    it("keeps architecture review separate from cost review", () => {
+      const prompt = buildSystemPrompt({
+        phase: Phase.Design,
+        appDefinition: { appName: "TestApp", description: "Test app" },
+      });
+
+      expect(prompt).toContain(
+        "Do NOT show cost estimates, best-practice summaries, or deployment/auth components in the same turn as the architecture diagram.",
+      );
+      expect(prompt).not.toContain("After gathering answers, present architecture using Tabs:");
+    });
+
+    it("does not end the guided flow at review", () => {
+      const prompt = buildSystemPrompt({
+        phase: Phase.Review,
+        appDefinition: { appName: "TestApp", description: "Test app" },
+      });
+
+      expect(prompt).toContain("### STEP 5 — HANDOFF");
+      expect(prompt).toContain("### STEP 6 — DEPLOY");
+      expect(prompt).not.toContain("This is the end of the guided flow — there is no further step after REVIEW.");
+      expect(prompt).not.toContain("Do not enter handoff or deploy phases — they are not yet implemented.");
+    });
+
+    it("treats review as a checkpoint before GitHub handoff", () => {
+      const prompt = buildSystemPrompt({
+        phase: Phase.Review,
+        appDefinition: { appName: "TestApp", description: "Test app" },
+      });
+
+      expect(prompt).toContain("REVIEW is a checkpoint, not the end of the flow.");
+      expect(prompt).toContain("One primary Button to continue to GitHub handoff and one secondary Button to revise the plan");
+    });
+  });
 });

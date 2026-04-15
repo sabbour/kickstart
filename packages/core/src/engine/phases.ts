@@ -2,7 +2,7 @@
  * @module @kickstart/core/engine/phases
  *
  * Phase definitions for the Kickstart conversation flow.
- * Six phases: DISCOVER → DESIGN → GENERATE → REVIEW (→ HANDOFF → DEPLOY, not yet implemented)
+ * Six phases: DISCOVER → DESIGN → GENERATE → REVIEW → HANDOFF → DEPLOY
  *
  * Phase templates are minimal context injections — behavioral instructions
  * live in the unified narrative prompt (system-prompt.ts).
@@ -77,7 +77,7 @@ Services:
 
 Cost context:
 {{costContext}}`,
-    nextPhase: null,
+    nextPhase: Phase.Handoff,
   },
   {
     id: Phase.Handoff,

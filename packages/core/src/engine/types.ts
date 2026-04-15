@@ -14,9 +14,9 @@ export enum Phase {
   Generate = "generate",
   /** Validate manifests, show cost estimate */
   Review = "review",
-  /** @deprecated Not yet implemented — flow currently ends at Review. */
+  /** Get the generated project into GitHub. */
   Handoff = "handoff",
-  /** @deprecated Not yet implemented — flow currently ends at Review. */
+  /** Guide the Azure deployment flow to a real running app. */
   Deploy = "deploy",
 }
 

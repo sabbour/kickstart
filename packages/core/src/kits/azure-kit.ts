@@ -14,10 +14,10 @@
  *   - PricingConnector     (Azure Retail Pricing API, no auth required)
  *
  * Component registrations (rendered by packages/web):
- *   - AuthCard             (MSAL sign-in card, provider: "azure")
- *   - azureResourcePicker  (cascading subscription → RG → resource selector)
- *   - azureResourceForm    (dynamic ARM-driven form for resource creation)
- *   - azureAction          (write-with-confirm pattern for ARM operations)
+ *   - AuthCard             (SWA-backed Azure sign-in card, provider: "azure")
+ *   - AzureResourcePicker  (cascading subscription → RG → resource selector)
+ *   - AzureResourceForm    (dynamic ARM-driven form for resource creation)
+ *   - AzureAction          (write-with-confirm pattern for ARM operations)
  */
 
 import type { IntegrationKit } from './types.js';
@@ -521,14 +521,14 @@ Use estimate_cost tool for live pricing when available; these reference prices a
     {
       type: 'AuthCard',
       description:
-        'Azure sign-in card (provider: "azure"). Uses MSAL with automatic subscription discovery.\n' +
+        'Azure sign-in card (provider: "azure"). Uses the existing Static Web Apps sign-in session; the browser never sends ARM bearer tokens directly.\n' +
         'Props:\n' +
         '  - provider (required string): Must be "azure".\n' +
         '  - title (optional string): Card heading. Defaults to "Azure".\n' +
         '  - description (optional string): Subheading text.',
     },
     {
-      type: 'azureResourcePicker',
+      type: 'AzureResourcePicker',
       description:
         'Cascading subscription → resource group → resource selector with search/filter.\n' +
         'Props:\n' +
@@ -539,7 +539,7 @@ Use estimate_cost tool for live pricing when available; these reference prices a
         '  - onSelect (optional action): Callback fired when the user selects a resource.',
     },
     {
-      type: 'azureResourceForm',
+      type: 'AzureResourceForm',
       description:
         'Dynamic form for creating Azure resources. Generates fields based on resource type.\n' +
         'Props:\n' +
@@ -550,7 +550,7 @@ Use estimate_cost tool for live pricing when available; these reference prices a
         '  - apiVersion (optional string): ARM API version for the resource type.',
     },
     {
-      type: 'azureAction',
+      type: 'AzureAction',
       description:
         'Write-with-confirm pattern for ARM operations. Shows action preview before execution.\n' +
         'Destructive operations (DELETE) require typing the resource name to confirm.\n' +

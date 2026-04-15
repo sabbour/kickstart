@@ -10,6 +10,7 @@ import {
   Phase,
   createInitialState,
   buildSystemPrompt,
+  transition,
 } from "@kickstart/core";
 import type {
   SessionState,
@@ -151,6 +152,26 @@ export function createSession(principalId?: string): ApiSession {
 export interface ClientMessage {
   role: "user" | "assistant";
   content: string;
+  phase?: string;
+}
+
+function restoreEngineStateFromHistory(clientMessages: ClientMessage[]): ConversationState {
+  const phases = new Set(Object.values(Phase));
+  const lastPhase = [...clientMessages]
+    .reverse()
+    .find((msg) => typeof msg.phase === "string" && phases.has(msg.phase as Phase))
+    ?.phase as Phase | undefined;
+
+  if (!lastPhase) {
+    return createInitialState();
+  }
+
+  let state = createInitialState();
+  while (state.currentPhase !== lastPhase && !state.isComplete) {
+    state = transition(state, { type: "ADVANCE" });
+  }
+
+  return state.currentPhase === lastPhase ? state : createInitialState();
 }
 
 /**
@@ -182,6 +203,8 @@ export function hydrateSession(clientMessages: ClientMessage[], principalId?: st
     }
   }
 
+  session.engineState = restoreEngineStateFromHistory(clientMessages);
+  session.state.currentPhase = session.engineState.currentPhase;
   session.state.updatedAt = now;
   return session;
 }

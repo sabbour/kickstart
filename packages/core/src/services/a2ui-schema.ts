@@ -124,14 +124,14 @@ const boundedStringNonEmpty = z.string().min(1).transform(truncateToLimit);
 const boundedStringPath = z.string().startsWith("/").transform(truncateToLimit);
 
 /** For dynamic props that can be string or object (DataBinding/FunctionCall). */
-const dynamicString = z.union([boundedString, z.record(z.unknown())]);
+const dynamicString = z.union([boundedString, z.record(z.string(), z.unknown())]);
 
 const actionSchema = z
   .object({
     event: z.object({
       name: z.string(),
-      data: z.record(z.unknown()).optional(),
-      context: z.record(z.unknown()).optional(),
+      data: z.record(z.string(), z.unknown()).optional(),
+      context: z.record(z.string(), z.unknown()).optional(),
     }),
   })
   .passthrough();
@@ -550,7 +550,7 @@ const GitHubActionPropsSchema = z
     method: z.enum(["POST", "PUT", "PATCH", "DELETE"]),
     path: dynamicString,
     operationType: dynamicString,
-    body: z.record(z.unknown()).optional(),
+    body: z.record(z.string(), z.unknown()).optional(),
     confirmLabel: dynamicString.optional(),
     onSuccess: actionSchema.optional(),
     onError: actionSchema.optional(),
@@ -614,7 +614,7 @@ const AzureActionPropsSchema = z
     description: dynamicString.optional(),
     method: z.enum(["PUT", "POST", "PATCH", "DELETE"]),
     path: dynamicString,
-    body: z.record(z.unknown()).optional(),
+    body: z.record(z.string(), z.unknown()).optional(),
     apiVersion: dynamicString.optional(),
     confirmLabel: dynamicString.optional(),
     onSuccess: actionSchema.optional(),
@@ -818,7 +818,7 @@ const CreateSurfaceMessageSchema = z
     createSurface: z.object({
       surfaceId: surfaceIdField,
       catalogId: boundedString.optional(),
-      theme: z.record(z.unknown()).optional(),
+      theme: z.record(z.string(), z.unknown()).optional(),
       sendDataModel: z.boolean().optional(),
     }),
   })
