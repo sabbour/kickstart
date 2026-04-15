@@ -591,7 +591,7 @@
             "component": {
               "const": "CostEstimate"
             },
-            "items": {
+            "resources": {
               "type": "array",
               "items": {
                 "type": "object",
@@ -602,16 +602,72 @@
                   "sku": {
                     "type": "string"
                   },
-                  "monthlyCost": {
+                  "monthlyEstimate": {
                     "type": "number"
+                  },
+                  "pricingModel": {
+                    "type": "string",
+                    "enum": [
+                      "monthly",
+                      "usage",
+                      "included"
+                    ]
+                  },
+                  "unitPrice": {
+                    "type": "number"
+                  },
+                  "unitOfMeasure": {
+                    "type": "string"
+                  },
+                  "skuOptions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "monthlyEstimate": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value",
+                        "monthlyEstimate"
+                      ]
+                    }
+                  },
+                  "pricingTiers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "monthlyEstimate": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "monthlyEstimate"
+                      ]
+                    }
                   }
                 },
                 "required": [
                   "name",
-                  "sku",
-                  "monthlyCost"
+                  "monthlyEstimate"
                 ]
               }
+            },
+            "monthlyEstimate": {
+              "type": "number"
             },
             "total": {
               "type": "number"
@@ -619,13 +675,146 @@
             "currency": {
               "type": "string",
               "default": "USD"
+            },
+            "title": {
+              "type": "string"
+            },
+            "projectionMonths": {
+              "type": "number"
+            },
+            "showProjectionSlider": {
+              "type": "boolean"
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "live",
+                "estimated"
+              ]
+            },
+            "citation": {
+              "type": "string"
+            },
+            "loading": {
+              "type": "object",
+              "properties": {
+                "supported": {
+                  "type": "boolean"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "loading",
+                    "ready"
+                  ]
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "supported"
+              ]
+            },
+            "cache": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "miss",
+                    "hit",
+                    "stale"
+                  ]
+                },
+                "updatedAt": {
+                  "type": "string"
+                },
+                "expiresAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "fallback": {
+              "type": "object",
+              "properties": {
+                "used": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "live_pricing_unavailable",
+                    "unsupported_request"
+                  ]
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "used"
+              ]
+            },
+            "pricingRequest": {
+              "type": "object",
+              "properties": {
+                "region": {
+                  "type": "string"
+                },
+                "lineItems": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "aksAutomaticControlPlane",
+                          "aksAutomaticSystemNodes",
+                          "aksAutomaticWorkloadCompute",
+                          "appRouting",
+                          "containerRegistry",
+                          "storage",
+                          "azureOpenAI"
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "sku": {
+                        "type": "string"
+                      },
+                      "quantity": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "region",
+                "lineItems"
+              ]
+            },
+            "estimatedAt": {
+              "type": "string"
             }
           },
           "required": [
             "component",
-            "items",
-            "total",
-            "currency"
+            "resources"
           ]
         }
       ]

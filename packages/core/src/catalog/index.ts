@@ -150,17 +150,92 @@ export interface DateTimeInputComponent extends BaseComponent {
 
 // ── Custom Kickstart Components (5) ─────────────────────────────────
 
-export interface CostItem {
-  name: string;
-  sku: string;
-  monthlyCost: number;
+export interface CostEstimateSkuOption {
+  label: string;
+  value: string;
+  monthlyEstimate: number;
 }
 
-export interface CostEstimateComponent extends BaseComponent {
+export interface CostEstimatePricingTier {
+  label: string;
+  monthlyEstimate: number;
+}
+
+export type CostEstimatePricingKind =
+  | "aksAutomaticControlPlane"
+  | "aksAutomaticSystemNodes"
+  | "aksAutomaticWorkloadCompute"
+  | "appRouting"
+  | "containerRegistry"
+  | "storage"
+  | "azureOpenAI";
+
+export type CostEstimateResourcePricingModel = "monthly" | "usage" | "included";
+
+export interface CostEstimateResource {
+  name: string;
+  sku?: string;
+  monthlyEstimate: number;
+  pricingModel?: CostEstimateResourcePricingModel;
+  unitPrice?: number;
+  unitOfMeasure?: string;
+  skuOptions?: CostEstimateSkuOption[];
+  pricingTiers?: CostEstimatePricingTier[];
+}
+
+export interface CostEstimatePricingLineItem {
+  id: string;
+  kind: CostEstimatePricingKind;
+  name?: string;
+  sku?: string;
+  quantity?: number;
+}
+
+export interface CostEstimatePricingRequest {
+  region: string;
+  lineItems: CostEstimatePricingLineItem[];
+}
+
+/** Backward-compatible alias for older CostEstimate item naming. */
+export type CostItem = CostEstimateResource;
+
+export interface CostEstimateLoadingState {
+  supported: boolean;
+  state?: "idle" | "loading" | "ready";
+  message?: string;
+}
+
+export interface CostEstimateCacheMetadata {
+  status: "miss" | "hit" | "stale";
+  updatedAt?: string;
+  expiresAt?: string;
+}
+
+export interface CostEstimateFallbackMetadata {
+  used: boolean;
+  reason?: "live_pricing_unavailable" | "unsupported_request";
+  message?: string;
+}
+
+export interface CostEstimateProps {
+  resources: CostEstimateResource[];
+  monthlyEstimate?: number;
+  total?: number;
+  currency?: string;
+  title?: string;
+  projectionMonths?: number;
+  showProjectionSlider?: boolean;
+  source?: "live" | "estimated";
+  citation?: string;
+  loading?: CostEstimateLoadingState;
+  cache?: CostEstimateCacheMetadata;
+  fallback?: CostEstimateFallbackMetadata;
+  pricingRequest?: CostEstimatePricingRequest;
+  estimatedAt?: string;
+}
+
+export interface CostEstimateComponent extends BaseComponent, CostEstimateProps {
   component: "CostEstimate";
-  items: CostItem[];
-  total: number;
-  currency: string;
 }
 
 export interface ArchNode {

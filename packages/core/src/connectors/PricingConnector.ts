@@ -72,6 +72,8 @@ export interface RetailPriceQuery {
   filter: string;
   /** Max pages to fetch (default: 1). */
   maxPages?: number;
+  /** Optional abort signal for request timeouts/cancellation. */
+  signal?: AbortSignal;
 }
 
 /** Resolved price for a VM SKU with optional reservation tiers. */
@@ -144,8 +146,8 @@ export class PricingConnector extends BaseConnector {
 
     while (page < maxPages) {
       const response = page === 0
-        ? await this.request('GET', initialPath)
-        : await this.requestUrl('GET', nextUrl!);
+        ? await this.request('GET', initialPath, undefined, { signal: query.signal })
+        : await this.requestUrl('GET', nextUrl!, query.signal);
 
       if (!response.ok) {
         throw new Error(`Azure Pricing API returned ${response.status}: ${response.statusText}`);
@@ -174,7 +176,11 @@ export class PricingConnector extends BaseConnector {
    * Returns pay-as-you-go and optional reservation prices.
    * Returns `null` if the API call fails (caller should fall back to stubs).
    */
-  async lookupVmPrice(vmSize: string, region: string): Promise<VmPriceResult | null> {
+  async lookupVmPrice(
+    vmSize: string,
+    region: string,
+    signal?: AbortSignal,
+  ): Promise<VmPriceResult | null> {
     // Map Standard_D4s_v3 → D4s v3 (API skuName format)
     const skuName = vmSize.replace(/^Standard_/, '').replace(/_/g, ' ');
 
@@ -186,7 +192,7 @@ export class PricingConnector extends BaseConnector {
     ].join(' and ');
 
     try {
-      const items = await this.fetchRetailPrices({ filter, maxPages: 1 });
+        const items = await this.fetchRetailPrices({ filter, maxPages: 1, signal });
 
       // Find Linux (non-Windows) consumption price
       const consumption = items.find(
@@ -232,6 +238,7 @@ export class PricingConnector extends BaseConnector {
     serviceName: string,
     region: string,
     skuName?: string,
+    signal?: AbortSignal,
   ): Promise<RetailPriceItem[]> {
     const parts = [
       `serviceName eq '${serviceName}'`,
@@ -243,7 +250,7 @@ export class PricingConnector extends BaseConnector {
     const filter = parts.join(' and ');
 
     try {
-      return await this.fetchRetailPrices({ filter, maxPages: 1 });
+      return await this.fetchRetailPrices({ filter, maxPages: 1, signal });
     } catch {
       return [];
     }
@@ -338,10 +345,15 @@ export class PricingConnector extends BaseConnector {
    * Make a GET request to a full URL (for NextPageLink pagination).
    * Uses raw fetch to bypass BaseConnector path resolution.
    */
-  private async requestUrl(method: 'GET', url: string): Promise<Response> {
+  private async requestUrl(
+    method: 'GET',
+    url: string,
+    signal?: AbortSignal,
+  ): Promise<Response> {
     return fetch(url, {
       method,
       headers: { Accept: 'application/json' },
+      signal,
     });
   }
 }
