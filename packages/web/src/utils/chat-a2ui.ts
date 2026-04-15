@@ -4,11 +4,46 @@ const PHASE_COMPONENT_NAME = 'ConversationPhase';
 const PHASE_SURFACE_ID = 'phase-indicator';
 const SURFACE_SCOPE_SEPARATOR = '::';
 
-const LEGACY_PHASE_ALIASES: Record<string, ConversationPhaseId> = {
+const PHASE_ALIASES = {
+  discover: 'discover',
   plan: 'design',
+  design: 'design',
   build: 'generate',
+  generate: 'generate',
+  review: 'review',
   validate: 'review',
+  handoff: 'handoff',
+  deploy: 'deploy',
+} as const satisfies Record<string, ConversationPhaseId>;
+
+const EXTENSION_LANGUAGES: Record<string, string> = {
+  ts: 'typescript',
+  tsx: 'typescript',
+  js: 'javascript',
+  jsx: 'javascript',
+  py: 'python',
+  yaml: 'yaml',
+  yml: 'yaml',
+  json: 'json',
+  md: 'markdown',
+  css: 'css',
+  html: 'html',
+  sh: 'shell',
+  bash: 'shell',
+  dockerfile: 'dockerfile',
+  bicep: 'bicep',
+  go: 'go',
 };
+
+const FILE_NAME_LANGUAGES: Record<string, string> = {
+  Dockerfile: 'dockerfile',
+  '.dockerignore': 'ignore',
+  '.gitignore': 'ignore',
+  '.env': 'dotenv',
+  '.env.template': 'dotenv',
+};
+
+export const GENERATE_PROGRESS_TITLE = 'Project Setup';
 
 export const CONVERSATION_PHASE_ORDER = [
   'discover',
@@ -28,7 +63,35 @@ export const CONVERSATION_PHASE_LABELS: Record<ConversationPhaseId, string> = {
   deploy: 'Deploy',
 };
 
-function isA2uiMessage(item: A2uiPayloadItem): item is A2uiMsg {
+export interface GeneratedChatFile {
+  path: string;
+  content: string;
+  language?: string;
+}
+
+export interface PrepareChatA2uiOptions {
+  currentPhase?: string | null;
+  resolveArtifactContent?: (artifactPath: string) => string | null | undefined;
+}
+
+export interface PreparedChatA2ui {
+  storedMessages: A2uiPayloadItem[];
+  renderableMessages: A2uiMsg[];
+  files: GeneratedChatFile[];
+  phase: ConversationPhaseId | null;
+}
+
+export function normalizeConversationPhase(phase: string | null | undefined): ConversationPhaseId | null {
+  if (!phase) return null;
+
+  const normalized = phase.trim().toLowerCase();
+  if (!normalized) return null;
+  if (!(normalized in PHASE_ALIASES)) return null;
+
+  return PHASE_ALIASES[normalized as keyof typeof PHASE_ALIASES];
+}
+
+export function isA2uiMessage(item: A2uiPayloadItem): item is A2uiMsg {
   return Boolean(
     'version' in item
     || 'createSurface' in item
@@ -46,7 +109,7 @@ function isConversationPhaseComponent(component: unknown): component is Record<s
     || (candidate.type === 'createSurface' && candidate.component === PHASE_COMPONENT_NAME);
 }
 
-function extractPhaseFromPhaseList(phases: unknown): string | null {
+function extractPhaseFromPhaseList(phases: unknown): ConversationPhaseId | null {
   if (!Array.isArray(phases)) return null;
 
   const activePhase = phases.find((phase): phase is { id?: string; status?: string } =>
@@ -59,7 +122,7 @@ function extractPhaseFromPhaseList(phases: unknown): string | null {
   return normalizeConversationPhase(activePhase?.id);
 }
 
-function extractPhaseFromComponent(component: unknown): string | null {
+function extractPhaseFromComponent(component: unknown): ConversationPhaseId | null {
   if (!isConversationPhaseComponent(component)) return null;
 
   const candidate = component as Record<string, unknown>;
@@ -70,25 +133,7 @@ function extractPhaseFromComponent(component: unknown): string | null {
   return extractPhaseFromPhaseList(candidate.phases);
 }
 
-function scopeSurfaceId(surfaceId: string, turnId: string): string {
-  const prefix = `${turnId}${SURFACE_SCOPE_SEPARATOR}`;
-  return surfaceId.startsWith(prefix) ? surfaceId : `${prefix}${surfaceId}`;
-}
-
-function filterRenderableComponents(components: A2uiComponent[]): A2uiComponent[] {
-  return components.filter(component => !isConversationPhaseComponent(component));
-}
-
-export function normalizeConversationPhase(phase: string | null | undefined): string | null {
-  if (!phase) return null;
-
-  const normalized = phase.trim().toLowerCase();
-  if (!normalized) return null;
-
-  return LEGACY_PHASE_ALIASES[normalized] ?? normalized;
-}
-
-export function extractConversationPhase(items: readonly A2uiPayloadItem[]): string | null {
+export function extractConversationPhase(items: readonly A2uiPayloadItem[]): ConversationPhaseId | null {
   for (const item of items) {
     const directPhase = extractPhaseFromComponent(item);
     if (directPhase) return directPhase;
@@ -104,80 +149,158 @@ export function extractConversationPhase(items: readonly A2uiPayloadItem[]): str
   return null;
 }
 
-export function scopeRenderableA2uiMessages(
+function scopeSurfaceId(surfaceId: string, turnId: string): string {
+  const prefix = `${turnId}${SURFACE_SCOPE_SEPARATOR}`;
+  return surfaceId.startsWith(prefix) ? surfaceId : `${prefix}${surfaceId}`;
+}
+
+function scopeRenderableMessage(
+  item: A2uiMsg,
+  turnId: string,
+  components?: A2uiComponent[],
+): A2uiMsg | null {
+  if (item.createSurface) {
+    if (item.createSurface.surfaceId === PHASE_SURFACE_ID) return null;
+    return {
+      ...item,
+      createSurface: {
+        ...item.createSurface,
+        surfaceId: scopeSurfaceId(item.createSurface.surfaceId, turnId),
+      },
+    };
+  }
+
+  if (item.updateComponents) {
+    if (item.updateComponents.surfaceId === PHASE_SURFACE_ID) return null;
+    const scopedComponents = components ?? item.updateComponents.components;
+    if (scopedComponents.length === 0) return null;
+    return {
+      ...item,
+      updateComponents: {
+        ...item.updateComponents,
+        surfaceId: scopeSurfaceId(item.updateComponents.surfaceId, turnId),
+        components: scopedComponents,
+      },
+    };
+  }
+
+  if (item.updateDataModel) {
+    if (item.updateDataModel.surfaceId === PHASE_SURFACE_ID) return null;
+    return {
+      ...item,
+      updateDataModel: {
+        ...item.updateDataModel,
+        surfaceId: scopeSurfaceId(item.updateDataModel.surfaceId, turnId),
+      },
+    };
+  }
+
+  if (item.deleteSurface) {
+    if (item.deleteSurface.surfaceId === PHASE_SURFACE_ID) return null;
+    return {
+      ...item,
+      deleteSurface: {
+        ...item.deleteSurface,
+        surfaceId: scopeSurfaceId(item.deleteSurface.surfaceId, turnId),
+      },
+    };
+  }
+
+  return item;
+}
+
+export function prepareChatA2ui(
   items: readonly A2uiPayloadItem[],
   turnId: string,
-): A2uiMsg[] {
-  return items.flatMap((item) => {
-    if (!isA2uiMessage(item)) return [];
+  options: PrepareChatA2uiOptions = {},
+): PreparedChatA2ui {
+  const phase = extractConversationPhase(items) ?? normalizeConversationPhase(options.currentPhase);
+  const files: GeneratedChatFile[] = [];
+  const storedMessages: A2uiPayloadItem[] = [];
+  const renderableMessages: A2uiMsg[] = [];
 
-    if (item.createSurface) {
-      if (item.createSurface.surfaceId === PHASE_SURFACE_ID) return [];
-      return [{
-        ...item,
-        createSurface: {
-          ...item.createSurface,
-          surfaceId: scopeSurfaceId(item.createSurface.surfaceId, turnId),
-        },
-      }];
+  for (const item of items) {
+    if (!isA2uiMessage(item)) {
+      storedMessages.push(item);
+      continue;
     }
 
-    if (item.updateComponents) {
-      if (item.updateComponents.surfaceId === PHASE_SURFACE_ID) return [];
-
-      const components = filterRenderableComponents(item.updateComponents.components);
-      if (components.length === 0) return [];
-
-      return [{
-        ...item,
-        updateComponents: {
-          ...item.updateComponents,
-          surfaceId: scopeSurfaceId(item.updateComponents.surfaceId, turnId),
-          components,
-        },
-      }];
+    if (!item.updateComponents?.components) {
+      storedMessages.push(item);
+      const renderableMessage = scopeRenderableMessage(item, turnId);
+      if (renderableMessage) {
+        renderableMessages.push(renderableMessage);
+      }
+      continue;
     }
 
-    if (item.updateDataModel) {
-      if (item.updateDataModel.surfaceId === PHASE_SURFACE_ID) return [];
-      return [{
-        ...item,
-        updateDataModel: {
-          ...item.updateDataModel,
-          surfaceId: scopeSurfaceId(item.updateDataModel.surfaceId, turnId),
-        },
-      }];
-    }
+    const storedComponents = enrichComponents(
+      item.updateComponents.components,
+      files,
+      options.resolveArtifactContent,
+    );
 
-    if (item.deleteSurface) {
-      if (item.deleteSurface.surfaceId === PHASE_SURFACE_ID) return [];
-      return [{
-        ...item,
-        deleteSurface: {
-          ...item.deleteSurface,
-          surfaceId: scopeSurfaceId(item.deleteSurface.surfaceId, turnId),
-        },
-      }];
-    }
+    storedMessages.push({
+      ...item,
+      updateComponents: {
+        ...item.updateComponents,
+        components: storedComponents,
+      },
+    });
 
-    return [item];
-  });
+    const renderableMessage = scopeRenderableMessage(
+      item,
+      turnId,
+      renderComponentsForChat(storedComponents, phase),
+    );
+    if (renderableMessage) {
+      renderableMessages.push(renderableMessage);
+    }
+  }
+
+  return { storedMessages, renderableMessages, files, phase };
 }
 
 export function prepareChatA2uiPayload(
   items: readonly A2uiPayloadItem[],
   turnId: string,
-): {
-  phase: string | null;
-  messages: A2uiMsg[];
-} {
+): { phase: ConversationPhaseId | null; messages: A2uiMsg[] } {
+  const prepared = prepareChatA2ui(items, turnId);
   return {
-    phase: extractConversationPhase(items),
-    messages: scopeRenderableA2uiMessages(items, turnId),
+    phase: prepared.phase,
+    messages: prepared.renderableMessages,
   };
 }
 
-export function getLatestConversationPhase(messages: readonly ChatMessage[]): string | null {
+export function rebuildChatSessionState(
+  messages: readonly Pick<ChatMessage, 'id' | 'a2uiMessages' | 'phase'>[],
+  options: Omit<PrepareChatA2uiOptions, 'currentPhase'> = {},
+): Omit<PreparedChatA2ui, 'storedMessages'> {
+  const renderableMessages: A2uiMsg[] = [];
+  const files: GeneratedChatFile[] = [];
+  let phase: ConversationPhaseId | null = null;
+
+  for (const message of messages) {
+    const fallbackPhase = normalizeConversationPhase(message.phase) ?? phase;
+    if (!message.a2uiMessages?.length) {
+      phase = fallbackPhase;
+      continue;
+    }
+
+    const prepared = prepareChatA2ui(message.a2uiMessages, message.id, {
+      ...options,
+      currentPhase: fallbackPhase,
+    });
+
+    renderableMessages.push(...prepared.renderableMessages);
+    files.push(...prepared.files);
+    phase = prepared.phase ?? fallbackPhase;
+  }
+
+  return { renderableMessages, files, phase };
+}
+
+export function getLatestConversationPhase(messages: readonly ChatMessage[]): ConversationPhaseId | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (message.role !== 'assistant') continue;
@@ -191,4 +314,173 @@ export function getLatestConversationPhase(messages: readonly ChatMessage[]): st
   }
 
   return null;
+}
+
+function enrichComponents(
+  components: A2uiComponent[],
+  files: GeneratedChatFile[],
+  resolveArtifactContent?: (artifactPath: string) => string | null | undefined,
+): A2uiComponent[] {
+  return components.map((component) => {
+    if (!isFileEditorComponent(component)) {
+      return component;
+    }
+
+    const normalizedEntries = extractFileEntries(component, resolveArtifactContent);
+    files.push(...normalizedEntries.map(({ path, content, language }) => ({
+      path,
+      content,
+      language,
+    })));
+
+    if ('files' in component && Array.isArray(component.files)) {
+      return {
+        ...component,
+        files: normalizedEntries.map(({ path, content, language }) => ({
+          filename: path,
+          content,
+          language,
+        })),
+      } as A2uiComponent;
+    }
+
+    const firstFile = normalizedEntries[0];
+    if (!firstFile) {
+      return component;
+    }
+
+    return {
+      ...component,
+      filename: firstFile.path,
+      content: firstFile.content,
+      language: firstFile.language,
+    } as A2uiComponent;
+  });
+}
+
+function renderComponentsForChat(
+  components: A2uiComponent[],
+  phase: ConversationPhaseId | null,
+): A2uiComponent[] {
+  return components.flatMap((component) => {
+    if (isConversationPhaseComponent(component)) {
+      return [];
+    }
+
+    if (isFileEditorComponent(component)) {
+      return buildGeneratedFileSummary(component);
+    }
+
+    if (phase === 'generate' && isDeploymentProgressComponent(component)) {
+      return [{ ...component, title: GENERATE_PROGRESS_TITLE } as A2uiComponent];
+    }
+
+    return [component];
+  });
+}
+
+function buildGeneratedFileSummary(component: A2uiComponent): A2uiComponent[] {
+  const entries = extractFileEntries(component);
+
+  if (entries.length === 0) {
+    return [{
+      id: component.id,
+      component: 'Text',
+      text: '📄 Generated files are available in the workspace.',
+      variant: 'body2',
+    } as A2uiComponent];
+  }
+
+  if (entries.length === 1) {
+    return [{
+      id: component.id,
+      component: 'Text',
+      text: formatFileLabel(entries[0].path),
+      variant: 'subtitle2',
+    } as A2uiComponent];
+  }
+
+  const childIds = entries.map((_, index) => `${component.id}__file_${index}`);
+
+  return [
+    {
+      id: component.id,
+      component: 'Column',
+      children: childIds,
+      gap: 'small',
+    } as A2uiComponent,
+    ...entries.map((entry, index) => ({
+      id: childIds[index],
+      component: 'Text',
+      text: formatFileLabel(entry.path),
+      variant: 'subtitle2',
+    }) as A2uiComponent),
+  ];
+}
+
+function extractFileEntries(
+  component: A2uiComponent,
+  resolveArtifactContent?: (artifactPath: string) => string | null | undefined,
+): Array<GeneratedChatFile & { artifactPath?: string }> {
+  const rawEntries = isFileEditorComponent(component) && Array.isArray(component.files) && component.files.length > 0
+    ? component.files
+    : [component];
+
+  return rawEntries
+    .map((entry) => normalizeFileEntry(entry, resolveArtifactContent))
+    .filter((entry): entry is GeneratedChatFile & { artifactPath?: string } => entry !== null);
+}
+
+function normalizeFileEntry(
+  entry: unknown,
+  resolveArtifactContent?: (artifactPath: string) => string | null | undefined,
+): (GeneratedChatFile & { artifactPath?: string }) | null {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  const record = entry as Record<string, unknown>;
+  const artifactPath = coerceString(record.artifactPath);
+  const path = coerceString(record.filename) ?? artifactPath;
+  if (!path) {
+    return null;
+  }
+
+  const directContent = typeof record.content === 'string' ? record.content : undefined;
+  const content = directContent ?? (artifactPath ? resolveArtifactContent?.(artifactPath) : undefined) ?? '';
+  const language = coerceString(record.language) ?? inferLanguageFromPath(path);
+
+  return { path, content, language, artifactPath };
+}
+
+function inferLanguageFromPath(path: string): string | undefined {
+  const filename = path.split('/').pop() ?? '';
+  if (filename in FILE_NAME_LANGUAGES) {
+    return FILE_NAME_LANGUAGES[filename];
+  }
+
+  const ext = filename.includes('.') ? filename.split('.').pop()?.toLowerCase() : filename.toLowerCase();
+  return ext ? EXTENSION_LANGUAGES[ext] : undefined;
+}
+
+function coerceString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function formatFileLabel(path: string): string {
+  return `📄 ${path}`;
+}
+
+function isFileEditorComponent(component: A2uiComponent): component is A2uiComponent & {
+  filename?: string;
+  content?: string;
+  language?: string;
+  artifactPath?: string;
+  files?: unknown[];
+} {
+  return component.component === 'FileEditor';
+}
+
+function isDeploymentProgressComponent(component: A2uiComponent): boolean {
+  return component.component === 'DeploymentProgress';
 }

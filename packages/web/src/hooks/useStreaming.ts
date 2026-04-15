@@ -85,8 +85,8 @@ export function useStreaming() {
     let displayText = '';
     let lastModel: string | undefined;
     let lastSessionId: string | undefined;
-    let lastPhase: string | undefined;
-    const debugA2uiMessages: A2uiPayloadItem[] = [];
+      let lastPhase: string | undefined;
+      const debugA2uiMessages: A2uiPayloadItem[] = [];
 
     try {
       // Build client message history for rehydration (strip system messages

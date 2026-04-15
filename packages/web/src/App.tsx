@@ -17,19 +17,20 @@ import type { NavState } from './hooks/useNavigation';
 import { useStreaming } from './hooks/useStreaming';
 import { useMockStreaming } from './hooks/useMockStreaming';
 import { useAPIConnectorRegistry } from './contexts/APIConnectorContext';
+import { useArtifacts } from './contexts/ArtifactContext';
 import { useTheme } from './contexts/ThemeContext';
 import { useDebug } from './contexts/DebugContext';
 import { useVirtualFS } from './contexts/VirtualFSContext';
 import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
-import type { VFSFile } from './services/virtual-fs';
-import type { AppMode, ChatMessage, A2uiPayloadItem } from './types';
 import {
   getLatestConversationPhase,
   normalizeConversationPhase,
-  prepareChatA2uiPayload,
+  prepareChatA2ui,
+  rebuildChatSessionState,
 } from './utils/chat-a2ui';
+import type { AppMode, ChatMessage, A2uiPayloadItem } from './types';
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
 const mockEnabled = isMockMode();
@@ -52,8 +53,11 @@ export function App() {
   const [filePanelOpen, setFilePanelOpen] = useState(true);
   const [fileSidebarOpen, setFileSidebarOpen] = useState(true);
   const [viewerFile, setViewerFile] = useState<string | undefined>();
+  const selectedFileRef = useRef<string | undefined>(undefined);
+  const viewerFileRef = useRef<string | undefined>(undefined);
 
   const connectorRegistry = useAPIConnectorRegistry();
+  const { getArtifact } = useArtifacts();
 
   const { handler: actionHandler, resetConsecutiveCount } = useActionDispatch({
     onSendMessage: (msg) => handleSendMessage(msg),
@@ -106,7 +110,7 @@ export function App() {
   // Messages for the active session
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // Current conversation phase for the active session
+  // Current conversation phase from SSE events
   const [currentPhase, setCurrentPhase] = useState<string | null>(null);
   const currentPhaseRef = useRef<string | null>(null);
 
@@ -115,6 +119,14 @@ export function App() {
 
   // Raw A2UI messages accumulated during streaming (for session persistence)
   const streamingA2UIMessagesRef = useRef<A2uiPayloadItem[]>([]);
+
+  useEffect(() => {
+    selectedFileRef.current = selectedFile;
+  }, [selectedFile]);
+
+  useEffect(() => {
+    viewerFileRef.current = viewerFile;
+  }, [viewerFile]);
 
   // Check API availability on mount (skip in mock mode — already true)
   useEffect(() => {
@@ -143,6 +155,64 @@ export function App() {
     setCurrentPhase(normalized);
     currentPhaseRef.current = normalized;
   }, []);
+
+  const openGeneratedFile = useCallback((path: string) => {
+    selectedFileRef.current = path;
+    viewerFileRef.current = path;
+    setSelectedFile(path);
+    setViewerFile(path);
+  }, []);
+
+  const resolveArtifactContent = useCallback((artifactPath: string) => {
+    return getArtifact(artifactPath)?.content ?? null;
+  }, [getArtifact]);
+
+  const clearWorkspace = useCallback(async () => {
+    a2ui.reset();
+    fs.clear();
+    lastPersistedRef.current = new Map();
+    clearActionLog();
+    selectedFileRef.current = undefined;
+    viewerFileRef.current = undefined;
+    setSelectedFile(undefined);
+    setViewerFile(undefined);
+    setConversationPhase(null);
+    try {
+      await vfs.clear();
+    } catch (err) {
+      console.error('[Workspace] failed to clear persisted files:', err);
+    }
+  }, [a2ui, fs, vfs, clearActionLog, setConversationPhase]);
+
+  const processIncomingA2UI = useCallback((msgs: A2uiPayloadItem[], turnId: string) => {
+    const prepared = prepareChatA2ui(msgs, turnId, {
+      currentPhase: currentPhaseRef.current,
+      resolveArtifactContent,
+    });
+
+    streamingA2UIMessagesRef.current = [
+      ...streamingA2UIMessagesRef.current,
+      ...prepared.storedMessages,
+    ];
+
+    if (prepared.phase) {
+      setConversationPhase(prepared.phase);
+    }
+
+    for (const file of prepared.files) {
+      fs.write(file.path, file.content, file.language);
+    }
+
+    if (prepared.files.length > 0 && !selectedFileRef.current && !viewerFileRef.current) {
+      openGeneratedFile(prepared.files[0].path);
+    }
+
+    const newIds = a2ui.processMessages(prepared.renderableMessages);
+    if (newIds.length > 0) {
+      streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
+      progressiveQueue.enqueue(newIds);
+    }
+  }, [resolveArtifactContent, fs, openGeneratedFile, a2ui, progressiveQueue, setConversationPhase]);
 
   const handleSendMessage = useCallback(async (text: string, isAutoContinue = false, explicitSessionId?: string) => {
     // Manual messages reset the consecutive auto-continue counter
@@ -190,22 +260,7 @@ export function App() {
     progressiveQueue.reset();
 
     const handleIncomingA2UI = (payload: A2uiPayloadItem[]) => {
-      const { phase, messages: scopedMessages } = prepareChatA2uiPayload(payload, assistantMessageId);
-
-      if (phase) {
-        setConversationPhase(phase);
-      }
-
-      if (scopedMessages.length === 0) {
-        return;
-      }
-
-      streamingA2UIMessagesRef.current = [...streamingA2UIMessagesRef.current, ...scopedMessages];
-      const newIds = a2ui.processMessages(scopedMessages);
-      if (newIds.length > 0) {
-        streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
-        progressiveQueue.enqueue(newIds);
-      }
+      processIncomingA2UI(payload, assistantMessageId);
     };
 
     // Use mock streaming when ?mock is active, real streaming otherwise
@@ -301,69 +356,56 @@ export function App() {
         },
       }, debugEnabled, activeSession?.messages ?? []);
     }
-  }, [sessions, streaming, mockStreaming, a2ui, isApiAvailable, resetConsecutiveCount, progressiveQueue, debugEnabled, clearActionLog, setConversationPhase]);
+  }, [sessions, streaming, mockStreaming, isApiAvailable, resetConsecutiveCount, progressiveQueue, debugEnabled, clearActionLog, setConversationPhase, processIncomingA2UI]);
 
-  const handleStartChat = useCallback((prompt: string) => {
-    a2ui.reset();
-    fs.clear();
-    void vfs.clear();
-    clearActionLog();
-    setSelectedFile(undefined);
-    setViewerFile(undefined);
+  const handleStartChat = useCallback(async (prompt: string) => {
+    await clearWorkspace();
     setMessages([]);
-    setConversationPhase(null);
     setMode('chat');
     document.body.classList.remove('on-landing');
 
     // Create session and send — pass explicit ID to avoid stale-closure duplicate
     const session = sessions.createSession(prompt);
     nav.pushSession(session.id);
-    handleSendMessage(prompt, false, session.id);
-  }, [sessions, a2ui, handleSendMessage, fs, vfs, nav.pushSession, clearActionLog, setConversationPhase]);
+    void handleSendMessage(prompt, false, session.id);
+  }, [clearWorkspace, sessions, handleSendMessage, nav.pushSession]);
 
-  const handleClearAllSessions = useCallback(() => {
+  const handleClearAllSessions = useCallback(async () => {
     sessions.clearAllSessions();
     setMessages([]);
-    a2ui.reset();
-    fs.clear();
-    void vfs.clear();
-    clearActionLog();
-    setSelectedFile(undefined);
-    setViewerFile(undefined);
-    setConversationPhase(null);
-  }, [sessions, a2ui, fs, vfs, clearActionLog, setConversationPhase]);
+    await clearWorkspace();
+  }, [sessions, clearWorkspace]);
 
-  const handleNewSession = useCallback((pushHistory = true) => {
-    a2ui.reset();
-    fs.clear();
-    void vfs.clear();
-    clearActionLog();
-    setSelectedFile(undefined);
-    setViewerFile(undefined);
+  const handleNewSession = useCallback(async (pushHistory = true) => {
+    await clearWorkspace();
     setMessages([]);
-    setConversationPhase(null);
     setMode('landing');
     document.body.classList.add('on-landing');
     sessions.setActiveSessionId(null);
     if (pushHistory) {
       nav.pushLanding();
     }
-  }, [a2ui, sessions, fs, vfs, nav.pushLanding, clearActionLog, setConversationPhase]);
+  }, [clearWorkspace, sessions, nav.pushLanding]);
 
-  const handleResumeSession = useCallback((sessionId: string, pushHistory = true) => {
+  const handleResumeSession = useCallback(async (sessionId: string, pushHistory = true) => {
     sessions.setActiveSessionId(sessionId);
     const session = sessions.sessions.find(s => s.id === sessionId);
     if (session) {
-      a2ui.reset();
-      clearActionLog();
-      for (const msg of session.messages) {
-        if (msg.a2uiMessages && msg.a2uiMessages.length > 0) {
-          const { messages: scopedMessages } = prepareChatA2uiPayload(msg.a2uiMessages, msg.id);
-          if (scopedMessages.length > 0) {
-            a2ui.processMessages(scopedMessages);
-          }
-        }
+      await clearWorkspace();
+      const restored = rebuildChatSessionState(session.messages, {
+        resolveArtifactContent,
+      });
+
+      if (restored.renderableMessages.length > 0) {
+        a2ui.processMessages(restored.renderableMessages);
       }
+      for (const file of restored.files) {
+        fs.write(file.path, file.content, file.language);
+      }
+      if (restored.files.length > 0) {
+        openGeneratedFile(restored.files[0].path);
+      }
+
       setMessages(session.messages);
       setConversationPhase(getLatestConversationPhase(session.messages));
       setMode('chat');
@@ -372,7 +414,7 @@ export function App() {
         nav.pushSession(sessionId);
       }
     }
-  }, [sessions, a2ui, nav.pushSession, clearActionLog, setConversationPhase]);
+  }, [sessions, clearWorkspace, resolveArtifactContent, a2ui, fs, openGeneratedFile, nav.pushSession, setConversationPhase]);
 
   // Wire up popstate -> handler dispatch (updated every render via ref)
   navHandlerRef.current = (state: NavState) => {
@@ -419,8 +461,8 @@ export function App() {
 
   // --- File Manager sidebar / viewer handlers ---
   const handleSelectViewerFile = useCallback((path: string) => {
-    setViewerFile(path);
-  }, []);
+    openGeneratedFile(path);
+  }, [openGeneratedFile]);
 
   const handleDownloadZip = useCallback(async () => {
     try {
@@ -443,9 +485,14 @@ export function App() {
       // file may not exist in IndexedDB
     }
     fs.delete(path);
-    if (viewerFile === path) setViewerFile(undefined);
-    if (selectedFile === path) setSelectedFile(undefined);
-    setViewerFile(undefined);
+    if (viewerFile === path) {
+      viewerFileRef.current = undefined;
+      setViewerFile(undefined);
+    }
+    if (selectedFile === path) {
+      selectedFileRef.current = undefined;
+      setSelectedFile(undefined);
+    }
   }, [vfs, fs, viewerFile, selectedFile]);
 
   const handleDismissSidebar = useCallback(() => {
@@ -453,25 +500,9 @@ export function App() {
   }, []);
 
   const handleDismissViewer = useCallback(() => {
+    viewerFileRef.current = undefined;
     setViewerFile(undefined);
   }, []);
-
-  // Wire navigation handler (popstate / initial deep-link)
-  navHandlerRef.current = (state: NavState) => {
-    if (state.view === 'session' && state.sessionId) {
-      handleResumeSession(state.sessionId, false);
-    } else {
-      handleNewSession(false);
-    }
-  };
-
-  // Restore deep-link on mount (e.g. #session/<id>)
-  useEffect(() => {
-    const initial = nav.getInitialState();
-    if (initial.view === 'session' && initial.sessionId) {
-      handleResumeSession(initial.sessionId, false);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Playground mode — standalone A2UI test harness
   if (playgroundEnabled) {
@@ -518,7 +549,7 @@ export function App() {
             <FileEditor
               fs={fs}
               selectedPath={selectedFile}
-              onSelectFile={setSelectedFile}
+              onSelectFile={openGeneratedFile}
             />
             <FileTreePanel />
           </>
