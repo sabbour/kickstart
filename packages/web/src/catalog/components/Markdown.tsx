@@ -195,6 +195,9 @@ const useStyles = makeStyles({
 export const Markdown = createReactComponent(MarkdownApi, ({ props }) => {
   const classes = useStyles();
 
+  // Normalize literal \n sequences (from LLM JSON) into actual newlines
+  const content = (props.content || '').replace(/\\n/g, '\n');
+
   return (
     <div className={classes.root}>
       <ReactMarkdown
@@ -261,7 +264,7 @@ export const Markdown = createReactComponent(MarkdownApi, ({ props }) => {
           hr: ({ node, ...props }) => <hr className={classes.hr} {...props} />,
         }}
       >
-        {props.content || ''}
+        {content}
       </ReactMarkdown>
     </div>
   );
