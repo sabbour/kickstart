@@ -59,12 +59,10 @@ const ARCHITECTURE: DemoResponse = {
     { id: 'r4-value', component: 'Text', text: 'AKS Automatic (zero-config Kubernetes)', variant: 'body2' },
     { id: 'divider2', component: 'Divider' },
     { id: 'actions-row', component: 'Row', children: ['approve-btn', 'modify-btn'], gap: 'small' },
-    { id: 'approve-btn', component: 'Button', child: 'approve-text', variant: 'primary',
+    { id: 'approve-btn', component: 'Button', label: "Looks good, let's build it", variant: 'primary',
       action: { event: { name: 'approve-arch' } } },
-    { id: 'approve-text', component: 'Text', text: "Looks good, let's build it" },
-    { id: 'modify-btn', component: 'Button', child: 'modify-text', variant: 'outlined',
+    { id: 'modify-btn', component: 'Button', label: 'I want to change something', variant: 'outlined',
       action: { event: { name: 'modify-arch' } } },
-    { id: 'modify-text', component: 'Text', text: 'I want to change something' },
   ]),
 };
 
@@ -217,12 +215,10 @@ const REVIEW_EXPANDED: DemoResponse = {
     // Actions
     { id: 'rev-divider', component: 'Divider' },
     { id: 'rev-actions', component: 'Row', children: ['approve-btn', 'modify-btn'], gap: 'small' },
-    { id: 'approve-btn', component: 'Button', child: 'approve-text', variant: 'primary',
+    { id: 'approve-btn', component: 'Button', label: 'Approve and continue', variant: 'primary',
       action: { event: { name: 'approve-review' } } },
-    { id: 'approve-text', component: 'Text', text: 'Approve and continue' },
-    { id: 'modify-btn', component: 'Button', child: 'modify-text', variant: 'outlined',
+    { id: 'modify-btn', component: 'Button', label: 'Change something', variant: 'outlined',
       action: { event: { name: 'modify-review' } } },
-    { id: 'modify-text', component: 'Text', text: 'Change something' },
   ]),
 };
 
@@ -260,12 +256,10 @@ const HANDOFF: DemoResponse = {
     { id: 'next-md', component: 'Markdown', content: 'Your code is on GitHub with CI/CD ready. Every push to `main` triggers **build → test → deploy**.' },
     { id: 'next-divider', component: 'Divider' },
     { id: 'next-actions', component: 'Row', children: ['codespace-btn', 'deploy-btn'], gap: 'small' },
-    { id: 'codespace-btn', component: 'Button', child: 'cs-text', variant: 'primary',
+    { id: 'codespace-btn', component: 'Button', label: 'Open in Codespaces', variant: 'primary',
       action: { event: { name: 'open-codespace' } } },
-    { id: 'cs-text', component: 'Text', text: 'Open in Codespaces' },
-    { id: 'deploy-btn', component: 'Button', child: 'deploy-text', variant: 'outlined',
+    { id: 'deploy-btn', component: 'Button', label: 'Deploy now', variant: 'outlined',
       action: { event: { name: 'start-deploy' } } },
-    { id: 'deploy-text', component: 'Text', text: 'Deploy now' },
   ]),
 };
 
@@ -345,9 +339,8 @@ const CONFIGURE_FORM: DemoResponse = {
       { id: 'python', label: 'Python 3.12', description: 'Great for APIs and data services' },
       { id: 'dotnet', label: '.NET 8', description: 'Enterprise-grade C# runtime' },
     ], value: '', action: { event: { name: 'select-runtime' } } },
-    { id: 'continue-btn', component: 'Button', child: 'continue-text', variant: 'primary',
+    { id: 'continue-btn', component: 'Button', label: 'Continue →', variant: 'primary',
       action: { event: { name: 'continue-config' } } },
-    { id: 'continue-text', component: 'Text', text: 'Continue →' },
   ]),
 };
 
