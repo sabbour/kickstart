@@ -7,11 +7,12 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { sendMock, resetMockState } from '../services/mock-streaming';
-import type { A2uiPayloadItem } from '../types';
+import type { A2uiPayloadItem, SetupGenerationEvent } from '../types';
 
 interface MockStreamCallbacks {
   onDelta: (text: string) => void;
   onA2UI: (messages: A2uiPayloadItem[]) => void;
+  onSetupEvent?: (event: SetupGenerationEvent) => void;
   onPhase: (phase: string) => void;
   onComplete: (fullText: string, model?: string, sessionId?: string) => void;
   onError: (error: string) => void;

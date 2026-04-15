@@ -14,6 +14,10 @@ const vfsApi = vi.hoisted(() => ({
   deleteFile: vi.fn().mockResolvedValue(undefined),
   readAll: vi.fn().mockResolvedValue([]),
   getFile: vi.fn().mockResolvedValue(undefined),
+  saveWorkspaceSnapshot: vi.fn().mockResolvedValue(undefined),
+  loadWorkspaceSnapshot: vi.fn().mockResolvedValue([]),
+  clearWorkspaceSnapshots: vi.fn().mockResolvedValue(undefined),
+  deleteWorkspaceSnapshot: vi.fn().mockResolvedValue(undefined),
 }));
 
 function marker(testId: string) {

@@ -24,13 +24,19 @@ import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
 import {
+  applyStepwiseSetupEvent,
+  buildStepwiseSetupMessages,
+  createStepwiseSetupState,
   getLatestConversationPhase,
+  getSetupEventKey,
+  getStepwiseSetupSurfaceId,
   normalizeConversationPhase,
   prepareChatA2ui,
+  redactSetupEvent,
   rebuildChatSessionState,
 } from './utils/chat-a2ui';
 import { summarizeTokenUsage } from './utils/chat-usage';
-import type { AppMode, ChatMessage, A2uiPayloadItem, ConversationPhaseId } from './types';
+import type { AppMode, ChatMessage, A2uiPayloadItem, ConversationPhaseId, SetupGenerationEvent } from './types';
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
 const mockEnabled = isMockMode();
@@ -53,6 +59,8 @@ export function App() {
   const [fileSidebarOpen, setFileSidebarOpen] = useState(true);
   const [viewerFile, setViewerFile] = useState<string | undefined>();
   const viewerFileRef = useRef<string | undefined>(undefined);
+  const [stepwiseStreamingText, setStepwiseStreamingText] = useState('');
+  const [stepwiseStreamingActive, setStepwiseStreamingActive] = useState(false);
 
   const connectorRegistry = useAPIConnectorRegistry();
   const { getArtifact } = useArtifacts();
@@ -80,6 +88,7 @@ export function App() {
 
   // IndexedDB-backed persistent filesystem (provided via context)
   const { fs: vfs, files: vfsFiles, fileRecords: vfsFileRecords } = useVirtualFS();
+  const workspaceSnapshotSyncSuspendedRef = useRef(false);
 
   // Navigation: ref breaks circular dependency between nav callbacks and handlers
   const navHandlerRef = useRef<(state: NavState) => void>(() => {});
@@ -89,6 +98,10 @@ export function App() {
   const lastPersistedRef = useRef<Map<string, string>>(new Map());
   useEffect(() => {
     const unsub = fs.subscribe(() => {
+      if (workspaceSnapshotSyncSuspendedRef.current) {
+        return;
+      }
+
       const snapshot = fs.getSnapshot();
       for (const file of snapshot) {
         if (file.status === 'complete') {
@@ -101,9 +114,25 @@ export function App() {
           }
         }
       }
+
+      if (sessions.activeSessionId) {
+        const completeFiles = snapshot
+          .filter((file) => file.status === 'complete')
+          .map((file) => ({
+            path: file.path,
+            content: file.content,
+            language: file.language,
+            createdAt: file.createdAt,
+            updatedAt: file.updatedAt,
+          }));
+
+        vfs.saveWorkspaceSnapshot(sessions.activeSessionId, completeFiles).catch((err) => {
+          console.error('[Workspace] failed to save session snapshot:', err);
+        });
+      }
     });
     return unsub;
-  }, [fs, vfs]);
+  }, [fs, sessions.activeSessionId, vfs]);
 
   // Messages for the active session
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -117,6 +146,11 @@ export function App() {
 
   // Raw A2UI messages accumulated during streaming (for session persistence)
   const streamingA2UIMessagesRef = useRef<A2uiPayloadItem[]>([]);
+  const streamingSetupEventsRef = useRef<SetupGenerationEvent[]>([]);
+  const streamingSetupStateRef = useRef(createStepwiseSetupState());
+  const streamingSetupEventKeysRef = useRef<Set<string>>(new Set());
+  const streamingSetupSurfaceCreatedRef = useRef(false);
+  const streamingSetupPersistedRef = useRef(false);
 
   useEffect(() => {
     viewerFileRef.current = viewerFile;
@@ -160,20 +194,209 @@ export function App() {
     return getArtifact(artifactPath)?.content ?? null;
   }, [getArtifact]);
 
+  const resetStepwiseStreamingState = useCallback(() => {
+    setStepwiseStreamingActive(false);
+    setStepwiseStreamingText('');
+    streamingSetupEventsRef.current = [];
+    streamingSetupStateRef.current = createStepwiseSetupState();
+    streamingSetupEventKeysRef.current = new Set();
+    streamingSetupSurfaceCreatedRef.current = false;
+    streamingSetupPersistedRef.current = false;
+  }, []);
+
   const clearWorkspace = useCallback(async () => {
+    workspaceSnapshotSyncSuspendedRef.current = true;
     a2ui.reset();
     fs.clear();
     lastPersistedRef.current = new Map();
     clearActionLog();
     viewerFileRef.current = undefined;
     setViewerFile(undefined);
+    resetStepwiseStreamingState();
     setConversationPhase(null);
     try {
       await vfs.clear();
     } catch (err) {
       console.error('[Workspace] failed to clear persisted files:', err);
+    } finally {
+      workspaceSnapshotSyncSuspendedRef.current = false;
     }
-  }, [a2ui, fs, vfs, clearActionLog, setConversationPhase]);
+  }, [a2ui, clearActionLog, fs, resetStepwiseStreamingState, setConversationPhase, vfs]);
+
+  const persistStepwiseStreamingMessage = useCallback((
+    sessionId: string,
+    assistantMessageId: string,
+    text: string,
+  ) => {
+    const surfaceIds = streamingSurfaceIdsRef.current.length > 0
+      ? [...streamingSurfaceIdsRef.current]
+      : [getStepwiseSetupSurfaceId(assistantMessageId)];
+    const draftMessage: ChatMessage = {
+      id: assistantMessageId,
+      role: 'assistant',
+      text,
+      surfaceIds,
+      phase: 'generate',
+      timestamp: Date.now(),
+      setupEvents: [...streamingSetupEventsRef.current],
+    };
+
+    if (streamingSetupPersistedRef.current) {
+      sessions.updateMessage(sessionId, assistantMessageId, draftMessage);
+      return;
+    }
+
+    sessions.addMessage(sessionId, draftMessage);
+    streamingSetupPersistedRef.current = true;
+  }, [sessions]);
+
+  const processIncomingSetupEvent = useCallback((
+    event: SetupGenerationEvent,
+    assistantMessageId: string,
+    sessionId: string,
+  ) => {
+    const eventKey = getSetupEventKey(event);
+    if (streamingSetupEventKeysRef.current.has(eventKey)) {
+      return;
+    }
+    streamingSetupEventKeysRef.current.add(eventKey);
+
+    setStepwiseStreamingActive(true);
+    setConversationPhase('generate');
+
+    if (event.type === 'file_generated' && typeof event.content === 'string') {
+      fs.write(event.path, event.content, event.language);
+      if (!viewerFileRef.current) {
+        openGeneratedFile(event.path);
+      }
+    }
+
+    const persistedEvent = redactSetupEvent(event);
+    streamingSetupEventsRef.current = [
+      ...streamingSetupEventsRef.current,
+      persistedEvent,
+    ];
+    streamingSetupStateRef.current = applyStepwiseSetupEvent(
+      streamingSetupStateRef.current,
+      persistedEvent,
+    );
+
+    const statusText = streamingSetupStateRef.current.statusText;
+    setStepwiseStreamingText(statusText);
+
+    const renderableMessages = buildStepwiseSetupMessages(
+      streamingSetupStateRef.current,
+      assistantMessageId,
+      {
+        includeCreateSurface: !streamingSetupSurfaceCreatedRef.current,
+        final: false,
+      },
+    );
+    if (renderableMessages.length > 0) {
+      const newIds = a2ui.processMessages(renderableMessages);
+      if (renderableMessages.some((message) => Boolean(message.createSurface))) {
+        streamingSetupSurfaceCreatedRef.current = true;
+      }
+      if (newIds.length > 0) {
+        streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
+        progressiveQueue.enqueue(newIds);
+      }
+    }
+
+    persistStepwiseStreamingMessage(sessionId, assistantMessageId, statusText);
+  }, [
+    a2ui,
+    fs,
+    openGeneratedFile,
+    persistStepwiseStreamingMessage,
+    progressiveQueue,
+    setConversationPhase,
+  ]);
+
+  const finalizeStepwiseAssistantTurn = useCallback((params: {
+    assistantMessageId: string;
+    sessionId: string;
+    debugInfo?: ChatMessage['debugInfo'];
+    errorMessage?: string;
+    model?: string;
+    usage?: ChatMessage['usage'];
+  }): boolean => {
+    if (streamingSetupEventsRef.current.length === 0) {
+      return false;
+    }
+
+    if (params.errorMessage) {
+      const lastKnownStep = streamingSetupStateRef.current.steps[streamingSetupStateRef.current.steps.length - 1];
+      const activeStepId = streamingSetupStateRef.current.steps.find((step) => step.status === 'running')?.id
+        ?? lastKnownStep?.id
+        ?? 'deployment-config';
+
+      processIncomingSetupEvent({
+        type: 'step_error',
+        stepId: activeStepId,
+        code: 'connection_interrupted',
+        message: params.errorMessage,
+        recoverable: true,
+      }, params.assistantMessageId, params.sessionId);
+    }
+
+    progressiveQueue.flush();
+    const renderableMessages = buildStepwiseSetupMessages(
+      streamingSetupStateRef.current,
+      params.assistantMessageId,
+      {
+        includeCreateSurface: !streamingSetupSurfaceCreatedRef.current,
+        final: true,
+      },
+    );
+    if (renderableMessages.length > 0) {
+      const newIds = a2ui.processMessages(renderableMessages);
+      if (renderableMessages.some((message) => Boolean(message.createSurface))) {
+        streamingSetupSurfaceCreatedRef.current = true;
+      }
+      if (newIds.length > 0) {
+        streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
+        progressiveQueue.enqueue(newIds);
+      }
+    }
+
+    const surfaceIds = streamingSurfaceIdsRef.current.length > 0
+      ? [...streamingSurfaceIdsRef.current]
+      : [getStepwiseSetupSurfaceId(params.assistantMessageId)];
+    const finalText = streamingSetupStateRef.current.errorMessage
+      ? streamingSetupStateRef.current.statusText
+      : 'Project setup complete. Generated files are ready in the workspace.';
+
+    const assistantMsg: ChatMessage = {
+      id: params.assistantMessageId,
+      role: 'assistant',
+      text: finalText,
+      ...(params.model ? { model: params.model } : {}),
+      surfaceIds,
+      phase: 'generate',
+      timestamp: Date.now(),
+      ...(params.debugInfo ? { debugInfo: params.debugInfo } : {}),
+      ...(streamingA2UIMessagesRef.current.length > 0 ? { a2uiMessages: [...streamingA2UIMessagesRef.current] } : {}),
+      setupEvents: [...streamingSetupEventsRef.current],
+      ...(params.usage ? { usage: params.usage } : {}),
+    };
+
+    setMessages(prev => [...prev, assistantMsg]);
+    if (streamingSetupPersistedRef.current) {
+      sessions.updateMessage(params.sessionId, params.assistantMessageId, assistantMsg);
+    } else {
+      sessions.addMessage(params.sessionId, assistantMsg);
+    }
+
+    resetStepwiseStreamingState();
+    return true;
+  }, [
+    a2ui,
+    processIncomingSetupEvent,
+    progressiveQueue,
+    resetStepwiseStreamingState,
+    sessions,
+  ]);
 
   const processIncomingA2UI = useCallback((msgs: A2uiPayloadItem[], turnId: string) => {
     const prepared = prepareChatA2ui(msgs, turnId, {
@@ -248,10 +471,14 @@ export function App() {
     // Reset streaming surface IDs for the new turn
     streamingSurfaceIdsRef.current = [];
     streamingA2UIMessagesRef.current = [];
+    resetStepwiseStreamingState();
     progressiveQueue.reset();
 
     const handleIncomingA2UI = (payload: A2uiPayloadItem[]) => {
       processIncomingA2UI(payload, assistantMessageId);
+    };
+    const handleIncomingSetupEvent = (event: SetupGenerationEvent) => {
+      processIncomingSetupEvent(event, assistantMessageId, sessionId!);
     };
 
     // Use mock streaming when ?mock is active, real streaming otherwise
@@ -259,8 +486,20 @@ export function App() {
       mockStreaming.send(text, sessionId, {
         onDelta: () => {},
         onA2UI: handleIncomingA2UI,
+        onSetupEvent: handleIncomingSetupEvent,
         onPhase: (phase) => setConversationPhase(phase),
         onComplete: (fullText, model) => {
+          if (finalizeStepwiseAssistantTurn({
+            assistantMessageId,
+            sessionId: sessionId!,
+            model,
+          })) {
+            streamingSurfaceIdsRef.current = [];
+            streamingA2UIMessagesRef.current = [];
+            progressiveQueue.reset();
+            return;
+          }
+
           const phase = currentPhaseRef.current || undefined;
           progressiveQueue.flush();
           const collectedIds = streamingSurfaceIdsRef.current;
@@ -283,6 +522,17 @@ export function App() {
           sessions.addMessage(sessionId!, assistantMsg);
         },
         onError: (error) => {
+          if (finalizeStepwiseAssistantTurn({
+            assistantMessageId,
+            sessionId: sessionId!,
+            errorMessage: error,
+          })) {
+            streamingSurfaceIdsRef.current = [];
+            streamingA2UIMessagesRef.current = [];
+            progressiveQueue.reset();
+            return;
+          }
+
           streamingSurfaceIdsRef.current = [];
           streamingA2UIMessagesRef.current = [];
           progressiveQueue.reset();
@@ -304,6 +554,7 @@ export function App() {
       streaming.send(text, backendSessionId, {
         onDelta: () => {},
         onA2UI: handleIncomingA2UI,
+        onSetupEvent: handleIncomingSetupEvent,
         onPhase: (phase) => setConversationPhase(phase),
         onComplete: (fullText, model, receivedSessionId, debugInfo, usage) => {
           const phase = currentPhaseRef.current || undefined;
@@ -311,6 +562,20 @@ export function App() {
           if (receivedSessionId && !activeSession?.backendSessionId) {
             sessions.updateSession(sessionId!, { backendSessionId: receivedSessionId });
           }
+
+          if (finalizeStepwiseAssistantTurn({
+            assistantMessageId,
+            sessionId: sessionId!,
+            debugInfo,
+            model,
+            usage: usage?.turn,
+          })) {
+            streamingSurfaceIdsRef.current = [];
+            streamingA2UIMessagesRef.current = [];
+            progressiveQueue.reset();
+            return;
+          }
+
           progressiveQueue.flush();
           const collectedIds = streamingSurfaceIdsRef.current;
           const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
@@ -334,6 +599,17 @@ export function App() {
           sessions.addMessage(sessionId!, assistantMsg);
         },
         onError: (error) => {
+          if (finalizeStepwiseAssistantTurn({
+            assistantMessageId,
+            sessionId: sessionId!,
+            errorMessage: error,
+          })) {
+            streamingSurfaceIdsRef.current = [];
+            streamingA2UIMessagesRef.current = [];
+            progressiveQueue.reset();
+            return;
+          }
+
           streamingSurfaceIdsRef.current = [];
           streamingA2UIMessagesRef.current = [];
           progressiveQueue.reset();
@@ -348,7 +624,21 @@ export function App() {
         },
       }, debugEnabled, activeSession?.messages ?? []);
     }
-  }, [sessions, streaming, mockStreaming, isApiAvailable, resetConsecutiveCount, progressiveQueue, debugEnabled, clearActionLog, setConversationPhase, processIncomingA2UI]);
+  }, [
+    clearActionLog,
+    debugEnabled,
+    finalizeStepwiseAssistantTurn,
+    isApiAvailable,
+    mockStreaming,
+    processIncomingA2UI,
+    processIncomingSetupEvent,
+    progressiveQueue,
+    resetConsecutiveCount,
+    resetStepwiseStreamingState,
+    sessions,
+    setConversationPhase,
+    streaming,
+  ]);
 
   const handleStartChat = useCallback(async (prompt: string) => {
     await clearWorkspace();
@@ -365,8 +655,18 @@ export function App() {
   const handleClearAllSessions = useCallback(async () => {
     sessions.clearAllSessions();
     setMessages([]);
+    await vfs.clearWorkspaceSnapshots().catch((err) => {
+      console.error('[Workspace] failed to clear saved session snapshots:', err);
+    });
     await clearWorkspace();
-  }, [sessions, clearWorkspace]);
+  }, [clearWorkspace, sessions, vfs]);
+
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    sessions.deleteSession(sessionId);
+    void vfs.deleteWorkspaceSnapshot(sessionId).catch((err) => {
+      console.error('[Workspace] failed to delete session snapshot:', err);
+    });
+  }, [sessions, vfs]);
 
   const handleNewSession = useCallback(async (pushHistory = true) => {
     await clearWorkspace();
@@ -384,6 +684,10 @@ export function App() {
     const session = sessions.sessions.find(s => s.id === sessionId);
     if (session) {
       await clearWorkspace();
+      const workspaceSnapshot = await vfs.loadWorkspaceSnapshot(sessionId).catch((err) => {
+        console.error('[Workspace] failed to restore session snapshot:', err);
+        return [];
+      });
       const restored = rebuildChatSessionState(session.messages, {
         resolveArtifactContent,
       });
@@ -391,11 +695,37 @@ export function App() {
       if (restored.renderableMessages.length > 0) {
         a2ui.processMessages(restored.renderableMessages);
       }
-      for (const file of restored.files) {
-        fs.write(file.path, file.content, file.language);
+
+      const filesToRestore = workspaceSnapshot.length > 0 ? workspaceSnapshot : restored.files;
+      workspaceSnapshotSyncSuspendedRef.current = true;
+      try {
+        for (const file of filesToRestore) {
+          fs.write(file.path, file.content, file.language);
+        }
+
+        const restoredWorkspaceFiles = fs.getSnapshot()
+          .filter((file) => file.status === 'complete')
+          .map((file) => ({
+            path: file.path,
+            content: file.content,
+            language: file.language,
+            createdAt: file.createdAt,
+            updatedAt: file.updatedAt,
+          }));
+        lastPersistedRef.current = new Map(
+          restoredWorkspaceFiles.map((file) => [file.path, file.content]),
+        );
+
+        await Promise.all(
+          restoredWorkspaceFiles.map((file) => vfs.writeFile(file.path, file.content, file.language)),
+        );
+        await vfs.saveWorkspaceSnapshot(sessionId, restoredWorkspaceFiles);
+      } finally {
+        workspaceSnapshotSyncSuspendedRef.current = false;
       }
-      if (restored.files.length > 0) {
-        openGeneratedFile(restored.files[0].path);
+
+      if (filesToRestore.length > 0) {
+        openGeneratedFile(filesToRestore[0].path);
       }
 
       setMessages(session.messages);
@@ -406,7 +736,7 @@ export function App() {
         nav.pushSession(sessionId);
       }
     }
-  }, [sessions, clearWorkspace, resolveArtifactContent, a2ui, fs, openGeneratedFile, nav.pushSession, setConversationPhase]);
+  }, [a2ui, clearWorkspace, fs, nav.pushSession, openGeneratedFile, resolveArtifactContent, sessions, setConversationPhase, vfs]);
 
   // Wire up popstate -> handler dispatch (updated every render via ref)
   navHandlerRef.current = (state: NavState) => {
@@ -428,11 +758,11 @@ export function App() {
         nav.replaceCurrent({ view: 'landing' });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
-  const currentStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
+  const baseStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
+  const currentStreamText = stepwiseStreamingActive ? stepwiseStreamingText : baseStreamText;
   const usageSummary = useMemo(() => summarizeTokenUsage(messages), [messages]);
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot, fs.getSnapshot);
   const hasFiles = fsFiles.length > 0 || vfsFiles.length > 0;
@@ -570,7 +900,7 @@ export function App() {
               activeSessionId={sessions.activeSessionId}
               onSelectSession={handleResumeSession}
               onNewSession={handleNewSession}
-              onDeleteSession={sessions.deleteSession}
+              onDeleteSession={handleDeleteSession}
             />
           ) : undefined}
           fileManagerSidebar={mode === 'chat' ? (
@@ -598,7 +928,7 @@ export function App() {
               onStartChat={handleStartChat}
               recentSessions={sessions.recentSessions}
               onResumeSession={handleResumeSession}
-              onDeleteSession={sessions.deleteSession}
+              onDeleteSession={handleDeleteSession}
               onClearAllSessions={handleClearAllSessions}
             />
           ) : (

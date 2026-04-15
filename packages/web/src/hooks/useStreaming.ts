@@ -4,6 +4,7 @@ import type {
   A2uiPayloadItem,
   DebugMetadata,
   ChatMessage,
+  SetupGenerationEvent,
   TokenUsageSummary,
 } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
@@ -11,6 +12,7 @@ import { apiFetch, SessionExpiredError } from '../services/api-client';
 interface StreamCallbacks {
   onDelta: (text: string) => void;
   onA2UI: (messages: A2uiPayloadItem[]) => void;
+  onSetupEvent: (event: SetupGenerationEvent) => void;
   onPhase: (phase: string) => void;
   onComplete: (
     fullText: string,
@@ -113,10 +115,11 @@ export function useStreaming() {
     let accumulated = '';
     let displayText = '';
     let lastModel: string | undefined;
-    let lastSessionId: string | undefined;
-    let lastPhase: string | undefined;
-    let lastUsage: TokenUsageSummary | undefined;
-    const debugA2uiMessages: A2uiPayloadItem[] = [];
+      let lastSessionId: string | undefined;
+      let lastPhase: string | undefined;
+      let lastUsage: TokenUsageSummary | undefined;
+      let sawStepwiseEvent = false;
+      const debugA2uiMessages: A2uiPayloadItem[] = [];
 
     try {
       // Build client message history for rehydration. The server rebuilds its
@@ -223,9 +226,9 @@ export function useStreaming() {
               continue;
             }
 
-            if (currentEventType === 'done') {
-              const parsed = JSON.parse(data);
-              if (parsed.model) lastModel = parsed.model;
+             if (currentEventType === 'done') {
+               const parsed = JSON.parse(data);
+               if (parsed.model) lastModel = parsed.model;
               if (parsed.sessionId) lastSessionId = parsed.sessionId;
               if (parsed.phase) {
                 lastPhase = parsed.phase;
@@ -234,12 +237,22 @@ export function useStreaming() {
               if (parsed.usage) {
                 lastUsage = parsed.usage as TokenUsageSummary;
               }
-              currentEventType = '';
-              continue;
-            }
+               currentEventType = '';
+               continue;
+             }
 
-            // --- Generic (untyped) events — backward compatibility ---
-            const event: StreamEvent = JSON.parse(data);
+             if (isStepwiseEventType(currentEventType)) {
+               sawStepwiseEvent = true;
+               callbacks.onSetupEvent({
+                 type: currentEventType,
+                 ...JSON.parse(data),
+               } as SetupGenerationEvent);
+               currentEventType = '';
+               continue;
+             }
+
+             // --- Generic (untyped) events — backward compatibility ---
+             const event: StreamEvent = JSON.parse(data);
             currentEventType = '';
 
             if (event.error) {
@@ -288,10 +301,10 @@ export function useStreaming() {
       }
 
       // Determine the final display text
-      let finalText = displayText || accumulated;
+      let finalText = sawStepwiseEvent ? displayText : (displayText || accumulated);
 
       // If no typed `message` event was received, try extracting from JSON envelope
-      if (!displayText) {
+      if (!displayText && !sawStepwiseEvent) {
         try {
           const envelope = JSON.parse(accumulated);
           if (typeof envelope?.message === 'string') {
@@ -360,4 +373,11 @@ export function useStreaming() {
   }, [cancelReveal]);
 
   return { send, isStreaming, streamText, abort };
+}
+
+function isStepwiseEventType(value: string): value is SetupGenerationEvent['type'] {
+  return value === 'step_start'
+    || value === 'file_generated'
+    || value === 'step_complete'
+    || value === 'step_error';
 }

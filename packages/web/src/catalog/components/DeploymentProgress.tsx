@@ -310,6 +310,9 @@ export const DeploymentProgress = createReactComponent(DeploymentProgressApi, ({
     }
   };
 
+  const getAccessibleStepLabel = (step: AzureDeploymentStep) =>
+    `${step.label} — ${getStatusLabel(step.status)}`;
+
   return (
     <Card className={classes.root}>
       <div className={classes.header}>
@@ -338,8 +341,9 @@ export const DeploymentProgress = createReactComponent(DeploymentProgressApi, ({
                 key={step.id}
                 className={`${classes.step} ${!isLast ? classes.stepWithConnector : ''}`}
                 role="listitem"
+                aria-label={getAccessibleStepLabel(step)}
               >
-                <div className={classes.iconWrapper} aria-label={getStatusLabel(step.status)} role="img">
+                <div className={classes.iconWrapper} aria-hidden="true">
                   {getStatusIcon(step.status)}
                 </div>
                 <div className={classes.stepContent}>
