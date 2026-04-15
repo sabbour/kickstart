@@ -382,41 +382,12 @@ function renderComponentsForChat(
 
 function buildGeneratedFileSummary(component: A2uiComponent): A2uiComponent[] {
   const entries = extractFileEntries(component);
-
-  if (entries.length === 0) {
-    return [{
-      id: component.id,
-      component: 'Text',
-      text: '📄 Generated files are available in the workspace.',
-      variant: 'body2',
-    } as A2uiComponent];
-  }
-
-  if (entries.length === 1) {
-    return [{
-      id: component.id,
-      component: 'Text',
-      text: formatFileLabel(entries[0].path),
-      variant: 'subtitle2',
-    } as A2uiComponent];
-  }
-
-  const childIds = entries.map((_, index) => `${component.id}__file_${index}`);
-
-  return [
-    {
-      id: component.id,
-      component: 'Column',
-      children: childIds,
-      gap: 'small',
-    } as A2uiComponent,
-    ...entries.map((entry, index) => ({
-      id: childIds[index],
-      component: 'Text',
-      text: formatFileLabel(entry.path),
-      variant: 'subtitle2',
-    }) as A2uiComponent),
-  ];
+  return [{
+    id: component.id,
+    component: 'Text',
+    text: formatFileWorkspaceSummary(entries),
+    variant: 'body2',
+  } as A2uiComponent];
 }
 
 function extractFileEntries(
@@ -442,7 +413,7 @@ function normalizeFileEntry(
 
   const record = entry as Record<string, unknown>;
   const artifactPath = coerceString(record.artifactPath);
-  const path = coerceString(record.filename) ?? artifactPath;
+  const path = coerceString(record.filename) ?? coerceString(record.path) ?? artifactPath;
   if (!path) {
     return null;
   }
@@ -468,12 +439,21 @@ function coerceString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function formatFileLabel(path: string): string {
-  return `📄 ${path}`;
+function formatFileWorkspaceSummary(entries: Array<GeneratedChatFile & { artifactPath?: string }>): string {
+  if (entries.length === 0) {
+    return '📄 Generated files are available in the workspace.';
+  }
+
+  if (entries.length === 1) {
+    return `📄 ${entries[0].path} is available in the workspace.`;
+  }
+
+  return `📄 ${entries.length} generated files are available in the workspace.`;
 }
 
 function isFileEditorComponent(component: A2uiComponent): component is A2uiComponent & {
   filename?: string;
+  path?: string;
   content?: string;
   language?: string;
   artifactPath?: string;

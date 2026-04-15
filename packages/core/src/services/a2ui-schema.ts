@@ -483,15 +483,50 @@ const ArchitectureDiagramPropsSchema = z
     }
   });
 
+const FileEditorEntrySchema = z
+  .object({
+    filename: dynamicString.optional(),
+    path: dynamicString.optional(),
+    language: dynamicString.optional(),
+    content: dynamicString.optional(),
+    artifactPath: dynamicString.optional(),
+  })
+  .strip()
+  .superRefine((value, ctx) => {
+    if (!value.filename && !value.path && !value.artifactPath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "FileEditor entries require filename, path, or artifactPath.",
+      });
+    }
+  });
+
 const FileEditorPropsSchema = z
   .object({
     id: boundedString,
     component: z.literal("FileEditor"),
-    filename: dynamicString,
-    language: dynamicString,
-    content: dynamicString,
+    filename: dynamicString.optional(),
+    path: dynamicString.optional(),
+    language: dynamicString.optional(),
+    content: dynamicString.optional(),
+    artifactPath: dynamicString.optional(),
+    files: z.array(FileEditorEntrySchema).optional(),
+    readOnly: z.boolean().optional(),
   })
-  .strip();
+  .strip()
+  .superRefine((value, ctx) => {
+    if (Array.isArray(value.files) && value.files.length > 0) {
+      return;
+    }
+
+    if (!value.filename && !value.path && !value.artifactPath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "FileEditor requires filename, path, artifactPath, or files.",
+        path: ["filename"],
+      });
+    }
+  });
 
 const AuthCardPropsSchema = z
   .object({

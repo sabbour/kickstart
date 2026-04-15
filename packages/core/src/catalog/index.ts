@@ -259,11 +259,23 @@ export interface ArchitectureDiagramComponent extends BaseComponent {
   edges?: ArchEdge[];
 }
 
+export interface FileEditorFileEntry {
+  filename?: string;
+  path?: string;
+  language?: string;
+  content?: string;
+  artifactPath?: string;
+}
+
 export interface FileEditorComponent extends BaseComponent {
   component: "FileEditor";
-  filename: string;
-  language: string;
-  content: string;
+  filename?: string;
+  path?: string;
+  language?: string;
+  content?: string;
+  artifactPath?: string;
+  files?: FileEditorFileEntry[];
+  readOnly?: boolean;
 }
 
 export interface AuthCardComponent extends BaseComponent {

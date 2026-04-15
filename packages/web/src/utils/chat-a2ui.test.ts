@@ -5,6 +5,7 @@ import {
   getLatestConversationPhase,
   prepareChatA2ui,
   prepareChatA2uiPayload,
+  rebuildChatSessionState,
 } from './chat-a2ui';
 
 describe('prepareChatA2uiPayload', () => {
@@ -88,7 +89,7 @@ describe('prepareChatA2uiPayload', () => {
 });
 
 describe('prepareChatA2ui', () => {
-  it('replaces inline FileEditor components with compact file labels and extracts files', () => {
+  it('replaces inline FileEditor components with workspace summaries and extracts files', () => {
     const payload: A2uiPayloadItem[] = [
       {
         type: 'ConversationPhase',
@@ -149,8 +150,8 @@ describe('prepareChatA2ui', () => {
         {
           id: 'file',
           component: 'Text',
-          text: '📄 Dockerfile',
-          variant: 'subtitle2',
+          text: '📄 Dockerfile is available in the workspace.',
+          variant: 'body2',
         },
       ],
     });
@@ -163,7 +164,7 @@ describe('prepareChatA2ui', () => {
     });
   });
 
-  it('expands multi-file FileEditor payloads into a compact list', () => {
+  it('collapses multi-file FileEditor payloads into one workspace summary', () => {
     const payload: A2uiPayloadItem[] = [
       {
         version: 'v0.9',
@@ -175,7 +176,7 @@ describe('prepareChatA2ui', () => {
               component: 'FileEditor',
               files: [
                 {
-                  filename: 'src/index.ts',
+                  path: 'src/index.ts',
                   language: 'typescript',
                   content: 'console.log("hi")',
                 },
@@ -202,24 +203,169 @@ describe('prepareChatA2ui', () => {
       components: [
         {
           id: 'editor',
-          component: 'Column',
-          children: ['editor__file_0', 'editor__file_1'],
-          gap: 'small',
-        },
-        {
-          id: 'editor__file_0',
           component: 'Text',
-          text: '📄 src/index.ts',
-          variant: 'subtitle2',
-        },
-        {
-          id: 'editor__file_1',
-          component: 'Text',
-          text: '📄 Dockerfile',
-          variant: 'subtitle2',
+          text: '📄 2 generated files are available in the workspace.',
+          variant: 'body2',
         },
       ],
     });
+  });
+
+  it('delivers artifact-backed files to the workspace while keeping chat output compact', () => {
+    const payload: A2uiPayloadItem[] = [
+      {
+        version: 'v0.9',
+        createSurface: { surfaceId: 'msg-3', catalogId: 'kickstart' },
+      },
+      {
+        version: 'v0.9',
+        updateComponents: {
+          surfaceId: 'msg-3',
+          components: [
+            {
+              id: 'artifact-file',
+              component: 'FileEditor',
+              filename: 'infra/main.bicep',
+              artifactPath: 'artifacts/infra/main.bicep',
+            },
+          ],
+        },
+      },
+    ];
+
+    const prepared = prepareChatA2ui(payload, 'assistant-turn-5', {
+      resolveArtifactContent: (artifactPath) => artifactPath === 'artifacts/infra/main.bicep'
+        ? 'param location string = resourceGroup().location'
+        : null,
+    });
+    const renderableUpdate = prepared.renderableMessages[1].updateComponents;
+    const storedUpdate = prepared.storedMessages[1];
+
+    expect(prepared.files).toEqual([
+      {
+        path: 'infra/main.bicep',
+        content: 'param location string = resourceGroup().location',
+        language: 'bicep',
+      },
+    ]);
+    expect(renderableUpdate).toMatchObject({
+      surfaceId: 'assistant-turn-5::msg-3',
+      components: [
+        {
+          id: 'artifact-file',
+          component: 'Text',
+          text: '📄 infra/main.bicep is available in the workspace.',
+          variant: 'body2',
+        },
+      ],
+    });
+    expect(renderableUpdate?.components).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ component: 'FileEditor' }),
+    ]));
+    expect('updateComponents' in storedUpdate && storedUpdate.updateComponents?.components[0]).toMatchObject({
+      id: 'artifact-file',
+      component: 'FileEditor',
+      filename: 'infra/main.bicep',
+      artifactPath: 'artifacts/infra/main.bicep',
+      content: 'param location string = resourceGroup().location',
+      language: 'bicep',
+    });
+  });
+});
+
+describe('rebuildChatSessionState', () => {
+  it('keeps repeated raw file surfaces isolated per assistant turn', () => {
+    const restored = rebuildChatSessionState([
+      {
+        id: 'assistant-turn-6',
+        a2uiMessages: [
+          {
+            version: 'v0.9',
+            createSurface: { surfaceId: 'msg-duplicate', catalogId: 'kickstart' },
+          },
+          {
+            version: 'v0.9',
+            updateComponents: {
+              surfaceId: 'msg-duplicate',
+              components: [
+                {
+                  id: 'file-one',
+                  component: 'FileEditor',
+                  filename: 'src/index.ts',
+                  language: 'typescript',
+                  content: 'console.log("one")',
+                },
+              ],
+            },
+          },
+        ],
+      },
+      {
+        id: 'assistant-turn-7',
+        a2uiMessages: [
+          {
+            version: 'v0.9',
+            createSurface: { surfaceId: 'msg-duplicate', catalogId: 'kickstart' },
+          },
+          {
+            version: 'v0.9',
+            updateComponents: {
+              surfaceId: 'msg-duplicate',
+              components: [
+                {
+                  id: 'file-two',
+                  component: 'FileEditor',
+                  filename: 'Dockerfile',
+                  language: 'dockerfile',
+                  content: 'FROM node:20-alpine',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+
+    expect(restored.files).toEqual([
+      {
+        path: 'src/index.ts',
+        content: 'console.log("one")',
+        language: 'typescript',
+      },
+      {
+        path: 'Dockerfile',
+        content: 'FROM node:20-alpine',
+        language: 'dockerfile',
+      },
+    ]);
+    expect(restored.renderableMessages.map((message) =>
+      message.createSurface?.surfaceId
+      ?? message.updateComponents?.surfaceId
+      ?? message.updateDataModel?.surfaceId
+      ?? message.deleteSurface?.surfaceId
+      ?? null,
+    )).toEqual([
+      'assistant-turn-6::msg-duplicate',
+      'assistant-turn-6::msg-duplicate',
+      'assistant-turn-7::msg-duplicate',
+      'assistant-turn-7::msg-duplicate',
+    ]);
+    expect(restored.renderableMessages[1].updateComponents?.components).toEqual([
+      {
+        id: 'file-one',
+        component: 'Text',
+        text: '📄 src/index.ts is available in the workspace.',
+        variant: 'body2',
+      },
+    ]);
+    expect(restored.renderableMessages[3].updateComponents?.components).toEqual([
+      {
+        id: 'file-two',
+        component: 'Text',
+        text: '📄 Dockerfile is available in the workspace.',
+        variant: 'body2',
+      },
+    ]);
   });
 });
 

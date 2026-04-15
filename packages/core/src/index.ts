@@ -33,6 +33,7 @@ export type {
   ArchitectureDiagramComponent,
   ArchNode,
   ArchEdge,
+  FileEditorFileEntry,
   FileEditorComponent,
   AuthCardComponent,
   DeploymentProgressComponent,

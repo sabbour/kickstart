@@ -25,6 +25,23 @@ interface StreamCallbacks {
 // Target ~80 rAF frames to reveal all text (~1.3s at 60fps)
 const REVEAL_FRAMES = 80;
 
+function extractHydrationA2uiMessages(items: A2uiPayloadItem[] | undefined): A2uiPayloadItem[] | undefined {
+  const artifactMessages = items?.filter((item) => {
+    if (!('updateComponents' in item) || !Array.isArray(item.updateComponents?.components)) {
+      return false;
+    }
+
+    return item.updateComponents.components.some((component) =>
+      Boolean(component)
+      && typeof component === 'object'
+      && !Array.isArray(component)
+      && (component as { component?: unknown }).component === 'FileEditor',
+    );
+  });
+
+  return artifactMessages?.length ? artifactMessages : undefined;
+}
+
 export function useStreaming() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState('');
@@ -102,23 +119,33 @@ export function useStreaming() {
     const debugA2uiMessages: A2uiPayloadItem[] = [];
 
     try {
-      // Build client message history for rehydration (strip system messages
-      // and A2UI JSON — the server builds its own system prompt).
+      // Build client message history for rehydration. The server rebuilds its
+      // own system prompt, so only user/assistant text is required. For
+      // assistant turns we also forward compact artifact-bearing A2UI payloads
+      // so generated files can be rebuilt after cold starts without re-leaking
+      // them into chat.
       // Filter assistant messages to only model-produced ones (m.model present)
       // to prevent client-generated error bubbles from spoofing assistant turns.
-        const clientMessages = chatHistory
-          ?.filter((m) => {
-            const text = m.text?.trim();
-            if (!text) return false;
-            if (m.role === 'user') return true;
-            return m.role === 'assistant' && Boolean(m.model);
-          })
-          .map((m) => ({
+      const clientMessages = chatHistory
+        ?.filter((m) => {
+          const text = m.text?.trim();
+          if (!text) return false;
+          if (m.role === 'user') return true;
+          return m.role === 'assistant' && Boolean(m.model);
+        })
+        .map((m) => {
+          const a2uiMessages = m.role === 'assistant'
+            ? extractHydrationA2uiMessages(m.a2uiMessages)
+            : undefined;
+
+          return {
             role: m.role === 'user' ? 'user' as const : 'assistant' as const,
             content: m.text.trim(),
             ...(m.phase ? { phase: m.phase } : {}),
             ...(m.usage ? { usage: m.usage } : {}),
-          }));
+            ...(a2uiMessages ? { a2uiMessages } : {}),
+          };
+        });
 
       const res = await apiFetch('/api/converse', {
         method: 'POST',

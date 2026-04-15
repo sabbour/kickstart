@@ -246,6 +246,51 @@ describe("processResponse", () => {
     expect(markdownComp!.content).toBe("**App type:** Full-stack web application");
   });
 
+  it("preserves workspace-backed FileEditor payloads (regression)", () => {
+    const json = JSON.stringify({
+      message: "Generated files are ready in the workspace.",
+      a2ui: [
+        { version: "v0.9", createSurface: { surfaceId: "msg-5", catalogId: "kickstart" } },
+        {
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "msg-5",
+            components: [
+              {
+                id: "editor",
+                component: "FileEditor",
+                files: [
+                  {
+                    path: "src/index.ts",
+                    language: "typescript",
+                    content: "console.log('hello')",
+                  },
+                  {
+                    artifactPath: "artifacts/Dockerfile",
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      actions: [],
+    });
+
+    const result = processResponse(json);
+    expect(result.a2uiMessages).toHaveLength(2);
+    const comps = result.a2uiMessages[1].updateComponents!.components as Array<Record<string, unknown>>;
+    expect(comps).toHaveLength(1);
+    expect(comps[0]).toMatchObject({
+      id: "editor",
+      component: "FileEditor",
+      files: [
+        expect.objectContaining({ path: "src/index.ts", language: "typescript" }),
+        expect.objectContaining({ artifactPath: "artifacts/Dockerfile" }),
+      ],
+    });
+  });
+
   it("strips unknown props from validated components", () => {
     const json = JSON.stringify({
       message: "test",

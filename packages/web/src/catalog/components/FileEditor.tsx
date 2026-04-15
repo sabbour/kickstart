@@ -10,7 +10,6 @@ import {
   Tab,
   TabList,
   makeStyles,
-  mergeClasses,
   shorthands,
   tokens,
 } from '@fluentui/react-components';
@@ -47,7 +46,8 @@ const MonacoEditor = lazy(() =>
 );
 
 const FileEntrySchema = z.object({
-  filename: DynamicStringSchema,
+  filename: DynamicStringSchema.optional(),
+  path: DynamicStringSchema.optional(),
   content: DynamicStringSchema.optional(),
   language: DynamicStringSchema.optional(),
   artifactPath: DynamicStringSchema.optional(),
@@ -57,6 +57,7 @@ const FileEditorApi = {
   name: 'FileEditor',
   schema: z.object({
     filename: DynamicStringSchema.optional(),
+    path: DynamicStringSchema.optional(),
     content: DynamicStringSchema.optional(),
     language: DynamicStringSchema.optional(),
     readOnly: z.boolean().optional(),
@@ -172,16 +173,16 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
       return props.files;
     }
     // Single-file fallback
-    if (props.filename || props.content || props.artifactPath) {
+    if (props.filename || props.path || props.content || props.artifactPath) {
       return [{
-        filename: props.filename ?? '',
+        filename: props.filename ?? props.path ?? '',
         content: props.content,
         language: props.language,
         artifactPath: props.artifactPath,
       }];
     }
     return [];
-  }, [props.files, props.filename, props.content, props.language, props.artifactPath]);
+  }, [props.files, props.filename, props.path, props.content, props.language, props.artifactPath]);
 
   const [activeTab, setActiveTab] = useState(0);
   const isMultiFile = fileEntries.length > 1;
@@ -207,6 +208,7 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
   }, [activeFile, getArtifact]);
 
   const resolvedFileName = str(activeFile?.filename) ??
+    str(activeFile?.path) ??
     (activeFile?.artifactPath ? str(activeFile.artifactPath)?.split('/').pop() : undefined);
 
   const resolvedLanguage = str(activeFile?.language) ??
@@ -247,6 +249,7 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
           >
             {fileEntries.map((file, i) => {
               const label = str(file.filename) ||
+                str(file.path) ||
                 (file.artifactPath ? str(file.artifactPath)?.split('/').pop() : `File ${i + 1}`);
               return <Tab key={i} value={String(i)}>{label}</Tab>;
             })}

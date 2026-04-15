@@ -173,6 +173,8 @@ export interface ClientMessage {
   content: string;
   phase?: string;
   usage?: TurnUsage;
+  /** Optional compact artifact-bearing A2UI payloads for cold-start rehydration. */
+  a2uiMessages?: unknown[];
 }
 
 function restoreEngineStateFromHistory(clientMessages: ClientMessage[]): ConversationState {
@@ -218,9 +220,17 @@ export function hydrateSession(clientMessages: ClientMessage[], principalId?: st
       timestamp: now,
     });
 
-    // Rebuild generatedArtifacts from assistant messages containing FileEditor components
+    // Rebuild generatedArtifacts from assistant messages containing FileEditor components.
+    // Prefer the compact A2UI payloads sent by the client; fall back to legacy
+    // JSON-envelope parsing for older persisted sessions.
     if (msg.role === "assistant") {
-      rebuildArtifactsFromMessage(msg.content, session.generatedArtifacts);
+      if (Array.isArray(msg.a2uiMessages) && msg.a2uiMessages.length > 0) {
+        for (const artifact of extractArtifactsFromA2UI(msg.a2uiMessages)) {
+          upsertArtifact(session.generatedArtifacts, artifact);
+        }
+      } else {
+        rebuildArtifactsFromMessage(msg.content, session.generatedArtifacts);
+      }
       if (isTurnUsage(msg.usage)) {
         session.usageHistory.push(msg.usage);
       }
@@ -238,7 +248,8 @@ export const MAX_TRACKED_ARTIFACTS = 50;
 
 /** Infer language from filename extension. */
 export function inferLanguage(filename: string): string {
-  const ext = filename.split(".").pop() ?? "";
+  const baseName = filename.split(/[\\/]/).pop() ?? filename;
+  const ext = baseName.includes(".") ? (baseName.split(".").pop() ?? "") : baseName;
   const langMap: Record<string, string> = {
     ts: "typescript", js: "javascript", py: "python", go: "go",
     rs: "rust", java: "java", cs: "csharp", bicep: "bicep",
@@ -298,24 +309,59 @@ export function upsertArtifact(list: GeneratedArtifact[], artifact: GeneratedArt
  * artifacts during session hydration.
  */
 export function extractArtifactsFromA2UI(
-  a2uiMessages: Array<{ updateComponents?: { components: unknown[] } }>,
+  a2uiMessages: unknown[],
 ): GeneratedArtifact[] {
   const artifacts: GeneratedArtifact[] = [];
   for (const msg of a2uiMessages) {
-    if (!msg.updateComponents?.components) continue;
-    for (const comp of msg.updateComponents.components) {
-      const c = comp as Record<string, unknown>;
-      if (c.component === "FileEditor" && typeof c.filename === "string") {
-        const artifact = extractArtifactMetadata(
-          c.filename,
-          typeof c.language === "string" ? c.language : "",
-          typeof c.content === "string" ? c.content : "",
-        );
-        artifacts.push(artifact);
-      }
+    if (!msg || typeof msg !== "object") continue;
+    const components = (msg as { updateComponents?: { components?: unknown[] } }).updateComponents?.components;
+    if (!Array.isArray(components)) continue;
+    for (const comp of components) {
+      artifacts.push(...extractArtifactsFromComponent(comp));
     }
   }
   return artifacts;
+}
+
+function extractArtifactsFromComponent(component: unknown): GeneratedArtifact[] {
+  if (!component || typeof component !== "object" || Array.isArray(component)) {
+    return [];
+  }
+
+  const candidate = component as Record<string, unknown>;
+  if (candidate.component !== "FileEditor") {
+    return [];
+  }
+
+  const rawEntries = Array.isArray(candidate.files) && candidate.files.length > 0
+    ? candidate.files
+    : [candidate];
+
+  return rawEntries
+    .map((entry) => normalizeArtifactEntry(entry))
+    .filter((entry): entry is GeneratedArtifact => entry !== null);
+}
+
+function normalizeArtifactEntry(entry: unknown): GeneratedArtifact | null {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    return null;
+  }
+
+  const record = entry as Record<string, unknown>;
+  const filename = coerceString(record.filename)
+    ?? coerceString(record.path)
+    ?? coerceString(record.artifactPath);
+  if (!filename) {
+    return null;
+  }
+
+  const language = coerceString(record.language) ?? inferLanguage(filename);
+  const content = coerceString(record.content) ?? "";
+  return extractArtifactMetadata(filename, language, content);
+}
+
+function coerceString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
 /**
