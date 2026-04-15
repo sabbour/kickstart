@@ -1,5 +1,5 @@
 import type { Cookie, HttpRequest } from "@azure/functions";
-import type { GitHubRepo } from "@kickstart/core";
+import type { GitHubPullRequest, GitHubRepo } from "@kickstart/core";
 import {
   createCipheriv,
   createDecipheriv,
@@ -13,9 +13,13 @@ const SESSION_COOKIE_NAME = "kickstart-github-session";
 const FLOW_TTL_S = 10 * 60;
 const SESSION_TTL_S = 8 * 60 * 60;
 const MAX_REPO_NAME_LENGTH = 100;
+const MAX_BRANCH_NAME_LENGTH = 100;
+const MAX_PULL_REQUEST_TITLE_LENGTH = 200;
+const MAX_PULL_REQUEST_BODY_LENGTH = 20_000;
 const GITHUB_API_BASE = "https://api.github.com";
 const GITHUB_AUTH_BASE = "https://github.com";
 const DEFAULT_GITHUB_SCOPES = "repo read:user read:org";
+const PROTECTED_BRANCHES = new Set(["main", "master", "production"]);
 
 interface GitHubConfig {
   clientId: string;
@@ -68,6 +72,24 @@ interface GitHubRepoResponse {
   updated_at?: string;
 }
 
+interface GitHubRefResponse {
+  ref: string;
+  object: {
+    sha: string;
+  };
+}
+
+interface GitHubCommitObjectResponse {
+  sha: string;
+  tree: {
+    sha: string;
+  };
+}
+
+interface GitHubTreeResponse {
+  sha: string;
+}
+
 export interface GitHubViewerSummary {
   login: string;
   name: string | null;
@@ -96,6 +118,30 @@ export interface GitHubCreateRepoInput {
   name: string;
   description?: string;
   private?: boolean;
+}
+
+export interface GitHubCommitFileInput {
+  path: string;
+  content: string;
+}
+
+export interface GitHubCommitPullRequestInput {
+  owner: string;
+  repo: string;
+  head: string;
+  base?: string;
+  title: string;
+  body?: string;
+  commitMessage?: string;
+  files: GitHubCommitFileInput[];
+}
+
+export interface GitHubCommitPullRequestResult {
+  pullRequest: GitHubPullRequest;
+  commitSha: string;
+  committedFilesCount: number;
+  headBranch: string;
+  baseBranch: string;
 }
 
 export class GitHubAuthError extends Error {
@@ -131,6 +177,20 @@ function stripControlChars(value: string): string {
 function sanitizeMessage(value: string, fallback: string): string {
   const cleaned = stripControlChars(value).slice(0, 200);
   return cleaned || fallback;
+}
+
+function sanitizeRequiredText(value: string, label: string, maxLength: number): string {
+  const cleaned = stripControlChars(value).slice(0, maxLength).trim();
+  if (!cleaned) {
+    throw new GitHubAuthError(`${label} is required.`, 400);
+  }
+
+  return cleaned;
+}
+
+function sanitizeOptionalText(value: string | undefined, maxLength: number): string | undefined {
+  const cleaned = stripControlChars(value || "").slice(0, maxLength).trim();
+  return cleaned || undefined;
 }
 
 function isSecureRequest(request: HttpRequest): boolean {
@@ -421,6 +481,19 @@ function mapRepo(repo: GitHubRepoResponse): GitHubRepo {
   };
 }
 
+function validateOwnerOrRepo(value: string, label: string): string {
+  const trimmed = stripControlChars(value).trim();
+  if (!trimmed) {
+    throw new GitHubAuthError(`${label} is required.`, 400);
+  }
+
+  if (!/^[A-Za-z0-9._-]+$/.test(trimmed)) {
+    throw new GitHubAuthError(`${label} contains invalid characters.`, 400);
+  }
+
+  return trimmed;
+}
+
 function validateRepoName(name: string): string | null {
   const trimmed = name.trim();
   if (!trimmed) return "Repository name is required.";
@@ -431,6 +504,97 @@ function validateRepoName(name: string): string | null {
     return "Repository name may only contain letters, numbers, '.', '_', and '-'.";
   }
   return null;
+}
+
+function validateBranchName(
+  name: string,
+  label: string,
+  options: { allowProtected?: boolean } = {},
+): string {
+  const trimmed = stripControlChars(name).trim();
+  if (!trimmed) {
+    throw new GitHubAuthError(`${label} is required.`, 400);
+  }
+  if (trimmed.length > MAX_BRANCH_NAME_LENGTH) {
+    throw new GitHubAuthError(
+      `${label} must be ${MAX_BRANCH_NAME_LENGTH} characters or fewer.`,
+      400,
+    );
+  }
+  if (/[~^:?*[\]\\]/.test(trimmed)) {
+    throw new GitHubAuthError(`${label} contains invalid characters.`, 400);
+  }
+  if (trimmed.startsWith("-") || trimmed.startsWith(".")) {
+    throw new GitHubAuthError(`${label} cannot start with '-' or '.'.`, 400);
+  }
+  if (trimmed.endsWith(".lock") || trimmed.endsWith(".")) {
+    throw new GitHubAuthError(`${label} cannot end with '.lock' or '.'.`, 400);
+  }
+  if (trimmed.includes("..") || /\s/.test(trimmed)) {
+    throw new GitHubAuthError(`${label} cannot contain spaces or '..'.`, 400);
+  }
+  if (!options.allowProtected && PROTECTED_BRANCHES.has(trimmed)) {
+    throw new GitHubAuthError(
+      `Cannot commit directly to protected branch "${trimmed}".`,
+      400,
+    );
+  }
+
+  return trimmed;
+}
+
+function validateArtifactPath(path: string): string {
+  const trimmed = stripControlChars(path).trim();
+  if (!trimmed) {
+    throw new GitHubAuthError("Artifact path is required.", 400);
+  }
+  if (trimmed.startsWith("/")) {
+    throw new GitHubAuthError("Artifact path must be relative.", 400);
+  }
+  if (/[\x00-\x1f\\]/.test(trimmed)) {
+    throw new GitHubAuthError("Artifact path contains forbidden characters.", 400);
+  }
+
+  const segments = trimmed.split("/");
+  for (const segment of segments) {
+    if (!segment || segment === "." || segment === "..") {
+      throw new GitHubAuthError("Artifact path contains invalid segments.", 400);
+    }
+  }
+
+  return trimmed;
+}
+
+function normalizeCommitFiles(files: GitHubCommitFileInput[]): GitHubCommitFileInput[] {
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new GitHubAuthError("Select at least one file to commit.", 400);
+  }
+
+  const seen = new Set<string>();
+  return files.map((file) => {
+    if (!file || typeof file !== "object") {
+      throw new GitHubAuthError("Each committed file must include a path and content.", 400);
+    }
+
+    const path = validateArtifactPath(typeof file.path === "string" ? file.path : "");
+    if (seen.has(path)) {
+      throw new GitHubAuthError(`Duplicate artifact path "${path}" is not allowed.`, 400);
+    }
+    seen.add(path);
+
+    if (typeof file.content !== "string") {
+      throw new GitHubAuthError(`Artifact "${path}" is missing file content.`, 400);
+    }
+
+    return {
+      path,
+      content: file.content,
+    };
+  });
+}
+
+function gitRefPath(branch: string): string {
+  return encodeURIComponent(`heads/${branch}`);
 }
 
 async function authorizeGitHubSession(request: HttpRequest): Promise<{
@@ -738,5 +902,137 @@ export async function createGitHubRepoForRequest(
   return {
     repo: mapRepo(repo),
     cookies: [],
+  };
+}
+
+export async function commitGitHubFilesAndCreatePullRequestForRequest(
+  request: HttpRequest,
+  input: GitHubCommitPullRequestInput,
+): Promise<GitHubCommitPullRequestResult> {
+  const owner = validateOwnerOrRepo(input.owner || "", "GitHub owner");
+  const repo = validateOwnerOrRepo(input.repo || "", "GitHub repository");
+  const headBranch = validateBranchName(input.head || "", "Branch name");
+  const requestedBaseBranch = input.base
+    ? validateBranchName(input.base, "Base branch", { allowProtected: true })
+    : undefined;
+  const title = sanitizeRequiredText(
+    input.title || "",
+    "Pull request title",
+    MAX_PULL_REQUEST_TITLE_LENGTH,
+  );
+  const body = sanitizeOptionalText(input.body, MAX_PULL_REQUEST_BODY_LENGTH);
+  const commitMessage = sanitizeRequiredText(
+    input.commitMessage || title,
+    "Commit message",
+    MAX_PULL_REQUEST_TITLE_LENGTH,
+  );
+  const files = normalizeCommitFiles(input.files);
+
+  const authorized = await authorizeGitHubSession(request);
+  if (!authorized.owners.some((candidate) => candidate.login === owner)) {
+    throw new GitHubAuthError("Selected GitHub owner is not available.", 400);
+  }
+
+  const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+  const repoInfo = await githubJson<GitHubRepoResponse>(
+    authorized.accessToken,
+    repoPath,
+  );
+  const baseBranch = requestedBaseBranch || repoInfo.default_branch;
+  const baseRef = await githubJson<GitHubRefResponse>(
+    authorized.accessToken,
+    `${repoPath}/git/ref/${gitRefPath(baseBranch)}`,
+  );
+
+  let headCommitSha = baseRef.object.sha;
+  try {
+    const headRef = await githubJson<GitHubRefResponse>(
+      authorized.accessToken,
+      `${repoPath}/git/ref/${gitRefPath(headBranch)}`,
+    );
+    headCommitSha = headRef.object.sha;
+  } catch (error) {
+    if (!(error instanceof GitHubAuthError) || error.status !== 404) {
+      throw error;
+    }
+
+    await githubJson<GitHubRefResponse>(
+      authorized.accessToken,
+      `${repoPath}/git/refs`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          ref: `refs/heads/${headBranch}`,
+          sha: baseRef.object.sha,
+        }),
+      },
+    );
+  }
+
+  const currentCommit = await githubJson<GitHubCommitObjectResponse>(
+    authorized.accessToken,
+    `${repoPath}/git/commits/${headCommitSha}`,
+  );
+  const nextTree = await githubJson<GitHubTreeResponse>(
+    authorized.accessToken,
+    `${repoPath}/git/trees`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        base_tree: currentCommit.tree.sha,
+        tree: files.map((file) => ({
+          path: file.path,
+          mode: "100644",
+          type: "blob",
+          content: file.content,
+        })),
+      }),
+    },
+  );
+  const nextCommit = await githubJson<GitHubCommitObjectResponse>(
+    authorized.accessToken,
+    `${repoPath}/git/commits`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        message: commitMessage,
+        tree: nextTree.sha,
+        parents: [headCommitSha],
+      }),
+    },
+  );
+
+  await githubJson<GitHubRefResponse>(
+    authorized.accessToken,
+    `${repoPath}/git/refs/${gitRefPath(headBranch)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        sha: nextCommit.sha,
+        force: false,
+      }),
+    },
+  );
+
+  const pullRequest = await githubJson<GitHubPullRequest>(
+    authorized.accessToken,
+    `${repoPath}/pulls`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        title,
+        head: headBranch,
+        base: baseBranch,
+        ...(body ? { body } : {}),
+      }),
+    },
+  );
+
+  return {
+    pullRequest,
+    commitSha: nextCommit.sha,
+    committedFilesCount: files.length,
+    headBranch,
+    baseBranch,
   };
 }

@@ -15,6 +15,7 @@
  * Component registrations (rendered by packages/web):
  *   - AuthCard           (server-owned GitHub OAuth sign-in card, provider: "github")
  *   - GitHubRepoPicker   (owner-aware repository picker with real create/list flows)
+ *   - GitHubCommit       (real commit + pull-request flow for generated artifacts)
  */
 
 import type { IntegrationKit } from './types.js';
@@ -132,10 +133,11 @@ export const githubKit: IntegrationKit = {
       '  1. Ask: new repo or push to existing? Use ChoicePicker.\n' +
       '  2. Show AuthCard for GitHub sign-in if needed.\n' +
       '  3. After GitHub sign-in, use GitHubRepoPicker so the user can pick a personal/org owner, choose an existing repo, or create a new repo.\n' +
-      '  4. Verify OIDC federation is set up — ask the user to confirm that AZURE_CLIENT_ID, AZURE_TENANT_ID, and ' +
+      '  4. Once the repository is selected, use GitHubCommit so the user can choose generated artifacts, create a feature branch, and open a pull request with the real files.\n' +
+      '  5. Verify OIDC federation is set up — ask the user to confirm that AZURE_CLIENT_ID, AZURE_TENANT_ID, and ' +
       'AZURE_SUBSCRIPTION_ID are configured as repository secrets. If not, walk the user through the setup.\n' +
-      '  5. After push: "Your workflow will deploy automatically on every push to {branch}."\n' +
-      '  6. Offer a Codespaces link so they can edit and iterate in the browser.',
+      '  6. After the pull request is merged or the user pushes to the default branch: "Your workflow will deploy automatically on every push to {branch}."\n' +
+      '  7. Offer a Codespaces link so they can edit and iterate in the browser.',
     ],
 
     [Phase.Deploy]: [
@@ -175,6 +177,24 @@ export const githubKit: IntegrationKit = {
         category: 'domain',
         example: '{"id":"ghp1","component":"GitHubRepoPicker","owner":"sabbour","allowCreate":true,"suggestedName":"my-kickstart-app"}',
         notes: 'This component can handle both existing-repository selection and new-repository creation after GitHub auth succeeds.',
+      },
+    },
+    {
+      type: 'GitHubCommit',
+      description:
+        'Commit-and-pull-request flow for generated artifacts using the authenticated GitHub ship path.\n' +
+        'Props:\n' +
+        '  - repoFullName (optional string): Target repository in owner/repo form.\n' +
+        '  - defaultBranch (optional string): Base branch for the pull request. Defaults to the repo default branch.\n' +
+        '  - suggestedBranchName (optional string): Suggested feature branch name.\n' +
+        '  - suggestedTitle (optional string): Suggested pull request title.\n' +
+        '  - suggestedBody (optional string): Suggested pull request body.\n' +
+        '  - onSuccess (optional action): Callback fired after the pull request is created.\n' +
+        '  - onError (optional action): Callback fired if the commit or pull request flow fails.',
+      promptMeta: {
+        category: 'domain',
+        example: '{"id":"ghc1","component":"GitHubCommit","repoFullName":"sabbour/my-kickstart-app","defaultBranch":"main","suggestedBranchName":"kickstart/generated-artifacts","suggestedTitle":"feat: add Kickstart-generated artifacts","suggestedBody":"Adds the files generated during the guided flow."}',
+        notes: 'Use this after GitHubRepoPicker once the user is ready to send generated files to GitHub.',
       },
     },
   ],
