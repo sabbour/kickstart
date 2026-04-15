@@ -264,3 +264,105 @@ Public skill ingestion is approved in principle only if external skill sources a
 
 ## Rationale
 The feature introduces a new supply-chain ingress path and trust-boundary crossing from third-party markdown into system prompt context. These controls preserve deterministic builds while reducing tampering and prompt-injection risk to an acceptable level.
+
+---
+
+## 6. User Directives (Continued — 2026-04-15)
+
+### 2026-04-15T08:39:29.427Z: Issue #271 must be ship-ready
+**By:** Ahmed Sabbour (via Copilot)
+**What:** #271 must be a fully functional, ship-ready implementation targeting a functioning app, not just a demo.
+**Why:** User request — captured for team memory
+
+### 2026-04-15T09:06:49.631Z: A2UI typography standard — Subtitle 1 for titles
+**By:** Ahmed Sabbour (via Copilot)
+**What:** For A2UI typography, component titles should start with Subtitle 1 size.
+**Why:** User request — captured for team memory
+
+### 2026-04-15T09:06:49.631Z: Enforce ceremony flow globally
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Ceremony flow is a general repo-wide operating rule for big-ticket work; follow the ceremonies. Big-ticket items like #271 need design proposals, reviews, and the configured ceremony flow. Do not treat ceremonies as specific to any one issue.
+**Why:** User correction — existing ceremonies should already be enforced globally.
+
+### 2026-04-15T09:16:48.306Z: Issue #265 is very important
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Issue #265 is very important; without it the file manager experience is missing, which is crucial.
+**Why:** User request — captured for team memory
+
+### 2026-04-15T09:16:48.306Z: Issue #275 should stay high-priority
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Issue #275 is important and should stay in the high-priority planning lane.
+**Why:** User request — captured for team memory
+
+### 2026-04-15T09:22:04.571Z: Issues #269, #271, #274 are related workstream
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Issues #269, #271, and #274 are related and should be treated as a connected workstream.
+**Why:** User request — captured for team memory
+
+### 2026-04-15T09:34:03.404Z: Debug action events not on chat message
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Do not list all action events on the same chat message; when debugging, show them somewhere else.
+**Why:** User request — captured for team memory
+
+### 2026-04-15T09:34:03.404Z: E2E demo ready with no mocking
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Make the remaining work e2e demo ready with no faking or mocking.
+**Why:** User request — captured for team memory
+
+---
+
+## 7. Quality Gate Decisions
+
+### Component Registration Coverage — Issue #271
+**Author:** Hermes (Tester)
+**Date:** 2026-04-15
+**Scope:** AuthCard registration + catalog validation
+**Status:** Active
+
+**Decision:** Component registration changes (adding/removing components from a catalog) REQUIRE two types of tests:
+1. **Inventory test** — verifies component is in the catalog
+2. **Schema validation test** — verifies component props schema is correct
+
+**Why:** Prevents silent failures where components are silently dropped from rendering with no error. This is a permanent, non-negotiable quality gate.
+
+**Implementation guidance:** When implementing #271:
+1. Add AuthCard to `kickstart-catalog.ts`
+2. Add inventory test: `it('AuthCard is in kickstartCatalog')`
+3. Add schema validation test: `it('AuthCard schema accepts/rejects valid/invalid payload')`
+4. Run tests to verify all pass
+5. Commit together — registration + tests in same commit
+
+**Follow-up:** Verify DeploymentProgress schema validation test exists; if not, add in same #271 commit.
+
+**Override:** Squad consensus only.
+
+---
+
+## 8. Architecture Decisions (Proposed)
+
+### Architecture Diagram Must Reflect AKS Reality
+**Author:** Leela (Lead)
+**Date:** 2026-04-15T09:34:03.404Z
+**Status:** Proposed
+**Issue:** Related to #300
+
+**Summary:** The architecture diagram at the end of the DESIGN step is under-informed. It only shows user selections but omits AKS infrastructure already known from hardcoded defaults (ACR, Gateway API, Key Vault, Workload Identity).
+
+**Decision:** The diagram must include three tiers:
+- **Tier 1 (Always):** AKS Automatic subgraph, ACR, Key Vault, Gateway (if public)
+- **Tier 2 (Conditional):** Database, cache, queues, AI services per user's DESIGN answers
+- **Tier 3 (Annotations):** CI/CD, Workload Identity labels, auto-scaling counts
+
+**Implementation:** Use Mermaid `diagram` prop with subgraphs, not `nodes/edges` structured API.
+
+**Required changes:**
+1. Update system prompt STEP 2 architecture instruction with detailed guidance
+2. Update Example 3 with `diagram` subgraph pattern
+3. Update component catalog ArchitectureDiagram entry
+4. Update demo-scenarios.ts architecture entry
+5. Verify ArchitectureDiagram.tsx Mermaid rendering handles subgraphs correctly
+
+**Owner:** Bender (Backend)  
+**Reviewer:** Fry (Frontend) — verify ArchitectureDiagram rendering
+
+---
