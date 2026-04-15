@@ -81,14 +81,14 @@ test.describe('Playground', () => {
       await page.getByRole('dialog').waitFor({ timeout: 5000 });
 
       await expect(page.getByRole('tab', { name: 'Preview' })).toBeVisible();
-      await expect(page.getByRole('tab', { name: 'JSON' })).toBeVisible();
+      await expect(page.getByRole('tab', { name: 'JSON', exact: true })).toBeVisible();
     });
 
     test('dialog JSON tab shows valid JSON', async ({ page }) => {
       await page.locator('.playground-gallery > div').first().click();
       await page.getByRole('dialog').waitFor({ timeout: 5000 });
 
-      await page.getByRole('tab', { name: 'JSON' }).click();
+      await page.getByRole('tab', { name: 'JSON', exact: true }).click();
       // The JSON code block renders A2UI message JSON — check it contains "version"
       await expect(page.getByRole('dialog').getByText(/version/)).toBeVisible({ timeout: 3000 });
     });
