@@ -25,6 +25,7 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 
 ## Learnings
 
+- **2026-04-15T22:27:37.636Z — Priority lane tracking on GitHub:** Encode sprint priority directly on GitHub issues using existing labels (`priority:p1`, `priority:p2`) plus cross-link comments. Each issue gets a pinned comment listing its related issues in the same lane. This makes priority visible on the issue page without requiring users to check local squad notes. Decision file: `.squad/decisions/inbox/leela-priority-tracking-github.md`
 - **2026-04-15T09:46:31.308Z — Issue #265 smallest ship:** Treat `FileEditor` payloads as workspace data, not chat bubble content. The no-mock v1 is frontend-first: transform incoming `FileEditor` A2UI into compact file cards, mirror those files into `VirtualFileSystem`, auto-open the sidebar/viewer, and override generate-phase progress title client-side. Key paths: `packages/web/src/utils/chat-a2ui.ts`, `packages/web/src/App.tsx`, `packages/web/src/components/FileManager/`, `packages/web/api/src/lib/session-store.ts`.
 - **2026-04-15T09:46:31.308Z — Issue #265 sequencing stays tight:** GitHub OAuth now being available and Azure deployment staying in scope does not widen #265. The file-manager slice remains a parallel generate/review UX track that should land before or alongside handoff/deploy work, not after it.
 
@@ -100,3 +101,8 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - **Files affected**: `system-prompt.ts` (§2 STEP 2 + Example 3), `component-catalog.ts` (ArchitectureDiagram entry), `demo-scenarios.ts` (ARCHITECTURE scenario)
 - **Assigned to**: Bender (implementation), Fry (rendering verification)
 - **Decision file**: `.squad/decisions/inbox/leela-architecture-diagram-depth.md`
+
+---
+
+### 2026-04-15T22:27:37Z: Priority Tracking Session
+**Outcome:** Priority labels and cross-links added to GitHub issues #333, #328, #327, #326, #331, #332. Decision recorded in decisions.md for future priority tracking workflow.
