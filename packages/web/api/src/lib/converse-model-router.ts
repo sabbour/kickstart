@@ -1,5 +1,8 @@
 import { Phase } from "@kickstart/core";
-import { getChatDeploymentName, getCodexDeploymentName } from "./openai-client.js";
+import {
+  getChatDeploymentName,
+  getGenerateDeploymentName,
+} from "./openai-client.js";
 
 export interface ConverseModelRoute {
   deployment: string;
@@ -22,7 +25,7 @@ export function resolveConverseModelRoute(
   options: { trustedPhase?: boolean } = {},
 ): ConverseModelRoute {
   if (options.trustedPhase && normalizeConversePhase(phase) === Phase.Generate) {
-    const model = getCodexDeploymentName();
+    const model = getGenerateDeploymentName();
     return { deployment: model, model };
   }
 

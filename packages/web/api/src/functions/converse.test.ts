@@ -21,8 +21,9 @@ vi.mock("@azure/functions", () => ({
 vi.mock("../lib/openai-client.js", () => ({
   chatCompletion,
   chatCompletionWithTools,
-  getChatDeploymentName: () => "test-chat-model",
-  getCodexDeploymentName: () => "test-codex-model",
+  getChatDeploymentName: () => "gpt-5.4-mini",
+  getGenerateDeploymentName: () => "gpt-5.4",
+  getCodexDeploymentName: () => "gpt-5.4",
 }));
 
 vi.mock("../lib/content-safety.js", () => ({
@@ -394,12 +395,12 @@ describe("converse usage tracking", () => {
 
 describe("converse model routing", () => {
   it.each([
-    [Phase.Discover, "test-chat-model"],
-    [Phase.Design, "test-chat-model"],
-    [Phase.Generate, "test-codex-model"],
-    [Phase.Review, "test-chat-model"],
-    [Phase.Handoff, "test-chat-model"],
-    [Phase.Deploy, "test-chat-model"],
+    [Phase.Discover, "gpt-5.4-mini"],
+    [Phase.Design, "gpt-5.4-mini"],
+    [Phase.Generate, "gpt-5.4"],
+    [Phase.Review, "gpt-5.4-mini"],
+    [Phase.Handoff, "gpt-5.4-mini"],
+    [Phase.Deploy, "gpt-5.4-mini"],
   ])("routes %s turns to %s in non-streaming mode", async (phase, expectedModel) => {
     const session = createSession();
     setSessionPhase(session, phase);
@@ -455,9 +456,9 @@ describe("converse model routing", () => {
     ) as { status: number; jsonBody: { model?: string } };
 
     expect(response.status).toBe(200);
-    expect(response.jsonBody.model).toBe("test-chat-model");
+    expect(response.jsonBody.model).toBe("gpt-5.4-mini");
     expect(chatCompletionWithTools.mock.calls[0]?.[1]).toMatchObject({
-      deployment: "test-chat-model",
+      deployment: "gpt-5.4-mini",
     });
   });
 
@@ -499,9 +500,9 @@ describe("converse model routing", () => {
     ) as { status: number; jsonBody: { sessionId: string; model?: string } };
 
     expect(firstResponse.status).toBe(200);
-    expect(firstResponse.jsonBody.model).toBe("test-chat-model");
+    expect(firstResponse.jsonBody.model).toBe("gpt-5.4-mini");
     expect(chatCompletionWithTools.mock.calls[0]?.[1]).toMatchObject({
-      deployment: "test-chat-model",
+      deployment: "gpt-5.4-mini",
     });
 
     const secondResponse = await converseHandler(
@@ -513,13 +514,13 @@ describe("converse model routing", () => {
     ) as { status: number; jsonBody: { model?: string } };
 
     expect(secondResponse.status).toBe(200);
-    expect(secondResponse.jsonBody.model).toBe("test-chat-model");
+    expect(secondResponse.jsonBody.model).toBe("gpt-5.4-mini");
     expect(chatCompletionWithTools.mock.calls[1]?.[1]).toMatchObject({
-      deployment: "test-chat-model",
+      deployment: "gpt-5.4-mini",
     });
   });
 
-  it("routes streaming generate turns to codex", async () => {
+  it("routes streaming generate turns to gpt-5.4", async () => {
     const session = createSession();
     setSessionPhase(session, Phase.Generate);
 
@@ -547,7 +548,7 @@ describe("converse model routing", () => {
 
     expect(response.status).toBe(200);
     expect(chatCompletion.mock.calls[0]?.[1]).toMatchObject({
-      deployment: "test-codex-model",
+      deployment: "gpt-5.4",
     });
 
     const events = parseSseEvents(await readStream(response.body));
@@ -556,7 +557,7 @@ describe("converse model routing", () => {
     ) as { model?: string; phase?: string };
 
     expect(donePayload).toMatchObject({
-      model: "test-codex-model",
+      model: "gpt-5.4",
       phase: Phase.Generate,
     });
   });

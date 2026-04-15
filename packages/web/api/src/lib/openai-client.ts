@@ -1,9 +1,9 @@
 /**
  * @module @kickstart/api/lib/openai-client
  *
- * Fetch-based Azure OpenAI client with dual-model support:
- * - Chat model (gpt-5.3-chat) — Chat Completions API for conversation
- * - Codex model (gpt-5.3-codex) — Responses API for code generation
+ * Fetch-based Azure OpenAI client with dual-deployment support:
+ * - Chat deployment (e.g. gpt-5.4-mini) — Chat Completions API for non-coding conversation
+ * - Generate deployment (e.g. gpt-5.4) — coding/generate flows
  */
 
 // ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ function getConfig(): OpenAIConfig {
   };
 }
 
-/** Return the chat deployment name (for UI model indicator). */
+/** Return the non-coding chat deployment name (for UI model indicator). */
 export function getChatDeploymentName(): string {
   return (
     process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
@@ -112,13 +112,18 @@ export function getInspireDeploymentName(): string {
   );
 }
 
-/** Return the codex deployment name (for UI model indicator). */
-export function getCodexDeploymentName(): string {
+/** Return the coding/generate deployment name used by the app router. */
+export function getGenerateDeploymentName(): string {
   return (
     process.env.AZURE_OPENAI_CODEX_DEPLOYMENT ??
     process.env.AZURE_OPENAI_DEPLOYMENT ??
     "unknown"
   );
+}
+
+/** Legacy alias for callers that still use codex naming. */
+export function getCodexDeploymentName(): string {
+  return getGenerateDeploymentName();
 }
 
 /** Check whether at least one Azure OpenAI model is configured. */
