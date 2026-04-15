@@ -2,7 +2,7 @@ import React from 'react';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
 import {z} from 'zod';
 import {ComponentIdSchema, DynamicStringSchema} from '../../vendor/a2ui/web_core/schema/common-types';
-import {Card as FluentCard, Subtitle2, makeStyles, tokens} from '@fluentui/react-components';
+import {Card as FluentCard, Subtitle1, makeStyles, tokens} from '@fluentui/react-components';
 
 // Flexible CardApi: accepts both `child` (spec) and `children` (common mistake by LLMs),
 // plus an optional `title` prop. No .strict() so unknown props don't break rendering.
@@ -36,7 +36,7 @@ export const Card = createReactComponent(FlexibleCardApi, ({props, buildChild}) 
   return (
     <FluentCard className={classes.root}>
       {props.title && typeof props.title === 'string' && (
-        <Subtitle2 className={classes.title} block>{props.title}</Subtitle2>
+        <Subtitle1 className={classes.title} block>{props.title}</Subtitle1>
       )}
       {childId ? buildChild(childId) : null}
     </FluentCard>

@@ -14,7 +14,7 @@ import {
   MessageBar,
   MessageBarBody,
   Spinner,
-  Subtitle2,
+  Subtitle1,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
@@ -242,7 +242,7 @@ export const AzureAction = createReactComponent(AzureActionApi, ({ props }) => {
   return (
     <Card className={classes.root}>
       <CardHeader
-        header={<Subtitle2>{titleText}</Subtitle2>}
+        header={<Subtitle1>{titleText}</Subtitle1>}
         description={description ? <Caption1 className={classes.description}>{description}</Caption1> : undefined}
       />
 

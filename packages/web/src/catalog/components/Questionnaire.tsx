@@ -10,7 +10,7 @@ import {
   RadioGroup as FluentRadioGroup,
   Radio,
   Card,
-  Subtitle2,
+  Subtitle1,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
@@ -95,9 +95,9 @@ export const Questionnaire = createReactComponent(QuestionnaireApi, ({ props }) 
 
   return (
     <Card className={classes.root}>
-      <Subtitle2 style={{ marginBottom: tokens.spacingVerticalM }}>
+      <Subtitle1 style={{ marginBottom: tokens.spacingVerticalM }}>
         {props.submitLabel || 'Questionnaire'}
-      </Subtitle2>
+      </Subtitle1>
 
       {(props.questions || []).map((q) => {
         const qType = q.type || 'text';

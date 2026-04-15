@@ -10,7 +10,7 @@ import {
   Label,
   Select,
   Slider,
-  Subtitle2,
+  Subtitle1,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
@@ -249,7 +249,7 @@ export const CostEstimate = createReactComponent(CostEstimateApi, ({ props, cont
     <Card className={classes.root}>
       <div className={classes.header}>
         <MoneyRegular />
-        <Subtitle2>{props.title ?? 'Estimated Monthly Cost'}</Subtitle2>
+        <Subtitle1>{props.title ?? 'Estimated Monthly Cost'}</Subtitle1>
         {props.source && (
           <Caption1 className={classes.sourceLabel}>
             {props.source === 'live' ? '● Live pricing' : '○ Estimated'}

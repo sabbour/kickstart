@@ -12,7 +12,7 @@ import {
   Input,
   Select,
   Spinner,
-  Subtitle2,
+  Subtitle1,
   Switch,
   MessageBar,
   MessageBarBody,
@@ -307,7 +307,7 @@ export const AzureResourceForm = createReactComponent(AzureResourceFormApi, ({ p
 
   return (
     <Card className={classes.root}>
-      <CardHeader header={<Subtitle2>{title}</Subtitle2>} />
+      <CardHeader header={<Subtitle1>{title}</Subtitle1>} />
 
       <form onSubmit={handleSubmit} className={classes.form}>
         {dynamicFields.map(renderField)}
