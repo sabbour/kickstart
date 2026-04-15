@@ -1,4 +1,13 @@
-import type { A2uiComponent, A2uiMsg, A2uiPayloadItem, ChatMessage, ConversationPhaseId } from '../types';
+import type {
+  A2uiComponent,
+  A2uiMsg,
+  A2uiPayloadItem,
+  ChatMessage,
+  ConversationPhaseId,
+  FileGeneratedEvent,
+  GenerateStreamEvent,
+  GenerationStepErrorCode,
+} from '../types';
 
 const PHASE_COMPONENT_NAME = 'ConversationPhase';
 const PHASE_SURFACE_ID = 'phase-indicator';
@@ -44,6 +53,17 @@ const FILE_NAME_LANGUAGES: Record<string, string> = {
 };
 
 export const GENERATE_PROGRESS_TITLE = 'Project Setup';
+export const GENERATE_PROGRESS_SURFACE_ID = 'generate-progress';
+
+const GENERATE_PROGRESS_COMPONENT_ID = 'generate-progress-card';
+
+const GENERATE_STEP_LABELS: Record<string, string> = {
+  'app-scaffolding': 'App scaffolding',
+  dockerfile: 'Dockerfile',
+  'deployment-config': 'Deployment config',
+  'ci-cd': 'CI/CD',
+  'service-connections': 'Service connections',
+};
 
 export const CONVERSATION_PHASE_ORDER = [
   'discover',
@@ -79,6 +99,289 @@ export interface PreparedChatA2ui {
   renderableMessages: A2uiMsg[];
   files: GeneratedChatFile[];
   phase: ConversationPhaseId | null;
+}
+
+export interface GenerateProgressStep {
+  id: string;
+  label: string;
+  sequence: number;
+  status: 'pending' | 'running' | 'complete' | 'error' | 'skipped';
+  detail?: string;
+}
+
+export interface GenerateProgressState {
+  steps: GenerateProgressStep[];
+  overallStatus: 'running' | 'complete' | 'error';
+  statusMessage?: string;
+  errorCode?: GenerationStepErrorCode;
+  errorMessage?: string;
+}
+
+export function applyGenerateStreamEvent(
+  state: GenerateProgressState | null,
+  event: GenerateStreamEvent,
+  options: { includeCreateSurface?: boolean } = {},
+): { state: GenerateProgressState; messages: A2uiPayloadItem[] } {
+  const nextState = reduceGenerateStreamEvent(state, event);
+  return {
+    state: nextState,
+    messages: buildGenerateProgressMessages(nextState, options.includeCreateSurface ?? false, event),
+  };
+}
+
+export function finalizeGenerateProgressState(state: GenerateProgressState): GenerateProgressState {
+  if (state.overallStatus !== 'running') {
+    return state;
+  }
+
+  return {
+    ...state,
+    overallStatus: 'complete',
+    statusMessage: 'Setup files are ready in the workspace.',
+    errorCode: undefined,
+    errorMessage: undefined,
+  };
+}
+
+export function interruptGenerateProgressState(
+  state: GenerateProgressState,
+  message: string,
+): GenerateProgressState {
+  const targetStep = [...state.steps]
+    .sort(compareGenerateSteps)
+    .find((step) => step.status === 'running')
+    ?? [...state.steps].sort(compareGenerateSteps).at(-1);
+
+  const nextSteps = targetStep
+    ? upsertGenerateStep(state.steps, {
+        ...targetStep,
+        status: 'error',
+        detail: message,
+      })
+    : state.steps;
+
+  return {
+    ...state,
+    steps: nextSteps,
+    overallStatus: 'error',
+    statusMessage: message,
+    errorCode: 'connection_interrupted',
+    errorMessage: message,
+  };
+}
+
+function reduceGenerateStreamEvent(
+  state: GenerateProgressState | null,
+  event: GenerateStreamEvent,
+): GenerateProgressState {
+  const current = state ?? {
+    steps: [],
+    overallStatus: 'running' as const,
+  };
+
+  switch (event.type) {
+    case 'step_start': {
+      const nextStep = {
+        id: event.stepId,
+        label: normalizeGenerateStepLabel(event.stepId, event.label),
+        sequence: event.sequence,
+        status: 'running' as const,
+        detail: undefined,
+      };
+
+      return {
+        steps: upsertGenerateStep(current.steps, nextStep),
+        overallStatus: 'running',
+        statusMessage: `Generating ${nextStep.label}…`,
+        errorCode: undefined,
+        errorMessage: undefined,
+      };
+    }
+
+    case 'file_generated': {
+      const step = findGenerateStep(current.steps, event.stepId);
+      const detail = `${event.path} added to workspace.`;
+
+      return {
+        ...current,
+        steps: upsertGenerateStep(current.steps, {
+          id: event.stepId,
+          label: step?.label ?? normalizeGenerateStepLabel(event.stepId),
+          sequence: step?.sequence ?? current.steps.length,
+          status: 'running',
+          detail,
+        }),
+        overallStatus: 'running',
+        statusMessage: detail,
+      };
+    }
+
+    case 'step_complete': {
+      const step = findGenerateStep(current.steps, event.stepId);
+
+      return {
+        ...current,
+        steps: upsertGenerateStep(current.steps, {
+          id: event.stepId,
+          label: step?.label ?? normalizeGenerateStepLabel(event.stepId),
+          sequence: step?.sequence ?? current.steps.length,
+          status: 'complete',
+          detail: formatStepCompleteDetail(event.filesCount, event.totalBytes),
+        }),
+        overallStatus: 'running',
+        statusMessage: `${step?.label ?? normalizeGenerateStepLabel(event.stepId)} complete.`,
+      };
+    }
+
+    case 'step_error': {
+      const step = findGenerateStep(current.steps, event.stepId);
+      const recoveryHint = event.recoverable ? ' Retry this step or stop generation.' : '';
+
+      return {
+        ...current,
+        steps: upsertGenerateStep(current.steps, {
+          id: event.stepId,
+          label: step?.label ?? normalizeGenerateStepLabel(event.stepId),
+          sequence: step?.sequence ?? current.steps.length,
+          status: 'error',
+          detail: event.message,
+        }),
+        overallStatus: 'error',
+        statusMessage: `${event.message}${recoveryHint}`,
+        errorCode: event.code,
+        errorMessage: event.message,
+      };
+    }
+  }
+}
+
+export function buildGenerateProgressMessages(
+  state: GenerateProgressState,
+  includeCreateSurface: boolean,
+  event?: GenerateStreamEvent,
+): A2uiPayloadItem[] {
+  const messages: A2uiPayloadItem[] = [];
+
+  if (includeCreateSurface) {
+    messages.push({
+      version: 'v0.9',
+      createSurface: {
+        surfaceId: GENERATE_PROGRESS_SURFACE_ID,
+        catalogId: 'kickstart',
+      },
+    });
+  }
+
+  const components: A2uiComponent[] = [buildGenerateProgressComponent(state)];
+  if (event?.type === 'file_generated') {
+    components.push(buildGeneratedFileComponent(event));
+  }
+
+  messages.push({
+    version: 'v0.9',
+    updateComponents: {
+      surfaceId: GENERATE_PROGRESS_SURFACE_ID,
+      components,
+    },
+  });
+
+  return messages;
+}
+
+function buildGenerateProgressComponent(state: GenerateProgressState): A2uiComponent {
+  return {
+    id: GENERATE_PROGRESS_COMPONENT_ID,
+    component: 'DeploymentProgress',
+    title: GENERATE_PROGRESS_TITLE,
+    overallStatus: state.overallStatus,
+    statusMessage: state.statusMessage,
+    errorCode: state.errorCode,
+    errorMessage: state.errorMessage,
+    steps: [...state.steps]
+      .sort(compareGenerateSteps)
+      .map(({ id, label, status, detail }) => ({
+        id,
+        label,
+        status,
+        ...(detail ? { detail } : {}),
+      })),
+  };
+}
+
+function buildGeneratedFileComponent(event: FileGeneratedEvent): A2uiComponent {
+  return {
+    id: `generated-file-${sanitizeGenerateComponentId(`${event.stepId}-${event.path}`)}`,
+    component: 'FileEditor',
+    filename: event.path,
+    path: event.path,
+    language: event.language,
+    content: event.content,
+  };
+}
+
+function sanitizeGenerateComponentId(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]+/g, '-');
+}
+
+function findGenerateStep(
+  steps: readonly GenerateProgressStep[],
+  stepId: string,
+): GenerateProgressStep | undefined {
+  return steps.find((step) => step.id === stepId);
+}
+
+function upsertGenerateStep(
+  steps: readonly GenerateProgressStep[],
+  nextStep: GenerateProgressStep,
+): GenerateProgressStep[] {
+  const nextSteps = [...steps];
+  const existingIndex = nextSteps.findIndex((step) => step.id === nextStep.id);
+
+  if (existingIndex === -1) {
+    nextSteps.push(nextStep);
+  } else {
+    nextSteps[existingIndex] = {
+      ...nextSteps[existingIndex],
+      ...nextStep,
+    };
+  }
+
+  return nextSteps.sort(compareGenerateSteps);
+}
+
+function compareGenerateSteps(a: GenerateProgressStep, b: GenerateProgressStep): number {
+  return a.sequence - b.sequence || a.label.localeCompare(b.label);
+}
+
+function normalizeGenerateStepLabel(stepId: string, label?: string): string {
+  return label?.trim() || GENERATE_STEP_LABELS[stepId] || humanizeGenerateStepId(stepId);
+}
+
+function humanizeGenerateStepId(stepId: string): string {
+  return stepId
+    .split(/[-_]/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function formatStepCompleteDetail(filesCount: number, totalBytes: number): string {
+  const fileLabel = filesCount === 1 ? '1 file' : `${filesCount} files`;
+  return `${fileLabel} validated • ${formatByteSize(totalBytes)}`;
+}
+
+function formatByteSize(totalBytes: number): string {
+  if (totalBytes < 1024) {
+    return `${totalBytes} bytes`;
+  }
+
+  const kib = totalBytes / 1024;
+  if (kib < 1024) {
+    return `${kib.toFixed(1).replace(/\.0$/, '')} KiB`;
+  }
+
+  const mib = kib / 1024;
+  return `${mib.toFixed(1).replace(/\.0$/, '')} MiB`;
 }
 
 export function normalizeConversationPhase(phase: string | null | undefined): ConversationPhaseId | null {
@@ -368,7 +671,7 @@ function renderComponentsForChat(
     }
 
     if (isFileEditorComponent(component)) {
-      return buildGeneratedFileSummary(component);
+      return phase === 'generate' ? [] : buildGeneratedFileSummary(component);
     }
 
     if (phase === 'generate' && isDeploymentProgressComponent(component)) {

@@ -57,6 +57,51 @@ export interface TokenUsageSummary {
   session: SessionUsageTotals;
 }
 
+export type GenerationStepErrorCode =
+  | 'codex_timeout'
+  | 'codex_error'
+  | 'validation_failed'
+  | 'quota_exceeded'
+  | 'connection_interrupted';
+
+export interface StepStartEvent {
+  type: 'step_start';
+  stepId: string;
+  label: string;
+  sequence: number;
+}
+
+export interface FileGeneratedEvent {
+  type: 'file_generated';
+  stepId: string;
+  path: string;
+  language: string;
+  content: string;
+  byteLength: number;
+  sha256: string;
+}
+
+export interface StepCompleteEvent {
+  type: 'step_complete';
+  stepId: string;
+  filesCount: number;
+  totalBytes: number;
+}
+
+export interface StepErrorEvent {
+  type: 'step_error';
+  stepId: string;
+  code: GenerationStepErrorCode;
+  message: string;
+  recoverable: boolean;
+}
+
+export type GenerateStreamEvent =
+  | StepStartEvent
+  | FileGeneratedEvent
+  | StepCompleteEvent
+  | StepErrorEvent;
+
 export type ConversationPhaseId =
   | 'discover'
   | 'design'

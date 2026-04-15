@@ -4,6 +4,7 @@ import type {
   A2uiPayloadItem,
   DebugMetadata,
   ChatMessage,
+  GenerateStreamEvent,
   TokenUsageSummary,
 } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
@@ -11,6 +12,7 @@ import { apiFetch, SessionExpiredError } from '../services/api-client';
 interface StreamCallbacks {
   onDelta: (text: string) => void;
   onA2UI: (messages: A2uiPayloadItem[]) => void;
+  onGenerateEvent: (event: GenerateStreamEvent) => void;
   onPhase: (phase: string) => void;
   onComplete: (
     fullText: string,
@@ -219,6 +221,58 @@ export function useStreaming() {
                 displayText = parsed.content;
                 updateRevealTarget(displayText);
               }
+              currentEventType = '';
+              continue;
+            }
+
+            if (currentEventType === 'step_start') {
+              const parsed = JSON.parse(data);
+              callbacks.onGenerateEvent({
+                type: 'step_start',
+                stepId: parsed.stepId,
+                label: parsed.label,
+                sequence: parsed.sequence,
+              });
+              currentEventType = '';
+              continue;
+            }
+
+            if (currentEventType === 'file_generated') {
+              const parsed = JSON.parse(data);
+              callbacks.onGenerateEvent({
+                type: 'file_generated',
+                stepId: parsed.stepId,
+                path: parsed.path,
+                language: parsed.language,
+                content: parsed.content,
+                byteLength: parsed.byteLength,
+                sha256: parsed.sha256,
+              });
+              currentEventType = '';
+              continue;
+            }
+
+            if (currentEventType === 'step_complete') {
+              const parsed = JSON.parse(data);
+              callbacks.onGenerateEvent({
+                type: 'step_complete',
+                stepId: parsed.stepId,
+                filesCount: parsed.filesCount,
+                totalBytes: parsed.totalBytes,
+              });
+              currentEventType = '';
+              continue;
+            }
+
+            if (currentEventType === 'step_error') {
+              const parsed = JSON.parse(data);
+              callbacks.onGenerateEvent({
+                type: 'step_error',
+                stepId: parsed.stepId,
+                code: parsed.code,
+                message: parsed.message,
+                recoverable: parsed.recoverable,
+              });
               currentEventType = '';
               continue;
             }

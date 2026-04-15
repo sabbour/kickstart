@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ChatMessage as ChatMessageView } from '../components/Chat/ChatMessage';
 import { ChatShell } from '../components/Chat/ChatShell';
 import { DebugPanel } from '../components/Chat/DebugPanel';
+import { FileManagerSidebar } from '../components/FileManager';
 import type { ChatMessage, TokenUsageSummary } from '../types';
 import { GENERATE_PROGRESS_TITLE, getLatestConversationPhase, rebuildChatSessionState } from '../utils/chat-a2ui';
 import { summarizeTokenUsage } from '../utils/chat-usage';
@@ -335,10 +336,12 @@ describe('chat file workspace rehydration', () => {
     ]);
     expect(firstSession.renderableMessages[0].createSurface?.surfaceId).toBe('assistant-turn-8::msg-1');
     expect(firstSession.renderableMessages[1].updateComponents?.surfaceId).toBe('assistant-turn-8::msg-1');
-    expect(firstSession.renderableMessages[1].updateComponents?.components[0]).toMatchObject({
-      id: 'progress',
-      title: GENERATE_PROGRESS_TITLE,
-    });
+    expect(firstSession.renderableMessages[1].updateComponents?.components).toEqual([
+      expect.objectContaining({
+        id: 'progress',
+        title: GENERATE_PROGRESS_TITLE,
+      }),
+    ]);
 
     const secondSession = rebuildChatSessionState([
       {
@@ -376,5 +379,21 @@ describe('chat file workspace rehydration', () => {
     ]);
     expect(secondSession.renderableMessages[0].createSurface?.surfaceId).toBe('assistant-turn-9::msg-2');
     expect(secondSession.renderableMessages[1].updateComponents?.surfaceId).toBe('assistant-turn-9::msg-2');
+  });
+
+  it('exposes a polite live region for streamed workspace announcements', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(FileManagerSidebar, {
+        streamingFiles: [],
+        persistedFiles: [],
+        workspaceAnnouncement: 'Dockerfile added to workspace',
+        onSelectFile: () => undefined,
+        onDismiss: () => undefined,
+      }),
+    );
+
+    expect(markup).toContain('role="status"');
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('Dockerfile added to workspace');
   });
 });

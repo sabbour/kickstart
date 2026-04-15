@@ -24,13 +24,18 @@ import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
 import {
+  applyGenerateStreamEvent,
+  buildGenerateProgressMessages,
+  finalizeGenerateProgressState,
   getLatestConversationPhase,
+  interruptGenerateProgressState,
   normalizeConversationPhase,
   prepareChatA2ui,
   rebuildChatSessionState,
 } from './utils/chat-a2ui';
+import type { GenerateProgressState } from './utils/chat-a2ui';
 import { summarizeTokenUsage } from './utils/chat-usage';
-import type { AppMode, ChatMessage, A2uiPayloadItem, ConversationPhaseId } from './types';
+import type { AppMode, ChatMessage, A2uiPayloadItem, ConversationPhaseId, GenerateStreamEvent } from './types';
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
 const mockEnabled = isMockMode();
@@ -52,7 +57,10 @@ export function App() {
   const [filePanelOpen, setFilePanelOpen] = useState(true);
   const [fileSidebarOpen, setFileSidebarOpen] = useState(true);
   const [viewerFile, setViewerFile] = useState<string | undefined>();
+  const [workspaceAnnouncement, setWorkspaceAnnouncement] = useState('');
   const viewerFileRef = useRef<string | undefined>(undefined);
+  const generateProgressStateRef = useRef<GenerateProgressState | null>(null);
+  const streamedFileKeysRef = useRef<Set<string>>(new Set());
 
   const connectorRegistry = useAPIConnectorRegistry();
   const { getArtifact } = useArtifacts();
@@ -164,6 +172,9 @@ export function App() {
     a2ui.reset();
     fs.clear();
     lastPersistedRef.current = new Map();
+    generateProgressStateRef.current = null;
+    streamedFileKeysRef.current = new Set();
+    setWorkspaceAnnouncement('');
     clearActionLog();
     viewerFileRef.current = undefined;
     setViewerFile(undefined);
@@ -204,6 +215,28 @@ export function App() {
       progressiveQueue.enqueue(newIds);
     }
   }, [resolveArtifactContent, fs, openGeneratedFile, a2ui, progressiveQueue, setConversationPhase]);
+
+  const handleIncomingGenerateEvent = useCallback((event: GenerateStreamEvent, turnId: string) => {
+    if (event.type === 'file_generated') {
+      const fileKey = `${event.stepId}::${event.path}::${event.sha256}`;
+      if (streamedFileKeysRef.current.has(fileKey)) {
+        return;
+      }
+      streamedFileKeysRef.current.add(fileKey);
+    }
+
+    setConversationPhase('generate');
+
+    const prepared = applyGenerateStreamEvent(generateProgressStateRef.current, event, {
+      includeCreateSurface: !generateProgressStateRef.current,
+    });
+    generateProgressStateRef.current = prepared.state;
+    processIncomingA2UI(prepared.messages, turnId);
+
+    if (event.type === 'file_generated') {
+      setWorkspaceAnnouncement(`${event.path} added to workspace`);
+    }
+  }, [processIncomingA2UI, setConversationPhase]);
 
   const handleSendMessage = useCallback(async (text: string, isAutoContinue = false, explicitSessionId?: string) => {
     // Manual messages reset the consecutive auto-continue counter
@@ -249,9 +282,56 @@ export function App() {
     streamingSurfaceIdsRef.current = [];
     streamingA2UIMessagesRef.current = [];
     progressiveQueue.reset();
+    generateProgressStateRef.current = null;
+    streamedFileKeysRef.current = new Set();
+    setWorkspaceAnnouncement('');
 
     const handleIncomingA2UI = (payload: A2uiPayloadItem[]) => {
       processIncomingA2UI(payload, assistantMessageId);
+    };
+
+    const finalizeGenerateProgressForCompletion = () => {
+      const currentState = generateProgressStateRef.current;
+      if (!currentState) {
+        return;
+      }
+
+      const finalizedState = finalizeGenerateProgressState(currentState);
+      if (finalizedState === currentState) {
+        return;
+      }
+
+      generateProgressStateRef.current = finalizedState;
+      processIncomingA2UI(buildGenerateProgressMessages(finalizedState, false), assistantMessageId);
+    };
+
+    const finalizeGenerateProgressForError = (error: string) => {
+      const currentState = generateProgressStateRef.current;
+      if (!currentState) {
+        return;
+      }
+
+      setConversationPhase('generate');
+      const interruptedState = interruptGenerateProgressState(currentState, error);
+      generateProgressStateRef.current = interruptedState;
+      processIncomingA2UI(buildGenerateProgressMessages(interruptedState, false), assistantMessageId);
+    };
+
+    const collectAssistantTurnArtifacts = () => {
+      progressiveQueue.flush();
+      const collectedIds = streamingSurfaceIdsRef.current;
+      const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
+      const a2uiMessages = streamingA2UIMessagesRef.current.length > 0
+        ? [...streamingA2UIMessagesRef.current]
+        : undefined;
+
+      streamingSurfaceIdsRef.current = [];
+      streamingA2UIMessagesRef.current = [];
+      progressiveQueue.reset();
+      generateProgressStateRef.current = null;
+      streamedFileKeysRef.current = new Set();
+
+      return { surfaceIds, a2uiMessages };
     };
 
     // Use mock streaming when ?mock is active, real streaming otherwise
@@ -259,16 +339,12 @@ export function App() {
       mockStreaming.send(text, sessionId, {
         onDelta: () => {},
         onA2UI: handleIncomingA2UI,
+        onGenerateEvent: (event) => handleIncomingGenerateEvent(event, assistantMessageId),
         onPhase: (phase) => setConversationPhase(phase),
         onComplete: (fullText, model) => {
+          finalizeGenerateProgressForCompletion();
           const phase = currentPhaseRef.current || undefined;
-          progressiveQueue.flush();
-          const collectedIds = streamingSurfaceIdsRef.current;
-          const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
-          const a2uiMessages = streamingA2UIMessagesRef.current.length > 0 ? [...streamingA2UIMessagesRef.current] : undefined;
-          streamingSurfaceIdsRef.current = [];
-          streamingA2UIMessagesRef.current = [];
-          progressiveQueue.reset();
+          const { surfaceIds, a2uiMessages } = collectAssistantTurnArtifacts();
           const assistantMsg: ChatMessage = {
             id: assistantMessageId,
             role: 'assistant',
@@ -283,14 +359,17 @@ export function App() {
           sessions.addMessage(sessionId!, assistantMsg);
         },
         onError: (error) => {
-          streamingSurfaceIdsRef.current = [];
-          streamingA2UIMessagesRef.current = [];
-          progressiveQueue.reset();
+          finalizeGenerateProgressForError(error);
+          const phase = currentPhaseRef.current || undefined;
+          const { surfaceIds, a2uiMessages } = collectAssistantTurnArtifacts();
           const errorMsg: ChatMessage = {
             id: msgId('error'),
             role: 'assistant',
             text: `⚠️ ${error}`,
+            surfaceIds,
+            phase,
             timestamp: Date.now(),
+            a2uiMessages,
           };
           setMessages(prev => [...prev, errorMsg]);
           sessions.addMessage(sessionId!, errorMsg);
@@ -304,20 +383,16 @@ export function App() {
       streaming.send(text, backendSessionId, {
         onDelta: () => {},
         onA2UI: handleIncomingA2UI,
+        onGenerateEvent: (event) => handleIncomingGenerateEvent(event, assistantMessageId),
         onPhase: (phase) => setConversationPhase(phase),
         onComplete: (fullText, model, receivedSessionId, debugInfo, usage) => {
+          finalizeGenerateProgressForCompletion();
           const phase = currentPhaseRef.current || undefined;
           // Store the backend session ID on first response
           if (receivedSessionId && !activeSession?.backendSessionId) {
             sessions.updateSession(sessionId!, { backendSessionId: receivedSessionId });
           }
-          progressiveQueue.flush();
-          const collectedIds = streamingSurfaceIdsRef.current;
-          const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
-          const a2uiMessages = streamingA2UIMessagesRef.current.length > 0 ? [...streamingA2UIMessagesRef.current] : undefined;
-          streamingSurfaceIdsRef.current = [];
-          streamingA2UIMessagesRef.current = [];
-          progressiveQueue.reset();
+          const { surfaceIds, a2uiMessages } = collectAssistantTurnArtifacts();
           const assistantMsg: ChatMessage = {
             id: assistantMessageId,
             role: 'assistant',
@@ -334,21 +409,24 @@ export function App() {
           sessions.addMessage(sessionId!, assistantMsg);
         },
         onError: (error) => {
-          streamingSurfaceIdsRef.current = [];
-          streamingA2UIMessagesRef.current = [];
-          progressiveQueue.reset();
+          finalizeGenerateProgressForError(error);
+          const phase = currentPhaseRef.current || undefined;
+          const { surfaceIds, a2uiMessages } = collectAssistantTurnArtifacts();
           const errorMsg: ChatMessage = {
             id: msgId('error'),
             role: 'assistant',
             text: `⚠️ ${error}`,
+            surfaceIds,
+            phase,
             timestamp: Date.now(),
+            a2uiMessages,
           };
           setMessages(prev => [...prev, errorMsg]);
           sessions.addMessage(sessionId!, errorMsg);
         },
       }, debugEnabled, activeSession?.messages ?? []);
     }
-  }, [sessions, streaming, mockStreaming, isApiAvailable, resetConsecutiveCount, progressiveQueue, debugEnabled, clearActionLog, setConversationPhase, processIncomingA2UI]);
+  }, [sessions, streaming, mockStreaming, isApiAvailable, resetConsecutiveCount, progressiveQueue, debugEnabled, clearActionLog, setConversationPhase, processIncomingA2UI, handleIncomingGenerateEvent]);
 
   const handleStartChat = useCallback(async (prompt: string) => {
     await clearWorkspace();
@@ -428,7 +506,6 @@ export function App() {
         nav.replaceCurrent({ view: 'landing' });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
@@ -577,6 +654,7 @@ export function App() {
             <FileManagerSidebar
               streamingFiles={fsFiles}
               persistedFiles={vfsFileRecords}
+              workspaceAnnouncement={workspaceAnnouncement}
               selectedPath={viewerFile}
               onSelectFile={handleSelectViewerFile}
               onDownloadZip={handleDownloadZip}

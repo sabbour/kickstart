@@ -38,6 +38,7 @@ const useStyles = makeStyles({
   root: {
     display: 'flex',
     flexDirection: 'column',
+    position: 'relative',
     width: '260px',
     minWidth: '200px',
     maxWidth: '360px',
@@ -117,6 +118,17 @@ const useStyles = makeStyles({
     justifyContent: 'center',
     paddingTop: tokens.spacingVerticalXXL,
     color: tokens.colorNeutralForeground3,
+  },
+  screenReaderOnly: {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    padding: '0',
+    margin: '-1px',
+    overflow: 'hidden',
+    border: '0',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
   },
 });
 
@@ -263,6 +275,8 @@ export interface FileManagerSidebarProps {
   streamingFiles: VirtualFile[];
   /** IndexedDB-backed persisted files. */
   persistedFiles: VFSFile[];
+  /** Latest screen-reader announcement for streamed workspace updates. */
+  workspaceAnnouncement?: string;
   /** Currently selected file path in the viewer. */
   selectedPath?: string;
   /** Called when user clicks a file node. */
@@ -276,6 +290,7 @@ export interface FileManagerSidebarProps {
 export function FileManagerSidebar({
   streamingFiles,
   persistedFiles,
+  workspaceAnnouncement,
   selectedPath,
   onSelectFile,
   onDownloadZip,
@@ -330,6 +345,14 @@ export function FileManagerSidebar({
 
   return (
     <div className={styles.root} data-testid="file-manager-sidebar">
+      <div
+        className={styles.screenReaderOnly}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {workspaceAnnouncement ?? ''}
+      </div>
       <div className={styles.header}>
         <Text className={styles.headerTitle} size={300}>
           Files{fileCount > 0 ? ` (${fileCount})` : ''}

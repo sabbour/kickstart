@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatMessage, A2uiPayloadItem } from '../types';
 import {
+  applyGenerateStreamEvent,
+  buildGenerateProgressMessages,
   GENERATE_PROGRESS_TITLE,
+  GENERATE_PROGRESS_SURFACE_ID,
+  finalizeGenerateProgressState,
   getLatestConversationPhase,
+  interruptGenerateProgressState,
   prepareChatA2ui,
   prepareChatA2uiPayload,
   rebuildChatSessionState,
@@ -89,7 +94,7 @@ describe('prepareChatA2uiPayload', () => {
 });
 
 describe('prepareChatA2ui', () => {
-  it('replaces inline FileEditor components with workspace summaries and extracts files', () => {
+  it('suppresses inline FileEditor components during generate while still extracting workspace files', () => {
     const payload: A2uiPayloadItem[] = [
       {
         type: 'ConversationPhase',
@@ -146,12 +151,6 @@ describe('prepareChatA2ui', () => {
           component: 'DeploymentProgress',
           steps: [{ id: 'dockerfile', label: 'Dockerfile', status: 'complete' }],
           title: GENERATE_PROGRESS_TITLE,
-        },
-        {
-          id: 'file',
-          component: 'Text',
-          text: '📄 Dockerfile is available in the workspace.',
-          variant: 'body2',
         },
       ],
     });
@@ -269,6 +268,135 @@ describe('prepareChatA2ui', () => {
       artifactPath: 'artifacts/infra/main.bicep',
       content: 'param location string = resourceGroup().location',
       language: 'bicep',
+    });
+  });
+
+  it('turns stepwise generate events into progress-only chat surfaces while writing files to the workspace', () => {
+    const started = applyGenerateStreamEvent(null, {
+      type: 'step_start',
+      stepId: 'dockerfile',
+      label: 'Dockerfile',
+      sequence: 1,
+    }, { includeCreateSurface: true });
+    const withFile = applyGenerateStreamEvent(started.state, {
+      type: 'file_generated',
+      stepId: 'dockerfile',
+      path: 'Dockerfile',
+      language: 'dockerfile',
+      content: 'FROM node:20-alpine',
+      byteLength: 19,
+      sha256: 'sha-1',
+    });
+    const completed = applyGenerateStreamEvent(withFile.state, {
+      type: 'step_complete',
+      stepId: 'dockerfile',
+      filesCount: 1,
+      totalBytes: 19,
+    });
+    const finalized = finalizeGenerateProgressState(completed.state);
+
+    const prepared = prepareChatA2ui(
+      [
+        ...started.messages,
+        ...withFile.messages,
+        ...completed.messages,
+        ...buildGenerateProgressMessages(finalized, false),
+      ],
+      'assistant-turn-stepwise',
+      { currentPhase: 'generate' },
+    );
+
+    expect(prepared.files).toEqual([
+      {
+        path: 'Dockerfile',
+        content: 'FROM node:20-alpine',
+        language: 'dockerfile',
+      },
+    ]);
+    expect(prepared.renderableMessages[0].createSurface?.surfaceId).toBe(
+      `assistant-turn-stepwise::${GENERATE_PROGRESS_SURFACE_ID}`,
+    );
+    expect(prepared.renderableMessages.slice(1)).toEqual([
+      expect.objectContaining({
+        updateComponents: expect.objectContaining({
+          surfaceId: `assistant-turn-stepwise::${GENERATE_PROGRESS_SURFACE_ID}`,
+          components: [
+            expect.objectContaining({
+              component: 'DeploymentProgress',
+              title: GENERATE_PROGRESS_TITLE,
+              overallStatus: 'running',
+              statusMessage: 'Generating Dockerfile…',
+            }),
+          ],
+        }),
+      }),
+      expect.objectContaining({
+        updateComponents: expect.objectContaining({
+          surfaceId: `assistant-turn-stepwise::${GENERATE_PROGRESS_SURFACE_ID}`,
+          components: [
+            expect.objectContaining({
+              component: 'DeploymentProgress',
+              statusMessage: 'Dockerfile added to workspace.',
+            }),
+          ],
+        }),
+      }),
+      expect.objectContaining({
+        updateComponents: expect.objectContaining({
+          surfaceId: `assistant-turn-stepwise::${GENERATE_PROGRESS_SURFACE_ID}`,
+          components: [
+            expect.objectContaining({
+              component: 'DeploymentProgress',
+              overallStatus: 'running',
+              statusMessage: 'Dockerfile complete.',
+            }),
+          ],
+        }),
+      }),
+      expect.objectContaining({
+        updateComponents: expect.objectContaining({
+          surfaceId: `assistant-turn-stepwise::${GENERATE_PROGRESS_SURFACE_ID}`,
+          components: [
+            expect.objectContaining({
+              component: 'DeploymentProgress',
+              overallStatus: 'complete',
+              statusMessage: 'Setup files are ready in the workspace.',
+            }),
+          ],
+        }),
+      }),
+    ]);
+    expect(
+      prepared.renderableMessages.flatMap((message) => message.updateComponents?.components ?? []),
+    ).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ component: 'FileEditor' }),
+      expect.objectContaining({ component: 'Text', text: expect.stringContaining('workspace') }),
+    ]));
+  });
+
+  it('marks interrupted stepwise progress as an error state without changing prior files', () => {
+    const started = applyGenerateStreamEvent(null, {
+      type: 'step_start',
+      stepId: 'deployment-config',
+      label: 'Deployment config',
+      sequence: 2,
+    });
+
+    const interrupted = interruptGenerateProgressState(started.state, 'Connection interrupted.');
+
+    expect(interrupted).toMatchObject({
+      overallStatus: 'error',
+      errorCode: 'connection_interrupted',
+      errorMessage: 'Connection interrupted.',
+      statusMessage: 'Connection interrupted.',
+      steps: [
+        {
+          id: 'deployment-config',
+          label: 'Deployment config',
+          status: 'error',
+          detail: 'Connection interrupted.',
+        },
+      ],
     });
   });
 });
