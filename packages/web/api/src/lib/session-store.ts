@@ -21,6 +21,10 @@ import type {
   SetupGenerationRunState,
   SetupGenerationSnapshot,
 } from "@kickstart/core";
+import {
+  cloneSetupGenerationRun,
+  isValidSetupGenerationSnapshot,
+} from "./setup-generation-state.js";
 import { buildUsageSummary } from "./usage-tracking.js";
 import type { TurnUsage, UsageSummary } from "./usage-tracking.js";
 
@@ -244,7 +248,7 @@ export function hydrateSession(clientMessages: ClientMessage[], principalId?: st
       if (isTurnUsage(msg.usage)) {
         session.usageHistory.push(msg.usage);
       }
-      if (isSetupGenerationSnapshot(msg.setupGeneration)) {
+      if (isValidSetupGenerationSnapshot(msg.setupGeneration)) {
         latestSetupGeneration = cloneSetupGenerationRun(msg.setupGeneration.run);
         for (const generatedFile of latestSetupGeneration.generatedFiles) {
           upsertArtifact(
@@ -462,69 +466,4 @@ function isTurnUsage(value: unknown): value is TurnUsage {
     && typeof usage.outputTokens === "number"
     && typeof usage.totalTokens === "number"
     && (usage.costStatus === "estimated" || usage.costStatus === "unavailable");
-}
-
-function isSetupGenerationSnapshot(
-  value: unknown,
-): value is SetupGenerationSnapshot {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return false;
-  }
-
-  const snapshot = value as { run?: unknown };
-  if (!snapshot.run || typeof snapshot.run !== "object" || Array.isArray(snapshot.run)) {
-    return false;
-  }
-
-  const run = snapshot.run as Partial<SetupGenerationRunState>;
-  if (run.phase !== "generate") return false;
-  if (typeof run.runId !== "string" || run.runId.length === 0) return false;
-  if (typeof run.currentStepIndex !== "number" || !Number.isInteger(run.currentStepIndex) || run.currentStepIndex < 0) {
-    return false;
-  }
-  if (typeof run.status !== "string" || typeof run.updatedAt !== "string") {
-    return false;
-  }
-  if (!Array.isArray(run.steps) || !Array.isArray(run.generatedFiles)) {
-    return false;
-  }
-  if (typeof run.totalBytes !== "number" || !Number.isFinite(run.totalBytes) || run.totalBytes < 0) {
-    return false;
-  }
-
-  return run.steps.every((step) => {
-    if (!step || typeof step !== "object" || Array.isArray(step)) return false;
-    const candidate = step as Record<string, unknown>;
-    return typeof candidate.id === "string"
-      && SETUP_GENERATION_STEP_ORDER.includes(candidate.id as SetupGenerationRunState["steps"][number]["id"])
-      && typeof candidate.label === "string"
-      && typeof candidate.required === "boolean"
-      && (candidate.status === "pending"
-        || candidate.status === "running"
-        || candidate.status === "complete"
-        || candidate.status === "error"
-        || candidate.status === "skipped");
-  }) && run.generatedFiles.every((file) => {
-    if (!file || typeof file !== "object" || Array.isArray(file)) return false;
-    const candidate = file as Record<string, unknown>;
-    return typeof candidate.stepId === "string"
-      && SETUP_GENERATION_STEP_ORDER.includes(candidate.stepId as SetupGenerationRunState["generatedFiles"][number]["stepId"])
-      && typeof candidate.path === "string"
-      && typeof candidate.language === "string"
-      && typeof candidate.byteLength === "number"
-      && Number.isFinite(candidate.byteLength)
-      && candidate.byteLength >= 0
-      && typeof candidate.sha256 === "string";
-  });
-}
-
-function cloneSetupGenerationRun(
-  run: SetupGenerationRunState,
-): SetupGenerationRunState {
-  return {
-    ...run,
-    steps: run.steps.map((step) => ({ ...step })),
-    generatedFiles: run.generatedFiles.map((file) => ({ ...file })),
-    ...(run.lastError ? { lastError: { ...run.lastError } } : {}),
-  };
 }

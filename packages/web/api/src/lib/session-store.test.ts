@@ -157,6 +157,34 @@ describe("session-store phase hydration", () => {
       },
     ]);
   });
+
+  it("rejects invalid setup generation snapshots from client history", () => {
+    const session = hydrateSession([
+      {
+        role: "assistant",
+        content: "Setup generation paused on Dockerfile.",
+        phase: Phase.Generate,
+        setupGeneration: {
+          run: {
+            runId: "run-1",
+            phase: "generate",
+            currentStepIndex: 1,
+            steps: [
+              { id: "dockerfile", label: "Dockerfile", required: true, status: "error" },
+            ],
+            status: "totally-invalid",
+            generatedFiles: [],
+            totalBytes: 0,
+            updatedAt: "2026-04-16T00:00:00.000Z",
+          },
+        },
+      },
+    ], "principal-123");
+
+    expect(session.setupGenerationTrusted).toBe(false);
+    expect(session.setupGenerationRun).toBeUndefined();
+    expect(session.generatedArtifacts).toEqual([]);
+  });
 });
 
 describe("extractArtifactsFromA2UI", () => {
