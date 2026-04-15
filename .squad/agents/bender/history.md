@@ -27,6 +27,7 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 
 - (2026-04-14 13:04) Triage pipeline fix: added project board assignment to squad-triage.yml, squad-heartbeat.yml, squad-issue-assign.yml. Added triage checklist to routing.md.
 - (2026-04-14 11:02) Wave 1: SWA continuous deploy + version footer → PR #177 opened. Auto-deploy from main, version shows SHA.
+- (2026-04-15 16:06) SWA outage triage: latest deploy was packaging 18 API entrypoints, including `converse.test.ts`, and bundling `bicep-node` into the function ESM output. Both crashed module import before handlers registered, which explains the live `/api/*` 404s. Fixed `packages/web/api/esbuild.config.mjs` to exclude `*.test.ts`/`*.spec.ts` and keep `bicep-node` external.
 
 ## Learnings
 - SWA deploy workflow (`deploy-swa.yml`) needs explicit `push → branches: [main]` trigger — tag-only triggers mean no continuous deployment from main.
@@ -69,3 +70,5 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - (2026-04-15) Auto-continue via filesComplete flag eliminates friction during multi-turn file generation. The LLM sets filesComplete: false, the client auto-sends "Generate next set of files" — no manual button clicks needed.
 - (2026-04-15) Artifact summary injection (appending generated file list + resource declarations to the system prompt each turn) gives the LLM running context and prevents hallucinated file references or duplicate generation. Modeled after Try-AKS's buildArtifactSummary pattern.
 - (2026-04-15) WSL on Windows can silently lose file edits when switching git branches — the working tree may revert to the branch commit state. Always verify file content after branch switches.
+- (2026-04-15T16:06:15Z) Azure Functions v4 loads every file matched by the `package.json` `main` glob during startup. If `src/functions` contains a Vitest file and the build bundles it, deployment can still succeed while every live `/api/*` route 404s because handler registration never finishes.
+- (2026-04-15T16:06:15Z) `bicep-node` must stay external in the managed Functions ESM bundle. When esbuild inlines it, the generated function entrypoint throws `Dynamic require of "os" is not supported` on import, which blocks the whole API app from starting.
