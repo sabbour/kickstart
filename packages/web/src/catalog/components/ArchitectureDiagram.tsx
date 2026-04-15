@@ -257,23 +257,24 @@ function raiseClusterLabels(svg: SVGSVGElement): void {
 /**
  * Sanitize a raw Mermaid diagram string from an untrusted source (LLM output).
  *
- * Strategy: allowlist `<br/>` and `<br>` (needed for multi-line node labels),
- * then strip every other HTML tag plus event-handler attributes and dangerous
- * URI schemes.  This runs BEFORE Mermaid parses the source, giving us control
- * over what HTML can reach the renderer even when `htmlLabels` is enabled.
+ * Uses single-character encoding rather than multi-character removal to avoid
+ * the incomplete-multi-character-sanitization class of bypass (e.g. a nested
+ * tag like `<sc<x>ript>` that reassembles after stripping `<x>`).
+ *
+ * Strategy: preserve `<br/>` (needed for multi-line node labels) via a null-
+ * byte placeholder, then encode every remaining `<` to `&lt;`.  Once `<` is
+ * encoded, no HTML tag — and therefore no event handler or dangerous URI in
+ * an attribute value — can reach Mermaid's htmlLabels renderer.
+ *
+ * Note: `<-->` bidirectional Mermaid arrows are not used in `graph TD`
+ * architecture diagrams, so encoding `<` has no practical syntax impact.
  */
 function sanitizeDiagramInput(source: string): string {
-  // Preserve <br/> / <br> by swapping to a safe placeholder
   const BR = '\u0000BR\u0000';
-  let safe = source.replace(/<br\s*\/?>/gi, BR);
-  // Strip all remaining HTML tags
-  safe = safe.replace(/<[^>]*>/g, '');
-  // Strip event-handler attributes that may survive tag stripping (e.g. inside Mermaid label syntax)
-  safe = safe.replace(/\bon\w+\s*=/gi, '');
-  // Strip javascript: and data: URI schemes
-  safe = safe.replace(/javascript\s*:/gi, '').replace(/data\s*:/gi, '');
-  // Restore <br/>
-  return safe.replace(new RegExp(BR, 'g'), '<br/>');
+  return source
+    .replace(/<br\s*\/?>/gi, BR)   // protect <br/> — needed for multi-line labels
+    .replace(/</g, '&lt;')         // encode all other '<' (single-char, no bypass risk)
+    .replace(new RegExp(BR, 'g'), '<br/>');
 }
 
 /**
