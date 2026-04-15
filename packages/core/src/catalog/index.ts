@@ -190,7 +190,7 @@ export interface FileEditorComponent extends BaseComponent {
 export interface AuthCardComponent extends BaseComponent {
   component: "AuthCard";
   provider: "azure" | "github";
-  title: string;
+  title?: string;
   description?: string;
 }
 
@@ -198,11 +198,23 @@ export interface DeploymentStep {
   id: string;
   label: string;
   status: "pending" | "running" | "complete" | "error" | "skipped";
+  detail?: string;
+  timestamp?: string;
 }
 
 export interface DeploymentProgressComponent extends BaseComponent {
   component: "DeploymentProgress";
-  steps: DeploymentStep[];
+  steps?: DeploymentStep[];
+  title?: string;
+  overallStatus?: "idle" | "running" | "complete" | "error";
+  runId?: string;
+  statusMessage?: string;
+  appUrl?: string;
+  portalUrl?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  lastUpdated?: string;
+  pollIntervalMs?: number;
 }
 
 // ── New Fluent Components (5) — Issue #18 ───────────────────────────

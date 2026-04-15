@@ -190,7 +190,7 @@ export const BASE_COMPONENT_CATALOG: readonly ComponentCatalogEntry[] = [
   {
     type: "DeploymentProgress",
     category: "domain",
-    example: '{"id":"dp1","component":"DeploymentProgress","steps":[{"id":"s1","label":"Build image","status":"complete"},{"id":"s2","label":"Push to registry","status":"running"},{"id":"s3","label":"Deploy","status":"pending"}]}',
+    example: '{"id":"dp1","component":"DeploymentProgress","runId":"deploy-123","overallStatus":"running","steps":[{"id":"s1","label":"Build image","status":"complete"},{"id":"s2","label":"Push to registry","status":"running","detail":"Publishing image to ACR"},{"id":"s3","label":"Deploy","status":"pending"}]}',
   },
 ];
 
