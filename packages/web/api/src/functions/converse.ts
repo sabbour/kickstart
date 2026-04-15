@@ -31,7 +31,8 @@ import {
 } from "@kickstart/core";
 import type { PhaseItem, ToolContext, ConversationState } from "@kickstart/core";
 import {
-  getSession, createSession, hydrateSession, addMessage,
+  getSession, createSession, getPrincipalId, hydrateSession, addMessage,
+  adoptSessionPrincipal, isSessionOwnedBy,
   extractArtifactsFromA2UI, upsertArtifact,
 } from "../lib/session-store.js";
 import type { ClientMessage, GeneratedArtifact } from "../lib/session-store.js";
@@ -60,7 +61,7 @@ interface ConverseResponse {
   autoContinue?: boolean;
   autoContinuePrompt?: string;
   debug?: DebugMetadata;
-  renderDecisions?: string;
+  renderDecisions?: string[];
 }
 
 /** SSE "done" event payload sent at the end of a streaming response. */
@@ -72,7 +73,7 @@ interface StreamDonePayload {
   autoContinue?: boolean;
   autoContinuePrompt?: string;
   debug?: DebugMetadata;
-  renderDecisions?: string;
+  renderDecisions?: string[];
 }
 
 app.http("converse", {
@@ -127,14 +128,19 @@ app.http("converse", {
       // Get or create session — if the in-memory session is gone but the
       // client sent its message history, hydrate a new session from it so
       // the LLM retains full conversational context across cold starts.
+      const principalId = getPrincipalId(request);
       let session = body.sessionId
         ? getSession(body.sessionId)
         : undefined;
+      if (session && !isSessionOwnedBy(session, principalId)) {
+        return { status: 403, jsonBody: { error: "Session belongs to a different signed-in user." } };
+      }
       if (!session) {
         session = body.messages?.length
-          ? hydrateSession(body.messages)
-          : createSession();
+          ? hydrateSession(body.messages, principalId)
+          : createSession(principalId);
       }
+      adoptSessionPrincipal(session, principalId);
 
       const { state, engineState } = session;
 

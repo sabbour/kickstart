@@ -32,6 +32,20 @@ export interface AzureTargetPayload {
   location: string;
 }
 
+export interface AzureDeploymentFile {
+  path: string;
+  content: string;
+}
+
+export interface StartAzureDeploymentPayload {
+  mainFile: string;
+  files: AzureDeploymentFile[];
+  deploymentName?: string;
+  parameters?: Record<string, unknown>;
+  appUrlOutput?: string;
+  healthCheckPath?: string;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === 'object' ? value as Record<string, unknown> : undefined;
 }
@@ -104,21 +118,23 @@ function normalizeStatus(value: unknown): AzureDeploymentStatus {
 function normalizeSteps(value: unknown): AzureDeploymentStep[] {
   if (!Array.isArray(value)) return [];
 
-  return value
-    .map((item, index) => {
-      const step = asRecord(item);
-      const label = readString(step?.label) ?? readString(step?.name);
-      if (!step || !label) return null;
+  const steps: AzureDeploymentStep[] = [];
 
-      return {
-        id: readString(step.id) ?? `step-${index + 1}`,
-        label,
-        status: normalizeStepStatus(step.status),
-        detail: readString(step.detail) ?? readString(step.message),
-        timestamp: readString(step.timestamp) ?? readString(step.updatedAt),
-      } satisfies AzureDeploymentStep;
-    })
-    .filter((item): item is AzureDeploymentStep => item !== null);
+  value.forEach((item, index) => {
+    const step = asRecord(item);
+    const label = readString(step?.label) ?? readString(step?.name);
+    if (!step || !label) return;
+
+    steps.push({
+      id: readString(step.id) ?? `step-${index + 1}`,
+      label,
+      status: normalizeStepStatus(step.status),
+      detail: readString(step.detail) ?? readString(step.message),
+      timestamp: readString(step.timestamp) ?? readString(step.updatedAt),
+    });
+  });
+
+  return steps;
 }
 
 function normalizeDeployment(body: unknown): AzureDeploymentRun {
@@ -188,13 +204,16 @@ export async function persistAzureTarget(
   await readJsonOrThrow(response, 'Unable to save the Azure deployment target.');
 }
 
-export async function startAzureDeployment(sessionId: string): Promise<AzureDeploymentRun> {
+export async function startAzureDeployment(
+  sessionId: string,
+  payload: StartAzureDeploymentPayload,
+): Promise<AzureDeploymentRun> {
   const response = await apiFetch(`/api/sessions/${encodeURIComponent(sessionId)}/azure-deployments`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({}),
+    body: JSON.stringify(payload),
   });
   const body = await readJsonOrThrow(response, 'Unable to start the Azure deployment.');
   return normalizeDeployment(body);

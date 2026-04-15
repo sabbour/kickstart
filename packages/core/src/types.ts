@@ -10,7 +10,9 @@ export type { Tool, ToolContext } from "./tools/types.js";
 /** Azure subscription and resource context for a deployment. */
 export interface AzureContext {
   subscriptionId: string;
+  subscriptionDisplayName?: string;
   resourceGroup: string;
+  resourceGroupId?: string;
   region: string;
   clusterName?: string;
   tenantId: string;

@@ -21,7 +21,10 @@ import {
 } from '@fluentui/react-components';
 import { Search20Regular } from '@fluentui/react-icons';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
-import { useConversationSession } from '../../contexts/ConversationSessionContext';
+import {
+  useConversationSession,
+  type DeploymentSourceFile,
+} from '../../contexts/ConversationSessionContext';
 import type {
   AzureARMConnector,
   AzureLocation,
@@ -60,6 +63,19 @@ function resourceGroupFromId(id: string): string {
 
 function readErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+function chooseMainBicepFile(files: DeploymentSourceFile[]): string | undefined {
+  const bicepPaths = files
+    .map((file) => file.path)
+    .filter((path) => path.toLowerCase().endsWith('.bicep'))
+    .sort((left, right) => left.localeCompare(right));
+
+  return (
+    bicepPaths.find((path) => path.toLowerCase() === 'infra/main.bicep')
+    ?? bicepPaths.find((path) => /(^|\/)main\.bicep$/i.test(path))
+    ?? bicepPaths[0]
+  );
 }
 
 const STUB_SUBSCRIPTIONS: AzureSubscription[] = [
@@ -180,7 +196,7 @@ const ALLOW_FALLBACK_DATA = isMockMode() || isPlaygroundMode();
 export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, ({ props, context }) => {
   const classes = useStyles();
   const connector = useAPIConnector('azure-arm') as AzureARMConnector | undefined;
-  const { backendSessionId } = useConversationSession();
+  const { backendSessionId, getDeploymentFiles } = useConversationSession();
 
   const label = props.label ? String(props.label) : 'Choose your Azure deployment target';
   const presetSubId = props.subscriptionId ? String(props.subscriptionId) : undefined;
@@ -476,7 +492,24 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
         location: selectedLocation,
       });
 
-      const deployment = await startAzureDeployment(backendSessionId);
+      const deploymentFiles = (await getDeploymentFiles())
+        .filter((file) => file.path.toLowerCase().endsWith('.bicep'))
+        .map((file) => ({
+          path: file.path,
+          content: file.content,
+        }));
+      const mainFile = chooseMainBicepFile(deploymentFiles);
+
+      if (!mainFile || deploymentFiles.length === 0) {
+        throw new Error('Kickstart could not find a generated Bicep deployment to send to Azure.');
+      }
+
+      const deployment = await startAzureDeployment(backendSessionId, {
+        mainFile,
+        files: deploymentFiles,
+        appUrlOutput: 'appUrl',
+        healthCheckPath: '/',
+      });
       if (!deployment.runId || deployment.runId === 'unknown-run') {
         throw new Error('The backend started the deployment without returning a runId.');
       }
@@ -502,6 +535,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     selectedResourceGroupName,
     selectedSubId,
     selectedSubscription?.displayName,
+    getDeploymentFiles,
   ]);
 
   const canStartDeployment = Boolean(

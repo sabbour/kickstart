@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createReactComponent } from "../../vendor/a2ui/react/adapter";
 import { z } from "zod";
 import { DynamicStringSchema, type DynamicString } from "../../vendor/a2ui/web_core/schema/common-types";
@@ -104,6 +104,7 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
   const [githubSession, setGitHubSession] = useState<GitHubSessionState | null>(null);
   const [azureSession, setAzureSession] = useState<AzureAuthSessionState | null>(null);
   const [checking, setChecking] = useState(true);
+  const azureContinueDispatchedRef = useRef(false);
 
   const title = str(props.title) || DEFAULT_TITLE[props.provider];
   const description = str(props.description) || DEFAULT_DESCRIPTION[props.provider];
@@ -151,6 +152,7 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
 
   const handleAzureContinue = useCallback((session: AzureAuthSessionState) => {
     if (!session.authenticated) return;
+    azureContinueDispatchedRef.current = true;
 
     context.dispatchAction({
       event: {
@@ -190,6 +192,19 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
     }
   }, [azureConnector, handleAzureContinue, props.provider]);
 
+  useEffect(() => {
+    if (props.provider !== "azure") return;
+
+    if (!azureSession?.authenticated) {
+      azureContinueDispatchedRef.current = false;
+      return;
+    }
+
+    if (!azureContinueDispatchedRef.current) {
+      handleAzureContinue(azureSession);
+    }
+  }, [azureSession, handleAzureContinue, props.provider]);
+
   const handleSignOut = useCallback(async () => {
     setLoading(true);
     setError(undefined);
@@ -201,7 +216,7 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
           ? { ...previous, authenticated: false, viewer: undefined, owners: [] }
           : null);
       } else {
-        await signOutAzure(azureConnector);
+        await signOutAzure();
         setAzureSession((previous) => previous
           ? { ...previous, authenticated: false, subscriptions: [], error: undefined }
           : null);

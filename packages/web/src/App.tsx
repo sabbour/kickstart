@@ -31,7 +31,7 @@ import {
   prepareChatA2ui,
   rebuildChatSessionState,
 } from './utils/chat-a2ui';
-import type { AppMode, ChatMessage, A2uiPayloadItem } from './types';
+import type { AppMode, ChatMessage, A2uiPayloadItem, ConversationPhaseId } from './types';
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
 const mockEnabled = isMockMode();
@@ -112,8 +112,8 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // Current conversation phase from SSE events
-  const [currentPhase, setCurrentPhase] = useState<string | null>(null);
-  const currentPhaseRef = useRef<string | null>(null);
+  const [currentPhase, setCurrentPhase] = useState<ConversationPhaseId | null>(null);
+  const currentPhaseRef = useRef<ConversationPhaseId | null>(null);
 
   // Surface IDs revealed progressively via the queue
   const streamingSurfaceIdsRef = useRef<string[]>([]);
@@ -445,12 +445,31 @@ export function App() {
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
   const hasFiles = fsFiles.length > 0 || vfsFiles.length > 0;
   const activeSession = sessions.getActiveSession();
+  const getDeploymentFiles = useCallback(async () => {
+    const liveFiles = fs.list();
+    if (liveFiles.length > 0) {
+      return liveFiles.map((file) => ({
+        path: file.path,
+        content: file.content,
+        language: file.language,
+      }));
+    }
+
+    const persistedFiles = await vfs.readAll();
+    return persistedFiles.map((file) => ({
+      path: file.path,
+      content: file.content,
+      language: file.language,
+    }));
+  }, [fs, vfs]);
+
   const sessionContextValue = useMemo(() => ({
     localSessionId: sessions.activeSessionId,
     backendSessionId: activeSession?.backendSessionId ?? null,
     currentPhase,
     activeSession,
-  }), [activeSession, currentPhase, sessions.activeSessionId]);
+    getDeploymentFiles,
+  }), [activeSession, currentPhase, getDeploymentFiles, sessions.activeSessionId]);
 
   // Auto-show file panel and sidebar when files appear
   const hadFilesRef = useRef(false);
