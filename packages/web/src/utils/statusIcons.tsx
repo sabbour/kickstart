@@ -13,7 +13,7 @@ const emojiIconMap: Record<string, { icon: React.FC<{ style?: React.CSSPropertie
   '⚠': { icon: Warning20Filled, color: tokens.colorPaletteDarkOrangeForeground1 },
   '❌': { icon: DismissCircle20Filled, color: tokens.colorPaletteRedForeground1 },
   'ℹ️': { icon: Info20Filled, color: tokens.colorPaletteBlueForeground2 },
-  'ℹ': { icon: Info20Filled, color: tokens.colorBrandForeground1 },
+  'ℹ': { icon: Info20Filled, color: tokens.colorPaletteBlueForeground2 },
 };
 
 // Sorted longest-first so multi-codepoint emoji variants (⚠️, ℹ️) match before single-codepoint forms
