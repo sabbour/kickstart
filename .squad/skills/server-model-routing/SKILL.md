@@ -34,3 +34,4 @@ Use this pattern when a backend conversation endpoint needs different LLM deploy
 - Assert unknown or invalid server phases fail closed to the chat model.
 - Assert client-rehydrated phase metadata never upgrades routing: hydrated sessions must keep `routingPhaseTrusted = false` and stay on chat deployment even if history says `generate`.
 - Assert streaming generate requests use the same routed deployment in the probe/final flow and surface the routed model in the SSE `done` payload.
+- Assert helper-layer loops keep the same deployment: tool-call rounds in `chatCompletionWithTools()` and continuation retries in `chatCompletionWithAutoContinue()` must not fall back to the default chat deployment.
