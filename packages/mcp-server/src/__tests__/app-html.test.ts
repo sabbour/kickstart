@@ -43,6 +43,27 @@ describe("kickstart-app.html", () => {
     expect(html).toContain('"action"');
   });
 
+  it("locks postMessage to a trusted parent origin", () => {
+    const html = readFileSync(appHtmlPath, "utf-8");
+    expect(html).toContain("resolveTrustedParentOrigin");
+    expect(html).not.toContain('postMessage(msg, "*")');
+    expect(html).toContain("event.source !== window.parent");
+    expect(html).toContain("event.origin !== trustedParentOrigin");
+  });
+
+  it("avoids schema-driven innerHTML sinks in renderers", () => {
+    const html = readFileSync(appHtmlPath, "utf-8");
+    expect(html).not.toContain(".innerHTML =");
+    expect(html).not.toContain("querySelector('[data-action=");
+  });
+
+  it("sanitizes navigation URLs before rendering links", () => {
+    const html = readFileSync(appHtmlPath, "utf-8");
+    expect(html).toContain("sanitizeNavigationUrl");
+    expect(html).toContain("createNavigationLink(schema.codespaceUrl");
+    expect(html).toContain("createNavigationLink(");
+  });
+
   it("contains all A2UI component renderers", () => {
     const html = readFileSync(appHtmlPath, "utf-8");
     const requiredRenderers = [
