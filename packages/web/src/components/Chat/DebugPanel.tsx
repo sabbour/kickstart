@@ -238,6 +238,14 @@ export function DebugPanel({ debugInfo, surfaceIds }: DebugPanelProps) {
 
   const codeBlockClass = `${styles.codeBlock} ${resolvedTheme === 'dark' ? styles.codeBlockDark : styles.codeBlockLight}`;
 
+  // Defense-in-depth: truncate raw content client-side even if the server
+  // already redacts, in case of future changes or misconfigurations.
+  const MAX_RAW_DISPLAY = 500;
+  const rawText = debugInfo?.rawContent ?? debugInfo?.rawResponse ?? '';
+  const displayRaw = rawText.length > MAX_RAW_DISPLAY
+    ? rawText.slice(0, MAX_RAW_DISPLAY) + '\u2026 [truncated]'
+    : rawText;
+
   return (
     <div className={styles.container}>
       <button
@@ -277,10 +285,10 @@ export function DebugPanel({ debugInfo, surfaceIds }: DebugPanelProps) {
             )}
           </CollapsibleSection>
 
-          {/* Raw Text Content */}
+          {/* Raw Text Content (truncated for defense-in-depth) */}
           <CollapsibleSection label="Raw Text Content" defaultOpen={false} styles={styles}>
-            {debugInfo?.rawResponse ? (
-              <code className={codeBlockClass}>{debugInfo.rawResponse}</code>
+            {displayRaw ? (
+              <code className={codeBlockClass}>{displayRaw}</code>
             ) : (
               <Text className={styles.notAvailable} size={200}>Not available</Text>
             )}

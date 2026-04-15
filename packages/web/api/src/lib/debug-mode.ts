@@ -12,6 +12,10 @@ import type { HttpRequest } from "@azure/functions";
 
 /** Check if the incoming request has debug mode enabled. */
 export function isDebugMode(request: HttpRequest): boolean {
+  // Server-side gate: debug metadata is only available when explicitly
+  // allowed via environment variable. In production this should be unset.
+  if (process.env.KICKSTART_DEBUG_ALLOWED !== "true") return false;
+
   const header = request.headers.get("x-kickstart-debug");
   if (header === "true" || header === "1") return true;
 
@@ -32,6 +36,18 @@ export interface DebugMetadata {
   model: string;
   rawContent: string;
   renderDecisions: RenderDecision[];
+}
+
+/** Maximum characters of raw LLM content exposed in debug metadata. */
+const RAW_CONTENT_MAX_LENGTH = 500;
+
+/**
+ * Redact raw LLM content for safe inclusion in debug metadata.
+ * Truncates to a safe length to avoid leaking full prompt/completion text.
+ */
+function redactRawContent(raw: string): string {
+  if (raw.length <= RAW_CONTENT_MAX_LENGTH) return raw;
+  return raw.slice(0, RAW_CONTENT_MAX_LENGTH) + "\u2026 [truncated]";
 }
 
 /**
@@ -75,7 +91,7 @@ export function buildConverseDebugMeta(
     });
   }
 
-  return { model, rawContent, renderDecisions };
+  return { model, rawContent: redactRawContent(rawContent), renderDecisions };
 }
 
 /**
@@ -87,7 +103,7 @@ export function buildGenerateDebugMeta(
 ): DebugMetadata {
   return {
     model,
-    rawContent,
+    rawContent: redactRawContent(rawContent),
     renderDecisions: [
       { type: "codex_generation", detail: `Code generated via ${model}` },
       { type: "no_a2ui", detail: "Code generation endpoint — no A2UI rendering" },

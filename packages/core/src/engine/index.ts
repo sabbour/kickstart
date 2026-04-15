@@ -19,7 +19,9 @@ export {
   transition,
   getCurrentPhase,
   canAdvance,
+  handleImplicitFlags,
 } from "./machine.js";
+export type { ImplicitFlags } from "./machine.js";
 
 export {
   resolveSkills,
