@@ -8,6 +8,7 @@
 import { randomUUID } from "node:crypto";
 import {
   Phase,
+  SETUP_GENERATION_STEP_ORDER,
   createInitialState,
   buildSystemPrompt,
   transition,
@@ -17,7 +18,13 @@ import type {
   ConversationState,
   ConversationMessage,
   CostEstimateProps,
+  SetupGenerationRunState,
+  SetupGenerationSnapshot,
 } from "@kickstart/core";
+import {
+  cloneSetupGenerationRun,
+  isValidSetupGenerationSnapshot,
+} from "./setup-generation-state.js";
 import { buildUsageSummary } from "./usage-tracking.js";
 import type { TurnUsage, UsageSummary } from "./usage-tracking.js";
 
@@ -78,6 +85,10 @@ export interface ApiSession {
   principalId?: string;
   /** Only server-owned phase state may escalate routing to codex. */
   routingPhaseTrusted: boolean;
+  /** Server-validated setup generation state for stepwise file generation. */
+  setupGenerationRun?: SetupGenerationRunState;
+  /** Client-supplied setup generation snapshots are trusted only after validation. */
+  setupGenerationTrusted: boolean;
   /** Thin deployment state for the real Azure happy path. */
   deployState: DeployState;
   /** Per-session CostEstimate pricing cache keyed by normalized pricing request. */
@@ -153,6 +164,7 @@ export function createSession(principalId?: string): ApiSession {
     usageHistory: [],
     principalId,
     routingPhaseTrusted: true,
+    setupGenerationTrusted: false,
     deployState: {
       stage: "idle",
       updatedAt: now,
@@ -173,6 +185,7 @@ export interface ClientMessage {
   content: string;
   phase?: string;
   usage?: TurnUsage;
+  setupGeneration?: SetupGenerationSnapshot;
   /** Optional compact artifact-bearing A2UI payloads for cold-start rehydration. */
   a2uiMessages?: unknown[];
 }
@@ -208,6 +221,7 @@ export function hydrateSession(clientMessages: ClientMessage[], principalId?: st
   const session = createSession(principalId);
   const now = new Date().toISOString();
   session.routingPhaseTrusted = false;
+  let latestSetupGeneration: SetupGenerationRunState | undefined;
 
   for (const msg of clientMessages) {
     // Only allow user/assistant — never trust client-sent system prompts
@@ -234,12 +248,29 @@ export function hydrateSession(clientMessages: ClientMessage[], principalId?: st
       if (isTurnUsage(msg.usage)) {
         session.usageHistory.push(msg.usage);
       }
+      if (isValidSetupGenerationSnapshot(msg.setupGeneration)) {
+        latestSetupGeneration = cloneSetupGenerationRun(msg.setupGeneration.run);
+        for (const generatedFile of latestSetupGeneration.generatedFiles) {
+          upsertArtifact(
+            session.generatedArtifacts,
+            extractArtifactMetadata(
+              generatedFile.path,
+              generatedFile.language,
+              "",
+            ),
+          );
+        }
+      }
     }
   }
 
   session.engineState = restoreEngineStateFromHistory(clientMessages);
   session.state.currentPhase = session.engineState.currentPhase;
   session.state.updatedAt = now;
+  if (latestSetupGeneration) {
+    session.setupGenerationRun = latestSetupGeneration;
+    session.setupGenerationTrusted = true;
+  }
   return session;
 }
 
