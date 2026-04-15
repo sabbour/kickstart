@@ -8,6 +8,7 @@
 import { randomUUID } from "node:crypto";
 import {
   Phase,
+  SETUP_GENERATION_STEP_ORDER,
   createInitialState,
   buildSystemPrompt,
   transition,
@@ -17,6 +18,8 @@ import type {
   ConversationState,
   ConversationMessage,
   CostEstimateProps,
+  SetupGenerationRunState,
+  SetupGenerationSnapshot,
 } from "@kickstart/core";
 import { buildUsageSummary } from "./usage-tracking.js";
 import type { TurnUsage, UsageSummary } from "./usage-tracking.js";
@@ -78,6 +81,10 @@ export interface ApiSession {
   principalId?: string;
   /** Only server-owned phase state may escalate routing to codex. */
   routingPhaseTrusted: boolean;
+  /** Server-validated setup generation state for stepwise file generation. */
+  setupGenerationRun?: SetupGenerationRunState;
+  /** Client-supplied setup generation snapshots are trusted only after validation. */
+  setupGenerationTrusted: boolean;
   /** Thin deployment state for the real Azure happy path. */
   deployState: DeployState;
   /** Per-session CostEstimate pricing cache keyed by normalized pricing request. */
@@ -153,6 +160,7 @@ export function createSession(principalId?: string): ApiSession {
     usageHistory: [],
     principalId,
     routingPhaseTrusted: true,
+    setupGenerationTrusted: false,
     deployState: {
       stage: "idle",
       updatedAt: now,
@@ -173,6 +181,7 @@ export interface ClientMessage {
   content: string;
   phase?: string;
   usage?: TurnUsage;
+  setupGeneration?: SetupGenerationSnapshot;
   /** Optional compact artifact-bearing A2UI payloads for cold-start rehydration. */
   a2uiMessages?: unknown[];
 }
@@ -208,6 +217,7 @@ export function hydrateSession(clientMessages: ClientMessage[], principalId?: st
   const session = createSession(principalId);
   const now = new Date().toISOString();
   session.routingPhaseTrusted = false;
+  let latestSetupGeneration: SetupGenerationRunState | undefined;
 
   for (const msg of clientMessages) {
     // Only allow user/assistant — never trust client-sent system prompts
@@ -234,12 +244,29 @@ export function hydrateSession(clientMessages: ClientMessage[], principalId?: st
       if (isTurnUsage(msg.usage)) {
         session.usageHistory.push(msg.usage);
       }
+      if (isSetupGenerationSnapshot(msg.setupGeneration)) {
+        latestSetupGeneration = cloneSetupGenerationRun(msg.setupGeneration.run);
+        for (const generatedFile of latestSetupGeneration.generatedFiles) {
+          upsertArtifact(
+            session.generatedArtifacts,
+            extractArtifactMetadata(
+              generatedFile.path,
+              generatedFile.language,
+              "",
+            ),
+          );
+        }
+      }
     }
   }
 
   session.engineState = restoreEngineStateFromHistory(clientMessages);
   session.state.currentPhase = session.engineState.currentPhase;
   session.state.updatedAt = now;
+  if (latestSetupGeneration) {
+    session.setupGenerationRun = latestSetupGeneration;
+    session.setupGenerationTrusted = true;
+  }
   return session;
 }
 
@@ -435,4 +462,69 @@ function isTurnUsage(value: unknown): value is TurnUsage {
     && typeof usage.outputTokens === "number"
     && typeof usage.totalTokens === "number"
     && (usage.costStatus === "estimated" || usage.costStatus === "unavailable");
+}
+
+function isSetupGenerationSnapshot(
+  value: unknown,
+): value is SetupGenerationSnapshot {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const snapshot = value as { run?: unknown };
+  if (!snapshot.run || typeof snapshot.run !== "object" || Array.isArray(snapshot.run)) {
+    return false;
+  }
+
+  const run = snapshot.run as Partial<SetupGenerationRunState>;
+  if (run.phase !== "generate") return false;
+  if (typeof run.runId !== "string" || run.runId.length === 0) return false;
+  if (typeof run.currentStepIndex !== "number" || !Number.isInteger(run.currentStepIndex) || run.currentStepIndex < 0) {
+    return false;
+  }
+  if (typeof run.status !== "string" || typeof run.updatedAt !== "string") {
+    return false;
+  }
+  if (!Array.isArray(run.steps) || !Array.isArray(run.generatedFiles)) {
+    return false;
+  }
+  if (typeof run.totalBytes !== "number" || !Number.isFinite(run.totalBytes) || run.totalBytes < 0) {
+    return false;
+  }
+
+  return run.steps.every((step) => {
+    if (!step || typeof step !== "object" || Array.isArray(step)) return false;
+    const candidate = step as Record<string, unknown>;
+    return typeof candidate.id === "string"
+      && SETUP_GENERATION_STEP_ORDER.includes(candidate.id as SetupGenerationRunState["steps"][number]["id"])
+      && typeof candidate.label === "string"
+      && typeof candidate.required === "boolean"
+      && (candidate.status === "pending"
+        || candidate.status === "running"
+        || candidate.status === "complete"
+        || candidate.status === "error"
+        || candidate.status === "skipped");
+  }) && run.generatedFiles.every((file) => {
+    if (!file || typeof file !== "object" || Array.isArray(file)) return false;
+    const candidate = file as Record<string, unknown>;
+    return typeof candidate.stepId === "string"
+      && SETUP_GENERATION_STEP_ORDER.includes(candidate.stepId as SetupGenerationRunState["generatedFiles"][number]["stepId"])
+      && typeof candidate.path === "string"
+      && typeof candidate.language === "string"
+      && typeof candidate.byteLength === "number"
+      && Number.isFinite(candidate.byteLength)
+      && candidate.byteLength >= 0
+      && typeof candidate.sha256 === "string";
+  });
+}
+
+function cloneSetupGenerationRun(
+  run: SetupGenerationRunState,
+): SetupGenerationRunState {
+  return {
+    ...run,
+    steps: run.steps.map((step) => ({ ...step })),
+    generatedFiles: run.generatedFiles.map((file) => ({ ...file })),
+    ...(run.lastError ? { lastError: { ...run.lastError } } : {}),
+  };
 }

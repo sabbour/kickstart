@@ -11,6 +11,12 @@ const chatCompletionWithTools = vi.fn();
 const chatCompletion = vi.fn();
 const chatCompletionWithAutoContinue = vi.fn(async () => ({ content: "" }));
 const isTruncated = vi.fn(() => false);
+const executeSetupGeneration = vi.fn();
+const serializeSetupGenerationEvent = vi.fn((event: unknown) => JSON.stringify(event));
+const shouldUseStepwiseGeneration = vi.fn(() => false);
+const isSetupGenerationControlAction = vi.fn((value: string | undefined) =>
+  value === "retry-current-step" || value === "stop-generation",
+);
 
 vi.mock("@azure/functions", () => ({
   app: {
@@ -24,6 +30,13 @@ vi.mock("../lib/openai-client.js", () => ({
   getChatDeploymentName: () => "gpt-5.4-mini",
   getGenerateDeploymentName: () => "gpt-5.4",
   getCodexDeploymentName: () => "gpt-5.4",
+}));
+
+vi.mock("../lib/setup-generation.js", () => ({
+  executeSetupGeneration,
+  serializeSetupGenerationEvent,
+  shouldUseStepwiseGeneration,
+  isSetupGenerationControlAction,
 }));
 
 vi.mock("../lib/content-safety.js", () => ({
@@ -64,6 +77,15 @@ beforeEach(() => {
   chatCompletionWithAutoContinue.mockResolvedValue({ content: "" });
   isTruncated.mockReset();
   isTruncated.mockReturnValue(false);
+  executeSetupGeneration.mockReset();
+  serializeSetupGenerationEvent.mockReset();
+  serializeSetupGenerationEvent.mockImplementation((event: unknown) => JSON.stringify(event));
+  shouldUseStepwiseGeneration.mockReset();
+  shouldUseStepwiseGeneration.mockReturnValue(false);
+  isSetupGenerationControlAction.mockReset();
+  isSetupGenerationControlAction.mockImplementation((value: string | undefined) =>
+    value === "retry-current-step" || value === "stop-generation",
+  );
 });
 
 function createRequest(
@@ -560,6 +582,112 @@ describe("converse model routing", () => {
       model: "gpt-5.4",
       phase: Phase.Generate,
     });
+  });
+
+  it("streams stepwise setup events and snapshots when the generate flow is feature-flagged", async () => {
+    const session = createSession();
+    setSessionPhase(session, Phase.Generate);
+    shouldUseStepwiseGeneration.mockReturnValueOnce(true);
+    executeSetupGeneration.mockImplementationOnce(async (_session, options) => {
+      await options.hooks?.emitEvent?.({
+        type: "step_start",
+        stepId: "dockerfile",
+        label: "Dockerfile",
+        sequence: 1,
+      });
+      await options.hooks?.emitEvent?.({
+        type: "file_generated",
+        stepId: "dockerfile",
+        path: "Dockerfile",
+        language: "dockerfile",
+        content: "FROM node:20-alpine",
+        byteLength: 20,
+        sha256: "sha-1",
+      });
+      await options.hooks?.emitEvent?.({
+        type: "step_complete",
+        stepId: "dockerfile",
+        filesCount: 1,
+        totalBytes: 20,
+      });
+
+      return {
+        message: "Setup files are ready in the workspace. Next up: review the plan and deployment defaults.",
+        currentPhase: Phase.Review,
+        usage: {
+          inputTokens: 120,
+          outputTokens: 45,
+          totalTokens: 165,
+        },
+        events: [],
+        a2uiMessages: [],
+        snapshot: {
+          run: {
+            runId: "run-1",
+            phase: "generate",
+            currentStepIndex: 1,
+            steps: [
+              { id: "dockerfile", label: "Dockerfile", required: true, status: "complete" },
+            ],
+            status: "complete",
+            generatedFiles: [
+              {
+                stepId: "dockerfile",
+                path: "Dockerfile",
+                language: "dockerfile",
+                byteLength: 20,
+                sha256: "sha-1",
+              },
+            ],
+            totalBytes: 20,
+            updatedAt: "2026-04-16T00:00:00.000Z",
+          },
+        },
+      };
+    });
+
+    const response = await converseHandler(
+      createRequest(
+        {
+          sessionId: session.state.sessionId,
+          message: "Generate the next batch",
+        },
+        { accept: "text/event-stream" },
+      ),
+      createContext(),
+    ) as { status: number; body: ReadableStream<Uint8Array> };
+
+    expect(response.status).toBe(200);
+    expect(chatCompletion).not.toHaveBeenCalled();
+
+    const events = parseSseEvents(await readStream(response.body));
+    const eventNames = events.map((event) => event.event);
+    expect(eventNames).toEqual(expect.arrayContaining([
+      "step_start",
+      "file_generated",
+      "step_complete",
+      "message",
+      "done",
+    ]));
+
+    const donePayload = JSON.parse(
+      events.find((event) => event.event === "done")?.data ?? "{}",
+    ) as {
+      model?: string;
+      phase?: string;
+      setupGeneration?: { run?: { runId?: string } };
+    };
+
+    expect(donePayload).toMatchObject({
+      model: "gpt-5.4",
+      phase: Phase.Review,
+      setupGeneration: {
+        run: {
+          runId: "run-1",
+        },
+      },
+    });
+    expect(getSession(session.state.sessionId)?.engineState.currentPhase).toBe(Phase.Review);
   });
 
   it("uses generate pricing for trusted gpt-5.4 turns", async () => {

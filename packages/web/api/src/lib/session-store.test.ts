@@ -92,6 +92,71 @@ describe("session-store phase hydration", () => {
       },
     ]);
   });
+
+  it("rehydrates trusted setup generation snapshots from client history", () => {
+    const session = hydrateSession([
+      {
+        role: "assistant",
+        content: "Setup generation paused on Dockerfile.",
+        phase: Phase.Generate,
+        setupGeneration: {
+          run: {
+            runId: "run-1",
+            phase: "generate",
+            currentStepIndex: 1,
+            steps: [
+              { id: "app-scaffolding", label: "App scaffolding", required: false, status: "skipped" },
+              { id: "dockerfile", label: "Dockerfile", required: true, status: "error" },
+              { id: "deployment-config", label: "Deployment config", required: true, status: "pending" },
+              { id: "ci-cd", label: "CI/CD", required: true, status: "pending" },
+              { id: "service-connections", label: "Service connections", required: false, status: "skipped" },
+            ],
+            status: "paused",
+            generatedFiles: [
+              {
+                stepId: "dockerfile",
+                path: "Dockerfile",
+                language: "dockerfile",
+                byteLength: 42,
+                sha256: "abc123",
+              },
+            ],
+            totalBytes: 42,
+            updatedAt: "2026-04-16T00:00:00.000Z",
+            lastError: {
+              stepId: "dockerfile",
+              code: "codex_error",
+              message: "Retry the current step.",
+              recoverable: true,
+              occurredAt: "2026-04-16T00:00:00.000Z",
+            },
+          },
+        },
+      },
+    ], "principal-123");
+
+    expect(session.setupGenerationTrusted).toBe(true);
+    expect(session.setupGenerationRun).toMatchObject({
+      runId: "run-1",
+      currentStepIndex: 1,
+      status: "paused",
+      totalBytes: 42,
+      generatedFiles: [
+        expect.objectContaining({
+          path: "Dockerfile",
+          language: "dockerfile",
+        }),
+      ],
+    });
+    expect(session.generatedArtifacts).toEqual([
+      {
+        filename: "Dockerfile",
+        language: "dockerfile",
+        bicepResources: [],
+        k8sResources: [],
+      },
+    ]);
+  });
 });
 
 describe("extractArtifactsFromA2UI", () => {

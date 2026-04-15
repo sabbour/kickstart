@@ -98,6 +98,32 @@ export type {
   ResolvedCopilotSkills,
 } from "./engine/index.js";
 
+// Setup generation shared contract
+export {
+  SETUP_GENERATION_STEP_ORDER,
+  SETUP_GENERATION_STEP_LABELS,
+  SETUP_GENERATION_FILE_LANGUAGE_ALLOWLIST,
+  SETUP_GENERATION_QUOTAS,
+} from "./setup-generation.js";
+export type {
+  SetupGenerationStepId,
+  SetupGenerationFileLanguage,
+  SetupGenerationStepStatus,
+  SetupGenerationRunStatus,
+  SetupGenerationControlAction,
+  SetupGenerationErrorCode,
+  SetupGenerationStepState,
+  SetupGeneratedFileManifest,
+  SetupGenerationStepError,
+  SetupGenerationRunState,
+  SetupGenerationSnapshot,
+  SetupGenerationStepStartEvent,
+  SetupGenerationFileGeneratedEvent,
+  SetupGenerationStepCompleteEvent,
+  SetupGenerationStepErrorEvent,
+  SetupGenerationEvent,
+} from "./setup-generation.js";
+
 // Generators
 export {
   generateKubernetesManifests,

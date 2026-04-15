@@ -47,12 +47,14 @@ export interface CodexCompletionOptions {
   instructions?: string;
   temperature?: number;
   maxOutputTokens?: number;
+  deployment?: string;
 }
 
 export interface CodexCompletionResult {
   content: string;
   responseId: string;
   status: string;
+  usage?: ChatUsage;
 }
 
 // ---------------------------------------------------------------------------
@@ -341,11 +343,12 @@ export async function codexCompletion(
   options: CodexCompletionOptions = {},
 ): Promise<CodexCompletionResult> {
   const { endpoint, codexDeployment, apiKey } = getConfig();
-  if (!codexDeployment) {
+  const deployment = options.deployment || codexDeployment;
+  if (!deployment) {
     throw new Error("No codex deployment configured. Set AZURE_OPENAI_CODEX_DEPLOYMENT or AZURE_OPENAI_DEPLOYMENT.");
   }
 
-  const url = `${endpoint}/openai/deployments/${codexDeployment}/responses?api-version=${RESPONSES_API_VERSION}`;
+  const url = `${endpoint}/openai/deployments/${deployment}/responses?api-version=${RESPONSES_API_VERSION}`;
 
   const body: Record<string, unknown> = {
     input: input.filter((m) => m.role !== "system"),
@@ -381,6 +384,13 @@ export async function codexCompletion(
       type: string;
       content?: Array<{ type: string; text: string }>;
     }>;
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      input_tokens?: number;
+      output_tokens?: number;
+      total_tokens?: number;
+    };
   };
 
   const textParts = data.output
@@ -391,6 +401,7 @@ export async function codexCompletion(
     content: textParts.join(""),
     responseId: data.id,
     status: data.status,
+    usage: normalizeChatUsage(data.usage),
   };
 }
 
@@ -403,11 +414,12 @@ export async function* codexCompletionStream(
   options: CodexCompletionOptions = {},
 ): AsyncGenerator<string> {
   const { endpoint, codexDeployment, apiKey } = getConfig();
-  if (!codexDeployment) {
+  const deployment = options.deployment || codexDeployment;
+  if (!deployment) {
     throw new Error("No codex deployment configured. Set AZURE_OPENAI_CODEX_DEPLOYMENT or AZURE_OPENAI_DEPLOYMENT.");
   }
 
-  const url = `${endpoint}/openai/deployments/${codexDeployment}/responses?api-version=${RESPONSES_API_VERSION}`;
+  const url = `${endpoint}/openai/deployments/${deployment}/responses?api-version=${RESPONSES_API_VERSION}`;
 
   const body: Record<string, unknown> = {
     input: input.filter((m) => m.role !== "system"),

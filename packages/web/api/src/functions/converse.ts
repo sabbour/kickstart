@@ -28,14 +28,21 @@ import {
   defaultKitRegistry,
   InMemoryArtifactStore,
   handleImplicitFlags,
+  transition,
 } from "@kickstart/core";
-import type { PhaseItem, ToolContext, ConversationState } from "@kickstart/core";
+import type {
+  PhaseItem,
+  ToolContext,
+  ConversationState,
+  SetupGenerationControlAction,
+  SetupGenerationSnapshot,
+} from "@kickstart/core";
 import {
   getSession, createSession, getPrincipalId, hydrateSession, addMessage,
   adoptSessionPrincipal, isSessionOwnedBy, recordUsage,
   extractArtifactsFromA2UI, upsertArtifact,
 } from "../lib/session-store.js";
-import type { ClientMessage, GeneratedArtifact } from "../lib/session-store.js";
+import type { ApiSession, ClientMessage, GeneratedArtifact } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
 import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
@@ -51,6 +58,12 @@ import {
   resolveConverseModelRoute,
 } from "../lib/converse-model-router.js";
 import type { ConverseModelRoute } from "../lib/converse-model-router.js";
+import {
+  executeSetupGeneration,
+  isSetupGenerationControlAction,
+  serializeSetupGenerationEvent,
+  shouldUseStepwiseGeneration,
+} from "../lib/setup-generation.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -65,6 +78,7 @@ interface ConverseResponse {
   message: string;
   model?: string;
   a2ui?: object[];
+  setupGeneration?: SetupGenerationSnapshot;
   usage?: UsageSummary;
   autoContinue?: boolean;
   autoContinuePrompt?: string;
@@ -78,6 +92,7 @@ interface StreamDonePayload {
   phase: string;
   phaseLabel: string;
   model?: string;
+  setupGeneration?: SetupGenerationSnapshot;
   usage?: UsageSummary;
   autoContinue?: boolean;
   autoContinuePrompt?: string;
@@ -89,6 +104,32 @@ function getSafeCurrentPhase(
   engineState: Pick<ConversationState, "currentPhase">,
 ): Phase {
   return normalizeConversePhase(engineState.currentPhase) ?? Phase.Discover;
+}
+
+function extractSetupControlAction(
+  message: string,
+): SetupGenerationControlAction | undefined {
+  const normalized = message.trim().toLowerCase();
+  if (isSetupGenerationControlAction(normalized)) {
+    return normalized;
+  }
+
+  if (/retry(?: the)? current step/.test(normalized)) {
+    return "retry-current-step";
+  }
+
+  if (/stop(?: generation)?/.test(normalized)) {
+    return "stop-generation";
+  }
+
+  return undefined;
+}
+
+function syncSessionPhase(session: ApiSession, nextPhase: Phase): void {
+  while (getSafeCurrentPhase(session.engineState) !== nextPhase && !session.engineState.isComplete) {
+    session.engineState = transition(session.engineState, { type: "ADVANCE" });
+  }
+  session.state.currentPhase = session.engineState.currentPhase;
 }
 
 app.http("converse", {
@@ -170,6 +211,32 @@ app.http("converse", {
       const modelRoute = resolveConverseModelRoute(currentPhase, {
         trustedPhase: session.routingPhaseTrusted,
       });
+      const wantsStream = request.headers
+        .get("accept")
+        ?.includes("text/event-stream");
+      const debugMode = isDebugMode(request);
+      const setupControlAction = extractSetupControlAction(body.message);
+
+      if (shouldUseStepwiseGeneration(session, currentPhase)) {
+        const stepwiseModelRoute = resolveConverseModelRoute(currentPhase, {
+          trustedPhase: true,
+        });
+        if (wantsStream) {
+          return handleSetupGenerationStreaming(
+            session,
+            stepwiseModelRoute,
+            context,
+            debugMode,
+            setupControlAction,
+          );
+        }
+        return handleSetupGenerationResponse(
+          session,
+          stepwiseModelRoute,
+          debugMode,
+          setupControlAction,
+        );
+      }
 
 
       // Build artifact summary from files generated in previous turns
@@ -188,14 +255,6 @@ app.http("converse", {
         role: m.role as "system" | "user" | "assistant",
         content: idx === 0 && m.role === "system" ? freshSystemPrompt : m.content,
       }));
-
-      // Check if client wants SSE streaming
-      const wantsStream = request.headers
-        .get("accept")
-        ?.includes("text/event-stream");
-
-      // Check if debug metadata is requested
-      const debugMode = isDebugMode(request);
 
       // Create a session-scoped ToolContext for artifact isolation
       const toolContext: ToolContext = {
@@ -328,6 +387,139 @@ function buildPhaseIndicator(engineState: ConversationState): object[] {
       currentPhase,
     },
   ];
+}
+
+async function handleSetupGenerationResponse(
+  session: ApiSession,
+  modelRoute: ConverseModelRoute,
+  debugMode: boolean,
+  controlAction?: SetupGenerationControlAction,
+): Promise<HttpResponseInit> {
+  const result = await executeSetupGeneration(session, {
+    controlAction,
+    surfaceId: "generate-progress",
+  });
+
+  syncSessionPhase(session, result.currentPhase);
+  addMessage(session.state.sessionId, "assistant", result.message);
+
+  const usageSummary = finalizeUsage(
+    session.state.sessionId,
+    modelRoute,
+    result.usage,
+  );
+
+  const responseBody: ConverseResponse = {
+    sessionId: session.state.sessionId,
+    phase: result.currentPhase,
+    message: result.message,
+    model: modelRoute.model,
+    a2ui: [...buildPhaseIndicator(session.engineState), ...result.a2uiMessages],
+    ...(usageSummary ? { usage: usageSummary } : {}),
+    setupGeneration: result.snapshot,
+  };
+
+  if (debugMode) {
+    const debugMeta = buildConverseDebugMeta(
+      modelRoute.model,
+      result.message,
+      result.a2uiMessages.length,
+      result.a2uiMessages.length > 0,
+      session.engineState.currentPhase,
+    );
+    responseBody.debug = debugMeta;
+    responseBody.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
+  }
+
+  return { status: 200, jsonBody: responseBody };
+}
+
+function handleSetupGenerationStreaming(
+  session: ApiSession,
+  modelRoute: ConverseModelRoute,
+  context: InvocationContext,
+  debugMode: boolean,
+  controlAction?: SetupGenerationControlAction,
+): HttpResponseInit {
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const result = await executeSetupGeneration(session, {
+          controlAction,
+          surfaceId: "generate-progress",
+          hooks: {
+            emitEvent: (event) => {
+              controller.enqueue(
+                encoder.encode(
+                  `event: ${event.type}\ndata: ${serializeSetupGenerationEvent(event)}\n\n`,
+                ),
+              );
+            },
+          },
+        });
+
+        syncSessionPhase(session, result.currentPhase);
+        addMessage(session.state.sessionId, "assistant", result.message);
+
+        const usageSummary = finalizeUsage(
+          session.state.sessionId,
+          modelRoute,
+          result.usage,
+        );
+
+        controller.enqueue(
+          encoder.encode(
+            `event: message\ndata: ${JSON.stringify({ content: result.message })}\n\n`,
+          ),
+        );
+
+        const phaseDef = getPhaseDefinition(result.currentPhase);
+        const donePayload: StreamDonePayload = {
+          sessionId: session.state.sessionId,
+          phase: result.currentPhase,
+          phaseLabel: phaseDef.label,
+          model: modelRoute.model,
+          ...(usageSummary ? { usage: usageSummary } : {}),
+          setupGeneration: result.snapshot,
+        };
+
+        if (debugMode) {
+          const debugMeta = buildConverseDebugMeta(
+            modelRoute.model,
+            result.message,
+            result.a2uiMessages.length,
+            result.a2uiMessages.length > 0,
+            session.engineState.currentPhase,
+          );
+          donePayload.debug = debugMeta;
+          donePayload.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
+        }
+
+        controller.enqueue(
+          encoder.encode(`event: done\ndata: ${JSON.stringify(donePayload)}\n\n`),
+        );
+      } catch (err) {
+        const safeMsg = safeStreamError(err, context, "Stream error");
+        controller.enqueue(
+          encoder.encode(`event: error\ndata: ${JSON.stringify({ error: safeMsg })}\n\n`),
+        );
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return {
+    status: 200,
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    },
+    body: stream,
+  };
 }
 
 /** Handle SSE streaming response with typed events. */
