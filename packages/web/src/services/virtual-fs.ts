@@ -199,13 +199,7 @@ export class VirtualFileSystem {
   }
 
   private sortTree(nodes: FileTreeNode[]): void {
-    nodes.sort((a, b) => {
-      if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
-    for (const node of nodes) {
-      if (node.children) this.sortTree(node.children);
-    }
+    sortTree(nodes);
   }
 
   private notify(): void {

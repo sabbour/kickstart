@@ -370,6 +370,7 @@ export function FileTreePanel({ onOpenFile }: FileTreePanelProps) {
     try {
       await navigator.clipboard.writeText(selectedFile.content);
       setCopied(true);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // Fallback for non-secure contexts
@@ -380,6 +381,7 @@ export function FileTreePanel({ onOpenFile }: FileTreePanelProps) {
       document.execCommand('copy');
       document.body.removeChild(ta);
       setCopied(true);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     }
   }, [selectedFile]);

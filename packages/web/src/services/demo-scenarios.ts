@@ -420,10 +420,25 @@ const SCENARIOS: { match: RegExp | null; response: DemoResponse }[] = [
   { match: null, response: WELCOME },
 ];
 
-let turnCount = 0;
+const SESSION_TURN_KEY = 'kickstart-demo-turnCount';
+
+function getTurnCount(): number {
+  try {
+    return parseInt(sessionStorage.getItem(SESSION_TURN_KEY) ?? '0', 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function setTurnCount(n: number): void {
+  try {
+    sessionStorage.setItem(SESSION_TURN_KEY, String(n));
+  } catch { /* ignore — sessionStorage may be unavailable */ }
+}
 
 export function getDemoResponse(userMessage: string): DemoResponse {
-  turnCount++;
+  const turnCount = getTurnCount() + 1;
+  setTurnCount(turnCount);
 
   // First turn always gets welcome
   if (turnCount === 1) {
@@ -445,7 +460,7 @@ export function getDemoResponse(userMessage: string): DemoResponse {
 }
 
 export function resetDemoState(): void {
-  turnCount = 0;
+  setTurnCount(0);
 }
 
 // --- Demo file content for the Spark file-generation experience ---
@@ -715,5 +730,5 @@ export function populateDemoFiles(fs: VirtualFileSystem): void {
 
 /** Check whether the current demo turn is the file-generation phase. */
 export function isDemoFileGenerationPhase(): boolean {
-  return turnCount >= 4; // FILE_GENERATION is the 3rd scenario (turn 4+)
+  return getTurnCount() >= 4; // FILE_GENERATION is the 3rd scenario (turn 4+)
 }

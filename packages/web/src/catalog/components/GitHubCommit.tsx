@@ -225,8 +225,8 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
         throw new Error('Invalid repository format. Expected "owner/repo".');
       }
 
-      const fileList = selectedArtifacts.map((a) => `- \`${a.path}\``).join('\\n');
-      const prBodyFull = `${prBody}\\n\\n---\\n\\n**Files included (${selectedArtifacts.length}):**\\n${fileList}`;
+      const fileList = selectedArtifacts.map((a) => `- \`${a.path}\``).join('\n');
+      const prBodyFull = `${prBody}\n\n---\n\n**Files included (${selectedArtifacts.length}):**\n${fileList}`;
 
       const pr = await connector.createPullRequest(
         owner,
