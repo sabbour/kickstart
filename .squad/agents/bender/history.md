@@ -29,9 +29,6 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - (2026-04-14 11:02) Wave 1: SWA continuous deploy + version footer → PR #177 opened. Auto-deploy from main, version shows SHA.
 
 ## Learnings
-- (2026-04-15) Any endpoint that hydrates sessions from client-supplied `messages` must mirror `/api/converse` replay guards: cap history length and run content-safety checks across every replayed message before hydration.
-- (2026-04-15) Static Web Apps `globalHeaders` CSP applies to function-returned HTML too. With `script-src 'self'`, OAuth callback pages cannot rely on inline `<script>` blocks; use a same-origin external callback script instead.
-- (2026-04-15) For GitHub handoff in the SWA app, keep Azure AD as the trusted app access boundary and layer GitHub as a secondary server-owned OAuth session bound to `x-ms-client-principal-id`. This avoids widening access by adding GitHub as a first-class SWA identity provider.
 - SWA deploy workflow (`deploy-swa.yml`) needs explicit `push → branches: [main]` trigger — tag-only triggers mean no continuous deployment from main.
 - `__BUILD_VERSION__` in `vite.config.ts` can embed git SHA via `execSync('git rev-parse --short HEAD')` — works both locally and in CI without relying on `GITHUB_SHA` env var.
 - Footer version display should use a single unified string (`version-sha`) rather than showing version and SHA separately — reduces redundancy and makes each build uniquely identifiable at a glance.
