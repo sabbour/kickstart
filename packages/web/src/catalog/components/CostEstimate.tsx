@@ -3,11 +3,12 @@ import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
 import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
-  Body1,
-  Body2,
+  Button,
   Caption1,
   Card,
   Label,
+  MessageBar,
+  MessageBarBody,
   Select,
   Slider,
   Subtitle1,
@@ -15,6 +16,8 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { MoneyRegular } from '@fluentui/react-icons';
+import { useConversationSession } from '../../contexts/ConversationSessionContext';
+import { approveCostGate } from '../../services/azure-deployments';
 
 const SkuOptionSchema = z.object({
   label: DynamicStringSchema,
@@ -182,12 +185,29 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
     marginLeft: 'auto',
   },
+  footer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
+    borderTopWidth: tokens.strokeWidthThin,
+    borderTopStyle: 'solid',
+    borderTopColor: tokens.colorNeutralStroke2,
+  },
+  footerActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+  },
 });
 
 export const CostEstimate = createReactComponent(CostEstimateApi, ({ props, context }) => {
   const classes = useStyles();
+  const { backendSessionId, currentPhase } = useConversationSession();
   const currency = props.currency ?? 'USD';
   const resources = props.resources ?? [];
+  const [approving, setApproving] = useState(false);
+  const [gateError, setGateError] = useState<string | undefined>();
 
   // Track SKU selections per resource index
   const [skuSelections, setSkuSelections] = useState<Record<number, string>>({});
@@ -244,6 +264,35 @@ export const CostEstimate = createReactComponent(CostEstimateApi, ({ props, cont
     new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 
   const hasSkuOptions = resources.some(r => r.skuOptions && r.skuOptions.length > 0);
+  const showApprovalCta = Boolean(backendSessionId) && (currentPhase === 'review' || currentPhase === 'deploy');
+
+  const handleApprove = useCallback(async () => {
+    if (!backendSessionId) return;
+
+    setApproving(true);
+    setGateError(undefined);
+    try {
+      await approveCostGate(backendSessionId, {
+        approved: true,
+        total: displayTotal,
+        currency,
+      });
+      context.dispatchAction({
+        event: {
+          name: 'continue:cost-gate-approved',
+          context: {
+            total: formatCost(displayTotal),
+            currency,
+            projectionMonths,
+          },
+        },
+      });
+    } catch (error) {
+      setGateError(error instanceof Error ? error.message : 'Unable to record cost approval.');
+    } finally {
+      setApproving(false);
+    }
+  }, [backendSessionId, context, currency, displayTotal, formatCost, projectionMonths]);
 
   return (
     <Card className={classes.root}>
@@ -356,6 +405,29 @@ export const CostEstimate = createReactComponent(CostEstimateApi, ({ props, cont
           <span className={classes.sliderValue}>
             {sliderMonths} {sliderMonths === 1 ? 'month' : 'months'}
           </span>
+        </div>
+      )}
+
+      {(gateError || showApprovalCta) && (
+        <div className={classes.footer}>
+          <div>
+            {gateError && (
+              <MessageBar intent="error">
+                <MessageBarBody>{gateError}</MessageBarBody>
+              </MessageBar>
+            )}
+          </div>
+          {showApprovalCta && (
+            <div className={classes.footerActions}>
+              <Button
+                appearance="primary"
+                onClick={() => void handleApprove()}
+                disabled={approving || resources.length === 0}
+              >
+                {approving ? 'Recording approval…' : 'Approve and continue'}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </Card>

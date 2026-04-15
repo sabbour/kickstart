@@ -321,9 +321,12 @@ describe("COMPONENT_SCHEMA_REGISTRY", () => {
     const result = COMPONENT_SCHEMA_REGISTRY["DeploymentProgress"].safeParse({
       id: "dp1",
       component: "DeploymentProgress",
+      runId: "deploy-123",
+      overallStatus: "running",
+      statusMessage: "Waiting for AKS rollout to finish.",
       steps: [
         { id: "s1", label: "Build", status: "complete" },
-        { id: "s2", label: "Deploy", status: "running" },
+        { id: "s2", label: "Deploy", status: "running", detail: "Rolling update in progress" },
       ],
     });
     expect(result.success).toBe(true);

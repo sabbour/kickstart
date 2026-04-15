@@ -392,7 +392,7 @@ const AuthCardPropsSchema = z
     id: boundedString,
     component: z.literal("AuthCard"),
     provider: z.enum(["azure", "github"]),
-    title: dynamicString,
+    title: dynamicString.optional(),
     description: dynamicString.optional(),
   })
   .strip();
@@ -401,13 +401,25 @@ const DeploymentStepSchema = z.object({
   id: boundedString,
   label: dynamicString,
   status: z.enum(["pending", "running", "complete", "error", "skipped"]),
+  detail: dynamicString.optional(),
+  timestamp: dynamicString.optional(),
 });
 
 const DeploymentProgressPropsSchema = z
   .object({
     id: boundedString,
     component: z.literal("DeploymentProgress"),
-    steps: z.array(DeploymentStepSchema),
+    steps: z.array(DeploymentStepSchema).optional(),
+    title: dynamicString.optional(),
+    overallStatus: z.enum(["idle", "running", "complete", "error"]).optional(),
+    runId: dynamicString.optional(),
+    statusMessage: dynamicString.optional(),
+    appUrl: dynamicString.optional(),
+    portalUrl: dynamicString.optional(),
+    errorCode: dynamicString.optional(),
+    errorMessage: dynamicString.optional(),
+    lastUpdated: dynamicString.optional(),
+    pollIntervalMs: z.number().int().positive().optional(),
   })
   .strip();
 
