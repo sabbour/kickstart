@@ -10,11 +10,13 @@ import { tokens } from '@fluentui/react-components';
 const emojiIconMap: Record<string, { icon: React.FC<{ style?: React.CSSProperties }>; color: string }> = {
   '✅': { icon: CheckmarkCircle20Filled, color: tokens.colorPaletteGreenForeground1 },
   '⚠️': { icon: Warning20Filled, color: tokens.colorPaletteDarkOrangeForeground1 },
+  '⚠': { icon: Warning20Filled, color: tokens.colorPaletteDarkOrangeForeground1 },
   '❌': { icon: DismissCircle20Filled, color: tokens.colorPaletteRedForeground1 },
   'ℹ️': { icon: Info20Filled, color: tokens.colorBrandForeground1 },
+  'ℹ': { icon: Info20Filled, color: tokens.colorBrandForeground1 },
 };
 
-// Sorted longest-first so multi-codepoint emoji (⚠️, ℹ️) match before single-codepoint
+// Sorted longest-first so multi-codepoint emoji variants (⚠️, ℹ️) match before single-codepoint forms
 const sortedEmoji = Object.keys(emojiIconMap).sort((a, b) => b.length - a.length);
 
 /**
