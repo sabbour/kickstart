@@ -4,8 +4,6 @@ import { Layout } from './components/Layout';
 import { Landing } from './components/Landing';
 import { ChatShell } from './components/Chat/ChatShell';
 import { SessionsSidebar } from './components/Sidebar/SessionsSidebar';
-import { FileEditor } from './components/FileEditor/FileEditor';
-import { FileTreePanel } from './components/FileTreePanel';
 import { FileManagerSidebar, FileViewer } from './components/FileManager';
 import { Playground } from './pages/Playground';
 import { useA2UI } from './hooks/useA2UI';
@@ -51,11 +49,9 @@ export function App() {
   const [mode, setMode] = useState<AppMode>(playgroundEnabled ? 'chat' : 'landing');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(mockEnabled ? true : null);
-  const [selectedFile, setSelectedFile] = useState<string | undefined>();
   const [filePanelOpen, setFilePanelOpen] = useState(true);
   const [fileSidebarOpen, setFileSidebarOpen] = useState(true);
   const [viewerFile, setViewerFile] = useState<string | undefined>();
-  const selectedFileRef = useRef<string | undefined>(undefined);
   const viewerFileRef = useRef<string | undefined>(undefined);
 
   const connectorRegistry = useAPIConnectorRegistry();
@@ -123,10 +119,6 @@ export function App() {
   const streamingA2UIMessagesRef = useRef<A2uiPayloadItem[]>([]);
 
   useEffect(() => {
-    selectedFileRef.current = selectedFile;
-  }, [selectedFile]);
-
-  useEffect(() => {
     viewerFileRef.current = viewerFile;
   }, [viewerFile]);
 
@@ -159,9 +151,8 @@ export function App() {
   }, []);
 
   const openGeneratedFile = useCallback((path: string) => {
-    selectedFileRef.current = path;
+    setFilePanelOpen(true);
     viewerFileRef.current = path;
-    setSelectedFile(path);
     setViewerFile(path);
   }, []);
 
@@ -174,9 +165,7 @@ export function App() {
     fs.clear();
     lastPersistedRef.current = new Map();
     clearActionLog();
-    selectedFileRef.current = undefined;
     viewerFileRef.current = undefined;
-    setSelectedFile(undefined);
     setViewerFile(undefined);
     setConversationPhase(null);
     try {
@@ -205,7 +194,7 @@ export function App() {
       fs.write(file.path, file.content, file.language);
     }
 
-    if (prepared.files.length > 0 && !selectedFileRef.current && !viewerFileRef.current) {
+    if (prepared.files.length > 0 && !viewerFileRef.current) {
       openGeneratedFile(prepared.files[0].path);
     }
 
@@ -445,7 +434,7 @@ export function App() {
   const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
   const currentStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
   const usageSummary = useMemo(() => summarizeTokenUsage(messages), [messages]);
-  const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
+  const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot, fs.getSnapshot);
   const hasFiles = fsFiles.length > 0 || vfsFiles.length > 0;
   const activeSession = sessions.getActiveSession();
   const getDeploymentFiles = useCallback(async () => {
@@ -485,9 +474,11 @@ export function App() {
   }, [hasFiles]);
 
   const handleToggleFilePanel = useCallback(() => {
+    if (!filePanelOpen && hasFiles) {
+      setFileSidebarOpen(true);
+    }
     setFilePanelOpen((prev) => !prev);
-    setFileSidebarOpen((prev) => !prev);
-  }, []);
+  }, [filePanelOpen, hasFiles]);
 
   // --- File Manager sidebar / viewer handlers ---
   const handleSelectViewerFile = useCallback((path: string) => {
@@ -518,21 +509,26 @@ export function App() {
     if (viewerFile === path) {
       viewerFileRef.current = undefined;
       setViewerFile(undefined);
+      if (!fileSidebarOpen) {
+        setFilePanelOpen(false);
+      }
     }
-    if (selectedFile === path) {
-      selectedFileRef.current = undefined;
-      setSelectedFile(undefined);
-    }
-  }, [vfs, fs, viewerFile, selectedFile]);
+  }, [vfs, fs, viewerFile, fileSidebarOpen]);
 
   const handleDismissSidebar = useCallback(() => {
     setFileSidebarOpen(false);
+    if (!viewerFileRef.current) {
+      setFilePanelOpen(false);
+    }
   }, []);
 
   const handleDismissViewer = useCallback(() => {
     viewerFileRef.current = undefined;
     setViewerFile(undefined);
-  }, []);
+    if (!fileSidebarOpen) {
+      setFilePanelOpen(false);
+    }
+  }, [fileSidebarOpen]);
 
   // Playground mode — standalone A2UI test harness
   if (playgroundEnabled) {
@@ -563,8 +559,8 @@ export function App() {
           showSessionsToggle={mode === 'chat'}
           hasFiles={hasFiles && filePanelOpen}
           showFilePanel={mode === 'chat' && filePanelOpen}
-          showFileSidebar={mode === 'chat' && fileSidebarOpen && hasFiles}
-          showFileViewer={mode === 'chat' && !!viewerFile}
+          showFileSidebar={mode === 'chat' && filePanelOpen && fileSidebarOpen && hasFiles}
+          showFileViewer={mode === 'chat' && filePanelOpen && !!viewerFile}
           onToggleFilePanel={mode === 'chat' && hasFiles ? handleToggleFilePanel : undefined}
           sidebar={mode === 'chat' ? (
             <SessionsSidebar
@@ -576,16 +572,6 @@ export function App() {
               onNewSession={handleNewSession}
               onDeleteSession={sessions.deleteSession}
             />
-          ) : undefined}
-          fileEditor={mode === 'chat' ? (
-            <>
-              <FileEditor
-                fs={fs}
-                selectedPath={selectedFile}
-                onSelectFile={openGeneratedFile}
-              />
-              <FileTreePanel />
-            </>
           ) : undefined}
           fileManagerSidebar={mode === 'chat' ? (
             <FileManagerSidebar

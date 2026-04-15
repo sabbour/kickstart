@@ -395,6 +395,34 @@ describe("COMPONENT_SCHEMA_REGISTRY", () => {
     expect(result.success).toBe(true);
   });
 
+  it("validates workspace-backed FileEditor payloads", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["FileEditor"].safeParse({
+      id: "fe2",
+      component: "FileEditor",
+      artifactPath: "artifacts/Dockerfile",
+      readOnly: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("validates multi-file FileEditor payloads with path aliases", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["FileEditor"].safeParse({
+      id: "fe3",
+      component: "FileEditor",
+      files: [
+        {
+          path: "src/index.ts",
+          language: "typescript",
+          content: "console.log('hi')",
+        },
+        {
+          artifactPath: "artifacts/Dockerfile",
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("accepts dynamic string (object) for Text.text", () => {
     const result = COMPONENT_SCHEMA_REGISTRY["Text"].safeParse({
       id: "t1",
