@@ -215,6 +215,20 @@ describe("COMPONENT_SCHEMA_REGISTRY", () => {
     expect(result.success).toBe(true);
   });
 
+  it("validates legacy CostEstimate items, stub source, and boolean fallback", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["CostEstimate"].safeParse({
+      id: "cost-legacy",
+      component: "CostEstimate",
+      items: [{ name: "VM", sku: "B1ms", monthlyCost: 12.40 }],
+      total: 12.40,
+      currency: "USD",
+      source: "stub",
+      fallback: true,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("validates Divider (minimal component)", () => {
     const result = COMPONENT_SCHEMA_REGISTRY["Divider"].safeParse({
       id: "div1",

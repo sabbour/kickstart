@@ -361,6 +361,12 @@ const CostEstimateResourceSchema = z.object({
   pricingTiers: z.array(CostEstimatePricingTierSchema).optional(),
 });
 
+const LegacyCostEstimateItemSchema = z.object({
+  name: dynamicString,
+  sku: dynamicString.optional(),
+  monthlyCost: z.number(),
+});
+
 const CostEstimatePricingKindSchema = z.enum([
   "aksAutomaticControlPlane",
   "aksAutomaticSystemNodes",
@@ -402,22 +408,30 @@ const CostEstimateFallbackMetadataSchema = z.object({
   message: dynamicString.optional(),
 });
 
+const CostEstimateSourceSchema = z.enum(["live", "estimated", "stub"]);
+
+const CostEstimateFallbackSchema = z.union([
+  z.boolean(),
+  CostEstimateFallbackMetadataSchema,
+]);
+
 const CostEstimatePropsSchema = z
   .object({
     id: boundedString,
     component: z.literal("CostEstimate"),
-    resources: z.array(CostEstimateResourceSchema),
+    resources: z.array(CostEstimateResourceSchema).optional(),
+    items: z.array(LegacyCostEstimateItemSchema).optional(),
     monthlyEstimate: z.number().optional(),
     total: z.number().optional(),
     currency: dynamicString.optional(),
     title: dynamicString.optional(),
     projectionMonths: z.number().optional(),
     showProjectionSlider: z.boolean().optional(),
-    source: z.enum(["live", "estimated"]).optional(),
+    source: CostEstimateSourceSchema.optional(),
     citation: dynamicString.optional(),
     loading: CostEstimateLoadingStateSchema.optional(),
     cache: CostEstimateCacheMetadataSchema.optional(),
-    fallback: CostEstimateFallbackMetadataSchema.optional(),
+    fallback: CostEstimateFallbackSchema.optional(),
     pricingRequest: CostEstimatePricingRequestSchema.optional(),
     estimatedAt: dynamicString.optional(),
   })

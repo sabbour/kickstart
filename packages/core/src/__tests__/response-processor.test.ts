@@ -298,6 +298,49 @@ describe("processResponse", () => {
     expect(comps).toHaveLength(0);
   });
 
+  it("preserves legacy CostEstimate payloads during component validation", () => {
+    const json = JSON.stringify({
+      message: "test",
+      a2ui: [
+        {
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "s1",
+            components: [
+              {
+                id: "cost1",
+                component: "CostEstimate",
+                items: [{ name: "VM", sku: "B1ms", monthlyCost: 12.4 }],
+                total: 12.4,
+                currency: "USD",
+                source: "stub",
+                fallback: true,
+                citation: "Estimated monthly pricing.",
+              },
+            ],
+          },
+        },
+      ],
+      actions: [],
+    });
+
+    const result = processResponse(json);
+    expect(result.a2uiMessages).toHaveLength(1);
+    const comps = result.a2uiMessages[0].updateComponents!.components as Record<string, unknown>[];
+    expect(comps).toHaveLength(1);
+    expect(comps[0]).toMatchObject({
+      component: "CostEstimate",
+      total: 12.4,
+      currency: "USD",
+      source: "stub",
+      fallback: true,
+      citation: "Estimated monthly pricing.",
+    });
+    expect(comps[0].items).toEqual([
+      { name: "VM", sku: "B1ms", monthlyCost: 12.4 },
+    ]);
+  });
+
   // -----------------------------------------------------------------------
   // Issue #153: Nesting depth limit
   // -----------------------------------------------------------------------
