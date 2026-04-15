@@ -153,6 +153,7 @@ The client auto-continues when filesComplete is false — do NOT include a Conti
 Before handoff or deployment, review the monthly spend and the most important deployment safeguards.
 Present ONE review step:
 - CostEstimate with monthly breakdown
+- For live session pricing, emit CostEstimate as resources[] + monthlyEstimate and include source/citation plus loading, cache, fallback, and pricingRequest metadata. pricingRequest line items must stay normalized and allowlisted — never raw Azure Retail API filters.
 - A short explanation of the biggest cost drivers and why the user should confirm them now
 - One primary Button to continue to GitHub handoff and one secondary Button to revise the plan
 Do NOT re-show the full architecture diagram, generated files, or a session-complete CTA in REVIEW. REVIEW is a checkpoint, not the end of the flow.
@@ -338,7 +339,7 @@ Study these examples carefully. Every response you give should match this level 
           { "id": "cost-card", "component": "Card", "children": ["cost-col"] },
           { "id": "cost-col", "component": "Column", "children": ["cost-why", "cost-recap"], "gap": "12px" },
           { "id": "cost-why", "component": "Markdown", "content": "**Why review cost now:** once we move into GitHub and Azure deployment, these choices become real spend, so this is the right checkpoint to confirm the plan." },
-          { "id": "cost-recap", "component": "CostEstimate", "items": [{ "name": "App Platform", "sku": "Standard", "monthlyCost": 116.80 }, { "name": "PostgreSQL", "sku": "B1ms", "monthlyCost": 12.40 }], "total": 129.20, "currency": "USD" },
+          { "id": "cost-recap", "component": "CostEstimate", "resources": [{ "name": "AKS Automatic control plane", "sku": "Standard", "monthlyEstimate": 116.80 }, { "name": "Workload compute", "sku": "Standard_D2s_v5", "monthlyEstimate": 81.53 }, { "name": "Azure OpenAI", "sku": "GPT-4.1 mini", "monthlyEstimate": 0, "pricingModel": "usage", "unitPrice": 0.00044, "unitOfMeasure": "1K tokens" }], "monthlyEstimate": 198.33, "currency": "USD", "source": "live", "citation": "Prices from Azure Retail Prices API (East US, consumption). Usage-based rows are excluded from the monthly total until usage is known.", "loading": { "supported": true, "state": "loading", "message": "Fetching live prices from Azure Retail Prices API…" }, "cache": { "status": "miss" }, "fallback": { "used": false }, "pricingRequest": { "region": "eastus", "lineItems": [{ "id": "aks-control-plane", "kind": "aksAutomaticControlPlane" }, { "id": "workload-compute", "kind": "aksAutomaticWorkloadCompute", "sku": "Standard_D2s_v5", "quantity": 1 }, { "id": "openai", "kind": "azureOpenAI", "sku": "gpt-4.1-mini" }] } },
           { "id": "action-row", "component": "Row", "children": ["continue-btn", "change-btn"], "gap": "8px" },
           { "id": "continue-btn", "component": "Button", "label": "Continue to GitHub", "variant": "primary", "action": { "event": { "name": "approve-cost", "context": { "label": "Continue to GitHub" } } } },
           { "id": "change-btn", "component": "Button", "label": "Change the plan", "variant": "secondary", "action": { "event": { "name": "revise-plan", "context": { "label": "Change the plan" } } } }

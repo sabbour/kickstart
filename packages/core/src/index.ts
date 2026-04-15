@@ -38,6 +38,17 @@ export type {
   DeploymentProgressComponent,
   DeploymentStep,
   CostItem,
+  CostEstimateProps,
+  CostEstimateResource,
+  CostEstimateSkuOption,
+  CostEstimatePricingTier,
+  CostEstimatePricingKind,
+  CostEstimatePricingLineItem,
+  CostEstimatePricingRequest,
+  CostEstimateResourcePricingModel,
+  CostEstimateLoadingState,
+  CostEstimateCacheMetadata,
+  CostEstimateFallbackMetadata,
   PhaseItem,
   ResourceOption,
 } from "./catalog/index.js";
@@ -276,4 +287,3 @@ export type {
   SessionState,
   ConversationMessage,
 } from "./types.js";
-

@@ -187,13 +187,30 @@ describe("COMPONENT_SCHEMA_REGISTRY", () => {
     expect(result.success).toBe(true);
   });
 
-  it("validates CostEstimate with items", () => {
+  it("validates CostEstimate with resources, monthlyEstimate, and pricing metadata", () => {
     const result = COMPONENT_SCHEMA_REGISTRY["CostEstimate"].safeParse({
       id: "cost1",
       component: "CostEstimate",
-      items: [{ name: "VM", sku: "B1ms", monthlyCost: 12.40 }],
-      total: 12.40,
+      resources: [{ name: "VM", sku: "B1ms", monthlyEstimate: 12.40 }],
+      monthlyEstimate: 12.40,
       currency: "USD",
+      source: "estimated",
+      cache: {
+        status: "miss",
+      },
+      fallback: {
+        used: true,
+        reason: "live_pricing_unavailable",
+      },
+      loading: {
+        supported: true,
+        state: "ready",
+      },
+      citation: "Live Azure pricing is unavailable right now, so these are estimated monthly prices for East US.",
+      pricingRequest: {
+        region: "eastus",
+        lineItems: [{ id: "vm", kind: "aksAutomaticWorkloadCompute", sku: "Standard_D2s_v5", quantity: 1 }],
+      },
     });
     expect(result.success).toBe(true);
   });

@@ -333,19 +333,93 @@ const DateTimeInputPropsSchema = z
 
 // Custom Kickstart components
 
-const CostItemSchema = z.object({
+const CostEstimateSkuOptionSchema = z.object({
+  label: dynamicString,
+  value: dynamicString,
+  monthlyEstimate: z.number(),
+});
+
+const CostEstimatePricingTierSchema = z.object({
+  label: dynamicString,
+  monthlyEstimate: z.number(),
+});
+
+const CostEstimateResourcePricingModelSchema = z.enum([
+  "monthly",
+  "usage",
+  "included",
+]);
+
+const CostEstimateResourceSchema = z.object({
   name: dynamicString,
-  sku: dynamicString,
-  monthlyCost: z.number(),
+  sku: dynamicString.optional(),
+  monthlyEstimate: z.number(),
+  pricingModel: CostEstimateResourcePricingModelSchema.optional(),
+  unitPrice: z.number().optional(),
+  unitOfMeasure: dynamicString.optional(),
+  skuOptions: z.array(CostEstimateSkuOptionSchema).optional(),
+  pricingTiers: z.array(CostEstimatePricingTierSchema).optional(),
+});
+
+const CostEstimatePricingKindSchema = z.enum([
+  "aksAutomaticControlPlane",
+  "aksAutomaticSystemNodes",
+  "aksAutomaticWorkloadCompute",
+  "appRouting",
+  "containerRegistry",
+  "storage",
+  "azureOpenAI",
+]);
+
+const CostEstimatePricingLineItemSchema = z.object({
+  id: boundedString,
+  kind: CostEstimatePricingKindSchema,
+  name: dynamicString.optional(),
+  sku: dynamicString.optional(),
+  quantity: z.number().int().positive().max(100).optional(),
+});
+
+const CostEstimatePricingRequestSchema = z.object({
+  region: dynamicString,
+  lineItems: z.array(CostEstimatePricingLineItemSchema).min(1).max(12),
+});
+
+const CostEstimateLoadingStateSchema = z.object({
+  supported: z.boolean(),
+  state: z.enum(["idle", "loading", "ready"]).optional(),
+  message: dynamicString.optional(),
+});
+
+const CostEstimateCacheMetadataSchema = z.object({
+  status: z.enum(["miss", "hit", "stale"]),
+  updatedAt: dynamicString.optional(),
+  expiresAt: dynamicString.optional(),
+});
+
+const CostEstimateFallbackMetadataSchema = z.object({
+  used: z.boolean(),
+  reason: z.enum(["live_pricing_unavailable", "unsupported_request"]).optional(),
+  message: dynamicString.optional(),
 });
 
 const CostEstimatePropsSchema = z
   .object({
     id: boundedString,
     component: z.literal("CostEstimate"),
-    items: z.array(CostItemSchema),
-    total: z.number(),
-    currency: dynamicString,
+    resources: z.array(CostEstimateResourceSchema),
+    monthlyEstimate: z.number().optional(),
+    total: z.number().optional(),
+    currency: dynamicString.optional(),
+    title: dynamicString.optional(),
+    projectionMonths: z.number().optional(),
+    showProjectionSlider: z.boolean().optional(),
+    source: z.enum(["live", "estimated"]).optional(),
+    citation: dynamicString.optional(),
+    loading: CostEstimateLoadingStateSchema.optional(),
+    cache: CostEstimateCacheMetadataSchema.optional(),
+    fallback: CostEstimateFallbackMetadataSchema.optional(),
+    pricingRequest: CostEstimatePricingRequestSchema.optional(),
+    estimatedAt: dynamicString.optional(),
   })
   .strip();
 

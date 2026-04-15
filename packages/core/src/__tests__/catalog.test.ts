@@ -122,7 +122,7 @@ describe("custom Kickstart components", () => {
     expect(props).toHaveProperty("edges");
   });
 
-  it("CostEstimate has items, total, and currency", () => {
+  it("CostEstimate has resources, monthlyEstimate, and provenance metadata", () => {
     const catalog = loadCatalog();
     const defs = catalog["$defs"] as Record<string, Record<string, unknown>>;
     const allOf = defs["CostEstimate"]["allOf"] as Array<
@@ -131,9 +131,14 @@ describe("custom Kickstart components", () => {
     const props = (allOf[1] as Record<string, unknown>)[
       "properties"
     ] as Record<string, unknown>;
-    expect(props).toHaveProperty("items");
-    expect(props).toHaveProperty("total");
+    expect(props).toHaveProperty("resources");
+    expect(props).toHaveProperty("monthlyEstimate");
     expect(props).toHaveProperty("currency");
+    expect(props).toHaveProperty("citation");
+    expect(props).toHaveProperty("cache");
+    expect(props).toHaveProperty("fallback");
+    expect(props).toHaveProperty("loading");
+    expect(props).toHaveProperty("pricingRequest");
   });
 
   it("FileEditor has filename, language, and content", () => {
