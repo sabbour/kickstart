@@ -30,7 +30,10 @@ import {
   handleImplicitFlags,
 } from "@kickstart/core";
 import type { PhaseItem, ToolContext, ConversationState } from "@kickstart/core";
-import { getSession, createSession, hydrateSession, addMessage } from "../lib/session-store.js";
+import {
+  getSession, createSession, hydrateSession, addMessage,
+  extractArtifactsFromA2UI, upsertArtifact,
+} from "../lib/session-store.js";
 import type { ClientMessage, GeneratedArtifact } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools, getChatDeploymentName } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
@@ -521,77 +524,5 @@ function extractImplicitFlags(rawJson: string): ParsedImplicitFlags {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Artifact extraction from A2UI messages
-// ---------------------------------------------------------------------------
-
-/** Extract FileEditor metadata from A2UI updateComponents messages. */
-function extractArtifactsFromA2UI(
-  a2uiMessages: Array<{ updateComponents?: { components: unknown[] } }>,
-): GeneratedArtifact[] {
-  const artifacts: GeneratedArtifact[] = [];
-  for (const msg of a2uiMessages) {
-    if (!msg.updateComponents?.components) continue;
-    for (const comp of msg.updateComponents.components) {
-      const c = comp as Record<string, unknown>;
-      if (
-        c.component === "FileEditor" &&
-        typeof c.filename === "string"
-      ) {
-        const filename = c.filename;
-        const language = typeof c.language === "string" ? c.language : "";
-        const content = typeof c.content === "string" ? c.content : "";
-
-        // Extract resource info at upsert time, discard full content
-        const bicepResources: string[] = [];
-        const k8sResources: string[] = [];
-
-        if (filename.endsWith(".bicep")) {
-          const re = /resource\s+(\w+)\s+'(Microsoft\.[^'@]+)@/g;
-          let m;
-          while ((m = re.exec(content)) !== null) {
-            bicepResources.push(`${m[1]} (${m[2]})`);
-          }
-        }
-        if (filename.endsWith(".yaml") || filename.endsWith(".yml")) {
-          const docs = content.split(/^---$/m);
-          for (const doc of docs) {
-            const kindMatch = doc.match(/kind:\s*(\w+)/);
-            const nameMatch = doc.match(/name:\s*["']?([a-z0-9][-a-z0-9]*)["']?/m);
-            if (kindMatch) {
-              k8sResources.push(kindMatch[1] + (nameMatch ? ": " + nameMatch[1] : ""));
-            }
-          }
-        }
-
-        artifacts.push({ filename, language: language || inferLanguage(filename), bicepResources, k8sResources });
-      }
-    }
-  }
-  return artifacts;
-}
-
-/** Infer language from filename extension. */
-function inferLanguage(filename: string): string {
-  const ext = filename.split(".").pop() ?? "";
-  const langMap: Record<string, string> = {
-    ts: "typescript", js: "javascript", py: "python", go: "go",
-    rs: "rust", java: "java", cs: "csharp", bicep: "bicep",
-    yaml: "yaml", yml: "yaml", json: "json", md: "markdown",
-    dockerfile: "dockerfile", sh: "shell",
-  };
-  return langMap[ext.toLowerCase()] ?? ext;
-}
-
-/** Max tracked artifacts to prevent unbounded growth. */
-const MAX_TRACKED_ARTIFACTS = 50;
-
-/** Upsert an artifact into the list — replace if same filename exists. */
-function upsertArtifact(list: GeneratedArtifact[], artifact: GeneratedArtifact): void {
-  const idx = list.findIndex((a) => a.filename === artifact.filename);
-  if (idx >= 0) {
-    list[idx] = artifact;
-  } else if (list.length < MAX_TRACKED_ARTIFACTS) {
-    list.push(artifact);
-  }
-}
+// extractArtifactsFromA2UI, upsertArtifact, inferLanguage, extractArtifactMetadata,
+// and MAX_TRACKED_ARTIFACTS are centralized in session-store.ts and imported above.

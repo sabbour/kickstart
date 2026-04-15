@@ -134,48 +134,22 @@ export function hydrateSession(clientMessages: ClientMessage[]): ApiSession {
 }
 
 /** Max number of artifacts tracked to prevent unbounded growth. */
-const MAX_TRACKED_ARTIFACTS = 50;
+export const MAX_TRACKED_ARTIFACTS = 50;
 
-/**
- * Scan a message (raw JSON or A2UI content) for FileEditor components
- * and upsert any found artifacts into the list.
- */
-function rebuildArtifactsFromMessage(
-  content: string,
-  artifacts: GeneratedArtifact[],
-): void {
-  // Match FileEditor components in assistant messages — these appear in
-  // A2UI updateComponents payloads as JSON objects with component:"FileEditor"
-  const fileEditorPattern = /"component"\s*:\s*"FileEditor"/;
-  if (!fileEditorPattern.test(content)) return;
-
-  try {
-    const parsed = JSON.parse(content) as Record<string, unknown>;
-    const a2ui = parsed.a2ui as Array<Record<string, unknown>> | undefined;
-    if (!Array.isArray(a2ui)) return;
-
-    for (const msg of a2ui) {
-      const update = msg.updateComponents as { components?: unknown[] } | undefined;
-      if (!update?.components) continue;
-      for (const comp of update.components) {
-        const c = comp as Record<string, unknown>;
-        if (c.component === "FileEditor" && typeof c.filename === "string") {
-          const artifact = extractArtifactMetadata(
-            c.filename,
-            typeof c.language === "string" ? c.language : "",
-            typeof c.content === "string" ? c.content : "",
-          );
-          upsertArtifact(artifacts, artifact);
-        }
-      }
-    }
-  } catch {
-    // Content isn't valid JSON — skip silently
-  }
+/** Infer language from filename extension. */
+export function inferLanguage(filename: string): string {
+  const ext = filename.split(".").pop() ?? "";
+  const langMap: Record<string, string> = {
+    ts: "typescript", js: "javascript", py: "python", go: "go",
+    rs: "rust", java: "java", cs: "csharp", bicep: "bicep",
+    yaml: "yaml", yml: "yaml", json: "json", md: "markdown",
+    dockerfile: "dockerfile", sh: "shell",
+  };
+  return langMap[ext.toLowerCase()] ?? ext;
 }
 
 /** Extract metadata from file content at upsert time — never stores the content. */
-function extractArtifactMetadata(
+export function extractArtifactMetadata(
   filename: string,
   language: string,
   content: string,
@@ -202,28 +176,68 @@ function extractArtifactMetadata(
     }
   }
 
-  // Infer language from extension if not provided
-  if (!language) {
-    const ext = filename.split(".").pop() ?? "";
-    const langMap: Record<string, string> = {
-      ts: "typescript", js: "javascript", py: "python", go: "go",
-      rs: "rust", java: "java", cs: "csharp", bicep: "bicep",
-      yaml: "yaml", yml: "yaml", json: "json", md: "markdown",
-      dockerfile: "dockerfile", sh: "shell",
-    };
-    language = langMap[ext.toLowerCase()] ?? ext;
-  }
-
-  return { filename, language, bicepResources, k8sResources };
+  return { filename, language: language || inferLanguage(filename), bicepResources, k8sResources };
 }
 
 /** Upsert an artifact into the list — replace if same filename exists. Caps at MAX_TRACKED_ARTIFACTS. */
-function upsertArtifact(list: GeneratedArtifact[], artifact: GeneratedArtifact): void {
+export function upsertArtifact(list: GeneratedArtifact[], artifact: GeneratedArtifact): void {
   const idx = list.findIndex((a) => a.filename === artifact.filename);
   if (idx >= 0) {
     list[idx] = artifact;
   } else if (list.length < MAX_TRACKED_ARTIFACTS) {
     list.push(artifact);
+  }
+}
+
+/**
+ * Extract FileEditor metadata from A2UI updateComponents messages.
+ * Used both during a live turn (converse.ts) and when rebuilding
+ * artifacts during session hydration.
+ */
+export function extractArtifactsFromA2UI(
+  a2uiMessages: Array<{ updateComponents?: { components: unknown[] } }>,
+): GeneratedArtifact[] {
+  const artifacts: GeneratedArtifact[] = [];
+  for (const msg of a2uiMessages) {
+    if (!msg.updateComponents?.components) continue;
+    for (const comp of msg.updateComponents.components) {
+      const c = comp as Record<string, unknown>;
+      if (c.component === "FileEditor" && typeof c.filename === "string") {
+        const artifact = extractArtifactMetadata(
+          c.filename,
+          typeof c.language === "string" ? c.language : "",
+          typeof c.content === "string" ? c.content : "",
+        );
+        artifacts.push(artifact);
+      }
+    }
+  }
+  return artifacts;
+}
+
+/**
+ * Scan a message (raw JSON or A2UI content) for FileEditor components
+ * and upsert any found artifacts into the list.
+ */
+function rebuildArtifactsFromMessage(
+  content: string,
+  artifacts: GeneratedArtifact[],
+): void {
+  // Match FileEditor components in assistant messages — these appear in
+  // A2UI updateComponents payloads as JSON objects with component:"FileEditor"
+  const fileEditorPattern = /"component"\s*:\s*"FileEditor"/;
+  if (!fileEditorPattern.test(content)) return;
+
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    const a2ui = parsed.a2ui as Array<{ updateComponents?: { components: unknown[] } }> | undefined;
+    if (!Array.isArray(a2ui)) return;
+
+    for (const artifact of extractArtifactsFromA2UI(a2ui)) {
+      upsertArtifact(artifacts, artifact);
+    }
+  } catch {
+    // Content isn't valid JSON — skip silently
   }
 }
 
