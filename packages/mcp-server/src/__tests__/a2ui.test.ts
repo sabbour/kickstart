@@ -8,7 +8,7 @@ import {
   KICKSTART_CATALOG_ID,
 } from "../a2ui.js";
 import type { A2UICapability as _A2UICapability } from "../a2ui.js";
-import type { Component, TextComponent, CardComponent } from "@kickstart/core";
+import type { AppComponent as Component, TextComponent, CardComponent } from "../a2ui.js";
 
 // ── resolveA2UICapability ───────────────────────────────────────────
 

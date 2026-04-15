@@ -19,16 +19,9 @@ import type {
   PhaseStatus,
 } from "@kickstart/core";
 import { createA2UIResource } from "../a2ui.js";
+import type { ConversationPhaseComponent } from "../a2ui.js";
 
 type ActionType = "advance" | "skip" | "select" | "submit" | "reply" | "navigate" | "api";
-
-/** Local structural type for the ConversationPhase A2UI component. */
-interface ConversationPhaseComponent {
-  type: "ConversationPhase";
-  id: string;
-  phases: PhaseItem[];
-  currentPhase: Phase;
-}
 
 /**
  * Handle a user action from the A2UI interface.

@@ -19,10 +19,10 @@ import {
 import type {
   SessionState,
   ConversationState,
-  ConversationPhaseComponent,
   PhaseItem,
 } from "@kickstart/core";
 import { createA2UIResource } from "../a2ui.js";
+import type { ConversationPhaseComponent } from "../a2ui.js";
 import type { A2UICapability } from "../a2ui.js";
 
 /** MCP tool result content item. */

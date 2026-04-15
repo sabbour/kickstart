@@ -6,9 +6,9 @@
 
 import type {
   SessionState,
-  DeploymentProgressComponent,
 } from "@kickstart/core";
 import { createA2UIResource } from "../a2ui.js";
+import type { DeploymentProgressComponent } from "../a2ui.js";
 
 /**
  * Check the deployment status for a session.

@@ -19,14 +19,16 @@ import type {
   GeneratorOutput,
   GeneratedFile,
   DeploymentSafeguard,
-  CodeBlockComponent,
-  ColumnComponent,
-  CardComponent,
-  TextComponent,
-  RowComponent,
 } from "@kickstart/core";
 import { createA2UIResource } from "../a2ui.js";
-import type { A2UICapability } from "../a2ui.js";
+import type {
+  A2UICapability,
+  CardComponent,
+  CodeBlockComponent,
+  ColumnComponent,
+  RowComponent,
+  TextComponent,
+} from "../a2ui.js";
 
 // ── Safeguard validation helpers ────────────────────────────────────
 

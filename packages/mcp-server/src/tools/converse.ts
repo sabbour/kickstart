@@ -14,12 +14,11 @@ import {
 } from "@kickstart/core";
 import type {
   SessionState,
-  ConversationPhaseComponent,
   PhaseItem,
 } from "@kickstart/core";
 import { getEngineState, setEngineState } from "./kickstart.js";
 import { createA2UIResource } from "../a2ui.js";
-import type { A2UICapability } from "../a2ui.js";
+import type { A2UICapability, ConversationPhaseComponent } from "../a2ui.js";
 
 /** MCP tool result content item. */
 type ContentItem =
