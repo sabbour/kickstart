@@ -1,12 +1,7 @@
 import type { Cookie, HttpRequest } from "@azure/functions";
 import type { GitHubRepo } from "@kickstart/core";
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHash,
-  randomBytes,
-  timingSafeEqual,
-} from "node:crypto";
+import { randomBytes } from "node:crypto";
+import { getSwaPrincipalId, safeEqual, seal, unseal } from "./auth-state.js";
 
 const FLOW_COOKIE_NAME = "kickstart-github-flow";
 const SESSION_COOKIE_NAME = "kickstart-github-session";
@@ -186,8 +181,7 @@ export function isGitHubConfigured(): boolean {
 }
 
 export function getGitHubPrincipalId(request: HttpRequest): string | null {
-  const principalId = request.headers.get("x-ms-client-principal-id")?.trim();
-  return principalId || null;
+  return getSwaPrincipalId(request);
 }
 
 function getCookieValue(request: HttpRequest, name: string): string | null {
@@ -202,58 +196,6 @@ function getCookieValue(request: HttpRequest, name: string): string | null {
   }
 
   return null;
-}
-
-function deriveKey(secret: string, purpose: string): Buffer {
-  return createHash("sha256")
-    .update(secret)
-    .update(":")
-    .update(purpose)
-    .digest();
-}
-
-function seal<T>(payload: T, secret: string, purpose: string): string {
-  const iv = randomBytes(12);
-  const key = deriveKey(secret, purpose);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  cipher.setAAD(Buffer.from(purpose));
-
-  const plaintext = Buffer.from(JSON.stringify(payload), "utf8");
-  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  const tag = cipher.getAuthTag();
-
-  return [
-    iv.toString("base64url"),
-    tag.toString("base64url"),
-    ciphertext.toString("base64url"),
-  ].join(".");
-}
-
-function unseal<T>(value: string, secret: string, purpose: string): T | null {
-  const [ivPart, tagPart, dataPart] = value.split(".");
-  if (!ivPart || !tagPart || !dataPart) {
-    return null;
-  }
-
-  try {
-    const key = deriveKey(secret, purpose);
-    const decipher = createDecipheriv(
-      "aes-256-gcm",
-      key,
-      Buffer.from(ivPart, "base64url"),
-    );
-    decipher.setAAD(Buffer.from(purpose));
-    decipher.setAuthTag(Buffer.from(tagPart, "base64url"));
-
-    const plaintext = Buffer.concat([
-      decipher.update(Buffer.from(dataPart, "base64url")),
-      decipher.final(),
-    ]).toString("utf8");
-
-    return JSON.parse(plaintext) as T;
-  } catch {
-    return null;
-  }
 }
 
 function buildCookie(
@@ -309,13 +251,6 @@ function readSessionCookie(request: HttpRequest, principalId: string): GitHubSes
   }
 
   return session;
-}
-
-function safeEqual(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 function sanitizeReturnTo(value: string | null): string {

@@ -1,7 +1,6 @@
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import {
-  decodeRunId,
   getAzureDeploymentStatus,
   startAzureDeployment,
 } from "../lib/azure-deployments.js";
@@ -122,11 +121,6 @@ app.http("azure-deployments-status", {
 
       const accessToken = requireBearerToken(request);
       const runId = request.params["runId"] ?? "";
-      const decoded = decodeRunId(runId);
-      if (decoded.pid !== principalId) {
-        throw new AzureApiError(403, "forbidden_run", "This deployment run belongs to a different user.");
-      }
-
       const result = await getAzureDeploymentStatus(accessToken, principalId, runId);
       return {
         status: 200,

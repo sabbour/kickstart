@@ -1,8 +1,5 @@
 import {
-  createCipheriv,
-  createDecipheriv,
   createHash,
-  randomBytes,
   randomUUID,
 } from "node:crypto";
 import type { AzureContext } from "@kickstart/core";
@@ -24,6 +21,7 @@ import type {
   DeployErrorState,
   DeployState,
 } from "./session-store.js";
+import { safeEqual, seal, unseal } from "./auth-state.js";
 import { appendAuditEvent, getSession, isSessionOwnedBy } from "./session-store.js";
 
 const RESOURCE_GROUP_RE = /^[-\w.()]{1,90}$/;
@@ -198,14 +196,6 @@ function getRunTokenSecret(): string {
   return secret;
 }
 
-function deriveKey(secret: string, purpose: string): Buffer {
-  return createHash("sha256")
-    .update(secret)
-    .update(":")
-    .update(purpose)
-    .digest();
-}
-
 function computeDeploymentKey(
   subscriptionId: string,
   resourceGroup: string,
@@ -220,56 +210,15 @@ function computeDeploymentKey(
     .digest("base64url");
 }
 
-function sealRunPayload(payload: DeploymentRunPayload): string {
-  const iv = randomBytes(12);
-  const key = deriveKey(getRunTokenSecret(), RUN_ID_PURPOSE);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  cipher.setAAD(Buffer.from(RUN_ID_PURPOSE));
-
-  const plaintext = Buffer.from(JSON.stringify(payload), "utf8");
-  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  const tag = cipher.getAuthTag();
-
-  return [
-    iv.toString("base64url"),
-    tag.toString("base64url"),
-    ciphertext.toString("base64url"),
-  ].join(".");
+function createRunId(payload: DeploymentRunPayload): string {
+  return seal(payload, getRunTokenSecret(), RUN_ID_PURPOSE);
 }
 
-function unsealRunPayload(runId: string): DeploymentRunPayload {
-  const [ivPart, tagPart, dataPart] = runId.split(".");
-  if (!ivPart || !tagPart || !dataPart) {
-    throw new AzureApiError(400, "invalid_run_id", "Deployment run ID is malformed.");
-  }
-
-  try {
-    const key = deriveKey(getRunTokenSecret(), RUN_ID_PURPOSE);
-    const decipher = createDecipheriv(
-      "aes-256-gcm",
-      key,
-      Buffer.from(ivPart, "base64url"),
-    );
-    decipher.setAAD(Buffer.from(RUN_ID_PURPOSE));
-    decipher.setAuthTag(Buffer.from(tagPart, "base64url"));
-
-    const plaintext = Buffer.concat([
-      decipher.update(Buffer.from(dataPart, "base64url")),
-      decipher.final(),
-    ]).toString("utf8");
-
-    return JSON.parse(plaintext) as DeploymentRunPayload;
-  } catch {
+export function decodeRunId(runId: string, principalId?: string): DeploymentRunPayload {
+  const payload = unseal<DeploymentRunPayload>(runId, getRunTokenSecret(), RUN_ID_PURPOSE);
+  if (!payload) {
     throw new AzureApiError(400, "invalid_run_id", "Deployment run ID could not be verified.");
   }
-}
-
-function createRunId(payload: DeploymentRunPayload): string {
-  return sealRunPayload(payload);
-}
-
-export function decodeRunId(runId: string): DeploymentRunPayload {
-  const payload = unsealRunPayload(runId);
 
   if (
     payload.v !== 1
@@ -292,12 +241,16 @@ export function decodeRunId(runId: string): DeploymentRunPayload {
     payload.resourceGroup,
     payload.deploymentName,
   );
-  if (payload.dk !== expectedDeploymentKey) {
+  if (!safeEqual(payload.dk, expectedDeploymentKey)) {
     throw new AzureApiError(
       400,
       "invalid_run_id",
       "Deployment run ID payload did not pass verification.",
     );
+  }
+
+  if (principalId && !safeEqual(payload.pid, principalId)) {
+    throw new AzureApiError(403, "forbidden_run", "This deployment run belongs to a different user.");
   }
 
   return payload;
@@ -632,7 +585,7 @@ export async function startAzureDeployment(
     );
   }
 
-  if (!session.ownerPrincipalId || session.ownerPrincipalId !== principalId) {
+  if (!isSessionOwnedBy(session, principalId)) {
     throw new AzureApiError(403, "forbidden_session", "This session belongs to a different user.");
   }
 
@@ -697,10 +650,7 @@ export async function getAzureDeploymentStatus(
   principalId: string,
   runId: string,
 ): Promise<DeploymentStatusResponse> {
-  const run = decodeRunId(runId);
-  if (run.pid !== principalId) {
-    throw new AzureApiError(403, "forbidden_run", "This deployment run belongs to a different user.");
-  }
+  const run = decodeRunId(runId, principalId);
 
   const deployment = await getResourceGroupDeployment(
     accessToken,
