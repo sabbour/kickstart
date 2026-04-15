@@ -6,6 +6,7 @@ import {
   PricingConnector,
 } from '@kickstart/core';
 import type { APIConnector } from '@kickstart/core';
+import { ensureAzureConnectorConfigured } from '../services/azure-auth';
 
 interface APIConnectorContextValue {
   registry: APIConnectorRegistry;
@@ -52,10 +53,21 @@ export function APIConnectorProvider({
   }, [externalRegistry]);
 
   // Pre-authenticate connectors that need it on mount.
-  // Failures are swallowed here — each connector logs its own warning.
+  // Azure auth wiring is established here so the ship-path components use the
+  // same connector instance, but we avoid interactive Azure auth at startup.
   useEffect(() => {
+    const azureConnector = registry.get('azure-arm') as AzureARMConnector | undefined;
+    if (azureConnector) {
+      ensureAzureConnectorConfigured(azureConnector).catch(() => {
+        // Intentionally silent — Azure surfaces show an explicit auth error when used.
+      });
+    }
+
     for (const name of registry.names()) {
       const connector = registry.get(name);
+      if (name === 'azure-arm') {
+        continue;
+      }
       if (connector && !connector.isAuthenticated()) {
         connector.authenticate().catch(() => {
           // Intentionally silent — stub connectors warn inside authenticate()

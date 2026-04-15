@@ -232,7 +232,7 @@ export async function ensureAzureConnectorConfigured(
 
   if (connector && config.configured) {
     connector.setTokenProvider(async (scopes) => {
-      const result = await acquireAzureToken(scopes, true);
+      const result = await acquireAzureToken(scopes, false);
       return toTokenInfo(result);
     });
   }
@@ -297,6 +297,7 @@ export async function signInToAzure(
   }
 
   try {
+    await acquireAzureToken(config.scopes, true);
     await connector.authenticate();
     const subscriptions = await connector.listSubscriptions();
     const client = await getMsalClient();
