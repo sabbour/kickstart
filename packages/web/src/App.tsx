@@ -18,6 +18,7 @@ import { useStreaming } from './hooks/useStreaming';
 import { useMockStreaming } from './hooks/useMockStreaming';
 import { useAPIConnectorRegistry } from './contexts/APIConnectorContext';
 import { useArtifacts } from './contexts/ArtifactContext';
+import { ConversationSessionProvider } from './contexts/ConversationSessionContext';
 import { useTheme } from './contexts/ThemeContext';
 import { useDebug } from './contexts/DebugContext';
 import { useVirtualFS } from './contexts/VirtualFSContext';
@@ -30,7 +31,7 @@ import {
   prepareChatA2ui,
   rebuildChatSessionState,
 } from './utils/chat-a2ui';
-import type { AppMode, ChatMessage, A2uiPayloadItem } from './types';
+import type { AppMode, ChatMessage, A2uiPayloadItem, ConversationPhaseId } from './types';
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
 const mockEnabled = isMockMode();
@@ -111,8 +112,8 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // Current conversation phase from SSE events
-  const [currentPhase, setCurrentPhase] = useState<string | null>(null);
-  const currentPhaseRef = useRef<string | null>(null);
+  const [currentPhase, setCurrentPhase] = useState<ConversationPhaseId | null>(null);
+  const currentPhaseRef = useRef<ConversationPhaseId | null>(null);
 
   // Surface IDs revealed progressively via the queue
   const streamingSurfaceIdsRef = useRef<string[]>([]);
@@ -443,6 +444,32 @@ export function App() {
   const currentStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot);
   const hasFiles = fsFiles.length > 0 || vfsFiles.length > 0;
+  const activeSession = sessions.getActiveSession();
+  const getDeploymentFiles = useCallback(async () => {
+    const liveFiles = fs.list();
+    if (liveFiles.length > 0) {
+      return liveFiles.map((file) => ({
+        path: file.path,
+        content: file.content,
+        language: file.language,
+      }));
+    }
+
+    const persistedFiles = await vfs.readAll();
+    return persistedFiles.map((file) => ({
+      path: file.path,
+      content: file.content,
+      language: file.language,
+    }));
+  }, [fs, vfs]);
+
+  const sessionContextValue = useMemo(() => ({
+    localSessionId: sessions.activeSessionId,
+    backendSessionId: activeSession?.backendSessionId ?? null,
+    currentPhase,
+    activeSession,
+    getDeploymentFiles,
+  }), [activeSession, currentPhase, getDeploymentFiles, sessions.activeSessionId]);
 
   // Auto-show file panel and sidebar when files appear
   const hadFilesRef = useRef(false);
@@ -508,93 +535,97 @@ export function App() {
   if (playgroundEnabled) {
     return (
       <FluentProvider theme={fluentTheme}>
-        <Layout
-          sidebarOpen={false}
-          onToggleSidebar={() => {}}
-          onNewSession={() => {}}
-          showSessionsToggle={false}
-          hasFiles={false}
-        >
-          <Playground />
-        </Layout>
+        <ConversationSessionProvider value={sessionContextValue}>
+          <Layout
+            sidebarOpen={false}
+            onToggleSidebar={() => {}}
+            onNewSession={() => {}}
+            showSessionsToggle={false}
+            hasFiles={false}
+          >
+            <Playground />
+          </Layout>
+        </ConversationSessionProvider>
       </FluentProvider>
     );
   }
 
   return (
     <FluentProvider theme={fluentTheme}>
-      <Layout
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen(prev => !prev)}
-        onNewSession={handleNewSession}
-        showSessionsToggle={mode === 'chat'}
-        hasFiles={hasFiles && filePanelOpen}
-        showFilePanel={mode === 'chat' && filePanelOpen}
-        showFileSidebar={mode === 'chat' && fileSidebarOpen && hasFiles}
-        showFileViewer={mode === 'chat' && !!viewerFile}
-        onToggleFilePanel={mode === 'chat' && hasFiles ? handleToggleFilePanel : undefined}
-        sidebar={mode === 'chat' ? (
-          <SessionsSidebar
-            isOpen={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-            sessions={sessions.sessions}
-            activeSessionId={sessions.activeSessionId}
-            onSelectSession={handleResumeSession}
-            onNewSession={handleNewSession}
-            onDeleteSession={sessions.deleteSession}
-          />
-        ) : undefined}
-        fileEditor={mode === 'chat' ? (
-          <>
-            <FileEditor
-              fs={fs}
-              selectedPath={selectedFile}
-              onSelectFile={openGeneratedFile}
+      <ConversationSessionProvider value={sessionContextValue}>
+        <Layout
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+          onNewSession={handleNewSession}
+          showSessionsToggle={mode === 'chat'}
+          hasFiles={hasFiles && filePanelOpen}
+          showFilePanel={mode === 'chat' && filePanelOpen}
+          showFileSidebar={mode === 'chat' && fileSidebarOpen && hasFiles}
+          showFileViewer={mode === 'chat' && !!viewerFile}
+          onToggleFilePanel={mode === 'chat' && hasFiles ? handleToggleFilePanel : undefined}
+          sidebar={mode === 'chat' ? (
+            <SessionsSidebar
+              isOpen={sidebarOpen}
+              onClose={() => setSidebarOpen(false)}
+              sessions={sessions.sessions}
+              activeSessionId={sessions.activeSessionId}
+              onSelectSession={handleResumeSession}
+              onNewSession={handleNewSession}
+              onDeleteSession={sessions.deleteSession}
             />
-            <FileTreePanel />
-          </>
-        ) : undefined}
-        fileManagerSidebar={mode === 'chat' ? (
-          <FileManagerSidebar
-            streamingFiles={fsFiles}
-            persistedFiles={vfsFileRecords}
-            selectedPath={viewerFile}
-            onSelectFile={handleSelectViewerFile}
-            onDownloadZip={handleDownloadZip}
-            onDismiss={handleDismissSidebar}
-          />
-        ) : undefined}
-        fileViewer={mode === 'chat' ? (
-          <FileViewer
-            filePath={viewerFile}
-            streamingFiles={fsFiles}
-            vfs={vfs}
-            onDeleteFile={handleDeleteViewerFile}
-            onDismiss={handleDismissViewer}
-          />
-        ) : undefined}
-      >
-        {mode === 'landing' ? (
-          <Landing
-            onStartChat={handleStartChat}
-            recentSessions={sessions.recentSessions}
-            onResumeSession={handleResumeSession}
-            onDeleteSession={sessions.deleteSession}
-            onClearAllSessions={handleClearAllSessions}
-          />
-        ) : (
-          <ChatShell
-            messages={messages}
-            isStreaming={isStreaming}
-            streamingText={currentStreamText}
-            streamingSurfaceIds={progressiveQueue.visibleIds}
-            currentPhase={currentPhase}
-            onSend={handleSendMessage}
-            getSurface={a2ui.getSurface}
-            debugEnabled={debugEnabled}
-          />
-        )}
-      </Layout>
+          ) : undefined}
+          fileEditor={mode === 'chat' ? (
+            <>
+              <FileEditor
+                fs={fs}
+                selectedPath={selectedFile}
+                onSelectFile={openGeneratedFile}
+              />
+              <FileTreePanel />
+            </>
+          ) : undefined}
+          fileManagerSidebar={mode === 'chat' ? (
+            <FileManagerSidebar
+              streamingFiles={fsFiles}
+              persistedFiles={vfsFileRecords}
+              selectedPath={viewerFile}
+              onSelectFile={handleSelectViewerFile}
+              onDownloadZip={handleDownloadZip}
+              onDismiss={handleDismissSidebar}
+            />
+          ) : undefined}
+          fileViewer={mode === 'chat' ? (
+            <FileViewer
+              filePath={viewerFile}
+              streamingFiles={fsFiles}
+              vfs={vfs}
+              onDeleteFile={handleDeleteViewerFile}
+              onDismiss={handleDismissViewer}
+            />
+          ) : undefined}
+        >
+          {mode === 'landing' ? (
+            <Landing
+              onStartChat={handleStartChat}
+              recentSessions={sessions.recentSessions}
+              onResumeSession={handleResumeSession}
+              onDeleteSession={sessions.deleteSession}
+              onClearAllSessions={handleClearAllSessions}
+            />
+          ) : (
+            <ChatShell
+              messages={messages}
+              isStreaming={isStreaming}
+              streamingText={currentStreamText}
+              streamingSurfaceIds={progressiveQueue.visibleIds}
+              currentPhase={currentPhase}
+              onSend={handleSendMessage}
+              getSurface={a2ui.getSurface}
+              debugEnabled={debugEnabled}
+            />
+          )}
+        </Layout>
+      </ConversationSessionProvider>
     </FluentProvider>
   );
 }

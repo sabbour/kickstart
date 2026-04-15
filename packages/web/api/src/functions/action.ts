@@ -24,7 +24,14 @@ import {
 } from "@kickstart/core";
 import type { Phase, PhaseItem } from "@kickstart/core";
 import type { A2UIMessage } from "@kickstart/core";
-import { getSession, hydrateSession, addMessage } from "../lib/session-store.js";
+import {
+  getSession,
+  getPrincipalId,
+  hydrateSession,
+  addMessage,
+  adoptSessionPrincipal,
+  isSessionOwnedBy,
+} from "../lib/session-store.js";
 import type { ClientMessage } from "../lib/session-store.js";
 import { chatCompletion, getChatDeploymentName } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
@@ -235,10 +242,17 @@ app.http("action", {
       }
 
       // --- Resolve session (hydrate from client history on cold start) ---
+      const principalId = getPrincipalId(request);
       let session = getSession(body.sessionId);
+      if (session && !isSessionOwnedBy(session, principalId)) {
+        return {
+          status: 403,
+          jsonBody: { error: "Session belongs to a different signed-in user." },
+        };
+      }
       if (!session) {
         if (body.messages?.length) {
-          session = hydrateSession(body.messages);
+          session = hydrateSession(body.messages, principalId);
         } else {
           return {
             status: 404,
@@ -246,6 +260,7 @@ app.http("action", {
           };
         }
       }
+      adoptSessionPrincipal(session, principalId);
 
       const { engineState } = session;
       const sessionId = session.state.sessionId;

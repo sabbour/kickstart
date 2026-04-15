@@ -128,6 +128,7 @@ resource kvSecretsUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
 
 var baseAppSettings = {
   AZURE_CLIENT_ID: entraClientId
+  AZURE_TENANT_ID: subscription().tenantId
   AZURE_OPENAI_ENDPOINT: openAiEndpoint
   AZURE_OPENAI_CHAT_DEPLOYMENT: openAiChatDeployment
   AZURE_OPENAI_CODEX_DEPLOYMENT: openAiCodexDeployment

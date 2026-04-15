@@ -12,7 +12,8 @@
     "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
   },
   "dependencies": {
-    "@azure/functions": "^4.6.0"
+    "@azure/functions": "^4.6.0",
+    "bicep-node": "^0.0.9"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"

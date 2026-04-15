@@ -10,6 +10,8 @@
 
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { requireAzureAccessToken } from "../lib/azure-auth.js";
+import { AzureApiError, azureErrorResponse } from "../lib/azure-errors.js";
 import { isAllowedHost, blockedHostResponse } from "../lib/proxy-allowlist.js";
 
 const ARM_BASE = "https://management.azure.com";
@@ -53,50 +55,50 @@ app.http("arm-proxy", {
       upstreamUrl.searchParams.set("api-version", DEFAULT_API_VERSION);
     }
 
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader) {
-      return { status: 401, jsonBody: { error: "Authorization header required" } };
-    }
-
-    const upstreamHeaders: Record<string, string> = {
-      Authorization: authHeader,
-      "Content-Type": request.headers.get("content-type") ?? "application/json",
-      Accept: request.headers.get("accept") ?? "application/json",
-    };
-
-    let body: BodyInit | undefined;
-    if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
-      body = await request.arrayBuffer();
-    }
-
-    context.log(`[arm-proxy] ${request.method} ${upstreamUrl.toString()}`);
-
-    let upstream: Response;
     try {
-      upstream = await fetch(upstreamUrl.toString(), {
-        method: request.method,
-        headers: upstreamHeaders,
-        body,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      context.error(`[arm-proxy] fetch error: ${message}`);
-      return { status: 502, jsonBody: { error: `Upstream unreachable: ${message}` } };
-    }
+      const accessToken = requireAzureAccessToken(request);
 
-    const responseHeaders: Record<string, string> = {
-      "Content-Type": upstream.headers.get("content-type") ?? "application/json",
-    };
-    for (const header of RATE_LIMIT_HEADERS) {
-      const value = upstream.headers.get(header);
-      if (value) responseHeaders[header] = value;
-    }
+      const upstreamHeaders: Record<string, string> = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": request.headers.get("content-type") ?? "application/json",
+        Accept: request.headers.get("accept") ?? "application/json",
+      };
 
-    const responseBody = await upstream.arrayBuffer();
-    return {
-      status: upstream.status,
-      headers: responseHeaders,
-      body: responseBody,
-    };
+      let body: BodyInit | undefined;
+      if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+        body = await request.arrayBuffer();
+      }
+
+      context.log(`[arm-proxy] ${request.method} ${upstreamUrl.toString()}`);
+
+      let upstream: Response;
+      try {
+        upstream = await fetch(upstreamUrl.toString(), {
+          method: request.method,
+          headers: upstreamHeaders,
+          body,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new AzureApiError(502, "arm_upstream_unreachable", `Upstream unreachable: ${message}`);
+      }
+
+      const responseHeaders: Record<string, string> = {
+        "Content-Type": upstream.headers.get("content-type") ?? "application/json",
+      };
+      for (const header of RATE_LIMIT_HEADERS) {
+        const value = upstream.headers.get(header);
+        if (value) responseHeaders[header] = value;
+      }
+
+      const responseBody = await upstream.arrayBuffer();
+      return {
+        status: upstream.status,
+        headers: responseHeaders,
+        body: responseBody,
+      };
+    } catch (error) {
+      return azureErrorResponse(error, context, "[arm-proxy]");
+    }
   },
 });

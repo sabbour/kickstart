@@ -45,7 +45,12 @@ export function APIConnectorProvider({
     if (externalRegistry) return externalRegistry;
 
     const r = new APIConnectorRegistry();
-    r.register(new AzureARMConnector());
+    r.register(new AzureARMConnector({
+      auth: { kind: 'none' },
+      corsProxy: {
+        proxyBaseUrl: '/api/arm-proxy',
+      },
+    }));
     r.register(new GitHubConnector());
     r.register(new PricingConnector());
     return r;
