@@ -112,12 +112,22 @@ export interface CostEstimateNotice {
   message?: string;
 }
 
+function isDefined<T>(value: T | null | undefined): value is T {
+  return value != null;
+}
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
 function readText(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
 }
 
 function roundCurrency(amount: number): number {
@@ -254,23 +264,28 @@ export function normalizeCostEstimateSource(value: unknown): CostEstimateSource 
   return undefined;
 }
 
+function normalizeLegacyCostEstimateItem(
+  item: LegacyCostEstimateItem,
+): CostEstimateResource | null {
+  const name = readText(item.name);
+  if (!name || !isFiniteNumber(item.monthlyCost)) return null;
+
+  return {
+    name,
+    sku: readText(item.sku),
+    monthlyEstimate: roundCurrency(item.monthlyCost),
+  };
+}
+
 export function normalizeCostEstimateInput(input: CostEstimateInput): CostEstimateData {
   const resources = Array.isArray(input.resources)
     ? input.resources
       .map(normalizeResource)
-      .filter((resource): resource is CostEstimateResource => Boolean(resource))
+      .filter(isDefined)
     : Array.isArray(input.items)
       ? input.items
-        .map((item) => {
-          const name = readText(item.name);
-          if (!name || !isFiniteNumber(item.monthlyCost)) return null;
-          return {
-            name,
-            sku: readText(item.sku),
-            monthlyEstimate: roundCurrency(item.monthlyCost),
-          } satisfies CostEstimateResource;
-        })
-        .filter((resource): resource is CostEstimateResource => Boolean(resource))
+        .map(normalizeLegacyCostEstimateItem)
+        .filter(isDefined)
       : [];
 
   const citation = readText(input.citation);
@@ -437,6 +452,47 @@ export function shouldFetchLivePricing(
       && Array.isArray(pricingRequest.lineItems)
       && pricingRequest.lineItems.length > 0,
   );
+}
+
+function normalizePricingRequestLineItem(
+  value: unknown,
+): CostEstimatePricingRequestLineItem | null {
+  const record = asRecord(value);
+  const id = readText(record?.id);
+  const kind = readText(record?.kind);
+
+  if (!id || !kind) {
+    return null;
+  }
+
+  return {
+    id,
+    kind,
+    name: readText(record?.name),
+    sku: readText(record?.sku),
+    quantity: isFiniteNumber(record?.quantity) && record.quantity > 0
+      ? record.quantity
+      : undefined,
+  };
+}
+
+export function normalizeCostEstimatePricingRequest(
+  value: unknown,
+): CostEstimatePricingRequest | undefined {
+  const record = asRecord(value);
+  const region = readText(record?.region);
+  const lineItems = Array.isArray(record?.lineItems)
+    ? record.lineItems.map(normalizePricingRequestLineItem).filter(isDefined)
+    : [];
+
+  if (!region || lineItems.length === 0) {
+    return undefined;
+  }
+
+  return {
+    region,
+    lineItems,
+  };
 }
 
 export function getCostEstimateRequestKey(

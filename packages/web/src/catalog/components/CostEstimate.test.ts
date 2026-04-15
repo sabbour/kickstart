@@ -25,12 +25,12 @@ function renderCostEstimate(
           getDeploymentFiles: async () => [],
           ...sessionOverrides,
         },
+        children: React.createElement(CostEstimateView, {
+          props: props as React.ComponentProps<typeof CostEstimateView>['props'],
+          context: componentContext,
+          buildChild: () => null,
+        }),
       },
-      React.createElement(CostEstimateView, {
-        props: props as React.ComponentProps<typeof CostEstimateView>['props'],
-        context: componentContext,
-        buildChild: () => null,
-      }),
     ),
   );
 }

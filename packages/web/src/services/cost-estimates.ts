@@ -69,6 +69,7 @@ export function normalizeCostEstimateResponse(body: unknown): CostEstimateData {
   const loading = asRecord(readOwn(root, 'loading'));
   const resources = readOwn(root, 'resources');
   const items = readOwn(root, 'items');
+  const cacheStatus = cache ? readCacheStatus(cache.status) : undefined;
 
   return normalizeCostEstimateInput({
     resources: Array.isArray(resources) ? resources as CostEstimateInput['resources'] : undefined,
@@ -88,11 +89,11 @@ export function normalizeCostEstimateResponse(body: unknown): CostEstimateData {
           message: readString(loading.message),
         }
       : undefined,
-    cache: cache
+    cache: cacheStatus
       ? {
-          status: readCacheStatus(cache.status),
-          updatedAt: readString(cache.updatedAt),
-          expiresAt: readString(cache.expiresAt),
+          status: cacheStatus,
+          updatedAt: readString(cache?.updatedAt),
+          expiresAt: readString(cache?.expiresAt),
         }
       : undefined,
     fallback: fallback && typeof fallback.used === 'boolean'

@@ -29,6 +29,7 @@ import {
   buildCostEstimateNotice,
   getCostEstimateRequestKey,
   normalizeCostEstimateInput,
+  normalizeCostEstimatePricingRequest,
   resolveCostEstimateDisplay,
   shouldFetchLivePricing,
   type CostEstimateData,
@@ -303,7 +304,10 @@ export function CostEstimateView({
 }: ReactA2uiComponentProps<CostEstimateProps>) {
   const classes = useStyles();
   const { backendSessionId, currentPhase } = useConversationSession();
-  const pricingRequest = props.pricingRequest;
+  const pricingRequest = useMemo(
+    () => normalizeCostEstimatePricingRequest(props.pricingRequest),
+    [props.pricingRequest],
+  );
   const initialEstimate = useMemo(
     () => normalizeCostEstimateInput(props as CostEstimateInput),
     [props],
