@@ -301,7 +301,7 @@ describe("converse usage tracking", () => {
     expect(firstResponse.status).toBe(200);
     expect(firstResponse.jsonBody.usage).toMatchObject({
       turn: {
-        model: "test-chat-model",
+        model: "gpt-5.4-mini",
         inputTokens: 120,
         outputTokens: 45,
         totalTokens: 165,
@@ -375,7 +375,7 @@ describe("converse usage tracking", () => {
 
     expect(donePayload.usage).toMatchObject({
       turn: {
-        model: "test-chat-model",
+        model: "gpt-5.4-mini",
         inputTokens: 95,
         outputTokens: 35,
         totalTokens: 130,
