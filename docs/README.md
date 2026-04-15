@@ -11,6 +11,7 @@ Welcome to the Kickstart docs — the AI-guided onboarding experience for deploy
 | [A2UI Catalog](./a2ui-catalog.md) | Kickstart custom components, fat A2UI components, vendor basics, adding new components |
 | [MCP Server](./mcp-server.md) | IDE integration for VS Code Copilot and Claude Code |
 | [Prompt Architecture](./prompt-architecture.md) | 3-layer system prompt, skill resolver, phase-specific augmentations |
+| [Extending Kickstart](./extending.md) | How to add phases, LLM tools, integration kits, API endpoints, and MCP tools |
 | [Deployment Guide](./deployment.md) | Azure resource setup, Bicep templates, CI/CD workflows |
 | [Development](./development.md) | Local development, testing, debugging |
 | [Contributing](../CONTRIBUTING.md) | Dev setup, project structure, code style |

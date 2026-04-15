@@ -113,6 +113,16 @@ docs-site/        Docusaurus documentation site
 - **[Contributing](./CONTRIBUTING.md)** — Dev setup, code style
 - **[Development Guide](./DEVELOPMENT.md)** — Credentials, scripts, testing
 
+## Extending Kickstart
+
+Want to build on the platform? The [Extension Guide](./docs/extending.md) covers five extension points:
+
+- **[Conversation Phases](./docs/extending.md#a-adding-a-new-conversation-phase)** — Add new phases to the guided flow (e.g., Monitor, Test)
+- **[LLM Tools](./docs/extending.md#b-adding-a-new-llm-tool)** — Expose new functions to the LLM via OpenAI function calling
+- **[Integration Kits](./docs/extending.md#c-adding-a-new-integration-kit)** — Bundle tools, connectors, prompts, and auth into a composable unit
+- **[API Endpoints](./docs/extending.md#d-adding-a-new-api-endpoint)** — Add Azure Functions endpoints with SSE streaming
+- **[MCP Tools](./docs/extending.md#e-adding-mcp-tools)** — Extend the IDE integration for VS Code Copilot and Claude Code
+
 ## License
 
 This project is licensed under the [MIT License](./LICENSE).
