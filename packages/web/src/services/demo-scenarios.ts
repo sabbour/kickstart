@@ -730,5 +730,5 @@ export function populateDemoFiles(fs: VirtualFileSystem): void {
 
 /** Check whether the current demo turn is the file-generation phase. */
 export function isDemoFileGenerationPhase(): boolean {
-  return turnCount >= 4; // FILE_GENERATION is the 3rd scenario (turn 4+)
+  return getTurnCount() >= 4; // FILE_GENERATION is the 3rd scenario (turn 4+)
 }
