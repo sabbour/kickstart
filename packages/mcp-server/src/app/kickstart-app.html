@@ -442,6 +442,36 @@ html, body {
   const inputEl = document.getElementById("input");
   const sendBtn = document.getElementById("send-btn");
   const phaseBarEl = document.getElementById("phase-bar");
+  var trustedParentOrigin = resolveTrustedParentOrigin();
+
+  function tryResolveOrigin(value) {
+    if (!value || typeof value !== "string") return "";
+    try {
+      var origin = new URL(value, window.location.href).origin;
+      return origin && origin !== "null" ? origin : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function resolveTrustedParentOrigin() {
+    if (!window.parent || window.parent === window) return "";
+
+    var params = new URLSearchParams(window.location.search);
+    var queryOrigin = tryResolveOrigin(params.get("parentOrigin"));
+    if (queryOrigin) return queryOrigin;
+
+    var ancestors = window.location.ancestorOrigins;
+    if (ancestors && ancestors.length > 0) {
+      var ancestorOrigin = tryResolveOrigin(ancestors[0]);
+      if (ancestorOrigin) return ancestorOrigin;
+    }
+
+    var referrerOrigin = tryResolveOrigin(document.referrer);
+    if (referrerOrigin) return referrerOrigin;
+
+    return tryResolveOrigin(window.location.href);
+  }
 
   // ── PostMessage protocol ───────────────────────────────────────────
 
@@ -450,8 +480,8 @@ html, body {
    * MCP App iframe spec: messages go to window.parent.
    */
   function sendToServer(msg) {
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage(msg, "*");
+    if (window.parent && window.parent !== window && trustedParentOrigin) {
+      window.parent.postMessage(msg, trustedParentOrigin);
     }
   }
 
@@ -459,6 +489,10 @@ html, body {
    * Handle incoming messages from the MCP server.
    */
   window.addEventListener("message", function (event) {
+    if (!window.parent || window.parent === window) return;
+    if (event.source !== window.parent) return;
+    if (!trustedParentOrigin || event.origin !== trustedParentOrigin) return;
+
     const data = event.data;
     if (!data || typeof data !== "object" || !data.type) return;
 
@@ -529,7 +563,11 @@ html, body {
       const indicator = document.createElement("div");
       indicator.className = "typing-indicator";
       indicator.setAttribute("aria-label", "Kickstart is thinking");
-      indicator.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+      for (var i = 0; i < 3; i++) {
+        var dot = document.createElement("span");
+        dot.className = "typing-dot";
+        indicator.appendChild(dot);
+      }
       messagesEl.appendChild(indicator);
       scrollToBottom();
     } else if (!val && existing) {
@@ -589,18 +627,27 @@ html, body {
   var currentPhaseIndex = 0;
 
   function renderPhaseBar() {
-    var html = "";
+    clearChildren(phaseBarEl);
     for (var i = 0; i < PHASES.length; i++) {
       var status = i < currentPhaseIndex ? "completed" : i === currentPhaseIndex ? "active" : "";
-      var connector = i < PHASES.length - 1
-        ? '<span class="phase-connector ' + (i < currentPhaseIndex ? "completed" : "") + '"></span>'
-        : "";
-      html += '<span class="phase-step">' +
-        '<span class="phase-dot ' + status + '"></span>' +
-        '<span>' + PHASES[i].label + '</span>' +
-        '</span>' + connector;
+      var step = document.createElement("span");
+      step.className = "phase-step";
+
+      var dot = document.createElement("span");
+      dot.className = "phase-dot" + (status ? " " + status : "");
+      step.appendChild(dot);
+
+      var label = document.createElement("span");
+      label.textContent = PHASES[i].label;
+      step.appendChild(label);
+      phaseBarEl.appendChild(step);
+
+      if (i < PHASES.length - 1) {
+        var connector = document.createElement("span");
+        connector.className = "phase-connector" + (i < currentPhaseIndex ? " completed" : "");
+        phaseBarEl.appendChild(connector);
+      }
     }
-    phaseBarEl.innerHTML = html;
   }
 
   function updatePhaseFromName(phaseName) {
@@ -617,10 +664,101 @@ html, body {
   // Adapted from packages/web/js/framework/a2ui-renderer.js
   // Renders A2UI component descriptors into DOM elements.
 
-  function escapeHtml(str) {
-    var div = document.createElement("div");
-    div.textContent = str || "";
-    return div.innerHTML;
+  function clearChildren(el) {
+    while (el.firstChild) {
+      el.removeChild(el.firstChild);
+    }
+  }
+
+  function createCardHeader(title, subtitle, styleText) {
+    var header = document.createElement("div");
+    header.className = "card-header";
+    if (styleText) header.style.cssText = styleText;
+
+    var content = document.createElement("div");
+    if (title) {
+      var heading = document.createElement("h3");
+      heading.className = "card-title";
+      heading.textContent = title;
+      content.appendChild(heading);
+    }
+    if (subtitle) {
+      var text = document.createElement("p");
+      text.className = "card-subtitle";
+      text.textContent = subtitle;
+      content.appendChild(text);
+    }
+
+    header.appendChild(content);
+    return header;
+  }
+
+  function createCardBody(styleText) {
+    var body = document.createElement("div");
+    body.className = "card-body";
+    if (styleText) body.style.cssText = styleText;
+    return body;
+  }
+
+  function sanitizeNavigationUrl(value) {
+    if (typeof value !== "string" || !value) return "";
+    try {
+      var url = new URL(value, window.location.href);
+      if (url.protocol === "http:" || url.protocol === "https:") {
+        return url.toString();
+      }
+    } catch (e) {
+      return "";
+    }
+    return "";
+  }
+
+  function createNavigationLink(href, label, className, styleText) {
+    var safeHref = sanitizeNavigationUrl(href);
+    if (!safeHref) {
+      var disabled = document.createElement("span");
+      disabled.className = className;
+      if (styleText) disabled.style.cssText = styleText;
+      disabled.textContent = label;
+      disabled.setAttribute("aria-disabled", "true");
+      disabled.style.opacity = "0.6";
+      disabled.style.cursor = "not-allowed";
+      return disabled;
+    }
+
+    var link = document.createElement("a");
+    link.href = safeHref;
+    link.className = className;
+    link.target = "_blank";
+    link.rel = "noopener";
+    if (styleText) link.style.cssText = styleText;
+    link.textContent = label;
+    return link;
+  }
+
+  function createStatusIcon(status) {
+    var el = document.createElement("span");
+    if (status === "completed") {
+      el.textContent = "✓";
+      el.style.color = "var(--color-success)";
+      return el;
+    }
+    if (status === "running") {
+      el.className = "spinner";
+      el.style.width = "14px";
+      el.style.height = "14px";
+      el.style.borderWidth = "2px";
+      return el;
+    }
+    if (status === "error") {
+      el.textContent = "✕";
+      el.style.color = "var(--color-error)";
+      return el;
+    }
+
+    el.textContent = "○";
+    el.style.color = "var(--color-neutral-foreground-disabled)";
+    return el;
   }
 
   var RENDERERS = {
@@ -653,8 +791,13 @@ html, body {
       }
       return wrapper;
     }
-    var renderer = RENDERERS[schema && schema.type];
-    if (!renderer) return createFallback(schema);
+    if (!schema || typeof schema !== "object") return createFallback(schema);
+    if (typeof schema.type !== "string") return createFallback(schema);
+    if (!Object.prototype.hasOwnProperty.call(RENDERERS, schema.type)) {
+      return createFallback(schema);
+    }
+    var renderer = RENDERERS[schema.type];
+    if (typeof renderer !== "function") return createFallback(schema);
     return renderer(schema, ctx);
   }
 
@@ -738,16 +881,11 @@ html, body {
   function renderCardA2UI(schema, ctx) {
     var card = document.createElement("article");
     card.className = "card" + (schema.className ? " " + schema.className : "");
-    var html = "";
     if (schema.title || schema.subtitle) {
-      html += '<div class="card-header"><div>';
-      if (schema.title) html += '<h3 class="card-title">' + escapeHtml(schema.title) + '</h3>';
-      if (schema.subtitle) html += '<p class="card-subtitle">' + escapeHtml(schema.subtitle) + '</p>';
-      html += '</div></div>';
+      card.appendChild(createCardHeader(schema.title || "", schema.subtitle || ""));
     }
-    html += '<div class="card-body"></div>';
-    card.innerHTML = html;
-    var body = card.querySelector(".card-body");
+    var body = createCardBody();
+    card.appendChild(body);
     var children = schema.children || [];
     for (var i = 0; i < children.length; i++) body.appendChild(renderA2UI(children[i], ctx));
     return card;
@@ -764,8 +902,8 @@ html, body {
     var activeIndex = schema.activeTab || 0;
 
     function showTab(index) {
-      tabBar.innerHTML = "";
-      contentArea.innerHTML = "";
+      clearChildren(tabBar);
+      clearChildren(contentArea);
       for (var i = 0; i < tabs.length; i++) {
         var btn = document.createElement("button");
         btn.className = "tab-item" + (i === index ? " active" : "");
@@ -807,17 +945,28 @@ html, body {
         if (pid === schema.currentPhase) { current = k; break; }
       }
     }
-    var html = "";
     for (var i = 0; i < phases.length; i++) {
       var phase = phases[i];
       var label = typeof phase === "string" ? phase : phase.label || phase.id;
       var st = i < current ? "completed" : i === current ? "active" : "";
-      var conn = i < phases.length - 1
-        ? '<span class="phase-connector ' + (i < current ? "completed" : "") + '"></span>'
-        : "";
-      html += '<span class="phase-step"><span class="phase-dot ' + st + '"></span><span>' + escapeHtml(label) + '</span></span>' + conn;
+      var step = document.createElement("span");
+      step.className = "phase-step";
+
+      var dot = document.createElement("span");
+      dot.className = "phase-dot" + (st ? " " + st : "");
+      step.appendChild(dot);
+
+      var textEl = document.createElement("span");
+      textEl.textContent = label || "";
+      step.appendChild(textEl);
+      el.appendChild(step);
+
+      if (i < phases.length - 1) {
+        var conn = document.createElement("span");
+        conn.className = "phase-connector" + (i < current ? " completed" : "");
+        el.appendChild(conn);
+      }
     }
-    el.innerHTML = html;
     // Also update top-level phase bar
     if (typeof schema.currentPhase === "string") updatePhaseFromName(schema.currentPhase);
     return el;
@@ -828,18 +977,32 @@ html, body {
     block.className = "code-block";
     var code = schema.code || "";
     var lang = schema.language || "";
-    block.innerHTML =
-      '<div class="code-block-header"><span>' + escapeHtml(lang) + '</span>' +
-      '<button class="code-block-copy" aria-label="Copy code">Copy</button></div>' +
-      '<pre><code>' + escapeHtml(code) + '</code></pre>';
-    block.querySelector(".code-block-copy").addEventListener("click", function () {
+    var header = document.createElement("div");
+    header.className = "code-block-header";
+
+    var label = document.createElement("span");
+    label.textContent = lang;
+    header.appendChild(label);
+
+    var copyBtn = document.createElement("button");
+    copyBtn.className = "code-block-copy";
+    copyBtn.setAttribute("aria-label", "Copy code");
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", function () {
       try {
         navigator.clipboard.writeText(code);
-        var btn = block.querySelector(".code-block-copy");
-        btn.textContent = "✓ Copied";
-        setTimeout(function () { btn.textContent = "Copy"; }, 2000);
+        copyBtn.textContent = "✓ Copied";
+        setTimeout(function () { copyBtn.textContent = "Copy"; }, 2000);
       } catch (e) { /* clipboard may not be available in sandbox */ }
     });
+    header.appendChild(copyBtn);
+    block.appendChild(header);
+
+    var pre = document.createElement("pre");
+    var codeEl = document.createElement("code");
+    codeEl.textContent = code;
+    pre.appendChild(codeEl);
+    block.appendChild(pre);
     return block;
   }
 
@@ -879,30 +1042,43 @@ html, body {
     return group;
   }
 
-  function statusIcon(status) {
-    switch (status) {
-      case "completed": return '<span style="color:var(--color-success)">✓</span>';
-      case "running":   return '<span class="spinner" style="width:14px;height:14px;border-width:2px"></span>';
-      case "error":     return '<span style="color:var(--color-error)">✕</span>';
-      default:          return '<span style="color:var(--color-neutral-foreground-disabled)">○</span>';
-    }
-  }
-
   function renderDeploymentProgress(schema) {
     var card = document.createElement("article");
     card.className = "card";
     var steps = schema.steps || [];
-    var header = '<div class="card-header"><h3 class="card-title">' + escapeHtml(schema.title || "Deployment Progress") + '</h3></div>';
-    var body = '<div class="card-body"><div style="display:flex;flex-direction:column;gap:var(--spacing-s)">';
+    card.appendChild(createCardHeader(schema.title || "Deployment Progress"));
+    var body = createCardBody();
+    var list = document.createElement("div");
+    list.style.display = "flex";
+    list.style.flexDirection = "column";
+    list.style.gap = "var(--spacing-s)";
     for (var i = 0; i < steps.length; i++) {
-      body += '<div style="display:flex;align-items:center;gap:var(--spacing-s)">' +
-        '<span style="width:20px;text-align:center">' + statusIcon(steps[i].status) + '</span>' +
-        '<span style="flex:1">' + escapeHtml(steps[i].label) + '</span>' +
-        '<span style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3)">' + (steps[i].duration || "") + '</span>' +
-        '</div>';
+      var row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.gap = "var(--spacing-s)";
+
+      var iconWrap = document.createElement("span");
+      iconWrap.style.width = "20px";
+      iconWrap.style.textAlign = "center";
+      iconWrap.appendChild(createStatusIcon(steps[i].status));
+      row.appendChild(iconWrap);
+
+      var label = document.createElement("span");
+      label.style.flex = "1";
+      label.textContent = steps[i].label || "";
+      row.appendChild(label);
+
+      var duration = document.createElement("span");
+      duration.style.fontSize = "var(--font-size-200)";
+      duration.style.color = "var(--color-neutral-foreground-3)";
+      duration.textContent = steps[i].duration || "";
+      row.appendChild(duration);
+
+      list.appendChild(row);
     }
-    body += '</div></div>';
-    card.innerHTML = header + body;
+    body.appendChild(list);
+    card.appendChild(body);
     return card;
   }
 
@@ -910,38 +1086,119 @@ html, body {
     var card = document.createElement("article");
     card.className = "card";
     var comps = schema.components || [];
-    var items = "";
+    card.appendChild(createCardHeader(schema.title || "Architecture"));
+    var body = createCardBody("text-align:center;padding:var(--spacing-l)");
+    var list = document.createElement("div");
+    list.style.display = "flex";
+    list.style.flexWrap = "wrap";
+    list.style.justifyContent = "center";
+    list.style.gap = "var(--spacing-m)";
     for (var i = 0; i < comps.length; i++) {
-      items += '<div class="card" style="min-width:100px;text-align:center;padding:var(--spacing-m)">' +
-        '<div style="font-size:24px;margin-bottom:var(--spacing-xs)">' + (comps[i].icon || "📦") + '</div>' +
-        '<div style="font-weight:var(--font-weight-semibold)">' + escapeHtml(comps[i].name) + '</div>' +
-        '<div style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3)">' + escapeHtml(comps[i].description || "") + '</div>' +
-        '</div>';
+      var item = document.createElement("div");
+      item.className = "card";
+      item.style.minWidth = "100px";
+      item.style.textAlign = "center";
+      item.style.padding = "var(--spacing-m)";
+
+      var icon = document.createElement("div");
+      icon.style.fontSize = "24px";
+      icon.style.marginBottom = "var(--spacing-xs)";
+      icon.textContent = comps[i].icon || "📦";
+      item.appendChild(icon);
+
+      var name = document.createElement("div");
+      name.style.fontWeight = "var(--font-weight-semibold)";
+      name.textContent = comps[i].name || "";
+      item.appendChild(name);
+
+      var description = document.createElement("div");
+      description.style.fontSize = "var(--font-size-200)";
+      description.style.color = "var(--color-neutral-foreground-3)";
+      description.textContent = comps[i].description || "";
+      item.appendChild(description);
+
+      list.appendChild(item);
     }
-    card.innerHTML = '<div class="card-header"><h3 class="card-title">' + escapeHtml(schema.title || "Architecture") + '</h3></div>' +
-      '<div class="card-body" style="text-align:center;padding:var(--spacing-l)">' +
-      '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:var(--spacing-m)">' + items + '</div></div>';
+    body.appendChild(list);
+    card.appendChild(body);
     return card;
   }
 
   function renderCostEstimate(schema) {
     var items = schema.items || [];
     var total = schema.total != null ? schema.total : items.reduce(function (s, it) { return s + (it.cost || 0); }, 0);
-    var rows = "";
-    for (var i = 0; i < items.length; i++) {
-      rows += '<tr style="border-bottom:1px solid var(--color-neutral-stroke-2)">' +
-        '<td style="padding:var(--spacing-s)">' + escapeHtml(items[i].name) + '</td>' +
-        '<td style="padding:var(--spacing-s);color:var(--color-neutral-foreground-3)">' + escapeHtml(items[i].sku || "") + '</td>' +
-        '<td style="text-align:right;padding:var(--spacing-s)">$' + (items[i].cost || 0).toFixed(2) + '</td></tr>';
-    }
     var card = document.createElement("article");
     card.className = "card";
-    card.innerHTML = '<div class="card-header"><h3 class="card-title">' + escapeHtml(schema.title || "Estimated Monthly Cost") + '</h3></div>' +
-      '<div class="card-body"><table style="width:100%;border-collapse:collapse">' +
-      '<thead><tr style="border-bottom:1px solid var(--color-neutral-stroke-2)"><th style="text-align:left;padding:var(--spacing-s)">Resource</th><th style="text-align:left;padding:var(--spacing-s)">SKU</th><th style="text-align:right;padding:var(--spacing-s)">$/mo</th></tr></thead>' +
-      '<tbody>' + rows + '</tbody>' +
-      '<tfoot><tr><td colspan="2" style="padding:var(--spacing-s);font-weight:var(--font-weight-semibold)">Total</td>' +
-      '<td style="text-align:right;padding:var(--spacing-s);font-weight:var(--font-weight-semibold)">$' + total.toFixed(2) + '</td></tr></tfoot></table></div>';
+    card.appendChild(createCardHeader(schema.title || "Estimated Monthly Cost"));
+    var body = createCardBody();
+    var table = document.createElement("table");
+    table.style.width = "100%";
+    table.style.borderCollapse = "collapse";
+
+    var thead = document.createElement("thead");
+    var headRow = document.createElement("tr");
+    headRow.style.borderBottom = "1px solid var(--color-neutral-stroke-2)";
+    var headers = [
+      { text: "Resource", align: "left" },
+      { text: "SKU", align: "left" },
+      { text: "$/mo", align: "right" }
+    ];
+    for (var i = 0; i < headers.length; i++) {
+      var th = document.createElement("th");
+      th.style.textAlign = headers[i].align;
+      th.style.padding = "var(--spacing-s)";
+      th.textContent = headers[i].text;
+      headRow.appendChild(th);
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement("tbody");
+    for (var j = 0; j < items.length; j++) {
+      var row = document.createElement("tr");
+      row.style.borderBottom = "1px solid var(--color-neutral-stroke-2)";
+
+      var nameCell = document.createElement("td");
+      nameCell.style.padding = "var(--spacing-s)";
+      nameCell.textContent = items[j].name || "";
+      row.appendChild(nameCell);
+
+      var skuCell = document.createElement("td");
+      skuCell.style.padding = "var(--spacing-s)";
+      skuCell.style.color = "var(--color-neutral-foreground-3)";
+      skuCell.textContent = items[j].sku || "";
+      row.appendChild(skuCell);
+
+      var costCell = document.createElement("td");
+      costCell.style.textAlign = "right";
+      costCell.style.padding = "var(--spacing-s)";
+      costCell.textContent = "$" + (items[j].cost || 0).toFixed(2);
+      row.appendChild(costCell);
+
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+
+    var tfoot = document.createElement("tfoot");
+    var footRow = document.createElement("tr");
+    var totalLabel = document.createElement("td");
+    totalLabel.colSpan = 2;
+    totalLabel.style.padding = "var(--spacing-s)";
+    totalLabel.style.fontWeight = "var(--font-weight-semibold)";
+    totalLabel.textContent = "Total";
+    footRow.appendChild(totalLabel);
+
+    var totalValue = document.createElement("td");
+    totalValue.style.textAlign = "right";
+    totalValue.style.padding = "var(--spacing-s)";
+    totalValue.style.fontWeight = "var(--font-weight-semibold)";
+    totalValue.textContent = "$" + total.toFixed(2);
+    footRow.appendChild(totalValue);
+    tfoot.appendChild(footRow);
+    table.appendChild(tfoot);
+
+    body.appendChild(table);
+    card.appendChild(body);
     return card;
   }
 
@@ -949,23 +1206,34 @@ html, body {
     var card = document.createElement("article");
     card.className = "card";
     var actions = schema.actions || [];
-    var btns = "";
+    card.appendChild(createCardHeader(schema.title || "Next Steps"));
+    var body = createCardBody();
+    var description = document.createElement("p");
+    description.style.marginBottom = "var(--spacing-l)";
+    description.textContent = schema.description || "";
+    body.appendChild(description);
+
+    var actionRow = document.createElement("div");
+    actionRow.style.display = "flex";
+    actionRow.style.flexWrap = "wrap";
+    actionRow.style.gap = "var(--spacing-s)";
     for (var i = 0; i < actions.length; i++) {
-      btns += '<button class="btn' + (actions[i].primary ? " primary" : "") + '" data-action="' + (actions[i].id || "") + '">' + escapeHtml(actions[i].label) + '</button>';
-    }
-    card.innerHTML = '<div class="card-header"><h3 class="card-title">' + escapeHtml(schema.title || "Next Steps") + '</h3></div>' +
-      '<div class="card-body"><p style="margin-bottom:var(--spacing-l)">' + escapeHtml(schema.description || "") + '</p>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:var(--spacing-s)">' + btns + '</div></div>';
-    for (var j = 0; j < actions.length; j++) {
-      if (actions[j].id) {
-        (function (action) {
-          var el = card.querySelector('[data-action="' + action.id + '"]');
-          if (el) el.addEventListener("click", function () {
-            sendToServer({ type: "action", sessionId: sessionId, actionType: action.id, payload: action.data || {} });
+      var action = actions[i];
+      var btn = document.createElement("button");
+      btn.className = "btn" + (action.primary ? " primary" : "");
+      btn.textContent = action.label || "Continue";
+      btn.disabled = !action.id;
+      if (action.id) {
+        (function (currentAction, currentButton) {
+          currentButton.addEventListener("click", function () {
+            sendToServer({ type: "action", sessionId: sessionId, actionType: currentAction.id, payload: currentAction.data || {} });
           });
-        })(actions[j]);
+        })(action, btn);
       }
+      actionRow.appendChild(btn);
     }
+    body.appendChild(actionRow);
+    card.appendChild(body);
     return card;
   }
 
@@ -1009,17 +1277,53 @@ html, body {
         default:            return "var(--color-neutral-foreground-disabled)";
       }
     };
-    var items = "";
+    card.appendChild(createCardHeader(schema.title || "Workflow Runs"));
+    var body = createCardBody();
+    var list = document.createElement("div");
+    list.style.display = "flex";
+    list.style.flexDirection = "column";
+    list.style.gap = "var(--spacing-s)";
     for (var i = 0; i < runs.length; i++) {
       var r = runs[i];
-      items += '<div style="display:flex;align-items:center;gap:var(--spacing-s);padding:var(--spacing-s);border-radius:var(--radius-medium);border:1px solid var(--color-neutral-stroke-2)">' +
-        '<span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:' + statusColor(r.status) + '"></span>' +
-        '<span style="flex:1;font-weight:var(--font-weight-semibold)">' + escapeHtml(r.name) + '</span>' +
-        '<span style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3)">' + escapeHtml(r.branch || "") + '</span>' +
-        '<span style="font-size:var(--font-size-200);text-transform:capitalize;color:' + statusColor(r.status) + '">' + escapeHtml((r.status || "").replace(/_/g, " ")) + '</span></div>';
+      var item = document.createElement("div");
+      item.style.display = "flex";
+      item.style.alignItems = "center";
+      item.style.gap = "var(--spacing-s)";
+      item.style.padding = "var(--spacing-s)";
+      item.style.borderRadius = "var(--radius-medium)";
+      item.style.border = "1px solid var(--color-neutral-stroke-2)";
+
+      var dot = document.createElement("span");
+      dot.style.width = "10px";
+      dot.style.height = "10px";
+      dot.style.borderRadius = "50%";
+      dot.style.flexShrink = "0";
+      dot.style.background = statusColor(r.status);
+      item.appendChild(dot);
+
+      var name = document.createElement("span");
+      name.style.flex = "1";
+      name.style.fontWeight = "var(--font-weight-semibold)";
+      name.textContent = r.name || "";
+      item.appendChild(name);
+
+      var branch = document.createElement("span");
+      branch.style.fontSize = "var(--font-size-200)";
+      branch.style.color = "var(--color-neutral-foreground-3)";
+      branch.textContent = r.branch || "";
+      item.appendChild(branch);
+
+      var status = document.createElement("span");
+      status.style.fontSize = "var(--font-size-200)";
+      status.style.textTransform = "capitalize";
+      status.style.color = statusColor(r.status);
+      status.textContent = (r.status || "").replace(/_/g, " " );
+      item.appendChild(status);
+
+      list.appendChild(item);
     }
-    card.innerHTML = '<div class="card-header"><h3 class="card-title">' + escapeHtml(schema.title || "Workflow Runs") + '</h3></div>' +
-      '<div class="card-body"><div style="display:flex;flex-direction:column;gap:var(--spacing-s)">' + items + '</div></div>';
+    body.appendChild(list);
+    card.appendChild(body);
     return card;
   }
 
@@ -1027,14 +1331,41 @@ html, body {
     var card = document.createElement("article");
     card.className = "card";
     card.style.cssText = "border:2px solid var(--color-brand-stroke-1);background:var(--color-brand-background-2)";
-    card.innerHTML = '<div class="card-body" style="text-align:center;padding:var(--spacing-xl)">' +
-      '<div style="font-size:32px;margin-bottom:var(--spacing-m)" aria-hidden="true">🚀</div>' +
-      '<h3 style="margin-bottom:var(--spacing-xs);font-size:var(--font-size-500)">' + escapeHtml(schema.repoFullName || "repository") + '</h3>' +
-      '<p style="font-size:var(--font-size-200);color:var(--color-neutral-foreground-3);margin-bottom:var(--spacing-l)">Branch: <strong>' + escapeHtml(schema.branch || "main") + '</strong></p>' +
-      '<div style="display:flex;gap:var(--spacing-m);justify-content:center;flex-wrap:wrap">' +
-      '<a href="' + (schema.codespaceUrl || "#") + '" target="_blank" rel="noopener" class="btn primary" style="text-decoration:none">⬡ Open in Codespaces</a>' +
-      '<a href="' + (schema.vscodeUrl || "#") + '" target="_blank" rel="noopener" class="btn" style="text-decoration:none">⌨ Open in vscode.dev</a>' +
-      '</div></div>';
+    var body = createCardBody("text-align:center;padding:var(--spacing-xl)");
+
+    var icon = document.createElement("div");
+    icon.style.fontSize = "32px";
+    icon.style.marginBottom = "var(--spacing-m)";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "🚀";
+    body.appendChild(icon);
+
+    var title = document.createElement("h3");
+    title.style.marginBottom = "var(--spacing-xs)";
+    title.style.fontSize = "var(--font-size-500)";
+    title.textContent = schema.repoFullName || "repository";
+    body.appendChild(title);
+
+    var branch = document.createElement("p");
+    branch.style.fontSize = "var(--font-size-200)";
+    branch.style.color = "var(--color-neutral-foreground-3)";
+    branch.style.marginBottom = "var(--spacing-l)";
+    branch.appendChild(document.createTextNode("Branch: "));
+    var strong = document.createElement("strong");
+    strong.textContent = schema.branch || "main";
+    branch.appendChild(strong);
+    body.appendChild(branch);
+
+    var actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.gap = "var(--spacing-m)";
+    actions.style.justifyContent = "center";
+    actions.style.flexWrap = "wrap";
+    actions.appendChild(createNavigationLink(schema.codespaceUrl, "⬡ Open in Codespaces", "btn primary", "text-decoration:none"));
+    actions.appendChild(createNavigationLink(schema.vscodeUrl, "⌨ Open in vscode.dev", "btn", "text-decoration:none"));
+    body.appendChild(actions);
+
+    card.appendChild(body);
     return card;
   }
 
@@ -1049,21 +1380,91 @@ html, body {
     };
     var color = statusColors[schema.status] || statusColors.draft;
     var services = schema.services || [];
-    var tags = "";
+    var header = document.createElement("div");
+    header.className = "card-header";
+    header.style.display = "flex";
+    header.style.alignItems = "center";
+    header.style.justifyContent = "space-between";
+
+    var headingWrap = document.createElement("div");
+    var title = document.createElement("h3");
+    title.className = "card-title";
+    title.style.display = "flex";
+    title.style.alignItems = "center";
+    title.style.gap = "var(--spacing-s)";
+    var emoji = document.createElement("span");
+    emoji.setAttribute("aria-hidden", "true");
+    emoji.textContent = "📦";
+    title.appendChild(emoji);
+    title.appendChild(document.createTextNode(schema.appName || "App"));
+    headingWrap.appendChild(title);
+    if (schema.description) {
+      var subtitle = document.createElement("p");
+      subtitle.className = "card-subtitle";
+      subtitle.style.marginTop = "var(--spacing-xxs)";
+      subtitle.textContent = schema.description;
+      headingWrap.appendChild(subtitle);
+    }
+    header.appendChild(headingWrap);
+
+    var status = document.createElement("span");
+    status.style.display = "inline-flex";
+    status.style.alignItems = "center";
+    status.style.gap = "var(--spacing-xs)";
+    status.style.fontSize = "var(--font-size-200)";
+    var dot = document.createElement("span");
+    dot.style.width = "8px";
+    dot.style.height = "8px";
+    dot.style.borderRadius = "50%";
+    dot.style.background = color;
+    status.appendChild(dot);
+    status.appendChild(document.createTextNode(schema.status || "draft"));
+    header.appendChild(status);
+    card.appendChild(header);
+
+    var body = createCardBody();
+    var tags = document.createElement("div");
+    tags.style.display = "flex";
+    tags.style.flexWrap = "wrap";
+    tags.style.gap = "var(--spacing-s)";
+    tags.style.alignItems = "center";
     if (schema.runtime) {
-      tags += '<span style="display:inline-block;padding:2px var(--spacing-s);border-radius:var(--radius-small);background:var(--color-brand-background-2);color:var(--color-brand-foreground-1);font-size:var(--font-size-200);font-weight:var(--font-weight-semibold)">' + escapeHtml(schema.runtime) + '</span>';
+      var runtime = document.createElement("span");
+      runtime.style.display = "inline-block";
+      runtime.style.padding = "2px var(--spacing-s)";
+      runtime.style.borderRadius = "var(--radius-small)";
+      runtime.style.background = "var(--color-brand-background-2)";
+      runtime.style.color = "var(--color-brand-foreground-1)";
+      runtime.style.fontSize = "var(--font-size-200)";
+      runtime.style.fontWeight = "var(--font-weight-semibold)";
+      runtime.textContent = schema.runtime;
+      tags.appendChild(runtime);
     }
     for (var i = 0; i < services.length; i++) {
-      tags += '<span style="display:inline-block;padding:2px var(--spacing-s);border-radius:var(--radius-small);background:var(--color-neutral-background-3);font-size:var(--font-size-200)">' + escapeHtml(services[i]) + '</span>';
+      var service = document.createElement("span");
+      service.style.display = "inline-block";
+      service.style.padding = "2px var(--spacing-s)";
+      service.style.borderRadius = "var(--radius-small)";
+      service.style.background = "var(--color-neutral-background-3)";
+      service.style.fontSize = "var(--font-size-200)";
+      service.textContent = services[i];
+      tags.appendChild(service);
     }
-    card.innerHTML = '<div class="card-header" style="display:flex;align-items:center;justify-content:space-between"><div>' +
-      '<h3 class="card-title" style="display:flex;align-items:center;gap:var(--spacing-s)"><span aria-hidden="true">📦</span>' + escapeHtml(schema.appName || "App") + '</h3>' +
-      (schema.description ? '<p class="card-subtitle" style="margin-top:var(--spacing-xxs)">' + escapeHtml(schema.description) + '</p>' : '') +
-      '</div><span style="display:inline-flex;align-items:center;gap:var(--spacing-xs);font-size:var(--font-size-200)">' +
-      '<span style="width:8px;height:8px;border-radius:50%;background:' + color + '"></span>' + escapeHtml(schema.status || "draft") + '</span></div>' +
-      '<div class="card-body"><div style="display:flex;flex-wrap:wrap;gap:var(--spacing-s);align-items:center">' + tags + '</div>' +
-      (schema.url ? '<div style="margin-top:var(--spacing-m)"><a href="' + schema.url + '" target="_blank" rel="noopener" style="font-size:var(--font-size-200);color:var(--color-brand-foreground-1)">🔗 ' + escapeHtml(schema.url) + '</a></div>' : '') +
-      '</div>';
+    body.appendChild(tags);
+    if (schema.url) {
+      var linkWrap = document.createElement("div");
+      linkWrap.style.marginTop = "var(--spacing-m)";
+      linkWrap.appendChild(
+        createNavigationLink(
+          schema.url,
+          "🔗 " + schema.url,
+          "",
+          "font-size:var(--font-size-200);color:var(--color-brand-foreground-1)"
+        )
+      );
+      body.appendChild(linkWrap);
+    }
+    card.appendChild(body);
     return card;
   }
 
