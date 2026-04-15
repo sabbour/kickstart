@@ -752,7 +752,7 @@ width: 100,
 
 #### Use design tokens for all colors and spacing
 
-Never hardcode colors or spacing. Always use Fluent 2 design tokens:
+For new components and any styling you touch, use Fluent 2 design tokens instead of hardcoded colors or spacing values. Some legacy components may still contain hardcoded values, but the standard for new and updated code is to use tokens:
 
 ```typescript
 import { tokens } from '@fluentui/react-components';
