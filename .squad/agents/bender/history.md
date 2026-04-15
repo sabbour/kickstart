@@ -25,11 +25,13 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 
 ## Work Log
 
+- (2026-04-15 16:26) Heartbeat workflow fix: traced failing Ralph checks on merged PRs to the project-board step requiring `COPILOT_ASSIGN_TOKEN`; patched `.github/workflows/squad-heartbeat.yml` to fall back to `GITHUB_TOKEN`, then audited sibling workflows and added explicit `github-token` inputs/fallbacks in `squad-triage.yml`, `squad-issue-assign.yml`, `squad-label-enforce.yml`, and `sync-squad-labels.yml`.
 - (2026-04-14 13:04) Triage pipeline fix: added project board assignment to squad-triage.yml, squad-heartbeat.yml, squad-issue-assign.yml. Added triage checklist to routing.md.
 - (2026-04-14 11:02) Wave 1: SWA continuous deploy + version footer → PR #177 opened. Auto-deploy from main, version shows SHA.
 - (2026-04-15 16:06) SWA outage triage: latest deploy was packaging 18 API entrypoints, including `converse.test.ts`, and bundling `bicep-node` into the function ESM output. Both crashed module import before handlers registered, which explains the live `/api/*` 404s. Fixed `packages/web/api/esbuild.config.mjs` to exclude `*.test.ts`/`*.spec.ts` and keep `bicep-node` external.
 
 ## Learnings
+- Heartbeat board-assignment steps that use `actions/github-script` must always fall back from `COPILOT_ASSIGN_TOKEN` to `GITHUB_TOKEN`. If the PAT secret is unset, the action fails before the script can early-return or downgrade GraphQL/project errors to warnings.
 - SWA deploy workflow (`deploy-swa.yml`) needs explicit `push → branches: [main]` trigger — tag-only triggers mean no continuous deployment from main.
 - `__BUILD_VERSION__` in `vite.config.ts` can embed git SHA via `execSync('git rev-parse --short HEAD')` — works both locally and in CI without relying on `GITHUB_SHA` env var.
 - Footer version display should use a single unified string (`version-sha`) rather than showing version and SHA separately — reduces redundancy and makes each build uniquely identifiable at a glance.
