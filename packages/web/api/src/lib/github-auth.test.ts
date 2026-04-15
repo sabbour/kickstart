@@ -193,7 +193,10 @@ describe("commitGitHubFilesAndCreatePullRequestForRequest", () => {
     });
 
     const githubAuthHeaders = fetchMock.mock.calls
-      .filter(([url]) => String(url).startsWith("https://api.github.com"))
+      .filter(([url]) => {
+        const parsed = new URL(String(url));
+        return parsed.origin === "https://api.github.com";
+      })
       .map(([, init]) => new Headers(init?.headers).get("authorization"));
     expect(githubAuthHeaders.length).toBeGreaterThan(0);
     expect(githubAuthHeaders.every((value) => value === "Bearer ghs_test_token")).toBe(true);

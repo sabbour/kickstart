@@ -123,6 +123,14 @@ interface GitHubErrorResponse {
  */
 const DEFAULT_GITHUB_SCOPES = ['read:user'];
 
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end--;
+  }
+  return value.slice(0, end);
+}
+
 function connectorErrorCodeForStatus(status: number): ConnectorErrorCode {
   if (status === 400) return 'BAD_REQUEST';
   if (status === 403) return 'FORBIDDEN';
@@ -153,7 +161,7 @@ export class GitHubConnector extends BaseConnector {
       ...rest,
       auth: auth ?? { kind: 'oauth2', scopes: DEFAULT_GITHUB_SCOPES },
     } as ConnectorConfig);
-    this.serverBaseUrl = serverBaseUrl ? serverBaseUrl.replace(/\/+$/, '') : null;
+    this.serverBaseUrl = serverBaseUrl ? trimTrailingSlashes(serverBaseUrl) : null;
   }
 
   /** GitHub-specific headers (Accept, API version). */
