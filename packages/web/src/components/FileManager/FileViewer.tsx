@@ -108,16 +108,43 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
-  codeBlock: {
+  codeWrapper: {
     flex: 1,
     overflowY: 'auto',
+    backgroundColor: '#1e1e1e',
+    color: '#d4d4d4',
     ...shorthands.margin(0),
-    ...shorthands.padding(tokens.spacingVerticalM, tokens.spacingHorizontalM),
-    fontFamily: tokens.fontFamilyMonospace,
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-word',
+    ...shorthands.padding(tokens.spacingVerticalS, '0'),
+  },
+  codePre: {
+    ...shorthands.margin(0),
+    ...shorthands.padding(0),
+    fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace',
+    fontSize: '13px',
+    lineHeight: '20px',
+    tabSize: '2',
+  },
+  codeLine: {
+    display: 'flex',
+    minHeight: '20px',
+    paddingRight: tokens.spacingHorizontalM,
+    ':hover': {
+      backgroundColor: 'rgba(255,255,255,0.04)',
+    },
+  },
+  lineNumber: {
+    display: 'inline-block',
+    width: '48px',
+    paddingRight: tokens.spacingHorizontalM,
+    textAlign: 'right' as const,
+    color: '#555555',
+    userSelect: 'none' as const,
+    flexShrink: 0,
+  },
+  lineContent: {
+    flex: '1',
+    whiteSpace: 'pre',
+    minWidth: '0',
   },
   generating: {
     animationName: {
@@ -238,8 +265,8 @@ export function FileViewer({
   const content = file?.content ?? '';
   const fileName = filePath?.split('/').pop() ?? '';
 
-  const highlighted = useMemo(
-    () => (content ? highlightCode(content, language) : ''),
+  const highlightedLines = useMemo(
+    () => (content ? highlightCode(content, language).split('\n') : []),
     [content, language],
   );
 
@@ -318,10 +345,21 @@ export function FileViewer({
         </div>
       </div>
 
-      <pre
-        className={mergeClasses(styles.codeBlock, isGenerating && styles.generating)}
-        dangerouslySetInnerHTML={{ __html: highlighted }}
-      />
+      <div className={mergeClasses(styles.codeWrapper, isGenerating && styles.generating)}>
+        <pre className={styles.codePre}>
+          <code className="hljs">
+            {highlightedLines.map((lineHtml, i) => (
+              <div key={i} className={styles.codeLine}>
+                <span className={styles.lineNumber}>{i + 1}</span>
+                <span
+                  className={styles.lineContent}
+                  dangerouslySetInnerHTML={{ __html: lineHtml }}
+                />
+              </div>
+            ))}
+          </code>
+        </pre>
+      </div>
     </div>
   );
 }
