@@ -38,14 +38,12 @@ describe("transition", () => {
     expect(reset.isComplete).toBe(false);
   });
 
-  it("ADVANCE moves through all phases in order", () => {
+  it("ADVANCE moves through active phases in order", () => {
     let state = createInitialState();
     const expectedOrder: Phase[] = [
       Phase.Design,
       Phase.Generate,
       Phase.Review,
-      Phase.Handoff,
-      Phase.Deploy,
     ];
 
     for (const expectedPhase of expectedOrder) {
@@ -55,19 +53,19 @@ describe("transition", () => {
     }
   });
 
-  it("ADVANCE from Deploy marks isComplete = true", () => {
+  it("ADVANCE from Review marks isComplete = true", () => {
     let state = createInitialState();
-    // Advance through all phases to Deploy
-    const phases = [Phase.Design, Phase.Generate, Phase.Review, Phase.Handoff, Phase.Deploy];
+    // Advance through active phases to Review
+    const phases = [Phase.Design, Phase.Generate, Phase.Review];
     for (const _ of phases) {
       state = transition(state, { type: "ADVANCE" });
     }
-    expect(state.currentPhase).toBe(Phase.Deploy);
+    expect(state.currentPhase).toBe(Phase.Review);
 
-    // Advance from Deploy
+    // Advance from Review
     state = transition(state, { type: "ADVANCE" });
     expect(state.isComplete).toBe(true);
-    expect(state.phaseStatus[Phase.Deploy]).toBe("complete");
+    expect(state.phaseStatus[Phase.Review]).toBe("complete");
   });
 
   it("SKIP marks current phase as skipped and advances to next", () => {
@@ -137,8 +135,8 @@ describe("canAdvance", () => {
 
   it("returns false when conversation is complete", () => {
     let state = createInitialState();
-    // Advance through all phases
-    for (let i = 0; i < 6; i++) {
+    // Advance through active phases (Discover → Design → Generate → Review → complete)
+    for (let i = 0; i < 4; i++) {
       state = transition(state, { type: "ADVANCE" });
     }
     expect(state.isComplete).toBe(true);
@@ -147,28 +145,26 @@ describe("canAdvance", () => {
 });
 
 describe("full journey", () => {
-  it("START → advance through all 6 phases → isComplete", () => {
+  it("START → advance through 4 active phases → isComplete", () => {
     let state = transition(createInitialState(), { type: "START" });
     expect(state.currentPhase).toBe(Phase.Discover);
     expect(state.isComplete).toBe(false);
 
-    const allPhases: Phase[] = [
+    const activePhases: Phase[] = [
       Phase.Discover,
       Phase.Design,
       Phase.Generate,
       Phase.Review,
-      Phase.Handoff,
-      Phase.Deploy,
     ];
 
     // Verify we start at Discover
     expect(getCurrentPhase(state)).toBe(Phase.Discover);
 
-    // Advance through each phase
-    for (let i = 0; i < allPhases.length; i++) {
-      expect(state.phaseStatus[allPhases[i]]).toBe("active");
+    // Advance through each active phase
+    for (let i = 0; i < activePhases.length; i++) {
+      expect(state.phaseStatus[activePhases[i]]).toBe("active");
       state = transition(state, { type: "ADVANCE" });
-      expect(state.phaseStatus[allPhases[i]]).toBe("complete");
+      expect(state.phaseStatus[activePhases[i]]).toBe("complete");
     }
 
     expect(state.isComplete).toBe(true);
@@ -195,8 +191,8 @@ describe("handleImplicitFlags", () => {
 
   it("does not advance when isComplete is true", () => {
     let state = createInitialState();
-    // Advance through all phases so isComplete = true
-    for (let i = 0; i < 6; i++) {
+    // Advance through active phases so isComplete = true
+    for (let i = 0; i < 4; i++) {
       state = transition(state, { type: "ADVANCE" });
     }
     expect(state.isComplete).toBe(true);
@@ -276,10 +272,10 @@ describe("handleImplicitFlags", () => {
     expect(state.currentPhase).toBe(Phase.Review);
   });
 
-  it("stops advancing after reaching the final phase", () => {
+  it("stops advancing after reaching the final active phase", () => {
     let state = createInitialState();
-    // Advance through all phases to completion
-    for (let i = 0; i < 6; i++) {
+    // Advance through active phases to completion
+    for (let i = 0; i < 4; i++) {
       state = transition(state, { type: "ADVANCE" });
     }
     expect(state.isComplete).toBe(true);

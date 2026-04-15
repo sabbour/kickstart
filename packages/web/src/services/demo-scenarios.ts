@@ -229,7 +229,7 @@ const SESSION_COMPLETE: DemoResponse = {
   typingDelay: 1400,
   a2uiMessages: surface('complete-surface', [
     { id: 'root', component: 'Column', children: ['complete-title', 'complete-card', 'summary-card'], gap: 'medium' },
-    { id: 'complete-title', component: 'Text', text: 'Session Complete', variant: 'h2' },
+    { id: 'complete-title', component: 'Text', text: 'Session Complete', variant: 'subtitle1' },
 
     // Completion status card
     { id: 'complete-card', component: 'Card', child: 'complete-inner' },
@@ -259,7 +259,7 @@ const SESSION_COMPLETE: DemoResponse = {
     { id: 'summary-divider2', component: 'Divider' },
     { id: 'summary-actions', component: 'Row', children: ['download-btn', 'new-project-btn'], gap: 'small' },
     { id: 'download-btn', component: 'Button', label: 'Download files', variant: 'primary',
-      action: { event: { name: 'download-files' } } },
+      action: { event: { name: 'client:download-project' } } },
     { id: 'new-project-btn', component: 'Button', label: 'Start a new project', variant: 'outlined',
       action: { event: { name: 'start-new-project' } } },
   ]),
@@ -276,7 +276,7 @@ const CONFIGURE_FORM: DemoResponse = {
       { id: 'info', label: 'App Info', status: 'active' },
       { id: 'infra', label: 'Infrastructure', status: 'pending' },
       { id: 'cicd', label: 'CI/CD', status: 'pending' },
-      { id: 'done', label: 'Deploy', status: 'pending' },
+      { id: 'done', label: 'Review', status: 'pending' },
     ] },
     { id: 'form1', component: 'FormGroup', title: 'Application Details', step: 1, child: 'form1-inner' },
     { id: 'form1-inner', component: 'Column', children: ['app-name', 'app-region'] },

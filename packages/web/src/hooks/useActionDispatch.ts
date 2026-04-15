@@ -19,8 +19,10 @@ import { sanitizeActionContext } from '../utils/sanitize-action-context';
  * - auto-continue: Explicit completion signal (complete: / continue: prefix) — the
  *                  conversation advances automatically with a synthesized prompt.
  * - api:           Direct API call — routed through APIConnectorRegistry (B-11).
+ * - client:        Client-side action (download, open panel) — routed to onClientAction
+ *                  callback. Never sent to the LLM.
  */
-type ActionCategory = 'reply' | 'navigate' | 'auto-continue' | 'api';
+type ActionCategory = 'reply' | 'navigate' | 'auto-continue' | 'api' | 'client';
 
 /** Prefix → category mapping. Actions without a known prefix default to 'reply'. */
 const PREFIX_MAP: Record<string, ActionCategory> = {
@@ -29,6 +31,7 @@ const PREFIX_MAP: Record<string, ActionCategory> = {
   'api:': 'api',
   'complete:': 'auto-continue',
   'continue:': 'auto-continue',
+  'client:': 'client',
 };
 
 function categorize(actionName: string): ActionCategory {
@@ -53,7 +56,7 @@ function actionToMessage(action: A2uiClientAction): string {
   const { name, context } = action;
 
   // Strip any routing prefix for the message
-  const cleanName = name.replace(/^(navigate:|nav:|api:|complete:|continue:)/, '');
+  const cleanName = name.replace(/^(navigate:|nav:|api:|complete:|continue:|client:)/, '');
 
   if (context && typeof context === 'object') {
     // 1. Prefer selectedLabel — human-readable chosen option (injected by enriched components)
@@ -132,6 +135,8 @@ export interface ActionDispatchOptions {
   connectorRegistry?: APIConnectorRegistry;
   /** Optional debug logger — called with action details when debug mode is active. */
   onDebugAction?: (event: { actionName: string; category: string; context: Record<string, unknown>; outboundMessage: string }) => void;
+  /** Callback for client-side actions (download, open panel, etc.). */
+  onClientAction?: (operation: string, context: Record<string, unknown>) => void;
 }
 
 export type ActionHandler = (action: A2uiClientAction) => void;
@@ -157,6 +162,7 @@ export interface ActionDispatchResult {
  * - `complete:*` / `continue:*` → auto-continue with synthesized completion prompt
  * - `api:*`                   → route to APIConnectorRegistry if available, otherwise fall back
  *                               to LLM re-prompt with a console warning
+ * - `client:*`               → client-side action (download, open panel) — routed to onClientAction
  *
  * Auto-continues are rate-limited to AUTO_CONTINUE_MAX_CONSECUTIVE consecutive calls.
  * Call resetConsecutiveCount() when the user manually sends a message.
@@ -321,6 +327,16 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
               `[API Error: ${connectorName}.${operation}] ${errMsg}`,
             );
           });
+        break;
+      }
+
+      case 'client': {
+        consecutiveRef.current = 0;
+        setConsecutiveAutoContinueCount(0);
+        const operation = action.name.replace(/^client:/, '');
+        const safeContext = sanitizeActionContext(action.context);
+        logDebug(operation);
+        optionsRef.current.onClientAction?.(operation, safeContext);
         break;
       }
     }
