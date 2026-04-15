@@ -24,3 +24,8 @@ QA engineer and test infrastructure owner. Expertise in Playwright E2E testing, 
 - v0.3.0 test expansion: tool system TDD, validation engine, action loop verification
 
 ## Learnings
+- 2026-04-15: For stepwise live artifact streaming reviews, I only clear the QA gate when validation is batch-atomic per step, mandatory-step failures pause instead of auto-skipping, and resume state persists explicit per-step outcomes (#326 Rev 4).
+
+---
+
+**2026-04-15T22:40:15Z — Scribe**: Issue #326 Revision 4 approved. QA gate post on #326#issuecomment-4256166025 logged. Ready for closure.

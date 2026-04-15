@@ -33,3 +33,13 @@ Merged 6 decision inbox entries into `decisions.md`:
 All 9 spawn manifest tasks reported complete and merged to main.
 Documented orchestration log and session log summary.
 Ready for QA handoff.
+
+---
+
+**2026-04-15T22:40:15Z — Scribe Orchestration**:
+- Inbox merged: 10 files, 48.8 KB
+- decisions.md appended (pre: 71.1 KB, post: TBD)
+- No archival needed (all entries ≤ 7 days)
+- 3 orchestration logs written (Zapp, Hermes, Copilot)
+- 1 session log written
+- All agent history files < 15 KB (no summarization)

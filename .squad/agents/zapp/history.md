@@ -25,3 +25,9 @@
 - **Reviewed DPs #186 & #187**: #187 approved (low risk), #186 flagged with High/Medium concerns.
 - **#186 blockers**: Immutable source pinning, prompt-safety validation, fail-closed + provenance.
 - **Coordination**: Communicated security requirements to Leela; provided detailed guidance for Phase 1 hardening.
+
+- 2026-04-15: Revision 4 on issue #326 approved from security side; prior blockers remained resolved with no regression, clearing security gate for #327/#328.
+
+---
+
+**2026-04-15T22:40:15Z — Scribe**: Issue #326 Revision 4 approved. Security gate post on #326#issuecomment-4256162191 logged. Ready for closure.
