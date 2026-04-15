@@ -49,8 +49,13 @@ param openAiApiKey string = ''
 @description('Entra ID client secret. When provided, stored in Key Vault and referenced by SWA.')
 param entraClientSecret string = ''
 
+@secure()
+@description('Application Insights connection string. When provided, SWA uses this existing telemetry resource instead of provisioning a new one.')
+param appInsightsConnectionString string = ''
+
 var applicationInsightsName = '${swaName}-appi'
 var logAnalyticsWorkspaceName = 'log-${swaName}'
+var provisionApplicationInsights = empty(appInsightsConnectionString)
 
 // ── Key Vault ───────────────────────────────────────────────────
 
@@ -87,9 +92,18 @@ resource secretEntraClientSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' 
   }
 }
 
+resource secretAppInsightsConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(appInsightsConnectionString)) {
+  parent: keyVault
+  name: 'applicationinsights-connection-string'
+  properties: {
+    value: appInsightsConnectionString
+    contentType: 'text/plain'
+  }
+}
+
 // ── Monitoring ──────────────────────────────────────────────────
 
-resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = if (provisionApplicationInsights) {
   name: logAnalyticsWorkspaceName
   location: location
   properties: {
@@ -100,7 +114,7 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09
   }
 }
 
-resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
+resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = if (provisionApplicationInsights) {
   name: applicationInsightsName
   location: location
   kind: 'web'
@@ -155,7 +169,9 @@ resource kvSecretsUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
 // so that secret values never appear in SWA config or ARM state.
 
 var applicationInsightsSetting = {
-  APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.properties.ConnectionString
+  APPLICATIONINSIGHTS_CONNECTION_STRING: provisionApplicationInsights
+    ? applicationInsights!.properties.ConnectionString
+    : '@Microsoft.KeyVault(SecretUri=${keyVault.properties.vaultUri}secrets/applicationinsights-connection-string)'
 }
 
 var entraClientIdSetting = !empty(entraClientId)
@@ -241,7 +257,10 @@ output keyVaultName string = keyVault.name
 output keyVaultUri string = keyVault.properties.vaultUri
 
 @description('Name of the Application Insights resource')
-output applicationInsightsName string = applicationInsights.name
+output applicationInsightsName string = provisionApplicationInsights ? applicationInsights.name : ''
 
 @description('Name of the Log Analytics workspace backing Application Insights')
-output logAnalyticsWorkspaceName string = logAnalyticsWorkspace.name
+output logAnalyticsWorkspaceName string = provisionApplicationInsights ? logAnalyticsWorkspace.name : ''
+
+@description('How Application Insights connection information is supplied to the app')
+output applicationInsightsSource string = provisionApplicationInsights ? 'provisioned' : 'secret-supplied'
