@@ -107,6 +107,8 @@ buildProperties: {
 
 Deploys the web frontend and API to Azure Static Web Apps on every push to `main` and on PRs.
 
+After upload, the workflow retries `GET /api/health` against the production custom domain and fails if the live API never returns `200 {"status":"ok"}`. This catches managed Functions startup regressions that can slip past a successful deploy job.
+
 **Trigger:**
 - Push to `main` → production deployment
 - PR opened/synced → staging environment (auto-destroyed on PR close)

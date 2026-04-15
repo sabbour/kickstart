@@ -8,9 +8,11 @@ on:
     tags:
       - "v*"
     paths:
+      - '.github/workflows/deploy-swa.yml'
       - 'packages/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'scripts/**'
       - 'tsconfig.json'
 
 permissions:
@@ -56,3 +58,14 @@ jobs:
           skip_app_build: true
           skip_api_build: false
           api_build_command: "echo 'API already built'"
+
+      - name: Resolve production smoke target
+        id: production_url
+        run: |
+          BASE_URL="$(node -e "const params = require('./infra/parameters.dev.json'); const host = params.parameters.customDomainHostname?.value; if (!host) { throw new Error('infra/parameters.dev.json is missing parameters.customDomainHostname.value'); } process.stdout.write('https://' + host);")"
+          echo "base_url=$BASE_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke check live API health
+        env:
+          SWA_HEALTHCHECK_URL: ${{ steps.production_url.outputs.base_url }}/api/health
+        run: node scripts/check-swa-health.mjs
