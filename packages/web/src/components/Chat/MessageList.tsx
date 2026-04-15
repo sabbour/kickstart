@@ -1,4 +1,5 @@
 import React from 'react';
+import { BotSparkle24Regular } from '@fluentui/react-icons';
 import { ChatMessage } from './ChatMessage';
 import { TypingIndicator } from './TypingIndicator';
 import { A2UISurfaceWrapper } from '../A2UI/A2UISurfaceWrapper';
@@ -34,13 +35,7 @@ export function MessageList({ messages, isStreaming, streamingText, streamingSur
       {/* Streaming message (being generated) — shows text and any components that arrive progressively */}
       {isStreaming && (streamingText || hasStreamingSurfaces) && (
         <div className="chat-bubble-row">
-          <img
-            src="/assets/icons/compute/aks-automatic.svg"
-            alt=""
-            className="assistant-avatar"
-            width="28"
-            height="28"
-          />
+          <BotSparkle24Regular className="assistant-avatar" />
           <div className="chat-bubble assistant streaming">
             {streamingText && (
               <>
