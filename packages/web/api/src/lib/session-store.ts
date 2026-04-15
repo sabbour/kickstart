@@ -179,14 +179,17 @@ export function extractArtifactMetadata(
   return { filename, language: language || inferLanguage(filename), bicepResources, k8sResources };
 }
 
-/** Upsert an artifact into the list — replace if same filename exists. Caps at MAX_TRACKED_ARTIFACTS. */
+/** Upsert an artifact into the list — keep the most recent entries, capped at MAX_TRACKED_ARTIFACTS. */
 export function upsertArtifact(list: GeneratedArtifact[], artifact: GeneratedArtifact): void {
   const idx = list.findIndex((a) => a.filename === artifact.filename);
+
   if (idx >= 0) {
-    list[idx] = artifact;
-  } else if (list.length < MAX_TRACKED_ARTIFACTS) {
-    list.push(artifact);
+    list.splice(idx, 1);
+  } else if (list.length >= MAX_TRACKED_ARTIFACTS) {
+    list.shift();
   }
+
+  list.push(artifact);
 }
 
 /**
