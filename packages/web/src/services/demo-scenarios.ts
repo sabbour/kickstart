@@ -36,28 +36,47 @@ const ARCHITECTURE: DemoResponse = {
   model: 'gpt-5.3-chat',
   typingDelay: 1800,
   a2uiMessages: surface('arch-surface', [
-    { id: 'root', component: 'Column', children: ['arch-card'] },
-    { id: 'arch-card', component: 'Card', child: 'arch-inner' },
-    { id: 'arch-inner', component: 'Column', children: ['arch-title', 'divider1', 'row1', 'row2', 'row3', 'row4', 'divider2', 'actions-row'], gap: 'small' },
-    { id: 'arch-title', component: 'Text', text: 'Your Architecture', variant: 'h2' },
-    { id: 'divider1', component: 'Divider' },
-    // Row 1: Frontend
-    { id: 'row1', component: 'Row', children: ['r1-label', 'r1-value'], gap: 'medium' },
-    { id: 'r1-label', component: 'Text', text: '**Frontend**', variant: 'subtitle2' },
-    { id: 'r1-value', component: 'Text', text: 'React 19 + TypeScript + Vite', variant: 'body2' },
-    // Row 2: API
-    { id: 'row2', component: 'Row', children: ['r2-label', 'r2-value'], gap: 'medium' },
-    { id: 'r2-label', component: 'Text', text: '**Backend**', variant: 'subtitle2' },
-    { id: 'r2-value', component: 'Text', text: 'Node.js + Express + TypeScript', variant: 'body2' },
-    // Row 3: Database
-    { id: 'row3', component: 'Row', children: ['r3-label', 'r3-value'], gap: 'medium' },
-    { id: 'r3-label', component: 'Text', text: '**Database**', variant: 'subtitle2' },
-    { id: 'r3-value', component: 'Text', text: 'Azure Cosmos DB (NoSQL)', variant: 'body2' },
-    // Row 4: Hosting
-    { id: 'row4', component: 'Row', children: ['r4-label', 'r4-value'], gap: 'medium' },
-    { id: 'r4-label', component: 'Text', text: '**Hosting**', variant: 'subtitle2' },
-    { id: 'r4-value', component: 'Text', text: 'AKS Automatic (zero-config Kubernetes)', variant: 'body2' },
-    { id: 'divider2', component: 'Divider' },
+    { id: 'root', component: 'Column', children: ['arch-tabs', 'actions-row'], gap: 'medium' },
+    { id: 'arch-tabs', component: 'Tabs', children: ['tab-arch', 'tab-cost', 'tab-included'] },
+
+    // Tab 1: Architecture diagram
+    { id: 'tab-arch', component: 'Column', children: ['arch-diagram'], label: 'Architecture' },
+    { id: 'arch-diagram', component: 'ArchitectureDiagram',
+      title: 'Proposed Architecture',
+      diagram: `graph TD
+  User(("User")) -->|HTTPS| GW{{"Gateway (Istio)"}}
+
+  subgraph AKS["AKS Automatic"]
+    GW --> API["Node.js + Express<br/>(2-10 replicas)"]
+  end
+
+  ACR["Container Registry"] -.->|image pull| API
+  API --> DB[("Azure Cosmos DB")]
+  API -->|Workload Identity| KV["Key Vault"]
+
+  GHA["GitHub Actions"] -.->|build and push| ACR`,
+    },
+
+    // Tab 2: Cost Estimate
+    { id: 'tab-cost', component: 'Column', children: ['cost-est'], label: 'Cost Estimate' },
+    { id: 'cost-est', component: 'CostEstimate', title: 'Estimated Monthly Cost',
+      currency: 'USD',
+      total: 129,
+      resources: [
+        { name: 'AKS Automatic', sku: 'Standard', monthlyEstimate: 72 },
+        { name: 'Container Registry', sku: 'Basic', monthlyEstimate: 5 },
+        { name: 'Cosmos DB', sku: 'Serverless', monthlyEstimate: 25 },
+        { name: 'Key Vault', sku: 'Standard', monthlyEstimate: 5 },
+        { name: 'Application Gateway', sku: 'Standard v2', monthlyEstimate: 22 },
+      ],
+    },
+
+    // Tab 3: What's Included
+    { id: 'tab-included', component: 'Column', children: ['included-card'], label: "What's Included" },
+    { id: 'included-card', component: 'Card', child: 'included-md' },
+    { id: 'included-md', component: 'Markdown', content: '### Included by default\n\n- **Auto-scaling** — 2–10 replicas based on CPU utilization\n- **Health checks** — liveness and readiness probes on all containers\n- **Zero-downtime deploys** — rolling updates via GitHub Actions\n- **Workload Identity** — no secrets in code; Key Vault for all credentials\n- **Resource limits** — CPU and memory limits prevent noisy-neighbour issues' },
+
+    // Actions
     { id: 'actions-row', component: 'Row', children: ['approve-btn', 'modify-btn'], gap: 'small' },
     { id: 'approve-btn', component: 'Button', label: "Looks good, let's build it", variant: 'primary',
       action: { event: { name: 'approve-arch' } } },
