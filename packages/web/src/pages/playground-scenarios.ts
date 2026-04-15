@@ -172,12 +172,9 @@ const inputButton = (): A2uiMsg[] => {
     { id: 'root', component: 'Column', children: ['heading', 'btn-row'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'Button Variants', variant: 'h3' },
     { id: 'btn-row', component: 'Row', children: ['btn-primary', 'btn-outlined', 'btn-text'], gap: 'medium' },
-    { id: 'btn-primary', component: 'Button', child: 'bp-label', variant: 'primary', action: { event: { name: 'deploy' } } },
-    { id: 'bp-label', component: 'Text', text: 'Deploy Now' },
-    { id: 'btn-outlined', component: 'Button', child: 'bo-label', variant: 'outlined', action: { event: { name: 'preview' } } },
-    { id: 'bo-label', component: 'Text', text: 'Preview' },
-    { id: 'btn-text', component: 'Button', child: 'bt-label', variant: 'text', action: { event: { name: 'cancel' } } },
-    { id: 'bt-label', component: 'Text', text: 'Cancel' },
+    { id: 'btn-primary', component: 'Button', label: 'Deploy Now', variant: 'primary', action: { event: { name: 'deploy' } } },
+    { id: 'btn-outlined', component: 'Button', label: 'Preview', variant: 'outlined', action: { event: { name: 'preview' } } },
+    { id: 'btn-text', component: 'Button', label: 'Cancel', variant: 'text', action: { event: { name: 'cancel' } } },
   ] as A2uiComponent[]);
 };
 
@@ -247,16 +244,13 @@ const inputModal = (): A2uiMsg[] => {
     { id: 'root', component: 'Column', children: ['heading', 'modal1'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'Modal Component', variant: 'h3' },
     { id: 'modal1', component: 'Modal', trigger: 'modal-trigger', content: 'modal-content' },
-    { id: 'modal-trigger', component: 'Button', child: 'trigger-label', variant: 'primary' },
-    { id: 'trigger-label', component: 'Text', text: 'Open confirmation' },
+    { id: 'modal-trigger', component: 'Button', label: 'Open confirmation', variant: 'primary' },
     { id: 'modal-content', component: 'Column', children: ['mc-title', 'mc-body', 'mc-actions'], gap: 'medium' },
     { id: 'mc-title', component: 'Text', text: 'Confirm deployment', variant: 'h3' },
     { id: 'mc-body', component: 'Text', text: 'This will deploy your application to the production environment. Are you sure?', variant: 'body1' },
     { id: 'mc-actions', component: 'Row', children: ['mc-confirm', 'mc-cancel'], gap: 'medium' },
-    { id: 'mc-confirm', component: 'Button', child: 'mc-confirm-label', variant: 'primary', action: { event: { name: 'confirm-deploy' } } },
-    { id: 'mc-confirm-label', component: 'Text', text: 'Deploy' },
-    { id: 'mc-cancel', component: 'Button', child: 'mc-cancel-label', variant: 'outlined' },
-    { id: 'mc-cancel-label', component: 'Text', text: 'Cancel' },
+    { id: 'mc-confirm', component: 'Button', label: 'Deploy', variant: 'primary', action: { event: { name: 'confirm-deploy' } } },
+    { id: 'mc-cancel', component: 'Button', label: 'Cancel', variant: 'outlined' },
   ] as A2uiComponent[]);
 };
 
@@ -886,10 +880,8 @@ const fileEditorCreateFlow = (): A2uiMsg[] => {
       ],
     },
     { id: 'actions', component: 'Row', children: ['accept-btn', 'edit-btn'], gap: 'medium' },
-    { id: 'accept-btn', component: 'Button', child: 'accept-label', variant: 'primary', action: { event: { name: 'accept-files' } } },
-    { id: 'accept-label', component: 'Text', text: 'Accept All' },
-    { id: 'edit-btn', component: 'Button', child: 'edit-label', variant: 'outlined', action: { event: { name: 'edit-files' } } },
-    { id: 'edit-label', component: 'Text', text: 'Edit Before Saving' },
+    { id: 'accept-btn', component: 'Button', label: 'Accept All', variant: 'primary', action: { event: { name: 'accept-files' } } },
+    { id: 'edit-btn', component: 'Button', label: 'Edit Before Saving', variant: 'outlined', action: { event: { name: 'edit-files' } } },
   ] as A2uiComponent[]);
 };
 
@@ -954,10 +946,8 @@ router.delete('/api/users/:id', async (req, res) => {
 export default router;`,
       },
       { id: 'actions', component: 'Row', children: ['save-btn', 'revert-btn'], gap: 'medium' },
-      { id: 'save-btn', component: 'Button', child: 'save-label', variant: 'primary', action: { event: { name: 'save-file' } } },
-      { id: 'save-label', component: 'Text', text: 'Save Changes' },
-      { id: 'revert-btn', component: 'Button', child: 'revert-label', variant: 'outlined', action: { event: { name: 'revert-file' } } },
-      { id: 'revert-label', component: 'Text', text: 'Revert' },
+      { id: 'save-btn', component: 'Button', label: 'Save Changes', variant: 'primary', action: { event: { name: 'save-file' } } },
+      { id: 'revert-btn', component: 'Button', label: 'Revert', variant: 'outlined', action: { event: { name: 'revert-file' } } },
     ] } } as A2uiMsg,
   ];
 };
@@ -1243,10 +1233,8 @@ const phaseReviewScenario = (): A2uiMsg[] => {
     { id: 'ck4', component: 'CheckBox', label: '⚠️ Autoscaler max replicas set to 8 (consider increasing for production)', value: true },
     { id: 'ck5', component: 'CheckBox', label: '✅ Resource quotas defined', value: true },
     { id: 'actions', component: 'Row', children: ['deploy-btn', 'back-btn'], gap: 'medium' },
-    { id: 'deploy-btn', component: 'Button', child: 'deploy-label', variant: 'primary', action: { event: { name: 'approve-deploy' } } },
-    { id: 'deploy-label', component: 'Text', text: 'Approve & Deploy' },
-    { id: 'back-btn', component: 'Button', child: 'back-label', variant: 'outlined', action: { event: { name: 'back-to-generate' } } },
-    { id: 'back-label', component: 'Text', text: 'Back to Generate' },
+    { id: 'deploy-btn', component: 'Button', label: 'Approve & Deploy', variant: 'primary', action: { event: { name: 'approve-deploy' } } },
+    { id: 'back-btn', component: 'Button', label: 'Back to Generate', variant: 'outlined', action: { event: { name: 'back-to-generate' } } },
   ] as A2uiComponent[]);
 };
 
