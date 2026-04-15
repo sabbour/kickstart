@@ -1306,7 +1306,7 @@ const kitGitHubAuth = (): A2uiMsg[] => {
     {
       id: 'desc',
       component: 'Text',
-      text: 'The GitHub kit registers an AuthCard with the github-oauth provider. It renders an OAuth Device Flow sign-in card that connects to the GitHub connector.',
+      text: 'The GitHub kit registers an AuthCard with the github-oauth provider. It renders a server-owned OAuth sign-in card that keeps GitHub tokens off the browser surface.',
       variant: 'body2',
     },
     { id: 'auth-card', component: 'AuthCard', provider: 'github' },
@@ -1517,7 +1517,7 @@ const domainGitHubLogin = (): A2uiMsg[] => {
   return surface(sid, [
     { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-login'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'GitHubLoginCard', variant: 'h3' },
-    { id: 'desc', component: 'Text', text: 'GitHub authentication card with device code flow. Sign in to connect your repositories.', variant: 'body2' },
+    { id: 'desc', component: 'Text', text: 'GitHub authentication card with a server-owned OAuth flow. Sign in to connect your repositories.', variant: 'body2' },
     { id: 'gh-login', component: 'GitHubLoginCard' },
   ] as A2uiComponent[]);
 };

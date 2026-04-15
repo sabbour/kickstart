@@ -10,11 +10,11 @@
  *   - github_repo_file_read  (read individual files for manifest inspection)
  *
  * Provided connectors:
- *   - GitHubConnector    (GitHub REST API with OAuth Device Flow + PAT auth)
+ *   - GitHubConnector    (GitHub REST API with injected OAuth auth)
  *
  * Component registrations (rendered by packages/web):
- *   - AuthCard            (OAuth Device Flow sign-in card, provider: "github")
- *   - githubRepoPicker   (repository picker with search and client-side filtering)
+ *   - AuthCard           (server-owned GitHub OAuth sign-in card, provider: "github")
+ *   - GitHubRepoPicker   (owner-aware repository picker with real create/list flows)
  */
 
 import type { IntegrationKit } from './types.js';
@@ -131,10 +131,11 @@ export const githubKit: IntegrationKit = {
       'Walk the user through getting their generated files into GitHub:\n' +
       '  1. Ask: new repo or push to existing? Use ChoicePicker.\n' +
       '  2. Show AuthCard for GitHub sign-in if needed.\n' +
-      '  3. Verify OIDC federation is set up — ask the user to confirm that AZURE_CLIENT_ID, AZURE_TENANT_ID, and ' +
+      '  3. After GitHub sign-in, use GitHubRepoPicker so the user can pick a personal/org owner, choose an existing repo, or create a new repo.\n' +
+      '  4. Verify OIDC federation is set up — ask the user to confirm that AZURE_CLIENT_ID, AZURE_TENANT_ID, and ' +
       'AZURE_SUBSCRIPTION_ID are configured as repository secrets. If not, walk the user through the setup.\n' +
-      '  4. After push: "Your workflow will deploy automatically on every push to {branch}."\n' +
-      '  5. Offer a Codespaces link so they can edit and iterate in the browser.',
+      '  5. After push: "Your workflow will deploy automatically on every push to {branch}."\n' +
+      '  6. Offer a Codespaces link so they can edit and iterate in the browser.',
     ],
 
     [Phase.Deploy]: [
@@ -149,20 +150,32 @@ export const githubKit: IntegrationKit = {
     {
       type: 'AuthCard',
       description:
-        'GitHub sign-in card (provider: "github"). Uses OAuth Device Flow.\n' +
+        'GitHub sign-in card (provider: "github"). Uses a server-owned OAuth authorization-code flow.\n' +
         'Props:\n' +
         '  - provider (required string): Must be "github".\n' +
         '  - title (optional string): Card heading. Defaults to "GitHub".\n' +
         '  - description (optional string): Subheading text.',
+      promptMeta: {
+        category: 'domain',
+        example: '{"id":"auth-github","component":"AuthCard","provider":"github","title":"Sign in to GitHub","description":"Connect your GitHub account so we can choose an owner and repository for these generated files."}',
+      },
     },
     {
-      type: 'githubRepoPicker',
+      type: 'GitHubRepoPicker',
       description:
-        'Repository picker with search and client-side filtering.\n' +
+        'Repository picker with real owner selection, repo search, and optional repo creation.\n' +
         'Props:\n' +
+        '  - owner (optional string): Initial owner login to select.\n' +
         '  - placeholder (optional string): Placeholder text for the search input. Defaults to "Search repositories…".\n' +
         '  - selectedRepo (optional string): Full name (owner/repo) of the pre-selected repository.\n' +
+        '  - suggestedName (optional string): Suggested name when creating a new repository.\n' +
+        '  - allowCreate (optional boolean): Show the create-new-repository flow. Defaults to true.\n' +
         '  - onSelect (optional action): Callback fired when the user selects a repository.',
+      promptMeta: {
+        category: 'domain',
+        example: '{"id":"ghp1","component":"GitHubRepoPicker","owner":"sabbour","allowCreate":true,"suggestedName":"my-kickstart-app"}',
+        notes: 'This component can handle both existing-repository selection and new-repository creation after GitHub auth succeeds.',
+      },
     },
   ],
 

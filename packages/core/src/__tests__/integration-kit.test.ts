@@ -432,11 +432,11 @@ describe('githubKit', () => {
     }
   });
 
-  it('registers component types for AuthCard and githubRepoPicker', () => {
+  it('registers component types for AuthCard and GitHubRepoPicker', () => {
     expect(githubKit.components).toBeDefined();
     const types = githubKit.components!.map((c) => c.type);
     expect(types).toContain('AuthCard');
-    expect(types).toContain('githubRepoPicker');
+    expect(types).toContain('GitHubRepoPicker');
   });
 
   it('declares github-oauth auth requirement', () => {

@@ -521,7 +521,10 @@ const GitHubRepoPickerPropsSchema = z
     id: boundedString,
     component: z.literal("GitHubRepoPicker"),
     placeholder: dynamicString.optional(),
+    owner: dynamicString.optional(),
     selectedRepo: dynamicString.optional(),
+    suggestedName: dynamicString.optional(),
+    allowCreate: z.boolean().optional(),
     onSelect: actionSchema.optional(),
   })
   .strip();
