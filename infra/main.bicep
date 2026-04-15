@@ -49,6 +49,10 @@ param openAiApiKey string = ''
 @description('Entra ID client secret. When provided, stored in Key Vault and referenced by SWA.')
 param entraClientSecret string = ''
 
+@secure()
+@description('Secret used to encrypt and sign opaque Azure deployment run IDs.')
+param deployRunSecret string = ''
+
 // ── Key Vault ───────────────────────────────────────────────────
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
@@ -80,6 +84,15 @@ resource secretEntraClientSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' 
   name: 'entra-client-secret'
   properties: {
     value: entraClientSecret
+    contentType: 'text/plain'
+  }
+}
+
+resource secretDeployRun 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(deployRunSecret)) {
+  parent: keyVault
+  name: 'deploy-run-secret'
+  properties: {
+    value: deployRunSecret
     contentType: 'text/plain'
   }
 }
@@ -143,10 +156,14 @@ var apiKeySetting = !empty(openAiApiKey)
   ? { AZURE_OPENAI_API_KEY: '@Microsoft.KeyVault(SecretUri=${keyVault.properties.vaultUri}secrets/openai-api-key)' }
   : {}
 
-resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = if (!empty(entraClientId) || !empty(openAiApiKey)) {
+var deployRunSecretSetting = !empty(deployRunSecret)
+  ? { DEPLOY_RUN_SECRET: '@Microsoft.KeyVault(SecretUri=${keyVault.properties.vaultUri}secrets/deploy-run-secret)' }
+  : {}
+
+resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = if (!empty(entraClientId) || !empty(openAiApiKey) || !empty(deployRunSecret)) {
   parent: staticWebApp
   name: 'appsettings'
-  properties: union(baseAppSettings, clientSecretSetting, apiKeySetting)
+  properties: union(baseAppSettings, clientSecretSetting, apiKeySetting, deployRunSecretSetting)
 }
 
 // ── Custom Domain ───────────────────────────────────────────────

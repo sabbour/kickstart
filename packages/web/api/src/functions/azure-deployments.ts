@@ -14,6 +14,9 @@ import {
   isSessionOwnedBy,
 } from "../lib/session-store.js";
 
+const DEPLOY_START_RATE_LIMIT = { maxRequests: 5, windowMs: 60_000 };
+const DEPLOY_POLL_RATE_LIMIT = { maxRequests: 60, windowMs: 60_000 };
+
 function requireBearerToken(request: HttpRequest): string {
   const authHeader = request.headers.get("authorization")?.trim();
   if (!authHeader?.toLowerCase().startsWith("bearer ")) {
@@ -35,7 +38,11 @@ app.http("azure-deployments-start", {
     request: HttpRequest,
     context: InvocationContext,
   ): Promise<HttpResponseInit> => {
-    const rateCheck = checkRateLimit(request);
+    const rateCheck = checkRateLimit(
+      request,
+      DEPLOY_START_RATE_LIMIT.maxRequests,
+      DEPLOY_START_RATE_LIMIT.windowMs,
+    );
     if (!rateCheck.allowed) {
       return rateLimitResponse(rateCheck.retryAfterMs!);
     }
@@ -98,7 +105,11 @@ app.http("azure-deployments-status", {
     request: HttpRequest,
     context: InvocationContext,
   ): Promise<HttpResponseInit> => {
-    const rateCheck = checkRateLimit(request);
+    const rateCheck = checkRateLimit(
+      request,
+      DEPLOY_POLL_RATE_LIMIT.maxRequests,
+      DEPLOY_POLL_RATE_LIMIT.windowMs,
+    );
     if (!rateCheck.allowed) {
       return rateLimitResponse(rateCheck.retryAfterMs!);
     }
@@ -112,7 +123,7 @@ app.http("azure-deployments-status", {
       const accessToken = requireBearerToken(request);
       const runId = request.params["runId"] ?? "";
       const decoded = decodeRunId(runId);
-      if (decoded.principalId !== principalId) {
+      if (decoded.pid !== principalId) {
         throw new AzureApiError(403, "forbidden_run", "This deployment run belongs to a different user.");
       }
 

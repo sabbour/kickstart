@@ -129,6 +129,9 @@ app.http("converse", {
       // client sent its message history, hydrate a new session from it so
       // the LLM retains full conversational context across cold starts.
       const principalId = getPrincipalId(request);
+      if (!principalId) {
+        return { status: 403, jsonBody: { error: "Sign in to Kickstart before sending messages." } };
+      }
       let session = body.sessionId
         ? getSession(body.sessionId)
         : undefined;

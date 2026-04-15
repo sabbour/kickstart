@@ -243,6 +243,9 @@ app.http("action", {
 
       // --- Resolve session (hydrate from client history on cold start) ---
       const principalId = getPrincipalId(request);
+      if (!principalId) {
+        return { status: 403, jsonBody: { error: "Sign in to Kickstart before invoking actions." } };
+      }
       let session = getSession(body.sessionId);
       if (session && !isSessionOwnedBy(session, principalId)) {
         return {

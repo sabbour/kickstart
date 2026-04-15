@@ -1,4 +1,10 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  randomUUID,
+} from "node:crypto";
 import type { AzureContext } from "@kickstart/core";
 import {
   createResourceGroup,
@@ -18,12 +24,22 @@ import type {
   DeployErrorState,
   DeployState,
 } from "./session-store.js";
-import { getSession } from "./session-store.js";
+import { appendAuditEvent, getSession, isSessionOwnedBy } from "./session-store.js";
 
 const RESOURCE_GROUP_RE = /^[-\w.()]{1,90}$/;
 const DEPLOYMENT_NAME_RE = /^[A-Za-z0-9._()\-]{1,64}$/;
 const HEALTH_CHECK_TIMEOUT_MS = 10_000;
 const HEALTH_CHECK_GRACE_MS = 15 * 60 * 1000;
+const RUN_ID_PURPOSE = "kickstart-azure-run";
+const RUN_ID_TTL_MS = 8 * 60 * 60 * 1000;
+const ALLOWED_APP_URL_OUTPUTS = [
+  "appUrl",
+  "applicationUrl",
+  "url",
+  "defaultHostname",
+  "hostname",
+  "fqdn",
+] as const;
 
 export interface CostGateInput {
   estimatedMonthlyTotal: number;
@@ -76,8 +92,11 @@ export interface DeploymentStatusResponse {
 }
 
 interface DeploymentRunPayload {
-  principalId: string;
-  sessionId: string;
+  v: 1;
+  sid: string;
+  pid: string;
+  dk: string;
+  exp: number;
   subscriptionId: string;
   resourceGroup: string;
   deploymentName: string;
@@ -140,6 +159,24 @@ function sanitizeHealthCheckPath(value?: string): string {
   return candidate;
 }
 
+function sanitizeAppUrlOutput(value?: string): string | undefined {
+  const candidate = value?.trim();
+  if (!candidate) return undefined;
+  if (!ALLOWED_APP_URL_OUTPUTS.includes(candidate as typeof ALLOWED_APP_URL_OUTPUTS[number])) {
+    throw new AzureApiError(
+      400,
+      "invalid_app_url_output",
+      "appUrlOutput must use an allowlisted deployment output name.",
+      undefined,
+      false,
+      [
+        `Use one of: ${ALLOWED_APP_URL_OUTPUTS.join(", ")}.`,
+      ],
+    );
+  }
+  return candidate;
+}
+
 function getRunTokenSecret(): string {
   const secret = process.env.DEPLOY_RUN_SECRET?.trim()
     || process.env.GITHUB_SESSION_SECRET?.trim()
@@ -161,40 +198,109 @@ function getRunTokenSecret(): string {
   return secret;
 }
 
-function signRunToken(encodedPayload: string): string {
-  return createHmac("sha256", getRunTokenSecret())
-    .update(encodedPayload)
+function deriveKey(secret: string, purpose: string): Buffer {
+  return createHash("sha256")
+    .update(secret)
+    .update(":")
+    .update(purpose)
+    .digest();
+}
+
+function computeDeploymentKey(
+  subscriptionId: string,
+  resourceGroup: string,
+  deploymentName: string,
+): string {
+  return createHash("sha256")
+    .update(subscriptionId.toLowerCase())
+    .update(":")
+    .update(resourceGroup.toLowerCase())
+    .update(":")
+    .update(deploymentName.toLowerCase())
     .digest("base64url");
 }
 
-function equalSignature(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left, "utf8");
-  const rightBuffer = Buffer.from(right, "utf8");
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return timingSafeEqual(leftBuffer, rightBuffer);
+function sealRunPayload(payload: DeploymentRunPayload): string {
+  const iv = randomBytes(12);
+  const key = deriveKey(getRunTokenSecret(), RUN_ID_PURPOSE);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  cipher.setAAD(Buffer.from(RUN_ID_PURPOSE));
+
+  const plaintext = Buffer.from(JSON.stringify(payload), "utf8");
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return [
+    iv.toString("base64url"),
+    tag.toString("base64url"),
+    ciphertext.toString("base64url"),
+  ].join(".");
 }
 
-function createRunId(payload: DeploymentRunPayload): string {
-  const encodedPayload = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  return `${encodedPayload}.${signRunToken(encodedPayload)}`;
-}
-
-export function decodeRunId(runId: string): DeploymentRunPayload {
-  const [encodedPayload, signature] = runId.split(".", 2);
-  if (!encodedPayload || !signature) {
+function unsealRunPayload(runId: string): DeploymentRunPayload {
+  const [ivPart, tagPart, dataPart] = runId.split(".");
+  if (!ivPart || !tagPart || !dataPart) {
     throw new AzureApiError(400, "invalid_run_id", "Deployment run ID is malformed.");
   }
 
-  const expectedSignature = signRunToken(encodedPayload);
-  if (!equalSignature(signature, expectedSignature)) {
+  try {
+    const key = deriveKey(getRunTokenSecret(), RUN_ID_PURPOSE);
+    const decipher = createDecipheriv(
+      "aes-256-gcm",
+      key,
+      Buffer.from(ivPart, "base64url"),
+    );
+    decipher.setAAD(Buffer.from(RUN_ID_PURPOSE));
+    decipher.setAuthTag(Buffer.from(tagPart, "base64url"));
+
+    const plaintext = Buffer.concat([
+      decipher.update(Buffer.from(dataPart, "base64url")),
+      decipher.final(),
+    ]).toString("utf8");
+
+    return JSON.parse(plaintext) as DeploymentRunPayload;
+  } catch {
     throw new AzureApiError(400, "invalid_run_id", "Deployment run ID could not be verified.");
   }
+}
 
-  try {
-    return JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as DeploymentRunPayload;
-  } catch {
+function createRunId(payload: DeploymentRunPayload): string {
+  return sealRunPayload(payload);
+}
+
+export function decodeRunId(runId: string): DeploymentRunPayload {
+  const payload = unsealRunPayload(runId);
+
+  if (
+    payload.v !== 1
+    || !payload.sid
+    || !payload.pid
+    || !payload.dk
+    || !payload.subscriptionId
+    || !payload.resourceGroup
+    || !payload.deploymentName
+  ) {
     throw new AzureApiError(400, "invalid_run_id", "Deployment run ID payload is invalid.");
   }
+
+  if (payload.exp <= Date.now()) {
+    throw new AzureApiError(410, "run_id_expired", "Deployment run ID has expired.");
+  }
+
+  const expectedDeploymentKey = computeDeploymentKey(
+    payload.subscriptionId,
+    payload.resourceGroup,
+    payload.deploymentName,
+  );
+  if (payload.dk !== expectedDeploymentKey) {
+    throw new AzureApiError(
+      400,
+      "invalid_run_id",
+      "Deployment run ID payload did not pass verification.",
+    );
+  }
+
+  return payload;
 }
 
 function pollUrlFor(runId: string): string {
@@ -248,12 +354,7 @@ function extractAppUrl(
 ): string | undefined {
   const candidates = [
     preferredOutput,
-    "appUrl",
-    "applicationUrl",
-    "url",
-    "defaultHostname",
-    "hostname",
-    "fqdn",
+    ...ALLOWED_APP_URL_OUTPUTS,
   ].filter((value): value is string => Boolean(value));
 
   for (const candidate of candidates) {
@@ -309,7 +410,7 @@ function extractDeploymentError(deployment: ArmDeploymentInfo): DeploymentErrorP
   return deploymentErrorPayload(
     error.code ?? "deployment_failed",
     error.message,
-    ["Review the Azure deployment error payload and fix the invalid resource settings before retrying."],
+    ["Review the Azure deployment in the Azure Portal or CLI and fix the invalid resource settings before retrying."],
   );
 }
 
@@ -383,6 +484,15 @@ export function recordCostGate(session: ApiSession, input: CostGateInput): Deplo
     appUrl: undefined,
     lastError: undefined,
   });
+  appendAuditEvent(session, {
+    type: "cost_gate_acknowledged",
+    actorPrincipalId: session.ownerPrincipalId,
+    details: {
+      estimatedMonthlyTotal: costGate.estimatedMonthlyTotal,
+      currency: costGate.currency,
+      source: costGate.source,
+    },
+  });
 
   return session.deployState;
 }
@@ -453,10 +563,49 @@ export async function persistAzureTarget(
     appUrl: undefined,
     lastError: undefined,
   });
+  appendAuditEvent(session, {
+    type: "azure_target_selected",
+    actorPrincipalId: session.ownerPrincipalId,
+    details: {
+      subscriptionId: azureContext.subscriptionId,
+      resourceGroup: azureContext.resourceGroup,
+      region: azureContext.region ?? null,
+      createIfMissing: input.createIfMissing === true,
+    },
+  });
 
   return {
     azureContext,
     deployState: session.deployState,
+  };
+}
+
+async function revalidateAzureContext(
+  accessToken: string,
+  azureContext: AzureContext,
+): Promise<AzureContext> {
+  const subscription = await getSubscriptionInfo(accessToken, azureContext.subscriptionId);
+  if (subscription.state !== "Enabled") {
+    throw new AzureApiError(
+      400,
+      "subscription_not_enabled",
+      `Subscription "${subscription.displayName}" is not enabled for deployments.`,
+    );
+  }
+
+  const resourceGroupInfo = await getResourceGroupInfo(
+    accessToken,
+    azureContext.subscriptionId,
+    azureContext.resourceGroup,
+  );
+
+  return {
+    subscriptionId: subscription.subscriptionId,
+    subscriptionDisplayName: subscription.displayName,
+    resourceGroup: resourceGroupInfo.name,
+    resourceGroupId: resourceGroupInfo.id,
+    region: resourceGroupInfo.location || azureContext.region,
+    tenantId: subscription.tenantId,
   };
 }
 
@@ -483,26 +632,40 @@ export async function startAzureDeployment(
     );
   }
 
+  if (!session.ownerPrincipalId || session.ownerPrincipalId !== principalId) {
+    throw new AzureApiError(403, "forbidden_session", "This session belongs to a different user.");
+  }
+
+  const validatedAzureContext = await revalidateAzureContext(accessToken, azureContext as AzureContext);
+  session.state.azureContext = validatedAzureContext;
   const deploymentName = sanitizeDeploymentName(input.deploymentName, input.mainFile);
+  const appUrlOutput = sanitizeAppUrlOutput(input.appUrlOutput);
   const healthCheckPath = sanitizeHealthCheckPath(input.healthCheckPath);
   const compiled = await compileBicepFiles(input.mainFile, input.files);
 
   await submitResourceGroupDeployment(
     accessToken,
-    azureContext.subscriptionId,
-    azureContext.resourceGroup,
+    validatedAzureContext.subscriptionId,
+    validatedAzureContext.resourceGroup,
     deploymentName,
     compiled.template,
     normalizeArmParameters(input.parameters),
   );
 
   const runPayload: DeploymentRunPayload = {
-    principalId,
-    sessionId: session.state.sessionId,
-    subscriptionId: azureContext.subscriptionId,
-    resourceGroup: azureContext.resourceGroup,
+    v: 1,
+    sid: session.state.sessionId,
+    pid: principalId,
+    dk: computeDeploymentKey(
+      validatedAzureContext.subscriptionId,
+      validatedAzureContext.resourceGroup,
+      deploymentName,
+    ),
+    exp: Date.now() + RUN_ID_TTL_MS,
+    subscriptionId: validatedAzureContext.subscriptionId,
+    resourceGroup: validatedAzureContext.resourceGroup,
     deploymentName,
-    appUrlOutput: input.appUrlOutput?.trim() || undefined,
+    appUrlOutput,
     healthCheckPath,
     startedAt: new Date().toISOString(),
   };
@@ -515,6 +678,16 @@ export async function startAzureDeployment(
     appUrl: undefined,
     lastError: undefined,
   });
+  appendAuditEvent(session, {
+    type: "azure_deployment_started",
+    actorPrincipalId: principalId,
+    details: {
+      subscriptionId: validatedAzureContext.subscriptionId,
+      resourceGroup: validatedAzureContext.resourceGroup,
+      deploymentName,
+      fileCount: input.files.length,
+    },
+  });
 
   return getAzureDeploymentStatus(accessToken, principalId, runId);
 }
@@ -525,7 +698,7 @@ export async function getAzureDeploymentStatus(
   runId: string,
 ): Promise<DeploymentStatusResponse> {
   const run = decodeRunId(runId);
-  if (run.principalId !== principalId) {
+  if (run.pid !== principalId) {
     throw new AzureApiError(403, "forbidden_run", "This deployment run belongs to a different user.");
   }
 
@@ -613,7 +786,7 @@ export async function getAzureDeploymentStatus(
           "app_url_missing",
           "Deployment completed, but no real app URL output was produced.",
           [
-            "Add an output such as appUrl, applicationUrl, url, or defaultHostname to the main Bicep file.",
+            `Add one of the allowlisted outputs to the main Bicep file: ${ALLOWED_APP_URL_OUTPUTS.join(", ")}.`,
           ],
         )
         : undefined
@@ -638,7 +811,11 @@ export async function getAzureDeploymentStatus(
       ? "complete"
       : "running";
 
-  const session = getSession(run.sessionId);
+  const session = getSession(run.sid);
+  if (session && !isSessionOwnedBy(session, principalId)) {
+    throw new AzureApiError(403, "forbidden_run", "This deployment run belongs to a different user.");
+  }
+  const previousStage = session?.deployState.stage;
   updateSessionDeployState(session, {
     stage: overallStatus === "complete" ? "succeeded" : overallStatus === "error" ? "failed" : "deploying",
     activeRunId: runId,
@@ -646,6 +823,29 @@ export async function getAzureDeploymentStatus(
     appUrl,
     lastError: derivedError as DeployErrorState | undefined,
   });
+  if (session && previousStage !== session.deployState.stage) {
+    if (overallStatus === "complete") {
+      appendAuditEvent(session, {
+        type: "azure_deployment_succeeded",
+        actorPrincipalId: principalId,
+        details: {
+          subscriptionId: run.subscriptionId,
+          resourceGroup: run.resourceGroup,
+          deploymentName: run.deploymentName,
+        },
+      });
+    } else if (overallStatus === "error") {
+      appendAuditEvent(session, {
+        type: "azure_deployment_failed",
+        actorPrincipalId: principalId,
+        details: {
+          subscriptionId: run.subscriptionId,
+          resourceGroup: run.resourceGroup,
+          deploymentName: run.deploymentName,
+        },
+      });
+    }
+  }
 
   return {
     runId,

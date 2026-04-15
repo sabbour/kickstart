@@ -61,7 +61,8 @@ The API needs Azure OpenAI credentials to power the conversation engine. Edit `p
     "AZURE_OPENAI_DEPLOYMENT": "gpt-4o",
     "AZURE_CLIENT_ID": "e71a23c6-aeb4-459a-88fc-07ff96fc9b92",
     "AZURE_TENANT_ID": "d91aa5af-8c1e-442c-b77c-0b92988b387b",
-    "AZURE_CLIENT_SECRET": "<your-client-secret>"
+    "AZURE_CLIENT_SECRET": "<your-client-secret>",
+    "DEPLOY_RUN_SECRET": "<32+ char random secret>"
   }
 }
 ```

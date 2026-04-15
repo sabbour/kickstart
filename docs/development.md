@@ -55,7 +55,8 @@ The API needs Azure OpenAI to power the conversation engine. Create `packages/we
     "AZURE_OPENAI_CODEX_DEPLOYMENT": "gpt-5.3-codex",
     "AZURE_CLIENT_ID": "<your-entra-client-id>",
     "AZURE_TENANT_ID": "<your-entra-tenant-id>",
-    "AZURE_CLIENT_SECRET": "<your-client-secret>"
+    "AZURE_CLIENT_SECRET": "<your-client-secret>",
+    "DEPLOY_RUN_SECRET": "<32+ char random secret>"
   }
 }
 ```

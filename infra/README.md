@@ -63,6 +63,7 @@ The SWA auth config in `staticwebapp.config.json` references these app settings 
 | `AZURE_CLIENT_ID` | Bicep parameter (`entraClientId`) — not a secret |
 | `AZURE_TENANT_ID` | Derived from `subscription().tenantId` in Bicep — not a secret |
 | `AZURE_CLIENT_SECRET` | Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`) |
+| `DEPLOY_RUN_SECRET` | Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`) |
 | `AZURE_OPENAI_API_KEY` | Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`) |
 | `AZURE_OPENAI_ENDPOINT` | Bicep parameter — not a secret |
 | `AZURE_OPENAI_*_DEPLOYMENT` | Bicep parameters — not secrets |
@@ -80,7 +81,8 @@ az deployment group create \
   --parameters @infra/parameters.dev.json \
   --parameters \
     openAiApiKey='<your-api-key>' \
-    entraClientSecret='<your-secret>'
+    entraClientSecret='<your-secret>' \
+    deployRunSecret='<32+ char random secret>'
 ```
 
 **To rotate a secret**, update it in Key Vault:

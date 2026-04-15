@@ -77,12 +77,9 @@ function sanitizeCode(rawCode: string | undefined, fallback: string): string {
 async function readArmError(response: Response): Promise<AzureApiError> {
   let message = `Azure request failed (${response.status}).`;
   let code = sanitizeCode(response.statusText, "azure_request_failed");
-  let details: unknown;
 
   try {
     const body = (await response.json()) as ArmErrorEnvelope & Record<string, unknown>;
-    details = body;
-
     const error = body.error;
     if (typeof error?.message === "string" && error.message.trim()) {
       message = error.message.trim();
@@ -98,7 +95,7 @@ async function readArmError(response: Response): Promise<AzureApiError> {
     response.status,
     code,
     message,
-    details,
+    undefined,
     response.status === 429 || response.status >= 500,
   );
 }

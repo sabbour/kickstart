@@ -43,9 +43,6 @@ export function azureErrorResponse(
 } {
   if (err instanceof AzureApiError) {
     context.error(`${label}: ${err.code} ${err.message}`);
-    if (err.details !== undefined) {
-      context.error(`${label} details: ${JSON.stringify(err.details)}`);
-    }
 
     return {
       status: err.status,
