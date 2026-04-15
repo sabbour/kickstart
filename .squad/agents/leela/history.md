@@ -59,15 +59,19 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 ## 2026-04-15 E2E Demo Sprint Planning
 
 - **Sprint plan built** for making Kickstart demo-ready with no faking/mocking
-- **Scope trade decision:** Demo ends at PR creation, not AKS deployment. Azure auth/provisioning deferred to next sprint. Honest, not faked.
-- **Critical path:** #298 (surface ownership) → #275 (progressive flow) + #274 (GitHub OAuth) → #271 (deployment unblocked)
-- **Dependency cluster confirmed:** #269 closed by #274, #271 closed by #274 + #275 combination
+- ~~**Scope trade decision:** Demo ends at PR creation~~ → **REVERSED v3:** Full E2E including Azure auth + deployment per Ahmed directive
+- **PR #297 ships immediately** (Option A) — closes #271, #269. Makes Review terminal with ZIP download. Safety net while real auth lands.
+- **GitHub OAuth App exists** — #274 no longer has external blockers. Registration risk removed.
+- **Azure auth/deployment IN SCOPE** — MSAL device-code auth, ARM provisioning for AKS Automatic. Needs new issue creation.
+- **Critical path:** PR #297 (merge now) → #298 (surface fix) → #275 (progressive flow, design for 6 phases) + #274 (GitHub OAuth, unblocked) → Azure MSAL + AKS deploy → full 6-phase E2E
+- **Conditional phase activation:** Handoff/Deploy re-enable when auth tokens present. 4-phase flow stays default for unauthenticated users.
+- **#274 patterns inform Azure auth** — GitHub OAuth device flow establishes the auth UX; Azure MSAL follows same structure.
 - **Deferred:** #272 (live pricing) and #277 (token tracker) — both self-described as non-blockers
 - **Coding agent candidates:** #296 (subtitle sweep) and #299 (debug placement) — mechanical, well-scoped
-- **Zapp mandatory** on #274 — OAuth is security-critical per routing rules
-- **3 parallel tracks** after #298: Flow (#275→#271), GitHub (#274), Polish (#300/#265/#273/#296/#299)
-- **#300 added** (arch diagram prompt depth) — prompt-only fix, lands before #273 (ELK engine). Bender owns prompt changes.
-- **Try-AKS reference path corrected** to `/mnt/c/Users/asabbour/Git/adaptive-ui`
+- **Zapp mandatory** on #274 AND Azure auth — both are security boundary crossings
+- **4 parallel tracks** after #298: Wizard Flow (#275), GitHub (#274), Azure (new), Polish (#300/#265/#273/#296/#299)
+- **#300** (arch diagram prompt depth) — prompt-only fix, lands before #273 (ELK engine). Bender owns.
+- **Try-AKS reference:** `/mnt/c/Users/asabbour/Git/adaptive-ui`
 - **Key files:** Sprint plan at `.squad/decisions/inbox/leela-e2e-sprint-plan.md`
 
 ## 2026-04-15 Architecture Diagram Depth Decision

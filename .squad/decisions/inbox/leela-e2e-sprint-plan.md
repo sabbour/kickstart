@@ -3,27 +3,42 @@
 # Decision: E2E Demo Sprint Plan — No Faking, No Mocking
 
 **Date:** 2026-04-15T09:34:03.404Z
+**Updated:** 2026-04-15T09:34:03.404Z
 **Author:** Leela (Lead)
-**Status:** Proposed
+**Status:** Active (v3 — scope expanded per Ahmed directive)
 **Scope:** Sprint plan for making Kickstart end-to-end demo ready with real integrations
 
 ---
 
 ## Goal
 
-A user walks through Kickstart from "describe your app" to "PR created on a real GitHub repo with a working GitHub Actions workflow" — zero fakes, zero mocks, zero dead ends.
+A user walks through Kickstart from "describe your app" through file generation, GitHub repo creation, and Azure deployment — **zero fakes, zero mocks, zero dead ends.** Full pipeline, all real.
 
-## Scope Trade (Critical Decision)
+## Scope (Revised)
 
-**The E2E demo ends at PR creation, not AKS deployment.** Here's why:
+~~**v1 scope trade:** Demo ended at PR creation. Azure bits deferred.~~
 
-- Real GitHub OAuth + repo creation + file commit + PR is achievable this sprint
-- Real Azure auth + AKS provisioning is a separate epic (needs Azure OAuth, ARM APIs, provisioning wait states)
-- The PR includes a GitHub Actions workflow that deploys to AKS — so deployment is real, just triggered by merge, not by the app
-- This is honest, not faked: "merge this PR and GitHub Actions deploys to AKS Automatic"
-- #271 (deployment flow blocked) gets resolved by: (a) #274 provides real GitHub flow, (b) #275's prompt guardrails prevent the LLM from entering unimplemented phases
+**v3 scope (current):** Full E2E including Azure auth and deployment. Ahmed's directive: "include the Azure bits too." The GitHub OAuth App now exists — #274 is unblocked. No more external blockers.
 
-**What we defer:** Azure auth, in-app AKS provisioning, live deployment status tracking. These become the next sprint.
+**Demo flow target:**
+```
+DISCOVER → DESIGN → GENERATE → REVIEW → HANDOFF (GitHub) → DEPLOY (Azure)
+```
+
+Every phase backed by real infrastructure. Handoff/Deploy re-enabled conditionally (only when auth tokens are present).
+
+---
+
+## What Already Shipped / Ships Now
+
+### PR #297 — Ship Immediately (Option A)
+
+| Closes | What it does |
+|--------|-------------|
+| **#271** | Makes Review terminal (`nextPhase = null`), adds `client:download-project` action routing, wires ZIP download. No more dead-end screens. |
+| **#269** | Prompt guardrail: LLM cannot hallucinate "repo created" cards. Engine prevents reaching Handoff/Deploy. |
+
+**Action:** Merge PR #297 now. It's the safety net — users get a clean flow even before GitHub/Azure integration lands. Handoff/Deploy phases are deprecated but retained in code, ready for conditional re-enablement.
 
 ---
 
@@ -33,112 +48,134 @@ A user walks through Kickstart from "describe your app" to "PR created on a real
 
 | # | Issue | Type | Why it's first |
 |---|-------|------|----------------|
-| 1 | **#298** — Chat surface ownership + phase bar regression | Bug (critical) | Surfaces mutate earlier turns, phase bar doesn't render. If the chat can't correctly own and render A2UI components per-turn, nothing downstream works. Every other issue touches chat rendering. |
+| 1 | **PR #297** | Fix (critical) | Merge now. Stops the dead-end flow. Closes #271, #269. Foundation for everything below. |
+| 2 | **#298** — Chat surface ownership + phase bar regression | Bug (critical) | Surfaces mutate earlier turns, phase bar doesn't render. Every other issue touches chat rendering. |
 
-**Duration:** 1–2 sessions. Small surface area (useA2UI, useStreaming, MessageList, ChatMessage).
-
-### TIER 2 — Demo Spine (the real flow, in order)
+### TIER 2 — Demo Spine (the real flow)
 
 | # | Issue | Type | Depends on | Why this order |
 |---|-------|------|------------|----------------|
-| 2 | **#275** — Progressive conversation flow | Feature (critical) | #298 | The wizard skeleton. One-step-at-a-time pacing, phase state tracking, prompt guardrails. This is the connective tissue that makes the entire demo feel guided vs dumped. Also adds guardrails that prevent LLM from entering unimplemented phases (solving #271). |
-| 3 | **#274** — GitHub OAuth + real repo flow | Feature (high) | #298 | Core differentiator. Real sign-in, real org selection, real repo creation, real file commit, real PR. Automatically closes #269 (fake repo card). Needs Zapp security review (OAuth is security-critical). |
-| 4 | **#271** — Deployment flow unblocked | Bug (high) | #274, #275 | Resolved by combination: #274 replaces fake repo card, #275's prompt guardrails scope the demo to end at PR creation. Residual work: register AuthCard component shell (renders "coming soon" or redirects to GitHub Actions). |
+| 3 | **#275** — Progressive conversation flow | Feature (critical) | #298 | The wizard skeleton. One-step-at-a-time pacing, phase state tracking. Must work for both current 4-phase flow AND future 6-phase flow when Handoff/Deploy re-activate. |
+| 4 | **#274** — GitHub OAuth + real repo flow | Feature (high) | #298 | **UNBLOCKED — OAuth App exists.** Real sign-in, org selection, repo creation, file commit, PR. Re-enables Handoff phase conditionally. Needs Zapp security review. |
+| 5 | **NEW** — Azure MSAL auth + AKS deployment flow | Feature (high) | #274 | Azure device-code/browser auth via MSAL. ARM API calls for AKS Automatic provisioning. Re-enables Deploy phase conditionally. **Needs issue creation.** Needs Zapp security review. |
 
-### TIER 3 — Demo Polish (parallel track, no ordering dependencies)
+**The #269/#271/#274 cluster is now resolved:** #269 and #271 closed by PR #297. #274 stands alone as real GitHub integration (unblocked).
+
+### TIER 3 — Demo Polish (parallel track)
 
 | # | Issue | Type | Depends on | Notes |
 |---|-------|------|------------|-------|
-| 5 | **#265** — File manager experience | Feature | #298 | Wire generated files into FileManagerSidebar, compact file list in chat. Independent of auth flow. |
-| 6 | **#300** — Architecture diagram prompt-layer depth | Feature | none | Prompt-only fix: make LLM produce diagrams with AKS subgraphs, ACR, Key Vault, Gateway, GitHub Actions. No component API changes. Quick win — ships before #273 and improves current Mermaid rendering immediately. |
-| 7 | **#273** — Architecture diagram (ELK + icons) | Feature | none | Self-contained component. ELK layout engine, Azure icons, zoom. Can start immediately. #300 (prompt depth) should land first — ELK rendering benefits from richer diagram input. |
-| 8 | **#299** — Debug action-event placement | Bug | none | Move debug output to separate panel. Quick fix, 1 session. |
-| 9 | **#296** — Subtitle 1 title sweep | Bug | none | Typography normalization across 11 components. Quick fix, 1 session. |
+| 6 | **#265** — File manager experience | Feature | #298 | Wire generated files into FileManagerSidebar, compact file list in chat. |
+| 7 | **#300** — Architecture diagram prompt-layer depth | Feature | none | Prompt-only fix: AKS subgraphs, ACR, Key Vault, Gateway. Quick win, ships before #273. |
+| 8 | **#273** — Architecture diagram (ELK + icons) | Feature | none | ELK layout engine, Azure icons, zoom. Benefits from #300 landing first. |
+| 9 | **#299** — Debug action-event placement | Bug | none | Move debug output to separate panel. Quick fix. |
+| 10 | **#296** — Subtitle 1 title sweep | Bug | none | Typography normalization across 11 components. Quick fix. |
 
-### TIER 4 — Deferred (next sprint, after E2E works)
+### TIER 4 — Deferred (after E2E works)
 
 | # | Issue | Type | Why defer |
 |---|-------|------|-----------|
-| 9 | **#272** — Live Azure pricing | Feature | Issue itself says "not a demo blocker." Fallback to estimated pricing is acceptable for demo. |
-| 10 | **#277** — Session token/cost tracker | Feature | Issue itself says "not a blocker." Nice-to-have for cost awareness demos. |
+| 11 | **#272** — Live Azure pricing | Feature | "Not a demo blocker" per issue. Estimated pricing acceptable for demo. |
+| 12 | **#277** — Session token/cost tracker | Feature | "Not a blocker" per issue. Nice-to-have for cost demos. |
 
 ---
 
 ## Dependency Graph
 
 ```
+PR #297 (merge now) ─── closes #271, #269
+  │
 #298 (surface ownership)
-  ├── #275 (progressive flow) ──┐
-  ├── #274 (GitHub OAuth) ──────┤── #271 (deployment unblocked)
-  ├── #265 (file manager)       │
-  │                             │
-  #300 (arch diagram prompt) ──(independent, land before #273)
-  #273 (arch diagram ELK) ────(independent, benefits from #300)
+  ├── #275 (progressive flow) ──────────────────┐
+  ├── #274 (GitHub OAuth — UNBLOCKED) ──────────┤── re-enable Handoff
+  ├── #265 (file manager)                       │
+  │                                             ├── NEW: Azure MSAL + AKS deploy
+  │                                             │        ── re-enable Deploy
+  #300 (arch diagram prompt) ── lands before ── #273 (arch diagram ELK)
   #299 (debug placement) ──────(independent)
   #296 (subtitle sweep) ───────(independent)
 ```
 
 ## Parallel Tracks
 
-Once #298 lands, three tracks can run simultaneously:
+After #297 merges and #298 lands:
 
-- **Track A (Flow):** #275 → #271 — Bender (prompt/backend) + Fry (frontend)
-- **Track B (GitHub):** #274 — Bender (OAuth backend) + Fry (A2UI components) + Zapp (security review)
-- **Track C (Polish):** #300, #265, #273, #296, #299 — #300 is prompt-only (Bender), rest is Fry (interleaved between Track A/B frontend work)
+- **Track A (Wizard Flow):** #275 — Bender (prompt/backend) + Fry (frontend). Must design phase state to support conditional 4-phase or 6-phase flow.
+- **Track B (GitHub):** #274 — Bender (OAuth service, device flow, pushTree, GitHubConnector) + Fry (A2UI components: GitHubLoginCard, AccountSelector, RepoForm, CommitCard, PRCard) + Zapp (security review). Re-enables Handoff phase.
+- **Track C (Azure):** NEW — Bender (MSAL auth, ARM provisioning API, AKS Automatic resource creation) + Fry (AuthCard for Azure, DeploymentProgress with real status) + Zapp (security review). Re-enables Deploy phase.
+- **Track D (Polish):** #300, #265, #273, #296, #299 — interleaved with Tracks A–C.
 
-Track A and Track B converge at #271 (deployment unblocked).
+Tracks B and C can run in parallel once #298 and #275 are stable. Track C depends on Track B patterns (auth flow established by GitHub OAuth informs Azure auth structure).
 
 ---
 
 ## Execution Plan — Squad Assignment
 
+### Phase 0: Ship Now
+
+| Item | Assignee | Work |
+|------|----------|------|
+| **Merge PR #297** | **Leela** (approve) | Merge Option A. Review terminal, download action, prompt guardrails. Closes #271, #269. |
+
 ### Phase 1: Foundation (Day 1)
 
 | Issue | Assignee | Work |
 |-------|----------|------|
-| **#298** | **Fry** | Fix surface ownership in useA2UI/useStreaming, restore phase bar rendering, add turn-scoped surface IDs |
-| **#300** | **Bender** | Prompt-layer depth fix: update system-prompt.ts, component-catalog.ts, demo-scenarios.ts. No component changes. Reference: `/mnt/c/Users/asabbour/Git/adaptive-ui` (Try-AKS checkout). |
-| **#273** | **Fry** (can start in parallel — independent) | Begin ELK layout engine swap, Azure icon integration. Reference: `/mnt/c/Users/asabbour/Git/adaptive-ui` |
-| **#296** | **Fry** or **@copilot** | Subtitle 1 sweep — 11 files, mechanical change. Good candidate for coding agent with Fry review. |
-| **#299** | **Fry** or **@copilot** | Debug panel extraction — small, well-scoped. Good candidate for coding agent with Fry review. |
+| **#298** | **Fry** | Fix surface ownership in useA2UI/useStreaming, restore phase bar rendering, turn-scoped surface IDs |
+| **#300** | **Bender** | Prompt-layer depth fix: system-prompt.ts, component-catalog.ts, demo-scenarios.ts. Ref: `/mnt/c/Users/asabbour/Git/adaptive-ui` |
+| **#296** | **@copilot** (Fry reviews) | Subtitle 1 sweep — 11 files, mechanical. |
+| **#299** | **@copilot** (Fry reviews) | Debug panel extraction — small, well-scoped. |
 
 ### Phase 2: Core Flow (Day 1–2, starts when #298 merges)
 
 | Issue | Assignee | Work |
 |-------|----------|------|
-| **#275** | **Bender** (prompt + backend phase state) + **Fry** (frontend phase UI) | System prompt rewrite for one-step-at-a-time pacing, phase state tracking in backend, transition templates, guardrails preventing unimplemented phases |
-| **#274** | **Bender** (OAuth service, GitHub API integration) + **Fry** (OAuthCard, AccountSelector, RepoForm, CommitCard, PRCard A2UI components) | GitHub OAuth flow end-to-end. **Zapp must review** before merge (OAuth is security-critical). |
+| **#275** | **Bender** (prompt + backend phase state) + **Fry** (frontend phase UI) | Progressive flow with phase state machine that supports conditional 4→6 phase expansion. Design phase transitions so Handoff/Deploy activate when auth tokens are present. |
+| **#274** | **Bender** (OAuth device flow, GitHub API service, GitHubConnector.pushTree) + **Fry** (GitHubLoginCard, AccountSelector, RepoForm, CommitCard, PRCard) | Full GitHub OAuth integration. Wire real device codes. Create repos, commit files, open PRs. Re-enable Handoff phase conditionally. Ref: `/mnt/c/Users/asabbour/Git/adaptive-ui`. **Zapp must review before merge.** |
 | **#265** | **Fry** | Wire VirtualFS → FileManagerSidebar, compact file cards in chat, progress card rename |
 
-### Phase 3: Convergence (Day 2–3)
+### Phase 3: Azure Integration (Day 2–3, starts when #274 patterns are established)
 
 | Issue | Assignee | Work |
 |-------|----------|------|
-| **#271** | **Bender** + **Fry** | Verify #274 + #275 resolve the dead end. Register minimal AuthCard component. Update prompt to end flow at PR creation. |
-| **#273** | **Fry** (continued) | Finish ELK diagram if not done in Phase 1. #300 prompt depth should be merged by now — ELK rendering benefits from richer input. |
-| All | **Hermes** | E2E test pass: full flow from app description → file generation → GitHub repo creation → PR |
-| All | **Zapp** | Security review of #274 OAuth implementation |
+| **NEW: Azure auth + deploy** | **Bender** (MSAL device-code auth, ARM REST API for AKS Automatic, deployment status polling) + **Fry** (AuthCard Azure rendering, DeploymentProgress real status) | Azure MSAL auth flow. AKS Automatic cluster + ACR provisioning via ARM. Re-enable Deploy phase conditionally. Follow auth patterns from #274. **Zapp must review before merge.** |
+| **#273** | **Fry** (continued) | Finish ELK diagram. #300 should be merged by now. Ref: `/mnt/c/Users/asabbour/Git/adaptive-ui` |
 
-### Phase 4: Ship (Day 3)
+### Phase 4: Convergence + Ship (Day 3–4)
 
 | Task | Assignee |
 |------|----------|
-| Integration test: full E2E walkthrough | **Hermes** |
-| Final review of merged state | **Leela** |
+| E2E test: full 6-phase flow (Discover → Deploy) | **Hermes** |
+| Security review: #274 OAuth + Azure MSAL + ARM calls | **Zapp** |
+| Conditional flow test: 4-phase (no auth) vs 6-phase (auth present) | **Hermes** |
+| Final architecture review | **Leela** |
 | Release cut | **Bender** |
 
 ---
 
-## Key Decisions Made
+## Key Decisions
 
-1. **Demo ends at PR creation** — not AKS deployment. Honest scope boundary.
-2. **#269 is closed by #274** — no separate fix needed for fake repo card.
-3. **#271 is closed by #274 + #275** — combination of real GitHub flow and prompt guardrails.
-4. **#272 and #277 are deferred** — not demo blockers per their own descriptions.
-5. **#296 and #299 are coding agent candidates** — mechanical, well-scoped, Fry reviews.
-6. **Zapp mandatory on #274** — OAuth is a security boundary crossing.
-7. **#300 lands before #273** — prompt depth improves current Mermaid rendering immediately; ELK swap (#273) benefits from richer diagram input.
-8. **Try-AKS reference checkout** is at `/mnt/c/Users/asabbour/Git/adaptive-ui` — use for #273, #274, #275, #300 reference implementations.
+1. **PR #297 ships now** — immediate safety net, closes #271 and #269.
+2. **Full E2E through Azure deployment is IN SCOPE** — scope trade reversed per Ahmed directive.
+3. **GitHub OAuth App exists** — #274 has no external blockers. Remove registration risk.
+4. **Azure auth/deploy needs a new issue** — Leela or Ahmed should create it, scoped to: MSAL auth, ARM provisioning, Deploy phase re-enablement.
+5. **Handoff/Deploy re-enabled conditionally** — phases activate only when auth tokens are present. 4-phase flow remains the default for unauthenticated users.
+6. **#275 must design for 6 phases** — progressive flow should account for the full pipeline, not just 4 phases.
+7. **#274 patterns inform Azure auth** — GitHub OAuth device flow establishes the auth UX pattern; Azure MSAL follows the same structure.
+8. **#272 and #277 remain deferred** — not demo blockers.
+9. **#296 and #299 are coding agent candidates** — mechanical, well-scoped, Fry reviews.
+10. **Zapp mandatory on #274 AND Azure auth** — both are security boundary crossings.
+11. **Try-AKS reference:** `/mnt/c/Users/asabbour/Git/adaptive-ui` for #273, #274, #275, #300, and Azure auth reference.
+
+---
+
+## Issue Hygiene — Action Items
+
+| Action | Owner |
+|--------|-------|
+| Merge PR #297 | Ahmed / Leela |
+| Create issue: "Azure MSAL auth + AKS Automatic deployment flow" | Leela (recommend) |
+| Update #274 description: remove "blocked by OAuth App registration" note | Leela |
 
 ---
 
@@ -146,10 +183,13 @@ Track A and Track B converge at #271 (deployment unblocked).
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| GitHub OAuth requires SWA auth proxy config changes | Medium | High — blocks #274 | Bender investigates SWA auth config early in Phase 2. Fallback: use SWA's built-in GitHub auth provider. |
-| Progressive flow prompt changes break existing scenarios | Medium | Medium | Hermes runs regression tests after #275 lands. Prompt changes are iterative, not big-bang. |
-| ELK layout engine (#273) is larger than estimated | Low | Low — not on critical path | Can ship demo without ELK; Mermaid diagram is functional, just not pretty. |
-| Surface ownership fix (#298) has deeper root cause | Low | High — blocks everything | Fry has the context from original #182 work. If stuck > 1 session, Leela escalates for pair debugging. |
+| ~~GitHub OAuth App registration missing~~ | ~~N/A~~ | ~~N/A~~ | **RESOLVED — App exists.** |
+| SWA auth proxy needs config for GitHub OAuth callback | Medium | High — blocks #274 | Bender investigates SWA auth config in Phase 2 day 1. Fallback: SWA built-in GitHub auth provider. |
+| Azure MSAL + ARM provisioning is larger than 1 sprint | Medium | Medium | Scope to AKS Automatic only (no custom clusters). Use ARM REST directly (no Terraform/Bicep in-app). Provisioning can be fire-and-forget with status polling. |
+| Progressive flow prompt changes break existing scenarios | Medium | Medium | Hermes runs regression tests after #275. Iterative prompt changes. |
+| ELK layout engine (#273) larger than estimated | Low | Low — not on critical path | Ship without ELK; Mermaid is functional. |
+| Surface ownership fix (#298) has deeper root cause | Low | High — blocks everything | Fry has context from #182. Escalate to pair debugging if stuck > 1 session. |
+| Conditional phase activation adds state complexity | Medium | Medium | Keep it simple: check for auth token presence at phase boundary. No complex feature flags. |
 
 ---
 
@@ -159,9 +199,12 @@ A human can:
 1. Open Kickstart, describe an app
 2. See progressive guided conversation (one step at a time)
 3. See generated files in file manager sidebar (not dumped as code blocks)
-4. See architecture diagram with AKS subgraphs, ACR, Key Vault, Gateway (not flat 4-node graph)
+4. See architecture diagram with AKS subgraphs, ACR, Key Vault, Gateway
 5. Sign in to GitHub with real OAuth
-6. Select a real org, create a real repo
-7. Commit generated files to the repo
-8. Create a PR with a GitHub Actions workflow
-9. Zero fake cards, zero dead ends, zero "coming soon" modals in the happy path
+6. Select a real org, create a real repo, commit files, create a PR
+7. Sign in to Azure with real MSAL auth
+8. Provision AKS Automatic cluster + ACR via ARM
+9. See real deployment status (not fake progress cards)
+10. **Without auth:** Flow ends at Review with project download (PR #297 baseline)
+11. **With auth:** Full 6-phase flow through deployment
+12. Zero fake cards, zero dead ends, zero hallucinated success messages
