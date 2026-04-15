@@ -86,7 +86,6 @@ export function useStreaming() {
     let lastModel: string | undefined;
     let lastSessionId: string | undefined;
     let lastPhase: string | undefined;
-    const renderDecisions: string[] = [];
     const debugA2uiMessages: any[] = [];
 
     try {
@@ -187,7 +186,6 @@ export function useStreaming() {
               if (parsed.model) lastModel = parsed.model;
               if (parsed.sessionId) lastSessionId = parsed.sessionId;
               if (parsed.phase) callbacks.onPhase(parsed.phase);
-              if (parsed.renderDecisions) renderDecisions.push(...parsed.renderDecisions);
               currentEventType = '';
               continue;
             }
@@ -233,9 +231,6 @@ export function useStreaming() {
               lastSessionId = event.sessionId;
             }
 
-            if (event.renderDecisions) {
-              renderDecisions.push(...event.renderDecisions);
-            }
           } catch { /* skip malformed JSON */ }
         }
       }
@@ -280,9 +275,7 @@ export function useStreaming() {
               a2ui: debugA2uiMessages.length > 0 ? debugA2uiMessages : undefined,
               model: lastModel,
               phase: lastPhase,
-              renderDecisions: renderDecisions.length > 0 ? renderDecisions : undefined,
             },
-            renderDecisions: renderDecisions.length > 0 ? renderDecisions : undefined,
           }
         : undefined;
 
