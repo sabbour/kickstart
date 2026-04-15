@@ -1,6 +1,6 @@
 # A2UI Component Extension Guide
 
-> How to add new components, register them across the stack, teach the LLM to use them, and build playground scenarios.
+> How to add new components, register them across the stack, teach the LLM to use them, and build playground scenarios — including fat components with built-in authentication, validation, and state management.
 
 This guide walks through the full lifecycle of extending Kickstart's A2UI component system — from defining a React component to seeing it rendered by the LLM in production.
 
@@ -14,7 +14,13 @@ This guide walks through the full lifecycle of extending Kickstart's A2UI compon
 4. [Teaching the LLM to Use Your Component](#4-teaching-the-llm-to-use-your-component)
 5. [Adding a Playground Scenario](#5-adding-a-playground-scenario)
 6. [Fluent 2 Styling Conventions](#6-fluent-2-styling-conventions)
-7. [Checklist](#7-checklist)
+7. [Understanding Fat Components](#7-understanding-fat-components)
+8. [Built-in Fat Components](#8-built-in-fat-components)
+9. [Building Your Own Fat Component](#9-building-your-own-fat-component)
+10. [Security Considerations for Fat Components](#10-security-considerations-for-fat-components)
+11. [Testing Fat Components](#11-testing-fat-components)
+12. [Component Metadata and Integration Kits](#12-component-metadata-and-integration-kits)
+13. [Checklist](#13-checklist)
 
 ---
 
@@ -825,7 +831,190 @@ All A2UI components must meet WCAG 2.1 AA:
 
 ---
 
-## 7. Checklist
+## 7. Understanding Fat Components
+
+### Key Insight: LLM Perspective
+
+**From the LLM's perspective, fat components look identical to any other component.** The LLM outputs the same `{ component: "GitHubLoginCard", ...props }` JSON structure. The **"fat" distinction is purely a frontend implementation pattern** — it describes how the component handles its internal logic, not how the LLM refers to it.
+
+The LLM doesn't need to know whether a component is "fat" or "normal." It just says:
+> "Render this component with these configuration props."
+
+The component author decides what to do with those props:
+- **Normal component**: Stateless UI that displays data passed from the parent
+- **Fat component**: Manages its own data fetching, authentication, loading states, and error handling internally
+
+### LLM Output Comparison
+
+Here's what the LLM produces for a normal component vs. a fat component. Notice they're identical:
+
+**Normal component — LLM output:**
+```json
+{
+  "component": "Text",
+  "text": "Click the button below",
+  "variant": "body1"
+}
+```
+
+**Fat component — LLM output (identical pattern!):**
+```json
+{
+  "component": "GitHubLoginCard",
+  "deviceCode": "ABCD-EFGH",
+  "verificationUrl": "https://github.com/login/device",
+  "expiresAt": "2025-01-01T12:30:00Z"
+}
+```
+
+The difference emerges **after rendering**:
+- The `Text` component simply displays the text.
+- The `GitHubLoginCard` component internally manages the OAuth flow, polls for authentication, stores tokens in memory, and handles errors—all without the LLM needing to orchestrate it.
+
+### Why Build Fat Components?
+
+Fat components encapsulate complexity that would otherwise require:
+- Multiple back-and-forth conversation turns to manage state
+- Complex orchestration logic in tool handlers
+- Manual error handling in the LLM's prompting
+
+By moving this complexity into the component itself, you reduce the LLM's cognitive load and make patterns reusable across conversations.
+
+---
+
+## 8. Built-in Fat Components
+
+Kickstart includes fat components for common security-critical workflows:
+
+### Azure Components
+| Component | Purpose | Handles Internally |
+|-----------|---------|-------------------|
+| **AzureLoginCard** | Device code auth flow for Azure MSAL | Token lifecycle, session state, logout clearing |
+| **AzureResourcePicker** | Browse subscriptions and list resources | ARM API calls, rate-limit handling, fallbacks |
+| **AzureResourceForm** | Collect deployment parameters | Input validation, cost estimation API calls |
+
+### GitHub Components
+| Component | Purpose | Handles Internally |
+|-----------|---------|-------------------|
+| **GitHubLoginCard** | Device code auth flow for GitHub OAuth | Token lifecycle, polling, session state |
+| **GitHubRepoPicker** | Search and select repositories | GitHub API calls, debounced search, pagination |
+| **GitHubAction** | Execute allowlisted GitHub API operations | Operation validation, typed confirmations for DELETE |
+| **GitHubCommit** | Create pull request with artifact selection | Branch validation, protected-branch guards, diff preview |
+
+---
+
+## 9. Building Your Own Fat Component
+
+To create a fat component, follow the same registration process as a normal component (sections 2–5 above), but design the React component to:
+
+1. **Manage its own state** — Use `useState`, `useReducer`, or Zustand for internal state management
+2. **Fetch data** — Call APIs through registered `APIConnector` instances instead of expecting data from props
+3. **Handle errors gracefully** — Display error states internally without requiring LLM intervention
+4. **Manage async flows** — Use `useEffect` to orchestrate multi-step flows (auth, polling, validation)
+5. **Use registered connectors** — Access auth credentials and API clients through `APIConnectorRegistry`
+
+**Example: A simplified GitHubLoginCard pattern**
+
+```tsx
+import { useState, useEffect } from 'react';
+import { useConnector } from '../hooks/useConnector';
+
+export const CustomGitHubComponent = createReactComponent(api, ({ props }) => {
+  const github = useConnector('github');
+  const [state, setState] = useState('idle');
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    // Component orchestrates its own async flow
+    (async () => {
+      try {
+        setState('loading');
+        const result = await github.doSomething(props.config);
+        setData(result);
+        setState('success');
+      } catch (err) {
+        setState('error');
+      }
+    })();
+  }, [props.config]);
+
+  if (state === 'loading') return <Spinner />;
+  if (state === 'error') return <Alert variant="error" />;
+  return <RenderedContent data={data} />;
+});
+```
+
+The LLM simply passes config props; the component handles everything else.
+
+For fat components that need full control over their context bindings, use `createBinderlessComponent()` instead of `createReactComponent()` (see [section 2](#the-fat-component-pattern) for details).
+
+---
+
+## 10. Security Considerations for Fat Components
+
+Fat components that integrate with external services should implement:
+
+- **In-memory token storage** — Never localStorage for sensitive tokens
+- **Operation allowlisting** — Validate allowed operations before execution
+- **Typed confirmation** — Require explicit user confirmation for destructive operations
+- **Protected-branch guards** — Block writes to production branches
+- **Rate-limit handling** — Gracefully degrade with warnings when limits are hit
+
+See the [Architecture Guide](./architecture.md) for details on the CORS proxy security model and APIConnectorRegistry.
+
+---
+
+## 11. Testing Fat Components
+
+Fat components with internal async flows should be tested with:
+
+- **Unit tests** for state transitions and error handling
+- **Integration tests** for connector interactions
+- **E2E tests** in the Playground for user-facing flows
+
+Use the [Playground](https://kickstart.aks.azure.sabbour.me/?playground) to manually test component behavior with sample data before deployment.
+
+---
+
+## 12. Component Metadata and Integration Kits
+
+### Component Metadata
+
+When contributing a component to an IntegrationKit, include:
+
+1. **Description** — Clear, 1-sentence purpose
+2. **Props documentation** — Link to the `.api.ts` file or include an API comment block
+3. **LLM JSON example** — Show what the LLM produces in A2UI format
+4. **Security notes** — If the component handles auth, tokens, or write operations
+
+Example kit contribution:
+
+```typescript
+export const myKit: IntegrationKit = {
+  components: [
+    {
+      type: 'MyComponent',
+      description: 'Renders a custom widget with data fetching',
+      propsSchema: MyComponentApi, // TypeScript interface or Zod schema
+      securityNote: 'Handles token management internally',
+    },
+  ],
+};
+```
+
+### Relationship to Integration Kits
+
+Components can be contributed by **IntegrationKits** (`azure`, `github`, or custom kits) or registered globally in the main catalog.
+
+- **Kit components** are scoped to a kit's domain (e.g., GitHub components for repo operations)
+- **Global components** are available in all conversations
+- **Fat components** can be either, depending on whether they're domain-specific
+
+The LLM sees all registered components through the catalog and treats them uniformly.
+
+---
+
+## 13. Checklist
 
 Use this checklist when adding a new A2UI component:
 
