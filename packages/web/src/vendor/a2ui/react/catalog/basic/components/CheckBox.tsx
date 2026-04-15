@@ -19,6 +19,7 @@ import {createReactComponent} from '../../../adapter';
 import {CheckBoxApi} from '../../../../web_core/basic_catalog/index';
 import {Checkbox, Field, makeStyles, tokens} from '@fluentui/react-components';
 import type {CheckboxOnChangeData} from '@fluentui/react-components';
+import {replaceStatusEmoji} from '../../../../../../utils/statusIcons';
 
 const useStyles = makeStyles({
   root: {
@@ -42,7 +43,7 @@ export const CheckBox = createReactComponent(CheckBoxApi, ({props}) => {
         validationMessage={hasError ? props.validationErrors?.[0] : undefined}
         validationState={hasError ? 'error' : 'none'}
       >
-        <Checkbox checked={!!props.value} onChange={onChange} label={props.label || undefined} />
+        <Checkbox checked={!!props.value} onChange={onChange} label={props.label ? replaceStatusEmoji(props.label) : undefined} />
       </Field>
     </div>
   );

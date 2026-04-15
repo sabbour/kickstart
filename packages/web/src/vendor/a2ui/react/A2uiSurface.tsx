@@ -17,6 +17,7 @@
 import React, {useSyncExternalStore, memo, useMemo, useCallback} from 'react';
 import {type SurfaceModel, ComponentContext, type ComponentModel} from '../web_core/index';
 import type {ReactComponentImplementation} from './adapter';
+import {Warning20Filled} from '@fluentui/react-icons';
 
 const ResolvedChild = memo(
   ({
@@ -112,8 +113,8 @@ export const DeferredChild: React.FC<{
     console.warn(`[A2UI] No renderer registered for component type "${componentModel.type}" (id: ${id})`);
     if (process.env.NODE_ENV !== 'production') {
       return (
-        <div style={{color: '#d4820c', padding: '4px', fontSize: '12px'}}>
-          ⚠️ Unknown component: {componentModel.type}
+        <div style={{color: '#d4820c', padding: '4px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px'}}>
+          <Warning20Filled /> Unknown component: {componentModel.type}
         </div>
       );
     }
