@@ -61,7 +61,12 @@ function actionToMessage(action: A2uiClientAction): string {
       return context.selectedLabel;
     }
 
-    // 2. Prefer value / selectedValue — the user's actual selection
+    // 2. Prefer label — the button's user-facing text (e.g. "Looks good, generate the project")
+    if (typeof context.label === 'string' && context.label) {
+      return context.label;
+    }
+
+    // 3. Prefer value / selectedValue — the user's actual selection
     const rawValue = context.value ?? context.selectedValue;
     if (rawValue !== undefined && rawValue !== null && rawValue !== '') {
       const valueStr = Array.isArray(rawValue) ? rawValue.join(', ') : String(rawValue);
@@ -70,7 +75,7 @@ function actionToMessage(action: A2uiClientAction): string {
       }
     }
 
-    // 3. Build a compact summary from non-internal context keys (sanitized)
+    // 4. Build a compact summary from non-internal context keys (sanitized)
     const INTERNAL_KEYS = new Set(['label', 'selectedLabel', 'value', 'selectedValue']);
     const safeCtx = sanitizeActionContext(context);
     const contextParts: string[] = [];

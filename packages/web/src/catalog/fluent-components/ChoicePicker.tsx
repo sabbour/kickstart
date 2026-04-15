@@ -19,7 +19,6 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components';
-import { ArrowRight16Regular } from '@fluentui/react-icons';
 import { useMessageText } from '../../contexts/MessageTextContext';
 import { sanitizeActionContext } from '../../utils/sanitize-action-context';
 
@@ -102,10 +101,6 @@ const useStyles = makeStyles({
   continueVisible: {
     opacity: 1,
     transform: 'translateY(0)',
-  },
-  continueHint: {
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground3,
   },
 });
 
@@ -270,17 +265,13 @@ export const ChoicePicker = createReactComponent(FlexibleChoicePickerApi, ({prop
           aria-hidden={!showContinue}
         >
           <Button
-            appearance="subtle"
-            size="small"
-            icon={<ArrowRight16Regular />}
-            iconPosition="after"
+            appearance="primary"
             onClick={handleContinue}
             disabled={!showContinue}
             aria-label={`Continue with ${bestGuessLabel}`}
           >
             Continue{bestGuessLabel ? ` with ${bestGuessLabel}` : ''}
           </Button>
-          <span className={classes.continueHint}>best guess</span>
         </div>
       )}
     </div>
