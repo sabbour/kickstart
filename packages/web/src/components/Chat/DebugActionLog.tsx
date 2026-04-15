@@ -10,9 +10,7 @@ const useStyles = makeStyles({
     paddingTop: tokens.spacingVerticalS,
     paddingBottom: tokens.spacingVerticalS,
     borderRadius: tokens.borderRadiusMedium,
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: tokens.colorNeutralStroke2,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground1,
   },
   toggle: {

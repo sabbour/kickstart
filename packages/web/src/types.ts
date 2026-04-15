@@ -28,14 +28,16 @@ export interface ConversationPhaseStep {
   status?: string;
 }
 
-export interface A2uiPayloadItem {
+export interface ConversationPhasePayload {
   id?: string;
-  type?: string;
-  component?: string;
+  type: 'ConversationPhase';
+  component?: 'ConversationPhase';
   currentPhase?: string;
   phases?: ConversationPhaseStep[];
   [key: string]: unknown;
 }
+
+export type A2uiPayloadItem = A2uiMsg | ConversationPhasePayload;
 
 export interface DebugMetadata {
   /** Model name used for this response (e.g., "gpt-4o"). */

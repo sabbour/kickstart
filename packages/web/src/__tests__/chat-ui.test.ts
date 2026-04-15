@@ -97,7 +97,8 @@ describe('chat/debug UI regressions', () => {
     }];
 
     const useStateSpy = vi.spyOn(React, 'useState');
-    useStateSpy.mockImplementationOnce(((_initial: boolean) => [true, () => undefined]) as typeof React.useState);
+    const mockSetExpanded: React.Dispatch<React.SetStateAction<unknown>> = () => undefined;
+    useStateSpy.mockReturnValueOnce([true, mockSetExpanded] as ReturnType<typeof React.useState>);
 
     const markup = renderChatMessage({
       id: 'assistant-1',

@@ -30,10 +30,11 @@ export const CONVERSATION_PHASE_LABELS: Record<ConversationPhaseId, string> = {
 
 function isA2uiMessage(item: A2uiPayloadItem): item is A2uiMsg {
   return Boolean(
-    (item as A2uiMsg).createSurface
-    || (item as A2uiMsg).updateComponents
-    || (item as A2uiMsg).updateDataModel
-    || (item as A2uiMsg).deleteSurface,
+    'version' in item
+    || 'createSurface' in item
+    || 'updateComponents' in item
+    || 'updateDataModel' in item
+    || 'deleteSurface' in item,
   );
 }
 

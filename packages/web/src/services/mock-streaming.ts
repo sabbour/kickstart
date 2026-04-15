@@ -9,13 +9,13 @@
  */
 
 import { getDemoResponse, resetDemoState } from './demo-scenarios';
-import type { A2uiMsg } from '../types';
+import type { A2uiMsg, A2uiPayloadItem } from '../types';
 
 const MOCK_MODEL = 'gpt-5.3-chat (mock)';
 
 interface MockStreamCallbacks {
   onDelta: (text: string) => void;
-  onA2UI: (messages: A2uiMsg[]) => void;
+  onA2UI: (messages: A2uiPayloadItem[]) => void;
   onPhase: (phase: string) => void;
   onComplete: (fullText: string, model: string) => void;
   onError: (error: string) => void;

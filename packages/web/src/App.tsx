@@ -24,7 +24,7 @@ import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
 import type { VFSFile } from './services/virtual-fs';
-import type { AppMode, ChatMessage, A2uiMsg, A2uiPayloadItem } from './types';
+import type { AppMode, ChatMessage, A2uiPayloadItem } from './types';
 import {
   getLatestConversationPhase,
   normalizeConversationPhase,
@@ -109,7 +109,7 @@ export function App() {
   const streamingSurfaceIdsRef = useRef<string[]>([]);
 
   // Raw A2UI messages accumulated during streaming (for session persistence)
-  const streamingA2UIMessagesRef = useRef<A2uiMsg[]>([]);
+  const streamingA2UIMessagesRef = useRef<A2uiPayloadItem[]>([]);
 
   // Check API availability on mount (skip in mock mode — already true)
   useEffect(() => {
