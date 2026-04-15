@@ -2,8 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { DebugActionLog } from './DebugActionLog';
+import { TokenUsageTracker } from './TokenUsageTracker';
 import { useDebug } from '../../contexts/DebugContext';
-import type { ChatMessage } from '../../types';
+import type { ChatMessage, TokenUsageSummary } from '../../types';
 import type { SurfaceModel } from '../../vendor/a2ui/web_core/index';
 import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapter';
 import { CONVERSATION_PHASE_LABELS, CONVERSATION_PHASE_ORDER } from '../../utils/chat-a2ui';
@@ -17,9 +18,10 @@ interface ChatShellProps {
   onSend: (text: string) => void;
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
   debugEnabled?: boolean;
+  usageSummary?: TokenUsageSummary | null;
 }
 
-export function ChatShell({ messages, isStreaming, streamingText, streamingSurfaceIds, currentPhase, onSend, getSurface, debugEnabled }: ChatShellProps) {
+export function ChatShell({ messages, isStreaming, streamingText, streamingSurfaceIds, currentPhase, onSend, getSurface, debugEnabled, usageSummary }: ChatShellProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { actionLog } = useDebug();
 
@@ -62,7 +64,11 @@ export function ChatShell({ messages, isStreaming, streamingText, streamingSurfa
           <div ref={messagesEndRef} />
         </div>
       </div>
-      <ChatInput onSend={onSend} disabled={isStreaming} />
+      <ChatInput
+        onSend={onSend}
+        disabled={isStreaming}
+        statusBar={usageSummary ? <TokenUsageTracker usage={usageSummary} /> : undefined}
+      />
     </div>
   );
 }

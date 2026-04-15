@@ -12,6 +12,8 @@
 
 import type { OpenAIToolDefinition, ToolCall } from "@kickstart/core";
 import { sanitizeToolOutput } from "./sanitize-tool-output.js";
+import { normalizeChatUsage, sumChatUsage } from "./usage-tracking.js";
+import type { ChatUsage } from "./usage-tracking.js";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -37,6 +39,8 @@ export interface ChatCompletionResult {
   finishReason: string;
   /** Tool calls requested by the LLM (present when finishReason is "tool_calls"). */
   toolCalls?: ToolCall[];
+  /** Token usage returned by the provider for this completion. */
+  usage?: ChatUsage;
 }
 
 export interface CodexCompletionOptions {
@@ -178,6 +182,11 @@ export async function chatCompletion(
       message: { content: string | null; tool_calls?: ToolCall[] };
       finish_reason: string;
     }>;
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
   };
 
   const choice = data.choices[0];
@@ -185,6 +194,7 @@ export async function chatCompletion(
     content: choice.message.content ?? "",
     finishReason: choice.finish_reason,
     toolCalls: choice.message.tool_calls,
+    usage: normalizeChatUsage(data.usage),
   };
 }
 
@@ -202,12 +212,17 @@ export async function chatCompletionWithTools(
   maxToolRounds = 5,
 ): Promise<ChatCompletionResult> {
   const workingMessages: ChatMessage[] = [...messages];
+  let accumulatedUsage: ChatUsage | undefined;
 
   for (let round = 0; round < maxToolRounds; round++) {
     const result = await chatCompletion(workingMessages, options);
+    accumulatedUsage = sumChatUsage(accumulatedUsage, result.usage);
 
     if (result.finishReason !== "tool_calls" || !result.toolCalls?.length) {
-      return result;
+      return {
+        ...result,
+        usage: accumulatedUsage,
+      };
     }
 
     // Append the assistant's tool-call message
@@ -236,7 +251,11 @@ export async function chatCompletionWithTools(
   }
 
   // Exceeded max rounds — do a final call without tools to get a text response
-  return chatCompletion(workingMessages, { ...options, tools: undefined });
+  const finalResult = await chatCompletion(workingMessages, { ...options, tools: undefined });
+  return {
+    ...finalResult,
+    usage: sumChatUsage(accumulatedUsage, finalResult.usage),
+  };
 }
 
 /**
