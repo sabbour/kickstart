@@ -27,10 +27,7 @@ export interface DebugMetadata {
     a2ui?: A2uiMsg[];
     model?: string;
     phase?: string;
-    renderDecisions?: string[];
   };
-  /** Rendering engine decisions (component choices, catalog, degradation). */
-  renderDecisions?: string[];
 }
 
 export interface ChatMessage {
@@ -103,6 +100,4 @@ export interface StreamEvent {
   phase?: string;
   model?: string;
   sessionId?: string;
-  /** Debug-only: rendering decisions from the engine. */
-  renderDecisions?: string[];
 }

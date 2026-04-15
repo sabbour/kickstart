@@ -1177,7 +1177,6 @@ function PlaygroundInner() {
         a2ui?: object[];
         model?: string;
         rawResponse?: string;
-        renderDecisions?: string[];
       };
 
       if (data.sessionId && !createSessionIdRef.current) {
@@ -1210,7 +1209,7 @@ function PlaygroundInner() {
 
       // Capture debug metadata when debug mode is on
       const debugInfo: DebugMetadata | undefined = debugEnabled
-        ? { model: data.model, rawResponse: data.rawResponse, renderDecisions: data.renderDecisions }
+        ? { model: data.model, rawResponse: data.rawResponse }
         : undefined;
 
       const assistantMsg: ChatMessage = {

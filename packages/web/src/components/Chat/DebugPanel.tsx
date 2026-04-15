@@ -118,16 +118,6 @@ const useStyles = makeStyles({
   jsonNull: {
     color: tokens.colorNeutralForeground4,
   },
-  decisionList: {
-    listStyleType: 'disc',
-    paddingLeft: tokens.spacingHorizontalL,
-    marginTop: tokens.spacingVerticalXXS,
-    marginBottom: '0',
-  },
-  decisionItem: {
-    color: tokens.colorNeutralForeground2,
-    marginBottom: tokens.spacingVerticalXXS,
-  },
   notAvailable: {
     color: tokens.colorNeutralForeground4,
     fontStyle: 'italic',
@@ -238,14 +228,6 @@ export function DebugPanel({ debugInfo, surfaceIds }: DebugPanelProps) {
 
   const codeBlockClass = `${styles.codeBlock} ${resolvedTheme === 'dark' ? styles.codeBlockDark : styles.codeBlockLight}`;
 
-  // Defense-in-depth: truncate raw content client-side even if the server
-  // already redacts, in case of future changes or misconfigurations.
-  const MAX_RAW_DISPLAY = 500;
-  const rawText = debugInfo?.rawContent ?? debugInfo?.rawResponse ?? '';
-  const displayRaw = rawText.length > MAX_RAW_DISPLAY
-    ? rawText.slice(0, MAX_RAW_DISPLAY) + '\u2026 [truncated]'
-    : rawText;
-
   return (
     <div className={styles.container}>
       <button
@@ -285,15 +267,6 @@ export function DebugPanel({ debugInfo, surfaceIds }: DebugPanelProps) {
             )}
           </CollapsibleSection>
 
-          {/* Raw Text Content (truncated for defense-in-depth) */}
-          <CollapsibleSection label="Raw Text Content" defaultOpen={false} styles={styles}>
-            {displayRaw ? (
-              <code className={codeBlockClass}>{displayRaw}</code>
-            ) : (
-              <Text className={styles.notAvailable} size={200}>Not available</Text>
-            )}
-          </CollapsibleSection>
-
           {/* Action Events */}
           <CollapsibleSection label={`Action Events (${actionLog.length})`} defaultOpen={actionLog.length > 0} styles={styles}>
             {actionLog.length > 0 ? (
@@ -319,18 +292,6 @@ export function DebugPanel({ debugInfo, surfaceIds }: DebugPanelProps) {
             )}
           </CollapsibleSection>
 
-          {/* Render Decisions */}
-          <CollapsibleSection label="Render Decisions" defaultOpen={false} styles={styles}>
-            {debugInfo?.renderDecisions && debugInfo.renderDecisions.length > 0 ? (
-              <ul className={styles.decisionList}>
-                {debugInfo.renderDecisions.map((decision, i) => (
-                  <li key={i} className={styles.decisionItem}>{decision}</li>
-                ))}
-              </ul>
-            ) : (
-              <Text className={styles.notAvailable} size={200}>Not available</Text>
-            )}
-          </CollapsibleSection>
         </div>
       )}
     </div>
