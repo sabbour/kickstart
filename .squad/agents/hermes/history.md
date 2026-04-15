@@ -24,3 +24,9 @@ QA engineer and test infrastructure owner. Expertise in Playwright E2E testing, 
 - v0.3.0 test expansion: tool system TDD, validation engine, action loop verification
 
 ## Learnings
+
+### 2026-04-15T15:28:36.991Z — Live `/api/health` smoke gate
+
+- `.github/workflows/deploy-swa.yml` is the right guardrail point for a missing live `/api/health` route because local builds and unit tests can pass while Azure Static Web Apps still deploys a runtime with the route missing.
+- For this outage class, a post-deploy probe is more valuable than another local integration test; it should hit `https://kickstart.aks.azure.sabbour.me/api/health`, retry briefly for propagation, and fail unless the response is `200` JSON with `{"status":"ok"}`.
+- The smoke logic is easy to validate locally by running the same Node fetch probe against a stub server for the success path and against the live site with `SMOKE_ATTEMPTS=1` for the failure path.

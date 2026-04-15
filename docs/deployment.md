@@ -105,11 +105,12 @@ buildProperties: {
 
 **Source:** [`.github/workflows/deploy-swa.yml`](../.github/workflows/deploy-swa.yml)
 
-Deploys the web frontend and API to Azure Static Web Apps on every push to `main` and on PRs.
+Deploys the web frontend and API to Azure Static Web Apps on every push to `main` and on manual dispatches, then probes the live health endpoint.
 
 **Trigger:**
 - Push to `main` → production deployment
-- PR opened/synced → staging environment (auto-destroyed on PR close)
+- Push tag `v*` → release deployment
+- Manual dispatch (`workflow_dispatch`) → on-demand production redeploy
 
 **Jobs:**
 
@@ -120,17 +121,19 @@ steps:
   - Checkout code
   - Setup Node.js 20 (with npm cache)
   - npm ci && build core + API
+  - vite build
   - Deploy via Azure/static-web-apps-deploy@v1
+  - Probe https://kickstart.aks.azure.sabbour.me/api/health with retries
 ```
 
 Key configuration:
 
 ```yaml
-app_location: "packages/web"         # Static frontend
+app_location: "packages/web/dist"    # Prebuilt static frontend
 api_location: "packages/web/api"     # Azure Functions API
-skip_app_build: true                 # No build step for static HTML
+skip_app_build: true                 # Vite build already ran
 skip_api_build: false                # API needs TypeScript compilation
-api_build_command: "npm run build"
+api_build_command: "echo 'API already built'"
 ```
 
 **Build order is critical:** The API depends on `@kickstart/core`, so both must be built before the SWA action:
@@ -139,17 +142,10 @@ api_build_command: "npm run build"
 npm ci
 npm run build -w @kickstart/core    # Build core first
 npm run build -w @kickstart/api     # Then API (depends on core)
+npx vite build                      # Build frontend dist
 ```
 
-#### `close_staging`
-
-Runs when a PR is closed — tears down the staging environment:
-
-```yaml
-- uses: Azure/static-web-apps-deploy@v1
-  with:
-    action: "close"
-```
+**Post-deploy smoke gate:** After upload, the workflow retries the live anonymous probe at `https://kickstart.aks.azure.sabbour.me/api/health` and requires a JSON payload with `"status": "ok"`. This is the production guardrail for cases where source builds succeed but the deployed Functions surface is missing the live `health` route.
 
 **Required secrets:**
 
