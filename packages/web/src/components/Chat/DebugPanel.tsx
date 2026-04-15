@@ -4,12 +4,10 @@ import {
   Text,
 } from '@fluentui/react-components';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useDebug } from '../../contexts/DebugContext';
 import type { DebugMetadata } from '../../types';
 
 interface DebugPanelProps {
   debugInfo?: DebugMetadata;
-  surfaceIds?: string[];
 }
 
 const useStyles = makeStyles({
@@ -122,36 +120,6 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground4,
     fontStyle: 'italic',
   },
-  actionEvent: {
-    marginBottom: tokens.spacingVerticalXS,
-    paddingLeft: tokens.spacingHorizontalS,
-    paddingRight: tokens.spacingHorizontalS,
-    paddingTop: tokens.spacingVerticalXXS,
-    paddingBottom: tokens.spacingVerticalXXS,
-    borderRadius: tokens.borderRadiusSmall,
-    borderLeftWidth: '3px',
-    borderLeftStyle: 'solid',
-    borderLeftColor: tokens.colorPaletteBlueBorderActive,
-  },
-  actionTimestamp: {
-    color: tokens.colorNeutralForeground4,
-    fontSize: tokens.fontSizeBase100,
-    marginRight: tokens.spacingHorizontalS,
-  },
-  actionName: {
-    fontWeight: tokens.fontWeightSemibold,
-    color: tokens.colorNeutralForeground1,
-  },
-  actionCategory: {
-    display: 'inline-block',
-    paddingLeft: tokens.spacingHorizontalXXS,
-    paddingRight: tokens.spacingHorizontalXXS,
-    borderRadius: tokens.borderRadiusSmall,
-    fontSize: tokens.fontSizeBase100,
-    backgroundColor: tokens.colorNeutralBackground4,
-    color: tokens.colorNeutralForeground2,
-    marginLeft: tokens.spacingHorizontalXS,
-  },
 });
 
 /** Simple JSON syntax highlighting via inline styles. */
@@ -191,11 +159,6 @@ function highlightJson(json: string, styles: ReturnType<typeof useStyles>): Reac
   return parts;
 }
 
-function formatTime(timestamp: number): string {
-  const d = new Date(timestamp);
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-
 /** Collapsible section wrapper. */
 function CollapsibleSection({ label, defaultOpen = false, children, styles: s }: {
   label: string;
@@ -220,11 +183,10 @@ function CollapsibleSection({ label, defaultOpen = false, children, styles: s }:
   );
 }
 
-export function DebugPanel({ debugInfo, surfaceIds }: DebugPanelProps) {
+export function DebugPanel({ debugInfo }: DebugPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const styles = useStyles();
   const { resolvedTheme } = useTheme();
-  const { actionLog } = useDebug();
 
   const codeBlockClass = `${styles.codeBlock} ${resolvedTheme === 'dark' ? styles.codeBlockDark : styles.codeBlockLight}`;
 
@@ -264,31 +226,6 @@ export function DebugPanel({ debugInfo, surfaceIds }: DebugPanelProps) {
               </code>
             ) : (
               <Text className={styles.notAvailable} size={200}>Not available</Text>
-            )}
-          </CollapsibleSection>
-
-          {/* Action Events */}
-          <CollapsibleSection label={`Action Events (${actionLog.length})`} defaultOpen={actionLog.length > 0} styles={styles}>
-            {actionLog.length > 0 ? (
-              actionLog.map((evt, i) => (
-                <div key={i} className={`${styles.actionEvent} ${codeBlockClass}`}>
-                  <div>
-                    <span className={styles.actionTimestamp}>{formatTime(evt.timestamp)}</span>
-                    <span className={styles.actionName}>{evt.actionName}</span>
-                    <span className={styles.actionCategory}>{evt.category}</span>
-                  </div>
-                  <div style={{ marginTop: '4px' }}>
-                    <Text className={styles.sectionLabel} size={200}>Context (sent to LLM):</Text>
-                    <code>{highlightJson(JSON.stringify(evt.context, null, 2), styles)}</code>
-                  </div>
-                  <div style={{ marginTop: '4px' }}>
-                    <Text className={styles.sectionLabel} size={200}>Outbound message:</Text>
-                    <code>{evt.outboundMessage}</code>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <Text className={styles.notAvailable} size={200}>No actions dispatched yet</Text>
             )}
           </CollapsibleSection>
 

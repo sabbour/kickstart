@@ -1,19 +1,12 @@
 import React, { useRef, useEffect } from 'react';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
+import { DebugActionLog } from './DebugActionLog';
+import { useDebug } from '../../contexts/DebugContext';
 import type { ChatMessage } from '../../types';
 import type { SurfaceModel } from '../../vendor/a2ui/web_core/index';
 import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapter';
-
-const PHASE_LABELS: Record<string, string> = {
-  discover: 'Discover',
-  plan: 'Plan',
-  build: 'Build',
-  deploy: 'Deploy',
-  validate: 'Validate',
-};
-
-const PHASE_ORDER = ['discover', 'plan', 'build', 'deploy', 'validate'];
+import { CONVERSATION_PHASE_LABELS, CONVERSATION_PHASE_ORDER } from '../../utils/chat-a2ui';
 
 interface ChatShellProps {
   messages: ChatMessage[];
@@ -28,26 +21,28 @@ interface ChatShellProps {
 
 export function ChatShell({ messages, isStreaming, streamingText, streamingSurfaceIds, currentPhase, onSend, getSurface, debugEnabled }: ChatShellProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { actionLog } = useDebug();
 
   // Auto-scroll to bottom on new messages or streaming updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingText, streamingSurfaceIds]);
+  }, [messages, streamingText, streamingSurfaceIds, actionLog.length]);
 
-  const activePhaseIndex = currentPhase ? PHASE_ORDER.indexOf(currentPhase) : -1;
+  const activePhaseIndex = currentPhase ? CONVERSATION_PHASE_ORDER.indexOf(currentPhase as typeof CONVERSATION_PHASE_ORDER[number]) : -1;
+  const showPhaseBar = Boolean(currentPhase) && activePhaseIndex !== -1;
 
   return (
     <div id="chat-ui" className="chat-container">
-      {currentPhase && (
-        <div className="chat-phase" role="status" aria-label={`Current phase: ${PHASE_LABELS[currentPhase] || currentPhase}`}>
-          {PHASE_ORDER.map((phase, index) => (
+      {showPhaseBar && (
+        <div className="chat-phase" role="status" aria-label={`Current phase: ${CONVERSATION_PHASE_LABELS[currentPhase as keyof typeof CONVERSATION_PHASE_LABELS] || currentPhase}`}>
+          {CONVERSATION_PHASE_ORDER.map((phase, index) => (
             <React.Fragment key={phase}>
               {index > 0 && (
                 <span className={`chat-phase-connector${index <= activePhaseIndex ? ' completed' : ''}`} />
               )}
               <span className="chat-phase-step">
                 <span className={`chat-phase-dot${index === activePhaseIndex ? ' active' : ''}${index < activePhaseIndex ? ' completed' : ''}`} />
-                <span>{PHASE_LABELS[phase]}</span>
+                <span>{CONVERSATION_PHASE_LABELS[phase]}</span>
               </span>
             </React.Fragment>
           ))}
@@ -63,6 +58,7 @@ export function ChatShell({ messages, isStreaming, streamingText, streamingSurfa
             getSurface={getSurface}
             debugEnabled={debugEnabled}
           />
+          {debugEnabled && actionLog.length > 0 && <DebugActionLog />}
           <div ref={messagesEndRef} />
         </div>
       </div>

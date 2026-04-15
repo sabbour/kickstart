@@ -24,7 +24,12 @@ import { healthCheck } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
 import type { VFSFile } from './services/virtual-fs';
-import type { AppMode, ChatMessage, A2uiMsg } from './types';
+import type { AppMode, ChatMessage, A2uiPayloadItem } from './types';
+import {
+  getLatestConversationPhase,
+  normalizeConversationPhase,
+  prepareChatA2uiPayload,
+} from './utils/chat-a2ui';
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
 const mockEnabled = isMockMode();
@@ -37,7 +42,7 @@ function msgId(role: string) {
 
 export function App() {
   const { resolvedTheme } = useTheme();
-  const { debugEnabled, logAction } = useDebug();
+  const { debugEnabled, logAction, clearActionLog } = useDebug();
   const fluentTheme = resolvedTheme === 'dark' ? webDarkTheme : webLightTheme;
 
   const [mode, setMode] = useState<AppMode>(playgroundEnabled ? 'chat' : 'landing');
@@ -101,7 +106,7 @@ export function App() {
   // Messages for the active session
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // Current conversation phase from SSE events
+  // Current conversation phase for the active session
   const [currentPhase, setCurrentPhase] = useState<string | null>(null);
   const currentPhaseRef = useRef<string | null>(null);
 
@@ -109,7 +114,7 @@ export function App() {
   const streamingSurfaceIdsRef = useRef<string[]>([]);
 
   // Raw A2UI messages accumulated during streaming (for session persistence)
-  const streamingA2UIMessagesRef = useRef<A2uiMsg[]>([]);
+  const streamingA2UIMessagesRef = useRef<A2uiPayloadItem[]>([]);
 
   // Check API availability on mount (skip in mock mode — already true)
   useEffect(() => {
@@ -123,8 +128,21 @@ export function App() {
     const active = sessions.getActiveSession();
     if (active) {
       setMessages(active.messages);
+      const phase = getLatestConversationPhase(active.messages);
+      setCurrentPhase(phase);
+      currentPhaseRef.current = phase;
+    } else {
+      setMessages([]);
+      setCurrentPhase(null);
+      currentPhaseRef.current = null;
     }
   }, [sessions.activeSessionId]);
+
+  const setConversationPhase = useCallback((phase: string | null | undefined) => {
+    const normalized = normalizeConversationPhase(phase);
+    setCurrentPhase(normalized);
+    currentPhaseRef.current = normalized;
+  }, []);
 
   const handleSendMessage = useCallback(async (text: string, isAutoContinue = false, explicitSessionId?: string) => {
     // Manual messages reset the consecutive auto-continue counter
@@ -137,11 +155,15 @@ export function App() {
     if (!sessionId) {
       const newSession = sessions.createSession(text);
       sessionId = newSession.id;
+      clearActionLog();
+      setConversationPhase(null);
     }
+
+    const assistantMessageId = msgId('assistant');
 
     // Add user message (auto-continue shows a subtle indicator instead of the full text)
     const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}-user`,
+      id: msgId(isAutoContinue ? 'auto-continue' : 'user'),
       role: 'user',
       text,
       timestamp: Date.now(),
@@ -152,7 +174,7 @@ export function App() {
 
     if (!isApiAvailable) {
       const errorMsg: ChatMessage = {
-        id: `msg-${Date.now()}-error`,
+        id: msgId('error'),
         role: 'assistant',
         text: '⚠️ The API is not available. Please check that Azure OpenAI credentials are configured and the API is running.',
         timestamp: Date.now(),
@@ -167,23 +189,33 @@ export function App() {
     streamingA2UIMessagesRef.current = [];
     progressiveQueue.reset();
 
+    const handleIncomingA2UI = (payload: A2uiPayloadItem[]) => {
+      const { phase, messages: scopedMessages } = prepareChatA2uiPayload(payload, assistantMessageId);
+
+      if (phase) {
+        setConversationPhase(phase);
+      }
+
+      if (scopedMessages.length === 0) {
+        return;
+      }
+
+      streamingA2UIMessagesRef.current = [...streamingA2UIMessagesRef.current, ...scopedMessages];
+      const newIds = a2ui.processMessages(scopedMessages);
+      if (newIds.length > 0) {
+        streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
+        progressiveQueue.enqueue(newIds);
+      }
+    };
+
     // Use mock streaming when ?mock is active, real streaming otherwise
     if (mockEnabled) {
       mockStreaming.send(text, sessionId, {
         onDelta: () => {},
-        onA2UI: (msgs) => {
-          streamingA2UIMessagesRef.current = [...streamingA2UIMessagesRef.current, ...msgs];
-          const newIds = a2ui.processMessages(msgs);
-          if (newIds.length > 0) {
-            streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
-            progressiveQueue.enqueue(newIds);
-          }
-        },
-        onPhase: (phase) => { setCurrentPhase(phase); currentPhaseRef.current = phase; },
+        onA2UI: handleIncomingA2UI,
+        onPhase: (phase) => setConversationPhase(phase),
         onComplete: (fullText, model) => {
           const phase = currentPhaseRef.current || undefined;
-          setCurrentPhase(null);
-          currentPhaseRef.current = null;
           progressiveQueue.flush();
           const collectedIds = streamingSurfaceIdsRef.current;
           const surfaceIds = collectedIds.length > 0 ? collectedIds : undefined;
@@ -192,7 +224,7 @@ export function App() {
           streamingA2UIMessagesRef.current = [];
           progressiveQueue.reset();
           const assistantMsg: ChatMessage = {
-            id: `msg-${Date.now()}-assistant`,
+            id: assistantMessageId,
             role: 'assistant',
             text: fullText,
             model,
@@ -209,7 +241,7 @@ export function App() {
           streamingA2UIMessagesRef.current = [];
           progressiveQueue.reset();
           const errorMsg: ChatMessage = {
-            id: `msg-${Date.now()}-error`,
+            id: msgId('error'),
             role: 'assistant',
             text: `⚠️ ${error}`,
             timestamp: Date.now(),
@@ -225,19 +257,10 @@ export function App() {
       
       streaming.send(text, backendSessionId, {
         onDelta: () => {},
-        onA2UI: (msgs) => {
-          streamingA2UIMessagesRef.current = [...streamingA2UIMessagesRef.current, ...msgs];
-          const newIds = a2ui.processMessages(msgs);
-          if (newIds.length > 0) {
-            streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
-            progressiveQueue.enqueue(newIds);
-          }
-        },
-        onPhase: (phase) => { setCurrentPhase(phase); currentPhaseRef.current = phase; },
+        onA2UI: handleIncomingA2UI,
+        onPhase: (phase) => setConversationPhase(phase),
         onComplete: (fullText, model, receivedSessionId, debugInfo) => {
           const phase = currentPhaseRef.current || undefined;
-          setCurrentPhase(null);
-          currentPhaseRef.current = null;
           // Store the backend session ID on first response
           if (receivedSessionId && !activeSession?.backendSessionId) {
             sessions.updateSession(sessionId!, { backendSessionId: receivedSessionId });
@@ -250,7 +273,7 @@ export function App() {
           streamingA2UIMessagesRef.current = [];
           progressiveQueue.reset();
           const assistantMsg: ChatMessage = {
-            id: `msg-${Date.now()}-assistant`,
+            id: assistantMessageId,
             role: 'assistant',
             text: fullText,
             model,
@@ -268,7 +291,7 @@ export function App() {
           streamingA2UIMessagesRef.current = [];
           progressiveQueue.reset();
           const errorMsg: ChatMessage = {
-            id: `msg-${Date.now()}-error`,
+            id: msgId('error'),
             role: 'assistant',
             text: `⚠️ ${error}`,
             timestamp: Date.now(),
@@ -278,15 +301,17 @@ export function App() {
         },
       }, debugEnabled, activeSession?.messages ?? []);
     }
-  }, [sessions, streaming, mockStreaming, a2ui, isApiAvailable, resetConsecutiveCount, progressiveQueue, debugEnabled]);
+  }, [sessions, streaming, mockStreaming, a2ui, isApiAvailable, resetConsecutiveCount, progressiveQueue, debugEnabled, clearActionLog, setConversationPhase]);
 
   const handleStartChat = useCallback((prompt: string) => {
     a2ui.reset();
     fs.clear();
     void vfs.clear();
+    clearActionLog();
     setSelectedFile(undefined);
     setViewerFile(undefined);
     setMessages([]);
+    setConversationPhase(null);
     setMode('chat');
     document.body.classList.remove('on-landing');
 
@@ -294,7 +319,7 @@ export function App() {
     const session = sessions.createSession(prompt);
     nav.pushSession(session.id);
     handleSendMessage(prompt, false, session.id);
-  }, [sessions, a2ui, handleSendMessage, fs, vfs, nav.pushSession]);
+  }, [sessions, a2ui, handleSendMessage, fs, vfs, nav.pushSession, clearActionLog, setConversationPhase]);
 
   const handleClearAllSessions = useCallback(() => {
     sessions.clearAllSessions();
@@ -302,43 +327,52 @@ export function App() {
     a2ui.reset();
     fs.clear();
     void vfs.clear();
+    clearActionLog();
     setSelectedFile(undefined);
     setViewerFile(undefined);
-  }, [sessions, a2ui, fs, vfs]);
+    setConversationPhase(null);
+  }, [sessions, a2ui, fs, vfs, clearActionLog, setConversationPhase]);
 
   const handleNewSession = useCallback((pushHistory = true) => {
     a2ui.reset();
     fs.clear();
     void vfs.clear();
+    clearActionLog();
     setSelectedFile(undefined);
     setViewerFile(undefined);
     setMessages([]);
+    setConversationPhase(null);
     setMode('landing');
     document.body.classList.add('on-landing');
     sessions.setActiveSessionId(null);
     if (pushHistory) {
       nav.pushLanding();
     }
-  }, [a2ui, sessions, fs, vfs, nav.pushLanding]);
+  }, [a2ui, sessions, fs, vfs, nav.pushLanding, clearActionLog, setConversationPhase]);
 
   const handleResumeSession = useCallback((sessionId: string, pushHistory = true) => {
     sessions.setActiveSessionId(sessionId);
     const session = sessions.sessions.find(s => s.id === sessionId);
     if (session) {
       a2ui.reset();
+      clearActionLog();
       for (const msg of session.messages) {
         if (msg.a2uiMessages && msg.a2uiMessages.length > 0) {
-          a2ui.processMessages(msg.a2uiMessages);
+          const { messages: scopedMessages } = prepareChatA2uiPayload(msg.a2uiMessages, msg.id);
+          if (scopedMessages.length > 0) {
+            a2ui.processMessages(scopedMessages);
+          }
         }
       }
       setMessages(session.messages);
+      setConversationPhase(getLatestConversationPhase(session.messages));
       setMode('chat');
       document.body.classList.remove('on-landing');
       if (pushHistory) {
         nav.pushSession(sessionId);
       }
     }
-  }, [sessions, a2ui, nav.pushSession]);
+  }, [sessions, a2ui, nav.pushSession, clearActionLog, setConversationPhase]);
 
   // Wire up popstate -> handler dispatch (updated every render via ref)
   navHandlerRef.current = (state: NavState) => {

@@ -25,6 +25,9 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 
 ## Learnings
 
+- **2026-04-15T09:46:31.308Z — Issue #265 smallest ship:** Treat `FileEditor` payloads as workspace data, not chat bubble content. The no-mock v1 is frontend-first: transform incoming `FileEditor` A2UI into compact file cards, mirror those files into `VirtualFileSystem`, auto-open the sidebar/viewer, and override generate-phase progress title client-side. Key paths: `packages/web/src/utils/chat-a2ui.ts`, `packages/web/src/App.tsx`, `packages/web/src/components/FileManager/`, `packages/web/api/src/lib/session-store.ts`.
+- **2026-04-15T09:46:31.308Z — Issue #265 sequencing stays tight:** GitHub OAuth now being available and Azure deployment staying in scope does not widen #265. The file-manager slice remains a parallel generate/review UX track that should land before or alongside handoff/deploy work, not after it.
+
 ## Round 5: Design Review Cycle
 
 **2026-04-14**
@@ -55,3 +58,45 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - **Approved PR #213**: Choice components fix. Clean, additive change.
 - **Team status**: Zapp flagged #186 security concerns; Fry delivered hash-based nav; Bender merged SWA deployment automation.
 - **Next:** Address #186 security gate before starting Phase 1.
+
+## 2026-04-15 E2E Demo Sprint Planning
+
+- **Sprint plan built** for making Kickstart demo-ready with no faking/mocking
+- ~~**Scope trade decision:** Demo ends at PR creation~~ → **REVERSED v3:** Full E2E including Azure auth + deployment per Ahmed directive
+- **PR #297 ships immediately** (Option A) — closes #271, #269. Makes Review terminal with ZIP download. Safety net while real auth lands.
+- **GitHub OAuth App exists** — #274 no longer has external blockers. Registration risk removed.
+- **Azure auth/deployment IN SCOPE** — MSAL device-code auth, ARM provisioning for AKS Automatic. Needs new issue creation.
+- **Critical path:** PR #297 (merge now) → #298 (surface fix) → #275 (progressive flow, design for 6 phases) + #274 (GitHub OAuth, unblocked) → Azure MSAL + AKS deploy → full 6-phase E2E
+- **Conditional phase activation:** Handoff/Deploy re-enable when auth tokens present. 4-phase flow stays default for unauthenticated users.
+- **#274 patterns inform Azure auth** — GitHub OAuth device flow establishes the auth UX; Azure MSAL follows same structure.
+- **Deferred:** #272 (live pricing) and #277 (token tracker) — both self-described as non-blockers
+- **Coding agent candidates:** #296 (subtitle sweep) and #299 (debug placement) — mechanical, well-scoped
+- **Zapp mandatory** on #274 AND Azure auth — both are security boundary crossings
+- **4 parallel tracks** after #298: Wizard Flow (#275), GitHub (#274), Azure (new), Polish (#300/#265/#273/#296/#299)
+- **#300** (arch diagram prompt depth) — prompt-only fix, lands before #273 (ELK engine). Bender owns.
+- **Try-AKS reference:** `/mnt/c/Users/asabbour/Git/adaptive-ui`
+- **Key files:** Sprint plan at `.squad/decisions/inbox/leela-e2e-sprint-plan.md`
+
+## 2026-04-15 Sprint Planning Ceremony (Overdue)
+
+- **Ceremony run** for v0.6.1 — full open backlog assessment (15 issues, 1 PR)
+- **Board drift identified:** 12/15 issues had no milestone, all had stale `go:needs-research`, no priority labels on 11/15, #271/#269 open despite ready fix
+- **Fixes applied:** All demo-critical → v0.6.1, created v0.7.0 for deferred, cleared stale labels on in-flight work
+- **Burn now (4):** PR #297, #298, #299, #274 — do not interrupt
+- **Burn next (5):** #300, #296, #275, #265, #266 — fire as Wave 1 when active lanes land
+- **Blocked (2):** #301 (Azure, waits for #274), #273 (ELK, waits for #300)
+- **Close (2):** #271, #269 — closed by PR #297
+- **Defer (3):** #272, #277 → v0.7.0; #46 stays v0.6.0 (multi-week epic)
+- **Fry is the bottleneck** — almost every issue has frontend surface. Mitigation: @copilot handles #296, #299 is quick, #273 is back-loaded.
+- **Ralph's next wave:** Monitor BURN NOW completion → fire #300/#296/#275/#265/#266 in parallel
+- **Key file:** `.squad/decisions/inbox/leela-sprint-planning-v061.md`
+
+## 2026-04-15 Architecture Diagram Depth Decision
+
+- **Issue #300**: Architecture diagram at DESIGN step is under-informed — shows only user-selected services as flat nodes, omits AKS infrastructure known from §7/§9 defaults (ACR, Gateway API, Key Vault, Workload Identity, CI/CD).
+- **Root cause**: System prompt line 125 says only "ArchitectureDiagram showing the app and connected services". Example 3 (line 282) reinforces the flat pattern. Component catalog gives 2-node example.
+- **Decision**: Three-tier model — Tier 1 (always: AKS subgraph, ACR, Key Vault, Gateway), Tier 2 (conditional: DB, cache, queue, AI), Tier 3 (annotations: CI/CD, Workload Identity, replicas). Use `diagram` prop with Mermaid subgraphs, not `nodes/edges`.
+- **Key insight**: ArchitectureDiagram.tsx already supports subgraphs via raw Mermaid `diagram` prop — this is purely a prompt-layer fix.
+- **Files affected**: `system-prompt.ts` (§2 STEP 2 + Example 3), `component-catalog.ts` (ArchitectureDiagram entry), `demo-scenarios.ts` (ARCHITECTURE scenario)
+- **Assigned to**: Bender (implementation), Fry (rendering verification)
+- **Decision file**: `.squad/decisions/inbox/leela-architecture-diagram-depth.md`

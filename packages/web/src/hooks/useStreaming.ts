@@ -1,10 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { StreamEvent, A2uiMsg, DebugMetadata, ChatMessage } from '../types';
+import type { StreamEvent, A2uiPayloadItem, DebugMetadata, ChatMessage } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
 
 interface StreamCallbacks {
   onDelta: (text: string) => void;
-  onA2UI: (messages: A2uiMsg[]) => void;
+  onA2UI: (messages: A2uiPayloadItem[]) => void;
   onPhase: (phase: string) => void;
   onComplete: (fullText: string, model?: string, sessionId?: string, debugInfo?: DebugMetadata) => void;
   onError: (error: string) => void;
@@ -86,7 +86,7 @@ export function useStreaming() {
     let lastModel: string | undefined;
     let lastSessionId: string | undefined;
     let lastPhase: string | undefined;
-    const debugA2uiMessages: any[] = [];
+    const debugA2uiMessages: A2uiPayloadItem[] = [];
 
     try {
       // Build client message history for rehydration (strip system messages
@@ -155,7 +155,7 @@ export function useStreaming() {
             // --- Typed SSE events ---
 
             if (currentEventType === 'a2ui') {
-              const a2uiMsg: A2uiMsg = JSON.parse(data);
+              const a2uiMsg: A2uiPayloadItem = JSON.parse(data);
               if (debugMode) debugA2uiMessages.push(a2uiMsg);
               callbacks.onA2UI([a2uiMsg]);
               currentEventType = '';
@@ -185,7 +185,10 @@ export function useStreaming() {
               const parsed = JSON.parse(data);
               if (parsed.model) lastModel = parsed.model;
               if (parsed.sessionId) lastSessionId = parsed.sessionId;
-              if (parsed.phase) callbacks.onPhase(parsed.phase);
+              if (parsed.phase) {
+                lastPhase = parsed.phase;
+                callbacks.onPhase(parsed.phase);
+              }
               currentEventType = '';
               continue;
             }
