@@ -7,7 +7,7 @@ import {
   Button,
   Caption1,
   Card,
-  Subtitle2,
+  Subtitle1,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
@@ -499,7 +499,7 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
     <Card className={classes.root}>
       {(props.title || props.description) && (
         <div className={classes.header}>
-          {props.title && <Subtitle2>{props.title}</Subtitle2>}
+          {props.title && <Subtitle1>{props.title}</Subtitle1>}
           {props.description && <Body2>{props.description}</Body2>}
         </div>
       )}

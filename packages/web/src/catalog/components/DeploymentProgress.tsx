@@ -8,7 +8,7 @@ import {
   Caption1,
   Card,
   Spinner,
-  Subtitle2,
+  Subtitle1,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
@@ -170,7 +170,7 @@ export const DeploymentProgress = createReactComponent(DeploymentProgressApi, ({
         {overallStatus === 'running' && <Spinner size="tiny" />}
         {overallStatus === 'complete' && <CheckmarkCircleRegular className={classes.iconComplete} />}
         {overallStatus === 'error' && <DismissCircleRegular className={classes.iconError} />}
-        <Subtitle2>{props.title ?? 'Deployment Progress'}</Subtitle2>
+        <Subtitle1>{props.title ?? 'Deployment Progress'}</Subtitle1>
       </div>
 
       <div className={classes.stepList} role="list" aria-label="Deployment steps" aria-live="polite">

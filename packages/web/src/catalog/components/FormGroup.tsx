@@ -9,7 +9,7 @@ import {
   Card,
   CardHeader,
   Badge,
-  Subtitle2,
+  Subtitle1,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
@@ -38,7 +38,7 @@ export const FormGroup = createReactComponent(FormGroupApi, ({ props, buildChild
   return (
     <Card className={classes.root}>
       <CardHeader
-        header={<Subtitle2>{props.title}</Subtitle2>}
+        header={<Subtitle1>{props.title}</Subtitle1>}
         action={
           props.step != null ? (
             <Badge appearance="filled" color="informative">Step {props.step}</Badge>

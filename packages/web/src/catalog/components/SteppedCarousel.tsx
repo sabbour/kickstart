@@ -8,7 +8,7 @@ import {
 import {
   Card,
   Button,
-  Subtitle2,
+  Subtitle1,
   Caption1,
   makeStyles,
   tokens,
@@ -142,7 +142,7 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
       </div>
 
       {/* Active step title */}
-      <Subtitle2>{activeStepData?.title}</Subtitle2>
+      <Subtitle1>{activeStepData?.title}</Subtitle1>
 
       {/* Active step content — key forces remount so CSS animation replays */}
       <div

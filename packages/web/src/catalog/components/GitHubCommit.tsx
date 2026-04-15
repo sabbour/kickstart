@@ -15,7 +15,7 @@ import {
   MessageBar,
   MessageBarBody,
   Spinner,
-  Subtitle2,
+  Subtitle1,
   Textarea,
   Tooltip,
   makeStyles,
@@ -260,7 +260,7 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
     return (
       <Card className={classes.root}>
         <CardHeader
-          header={<Subtitle2>Create Pull Request</Subtitle2>}
+          header={<Subtitle1>Create Pull Request</Subtitle1>}
           description={
             <Caption1>
               {repoFullName || 'Repository'} \u2192 {branchName}
@@ -301,7 +301,7 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
     return (
       <Card className={classes.root}>
         <CardHeader
-          header={<Subtitle2>Creating Pull Request\u2026</Subtitle2>}
+          header={<Subtitle1>Creating Pull Request\u2026</Subtitle1>}
           description={<Caption1>Pushing {selectedArtifacts.length} files to {branchName}</Caption1>}
         />
         <div className={classes.actions} style={{ justifyContent: 'center' }}>
@@ -316,7 +316,7 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
     return (
       <Card className={classes.root}>
         <CardHeader
-          header={<Subtitle2>Configure Pull Request</Subtitle2>}
+          header={<Subtitle1>Configure Pull Request</Subtitle1>}
           description={
             <Caption1>
               {selectedArtifacts.length} file{selectedArtifacts.length !== 1 ? 's' : ''} selected
@@ -398,7 +398,7 @@ export const GitHubCommit = createReactComponent(GitHubCommitApi, ({ props }) =>
   return (
     <Card className={classes.root}>
       <CardHeader
-        header={<Subtitle2>Create Pull Request</Subtitle2>}
+        header={<Subtitle1>Create Pull Request</Subtitle1>}
         description={
           <Caption1>
             Select artifacts to include in the pull request
