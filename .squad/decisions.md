@@ -81,6 +81,24 @@ Agents must create branch + draft PR immediately after DP approval, BEFORE writi
 
 ## 5. Decisions from Recent Sprints
 
+### Emoji-to-Icon Mapping Utility for A2UI
+**Author:** Fry (Frontend Dev)
+**Date:** 2026-04-15
+**PR:** #293
+**Issue:** #258
+**Status:** Implemented
+
+Created `statusIcons.tsx` utility mapping emoji (✅ ⚠️ ❌ ℹ️) to Fluent UI icons with semantic colors. A2UI components with user-facing text should call `replaceStatusEmoji(text)` to normalize status indicators.
+
+### Code Block Dark Theme Standard
+**Author:** Fry (Frontend Dev)
+**Date:** 2026-04-15
+**PR:** #294
+**Issue:** #264
+**Status:** Implemented
+
+Standardized code block rendering across all components (CodeBlock, FileViewer, ChatMarkdown, CodeView) on try-aks dark palette: `#1e1e1e` bg, `#d4d4d4` text, Cascadia Code 13px, `github-dark.css` theme, with auto-normalization of literal `\n` in code payloads.
+
 ### CI Workflow paths-ignore Removal
 **Author:** Bender (Backend Dev)
 **Date:** 2026-04-15
