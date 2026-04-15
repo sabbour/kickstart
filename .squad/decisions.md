@@ -81,6 +81,13 @@ Agents must create branch + draft PR immediately after DP approval, BEFORE writi
 
 ## 5. Decisions from Recent Sprints
 
+### CI Workflow paths-ignore Removal
+**Author:** Bender (Backend Dev)
+**Date:** 2026-04-15
+**Status:** Implemented
+
+Removed paths-ignore from `.github/workflows/ci.yml` to ensure all PRs trigger CI checks. The protect-main ruleset requires 'Lint, Build & Unit Tests' and 'Playwright E2E Tests' to pass, but docs-only files were excluded, causing merge deadlocks.
+
 ### Continuous SWA Deployment + Version Footer
 **Author:** Bender (Backend Dev)
 **Date:** 2026-04-14
