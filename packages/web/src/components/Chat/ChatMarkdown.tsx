@@ -39,6 +39,15 @@ hljs.registerLanguage('yaml', yaml);
 hljs.registerLanguage('yml', yaml);
 hljs.registerLanguage('go', go);
 
+const CHAT_LANG_DISPLAY: Record<string, string> = {
+  typescript: 'TYPESCRIPT', javascript: 'JAVASCRIPT', python: 'PYTHON',
+  json: 'JSON', yaml: 'YAML', yml: 'YAML', xml: 'XML', html: 'HTML',
+  css: 'CSS', bash: 'BASH', shell: 'SHELL', sh: 'SHELL', sql: 'SQL',
+  go: 'GO', java: 'JAVA', csharp: 'C#', dockerfile: 'DOCKERFILE',
+  markdown: 'MARKDOWN', md: 'MARKDOWN', bicep: 'BICEP', ts: 'TYPESCRIPT',
+  js: 'JAVASCRIPT', plaintext: 'TEXT',
+};
+
 interface ChatMarkdownProps {
   content: string;
 }
@@ -82,13 +91,79 @@ function HighlightedBlock({ code, language }: { code: string; language: string }
     }
   }, [code, language]);
 
+  const lines = html.split('\n');
+  const langLabel = language
+    ? (CHAT_LANG_DISPLAY[language.toLowerCase()] ?? language.toUpperCase())
+    : undefined;
+
   return (
-    <pre>
-      <code
-        className="hljs"
-        dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
-      />
-    </pre>
+    <div style={{
+      backgroundColor: '#1e1e1e',
+      color: '#d4d4d4',
+      borderRadius: '6px',
+      overflow: 'hidden',
+      margin: '8px 0',
+    }}>
+      {langLabel && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '4px 12px',
+          backgroundColor: '#252526',
+          borderBottom: '1px solid #333333',
+          minHeight: '28px',
+        }}>
+          <span style={{
+            fontSize: '10px',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+            padding: '1px 6px',
+            borderRadius: '3px',
+            backgroundColor: '#0e639c',
+            color: '#ffffff',
+          }}>
+            {langLabel}
+          </span>
+        </div>
+      )}
+      <div style={{ overflow: 'auto', padding: '8px 0' }}>
+        <pre style={{
+          margin: 0,
+          padding: 0,
+          fontFamily: '"Cascadia Code", "Fira Code", Consolas, "Courier New", monospace',
+          fontSize: '13px',
+          lineHeight: '20px',
+          tabSize: 2,
+        }}>
+          <code className="hljs">
+            {lines.map((lineHtml, i) => (
+              <div key={i} style={{
+                display: 'flex',
+                minHeight: '20px',
+                paddingRight: '16px',
+              }}>
+                <span style={{
+                  display: 'inline-block',
+                  width: '48px',
+                  paddingRight: '16px',
+                  textAlign: 'right',
+                  color: '#555555',
+                  userSelect: 'none',
+                  flexShrink: 0,
+                }}>
+                  {i + 1}
+                </span>
+                <span
+                  style={{ flex: 1, whiteSpace: 'pre', minWidth: 0 }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(lineHtml) }}
+                />
+              </div>
+            ))}
+          </code>
+        </pre>
+      </div>
+    </div>
   );
 }
 
