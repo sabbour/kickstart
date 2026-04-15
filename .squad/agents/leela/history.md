@@ -25,6 +25,9 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 
 ## Learnings
 
+- **2026-04-15T09:46:31.308Z — Issue #265 smallest ship:** Treat `FileEditor` payloads as workspace data, not chat bubble content. The no-mock v1 is frontend-first: transform incoming `FileEditor` A2UI into compact file cards, mirror those files into `VirtualFileSystem`, auto-open the sidebar/viewer, and override generate-phase progress title client-side. Key paths: `packages/web/src/utils/chat-a2ui.ts`, `packages/web/src/App.tsx`, `packages/web/src/components/FileManager/`, `packages/web/api/src/lib/session-store.ts`.
+- **2026-04-15T09:46:31.308Z — Issue #265 sequencing stays tight:** GitHub OAuth now being available and Azure deployment staying in scope does not widen #265. The file-manager slice remains a parallel generate/review UX track that should land before or alongside handoff/deploy work, not after it.
+
 ## Round 5: Design Review Cycle
 
 **2026-04-14**
@@ -73,6 +76,20 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - **#300** (arch diagram prompt depth) — prompt-only fix, lands before #273 (ELK engine). Bender owns.
 - **Try-AKS reference:** `/mnt/c/Users/asabbour/Git/adaptive-ui`
 - **Key files:** Sprint plan at `.squad/decisions/inbox/leela-e2e-sprint-plan.md`
+
+## 2026-04-15 Sprint Planning Ceremony (Overdue)
+
+- **Ceremony run** for v0.6.1 — full open backlog assessment (15 issues, 1 PR)
+- **Board drift identified:** 12/15 issues had no milestone, all had stale `go:needs-research`, no priority labels on 11/15, #271/#269 open despite ready fix
+- **Fixes applied:** All demo-critical → v0.6.1, created v0.7.0 for deferred, cleared stale labels on in-flight work
+- **Burn now (4):** PR #297, #298, #299, #274 — do not interrupt
+- **Burn next (5):** #300, #296, #275, #265, #266 — fire as Wave 1 when active lanes land
+- **Blocked (2):** #301 (Azure, waits for #274), #273 (ELK, waits for #300)
+- **Close (2):** #271, #269 — closed by PR #297
+- **Defer (3):** #272, #277 → v0.7.0; #46 stays v0.6.0 (multi-week epic)
+- **Fry is the bottleneck** — almost every issue has frontend surface. Mitigation: @copilot handles #296, #299 is quick, #273 is back-loaded.
+- **Ralph's next wave:** Monitor BURN NOW completion → fire #300/#296/#275/#265/#266 in parallel
+- **Key file:** `.squad/decisions/inbox/leela-sprint-planning-v061.md`
 
 ## 2026-04-15 Architecture Diagram Depth Decision
 
