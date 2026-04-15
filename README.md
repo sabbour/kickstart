@@ -109,6 +109,7 @@ docs-site/        Docusaurus documentation site
 
 - **[Architecture](https://sabbour.github.io/kickstart/docs/architecture/overview)** — System design, A2UI integration, JSON envelope format
 - **[Getting Started](https://sabbour.github.io/kickstart/docs/getting-started/local-setup)** — Local setup, project structure
+- **[Deployment Guide](./docs/deployment.md)** — Handover notes, secrets, deploy order, validation, and rollback basics
 - **[Custom Components](https://sabbour.github.io/kickstart/docs/components/custom-catalog)** — Kickstart A2UI catalog
 - **[Contributing](./CONTRIBUTING.md)** — Dev setup, code style
 - **[Development Guide](./DEVELOPMENT.md)** — Credentials, scripts, testing

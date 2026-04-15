@@ -1,197 +1,285 @@
-# Deployment & Infrastructure Guide
+# Deployment Handover Guide
 
-This guide covers how to deploy the Kickstart platform — from Azure resources to CI/CD workflows.
+This guide is for the team taking over Kickstart from proof of concept to hardened deployment. It makes the current deployment path explicit: what owns what, which secrets are required, which workflow runs first, and what must be validated after each release.
 
-> **Related docs:** [API Reference](./api-reference.md) for environment variables · [MCP Server](./mcp-server.md) for the MCP server setup
-
----
-
-## Azure Resources
-
-Kickstart requires the following Azure resources:
-
-| Resource | Purpose | SKU |
-|----------|---------|-----|
-| Azure Static Web App | Hosts the web frontend + API Functions | Standard |
-| Azure OpenAI | LLM backend for conversation | — |
-| Entra App Registration | Authentication (SPA Auth Code + PKCE) | — |
-
-### Resource Group
-
-All resources are deployed to a single resource group. The default dev environment uses:
-
-- **Subscription:** `4498459e-01d5-4a3f-b07e-8f1f36598c16`
-- **Resource Group:** `rg-kickstart-dev`
-- **Region:** `centralus`
+> Primary sources: [`infra/main.bicep`](../infra/main.bicep), [`.github/workflows/deploy-infra.yml`](../.github/workflows/deploy-infra.yml), [`.github/workflows/deploy-swa.yml`](../.github/workflows/deploy-swa.yml), and the repo [`README`](../README.md).
 
 ---
 
-## Bicep Template
+## 1) Ownership assumptions and prerequisites
 
-**Source:** [`infra/main.bicep`](../infra/main.bicep)
+The receiving team should assume ownership of:
 
-The Bicep template deploys an Azure Static Web App resource:
+- **Azure subscription + resource group** used for the deployed environment
+- **Azure Static Web App** and its managed Functions API
+- **Azure Key Vault** used for secret-backed SWA app settings
+- **Azure OpenAI resource** and model deployments
+- **Entra app registration** used by SWA auth
+- **GitHub repository settings and Actions secrets**
+- **Application Insights / Log Analytics ownership**, whether reused or provisioned by infra
 
-```bicep
-targetScope = 'resourceGroup'
+Minimum access required:
 
-@description('Name of the Static Web App resource')
-param swaName string = 'kickstart-web'
+- **GitHub repo admin or maintainer** who can manage Actions secrets and run workflows
+- **Azure Contributor** on the target resource group/subscription
+- Permission to create **role assignments** (SWA managed identity needs Key Vault access)
+- Permission to manage the **Entra app registration** or coordinate with the identity team
 
-@description('Azure region for the Static Web App')
-param location string = 'centralus'
+Baseline tooling for manual validation:
 
-@description('SKU for the Static Web App')
-@allowed(['Free', 'Standard'])
-param skuName string = 'Standard'
-
-@description('Repository URL for the Static Web App (for GitHub integration)')
-param repositoryUrl string = ''
-
-@description('Branch to deploy from')
-param branch string = 'main'
-```
-
-### Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `swaName` | `kickstart-web` | Static Web App resource name |
-| `location` | `centralus` | Azure region |
-| `skuName` | `Standard` | SWA SKU tier (`Free` or `Standard`) |
-| `repositoryUrl` | `''` | GitHub repo URL for SWA integration |
-| `branch` | `main` | Git branch for deployment |
-
-### Dev Parameters
-
-**Source:** [`infra/parameters.dev.json`](../infra/parameters.dev.json)
-
-```json
-{
-  "parameters": {
-    "swaName": { "value": "kickstart-web-dev" },
-    "location": { "value": "centralus" },
-    "skuName": { "value": "Standard" },
-    "repositoryUrl": { "value": "https://github.com/sabbour/kickstart" },
-    "branch": { "value": "main" }
-  }
-}
-```
-
-### Outputs
-
-| Output | Description |
-|--------|-------------|
-| `defaultHostname` | Default hostname of the Static Web App |
-| `resourceId` | Azure resource ID |
-| `swaName` | Resource name |
-
-### Build Properties
-
-The Bicep template configures SWA build settings:
-
-```bicep
-buildProperties: {
-  appLocation: 'packages/web'
-  skipGithubActionWorkflowGeneration: true  // We manage our own workflow
-}
-```
+- `az` CLI with Bicep support
+- `gh` CLI or GitHub UI access
+- Node.js 20+ / npm
 
 ---
 
-## GitHub Actions Workflows
+## 2) Current deployment model
 
-### `deploy-swa.yml` — Static Web App Deployment
+Kickstart deploys in two separate layers:
 
-**Source:** [`.github/workflows/deploy-swa.yml`](../.github/workflows/deploy-swa.yml)
+1. **Infrastructure layer** — `deploy-infra.yml`
+   - Creates or updates Azure resources from `infra/main.bicep`
+   - Configures SWA app settings
+   - Pushes secrets into Key Vault and references them from SWA
+   - Handles the Application Insights connection string path
 
-Deploys the web frontend and API to Azure Static Web Apps on every push to `main` and on PRs.
+2. **Application layer** — `deploy-swa.yml`
+   - Builds `@kickstart/core`
+   - Builds the Azure Functions API in `packages/web/api`
+   - Builds the Vite frontend in `packages/web`
+   - Uploads the frontend + API bundle to Azure Static Web Apps
 
-**Trigger:**
-- Push to `main` → production deployment
-- PR opened/synced → staging environment (auto-destroyed on PR close)
+**Important:** the app deploy assumes the infra deploy has already created and configured the target SWA and its runtime settings.
 
-**Jobs:**
+---
 
-#### `deploy`
+## 3) Required GitHub secrets and config inputs
 
-```yaml
-steps:
-  - Checkout code
-  - Setup Node.js 20 (with npm cache)
-  - npm ci && build core + API
-  - Deploy via Azure/static-web-apps-deploy@v1
-```
+### GitHub Actions secrets
 
-Key configuration:
+These are the inputs another team must set in the repository before relying on CI/CD:
 
-```yaml
-app_location: "packages/web"         # Static frontend
-api_location: "packages/web/api"     # Azure Functions API
-skip_app_build: true                 # No build step for static HTML
-skip_api_build: false                # API needs TypeScript compilation
-api_build_command: "npm run build"
-```
+| Secret | Required | Used by | Purpose |
+|---|---|---|---|
+| `AZURE_STATIC_WEB_APPS_API_TOKEN` | Yes | `deploy-swa.yml` | Upload token for Azure Static Web Apps deployment |
+| `AZURE_CLIENT_ID` | Yes | `deploy-infra.yml` | OIDC login client ID for Azure workflow auth |
+| `AZURE_TENANT_ID` | Yes | `deploy-infra.yml` | OIDC tenant ID for Azure workflow auth |
+| `AZURE_CLIENT_SECRET` | Yes | `deploy-infra.yml` | Stored in Key Vault, referenced by SWA auth config |
+| `AZURE_OPENAI_API_KEY` | Yes | `deploy-infra.yml` | Stored in Key Vault, referenced by runtime |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Conditional | `deploy-infra.yml` | Supply only when reusing an existing Application Insights resource; never commit the value |
 
-**Build order is critical:** The API depends on `@kickstart/core`, so both must be built before the SWA action:
+### Non-secret deployment inputs
+
+These are currently committed in `infra/parameters.dev.json` or hardcoded in workflow env:
+
+| Input | Current source |
+|---|---|
+| SWA name | `infra/parameters.dev.json` |
+| Azure region | `infra/parameters.dev.json` / `deploy-infra.yml` |
+| Repo URL | `infra/parameters.dev.json` |
+| Deployment branch | `infra/parameters.dev.json` |
+| Entra client ID | `infra/parameters.dev.json` |
+| Custom domain hostname | `infra/parameters.dev.json` |
+| Azure OpenAI endpoint + deployment names | `infra/parameters.dev.json` |
+| Key Vault name | `infra/parameters.dev.json` |
+| Subscription ID / resource group | `deploy-infra.yml` env |
+
+### Application Insights secret path
+
+The current contract is:
+
+- `deploy-infra.yml` passes `secrets.APPLICATIONINSIGHTS_CONNECTION_STRING` into the secure Bicep parameter `appInsightsConnectionString`
+- `infra/main.bicep`:
+  - stores that value in Key Vault when provided
+  - points SWA runtime setting `APPLICATIONINSIGHTS_CONNECTION_STRING` at the Key Vault secret
+  - otherwise provisions a new Application Insights + Log Analytics pair and uses that generated connection string
+- the browser reads telemetry config at runtime from `/api/client-config`
+- the managed Functions API reads `APPLICATIONINSIGHTS_CONNECTION_STRING` from its SWA environment
+
+**Do not** put the connection string in committed parameter files, docs examples with real values, PR text, or source code.
+
+---
+
+## 4) Deploy order and dependency chain
+
+Use this order every time:
+
+### Step 1 — validate infra inputs
+
+Before deploying, confirm:
+
+- all required GitHub secrets exist
+- `infra/parameters.dev.json` matches the intended environment
+- the Entra app registration redirect URIs and tenant are correct
+- the target resource group/subscription are still the intended ones
+
+### Step 2 — deploy infrastructure first
+
+Run **Deploy Infrastructure** (`.github/workflows/deploy-infra.yml`) first.
+
+This workflow:
+
+1. logs into Azure via OIDC
+2. creates/updates the resource group
+3. deploys `infra/main.bicep`
+4. configures SWA app settings and Key Vault references
+5. emits deployment outputs in the GitHub step summary
+
+Infra must succeed before the SWA deploy, because the app depends on:
+
+- existing SWA resource
+- Key Vault references resolving
+- auth settings being present
+- Azure OpenAI settings being available at runtime
+- Application Insights wiring being present before browser/API telemetry can light up
+
+### Step 3 — deploy frontend + API
+
+Run **Deploy to Azure Static Web Apps** (`.github/workflows/deploy-swa.yml`) after infra is ready.
+
+This workflow:
+
+1. runs `npm ci`
+2. builds `@kickstart/core`
+3. builds `@kickstart/api`
+4. builds the Vite frontend
+5. uploads frontend + API to SWA
+
+### Step 4 — run post-deploy validation
+
+Do not treat workflow success alone as production validation. Run the checks in section 5 after both workflows complete.
+
+---
+
+## 5) Post-deploy validation checklist
+
+After deployment, validate all of the following:
+
+### Infrastructure and config
+
+- `deploy-infra.yml` completed successfully
+- step summary shows expected SWA name / hostname
+- Application Insights source is what you expected:
+  - `secret-supplied` when reusing an existing App Insights instance
+  - `provisioned` when letting Bicep create one
+- Key Vault exists and SWA managed identity has secret-read access
+
+### Static Web App and API health
+
+- site loads at the expected hostname
+- `GET /api/health` returns `200` with `{ "status": "ok" }`
+- authenticated routes no longer 404 at the edge
+- Azure login flow redirects correctly and returns to the app
+
+### Functional smoke checks
+
+- sign in through SWA auth
+- load the main chat surface
+- send a conversation request that exercises `/api/converse`
+- verify any Azure/OpenAI-backed flow works with real runtime config
+
+### Observability checks
+
+- frontend page view events appear in Application Insights
+- frontend dependency/AJAX calls appear
+- backend request telemetry appears for Functions routes
+- correlation between browser dependency calls and API requests is visible
+
+### Build/runtime sanity
+
+- deployed frontend version matches the expected commit/build
+- no startup crash from bundled non-runtime files
+- no API cold-start import error from bundled dependencies
+
+---
+
+## 6) Troubleshooting and rollback notes
+
+### If infra succeeds but the app fails
+
+Likely causes:
+
+- stale or missing `AZURE_STATIC_WEB_APPS_API_TOKEN`
+- build/runtime break in `packages/web` or `packages/web/api`
+- frontend deployed successfully but API startup failed
+
+Check:
+
+- `deploy-swa.yml` logs
+- SWA deployment status in Azure Portal
+- `/api/health`
+
+### If the site works but API routes 404
+
+Treat this as a managed Functions startup failure until proven otherwise.
+
+Known prior failure mode:
+
+- Azure Functions v4 imports every file matched by the package `main` glob on startup
+- bundling test files or incompatible runtime dependencies can crash module import and leave every `/api/*` route effectively unavailable
+
+### If auth is broken
+
+Check:
+
+- SWA app settings for `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_SECRET`
+- Entra redirect URIs
+- custom domain alignment with auth expectations
+
+### If telemetry is missing
+
+Check:
+
+- whether infra used `secret-supplied` or `provisioned`
+- SWA runtime config contains `APPLICATIONINSIGHTS_CONNECTION_STRING`
+- `/api/client-config` returns telemetry config
+- CSP still allows Azure Monitor / Application Insights endpoints
+
+### Rollback
+
+There is no separate documented release orchestration yet. Current safe rollback is:
+
+1. redeploy the last known good commit through `deploy-swa.yml`
+2. if infra changed incompatibly, revert the infra change and rerun `deploy-infra.yml`
+3. re-run post-deploy validation, especially `/api/health`, auth, and telemetry
+
+For production hardening, the receiving team should add a formal rollback playbook and release/version pinning policy.
+
+---
+
+## 7) Proof-of-concept limitations the receiving team should harden
+
+Plan follow-up work in these areas:
+
+- **Environment strategy** — current docs/workflows are dev-environment-centric; introduce explicit dev/stage/prod separation
+- **Secret management discipline** — inventory all required secrets and move toward formal ownership/rotation policy
+- **Release process** — add clear promotion, rollback, and environment approval gates
+- **Monitoring / alerting** — App Insights wiring exists, but operational alerts/dashboards are not documented here
+- **Identity ownership** — formalize Entra app registration ownership and redirect URI change process
+- **Infrastructure parameterization** — reduce hardcoded subscription/resource-group assumptions in workflows
+- **Deployment smoke tests** — automate post-deploy health/auth/telemetry checks
+- **Disaster recovery** — document restoration steps for SWA, Key Vault, and App Insights dependencies
+
+---
+
+## 8) Manual commands reference
+
+### Validate Bicep
 
 ```bash
-npm ci
-npm run build -w @kickstart/core    # Build core first
-npm run build -w @kickstart/api     # Then API (depends on core)
+az bicep build --file infra/main.bicep
 ```
 
-#### `close_staging`
+### What-if infra deployment
 
-Runs when a PR is closed — tears down the staging environment:
-
-```yaml
-- uses: Azure/static-web-apps-deploy@v1
-  with:
-    action: "close"
+```bash
+az deployment group what-if \
+  --resource-group rg-kickstart-dev \
+  --template-file infra/main.bicep \
+  --parameters @infra/parameters.dev.json
 ```
 
-**Required secrets:**
-
-| Secret | Description |
-|--------|-------------|
-| `AZURE_STATIC_WEB_APPS_API_TOKEN` | SWA deployment token (from Azure Portal) |
-| `GITHUB_TOKEN` | Auto-provided by GitHub Actions |
-
----
-
-### `deploy-infra.yml` — Infrastructure Deployment
-
-**Source:** [`.github/workflows/deploy-infra.yml`](../.github/workflows/deploy-infra.yml)
-
-Deploys Azure infrastructure via Bicep on changes to the `infra/` directory.
-
-**Trigger:**
-- Push to `main` with changes in `infra/**`
-- Manual dispatch (`workflow_dispatch`)
-
-**Authentication:** OIDC (OpenID Connect) — no stored credentials:
-
-```yaml
-permissions:
-  id-token: write
-  contents: read
-
-steps:
-  - uses: azure/login@v2
-    with:
-      client-id: ${{ secrets.AZURE_CLIENT_ID }}
-      tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-      subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-```
-
-**Steps:**
-
-1. **Checkout code**
-2. **Azure Login** via OIDC federation
-3. **Create resource group** (idempotent `az group create`)
-4. **Deploy Bicep template** with dev parameters
-5. **Store deployment outputs** in GitHub step summary
+### Manual infra deployment with existing App Insights
 
 ```bash
 az deployment group create \
@@ -201,179 +289,11 @@ az deployment group create \
   --parameters appInsightsConnectionString='<existing-app-insights-connection-string>'
 ```
 
-> `appInsightsConnectionString` is a secure parameter. Do not add it to committed parameter files. In CI, supply it through the GitHub Actions secret `APPLICATIONINSIGHTS_CONNECTION_STRING`.
-
-**Required secrets:**
-
-| Secret | Description |
-|--------|-------------|
-| `AZURE_CLIENT_ID` | Entra app registration client ID (for OIDC) |
-| `AZURE_TENANT_ID` | Entra tenant ID |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Optional but required when reusing a real existing Application Insights resource instead of letting Bicep provision a new one |
-
-**Environment variables (hardcoded in workflow):**
-
-| Variable | Value | Description |
-|----------|-------|-------------|
-| `AZURE_SUBSCRIPTION_ID` | `4498459e-...` | Target subscription |
-| `AZURE_RESOURCE_GROUP` | `rg-kickstart-dev` | Resource group name |
-| `AZURE_LOCATION` | `centralus` | Azure region |
-
----
-
-## Environment Variables & Secrets
-
-### SWA API (Runtime)
-
-Set these in the Azure Static Web App **Application Settings** (Azure Portal → SWA → Configuration):
-
-| Variable | Description |
-|----------|-------------|
-| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI resource endpoint (e.g., `https://my-openai.openai.azure.com`) |
-| `AZURE_OPENAI_DEPLOYMENT` | Model deployment name (e.g., `gpt-4o`) |
-| `AZURE_OPENAI_API_KEY` | API key for the Azure OpenAI resource |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Runtime telemetry connection string. `deploy-infra.yml` sets this via SWA app settings and Key Vault; for local dev, add it to `local.settings.json`. |
-
-### GitHub Secrets
-
-| Secret | Used By | Description |
-|--------|---------|-------------|
-| `AZURE_STATIC_WEB_APPS_API_TOKEN` | `deploy-swa.yml` | SWA deployment token |
-| `AZURE_CLIENT_ID` | `deploy-infra.yml` | Entra app client ID for OIDC login |
-| `AZURE_TENANT_ID` | `deploy-infra.yml` | Entra tenant ID for OIDC login |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` | `deploy-infra.yml` | Existing App Insights connection string to inject securely via Key Vault; omit only if you want infra to create a new App Insights instance |
-
----
-
-## Entra App Registration
-
-Kickstart uses an Entra ID (Azure AD) app registration for authentication via SPA Auth Code Flow with PKCE (no client secret for the SPA itself).
-
-**Source:** [`infra/setup-entra.sh`](../infra/setup-entra.sh)
-
-### Running the Setup Script
+### Manual app build path used by SWA deploy
 
 ```bash
-# Login to the correct tenant
-az login --tenant caglobaldemos2605.onmicrosoft.com
-
-# Run the setup script
-chmod +x infra/setup-entra.sh
-./infra/setup-entra.sh
-```
-
-### What the Script Creates
-
-1. **App Registration** named "Kickstart - AKS Onboarding" with single-tenant sign-in
-2. **SPA Redirect URIs:**
-   - `http://localhost:8080` (local dev)
-   - `http://localhost:4280` (SWA CLI)
-   - `https://kickstart.aks.azure.sabbour.me` (staging)
-   - `https://kickstart.aks.azure.com` (production)
-3. **API Permissions (delegated):**
-   - Microsoft Graph: `User.Read`
-   - Azure Service Management: `user_impersonation`
-4. **Client Secret** (for server-side use; SPA uses PKCE)
-
-### Script Output
-
-The script outputs the Client ID, Object ID, Tenant ID, and client secret. Store the secret in GitHub Secrets:
-
-```
-AZURE_CLIENT_SECRET=<the-generated-secret>
-```
-
----
-
-## Custom Domain Configuration
-
-After initial deployment, configure custom domains via the Azure Portal:
-
-1. Navigate to the Static Web App resource
-2. Go to **Custom domains**
-3. Add your domain and follow the DNS validation steps
-
-**Current domains:**
-- **Staging:** `kickstart.aks.azure.sabbour.me`
-- **Production:** `kickstart.aks.azure.com` (future)
-
-SWA automatically provisions and manages TLS certificates for custom domains.
-
----
-
-## Local Development
-
-### Full Stack (Frontend + API)
-
-```bash
-# Install dependencies
 npm ci
-
-# Build core and API
 npm run build -w @kickstart/core
 npm run build -w @kickstart/api
-
-# Create local settings for API
-cat > packages/web/api/local.settings.json << 'EOF'
-{
-  "IsEncrypted": false,
-  "Values": {
-    "FUNCTIONS_WORKER_RUNTIME": "node",
-    "AzureWebJobsStorage": "",
-    "AZURE_OPENAI_ENDPOINT": "https://your-resource.openai.azure.com",
-    "AZURE_OPENAI_DEPLOYMENT": "gpt-4o",
-    "AZURE_OPENAI_API_KEY": "your-key-here"
-  }
-}
-EOF
-
-# Start SWA CLI
-swa start packages/web --api-location packages/web/api
-```
-
-Access at `http://localhost:4280`.
-
-### MCP Server Only
-
-```bash
-npm ci
-npm run build -w @kickstart/core
-npm run build -w @kickstart/mcp-server
-
-# Run directly (stdio transport)
-node packages/mcp-server/dist/index.js
-```
-
-See [MCP Server — Configuration](./mcp-server.md#configuration) for connecting to AI coding assistants.
-
-### Running Tests
-
-```bash
-# Run all tests (vitest)
-npm test
-
-# Run tests for a specific workspace
-npm test -w @kickstart/core
-npm test -w @kickstart/mcp-server
-```
-
-The root `vitest.config.ts` excludes Playwright e2e specs — those are run separately via `npx playwright test`.
-
-### Infrastructure (Bicep)
-
-```bash
-# Validate the Bicep template
-az bicep build --file infra/main.bicep
-
-# What-if deployment (dry run)
-az deployment group what-if \
-  --resource-group rg-kickstart-dev \
-  --template-file infra/main.bicep \
-  --parameters @infra/parameters.dev.json
-
-# Deploy
-az deployment group create \
-  --resource-group rg-kickstart-dev \
-  --template-file infra/main.bicep \
-  --parameters @infra/parameters.dev.json
+cd packages/web && npx vite build
 ```
