@@ -63,3 +63,9 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - **SWA automation**: Implemented continuous deployment on main + version-SHA footer (PR #177).
 - **Project board triage**: Implemented auto-assignment workflow for issues.
 - **Team notes**: Coordinated with Fry on footer components; ensured Leela's approval before merge.
+## Learnings
+
+- (2026-04-15) Unified narrative prompts produce more natural conversations than layered phase-template architectures. Embedding step markers (STEP 1—DISCOVER, STEP 2—DESIGN, etc.) in one prompt lets the LLM flow naturally between topics instead of feeling gated by explicit phase switches.
+- (2026-04-15) Auto-continue via filesComplete flag eliminates friction during multi-turn file generation. The LLM sets filesComplete: false, the client auto-sends "Generate next set of files" — no manual button clicks needed.
+- (2026-04-15) Artifact summary injection (appending generated file list + resource declarations to the system prompt each turn) gives the LLM running context and prevents hallucinated file references or duplicate generation. Modeled after Try-AKS's buildArtifactSummary pattern.
+- (2026-04-15) WSL on Windows can silently lose file edits when switching git branches — the working tree may revert to the branch commit state. Always verify file content after branch switches.
