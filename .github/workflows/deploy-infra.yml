@@ -58,10 +58,14 @@ jobs:
           DEFAULT_HOSTNAME=$(echo "$OUTPUT" | jq -r '.defaultHostname.value')
           RESOURCE_ID=$(echo "$OUTPUT" | jq -r '.resourceId.value')
           SWA_NAME=$(echo "$OUTPUT" | jq -r '.swaName.value')
+          APP_INSIGHTS_NAME=$(echo "$OUTPUT" | jq -r '.applicationInsightsName.value')
+          LOG_ANALYTICS_NAME=$(echo "$OUTPUT" | jq -r '.logAnalyticsWorkspaceName.value')
 
           echo "default_hostname=$DEFAULT_HOSTNAME" >> $GITHUB_OUTPUT
           echo "resource_id=$RESOURCE_ID" >> $GITHUB_OUTPUT
           echo "swa_name=$SWA_NAME" >> $GITHUB_OUTPUT
+          echo "application_insights_name=$APP_INSIGHTS_NAME" >> $GITHUB_OUTPUT
+          echo "log_analytics_workspace_name=$LOG_ANALYTICS_NAME" >> $GITHUB_OUTPUT
 
       - name: Store deployment outputs
         run: |
@@ -72,3 +76,5 @@ jobs:
           echo "| Hostname | ${{ steps.deploy.outputs.default_hostname }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Resource ID | ${{ steps.deploy.outputs.resource_id }} |" >> $GITHUB_STEP_SUMMARY
           echo "| SWA Name | ${{ steps.deploy.outputs.swa_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Application Insights | ${{ steps.deploy.outputs.application_insights_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Log Analytics Workspace | ${{ steps.deploy.outputs.log_analytics_workspace_name }} |" >> $GITHUB_STEP_SUMMARY

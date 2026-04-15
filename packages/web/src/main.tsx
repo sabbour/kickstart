@@ -7,6 +7,7 @@ import { VirtualFSProvider } from './contexts/VirtualFSContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { DebugProvider } from './contexts/DebugContext';
 import { registerKit, azureKit, githubKit, InMemoryArtifactStore } from '@kickstart/core';
+import { initializeTelemetry } from './services/telemetry';
 
 // Register integration kits at startup — auto-wires tools + connectors into
 // their default registries so the engine can call them immediately.
@@ -17,6 +18,8 @@ void registerKit(githubKit);
 
 // Session-scoped artifact store — one per page load, no singleton fallback.
 const sessionArtifactStore = new InMemoryArtifactStore();
+
+void initializeTelemetry();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

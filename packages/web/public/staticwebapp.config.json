@@ -20,6 +20,10 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/api/client-config",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/github-auth/callback",
       "allowedRoles": ["anonymous"]
     },
@@ -72,7 +76,7 @@
     ]
   },
   "globalHeaders": {
-    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.openai.azure.com; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.openai.azure.com https://*.applicationinsights.azure.com https://*.monitor.azure.com https://dc.services.visualstudio.com; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "X-XSS-Protection": "1; mode=block",
