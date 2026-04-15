@@ -123,6 +123,8 @@ export interface ActionDispatchOptions {
    * e.g. `api:azure-arm.listResources`
    */
   connectorRegistry?: APIConnectorRegistry;
+  /** Optional debug logger — called with action details when debug mode is active. */
+  onDebugAction?: (event: { actionName: string; category: string; context: Record<string, unknown>; outboundMessage: string }) => void;
 }
 
 export type ActionHandler = (action: A2uiClientAction) => void;
@@ -195,12 +197,23 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
   const handler = useCallback((action: A2uiClientAction) => {
     const category = categorize(action.name);
 
+    /** Log to debug logger if provided. */
+    function logDebug(outboundMessage: string) {
+      optionsRef.current.onDebugAction?.({
+        actionName: action.name,
+        category,
+        context: (action.context ?? {}) as Record<string, unknown>,
+        outboundMessage,
+      });
+    }
+
     switch (category) {
       case 'reply': {
         // Manual action — reset the consecutive counter
         consecutiveRef.current = 0;
         setConsecutiveAutoContinueCount(0);
         const message = actionToMessage(action);
+        logDebug(message);
         optionsRef.current.onSendMessage(message);
         break;
       }
@@ -211,6 +224,7 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
         optionsRef.current.onNavigate?.(phase, action.context ?? {});
         // Phase transitions auto-continue
         const message = synthesizeNavigationPrompt(phase, action.context ?? {});
+        logDebug(message);
         dispatchAutoContinue(message);
         break;
       }
@@ -219,13 +233,16 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
         // Explicit completion signal — synthesize a continuation prompt
         if (!shouldAutoContinue(action.name)) {
           // Shouldn't happen, but guard defensively
-          optionsRef.current.onSendMessage(actionToMessage(action));
+          const message = actionToMessage(action);
+          logDebug(message);
+          optionsRef.current.onSendMessage(message);
           break;
         }
         const message = synthesizeContinuationPrompt({
           name: action.name,
           context: action.context ?? {},
         });
+        logDebug(message);
         dispatchAutoContinue(message);
         break;
       }

@@ -85,7 +85,9 @@ export function useStreaming() {
     let displayText = '';
     let lastModel: string | undefined;
     let lastSessionId: string | undefined;
+    let lastPhase: string | undefined;
     const renderDecisions: string[] = [];
+    const debugA2uiMessages: any[] = [];
 
     try {
       // Build client message history for rehydration (strip system messages
@@ -155,6 +157,7 @@ export function useStreaming() {
 
             if (currentEventType === 'a2ui') {
               const a2uiMsg: A2uiMsg = JSON.parse(data);
+              if (debugMode) debugA2uiMessages.push(a2uiMsg);
               callbacks.onA2UI([a2uiMsg]);
               currentEventType = '';
               continue;
@@ -213,10 +216,12 @@ export function useStreaming() {
             }
 
             if (event.a2ui && event.a2ui.length > 0) {
+              if (debugMode) debugA2uiMessages.push(...event.a2ui);
               callbacks.onA2UI(event.a2ui);
             }
 
             if (event.phase) {
+              lastPhase = event.phase;
               callbacks.onPhase(event.phase);
             }
 
@@ -246,6 +251,7 @@ export function useStreaming() {
             finalText = envelope.message;
           }
           if (Array.isArray(envelope?.a2ui) && envelope.a2ui.length > 0) {
+            if (debugMode) debugA2uiMessages.push(...envelope.a2ui);
             callbacks.onA2UI(envelope.a2ui);
           }
         } catch { /* plain text, not JSON — use as-is */ }
@@ -269,6 +275,13 @@ export function useStreaming() {
             model: lastModel,
             rawResponse: finalText,
             rawContent: accumulated !== finalText ? accumulated : undefined,
+            fullEnvelope: {
+              message: finalText,
+              a2ui: debugA2uiMessages.length > 0 ? debugA2uiMessages : undefined,
+              model: lastModel,
+              phase: lastPhase,
+              renderDecisions: renderDecisions.length > 0 ? renderDecisions : undefined,
+            },
             renderDecisions: renderDecisions.length > 0 ? renderDecisions : undefined,
           }
         : undefined;

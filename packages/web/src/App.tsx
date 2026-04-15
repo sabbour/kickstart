@@ -37,7 +37,7 @@ function msgId(role: string) {
 
 export function App() {
   const { resolvedTheme } = useTheme();
-  const { debugEnabled } = useDebug();
+  const { debugEnabled, logAction } = useDebug();
   const fluentTheme = resolvedTheme === 'dark' ? webDarkTheme : webLightTheme;
 
   const [mode, setMode] = useState<AppMode>(playgroundEnabled ? 'chat' : 'landing');
@@ -54,6 +54,7 @@ export function App() {
     onSendMessage: (msg) => handleSendMessage(msg),
     onAutoContinue: (msg) => handleSendMessage(msg, true),
     connectorRegistry,
+    onDebugAction: debugEnabled ? (evt) => logAction({ ...evt, timestamp: Date.now() }) : undefined,
   });
 
   const a2ui = useA2UI({ actionHandler });

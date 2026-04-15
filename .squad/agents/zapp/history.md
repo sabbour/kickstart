@@ -20,3 +20,8 @@
 - Security review of DP #188 (demo scenarios) — approved
 - Re-review of DP #186 (round 2) — identified 3 concerns
 - Final review and sign-off on DP #186 (round 3) — approved for implementation
+## 2026-04-14 Round 2: DP Security Review
+
+- **Reviewed DPs #186 & #187**: #187 approved (low risk), #186 flagged with High/Medium concerns.
+- **#186 blockers**: Immutable source pinning, prompt-safety validation, fail-closed + provenance.
+- **Coordination**: Communicated security requirements to Leela; provided detailed guidance for Phase 1 hardening.

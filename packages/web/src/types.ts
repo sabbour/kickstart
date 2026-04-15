@@ -1,5 +1,19 @@
 // Shared TypeScript types for the Kickstart chat application
 
+/** A logged action dispatch event for debug visibility. */
+export interface ActionDebugEvent {
+  /** Timestamp (ms) when the action was dispatched. */
+  timestamp: number;
+  /** A2UI action name (e.g. "pick-runtime", "navigate:plan"). */
+  actionName: string;
+  /** Routing category determined by useActionDispatch. */
+  category: string;
+  /** The event.context payload sent back to the LLM. */
+  context: Record<string, unknown>;
+  /** The natural-language message synthesised from the action. */
+  outboundMessage: string;
+}
+
 export interface DebugMetadata {
   /** Model name used for this response (e.g., "gpt-4o"). */
   model?: string;
@@ -7,6 +21,14 @@ export interface DebugMetadata {
   rawResponse?: string;
   /** Full JSON envelope content before message extraction. */
   rawContent?: string;
+  /** Complete structured envelope: text + all A2UI messages received for this turn. */
+  fullEnvelope?: {
+    message?: string;
+    a2ui?: A2uiMsg[];
+    model?: string;
+    phase?: string;
+    renderDecisions?: string[];
+  };
   /** Rendering engine decisions (component choices, catalog, degradation). */
   renderDecisions?: string[];
 }
