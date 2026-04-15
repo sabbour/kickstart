@@ -50,7 +50,7 @@ param openAiApiKey string = ''
 param entraClientSecret string = ''
 
 @secure()
-@description('Application Insights connection string. When provided, SWA uses this existing telemetry resource instead of provisioning a new one.')
+@description('Application Insights connection string. Supply this via a secure deployment parameter (for CI: GitHub secret `APPLICATIONINSIGHTS_CONNECTION_STRING`), never via committed parameter files. When provided, SWA uses this existing telemetry resource instead of provisioning a new one.')
 param appInsightsConnectionString string = ''
 
 var applicationInsightsName = '${swaName}-appi'
@@ -92,6 +92,9 @@ resource secretEntraClientSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' 
   }
 }
 
+// Optional: if a real connection string is supplied securely at deploy time,
+// persist it in Key Vault and have SWA read it from there instead of creating
+// a new Application Insights resource in this template.
 resource secretAppInsightsConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(appInsightsConnectionString)) {
   parent: keyVault
   name: 'applicationinsights-connection-string'

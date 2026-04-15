@@ -197,8 +197,11 @@ steps:
 az deployment group create \
   --resource-group rg-kickstart-dev \
   --template-file infra/main.bicep \
-  --parameters @infra/parameters.dev.json
+  --parameters @infra/parameters.dev.json \
+  --parameters appInsightsConnectionString='<existing-app-insights-connection-string>'
 ```
+
+> `appInsightsConnectionString` is a secure parameter. Do not add it to committed parameter files. In CI, supply it through the GitHub Actions secret `APPLICATIONINSIGHTS_CONNECTION_STRING`.
 
 **Required secrets:**
 
@@ -206,6 +209,7 @@ az deployment group create \
 |--------|-------------|
 | `AZURE_CLIENT_ID` | Entra app registration client ID (for OIDC) |
 | `AZURE_TENANT_ID` | Entra tenant ID |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Optional but required when reusing a real existing Application Insights resource instead of letting Bicep provision a new one |
 
 **Environment variables (hardcoded in workflow):**
 
@@ -228,6 +232,7 @@ Set these in the Azure Static Web App **Application Settings** (Azure Portal →
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI resource endpoint (e.g., `https://my-openai.openai.azure.com`) |
 | `AZURE_OPENAI_DEPLOYMENT` | Model deployment name (e.g., `gpt-4o`) |
 | `AZURE_OPENAI_API_KEY` | API key for the Azure OpenAI resource |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Runtime telemetry connection string. `deploy-infra.yml` sets this via SWA app settings and Key Vault; for local dev, add it to `local.settings.json`. |
 
 ### GitHub Secrets
 
@@ -236,6 +241,7 @@ Set these in the Azure Static Web App **Application Settings** (Azure Portal →
 | `AZURE_STATIC_WEB_APPS_API_TOKEN` | `deploy-swa.yml` | SWA deployment token |
 | `AZURE_CLIENT_ID` | `deploy-infra.yml` | Entra app client ID for OIDC login |
 | `AZURE_TENANT_ID` | `deploy-infra.yml` | Entra tenant ID for OIDC login |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | `deploy-infra.yml` | Existing App Insights connection string to inject securely via Key Vault; omit only if you want infra to create a new App Insights instance |
 
 ---
 

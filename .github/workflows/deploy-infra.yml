@@ -42,6 +42,10 @@ jobs:
       - name: Deploy Bicep template
         id: deploy
         run: |
+          # Secure inputs come from GitHub Actions secrets. If
+          # APPLICATIONINSIGHTS_CONNECTION_STRING is set, infra/main.bicep stores
+          # it in Key Vault and points SWA runtime config at that existing App
+          # Insights instance. If it is blank, the template provisions a new one.
           OUTPUT=$(az deployment group create \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --template-file infra/main.bicep \

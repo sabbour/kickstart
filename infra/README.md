@@ -64,6 +64,7 @@ The SWA auth config in `staticwebapp.config.json` references these app settings 
 | `AZURE_TENANT_ID` | Derived from `subscription().tenantId` in Bicep — not a secret |
 | `AZURE_CLIENT_SECRET` | Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`) |
 | `AZURE_OPENAI_API_KEY` | Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`) |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Key Vault reference when supplied from GitHub secret `APPLICATIONINSIGHTS_CONNECTION_STRING`; otherwise Bicep provisions a new App Insights resource and sets the generated connection string |
 | `AZURE_OPENAI_ENDPOINT` | Bicep parameter — not a secret |
 | `AZURE_OPENAI_*_DEPLOYMENT` | Bicep parameters — not secrets |
 
@@ -71,7 +72,7 @@ The SWA auth config in `staticwebapp.config.json` references these app settings 
 
 Secrets are stored in Azure Key Vault and referenced by SWA via `@Microsoft.KeyVault(SecretUri=...)`. The SWA's system-assigned managed identity has the `Key Vault Secrets User` RBAC role on the vault.
 
-**To set secrets during deployment**, pass them as `@secure()` Bicep parameters:
+**To set secrets during deployment**, pass them as `@secure()` Bicep parameters. Do **not** put these values in `infra/parameters.dev.json`; that file is committed and intentionally omits secure parameters.
 
 ```bash
 az deployment group create \
@@ -79,6 +80,7 @@ az deployment group create \
   --template-file infra/main.bicep \
   --parameters @infra/parameters.dev.json \
   --parameters \
+    appInsightsConnectionString='<existing-app-insights-connection-string>' \
     openAiApiKey='<your-api-key>' \
     entraClientSecret='<your-secret>'
 ```
@@ -94,7 +96,7 @@ az keyvault secret set \
 
 The SWA automatically picks up the latest secret version (versionless URI).
 
-**In CI/CD**, secrets are passed from GitHub Actions secrets. See `.github/workflows/deploy-infra.yml`.
+**In CI/CD**, secrets are passed from GitHub Actions secrets. For observability, set `APPLICATIONINSIGHTS_CONNECTION_STRING` if you want the deployment to reuse an existing Application Insights resource; leave it unset to let Bicep provision a new one. See `.github/workflows/deploy-infra.yml`.
 
 ### Auth Routes
 
@@ -125,7 +127,8 @@ az group create --name rg-kickstart-dev --location centralus
 az deployment group create \
   --resource-group rg-kickstart-dev \
   --template-file infra/main.bicep \
-  --parameters @infra/parameters.dev.json
+  --parameters @infra/parameters.dev.json \
+  --parameters appInsightsConnectionString='<existing-app-insights-connection-string>'
 ```
 
 ## Set Up Entra App Registration
