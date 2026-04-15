@@ -59,6 +59,22 @@ interface ConverseResponse {
   message: string;
   model?: string;
   a2ui?: object[];
+  autoContinue?: boolean;
+  autoContinuePrompt?: string;
+  debug?: DebugMetadata;
+  renderDecisions?: string;
+}
+
+/** SSE "done" event payload sent at the end of a streaming response. */
+interface StreamDonePayload {
+  sessionId: string;
+  phase: string;
+  phaseLabel: string;
+  model?: string;
+  autoContinue?: boolean;
+  autoContinuePrompt?: string;
+  debug?: DebugMetadata;
+  renderDecisions?: string;
 }
 
 app.http("converse", {
@@ -235,8 +251,8 @@ app.http("converse", {
 
       // Include auto-continue signal when more files are pending
       if (flags.filesComplete === false) {
-        (responseBody as unknown as Record<string, unknown>).autoContinue = true;
-        (responseBody as unknown as Record<string, unknown>).autoContinuePrompt = "Generate next set of files";
+        responseBody.autoContinue = true;
+        responseBody.autoContinuePrompt = "Generate next set of files";
       }
 
       // Attach debug metadata when requested
@@ -249,9 +265,8 @@ app.http("converse", {
           hadExplicitA2UI,
           session.engineState.currentPhase,
         );
-        (responseBody as unknown as Record<string, unknown>).debug = debugMeta;
-        (responseBody as unknown as Record<string, unknown>).renderDecisions =
-          formatRenderDecisions(debugMeta.renderDecisions);
+        responseBody.debug = debugMeta;
+        responseBody.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
       }
 
       return { status: 200, jsonBody: responseBody };
@@ -371,7 +386,7 @@ function handleStreaming(
             }
 
             const phaseDef = getPhaseDefinition(engineState.currentPhase as import("@kickstart/core").Phase);
-            const donePayload: Record<string, unknown> = {
+            const donePayload: StreamDonePayload = {
               sessionId,
               phase: engineState.currentPhase,
               phaseLabel: phaseDef.label,

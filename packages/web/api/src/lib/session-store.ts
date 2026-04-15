@@ -308,10 +308,15 @@ export function extractArtifactsFromA2UI(
  * Scan a message (raw JSON or A2UI content) for FileEditor components
  * and upsert any found artifacts into the list.
  */
+/** Max content length to attempt JSON.parse on during hydration (prevent DoS). */
+const MAX_HYDRATION_CONTENT_LENGTH = 100_000; // 100KB max per message
+
 function rebuildArtifactsFromMessage(
   content: string,
   artifacts: GeneratedArtifact[],
 ): void {
+  if (content.length > MAX_HYDRATION_CONTENT_LENGTH) return;
+
   // Match FileEditor components in assistant messages — these appear in
   // A2UI updateComponents payloads as JSON objects with component:"FileEditor"
   const fileEditorPattern = /"component"\s*:\s*"FileEditor"/;
