@@ -336,6 +336,13 @@ describe("githubKit phasePrompts", () => {
     expect(hasGitHub).toBe(true);
   });
 
+  it("has Handoff phase prompts mentioning GitHubCommit", async () => {
+    const { githubKit } = await import("../kits/github-kit.js");
+    const handoffPrompts = githubKit.phasePrompts?.[Phase.Handoff] ?? [];
+    const hasCommitFlow = handoffPrompts.some((p) => p.includes("GitHubCommit"));
+    expect(hasCommitFlow).toBe(true);
+  });
+
   it("has Generate phase prompts mentioning OIDC", async () => {
     const { githubKit } = await import("../kits/github-kit.js");
     const generatePrompts = githubKit.phasePrompts?.[Phase.Generate] ?? [];
