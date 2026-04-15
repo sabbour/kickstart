@@ -2,7 +2,110 @@
 
 A2UI (Agent-to-UI) v0.9 is the component protocol Kickstart uses to render rich interactive UI alongside AI responses. The LLM returns structured A2UI JSON; the web surface renders it using React 19 with Fluent 2 styling.
 
-> **Related docs:** [MCP Server](./mcp-server.md) for catalog negotiation · [API Reference](./api-reference.md) for the web endpoint
+> **Related docs:** [MCP Server](./mcp-server.md) for catalog negotiation · [API Reference](./api-reference.md) for the web endpoint · [Integration Kits](./integration-kits.md) for kit-contributed components
+
+> 💡 **Try it live:** All components can be tested interactively in the [Playground](https://kickstart.aks.azure.sabbour.me/?playground). Select any component from the sidebar to see it rendered with sample data.
+
+---
+
+## Component Gallery
+
+The Playground organizes every component into scenario groups. The tables below map each component to its playground group so you can find and test it instantly.
+
+### Layout Components
+
+| Component | Catalog | Description | Playground Group |
+|-----------|---------|-------------|------------------|
+| Row | a2ui | Horizontal flex layout | Layout |
+| Column | a2ui | Vertical flex layout | Layout |
+| List | a2ui | Ordered list of items | Layout |
+| Card | a2ui | Content card wrapper | Layout |
+| Tabs | a2ui | Tabbed content panels | Layout |
+| Divider | a2ui | Horizontal separator | Layout |
+| Accordion | a2ui | Collapsible FAQ sections | Layout |
+
+### Content Components
+
+| Component | Catalog | Description | Playground Group |
+|-----------|---------|-------------|------------------|
+| Text | a2ui | All text variants (h1–overline) | Content |
+| Image | a2ui | Image with placeholder fallback | Content |
+| Alert | a2ui | Info / success / warning / error messages | Content |
+| Badge | a2ui | Status, counter, and presence badges | Content |
+| Icon | a2ui | Fluent icon display | Content |
+| Link | a2ui | Hyperlinks with external indicator | Content |
+| Table | a2ui | Striped data table with caption | Content |
+| AudioPlayer | a2ui | HTML5 audio with controls | Content |
+| Video | a2ui | HTML5 video with 16:9 player | Content |
+
+### Input Components
+
+| Component | Catalog | Description | Playground Group |
+|-----------|---------|-------------|------------------|
+| Button | a2ui | Primary / outlined / text variants | Inputs |
+| TextField | a2ui | Text input with label and validation | Inputs |
+| CheckBox | a2ui | Toggle checkboxes | Inputs |
+| ChoicePicker | a2ui | Chips and list selection variants | Inputs |
+| Slider | a2ui | Range slider control | Inputs |
+| DateTimeInput | a2ui | Date and time picker | Inputs |
+| Modal | a2ui | Modal dialog with trigger | Inputs |
+| ComboBox | a2ui | Dropdown with search and custom entry | Inputs |
+| MultiSelect | a2ui | Multi-value dropdown | Inputs |
+| Toggle | a2ui | On/off switch control | Inputs |
+
+### Custom Kickstart Components
+
+| Component | Catalog | Description | Playground Group |
+|-----------|---------|-------------|------------------|
+| RadioGroup | kickstart | Radio options with descriptions | Custom Controls |
+| FormGroup | kickstart | Stepped form sections with validation | Custom Controls |
+| SteppedCarousel | kickstart | Wizard-style stepped carousel | Custom Controls |
+| CodeBlock | kickstart | Syntax-highlighted code with copy/download | Custom Controls |
+| ProgressSteps | kickstart | Multi-step progress tracker | Custom Controls |
+| ArchitectureDiagram | kickstart | Mermaid-powered architecture diagram | Custom Controls |
+| Questionnaire | kickstart | Multi-question form (text/choice/multiChoice) | Custom Controls |
+| Markdown | kickstart | Rich markdown with tables and code blocks | Custom Controls |
+
+### Azure Components
+
+| Component | Catalog | Description | Playground Group |
+|-----------|---------|-------------|------------------|
+| AzureLoginCard | kickstart | MSAL authentication with subscriptions | Azure Components |
+| AzureResourcePicker | kickstart | Cascading subscription → RG → resource selection | Azure Components |
+| AzureResourceForm | kickstart | Dynamic resource creation form | Azure Components |
+| AzureAction | kickstart | Safe ARM API operations with confirmation | Azure Components |
+
+### GitHub Components
+
+| Component | Catalog | Description | Playground Group |
+|-----------|---------|-------------|------------------|
+| GitHubLoginCard | kickstart | Device code authentication flow | GitHub Components |
+| GitHubRepoPicker | kickstart | Repository search and selection | GitHub Components |
+| GitHubAction | kickstart | Safe GitHub API operations | GitHub Components |
+| GitHubCommit | kickstart | PR creation wizard | GitHub Components |
+
+### Integration Kit Auth
+
+| Component | Catalog | Description | Playground Group |
+|-----------|---------|-------------|------------------|
+| AuthCard (Azure) | kickstart | Azure MSAL sign-in via kit registration | Integration Kits |
+| AuthCard (GitHub) | kickstart | GitHub OAuth sign-in via kit registration | Integration Kits |
+| Multi-Provider | kickstart | Azure + GitHub AuthCards side by side | Integration Kits |
+
+### Additional Playground Groups
+
+The playground also includes scenario groups for advanced patterns:
+
+| Group | Description |
+|-------|-------------|
+| Kickstart Scenarios | 9 end-to-end app demo flows (Welcome → Deploy) |
+| Multi-Phase Demo | Discover → Design → Generate → Review → Deploy phase demos |
+| File Operations | FileEditor with create, edit, delete, and multi-file tabs |
+| Cost Estimate | Azure pricing breakdown with SKU options |
+| Data Binding | Text/form components bound to JSON Pointer data paths |
+| Events & Actions | Button events, form submit, function call actions |
+| Surface Lifecycle | Multi-surface creation, update, and deletion |
+| Dynamic Patterns | Nested data scopes, conditional content, complex dashboards |
 
 ---
 
@@ -428,3 +531,265 @@ export const myKit: IntegrationKit = {
 ### 4. Use in tool handlers
 
 The component type string is sent in A2UI JSON from the LLM or tool handler response. The catalog runtime looks up the registered React component by `type` and renders it.
+
+---
+
+## LLM JSON Examples — Custom Kickstart Components
+
+The JSON examples below show what the LLM produces for each custom component. Use these as a reference when authoring tool handlers or extending the catalog.
+
+### RadioGroup
+
+```json
+{
+  "type": "RadioGroup",
+  "id": "runtime-picker",
+  "label": "Select runtime",
+  "options": [
+    { "label": "Node.js", "value": "node" },
+    { "label": "Python", "value": "python" },
+    { "label": "Go", "value": "go" }
+  ],
+  "value": "node"
+}
+```
+
+### FormGroup
+
+```json
+{
+  "type": "FormGroup",
+  "id": "app-config",
+  "label": "Application settings",
+  "children": [
+    { "type": "TextField", "id": "app-name", "label": "App name" },
+    { "type": "TextField", "id": "port", "label": "Container port" }
+  ]
+}
+```
+
+### SteppedCarousel
+
+```json
+{
+  "type": "SteppedCarousel",
+  "id": "setup-wizard",
+  "steps": [
+    { "id": "step-1", "title": "Select Runtime", "children": ["runtime-picker"] },
+    { "id": "step-2", "title": "Configure", "children": ["app-config"] },
+    { "id": "step-3", "title": "Review", "children": ["summary-text"] }
+  ],
+  "currentStep": "step-1"
+}
+```
+
+### CodeBlock
+
+```json
+{
+  "type": "CodeBlock",
+  "id": "deployment-yaml",
+  "code": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web-app",
+  "language": "yaml",
+  "filename": "k8s/deployment.yaml"
+}
+```
+
+### ProgressSteps
+
+```json
+{
+  "type": "ProgressSteps",
+  "id": "onboarding-steps",
+  "steps": [
+    { "id": "discover", "label": "Discover", "status": "complete" },
+    { "id": "design", "label": "Design", "status": "active" },
+    { "id": "generate", "label": "Generate", "status": "pending" }
+  ],
+  "currentStep": "design"
+}
+```
+
+### ArchitectureDiagram
+
+```json
+{
+  "type": "ArchitectureDiagram",
+  "id": "app-architecture",
+  "mermaid": "graph LR\n  App[My App] --> DB[(PostgreSQL)]\n  App --> Cache[(Redis)]\n  LB[Public URL] --> App"
+}
+```
+
+### Questionnaire
+
+```json
+{
+  "type": "Questionnaire",
+  "id": "app-requirements",
+  "title": "Tell us about your app",
+  "questions": [
+    { "id": "q1", "type": "text", "label": "App name", "placeholder": "my-app" },
+    { "id": "q2", "type": "choice", "label": "Language", "options": ["Node.js", "Python", "Go", ".NET"] },
+    { "id": "q3", "type": "multiChoice", "label": "Services needed", "options": ["Database", "Cache", "Queue", "Storage"] }
+  ]
+}
+```
+
+### Markdown
+
+```json
+{
+  "type": "Markdown",
+  "id": "summary-text",
+  "content": "## Architecture Summary\n\nYour app will be deployed on **AKS Automatic** with:\n\n- Container Registry (Basic)\n- PostgreSQL Flexible Server\n- Key Vault for secrets"
+}
+```
+
+### FileEditor
+
+```json
+{
+  "type": "FileEditor",
+  "id": "manifest-editor",
+  "filename": "k8s/deployment.yaml",
+  "language": "yaml",
+  "content": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web-app",
+  "readOnly": false
+}
+```
+
+### CostEstimate
+
+```json
+{
+  "type": "CostEstimate",
+  "id": "cost-breakdown",
+  "items": [
+    { "name": "AKS Automatic", "sku": "Standard", "monthlyCost": 73.00 },
+    { "name": "PostgreSQL", "sku": "Burstable B1ms", "monthlyCost": 25.00 },
+    { "name": "Container Registry", "sku": "Basic", "monthlyCost": 5.00 }
+  ],
+  "total": 103.00,
+  "currency": "USD"
+}
+```
+
+### DeploymentProgress
+
+```json
+{
+  "type": "DeploymentProgress",
+  "id": "deployment-status",
+  "steps": [
+    { "id": "acr-build", "label": "Build container image", "status": "success" },
+    { "id": "aks-deploy", "label": "Deploy to AKS cluster", "status": "running" },
+    { "id": "ingress-setup", "label": "Configure ingress", "status": "pending" }
+  ],
+  "overallStatus": "running"
+}
+```
+
+### AzureLoginCard
+
+```json
+{
+  "type": "AzureLoginCard",
+  "id": "azure-login",
+  "prompt": "Sign in to discover your Azure resources"
+}
+```
+
+### AzureResourcePicker
+
+```json
+{
+  "type": "AzureResourcePicker",
+  "id": "cluster-picker",
+  "resourceType": "cluster",
+  "label": "Select an AKS cluster",
+  "subscriptionId": "4498459e-..."
+}
+```
+
+### AzureResourceForm
+
+```json
+{
+  "type": "AzureResourceForm",
+  "id": "new-cluster-form",
+  "resourceType": "cluster",
+  "fields": [
+    { "id": "name", "label": "Cluster name", "value": "my-aks-cluster" },
+    { "id": "region", "label": "Region", "value": "eastus" }
+  ]
+}
+```
+
+### AzureAction
+
+```json
+{
+  "type": "AzureAction",
+  "id": "scale-aks",
+  "title": "Scale AKS cluster",
+  "description": "Updates the node count for the default node pool.",
+  "method": "PATCH",
+  "path": "/subscriptions/.../providers/Microsoft.ContainerService/managedClusters/my-cluster",
+  "body": { "properties": { "agentPoolProfiles": [{ "name": "default", "count": 5 }] } }
+}
+```
+
+### GitHubLoginCard
+
+```json
+{
+  "type": "GitHubLoginCard",
+  "id": "gh-login",
+  "deviceCode": "ABCD-EFGH",
+  "verificationUrl": "https://github.com/login/device",
+  "expiresAt": "2025-01-01T12:30:00Z"
+}
+```
+
+### GitHubRepoPicker
+
+```json
+{
+  "type": "GitHubRepoPicker",
+  "id": "repo-selector",
+  "label": "Choose a repository",
+  "allowCreate": true,
+  "options": [
+    { "label": "my-app", "value": "owner/my-app" },
+    { "label": "my-api", "value": "owner/my-api" }
+  ]
+}
+```
+
+### GitHubAction
+
+```json
+{
+  "type": "GitHubAction",
+  "id": "ci-run",
+  "workflowName": "Build & Deploy",
+  "status": "success",
+  "runUrl": "https://github.com/owner/repo/actions/runs/123",
+  "branch": "main",
+  "commitSha": "abc1234"
+}
+```
+
+### GitHubCommit
+
+```json
+{
+  "type": "GitHubCommit",
+  "id": "latest-commit",
+  "sha": "abc1234",
+  "message": "feat: add AKS deployment manifests",
+  "author": "Ahmed Sabbour",
+  "timestamp": "2025-01-01T12:00:00Z",
+  "url": "https://github.com/owner/repo/commit/abc1234"
+}
+```
