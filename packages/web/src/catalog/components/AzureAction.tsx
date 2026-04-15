@@ -280,8 +280,8 @@ export const AzureAction = createReactComponent(AzureActionApi, ({ props }) => {
       {/* Destructive confirmation (per Zapp: type resource name to confirm) */}
       {state === 'confirming' && isDestructive && (
         <div className={classes.confirmSection}>
-          <Body1 style={{ fontWeight: 600, color: tokens.colorPaletteRedForeground1 }}>
-            ⚠️ Destructive operation
+          <Body1 style={{ fontWeight: 600, color: tokens.colorPaletteRedForeground1, display: 'inline-flex', alignItems: 'center', gap: tokens.spacingHorizontalXS }}>
+            <Warning20Regular /> Destructive operation
           </Body1>
           <Body2 style={{ marginTop: tokens.spacingVerticalXS }}>
             This will permanently delete the resource. Type <strong>{resourceName}</strong> to confirm.
