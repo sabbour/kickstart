@@ -32,6 +32,27 @@ describe("handleAction", () => {
     expect(text).toContain("ghost-session");
   });
 
+  it("normalizes an unknown persisted currentPhase before handling actions", async () => {
+    const now = new Date().toISOString();
+    sessions.set("s-bad-phase", {
+      sessionId: "s-bad-phase",
+      currentPhase: "not-a-phase",
+      createdAt: now,
+      updatedAt: now,
+      appDefinition: {},
+      messages: [],
+    } as unknown as SessionState);
+
+    const result = await handleAction(sessions, "s-bad-phase", "reply", {
+      message: "Continue",
+    });
+
+    const text = (result.content[0] as { type: "text"; text: string }).text;
+    const discoverDef = getPhaseDefinition(Phase.Discover);
+    expect(text).toContain(discoverDef.label);
+    expect(sessions.get("s-bad-phase")!.currentPhase).toBe(Phase.Discover);
+  });
+
   // ── Advance action ─────────────────────────────────────────────
 
   it('"advance" moves the session to the next phase', async () => {

@@ -46,14 +46,19 @@ export async function handleAction(
     };
   }
 
-  // Use simple phase string — advance by looking up nextPhase in PHASE_DEFINITIONS
-  let currentPhase = session.currentPhase as Phase;
+  const phaseOrder = getPhaseOrder();
+  const isKnownPhase = (value: string): value is Phase =>
+    phaseOrder.includes(value as Phase);
+
+  // Normalize persisted phase before using it.
+  let currentPhase: Phase = isKnownPhase(session.currentPhase)
+    ? (session.currentPhase as Phase)
+    : Phase.Discover;
 
   // Helper: compute phase indicator items from current phase
   function buildPhaseItems(): PhaseItem[] {
-    const order = getPhaseOrder();
-    const currentIdx = order.indexOf(currentPhase);
-    return order.map((phase, idx) => ({
+    const currentIdx = phaseOrder.indexOf(currentPhase);
+    return phaseOrder.map((phase, idx) => ({
       id: phase,
       label: getPhaseDefinition(phase).label,
       status: idx < currentIdx ? "complete" : idx === currentIdx ? "active" : "pending",
@@ -104,9 +109,10 @@ export async function handleAction(
         content: message,
         timestamp: new Date().toISOString(),
       });
+      session.currentPhase = currentPhase;
       session.updatedAt = new Date().toISOString();
       sessions.set(sessionId, session);
-      const replyDef = getPhaseDefinition(session.currentPhase as Phase);
+      const replyDef = getPhaseDefinition(currentPhase);
       return {
         content: [{ type: "text", text: `Received reply in **${replyDef.label}** phase. The conversation will continue from here.` }],
       };
@@ -121,8 +127,7 @@ export async function handleAction(
           content: [{ type: "text", text: "Error: Missing required field: `targetPhase` is required for navigate actions." }],
         };
       }
-      const validPhases = getPhaseOrder() as string[];
-      if (!validPhases.includes(targetPhase as string)) {
+      if (!isKnownPhase(targetPhase as string)) {
         session.updatedAt = new Date().toISOString();
         sessions.set(sessionId, session);
         return {
@@ -136,9 +141,8 @@ export async function handleAction(
 
       // Build phase indicator for the new current phase
       const navPhase = targetPhase as Phase;
-      const navOrder = getPhaseOrder();
-      const navIdx = navOrder.indexOf(navPhase);
-      const navPhaseItems: PhaseItem[] = navOrder.map((phase, idx) => ({
+      const navIdx = phaseOrder.indexOf(navPhase);
+      const navPhaseItems: PhaseItem[] = phaseOrder.map((phase, idx) => ({
         id: phase,
         label: getPhaseDefinition(phase).label,
         status: idx < navIdx ? "complete" : idx === navIdx ? "active" : "pending",
@@ -147,13 +151,13 @@ export async function handleAction(
         type: "ConversationPhase",
         id: "phase-indicator",
         phases: navPhaseItems,
-        currentPhase: session.currentPhase as Phase,
+        currentPhase: navPhase,
       };
       const navResource = createA2UIResource(
         navPhaseComponent,
         `a2ui://kickstart/session/${sessionId}/phase`,
       );
-      const navDef = getPhaseDefinition(session.currentPhase as Phase);
+      const navDef = getPhaseDefinition(navPhase);
       const navContent: Array<{ type: "text"; text: string } | { type: "resource"; resource: { uri: string; mimeType: string; text: string } }> = [
         { type: "text", text: `Navigated to **${navDef.label}** phase: ${navDef.description}` },
       ];
