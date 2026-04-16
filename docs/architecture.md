@@ -95,7 +95,7 @@ Trust-based. Generate phase + `session.routingPhaseTrusted = true` → generate-
 In-memory, 1-hour TTL, GC every 10 minutes. Stores conversation messages (max 50), FSM phase state, generated artifact metadata. Full file content is NOT stored — it lives in the A2UI message history on the client.
 
 ### `packages/web/src/services/virtual-fs.ts` — Virtual Filesystem
-Browser-side virtual file store with optional IndexedDB persistence (`kickstart-vfs`). Backs both the A2UI FileEditor (in-chat) and the Sidebar FileEditor (persistent panel). No TTL — data persists in client memory for the session and may survive across sessions via IndexedDB.
+Browser-side virtual file store with optional IndexedDB persistence (`kickstart-vfs`). Provides an in-memory `VirtualFileSystem` and an IndexedDB-backed `VirtualFS` used by the sidebar/workspace file experience. It does **not** directly back the in-chat A2UI `FileEditor`, which resolves file content from the A2UI payload / `ArtifactContext`. No TTL — data persists in client memory for the session and may survive across sessions via IndexedDB.
 
 ---
 

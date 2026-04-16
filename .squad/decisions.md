@@ -2,6 +2,9 @@
 **By:** asabbour (via Copilot)
 **What:** Engineering docs should be written with code cleanup in mind. The goal is to make actual code paths so explicit that reading the docs reveals dead code, conflated logic, and redundant mechanisms. Docs are not just reference — they are the instrument for identifying what needs to be trimmed before proceeding to issue #330.
 **Why:** User request — captured for team memory
+
+---
+
 # Decision: Playground Tab Grouping + Real Connectors in Playground
 
 **Date:** 2026-04-16  

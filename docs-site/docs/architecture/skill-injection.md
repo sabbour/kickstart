@@ -15,7 +15,7 @@ Two independent skill injection mechanisms run every turn. This page explains bo
 
 | | Mechanism A | Mechanism B |
 |-|-------------|-------------|
-| **File** | `engine/skill-resolver.ts` (428 lines) | `services/resolveConversationSkills.ts` (250+ lines) |
+| **File** | `engine/skill-resolver.ts` | `services/resolveConversationSkills.ts` |
 | **Added** | Original codebase | PR #382 |
 | **Fires** | Every turn | Every turn |
 | **Selection trigger** | Current FSM phase | Keywords in user message |
