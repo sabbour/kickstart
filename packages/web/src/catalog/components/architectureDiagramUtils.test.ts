@@ -5,6 +5,7 @@ import {
   isAllowedIconKey,
   prepareArchitectureDiagramSource,
   renderArchitectureDiagramSvg,
+  sanitizeMermaidSource,
 } from './architectureDiagramUtils';
 
 describe('architectureDiagramUtils', () => {
@@ -324,16 +325,71 @@ describe('architectureDiagramUtils', () => {
   });
 
   // ---------------------------------------------------------------
+  // sanitizeMermaidSource — strip LLM HTML artefacts
+  // ---------------------------------------------------------------
+
+  describe('sanitizeMermaidSource', () => {
+    it('replaces <br/> with newlines', () => {
+      expect(sanitizeMermaidSource('graph TD<br/> A --> B<br/> B --> C')).toBe('graph TD\n A --> B\n B --> C');
+    });
+
+    it('replaces <br> (no slash) with newlines', () => {
+      expect(sanitizeMermaidSource('graph TD<br> A --> B')).toBe('graph TD\n A --> B');
+    });
+
+    it('replaces self-closing <br /> (with space) with newlines', () => {
+      expect(sanitizeMermaidSource('graph TD<br /> A --> B')).toBe('graph TD\n A --> B');
+    });
+
+    it('strips other HTML tags from the Mermaid source', () => {
+      const result = sanitizeMermaidSource('graph TD\n  A["<span>label</span>"]');
+      expect(result).not.toContain('<span>');
+      expect(result).not.toContain('</span>');
+      expect(result).toContain('label');
+    });
+
+    it('removes XSS vectors like <img onerror>', () => {
+      const result = sanitizeMermaidSource('graph TD\n  A["text<img src=x onerror=alert(1)>"]');
+      expect(result).not.toContain('<img');
+      expect(result).not.toContain('onerror');
+      expect(result).toContain('text');
+    });
+
+    it('preserves valid Mermaid syntax untouched', () => {
+      const clean = 'graph TD\n  A["AKS Cluster"] --> B["App"]';
+      expect(sanitizeMermaidSource(clean)).toBe(clean);
+    });
+
+    it('is case-insensitive for <BR/>', () => {
+      expect(sanitizeMermaidSource('A<BR/>B')).toBe('A\nB');
+      expect(sanitizeMermaidSource('A<Br>B')).toBe('A\nB');
+    });
+  });
+
+  // ---------------------------------------------------------------
   // prepareArchitectureDiagramSource — HTML sanitisation
   // ---------------------------------------------------------------
 
-  it('preserves line breaks while encoding unsafe html', () => {
+  it('preserves label line breaks (via \\n) and strips injected HTML tags', () => {
     const prepared = prepareArchitectureDiagramSource(
       'graph TD\n  APP["API\\nsubtitle<br/><img src=x onerror=alert(1)>"]',
     );
 
-    expect(prepared).toContain('API<br/>subtitle<br/>');
-    expect(prepared).toContain('&lt;img src=x onerror=alert&#40;1&#41;>');
+    // The \\n in the label becomes <br/> for Mermaid HTML labels
+    expect(prepared).toContain('API<br/>subtitle');
+    // The <img> tag was stripped entirely by sanitizeMermaidSource
+    expect(prepared).not.toContain('<img');
+    expect(prepared).not.toContain('onerror');
+  });
+
+  it('converts LLM-emitted <br/> line separators to real newlines before processing', () => {
+    // LLM sometimes outputs: "graph TD<br/> A --> B" instead of real newlines
+    const prepared = prepareArchitectureDiagramSource('graph TD<br/> A["User"] --> B["App"]');
+    expect(prepared).toContain('A["User"]');
+    expect(prepared).toContain('B["App"]');
+    // <br/> as line separator should become a real newline, not remain as <br/>
+    // at the structural level
+    expect(prepared).not.toMatch(/^graph TD<br\/>/);
   });
 
   // ---------------------------------------------------------------

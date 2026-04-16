@@ -80,6 +80,19 @@
   font-size: 14px;
   flex-shrink: 0;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  color: #888888;
+}
+
+.file-tree-chevron {
+  font-size: 10px;
+  flex-shrink: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  color: #666666;
+  width: 12px;
 }
 
 .file-tree-name {

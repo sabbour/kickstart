@@ -220,6 +220,20 @@ export function normalizeDiagramText(source: string): string {
   return source.replace(/\\n/g, '<br/>');
 }
 
+/**
+ * Strips HTML artefacts that the LLM sometimes emits in raw Mermaid source:
+ * - `<br/>` / `<br>` used as line separators → real newlines
+ * - Any remaining HTML tags that would cause Mermaid parse errors
+ *
+ * This runs before any other pipeline step so the normalisation functions
+ * that follow receive clean Mermaid text.
+ */
+export function sanitizeMermaidSource(source: string): string {
+  return source
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '');
+}
+
 export function preprocessDiagram(source: string): string {
   let processed = source;
 
@@ -251,7 +265,7 @@ export function sanitizeDiagramInput(source: string): string {
 }
 
 export function prepareArchitectureDiagramSource(diagram: string): string {
-  return sanitizeDiagramInput(preprocessDiagram(normalizeDiagramText(diagram)));
+  return sanitizeDiagramInput(preprocessDiagram(normalizeDiagramText(sanitizeMermaidSource(diagram))));
 }
 
 export function expandIconPlaceholders(svg: string, resolveIconUrl: IconUrlResolver): string {
