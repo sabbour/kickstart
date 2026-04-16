@@ -4,14 +4,19 @@ import { z } from 'zod';
 import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Body2,
+  Button,
   Caption1,
   Card,
   makeStyles,
+  mergeClasses,
+  shorthands,
+  Subtitle2,
   tokens,
 } from '@fluentui/react-components';
 import {
   DiagramEdge,
   DiagramNode,
+  FLUENT_DIAGRAM_PALETTE,
   nodesToMermaid,
   renderArchitectureDiagramSvg,
 } from './architectureDiagramUtils';
@@ -21,22 +26,12 @@ import {
   getArchitectureDiagramIconRegistry,
 } from './architectureDiagramIconRegistry';
 
-const AZURE = {
-  themePrimary: '#0078d4',
-  neutralPrimary: '#292827',
-  neutralSecondary: '#646464',
-  neutralTertiaryAlt: '#a19f9d',
-  neutralLight: '#e1dfdd',
-  neutralLighter: '#f3f2f1',
-  neutralLighterAlt: '#faf9f8',
-  white: '#ffffff',
-  fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
-} as const;
-
 const VIEWPORT_MIN_HEIGHT = 320;
 const VIEWPORT_MAX_HEIGHT = 800;
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 5;
+const FLUENT_DIAGRAM_ICON_FILTER =
+  'brightness(0) saturate(100%) invert(30%) sepia(91%) saturate(1523%) hue-rotate(191deg) brightness(92%) contrast(88%)';
 
 const NodeSchema = z.object({
   id: z.string(),
@@ -67,26 +62,25 @@ const useStyles = makeStyles({
     marginBottom: tokens.spacingVerticalS,
     width: '100%',
     overflow: 'hidden',
-    padding: '0',
-    backgroundColor: '#ffffff',
+    padding: 0,
+    backgroundColor: tokens.colorNeutralBackground1,
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    flexWrap: 'wrap',
     gap: tokens.spacingHorizontalM,
-    padding: '14px 20px',
-    borderBottomWidth: tokens.strokeWidthThin,
-    borderBottomStyle: 'solid',
-    borderBottomColor: '#e1dfdd',
-    backgroundColor: '#faf9f8',
-    letterSpacing: '0.01em',
+    ...shorthands.padding(tokens.spacingVerticalM, tokens.spacingHorizontalL),
+    ...shorthands.borderBottom(tokens.strokeWidthThin, 'solid', tokens.colorNeutralStroke2),
+    backgroundColor: tokens.colorNeutralBackground2,
   },
   titleGroup: {
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalXXS,
     minWidth: '0',
+    flex: '1 1 auto',
   },
   titleRow: {
     display: 'flex',
@@ -98,64 +92,45 @@ const useStyles = makeStyles({
     width: '16px',
     height: '16px',
     flexShrink: 0,
-    filter: 'brightness(0) saturate(100%) invert(28%) sepia(98%) saturate(1624%) hue-rotate(196deg) brightness(96%) contrast(101%)',
+    filter: FLUENT_DIAGRAM_ICON_FILTER,
   },
   title: {
-    fontSize: '16px',
-    fontWeight: 600,
-    lineHeight: '22px',
-    color: '#292827',
+    color: tokens.colorNeutralForeground1,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
   description: {
-    color: '#646464',
-    marginLeft: '24px',
+    color: tokens.colorNeutralForeground2,
+    paddingLeft: `calc(16px + ${tokens.spacingHorizontalXS})`,
   },
   controls: {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: '4px',
+    justifyContent: 'flex-end',
+    gap: tokens.spacingHorizontalXXS,
     flexShrink: 0,
   },
   controlButton: {
-    width: '28px',
-    height: '28px',
-    border: '1px solid #e1dfdd',
-    borderRadius: '2px',
-    backgroundColor: '#ffffff',
-    color: '#646464',
-    cursor: 'pointer',
+    minWidth: '28px',
+    fontSize: tokens.fontSizeBase300,
+  },
+  actionButton: {
+    minWidth: 'fit-content',
+  },
+  percentage: {
+    minWidth: '40px',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '14px',
-    lineHeight: 1,
-    padding: 0,
-    ':disabled': {
-      cursor: 'not-allowed',
-      opacity: 0.6,
-    },
-  },
-  actionButton: {
-    minWidth: '0',
-    width: 'auto',
-    paddingLeft: '8px',
-    paddingRight: '8px',
-    fontSize: '12px',
-  },
-  percentage: {
-    minWidth: '36px',
     textAlign: 'center',
-    fontSize: '11px',
-    lineHeight: '16px',
-    color: '#646464',
+    color: tokens.colorNeutralForeground3,
     fontFamily: tokens.fontFamilyMonospace,
   },
   diagramArea: {
-    padding: '24px',
-    backgroundColor: '#ffffff',
+    padding: tokens.spacingHorizontalXXL,
+    backgroundColor: tokens.colorNeutralBackground1,
   },
   viewport: {
     width: '100%',
@@ -163,9 +138,10 @@ const useStyles = makeStyles({
     position: 'relative',
     cursor: 'grab',
     userSelect: 'none',
-    border: '1px solid #e1dfdd',
-    backgroundColor: '#ffffff',
-    boxShadow: '0 1.6px 3.6px rgba(0,0,0,0.132), 0 0.3px 0.9px rgba(0,0,0,0.108)',
+    ...shorthands.border(tokens.strokeWidthThin, 'solid', tokens.colorNeutralStroke2),
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
   },
   viewportGrabbing: {
     cursor: 'grabbing',
@@ -177,22 +153,22 @@ const useStyles = makeStyles({
     transformOrigin: '0 0',
   },
   fallback: {
-    padding: '16px 20px',
-    backgroundColor: '#fdd8db',
-    border: '1px solid #a4262c',
-    borderRadius: '2px',
-    color: '#a4262c',
+    ...shorthands.padding(tokens.spacingVerticalM, tokens.spacingHorizontalL),
+    ...shorthands.border(tokens.strokeWidthThin, 'solid', tokens.colorPaletteRedBorder1),
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorPaletteRedBackground1,
+    color: tokens.colorPaletteRedForeground1,
     lineHeight: 1.5,
   },
   fallbackTitle: {
     display: 'block',
     marginBottom: tokens.spacingVerticalXS,
-    color: '#a4262c',
+    color: tokens.colorPaletteRedForeground1,
   },
   rawCode: {
     fontFamily: tokens.fontFamilyMonospace,
-    fontSize: '12px',
-    lineHeight: '18px',
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase300,
     whiteSpace: 'pre-wrap',
     margin: 0,
     overflowX: 'auto',
@@ -204,14 +180,18 @@ const useStyles = makeStyles({
     justifyContent: 'center',
     gap: tokens.spacingVerticalXS,
     minHeight: '220px',
-    color: '#646464',
+    ...shorthands.padding(tokens.spacingHorizontalXXL),
+    ...shorthands.border(tokens.strokeWidthThin, 'solid', tokens.colorNeutralStroke2),
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground2,
+    color: tokens.colorNeutralForeground3,
     textAlign: 'center',
   },
   emptyStateIcon: {
     width: '32px',
     height: '32px',
-    opacity: 0.5,
-    filter: 'brightness(0) saturate(100%) invert(28%) sepia(98%) saturate(1624%) hue-rotate(196deg) brightness(96%) contrast(101%)',
+    opacity: 0.72,
+    filter: FLUENT_DIAGRAM_ICON_FILTER,
   },
 });
 
@@ -237,24 +217,24 @@ function loadMermaid(): Promise<MermaidApi> {
           startOnLoad: false,
           theme: 'base',
           securityLevel: 'antiscript',
-          fontFamily: AZURE.fontFamily,
+          fontFamily: FLUENT_DIAGRAM_PALETTE.fontFamily,
           themeVariables: {
-            primaryColor: AZURE.white,
-            primaryBorderColor: AZURE.themePrimary,
-            primaryTextColor: AZURE.neutralPrimary,
-            lineColor: AZURE.neutralTertiaryAlt,
-            secondaryColor: AZURE.neutralLighter,
-            secondaryBorderColor: AZURE.neutralLight,
-            tertiaryColor: AZURE.neutralLighterAlt,
-            fontSize: '13px',
-            fontFamily: AZURE.fontFamily,
-            background: AZURE.white,
-            mainBkg: AZURE.white,
-            nodeBorder: AZURE.themePrimary,
-            clusterBkg: AZURE.neutralLighter,
-            clusterBorder: AZURE.neutralLight,
-            titleColor: AZURE.neutralPrimary,
-            edgeLabelBackground: AZURE.white,
+            primaryColor: FLUENT_DIAGRAM_PALETTE.neutralBackground1,
+            primaryBorderColor: FLUENT_DIAGRAM_PALETTE.brandForeground1,
+            primaryTextColor: FLUENT_DIAGRAM_PALETTE.neutralForeground1,
+            lineColor: FLUENT_DIAGRAM_PALETTE.neutralStroke1,
+            secondaryColor: FLUENT_DIAGRAM_PALETTE.neutralBackground3,
+            secondaryBorderColor: FLUENT_DIAGRAM_PALETTE.neutralStroke2,
+            tertiaryColor: FLUENT_DIAGRAM_PALETTE.neutralBackground4,
+            fontSize: FLUENT_DIAGRAM_PALETTE.fontSizeBody1,
+            fontFamily: FLUENT_DIAGRAM_PALETTE.fontFamily,
+            background: FLUENT_DIAGRAM_PALETTE.neutralBackground1,
+            mainBkg: FLUENT_DIAGRAM_PALETTE.neutralBackground1,
+            nodeBorder: FLUENT_DIAGRAM_PALETTE.brandForeground1,
+            clusterBkg: FLUENT_DIAGRAM_PALETTE.neutralBackground3,
+            clusterBorder: FLUENT_DIAGRAM_PALETTE.neutralStroke2,
+            titleColor: FLUENT_DIAGRAM_PALETTE.neutralForeground1,
+            edgeLabelBackground: FLUENT_DIAGRAM_PALETTE.neutralBackground1,
           },
           flowchart: {
             htmlLabels: true,
@@ -477,36 +457,62 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
   const regenerateDiagram = () => setRenderVersion((currentVersion) => currentVersion + 1);
 
   return (
-    <Card className={classes.root}>
+    <Card appearance="outline" className={classes.root}>
       <div className={classes.header}>
         <div className={classes.titleGroup}>
           <div className={classes.titleRow}>
             <img src={ARCHITECTURE_DIAGRAM_HEADER_ICON_URL} alt="" className={classes.headerIcon} />
-            <div className={classes.title}>{headerTitle}</div>
+            <Subtitle2 className={classes.title}>{headerTitle}</Subtitle2>
           </div>
           {props.description && <Body2 className={classes.description}>{props.description}</Body2>}
         </div>
-        <div className={classes.controls}>
-          <button type="button" className={classes.controlButton} onClick={zoomOut} aria-label="Zoom out" title="Zoom out">
-            −
-          </button>
-          <div className={classes.percentage}>{Math.round(scale * 100)}%</div>
-          <button type="button" className={classes.controlButton} onClick={zoomIn} aria-label="Zoom in" title="Zoom in">
-            +
-          </button>
-          <button type="button" className={`${classes.controlButton} ${classes.actionButton}`} onClick={resetView} aria-label="Reset view" title="Reset view">
-            Reset
-          </button>
-          <button
+        <div className={classes.controls} role="group" aria-label="Architecture diagram controls">
+          <Button
             type="button"
-            className={`${classes.controlButton} ${classes.actionButton}`}
+            size="small"
+            appearance="subtle"
+            className={classes.controlButton}
+            onClick={zoomOut}
+            aria-label="Zoom out"
+            title="Zoom out"
+          >
+            −
+          </Button>
+          <Caption1 className={classes.percentage}>{Math.round(scale * 100)}%</Caption1>
+          <Button
+            type="button"
+            size="small"
+            appearance="subtle"
+            className={classes.controlButton}
+            onClick={zoomIn}
+            aria-label="Zoom in"
+            title="Zoom in"
+          >
+            +
+          </Button>
+          <Button
+            type="button"
+            size="small"
+            appearance="transparent"
+            className={mergeClasses(classes.controlButton, classes.actionButton)}
+            onClick={resetView}
+            aria-label="Reset view"
+            title="Reset view"
+          >
+            Reset
+          </Button>
+          <Button
+            type="button"
+            size="small"
+            appearance="transparent"
+            className={mergeClasses(classes.controlButton, classes.actionButton)}
             onClick={regenerateDiagram}
             aria-label="Regenerate layout"
             title="Regenerate layout"
             disabled={isRendering || !hasDiagram}
           >
             {isRendering ? 'Rendering' : 'Regenerate'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -519,7 +525,7 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
         ) : hasDiagram ? (
           <div
             ref={viewportRef}
-            className={`${classes.viewport} ${isDragging ? classes.viewportGrabbing : ''}`}
+            className={mergeClasses(classes.viewport, isDragging && classes.viewportGrabbing)}
             style={{ height: `${viewportHeight}px` }}
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}

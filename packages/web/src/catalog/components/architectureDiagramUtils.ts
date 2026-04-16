@@ -1,3 +1,5 @@
+import { webLightTheme } from '@fluentui/react-components';
+
 export interface DiagramNode {
   id: string;
   label: string;
@@ -66,13 +68,31 @@ const ALLOWED_ICON_KEY_SET = new Set<string>(ALLOWED_ICON_KEYS);
 const ICON_KEY_PATTERN = /^[a-z0-9]+\/[a-z0-9-]+$/;
 const ICON_PLACEHOLDER_PATTERN = /%%icon:([^%]+)%%/gi;
 
-const TRY_AKS_SVG_CSS = `
+export const FLUENT_DIAGRAM_PALETTE = {
+  brandForeground1: webLightTheme.colorBrandForeground1,
+  neutralForeground1: webLightTheme.colorNeutralForeground1,
+  neutralForeground2: webLightTheme.colorNeutralForeground2,
+  neutralForeground3: webLightTheme.colorNeutralForeground3,
+  neutralStroke1: webLightTheme.colorNeutralStroke1,
+  neutralStroke2: webLightTheme.colorNeutralStroke2,
+  neutralBackground1: webLightTheme.colorNeutralBackground1,
+  neutralBackground2: webLightTheme.colorNeutralBackground2,
+  neutralBackground3: webLightTheme.colorNeutralBackground3,
+  neutralBackground4: webLightTheme.colorNeutralBackground4,
+  borderRadiusMedium: webLightTheme.borderRadiusMedium,
+  fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
+  fontSizeCaption1: '12px',
+  fontSizeBody1: '14px',
+  nodeShadow: 'drop-shadow(0 2px 4px rgba(0,0,0,0.04))',
+} as const;
+
+export const FLUENT_DIAGRAM_SVG_CSS = `
   .cluster rect {
-    rx: 0 !important;
-    ry: 0 !important;
+    rx: ${FLUENT_DIAGRAM_PALETTE.borderRadiusMedium} !important;
+    ry: ${FLUENT_DIAGRAM_PALETTE.borderRadiusMedium} !important;
     stroke-dasharray: none !important;
-    fill: #f3f2f1 !important;
-    stroke: #e1dfdd !important;
+    fill: ${FLUENT_DIAGRAM_PALETTE.neutralBackground3} !important;
+    stroke: ${FLUENT_DIAGRAM_PALETTE.neutralStroke2} !important;
     stroke-width: 1 !important;
   }
   .cluster-label,
@@ -91,37 +111,45 @@ const TRY_AKS_SVG_CSS = `
     white-space: nowrap !important;
     width: auto !important;
     padding-top: 13px !important;
-    font-family: 'Segoe UI', system-ui, sans-serif !important;
+    font-family: ${FLUENT_DIAGRAM_PALETTE.fontFamily} !important;
     font-weight: 600 !important;
-    font-size: 15px !important;
-    color: #646464 !important;
+    font-size: ${FLUENT_DIAGRAM_PALETTE.fontSizeBody1} !important;
+    color: ${FLUENT_DIAGRAM_PALETTE.neutralForeground2} !important;
   }
-  .edgePath .path,
+  .edgePath .path {
+    stroke-width: 1 !important;
+    stroke: ${FLUENT_DIAGRAM_PALETTE.neutralStroke1} !important;
+  }
   .flowchart-link {
-    stroke-width: 1.5;
-    stroke: #a19f9d;
+    stroke-width: 1 !important;
+    stroke: ${FLUENT_DIAGRAM_PALETTE.neutralStroke1} !important;
   }
   .edgePath marker path {
-    fill: #a19f9d;
+    fill: ${FLUENT_DIAGRAM_PALETTE.neutralStroke1} !important;
   }
   .edgeLabel {
-    font-family: 'Segoe UI Light', 'Segoe UI', system-ui, sans-serif;
-    font-size: 13px;
-    background-color: #ffffff;
+    font-family: ${FLUENT_DIAGRAM_PALETTE.fontFamily};
+    font-size: ${FLUENT_DIAGRAM_PALETTE.fontSizeCaption1};
+    background-color: ${FLUENT_DIAGRAM_PALETTE.neutralBackground1};
     padding: 2px 6px;
-    border-radius: 2px;
-    color: #646464;
+    border-radius: ${FLUENT_DIAGRAM_PALETTE.borderRadiusMedium};
+    color: ${FLUENT_DIAGRAM_PALETTE.neutralForeground3};
   }
   .node rect,
   .node circle,
   .node polygon {
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.06));
-    stroke-width: 1.5;
+    filter: ${FLUENT_DIAGRAM_PALETTE.nodeShadow};
+    stroke-width: 1 !important;
+  }
+  .node rect {
+    rx: ${FLUENT_DIAGRAM_PALETTE.borderRadiusMedium};
+    ry: ${FLUENT_DIAGRAM_PALETTE.borderRadiusMedium};
   }
   .nodeLabel,
   .node .label {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    font-weight: 500;
+    font-family: ${FLUENT_DIAGRAM_PALETTE.fontFamily};
+    font-size: ${FLUENT_DIAGRAM_PALETTE.fontSizeBody1};
+    font-weight: 600;
     text-align: center;
     line-height: normal !important;
   }
@@ -242,8 +270,8 @@ export function expandIconPlaceholders(svg: string, resolveIconUrl: IconUrlResol
   });
 }
 
-export function injectTryAksDiagramStyles(svg: string): string {
-  return svg.replace(/<svg([^>]*)>/, `<svg$1><style>${TRY_AKS_SVG_CSS}</style>`);
+export function injectDiagramStyles(svg: string): string {
+  return svg.replace(/<svg([^>]*)>/, `<svg$1><style>${FLUENT_DIAGRAM_SVG_CSS}</style>`);
 }
 
 export async function renderArchitectureDiagramSvg(
@@ -253,5 +281,5 @@ export async function renderArchitectureDiagramSvg(
   resolveIconUrl: IconUrlResolver,
 ): Promise<string> {
   const { svg } = await renderSvg(id, prepareArchitectureDiagramSource(diagram));
-  return injectTryAksDiagramStyles(expandIconPlaceholders(svg, resolveIconUrl));
+  return injectDiagramStyles(expandIconPlaceholders(svg, resolveIconUrl));
 }
