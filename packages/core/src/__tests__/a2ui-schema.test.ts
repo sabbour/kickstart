@@ -58,8 +58,8 @@ describe("PAYLOAD_LIMITS", () => {
 // ---------------------------------------------------------------------------
 
 describe("KNOWN_COMPONENT_TYPES", () => {
-  it("contains exactly 46 types", () => {
-    expect(KNOWN_COMPONENT_TYPES.size).toBe(46);
+  it("contains exactly 48 types", () => {
+    expect(KNOWN_COMPONENT_TYPES.size).toBe(48);
   });
 
   it("includes all expected component types", () => {

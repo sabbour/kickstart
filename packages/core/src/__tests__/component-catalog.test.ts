@@ -2,13 +2,13 @@
  * Tests for dynamic A2UI component catalog injection (Issue #185).
  *
  * Verifies:
- *   - Base catalog generates all 28 component entries
+ *   - Base catalog generates all 33 component entries
  *   - Kit-contributed components appear in the generated section
  *   - Kit entries override base entries of the same type (dedup)
  *   - Component count updates dynamically
  *   - buildSystemPrompt injects the catalog via the placeholder
  *   - IntegrationKitRegistry.getComponentCatalogEntries() works
- *   - Backward-compatible: no kit entries means base 28 components appear
+ *   - Backward-compatible: no kit entries means base 33 components appear
  */
 
 import { describe, it, expect } from "vitest";
@@ -29,9 +29,9 @@ import type { IntegrationKit } from "../kits/types.js";
 // ---------------------------------------------------------------------------
 
 describe("generateComponentCatalogSection", () => {
-  it("generates all 28 base components", () => {
+  it("generates all 33 base components", () => {
     const section = generateComponentCatalogSection();
-    expect(section).toContain("You have 28 components");
+    expect(section).toContain("You have 33 components");
   });
 
   it("includes all four category headings", () => {
@@ -71,7 +71,7 @@ describe("generateComponentCatalogSection", () => {
       },
     ];
     const section = generateComponentCatalogSection(BASE_COMPONENT_CATALOG, kitEntries);
-    expect(section).toContain("You have 29 components");
+    expect(section).toContain("You have 34 components");
     expect(section).toContain("- AzureResourcePicker:");
     expect(section).toContain("Picks Azure resources");
   });
@@ -86,7 +86,7 @@ describe("generateComponentCatalogSection", () => {
       },
     ];
     const section = generateComponentCatalogSection(BASE_COMPONENT_CATALOG, kitEntries);
-    expect(section).toContain("You have 28 components");
+    expect(section).toContain("You have 33 components");
     expect(section).toContain("customized by kit");
   });
 
@@ -117,7 +117,7 @@ describe("buildSystemPrompt with dynamic component catalog", () => {
   it("includes the dynamically generated catalog in the prompt", () => {
     const prompt = buildSystemPrompt({ phase: Phase.Discover });
     expect(prompt).toContain("## 5. A2UI COMPONENT CATALOG");
-    expect(prompt).toContain("You have 28 components");
+    expect(prompt).toContain("You have 33 components");
     expect(prompt).toContain("### Layout Components");
   });
 
@@ -137,13 +137,13 @@ describe("buildSystemPrompt with dynamic component catalog", () => {
         },
       ],
     });
-    expect(prompt).toContain("You have 29 components");
+    expect(prompt).toContain("You have 34 components");
     expect(prompt).toContain("- GitHubRepoPicker:");
   });
 
-  it("backward-compatible: no kitComponentEntries means base 28 appear", () => {
+  it("backward-compatible: no kitComponentEntries means base 33 appear", () => {
     const prompt = buildSystemPrompt({ phase: Phase.Design });
-    expect(prompt).toContain("You have 28 components");
+    expect(prompt).toContain("You have 33 components");
     expect(prompt).toContain("- Row:");
     expect(prompt).toContain("- GenerationProgress:");
   });
@@ -260,8 +260,8 @@ describe("IntegrationKitRegistry.getComponentCatalogEntries", () => {
 // ---------------------------------------------------------------------------
 
 describe("BASE_COMPONENT_CATALOG", () => {
-  it("has exactly 28 entries", () => {
-    expect(BASE_COMPONENT_CATALOG).toHaveLength(28);
+  it("has exactly 33 entries", () => {
+    expect(BASE_COMPONENT_CATALOG).toHaveLength(33);
   });
 
   it("has unique type names", () => {
