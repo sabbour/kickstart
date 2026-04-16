@@ -1196,3 +1196,201 @@ Key findings from the overnight audit:
 - **07:04Z** — Skip NetworkPolicy in the current icon batch; it already exists in azure-pack. Continue with remaining DRA resources and inference extensions.
 - **07:08Z** — Remove EndpointSlice from current batch; add InferencePool, InferenceObjective, and EndPointPicker instead.
 
+
+---
+
+# Decision: Remove FSM from core engine
+
+**Date:** 2025-07-18  
+**Author:** Bender (Backend Dev)  
+**Related issue:** #384
+
+## Context
+
+Machine.ts (XState-style finite state machine) was implemented in `@kickstart/core` to manage phase transitions with explicit state maps and status tracking.
+
+## Decision
+
+Remove `machine.ts` and `phases.ts` FSM layer. Replace with:
+
+1. **Simple phase state:** `ConversationState.currentPhase: Phase`
+2. **Linear advancement:** Use `PHASE_DEFINITIONS.nextPhase` to advance
+3. **Position-based status:** Calculate "complete/active/pending" from phase order and current index
+
+## Rationale
+
+- FSM added complexity without benefit — phase transitions are strictly linear
+- `ConversationState` bloat: `phaseStatus` maps, `phaseData`, `isComplete` flag
+- All transitions collapsed to sequential; `USER_INPUT` was a no-op
+- Simpler code reduces maintenance burden and makes extensions clearer
+
+## Pattern
+
+```typescript
+interface ConversationState {
+  currentPhase: Phase;
+}
+
+function advancePhase(current: Phase): Phase {
+  const def = PHASE_DEFINITIONS.find(p => p.id === current);
+  return def?.nextPhase ?? current;
+}
+
+const order = getPhaseOrder();
+const currentIdx = order.indexOf(currentPhase);
+status = idx < currentIdx ? "complete" : idx === currentIdx ? "active" : "pending";
+```
+
+## What stays
+
+- `phases.ts`: PHASE_DEFINITIONS, getPhaseDefinition(), getPhaseOrder() — used everywhere
+- `Phase` enum: unchanged
+- All reducer logic: moved to inline handlers
+
+## Consequences
+
+- Conversation engine simpler and faster
+- Easier to add new phases or change order
+- Phase lifecycle now trackable in raw state (no mapping layer)
+
+---
+
+# Directive: Worktree-per-session isolation
+
+**Date:** 2026-04-16T17:52:34Z
+**Source:** Copilot directive (user asabbour)
+
+## Context
+
+Concurrent sessions were mixing unrelated files into the same PR when sharing a working directory. Need isolation to prevent cross-session contamination.
+
+## Decision
+
+Every session starts in its own git worktree. Configuration:
+- `.squad/config.json`: `worktrees: true`
+- Coordinator agent sets up worktrees on session start
+- Main session uses a unique branch `chore/squad-worktree-isolation`
+
+## Benefits
+
+- Zero cross-session file mixing
+- PRs contain only work from one session
+- Concurrent work becomes deterministic and traceable
+- Clean separation of concerns
+
+---
+
+# Decision: Ideas Tab Audit — Aggressive Cleanup
+
+**Date:** 2026-04-16
+**Author:** Leela (Lead)
+**Status:** Proposed → Implemented (Fry assigned)
+
+## Context
+
+Ahmed requested decisive simplification: "I don't want distractions." The Ideas tab had **36 scenarios across 9 groups**. Most are noise — trivial exercises, redundant compositions, kitchen-sink tests.
+
+## Decision
+
+**Cut to 16 scenarios across 6 groups** (56% reduction). Extract 3 real components to Custom Controls.
+
+### Remove (17 scenarios)
+
+**Entire groups:**
+- Multi-Phase Demo (5 scenarios): redundant with Kickstart Scenarios
+- Integration Kits (4 scenarios): AuthCard recipes, redundant with existing demos
+- Individual removals (8): data-basic, data-sequence, event-form, life-update, life-delete, dyn-nested, dyn-conditional, file-edit-delete
+
+### Keep (16 scenarios)
+
+| Group | Count | Why |
+|---|---|---|
+| Kickstart Scenarios | 9 | Core product — workflow demonstrations |
+| Data Binding | 2 | data-form (composition), data-jsonptr (B-22 regression guard) |
+| Events & Actions | 2 | event-buttons (emitter pattern), event-func (functionCall action) |
+| Surface Lifecycle | 1 | life-multi (unique multi-surface capability) |
+| Dynamic Patterns | 1 | dyn-dashboard (capstone composition example) |
+| File Operations | 1 | file-create (workflow: ProgressSteps + FileEditor) |
+
+### Extract to Components (3 components)
+
+1. **FileEditor** → Custom Controls: file-single, file-multi
+2. **CostEstimate** → Custom Controls: cost-estimate
+3. **GenerationProgress** → Custom Controls: new demo gap-fill
+
+## Implementation
+
+- Update GALLERY_GROUPS in Playground.tsx (line 178): remove 3 group labels
+- Delete 17 scenario entries + their generators from playground-scenarios.ts
+- Move 3 scenarios to Custom Controls (rename IDs: ctrl-file-single, ctrl-file-multi, ctrl-cost-estimate)
+- Create new customGenerationProgress() generator function
+- Verify: npm run build passes, both tabs load
+
+## Status
+
+Assigned to Fry (Frontend Dev). Estimated 2-3 hours. Depends on .squad/config.json worktree setup.
+
+---
+
+# Decision: PR #383 Documentation Rewrite — Complete
+
+**Date:** 2026-04-16
+**Author:** Leela (Lead)
+**Status:** Implemented
+
+## What
+
+Engineering docs rewrite for **Issue #271 — Deployment Flow is Blocked**. Rewrote 7 core files with code health analysis, decision preservation, and FSM deletion documentation.
+
+## Files Updated
+
+1. `docs/ARCHITECTURE.md` → Comprehensive system architecture with VSCode type hints
+2. `docs/PHASES.md` → Phase definitions (no FSM references after machine.ts removal)
+3. `docs/CONVERSATION-ENGINE.md` → Engine internals with advancePhase() pattern
+4. `docs/AUTHENTICATION.md` → New auth security model (no localStorage secrets)
+5. `docs/PERSISTENCE.md` → virtual-fs.ts (client-side IndexedDB) + server backup
+6. `docs/INTEGRATION.md` → Kit pattern + lifecycle management
+7. `docs/TESTING.md` → Snapshot + E2E test patterns
+
+## Code Health Notes
+
+- **virtual-fs.ts:** Client-side VirtualFileSystem (IndexedDB). NO server-side TTL.
+- **Splice vs push:** Used splice(0,1) for immutable ops vs push (mutable). Clarified pattern.
+- **Resolver ordering:** Scoped → base → global. Documented dependency resolution chain.
+- **IntegrationKit:** Interface defined in `@kickstart/core`, exposed via catalog plugin system.
+
+## Verification
+
+- npm run build passes
+- All internal doc links validated
+- Code examples execute without errors
+- Review comments from PR #383 addressed (Copilot, Fry)
+
+## Status
+
+Completed. Awaiting merge of PR #383.
+
+---
+
+# Decision: PR #383 Accuracy Fixes
+
+**Date:** 2026-04-16T17:44:57Z
+**Author:** Leela (Lead)
+**Fixes:** PR #383 review feedback
+
+## What
+
+Corrected factual errors in engineering documentation based on Copilot's PR review:
+
+1. **virtual-fs.ts is client-side** — Not backed by server TTL. Browser-side IndexedDB persistence only. Affects data durability understanding.
+
+2. **Splice vs Push semantics** — Clarified immutable array operations in reducer examples. Splice uses (0,1) for safe mutation-free operations.
+
+3. **Resolver ordering** — System walks scoped → base → global. Made dependency resolution chain explicit in docs.
+
+4. **IntegrationKit interface** — Defined in @kickstart/core, published through catalog schema. Corrected component availability model.
+
+## Status
+
+Incorporated into PR #383 revision. All 12 review comments addressed.
+

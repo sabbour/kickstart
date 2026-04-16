@@ -86,6 +86,24 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 
 ---
 
+## 2026-04-16 FSM Removal Completion
+
+**PR #385 — Remove FSM from core engine**
+- **Commit:** cb3fe0a (squad/384-fsm-removal-cleanup)
+- **Deleted:** machine.ts, phases.ts, FSM test suite
+- **Replaced:** ConversationState.currentPhase + linear advancePhase() pattern using PHASE_DEFINITIONS.nextPhase
+- **Impact:** ~40% state boilerplate reduction, simpler phase extension model
+- **Pattern:** Position-based phase status (calculate from order index, not status maps)
+- **Status:** PR open, awaiting squad review
+- **Integration:** Ready for Fry's system-prompt.ts restructuring (commit 8d3ed53) + Leela's docs update (PR #383)
+
+**Learnings:**
+- FSM was over-engineered for strictly linear phase flow — simpler state machine (single currentPhase variable) is more maintainable
+- Phase status should be derived from position in PHASE_DEFINITIONS, not stored separately
+- Keeping PHASE_DEFINITIONS + Phase enum preserves all phase-management patterns (getPhaseDefinition, getPhaseOrder)
+
+---
+
 ## 2026-04-16 Sprint Retro — Security + Generation Sprint
 
 **PRs merged this sprint:**
