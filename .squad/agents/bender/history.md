@@ -83,3 +83,32 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - (2026-04-15T19:24:36.732Z) For routed model regressions, test the helper layer where the inner loops actually live: `chatCompletionWithTools()` owns tool-call rounds and `chatCompletionWithAutoContinue()` owns continuation retries. A top-level endpoint test alone cannot prove the deployment survives those internal hops.
 - (2026-04-16) `BaseConnector.isAuthenticated()` returns `true` for `auth: { kind: 'none' }` connectors (SWA cookie auth). Components guarding live API calls with `isAuthenticated()` must also check `isMockMode() || isPlaygroundMode()` — the connector doesn't distinguish offline/playground from production for this auth kind.
 - (2026-04-16) All `useA2UI()` calls must supply an `actionHandler` (even a no-op) if the component may host surfaces that fire `continue:` or other actions. Omitting the handler silently swallows actions and can stall wizard flows.
+
+---
+
+## 2026-04-16 Sprint Retro — Security + Generation Sprint
+
+**PRs merged this sprint:**
+- #369 serialize-javascript 7.0.5 (CVSS 8.1 RCE, npm overrides pattern)
+- #373 Sanitization + ReDoS fixes (26 CodeQL alerts, 5 files)
+- #375 hono 4.12.14 + follow-redirects 1.16.0 upgrades
+- #371 crypto.randomUUID session IDs (Math.random → Web Crypto)
+- Auth handler fix: Playground useA2UI() no-op actionHandler + AzureResourceForm SKIP_LIVE_ARM_CALLS guard
+
+**Security decisions shipped:**
+- Sanitization: regex/he for Node.js packages; DOMPurify for browser-only packages
+- ReDoS: polynomial regexes rewritten to linear-time in data-binding.ts, skill-policy.ts, in-memory.ts
+- Transitive dep pinning: npm overrides pattern for when direct upgrade is unavailable
+- CI permissions: explicit permissions blocks required in all workflow files
+- Insecure randomness: crypto.randomUUID() mandatory for all security-sensitive IDs
+
+**K8s icon catalog work:**
+- Updated system-prompt.ts allowlist + examples for all 7 new DRA/Inference icon keys
+- Updated component-catalog.ts ArchitectureDiagram notes with new keys
+- Bender-side surfaces done before Fry completed SVG assets
+
+**Learnings:**
+- `BaseConnector.isAuthenticated()` returns true for `auth: { kind: 'none' }` (SWA cookie auth) — ARM guards must check `isMockMode()||isPlaygroundMode()` independently
+- All useA2UI() calls must supply an actionHandler; omitting it silently swallows actions
+
+**Next:** Monitor #359–#363 (remaining CodeQL alerts not yet addressed in this sprint).

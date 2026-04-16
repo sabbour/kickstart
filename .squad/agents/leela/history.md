@@ -110,3 +110,27 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 **Outcome:** Priority labels and cross-links added to GitHub issues #333, #328, #327, #326, #331, #332. Decision recorded in decisions.md for future priority tracking workflow.
 
 - **2026-04-16T05:51:43.085Z — Post-v0.7.0 triage and priority lane decision:** Burndown complete, all demo-sprint lanes shipped. Decided: (1) merge PR #341 security bump immediately, (2) run sprint planning ceremony before any feature code, (3) proceed with #330 Agents SDK design spike (P1) in parallel since DPs are process-compatible with a reset, (4) #329 MCP App IDE design follows, (5) #332 stays blocked. Key insight: design spikes produce the DP gates the process requires — blocking them on the ceremony is circular. Updated now.md, session plan, and wrote decision to inbox. Decision file: `.squad/decisions/inbox/leela-post-v070-priority-lane.md`
+
+---
+
+## 2026-04-16 Sprint Retro — Security + Generation Sprint
+
+**PRs merged this sprint (Leela-owned or cross-cutting):**
+- #341 DOMPurify 3.4.0 (XSS/prototype pollution fix)
+- #354 Enable STEPWISE_GENERATION_V1 flag — now default in prod via infra/main.bicep
+- #356 DeploymentProgress → GenerationProgress rename (18 files)
+- #358 LLM combined catalog guidance in system-prompt.ts
+- #368 CI permissions (explicit permissions blocks in all workflows)
+- #372 next-card phantom cleanup + DeploymentProgress orphan text removal
+
+**Issues created / triaged:**
+- Overnight backlog audit: 11 items triaged. New: #349 (FileEditor A2UI coupling), #350 (DeploymentProgress wording), #351 (custom components audit) — all Leela spikes.
+- Confirmed #329 (MCP App IDE) and #330 (Agents SDK) spikes adequate — no follow-up issues needed.
+
+**Architecture decisions made:**
+- Component rename discipline formalized (all 8 surfaces must be updated together)
+- Sanitization standard: regex approach for Node.js packages, DOMPurify for browser-only
+- Stepwise generation is now production default
+- Prompt-catalog contract tests (#374) guard phantom references automatically going forward
+
+**Next:** Address architecture spikes #349, #350, #351; review DPs for #329 and #330.
