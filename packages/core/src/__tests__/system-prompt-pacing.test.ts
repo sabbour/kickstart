@@ -254,8 +254,8 @@ describe("System Prompt — Pacing Directives (Gate A1)", () => {
         appDefinition: { appName: "TestApp", description: "Test app" },
       });
 
-      expect(prompt).toContain("### STEP 5 — HANDOFF");
-      expect(prompt).toContain("### STEP 6 — DEPLOY");
+      expect(prompt).toContain("═══ STEP 5 — HANDOFF ═══");
+      expect(prompt).toContain("═══ STEP 6 — DEPLOY ═══");
       expect(prompt).not.toContain("This is the end of the guided flow — there is no further step after REVIEW.");
       expect(prompt).not.toContain("Do not enter handoff or deploy phases — they are not yet implemented.");
     });
