@@ -356,6 +356,16 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
           Azure sign-in is unavailable until the backend auth configuration is ready.
         </Caption1>
       )}
+      {usePlaygroundStub && (
+        <Caption1
+          style={{
+            color: tokens.colorNeutralForeground3,
+            marginTop: tokens.spacingVerticalXS,
+          }}
+        >
+          Running in offline mode — sign-in will use stub data
+        </Caption1>
+      )}
     </Card>
   );
 });

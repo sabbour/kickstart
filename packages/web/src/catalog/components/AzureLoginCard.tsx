@@ -223,6 +223,11 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
           {loading ? 'Signing in…' : 'Sign in to Azure'}
         </Button>
       </div>
+      {!connector && (
+        <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalXS }}>
+          Running in offline mode — sign-in will use stub data
+        </Caption1>
+      )}
     </Card>
   );
 });

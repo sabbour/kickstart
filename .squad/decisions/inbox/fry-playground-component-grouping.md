@@ -1,4 +1,4 @@
-# Decision: Playground Tab Grouping + Offline Mode Banner Removal
+# Decision: Playground Tab Grouping + Real Connectors in Playground
 
 **Date:** 2026-04-16  
 **Author:** Fry (Frontend Dev)
@@ -13,14 +13,8 @@
 
 ---
 
-## 2. Offline mode banners removed from all catalog components
+## 2. Playground uses real connectors — stub mode removed
 
-**Decision:** The "Running in offline mode — …" `Caption1` banners are removed from:
-- `AzureLoginCard.tsx`
-- `GitHubAction.tsx`
-- `AzureAction.tsx`
-- `AzureResourceForm.tsx`
-- `GitHubLoginCard.tsx`
-- `AuthCard.tsx`
+**Decision:** The playground-mode connector guard (`shouldUsePlaygroundStubRegistry()`) is removed from `APIConnectorContext.tsx`. `AzureARMConnector` and `GitHubConnector` are now always registered unconditionally. `shouldUsePlaygroundAuthStub()` in `playground-auth-stub.ts` always returns `false`.
 
-**Rationale:** In playground mode, stub behavior is automatic and silent by design — there is no need to surface it to users. In production, a real connector is always injected, so the `!connector` condition would never be true. There is no meaningful scenario where showing "offline mode" provides value to end users. Silent stub operation is the established pattern for playground components.
+**Rationale:** Playground should use real authentication and real API calls, not stubs. The offline mode banners in components (`AzureLoginCard`, `GitHubAction`, `AzureAction`, `AzureResourceForm`, `GitHubLoginCard`, `AuthCard`) are kept as-is — they are valid fallbacks for genuine misconfiguration scenarios where a connector is absent. With real connectors always registered, these conditions will naturally be false in a correctly configured environment.
