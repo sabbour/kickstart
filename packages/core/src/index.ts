@@ -163,13 +163,15 @@ export type { Artifact, ArtifactStore, ArtifactStoreQuota } from "./artifacts/in
 export { ArtifactQuotaExceededError, DEFAULT_ARTIFACT_QUOTA } from "./artifacts/index.js";
 export { InMemoryArtifactStore, defaultArtifactStore } from "./artifacts/index.js";
 
-// Services (response processing)
-export { processResponse } from "./services/index.js";
+// Services (response processing + per-turn skill injection)
+export { processResponse, resolveConversationSkills } from "./services/index.js";
 export type {
   ProcessedResponse,
   A2UIMessage,
   A2UIMessageType,
   Action,
+  ConversationSkillsContext,
+  ConversationSkillsResult,
 } from "./services/index.js";
 
 // A2UI schema validation (Issue #153)
