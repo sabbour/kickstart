@@ -67,7 +67,7 @@ describe("KNOWN_COMPONENT_TYPES", () => {
       "Accordion", "Alert", "ArchitectureDiagram", "AudioPlayer", "AuthCard",
       "AzureAction", "AzureLoginCard", "AzureResourceForm", "AzureResourcePicker",
       "Badge", "Button", "Card", "CheckBox", "ChoicePicker", "CodeBlock",
-      "Column", "ComboBox", "CostEstimate", "DateTimeInput", "DeploymentProgress",
+      "Column", "ComboBox", "CostEstimate", "DateTimeInput", "GenerationProgress",
       "Divider", "FileEditor", "FormGroup", "GitHubAction", "GitHubCommit",
       "GitHubLoginCard", "GitHubRepoPicker", "Icon", "Image", "Link", "List",
       "Markdown", "Modal", "MultiSelect", "ProgressSteps", "Questionnaire",
@@ -369,10 +369,10 @@ describe("COMPONENT_SCHEMA_REGISTRY", () => {
     expect(result.success).toBe(true);
   });
 
-  it("validates DeploymentProgress", () => {
-    const result = COMPONENT_SCHEMA_REGISTRY["DeploymentProgress"].safeParse({
+  it("validates GenerationProgress", () => {
+    const result = COMPONENT_SCHEMA_REGISTRY["GenerationProgress"].safeParse({
       id: "dp1",
-      component: "DeploymentProgress",
+      component: "GenerationProgress",
       runId: "deploy-123",
       overallStatus: "running",
       statusMessage: "Waiting for AKS rollout to finish.",

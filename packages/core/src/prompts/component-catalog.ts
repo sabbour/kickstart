@@ -189,9 +189,9 @@ export const BASE_COMPONENT_CATALOG: readonly ComponentCatalogEntry[] = [
     example: '{"id":"auth1","component":"AuthCard","provider":"azure","title":"Sign in to Azure","description":"Connect your Azure account to deploy"}',
   },
   {
-    type: "DeploymentProgress",
+    type: "GenerationProgress",
     category: "domain",
-    example: '{"id":"dp1","component":"DeploymentProgress","runId":"deploy-123","overallStatus":"running","steps":[{"id":"s1","label":"Build image","status":"complete"},{"id":"s2","label":"Push to registry","status":"running","detail":"Publishing image to ACR"},{"id":"s3","label":"Deploy","status":"pending"}]}',
+    example: '{"id":"dp1","component":"GenerationProgress","runId":"deploy-123","overallStatus":"running","steps":[{"id":"s1","label":"Build image","status":"complete"},{"id":"s2","label":"Push to registry","status":"running","detail":"Publishing image to ACR"},{"id":"s3","label":"Deploy","status":"pending"}]}',
   },
 ];
 

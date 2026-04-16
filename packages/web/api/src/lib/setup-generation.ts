@@ -249,7 +249,7 @@ export function buildSetupGenerationProgressA2UI(
 
   const progressComponent = {
     id: "setup-progress",
-    component: "DeploymentProgress",
+    component: "GenerationProgress",
     title: "Project Setup",
     runId: run.runId,
     overallStatus: mapRunStatusToOverallStatus(run.status),

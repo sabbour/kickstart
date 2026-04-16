@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatMessage, A2uiPayloadItem, SetupGenerationEvent } from '../types';
 import {
-  GENERATE_PROGRESS_TITLE,
+  GENERATION_PROGRESS_TITLE,
   getLatestConversationPhase,
   prepareStepwiseSetup,
   prepareChatA2ui,
@@ -113,7 +113,7 @@ describe('prepareChatA2ui', () => {
           components: [
             {
               id: 'progress',
-              component: 'DeploymentProgress',
+              component: 'GenerationProgress',
               steps: [{ id: 'dockerfile', label: 'Dockerfile', status: 'complete' }],
             },
             {
@@ -145,9 +145,9 @@ describe('prepareChatA2ui', () => {
       components: [
         {
           id: 'progress',
-          component: 'DeploymentProgress',
+          component: 'GenerationProgress',
           steps: [{ id: 'dockerfile', label: 'Dockerfile', status: 'complete' }],
-          title: GENERATE_PROGRESS_TITLE,
+          title: GENERATION_PROGRESS_TITLE,
         },
         {
           id: 'file',
@@ -425,8 +425,8 @@ describe('prepareStepwiseSetup', () => {
           components: [
             {
               id: 'setup-progress',
-              component: 'DeploymentProgress',
-              title: GENERATE_PROGRESS_TITLE,
+              component: 'GenerationProgress',
+              title: GENERATION_PROGRESS_TITLE,
               overallStatus: 'running',
               statusMessage: 'Dockerfile complete — 1 file added to the workspace.',
               steps: [
@@ -456,8 +456,8 @@ describe('prepareStepwiseSetup', () => {
       components: [
         {
           id: 'setup-progress',
-          component: 'DeploymentProgress',
-          title: GENERATE_PROGRESS_TITLE,
+          component: 'GenerationProgress',
+          title: GENERATION_PROGRESS_TITLE,
           overallStatus: 'complete',
           statusMessage: 'Project setup complete. Generated files are ready in the workspace.',
           steps: [

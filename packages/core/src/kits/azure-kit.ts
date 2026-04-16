@@ -513,7 +513,7 @@ Use estimate_cost tool for live pricing when available; these reference prices a
     [Phase.Deploy]: [
       'Use azure_resource_list to confirm the target subscription and resource group before deploying. ' +
       'Use azure_resource_get to check AKS cluster status if the user already has one. ' +
-      'Show a DeploymentProgress component tracking: image build → push to ACR → AKS rolling update → health check.',
+      'Show a GenerationProgress component tracking: image build → push to ACR → AKS rolling update → health check.',
     ],
   },
 

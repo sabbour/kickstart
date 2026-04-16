@@ -54,7 +54,7 @@ export const KICKSTART_SCENARIOS: ScenarioDef[] = [
   { id: 'filegen',     label: 'File Generation',  description: 'File cards list',              group: 'Kickstart Scenarios', keyword: 'generate' },
   { id: 'review',      label: 'Review',           description: 'Tabs + CostEstimate + Accordion + Badge safeguards',  group: 'Kickstart Scenarios', keyword: 'review' },
   { id: 'handoff',     label: 'Handoff',          description: 'ProgressSteps + repo card + Codespaces link',         group: 'Kickstart Scenarios', keyword: 'handoff' },
-  { id: 'deploy',      label: 'Deploy Progress',  description: 'DeploymentProgress with 7 resource steps',            group: 'Kickstart Scenarios', keyword: 'deploy' },
+  { id: 'deploy',      label: 'Deploy Progress',  description: 'GenerationProgress with 7 resource steps',            group: 'Kickstart Scenarios', keyword: 'deploy' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1273,7 +1273,7 @@ const phaseDeployScenario = (): A2uiMsg[] => {
       { id: 'deploy', label: 'Deploy', status: 'active' },
     ] },
     { id: 'desc', component: 'Text', text: 'Deploying your application to Azure. Resource provisioning in progress.', variant: 'body1' },
-    { id: 'deployment', component: 'DeploymentProgress',
+    { id: 'deployment', component: 'GenerationProgress',
       title: 'Deployment Progress',
       overallStatus: 'running',
       steps: [
@@ -1743,7 +1743,7 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'phase-design',      label: 'Design Phase',           description: 'Architecture diagram + service breakdown',      group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDesignScenario },
   { id: 'phase-generate',    label: 'Generate Phase',         description: 'IaC + CI/CD + K8s manifests in FileEditor',     group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseGenerateScenario },
   { id: 'phase-review',      label: 'Review Phase',           description: 'Cost estimate + deployment safeguard checks',   group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseReviewScenario },
-  { id: 'phase-deploy',      label: 'Deploy Phase',           description: 'DeploymentProgress with live provisioning',     group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDeployScenario },
+  { id: 'phase-deploy',      label: 'Deploy Phase',           description: 'GenerationProgress with live provisioning',     group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDeployScenario },
   // GitHub Components
   { id: 'ctrl-gh-login',   label: 'GitHubLoginCard',    description: 'Device code authentication flow',      group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubLogin },
   { id: 'ctrl-gh-repo',    label: 'GitHubRepoPicker',   description: 'Repository search and selection',      group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubRepoPicker },

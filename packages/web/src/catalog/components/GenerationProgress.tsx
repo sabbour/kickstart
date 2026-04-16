@@ -22,7 +22,7 @@ import {
 } from '@fluentui/react-icons';
 import { getAzureDeployment, type AzureDeploymentRun, type AzureDeploymentStep } from '../../services/azure-deployments';
 
-const DeploymentStepSchema = z.object({
+const GenerationStepSchema = z.object({
   id: z.string(),
   label: DynamicStringSchema,
   status: z.enum(['pending', 'running', 'complete', 'error', 'skipped']),
@@ -30,10 +30,10 @@ const DeploymentStepSchema = z.object({
   timestamp: DynamicStringSchema.optional(),
 });
 
-const DeploymentProgressApi = {
-  name: 'DeploymentProgress',
+const GenerationProgressApi = {
+  name: 'GenerationProgress',
   schema: z.object({
-    steps: z.array(DeploymentStepSchema),
+    steps: z.array(GenerationStepSchema),
     title: DynamicStringSchema.optional(),
     overallStatus: z.enum(['idle', 'running', 'complete', 'error']).optional(),
     runId: DynamicStringSchema.optional(),
@@ -210,7 +210,7 @@ function buildMergedState(props: Record<string, unknown>, deployment: AzureDeplo
   };
 }
 
-export const DeploymentProgress = createReactComponent(DeploymentProgressApi, ({ props }) => {
+export const GenerationProgress = createReactComponent(GenerationProgressApi, ({ props }) => {
   const classes = useStyles();
   const [deployment, setDeployment] = useState<AzureDeploymentRun | null>(null);
   const [loading, setLoading] = useState(Boolean(props.runId));
@@ -333,7 +333,7 @@ export const DeploymentProgress = createReactComponent(DeploymentProgressApi, ({
           <Spinner size="small" label="Loading deployment status…" />
         </div>
       ) : (
-        <div className={classes.stepList} role="list" aria-label="Deployment steps" aria-live="polite">
+        <div className={classes.stepList} role="list" aria-label="Generation steps" aria-live="polite">
           {merged.steps.map((step, index) => {
             const isLast = index === merged.steps.length - 1;
             return (

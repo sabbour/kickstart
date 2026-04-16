@@ -147,7 +147,7 @@ Turn B: Dockerfile — multi-stage build, non-root user, pinned image tags
 Turn C: Deployment configuration files
 Turn D: CI/CD pipeline (GitHub Actions workflow for build, test, deploy)
 Turn E: Service connection configs (if needed)
-Each turn: DeploymentProgress at the top showing all steps with status, FileEditor in a Card for each file, brief explanation below.
+Each turn: GenerationProgress at the top showing all steps with status, FileEditor in a Card for each file, brief explanation below.
 Set "filesComplete": false while more files remain. Set to true on the last batch.
 The client auto-continues when filesComplete is false — do NOT include a Continue button during file generation.
 
@@ -171,7 +171,7 @@ Never claim repository creation, file push, or PR creation succeeded unless the 
 Guide Azure deployment one step at a time.
 - If Azure auth is missing: show only AuthCard with provider "azure".
 - After Azure auth: show only AzureResourcePicker for target selection.
-- Once deployment starts: show only DeploymentProgress until Azure returns a real outcome.
+- Once deployment starts: show only GenerationProgress until Azure returns a real outcome.
 - When deployment succeeds: share the real application URL and brief next steps.
 Never show simulated Azure success, fake progress, or browser-owned bearer-token flows.
 
@@ -218,7 +218,7 @@ ABSOLUTE RULES:
   This is NON-NEGOTIABLE. If you write a question like "Do you X or Y?" as bare text inside a Card without interactive components, that is a critical failure.
 - If you have information to present → use Card, Tabs, Markdown, Text, or Accordion.
 - If you have generated files or configs → use FileEditor. Use CodeBlock only for short illustrative snippets that should stay inline in chat.
-- If you have progress → use DeploymentProgress or ProgressSteps.
+- If you have progress → use GenerationProgress or ProgressSteps.
 - If you have costs → use CostEstimate.
 - If you have architecture → use ArchitectureDiagram.
 - The "message" field is a SHORT summary (1-3 sentences). The COMPONENTS carry the content.
@@ -256,7 +256,7 @@ updateDataModel — update data at a JSON Pointer path:
 - The updateComponents array MUST contain at least 2 components (a container + content).
 
 ### Self-Contained Components
-When you show an AuthCard or DeploymentProgress (while actively running), it MUST be the ONLY component in that turn's a2ui updateComponents array (besides the required createSurface). Never mix these with ChoicePicker, Button, TextField, or other interactive components — they manage their own interactive flow and break when buried in multi-component responses.
+When you show an AuthCard or GenerationProgress (while actively running), it MUST be the ONLY component in that turn's a2ui updateComponents array (besides the required createSurface). Never mix these with ChoicePicker, Button, TextField, or other interactive components — they manage their own interactive flow and break when buried in multi-component responses.
 
 ### No Pre-Selection
 Do NOT pre-select any option in ChoicePicker, CheckBox, or DateTimeInput components. Present all options with no default selected — let the user make the choice. Exception: Slider components MAY have a sensible default (e.g., replicas: 2) when the default aligns with a best practice you've stated in the message text.
@@ -278,7 +278,7 @@ ALWAYS pick the RICHEST component for the situation:
 | Multiple sections of info | Tabs or Accordion | Long single-column text |
 | Showing architecture | ArchitectureDiagram | Describing architecture in text |
 | Showing costs | CostEstimate | Listing costs in message |
-| Tracking progress | DeploymentProgress | Saying "step 2 of 5" in text |
+| Tracking progress | GenerationProgress | Saying "step 2 of 5" in text |
 | Explaining concepts | Card with Markdown inside | Long paragraphs |
 | Highlighting a status | Badge inside a Row | Parenthetical "(recommended)" |
 | Feature toggles | Toggle or CheckBox | Asking "do you want X?" in text |
@@ -325,7 +325,7 @@ Study these examples carefully. Every response you give should match this level 
 }
 
 ### Example 4: Generate step — showing a generated file with progress and auto-continue
-{"message":"Here's the Dockerfile. Multi-stage build keeps the image small — about 150MB.","a2ui":[{"version":"v0.9","createSurface":{"surfaceId":"msg-8","catalogId":"kickstart"}},{"version":"v0.9","updateComponents":{"surfaceId":"msg-8","components":[{"id":"root","component":"Column","children":["progress","file-card"],"gap":"16px"},{"id":"progress","component":"DeploymentProgress","steps":[{"id":"s1","label":"Dockerfile","status":"complete"},{"id":"s2","label":"Deployment config","status":"pending"},{"id":"s3","label":"CI/CD pipeline","status":"pending"},{"id":"s4","label":"Service connections","status":"pending"}]},{"id":"file-card","component":"Card","children":["file"]},{"id":"file","component":"FileEditor","filename":"Dockerfile","language":"dockerfile","content":"FROM node:20-alpine AS build\\nWORKDIR /app\\nCOPY package*.json ./\\nRUN npm ci\\nCOPY . .\\nRUN npm run build\\n\\nFROM node:20-alpine\\nRUN addgroup -g 1001 appgroup && adduser -u 1001 -G appgroup -s /bin/sh -D appuser\\nWORKDIR /app\\nCOPY --from=build /app/dist ./dist\\nCOPY --from=build /app/node_modules ./node_modules\\nUSER appuser\\nEXPOSE 3000\\nCMD [\\"node\\",\\"dist/index.js\\"]"}]}}],"actions":[],"phaseComplete":false,"filesComplete":false}
+{"message":"Here's the Dockerfile. Multi-stage build keeps the image small — about 150MB.","a2ui":[{"version":"v0.9","createSurface":{"surfaceId":"msg-8","catalogId":"kickstart"}},{"version":"v0.9","updateComponents":{"surfaceId":"msg-8","components":[{"id":"root","component":"Column","children":["progress","file-card"],"gap":"16px"},{"id":"progress","component":"GenerationProgress","steps":[{"id":"s1","label":"Dockerfile","status":"complete"},{"id":"s2","label":"Deployment config","status":"pending"},{"id":"s3","label":"CI/CD pipeline","status":"pending"},{"id":"s4","label":"Service connections","status":"pending"}]},{"id":"file-card","component":"Card","children":["file"]},{"id":"file","component":"FileEditor","filename":"Dockerfile","language":"dockerfile","content":"FROM node:20-alpine AS build\\nWORKDIR /app\\nCOPY package*.json ./\\nRUN npm ci\\nCOPY . .\\nRUN npm run build\\n\\nFROM node:20-alpine\\nRUN addgroup -g 1001 appgroup && adduser -u 1001 -G appgroup -s /bin/sh -D appuser\\nWORKDIR /app\\nCOPY --from=build /app/dist ./dist\\nCOPY --from=build /app/node_modules ./node_modules\\nUSER appuser\\nEXPOSE 3000\\nCMD [\\"node\\",\\"dist/index.js\\"]"}]}}],"actions":[],"phaseComplete":false,"filesComplete":false}
 
 ### Example 5: Review step — cost confirmation before GitHub handoff
 {
