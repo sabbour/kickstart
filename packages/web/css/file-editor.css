@@ -80,6 +80,19 @@
   font-size: 14px;
   flex-shrink: 0;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  color: #888888;
+}
+
+.file-tree-chevron {
+  font-size: 10px;
+  flex-shrink: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  color: #666666;
+  width: 12px;
 }
 
 .file-tree-name {
@@ -228,6 +241,49 @@
   flex: 1;
   white-space: pre;
   min-width: 0;
+}
+
+.code-view-btn.active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+/* --- Inline diagram preview (for .mmd / .mermaid files) --- */
+.code-view-diagram-body {
+  padding: var(--spacing-m);
+  overflow: auto;
+  background: #ffffff;
+}
+
+.diagram-preview {
+  width: 100%;
+  min-height: 120px;
+  background: #ffffff;
+}
+
+.diagram-preview-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  padding: var(--spacing-m);
+  color: #666666;
+  font-size: var(--font-size-200);
+}
+
+.diagram-preview-error {
+  padding: var(--spacing-m);
+  color: #d32f2f;
+  font-size: var(--font-size-200);
+  line-height: 1.5;
+}
+
+.diagram-preview-raw {
+  margin-top: var(--spacing-s);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  color: #555555;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 /* --- Generating state --- */

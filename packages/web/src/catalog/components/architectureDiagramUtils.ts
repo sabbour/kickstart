@@ -220,6 +220,29 @@ export function normalizeDiagramText(source: string): string {
   return source.replace(/\\n/g, '<br/>');
 }
 
+/**
+ * Strips HTML artefacts that the LLM sometimes emits in raw Mermaid source:
+ * - `<br/>` / `<br>` used as line separators → real newlines
+ * - All HTML tags (complete and incomplete) to prevent injection
+ *
+ * This runs before any other pipeline step so the normalisation functions
+ * that follow receive clean Mermaid text.
+ */
+export function sanitizeMermaidSource(source: string): string {
+  if (!source) return source;
+
+  // Replace <br/>, <br />, <br> (case-insensitive) with newlines first
+  // so structural line breaks are preserved before tag stripping.
+  let result = source.replace(/<br\s*\/?>/gi, '\n');
+
+  // Strip all HTML tags (complete and incomplete) using aggressive regex.
+  // - /<[^>]*>/g: matches well-formed tags like <img src=...>
+  // - /</g: removes any remaining < that wasn't closed (prevents <script> attacks)
+  result = result.replace(/<[^>]*>/g, '').replace(/</g, '');
+
+  return result;
+}
+
 export function preprocessDiagram(source: string): string {
   let processed = source;
 
@@ -251,7 +274,7 @@ export function sanitizeDiagramInput(source: string): string {
 }
 
 export function prepareArchitectureDiagramSource(diagram: string): string {
-  return sanitizeDiagramInput(preprocessDiagram(normalizeDiagramText(diagram)));
+  return sanitizeDiagramInput(preprocessDiagram(normalizeDiagramText(sanitizeMermaidSource(diagram))));
 }
 
 export function expandIconPlaceholders(svg: string, resolveIconUrl: IconUrlResolver): string {
@@ -282,4 +305,67 @@ export async function renderArchitectureDiagramSvg(
 ): Promise<string> {
   const { svg } = await renderSvg(id, prepareArchitectureDiagramSource(diagram));
   return injectDiagramStyles(expandIconPlaceholders(svg, resolveIconUrl));
+}
+
+type MermaidModule = typeof import('mermaid');
+type MermaidApi = MermaidModule['default'];
+
+let mermaidPromise: Promise<MermaidApi> | null = null;
+
+/**
+ * Loads and initialises the Mermaid library (singleton — safe to call many times).
+ * Shared by ArchitectureDiagram (catalog/chat) and DiagramPreview (file editor).
+ */
+export function loadMermaid(): Promise<MermaidApi> {
+  if (!mermaidPromise) {
+    mermaidPromise = Promise.all([
+      import('mermaid'),
+      import('@mermaid-js/layout-elk'),
+    ])
+      .then(([mermaidModule, elkModule]) => {
+        const mermaid = mermaidModule.default as MermaidApi & {
+          registerLayoutLoaders?: (loaders: unknown) => void;
+        };
+        mermaid.registerLayoutLoaders?.(elkModule.default);
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'base',
+          securityLevel: 'antiscript',
+          fontFamily: FLUENT_DIAGRAM_PALETTE.fontFamily,
+          themeVariables: {
+            primaryColor: FLUENT_DIAGRAM_PALETTE.neutralBackground1,
+            primaryBorderColor: FLUENT_DIAGRAM_PALETTE.brandForeground1,
+            primaryTextColor: FLUENT_DIAGRAM_PALETTE.neutralForeground1,
+            lineColor: FLUENT_DIAGRAM_PALETTE.neutralStroke1,
+            secondaryColor: FLUENT_DIAGRAM_PALETTE.neutralBackground3,
+            secondaryBorderColor: FLUENT_DIAGRAM_PALETTE.neutralStroke2,
+            tertiaryColor: FLUENT_DIAGRAM_PALETTE.neutralBackground4,
+            fontSize: FLUENT_DIAGRAM_PALETTE.fontSizeBody1,
+            fontFamily: FLUENT_DIAGRAM_PALETTE.fontFamily,
+            background: FLUENT_DIAGRAM_PALETTE.neutralBackground1,
+            mainBkg: FLUENT_DIAGRAM_PALETTE.neutralBackground1,
+            nodeBorder: FLUENT_DIAGRAM_PALETTE.brandForeground1,
+            clusterBkg: FLUENT_DIAGRAM_PALETTE.neutralBackground3,
+            clusterBorder: FLUENT_DIAGRAM_PALETTE.neutralStroke2,
+            titleColor: FLUENT_DIAGRAM_PALETTE.neutralForeground1,
+            edgeLabelBackground: FLUENT_DIAGRAM_PALETTE.neutralBackground1,
+          },
+          flowchart: {
+            htmlLabels: true,
+            curve: 'basis',
+            padding: 12,
+            nodeSpacing: 80,
+            rankSpacing: 90,
+            useMaxWidth: false,
+            defaultRenderer: 'elk',
+          },
+        });
+        return mermaid;
+      })
+      .catch((error) => {
+        mermaidPromise = null;
+        throw error;
+      });
+  }
+  return mermaidPromise;
 }

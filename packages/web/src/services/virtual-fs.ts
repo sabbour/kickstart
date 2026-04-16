@@ -45,6 +45,8 @@ const EXTENSION_LANGUAGES: Record<string, string> = {
   cs: 'csharp',
   rb: 'ruby',
   env: 'dotenv',
+  mmd: 'mermaid',
+  mermaid: 'mermaid',
 };
 
 const FILENAME_LANGUAGES: Record<string, string> = {
