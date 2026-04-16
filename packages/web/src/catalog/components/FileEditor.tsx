@@ -1,3 +1,42 @@
+/**
+ * @module FileEditor (A2UI catalog component)
+ *
+ * ## Architectural role
+ *
+ * This component lives in the A2UI catalog and is **LLM-controlled**. The LLM
+ * emits it inline inside chat message surfaces to render generated code and
+ * config files with syntax highlighting (read-only) or a live Monaco editor
+ * (editable mode). It is the canonical way for the assistant to display
+ * generated artifacts in the conversation.
+ *
+ * ## Why it's in A2UI and not the sidebar
+ *
+ * There are two distinct "file" UIs in this app, and they serve different
+ * masters:
+ *
+ *   1. **This component** (`catalog/components/FileEditor.tsx`):
+ *      - Rendered *inside* a chat message surface by the A2UI runtime.
+ *      - The LLM decides when to emit it, what files to show, and what
+ *        content to put in each file.
+ *      - Content is either inlined in the JSON (small snippets) or resolved
+ *        from `ArtifactContext` via `artifactPath` (backend tool output).
+ *      - Scope: per-message, ephemeral presentation layer.
+ *
+ *   2. **Sidebar FileEditor** (`components/FileEditor/FileEditor.tsx`) and
+ *      `FileManagerSidebar`:
+ *      - Rendered in the app shell sidebar, always visible next to the chat.
+ *      - Driven by `VirtualFileSystem` and `ArtifactContext` — the LLM never
+ *        directly controls which file is selected.
+ *      - Scope: persistent workspace browser across the whole session.
+ *
+ * The two are complementary, not competing. The LLM emits `FileEditor`
+ * components in A2UI for rich per-message code display; the sidebar provides
+ * a persistent tree view of everything generated so far. `ArtifactContext`
+ * is the shared backing store that connects them.
+ *
+ * See also: issue #349 — architecture decision recorded in
+ * `.squad/decisions/inbox/leela-349-fileeditor-architecture.md`.
+ */
 import React, { useMemo, useState, useEffect, lazy, Suspense } from 'react';
 import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
