@@ -1,454 +1,11 @@
-# Kickstart Architecture
+# Kickstart Architecture — Engineering Overview
 
-This document describes the Kickstart system architecture — an AI-guided onboarding experience that helps developers deploy applications to AKS Automatic. Kickstart presents AKS as a "scalable app platform," hiding Kubernetes complexity until the Deploy phase.
+This document answers "how does this system work?" in 5 minutes of reading.
 
-## System Overview
-
-Kickstart has two surfaces — a **web portal** and an **IDE integration** — both powered by a shared core engine.
-
-```mermaid
-graph TB
-    Dev["👩‍💻 Developer"]
-
-    subgraph "Web Surface"
-        Browser["Browser"]
-        SWA["Azure Static Web Apps"]
-        API["Azure Functions API"]
-    end
-
-    subgraph "IDE Surface"
-        IDE["VS Code / Claude Code"]
-        MCPClient["MCP Client"]
-        KickstartMCP["Kickstart MCP Server"]
-    end
-
-    subgraph "Shared Core — @kickstart/core"
-        Engine["Conversation Engine<br/>(FSM + Skill Resolver)"]
-        Kits["IntegrationKits<br/>(Azure, GitHub)"]
-        Tools["ToolRegistry<br/>(7 built-in tools)"]
-        Connectors["APIConnectors<br/>(ARM, GitHub, Pricing)"]
-        Artifacts["ArtifactStore"]
-        Validation["ValidationEngine<br/>(7 validators)"]
-        Prompts["3-Layer Prompt System"]
-        Generators["Code Generators"]
-    end
-
-    subgraph "External Services"
-        AOAI["Azure OpenAI"]
-        AzureMCP["Azure MCP Server"]
-        AKSMCP["AKS MCP Server"]
-        GitHubMCP["GitHub MCP Server"]
-    end
-
-    Dev --> Browser
-    Dev --> IDE
-    Browser --> SWA --> API
-    API --> Engine
-    API --> AOAI
-    IDE --> MCPClient --> KickstartMCP
-    KickstartMCP --> Engine
-    KickstartMCP --> AzureMCP
-    KickstartMCP --> AKSMCP
-    KickstartMCP --> GitHubMCP
-    Engine --> Prompts
-    Engine --> Kits
-    Kits --> Tools
-    Kits --> Connectors
-    Engine --> Artifacts
-    Engine --> Validation
-    Engine --> Generators
-```
-
-**Key insight:** When Kickstart hosts the experience (web), it provides the LLM (Azure OpenAI). When running as an MCP server (IDE), the user's own LLM handles inference.
-
----
-
-## Web Surface Flow
-
-The web surface runs as a static site on Azure Static Web Apps with an Azure Functions backend that proxies to Azure OpenAI.
-
-```mermaid
-sequenceDiagram
-    participant User as Developer
-    participant Browser
-    participant SWA as Azure Static Web Apps
-    participant API as Azure Functions API
-    participant AOAI as Azure OpenAI
-    participant Engine as Conversation Engine
-
-    User->>Browser: Opens Kickstart portal
-    Browser->>SWA: Load static assets (HTML/CSS/JS)
-    SWA-->>Browser: Portal Prototyper chrome + Copilot panel
-
-    User->>Browser: Types message in Copilot panel
-    Browser->>API: POST /api/converse { message, phase, context }
-    API->>Engine: Process conversation state
-    Engine-->>API: Phase-specific prompt + context
-    API->>AOAI: Chat completion request
-    AOAI-->>API: Response with A2UI JSON
-    API-->>Browser: { reply, a2ui_components[], phase }
-    Browser->>Browser: Render A2UI components in DOM
-```
-
----
-
-## IDE Surface Flow
-
-The IDE surface exposes Kickstart as an MCP server. It delegates infrastructure operations to specialized MCP servers for Azure, AKS, and GitHub.
-
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant IDE as VS Code / Claude Code
-    participant MCP as Kickstart MCP Server
-    participant Engine as Conversation Engine
-    participant AzMCP as Azure MCP Server
-    participant AKSMCP as AKS MCP Server
-    participant GHMCP as GitHub MCP Server
-
-    Dev->>IDE: "Deploy my Node.js app"
-    IDE->>MCP: tool/kickstart { message }
-    MCP->>Engine: Advance conversation state
-    Engine-->>MCP: Phase context + actions needed
-
-    Note over MCP: Kickstart owns orchestration.<br/>Delegates infra operations.
-
-    MCP->>AzMCP: Create resource group
-    AzMCP-->>MCP: Resource group created
-    MCP->>AKSMCP: Create AKS Automatic cluster
-    AKSMCP-->>MCP: Cluster provisioned
-    MCP->>GHMCP: Create repo + push manifests
-    GHMCP-->>MCP: Repo ready, workflow triggered
-
-    MCP-->>IDE: A2UI JSON response (rendered as MCP App)
-    IDE-->>Dev: Shows progress + next steps
-```
-
----
-
-## Conversation Phases & Skill Resolver
-
-Kickstart guides developers through 6 conversation phases. Kubernetes concepts are deliberately hidden until the Review phase — the user experience is "deploy an app," not "configure Kubernetes."
-
-```mermaid
-graph LR
-    D["1️⃣ Discover"] --> De["2️⃣ Design"]
-    De --> G["3️⃣ Generate"]
-    G --> R["4️⃣ Review"]
-    R --> H["5️⃣ Handoff"]
-    H --> Dp["6️⃣ Deploy"]
-
-    style D fill:#e1f5fe
-    style De fill:#e1f5fe
-    style G fill:#e1f5fe
-    style R fill:#fff3e0
-    style H fill:#fff3e0
-    style Dp fill:#fff3e0
-```
-
-| Phase | Purpose | K8s Exposure |
-|-------|---------|:---:|
-| **Discover** | Understand the app — language, framework, ports, data stores | Hidden |
-| **Design** | Architecture decisions — scaling, networking, storage | Hidden |
-| **Generate** | Produce Dockerfiles, manifests, CI/CD pipelines | Hidden |
-| **Review** | Validate generated artifacts, show K8s resources | Visible |
-| **Handoff** | Push to GitHub, create PR, open Codespace | Visible |
-| **Deploy** | Provision AKS Automatic, deploy workloads | Visible |
-
-Phases 1–3 frame AKS Automatic as a "scalable app platform." Kubernetes terminology only surfaces in phases 4–6 when the developer reviews actual manifests.
-
-### Skill Resolver
-
-The **skill resolver** (`packages/core/src/engine/skill-resolver.ts`) is Layer 1 of the prompt system. At each phase transition, it inspects all registered `IntegrationKit`s and injects only the relevant domain knowledge into the system prompt.
-
-Resolution priority (highest first):
-1. `kit.phasePrompts[phase]` — explicit per-phase augmentations declared by the kit
-2. `kit.prompts` filtered by keyword heuristics — backward-compat for kits that don't use `phasePrompts`
-
-A synthetic tool-listing prompt is prepended at the Discover phase so the LLM knows which tools it can call proactively.
-
----
-
-## IntegrationKit + APIConnector Pattern
-
-**IntegrationKits** are the canonical extension unit for Kickstart. A kit bundles:
-
-- **Tools** — LLM-callable functions (registered into `ToolRegistry` on `registerKit`)
-- **Connectors** — Authenticated API clients (registered into `APIConnectorRegistry` on `registerKit`)
-- **Prompts** — System-prompt augmentations, optionally scoped per-phase
-- **Components** — A2UI component type declarations (rendered by the web layer)
-
-Two built-in kits ship with `@kickstart/core`:
-
-| Kit | Tools | Connectors | Components |
-|-----|-------|-----------|-----------|
-| `azure` | `azure_resource_list`, `azure_resource_get`, `estimate_cost` | `AzureARMConnector`, `PricingConnector` | `azureLoginCard`, `azureResourcePicker`, `azureResourceForm` |
-| `github` | `github_repo_info` | `GitHubConnector` | `githubLoginCard`, `githubRepoPicker`, `githubAction`, `githubCommit` |
-
-**APIConnectors** own the token lifecycle and HTTP plumbing. Every connector implements the same interface: `authenticate()`, `request()`, `isAuthenticated()`. The `APIConnectorRegistry` maps connector names to instances and is shared across the app.
-
-```mermaid
-flowchart LR
-    Kit["IntegrationKit"] -->|register| KitReg["IntegrationKitRegistry"]
-    KitReg -->|auto-wires| ToolReg["ToolRegistry"]
-    KitReg -->|auto-wires| ConnReg["APIConnectorRegistry"]
-    ToolReg -->|execute| Tools["azure_resource_list\nazure_resource_get\ngh_repo_info\n..."]
-    ConnReg -->|request()| Connectors["AzureARMConnector\nGitHubConnector\nPricingConnector"]
-```
-
-### ServicePack Pattern
-
-**ServicePacks** extend `IntegrationKit` with declarative **auth requirements**, **lifecycle hooks**, and **dependency management**:
-
-```typescript
-interface ServicePack extends IntegrationKit {
-  authRequirements?: KitAuthRequirement[];  // Declare needed credentials
-  dependencies?: string[];                   // Kit names this pack requires
-  onActivate?(): Promise<void>;             // Called after registration
-  onDeactivate?(): Promise<void>;           // Called before unregistration
-}
-
-interface KitAuthRequirement {
-  provider: 'azure-msal' | 'github-oauth' | ...;
-  scopes: string[];
-}
-```
-
-**Registration is transactional:**
-- Validates dependencies exist (DFS cycle detection)
-- Validates auth schemas
-- Calls `onActivate()` on all kits; rolls back on failure
-- Unregistration keeps a kit if its `onDeactivate()` fails (safety-first)
-
-**Example:** The `github` kit declares `{ provider: 'github-oauth', scopes: ['repo', 'read:user'] }`. When a component needs GitHub functionality, the app calls `GitHubConnector.authenticate()`, which kicks off device code flow (with in-memory token storage — no localStorage).
-
----
-
-### Fat Components & Component Lifecycle
-
-**Fat A2UI components** are self-managing, opinionated implementations of common workflows:
-
-| Component | Auth | Lifecycle | Security |
-|-----------|------|-----------|----------|
-| **AzureLoginCard** | MSAL (Device Code) | Display code → poll token → fetch profile | Token in memory; logout clears it |
-| **AzureResourcePicker** | AzureARMConnector | Fetch subscriptions → list resources with live search | Rate-limit handling + stub fallback |
-| **AzureResourceForm** | AzureARMConnector | Collect deployment params, preview cost, submit | Input validation + cost estimation |
-| **GitHubLoginCard** | GitHub OAuth (Device Code) | Display code → poll token → fetch user + profile | Token in memory; no localStorage |
-| **GitHubRepoPicker** | GitHubConnector | Fetch user's repos, debounced search, pagination | Rate-limit warnings + stub fallback |
-| **GitHubAction** | GitHubConnector | Map to allowlisted GitHub API operations, require typed confirmation for destructive ops | Blocks main/master/production branches |
-| **GitHubCommit** | GitHubConnector | Artifact selection, branch name validation, PR creation flow, diff preview | Protected-branch guards |
-
-**Security guardrails:**
-- **In-memory token storage only** — tokens are cleared on logout or session end
-- **Operation allowlisting** — write operations must be explicitly listed (no arbitrary API calls)
-- **Typed confirmation** — DELETE and merge operations require developer confirmation
-- **Protected-branch blocking** — Cannot push to main/master/production via the component
-
----
-
-## Tool System & LLM Function Calling
-
-The `ToolRegistry` is the central register for LLM-callable tools. Tools are plain objects implementing `Tool<TArgs>`:
-
-```typescript
-interface Tool<TArgs> {
-  name: string;
-  description: string;
-  parameters: JSONSchema;
-  execute(args: TArgs): Promise<unknown>;
-}
-```
-
-The registry exports tools in **OpenAI function-calling format** via `toOpenAIFormat()` and routes `execute(name, args)` calls with structured logging. When the LLM returns a `tool_calls` response, the engine:
-1. Maps tool names to `ToolRegistry` entries
-2. Validates arguments against JSON schemas
-3. Executes each tool and collects results
-4. Sends results back to the LLM for follow-up reasoning
-
-**9 built-in tools** (auto-registered at import):
-
-| Tool | Kit | Purpose | Function Call? |
-|------|-----|---------|:---:|
-| `azure_resource_list` | azure | List Azure resources in a subscription | ✓ |
-| `azure_resource_get` | azure | Inspect a specific Azure resource | ✓ |
-| `estimate_cost` | azure | Monthly cost estimate for a deployment plan | ✓ |
-| `github_repo_info` | github | Detect language, runtime, CI setup from a GitHub repo | ✓ |
-| `github_api_get` | github | General-purpose GitHub REST API read-only query | ✓ |
-| `fetch_webpage` | core | Fetch webpage and convert HTML to text (SSRF-protected) | ✓ |
-| `generate_kubernetes_manifest` | core | Generate K8s Deployment/Service/Ingress YAML | No |
-| `list_artifacts` | core | List generated artifacts in the store | No |
-| `get_artifact` | core | Retrieve a generated artifact by path | No |
-
-**SSRF & Security Controls:**
-- `fetch_webpage` blocks private IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x)
-- Blocks localhost, cloud metadata endpoints, and suspicious redirects
-- All tools sanitize output to prevent injection attacks
-
-### ServiceConnector Pattern
-
-**ServiceConnectors** (`AzureARMConnector`, `GitHubConnector`, `PricingConnector`) handle authenticated API calls on behalf of the engine. Each connector:
-
-1. **Manages authentication** — Token lifecycle, refresh, and credential storage
-2. **Implements uniform interface** — `authenticate()`, `request()`, `isAuthenticated()`
-3. **Provides domain methods** — `listResources()`, `getResource()`, `listUserRepos()`, etc.
-4. **Handles errors gracefully** — Rate limiting, retry logic, stub fallback for offline mode
-
-Connectors are registered in `APIConnectorRegistry` and are shared across tools and fat components. When a component or tool needs to call an API, it looks up the connector by name and calls its methods.
-
----
-
-## CORS Proxy Security
-
-The web API provides CORS proxy endpoints (`/api/arm-proxy`, `/api/github-proxy`, `/api/pricing-proxy`) to allow the browser to access external APIs. These proxies enforce strict security controls:
-
-| Control | Purpose |
-|---------|---------|
-| **Private IP blocking** | Rejects requests to 10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x |
-| **Redirect validation** | Follows redirects only to same origin or Azure/GitHub domains |
-| **Hostname allowlist** | Blocks localhost, 127.0.0.1, cloud metadata endpoints (169.254.169.254, etc.) |
-| **Rate limiting** | Per-user, per-endpoint throttling to prevent abuse |
-| **Header filtering** | Strips sensitive headers; only allows safe response headers back to browser |
-
-**Auto-continue middleware** wraps the conversation engine to automatically advance past "waiting for user decision" phases when the LLM has enough context. This keeps the flow smooth even with network latency.
-
----
-
-## Artifact Store
-
-The `ArtifactStore` manages generated deployment files in-memory during a session. Artifacts are produced by tools and generators, then surfaced in the Review phase for user inspection.
-
-```typescript
-interface ArtifactStore {
-  put(path, content, metadata?): void;  // Create or replace
-  get(path): Artifact | null;
-  list(glob?): Artifact[];              // Glob filtering supported
-  delete(path): void;
-  export(): Record<string, string>;     // Path → content map
-  clear(): void;
-}
-```
-
-Artifacts carry a `language` hint (e.g. `"yaml"`, `"dockerfile"`) for syntax highlighting and optional free-form `metadata`.
-
----
-
-## Validation Engine
-
-The `ValidationEngine` runs registered validators against generated artifacts before deployment. Each validator maps to one or more deployment safeguard rules (DS001–DS013).
-
-**7 built-in validators:**
-
-| Validator | What it checks |
-|-----------|---------------|
-| `resource-limits` | Every container specifies CPU/memory requests and limits |
-| `no-latest-tag` | No container image uses the `:latest` tag |
-| `health-probes` | Readiness and liveness probes are configured |
-| `no-privileged` | No container runs with `privileged: true` |
-| `namespace-set` | A non-default namespace is explicitly set |
-| `replica-count` | Deployment has ≥ 2 replicas for availability |
-| `image-pull-policy` | `imagePullPolicy` is set to `Always` for mutable tags |
-
-Validators return `{ passed, message, severity, fix? }`. Severity `"error"` blocks deployment; `"warning"` suggests improvement.
-
-```typescript
-const engine = createDefaultValidationEngine();  // all 7 pre-registered
-const report = engine.validateArtifact(myArtifact);
-if (report.hasErrors) { /* block deploy */ }
-```
-
----
-
-## A2UI Rendering Pipeline
-
-A2UI (Agent-to-UI) v0.9 is the UI component protocol used by Kickstart. The LLM returns structured A2UI JSON; the web layer renders it natively using React 19.
-
----
-
-## Prompt Architecture
-
-Kickstart uses a 3-layer prompt system. Higher layers are more specific and override lower layers as needed.
-
-```mermaid
-graph TB
-    subgraph "Layer 3 — Phase-Specific Prompts"
-        P1["Discover Prompt"]
-        P2["Design Prompt"]
-        P3["Generate Prompt"]
-        P4["Review Prompt"]
-        P5["Handoff Prompt"]
-        P6["Deploy Prompt"]
-    end
-
-    subgraph "Layer 2 — System Prompt"
-        Persona["Persona<br/>(Kickstart assistant)"]
-        Safeguards["13 Deployment Safeguards<br/>(DS001 – DS013)"]
-    end
-
-    subgraph "Layer 1 — IntegrationKit Skills (via Skill Resolver)"
-        AKS["AKS Automatic<br/>domain knowledge"]
-        ACR["Container Registry<br/>patterns"]
-        GHA["GitHub Actions<br/>CI/CD templates"]
-        Net["Networking &<br/>DNS patterns"]
-    end
-
-    P1 & P2 & P3 & P4 & P5 & P6 -->|"override / extend"| Persona
-    Persona --> AKS & ACR & GHA & Net
-    Safeguards -->|"always enforced"| P1 & P2 & P3 & P4 & P5 & P6
-
-    style Safeguards fill:#ffcdd2
-```
-
-**Layer composition at runtime:**
-1. **IntegrationKit Skills** (Layer 1) are loaded per-phase by the **Skill Resolver** — only relevant domain knowledge from registered kits is injected. Kits can declare `phasePrompts` for explicit per-phase targeting, or flat `prompts` that are classified via keyword heuristics.
-2. **System Prompt** (Layer 2) provides the Kickstart persona and enforces 13 deployment safeguards (DS001–DS013) across all phases
-3. **Phase-Specific Prompts** (Layer 3) tailor the conversation for each phase's goals
-
-The deployment safeguards (DS001–DS013) ensure generated infrastructure follows Azure best practices — things like enabling managed identity, enforcing HTTPS, setting resource limits, and using private endpoints.
-
----
-
-## Deployment Architecture
-
-```mermaid
-flowchart TB
-    subgraph "Source"
-        Repo["GitHub Repository"]
-    end
-
-    subgraph "CI/CD"
-        GHA["GitHub Actions"]
-        DeployInfra["deploy-infra.yml<br/>(OIDC + Bicep)"]
-        DeploySWA["deploy-swa.yml<br/>(packages/web → SWA)"]
-    end
-
-    subgraph "Azure (Web Surface)"
-        SWA["Azure Static Web Apps"]
-        Functions["Azure Functions<br/>(API backend)"]
-        AOAI["Azure OpenAI"]
-    end
-
-    subgraph "npm (IDE Surface)"
-        NPM["npm package<br/>@kickstart/mcp-server"]
-        MCPConfig["MCP client config<br/>(VS Code / Claude Code)"]
-    end
-
-    Repo --> GHA
-    GHA --> DeployInfra -->|"Bicep"| SWA
-    GHA --> DeploySWA -->|"static files"| SWA
-    SWA --> Functions --> AOAI
-
-    Repo -->|"npm publish"| NPM
-    NPM -->|"install + configure"| MCPConfig
-
-    style SWA fill:#e8f5e9
-    style NPM fill:#e3f2fd
-```
-
-| Target | Domain | Status |
-|--------|--------|--------|
-| Web (dev) | `kickstart.aks.azure.sabbour.me` | Active |
-| Web (production) | `kickstart.aks.azure.com` | Future |
-| IDE | npm: `@kickstart/mcp-server` | In development |
+> **Related docs:**
+> - [Prompt Architecture](./prompt-architecture.md) — full LLM pipeline details
+> - [FSM](./fsm.md) — conversation state machine
+> - [Integration Kits](./integration-kits.md) — how to extend the engine
 
 ---
 
@@ -457,38 +14,138 @@ flowchart TB
 ```
 kickstart/
 ├── packages/
-│   ├── core/               @kickstart/core — shared engine
+│   ├── core/          @kickstart/core — shared TypeScript engine
+│   │   ├── engine/        FSM (machine.ts, phases.ts, types.ts) + Skill Resolver
+│   │   ├── kits/          IntegrationKit interface + defaultKitRegistry
+│   │   ├── prompts/       buildSystemPrompt(), phase templates, component catalog
+│   │   ├── services/      resolveConversationSkills (per-turn injection)
+│   │   ├── tools/         ToolRegistry + built-in LLM-callable tools
+│   │   └── telemetry/     Logging helpers
+│   ├── web/           @kickstart/web — React SPA + Azure Functions API
+│   │   ├── api/           Azure Functions (converse, health, proxies, etc.)
+│   │   │   └── src/lib/   session-store, openai-client, model-router, rate-limiter
 │   │   └── src/
-│   │       ├── artifacts/  ArtifactStore — generated file management
-│   │       ├── catalog/    A2UI component schemas (JSON Schema draft/2020-12)
-│   │       ├── connectors/ APIConnector implementations + registry
-│   │       ├── engine/     Conversation FSM, phases, skill resolver
-│   │       ├── generators/ Dockerfile, manifest, and CI/CD generators
-│   │       ├── kits/       IntegrationKit definitions + registry
-│   │       ├── prompts/    3-layer prompt system
-│   │       ├── services/   Response processor
-│   │       ├── telemetry/  Structured logger
-│   │       ├── tools/      ToolRegistry + 7 built-in tools
-│   │       ├── validation/ ValidationEngine + 7 validators
-│   │       └── types.ts    Shared type contracts
-│   ├── web/                @kickstart/web — React 19 + Vite 6 portal
-│   │   ├── api/            Azure Functions API (7 endpoints)
-│   │   ├── src/
-│   │   │   ├── catalog/    Kickstart A2UI catalog (16 custom components)
-│   │   │   ├── components/ Chat, FileEditor, Landing, Layout, Sidebar
-│   │   │   ├── hooks/      useA2UI, useChat
-│   │   │   ├── services/   API client, demo scenarios, virtual-fs
-│   │   │   └── vendor/     Vendored A2UI v0.9 runtime
-│   │   ├── css/            Stylesheets (Fluent 2, A2UI overrides)
-│   │   └── public/         Static assets
-│   └── mcp-server/         @kickstart/mcp-server — IDE integration
-│       └── src/
-│           ├── tools/      MCP tool definitions
-│           ├── a2ui.ts     A2UI response formatting
-│           └── index.ts    Server entry point (stdio transport)
-├── infra/                  Bicep templates + setup scripts
-├── docs/                   Architecture and documentation
-└── package.json            Workspace root
+│   │       ├── catalog/   A2UI component implementations (28+ components)
+│   │       ├── components/ Chat UI, FileEditor (sidebar), Landing
+│   │       └── services/  virtual-fs.ts (in-memory file store)
+│   └── mcp-server/    @kickstart/mcp-server — optional IDE adapter
+└── infra/             Bicep templates for Azure provisioning
 ```
 
-Build order: `core` → `web/api` + `mcp-server` (core must build first due to project references).
+---
+
+## Request Flow
+
+What happens when a user sends a message:
+
+```
+1. Browser (React SPA)
+   └─ POST /api/converse  { sessionId, message, messages? }
+       └─ Accept: text/event-stream  (SSE streaming)
+
+2. Azure Functions — converse.ts
+   a. Rate limit check
+   b. Content safety check (Azure AI Content Safety)
+   c. Look up or create session (in-memory, 1-hour TTL)
+      - If session missing and client sent messages[], rehydrate from client history
+        (max 50 messages, all content-safety checked)
+   d. Resolve current phase from FSM engineState
+   e. resolveSkills(phase, kits)      ← Mechanism A: system prompt skill injection
+   f. resolveConverseModelRoute()     ← trust-based model selection
+   g. buildSystemPrompt({ phase, appDefinition, kitPrompts, artifactSummary })
+   h. Replace stored system message with freshly built prompt
+   i. resolveConversationSkills(msg, phase, context)  ← Mechanism B: per-turn injection
+      - If domainKnowledge != null: insert as user message before real message
+      - Append currentState snapshot to real user message
+   j. Call Azure OpenAI (streaming or JSON)
+   k. Parse JSON envelope { message, a2ui, phaseComplete, filesComplete }
+   l. handleImplicitFlags(state, { phaseComplete }) → may advance FSM phase
+   m. Extract FileEditor components → upsertArtifact() into session
+   n. Stream SSE events back to client
+
+3. Browser (React SPA)
+   a. Render text chunks as they arrive
+   b. On "done" event: render A2UI component tree from kickstartCatalog
+   c. If autoContinue: true — auto-send "Continue where you left off"
+   d. Sidebar FileEditor re-populated from virtual-fs artifacts
+```
+
+---
+
+## Key Components
+
+### `packages/core/src/engine/machine.ts` — Conversation FSM
+Pure function state machine. Tracks current phase and phase statuses. Enforces forward-only transitions. Does NOT enforce exit conditions — those are narrative strings in `phases.ts` for LLM guidance only. See [fsm.md](./fsm.md).
+
+### `packages/core/src/engine/skill-resolver.ts` — Kit Skill Resolver (Mechanism A)
+3-stage middleware: phase filter → keyword activation → priority sort. Injects kit-provided domain knowledge as `## Available Capabilities` into the system prompt via `buildSystemPrompt()`. Called every turn.
+
+### `packages/core/src/services/resolveConversationSkills.ts` — Per-Turn Injection (Mechanism B)
+Keyword-based domain detection on the user message. Injects targeted domain knowledge as a **user message turn** before the real user message. Also appends a `[Current session context]` block to the real user message. Called every turn.
+
+### `packages/core/src/prompts/system-prompt.ts` — System Prompt Builder
+`buildSystemPrompt()` assembles the full system prompt: persona + COLLABORATOR VOICE + GUARDRAILS + phase template + kit prompts. Called every turn with fresh context.
+
+### `packages/web/api/src/lib/converse-model-router.ts` — Model Router
+Trust-based, NOT phase-based. Generate phase + `session.routingPhaseTrusted = true` → generate-tier model (GPT-5.4 via `AZURE_OPENAI_CODEX_DEPLOYMENT`). All other cases → chat-tier model (GPT-5.4-mini via `AZURE_OPENAI_CHAT_DEPLOYMENT`). Client cannot self-elevate — `routingPhaseTrusted` is reset to `false` on session rehydration.
+
+### `packages/web/api/src/lib/session-store.ts` — Session Store
+In-memory, 1-hour TTL, GC every 10 minutes. Stores conversation messages (max 50), FSM phase state, generated artifact metadata (filename, language, resource declarations). Full file content is NOT stored — it lives in the A2UI message history on the client, sent back for rehydration on cold start.
+
+### `packages/web/src/services/virtual-fs.ts` — Virtual Filesystem
+In-memory file store, 1-hour TTL. Backs both the A2UI FileEditor (in-chat) and the Sidebar FileEditor (persistent panel). Files are extracted from A2UI FileEditor components and written here automatically.
+
+### `packages/web/src/catalog/` — A2UI Component Catalog
+28+ React components: layout (Row, Column, Card, Tabs, Modal), content (Text, Markdown, CodeBlock, Badge), input (Button, TextField, ChoicePicker, RadioGroup, Toggle), domain-specific (AuthCard, GenerationProgress, ArchitectureDiagram, FileEditor, CostEstimate, GitHubRepoPicker, AzureResourcePicker). Defined in `packages/core/src/prompts/component-catalog.ts`; implemented in `packages/web/src/catalog/components/`.
+
+---
+
+## Server-Side vs Client-Side State
+
+| What | Where | Lifetime |
+|------|-------|----------|
+| Conversation messages (text only) | Server session store (memory) | 1 hour |
+| FSM phase state | Server session store (memory) | 1 hour |
+| Generated artifact metadata | Server session store (memory) | 1 hour |
+| Full file content (generated files) | Client A2UI message history | Browser session |
+| Virtual FS (file content) | Server virtual-fs (memory) | 1 hour |
+| `routingPhaseTrusted` flag | Server session | Reset on rehydration |
+
+**Cold start rehydration:** When the server session expires, the client re-sends its message history (`messages[]` in the POST body). The server re-creates the session from this. `routingPhaseTrusted` is set to `false` during rehydration, so even if the client claims to be in Generate phase, it gets the chat-tier model.
+
+---
+
+## Session Lifecycle
+
+```
+Client POST (no sessionId)
+  → createSession()  OR  hydrateSession(messages[])
+  → Session ID returned in response
+
+Client POST (with sessionId, session alive)
+  → getSession(sessionId) → found → continue
+
+Client POST (with sessionId, session expired)
+  → getSession(sessionId) → null
+  → body.messages[] present → hydrateSession() → new session, same conversation
+  → body.messages[] absent → createSession() → fresh start
+
+Garbage collection
+  → Every 10 minutes: delete sessions older than 1 hour
+```
+
+---
+
+## What Is and Isn't Implemented
+
+| Feature | Status |
+|---------|--------|
+| 6-phase FSM (Discover → Deploy) | ✅ Implemented |
+| Kit-based skill injection (Mechanism A) | ✅ Implemented |
+| Per-turn domain skill injection (Mechanism B) | ✅ Implemented (wired in converse.ts as of latest commit) |
+| Auto-continue file generation | ✅ Implemented |
+| Session rehydration from client history | ✅ Implemented |
+| Trust-based model routing | ✅ Implemented |
+| FSM exit condition enforcement | ❌ Not implemented — exit conditions are LLM narrative only |
+| External plugin/config skill loading | ❌ Not implemented — new skills require TypeScript IntegrationKit |
+| Persistent storage (DB) | ❌ Not implemented — all in-memory |
