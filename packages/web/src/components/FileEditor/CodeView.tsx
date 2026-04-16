@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import type { VirtualFile } from '../../services/virtual-fs';
 import { sanitizeHtml } from '../../utils/sanitize';
+import { DiagramPreview } from './DiagramPreview';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
@@ -42,8 +43,14 @@ interface CodeViewProps {
   file?: VirtualFile;
 }
 
+function isMermaidFile(file: VirtualFile): boolean {
+  const ext = file.path.split('.').pop()?.toLowerCase();
+  return ext === 'mmd' || ext === 'mermaid' || file.language === 'mermaid';
+}
+
 export function CodeView({ file }: CodeViewProps) {
   const [copied, setCopied] = useState(false);
+  const [diagramTab, setDiagramTab] = useState<'preview' | 'source'>('preview');
 
   const handleCopy = useCallback(async () => {
     if (!file) return;
@@ -88,8 +95,8 @@ export function CodeView({ file }: CodeViewProps) {
     );
   }
 
-  const lines = file.content.split('\n');
   const isGenerating = file.status === 'generating';
+  const isDiagram = isMermaidFile(file);
 
   const highlightedHtml = useMemo(() => {
     try {
@@ -112,6 +119,26 @@ export function CodeView({ file }: CodeViewProps) {
           <span className="code-view-lang-badge">{file.language}</span>
         </div>
         <div className="code-view-actions">
+          {isDiagram && (
+            <>
+              <button
+                className={`code-view-btn${diagramTab === 'preview' ? ' active' : ''}`}
+                onClick={() => setDiagramTab('preview')}
+                title="Show diagram preview"
+                type="button"
+              >
+                ⬡ Preview
+              </button>
+              <button
+                className={`code-view-btn${diagramTab === 'source' ? ' active' : ''}`}
+                onClick={() => setDiagramTab('source')}
+                title="Show source code"
+                type="button"
+              >
+                {'</>'} Source
+              </button>
+            </>
+          )}
           <button
             className="code-view-btn"
             onClick={handleCopy}
@@ -130,18 +157,26 @@ export function CodeView({ file }: CodeViewProps) {
           </button>
         </div>
       </div>
-      <div className="code-view-body">
-        <pre className="code-view-pre">
-          <code className="hljs">
-            {highlightedLines.map((lineHtml, i) => (
-              <div key={i} className="code-line">
-                <span className="code-line-number">{i + 1}</span>
-                <span className="code-line-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(lineHtml) }} />
-              </div>
-            ))}
-          </code>
-        </pre>
-      </div>
+
+      {isDiagram && diagramTab === 'preview' ? (
+        <div className="code-view-body code-view-diagram-body">
+          <DiagramPreview content={file.content} />
+        </div>
+      ) : (
+        <div className="code-view-body">
+          <pre className="code-view-pre">
+            <code className="hljs">
+              {highlightedLines.map((lineHtml, i) => (
+                <div key={i} className="code-line">
+                  <span className="code-line-number">{i + 1}</span>
+                  <span className="code-line-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(lineHtml) }} />
+                </div>
+              ))}
+            </code>
+          </pre>
+        </div>
+      )}
+
       {isGenerating && (
         <div className="code-view-generating">
           <span className="generating-dot" />
