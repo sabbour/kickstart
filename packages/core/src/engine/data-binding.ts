@@ -69,8 +69,10 @@ export function resolveDataPath(
   let current: unknown = dataModel;
   for (const rawSegment of segments) {
     if (current === null || current === undefined) return defaultValue;
-    // RFC 6901: ~1 → '/', ~0 → '~'
-    const segment = rawSegment.replace(/~1/g, '/').replace(/~0/g, '~');
+    // RFC 6901: decode ~1 → '/' and ~0 → '~' in a single pass so that the
+    // order of replacements is unambiguous and CodeQL incomplete-sanitization
+    // checks are satisfied (chained two-pass replace is no longer used).
+    const segment = rawSegment.replace(/~([01])/g, (_, c) => c === "1" ? "/" : "~");
     if (Array.isArray(current)) {
       const idx = Number(segment);
       current = Number.isInteger(idx) ? current[idx] : undefined;

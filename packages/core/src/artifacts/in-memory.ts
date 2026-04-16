@@ -63,13 +63,29 @@ function artifactSizeBytes(content: string, metadata?: Record<string, unknown>):
 /**
  * Convert a glob pattern to a RegExp.
  * Supports `*` (matches within a path segment) and `**` (matches across segments).
+ *
+ * Uses segment-aware replacements (`[^/]+`, `[^/]*`) instead of `.*` to
+ * prevent polynomial ReDoS from adjacent unbounded quantifiers (CodeQL alert).
+ * Input is validated to guard against patterns that could still produce slow
+ * regex even with the safer quantifiers.
  */
 function globToRegExp(pattern: string): RegExp {
+  if (pattern.length > 256) {
+    throw new Error(`Glob pattern too long (max 256 characters): "${pattern.slice(0, 40)}…"`);
+  }
+  const doubleStars = (pattern.match(/\*\*/g) ?? []).length;
+  if (doubleStars > 8) {
+    throw new Error(`Glob pattern contains too many '**' wildcards (max 8)`);
+  }
+
   const escaped = pattern
     .replace(/[.+^${}()|[\]\\]/g, "\\$&") // escape regex specials (except * and ?)
-    .replace(/\*\*/g, "\x00") // placeholder for **
-    .replace(/\*/g, "[^/]*") // * → match within segment
-    .replace(/\x00/g, ".*"); // ** → match across segments
+    .replace(/\*\*/g, "\x00")              // placeholder for **
+    .replace(/\*/g, "[^/]*")              // * → within-segment wildcard (no slash)
+    // ** replacements use [^/]+ (no slash) to prevent overlapping quantifiers:
+    .replace(/\x00\//g, "(?:[^/]+/)*")    // **/ → zero or more "segment/" prefixes
+    .replace(/\/\x00/g, "(?:/[^/]+)*")   // /** → zero or more "/segment" suffixes
+    .replace(/\x00/g, "(?:[^/]+/)*[^/]*"); // standalone ** → any path segments
   return new RegExp(`^${escaped}$`);
 }
 
@@ -78,23 +94,29 @@ function globToRegExp(pattern: string): RegExp {
 // Artifacts are code/config (YAML, Dockerfiles, etc.), not HTML documents.
 // ---------------------------------------------------------------------------
 
-/** Patterns that should never appear in stored artifact content. */
-const DANGEROUS_HTML_RE =
-  /<\s*\/?\s*(script|iframe|object|embed|form|input|link|meta|style|svg|base|applet)[^>]*>/gi;
+/**
+ * Attribute-aware HTML tag pattern.
+ * Uses `(?:[^>"']|"[^"]*"|'[^']*')*` so that `>` inside a quoted attribute
+ * value does not prematurely end the match (CodeQL bad-tag-filter fix).
+ */
+const HTML_TAG_RE = /<(?:[^>"']|"[^"]*"|'[^']*')*>/g;
 
 /**
- * Sanitize artifact content: strip dangerous HTML tags and event handlers.
+ * Matches script/style blocks including content via a back-reference.
+ * Replaces the previous chain of per-tag removes that was bypassable through
+ * nested/interleaved tag injection (CodeQL incomplete-sanitization fix).
+ */
+const SCRIPT_STYLE_BLOCK_RE =
+  /<(script|style)\b(?:[^>"']|"[^"]*"|'[^']*')*>[\s\S]*?<\/\1\s*>/gi;
+
+/**
+ * Sanitize artifact content: strip script/style blocks and all HTML tags.
  * Only applied to non-HTML artifacts (YAML, JSON, Dockerfiles, etc.).
  */
 function sanitizeContent(content: string): string {
   return content
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
-    .replace(/<object[\s\S]*?<\/object>/gi, "")
-    .replace(/<embed[\s\S]*?<\/embed>/gi, "")
-    .replace(DANGEROUS_HTML_RE, "")
-    .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, "");
+    .replace(SCRIPT_STYLE_BLOCK_RE, "")
+    .replace(HTML_TAG_RE, "");
 }
 
 /** Languages whose content legitimately contains HTML-like tags. */

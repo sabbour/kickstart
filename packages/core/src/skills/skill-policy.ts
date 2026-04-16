@@ -51,9 +51,13 @@ const EXECUTABLE_INLINE_PATTERNS = [
   /\bFunction\s*\(/i,      // new Function()
 ];
 
-/** HTML tags that could be used for injection. */
+/** HTML tags that could be used for injection.
+ * Uses `(?:[^>"']|"[^"]*"|'[^']*')*` instead of `[^>]*` so that `>` inside
+ * a quoted attribute value does not prematurely terminate the match
+ * (CodeQL bad-tag-filter / incomplete-sanitization fix).
+ */
 const HTML_INJECTION_PATTERN =
-  /<\s*(script|style|iframe|object|embed|form|input|button|link|meta|base)\b[^>]*>/gi;
+  /<\s*(script|style|iframe|object|embed|form|input|button|link|meta|base)\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
 
 /** Event handler attributes in any HTML. */
 const EVENT_HANDLER_PATTERN =
