@@ -159,7 +159,7 @@ Both mechanisms activate in Generate phase, both inject AKS/Docker context, thro
 
 Phase exit conditions in `phases.ts` are human-readable strings. Not code-enforced. See [FSM](./fsm.md).
 
-## Model Routing {#model-routing}
+## Model Routing
 
 Trust-based, not phase-based:
 
