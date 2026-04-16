@@ -28,7 +28,9 @@
   },
   "overrides": {
     "cookie": "0.7.2",
-    "tmp": "0.2.5"
+    "tmp": "0.2.5",
+    "hono": "4.12.14",
+    "follow-redirects": "1.16.0"
   },
   "devDependencies": {
     "@azure/static-web-apps-cli": "^2.0.8",
