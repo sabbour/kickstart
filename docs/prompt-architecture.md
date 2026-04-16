@@ -78,25 +78,13 @@ converse.ts receives POST /api/converse { sessionId, message }
 
 **Injection location:** `buildSystemPrompt()` appends a `## Available Capabilities` section at the end of the system prompt.
 
-**Tool listing:** In Discover/Design phases, the resolver also synthesises a prompt listing all registered tool names and descriptions, telling the LLM to call them proactively rather than ask the user.
-
-```typescript
-// converse.ts line ~210
-const resolvedSkills = resolveSkills(currentPhase, defaultKitRegistry.getAll());
-// ...
-const freshSystemPrompt = buildSystemPrompt({
-  phase: currentPhase,
-  appDefinition: state.appDefinition,
-  kitPrompts: resolvedSkills.prompts,   // ← A injected here
-  artifactSummary: artifactSummary || undefined,
-});
-```
-
 **To add a new skill via Mechanism A:** Create an `IntegrationKit` class and register it with `defaultKitRegistry`. No config files — TypeScript only.
 
 ---
 
 ## Mechanism B — Per-Turn Domain Injection (`services/resolveConversationSkills.ts`)
+
+**Status: Live in main as of PR #382.** Wired into `converse.ts` at lines ~278–299.
 
 **Purpose:** Detects which technical domains the user's current message touches, then injects targeted domain knowledge as a user turn. Saves 500–1000 tokens compared to always-on system prompt injection.
 
@@ -106,34 +94,35 @@ const freshSystemPrompt = buildSystemPrompt({
 3. **Inject as user message** — if any domain matched, insert `{ role: "user", content: domainKnowledge }` BEFORE the real user message.
 4. **Session context** — always build and append a `[Current session context]` block to the real user message.
 
-**Detected domains:**
-- Stack: `stack-node`, `stack-python`, `stack-dotnet`, `stack-java`, `stack-go`
-- Infrastructure: `infra-docker`, `infra-aks`, `infra-cicd`
-- Auth: `auth`
-- Data: `data-relational`, `data-nosql`, `data-cache`, `data-queue`
-- Components: `component-form`, `component-table`, `component-chart`
-
-**Injection location:** User message turn, immediately before the real user message. The `[Current session context]` block (phase, app, runtime, files generated) is appended to the real user message.
+**Detected domains:** `stack-node`, `stack-python`, `stack-dotnet`, `stack-java`, `stack-go`, `infra-docker`, `infra-aks`, `infra-cicd`, `auth`, `data-relational`, `data-nosql`, `data-cache`, `data-queue`, `component-form`, `component-table`, `component-chart`
 
 **Example:** User says "generate the Dockerfile for my Node app":
 - Detected domains: `infra-docker`, `stack-node`
 - Injected: `[Domain knowledge: Docker + Node.js]` as user message
 - Then real user message: `"generate the Dockerfile for my Node app\n\n[Current session context]\nPhase: generate\nRuntime: node\n..."`
 
-```typescript
-// converse.ts
-const { domainKnowledge, currentState } = resolveConversationSkills(
-  body.message,
-  currentPhase,
-  { phase: currentPhase, appDefinition: state.appDefinition, filesGenerated }
-);
-if (domainKnowledge) {
-  messages.push({ role: "user", content: domainKnowledge });
-}
-// Append currentState to last user message
-```
-
 **The keyword matching is hardcoded** in `resolveConversationSkills.ts`. There is no config file to add new domains — new domains require editing that file.
+
+---
+
+## Conflict Analysis: Do the Two Mechanisms Overlap?
+
+**They classify different things** — Mechanism A classifies *kit prompt strings*; Mechanism B classifies *user messages*. They do not directly interact.
+
+**But they share trigger vocabulary.** Mechanism A `GENERATE_KEYWORDS` includes `"dockerfile"`, `"manifest"`, `"pipeline"`. Mechanism B's `infra-docker` matches `/\bdocker(file)?\b/i` and `infra-aks` matches `/\bmanifest\b/i`. When a user says "generate a Dockerfile", both fire:
+- A adds the kit's generate-phase prompts to the system prompt.
+- B adds Docker + AKS domain knowledge as a user turn.
+
+This is intentional in the current design (different audiences — system prompt vs user turn context), but the keyword sets evolved independently. There is no shared vocabulary file. If someone adds a new kit whose prompts trigger on "manifest", it will activate in phases that now also receive Mechanism B's infra-aks domain block. The combined injection is not tested end-to-end.
+
+**The `resolveConversationSkills.ts` also has phase-conditional logic:**
+```typescript
+if (phase === "generate") {
+  matchedDomains.add("infra-aks");
+  matchedDomains.add("infra-docker");
+}
+```
+This hard-codes Generate phase as always receiving AKS + Docker knowledge — regardless of what the user message says. This duplicates what Mechanism A's `GENERATE_KEYWORDS` heuristic was already doing: ensuring the LLM has AKS/Docker context during Generate. There is genuine overlap here.
 
 ---
 
@@ -162,16 +151,11 @@ if (domainKnowledge) {
   (omitted if no kits matched)
 ```
 
-**Sources:**
-- `KICKSTART_SYSTEM_PROMPT` — `packages/core/src/prompts/system-prompt.ts`
-- Phase templates — `packages/core/src/engine/phases.ts`
-- `BASE_COMPONENT_CATALOG` — `packages/core/src/prompts/component-catalog.ts`
-
 ---
 
 ## Phase Templates
 
-Phase templates are minimal context injections. The behavioral instructions (K8s terminology rules, ONE concept per turn, etc.) are in the unified system prompt — NOT in each phase template.
+Phase templates are minimal context injections. Behavioral instructions live in the unified system prompt, NOT in each phase template.
 
 | Phase | Template variables injected |
 |-------|---------------------------|
@@ -182,7 +166,7 @@ Phase templates are minimal context injections. The behavioral instructions (K8s
 | Handoff | `{{appContext}}`, `{{repoInfo}}` |
 | Deploy | `{{appContext}}`, `{{deploymentConfig}}` |
 
-**Exit conditions in `phases.ts` are narrative strings** (e.g., `"user has approved the plan"`). They are human-readable guidance for the LLM — they are NOT checked by code.
+**Exit conditions in `phases.ts` are narrative strings.** They are human-readable guidance for the LLM — not checked by code.
 
 ---
 
@@ -194,10 +178,10 @@ Model routing is **trust-based**, not phase-based.
 // packages/web/api/src/lib/converse-model-router.ts
 export function resolveConverseModelRoute(phase, { trustedPhase }): ConverseModelRoute {
   if (trustedPhase && normalizeConversePhase(phase) === Phase.Generate) {
-    // High-quality generate model (AZURE_OPENAI_CODEX_DEPLOYMENT env var)
+    // AZURE_OPENAI_CODEX_DEPLOYMENT (e.g. gpt-5.4)
     return { deployment: getGenerateDeploymentName(), pricingGroup: "generate" };
   }
-  // Chat model for everything else (AZURE_OPENAI_CHAT_DEPLOYMENT env var)
+  // AZURE_OPENAI_CHAT_DEPLOYMENT (e.g. gpt-5.4-mini)
   return { deployment: getChatDeploymentName(), pricingGroup: "chat" };
 }
 ```
@@ -208,6 +192,27 @@ export function resolveConverseModelRoute(phase, { trustedPhase }): ConverseMode
 | Any other phase | Chat (GPT-5.4-mini) | `AZURE_OPENAI_CHAT_DEPLOYMENT` |
 | Client-rehydrated session (any phase) | Chat (GPT-5.4-mini) | `AZURE_OPENAI_CHAT_DEPLOYMENT` |
 
-**Security:** `session.routingPhaseTrusted` is set to `false` when a session is rehydrated from client-provided message history. The client cannot self-elevate to the generate-tier model by claiming to be in Generate phase.
+---
 
-> ⚠️ **Stale docs note:** The old `docs/prompt-architecture.md` described a future "Layer 1: Azure Skills" that was "not yet implemented". Both skill injection mechanisms are now implemented and live. The old `docs-site/docs/architecture/overview.md` cited GPT-4o/Codex — the current models are GPT-5.4 / GPT-5.4-mini.
+## Code Health Notes
+
+**`resolveSkillsAsync` and `resolveSkillsFromList` are exported but never called in production:**
+Both are exported from `@kickstart/core`, tested in `skill-resolver.test.ts`, but `converse.ts` only calls `resolveSkills()`. They add SDK surface area without a runtime caller.
+
+**Mechanism B has a hard-coded phase guard that duplicates Mechanism A's intent:**
+The generate-phase branch in `resolveConversationSkills.ts` unconditionally adds `infra-aks` and `infra-docker` domains regardless of user message content. This is the same coverage Mechanism A achieves by classifying kit prompts containing `"dockerfile"` or `"manifest"` into Generate phase. The overlap is functional but untested as a combined behavior.
+
+**Two independent keyword systems with no shared vocabulary:**
+Mechanism A uses plain string arrays (`GENERATE_KEYWORDS = ["generat", "dockerfile", ...]`); Mechanism B uses regex arrays per domain. They will drift independently as both files evolve.
+
+---
+
+## What Should Be Cleaned Up
+
+1. **Remove or internalize `resolveSkillsAsync` / `resolveSkillsFromList`** — they're not needed by the current runtime and shouldn't be part of the Agent SDK public API without a defined use case.
+
+2. **Resolve the generate-phase overlap between Mechanisms A and B** — either the unconditional generate-phase injection in Mechanism B should be removed (let Mechanism A cover it via kit prompts), or document explicitly that they're intentionally layered.
+
+3. **Extract a shared keyword/domain vocabulary** — a single `DOMAIN_VOCAB` module referenced by both mechanisms would prevent silent divergence and make it obvious when a new kit keyword should also have a Mechanism B domain block.
+
+4. **Decide on typed `Skill` vs legacy path** — `skill-resolver.ts` has two code paths and zero production kits on the new path. Before the Agent SDK integration, decide which is canonical and delete the other.

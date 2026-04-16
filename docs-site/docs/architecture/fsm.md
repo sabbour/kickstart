@@ -8,24 +8,20 @@ The FSM tracks which phase the conversation is in and enforces forward-only prog
 
 > **Source:** `packages/core/src/engine/machine.ts`, `packages/core/src/engine/phases.ts`, `packages/core/src/engine/types.ts`
 
----
-
 ## What the FSM Enforces
 
-- **Current phase** — `state.currentPhase` is always the authoritative phase.
+- **Current phase** — `state.currentPhase` is always authoritative.
 - **Forward-only transitions** — phases advance in order, never backward.
-- **Phase status** — each phase carries `pending | active | complete | skipped`.
-- **Completion** — `state.isComplete = true` after the last phase (Deploy) advances.
+- **Phase status** — `pending | active | complete | skipped` per phase.
+- **Completion** — `state.isComplete = true` after Deploy advances.
 
 ## What the FSM Does NOT Enforce
 
-- **Exit conditions** — `phases.ts` lists conditions like `"user has approved the plan"`. These are strings for LLM context only. **No code checks them.**
+- **Exit conditions** — `phases.ts` lists conditions like `"user has approved the plan"`. These are strings in the `PhaseDefinition` struct. **Zero code reads them.** The FSM advances when it receives an ADVANCE event regardless of whether exit conditions are met.
 - **Entry conditions** — same: narrative only.
-- **Phase content** — the FSM tracks state, not what was discussed.
+- **Phase content quality** — the FSM tracks state, not what was said.
 
 **The LLM decides WHEN to advance. The FSM decides WHAT is allowed (forward only).**
-
----
 
 ## The Six Phases
 
@@ -33,29 +29,20 @@ The FSM tracks which phase the conversation is in and enforces forward-only prog
 Discover → Design → Generate → Review → Handoff → Deploy
 ```
 
-| Phase ID | Label | LLM Goal |
-|----------|-------|----------|
+| Phase | Label | LLM Goal |
+|-------|-------|----------|
 | `discover` | Discover | Learn app name, runtime, description |
-| `design` | Design | Confirm service requirements, present architecture |
-| `generate` | Generate | Produce Dockerfile, K8s manifests, GitHub Actions workflow |
-| `review` | Review | Walk through generated files, show cost estimate |
+| `design` | Design | Confirm services, present architecture |
+| `generate` | Generate | Produce Dockerfile, manifests, CI/CD workflow |
+| `review` | Review | Walk through artifacts, show cost estimate |
 | `handoff` | Handoff | Create/select GitHub repo, push files, Codespace link |
 | `deploy` | Deploy | Trigger GitHub Actions, show deployment status and URL |
 
 Source: `PHASE_DEFINITIONS` in `packages/core/src/engine/phases.ts`.
 
----
+## Phase Transition Triggers
 
-## How Phase Transitions Trigger
-
-### Via LLM — `phaseComplete: true` in JSON response
-
-The LLM outputs a JSON envelope each turn:
-```json
-{ "message": "...", "a2ui": [...], "phaseComplete": true }
-```
-
-The converse handler calls `handleImplicitFlags()`:
+### Trigger 1 — LLM sets `phaseComplete: true`
 
 ```typescript
 // packages/core/src/engine/machine.ts
@@ -68,78 +55,64 @@ export function handleImplicitFlags(
   }
   return state;
 }
+
+export function canAdvance(state, _phaseData?): boolean {
+  // NOTE: does NOT check exit conditions
+  return state.phaseStatus[state.currentPhase] === "active" && !state.isComplete;
+}
 ```
 
-`canAdvance()` only checks that the current phase is `active` and the conversation is not complete. It does NOT check exit conditions.
+### Trigger 2 — UI Button event
 
-### Via UI Button — `event.name: "complete:navigate:{phase}"`
-
-A2UI Button components in the LLM's JSON response can carry:
-```json
-{ "type": "Button", "label": "Looks good →", "event": { "name": "complete:navigate:design" } }
-```
-When clicked, the client sends this event to the server, triggering an ADVANCE.
-
----
+A2UI Button with `event.name: "complete:navigate:{phase}"` → client sends event → server emits ADVANCE.
 
 ## State Machine Events
 
 ```typescript
 type ConversationEvent =
-  | { type: "START" }                     // Reset to Discover
-  | { type: "ADVANCE" }                   // Advance to next phase
-  | { type: "SKIP" }                      // Skip current phase, go to next
-  | { type: "PHASE_COMPLETE"; phase: Phase; data?: Record<string, unknown> }
-  | { type: "RESET" }                     // Full reset to Discover
-  | { type: "USER_INPUT"; input?: string } // No-op, state unchanged
+  | { type: "START" }                       // Reset to Discover
+  | { type: "ADVANCE" }                     // Advance to next phase  ← only path used in production
+  | { type: "SKIP" }                        // Skip, advance to next
+  | { type: "PHASE_COMPLETE"; phase: Phase; data?: Record<string, unknown> }  ← never emitted
+  | { type: "RESET" }                       // Full reset
+  | { type: "USER_INPUT"; input?: string }  // No-op
 ```
 
-`transition()` is a pure function — returns a new state, never mutates input.
+`transition()` is a pure function — returns new state, never mutates input.
 
----
+## `PhaseStatus` — Used or Dead?
 
-## Phase Status
+**Used.** `phaseStatus` is read in production:
 
-```typescript
-type PhaseStatus = "pending" | "active" | "complete" | "skipped";
-```
+- `converse.ts` lines 421/423 — checks `"active"` / `"complete"` for phase progress info
+- `action.ts` lines 152/154 — same check for action event routing
 
-Initial state: `discover = active`, all others = `pending`.
+`PhaseStatus` is live computed state. Only `exitConditions`, `entryConditions`, and `PHASE_COMPLETE` event handling are dead.
 
-After ADVANCE: current phase → `complete`, next phase → `active`.
+## Code Health Notes
 
-After SKIP: current phase → `skipped`, next phase → `active`.
+:::danger `exitConditions` and `entryConditions` are dead constraint logic
+Defined in `PhaseDefinition` interface (`types.ts` lines 47, 49), populated in every phase definition in `phases.ts`, **never read anywhere in the runtime** — not by `machine.ts`, not by `converse.ts`, not by `action.ts`. Anyone reading `types.ts` will assume these are enforced. They are not.
+:::
 
----
+:::warning `PHASE_COMPLETE` event is handled but never emitted
+`transition()` handles a `PHASE_COMPLETE` event that copies `event.data` into `phaseData`. No production code ever emits this event. The only advance path in use is `ADVANCE`. The `PHASE_COMPLETE` handler and all `phaseData` writes are dead code.
+:::
 
-## FSM in the Request Handler
+:::warning `phaseData` is written but never read
+`ConversationState.phaseData` accumulates data per phase via `PHASE_COMPLETE` events. Since `PHASE_COMPLETE` is never emitted, `phaseData` is always empty at runtime. It is never read in `converse.ts` or `action.ts`.
+:::
 
-```typescript
-// packages/web/api/src/functions/converse.ts (simplified)
-const currentPhase = getSafeCurrentPhase(session.engineState);
+:::note `_phaseData` parameter in `canAdvance()` is unused
+The parameter exists as a placeholder for future exit condition checking. The source comment says "In a real implementation, this would check exit conditions against the accumulated phase data." It does not do that.
+:::
 
-// ... build prompt, call OpenAI, parse response ...
+## What Should Be Cleaned Up
 
-// Advance phase if LLM said so
-session.engineState = handleImplicitFlags(session.engineState, { phaseComplete });
+1. **Remove `exitConditions` and `entryConditions` from `PhaseDefinition`** (or add an explicit code comment that they are narrative-only, not enforced). Typed interface fields that are never read mislead Agent SDK implementors.
 
-// Keep session.state in sync
-session.state.currentPhase = session.engineState.currentPhase;
-```
+2. **Remove `PHASE_COMPLETE` event handling** — or emit it from somewhere. Dead event handler in a state machine is a maintenance trap.
 
-The updated phase is returned to the client in the SSE "done" event so the UI can reflect phase progress.
+3. **Remove `phaseData` from `ConversationState`** — or start using it. If Agent SDK integration (issue #330) needs per-phase data accumulation, wire it up then. Right now it's allocated and populated by dead paths.
 
----
-
-## `canAdvance()` — What It Actually Checks
-
-```typescript
-export function canAdvance(state: ConversationState, _phaseData?: Record<string, unknown>): boolean {
-  // NOTE: source comment says "In a real implementation, this would check
-  // exit conditions against the accumulated phase data."
-  // It does not do that.
-  return state.phaseStatus[state.currentPhase] === "active" && !state.isComplete;
-}
-```
-
-Exit condition checking is **not implemented**. The code comment in `machine.ts` acknowledges this explicitly.
+4. **Remove `_phaseData` from `canAdvance()`** — or implement exit condition checking. The unused parameter with its aspirational comment is a distraction.

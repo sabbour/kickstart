@@ -28,49 +28,23 @@ kickstart/
 └── infra/             Bicep templates for Azure provisioning
 ```
 
-## System Components
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Browser (SPA)                                          │
-│  React + Vite + TypeScript                              │
-│  A2UI React Renderer + Fluent 2                         │
-└────────────────────┬────────────────────────────────────┘
-                     │ HTTPS (SSE + JSON)
-┌────────────────────▼────────────────────────────────────┐
-│  Azure Static Web App                                   │
-│  ├─ Static hosting (React build)                        │
-│  └─ Managed Functions (API)                             │
-│       ├─ /api/converse  → main LLM proxy               │
-│       ├─ /api/health    → health check                  │
-│       └─ /api/*-proxy   → ARM, GitHub, Pricing proxies │
-└────────────────────┬────────────────────────────────────┘
-                     │ HTTPS
-┌────────────────────▼────────────────────────────────────┐
-│  Azure OpenAI Service                                   │
-│  GPT-5.4-mini (chat) + GPT-5.4 (generate, trusted only)│
-└─────────────────────────────────────────────────────────┘
-```
-
 ## Request Flow
-
-What happens when a user sends a message:
 
 ```
 POST /api/converse { sessionId, message, messages? }
   1. Rate limit + content safety checks
   2. Session lookup or creation (rehydrate from client messages[] on cold start)
-  3. resolveSkills(phase, kits)         ← kit prompts for system prompt
+  3. resolveSkills(phase, kits)         ← kit prompts for system prompt (Mechanism A)
   4. resolveConverseModelRoute()        ← trust-based model selection
   5. buildSystemPrompt({ phase, kitPrompts, artifactSummary })
-  6. resolveConversationSkills(msg)     ← per-turn domain knowledge injection
+  6. resolveConversationSkills(msg)     ← per-turn domain injection (Mechanism B)
   7. Call Azure OpenAI
-  8. Parse JSON envelope → handleImplicitFlags() → may advance FSM phase
+  8. Parse JSON → handleImplicitFlags() → may advance FSM phase
   9. Extract FileEditor artifacts → session store
  10. Stream SSE events to client
 ```
 
-See [Prompt Pipeline](./prompt-pipeline.md) for the full assembly order.
+See [Prompt Pipeline](./prompt-pipeline.md) for the full assembly order with code references.
 
 ## Server-Side vs Client-Side State
 
@@ -83,23 +57,42 @@ See [Prompt Pipeline](./prompt-pipeline.md) for the full assembly order.
 | Virtual FS (file content for sidebar) | Server (memory) | 1 hour |
 | `routingPhaseTrusted` flag | Server session | Reset on rehydration |
 
-**Cold start:** Server session expires → client resends up to 50 messages for rehydration. All messages are content-safety checked. `routingPhaseTrusted` is reset to `false` — client cannot self-elevate to the generate-tier model.
+**Cold start:** Server session expires → client resends up to 50 messages for rehydration. All messages content-safety checked. `routingPhaseTrusted` reset to `false` — client cannot self-elevate to generate-tier model.
 
 ## AI Engine
 
 - **Azure OpenAI GPT-5.4-mini** for all conversation phases (`AZURE_OPENAI_CHAT_DEPLOYMENT`)
 - **Azure OpenAI GPT-5.4** for Generate phase when server-trusted (`AZURE_OPENAI_CODEX_DEPLOYMENT`)
-- Model selection is trust-based, not phase-based — see [Prompt Pipeline](./prompt-pipeline.md#model-routing)
+- Model selection is trust-based, not phase-based — see [Prompt Pipeline: Model Routing](./prompt-pipeline.md#model-routing)
 - Two skill injection mechanisms run every turn — see [Skill Injection](./skill-injection.md)
 - 6-phase FSM tracks conversation progress — see [FSM](./fsm.md)
 
 ## A2UI Component Catalog
 
-28+ components split across two concepts:
+Two FileEditor concepts, both backed by `services/virtual-fs.ts`:
 
-- **A2UI FileEditor** (`catalog/components/FileEditor.tsx`) — ephemeral, per-turn. LLM controls content. Shows one file in chat.
-- **Sidebar FileEditor** (`components/FileEditor/`) — persistent panel with FileTree + Monaco editor. Shows ALL generated files across the session.
+- **A2UI FileEditor** (`catalog/components/FileEditor.tsx`) — ephemeral, per-turn in-chat component. LLM controls content.
+- **Sidebar FileEditor** (`components/FileEditor/`) — persistent panel with FileTree + Monaco. Shows all generated files across the session.
 
-Both are backed by `services/virtual-fs.ts` (in-memory, 1-hour TTL).
+Base catalog: `packages/core/src/prompts/component-catalog.ts`. Kit-contributed components merged at `buildSystemPrompt()` time.
 
-The base catalog is defined in `packages/core/src/prompts/component-catalog.ts`. Kit-contributed components are merged at `buildSystemPrompt()` time.
+## Code Health Notes
+
+:::warning Exported but uncalled APIs
+`resolveSkillsAsync()` and `resolveSkillsFromList()` are exported from `@kickstart/core` and tested, but never called in any production handler. Only `resolveSkills()` is used. These inflate the public API surface without runtime callers.
+:::
+
+:::warning Typed Skill path is dormant
+`skill-resolver.ts` has two resolution paths: a typed `kit.skills[]` (Skill objects) and a legacy `kit.prompts[]`/`kit.phasePrompts[]` path. Neither production kit (`azure-kit.ts`, `github-kit.ts`) uses the typed path. The typed path is exercised only in tests.
+:::
+
+:::note Two keyword systems with no shared vocabulary
+Mechanism A (kit prompt classification) and Mechanism B (user message classification) both key on words like `"dockerfile"`, `"manifest"`, `"pipeline"` — but in separate files with separate formats. They will drift independently.
+:::
+
+## What Should Be Cleaned Up
+
+1. **`resolveSkillsAsync` / `resolveSkillsFromList`** — remove or mark `@internal` before Agent SDK integration.
+2. **Typed `Skill` path in `skill-resolver.ts`** — consolidate to one path; both existing kits use legacy.
+3. **Keyword vocabulary** — extract a shared constants module referenced by both mechanisms.
+4. **`exitConditions`/`entryConditions` in `phases.ts`** — move out of the runtime interface or wire them up.
