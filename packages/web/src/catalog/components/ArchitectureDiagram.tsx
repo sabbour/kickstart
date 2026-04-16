@@ -9,16 +9,17 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
-import { getDiagramIconRegistry } from '@sabbour/adaptive-ui-core';
-import { registerAzureDiagramIcons } from '@sabbour/adaptive-ui-azure-pack/diagram-icons';
-import buildingCloudIcon from '@sabbour/adaptive-ui-core/icons/fluent/building-cloud.svg?url';
-import designIdeasIcon from '@sabbour/adaptive-ui-core/icons/fluent/design-ideas.svg?url';
 import {
   DiagramEdge,
   DiagramNode,
   nodesToMermaid,
   renderArchitectureDiagramSvg,
 } from './architectureDiagramUtils';
+import {
+  ARCHITECTURE_DIAGRAM_EMPTY_STATE_ICON_URL,
+  ARCHITECTURE_DIAGRAM_HEADER_ICON_URL,
+  getArchitectureDiagramIconRegistry,
+} from './architectureDiagramIconRegistry';
 
 const AZURE = {
   themePrimary: '#0078d4',
@@ -218,15 +219,7 @@ type MermaidModule = typeof import('mermaid');
 type MermaidApi = MermaidModule['default'];
 
 let mermaidPromise: Promise<MermaidApi> | null = null;
-let iconsRegistered = false;
 let diagramCounter = 0;
-
-function ensureDiagramIconsRegistered() {
-  if (!iconsRegistered) {
-    registerAzureDiagramIcons();
-    iconsRegistered = true;
-  }
-}
 
 function loadMermaid(): Promise<MermaidApi> {
   if (!mermaidPromise) {
@@ -357,8 +350,7 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
   const headerTitle = props.title || 'Solution Architecture';
 
   const resolveIconUrl = useCallback((key: string) => {
-    ensureDiagramIconsRegistered();
-    return getDiagramIconRegistry().get(key) ?? null;
+    return getArchitectureDiagramIconRegistry().get(key.toLowerCase()) ?? null;
   }, []);
 
   const fitAndCenter = useCallback(() => {
@@ -489,7 +481,7 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
       <div className={classes.header}>
         <div className={classes.titleGroup}>
           <div className={classes.titleRow}>
-            <img src={buildingCloudIcon} alt="" className={classes.headerIcon} />
+            <img src={ARCHITECTURE_DIAGRAM_HEADER_ICON_URL} alt="" className={classes.headerIcon} />
             <div className={classes.title}>{headerTitle}</div>
           </div>
           {props.description && <Body2 className={classes.description}>{props.description}</Body2>}
@@ -546,7 +538,7 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
           </div>
         ) : (
           <div className={classes.emptyState}>
-            <img src={designIdeasIcon} alt="" className={classes.emptyStateIcon} />
+            <img src={ARCHITECTURE_DIAGRAM_EMPTY_STATE_ICON_URL} alt="" className={classes.emptyStateIcon} />
             <Body2>Architecture diagram will appear here as you design your solution.</Body2>
           </div>
         )}
