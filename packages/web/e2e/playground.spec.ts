@@ -3,7 +3,11 @@ import { test, expect } from './helpers';
 
 const PLAYGROUND_URL = '/?playground';
 
-async function openScenario(page: Page, label: string) {
+async function openScenario(page: Page, label: string, tab: 'gallery' | 'components' = 'gallery') {
+  if (tab === 'components') {
+    await page.getByRole('tab', { name: 'Components' }).click();
+    await expect(page.getByRole('tab', { name: 'Components' })).toHaveAttribute('aria-selected', 'true');
+  }
   const searchBox = page.getByPlaceholder('Filter scenarios...');
   await searchBox.fill(label);
   const card = page.getByRole('button', { name: label }).first();
@@ -139,7 +143,7 @@ test.describe('Playground', () => {
 
   test.describe('Fat component slices', () => {
     test('Azure AuthCard signs in with the playground stub flow', async ({ page }) => {
-      await openScenario(page, 'Azure AuthCard');
+      await openScenario(page, 'Azure AuthCard', 'components');
 
       const dialog = page.getByRole('dialog');
       await dialog.getByRole('button', { name: 'Sign in to Azure' }).click();
@@ -149,7 +153,7 @@ test.describe('Playground', () => {
     });
 
     test('GitHub AuthCard signs in with the playground stub flow', async ({ page }) => {
-      await openScenario(page, 'GitHub AuthCard');
+      await openScenario(page, 'GitHub AuthCard', 'components');
 
       const dialog = page.getByRole('dialog');
       await dialog.getByRole('button', { name: 'Sign in to GitHub' }).click();
@@ -159,7 +163,7 @@ test.describe('Playground', () => {
     });
 
     test('fat slice scenario renders stub Azure and GitHub data', async ({ page }) => {
-      await openScenario(page, 'Fat slice: Azure + GitHub');
+      await openScenario(page, 'Fat slice: Azure + GitHub', 'components');
 
       const dialog = page.getByRole('dialog');
       await expect(dialog.getByText('kickstart-aks')).toBeVisible({ timeout: 5_000 });
