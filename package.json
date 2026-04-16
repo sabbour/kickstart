@@ -8,6 +8,9 @@
     "packages/*",
     "packages/web/api"
   ],
+  "squad": {
+    "worktrees": true
+  },
   "scripts": {
     "build": "npm run clean --workspaces --if-present && npm run build --workspaces --if-present",
     "test": "npx vitest run",
