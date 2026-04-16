@@ -357,7 +357,7 @@ const customArchitectureDiagram = (): A2uiMsg[] => {
       title: 'AKS Application Architecture',
       description: 'ELK-rendered AKS Automatic diagram with grouped Azure and Kubernetes resources',
       diagram: `graph LR
-  Client([Client]) --> GW[Gateway API<br/>approuting-istio]
+  Client([Client]) --> GW[%%icon:k8s/gateway%%Gateway API<br/>approuting-istio]
 
   subgraph cicd[GitHub Actions]
     GHA[GitHub Actions<br/>build + push]
@@ -373,7 +373,7 @@ const customArchitectureDiagram = (): A2uiMsg[] => {
 
   subgraph aks[%%icon:azure/aks%%AKS Automatic]
     subgraph ns[%%icon:k8s/ns%%namespace: microservice-app]
-      Route[HTTPRoute<br/>/ → api]
+      Route[%%icon:k8s/httproute%%HTTPRoute<br/>/ → api]
       SVC[%%icon:k8s/svc%%Service<br/>api]
       DEP[%%icon:k8s/deploy%%Deployment<br/>API + Worker<br/>2-10 replicas]
       SA[%%icon:k8s/sa%%ServiceAccount<br/>workload identity]
@@ -1054,7 +1054,7 @@ const phaseDesignScenario = (): A2uiMsg[] => {
       title: 'Proposed Architecture',
       description: 'Full-stack application grouped by AKS namespace and Azure dependencies',
       diagram: `graph LR
-  Client([Browser]) --> GW[Gateway API<br/>approuting-istio]
+  Client([Browser]) --> GW[%%icon:k8s/gateway%%Gateway API<br/>approuting-istio]
 
   subgraph cicd[GitHub Actions]
     GHA[GitHub Actions<br/>build + push]
@@ -1071,7 +1071,7 @@ const phaseDesignScenario = (): A2uiMsg[] => {
 
   subgraph aks[%%icon:azure/aks%%AKS Automatic]
     subgraph ns[%%icon:k8s/ns%%namespace: full-stack-app]
-      Route[HTTPRoute<br/>/ → web]
+      Route[%%icon:k8s/httproute%%HTTPRoute<br/>/ → web]
       SVC[%%icon:k8s/svc%%Service<br/>web]
       DEP[%%icon:k8s/deploy%%Deployment<br/>React + Node API<br/>2-10 replicas]
       SA[%%icon:k8s/sa%%ServiceAccount<br/>workload identity]
