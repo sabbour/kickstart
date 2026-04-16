@@ -697,38 +697,6 @@ const dynamicConditionalContent = (): A2uiMsg[] => {
   ];
 };
 
-const dynamicComplexDashboard = (): A2uiMsg[] => {
-  const sid = uid('dynamic-dashboard');
-  return [
-    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/name', value: 'production-cluster' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/status', value: 'Healthy' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/replicas', value: 5 } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/region', value: 'eastus2' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/tier', value: 'Standard_D4s_v3' } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
-      { id: 'root', component: 'Column', children: ['heading', 'dashboard-card'], gap: 'medium' },
-      { id: 'heading', component: 'Text', text: 'Deployment Dashboard', variant: 'h3' },
-      { id: 'dashboard-card', component: 'Card', children: ['tabs'], title: { path: '/deployment/name' } },
-      { id: 'tabs', component: 'Tabs', children: ['tab-overview', 'tab-config', 'tab-logs'] },
-      { id: 'tab-overview', component: 'Card', children: ['overview-col'], title: 'Overview' },
-      { id: 'overview-col', component: 'Column', children: ['status-text', 'replicas-text'], gap: 'medium' },
-      { id: 'status-text', component: 'Text', text: { path: '/deployment/status' }, variant: 'h4' },
-      { id: 'replicas-text', component: 'Text', text: { path: '/deployment/replicas' }, variant: 'body1' },
-      { id: 'tab-config', component: 'Card', children: ['config-col'], title: 'Configuration' },
-      { id: 'config-col', component: 'Column', children: ['region-field', 'tier-field', 'replica-slider'], gap: 'medium' },
-      { id: 'region-field', component: 'TextField', label: 'Region', value: { path: '/deployment/region' } },
-      { id: 'tier-field', component: 'TextField', label: 'VM Tier', value: { path: '/deployment/tier' } },
-      { id: 'replica-slider', component: 'Slider', label: 'Replicas', min: 1, max: 10, value: { path: '/deployment/replicas' } },
-      { id: 'tab-logs', component: 'Card', children: ['logs-code'], title: 'Logs' },
-      { id: 'logs-code', component: 'CodeBlock', code: `[2025-07-28 14:23:45] Deployment started
-[2025-07-28 14:24:12] Scaling to 5 replicas
-[2025-07-28 14:25:01] Health check passed
-[2025-07-28 14:25:30] Deployment complete`, language: 'text', filename: 'deployment.log' },
-    ] } } as A2uiMsg,
-  ];
-};
-
 // ---------------------------------------------------------------------------
 // File Operations Scenarios — FileEditor component demos
 // ---------------------------------------------------------------------------
@@ -1366,54 +1334,6 @@ const kitMultiProvider = (): A2uiMsg[] => {
   ] as A2uiComponent[]);
 };
 
-const fatAzureGitHubSlice = (): A2uiMsg[] => {
-  const sid = uid('fat-slice-azure-github');
-  return surface(sid, [
-    {
-      id: 'root',
-      component: 'Column',
-      children: ['heading', 'desc', 'auth-row', 'azure-picker-card', 'github-picker-card', 'note'],
-      gap: 'medium',
-    },
-    { id: 'heading', component: 'Text', text: 'Fat slice: Azure + GitHub', variant: 'h3' },
-    {
-      id: 'desc',
-      component: 'Text',
-      text: 'This is the first real Playground smoke slice for fat components. Sign-in is simulated in Playground mode and the pickers use built-in stub data so you can validate the UX without live credentials.',
-      variant: 'body2',
-    },
-    { id: 'auth-row', component: 'Row', children: ['azure-login', 'github-login'], gap: 'medium' },
-    { id: 'azure-login', component: 'AzureLoginCard' },
-    { id: 'github-login', component: 'GitHubLoginCard' },
-    { id: 'azure-picker-card', component: 'Card', child: 'azure-picker-col' },
-    { id: 'azure-picker-col', component: 'Column', children: ['azure-picker-title', 'azure-picker-copy', 'azure-picker'], gap: 'small' },
-    { id: 'azure-picker-title', component: 'Text', text: 'Azure resource selection', variant: 'subtitle1' },
-    {
-      id: 'azure-picker-copy',
-      component: 'Text',
-      text: 'The picker loads stub subscriptions, resource groups, and resources so the cascading flow is easy to test inside Playground.',
-      variant: 'caption',
-    },
-    { id: 'azure-picker', component: 'AzureResourcePicker', label: 'Pick an Azure cluster', resourceType: 'Microsoft.ContainerService/managedClusters' },
-    { id: 'github-picker-card', component: 'Card', child: 'github-picker-col' },
-    { id: 'github-picker-col', component: 'Column', children: ['github-picker-title', 'github-picker-copy', 'github-picker'], gap: 'small' },
-    { id: 'github-picker-title', component: 'Text', text: 'GitHub repository selection', variant: 'subtitle1' },
-    {
-      id: 'github-picker-copy',
-      component: 'Text',
-      text: 'The picker loads stub repositories so search and selection work even when no GitHub auth is configured.',
-      variant: 'caption',
-    },
-    { id: 'github-picker', component: 'GitHubRepoPicker', placeholder: 'Search repositories...' },
-    {
-      id: 'note',
-      component: 'Text',
-      text: 'Use the Playground at /?playground and open this card for the quickest end-to-end fat-component check.',
-      variant: 'caption',
-    },
-  ] as A2uiComponent[]);
-};
-
 // ---------------------------------------------------------------------------
 // Missing Layout scenarios
 // ---------------------------------------------------------------------------
@@ -1725,19 +1645,17 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   // Dynamic Patterns
   { id: 'dyn-nested',    label: 'Nested Data Scopes',     description: 'Components with nested path bindings',       group: 'Dynamic Patterns', generate: dynamicNestedScopes },
   { id: 'dyn-conditional', label: 'Conditional Content',  description: 'Feature flags with data binding',            group: 'Dynamic Patterns', generate: dynamicConditionalContent },
-  { id: 'dyn-dashboard', label: 'Complex Dashboard',      description: 'Multi-tab dashboard with data binding',      group: 'Dynamic Patterns', generate: dynamicComplexDashboard },
   // Integration Kits
-  { id: 'fat-slice-azure-github', label: 'Fat slice: Azure + GitHub', description: 'Offline smoke test for login cards + pickers', group: 'Integration Kits', catalog: 'kickstart', generate: fatAzureGitHubSlice },
   { id: 'kit-azure-auth',    label: 'Azure AuthCard',         description: 'Azure MSAL sign-in via kit registration',  group: 'Integration Kits', catalog: 'kickstart', generate: kitAzureAuth },
   { id: 'kit-github-auth',   label: 'GitHub AuthCard',        description: 'GitHub OAuth sign-in via kit registration', group: 'Integration Kits', catalog: 'kickstart', generate: kitGitHubAuth },
   { id: 'kit-multi-provider', label: 'Multi-Provider Sign-In', description: 'Azure + GitHub AuthCards side by side',    group: 'Integration Kits', catalog: 'kickstart', generate: kitMultiProvider },
-  // File Operations
-  { id: 'file-single',       label: 'Single File',            description: 'FileEditor with syntax-highlighted YAML',       group: 'File Operations', catalog: 'kickstart', generate: fileEditorSingleFile },
-  { id: 'file-multi',        label: 'Multi-File Tabs',        description: 'Tabbed FileEditor with TS + Dockerfile',        group: 'File Operations', catalog: 'kickstart', generate: fileEditorMultiFile },
+  // File Operations (workflow patterns — single/multi extraced to Custom Controls)
   { id: 'file-create',       label: 'Create Workflow',        description: 'File generation with progress tracker',         group: 'File Operations', catalog: 'kickstart', generate: fileEditorCreateFlow },
   { id: 'file-edit-delete',  label: 'Edit & Delete',          description: 'Before/after file edit with dual surfaces',     group: 'File Operations', catalog: 'kickstart', generate: fileEditorEditDeleteFlow },
-  // Cost Estimate
-  { id: 'cost-estimate',     label: 'CostEstimate',           description: 'Azure pricing breakdown with SKU options',      group: 'Cost Estimate',   catalog: 'kickstart', generate: costEstimateScenario },
+  // Custom Controls — FileEditor and CostEstimate promoted from Ideas
+  { id: 'file-single',       label: 'FileEditor (single)',    description: 'FileEditor with syntax-highlighted YAML',       group: 'Custom Controls', catalog: 'kickstart', generate: fileEditorSingleFile },
+  { id: 'file-multi',        label: 'FileEditor (multi-tab)', description: 'Tabbed FileEditor with TS + Dockerfile',        group: 'Custom Controls', catalog: 'kickstart', generate: fileEditorMultiFile },
+  { id: 'cost-estimate',     label: 'CostEstimate',           description: 'Azure pricing breakdown with SKU options',      group: 'Custom Controls', catalog: 'kickstart', generate: costEstimateScenario },
   // Multi-Phase Demo
   { id: 'phase-discover',    label: 'Discover Phase',         description: 'Questionnaire for application requirements',    group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDiscoverScenario },
   { id: 'phase-design',      label: 'Design Phase',           description: 'Architecture diagram + service breakdown',      group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDesignScenario },
@@ -1761,7 +1679,6 @@ export const SCENARIO_GROUPS = [
   'Kickstart Scenarios',
   'Multi-Phase Demo',
   'File Operations',
-  'Cost Estimate',
   'Layout',
   'Content',
   'Inputs',
