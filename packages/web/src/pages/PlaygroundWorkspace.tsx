@@ -356,6 +356,7 @@ export function PlaygroundWorkspace() {
   const styles = useStyles();
 
   const [selectedPath, setSelectedPath] = useState<string | undefined>(SAMPLE_FILES[0]?.path);
+  const [showSidebar, setShowSidebar] = useState(true);
   const [repoInput, setRepoInput] = useState('');
   const [appliedRepo, setAppliedRepo] = useState('');
 
@@ -366,6 +367,11 @@ export function PlaygroundWorkspace() {
       {/* Header bar */}
       <div className={styles.header}>
         <Text className={styles.headerTitle} size={400}>Workspace</Text>
+        {!showSidebar && (
+          <Button size="small" onClick={() => setShowSidebar(true)}>
+            Show files
+          </Button>
+        )}
         <div className={styles.repoField}>
           <Label htmlFor="ws-repo-input" size="small">GitHub repository (optional)</Label>
           <Input
@@ -389,14 +395,16 @@ export function PlaygroundWorkspace() {
 
       {/* Sidebar + Viewer */}
       <div className={styles.body}>
-        <FileManagerSidebar
-          streamingFiles={streamingFiles}
-          persistedFiles={[]}
-          selectedPath={selectedPath}
-          onSelectFile={setSelectedPath}
-          onDismiss={() => {}}
-          githubRepoUrl={appliedRepo || undefined}
-        />
+        {showSidebar && (
+          <FileManagerSidebar
+            streamingFiles={streamingFiles}
+            persistedFiles={[]}
+            selectedPath={selectedPath}
+            onSelectFile={setSelectedPath}
+            onDismiss={() => setShowSidebar(false)}
+            githubRepoUrl={appliedRepo || undefined}
+          />
+        )}
         <div className={styles.viewerWrapper}>
           <FileViewer
             filePath={selectedPath}
