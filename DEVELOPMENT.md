@@ -62,12 +62,31 @@ The API needs Azure OpenAI credentials to power the conversation engine. Edit `p
     "AZURE_OPENAI_CODEX_DEPLOYMENT": "gpt-5.4",
     "AZURE_CLIENT_ID": "e71a23c6-aeb4-459a-88fc-07ff96fc9b92",
     "AZURE_TENANT_ID": "d91aa5af-8c1e-442c-b77c-0b92988b387b",
-    "AZURE_CLIENT_SECRET": "<your-client-secret>"
+    "AZURE_CLIENT_SECRET": "<your-client-secret>",
+    "STEPWISE_GENERATION_V1": "true"
   }
 }
 ```
 
 > **Note:** `local.settings.json` is gitignored — it will never be committed. Each developer needs their own copy.
+
+### Stepwise Generation Feature Flag
+
+The `STEPWISE_GENERATION_V1` environment variable enables **codex-backed stepwise setup generation** — a feature that streams multi-step file generation during the Generate phase using Azure OpenAI's Responses API.
+
+**Default behavior:**
+- **Production (SWA):** `true` (enabled by default via Bicep parameter `enableStepwiseGeneration`)
+- **Local dev:** Set to `"true"` in `local.settings.json` to enable
+- **Feature activation:** Only activates on the Generate phase when:
+  - Session is server-owned (`routingPhaseTrusted = true`), OR
+  - Client-supplied setup-generation snapshot is validated (`setupGenerationTrusted = true`)
+
+**When enabled:**
+- `/api/converse` detects the Generate phase and activates stepwise SSE streaming
+- Generated files are streamed in real-time, workspace snapshots are created per turn
+- Users see progress as files are generated, not just the final result
+
+**To disable locally:** Set `"STEPWISE_GENERATION_V1": "false"` in `local.settings.json` to fall back to standard chat completions.
 
 ## Running Just the Frontend
 
