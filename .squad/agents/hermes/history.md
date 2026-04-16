@@ -25,7 +25,12 @@ QA engineer and test infrastructure owner. Expertise in Playwright E2E testing, 
 
 ## Learnings
 - 2026-04-15: For stepwise live artifact streaming reviews, I only clear the QA gate when validation is batch-atomic per step, mandatory-step failures pause instead of auto-skipping, and resume state persists explicit per-step outcomes (#326 Rev 4).
+- 2026-04-16: When feature code (allowlist additions) is developed in parallel by another agent, write TDD-red tests that define the exact contract — 4 tests for `k8s/gateway`, `k8s/httproute`, `k8s/pdb`, `k8s/vpa` fail until Fry adds the keys to `ALLOWED_ICON_KEYS`. Also added 14 green tests covering path-traversal safety, case sensitivity, structural validation, a11y (alt=""), null-resolver handling, and consecutive/mixed-case placeholders.
 
 ---
 
 **2026-04-15T22:40:15Z — Scribe**: Issue #326 Revision 4 approved. QA gate post on #326#issuecomment-4256166025 logged. Ready for closure.
+
+---
+
+**2026-04-16T06:52:50Z — Scribe**: K8s icons test session complete. Expanded `architectureDiagramUtils.test.ts` from 3 to 18 tests covering new k8s icon keys, path-traversal rejection, case sensitivity, structural validation, a11y, and null-resolver handling. Decision `hermes-k8s-icons.md` merged to decisions.md.
