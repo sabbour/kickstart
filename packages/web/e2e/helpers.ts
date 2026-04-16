@@ -32,6 +32,10 @@ export const test = base.extend<{ mockAuth: void }>({
       route.fulfill({ status: 503, contentType: 'text/plain', body: 'No backend' }),
     );
 
+    // Block auth redirects — prevents navigating away from the app when the
+    // playground auth stub is not active (e.g. in non-playground test routes).
+    await page.route('**/.auth/**', route => route.abort());
+
     await use();
   }, { auto: true }],
 });
