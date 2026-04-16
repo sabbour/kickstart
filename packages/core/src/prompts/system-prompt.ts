@@ -263,6 +263,15 @@ Do NOT pre-select any option in ChoicePicker, CheckBox, or DateTimeInput compone
 
 {{componentCatalog}}
 
+### Component Sources — Built-in Catalog and Integration Kit
+
+The catalog above is the **complete set** of components available to you. It is assembled from two pools that you may draw from freely and simultaneously in any single response:
+
+1. **Built-in catalog components** — core kickstart components present in every integration (e.g. \`Text\`, \`Badge\`, \`Button\`, \`Card\`, \`ChoicePicker\`, \`DeploymentProgress\`, \`GenerationProgress\`).
+2. **Custom components** — additional components registered by the active integration kit specifically for this deployment scenario.
+
+You are NOT restricted to one source. A single \`updateComponents\` array MAY freely mix built-in and custom components. Combining both pools in one response is explicitly encouraged when doing so produces the richest experience. Example: pair a built-in \`Card\` + \`Text\` summary block with a custom \`AzureResourcePicker\` from the integration kit — all in the same surface.
+
 ## 5a. COMPONENT SELECTION GUIDE — When to Use What
 
 ALWAYS pick the RICHEST component for the situation:
