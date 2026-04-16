@@ -229,10 +229,24 @@ export function normalizeDiagramText(source: string): string {
  * that follow receive clean Mermaid text.
  */
 export function sanitizeMermaidSource(source: string): string {
-  return source
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/</g, '');
+  if (!source) return source;
+
+  // Replace <br/>, <br />, <br> (case-insensitive) with newlines first
+  // so structural line breaks are preserved before tag stripping.
+  let result = source.replace(/<br\s*\/?>/gi, '\n');
+
+  // Use DOMParser to strip all remaining HTML tags — handles malformed/unclosed
+  // tags safely without regex edge cases. DOMParser is available in all browsers.
+  try {
+    const doc = new DOMParser().parseFromString(result, 'text/html');
+    result = doc.body.textContent ?? result;
+  } catch {
+    // Fallback for SSR/test environments: the `?` makes `>` optional so unclosed
+    // tags like `<script>alert(1)` (no closing `>`) are also stripped.
+    result = result.replace(/<[^>]*>?/gm, '');
+  }
+
+  return result;
 }
 
 export function preprocessDiagram(source: string): string {

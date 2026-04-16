@@ -364,6 +364,13 @@ describe('architectureDiagramUtils', () => {
       expect(sanitizeMermaidSource('A<BR/>B')).toBe('A\nB');
       expect(sanitizeMermaidSource('A<Br>B')).toBe('A\nB');
     });
+
+    it('strips unclosed tags like <script>alert(1) with no closing >', () => {
+      const result = sanitizeMermaidSource('text<script>alert(1)more');
+      expect(result).not.toContain('<script>');
+      expect(result).not.toContain('<script');
+      expect(result).toContain('text');
+    });
   });
 
   // ---------------------------------------------------------------
