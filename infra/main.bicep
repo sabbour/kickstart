@@ -49,6 +49,9 @@ param openAiApiKey string = ''
 @description('Entra ID client secret. When provided, stored in Key Vault and referenced by SWA.')
 param entraClientSecret string = ''
 
+@description('Enable stepwise-generation feature flag for codex-backed setup generation (STEPWISE_GENERATION_V1). Default: true (enabled in production).')
+param enableStepwiseGeneration bool = true
+
 // ── Key Vault ───────────────────────────────────────────────────
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
@@ -133,6 +136,7 @@ var baseAppSettings = {
   AZURE_OPENAI_CHAT_DEPLOYMENT: openAiChatDeployment
   AZURE_OPENAI_CODEX_DEPLOYMENT: openAiCodexDeployment
   AZURE_OPENAI_INSPIRE_DEPLOYMENT: openAiInspireDeployment
+  STEPWISE_GENERATION_V1: enableStepwiseGeneration ? 'true' : 'false'
 }
 
 var clientSecretSetting = !empty(entraClientSecret)
