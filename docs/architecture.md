@@ -74,8 +74,10 @@ What happens when a user sends a message:
 
 ## Key Components
 
-### `packages/core/src/engine/machine.ts` — Conversation FSM
+### `packages/core/src/engine/machine.ts` — Conversation FSM ⚠️ SCHEDULED FOR DELETION
 Pure function state machine. Tracks current phase and phase statuses. Enforces forward-only transitions. Does NOT enforce exit conditions — those are narrative strings in `phases.ts` for LLM guidance only.
+
+**This file and `phases.ts` are confirmed for deletion** (architectural decision recorded in `.squad/decisions.md`). Replacement: `session.state.currentPhase` as a plain `string` set directly by the LLM. Phase sequencing moves from TypeScript structs into numbered `═══ N. SECTION ═══` blocks in `system-prompt.ts`. See `docs/fsm.md` for the migration plan.
 
 ### `packages/core/src/engine/skill-resolver.ts` — Kit Skill Resolver (Mechanism A)
 3-stage middleware: phase filter → keyword activation → priority sort. Injects kit-provided domain knowledge as `## Available Capabilities` into the system prompt via `buildSystemPrompt()`. Called every turn.
@@ -102,7 +104,7 @@ In-memory file store, 1-hour TTL. Backs both the A2UI FileEditor (in-chat) and t
 | What | Where | Lifetime |
 |------|-------|----------|
 | Conversation messages (text only) | Server session store (memory) | 1 hour |
-| FSM phase state | Server session store (memory) | 1 hour |
+| FSM phase state | Server session store (memory) | 1 hour | **Being replaced by plain `session.state.currentPhase` string** |
 | Generated artifact metadata | Server session store (memory) | 1 hour |
 | Full file content (generated files) | Client A2UI message history | Browser session |
 | Virtual FS (file content for sidebar) | Server virtual-fs (memory) | 1 hour |
@@ -150,7 +152,12 @@ Garbage collection
 - When a user says "generate a Dockerfile", both fire. They inject different *content* (A: kit prompts into system prompt; B: Docker knowledge as user turn) but from overlapping trigger logic. This works correctly today but creates maintenance risk — changes to keyword sets in one mechanism are invisible to the other.
 
 **`exitConditions`/`entryConditions` in `phases.ts` are load-bearing strings in zero places:**
-- Defined in `PhaseDefinition` interface, populated in every phase, never read by `machine.ts` or any handler. They exist only as documentation embedded in code. Should either be enforced or moved to comments/docs.
+- Defined in `PhaseDefinition` interface, populated in every phase, never read by `machine.ts` or any handler. They exist only as documentation embedded in code.
+- **Moot on FSM removal** — `phases.ts` is being deleted. This dead code goes away automatically.
+
+**`machine.ts` and `phases.ts` are scheduled for deletion:**
+- The FSM adds transition enforcement that the LLM already handles narratively. Removing it simplifies the architecture significantly.
+- See `docs/fsm.md` for the full migration plan and what replaces each deleted artifact.
 
 ---
 
@@ -158,7 +165,9 @@ Garbage collection
 
 Prioritized by impact before the Agent SDK integration (issue #330):
 
-1. **`resolveSkillsAsync` and `resolveSkillsFromList`** — remove from public exports or clearly mark `@internal`. They add surface area to the SDK without being used.
+1. **Delete `machine.ts` and `phases.ts`** — confirmed architectural decision. Replace with `session.state.currentPhase` string + numbered prompt blocks in `system-prompt.ts`. See `docs/fsm.md` for the migration checklist.
+
+2. **`resolveSkillsAsync` and `resolveSkillsFromList`** — remove from public exports or clearly mark `@internal`. They add surface area to the SDK without being used.
 
 2. **Typed `Skill` path in `skill-resolver.ts`** — either have at least one kit use it (making it the canonical API), or consolidate to the legacy path and remove `collectSkills()` and the typed path. The dual-path resolver is confusing to anyone building Agent SDK adapters.
 

@@ -216,3 +216,42 @@ Mechanism A uses plain string arrays (`GENERATE_KEYWORDS = ["generat", "dockerfi
 3. **Extract a shared keyword/domain vocabulary** — a single `DOMAIN_VOCAB` module referenced by both mechanisms would prevent silent divergence and make it obvious when a new kit keyword should also have a Mechanism B domain block.
 
 4. **Decide on typed `Skill` vs legacy path** — `skill-resolver.ts` has two code paths and zero production kits on the new path. Before the Agent SDK integration, decide which is canonical and delete the other.
+
+---
+
+## Impact of FSM Removal on the Prompt Pipeline
+
+`machine.ts` and `phases.ts` are scheduled for deletion. Here is exactly what changes and what does not.
+
+### What Changes
+
+**`buildSystemPrompt()` — phase template selection is removed:**
+
+Before FSM removal, `buildSystemPrompt()` accepted a `phase` parameter and selected one of several phase-specific prompt templates defined in `phases.ts`. After FSM removal, the full phase sequence lives in the prompt itself as numbered `═══ N. SECTION ═══` blocks. No template selection is needed — the LLM reads the numbered blocks and knows where it is:
+
+```
+═══ 1. BEFORE YOU START ═══
+...
+═══ 2. GATHER REQUIREMENTS ═══
+...
+═══ 3. GENERATE ═══
+...
+```
+
+**`converse-model-router.ts` — phase source changes:**
+
+```typescript
+// Before: reads FSM-managed enum value
+const phase = session.engineState.currentPhase;
+
+// After: reads plain string from LLM JSON envelope
+const phase = session.state.currentPhase;
+```
+
+The routing logic (trust check + phase string comparison) is unchanged.
+
+### What Does NOT Change
+
+- **Mechanism A** (`resolveSkills(phase, kits)`) — accepts a phase string, returns kit prompts for that phase. Interface unchanged. Only the source of the phase string changes.
+- **Mechanism B** (`resolveConversationSkills(message, phase, context)`) — accepts a phase string, runs domain detection. Interface unchanged. The `if (phase === "generate")` guard continues to work as a plain string comparison.
+- **Assembly order** — persona → COLLABORATOR VOICE → GUARDRAILS → phase blocks → kit prompts. The per-turn assembly sequence is the same; only the phase block generation changes.

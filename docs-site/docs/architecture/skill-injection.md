@@ -198,3 +198,5 @@ The `if (phase === "generate")` guard in `resolveConversationSkills.ts` is not c
 3. **Consolidate the typed `Skill` vs legacy path in Mechanism A** — pick one canonical resolution API. Currently the typed path exists, is exported, and is tested but used by no production kit. This is the highest-risk surface area for Agent SDK integration confusion.
 
 4. **Remove `resolveSkillsAsync` / `resolveSkillsFromList` from public exports** — or document exactly what async/list scenarios they serve for Agent SDK callers.
+
+5. **After FSM removal** — both `resolveSkills(phase, kits)` and `resolveConversationSkills(message, phase, context)` accept a phase string. Neither needs code changes when the FSM is removed. The `if (phase === "generate")` guard in Mechanism B continues to work as a plain string comparison. The source of the phase string changes (was `engineState.currentPhase`, becomes `session.state.currentPhase`) but the function signatures and behavior are identical.

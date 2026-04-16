@@ -204,3 +204,31 @@ Two independent keyword systems. Changes in one are invisible to the other. A ne
 2. **Resolve Generate-phase overlap** — remove the unconditional `infra-aks`/`infra-docker` injection from Mechanism B or document why the system prompt coverage is insufficient.
 3. **Consolidate typed `Skill` vs legacy path** — one canonical resolution path before Agent SDK adapters are built.
 4. **Create a shared vocabulary file** for terms that must stay in sync between the two mechanisms.
+
+---
+
+## Impact of FSM Removal
+
+:::warning phases.ts is being deleted
+`phases.ts` phase templates are confirmed for deletion. `buildSystemPrompt()` will no longer select a template by phase. See [FSM](./fsm.md).
+:::
+
+### What Changes
+
+`buildSystemPrompt()` replaces phase-template selection with a single full-sequence prompt using numbered blocks:
+
+```
+═══ 1. BEFORE YOU START ═══  [always present]
+═══ 2. GATHER REQUIREMENTS ═══  [always present]
+═══ 3. GENERATE ═══  [always present]
+```
+
+Model routing reads `session.state.currentPhase` (plain string) instead of `session.engineState.currentPhase` (FSM enum).
+
+### What Does NOT Change
+
+Both skill injection mechanisms are unaffected:
+- `resolveSkills(phase, kits)` — same signature, same behavior
+- `resolveConversationSkills(message, phase, context)` — same signature; `if (phase === "generate")` guard works as plain string comparison
+
+The 6-part per-turn assembly order is unchanged.

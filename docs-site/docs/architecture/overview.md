@@ -12,7 +12,7 @@ Kickstart is a monorepo with three packages — a shared core engine, a React SP
 kickstart/
 ├── packages/
 │   ├── core/          @kickstart/core — shared TypeScript engine
-│   │   ├── engine/        FSM + Skill Resolver (machine.ts, skill-resolver.ts)
+│   │   ├── engine/        Skill Resolver (machine.ts ⚠️ DELETE, skill-resolver.ts)
 │   │   ├── kits/          IntegrationKit interface + defaultKitRegistry
 │   │   ├── prompts/       buildSystemPrompt(), phase templates, component catalog
 │   │   ├── services/      resolveConversationSkills (per-turn injection)
@@ -65,7 +65,11 @@ See [Prompt Pipeline](./prompt-pipeline.md) for the full assembly order with cod
 - **Azure OpenAI GPT-5.4** for Generate phase when server-trusted (`AZURE_OPENAI_CODEX_DEPLOYMENT`)
 - Model selection is trust-based, not phase-based — see [Prompt Pipeline: Model Routing](./prompt-pipeline.md#model-routing)
 - Two skill injection mechanisms run every turn — see [Skill Injection](./skill-injection.md)
-- 6-phase FSM tracks conversation progress — see [FSM](./fsm.md)
+- FSM (`machine.ts`, `phases.ts`) **is scheduled for deletion** — see [FSM](./fsm.md)
+
+:::danger FSM scheduled for deletion
+`machine.ts` and `phases.ts` are confirmed for deletion per architectural decision in `.squad/decisions.md`. The FSM is being replaced by a plain `session.state.currentPhase` string + numbered `═══ N. SECTION ═══` blocks in the system prompt. Do not add new FSM dependencies. See [FSM](./fsm.md) for the migration plan.
+:::
 
 ## A2UI Component Catalog
 
@@ -92,7 +96,8 @@ Mechanism A (kit prompt classification) and Mechanism B (user message classifica
 
 ## What Should Be Cleaned Up
 
-1. **`resolveSkillsAsync` / `resolveSkillsFromList`** — remove or mark `@internal` before Agent SDK integration.
-2. **Typed `Skill` path in `skill-resolver.ts`** — consolidate to one path; both existing kits use legacy.
-3. **Keyword vocabulary** — extract a shared constants module referenced by both mechanisms.
-4. **`exitConditions`/`entryConditions` in `phases.ts`** — move out of the runtime interface or wire them up.
+1. **Delete `machine.ts` and `phases.ts`** (confirmed architectural decision) — see [FSM](./fsm.md) for migration checklist.
+2. **`resolveSkillsAsync` / `resolveSkillsFromList`** — remove or mark `@internal` before Agent SDK integration.
+3. **Typed `Skill` path in `skill-resolver.ts`** — consolidate to one path; both existing kits use legacy.
+4. **Keyword vocabulary** — extract a shared constants module referenced by both mechanisms.
+5. **`exitConditions`/`entryConditions` in `phases.ts`** — moot on FSM removal; will be deleted with `phases.ts`.

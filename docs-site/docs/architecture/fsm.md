@@ -2,117 +2,102 @@
 sidebar_position: 3
 ---
 
-# Conversation State Machine (FSM)
+# FSM — Confirmed for Deletion
 
-The FSM tracks which phase the conversation is in and enforces forward-only progression. It does NOT enforce exit conditions — those are LLM-driven.
+:::danger Scheduled for deletion
+`machine.ts` and `phases.ts` are confirmed for deletion per architectural decision in `.squad/decisions.md`. Do not add new dependencies on the FSM. The migration plan is below.
+:::
 
-> **Source:** `packages/core/src/engine/machine.ts`, `packages/core/src/engine/phases.ts`, `packages/core/src/engine/types.ts`
+---
 
-## What the FSM Enforces
+## What Is Being Deleted
 
-- **Current phase** — `state.currentPhase` is always authoritative.
-- **Forward-only transitions** — phases advance in order, never backward.
-- **Phase status** — `pending | active | complete | skipped` per phase.
-- **Completion** — `state.isComplete = true` after Deploy advances.
+| File | Lines | Purpose |
+|------|-------|---------|
+| `packages/core/src/engine/machine.ts` | 157 | Pure-function state machine: `transition()`, `handleImplicitFlags()`, `canAdvance()` |
+| `packages/core/src/engine/phases.ts` | ~120 | Phase definitions with `exitConditions`, `entryConditions`, prompt templates |
+| `ConversationState.engineState` | — | FSM state slice in session: `currentPhase`, `phaseStatuses`, `phaseData` |
+| `ConversationEvent` type | — | `USER_MESSAGE`, `PHASE_COMPLETE` enum used by machine |
+| `PhaseStatus` type | — | `"active"` / `"complete"` string enum read in `converse.ts` and `action.ts` |
 
-## What the FSM Does NOT Enforce
+### Dead Code That Goes Away Automatically
 
-- **Exit conditions** — `phases.ts` lists conditions like `"user has approved the plan"`. These are strings in the `PhaseDefinition` struct. **Zero code reads them.** The FSM advances when it receives an ADVANCE event regardless of whether exit conditions are met.
-- **Entry conditions** — same: narrative only.
-- **Phase content quality** — the FSM tracks state, not what was said.
+:::note
+These fields and code paths are currently in the codebase but never exercised at runtime. FSM removal deletes them without any behavioral change.
+:::
 
-**The LLM decides WHEN to advance. The FSM decides WHAT is allowed (forward only).**
+- `exitConditions` / `entryConditions` — defined in `PhaseDefinition`, never read at runtime
+- `PHASE_COMPLETE` event — handled in `machine.ts`, never emitted by any handler
+- `phaseData` on `ConversationState` — written only by the dead `PHASE_COMPLETE` path, never read
+- `_phaseData` param in `canAdvance()` — unused placeholder
 
-## The Six Phases
+---
 
-```
-Discover → Design → Generate → Review → Handoff → Deploy
-```
+## What Replaces It
 
-| Phase | Label | LLM Goal |
-|-------|-------|----------|
-| `discover` | Discover | Learn app name, runtime, description |
-| `design` | Design | Confirm services, present architecture |
-| `generate` | Generate | Produce Dockerfile, manifests, CI/CD workflow |
-| `review` | Review | Walk through artifacts, show cost estimate |
-| `handoff` | Handoff | Create/select GitHub repo, push files, Codespace link |
-| `deploy` | Deploy | Trigger GitHub Actions, show deployment status and URL |
-
-Source: `PHASE_DEFINITIONS` in `packages/core/src/engine/phases.ts`.
-
-## Phase Transition Triggers
-
-### Trigger 1 — LLM sets `phaseComplete: true`
+### Plain Phase String
 
 ```typescript
-// packages/core/src/engine/machine.ts
-export function handleImplicitFlags(
-  state: ConversationState,
-  flags: ImplicitFlags,
-): ConversationState {
-  if (flags.phaseComplete === true && canAdvance(state)) {
-    return transition(state, { type: "ADVANCE" });
-  }
-  return state;
-}
-
-export function canAdvance(state, _phaseData?): boolean {
-  // NOTE: does NOT check exit conditions
-  return state.phaseStatus[state.currentPhase] === "active" && !state.isComplete;
-}
+// Before: session.engineState.currentPhase (FSM-managed enum)
+// After:  session.state.currentPhase (plain string, LLM sets directly via JSON envelope)
 ```
 
-### Trigger 2 — UI Button event
+### Numbered Prompt Blocks
 
-A2UI Button with `event.name: "complete:navigate:{phase}"` → client sends event → server emits ADVANCE.
+Phase progression moves from `phases.ts` TypeScript structs into `═══ N. SECTION ═══` narrative blocks in the system prompt (pattern from `sabbour/adaptive-ui-try-aks`):
 
-## State Machine Events
+```
+═══ 1. BEFORE YOU START ═══
+...
+═══ 2. GATHER REQUIREMENTS ═══
+...
+═══ 3. GENERATE ═══
+...
+```
+
+The full sequence is always present. The LLM reads the numbered blocks and knows its position from conversation history.
+
+### Model Routing — Interface Unchanged
+
+`resolveConverseModelRoute` reads a phase string. Only the source changes:
 
 ```typescript
-type ConversationEvent =
-  | { type: "START" }                       // Reset to Discover
-  | { type: "ADVANCE" }                     // Advance to next phase  ← only path used in production
-  | { type: "SKIP" }                        // Skip, advance to next
-  | { type: "PHASE_COMPLETE"; phase: Phase; data?: Record<string, unknown> }  ← never emitted
-  | { type: "RESET" }                       // Full reset
-  | { type: "USER_INPUT"; input?: string }  // No-op
+// Before: session.engineState.currentPhase  (FSM enum)
+// After:  session.state.currentPhase         (plain string)
 ```
 
-`transition()` is a pure function — returns new state, never mutates input.
+`routingPhaseTrusted` flag is unchanged. `Phase.Generate` enum becomes `"generate"` string literal.
 
-## `PhaseStatus` — Used or Dead?
+### `filesComplete` Flag — Unchanged
 
-**Used.** `phaseStatus` is read in production:
+The `filesComplete` auto-continue flag is **not FSM**. It is a client-side reactive check. It stays exactly as-is.
 
-- `converse.ts` lines 421/423 — checks `"active"` / `"complete"` for phase progress info
-- `action.ts` lines 152/154 — same check for action event routing
+---
 
-`PhaseStatus` is live computed state. Only `exitConditions`, `entryConditions`, and `PHASE_COMPLETE` event handling are dead.
+## Migration Checklist
 
-## Code Health Notes
+- [ ] Delete `packages/core/src/engine/machine.ts`
+- [ ] Delete `packages/core/src/engine/phases.ts`
+- [ ] Remove `ConversationState.engineState` slice; add `state: Record<string, string>`
+- [ ] Remove `ConversationEvent`, `PhaseStatus`, `PhaseDefinition` types from `types.ts`
+- [ ] Update `system-prompt.ts`: replace phase-template selection with numbered blocks
+- [ ] Update `converse.ts`: replace `session.engineState.currentPhase` with `session.state.currentPhase`
+- [ ] Update `converse-model-router.ts`: replace `Phase.Generate` enum with `"generate"` string
+- [ ] Update `session-store.ts`: remove FSM state from session initializer and rehydration
+- [ ] Delete `packages/core/src/__tests__/machine.test.ts`
+- [ ] Delete `packages/core/src/__tests__/phases.test.ts`
+- [ ] Update `packages/core/src/engine/index.ts`: remove `machine` and `phases` exports
+- [ ] Verify `resolveSkills(phase, kits)` and `resolveConversationSkills(message, phase, context)` — both accept phase strings; no changes needed to either function
 
-:::danger `exitConditions` and `entryConditions` are dead constraint logic
-Defined in `PhaseDefinition` interface (`types.ts` lines 47, 49), populated in every phase definition in `phases.ts`, **never read anywhere in the runtime** — not by `machine.ts`, not by `converse.ts`, not by `action.ts`. Anyone reading `types.ts` will assume these are enforced. They are not.
-:::
+---
 
-:::warning `PHASE_COMPLETE` event is handled but never emitted
-`transition()` handles a `PHASE_COMPLETE` event that copies `event.data` into `phaseData`. No production code ever emits this event. The only advance path in use is `ADVANCE`. The `PHASE_COMPLETE` handler and all `phaseData` writes are dead code.
-:::
+## Why
 
-:::warning `phaseData` is written but never read
-`ConversationState.phaseData` accumulates data per phase via `PHASE_COMPLETE` events. Since `PHASE_COMPLETE` is never emitted, `phaseData` is always empty at runtime. It is never read in `converse.ts` or `action.ts`.
-:::
+The FSM added TypeScript enforcement for phase transitions that:
 
-:::note `_phaseData` parameter in `canAdvance()` is unused
-The parameter exists as a placeholder for future exit condition checking. The source comment says "In a real implementation, this would check exit conditions against the accumulated phase data." It does not do that.
-:::
+1. **Was never actually used** — `exitConditions` and `entryConditions` are typed but not read at runtime
+2. **Duplicated the LLM's judgment** — the LLM navigates transitions from its system prompt, not the state machine
+3. **Added coupling** — `converse.ts` called `transition()` even though the LLM was the real decision-maker
+4. **Has dead internal paths** — `PHASE_COMPLETE` is handled but never emitted; `phaseData` is written by a dead path and never read
 
-## What Should Be Cleaned Up
-
-1. **Remove `exitConditions` and `entryConditions` from `PhaseDefinition`** (or add an explicit code comment that they are narrative-only, not enforced). Typed interface fields that are never read mislead Agent SDK implementors.
-
-2. **Remove `PHASE_COMPLETE` event handling** — or emit it from somewhere. Dead event handler in a state machine is a maintenance trap.
-
-3. **Remove `phaseData` from `ConversationState`** — or start using it. If Agent SDK integration (issue #330) needs per-phase data accumulation, wire it up then. Right now it's allocated and populated by dead paths.
-
-4. **Remove `_phaseData` from `canAdvance()`** — or implement exit condition checking. The unused parameter with its aspirational comment is a distraction.
+Replacing it with `session.state.currentPhase` removes the redundant layer while keeping all behavior.
