@@ -1079,3 +1079,120 @@ Single-component dependency is a smell. Vendor the minimal surface (two function
 - Frontend: ArchitectureDiagram refactor (small, isolated)
 - DevOps: Eliminates GitHub Packages auth requirement
 - No impact on architecture or other components
+
+---
+
+## Sprint: 2026-04-16 Security + Generation Sprint
+
+### 2026-04-16: Security sprint — sanitization, ReDoS, insecure randomness, CI permissions, dep upgrades
+**By:** Bender (Backend Dev / Security)
+
+**Decisions shipped:**
+1. **Sanitization rewrites** — Use environment-agnostic regex approach (not DOMPurify) for Node.js API/core packages since jsdom is absent. DOMPurify is correct for browser-only packages. Replaced ad-hoc regex HTML sanitizers in `in-memory.ts`, `skill-policy.ts`, `fetch-webpage.ts`, and `sanitize-tool-output.ts`. (PRs #373)
+2. **ReDoS** — Regexes with catastrophic backtracking in `data-binding.ts`, `skill-policy.ts`, and `in-memory.ts` rewritten to linear-time patterns. (PR #373)
+3. **Transitive dependency pinning** — Use npm `overrides` in `package.json` to pin vulnerable transitive deps when a direct upgrade is unavailable (e.g. `serialize-javascript` inside Docusaurus). Update lock with `--package-lock-only`. (PR #369)
+4. **CI workflow permissions** — All `.github/workflows/*.yml` must declare explicit `permissions:` blocks. Default: `contents: read` at workflow level. Jobs needing more (e.g. `pull-requests: write`) declare at job level. (PR #368)
+5. **Insecure randomness** — Any code generating security-sensitive values (IDs, tokens, nonces) must use `crypto.randomUUID()` or `crypto.getRandomValues()`. `Math.random()` is prohibited for these use cases. (PR #371)
+
+**Related issues:** #359 (multi-char sanitization), #360 (bad HTML regexp), #361 (ReDoS), #362 (insecure randomness), #364 (CI permissions) ✅, #365 (serialize-javascript RCE) ✅, #366 (hono upgrade) ✅, #367 (follow-redirects upgrade) ✅
+
+---
+
+### 2026-04-16: Canonical K8s icon keys — DRA and Gateway API Inference Extension
+**By:** Bender, Fry, Hermes
+
+Seven new Kubernetes icon keys added across `system-prompt.ts`, `component-catalog.ts`, and `architectureDiagramUtils.ts`:
+
+| Key | Resource | SVG label |
+|-----|----------|-----------|
+| `k8s/deviceclass` | DeviceClass | `dc` |
+| `k8s/resourceclaim` | ResourceClaim | `rc` |
+| `k8s/resourceclaimtemplate` | ResourceClaimTemplate | `rct` |
+| `k8s/resourceslice` | ResourceSlice | `rslice` |
+| `k8s/inferencepool` | InferencePool | `pool` |
+| `k8s/inferenceobjective` | InferenceObjective | `obj` |
+| `k8s/endpointpicker` | Endpoint Picker (EPP) | `epp` |
+
+**Conventions:** Full-word lowercase keys matching `k8s/<lowercase-kind>` pattern. No abbreviated keys unless the resource has an established kubectl short name. `resourceslice` uses `rslice` SVG label to avoid collision with ReplicaSet (`rs`). `endpointpicker` uses full name (not `epp`) for consistency; SVG label retains `epp` abbreviation. NetworkPolicy (`k8s/netpol`) already registered by azure-pack — never add to `K8S_EXTRA_ICONS`. EndpointSlice was removed from this batch per user direction.
+
+**Test contract (Hermes):** TDD tests in `architectureDiagramUtils.test.ts` lock all new keys via `isAllowedIconKey`, `ALLOWED_ICON_KEYS`, `expandIconPlaceholders`, and `renderArchitectureDiagramSvg` assertions. Adding keys to `ALLOWED_ICON_KEYS` turns tests green without further changes.
+
+---
+
+### 2026-04-16: `next-card` is a phantom reference — use `Card`
+**By:** Fry, via PR #372
+
+Full codebase search returned zero matches for `next-card`, `NextCard`, or `nextCard`. The component does not exist in catalog, schema, kickstart-catalog.ts, or any demo scenario. Decided **not to implement** — `Card` already covers all "what's next" UX patterns. A2UI graceful fallback handles any LLM emission silently. Also cleaned up stale `DeploymentProgress` holdover in `system-prompt.ts` example list (PR #356 rename leftover).
+
+---
+
+### 2026-04-16: A2UI action handlers and ARM guard in Playground
+**By:** Bender
+
+1. **`useA2UI()` must always supply an `actionHandler`** — even a no-op — if the component may host surfaces that fire `continue:` or other actions. Omitting the handler silently swallows actions and stalls wizard flows. Fixed in Playground.tsx.
+2. **`SKIP_LIVE_ARM_CALLS` guard** — `AzureResourceForm.tsx` must check `isMockMode() || isPlaygroundMode()` before hitting the live ARM subscription endpoint. `BaseConnector.isAuthenticated()` returns `true` for `auth: { kind: 'none' }` (SWA cookie auth) — the fix belongs in the caller, not the connector.
+3. **Stepwise setup streaming** — `SetupGenerationEvent` discriminated union, `StepwiseSetupState` types, and six exported functions added to `utils/chat-a2ui.ts`; `VirtualFS` workspace snapshot methods and `workspace-snapshots` IDB object store added (IDB version 2→3).
+
+---
+
+### 2026-04-16: DeploymentProgress → GenerationProgress rename
+**By:** Leela (PR #356)
+
+When renaming an A2UI component, every surface must be updated together:
+- Component file + TypeScript interfaces
+- `a2ui-schema.ts`
+- `kickstart-catalog.ts`
+- `system-prompt.ts` — all occurrences, section text, and example JSON payloads
+- `component-catalog.ts`
+- Demo/playground scenario files
+- Test fixtures
+- Public exports in `index.ts`
+
+Missed surfaces from a partial rename leave orphan phantom references in LLM-facing text and break prompt-catalog contract tests.
+
+---
+
+### 2026-04-16: Stepwise generation enabled by default in production
+**By:** Leela (PR #354)
+
+`STEPWISE_GENERATION_V1=true` is now the default in `infra/main.bicep`. All new environments pick it up automatically; no manual flag override needed.
+
+---
+
+### 2026-04-16: Prompt-catalog contract tests guard against phantom components
+**By:** Hermes (PR #374)
+
+15 contract tests in the prompt-catalog suite automatically detect any system-prompt reference to a component that is not registered in the catalog. CI will catch regressions from partial renames or phantom additions without manual review.
+
+---
+
+### 2026-04-16: Overnight backlog audit — triage and routing outcomes
+**By:** Leela
+
+Triaged 11 backlog items against GitHub. Outcome:
+- 5 items already covered by merged PRs (model router, cost estimate, token tracker, missing components, ARM 401)
+- 1 item partially covered (#332 — Azure login, blocked on live credentials, P2)
+- 3 new issues created: #349 (file editor A2UI coupling — architecture clarity), #350 (deployment vs. generation wording), #351 (custom components audit) — all assigned Leela, type:spike
+
+Future spikes #329 (MCP App IDE + A2UI) and #330 (Agents SDK migration) verified adequate — no follow-up issues needed.
+
+---
+
+### 2026-04-16: Frontend architecture audit findings
+**By:** Fry
+
+Key findings from the overnight audit:
+- **FileEditor coupling** is intentional: it acts as an LLM-declaration vehicle that the pipeline extracts to the workspace, not a rendered component. Three separate functions in `chat-a2ui.ts` handle it. The coupling works but is opaque (no first-class `FilePayload` type). Decision deferred to Leela (#349).
+- **`root`** is a reserved A2UI surface ID, not a missing component. Working as designed.
+- **`picker` naming**: `ChoicePicker` is the correct component name. System prompt should reference it explicitly, not generic `picker`.
+- **`DeploymentProgress` title** is hardcoded to `'Project Setup'` via `GENERATE_PROGRESS_TITLE` in `chat-a2ui.ts`. Dynamic per-step title is a low-impact cosmetic improvement (tracked in #350).
+- **Custom component strategy** is sound — 20 registered components covering auth, GitHub, Azure, cost, and primitives. FileEditor is the only legacy fat component needing a refactor decision.
+
+---
+
+### 2026-04-16: User directives — K8s icon batch scope changes
+**By:** Ahmed Sabbour (via Copilot)
+
+- **07:04Z** — Skip NetworkPolicy in the current icon batch; it already exists in azure-pack. Continue with remaining DRA resources and inference extensions.
+- **07:08Z** — Remove EndpointSlice from current batch; add InferencePool, InferenceObjective, and EndPointPicker instead.
+

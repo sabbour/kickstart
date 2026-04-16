@@ -125,3 +125,29 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - (2026-04-16T07:01:08Z) NetworkPolicy (`k8s/netpol`) is registered by the azure-pack at `@sabbour/adaptive-ui-azure-pack/src/diagram-icons.ts:145`. It doesn't need an entry in `K8S_EXTRA_ICONS` — only icons missing from the pack go there. Always check the pack first before adding local overrides.
 - (2026-04-16T07:01:08Z) EndpointSlice (`k8s/endpointslice`) follows the `*slice` naming pattern established for `resourceslice`. Existing Endpoints uses `ep` (from the azure-pack), so `endpointslice` (full name, no hyphen) avoids ambiguity. SVG label `epslice` distinguishes from `ep` at small render sizes.
 - (2026-04-16T07:01:08Z) Gateway API Inference Extension CRDs (InferencePool, InferenceObjective) and the Endpoint Picker (EPP) component use full lowercase names as icon keys (`k8s/inferencepool`, `k8s/inferenceobjective`, `k8s/endpointpicker`) for consistency with DRA keys in the same batch. `endpointpicker` was chosen over `epp` to stay consistent with the full-name convention; the SVG label still shows `epp` since that's the well-known project abbreviation. Hermes had pre-written tests expecting these exact keys.
+
+## Work Log (continued)
+
+- (2026-04-16T09:32:00Z) Issue #352: Investigated `next-card` phantom reference. Zero matches anywhere in codebase. Chose Option B (don't implement). Also fixed holdover `DeploymentProgress` reference in system-prompt.ts example list (PR #356 rename leftover). → PR #372 opened (draft).
+
+---
+
+## 2026-04-16 Sprint Retro — Security + Generation Sprint
+
+**PRs merged this sprint:**
+- #370 Playground surfaceIds fix (useCallback → useMemo)
+- Icon batch: 7 new K8s SVG icons (DRA + Inference Extension) added to `packages/web/public/assets/icons/k8s/`, frontend registration updated, ALLOWED_ICON_KEYS updated, 27/27 tests passing
+- #372 (co-authored) next-card phantom cleanup
+
+**Frontend audit delivered:**
+- Confirmed FileEditor coupling is intentional (workspace extraction, not chat render)
+- Identified `root` as reserved surface ID, not missing component
+- Surfaced ChoicePicker naming confusion (LLM uses generic "picker")
+- Custom component strategy assessed: 20 components, sound architecture, FileEditor is only legacy fat component needing a decision
+
+**Icon key conventions locked:**
+- `k8s/<lowercase-kind>` pattern, full-word keys, no abbreviations unless established kubectl short names
+- `endpointpicker` (not `epp`) for EndPointPicker; `rslice` SVG label for ResourceSlice to avoid RS collision
+- NetworkPolicy stays in azure-pack, never in K8S_EXTRA_ICONS
+
+**Next:** Unblock #349 FileEditor decision; address ChoicePicker naming in system prompt.
