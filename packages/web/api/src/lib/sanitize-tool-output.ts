@@ -12,24 +12,37 @@
 /** Maximum characters allowed in a single tool result (before JSON encoding). */
 const MAX_TOOL_OUTPUT_LENGTH = 16_000;
 
-/** Patterns that should never appear in tool output sent to the client. */
-const DANGEROUS_HTML_RE =
-  /<\s*\/?\s*(script|iframe|object|embed|form|input|link|meta|style|svg|base|applet)[^>]*>/gi;
+/**
+ * Attribute-aware HTML tag pattern.
+ * Uses `(?:[^>"']|"[^"]*"|'[^']*')*` instead of `[^>]*` so that a `>`
+ * inside a quoted attribute value (e.g. `src=">"`) does not prematurely
+ * terminate the match — fixing the CodeQL bad-tag-filter alert.
+ */
+const HTML_TAG_RE = /<(?:[^>"']|"[^"]*"|'[^']*')*>/g;
 
 /**
- * Strip dangerous HTML tags from a string while leaving plain text intact.
- * This is intentionally aggressive — tool results are plain-text data, not
- * HTML documents. Any residual HTML is an injection vector.
+ * Matches `<script>…</script>` and `<style>…</style>` blocks including their
+ * content, using a back-reference so a single replacement covers both tag
+ * names and avoids chaining multiple incomplete patterns.
+ */
+const SCRIPT_STYLE_BLOCK_RE =
+  /<(script|style)\b(?:[^>"']|"[^"]*"|'[^']*')*>[\s\S]*?<\/\1\s*>/gi;
+
+/**
+ * Strip all HTML from a string leaving plain text intact.
+ * Tool results are plain-text data, not HTML documents — any HTML is an
+ * injection vector.
+ *
+ * Strategy (avoids incomplete multi-character sanitisation chains):
+ *   1. Remove `<script>` / `<style>` blocks *with their content* so that
+ *      inline JS/CSS does not surface as plain text in the LLM context.
+ *   2. Strip every remaining tag in one comprehensive pass using an
+ *      attribute-aware regex that handles `>` inside quoted attribute values.
  */
 function stripDangerousHtml(text: string): string {
   return text
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
-    .replace(/<object[\s\S]*?<\/object>/gi, "")
-    .replace(/<embed[\s\S]*?<\/embed>/gi, "")
-    .replace(DANGEROUS_HTML_RE, "")
-    .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, "");
+    .replace(SCRIPT_STYLE_BLOCK_RE, "")
+    .replace(HTML_TAG_RE, "");
 }
 
 /**
@@ -37,8 +50,10 @@ function stripDangerousHtml(text: string): string {
  * dependency versions don't leak to the LLM or client.
  */
 function sanitizeErrorText(text: string): string {
+  // Use [^\n]+ instead of .+ to make the per-line scope explicit and prevent
+  // polynomial backtracking in the repeated group (ReDoS fix).
   return text.replace(
-    /(\n\s+at\s+.+){2,}/g,
+    /(\n\s+at\s+[^\n]+){2,}/g,
     "\n    [stack trace redacted]",
   );
 }

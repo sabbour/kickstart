@@ -69,17 +69,23 @@ function isBlockedHost(hostname: string): boolean {
 /**
  * Minimal HTML → plain text conversion.
  * Strips tags, decodes common entities, and collapses whitespace.
+ *
+ * Uses an attribute-aware tag pattern `(?:[^>"']|"[^"]*"|'[^']*')*` instead
+ * of `[^>]*` so that `>` inside quoted attribute values does not prematurely
+ * end a tag match (fixes CodeQL bad-tag-filter / incomplete-sanitization).
+ * script/style block content is removed via a single back-reference pattern
+ * instead of two separate chains.
  */
 function htmlToText(html: string): string {
   return html
-    // Remove script/style blocks
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    // Remove script/style blocks including their content (single pattern,
+    // back-reference covers both tag names — no incomplete-chain bypass)
+    .replace(/<(script|style)\b(?:[^>"']|"[^"]*"|'[^']*')*>[\s\S]*?<\/\1\s*>/gi, "")
     // Block elements → newlines
     .replace(/<\/(p|div|h[1-6]|li|tr|blockquote|section|article)>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
-    // Strip remaining tags
-    .replace(/<[^>]+>/g, "")
+    // Strip remaining tags (attribute-aware: handles > inside quoted values)
+    .replace(/<(?:[^>"']|"[^"]*"|'[^']*')*>/g, "")
     // Decode common HTML entities
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
