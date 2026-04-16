@@ -235,16 +235,10 @@ export function sanitizeMermaidSource(source: string): string {
   // so structural line breaks are preserved before tag stripping.
   let result = source.replace(/<br\s*\/?>/gi, '\n');
 
-  // Use DOMParser to strip all remaining HTML tags — handles malformed/unclosed
-  // tags safely without regex edge cases. DOMParser is available in all browsers.
-  try {
-    const doc = new DOMParser().parseFromString(result, 'text/html');
-    result = doc.body.textContent ?? result;
-  } catch {
-    // Fallback for SSR/test environments: the `?` makes `>` optional so unclosed
-    // tags like `<script>alert(1)` (no closing `>`) are also stripped.
-    result = result.replace(/<[^>]*>?/gm, '');
-  }
+  // Strip all HTML tags (complete and incomplete) using aggressive regex.
+  // - /<[^>]*>/g: matches well-formed tags like <img src=...>
+  // - /</g: removes any remaining < that wasn't closed (prevents <script> attacks)
+  result = result.replace(/<[^>]*>/g, '').replace(/</g, '');
 
   return result;
 }
