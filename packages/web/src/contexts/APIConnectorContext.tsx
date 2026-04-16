@@ -46,7 +46,6 @@ export function APIConnectorProvider({
 
     const r = new APIConnectorRegistry();
     r.register(new AzureARMConnector({
-      auth: { kind: 'none' },
       corsProxy: {
         proxyBaseUrl: '/api/arm-proxy',
       },

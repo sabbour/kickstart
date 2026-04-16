@@ -202,6 +202,30 @@ function buildWorkspaceAnnouncement(paths: string[]): string {
   return `${paths.length} new files added to workspace`;
 }
 
+function parseGitHubOwnerRepo(githubRepoUrl?: string): string | null {
+  if (!githubRepoUrl) {
+    return null;
+  }
+
+  try {
+    const url = new URL(githubRepoUrl);
+    if (url.hostname !== 'github.com') {
+      return null;
+    }
+
+    const [owner, repoSegment] = url.pathname.replace(/^\/|\/$/g, '').split('/');
+    const repo = repoSegment?.replace(/\.git$/i, '');
+
+    if (!owner || !repo) {
+      return null;
+    }
+
+    return `${owner}/${repo}`;
+  } catch {
+    return null;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Tree node component                                                */
 /* ------------------------------------------------------------------ */
@@ -332,6 +356,7 @@ export function FileManagerSidebar({
     [streamingFiles, persistedFiles],
   );
   const mergedFilePaths = useMemo(() => collectFilePaths(tree), [tree]);
+  const ownerRepo = useMemo(() => parseGitHubOwnerRepo(githubRepoUrl), [githubRepoUrl]);
 
   // Count all leaf (non-directory) files
   const fileCount = useMemo(() => {
@@ -404,41 +429,28 @@ export function FileManagerSidebar({
           Files{fileCount > 0 ? ` (${fileCount})` : ''}
         </Text>
         <div className={styles.headerActions}>
-          {githubRepoUrl && (() => {
-            let ownerRepo: string | null = null;
-            try {
-              const url = new URL(githubRepoUrl);
-              if (url.hostname === 'github.com') {
-                const segments = url.pathname.replace(/^\/|\/$/g, '').split('/');
-                if (segments.length >= 2 && segments[0] && segments[1]) {
-                  ownerRepo = `${segments[0]}/${segments[1]}`;
-                }
-              }
-            } catch { /* invalid URL — buttons stay hidden */ }
-            if (!ownerRepo) return null;
-            return (
-              <>
-                <Tooltip content="Open in vscode.dev" relationship="label">
-                  <Button
-                    appearance="subtle"
-                    size="small"
-                    icon={<WindowDevTools24Regular />}
-                    aria-label="Open in vscode.dev"
-                    onClick={() => window.open(`https://github.dev/${ownerRepo}`, '_blank', 'noopener,noreferrer')}
-                  />
-                </Tooltip>
-                <Tooltip content="Open in GitHub Codespaces" relationship="label">
-                  <Button
-                    appearance="subtle"
-                    size="small"
-                    icon={<Cloud24Regular />}
-                    aria-label="Open in GitHub Codespaces"
-                    onClick={() => window.open(`https://codespaces.new/${ownerRepo}`, '_blank', 'noopener,noreferrer')}
-                  />
-                </Tooltip>
-              </>
-            );
-          })()}
+          {ownerRepo && (
+            <>
+              <Tooltip content="Open in vscode.dev" relationship="label">
+                <Button
+                  appearance="subtle"
+                  size="small"
+                  icon={<WindowDevTools24Regular />}
+                  aria-label="Open in vscode.dev"
+                  onClick={() => window.open(`https://vscode.dev/github/${ownerRepo}`, '_blank', 'noopener,noreferrer')}
+                />
+              </Tooltip>
+              <Tooltip content="Open in GitHub Codespaces" relationship="label">
+                <Button
+                  appearance="subtle"
+                  size="small"
+                  icon={<Cloud24Regular />}
+                  aria-label="Open in GitHub Codespaces"
+                  onClick={() => window.open(`https://codespaces.new/${ownerRepo}`, '_blank', 'noopener,noreferrer')}
+                />
+              </Tooltip>
+            </>
+          )}
           {onDownloadZip && fileCount > 0 && (
             <Button
               appearance="subtle"

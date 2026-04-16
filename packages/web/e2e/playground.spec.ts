@@ -3,9 +3,8 @@ import { test, expect } from './helpers';
 
 const PLAYGROUND_URL = '/?playground';
 
-async function openScenario(page: Page, label: string, tab: 'ideas' | 'components' = 'ideas') {
-  const tabName = tab === 'components' ? 'Components' : 'Ideas';
-  await page.getByRole('tab', { name: tabName }).click();
+async function openScenario(page: Page, label: string, tab: 'Ideas' | 'Components' = 'Ideas') {
+  await page.getByRole('tab', { name: tab }).click();
   const searchBox = page.getByPlaceholder('Filter scenarios...');
   await searchBox.fill(label);
   const card = page.getByRole('button', { name: label }).first();
@@ -140,21 +139,21 @@ test.describe('Playground', () => {
   });
 
   test.describe('Fat component slices', () => {
-    test('Azure AuthCard signs in with the playground stub flow', async ({ page }) => {
-      await openScenario(page, 'AzureLoginCard', 'components');
+    test('AzureLoginCard signs in with the playground auth flow', async ({ page }) => {
+      await openScenario(page, 'AzureLoginCard', 'Components');
 
       const dialog = page.getByRole('dialog');
       await dialog.getByRole('button', { name: 'Sign in to Azure' }).click();
 
       await expect(dialog.getByText('Connected')).toBeVisible({ timeout: 3_000 });
-      await expect(dialog.getByRole('button', { name: 'Disconnect' })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Sign out' })).toBeVisible();
     });
 
-    test('GitHub AuthCard signs in with the playground stub flow', async ({ page }) => {
-      await openScenario(page, 'GitHubLoginCard', 'components');
+    test('GitHubLoginCard signs in with the playground auth flow', async ({ page }) => {
+      await openScenario(page, 'GitHubLoginCard', 'Components');
 
       const dialog = page.getByRole('dialog');
-      await dialog.getByRole('button', { name: 'Sign in to GitHub' }).click();
+      await dialog.getByRole('button', { name: 'Sign in with GitHub' }).click();
 
       await expect(dialog.getByText('Connected')).toBeVisible({ timeout: 3_000 });
       await expect(dialog.getByRole('button', { name: 'Disconnect' })).toBeVisible();
