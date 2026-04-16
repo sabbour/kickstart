@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "@azure/functions": "^4.6.0",
-    "bicep-node": "^0.0.9"
+    "bicep-node": "^0.0.9",
+    "dompurify": "^3.4.0"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"
