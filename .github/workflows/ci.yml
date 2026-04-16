@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   lint-build:
     name: Lint, Build & Unit Tests
