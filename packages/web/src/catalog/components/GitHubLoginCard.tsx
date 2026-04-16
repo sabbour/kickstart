@@ -218,11 +218,6 @@ export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props
           {loading ? "Checking sign-in…" : "Sign in with GitHub"}
         </Button>
       </div>
-      {usePlaygroundStub && (
-        <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalXS }}>
-          Running in offline mode — sign-in will use stub data
-        </Caption1>
-      )}
     </Card>
   );
 });

@@ -404,11 +404,6 @@ export const GitHubAction = createReactComponent(GitHubActionApi, ({ props }) =>
         </div>
       )}
 
-      {!connector && state === 'idle' && (
-        <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
-          Running in offline mode — action will simulate success
-        </Caption1>
-      )}
     </Card>
   );
 });

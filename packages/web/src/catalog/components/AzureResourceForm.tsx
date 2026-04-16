@@ -394,11 +394,6 @@ export const AzureResourceForm = createReactComponent(AzureResourceFormApi, ({ p
         </div>
       </form>
 
-      {!connector && (
-        <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
-          Running in offline mode — form uses fallback data
-        </Caption1>
-      )}
     </Card>
   );
 });
