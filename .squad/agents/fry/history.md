@@ -132,6 +132,30 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 
 ---
 
+## 2026-04-16 System Prompt Restructuring + Ideas Cleanup Assignment
+
+**System Prompt Restructuring (Commit 8d3ed53)**
+- **Format:** Restructured system-prompt.ts into ═══ STEP N ═══ narrative blocks
+- **Integration:** Aligns with Bender's FSM removal (PR #385) for streamlined phase flow documentation
+- **Status:** Committed on squad/384-fsm-removal-cleanup, awaiting FSM PR merge
+
+**Ideas Tab Cleanup — Assigned**
+- **From:** leela-ideas-audit.md (2026-04-16)
+- **Scope:** Cut Ideas tab 36 → 16 scenarios (56% reduction), extract 3 components to Custom Controls
+- **Changes:**
+  - Remove 3 GALLERY_GROUPS: 'Multi-Phase Demo', 'Cost Estimate', 'Integration Kits'
+  - Delete 17 scenario entries + generators (phase-discover/design/generate/review/deploy, kit-*, data-basic, etc.)
+  - Move 3 components to Custom Controls: FileEditor (file-single/multi), CostEstimate, GenerationProgress (new demo)
+  - Update playground-scenarios.ts (line 178 GALLERY_GROUPS), CONTROL_SCENARIOS array
+  - Create customGenerationProgress() generator function
+  - Verify npm run build passes
+- **File:** packages/web/src/pages/playground-scenarios.ts, Playground.tsx (line 178)
+- **Est. duration:** 2–3 hours
+- **Dependency:** .squad/config.json worktree setup (Coordinator PR #386)
+- **Status:** Assigned, awaiting start
+
+---
+
 ## 2026-04-16 Sprint Retro — Security + Generation Sprint
 
 **PRs merged this sprint:**
