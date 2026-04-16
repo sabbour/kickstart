@@ -13,16 +13,16 @@ describe('architectureDiagramIconRegistry', () => {
     expect(Array.from(registry.keys())).toEqual(ALLOWED_ICON_KEYS);
 
     for (const key of ALLOWED_ICON_KEYS) {
-      expect(registry.get(key)).toMatch(/^\/assets\/architecture-diagram\//);
+      expect(registry.get(key)).toMatch(/^\/assets\/icons\//);
     }
   });
 
   it('uses local repo-owned fluent assets for the diagram chrome', () => {
     expect(ARCHITECTURE_DIAGRAM_HEADER_ICON_URL).toBe(
-      '/assets/architecture-diagram/fluent/building-cloud.svg',
+      '/assets/icons/fluent/building-cloud.svg',
     );
     expect(ARCHITECTURE_DIAGRAM_EMPTY_STATE_ICON_URL).toBe(
-      '/assets/architecture-diagram/fluent/design-ideas.svg',
+      '/assets/icons/fluent/design-ideas.svg',
     );
   });
 });
