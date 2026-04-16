@@ -165,3 +165,23 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - Prompt-catalog contract tests (#374) guard phantom references automatically going forward
 
 **Next:** Address architecture spikes #349, #350, #351; review DPs for #329 and #330.
+
+## 2026-04-16: Engineering Docs Accuracy Rewrite
+
+**Date:** 2026-04-16T17:21:17Z
+
+**Status:** Proposed
+
+Rewrote engineering docs to fix stale/incorrect claims:
+
+1. **Models** — Docs cited GPT-4o/Codex; current are GPT-5.4/GPT-5.4-mini
+2. **Skill injection** — Was underdocumented; actually two separate mechanisms
+3. **FSM exit conditions** — Misrepresented; are narrative strings only, not code-enforced
+4. **Component count** — Was "16"; now 28+
+5. **Mechanism B** — No docs for `resolveConversationSkills.ts` despite being live
+
+**Files Updated:**
+- `docs/architecture.md`, `docs/prompt-architecture.md`, `docs/fsm.md` (new)
+- `docs-site/docs/architecture/overview.md`, `prompt-pipeline.md` (new), `fsm.md` (new), `skill-injection.md` (new)
+
+**Decision:** `.squad/decisions.md` (merged from inbox)
