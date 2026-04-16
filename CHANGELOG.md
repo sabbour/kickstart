@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## [0.7.0] - 2026-04-15
+
+### Added
+
+- **Stepwise setup generation** — Codex-backed setup execution now streams progress in chat while delivering generated files directly into the workspace/file manager. (#336, #337)
+- **Real Azure deployment lane** — Kickstart now includes the real Azure deployment path with deploy UI, auth boundary coverage, and deployment health-check hardening. (#301)
+- **Real GitHub handoff flow** — Project handoff now supports the real GitHub ship/repo flow instead of placeholder behavior. (#274)
+- **Live pricing + token usage tracking** — Chat sessions now surface Azure pricing data and per-session token usage/cost tracking. (#272, #277)
+- **Workspace and diagram upgrades** — Generated-file routing, file manager UX, and ArchitectureDiagram rendering depth all improved significantly. (#252, #265, #314)
+
+### Changed
+
+- **Generate routing and progressive flow** — Generate-phase routing now prefers codex-backed execution and the progressive conversation/setup flow is more resilient end-to-end. (#266, #275, #278)
+- **Prompt and diagram narrative alignment** — System prompts and diagram rendering are more closely aligned with the Try-AKS narrative and richer architecture output. (#278, #300, #314)
+
+### Fixed
+
+- **File/workspace artifact stability** — Fixed the setup/file rendering regressions, file-surface duplication, and chat/file ownership issues around generated artifacts. (#334, #336, #337)
+- **Runtime and deployment hardening** — Fixed CostEstimate compatibility, hotspot robustness, SWA/API startup hygiene, false heartbeat failures, and Azure/GitHub deployment-path error handling. (#312, #317, #320, #324)
+- **Security and debug hardening** — Strengthened action-context sanitization, ArchitectureDiagram safety, and raw/debug output handling. (#250, #263, #300)
+- **UI and session polish** — Fixed assorted issues across session rehydration, streaming, buttons, tabs, code blocks, topbar polish, and general chat rendering behavior. (#239, #243, #244, #248, #291, #294)
+
 ## [0.6.0] - 2026-04-14
 
 ### Added

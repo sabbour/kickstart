@@ -1,5 +1,13 @@
 # @kickstart/core
 
+## 0.7.0
+
+### Minor Changes
+
+- Release the merged v0.7.0 feature set: codex-backed stepwise setup generation,
+  workspace-first file delivery, real Azure and GitHub deployment lanes, live pricing
+  and token usage tracking, file manager improvements, and architecture diagram upgrades.
+
 ## 0.5.7
 
 ### Patch Changes
