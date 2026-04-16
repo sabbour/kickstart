@@ -21,6 +21,7 @@ import {
   Phase,
   getPhaseDefinition,
   getPhaseOrder,
+  PHASE_DEFINITIONS,
   processResponse,
   resolveConversationSkills,
   defaultRegistry,
@@ -28,8 +29,6 @@ import {
   resolveSkills,
   defaultKitRegistry,
   InMemoryArtifactStore,
-  handleImplicitFlags,
-  transition,
 } from "@kickstart/core";
 import type {
   PhaseItem,
@@ -108,6 +107,12 @@ function getSafeCurrentPhase(
   return normalizeConversePhase(engineState.currentPhase) ?? Phase.Discover;
 }
 
+/** Return the next phase after the given one, or the same phase if already at the end. */
+function advancePhase(currentPhase: Phase): Phase {
+  const def = PHASE_DEFINITIONS.find((p) => p.id === currentPhase);
+  return def?.nextPhase ?? currentPhase;
+}
+
 function extractSetupControlAction(
   message: string,
 ): SetupGenerationControlAction | undefined {
@@ -128,10 +133,8 @@ function extractSetupControlAction(
 }
 
 function syncSessionPhase(session: ApiSession, nextPhase: Phase): void {
-  while (getSafeCurrentPhase(session.engineState) !== nextPhase && !session.engineState.isComplete) {
-    session.engineState = transition(session.engineState, { type: "ADVANCE" });
-  }
-  session.state.currentPhase = session.engineState.currentPhase;
+  session.engineState.currentPhase = nextPhase;
+  session.state.currentPhase = nextPhase;
 }
 
 app.http("converse", {
@@ -364,8 +367,9 @@ app.http("converse", {
 
       // Handle implicit state flags from LLM response
       const flags = extractImplicitFlags(finalContent);
-      if (flags.phaseComplete || flags.filesComplete !== null) {
-        session.engineState = handleImplicitFlags(session.engineState, flags);
+      if (flags.phaseComplete) {
+        session.engineState.currentPhase = advancePhase(session.engineState.currentPhase);
+        session.state.currentPhase = session.engineState.currentPhase;
       }
 
       // Compute phase indicator AFTER implicit flags so UI and metadata are consistent
@@ -414,15 +418,16 @@ app.http("converse", {
 /** Build a fresh ConversationPhase A2UI indicator from the current engine state. */
 function buildPhaseIndicator(engineState: ConversationState): object[] {
   const currentPhase = getSafeCurrentPhase(engineState);
-  const phases: PhaseItem[] = getPhaseOrder().map((phase) => ({
+  const order = getPhaseOrder();
+  const currentIdx = order.indexOf(currentPhase);
+  const phases: PhaseItem[] = order.map((phase, idx) => ({
     id: phase,
     label: getPhaseDefinition(phase).label,
-    status:
-      engineState.phaseStatus[phase] === "active"
+    status: idx < currentIdx
+      ? ("complete" as const)
+      : idx === currentIdx
         ? ("active" as const)
-        : engineState.phaseStatus[phase] === "complete"
-          ? ("complete" as const)
-          : ("pending" as const),
+        : ("pending" as const),
   }));
   return [
     {
@@ -635,11 +640,9 @@ function handleStreaming(
 
             // Handle implicit state flags
             const flags = extractImplicitFlags(fullContent);
-            if (flags.phaseComplete || flags.filesComplete !== null) {
-              const updated = handleImplicitFlags(
-                engineState,
-                flags,
-              );
+            if (flags.phaseComplete) {
+              const nextPhase = advancePhase(engineState.currentPhase);
+              const updated: ConversationState = { currentPhase: nextPhase };
               updateEngineState(updated);
               engineState = updated;
             }

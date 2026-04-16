@@ -10,7 +10,7 @@ import {
   getPhaseOrder,
   getPhaseDefinition,
   buildSystemPrompt,
-  transition,
+  Phase,
 } from "@kickstart/core";
 import type {
   SessionState,
@@ -63,14 +63,9 @@ export async function handleConverse(
   // Retrieve or recover engine state
   let engineState = getEngineState(sessionId);
   if (!engineState) {
-    const { createInitialState } = await import("@kickstart/core");
-    engineState = createInitialState();
+    engineState = { currentPhase: Phase.Discover };
     setEngineState(sessionId, engineState);
   }
-
-  // Process the message through the phase machine
-  engineState = transition(engineState, { type: "USER_INPUT", input: message });
-  setEngineState(sessionId, engineState);
 
   // Recompose system prompt for the (possibly new) current phase
   const systemPrompt = buildSystemPrompt({
@@ -84,15 +79,12 @@ export async function handleConverse(
   session.currentPhase = engineState.currentPhase;
 
   // Build A2UI phase indicator
-  const phases: PhaseItem[] = getPhaseOrder().map((phase) => ({
+  const order = getPhaseOrder();
+  const currentIdx = order.indexOf(engineState.currentPhase);
+  const phases: PhaseItem[] = order.map((phase, idx) => ({
     id: phase,
     label: getPhaseDefinition(phase).label,
-    status:
-      engineState!.phaseStatus[phase] === "active"
-        ? "active"
-        : engineState!.phaseStatus[phase] === "complete"
-          ? "complete"
-          : "pending",
+    status: idx < currentIdx ? "complete" : idx === currentIdx ? "active" : "pending",
   }));
 
   const phaseComponent: ConversationPhaseComponent = {

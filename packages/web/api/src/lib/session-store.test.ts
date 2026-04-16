@@ -26,12 +26,6 @@ describe("session-store phase hydration", () => {
     expect(session.engineState.currentPhase).toBe(Phase.Deploy);
     expect(session.state.currentPhase).toBe(Phase.Deploy);
     expect(session.routingPhaseTrusted).toBe(false);
-    expect(session.engineState.phaseStatus[Phase.Discover]).toBe("complete");
-    expect(session.engineState.phaseStatus[Phase.Design]).toBe("complete");
-    expect(session.engineState.phaseStatus[Phase.Generate]).toBe("complete");
-    expect(session.engineState.phaseStatus[Phase.Review]).toBe("complete");
-    expect(session.engineState.phaseStatus[Phase.Handoff]).toBe("complete");
-    expect(session.engineState.phaseStatus[Phase.Deploy]).toBe("active");
   });
 
   it("falls back to discover when the client history has no usable phase", () => {

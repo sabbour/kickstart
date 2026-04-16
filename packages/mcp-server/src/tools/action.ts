@@ -6,17 +6,14 @@
  */
 
 import {
-  transition,
-  getCurrentPhase,
   getPhaseDefinition,
   getPhaseOrder,
+  PHASE_DEFINITIONS,
   Phase,
 } from "@kickstart/core";
 import type {
   SessionState,
-  ConversationState,
   PhaseItem,
-  PhaseStatus,
 } from "@kickstart/core";
 import { createA2UIResource } from "../a2ui.js";
 
@@ -49,34 +46,39 @@ export async function handleAction(
     };
   }
 
-  // Reconstruct engine state from session
-  const phases = getPhaseOrder();
-  const phaseStatus = {} as Record<Phase, PhaseStatus>;
-  for (const phase of phases) {
-    if (phase === session.currentPhase) {
-      phaseStatus[phase] = "active";
-    } else if (phases.indexOf(phase) < phases.indexOf(session.currentPhase as Phase)) {
-      phaseStatus[phase] = "complete";
-    } else {
-      phaseStatus[phase] = "pending";
-    }
+  const phaseOrder = getPhaseOrder();
+  const isKnownPhase = (value: string): value is Phase =>
+    phaseOrder.includes(value as Phase);
+
+  // Normalize persisted phase before using it.
+  let currentPhase: Phase = isKnownPhase(session.currentPhase)
+    ? session.currentPhase
+    : Phase.Discover;
+
+  // Helper: compute phase indicator items from current phase
+  function buildPhaseItems(): PhaseItem[] {
+    const currentIdx = phaseOrder.indexOf(currentPhase);
+    return phaseOrder.map((phase, idx) => ({
+      id: phase,
+      label: getPhaseDefinition(phase).label,
+      status: idx < currentIdx ? "complete" : idx === currentIdx ? "active" : "pending",
+    }));
   }
 
-  let engineState: ConversationState = {
-    currentPhase: session.currentPhase as Phase,
-    phaseStatus,
-    phaseData: Object.fromEntries(phases.map((p) => [p, {}])) as Record<Phase, Record<string, unknown>>,
-    isComplete: false,
-  };
+  // Helper: advance to the next phase
+  function advancePhase(phase: Phase): Phase {
+    const def = PHASE_DEFINITIONS.find((p) => p.id === phase);
+    return def?.nextPhase ?? phase;
+  }
 
   // Process action
   switch (actionType) {
     case "advance":
-      engineState = transition(engineState, { type: "ADVANCE", data: payload });
+      currentPhase = advancePhase(currentPhase);
       break;
 
     case "skip":
-      engineState = transition(engineState, { type: "SKIP" });
+      currentPhase = advancePhase(currentPhase);
       break;
 
     case "select":
@@ -89,7 +91,7 @@ export async function handleAction(
       if (payload) {
         Object.assign(session.appDefinition, payload);
       }
-      engineState = transition(engineState, { type: "ADVANCE", data: payload });
+      currentPhase = advancePhase(currentPhase);
       break;
 
     case "reply": {
@@ -107,9 +109,10 @@ export async function handleAction(
         content: message,
         timestamp: new Date().toISOString(),
       });
+      session.currentPhase = currentPhase;
       session.updatedAt = new Date().toISOString();
       sessions.set(sessionId, session);
-      const replyDef = getPhaseDefinition(session.currentPhase as Phase);
+      const replyDef = getPhaseDefinition(currentPhase);
       return {
         content: [{ type: "text", text: `Received reply in **${replyDef.label}** phase. The conversation will continue from here.` }],
       };
@@ -118,14 +121,15 @@ export async function handleAction(
     case "navigate": {
       const targetPhase = payload?.targetPhase;
       if (!targetPhase) {
+        session.currentPhase = currentPhase;
         session.updatedAt = new Date().toISOString();
         sessions.set(sessionId, session);
         return {
           content: [{ type: "text", text: "Error: Missing required field: `targetPhase` is required for navigate actions." }],
         };
       }
-      const validPhases = getPhaseOrder() as string[];
-      if (!validPhases.includes(targetPhase as string)) {
+      if (!isKnownPhase(targetPhase as string)) {
+        session.currentPhase = currentPhase;
         session.updatedAt = new Date().toISOString();
         sessions.set(sessionId, session);
         return {
@@ -137,34 +141,25 @@ export async function handleAction(
       session.updatedAt = new Date().toISOString();
       sessions.set(sessionId, session);
 
-      // Rebuild phase status for the new current phase
-      const navPhases = getPhaseOrder();
-      const navPhaseStatus = {} as Record<Phase, PhaseStatus>;
-      for (const phase of navPhases) {
-        if (phase === session.currentPhase) {
-          navPhaseStatus[phase] = "active";
-        } else if (navPhases.indexOf(phase) < navPhases.indexOf(session.currentPhase as Phase)) {
-          navPhaseStatus[phase] = "complete";
-        } else {
-          navPhaseStatus[phase] = "pending";
-        }
-      }
-      const navPhaseItems: PhaseItem[] = navPhases.map((phase) => ({
+      // Build phase indicator for the new current phase
+      const navPhase = targetPhase as Phase;
+      const navIdx = phaseOrder.indexOf(navPhase);
+      const navPhaseItems: PhaseItem[] = phaseOrder.map((phase, idx) => ({
         id: phase,
         label: getPhaseDefinition(phase).label,
-        status: navPhaseStatus[phase],
+        status: idx < navIdx ? "complete" : idx === navIdx ? "active" : "pending",
       }));
       const navPhaseComponent: ConversationPhaseComponent = {
         type: "ConversationPhase",
         id: "phase-indicator",
         phases: navPhaseItems,
-        currentPhase: session.currentPhase as Phase,
+        currentPhase: navPhase,
       };
       const navResource = createA2UIResource(
         navPhaseComponent,
         `a2ui://kickstart/session/${sessionId}/phase`,
       );
-      const navDef = getPhaseDefinition(session.currentPhase as Phase);
+      const navDef = getPhaseDefinition(navPhase);
       const navContent: Array<{ type: "text"; text: string } | { type: "resource"; resource: { uri: string; mimeType: string; text: string } }> = [
         { type: "text", text: `Navigated to **${navDef.label}** phase: ${navDef.description}` },
       ];
@@ -189,22 +184,18 @@ export async function handleAction(
   }
 
   // Update session
-  session.currentPhase = getCurrentPhase(engineState);
+  session.currentPhase = currentPhase;
   session.updatedAt = new Date().toISOString();
   sessions.set(sessionId, session);
 
   // Build updated A2UI phase component
-  const phaseItems: PhaseItem[] = getPhaseOrder().map((phase) => ({
-    id: phase,
-    label: getPhaseDefinition(phase).label,
-    status: engineState.phaseStatus[phase],
-  }));
+  const phaseItems = buildPhaseItems();
 
   const phaseComponent: ConversationPhaseComponent = {
     type: "ConversationPhase",
     id: "phase-indicator",
     phases: phaseItems,
-    currentPhase: engineState.currentPhase,
+    currentPhase,
   };
 
   const a2uiResource = createA2UIResource(
@@ -212,8 +203,9 @@ export async function handleAction(
     `a2ui://kickstart/session/${sessionId}/phase`,
   );
 
-  const currentDef = getPhaseDefinition(engineState.currentPhase);
-  const statusText = engineState.isComplete
+  const currentDef = getPhaseDefinition(currentPhase);
+  const isAtEnd = !PHASE_DEFINITIONS.find((p) => p.id === currentPhase)?.nextPhase;
+  const statusText = isAtEnd
     ? "**All phases complete.** Your deployment plan is ready."
     : `Now in **${currentDef.label}** phase: ${currentDef.description}`;
 

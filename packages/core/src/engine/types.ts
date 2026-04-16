@@ -20,19 +20,10 @@ export enum Phase {
   Deploy = "deploy",
 }
 
-/** Status of a conversation phase. */
-export type PhaseStatus = "pending" | "active" | "complete" | "skipped";
-
-/** Tracks the state of the conversation across phases. */
+/** Tracks the state of the conversation. */
 export interface ConversationState {
   /** Current active phase */
   currentPhase: Phase;
-  /** Status of each phase */
-  phaseStatus: Record<Phase, PhaseStatus>;
-  /** Data collected during each phase */
-  phaseData: Record<Phase, Record<string, unknown>>;
-  /** Whether the conversation is complete */
-  isComplete: boolean;
 }
 
 /** Definition of a conversation phase with its behavior. */
@@ -52,15 +43,6 @@ export interface PhaseDefinition {
   /** Next phase after this one completes */
   nextPhase: Phase | null;
 }
-
-/** Events that drive the conversation state machine. */
-export type ConversationEvent =
-  | { type: "START" }
-  | { type: "ADVANCE"; data?: Record<string, unknown> }
-  | { type: "SKIP" }
-  | { type: "RESET" }
-  | { type: "USER_INPUT"; input: string }
-  | { type: "PHASE_COMPLETE"; phase: Phase; data: Record<string, unknown> };
 
 // ---------------------------------------------------------------------------
 // Knowledge Skills (#33)

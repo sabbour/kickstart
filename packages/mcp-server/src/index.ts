@@ -16,11 +16,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import {
-  createInitialState,
-  transition,
   Phase,
 } from "@kickstart/core";
-import type { SessionState, ConversationState } from "@kickstart/core";
+import type { SessionState } from "@kickstart/core";
 
 import { handleKickstart, deleteEngineState } from "./tools/kickstart.js";
 import { handleConverse } from "./tools/converse.js";

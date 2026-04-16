@@ -39,7 +39,7 @@ describe("handleKickstart", () => {
     const engineState = getEngineState(sessionId);
     expect(engineState).toBeDefined();
     expect(engineState!.currentPhase).toBe(Phase.Discover);
-    expect(engineState!.isComplete).toBe(false);
+    // isComplete was removed with the FSM; currentPhase being Discover means not complete
   });
 
   it("stores the system prompt as a system message in the session", async () => {

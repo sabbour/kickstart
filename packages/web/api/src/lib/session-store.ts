@@ -9,9 +9,7 @@ import { randomUUID } from "node:crypto";
 import {
   Phase,
   SETUP_GENERATION_STEP_ORDER,
-  createInitialState,
   buildSystemPrompt,
-  transition,
 } from "@kickstart/core";
 import type {
   SessionState,
@@ -140,7 +138,7 @@ export function adoptSessionPrincipal(session: ApiSession, principalId?: string)
 export function createSession(principalId?: string): ApiSession {
   const sessionId = randomUUID();
   const now = new Date().toISOString();
-  const engineState = createInitialState();
+  const engineState: ConversationState = { currentPhase: Phase.Discover };
 
   const systemPrompt = buildSystemPrompt({
     phase: Phase.Discover,
@@ -197,16 +195,7 @@ function restoreEngineStateFromHistory(clientMessages: ClientMessage[]): Convers
     .find((msg) => typeof msg.phase === "string" && phases.has(msg.phase as Phase))
     ?.phase as Phase | undefined;
 
-  if (!lastPhase) {
-    return createInitialState();
-  }
-
-  let state = createInitialState();
-  while (state.currentPhase !== lastPhase && !state.isComplete) {
-    state = transition(state, { type: "ADVANCE" });
-  }
-
-  return state.currentPhase === lastPhase ? state : createInitialState();
+  return { currentPhase: lastPhase ?? Phase.Discover };
 }
 
 /**

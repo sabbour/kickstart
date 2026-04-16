@@ -60,11 +60,6 @@ export {
   PHASE_DEFINITIONS,
   getPhaseDefinition,
   getPhaseOrder,
-  createInitialState,
-  transition,
-  getCurrentPhase,
-  canAdvance,
-  handleImplicitFlags,
   resolveSkills,
   resolveSkillsAsync,
   resolveSkillsFromList,
@@ -85,11 +80,8 @@ export {
   formatCopilotSkillsPrompt,
 } from "./engine/index.js";
 export type {
-  PhaseStatus,
   ConversationState,
   PhaseDefinition,
-  ConversationEvent,
-  ImplicitFlags,
   ResolvedSkills,
   Skill,
   SkillResolverContext,

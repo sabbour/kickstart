@@ -8,7 +8,6 @@
 
 import { randomUUID } from "node:crypto";
 import {
-  createInitialState,
   Phase,
   getPhaseOrder,
   getPhaseDefinition,
@@ -62,7 +61,7 @@ export async function handleKickstart(
 ): Promise<{ content: ContentItem[] }> {
   const sessionId = randomUUID();
   const now = new Date().toISOString();
-  const engineState = createInitialState();
+  const engineState: ConversationState = { currentPhase: Phase.Discover };
 
   // Persist engine state for future tool calls
   engineStates.set(sessionId, engineState);

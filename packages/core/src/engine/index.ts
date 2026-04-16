@@ -1,9 +1,7 @@
 export { Phase } from "./types.js";
 export type {
-  PhaseStatus,
   ConversationState,
   PhaseDefinition,
-  ConversationEvent,
   Skill,
   SkillResolverContext,
 } from "./types.js";
@@ -13,15 +11,6 @@ export {
   getPhaseDefinition,
   getPhaseOrder,
 } from "./phases.js";
-
-export {
-  createInitialState,
-  transition,
-  getCurrentPhase,
-  canAdvance,
-  handleImplicitFlags,
-} from "./machine.js";
-export type { ImplicitFlags } from "./machine.js";
 
 export {
   resolveSkills,
