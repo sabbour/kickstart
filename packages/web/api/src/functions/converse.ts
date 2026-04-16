@@ -22,6 +22,7 @@ import {
   getPhaseDefinition,
   getPhaseOrder,
   processResponse,
+  resolveConversationSkills,
   defaultRegistry,
   buildSystemPrompt,
   resolveSkills,
@@ -36,6 +37,7 @@ import type {
   ConversationState,
   SetupGenerationControlAction,
   SetupGenerationSnapshot,
+  ConversationSkillsContext,
 } from "@kickstart/core";
 import {
   getSession, createSession, getPrincipalId, hydrateSession, addMessage,
@@ -255,6 +257,49 @@ app.http("converse", {
         role: m.role as "system" | "user" | "assistant",
         content: idx === 0 && m.role === "system" ? freshSystemPrompt : m.content,
       }));
+
+      // Per-turn dynamic skill injection (adaptive-ui pattern):
+      // Detect the domain of THIS message and inject targeted knowledge +
+      // a live session snapshot so the LLM has the right context at the right moment.
+      const skillsCtx: ConversationSkillsContext = {
+        phase: currentPhase,
+        appDefinition: state.appDefinition
+          ? {
+              runtime: (state.appDefinition as Record<string, unknown>).runtime as string | undefined,
+              appType: (state.appDefinition as Record<string, unknown>).appType as string | undefined,
+              name: (state.appDefinition as Record<string, unknown>).name as string | undefined,
+              databaseType: (state.appDefinition as Record<string, unknown>).databaseType as string | undefined,
+              needsIngress: (state.appDefinition as Record<string, unknown>).needsIngress as boolean | undefined,
+              resourceTier: (state.appDefinition as Record<string, unknown>).resourceTier as string | undefined,
+            }
+          : undefined,
+        filesGenerated: session.generatedArtifacts.map((a) => a.filename),
+      };
+      const { domainKnowledge, currentState } = resolveConversationSkills(
+        body.message,
+        currentPhase,
+        skillsCtx,
+      );
+
+      // Inject domain knowledge as a one-time user message before the real message.
+      // currentState is appended to the last (real) user message.
+      if (domainKnowledge) {
+        messages.splice(messages.length - 1, 0, {
+          role: "user",
+          content: domainKnowledge,
+        });
+      }
+      // Append currentState snapshot to the final user message so the LLM always
+      // has a live, authoritative snapshot without re-scanning history.
+      if (messages.length > 0) {
+        const last = messages[messages.length - 1];
+        if (last.role === "user") {
+          messages[messages.length - 1] = {
+            ...last,
+            content: `${last.content}\n\n${currentState}`,
+          };
+        }
+      }
 
       // Create a session-scoped ToolContext for artifact isolation
       const toolContext: ToolContext = {

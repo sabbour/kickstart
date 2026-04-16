@@ -5,6 +5,11 @@
  */
 
 export { processResponse } from "./response-processor.js";
+export { resolveConversationSkills } from "./resolveConversationSkills.js";
+export type {
+  ConversationSkillsContext,
+  ConversationSkillsResult,
+} from "./resolveConversationSkills.js";
 
 export type {
   ProcessedResponse,
