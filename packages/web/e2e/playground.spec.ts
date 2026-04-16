@@ -145,7 +145,7 @@ test.describe('Playground', () => {
       await dialog.getByRole('button', { name: 'Sign in to Azure' }).click();
 
       await expect(dialog.getByText('Connected')).toBeVisible({ timeout: 3_000 });
-      await expect(dialog.getByRole('button', { name: 'Sign out' })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Disconnect' })).toBeVisible();
     });
 
     test('GitHub AuthCard signs in with the playground stub flow', async ({ page }) => {
@@ -155,7 +155,7 @@ test.describe('Playground', () => {
       await dialog.getByRole('button', { name: 'Sign in to GitHub' }).click();
 
       await expect(dialog.getByText('Connected')).toBeVisible({ timeout: 3_000 });
-      await expect(dialog.getByRole('button', { name: 'Sign out' })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Disconnect' })).toBeVisible();
     });
 
     test('fat slice scenario renders stub Azure and GitHub data', async ({ page }) => {

@@ -28,6 +28,13 @@ import {
   listGitHubRepos,
   type GitHubSessionState,
 } from "../../services/github-handoff";
+import {
+  createGitHubStubRepo,
+  createGitHubStubSession,
+  DEFAULT_GITHUB_STUB_OWNER,
+  listGitHubStubRepos,
+  shouldUsePlaygroundAuthStub,
+} from "../../services/playground-auth-stub";
 import { sanitizeActionContext } from "../../utils/sanitize-action-context";
 
 const GitHubRepoPickerApi = {
@@ -136,6 +143,7 @@ function repoParts(fullName: string): { owner: string; repo: string } {
 export const GitHubRepoPicker = createReactComponent(GitHubRepoPickerApi, ({ props, context }) => {
   const classes = useStyles();
   const allowCreate = props.allowCreate !== false;
+  const usePlaygroundStub = shouldUsePlaygroundAuthStub();
 
   const [session, setSession] = useState<GitHubSessionState | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -158,6 +166,15 @@ export const GitHubRepoPicker = createReactComponent(GitHubRepoPickerApi, ({ pro
   const [createPrivate, setCreatePrivate] = useState(false);
 
   const refreshSession = useCallback(async () => {
+    if (usePlaygroundStub) {
+      const nextSession = createGitHubStubSession(true);
+      setSession(nextSession);
+      setError(undefined);
+      setSelectedOwner((current) => current || DEFAULT_GITHUB_STUB_OWNER);
+      setAuthLoading(false);
+      return;
+    }
+
     setAuthLoading(true);
     try {
       const nextSession = await getGitHubSession();
@@ -170,13 +187,24 @@ export const GitHubRepoPicker = createReactComponent(GitHubRepoPickerApi, ({ pro
     } finally {
       setAuthLoading(false);
     }
-  }, []);
+  }, [usePlaygroundStub]);
 
   useEffect(() => {
     void refreshSession();
   }, [refreshSession]);
 
   const fetchRepos = useCallback(async (owner: string, pageNumber: number) => {
+    if (usePlaygroundStub) {
+      const nextRepos = listGitHubStubRepos(owner);
+      const pageStart = (pageNumber - 1) * PER_PAGE;
+      const pageRepos = nextRepos.slice(pageStart, pageStart + PER_PAGE);
+      setRepos(pageRepos);
+      setHasMore(pageStart + PER_PAGE < nextRepos.length);
+      setError(undefined);
+      setLoadingRepos(false);
+      return;
+    }
+
     setLoadingRepos(true);
     try {
       const nextRepos = await listGitHubRepos(owner, pageNumber, PER_PAGE);
@@ -190,7 +218,7 @@ export const GitHubRepoPicker = createReactComponent(GitHubRepoPickerApi, ({ pro
     } finally {
       setLoadingRepos(false);
     }
-  }, []);
+  }, [usePlaygroundStub]);
 
   useEffect(() => {
     if (!session?.authenticated || !selectedOwner || mode !== "existing") {
@@ -263,12 +291,19 @@ export const GitHubRepoPicker = createReactComponent(GitHubRepoPickerApi, ({ pro
 
     setCreating(true);
     try {
-      const createdRepo = await createGitHubRepo({
-        owner: selectedOwner,
-        name: createName.trim(),
-        description: createDescription.trim() || undefined,
-        private: createPrivate,
-      });
+      const createdRepo = usePlaygroundStub
+        ? createGitHubStubRepo({
+            owner: selectedOwner || DEFAULT_GITHUB_STUB_OWNER,
+            name: createName.trim(),
+            description: createDescription.trim() || undefined,
+            private: createPrivate,
+          })
+        : await createGitHubRepo({
+            owner: selectedOwner,
+            name: createName.trim(),
+            description: createDescription.trim() || undefined,
+            private: createPrivate,
+          });
       setRepos((previous) => [createdRepo, ...previous.filter((repo) => repo.full_name !== createdRepo.full_name)]);
       setSelectedRepo(createdRepo.full_name);
       setMode("existing");

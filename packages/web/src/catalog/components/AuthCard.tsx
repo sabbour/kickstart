@@ -30,6 +30,11 @@ import {
   signOutAzure,
   type AzureAuthSessionState,
 } from "../../services/azure-auth";
+import {
+  createAzureStubSession,
+  createGitHubStubSession,
+  shouldUsePlaygroundAuthStub,
+} from "../../services/playground-auth-stub";
 
 const AuthCardApi = {
   name: "AuthCard",
@@ -97,6 +102,7 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
   const classes = useStyles();
   const connector = useAPIConnector(CONNECTOR_NAME[props.provider]);
   const azureConnector = props.provider === "azure" ? connector as AzureARMConnector | undefined : undefined;
+  const usePlaygroundStub = shouldUsePlaygroundAuthStub();
 
   const [loading, setLoading] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
@@ -110,6 +116,15 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
   const description = str(props.description) || DEFAULT_DESCRIPTION[props.provider];
 
   const refreshGitHubSession = useCallback(async () => {
+    if (usePlaygroundStub) {
+      const session = createGitHubStubSession(false);
+      setGitHubSession(session);
+      setAuthenticated(false);
+      setError(undefined);
+      setChecking(false);
+      return;
+    }
+
     setChecking(true);
     try {
       const session = await getGitHubSession();
@@ -123,9 +138,18 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
     } finally {
       setChecking(false);
     }
-  }, []);
+  }, [usePlaygroundStub]);
 
   const refreshAzureSession = useCallback(async () => {
+    if (usePlaygroundStub) {
+      const session = createAzureStubSession(false);
+      setAzureSession(session);
+      setAuthenticated(false);
+      setError(undefined);
+      setChecking(false);
+      return;
+    }
+
     setChecking(true);
     try {
       const session = await getAzureSession(azureConnector);
@@ -139,7 +163,7 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
     } finally {
       setChecking(false);
     }
-  }, [azureConnector]);
+  }, [azureConnector, usePlaygroundStub]);
 
   useEffect(() => {
     if (props.provider === "github") {
@@ -173,12 +197,16 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
 
     try {
       if (props.provider === "github") {
-        const session = await signInWithGitHubPopup();
+        const session = usePlaygroundStub
+          ? createGitHubStubSession(true)
+          : await signInWithGitHubPopup();
         setGitHubSession(session);
         setAuthenticated(session.authenticated);
         setError(session.error);
       } else {
-        const session = await signInToAzure(azureConnector);
+        const session = usePlaygroundStub
+          ? createAzureStubSession(true)
+          : await signInToAzure(azureConnector);
         setAzureSession(session);
         setAuthenticated(session.authenticated);
         setError(session.error);
@@ -190,7 +218,7 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
     } finally {
       setLoading(false);
     }
-  }, [azureConnector, handleAzureContinue, props.provider]);
+  }, [azureConnector, handleAzureContinue, props.provider, usePlaygroundStub]);
 
   useEffect(() => {
     if (props.provider !== "azure") return;
@@ -211,15 +239,23 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
 
     try {
       if (props.provider === "github") {
-        await signOutGitHub();
-        setGitHubSession((previous) => previous
-          ? { ...previous, authenticated: false, viewer: undefined, owners: [] }
-          : null);
+        if (usePlaygroundStub) {
+          setGitHubSession(createGitHubStubSession(false));
+        } else {
+          await signOutGitHub();
+          setGitHubSession((previous) => previous
+            ? { ...previous, authenticated: false, viewer: undefined, owners: [] }
+            : null);
+        }
       } else {
-        await signOutAzure();
-        setAzureSession((previous) => previous
-          ? { ...previous, authenticated: false, subscriptions: [], error: undefined }
-          : null);
+        if (usePlaygroundStub) {
+          setAzureSession(createAzureStubSession(false));
+        } else {
+          await signOutAzure();
+          setAzureSession((previous) => previous
+            ? { ...previous, authenticated: false, subscriptions: [], error: undefined }
+            : null);
+        }
       }
       setAuthenticated(false);
     } catch (err) {
@@ -227,7 +263,7 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
     } finally {
       setLoading(false);
     }
-  }, [azureConnector, props.provider]);
+  }, [props.provider, usePlaygroundStub]);
 
   const summary = useMemo(() => {
     if (props.provider === "azure") {
@@ -318,6 +354,16 @@ export const AuthCard = createReactComponent(AuthCardApi, ({ props, context }) =
           }}
         >
           Azure sign-in is unavailable until the backend auth configuration is ready.
+        </Caption1>
+      )}
+      {usePlaygroundStub && (
+        <Caption1
+          style={{
+            color: tokens.colorNeutralForeground3,
+            marginTop: tokens.spacingVerticalXS,
+          }}
+        >
+          Running in offline mode — sign-in will use stub data
         </Caption1>
       )}
     </Card>
