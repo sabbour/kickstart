@@ -70,10 +70,10 @@ const useStyles = makeStyles({
 // Badge colour mapping
 // ---------------------------------------------------------------------------
 
-type BadgeColor = 'neutral' | 'success' | 'warning' | 'danger' | 'informative';
+type BadgeColor = 'subtle' | 'success' | 'warning' | 'danger' | 'informative';
 
 const BADGE_COLOR_MAP: Record<string, BadgeColor> = {
-  neutral: 'neutral',
+  neutral: 'subtle',
   success: 'success',
   warning: 'warning',
   danger: 'danger',
@@ -101,7 +101,7 @@ export const SummaryCard = createReactComponent(SummaryCardApi, ({ props }) => {
               <Body1Strong>{item.value}</Body1Strong>
               {item.badge && (
                 <Badge
-                  color={BADGE_COLOR_MAP[item.badge] ?? 'neutral'}
+                  color={BADGE_COLOR_MAP[item.badge] ?? 'subtle'}
                   appearance="tint"
                   size="small"
                 >
