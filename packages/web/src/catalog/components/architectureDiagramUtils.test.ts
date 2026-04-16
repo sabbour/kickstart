@@ -402,4 +402,74 @@ describe('architectureDiagramUtils', () => {
     expect(result).toContain('<style>');
     expect(result).not.toContain('%%icon');
   });
+
+  // ---------------------------------------------------------------
+  // Fluent 2 injected diagram CSS — structural contract (#347)
+  // These tests lock the Fluent 2 restyle expectations.
+  // ---------------------------------------------------------------
+
+  describe('Fluent 2 diagram CSS contract', () => {
+    async function getInjectedStyle(): Promise<string> {
+      const renderSvg = vi.fn(async () => ({
+        svg: '<svg xmlns="http://www.w3.org/2000/svg"><g></g></svg>',
+      }));
+      const result = await renderArchitectureDiagramSvg(
+        renderSvg,
+        'style-test',
+        'graph TD\n  A["Node"]',
+        () => null,
+      );
+      const match = result.match(/<style>([\s\S]*?)<\/style>/);
+      return match?.[1] ?? '';
+    }
+
+    it('injects a non-empty <style> block into the rendered SVG', async () => {
+      const css = await getInjectedStyle();
+      expect(css.length).toBeGreaterThan(0);
+    });
+
+    it('targets cluster, edge, and node selectors in injected CSS', async () => {
+      const css = await getInjectedStyle();
+      expect(css).toMatch(/\.cluster\s/);
+      expect(css).toMatch(/\.edgePath/);
+      expect(css).toMatch(/\.edgeLabel/);
+      expect(css).toMatch(/\.nodeLabel|\.node\s+\.label/);
+    });
+
+    it('uses Fluent 2 medium corner radius (4px) on cluster rects', async () => {
+      const css = await getInjectedStyle();
+      expect(css).toMatch(/\.cluster rect[\s\S]*?rx:\s*4/);
+    });
+
+    it('uses Fluent 2 medium corner radius (4px) on edge labels', async () => {
+      const css = await getInjectedStyle();
+      expect(css).toMatch(/\.edgeLabel[\s\S]*?border-radius:\s*4px/);
+    });
+
+    it('uses Fluent 2 thin stroke-width (1) on edges', async () => {
+      const css = await getInjectedStyle();
+      const edgeBlock = css.match(/\.edgePath .path[\s\S]*?(?=\.\w|\}$)/)?.[0] ?? '';
+      expect(edgeBlock).toMatch(/stroke-width:\s*1[^.]|stroke-width:\s*1;/);
+    });
+
+    it('uses Fluent 2 neutralStroke1 (#d1d1d1) on edge paths', async () => {
+      const css = await getInjectedStyle();
+      expect(css).toMatch(/\.edgePath .path[\s\S]*?stroke:\s*#d1d1d1/);
+    });
+
+    it('uses Fluent 2 semibold (600) font-weight on node labels', async () => {
+      const css = await getInjectedStyle();
+      expect(css).toMatch(/(\.nodeLabel|\.node\s+\.label)[\s\S]*?font-weight:\s*600/);
+    });
+
+    it('uses Fluent 2 neutralBackground3 (#f5f5f5) for cluster fill', async () => {
+      const css = await getInjectedStyle();
+      expect(css).toMatch(/\.cluster rect[\s\S]*?fill:\s*#f5f5f5/);
+    });
+
+    it('uses Fluent 2 neutralStroke2 (#e0e0e0) for cluster stroke', async () => {
+      const css = await getInjectedStyle();
+      expect(css).toMatch(/\.cluster rect[\s\S]*?stroke:\s*#e0e0e0/);
+    });
+  });
 });
