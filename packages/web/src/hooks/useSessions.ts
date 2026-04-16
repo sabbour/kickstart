@@ -36,7 +36,7 @@ export function useSessions() {
 
   const createSession = useCallback((firstMessage: string): Session => {
     const session: Session = {
-      id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `session-${crypto.randomUUID()}`,
       title: firstMessage.slice(0, 80),
       messages: [],
       createdAt: Date.now(),
