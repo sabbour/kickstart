@@ -1,21 +1,33 @@
 ---
-updated_at: 2026-04-15T10:11:35.848Z
-mode: burndown-before-ceremony
-focus_area: Complete in-flight demo lanes, then stop for process reset and sprint-start ceremony/system review
-active_issues: [297, 298, 299, 274, 301, 265, 300]
+updated_at: 2026-04-16T05:51:43.085Z
+mode: process-reset-then-design
+focus_area: Sprint planning ceremony, then architecture design spikes (#330, #329)
+active_issues: [330, 329]
+blocked_issues: [332]
 ---
 
 # What We're Focused On
 
-**IMPORTANT: Sprint-start ceremony was skipped. Process drift acknowledged. After burning down current in-flight work, the team will stop and rebuild the operating system.**
+**v0.7.0 shipped. The burndown is complete. Process reset starts NOW.**
 
-Current sprint focus is the real no-mock demo path for Kickstart: stabilize chat rendering, unblock the Review terminal safety-net PR, start the real GitHub handoff, and queue the Azure deployment lane behind it.
+The demo-sprint lanes (297, 298, 299, 274, 301, 265, 300, 331) are all done. #338 confirmed fixed. #332 remains blocked on live credentials (P2, v1.0.0 — no action until external deps clear).
 
-After these lanes complete, all new work stops. The team will conduct:
-1. **Sprint-start ceremony** (skipped at last sprint begin)
-2. **Process review** — address RCA-1 through RCA-5 from decisions.md
-3. **System rebuild** — implement C1, C2, C3 improvements
-4. **Board discipline reset** — restore triage, assignment, and milestone ceremony
+## Immediate Priority Order
+
+1. **Merge PR #341** — DOMPurify 3.4.0 security bump. Fixes mXSS and prototype pollution. Safety-first.
+2. **Sprint planning ceremony** — scope post-v0.7.0 milestones, reassess board, calibrate estimates. Leela facilitates. This was committed to and is now overdue.
+3. **#330 — Agents SDK migration design** (P1, v1.0.0) — Leela writes the DP. Architecture spike, no code. Can proceed in parallel with ceremony since it doesn't consume implementation capacity.
+4. **#329 — MCP App IDE surface design** (important, v0.7.0) — Leela writes the DP after #330, or in parallel if bandwidth allows. Depends on #46 epic direction.
+
+## What's NOT Happening
+
+- **No feature code** until sprint planning completes and the next sprint is scoped.
+- **#332** stays blocked — needs live Azure/GitHub credentials and cross-system auth.
+- **#46** stays as the parent epic — #329 is the active design slice.
+
+## Rationale
+
+Design spikes are process-compatible with a reset — they're architecture planning, exactly what a healthy process produces. The reset prevents premature code without proper DP gates. Writing DPs IS the gate.
 
 ## Reference Projects
 

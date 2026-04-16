@@ -193,4 +193,8 @@ export interface StreamEvent {
   model?: string;
   sessionId?: string;
   usage?: TokenUsageSummary;
+  /** A single stepwise setup event emitted during file generation. */
+  setup_event?: SetupGenerationEvent;
 }
+
+

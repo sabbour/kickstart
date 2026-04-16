@@ -18,6 +18,7 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - **Process directives:** Always stored in .squad/decisions/inbox/ for Scribe merge; not versioned inline
 
 ## Recent Work
+- v0.6.1 deployment prep: vendor diagram assets, eliminate GitHub Packages auth dependency
 - v0.5.6 retro: sprint timing analysis, DP compliance audit, cross-branch contamination fix
 - v0.5.0 multi-surface: security review intensive, postMessage origin validation, session auth spec
 - v0.4.0 planning: wave structure refinement, velocity tracking, dependency mapping
@@ -25,6 +26,7 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 
 ## Learnings
 
+- **2026-04-16T06:00:45.448Z — User directive: vendor adaptive-ui instead of depending:** When a user says "do not depend on X, vendor it instead," the right action is surgical extraction of the minimal surface + create a tracked issue. Issue #342 removes `@sabbour/adaptive-ui-core` + `@sabbour/adaptive-ui-azure-pack` from web app by extracting icon registry + two SVGs into native code. Router: Fry. Scope: hotfix, no design proposal needed (pure refactor). Decision file: `.squad/decisions/inbox/leela-vendor-diagram-hotfix.md`
 - **2026-04-15T22:27:37.636Z — Priority lane tracking on GitHub:** Encode sprint priority directly on GitHub issues using existing labels (`priority:p1`, `priority:p2`) plus cross-link comments. Each issue gets a pinned comment listing its related issues in the same lane. This makes priority visible on the issue page without requiring users to check local squad notes. Decision file: `.squad/decisions/inbox/leela-priority-tracking-github.md`
 - **2026-04-15T09:46:31.308Z — Issue #265 smallest ship:** Treat `FileEditor` payloads as workspace data, not chat bubble content. The no-mock v1 is frontend-first: transform incoming `FileEditor` A2UI into compact file cards, mirror those files into `VirtualFileSystem`, auto-open the sidebar/viewer, and override generate-phase progress title client-side. Key paths: `packages/web/src/utils/chat-a2ui.ts`, `packages/web/src/App.tsx`, `packages/web/src/components/FileManager/`, `packages/web/api/src/lib/session-store.ts`.
 - **2026-04-15T09:46:31.308Z — Issue #265 sequencing stays tight:** GitHub OAuth now being available and Azure deployment staying in scope does not widen #265. The file-manager slice remains a parallel generate/review UX track that should land before or alongside handoff/deploy work, not after it.
@@ -106,3 +108,5 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 
 ### 2026-04-15T22:27:37Z: Priority Tracking Session
 **Outcome:** Priority labels and cross-links added to GitHub issues #333, #328, #327, #326, #331, #332. Decision recorded in decisions.md for future priority tracking workflow.
+
+- **2026-04-16T05:51:43.085Z — Post-v0.7.0 triage and priority lane decision:** Burndown complete, all demo-sprint lanes shipped. Decided: (1) merge PR #341 security bump immediately, (2) run sprint planning ceremony before any feature code, (3) proceed with #330 Agents SDK design spike (P1) in parallel since DPs are process-compatible with a reset, (4) #329 MCP App IDE design follows, (5) #332 stays blocked. Key insight: design spikes produce the DP gates the process requires — blocking them on the ceremony is circular. Updated now.md, session plan, and wrote decision to inbox. Decision file: `.squad/decisions/inbox/leela-post-v070-priority-lane.md`

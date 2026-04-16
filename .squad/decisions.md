@@ -1,422 +1,7 @@
-
-**What went well:**
-- Bot identity system working — reviews posted as `sabbour-squad-lead[bot]`.
-- Parallel reviewer spawning effective — reviewers + implementation ran simultaneously.
-- 10 issues closed in one session — highest throughput sprint to date.
-- Security gate caught real issues: `Buffer` usage in browser (Node-only API), path traversal risks.
-
----
-
-## 2. Root Cause Analysis
-
-### RCA-1: Agent spawn time dominated by context reading
-- **Symptom:** 9 min gap between DP approval and PR.
-- **Root cause:** Agents read 287 KB of history/decisions at spawn. At ~500 tokens/KB, that's ~143K tokens of context before a single line of code. LLM inference on that volume is slow and expensive.
-- **Why it grew:** Scribe summarization threshold is 15 KB, but files grew past 40 KB. Compaction runs after sprints, not before. Agents start with accumulated cruft from previous sprints.
-
-### RCA-2: Process ceremony too heavy for trivial fixes
-- **Symptom:** CSS-only change (#161) went through full DP → architecture review → security review → code → PR review pipeline.
-- **Root cause:** No fast-track path for changes below a complexity threshold. Every issue got the same ceremony regardless of risk or size.
-
-### RCA-3: No progress visibility during implementation
-- **Symptom:** Ahmed frustrated by silence between DP approval and PR appearing.
-- **Root cause:** Agents create branch + commits + PR as a batch at the end. No draft PR or branch push happens early. GitHub shows nothing until the agent is completely done.
-
-### RCA-4: Shared working tree causes git conflicts
-- **Symptom:** Parallel agents stepping on each other's git state.
-- **Root cause:** All agents share the same `main` checkout. No worktree isolation between parallel agent runs.
-
-### RCA-5: Stale directives not loaded at sprint start
-- **Symptom:** Agents skipped DP step; lockout protocol fired incorrectly.
-- **Root cause:** Directives captured mid-sprint aren't retroactively applied to already-running agents. New agents pick them up, but running ones don't re-read context.
-
----
-
-## 3. What Should Change
-
-### C1: Pre-sprint context compaction ("the nap")
-Run aggressive history compaction BEFORE sprints, not just after. Target: each history file ≤ 10 KB, decisions.md ≤ 30 KB. Agents should start clean.
-
-**Rule:** Before any sprint, Scribe runs compaction. If total context > 50 KB, sprint does not start.
-
-### C2: Fast-track path for trivial changes
-Define a "trivial change" gate: CSS-only, typo fix, config change, rename, or single-file change with no logic. Trivial changes skip DP architecture review and security review. They still need code review (one reviewer, not two).
-
-**Threshold:** ≤ 1 file changed, no new dependencies, no API surface change, no security-relevant code.
-
-### C3: Draft PR within 30 seconds
-Agents must create branch + draft PR immediately after DP approval, BEFORE writing code. This gives Ahmed a GitHub URL to watch within 30 seconds. Commits are pushed incrementally as work progresses.
-
-**Sequence:** DP approved → create branch → push empty commit → open draft PR → implement → push commits → mark PR ready for review.
-## 4. User Directives (April 2026)
-
-### 2026-04-15T10:11:35Z: Burn down in-flight work, then stop for process reset
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Finish current in-flight issues without interruption, then stop and rebuild the operating system. The missed sprint-start ceremony and process drift are not acceptable.
-**Status:** Active — squad in burndown mode before ceremony/system review
-
-### 2026-04-14T13:00:43Z: Stop deploying PRs to SWA
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Stop deploying pull requests to Azure Static Web Apps. Domain filtering breaks the login mechanisms (SWA auth requires the correct domain), making PR preview deployments useless and a waste of CI time.
-**Status:** Implemented in bender-remove-pr-preview-deploys.md
-
-### 2026-04-14T13:05:30Z: Comment when addressing feedback
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Whenever an agent starts addressing PR review feedback or issue feedback, it must post an acknowledgment comment on the PR or issue (using its bot identity) before making changes. This makes the feedback loop visible to humans watching the repo.
-
-### 2026-04-14T21:38:43Z: Enforce PR review feedback gate
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Stop skipping PR review feedback comments and stop skipping asking for reviews. All PRs must have Copilot review comments addressed before merging. Do not auto-merge without checking for and resolving review feedback first.
-**Why:** The team has been shipping shoddy work by bypassing the review gate.
-
-### 2026-04-15T01:44:20Z: ArchitectureDiagram styling alignment
-**By:** Ahmed Sabbour (via Copilot)
-**What:** The ArchitectureDiagram A2UI component should follow the directive and styling from the try-aks app implementation, not custom styling.
-**Status:** Linked to Issue #255
-
-### 2026-04-15T01:44:20Z: Button styling consistency
-**By:** Ahmed Sabbour (via Copilot)
-**What:** All action buttons rendered by A2UI components must use consistent Fluent UI button styling. Currently "Continue →", "Save Changes", "Revert", "Approve and continue", "Change something", "Deploy Now", "Preview", and "Cancel" buttons are visually inconsistent with the properly-styled "Submit" and "Format Date" buttons. Every button must follow the same Fluent UI appearance rules (primary, outlined, text variants).
-**Status:** Linked to Issue #254
-
-## 5. Decisions from Recent Sprints
-
-### Emoji-to-Icon Mapping Utility for A2UI
-**Author:** Fry (Frontend Dev)
-**Date:** 2026-04-15
-**PR:** #293
-**Issue:** #258
-**Status:** Implemented
-
-Created `statusIcons.tsx` utility mapping emoji (✅ ⚠️ ❌ ℹ️) to Fluent UI icons with semantic colors. A2UI components with user-facing text should call `replaceStatusEmoji(text)` to normalize status indicators.
-
-### Code Block Dark Theme Standard
-**Author:** Fry (Frontend Dev)
-**Date:** 2026-04-15
-**PR:** #294
-**Issue:** #264
-**Status:** Implemented
-
-Standardized code block rendering across all components (CodeBlock, FileViewer, ChatMarkdown, CodeView) on try-aks dark palette: `#1e1e1e` bg, `#d4d4d4` text, Cascadia Code 13px, `github-dark.css` theme, with auto-normalization of literal `\n` in code payloads.
-
-### CI Workflow paths-ignore Removal
-**Author:** Bender (Backend Dev)
-**Date:** 2026-04-15
-**Status:** Implemented
-
-Removed paths-ignore from `.github/workflows/ci.yml` to ensure all PRs trigger CI checks. The protect-main ruleset requires 'Lint, Build & Unit Tests' and 'Playwright E2E Tests' to pass, but docs-only files were excluded, causing merge deadlocks.
-
-### Continuous SWA Deployment + Version Footer
-**Author:** Bender (Backend Dev)
-**Date:** 2026-04-14
-**PR:** #177
-**Status:** Implemented
-
-- Every push to `main` that touches package code auto-deploys to SWA
-- Unified version string: `{semver}-{shortSHA}` (e.g., `0.5.6-abc1234`)
-- Landing and Playground footers show unified version
-
-### Project Board Auto-Assignment in Triage
-**Author:** Bender (Backend Dev)
-=== bender-project-board-triage.md ===
----
-
-# Decision: Project board auto-assignment in triage pipeline
-
-**Date:** 2026-04-14T13:04:54.232Z
-**Author:** Bender (Backend Dev)
-**Status:** Implemented
-
-## Context
-
-Issues created by Ahmed were not being added to the GitHub project board
-(https://github.com/users/sabbour/projects/3) or assigned milestones.
-
-## Decision
-
-1. **Project board:** All three triage workflows (squad-triage, squad-heartbeat,
-   squad-issue-assign) now add issues to the project board automatically using
-   the GraphQL `addProjectV2ItemById` mutation via `COPILOT_ASSIGN_TOKEN`.
-
-2. **Milestones:** NOT auto-assigned. Milestones require judgment (which release?
-   which sprint?). The Lead must assign milestones during in-session triage per
-   the new Triage Checklist in routing.md.
-
-3. **Graceful fallback:** All project board operations are wrapped in try/catch --
-   if the API call fails, the workflow logs a warning but does not fail.
-
-## Affected Files
-
-- `.github/workflows/squad-triage.yml`
-- `.github/workflows/squad-heartbeat.yml`
-- `.github/workflows/squad-issue-assign.yml`
-- `.squad/routing.md`
-
-=== bender-remove-pr-preview-deploys.md ===
----
-
-# Decision: Remove PR preview deployments from SWA workflow
-
-**Date:** 2026-04-14
-**Status:** Implemented
-
-- Issues auto-added to GitHub project board via `addProjectV2ItemById`
-- Milestones NOT auto-assigned (require human judgment)
-- Graceful fallback: failed API calls log warnings but don't fail workflow
-- Affected: `squad-triage.yml`, `squad-heartbeat.yml`, `squad-issue-assign.yml`
-## Context
-
-SWA auth relies on domain filtering — staging preview URLs break login.
-
-## Decision
-
-Removed pull_request trigger, close_staging job, and pull-requests:write permission.
-
-## Consequences
-
-PRs no longer trigger SWA deployments, saving CI minutes.
-
-=== copilot-directive-2026-04-14T130043Z.md ===
----
-
-### 2026-04-14T13:00:43Z: User directive — Stop deploying PRs to SWA
-
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Stop deploying pull requests to Azure Static Web Apps. Domain filtering breaks the login mechanisms (SWA auth requires the correct domain), making PR preview deployments useless and a waste of CI time.
-**Why:** User request — captured for team memory
-
-=== copilot-directive-2026-04-14T130530Z.md ===
----
-
-### 2026-04-14T13:05:30Z: User directive — Comment when addressing feedback
-
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Whenever an agent starts addressing PR review feedback or issue feedback, it must post an acknowledgment comment on the PR or issue (using its bot identity) before making changes. This makes the feedback loop visible to humans watching the repo.
-**Why:** User request — captured for team memory
-
-=== copilot-directive-2026-04-14T192924Z.md ===
-### 2026-04-14T19:29:24Z: User directive
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Drop the "I chose" prefix from button click / ChoicePicker selection messages. The user message should just say the selected value (e.g., "Selected: Web API / REST service"), not "I chose: ...".
-**Why:** User request — captured for team memory
-
-=== fry-browser-back-button.md ===
----
-
-# Decision: Hash-based Navigation with History API
-
-### Hash-Based Navigation with History API
-**Author:** Fry (Frontend Dev)
-**Date:** 2026-04-14
-**Context:** Browser back button support
-
-- Hash routing (`#session/{id}`) with History API (`pushState`/`popstate`)
-- Avoids server-side SWA configuration changes
-- Centralised `useNavigation` hook for all history management
-- Deep-link support: users can bookmark `#session/{id}` URLs
-- All future navigation paths should follow this pattern
----
-
-# Decision: DP Reviews — Public Skills (#186) and Onboarding Tour (#187)
-
-**Author:** Leela (Lead)
-**Date:** 2026-04-14
-
-## Context
-
-Two Design Proposals reviewed and approved with conditions.
-
-## Decisions
-
-### DP #186 — Public Copilot Skill Support
-1. **Build-time bundling via CLI command** — `npm run sync-public-skills` fetches SKILL.md files, parses to Skill[], commits output. No Vite plugin, no runtime fetch.
-2. **Virtual IntegrationKit pattern** — public skills wrapped in a kit registered via `registerKit()`. Zero changes to `resolveSkills()` or `buildSystemPrompt()`.
-3. **Phase auto-mapping** — use `classifyPrompt()` heuristics with `phaseOverrides` config as escape hatch.
-4. **Reference sub-docs ignored** — only SKILL.md body (≤500 tokens) ingested. Sub-docs are a follow-up.
-5. **Public skill priority: -5** — first-party kit skills win on conflict.
-6. **Config in packages/web only** — IDE consumes public skills natively via extensions.
-7. **Namespace prefix mandatory** — `ghca:{skill-name}` format to prevent ID collisions.
-8. **Use existing YAML parser** — no custom frontmatter-parser module.
-
-### DP #187 — Guided Onboarding Tour
-1. **Option A: split tour** — steps 1-2 on Landing, steps 3-4 triggered on first chat entry. Minimal state machine (currentStep + mode check).
-2. **Standalone TourContext** — follows DebugContext/ThemeContext pattern. No UserPreferencesContext consolidation yet.
-3. **No clickable example prompts in tour** — tour explains and points; user interacts with actual UI. Clickable prompts are a separate Landing enhancement.
-4. **requestIdleCallback for auto-start** — not a fixed setTimeout delay.
-5. **4 steps maximum** — scope locked. Expansion requires a new issue.
-6. **Existing CSS targets** — use `.landing-hero`, `.landing-tracks`, `.chat-phase`, `.chat-input-area` directly. No new classes on existing components.
-
----
-
-# Zapp Security Decision — Public Skills Trust Boundary
-
-**Date:** 2026-04-14T17:32:34.141Z  
-**Author:** Zapp (Security Architect)  
-**Scope:** DP #186 public Copilot skill ingestion
-
-## Decision
-Public skill ingestion is approved in principle only if external skill sources are treated as untrusted content crossing into control-plane prompt assembly.
-
-## Required Controls
-1. **Immutable source pinning**: production configs must pin each source to a commit SHA (or signed immutable tag), not moving branches like `main`.
-2. **Prompt-safety validation**: imported `SKILL.md` content must pass policy checks aimed at instruction-level prompt injection; HTML/script stripping alone is insufficient.
-3. **Fail-closed + provenance**: sync must fail on parse/policy violations and persist source provenance (`repo`, `sha`, `path`, `fetchedAt`) for audit/incident response.
-
-## Rationale
-The feature introduces a new supply-chain ingress path and trust-boundary crossing from third-party markdown into system prompt context. These controls preserve deterministic builds while reducing tampering and prompt-injection risk to an acceptable level.
-
----
-
-## 6. User Directives (Continued — 2026-04-15)
-
-### 2026-04-15T08:39:29.427Z: Issue #271 must be ship-ready
-**By:** Ahmed Sabbour (via Copilot)
-**What:** #271 must be a fully functional, ship-ready implementation targeting a functioning app, not just a demo.
-**Why:** User request — captured for team memory
-
-### 2026-04-15T09:06:49.631Z: A2UI typography standard — Subtitle 1 for titles
-**By:** Ahmed Sabbour (via Copilot)
-**What:** For A2UI typography, component titles should start with Subtitle 1 size.
-**Why:** User request — captured for team memory
-
-### 2026-04-15T09:06:49.631Z: Enforce ceremony flow globally
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Ceremony flow is a general repo-wide operating rule for big-ticket work; follow the ceremonies. Big-ticket items like #271 need design proposals, reviews, and the configured ceremony flow. Do not treat ceremonies as specific to any one issue.
-**Why:** User correction — existing ceremonies should already be enforced globally.
-
-### 2026-04-15T09:16:48.306Z: Issue #265 is very important
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Issue #265 is very important; without it the file manager experience is missing, which is crucial.
-**Why:** User request — captured for team memory
-
-### 2026-04-15T09:16:48.306Z: Issue #275 should stay high-priority
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Issue #275 is important and should stay in the high-priority planning lane.
-**Why:** User request — captured for team memory
-
-### 2026-04-15T09:22:04.571Z: Issues #269, #271, #274 are related workstream
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Issues #269, #271, and #274 are related and should be treated as a connected workstream.
-**Why:** User request — captured for team memory
-
-### 2026-04-15T09:34:03.404Z: Debug action events not on chat message
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Do not list all action events on the same chat message; when debugging, show them somewhere else.
-**Why:** User request — captured for team memory
-
-### 2026-04-15T09:34:03.404Z: E2E demo ready with no mocking
-**By:** Ahmed Sabbour (via Copilot)
-**What:** Make the remaining work e2e demo ready with no faking or mocking.
-**Why:** User request — captured for team memory
-
----
-
-## 7. Quality Gate Decisions
-
-### Component Registration Coverage — Issue #271
-**Author:** Hermes (Tester)
-**Date:** 2026-04-15
-**Scope:** AuthCard registration + catalog validation
-**Status:** Active
-
-**Decision:** Component registration changes (adding/removing components from a catalog) REQUIRE two types of tests:
-1. **Inventory test** — verifies component is in the catalog
-2. **Schema validation test** — verifies component props schema is correct
-
-**Why:** Prevents silent failures where components are silently dropped from rendering with no error. This is a permanent, non-negotiable quality gate.
-
-**Implementation guidance:** When implementing #271:
-1. Add AuthCard to `kickstart-catalog.ts`
-2. Add inventory test: `it('AuthCard is in kickstartCatalog')`
-3. Add schema validation test: `it('AuthCard schema accepts/rejects valid/invalid payload')`
-4. Run tests to verify all pass
-5. Commit together — registration + tests in same commit
-
-**Follow-up:** Verify DeploymentProgress schema validation test exists; if not, add in same #271 commit.
-
-**Override:** Squad consensus only.
-
----
-
-## 8. Architecture Decisions (Proposed)
-
-### Architecture Diagram Must Reflect AKS Reality
-**Author:** Leela (Lead)
-**Date:** 2026-04-15T09:34:03.404Z
-**Status:** Proposed
-**Issue:** Related to #300
-
-**Summary:** The architecture diagram at the end of the DESIGN step is under-informed. It only shows user selections but omits AKS infrastructure already known from hardcoded defaults (ACR, Gateway API, Key Vault, Workload Identity).
-
-**Decision:** The diagram must include three tiers:
-- **Tier 1 (Always):** AKS Automatic subgraph, ACR, Key Vault, Gateway (if public)
-- **Tier 2 (Conditional):** Database, cache, queues, AI services per user's DESIGN answers
-- **Tier 3 (Annotations):** CI/CD, Workload Identity labels, auto-scaling counts
-
-**Implementation:** Use Mermaid `diagram` prop with subgraphs, not `nodes/edges` structured API.
-
-**Required changes:**
-1. Update system prompt STEP 2 architecture instruction with detailed guidance
-2. Update Example 3 with `diagram` subgraph pattern
-3. Update component catalog ArchitectureDiagram entry
-4. Update demo-scenarios.ts architecture entry
-5. Verify ArchitectureDiagram.tsx Mermaid rendering handles subgraphs correctly
-
-**Owner:** Bender (Backend)  
-**Reviewer:** Fry (Frontend) — verify ArchitectureDiagram rendering
-
----
-
-
----
-
-## Inbox Entries (Merged)
-
 ### 2026-04-15: Removed paths-ignore from CI workflow
 **By:** Bender (Backend Dev)
 **What:** Removed paths-ignore from .github/workflows/ci.yml so all PRs trigger CI checks, preventing merge deadlocks on docs-only PRs.
 **Why:** The protect-main ruleset requires 'Lint, Build & Unit Tests' and 'Playwright E2E Tests', but paths-ignore excluded docs files. Docs-only PRs could never merge.
-
----
-
----
-date: 2026-04-15T21:57:48.087Z
-author: Bender
-topic: file-generation-contract-fix
-issue: 333
----
-
-# Decision (#333)
-
-Keep generated artifacts canonical in the workspace/file manager, not inline chat. The shared `FileEditor` contract must accept workspace-backed payloads (`artifactPath`), multi-file payloads (`files`), and `path` aliases end-to-end, and cold-start rehydration must preserve artifact-bearing A2UI snippets so the backend can rebuild generated-file context.
-
-## Why
-
-- The frontend chat lane already knows how to replace `FileEditor` surfaces with compact summaries and mirror files into the workspace.
-- Core validation was narrower than the frontend contract, so workspace-backed or multi-file `FileEditor` payloads could be dropped before they reached the file manager path.
-- Client-to-server rehydration only forwarded assistant text, which meant the backend lost generated-file context after cold starts and could drift back toward inline regeneration behavior.
-
-## Impact
-
-- Generated files remain visible in the workspace/file manager while chat stays readable.
-- Backend artifact summaries survive session rehydration without depending on inline chat dumps.
-- Future backend/file-surface work should keep artifact payloads structured and avoid widening chat text with raw file contents.
-
----
-
-### 2026-04-15T22:23:13.115Z: User directive
-**By:** sabbour-squad-frontend[bot] (via Copilot)
-**What:** Prioritize issues #333, #328, #327, #326 and related work first, then #331 and #332.
-**Why:** User request — captured for team memory
-
----
-
-### 2026-04-15T22:27:37.636Z: User directive
-**By:** sabbour-squad-frontend[bot] (via Copilot)
-**What:** Track priority order on the GitHub issues themselves; Git is the source of truth.
-**Why:** User request — captured for team memory
-
----
 
 # Decision: Keep non-runtime files and `bicep-node` out of SWA function startup
 
@@ -453,10 +38,8 @@ Azure Functions v4 loads every file matched by the `package.json` `main` glob at
 - Managed Functions startup now only imports real runtime entrypoints.
 - Azure deployment routes can still use `bicep-node`, but only through the runtime dependency in `node_modules`.
 - Future API tests can stay near the functions code, but the build must continue filtering non-runtime files out of the startup glob.
-
 ---
 
----
 # Decision: Secure ELK ArchitectureDiagram contract
 
 **Date:** 2026-04-15T15:20:24Z
@@ -479,17 +62,21 @@ Issue #273 needed the real try-aks architecture diagram path: ELK layout, Azure/
 - Reusable renderer helpers live in `packages/web/src/catalog/components/architectureDiagramUtils.ts`.
 - Web-only type shims in `packages/web/src/types/` are acceptable when source-published packages expose more TypeScript surface area than the renderer actually needs.
 
----
+# Hermes Decision — Issue #326 Revision 4 QA Gate
 
-# Fry decision — file surface fix
+- **Date:** 2026-04-15
+- **Issue:** #326
+- **Revision Reviewed:** 4 (`#4255575488`)
+- **Decision:** APPROVE
 
-- **Date:** 2026-04-15T21:57:48.087Z
-- **Issue:** #333
-- **Decision:** Keep the current duplicate-file-surface work anchored to #333 as a narrow bug-fix lane. In chat mode, the workspace/file manager remains the canonical generated-file surface; do not mount the legacy `FileEditor` / `FileTreePanel` layout alongside `FileManagerSidebar` / `FileViewer`, and do not fold blocked #326 proposal changes into this fix.
-- **Why:** The user-visible bug is duplicate file chrome plus artifact leakage into chat, not a request for a broader multi-surface redesign. Keeping the fix scoped to the active bug issue lets us stabilize current behavior without importing unapproved proposal-lane changes.
+## Context
+Revision 4 was reviewed specifically against the previously blocked QA concerns: batch validation semantics, mandatory-step failure handling, deterministic rehydration, and the accessibility/regression contract for workspace-only live file streaming.
 
----
+## QA Decision
+Revision 4 makes validation all-or-nothing per step, keeps mandatory-step failures from silently advancing, persists explicit per-step run outcomes for deterministic resume behavior, and keeps accessibility plus regression requirements explicit on the FileManager-first stream.
 
+## Outcome
+QA gate is clear for implementation issues #327 and #328 from the testing side.
 ---
 
 # Decision: Issue #271 — Real flow termination with project download
@@ -615,9 +202,6 @@ code — no fake data, no placeholder URLs, no pretend deployments.
 ## Needs Sign-Off
 
 - **Ahmed Sabbour** — confirm "download project" is acceptable as #271 scope; confirm GitHub OAuth App registration goes into a follow-up issue.
-
----
-
 ---
 
 # Decision: Issue #271 — Ship complete flow with real project delivery
@@ -840,9 +424,6 @@ c) `packages/mcp-server/src/__tests__/action.test.ts`
 5. **Engine state correct**: After Review approval, `engineState.isComplete === true`.
 6. **All tests green**: `npm run build && npm test` pass, including updated phase chain tests.
 7. **Guardrail holds**: LLM prompt explicitly prevents entering Handoff/Deploy; engine enforces mechanically via `nextPhase: null`.
-
----
-
 ---
 
 # Decision: Stop the flow before handoff/deploy — Issue #271
@@ -913,9 +494,6 @@ happening when it is not.
 ## Needs Sign-Off
 
 - **Ahmed Sabbour** — product scope confirmation (ending at review is acceptable).
-
----
-
 ---
 
 # Decision: E2E Demo Sprint Plan — No Faking, No Mocking
@@ -1126,71 +704,6 @@ A human can:
 10. **Without auth:** Flow ends at Review with project download (PR #297 baseline)
 11. **With auth:** Full 6-phase flow through deployment
 12. Zero fake cards, zero dead ends, zero hallucinated success messages
-
----
-
-# Decision: Priority Lane Tracking on GitHub Issues
-
-**Date:** 2026-04-15T22:27:37.636Z  
-**Author:** Leela (Lead)  
-**Status:** Implemented  
-
-## Context
-
-The team had priority lane information (P1 active lane, P2 deferred) tracked only in local squad notes. A reader on GitHub alone could not see why some issues were being worked first and others deferred.
-
-## Decision
-
-Encode priority lane structure directly on GitHub issues using a combination of **labels** and **cross-link comments**.
-
-### Labels
-
-- **Existing label `priority:p1`** ("This sprint") — already applied to #333, #328, #327, #326
-- **Existing label `priority:p2`** ("Next sprint") — applied to #331, #332 as the deferred lane
-
-### Cross-Link Comments
-
-Each of the 6 affected issues now carries a pinned comment listing:
-1. The issue's own position in the lane
-2. All related issues in the same lane (grouped by P1 and P2)
-3. The label convention used
-
-This makes the priority structure visible from any individual issue without requiring a user to navigate to local squad files or a GitHub project board.
-
-## Affected Issues
-
-**P1 Lane (Active):**
-- #333 — stabilize file surfaces (bug fix) ✅ `priority:p1`
-- #328 — keep setup generation in chat ✅ `priority:p1`
-- #327 — implement codex-backed setup ✅ `priority:p1`
-- #326 — design proposal for setup generation ✅ `priority:p1`
-
-**P2 Lane (Deferred):**
-- #331 — playground fat components validation ✅ `priority:p2`
-- #332 — real Azure/GitHub auth integration ✅ `priority:p2`
-
-## Why This Approach
-
-1. **Reuses existing taxonomy** — no new noisy labels invented; `priority:p2` was already defined but unused.
-2. **Visible on GitHub alone** — a reader viewing the issue page sees the full context without needing local notes.
-3. **Minimal, clear change** — comments are non-invasive; labels are the system of record.
-4. **Avoids project-board-only state** — the issue page itself carries the information.
-5. **Supports scale** — as more lanes emerge, this pattern extends naturally.
-
-## Implications
-
-- Users and team members can now look at any issue and understand its relative priority and related work
-- The label filters (`priority:p1`, `priority:p2`) work as expected for sorting/querying
-- Next sprint assignment happens at the label level, not in side notes
-- When an issue moves lanes, both the label and the cross-link comment should be updated
-
-## Related
-
-- User directive: "You need to track those priorities on the issues themselves. Git is the source of truth." (2026-04-15T22:27:37Z)
-- Historical pattern: Previously, priority was tracked in `.squad/decisions.md` sprint plan; now mirrored on GitHub for discoverability
-
----
-
 ---
 
 # Sprint Planning Ceremony — v0.6.1 (E2E Demo Ready)
@@ -1334,3 +847,235 @@ Wave 4: Leela final review → Bender release cut
 4. Monitor #274 completion → trigger #301
 5. Monitor #300 completion → trigger #273
 6. After Waves 1-2 complete → trigger Hermes + Zapp
+
+# Zapp Decision — Issue #326 Revision 4 Security Gate
+
+- **Date:** 2026-04-15
+- **Issue:** #326
+- **Revision Reviewed:** 4 (`#4255575488`)
+- **Decision:** APPROVE
+
+## Context
+Revision 4 was reviewed specifically against previously identified security blockers on sequencing trust boundaries, fail-closed validation/quotas, and SSE privacy/schema controls.
+
+## Security Decision
+Revision 4 keeps security ownership on the server for step progression, enforces fail-closed validation and bounded quotas before file streaming, and defines explicit SSE schema/privacy constraints with non-leaky error semantics.
+
+## Outcome
+Security gate is clear for implementation issues #327 and #328 from the security side.
+
+---
+
+# Decision: Fix Azure Auth A2UI Action Handler and Playground ARM 401 Loop
+
+**Author:** Bender (Backend Dev)  
+**Date:** 2026-04-16  
+**Status:** Implemented  
+**PR:** #345
+
+## Context
+
+Two browser console bugs were found in the Playground / Auth flow:
+
+1. `[A2UI] action (no handler): continue:azure-auth-complete` — fired whenever the Azure auth
+   flow completed inside a Playground Gallery or Widget card. Every `useA2UI()` call in
+   `Playground.tsx` lacked an `actionHandler`, so `continue:` actions were silently swallowed
+   and the wizard got stuck.
+
+2. Repeated ARM proxy 401 errors (`/api/arm/subscriptions?api-version=…`) in playground/mock
+   mode. `AzureResourceForm` guards its fetch with `connector.isAuthenticated()`, but for
+   `auth: { kind: 'none' }` connectors `isAuthenticated()` always returns `true`, so the form
+   hit the real ARM proxy even when running offline.
+
+## Decisions
+
+- **Playground A2UI handlers**: Add a no-op `ActionHandler` to every `useA2UI()` call in
+  `Playground.tsx` that previously passed no handler. The handler is intentionally empty — the
+  Playground has no real wizard state to advance. This silences the console warning and
+  unblocks the auth card UI transition.
+
+- **`SKIP_LIVE_ARM_CALLS` guard**: Evaluate `isMockMode() || isPlaygroundMode()` once at
+  module load time in `AzureResourceForm.tsx` (same pattern as `ALLOW_FALLBACK_DATA` in
+  `AzureResourcePicker.tsx`) and bail out of the live ARM subscription fetch when the flag is
+  set. This is correct because the Playground uses stub subscription IDs that the real ARM
+  proxy rejects.
+
+- **`isAuthenticated()` contract is unchanged**: `BaseConnector.isAuthenticated()` returning
+  `true` for `auth: { kind: 'none' }` is correct behaviour for SWA cookie-based auth — the
+  connector does not manage tokens. The fix belongs in the caller (`AzureResourceForm`), not
+  in the connector.
+
+## Stepwise Setup Streaming (unblocking existing App.tsx diff)
+
+The branch `squad/333-stabilize-file-surfaces` already had 344 lines of uncommitted changes in
+`App.tsx` wiring stepwise file-generation streaming. Those changes referenced several missing
+exports. The following were implemented to unblock the build:
+
+- `SetupGenerationEvent` discriminated union and `ChatMessage.setupEvents` field added to
+  `types.ts`.
+- `StepwiseSetupState` / `SetupStep` types and six exported functions
+  (`createStepwiseSetupState`, `applyStepwiseSetupEvent`, `buildStepwiseSetupMessages`,
+  `getSetupEventKey`, `getStepwiseSetupSurfaceId`, `redactSetupEvent`) added to
+  `utils/chat-a2ui.ts`.
+- `VirtualFS` workspace snapshot methods (`saveWorkspaceSnapshot`, `loadWorkspaceSnapshot`,
+  `deleteWorkspaceSnapshot`, `clearWorkspaceSnapshots`) and new `workspace-snapshots`
+  IndexedDB object store added to `services/virtual-fs.ts` (IDB version bumped 2 → 3).
+
+---
+
+### 2026-04-16T06:00:45.448Z: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Do not take a dependency on `@sabbour/adaptive-ui-core`; vendor whatever is needed into this app natively instead.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-16T06:21:46.299Z: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Recreating the local icon registry binding code in-repo is allowed for the hotfix.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-16T06:50:36.209Z: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Pause for a bit after merged work so the team can catch up before starting new work.
+**Why:** User request — captured for team memory
+
+---
+
+# Fry decision — #328 recovery
+
+## Context
+Issue #328 needs a focused frontend recovery slice against the approved stepwise generation contract without reintroducing duplicate file surfaces in chat.
+
+## Decision
+Represent approved `step_start` / `file_generated` / `step_complete` / `step_error` events as a synthetic `DeploymentProgress` A2UI surface during Generate, and store `file_generated` payloads as hidden `FileEditor` updates on that same surface.
+
+## Why
+This keeps Generate chat progress/status only while preserving existing workspace rehydration, because the stored `FileEditor` payloads still rebuild files into the workspace on session resume without rendering duplicate chat artifacts.
+
+## Follow-up notes
+- Screen reader announcements now come from the FileManager sidebar live region (`aria-live="polite"`).
+- Replay dedupe is client-side on `stepId + path + sha256` for this slice.
+
+---
+
+# K8s icon registration pattern for new resources
+
+## Decision
+
+New Kubernetes resource icons that don't ship with `@sabbour/adaptive-ui-azure-pack` are created as static SVGs under `packages/web/public/assets/icons/k8s/` and registered via `registerDiagramIcons()` in the `ensureDiagramIconsRegistered()` function in `ArchitectureDiagram.tsx`. This supplements (not replaces) the existing pack registration flow. The `ALLOWED_ICON_KEYS` allowlist in `architectureDiagramUtils.ts` must be updated in tandem.
+
+## Rationale
+
+- The azure-pack is an npm dependency we don't modify directly; local static SVGs in `public/` give us fast iteration on new K8s resources without a package release cycle.
+- The `registerDiagramIcons()` call is idempotent and additive, so local icons merge cleanly with pack icons.
+- The allowlist + registry two-layer check keeps untrusted LLM output from injecting arbitrary icon paths.
+
+## Impact
+
+- **Bender**: The system prompt (`system-prompt.ts`) and component catalog (`component-catalog.ts`) list available icon keys for the LLM. New icons (gateway, httproute, pdb, vpa, cronjob, role, rb) should be added to those lists so the LLM uses them in generated diagrams.
+- **Hermes**: The sanitizer test in `architectureDiagramUtils.test.ts` now expects `k8s/gateway` to be allowlisted (previously it asserted the opposite). Test was already updated by the test suite (not by this change).
+
+---
+
+# Decision: TDD contract tests for new k8s icon allowlist entries
+
+## Context
+
+Fry is adding `k8s/gateway`, `k8s/httproute`, `k8s/pdb`, and `k8s/vpa` to the `ALLOWED_ICON_KEYS` allowlist in `architectureDiagramUtils.ts`. Tests need to validate these additions.
+
+## Decision
+
+Wrote 18 tests (up from 3) in `architectureDiagramUtils.test.ts`. Four tests are intentionally TDD-red — they assert the new icon keys are allowlisted and rendered. They will go green when Fry adds the four keys to `ALLOWED_ICON_KEYS`. No other code change is needed to satisfy them.
+
+The canonical icon key names are: `k8s/gateway`, `k8s/httproute`, `k8s/pdb`, `k8s/vpa`. If Fry uses different names, the test expectations must be updated to match.
+
+## Impact
+
+- **Fry**: Adding the 4 keys to `ALLOWED_ICON_KEYS` will turn all 18 tests green.
+- **All agents**: The test file now covers path-traversal rejection, case sensitivity, structural validation, duplicate detection, a11y attributes, and null-resolver handling. Future allowlist additions should follow the same pattern.
+
+---
+
+# Decision: Post-v0.7.0 Priority Lane
+
+**Date:** 2026-04-16T05:51:43.085Z
+**Author:** Leela (Lead)
+**Status:** Active
+
+## Context
+
+v0.7.0 shipped. All burndown lanes complete (297, 298, 299, 274, 301, 265, 300, 331, 338). The team committed to a process reset after burndown. #332 is blocked on external dependencies (live credentials). Two design spikes (#329, #330) are open and assigned to Leela. PR #341 (DOMPurify security bump) is waiting for merge.
+
+## Decision
+
+### Priority order:
+
+1. **PR #341 — merge immediately.** DOMPurify 3.4.0 fixes mXSS, prototype pollution, and FORBID_TAGS bypass. Security dependency bumps don't wait for ceremonies.
+
+2. **Sprint planning ceremony — run next.** The team committed to this after burndown. It's overdue. No feature code starts until the ceremony scopes the next sprint and resets the board.
+
+3. **#330 (Agents SDK design, P1) — in parallel with ceremony.** This is a Leela-only architecture spike. It produces a DP, not code. Design proposals are process-compatible with a reset — they ARE the gate that the process requires before implementation.
+
+4. **#329 (MCP App IDE design, important) — after #330 or in parallel.** Lower priority than the P1 Agents SDK lane. Also a Leela-only DP.
+
+5. **#332 — stays blocked.** P2, v1.0.0. No action until live Azure/GitHub credentials are available.
+
+### What this means for the team:
+
+- **Fry, Bender, Hermes:** No new feature code until sprint planning completes. Available for ceremony participation and PR #341 review/merge.
+- **Zapp:** Standby for security review on #330 and #329 DPs when posted.
+- **Leela:** Facilitates ceremony, writes DPs for #330 and #329.
+
+## Why design spikes proceed during reset
+
+The process reset prevents premature implementation without proper DP gates. Writing DPs is literally building those gates. Blocking architecture planning on a ceremony that plans the architecture is circular. The ceremony will consume the DPs as input for sprint scoping.
+
+## Consequences
+
+- `now.md` updated to reflect new mode and active issues.
+- Session plan updated if stale.
+- Sprint planning ceremony should be requested as the next coordinator action.
+
+---
+
+# Decision: Vendor Diagram Assets to Remove Adaptive-UI Dependency
+
+**Date:** 2026-04-16T06:00:45.448Z  
+**Decision:** Remove \`@sabbour/adaptive-ui-core\` and \`@sabbour/adaptive-ui-azure-pack\` from web app dependencies by vendoring required assets natively into the repo.
+
+## Context
+
+User directive: Do not take a dependency on `@sabbour/adaptive-ui-core`; vendor needed functionality instead.
+
+The web app currently depends on two private packages that require GitHub Packages authentication:
+- `@sabbour/adaptive-ui-core@1.2.2`
+- `@sabbour/adaptive-ui-azure-pack@0.4.0`
+
+This blocks deployment and creates friction for the team.
+
+## Scope
+
+**Only ArchitectureDiagram.tsx uses these packages:**
+1. `getDiagramIconRegistry()` from `@sabbour/adaptive-ui-core`
+2. `registerAzureDiagramIcons()` from `@sabbour/adaptive-ui-azure-pack/diagram-icons`
+3. Two SVG icons: `building-cloud.svg`, `design-ideas.svg` from `@sabbour/adaptive-ui-core/icons/fluent/`
+
+## Action
+
+- Issue #342 created, routed to **Fry** (Frontend Dev)
+- Scope: Extract icon registry logic natively, move SVG icons to repo, update imports, remove packages, remove type shims
+- Acceptance: Builds without auth, component renders, icons display, tests pass
+- Milestone: v0.6.1 (deployment-critical hotfix)
+
+## Rationale
+
+Single-component dependency is a smell. Vendor the minimal surface (two functions + two icons) rather than carry the external package. This restores deployability and removes a blocker.
+
+## Impact
+
+- Frontend: ArchitectureDiagram refactor (small, isolated)
+- DevOps: Eliminates GitHub Packages auth requirement
+- No impact on architecture or other components

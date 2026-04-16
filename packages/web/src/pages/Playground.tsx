@@ -21,6 +21,7 @@ import {
   CardUi24Regular, Navigation24Regular,
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
+import type { ActionHandler } from '../hooks/useActionDispatch';
 import { WidgetsProvider, useWidgets } from '../hooks/useWidgets';
 import { useDebug } from '../contexts/DebugContext';
 import { getDemoResponse, resetDemoState } from '../services/demo-scenarios';
@@ -747,7 +748,11 @@ interface GalleryCardProps {
 
 const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
   const classes = useStyles();
-  const { surfaces, processMessages, processor } = useA2UI();
+  // Gallery cards are display-only previews — provide a stable no-op handler so
+  // that auth actions like continue:azure-auth-complete are gracefully absorbed
+  // instead of triggering "[A2UI] action (no handler)" console warnings.
+  const galleryActionHandler = useCallback<ActionHandler>(() => {}, []);
+  const { surfaces, processMessages, processor } = useA2UI({ actionHandler: galleryActionHandler });
 
   // Process scenario messages in useEffect.
   // Cleanup deletes surfaces so React 19 Strict Mode double-fire doesn't crash.
@@ -826,7 +831,8 @@ interface WidgetCardProps {
 
 const WidgetCard = memo(({ widget, onWidgetClick, onDuplicate, onDelete }: WidgetCardProps) => {
   const classes = useStyles();
-  const { surfaces, processMessages, processor } = useA2UI();
+  const widgetCardActionHandler = useCallback<ActionHandler>(() => {}, []);
+  const { surfaces, processMessages, processor } = useA2UI({ actionHandler: widgetCardActionHandler });
 
   useEffect(() => {
     const createdIds = processMessages(widget.messages);
@@ -881,7 +887,8 @@ interface WidgetPreviewProps {
 }
 
 const WidgetPreview = memo(({ widget }: WidgetPreviewProps) => {
-  const { surfaces, processMessages, processor } = useA2UI();
+  const widgetPreviewActionHandler = useCallback<ActionHandler>(() => {}, []);
+  const { surfaces, processMessages, processor } = useA2UI({ actionHandler: widgetPreviewActionHandler });
 
   useEffect(() => {
     const createdIds = processMessages(widget.messages);
@@ -938,8 +945,11 @@ function PlaygroundInner() {
   const [selectedWidget, setSelectedWidget] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<'preview' | 'json'>('preview');
   const customCounter = useRef(0);
-  const customA2ui = useA2UI(); // For custom JSON editor
-  const createA2ui = useA2UI(); // For Create tab chat
+  // No-op handler: neither the JSON editor nor the Create tab widget previews
+  // have an LLM conversation to advance — absorb all component actions silently.
+  const playgroundInnerActionHandler = useCallback<ActionHandler>(() => {}, []);
+  const customA2ui = useA2UI({ actionHandler: playgroundInnerActionHandler }); // For custom JSON editor
+  const createA2ui = useA2UI({ actionHandler: playgroundInnerActionHandler }); // For Create tab chat
   const [createLoading, setCreateLoading] = useState(false);
   const createSessionIdRef = useRef<string | undefined>(undefined);
   const createEndRef = useRef<HTMLDivElement>(null);

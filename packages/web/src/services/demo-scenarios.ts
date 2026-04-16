@@ -45,7 +45,7 @@ const ARCHITECTURE: DemoResponse = {
       title: 'Proposed Architecture',
       description: 'AKS Automatic with a grouped namespace, managed services, and registry-backed icons.',
       diagram: `graph TD
-  User(("User")) -->|HTTPS| GW["Gateway API<br/>approuting-istio"]
+  User(("User")) -->|HTTPS| GW["%%icon:k8s/gateway%%Gateway API<br/>approuting-istio"]
 
   subgraph CI["GitHub Actions"]
     GHA["GitHub Actions<br/>build + push"]
@@ -59,7 +59,7 @@ const ARCHITECTURE: DemoResponse = {
 
   subgraph AKS["%%icon:azure/aks%%AKS Automatic"]
     subgraph NS["%%icon:k8s/ns%%namespace: web-app"]
-      Route["HTTPRoute<br/>/ → api"]
+      Route["%%icon:k8s/httproute%%HTTPRoute<br/>/ → api"]
       SVC["%%icon:k8s/svc%%Service<br/>api"]
       DEP["%%icon:k8s/deploy%%Deployment<br/>Node.js + Express<br/>(2-10 replicas)"]
       SA["%%icon:k8s/sa%%ServiceAccount<br/>workload identity"]
@@ -199,7 +199,7 @@ const REVIEW_EXPANDED: DemoResponse = {
     { id: 'arch-diagram', component: 'ArchitectureDiagram', title: 'System Architecture',
       description: 'Grouped runtime view with AKS Automatic, namespace boundaries, and managed dependencies.',
       diagram: `graph LR
-  User-->|HTTPS|GW[Gateway API<br/>approuting-istio]
+  User-->|HTTPS|GW[%%icon:k8s/gateway%%Gateway API<br/>approuting-istio]
 
   subgraph ci["GitHub Actions"]
     GHA["GitHub Actions<br/>build + push"]
@@ -214,7 +214,7 @@ const REVIEW_EXPANDED: DemoResponse = {
 
   subgraph aks["%%icon:azure/aks%%AKS Automatic"]
     subgraph ns["%%icon:k8s/ns%%namespace: web-app"]
-      Route["HTTPRoute<br/>/ → web"]
+      Route["%%icon:k8s/httproute%%HTTPRoute<br/>/ → web"]
       SVC["%%icon:k8s/svc%%Service<br/>web"]
       DEP["%%icon:k8s/deploy%%Deployment<br/>web-frontend<br/>3 replicas"]
       SA["%%icon:k8s/sa%%ServiceAccount<br/>workload identity"]

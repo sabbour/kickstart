@@ -110,3 +110,18 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - **Hash-based navigation**: Implemented History API support for browser back button (#169). Uses `#session/{id}` pattern.
 - **Footer update**: Coordinated with Bender on version-SHA display.
 - **Team status**: Awaiting review on PR #214; navigation feature documented in decisions.md.
+- (2026-04-15 22:40Z) Recovery lane for #328 on `squad/328-setup-frontend-recovery`: wired `step_start`/`file_generated`/`step_complete`/`step_error` streaming into a synthetic DeploymentProgress surface, kept generate chat progress-only, routed streamed files into the workspace/FileManager, added a polite live-region announcement, and covered the slice with targeted frontend regressions.
+
+## Learnings
+- (2026-04-16T06:38:32Z) New K8s resource icons that don't exist in the azure-pack should be created as static SVGs under `packages/web/public/assets/icons/k8s/` and registered via `registerDiagramIcons()` in `ensureDiagramIconsRegistered()`. The registration call is additive and idempotent — local icons merge with pack-provided ones without conflict. Always update `ALLOWED_ICON_KEYS` in `architectureDiagramUtils.ts` in tandem.
+- (2026-04-16T06:38:32Z) K8s icon SVGs follow the community convention: blue hexagonal shield (#326ce5) with white glyph and abbreviated label. At 20×20 rendered size in Mermaid diagrams, simple Fluent-inspired glyphs (geometric shapes, arrows) are more readable than detailed illustrations. Match the existing viewBox ratio (≈18×17.5) and keep file sizes minimal.
+
+---
+
+**2026-04-16T06:52:50Z — Scribe**: K8s icons session complete. Added 7 SVG icons (gateway, httproute, pdb, vpa, cronjob, role, rb) to `packages/web/public/assets/icons/k8s/`, wired frontend registration, updated allowlist. Lint clean, tests passing. Decision `fry-k8s-icons.md` merged to decisions.md.
+
+## Learnings
+- (2026-04-16T07:01:08Z) DRA (Dynamic Resource Allocation) K8s resources — DeviceClass, ResourceClaim, ResourceClaimTemplate, ResourceSlice — don't have official `kubectl` short names yet. Use lowercase full resource names as icon keys (`k8s/deviceclass`, `k8s/resourceclaim`, etc.) to stay unambiguous. Avoid `rs` as a label for ResourceSlice since it's the established ReplicaSet abbreviation — use `rslice` instead.
+- (2026-04-16T07:01:08Z) NetworkPolicy (`k8s/netpol`) is registered by the azure-pack at `@sabbour/adaptive-ui-azure-pack/src/diagram-icons.ts:145`. It doesn't need an entry in `K8S_EXTRA_ICONS` — only icons missing from the pack go there. Always check the pack first before adding local overrides.
+- (2026-04-16T07:01:08Z) EndpointSlice (`k8s/endpointslice`) follows the `*slice` naming pattern established for `resourceslice`. Existing Endpoints uses `ep` (from the azure-pack), so `endpointslice` (full name, no hyphen) avoids ambiguity. SVG label `epslice` distinguishes from `ep` at small render sizes.
+- (2026-04-16T07:01:08Z) Gateway API Inference Extension CRDs (InferencePool, InferenceObjective) and the Endpoint Picker (EPP) component use full lowercase names as icon keys (`k8s/inferencepool`, `k8s/inferenceobjective`, `k8s/endpointpicker`) for consistency with DRA keys in the same batch. `endpointpicker` was chosen over `epp` to stay consistent with the full-name convention; the SVG label still shows `epp` since that's the well-known project abbreviation. Hermes had pre-written tests expecting these exact keys.
