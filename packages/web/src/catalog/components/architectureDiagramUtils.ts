@@ -231,14 +231,17 @@ export function normalizeDiagramText(source: string): string {
 export function sanitizeMermaidSource(source: string): string {
   if (!source) return source;
 
+  let result = source;
+
   // Replace <br/>, <br />, <br> (case-insensitive) with newlines first
   // so structural line breaks are preserved before tag stripping.
-  let result = source.replace(/<br\s*\/?>/gi, '\n');
+  result = result.replace(/<br\s*\/?>/gi, '\n');
 
-  // Strip all HTML tags (complete and incomplete) using aggressive regex.
-  // - /<[^>]*>/g: matches well-formed tags like <img src=...>
-  // - /</g: removes any remaining < that wasn't closed (prevents <script> attacks)
-  result = result.replace(/<[^>]*>/g, '').replace(/</g, '');
+  // Strip all HTML tags using a comprehensive regex that removes:
+  // 1. Well-formed tags: <...>
+  // 2. Incomplete tags: remaining < that aren't followed by >
+  // This prevents <script> and other injection attacks.
+  result = result.replace(/<[^>]*>?|</g, '');
 
   return result;
 }
