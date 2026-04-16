@@ -6,17 +6,14 @@
  */
 
 import {
-  transition,
-  getCurrentPhase,
   getPhaseDefinition,
   getPhaseOrder,
+  PHASE_DEFINITIONS,
   Phase,
 } from "@kickstart/core";
 import type {
   SessionState,
-  ConversationState,
   PhaseItem,
-  PhaseStatus,
 } from "@kickstart/core";
 import { createA2UIResource } from "../a2ui.js";
 
@@ -49,34 +46,34 @@ export async function handleAction(
     };
   }
 
-  // Reconstruct engine state from session
-  const phases = getPhaseOrder();
-  const phaseStatus = {} as Record<Phase, PhaseStatus>;
-  for (const phase of phases) {
-    if (phase === session.currentPhase) {
-      phaseStatus[phase] = "active";
-    } else if (phases.indexOf(phase) < phases.indexOf(session.currentPhase as Phase)) {
-      phaseStatus[phase] = "complete";
-    } else {
-      phaseStatus[phase] = "pending";
-    }
+  // Use simple phase string — advance by looking up nextPhase in PHASE_DEFINITIONS
+  let currentPhase = session.currentPhase as Phase;
+
+  // Helper: compute phase indicator items from current phase
+  function buildPhaseItems(): PhaseItem[] {
+    const order = getPhaseOrder();
+    const currentIdx = order.indexOf(currentPhase);
+    return order.map((phase, idx) => ({
+      id: phase,
+      label: getPhaseDefinition(phase).label,
+      status: idx < currentIdx ? "complete" : idx === currentIdx ? "active" : "pending",
+    }));
   }
 
-  let engineState: ConversationState = {
-    currentPhase: session.currentPhase as Phase,
-    phaseStatus,
-    phaseData: Object.fromEntries(phases.map((p) => [p, {}])) as Record<Phase, Record<string, unknown>>,
-    isComplete: false,
-  };
+  // Helper: advance to the next phase
+  function advancePhase(phase: Phase): Phase {
+    const def = PHASE_DEFINITIONS.find((p) => p.id === phase);
+    return def?.nextPhase ?? phase;
+  }
 
   // Process action
   switch (actionType) {
     case "advance":
-      engineState = transition(engineState, { type: "ADVANCE", data: payload });
+      currentPhase = advancePhase(currentPhase);
       break;
 
     case "skip":
-      engineState = transition(engineState, { type: "SKIP" });
+      currentPhase = advancePhase(currentPhase);
       break;
 
     case "select":
@@ -89,7 +86,7 @@ export async function handleAction(
       if (payload) {
         Object.assign(session.appDefinition, payload);
       }
-      engineState = transition(engineState, { type: "ADVANCE", data: payload });
+      currentPhase = advancePhase(currentPhase);
       break;
 
     case "reply": {
@@ -137,22 +134,14 @@ export async function handleAction(
       session.updatedAt = new Date().toISOString();
       sessions.set(sessionId, session);
 
-      // Rebuild phase status for the new current phase
-      const navPhases = getPhaseOrder();
-      const navPhaseStatus = {} as Record<Phase, PhaseStatus>;
-      for (const phase of navPhases) {
-        if (phase === session.currentPhase) {
-          navPhaseStatus[phase] = "active";
-        } else if (navPhases.indexOf(phase) < navPhases.indexOf(session.currentPhase as Phase)) {
-          navPhaseStatus[phase] = "complete";
-        } else {
-          navPhaseStatus[phase] = "pending";
-        }
-      }
-      const navPhaseItems: PhaseItem[] = navPhases.map((phase) => ({
+      // Build phase indicator for the new current phase
+      const navPhase = targetPhase as Phase;
+      const navOrder = getPhaseOrder();
+      const navIdx = navOrder.indexOf(navPhase);
+      const navPhaseItems: PhaseItem[] = navOrder.map((phase, idx) => ({
         id: phase,
         label: getPhaseDefinition(phase).label,
-        status: navPhaseStatus[phase],
+        status: idx < navIdx ? "complete" : idx === navIdx ? "active" : "pending",
       }));
       const navPhaseComponent: ConversationPhaseComponent = {
         type: "ConversationPhase",
@@ -189,22 +178,18 @@ export async function handleAction(
   }
 
   // Update session
-  session.currentPhase = getCurrentPhase(engineState);
+  session.currentPhase = currentPhase;
   session.updatedAt = new Date().toISOString();
   sessions.set(sessionId, session);
 
   // Build updated A2UI phase component
-  const phaseItems: PhaseItem[] = getPhaseOrder().map((phase) => ({
-    id: phase,
-    label: getPhaseDefinition(phase).label,
-    status: engineState.phaseStatus[phase],
-  }));
+  const phaseItems = buildPhaseItems();
 
   const phaseComponent: ConversationPhaseComponent = {
     type: "ConversationPhase",
     id: "phase-indicator",
     phases: phaseItems,
-    currentPhase: engineState.currentPhase,
+    currentPhase,
   };
 
   const a2uiResource = createA2UIResource(
@@ -212,8 +197,9 @@ export async function handleAction(
     `a2ui://kickstart/session/${sessionId}/phase`,
   );
 
-  const currentDef = getPhaseDefinition(engineState.currentPhase);
-  const statusText = engineState.isComplete
+  const currentDef = getPhaseDefinition(currentPhase);
+  const isAtEnd = !PHASE_DEFINITIONS.find((p) => p.id === currentPhase)?.nextPhase;
+  const statusText = isAtEnd
     ? "**All phases complete.** Your deployment plan is ready."
     : `Now in **${currentDef.label}** phase: ${currentDef.description}`;
 

@@ -145,15 +145,16 @@ async function callLLM(
   }));
 
   // Build phase indicator A2UI message
-  const phases: PhaseItem[] = getPhaseOrder().map((phase) => ({
+  const order = getPhaseOrder();
+  const currentIdx = order.indexOf(engineState.currentPhase as Phase);
+  const phases: PhaseItem[] = order.map((phase, idx) => ({
     id: phase,
     label: getPhaseDefinition(phase as Phase).label,
-    status:
-      session.engineState.phaseStatus[phase as Phase] === "active"
+    status: idx < currentIdx
+      ? ("complete" as const)
+      : idx === currentIdx
         ? ("active" as const)
-        : session.engineState.phaseStatus[phase as Phase] === "complete"
-          ? ("complete" as const)
-          : ("pending" as const),
+        : ("pending" as const),
   }));
 
   const phaseA2ui: A2UIMessage[] = [
