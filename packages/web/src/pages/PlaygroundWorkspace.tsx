@@ -255,7 +255,7 @@ CMD ["node", "dist/server.js"]
   },
   {
     path: 'architecture.mmd',
-    language: 'markdown',
+    language: 'mermaid',
     status: 'complete',
     createdAt: NOW,
     updatedAt: NOW,
@@ -282,7 +282,7 @@ app:T --> B:monitor
   },
   {
     path: 'infra/main.bicep',
-    language: 'plaintext',
+    language: 'bicep',
     status: 'complete',
     createdAt: NOW,
     updatedAt: NOW,
@@ -356,8 +356,8 @@ export function PlaygroundWorkspace() {
   const styles = useStyles();
 
   const [selectedPath, setSelectedPath] = useState<string | undefined>(SAMPLE_FILES[0]?.path);
-  const [repoInput, setRepoInput] = useState('https://github.com/sabbour/kickstart');
-  const [appliedRepo, setAppliedRepo] = useState('https://github.com/sabbour/kickstart');
+  const [repoInput, setRepoInput] = useState('');
+  const [appliedRepo, setAppliedRepo] = useState('');
 
   const streamingFiles = useMemo(() => SAMPLE_FILES, []);
 

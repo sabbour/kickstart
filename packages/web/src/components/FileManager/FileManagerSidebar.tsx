@@ -405,8 +405,17 @@ export function FileManagerSidebar({
         </Text>
         <div className={styles.headerActions}>
           {githubRepoUrl && (() => {
-            const parts = githubRepoUrl.replace(/\/$/, '').split('/');
-            const ownerRepo = parts.slice(-2).join('/');
+            let ownerRepo: string | null = null;
+            try {
+              const url = new URL(githubRepoUrl);
+              if (url.hostname === 'github.com') {
+                const segments = url.pathname.replace(/^\/|\/$/g, '').split('/');
+                if (segments.length >= 2 && segments[0] && segments[1]) {
+                  ownerRepo = `${segments[0]}/${segments[1]}`;
+                }
+              }
+            } catch { /* invalid URL — buttons stay hidden */ }
+            if (!ownerRepo) return null;
             return (
               <>
                 <Tooltip content="Open in vscode.dev" relationship="label">
