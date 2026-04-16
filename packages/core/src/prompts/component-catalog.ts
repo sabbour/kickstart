@@ -19,7 +19,8 @@ export type ComponentCategory =
   | "layout"
   | "content"
   | "input"
-  | "domain";
+  | "domain"
+  | "feedback";
 
 /**
  * A catalog entry carries the metadata needed to render one component's
@@ -94,6 +95,25 @@ export const BASE_COMPONENT_CATALOG: readonly ComponentCatalogEntry[] = [
     type: "Markdown",
     category: "content",
     example: '{"id":"md1","component":"Markdown","content":"### Features\\\\n- Auto-scaling\\\\n- Health checks\\\\n- Zero-downtime deploys"}',
+    notes: "Use for free-form prose only. For structured label-value summaries use SummaryCard. For recommendations use DecisionCard. For tabular data use Table. For status messages use Alert.",
+  },
+  {
+    type: "Table",
+    category: "content",
+    example: '{"id":"tbl1","component":"Table","caption":"AKS Node Pools","columns":["Pool","VM Size","Min Nodes","Max Nodes"],"rows":[["system","Standard_D2s_v5","1","3"],["user","Standard_D4s_v5","0","10"]]}',
+    notes: "Use whenever data has clear columns — never use Markdown tables. columns is an array of header strings; rows is an array of string arrays.",
+  },
+  {
+    type: "Link",
+    category: "content",
+    example: '{"id":"lnk1","component":"Link","text":"Azure Pricing Calculator","url":"https://azure.microsoft.com/pricing/calculator/","external":true}',
+    notes: "Use for standalone hyperlinks. For inline links within prose, embed them in Markdown content.",
+  },
+  {
+    type: "Alert",
+    category: "content",
+    example: '{"id":"alert1","component":"Alert","message":"Your app will be publicly accessible. Add network policies before production.","severity":"warning","dismissible":true}',
+    notes: "severities: info, warning, error, success. Use instead of ⚠️/ℹ️ emoji in Markdown.",
   },
   {
     type: "Image",
@@ -193,6 +213,18 @@ export const BASE_COMPONENT_CATALOG: readonly ComponentCatalogEntry[] = [
     category: "domain",
     example: '{"id":"dp1","component":"GenerationProgress","runId":"deploy-123","overallStatus":"running","steps":[{"id":"s1","label":"Build image","status":"complete"},{"id":"s2","label":"Push to registry","status":"running","detail":"Publishing image to ACR"},{"id":"s3","label":"Deploy","status":"pending"}]}',
   },
+  {
+    type: "SummaryCard",
+    category: "domain",
+    example: '{"id":"sum1","component":"SummaryCard","title":"Your App","items":[{"label":"App type","value":"REST API"},{"label":"Runtime","value":"Node.js 20","badge":"success"},{"label":"Database","value":"PostgreSQL Flexible Server"},{"label":"Region","value":"East US"}]}',
+    notes: "Use to summarize gathered facts at the end of Discover, confirm architecture choices, or recap before deployment. Each item may include an optional badge: success, warning, info, danger, neutral.",
+  },
+  {
+    type: "DecisionCard",
+    category: "domain",
+    example: '{"id":"dec1","component":"DecisionCard","title":"Database","recommendation":"PostgreSQL Flexible Server","rationale":"Best fit for your relational workload. Managed service with automatic backups and Entra auth support.","alternatives":["Cosmos DB for NoSQL/global","Azure SQL for SQL Server compat"],"badge":"recommended"}',
+    notes: "Use to present architecture recommendations with rationale instead of Markdown prose. badge: recommended | best-practice | required | optional.",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -204,6 +236,7 @@ const CATEGORY_LABELS: Record<ComponentCategory, string> = {
   content: "Content Components",
   input: "Input Components",
   domain: "Kickstart Domain Components",
+  feedback: "Feedback Components",
 };
 
 const CATEGORY_ORDER: readonly ComponentCategory[] = [
@@ -211,6 +244,7 @@ const CATEGORY_ORDER: readonly ComponentCategory[] = [
   "content",
   "input",
   "domain",
+  "feedback",
 ];
 
 // ---------------------------------------------------------------------------

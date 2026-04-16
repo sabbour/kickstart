@@ -73,6 +73,7 @@ export const KNOWN_COMPONENT_TYPES = new Set([
   "ComboBox",
   "CostEstimate",
   "DateTimeInput",
+  "DecisionCard",
   "GenerationProgress",
   "Divider",
   "FileEditor",
@@ -94,6 +95,7 @@ export const KNOWN_COMPONENT_TYPES = new Set([
   "Row",
   "Slider",
   "SteppedCarousel",
+  "SummaryCard",
   "Tabs",
   "Table",
   "Text",
@@ -894,6 +896,35 @@ const MultiSelectPropsSchema = z
 // Component schema registry
 // ---------------------------------------------------------------------------
 
+// SummaryCard and DecisionCard — new domain components
+
+const SummaryItemSchema = z.object({
+  label: dynamicString,
+  value: dynamicString,
+  badge: z.enum(["neutral", "success", "warning", "danger", "info"]).optional(),
+});
+
+const SummaryCardPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("SummaryCard"),
+    title: dynamicString.optional(),
+    items: z.array(SummaryItemSchema),
+  })
+  .strip();
+
+const DecisionCardPropsSchema = z
+  .object({
+    id: boundedString,
+    component: z.literal("DecisionCard"),
+    title: dynamicString,
+    recommendation: dynamicString,
+    rationale: dynamicString.optional(),
+    alternatives: z.array(dynamicString).optional(),
+    badge: z.enum(["recommended", "best-practice", "required", "optional"]).optional(),
+  })
+  .strip();
+
 /**
  * Maps each known component type to its Zod schema.
  * Used by the response processor to validate per-component props.
@@ -918,6 +949,7 @@ export const COMPONENT_SCHEMA_REGISTRY: Record<string, z.ZodType> = {
   ComboBox: ComboBoxPropsSchema,
   CostEstimate: CostEstimatePropsSchema,
   DateTimeInput: DateTimeInputPropsSchema,
+  DecisionCard: DecisionCardPropsSchema,
   GenerationProgress: GenerationProgressPropsSchema,
   Divider: DividerPropsSchema,
   FileEditor: FileEditorPropsSchema,
@@ -939,6 +971,7 @@ export const COMPONENT_SCHEMA_REGISTRY: Record<string, z.ZodType> = {
   Row: RowPropsSchema,
   Slider: SliderPropsSchema,
   SteppedCarousel: SteppedCarouselPropsSchema,
+  SummaryCard: SummaryCardPropsSchema,
   Tabs: TabsPropsSchema,
   Table: TablePropsSchema,
   Text: TextPropsSchema,

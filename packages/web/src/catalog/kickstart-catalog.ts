@@ -22,6 +22,8 @@ import { CostEstimate } from './components/CostEstimate';
 import { GenerationProgress } from './components/GenerationProgress';
 import { SteppedCarousel } from './components/SteppedCarousel';
 import { Questionnaire } from './components/Questionnaire';
+import { SummaryCard } from './components/SummaryCard';
+import { DecisionCard } from './components/DecisionCard';
 
 const kickstartComponents: ReactComponentImplementation[] = [
   ...Array.from(basicCatalog.components.values()),
@@ -46,6 +48,8 @@ const kickstartComponents: ReactComponentImplementation[] = [
   GenerationProgress,
   SteppedCarousel,
   Questionnaire,
+  SummaryCard,
+  DecisionCard,
 ];
 
 export const kickstartCatalog = new Catalog<ReactComponentImplementation>(
