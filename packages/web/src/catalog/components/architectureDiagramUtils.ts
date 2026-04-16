@@ -223,7 +223,7 @@ export function normalizeDiagramText(source: string): string {
 /**
  * Strips HTML artefacts that the LLM sometimes emits in raw Mermaid source:
  * - `<br/>` / `<br>` used as line separators → real newlines
- * - Any remaining HTML tags that would cause Mermaid parse errors
+ * - All HTML tags (complete and incomplete) to prevent injection
  *
  * This runs before any other pipeline step so the normalisation functions
  * that follow receive clean Mermaid text.
@@ -231,7 +231,8 @@ export function normalizeDiagramText(source: string): string {
 export function sanitizeMermaidSource(source: string): string {
   return source
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '');
+    .replace(/<[^>]*>/g, '')
+    .replace(/</g, '');
 }
 
 export function preprocessDiagram(source: string): string {
