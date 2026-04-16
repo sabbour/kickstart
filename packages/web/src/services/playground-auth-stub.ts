@@ -82,7 +82,7 @@ export function createGitHubStubSession(authenticated: boolean): GitHubSessionSt
     authenticated,
     configured: true,
     viewer: authenticated ? GITHUB_STUB_VIEWER : undefined,
-    owners: GITHUB_STUB_OWNERS,
+    owners: authenticated ? GITHUB_STUB_OWNERS : [],
   };
 }
 

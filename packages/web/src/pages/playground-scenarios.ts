@@ -1394,7 +1394,7 @@ const fatAzureGitHubSlice = (): A2uiMsg[] => {
       text: 'The picker loads stub subscriptions, resource groups, and resources so the cascading flow is easy to test inside Playground.',
       variant: 'caption',
     },
-    { id: 'azure-picker', component: 'AzureResourcePicker', label: 'Pick an Azure resource' },
+    { id: 'azure-picker', component: 'AzureResourcePicker', label: 'Pick an Azure cluster', resourceType: 'Microsoft.ContainerService/managedClusters' },
     { id: 'github-picker-card', component: 'Card', child: 'github-picker-col' },
     { id: 'github-picker-col', component: 'Column', children: ['github-picker-title', 'github-picker-copy', 'github-picker'], gap: 'small' },
     { id: 'github-picker-title', component: 'Text', text: 'GitHub repository selection', variant: 'subtitle1' },
