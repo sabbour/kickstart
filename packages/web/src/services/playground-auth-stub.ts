@@ -1,6 +1,7 @@
 import type { AzureSubscription, GitHubRepo } from "@kickstart/core";
 import type { AzureAuthSessionState } from "./azure-auth";
 import type { GitHubSessionState, GitHubOwnerSummary, GitHubViewerSummary } from "./github-handoff";
+import { isPlaygroundMode } from "./mock-streaming";
 
 const AZURE_STUB_SUBSCRIPTIONS: AzureSubscription[] = [
   {
@@ -58,7 +59,7 @@ const GITHUB_STUB_REPOS: GitHubRepo[] = [
 export const DEFAULT_GITHUB_STUB_OWNER = GITHUB_STUB_VIEWER.login;
 
 export function shouldUsePlaygroundAuthStub(): boolean {
-  return false;
+  return typeof window !== "undefined" && isPlaygroundMode();
 }
 
 export function createAzureStubSession(authenticated: boolean): AzureAuthSessionState {

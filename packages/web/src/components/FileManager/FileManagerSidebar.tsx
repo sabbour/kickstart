@@ -16,7 +16,6 @@ import {
   Button,
   Text,
   Spinner,
-  Tooltip,
   mergeClasses,
 } from '@fluentui/react-components';
 import {
@@ -27,8 +26,6 @@ import {
   ChevronDownRegular,
   DismissRegular,
   ArrowDownloadRegular,
-  WindowDevTools24Regular,
-  Cloud24Regular,
 } from '@fluentui/react-icons';
 import type { VirtualFile, VFSFile, FileTreeNode } from '../../services/virtual-fs';
 import { buildFileTree } from '../../services/virtual-fs';
@@ -309,8 +306,6 @@ export interface FileManagerSidebarProps {
   onDownloadZip?: () => void;
   /** Called to dismiss / close the sidebar. */
   onDismiss: () => void;
-  /** Optional GitHub repo URL (e.g. https://github.com/owner/repo) — enables vscode.dev and Codespaces buttons. */
-  githubRepoUrl?: string;
 }
 
 export function FileManagerSidebar({
@@ -320,7 +315,6 @@ export function FileManagerSidebar({
   onSelectFile,
   onDownloadZip,
   onDismiss,
-  githubRepoUrl,
 }: FileManagerSidebarProps) {
   const styles = useStyles();
   const [workspaceAnnouncement, setWorkspaceAnnouncement] = React.useState('');
@@ -404,32 +398,6 @@ export function FileManagerSidebar({
           Files{fileCount > 0 ? ` (${fileCount})` : ''}
         </Text>
         <div className={styles.headerActions}>
-          {githubRepoUrl && (() => {
-            const parts = githubRepoUrl.replace(/\/$/, '').split('/');
-            const ownerRepo = parts.slice(-2).join('/');
-            return (
-              <>
-                <Tooltip content="Open in vscode.dev" relationship="label">
-                  <Button
-                    appearance="subtle"
-                    size="small"
-                    icon={<WindowDevTools24Regular />}
-                    aria-label="Open in vscode.dev"
-                    onClick={() => window.open(`https://github.dev/${ownerRepo}`, '_blank', 'noopener,noreferrer')}
-                  />
-                </Tooltip>
-                <Tooltip content="Open in GitHub Codespaces" relationship="label">
-                  <Button
-                    appearance="subtle"
-                    size="small"
-                    icon={<Cloud24Regular />}
-                    aria-label="Open in GitHub Codespaces"
-                    onClick={() => window.open(`https://codespaces.new/${ownerRepo}`, '_blank', 'noopener,noreferrer')}
-                  />
-                </Tooltip>
-              </>
-            );
-          })()}
           {onDownloadZip && fileCount > 0 && (
             <Button
               appearance="subtle"

@@ -15,6 +15,11 @@ interface APIConnectorContextValue {
 
 const APIConnectorContext = createContext<APIConnectorContextValue | null>(null);
 
+function shouldUsePlaygroundStubRegistry(): boolean {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).has('playground');
+}
+
 interface APIConnectorProviderProps {
   children: ReactNode;
   /**
@@ -45,16 +50,20 @@ export function APIConnectorProvider({
     if (externalRegistry) return externalRegistry;
 
     const r = new APIConnectorRegistry();
-    r.register(new AzureARMConnector({
-      auth: { kind: 'none' },
-      corsProxy: {
-        proxyBaseUrl: '/api/arm-proxy',
-      },
-    }));
-    r.register(new GitHubConnector({
-      auth: { kind: 'oauth2', scopes: ['read:user'] },
-      serverBaseUrl: '/api/github',
-    }));
+    // Playground intentionally omits auth-gated connectors so fat components
+    // exercise their built-in offline/stub flows without live credentials.
+    if (!shouldUsePlaygroundStubRegistry()) {
+      r.register(new AzureARMConnector({
+        auth: { kind: 'none' },
+        corsProxy: {
+          proxyBaseUrl: '/api/arm-proxy',
+        },
+      }));
+      r.register(new GitHubConnector({
+        auth: { kind: 'oauth2', scopes: ['read:user'] },
+        serverBaseUrl: '/api/github',
+      }));
+    }
     r.register(new PricingConnector());
     return r;
   }, [externalRegistry]);
