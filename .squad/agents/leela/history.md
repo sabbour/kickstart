@@ -113,6 +113,37 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 
 ---
 
+## 2026-04-16 PR #383 Documentation Rewrite — Complete
+
+**Engineering Docs Rewrite (7 files)**
+- **Status:** Ready for merge; all review comments addressed
+- **Files updated:**
+  1. docs/ARCHITECTURE.md — Comprehensive system architecture with VSCode type hints
+  2. docs/PHASES.md — Phase definitions (updated post-FSM removal)
+  3. docs/CONVERSATION-ENGINE.md — Engine internals with advancePhase() pattern
+  4. docs/AUTHENTICATION.md — Auth security model (no localStorage secrets)
+  5. docs/PERSISTENCE.md — virtual-fs.ts (client-side IndexedDB) + server backup
+  6. docs/INTEGRATION.md — Kit pattern + lifecycle management
+  7. docs/TESTING.md — Snapshot + E2E test patterns
+
+**Code Health Documentation**
+- **virtual-fs.ts:** Client-side VirtualFileSystem (IndexedDB). NO server-side TTL. Affects data durability understanding.
+- **Splice vs push:** Clarified immutable array operations using splice(0,1) for safe mutation-free operations in reducer examples.
+- **Resolver ordering:** System walks scoped → base → global. Made dependency resolution chain explicit.
+- **IntegrationKit:** Interface defined in @kickstart/core, published via catalog plugin system.
+
+**Accuracy Fixes (2026-04-16T17:44:57Z)**
+- Corrected factual errors from Copilot PR review (12 comments total)
+- All review feedback incorporated; PR ready for merge
+
+**Quality Gates**
+- npm run build ✅
+- All internal doc links validated ✅
+- Code examples executable ✅
+- Copilot review completed ✅
+
+---
+
 ## 2026-04-16 Sprint Retro — Security + Generation Sprint
 
 **PRs merged this sprint (Leela-owned or cross-cutting):**
