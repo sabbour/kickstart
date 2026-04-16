@@ -1307,7 +1307,7 @@ const kitAzureAuth = (): A2uiMsg[] => {
     {
       id: 'desc',
       component: 'Text',
-      text: 'The AuthCard component is registered by the Azure kit. It renders an MSAL sign-in card that integrates with the azure-arm connector. In offline mode the card uses stub data.',
+      text: 'The AuthCard component is registered by the Azure kit. In Playground it uses the offline stub flow so you can verify the UI without wiring real Azure credentials first.',
       variant: 'body2',
     },
     { id: 'auth-card', component: 'AuthCard', provider: 'azure' },
@@ -1328,7 +1328,7 @@ const kitGitHubAuth = (): A2uiMsg[] => {
     {
       id: 'desc',
       component: 'Text',
-      text: 'The GitHub kit registers an AuthCard with the github-oauth provider. It renders a server-owned OAuth sign-in card that keeps GitHub tokens off the browser surface.',
+      text: 'The GitHub kit registers an AuthCard with the github-oauth provider. In Playground it falls back to the local offline flow so the sign-in card stays testable without a live GitHub session.',
       variant: 'body2',
     },
     { id: 'auth-card', component: 'AuthCard', provider: 'github' },
@@ -1349,7 +1349,7 @@ const kitMultiProvider = (): A2uiMsg[] => {
     {
       id: 'desc',
       component: 'Text',
-      text: 'Both Azure and GitHub kits registered side-by-side. Each AuthCard connects to its own connector and auth provider independently.',
+      text: 'Both Azure and GitHub kits are registered side-by-side. In Playground each AuthCard runs its own offline stub flow so the multi-provider layout is easy to verify without live auth.',
       variant: 'body2',
     },
     { id: 'cards-row', component: 'Row', children: ['azure-card', 'github-card'], gap: 'medium' },
@@ -1362,6 +1362,54 @@ const kitMultiProvider = (): A2uiMsg[] => {
       component: 'Text',
       text: 'Sign in to both providers to enable the full Kickstart workflow — Azure for infrastructure, GitHub for source code.',
       variant: 'body2',
+    },
+  ] as A2uiComponent[]);
+};
+
+const fatAzureGitHubSlice = (): A2uiMsg[] => {
+  const sid = uid('fat-slice-azure-github');
+  return surface(sid, [
+    {
+      id: 'root',
+      component: 'Column',
+      children: ['heading', 'desc', 'auth-row', 'azure-picker-card', 'github-picker-card', 'note'],
+      gap: 'medium',
+    },
+    { id: 'heading', component: 'Text', text: 'Fat slice: Azure + GitHub', variant: 'h3' },
+    {
+      id: 'desc',
+      component: 'Text',
+      text: 'This is the first real Playground smoke slice for fat components. Sign-in is simulated in Playground mode and the pickers use built-in stub data so you can validate the UX without live credentials.',
+      variant: 'body2',
+    },
+    { id: 'auth-row', component: 'Row', children: ['azure-login', 'github-login'], gap: 'medium' },
+    { id: 'azure-login', component: 'AzureLoginCard' },
+    { id: 'github-login', component: 'GitHubLoginCard' },
+    { id: 'azure-picker-card', component: 'Card', child: 'azure-picker-col' },
+    { id: 'azure-picker-col', component: 'Column', children: ['azure-picker-title', 'azure-picker-copy', 'azure-picker'], gap: 'small' },
+    { id: 'azure-picker-title', component: 'Text', text: 'Azure resource selection', variant: 'subtitle1' },
+    {
+      id: 'azure-picker-copy',
+      component: 'Text',
+      text: 'The picker loads stub subscriptions, resource groups, and resources so the cascading flow is easy to test inside Playground.',
+      variant: 'caption',
+    },
+    { id: 'azure-picker', component: 'AzureResourcePicker', label: 'Pick an Azure resource' },
+    { id: 'github-picker-card', component: 'Card', child: 'github-picker-col' },
+    { id: 'github-picker-col', component: 'Column', children: ['github-picker-title', 'github-picker-copy', 'github-picker'], gap: 'small' },
+    { id: 'github-picker-title', component: 'Text', text: 'GitHub repository selection', variant: 'subtitle1' },
+    {
+      id: 'github-picker-copy',
+      component: 'Text',
+      text: 'The picker loads stub repositories so search and selection work even when no GitHub auth is configured.',
+      variant: 'caption',
+    },
+    { id: 'github-picker', component: 'GitHubRepoPicker', placeholder: 'Search repositories...' },
+    {
+      id: 'note',
+      component: 'Text',
+      text: 'Use the Playground at /?playground and open this card for the quickest end-to-end fat-component check.',
+      variant: 'caption',
     },
   ] as A2uiComponent[]);
 };
@@ -1539,7 +1587,7 @@ const domainGitHubLogin = (): A2uiMsg[] => {
   return surface(sid, [
     { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-login'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'GitHubLoginCard', variant: 'h3' },
-    { id: 'desc', component: 'Text', text: 'GitHub authentication card with a server-owned OAuth flow. Sign in to connect your repositories.', variant: 'body2' },
+    { id: 'desc', component: 'Text', text: 'GitHub authentication card with a server-owned OAuth flow. In Playground it falls back to a stub user so you can verify the states without live auth.', variant: 'body2' },
     { id: 'gh-login', component: 'GitHubLoginCard' },
   ] as A2uiComponent[]);
 };
@@ -1549,7 +1597,7 @@ const domainGitHubRepoPicker = (): A2uiMsg[] => {
   return surface(sid, [
     { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-picker'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'GitHubRepoPicker', variant: 'h3' },
-    { id: 'desc', component: 'Text', text: 'Search and select a GitHub repository with pagination, language badges, and metadata. Requires GitHub authentication.', variant: 'body2' },
+    { id: 'desc', component: 'Text', text: 'Search and select a GitHub repository with pagination, language badges, and metadata. Playground falls back to stub repositories when GitHub auth is unavailable.', variant: 'body2' },
     { id: 'gh-picker', component: 'GitHubRepoPicker', placeholder: 'Search repositories...' },
   ] as A2uiComponent[]);
 };
@@ -1559,7 +1607,7 @@ const domainGitHubAction = (): A2uiMsg[] => {
   return surface(sid, [
     { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-action'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'GitHubAction', variant: 'h3' },
-    { id: 'desc', component: 'Text', text: 'Execute a GitHub API action with built-in safety: operation allowlist, branch protection, and destructive confirmation.', variant: 'body2' },
+    { id: 'desc', component: 'Text', text: 'Execute a GitHub API action with built-in safety: operation allowlist, branch protection, and destructive confirmation. Playground simulates success when no GitHub connector is configured.', variant: 'body2' },
     { id: 'gh-action', component: 'GitHubAction', title: 'Create feature branch', description: 'Creates a new branch from main for the feature implementation.', method: 'POST', path: '/repos/demo-org/demo-repo/git/refs', operationType: 'git/refs/create', body: { ref: 'refs/heads/feature/new-api', sha: 'abc123' } },
   ] as A2uiComponent[]);
 };
@@ -1569,7 +1617,7 @@ const domainGitHubCommit = (): A2uiMsg[] => {
   return surface(sid, [
     { id: 'root', component: 'Column', children: ['heading', 'desc', 'gh-commit'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'GitHubCommit', variant: 'h3' },
-    { id: 'desc', component: 'Text', text: 'Multi-step pull request creation wizard: select artifacts, configure branch name, title, and body.', variant: 'body2' },
+    { id: 'desc', component: 'Text', text: 'Multi-step pull request creation wizard: select artifacts, configure branch name, title, and body. Playground simulates PR creation when no GitHub connector is configured.', variant: 'body2' },
     { id: 'gh-commit', component: 'GitHubCommit', suggestedBranchName: 'feature/add-api-endpoints', suggestedTitle: 'Add REST API endpoints', suggestedBody: 'Implements CRUD endpoints for the user service.' },
   ] as A2uiComponent[]);
 };
@@ -1583,7 +1631,7 @@ const domainAzureLogin = (): A2uiMsg[] => {
   return surface(sid, [
     { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-login'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'AzureLoginCard', variant: 'h3' },
-    { id: 'desc', component: 'Text', text: 'Azure MSAL authentication card. Sign in to manage your Azure subscriptions and resources.', variant: 'body2' },
+    { id: 'desc', component: 'Text', text: 'Azure MSAL authentication card. In Playground it uses stub subscription data so you can verify the signed-in states without live Azure auth.', variant: 'body2' },
     { id: 'az-login', component: 'AzureLoginCard' },
   ] as A2uiComponent[]);
 };
@@ -1593,7 +1641,7 @@ const domainAzureResourcePicker = (): A2uiMsg[] => {
   return surface(sid, [
     { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-picker'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'AzureResourcePicker', variant: 'h3' },
-    { id: 'desc', component: 'Text', text: 'Cascading dropdowns: subscription → resource group → resource. Requires Azure authentication.', variant: 'body2' },
+    { id: 'desc', component: 'Text', text: 'Cascading dropdowns: subscription → resource group → resource. Playground uses stub subscriptions, resource groups, and resources when Azure auth is unavailable.', variant: 'body2' },
     { id: 'az-picker', component: 'AzureResourcePicker', label: 'Select a resource' },
   ] as A2uiComponent[]);
 };
@@ -1603,7 +1651,7 @@ const domainAzureResourceForm = (): A2uiMsg[] => {
   return surface(sid, [
     { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-form'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'AzureResourceForm', variant: 'h3' },
-    { id: 'desc', component: 'Text', text: 'Dynamic resource creation form with type-specific fields (Kubernetes version, admin user, access tier, etc.). Requires Azure authentication.', variant: 'body2' },
+    { id: 'desc', component: 'Text', text: 'Dynamic resource creation form with type-specific fields (Kubernetes version, admin user, access tier, etc.). Playground uses fallback data and simulated submission when Azure auth is unavailable.', variant: 'body2' },
     { id: 'az-form', component: 'AzureResourceForm', title: 'Create Kubernetes Cluster', resourceType: 'Microsoft.ContainerService/managedClusters' },
   ] as A2uiComponent[]);
 };
@@ -1613,7 +1661,7 @@ const domainAzureAction = (): A2uiMsg[] => {
   return surface(sid, [
     { id: 'root', component: 'Column', children: ['heading', 'desc', 'az-action'], gap: 'medium' },
     { id: 'heading', component: 'Text', text: 'AzureAction', variant: 'h3' },
-    { id: 'desc', component: 'Text', text: 'Execute an Azure ARM API action with resource type allowlist, path validation, and destructive confirmation.', variant: 'body2' },
+    { id: 'desc', component: 'Text', text: 'Execute an Azure ARM API action with resource type allowlist, path validation, and destructive confirmation. Playground simulates success when no Azure connector is configured.', variant: 'body2' },
     { id: 'az-action', component: 'AzureAction', title: 'Scale AKS cluster', description: 'Updates the node count for the default node pool.', method: 'PATCH', path: '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/Microsoft.ContainerService/managedClusters/my-cluster', body: { properties: { agentPoolProfiles: [{ name: 'default', count: 5 }] } } },
   ] as A2uiComponent[]);
 };
@@ -1679,6 +1727,7 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'dyn-conditional', label: 'Conditional Content',  description: 'Feature flags with data binding',            group: 'Dynamic Patterns', generate: dynamicConditionalContent },
   { id: 'dyn-dashboard', label: 'Complex Dashboard',      description: 'Multi-tab dashboard with data binding',      group: 'Dynamic Patterns', generate: dynamicComplexDashboard },
   // Integration Kits
+  { id: 'fat-slice-azure-github', label: 'Fat slice: Azure + GitHub', description: 'Offline smoke test for login cards + pickers', group: 'Integration Kits', catalog: 'kickstart', generate: fatAzureGitHubSlice },
   { id: 'kit-azure-auth',    label: 'Azure AuthCard',         description: 'Azure MSAL sign-in via kit registration',  group: 'Integration Kits', catalog: 'kickstart', generate: kitAzureAuth },
   { id: 'kit-github-auth',   label: 'GitHub AuthCard',        description: 'GitHub OAuth sign-in via kit registration', group: 'Integration Kits', catalog: 'kickstart', generate: kitGitHubAuth },
   { id: 'kit-multi-provider', label: 'Multi-Provider Sign-In', description: 'Azure + GitHub AuthCards side by side',    group: 'Integration Kits', catalog: 'kickstart', generate: kitMultiProvider },
