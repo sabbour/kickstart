@@ -1283,10 +1283,12 @@ function PlaygroundInner() {
     setDialogOpen(true);
   }, []);
 
-  // Get JSON for selected scenario
-  const getScenarioJson = useCallback(() => {
+  // Memoize the JSON for the selected scenario so that re-renders don't call
+  // generate() again (which would increment the uid() counter and produce new
+  // surfaceId values for an unchanged scenario).
+  const scenarioJson = useMemo(() => {
     if (!selectedScenario) return '';
-    
+
     if (selectedScenario.generate) {
       const msgs = selectedScenario.generate();
       return JSON.stringify(msgs, null, 2);
@@ -1975,7 +1977,7 @@ function PlaygroundInner() {
                   </div>
                 ) : (
                   <div className={classes.jsonCodeBlock}>
-                    {selectedScenario ? getScenarioJson() : JSON.stringify(widgets.find(w => w.id === selectedWidget)?.messages, null, 2)}
+                    {selectedScenario ? scenarioJson : JSON.stringify(widgets.find(w => w.id === selectedWidget)?.messages, null, 2)}
                   </div>
                 )}
               </div>
