@@ -53,7 +53,7 @@ converse.ts receives POST /api/converse { sessionId, message }
   │
   ├─ 8. MECHANISM B: resolveConversationSkills(message, phase, sessionContext)
   │      ├─ If domainKnowledge != null:
-  │      │    messages.push({ role: "user", content: domainKnowledge })
+  │      │    messages.splice(messages.length - 1, 0, { role: "user", content: domainKnowledge })  // ↑ inserted immediately before the real user message
   │      └─ Append currentState snapshot to last user message
   │
   └─ 9. Call Azure OpenAI with assembled messages[]
@@ -66,13 +66,13 @@ converse.ts receives POST /api/converse { sessionId, message }
 **Purpose:** Injects capabilities from registered IntegrationKits into the system prompt so the LLM knows what tools and domain knowledge are available for the current phase.
 
 **How it works (`resolveSkills`):**
-1. **Phase filter** — select kits whose explicit `phasePrompts[currentPhase]` match, OR fall back to heuristic keyword classification of flat `kit.prompts[]`.
-2. **Keyword activation** — classify each prompt string against keyword groups:
+1. **Typed skill resolution first** — resolve `kit.skills[]` entries matching the current phase; apply keyword activation rules and priority sorting.
+2. **Legacy prompt fallback** — if no typed skills, fall back to `kit.phasePrompts[phase]` (explicit per-phase), then flat `kit.prompts[]` classified by keyword groups:
    - `DISCOVER_KEYWORDS` → `Phase.Discover`
    - `DESIGN_KEYWORDS` → `Phase.Discover, Phase.Design`
    - `GENERATE_KEYWORDS` → `Phase.Generate`
    - `DEPLOYMENT_KEYWORDS` → `Phase.Review, Phase.Handoff, Phase.Deploy`
-3. **Priority sort** — explicit `phasePrompts` take priority over heuristically classified flat prompts.
+3. **Phase-specific tool handling** — `resolveLegacySkills()` synthesizes a tool-listing prompt in **Discover** only; in Design it collects `availableTools` but does **not** inject that prompt.
 
 **Output:** `resolvedSkills.prompts[]` — passed to `buildSystemPrompt()` as `kitPrompts`.
 

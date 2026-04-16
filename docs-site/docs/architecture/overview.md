@@ -23,7 +23,7 @@ kickstart/
 │   │   └── src/
 │   │       ├── catalog/   A2UI component implementations (28+ components)
 │   │       ├── components/ Chat UI, FileEditor sidebar, Landing
-│   │       └── services/  virtual-fs.ts (in-memory file store, 1-hour TTL)
+│   │       └── services/  virtual-fs.ts (browser-side virtual file store with IndexedDB persistence)
 │   └── mcp-server/    @kickstart/mcp-server — optional IDE adapter
 └── infra/             Bicep templates for Azure provisioning
 ```
@@ -54,7 +54,7 @@ See [Prompt Pipeline](./prompt-pipeline.md) for the full assembly order with cod
 | FSM phase state | Server (memory) | 1 hour |
 | Generated artifact metadata | Server (memory) | 1 hour |
 | Full generated file content | Client message history | Browser session |
-| Virtual FS (file content for sidebar) | Server (memory) | 1 hour |
+| Virtual FS (file content for sidebar) | Client memory + optional IndexedDB (`kickstart-vfs`) | No TTL |
 | `routingPhaseTrusted` flag | Server session | Reset on rehydration |
 
 **Cold start:** Server session expires → client resends up to 50 messages for rehydration. All messages content-safety checked. `routingPhaseTrusted` reset to `false` — client cannot self-elevate to generate-tier model.
@@ -74,6 +74,8 @@ See [Prompt Pipeline](./prompt-pipeline.md) for the full assembly order with cod
 ## A2UI Component Catalog
 
 Two FileEditor concepts, both backed by `services/virtual-fs.ts`:
+
+Both use `services/virtual-fs.ts` as the browser-side virtual file store: data lives in client memory and may also be persisted in IndexedDB for reuse across sessions. This module does not implement a 1-hour TTL eviction policy.
 
 - **A2UI FileEditor** (`catalog/components/FileEditor.tsx`) — ephemeral, per-turn in-chat component. LLM controls content.
 - **Sidebar FileEditor** (`components/FileEditor/`) — persistent panel with FileTree + Monaco. Shows all generated files across the session.

@@ -58,7 +58,7 @@ POST /api/converse arrives
     │
     ├─ 8. [MECHANISM B] resolveConversationSkills(message, phase, sessionContext)
     │      ├─ domainKnowledge != null:
-    │      │    messages.push({ role: "user", content: domainKnowledge })  ← here
+    │      │    messages.splice(messages.length - 1, 0, { role: "user", content: domainKnowledge })  // ↑ inserted immediately before the real user message
     │      └─ Append currentState to messages[last].content
     │
     └─ 9. chatCompletion(messages, { deployment, responseFormat: "json_object" })
@@ -81,9 +81,9 @@ const freshSystemPrompt = buildSystemPrompt({
 ```
 
 **3-stage resolution:**
-1. Explicit `kit.phasePrompts[phase]` takes priority.
-2. Heuristic keyword classification of flat `kit.prompts[]` strings.
-3. Tool listing synthesis for Discover/Design phases.
+1. **Typed skill resolution first** — resolve `kit.skills[]` entries matching the current phase; apply keyword activation rules and priority sorting.
+2. **Legacy prompt fallback** — if no typed skills, fall back to `kit.phasePrompts[phase]` (explicit per-phase), then flat `kit.prompts[]` classified by keyword groups.
+3. **Phase-specific tool handling** — `resolveLegacySkills()` synthesizes a tool-listing prompt in **Discover** only; in Design it collects `availableTools` but does **not** inject that prompt.
 
 **To add a skill:** Implement `IntegrationKit` and register with `defaultKitRegistry`. No config files.
 
@@ -100,7 +100,7 @@ const { domainKnowledge, currentState } = resolveConversationSkills(
   { phase: currentPhase, appDefinition: state.appDefinition, filesGenerated },
 );
 if (domainKnowledge) {
-  messages.push({ role: "user", content: domainKnowledge });
+  messages.splice(messages.length - 1, 0, { role: "user", content: domainKnowledge });  // ↑ inserted immediately before the real user message
 }
 const last = messages[messages.length - 1];
 messages[messages.length - 1] = {

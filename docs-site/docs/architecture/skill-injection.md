@@ -44,7 +44,13 @@ const freshSystemPrompt = buildSystemPrompt({
 
 ### Resolution Paths
 
-Mechanism A has **two resolution paths** — a typed `Skill` object path and a legacy `prompts[]` path:
+`resolveSkills()` uses a **3-stage resolution** for each kit:
+
+1. **Typed skill resolution first** — resolve `kit.skills[]` entries matching the current phase; apply keyword activation rules and priority sorting.
+2. **Legacy prompt fallback** — if no typed skills, fall back to `kit.phasePrompts[phase]` (explicit per-phase), then flat `kit.prompts[]` classified by keyword groups.
+3. **Phase-specific tool handling** — `resolveLegacySkills()` synthesizes a tool-listing prompt in **Discover** only; in Design it collects `availableTools` but does **not** inject that prompt.
+
+This is backed by **two resolution paths** — a typed `Skill` object path and a legacy `prompts[]` path:
 
 ```typescript
 // Path 1 — typed Skill objects (kit.skills[])
@@ -56,9 +62,15 @@ interface Skill {
 }
 
 // Path 2 — legacy flat prompts (kit.prompts[] / kit.phasePrompts{})
+// IntegrationKit (full interface — see packages/core/src/kits/types.ts)
 interface IntegrationKit {
-  prompts?: string[];                            // classified by keyword heuristic
+  name: string;
+  description: string;
+  tools: Tool<any>[];
+  connectors: APIConnector[];
+  prompts?: string[];                              // classified by keyword heuristic
   phasePrompts?: Partial<Record<Phase, string[]>>; // explicit per-phase prompts
+  skills?: Skill[];                                // typed skill definitions (Path 1)
 }
 ```
 
@@ -93,7 +105,7 @@ const { domainKnowledge, currentState } = resolveConversationSkills(
   { phase: currentPhase, appDefinition: state.appDefinition, filesGenerated },
 );
 if (domainKnowledge) {
-  messages.push({ role: "user", content: domainKnowledge });  // before real message
+  messages.splice(messages.length - 1, 0, { role: "user", content: domainKnowledge });  // ↑ inserted immediately before the real user message
 }
 messages[last] = { ...messages[last], content: `${messages[last].content}\n\n${currentState}` };
 ```

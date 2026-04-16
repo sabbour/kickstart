@@ -27,7 +27,7 @@ kickstart/
 │   │   └── src/
 │   │       ├── catalog/   A2UI component implementations (28+ components)
 │   │       ├── components/ Chat UI, FileEditor (sidebar), Landing
-│   │       └── services/  virtual-fs.ts (in-memory file store)
+│   │       └── services/  virtual-fs.ts (browser-side virtual file store with IndexedDB persistence)
 │   └── mcp-server/    @kickstart/mcp-server — optional IDE adapter
 └── infra/             Bicep templates for Azure provisioning
 ```
@@ -95,7 +95,7 @@ Trust-based. Generate phase + `session.routingPhaseTrusted = true` → generate-
 In-memory, 1-hour TTL, GC every 10 minutes. Stores conversation messages (max 50), FSM phase state, generated artifact metadata. Full file content is NOT stored — it lives in the A2UI message history on the client.
 
 ### `packages/web/src/services/virtual-fs.ts` — Virtual Filesystem
-In-memory file store, 1-hour TTL. Backs both the A2UI FileEditor (in-chat) and the Sidebar FileEditor (persistent panel).
+Browser-side virtual file store with optional IndexedDB persistence (`kickstart-vfs`). Backs both the A2UI FileEditor (in-chat) and the Sidebar FileEditor (persistent panel). No TTL — data persists in client memory for the session and may survive across sessions via IndexedDB.
 
 ---
 
@@ -107,7 +107,7 @@ In-memory file store, 1-hour TTL. Backs both the A2UI FileEditor (in-chat) and t
 | FSM phase state | Server session store (memory) | 1 hour | **Being replaced by plain `session.state.currentPhase` string** |
 | Generated artifact metadata | Server session store (memory) | 1 hour |
 | Full file content (generated files) | Client A2UI message history | Browser session |
-| Virtual FS (file content for sidebar) | Server virtual-fs (memory) | 1 hour |
+| Virtual FS (file content for sidebar) | Client memory + optional IndexedDB (`kickstart-vfs`) | No TTL |
 | `routingPhaseTrusted` flag | Server session | Reset on rehydration |
 
 **Cold start rehydration:** When the server session expires, the client re-sends its message history (`messages[]` in the POST body). The server re-creates the session from this. `routingPhaseTrusted` is set to `false` during rehydration.
