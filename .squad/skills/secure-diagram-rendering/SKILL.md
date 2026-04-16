@@ -14,6 +14,7 @@ Use this when a frontend needs richer architecture diagrams from untrusted LLM o
 - **ELK over default layout:** Register `@mermaid-js/layout-elk` and set `defaultRenderer: 'elk'` for cleaner clustered layouts.
 - **Sanitize before render:** Normalize literal `\\n` to `<br/>`, then run `sanitizeDiagramInput()` before Mermaid render. Preserve `securityLevel: 'antiscript'`.
 - **Strict icon placeholders:** Expand `%%icon:name%%` only after render, only for allowlisted keys, and only from a shared registry. Unknown keys should collapse to plain text.
+- **Vendor fixed icon sets locally when install auth is the problem:** If the renderer only needs a stable allowlist of SVGs, copy those exact assets into the app (for example `public/assets/architecture-diagram/`) and resolve them through a local registry module instead of keeping a private package in the web dependency path.
 - **Keep styling centralized:** Put Mermaid preprocessing, placeholder expansion, and SVG styling in one helper module so prompts, tests, and UI stay aligned.
 - **Use TS shims when source-published packages are noisy:** If a package publishes source TypeScript that drags extra surface area into `tsc`, add narrow web-only shims for the exact runtime APIs you use.
 

@@ -14,9 +14,7 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@sabbour/adaptive-ui-core": ["src/types/adaptive-ui-core-shim.d.ts"],
-      "@sabbour/adaptive-ui-azure-pack/diagram-icons": ["src/types/adaptive-ui-azure-pack-diagram-icons-shim.d.ts"]
+      "@/*": ["src/*"]
     }
   },
   "include": ["src"],
