@@ -69,7 +69,7 @@ describe("kickstart-app.html", () => {
     const requiredRenderers = [
       "Text", "Button", "TextField", "Row", "Column", "Card", "Tabs",
       "ConversationPhase", "CodeBlock", "ResourcePicker",
-      "DeploymentProgress", "ArchitectureDiagram", "CostEstimate", "HandoffCard",
+      "GenerationProgress", "ArchitectureDiagram", "CostEstimate", "HandoffCard",
       "RepoPicker", "WorkflowStatus", "CodespaceLink", "AppOverview",
     ];
     for (const renderer of requiredRenderers) {

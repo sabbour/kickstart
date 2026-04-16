@@ -242,12 +242,12 @@ describe('Catalog components — ARIA compliance', () => {
     });
   });
 
-  describe('DeploymentProgress', () => {
-    const src = readComponent(CATALOG_DIR, 'DeploymentProgress');
+  describe('GenerationProgress', () => {
+    const src = readComponent(CATALOG_DIR, 'GenerationProgress');
 
     it('step list has role="list" and aria-label', () => {
       expect(src).toContain('role="list"');
-      expect(src).toContain('aria-label="Deployment steps"');
+      expect(src).toContain('aria-label="Generation steps"');
     });
 
     it('individual steps have role="listitem"', () => {

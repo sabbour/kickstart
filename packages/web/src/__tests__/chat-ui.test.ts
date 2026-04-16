@@ -5,7 +5,7 @@ import { ChatMessage as ChatMessageView } from '../components/Chat/ChatMessage';
 import { ChatShell } from '../components/Chat/ChatShell';
 import { DebugPanel } from '../components/Chat/DebugPanel';
 import type { ChatMessage, TokenUsageSummary } from '../types';
-import { GENERATE_PROGRESS_TITLE, getLatestConversationPhase, rebuildChatSessionState } from '../utils/chat-a2ui';
+import { GENERATION_PROGRESS_TITLE, getLatestConversationPhase, rebuildChatSessionState } from '../utils/chat-a2ui';
 import { summarizeTokenUsage } from '../utils/chat-usage';
 import { A2uiSurface, basicCatalog } from '../vendor/a2ui/react';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
@@ -307,7 +307,7 @@ describe('chat file workspace rehydration', () => {
               components: [
                 {
                   id: 'progress',
-                  component: 'DeploymentProgress',
+                  component: 'GenerationProgress',
                   steps: [{ id: 'dockerfile', label: 'Dockerfile', status: 'complete' }],
                 },
                 {
@@ -337,7 +337,7 @@ describe('chat file workspace rehydration', () => {
     expect(firstSession.renderableMessages[1].updateComponents?.surfaceId).toBe('assistant-turn-8::msg-1');
     expect(firstSession.renderableMessages[1].updateComponents?.components[0]).toMatchObject({
       id: 'progress',
-      title: GENERATE_PROGRESS_TITLE,
+      title: GENERATION_PROGRESS_TITLE,
     });
 
     const secondSession = rebuildChatSessionState([
@@ -426,8 +426,8 @@ describe('chat file workspace rehydration', () => {
           components: [
             {
               id: 'setup-progress',
-              component: 'DeploymentProgress',
-              title: GENERATE_PROGRESS_TITLE,
+              component: 'GenerationProgress',
+              title: GENERATION_PROGRESS_TITLE,
               overallStatus: 'complete',
               statusMessage: 'Project setup complete. Generated files are ready in the workspace.',
               steps: [

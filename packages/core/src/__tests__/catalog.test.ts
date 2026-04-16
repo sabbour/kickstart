@@ -56,7 +56,7 @@ describe("component definitions", () => {
     "ArchitectureDiagram",
     "FileEditor",
     "AuthCard",
-    "DeploymentProgress",
+    "GenerationProgress",
   ];
 
   const expectedComponents = [...basicComponents, ...customComponents];
@@ -171,10 +171,10 @@ describe("custom Kickstart components", () => {
     expect(props).toHaveProperty("title");
   });
 
-  it("DeploymentProgress has steps", () => {
+  it("GenerationProgress has steps", () => {
     const catalog = loadCatalog();
     const defs = catalog["$defs"] as Record<string, Record<string, unknown>>;
-    const allOf = defs["DeploymentProgress"]["allOf"] as Array<
+    const allOf = defs["GenerationProgress"]["allOf"] as Array<
       Record<string, unknown>
     >;
     const props = (allOf[1] as Record<string, unknown>)[

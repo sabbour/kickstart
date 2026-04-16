@@ -51,7 +51,7 @@ const FILE_NAME_LANGUAGES: Record<string, string> = {
   '.env.template': 'dotenv',
 };
 
-export const GENERATE_PROGRESS_TITLE = 'Project Setup';
+export const GENERATION_PROGRESS_TITLE = 'Project Setup';
 
 export const CONVERSATION_PHASE_ORDER = [
   'discover',
@@ -235,8 +235,8 @@ export function buildStepwiseSetupMessages(
     : ((options.final ?? false) ? buildFinalStepwiseStatus(state) : state.statusText);
   const components: A2uiComponent[] = [{
     id: STEPWISE_SETUP_SURFACE_SUFFIX,
-    component: 'DeploymentProgress',
-    title: GENERATE_PROGRESS_TITLE,
+    component: 'GenerationProgress',
+    title: GENERATION_PROGRESS_TITLE,
     overallStatus,
     statusMessage,
     ...(state.errorMessage ? {
@@ -617,9 +617,9 @@ function renderComponentsForChat(
       return buildGeneratedFileSummary(component);
     }
 
-    if (phase === 'generate' && isDeploymentProgressComponent(component)) {
+    if (phase === 'generate' && isGenerationProgressComponent(component)) {
       const progressComponent = component as A2uiComponent;
-      return [{ ...progressComponent, title: GENERATE_PROGRESS_TITLE }];
+      return [{ ...progressComponent, title: GENERATION_PROGRESS_TITLE }];
     }
 
     return [component];
@@ -840,6 +840,6 @@ function isFileEditorComponent(component: A2uiComponent): component is A2uiCompo
   return component.component === 'FileEditor';
 }
 
-function isDeploymentProgressComponent(component: A2uiComponent): boolean {
-  return component.component === 'DeploymentProgress';
+function isGenerationProgressComponent(component: A2uiComponent): boolean {
+  return component.component === 'GenerationProgress';
 }

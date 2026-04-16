@@ -6,7 +6,7 @@
 
 import type {
   SessionState,
-  DeploymentProgressComponent,
+  GenerationProgressComponent,
 } from "@kickstart/core";
 import { createA2UIResource } from "../a2ui.js";
 
@@ -28,8 +28,8 @@ export async function handleCheckStatus(
   }
 
   // Phase 1 stub — no actual deployment tracking yet
-  const progress: DeploymentProgressComponent = {
-    type: "DeploymentProgress",
+  const progress: GenerationProgressComponent = {
+    type: "GenerationProgress",
     id: "deployment-status",
     steps: [
       { id: "acr-build", label: "Build container image", status: "pending" },

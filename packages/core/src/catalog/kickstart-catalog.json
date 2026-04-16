@@ -970,7 +970,7 @@
         }
       ]
     },
-    "DeploymentProgress": {
+    "GenerationProgress": {
       "allOf": [
         {
           "$ref": "#/$defs/BaseComponent"
@@ -978,7 +978,7 @@
         {
           "properties": {
             "component": {
-              "const": "DeploymentProgress"
+              "const": "GenerationProgress"
             },
             "steps": {
               "type": "array",
@@ -1086,7 +1086,7 @@
           "$ref": "#/$defs/AuthCard"
         },
         {
-          "$ref": "#/$defs/DeploymentProgress"
+          "$ref": "#/$defs/GenerationProgress"
         },
         {
           "$ref": "#/$defs/Badge"

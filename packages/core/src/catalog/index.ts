@@ -285,7 +285,7 @@ export interface AuthCardComponent extends BaseComponent {
   description?: string;
 }
 
-export interface DeploymentStep {
+export interface GenerationStep {
   id: string;
   label: string;
   status: "pending" | "running" | "complete" | "error" | "skipped";
@@ -293,9 +293,9 @@ export interface DeploymentStep {
   timestamp?: string;
 }
 
-export interface DeploymentProgressComponent extends BaseComponent {
-  component: "DeploymentProgress";
-  steps?: DeploymentStep[];
+export interface GenerationProgressComponent extends BaseComponent {
+  component: "GenerationProgress";
+  steps?: GenerationStep[];
   title?: string;
   overallStatus?: "idle" | "running" | "complete" | "error";
   runId?: string;
@@ -388,7 +388,7 @@ export type Component =
   | ArchitectureDiagramComponent
   | FileEditorComponent
   | AuthCardComponent
-  | DeploymentProgressComponent
+  | GenerationProgressComponent
   | BadgeComponent
   | AccordionComponent
   | ToggleComponent

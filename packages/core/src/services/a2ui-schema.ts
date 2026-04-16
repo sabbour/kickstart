@@ -73,7 +73,7 @@ export const KNOWN_COMPONENT_TYPES = new Set([
   "ComboBox",
   "CostEstimate",
   "DateTimeInput",
-  "DeploymentProgress",
+  "GenerationProgress",
   "Divider",
   "FileEditor",
   "FormGroup",
@@ -538,7 +538,7 @@ const AuthCardPropsSchema = z
   })
   .strip();
 
-const DeploymentStepSchema = z.object({
+const GenerationStepSchema = z.object({
   id: boundedString,
   label: dynamicString,
   status: z.enum(["pending", "running", "complete", "error", "skipped"]),
@@ -546,11 +546,11 @@ const DeploymentStepSchema = z.object({
   timestamp: dynamicString.optional(),
 });
 
-const DeploymentProgressPropsSchema = z
+const GenerationProgressPropsSchema = z
   .object({
     id: boundedString,
-    component: z.literal("DeploymentProgress"),
-    steps: z.array(DeploymentStepSchema).optional(),
+    component: z.literal("GenerationProgress"),
+    steps: z.array(GenerationStepSchema).optional(),
     title: dynamicString.optional(),
     overallStatus: z.enum(["idle", "running", "complete", "error"]).optional(),
     runId: dynamicString.optional(),
@@ -918,7 +918,7 @@ export const COMPONENT_SCHEMA_REGISTRY: Record<string, z.ZodType> = {
   ComboBox: ComboBoxPropsSchema,
   CostEstimate: CostEstimatePropsSchema,
   DateTimeInput: DateTimeInputPropsSchema,
-  DeploymentProgress: DeploymentProgressPropsSchema,
+  GenerationProgress: GenerationProgressPropsSchema,
   Divider: DividerPropsSchema,
   FileEditor: FileEditorPropsSchema,
   FormGroup: FormGroupPropsSchema,

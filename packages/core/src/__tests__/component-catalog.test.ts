@@ -51,7 +51,7 @@ describe("generateComponentCatalogSection", () => {
     expect(section).toContain("- Button:");
     expect(section).toContain("- ChoicePicker:");
     expect(section).toContain("- CostEstimate:");
-    expect(section).toContain("- DeploymentProgress:");
+    expect(section).toContain("- GenerationProgress:");
   });
 
   it("includes notes for components that have them", () => {
@@ -145,7 +145,7 @@ describe("buildSystemPrompt with dynamic component catalog", () => {
     const prompt = buildSystemPrompt({ phase: Phase.Design });
     expect(prompt).toContain("You have 28 components");
     expect(prompt).toContain("- Row:");
-    expect(prompt).toContain("- DeploymentProgress:");
+    expect(prompt).toContain("- GenerationProgress:");
   });
 });
 

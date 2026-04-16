@@ -19,7 +19,7 @@ import { AzureAction } from './components/AzureAction';
 import { ArchitectureDiagram } from './components/ArchitectureDiagram';
 import { FileEditor } from './components/FileEditor';
 import { CostEstimate } from './components/CostEstimate';
-import { DeploymentProgress } from './components/DeploymentProgress';
+import { GenerationProgress } from './components/GenerationProgress';
 import { SteppedCarousel } from './components/SteppedCarousel';
 import { Questionnaire } from './components/Questionnaire';
 
@@ -43,7 +43,7 @@ const kickstartComponents: ReactComponentImplementation[] = [
   ArchitectureDiagram,
   FileEditor,
   CostEstimate,
-  DeploymentProgress,
+  GenerationProgress,
   SteppedCarousel,
   Questionnaire,
 ];
