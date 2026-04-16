@@ -1,6 +1,16 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from './helpers';
 
 const PLAYGROUND_URL = '/?playground';
+
+async function openScenario(page: Page, label: string) {
+  const searchBox = page.getByPlaceholder('Filter scenarios...');
+  await searchBox.fill(label);
+  const card = page.getByRole('button', { name: label }).first();
+  await card.waitFor({ timeout: 10_000 });
+  await card.click();
+  await page.getByRole('dialog').waitFor({ timeout: 5_000 });
+}
 
 test.describe('Playground', () => {
   test.beforeEach(async ({ page }) => {
@@ -124,6 +134,42 @@ test.describe('Playground', () => {
       await expect(async () => {
         expect(await cards.count()).toBe(initialCount);
       }).toPass({ timeout: 3000 });
+    });
+  });
+
+  test.describe('Fat component slices', () => {
+    test('Azure AuthCard signs in with the playground stub flow', async ({ page }) => {
+      await openScenario(page, 'Azure AuthCard');
+
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('button', { name: 'Sign in to Azure' }).click();
+
+      await expect(dialog.getByText('Connected')).toBeVisible({ timeout: 3_000 });
+      await expect(dialog.getByRole('button', { name: 'Disconnect' })).toBeVisible();
+    });
+
+    test('GitHub AuthCard signs in with the playground stub flow', async ({ page }) => {
+      await openScenario(page, 'GitHub AuthCard');
+
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('button', { name: 'Sign in to GitHub' }).click();
+
+      await expect(dialog.getByText('Connected')).toBeVisible({ timeout: 3_000 });
+      await expect(dialog.getByRole('button', { name: 'Disconnect' })).toBeVisible();
+    });
+
+    test('fat slice scenario renders stub Azure and GitHub data', async ({ page }) => {
+      await openScenario(page, 'Fat slice: Azure + GitHub');
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByText('kickstart-aks')).toBeVisible({ timeout: 5_000 });
+      await expect(dialog.getByText('stub-user/my-web-app')).toBeVisible({ timeout: 5_000 });
+
+      await dialog.getByRole('button', { name: 'Sign in to Azure' }).click();
+      await expect(dialog.getByText('Kickstart Dev Subscription')).toBeVisible({ timeout: 5_000 });
+
+      await dialog.getByRole('button', { name: 'Sign in with GitHub' }).click();
+      await expect(dialog.getByText('Signed in via GitHub')).toBeVisible({ timeout: 5_000 });
     });
   });
 

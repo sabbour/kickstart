@@ -22,6 +22,10 @@ import {
   signOutGitHub,
   type GitHubSessionState,
 } from "../../services/github-handoff";
+import {
+  createGitHubStubSession,
+  shouldUsePlaygroundAuthStub,
+} from "../../services/playground-auth-stub";
 
 const GitHubLoginCardApi = {
   name: "GitHubLoginCard",
@@ -69,12 +73,20 @@ const useStyles = makeStyles({
 
 export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props }) => {
   const classes = useStyles();
+  const usePlaygroundStub = shouldUsePlaygroundAuthStub();
 
   const [session, setSession] = useState<GitHubSessionState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
 
   const refreshSession = useCallback(async () => {
+    if (usePlaygroundStub) {
+      setSession(createGitHubStubSession(false));
+      setError(undefined);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const nextSession = await getGitHubSession();
@@ -86,13 +98,23 @@ export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [usePlaygroundStub]);
 
   useEffect(() => {
     void refreshSession();
   }, [refreshSession]);
 
   const handleSignIn = async () => {
+    if (usePlaygroundStub) {
+      setSession(createGitHubStubSession(true));
+      setError(undefined);
+      setLoading(false);
+      if (props.onSignIn) {
+        (props.onSignIn as () => void)();
+      }
+      return;
+    }
+
     setLoading(true);
     setError(undefined);
     try {
@@ -110,6 +132,16 @@ export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props
   };
 
   const handleSignOut = async () => {
+    if (usePlaygroundStub) {
+      setSession(createGitHubStubSession(false));
+      setError(undefined);
+      setLoading(false);
+      if (props.onSignOut) {
+        (props.onSignOut as () => void)();
+      }
+      return;
+    }
+
     setLoading(true);
     setError(undefined);
     try {
@@ -151,6 +183,7 @@ export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props
             <Body2 style={{ fontWeight: 600 }}>
               {session.viewer.name || session.viewer.login}
             </Body2>
+            <Caption1>Signed in via GitHub</Caption1>
             <Caption1>{session.viewer.login}</Caption1>
           </div>
         </div>
@@ -179,12 +212,17 @@ export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props
         <Button
           appearance="primary"
           onClick={() => void handleSignIn()}
-          disabled={loading || session?.configured === false}
+          disabled={loading || (!usePlaygroundStub && session?.configured === false)}
           icon={loading ? <Spinner size="tiny" /> : undefined}
         >
           {loading ? "Checking sign-in…" : "Sign in with GitHub"}
         </Button>
       </div>
+      {usePlaygroundStub && (
+        <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalXS }}>
+          Running in offline mode — sign-in will use stub data
+        </Caption1>
+      )}
     </Card>
   );
 });
