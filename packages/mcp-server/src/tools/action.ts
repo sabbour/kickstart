@@ -52,7 +52,7 @@ export async function handleAction(
 
   // Normalize persisted phase before using it.
   let currentPhase: Phase = isKnownPhase(session.currentPhase)
-    ? (session.currentPhase as Phase)
+    ? session.currentPhase
     : Phase.Discover;
 
   // Helper: compute phase indicator items from current phase
@@ -121,6 +121,7 @@ export async function handleAction(
     case "navigate": {
       const targetPhase = payload?.targetPhase;
       if (!targetPhase) {
+        session.currentPhase = currentPhase;
         session.updatedAt = new Date().toISOString();
         sessions.set(sessionId, session);
         return {
@@ -128,6 +129,7 @@ export async function handleAction(
         };
       }
       if (!isKnownPhase(targetPhase as string)) {
+        session.currentPhase = currentPhase;
         session.updatedAt = new Date().toISOString();
         sessions.set(sessionId, session);
         return {
