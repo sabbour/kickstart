@@ -437,6 +437,7 @@ const customGenerationProgress = (): A2uiMsg[] => {
   ] as A2uiComponent[]);
 };
 
+// ---------------------------------------------------------------------------
 // Advanced Scenarios — Data Binding, Events, Lifecycle, Dynamic Patterns
 // ---------------------------------------------------------------------------
 
@@ -783,7 +784,6 @@ const costEstimateScenario = (): A2uiMsg[] => {
 };
 
 // ---------------------------------------------------------------------------
-
 // Missing Layout scenarios
 // ---------------------------------------------------------------------------
 
@@ -1092,7 +1092,6 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'life-multi',    label: 'Multi-Surface',          description: 'Three parallel surfaces',                    group: 'Surface Lifecycle', generate: lifecycleMultiSurface },
   // Dynamic Patterns
   { id: 'file-create',       label: 'Create Workflow',        description: 'File generation with progress tracker',         group: 'File Operations', catalog: 'kickstart', generate: fileEditorCreateFlow },
-
   // GitHub Components
   { id: 'ctrl-gh-login',   label: 'GitHubLoginCard',    description: 'Device code authentication flow',      group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubLogin },
   { id: 'ctrl-gh-repo',    label: 'GitHubRepoPicker',   description: 'Repository search and selection',      group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubRepoPicker },
