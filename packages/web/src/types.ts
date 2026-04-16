@@ -135,6 +135,8 @@ export interface ChatMessage {
   setupEvents?: SetupGenerationEvent[];
   /** Token usage captured for this assistant turn. */
   usage?: TokenUsageSnapshot;
+  /** Setup events recorded during a stepwise file-generation turn. */
+  setupEvents?: SetupGenerationEvent[];
 }
 
 export interface Session {
@@ -193,4 +195,18 @@ export interface StreamEvent {
   model?: string;
   sessionId?: string;
   usage?: TokenUsageSummary;
+  /** A single stepwise setup event emitted during file generation. */
+  setup_event?: SetupGenerationEvent;
 }
+
+/**
+ * A discriminated union of events emitted by the backend during stepwise
+ * file-generation streaming.  The client applies these to a StepwiseSetupState
+ * to drive the live progress surface.
+ */
+export type SetupGenerationEvent =
+  | { type: 'file_generated'; path: string; content: string; language?: string }
+  | { type: 'step_started';   stepId: string; label?: string }
+  | { type: 'step_complete';  stepId: string }
+  | { type: 'step_error';     stepId: string; code: string; message: string; recoverable: boolean }
+  | { type: 'step_skipped';   stepId: string; reason?: string };

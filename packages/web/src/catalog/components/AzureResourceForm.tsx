@@ -21,6 +21,10 @@ import {
 } from '@fluentui/react-components';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
 import type { AzureARMConnector, AzureLocation } from '@kickstart/core';
+import { isMockMode, isPlaygroundMode } from '../../services/mock-streaming';
+
+/** Skip real ARM proxy calls when running in mock or playground mode. */
+const SKIP_LIVE_ARM_CALLS = isMockMode() || isPlaygroundMode();
 
 // ── Input validation & sanitization helpers ──
 
@@ -164,7 +168,7 @@ export const AzureResourceForm = createReactComponent(AzureResourceFormApi, ({ p
 
   // Fetch real locations when connector is available
   useEffect(() => {
-    if (!connector?.isAuthenticated()) return;
+    if (!connector?.isAuthenticated() || SKIP_LIVE_ARM_CALLS) return;
     setLoadingLocations(true);
     connector
       .listLocations(subscriptionId)
