@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #203 "fix: wire onAction callback to send user messages on A2UI interaction (#192)" | S | impl=0m | review=35m | cycles=1 | merged | @sabbour
