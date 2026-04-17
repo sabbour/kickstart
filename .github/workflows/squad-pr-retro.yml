@@ -6,14 +6,16 @@ name: Squad · PR Retro
 on:
   pull_request:
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to backfill retro entry for'
+        required: true
+        type: string
 
 permissions:
   contents: write
   pull-requests: write
-
-concurrency:
-  group: squad-pr-retro-${{ github.repository }}-${{ github.event.pull_request.base.ref }}
-  cancel-in-progress: false
 
 jobs:
   retro:
@@ -24,14 +26,24 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.event.pull_request.base.ref }}
 
       - name: Compute metrics
         id: metrics
         uses: actions/github-script@v7
         with:
           script: |
-            const pr = context.payload.pull_request;
+            let pr;
+            if (context.eventName === 'workflow_dispatch') {
+              const { data } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: parseInt(context.payload.inputs.pr_number),
+              });
+              pr = data;
+              pr.merged = pr.merged_at != null;
+            } else {
+              pr = context.payload.pull_request;
+            }
             const title = (pr.title || '').replace(/"/g, "'");
             const author = pr.user?.login ?? 'unknown';
             const changed = (pr.additions ?? 0) + (pr.deletions ?? 0);
@@ -112,26 +124,8 @@ jobs:
             echo "No retro-log changes to commit (duplicate event?)"
             exit 0
           fi
-          git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]
-
-Working as Scribe — see .squad/agents/scribe/charter.md"
-          max_attempts=3
-          for attempt in $(seq 1 "$max_attempts"); do
-            if git push; then
-              break
-            fi
-            if [ "$attempt" -eq "$max_attempts" ]; then
-              echo "git push failed after ${attempt} attempts"
-              exit 1
-            fi
-            echo "git push failed (attempt ${attempt}); rebasing latest base branch before retry"
-            if ! git pull --rebase origin "${{ github.event.pull_request.base.ref }}"; then
-              echo "git pull --rebase failed while preparing retry push"
-              exit 1
-            fi
-            sleep_seconds=$((2 ** attempt))
-            sleep "$sleep_seconds"
-          done
+          git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
+          git push
 
       - name: Mirror line as PR comment
         uses: actions/github-script@v7
@@ -151,6 +145,6 @@ Working as Scribe — see .squad/agents/scribe/charter.md"
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
+              issue_number: parseInt('${{ steps.metrics.outputs.pr }}'),
               body,
             });

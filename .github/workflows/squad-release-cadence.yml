@@ -80,9 +80,7 @@ jobs:
           git checkout -B release/cadence
           npm run version
           git add -A
-          git commit -m "chore(release): daily cadence [leela]
-
-Working as Leela — see .squad/agents/leela/charter.md"
+          git commit -m "chore(release): daily cadence [leela]" -m "Working as Leela — see .squad/agents/leela/charter.md"
           git push --force-with-lease origin release/cadence
 
       - name: Open release PR (as Leela, with Scribe curating notes)
