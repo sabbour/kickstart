@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-16 | #387 "feat(playground): Workspace tab, Codespaces buttons, Ideas cleanup" | S | impl=3m | review=67m | cycles=1 | merged | @sabbour
