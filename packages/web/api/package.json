@@ -6,7 +6,7 @@
   "type": "module",
   "main": "dist/functions/*.js",
   "scripts": {
-    "build": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true})\" && node esbuild.config.mjs",
+    "build": "npm run build -w @kickstart/harness && node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true})\" && node esbuild.config.mjs",
     "build:tsc": "tsc",
     "start": "func start",
     "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""

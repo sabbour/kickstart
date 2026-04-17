@@ -24,8 +24,6 @@ import {
   PricingConnector,
   InMemoryArtifactStore,
   APIConnectorRegistry,
-  AzureARMConnector,
-  GitHubConnector,
   advancePhase,
   getPhaseDefinition,
   getPhaseOrder,
@@ -216,14 +214,16 @@ describe('class stubs', () => {
     expect(reg.get('anything')).toBeUndefined();
   });
 
-  it('AzureARMConnector instantiates and has name', () => {
-    const conn = new AzureARMConnector();
-    expect(conn.name).toBe('azure-arm');
+  it('AzureARMConnector is exported as a v2 interface (type-only)', () => {
+    // In v2, AzureARMConnector is a lightweight interface, not a class.
+    // Pack-azure is responsible for providing a concrete implementation.
+    expect(harness).not.toHaveProperty('AzureARMConnector');
   });
 
-  it('GitHubConnector instantiates and has name', () => {
-    const conn = new GitHubConnector();
-    expect(conn.name).toBe('github');
+  it('GitHubConnector is exported as a v2 interface (type-only)', () => {
+    // In v2, GitHubConnector is a lightweight interface, not a class.
+    // Pack-github is responsible for providing a concrete implementation.
+    expect(harness).not.toHaveProperty('GitHubConnector');
   });
 
   it('PricingConnector instantiates with no options', () => {

@@ -17,12 +17,40 @@ export type Phase = (typeof Phase)[keyof typeof Phase];
 export type PhaseItem = { id: string; label: string; status: string; [key: string]: unknown };
 export type A2UIMessage = Record<string, unknown>;
 export type A2UIDocument = Record<string, unknown>;
-export type ChatMessage = Record<string, unknown>;
+// ConversationMessage / CostEstimateProps are v1 API-layer types kept here only
+// to unblock the release/1.0.0 migration; they are not part of the v2 harness
+// contract and should be removed once the API is ported off them.
 export type ConversationMessage = Record<string, unknown>;
 export type CostEstimateProps = Record<string, unknown>;
-export type Artifact = Record<string, unknown>;
-export type ArtifactStore = Record<string, unknown>;
-export type APIConnector = Record<string, unknown>;
+
+/**
+ * Minimal artifact record stored in the session's artifact map.
+ * Re-exported from the session type module so there is a single source of truth.
+ */
+export type { Artifact } from './types/session.js';
+
+/**
+ * Append-only artifact store used by the harness runtime to persist files
+ * produced during a session (generated manifests, diffs, logs, etc.).
+ * Domain-agnostic; packs decide what to write.
+ */
+export interface ArtifactStore {
+  put(path: string, content: string, opts?: { kind?: string; metadata?: Record<string, unknown> }): void | Promise<void>;
+  get?(path: string): string | undefined | Promise<string | undefined>;
+  list?(): string[] | Promise<string[]>;
+}
+
+/**
+ * v2 connector contract: lightweight auth-only surface. Connectors expose
+ * authentication state and token retrieval; all domain work (creating
+ * resources, calling APIs, etc.) is performed by UserActions contributed by
+ * packs. Keep this interface minimal on purpose.
+ */
+export interface APIConnector {
+  readonly name: string;
+  isAuthenticated(): boolean | Promise<boolean>;
+  getToken(scopes?: string[]): Promise<string | null>;
+}
 export type AzureSubscription = Record<string, unknown>;
 export type AzureLocation = Record<string, unknown>;
 export type AzureContext = Record<string, unknown>;
@@ -58,24 +86,45 @@ export type SetupGenerationStepState = Record<string, unknown>;
 
 export class InMemoryArtifactStore {}
 
-// APIConnectorRegistry stub — replaced by harness PackRegistry in Step 5
+// APIConnectorRegistry — a simple name-keyed connector registry. In v2 the
+// heavy lifting moves into the harness PackRegistry, but the web client still
+// uses this to look up connectors by name. Kept loose on purpose.
 export class APIConnectorRegistry {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  register(_connector: any): void {}
-  get(_name: string): APIConnector | undefined { return undefined; }
-  names(): string[] { return []; }
+  private readonly _connectors = new Map<string, APIConnector>();
+
+  register(connector: APIConnector): void {
+    this._connectors.set(connector.name, connector);
+  }
+  get(name: string): APIConnector | undefined {
+    return this._connectors.get(name);
+  }
+  names(): string[] {
+    return [...this._connectors.keys()];
+  }
 }
 
-// AzureARMConnector stub — replaced by pack-azure in Step 7
-export class AzureARMConnector {
-  constructor(_opts?: unknown) {}
-  readonly name = 'azure-arm';
+/**
+ * v2 Azure ARM connector contract. Exposes MSAL-backed auth state plus the
+ * minimum context callers need to scope token requests (tenant + subscription).
+ * All Azure domain actions (list subscriptions, create resource groups, etc.)
+ * live in the Azure pack as UserActions — this interface deliberately does not
+ * model them.
+ */
+export interface AzureARMConnector extends APIConnector {
+  readonly name: 'azure-arm';
+  getTenantId(): string | undefined;
+  getSubscriptionId(): string | undefined;
+  setSubscriptionId(subscriptionId: string | undefined): void;
 }
 
-// GitHubConnector stub — replaced by pack-github in Step 9
-export class GitHubConnector {
-  constructor(_opts?: unknown) {}
-  readonly name = 'github';
+/**
+ * v2 GitHub connector contract. Exposes auth state and the authenticated user
+ * login. GitHub domain actions (list repos, open PRs, etc.) live in the
+ * GitHub pack as UserActions.
+ */
+export interface GitHubConnector extends APIConnector {
+  readonly name: 'github';
+  getLogin(): string | undefined;
 }
 
 // PricingConnector stub — replaced by pack-azure in Step 7
