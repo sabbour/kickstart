@@ -276,6 +276,7 @@ app.http("converse", {
         kitPrompts: resolvedSkills.prompts,
         artifactSummary: artifactSummary || undefined,
       });
+      // Note: azureContext and githubContext are intentionally excluded from DebugMetadata to prevent tenant ID leakage
 
       // Build messages array for OpenAI, replacing the stored system prompt
       // with the freshly resolved one (phase + kit skills).
@@ -335,7 +336,7 @@ app.http("converse", {
       if (wantsStream) {
         return handleStreaming(
           messages, state.sessionId, session, modelRoute, context,
-          toolContext, debugMode, session.generatedArtifacts,
+          toolContext, debugMode, session.generatedArtifacts, freshSystemPrompt,
         );
       }
 
@@ -424,6 +425,7 @@ app.http("converse", {
           processed.a2uiMessages.length,
           hadExplicitA2UI,
           session.state.currentPhase,
+          freshSystemPrompt,
         );
         responseBody.debug = debugMeta;
         responseBody.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
@@ -603,6 +605,7 @@ function handleStreaming(
   toolContext: ToolContext,
   debugMode: boolean,
   sessionArtifacts: GeneratedArtifact[],
+  systemPrompt?: string,
 ): HttpResponseInit {
   const encoder = new TextEncoder();
   let accumulatedUsage: ChatUsage | undefined;
@@ -706,6 +709,7 @@ function handleStreaming(
                 processed.a2uiMessages.length,
                 hadExplicitA2UI,
                 session.state.currentPhase,
+                systemPrompt,
               );
               donePayload.debug = debugMeta;
               donePayload.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);

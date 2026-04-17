@@ -10,6 +10,11 @@
 
 import type { HttpRequest } from "@azure/functions";
 
+// Warn at module load time if debug is allowed in production.
+if (process.env.KICKSTART_DEBUG_ALLOWED && process.env.NODE_ENV === "production") {
+  console.warn("[SECURITY] KICKSTART_DEBUG_ALLOWED is set in production — system prompt will be exposed in API responses");
+}
+
 /** Check if the incoming request has debug mode enabled. */
 export function isDebugMode(request: HttpRequest): boolean {
   // Server-side gate: debug metadata is only available when explicitly
@@ -36,6 +41,8 @@ export interface DebugMetadata {
   model: string;
   rawContent: string;
   renderDecisions: RenderDecision[];
+  /** System prompt used for this LLM call (truncated at 8 KB). */
+  systemPrompt?: string;
 }
 
 /** Maximum characters of raw LLM content exposed in debug metadata. */
@@ -50,6 +57,9 @@ function redactRawContent(raw: string): string {
   return raw.slice(0, RAW_CONTENT_MAX_LENGTH) + "\u2026 [truncated]";
 }
 
+/** Maximum characters of system prompt exposed in debug metadata (8 KB soft cap). */
+const SYSTEM_PROMPT_MAX_LENGTH = 8192;
+
 /**
  * Build debug metadata for a converse response.
  *
@@ -58,6 +68,7 @@ function redactRawContent(raw: string): string {
  * @param a2uiCount  - Number of A2UI messages extracted
  * @param hadExplicitA2UI - Whether the LLM returned explicit A2UI JSON
  * @param currentPhase - Current conversation phase name
+ * @param systemPrompt - System prompt used for this LLM call (truncated at 8 KB)
  */
 export function buildConverseDebugMeta(
   model: string,
@@ -65,6 +76,7 @@ export function buildConverseDebugMeta(
   a2uiCount: number,
   hadExplicitA2UI: boolean,
   currentPhase?: string,
+  systemPrompt?: string,
 ): DebugMetadata {
   const renderDecisions: RenderDecision[] = [];
 
@@ -91,7 +103,11 @@ export function buildConverseDebugMeta(
     });
   }
 
-  return { model, rawContent: redactRawContent(rawContent), renderDecisions };
+  const truncatedPrompt = systemPrompt && systemPrompt.length > SYSTEM_PROMPT_MAX_LENGTH
+    ? systemPrompt.slice(0, SYSTEM_PROMPT_MAX_LENGTH) + "\u2026[truncated]"
+    : systemPrompt;
+
+  return { model, rawContent: redactRawContent(rawContent), renderDecisions, ...(truncatedPrompt !== undefined ? { systemPrompt: truncatedPrompt } : {}) };
 }
 
 /**
