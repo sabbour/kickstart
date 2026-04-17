@@ -32,6 +32,9 @@ export function redirectToGitHubOAuth(options: {
   url.searchParams.set('scope', options.scopes.join(' '));
   url.searchParams.set('state', options.state);
 
+  // Persist state so parseOAuthCallback can validate it after the redirect
+  sessionStorage.setItem('github_oauth_state', options.state);
+
   window.location.href = url.toString();
 }
 
@@ -59,14 +62,24 @@ export function openGitHubOAuthPopup(options: {
 }
 
 /**
- * Parses the OAuth callback parameters from the current URL.
+ * Parses the OAuth callback parameters from the current URL and validates the
+ * state parameter against the value stored in sessionStorage by redirectToGitHubOAuth.
  * Called on the OAuth callback page after GitHub redirects back.
+ * Throws if the state is missing or doesn't match (CSRF protection).
  */
 export function parseOAuthCallback(): GitHubOAuthCallbackResult | null {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   const state = params.get('state');
   if (!code || !state) return null;
+
+  // Validate state to prevent CSRF — mirrors popup mode's waitForOAuthCallback check
+  const expectedState = sessionStorage.getItem('github_oauth_state');
+  sessionStorage.removeItem('github_oauth_state');
+  if (!expectedState || state !== expectedState) {
+    throw new Error('OAuth state mismatch — possible CSRF attack');
+  }
+
   return { code, state };
 }
 

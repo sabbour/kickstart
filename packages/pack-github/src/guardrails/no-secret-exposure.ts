@@ -31,7 +31,8 @@ export const noSecretExposureGuardrail: GuardrailContribution = {
     try {
       text = typeof payload === 'string' ? payload : JSON.stringify(payload);
     } catch {
-      return { kind: 'pass' };
+      // Cannot serialize payload — fail closed to avoid leaking unserializable secrets
+      return { kind: 'block', reason: 'Payload serialization failed — blocking as precaution' };
     }
 
     if (containsSecret(text)) {

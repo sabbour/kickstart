@@ -177,25 +177,15 @@ export async function setRepositorySecret(
     'X-GitHub-Api-Version': '2022-11-28',
   };
 
-  // 1. Get repo public key for secret encryption
-  const keyRes = await fetch(`${apiBase}/actions/secrets/public-key`, { headers });
-  if (!keyRes.ok) throw new Error(`Failed to get repo public key: ${keyRes.status}`);
-  const keyData = (await keyRes.json()) as { key_id: string; key: string };
-
-  // 2. Encrypt the secret value with the public key (Base64 placeholder — real impl needs tweetnacl)
-  // In production this would use tweetnacl or libsodium to encrypt the value.
-  const encryptedValue = btoa(secretValue); // placeholder encoding
-
-  // 3. Create or update the secret
-  const putRes = await fetch(`${apiBase}/actions/secrets/${encodeURIComponent(secretName)}`, {
-    method: 'PUT',
-    headers,
-    body: JSON.stringify({
-      encrypted_value: encryptedValue,
-      key_id: keyData.key_id,
-    }),
-  });
-  if (!putRes.ok && putRes.status !== 204) {
-    throw new Error(`Failed to set secret ${secretName}: ${putRes.status}`);
-  }
+  // GitHub Secrets API requires the value to be encrypted with the repo's public key
+  // using libsodium crypto_box_seal. btoa() is NOT encryption — it is only base64.
+  // Blocked until libsodium-wrappers is added and proper sealed-box encryption is wired:
+  //   1. GET /repos/{owner}/{repo}/actions/public-key  → { key_id, key }
+  //   2. sodium.crypto_box_seal(secretBytes, keyBytes) → encryptedBytes
+  //   3. Base64-encode → encrypted_value
+  //   4. PUT /repos/{owner}/{repo}/actions/secrets/{name}  { encrypted_value, key_id }
+  throw new Error(
+    'setRepositorySecret requires libsodium crypto_box_seal encryption — not yet implemented. ' +
+    'Add libsodium-wrappers to dependencies and replace this stub.',
+  );
 }

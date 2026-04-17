@@ -79,38 +79,14 @@ describe('github-handoff service', () => {
   });
 
   describe('setRepositorySecret', () => {
-    it('calls the GitHub secrets API', async () => {
-      const fetchMock = vi.fn()
-        // 1. get public key
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ key_id: 'kid1', key: 'base64key' }) })
-        // 2. set secret (204)
-        .mockResolvedValueOnce({ ok: true, status: 204 });
-
-      vi.stubGlobal('fetch', fetchMock);
-
+    it('throws — not yet implemented (requires libsodium encryption)', async () => {
       await expect(
         setRepositorySecret('token', {
           repo: { owner: 'acme', name: 'repo' },
           secretName: 'AZURE_CLIENT_ID',
           secretValue: 'secret-value',
         }),
-      ).resolves.toBeUndefined();
-
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-    });
-
-    it('throws when getting public key fails', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
-        ok: false,
-        status: 403,
-      }));
-      await expect(
-        setRepositorySecret('token', {
-          repo: { owner: 'acme', name: 'repo' },
-          secretName: 'MY_SECRET',
-          secretValue: 'value',
-        }),
-      ).rejects.toThrow('403');
+      ).rejects.toThrow('libsodium');
     });
   });
 });
