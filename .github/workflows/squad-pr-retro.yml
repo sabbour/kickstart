@@ -62,11 +62,10 @@ jobs:
 
             // Skip metadata/bot PRs — only log "work" PRs
             const SKIP_PREFIXES = ['scribe:', 'chore(deps):', 'chore(deps-dev):'];
-            const isBot = pr.user?.type === 'Bot';
             const isMetadata = SKIP_PREFIXES.some(p => (pr.title ?? '').startsWith(p));
-            if (isBot || isMetadata) {
+            if (isMetadata) {
               core.setOutput('skip', 'true');
-              core.warning(`Skipping metadata PR #${pr.number}: "${pr.title}" (isBot=${isBot})`);
+              core.warning(`Skipping metadata PR #${pr.number}: "${pr.title}"`);
               return;
             }
             core.setOutput('skip', 'false');
