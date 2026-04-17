@@ -26,10 +26,14 @@
     "@testing-library/jest-dom": "^6.0.0",
     "typescript": "*",
     "vitest": "*",
-    "jsdom": "*"
+    "jsdom": "*",
+    "@fluentui/react-components": "*",
+    "@fluentui/react-icons": "*"
   },
   "peerDependencies": {
     "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react-dom": "^18.0.0",
+    "@fluentui/react-components": "^9.0.0",
+    "@fluentui/react-icons": "^2.0.0"
   }
 }

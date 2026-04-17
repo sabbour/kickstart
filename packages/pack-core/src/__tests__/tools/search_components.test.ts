@@ -2,164 +2,130 @@
  * @file search_components.test.ts
  * @suite Phase C — core.search_components tool
  *
- * Tests query filtering against the negotiated A2UI catalog.
+ * Tests query filtering against a ComponentRegistry using the
+ * createSearchComponentsTool factory.
+ * Tool is invoked via FunctionTool.invoke(runCtx, jsonInput).
  *
- * The tool module is stubbed via vi.mock until Fry ships
- * packages/pack-core/src/tools/search_components.ts (Phase C of #477).
- *
- * MIGRATION: once search_components.ts ships, replace the vi.mock block with:
- *   import { searchComponentsTool } from '../../tools/search_components.js';
- * and delete the mock factory below.
- *
- * @depends Phase C of #477
- * @depends SessionCtx.negotiatedCatalog (A2UICatalog)
+ * @depends Phase C of #477 (search_components.ts must exist)
+ * @depends ComponentContribution shape from @kickstart/harness
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { z } from 'zod';
+import { RunContext } from '@openai/agents';
+import { createSearchComponentsTool, type ComponentRegistry } from '../../tools/search_components.js';
 import { makeSessionCtx } from './_session-stub.js';
 
-// ── Module stub (remove when Phase C ships) ──────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-vi.mock('../../tools/search_components.js', () => {
+function makeRegistry(names: string[]): ComponentRegistry {
   return {
-    searchComponentsTool: {
-      name: 'core.search_components',
-      mcpExposed: false,
-      tool: {
-        name: 'core.search_components',
-        description: 'Search for UI components available in the negotiated A2UI catalog.',
-        execute: vi.fn(
-          async (
-            { query }: { query: string },
-            runCtx?: { context?: ReturnType<typeof makeSessionCtx> } | ReturnType<typeof makeSessionCtx>,
-          ): Promise<{ ok: boolean; results: string[] }> => {
-            const session =
-              runCtx && 'context' in (runCtx as object)
-                ? (runCtx as { context: ReturnType<typeof makeSessionCtx> }).context
-                : (runCtx as ReturnType<typeof makeSessionCtx> | undefined);
-
-            const components = session?.negotiatedCatalog?.components ?? [];
-            const normalised = query.trim().toLowerCase();
-            const results = normalised
-              ? [...components].filter((c) => c.toLowerCase().includes(normalised))
-              : [...components];
-
-            return { ok: true, results };
-          },
-        ),
-      },
-    },
+    components: names.map((name) => ({
+      name,
+      propertySchema: z.object({}),
+      renderer: null,
+    })),
   };
-});
+}
 
-import { searchComponentsTool } from '../../tools/search_components.js';
+const CATALOG_NAMES = ['Button', 'Text', 'CodeBlock', 'AuthCard', 'ProgressSteps'];
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('core.search_components', () => {
-  const execute = () => searchComponentsTool.tool.execute;
-  let session: ReturnType<typeof makeSessionCtx>;
+  let tool: ReturnType<typeof createSearchComponentsTool>;
 
-  // The _session-stub catalog has: ['Button', 'Text', 'CodeBlock', 'AuthCard', 'ProgressSteps']
+  const invoke = (query: string) =>
+    tool.tool.invoke(new RunContext(makeSessionCtx()), JSON.stringify({ query }));
 
   beforeEach(() => {
-    session = makeSessionCtx();
-    vi.clearAllMocks();
+    tool = createSearchComponentsTool(makeRegistry(CATALOG_NAMES));
   });
 
   // ── Query matching ────────────────────────────────────────────────────────
 
   describe('query matching component name', () => {
-    it('returns matching component when query equals name (case-insensitive)', async () => {
-      const result = await execute()({ query: 'Button' }, { context: session });
-
-      expect(result.ok).toBe(true);
-      expect(result.results).toContain('Button');
+    it('returns JSON with matching component when query equals name (case-insensitive)', async () => {
+      const raw = await invoke('Button');
+      const result = JSON.parse(String(raw));
+      expect(result.matches).toEqual(expect.arrayContaining([{ name: 'Button' }]));
     });
 
     it('returns matching component for lowercase query', async () => {
-      const result = await execute()({ query: 'button' }, { context: session });
-
-      expect(result.results).toContain('Button');
+      const raw = await invoke('button');
+      const result = JSON.parse(String(raw));
+      const names = result.matches.map((m: { name: string }) => m.name);
+      expect(names).toContain('Button');
     });
 
     it('returns matching component for partial match', async () => {
-      const result = await execute()({ query: 'Block' }, { context: session });
-
-      expect(result.results).toContain('CodeBlock');
+      const raw = await invoke('Block');
+      const result = JSON.parse(String(raw));
+      const names = result.matches.map((m: { name: string }) => m.name);
+      expect(names).toContain('CodeBlock');
     });
 
     it('returns only components whose name contains the query', async () => {
-      const result = await execute()({ query: 'Auth' }, { context: session });
-
-      expect(result.results).toEqual(['AuthCard']);
+      const raw = await invoke('Auth');
+      const result = JSON.parse(String(raw));
+      const names = result.matches.map((m: { name: string }) => m.name);
+      expect(names).toEqual(['AuthCard']);
     });
 
-    it('returns multiple results when query matches several names', async () => {
-      // 'e' appears in Text, CodeBlock, ProgressSteps, AuthCard
-      const result = await execute()({ query: 'e' }, { context: session });
-
-      expect(result.results.length).toBeGreaterThan(1);
-      expect(result.results).toContain('Text');
+    it('total field matches the number of matches', async () => {
+      const raw = await invoke('Button');
+      const result = JSON.parse(String(raw));
+      expect(result.total).toBe(result.matches.length);
     });
   });
 
-  // ── Empty query returns all ───────────────────────────────────────────────
+  // ── Wildcard "*" returns all components ──────────────────────────────────
 
-  describe('empty query returns all components', () => {
-    it('returns all catalog components for empty string', async () => {
-      const result = await execute()({ query: '' }, { context: session });
-
-      expect(result.ok).toBe(true);
-      expect(result.results).toEqual([
-        'Button',
-        'Text',
-        'CodeBlock',
-        'AuthCard',
-        'ProgressSteps',
-      ]);
+  describe('"*" query returns all components', () => {
+    it('returns all catalog components for "*"', async () => {
+      const raw = await invoke('*');
+      const result = JSON.parse(String(raw));
+      const names = result.matches.map((m: { name: string }) => m.name).sort();
+      expect(names).toEqual([...CATALOG_NAMES].sort());
     });
 
-    it('returns all components for whitespace-only query', async () => {
-      const result = await execute()({ query: '   ' }, { context: session });
-
-      expect(result.results).toHaveLength(5);
+    it('total equals the full catalog size', async () => {
+      const raw = await invoke('*');
+      const result = JSON.parse(String(raw));
+      expect(result.total).toBe(CATALOG_NAMES.length);
     });
   });
 
   // ── No match returns empty array ─────────────────────────────────────────
 
   describe('no match', () => {
-    it('returns empty results array for query with no matches', async () => {
-      const result = await execute()(
-        { query: 'xyzzy-nonexistent' },
-        { context: session },
-      );
-
-      expect(result.ok).toBe(true);
-      expect(result.results).toEqual([]);
+    it('returns JSON with empty matches array for query with no matches', async () => {
+      const raw = await invoke('xyzzy-nonexistent');
+      const result = JSON.parse(String(raw));
+      expect(Array.isArray(result.matches)).toBe(true);
+      expect(result.matches).toHaveLength(0);
     });
 
-    it('returns empty array when catalog has no components', async () => {
-      const emptySession = makeSessionCtx({
-        negotiatedCatalog: { id: 'empty', components: [], userActions: [] },
-      });
-
-      const result = await execute()({ query: 'Button' }, { context: emptySession });
-
-      expect(result.results).toEqual([]);
+    it('returns empty matches when registry is empty', async () => {
+      const emptyTool = createSearchComponentsTool(makeRegistry([]));
+      const raw = await emptyTool.tool.invoke(
+        new RunContext(makeSessionCtx()),
+        JSON.stringify({ query: 'Button' }),
+      );
+      const result = JSON.parse(String(raw));
+      expect(result.matches).toHaveLength(0);
     });
   });
 
   // ── Metadata ──────────────────────────────────────────────────────────────
 
   describe('ToolContribution shape', () => {
-    it('tool name is core.search_components', () => {
-      expect(searchComponentsTool.tool.name).toBe('core.search_components');
+    it('SDK tool name is core_search_components', () => {
+      expect(tool.tool.name).toBe('core_search_components');
     });
 
     it('contribution name is core.search_components', () => {
-      expect(searchComponentsTool.name).toBe('core.search_components');
+      expect(tool.name).toBe('core.search_components');
     });
   });
 });

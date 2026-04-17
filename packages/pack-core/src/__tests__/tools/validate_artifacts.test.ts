@@ -2,75 +2,27 @@
  * @file validate_artifacts.test.ts
  * @suite Phase C — core.validate_artifacts tool
  *
- * Tests the artifact validation tool.  Phase C ships a stub implementation
- * that always returns { valid: true, errors: [] }.  These tests verify that
- * contract and that the tool accepts an array of file paths without throwing.
+ * Tests the Phase C stub validation contract against the real implementation.
+ * The stub always returns { valid: true, errors: [] }.
+ * Input field is `files` (not `paths`), with min(1).
+ * Tool is invoked via FunctionTool.invoke(runCtx, jsonInput).
  *
- * Richer rule-based tests (DS001 resource-limits, etc.) are marked as todo
- * for when the real validator ships in a later phase.
- *
- * The tool module is stubbed via vi.mock until Fry ships
- * packages/pack-core/src/tools/validate_artifacts.ts (Phase C of #477).
- *
- * MIGRATION: once validate_artifacts.ts ships, replace the vi.mock block with:
- *   import { validateArtifactsTool } from '../../tools/validate_artifacts.js';
- * and delete the mock factory below.
- *
- * @depends Phase C of #477
- * @depends SessionCtx.artifacts (Map<string, Artifact>)
+ * @depends Phase C of #477 (validate_artifacts.ts must exist)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { makeSessionCtx } from './_session-stub.js';
-
-// ── Types mirroring the expected Phase C contract ────────────────────────────
-
-export type ValidationError = {
-  rule: string;
-  path: string;
-  severity: 'error' | 'warning';
-  message: string;
-};
-
-export type ValidationResult = {
-  valid: boolean;
-  errors: ValidationError[];
-};
-
-// ── Module stub (remove when Phase C ships) ──────────────────────────────────
-
-vi.mock('../../tools/validate_artifacts.js', () => {
-  return {
-    validateArtifactsTool: {
-      name: 'core.validate_artifacts',
-      mcpExposed: false,
-      tool: {
-        name: 'core.validate_artifacts',
-        description: 'Validate session artifact files against known rules.',
-        execute: vi.fn(
-          async (
-            { paths }: { paths: string[] },
-            _runCtx?: unknown,
-          ): Promise<ValidationResult> => {
-            // Phase C stub: accept any array of strings, always pass
-            if (!Array.isArray(paths)) {
-              throw new TypeError('paths must be an array');
-            }
-            return { valid: true, errors: [] };
-          },
-        ),
-      },
-    },
-  };
-});
-
+import { RunContext } from '@openai/agents';
 import { validateArtifactsTool } from '../../tools/validate_artifacts.js';
+import { makeSessionCtx } from './_session-stub.js';
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('core.validate_artifacts', () => {
-  const execute = () => validateArtifactsTool.tool.execute;
-  const session = makeSessionCtx();
+  const invoke = (files: string[]) =>
+    validateArtifactsTool.tool.invoke(
+      new RunContext(makeSessionCtx()),
+      JSON.stringify({ files }),
+    );
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -79,59 +31,34 @@ describe('core.validate_artifacts', () => {
   // ── Phase C stub contract ─────────────────────────────────────────────────
 
   describe('stub implementation contract', () => {
-    it('returns { valid: true, errors: [] } for an empty paths array', async () => {
-      const result = await execute()({ paths: [] }, session);
-
-      expect(result.valid).toBe(true);
-      expect(result.errors).toEqual([]);
+    it('returns JSON string for a single file path', async () => {
+      const raw = await invoke(['k8s/deployment.yaml']);
+      expect(typeof String(raw)).toBe('string');
+      expect(() => JSON.parse(String(raw))).not.toThrow();
     });
 
-    it('returns { valid: true, errors: [] } for a single file path', async () => {
-      const result = await execute()(
-        { paths: ['k8s/deployment.yaml'] },
-        session,
-      );
-
+    it('parsed result has valid: true', async () => {
+      const raw = await invoke(['k8s/deployment.yaml']);
+      const result = JSON.parse(String(raw));
       expect(result.valid).toBe(true);
-      expect(result.errors).toEqual([]);
     });
 
-    it('returns { valid: true, errors: [] } for multiple file paths', async () => {
-      const result = await execute()(
-        {
-          paths: [
-            'k8s/deployment.yaml',
-            'k8s/service.yaml',
-            'k8s/ingress.yaml',
-          ],
-        },
-        session,
-      );
-
-      expect(result.valid).toBe(true);
-      expect(result.errors).toEqual([]);
-    });
-
-    it('result.errors is an array', async () => {
-      const result = await execute()({ paths: ['any/file.yaml'] }, session);
-
+    it('parsed result has errors: []', async () => {
+      const raw = await invoke(['k8s/deployment.yaml']);
+      const result = JSON.parse(String(raw));
       expect(Array.isArray(result.errors)).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
 
-    it('does not throw for typical Kubernetes manifest paths', async () => {
+    it('accepts multiple file paths without throwing', async () => {
       await expect(
-        execute()(
-          {
-            paths: [
-              'manifests/deploy.yaml',
-              'manifests/service.yaml',
-              'manifests/hpa.yaml',
-              'manifests/configmap.yaml',
-            ],
-          },
-          session,
-        ),
+        invoke(['k8s/deployment.yaml', 'k8s/service.yaml', 'k8s/ingress.yaml']),
       ).resolves.not.toThrow();
+    });
+
+    it('returns valid JSON for multiple files', async () => {
+      const raw = await invoke(['manifests/deploy.yaml', 'manifests/service.yaml']);
+      expect(() => JSON.parse(String(raw))).not.toThrow();
     });
   });
 
@@ -140,18 +67,18 @@ describe('core.validate_artifacts', () => {
   describe('future rule-based validation (pending real implementation)', () => {
     it.todo('DS001: rejects Deployment without resource limits with severity "error"');
     it.todo('DS001: passes Deployment that has resource limits set');
-    it.todo('result shape includes { violations, passedCount, failedCount } when rules run');
-    it.todo('an unknown rule ID in config is ignored gracefully');
+    it.todo('result shape includes violation details when rules run');
+    it.todo('an unknown file extension is handled gracefully');
   });
 
   // ── Metadata ──────────────────────────────────────────────────────────────
 
   describe('ToolContribution shape', () => {
-    it('tool name is core.validate_artifacts', () => {
-      expect(validateArtifactsTool.tool.name).toBe('core.validate_artifacts');
+    it('SDK tool name is core_validate_artifacts', () => {
+      expect(validateArtifactsTool.tool.name).toBe('core_validate_artifacts');
     });
 
-    it('contribution name is core.validate_artifacts', () => {
+    it('ToolContribution logical name is core.validate_artifacts', () => {
       expect(validateArtifactsTool.name).toBe('core.validate_artifacts');
     });
   });
