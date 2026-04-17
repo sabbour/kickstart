@@ -189,6 +189,22 @@ Decision filed: `.squad/decisions/inbox/leela-pr544-review.md`
 - **Hard gate on Step 2:** `packages/web/src/types.ts` is `export {};` but 15+ web shell files still import named types from it. `tsc --noEmit` would fail. Step 2 must resolve this first (re-export from harness or inline). Bender + Fry co-own tsc clean-up before any new type-safe code.
 - Filed `leela-pr544-review.md` → decisions.md.
 
+## Wave 6 — 2026-06-10 DP Review #479 v2 Step 5: Runner + SSE
+
+**Verdict:** APPROVE_WITH_CONDITIONS
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/479#issuecomment-4268302933
+
+- SSE 9-event taxonomy approved and locked: `chunk | a2ui | tool | artifact | user_action_required | handoff | intent | done | error`. No envelope. Separation of `a2ui` / `chunk` is canonical.
+- Runner/registry coupling correct: read-only calls on sealed registry, per-turn `Agent` construction from `AgentContribution`.
+- Step 6 boundary clean: skill resolver stubbed with explicit `// Step 6 / #480` deferral. No pre-emption.
+- C1 (Phase A+B gate): Confirm `getToolsForAgent(agentName)` on #476 PackRegistry — OQ1 only asked about skills, not tools.
+- C2 (Phase B gate): Spec `runner.ts` to drain `a2uiEmissions` immediately on each SDK `tool_call_item`, not end-of-turn. Array is a log, not the streaming path.
+- C3 (Phase C gate): Drop `resultSchema: z.ZodTypeAny` from `SessionCtx.pendingUserAction` — Zod schemas can't serialize to JSON; redundant with registry lookup on resume.
+- C4 (merge gate): Address `useNavigation.ts` + `onIntent` wiring — hook listed as "untouched" but its prior feed (`onPhase`) is removed.
+- C5 (Phase C gate): Clarify playground scenario listing in `/api/packs` — scenarios missing from response, `TODO(Step 5)` can only be partially resolved without them.
+- Zapp Critical 1–3 remain merge gates (session ownership, resultSchema validation, playground env gate).
+- Filed `leela-479-dp-review.md` → decisions inbox.
+
 ## 2026-06-10 — PR #545 Code Review (v2 Step 2)
 
 **PR:** #545 — feat(v2): Step 2 — Harness primitives, all types + Zod schemas (Closes #475)  
