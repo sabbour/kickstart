@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #94 "feat: Bring back VSCode launch & MCP install buttons" | L | impl=223m | review=13m | cycles=1 | merged | @sabbour
