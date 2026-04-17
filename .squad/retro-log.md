@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #163 "fix: dark mode playground styling" | S | impl=0m | review=4m | cycles=1 | merged | @sabbour-squad-frontend[bot]
