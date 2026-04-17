@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #242 "fix: remove CSS overrides that broke Fluent UI styling" | XL | impl=21m | review=155m | cycles=1 | merged | @sabbour
