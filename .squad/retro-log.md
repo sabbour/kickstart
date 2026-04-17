@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #93 "fix(security): update vulnerable dev dependencies (fixes #88)" | S | impl=0m | review=6m | cycles=1 | merged | @sabbour
