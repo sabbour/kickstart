@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #214 "fix: enrich A2UI action context with selected value and improve chat display" | M | impl=1m | review=7m | cycles=1 | merged | @sabbour
