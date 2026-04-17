@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-12 | #120 "Wire squad-aware instructions into Copilot coding agent" | M | impl=2m | review=93m | cycles=1 | merged | @Copilot
