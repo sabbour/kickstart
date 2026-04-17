@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-15 | #312 "fix: keep SWA API startup imports clean" | S | impl=0m | review=114m | cycles=1 | merged | @sabbour
+
 - 2026-04-15 | #311 "feat: route converse generate phase to gpt-5.4" | L | impl=0m | review=22m | cycles=1 | merged | @sabbour
 
 - 2026-04-15 | #314 "feat: upgrade architecture diagram renderer" | XL | impl=3m | review=144m | cycles=1 | merged | @sabbour
