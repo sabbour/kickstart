@@ -10,10 +10,12 @@ How to decide who handles what.
 | Backend & runtime | Bender | Harness, non-UI packs, SDK tools, user actions, guardrails, SWA Functions API, Azure infra |
 | Code review | Leela | Review PRs, check architecture alignment, suggest improvements |
 | Testing | Hermes | Four test layers: unit, pack conformance, contract, Playwright E2E |
+| Performance & observability | Hermes | Perf budgets on DPs, p95 latency, first-chunk time, token ceilings, cold-start, resource sizing, tracing spans, structured logging |
 | Scope & priorities | Leela | What to build next, trade-offs, decisions |
 | Architecture | Leela | Pack boundaries, primitive surface, harness contract |
 | Security | Zapp | DP security review, tool schema review, guardrail design |
-| Release notes, docs | Scribe | Release PR curation, pulse issues, decision merging |
+| Release notes, docs | Scribe | Release PR curation, pulse issues, decision merging, public docs, CHANGELOG, README |
+| Product & DX review | Scribe | Advisory review on DPs and PRs for naming, defaults, newcomer experience |
 | Queue monitoring | Ralph | Stuck PRs, expired gates, missed cron runs |
 
 ## Issue Routing

@@ -15,9 +15,9 @@
 | Leela | Lead | `.squad/agents/leela/charter.md` | ✅ Active |
 | Fry | Frontend Dev | `.squad/agents/fry/charter.md` | ✅ Active |
 | Bender | Backend Dev | `.squad/agents/bender/charter.md` | ✅ Active |
-| Hermes | Tester | `.squad/agents/hermes/charter.md` | ✅ Active |
+| Hermes | Tester + Observability | `.squad/agents/hermes/charter.md` | ✅ Active |
 | Zapp | Security Architect | `.squad/agents/zapp/charter.md` | ✅ Active |
-| Scribe | Scribe | `.squad/agents/scribe/charter.md` | 📋 Silent |
+| Scribe | Scribe + Product/DX | `.squad/agents/scribe/charter.md` | 📋 Silent |
 | Ralph | Work Monitor | - | 🔄 Monitor |
 
 ## Coding Agent

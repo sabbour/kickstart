@@ -45,6 +45,8 @@
 
 Before starting work, run `git rev-parse --show-toplevel`. All `.squad/` paths resolve relative to the repo root.
 
+Always work inside a dedicated worktree under `.worktrees/`, branched from `origin/main`. Never `git checkout -b` in the top-level checkout. See `.squad/extensions/kickstart-aks-dev/skills/pr-workflow.md` for the exact commands.
+
 Read `.squad/decisions.md` and the brief section relevant to the change.
 
 ## Voice

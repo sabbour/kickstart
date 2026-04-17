@@ -32,11 +32,34 @@ Before writing code, post a DP comment on the issue with:
 
 Wait for **Leela** (architecture) and **Zapp** (security) to approve the DP. Do not start coding before.
 
-### 3. Create the branch
+### 3. Create a worktree (required)
+
+**Always use a worktree.** The shared top-level checkout is for reading and coordination. Agents that `git checkout -b` in the main working tree clobber each other's uncommitted work and produce dirty issues: wrong branch base, mixed diffs, orphaned files.
+
+From the repo root:
 
 ```bash
-git checkout -b squad/<issue-number>-<kebab-case-slug>
+git fetch origin
+git worktree list                                      # reuse if yours exists
+git worktree add .worktrees/<slug-or-issue-number> \
+  -b squad/<issue-number>-<kebab-case-slug> \
+  origin/main
+cd .worktrees/<slug-or-issue-number>
 ```
+
+Rules:
+
+- Worktree path lives under `.worktrees/` (gitignored). Name it after the issue or a short slug.
+- Branch off `origin/main`, not the local `main`.
+- Never run `git checkout -b` in the top-level working tree.
+- One worktree per in-flight PR. Reuse, don't duplicate.
+- When the PR merges or closes, run from any other checkout:
+  ```bash
+  git worktree remove .worktrees/<name>
+  git worktree prune
+  ```
+
+All subsequent commands in this skill run from inside the worktree.
 
 ### 4. Open a draft PR
 

@@ -36,6 +36,24 @@ squad/{issue-number}-{kebab-case-slug}
 ```
 Example: `squad/42-fix-login-validation`
 
+## Worktrees are mandatory
+
+Never run `git checkout -b` in the top-level working tree. Every piece of issue work happens inside its own worktree under `.worktrees/`. This prevents agents from stomping on each other's uncommitted changes, branching off the wrong base, or producing mixed-diff PRs.
+
+Before starting work:
+
+```bash
+git fetch origin
+git worktree list                    # see what's already in flight; reuse if yours exists
+git worktree add .worktrees/<issue-number-or-slug> \
+  -b squad/<issue-number>-<slug> origin/main
+cd .worktrees/<issue-number-or-slug>
+```
+
+All subsequent edits, commits, and `gh pr create` calls run from inside the worktree. After the PR merges or closes, run `git worktree remove .worktrees/<name> && git worktree prune` from another checkout.
+
+If you find yourself about to branch from `main` in the top-level checkout, stop and create a worktree instead.
+
 ## PR Guidelines
 
 When opening a PR:

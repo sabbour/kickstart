@@ -79,3 +79,38 @@ All required. A red CI blocks merge.
 
 - 80% is a floor, not a target.
 - Coverage without contract and conformance is theatre. A pack with 100% unit coverage but a broken conformance test still fails.
+
+## Performance budgets
+
+Hermes owns the perf budget on every DP that introduces or materially changes a user-facing path.
+
+A DP must state:
+
+| Metric | Required for |
+|--------|--------------|
+| p95 latency | Any new `/api/*` endpoint or tool invocation path |
+| First-chunk time | Any new streaming path (SSE, agent response) |
+| Token budget | Any new LLM-backed tool, agent, or prompt |
+| Cold-start delta | Any change to SWA Functions API bundle or dependencies |
+| Resource footprint | Any change to pack infra, AKS Automatic defaults, or deployment manifests |
+
+Defaults (adjust per feature):
+
+- `/api/converse` p95 under 500 ms excluding LLM call time
+- First SSE chunk under 800 ms from request receipt
+- Cold start under 3 s for the Functions host
+- Token budget stated per-call with a hard ceiling
+
+Enforcement:
+
+- PRs that regress a stated budget without a written justification are blocked.
+- Regression tests live next to the feature. Playwright timing assertions are acceptable for UI paths.
+- Budget changes themselves are a DP item, not a silent PR edit.
+
+Observability:
+
+- Emit structured logs with `trace_id`, `session_id`, `agent`, `tool`, `latency_ms`, `tokens_in`, `tokens_out`, `first_chunk_ms`, and `outcome` on every agent turn.
+- Every new tool, agent, or endpoint gets an OpenTelemetry span. Span names: `tool.{name}`, `agent.{name}`, `emit_ui`, `sse.chunk`. Trace IDs propagate from the Functions API through harness and packs.
+- No `console.log` in shipped code. Secrets and user content are redacted at source; redaction rules go through Zapp.
+- Dropping a span, breaking trace propagation, or emitting unstructured logs is a block-merge regression on par with a perf-budget regression.
+- Surface regressions in the weekly pulse when available.
