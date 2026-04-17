@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SQUAD_BOT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Compute metrics
         id: metrics
@@ -117,7 +117,7 @@ jobs:
         env:
           BASE_REF: ${{ steps.metrics.outputs.base_ref }}
           LINE: ${{ steps.metrics.outputs.line }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SQUAD_BOT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -e
           git fetch origin "$BASE_REF"
@@ -146,23 +146,34 @@ jobs:
 
           git config user.name "squad-scribe[bot]"
           git config user.email "scribe@squad.local"
-          git checkout -b "${SIDE_BRANCH}"
+          git checkout -B "${SIDE_BRANCH}"
           git add .squad/retro-log.md
           if git diff --cached --quiet; then
             echo "No retro-log changes to commit (duplicate event?)"
             exit 0
           fi
           git commit -m "chore(retro-log): #${PR_NUM} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
-          git push origin "${SIDE_BRANCH}"
-          gh pr create \
-            --title "chore(retro-log): #${PR_NUM} [scribe]" \
-            --body "Automated retro log entry for #${PR_NUM}. Opened by \`.github/workflows/squad-pr-retro.yml\`." \
+          git push --force-with-lease origin "${SIDE_BRANCH}"
+
+          PR_URL="$(gh pr list \
+            --state open \
             --base "$BASE_REF" \
             --head "${SIDE_BRANCH}" \
-            --label "retro-log" \
-            --label "leela:approved" \
-            --label "zapp:approved"
-          gh pr merge "${SIDE_BRANCH}" --squash --auto --delete-branch
+            --json url \
+            --jq '.[0].url')"
+
+          if [ -z "$PR_URL" ]; then
+            PR_URL="$(gh pr create \
+              --title "chore(retro-log): #${PR_NUM} [scribe]" \
+              --body "Automated retro log entry for #${PR_NUM}. Opened by \`.github/workflows/squad-pr-retro.yml\`." \
+              --base "$BASE_REF" \
+              --head "${SIDE_BRANCH}" \
+              --label "retro-log" \
+              --label "leela:approved" \
+              --label "zapp:approved")"
+          fi
+
+          gh pr merge "$PR_URL" --squash --auto --delete-branch
 
       - name: Mirror line as PR comment
         uses: actions/github-script@v7

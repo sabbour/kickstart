@@ -12,7 +12,12 @@ jobs:
   lint-build:
     name: Lint, Build & Unit Tests
     runs-on: ubuntu-latest
-    if: "!contains(github.event.pull_request.labels.*.name, 'retro-log')"
+    if: >
+      !(
+        contains(github.event.pull_request.labels.*.name, 'retro-log') &&
+        startsWith(github.event.pull_request.head.ref, 'retro-log/pr-') &&
+        (github.event.pull_request.user.login == 'github-actions[bot]' || github.event.pull_request.user.login == 'sabbour-squad-lead[bot]')
+      )
 
     steps:
       - name: Checkout code
@@ -57,7 +62,12 @@ jobs:
   e2e:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
-    if: "!contains(github.event.pull_request.labels.*.name, 'retro-log')"
+    if: >
+      !(
+        contains(github.event.pull_request.labels.*.name, 'retro-log') &&
+        startsWith(github.event.pull_request.head.ref, 'retro-log/pr-') &&
+        (github.event.pull_request.user.login == 'github-actions[bot]' || github.event.pull_request.user.login == 'sabbour-squad-lead[bot]')
+      )
 
     steps:
       - name: Checkout code
@@ -97,8 +107,11 @@ jobs:
     steps:
       - name: Check results
         run: |
-          if [[ "${{ needs.lint-build.result }}" == "failure" || "${{ needs.e2e.result }}" == "failure" ]]; then
-            echo "CI failed"
+          lint_build_result="${{ needs.lint-build.result }}"
+          e2e_result="${{ needs.e2e.result }}"
+
+          if [[ ! " success skipped " =~ (^|[[:space:]])${lint_build_result}($|[[:space:]]) || ! " success skipped " =~ (^|[[:space:]])${e2e_result}($|[[:space:]]) ]]; then
+            echo "CI failed: lint-build=${lint_build_result}, e2e=${e2e_result}"
             exit 1
           fi
-          echo "CI passed or skipped"
+          echo "CI passed: lint-build=${lint_build_result}, e2e=${e2e_result}"
