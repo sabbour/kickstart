@@ -24,7 +24,7 @@ import {
   MAX_PROP_DEPTH,
   MAX_PROP_BYTES,
 } from '../contexts/A2UIRegistryContext';
-import { dispatchUserActionResult } from '../hooks/useActionDispatch';
+import { dispatchUserActionResult, UserActionQueueManager } from '../hooks/useActionDispatch';
 import type { UserActionReqPayload } from '../hooks/useStreaming';
 
 // ---------------------------------------------------------------------------
@@ -465,5 +465,213 @@ describe('cancellation queue policy', () => {
     expect(body2.actionId).toBe('a2');
     expect(body1.toolName).toBeUndefined();
     expect(body2.toolName).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// UserActionQueueManager — receiveUserActionReq behavior
+// (pure class, no DOM required — exercises the same logic as the hook)
+// ---------------------------------------------------------------------------
+
+describe('UserActionQueueManager — receiveUserActionReq (renderHook-equivalent)', () => {
+  const alwaysValid: import('../hooks/useActionDispatch').ValidateConfirmFn = () => true;
+  const alwaysInvalid: import('../hooks/useActionDispatch').ValidateConfirmFn = () => false;
+
+  function makeQueue(validate = alwaysValid) {
+    const activations: Array<UserActionReqPayload | null> = [];
+    const errors: Array<string | null> = [];
+    const q = new UserActionQueueManager(
+      validate,
+      (p) => activations.push(p),
+      (msg) => errors.push(msg),
+    );
+    return { q, activations, errors };
+  }
+
+  function makePayload(actionId: string, opts: Partial<UserActionReqPayload> = {}): UserActionReqPayload {
+    return {
+      sessionId: 's1',
+      actionId,
+      toolName: `tool:${actionId}`,
+      wireName: `tool__${actionId}`,
+      parameters: {},
+      scopes: [],
+      cancellation: 'not-supported',
+      ...opts,
+    };
+  }
+
+  // ── cancellation: 'supported' path ──────────────────────────────────────
+
+  it('cancellation:supported — B aborts A and becomes active immediately', () => {
+    const { q, activations, errors } = makeQueue();
+
+    const payloadA = makePayload('a1');
+    const payloadB = makePayload('b1', { cancellation: 'supported' });
+
+    // Activate A
+    q.receive(payloadA);
+    expect(q.activePayload?.actionId).toBe('a1');
+    expect(q.inFlight).toBe(true);
+    expect(activations).toHaveLength(1);
+
+    // AbortSignal for A should be undefined (not-supported)
+    expect(q.abortSignal).toBeUndefined();
+
+    // Receive B with cancellation:'supported' — A should be aborted, B active
+    q.receive(payloadB);
+    expect(q.activePayload?.actionId).toBe('b1');
+    expect(q.activeActionId).toBe('b1');
+    expect(q.inFlight).toBe(true);
+    expect(activations).toHaveLength(2);
+    expect(activations[1]?.actionId).toBe('b1');
+    // Queue should be cleared
+    expect(q.queueLength).toBe(0);
+    // No errors
+    expect(errors.filter(Boolean)).toHaveLength(0);
+  });
+
+  it('cancellation:supported — B creates an AbortController for its own POST', () => {
+    const { q } = makeQueue();
+
+    const payloadA = makePayload('a1');
+    const payloadB = makePayload('b1', { cancellation: 'supported' });
+
+    q.receive(payloadA);
+    q.receive(payloadB);
+
+    // B is now active with cancellation:'supported' — it should have an AbortSignal
+    expect(q.abortSignal).toBeDefined();
+    expect(q.abortSignal?.aborted).toBe(false);
+  });
+
+  it('cancellation:supported — A\'s AbortController is aborted when B preempts', () => {
+    const { q } = makeQueue();
+
+    // A is cancellation:'supported' so it has an AbortController
+    const payloadA = makePayload('a1', { cancellation: 'supported' });
+    const payloadB = makePayload('b1', { cancellation: 'supported' });
+
+    q.receive(payloadA);
+    const signalA = q.abortSignal!;
+    expect(signalA.aborted).toBe(false);
+
+    q.receive(payloadB);
+    // A's signal should now be aborted
+    expect(signalA.aborted).toBe(true);
+    // B is now active
+    expect(q.activePayload?.actionId).toBe('b1');
+  });
+
+  // ── cancellation: 'not-supported' path ──────────────────────────────────
+
+  it('cancellation:not-supported — B is queued while A is active', () => {
+    const { q, activations } = makeQueue();
+
+    const payloadA = makePayload('a1');
+    const payloadB = makePayload('b2', { cancellation: 'not-supported' });
+
+    q.receive(payloadA);
+    expect(q.activePayload?.actionId).toBe('a1');
+
+    q.receive(payloadB);
+    // B should be queued, not active
+    expect(q.activePayload?.actionId).toBe('a1');
+    expect(q.queueLength).toBe(1);
+    expect(activations).toHaveLength(1); // only A activated so far
+  });
+
+  it('cancellation:not-supported — B activates after A completes (tryComplete)', () => {
+    const { q, activations } = makeQueue();
+
+    const payloadA = makePayload('a1');
+    const payloadB = makePayload('b2');
+
+    q.receive(payloadA);
+    q.receive(payloadB);
+
+    const ownId = q.captureOwnId();
+    expect(ownId).toBe('a1');
+
+    // Simulate A completing
+    q.tryComplete(ownId);
+
+    // B should now be active
+    expect(q.activePayload?.actionId).toBe('b2');
+    expect(q.activeActionId).toBe('b2');
+    expect(q.queueLength).toBe(0);
+    expect(activations[activations.length - 1]?.actionId).toBe('b2');
+  });
+
+  it('cancellation:not-supported — multiple actions queue in order', () => {
+    const { q, activations } = makeQueue();
+
+    q.receive(makePayload('a1'));
+    q.receive(makePayload('b2'));
+    q.receive(makePayload('c3'));
+
+    expect(q.queueLength).toBe(2); // B and C queued
+
+    q.tryComplete(q.captureOwnId()); // complete A → B activates
+    expect(q.activePayload?.actionId).toBe('b2');
+    expect(q.queueLength).toBe(1);
+
+    q.tryComplete(q.captureOwnId()); // complete B → C activates
+    expect(q.activePayload?.actionId).toBe('c3');
+    expect(q.queueLength).toBe(0);
+
+    expect(activations.map(p => p?.actionId ?? null)).toEqual(['a1', null, 'b2', null, 'c3']);
+  });
+
+  // ── race-condition guard (Leela Defect 1) ───────────────────────────────
+
+  it('tryComplete is a no-op when ownId no longer matches (race-condition guard)', () => {
+    const { q, activations } = makeQueue();
+
+    // Receive A (not-supported)
+    q.receive(makePayload('a1'));
+    const staleOwnId = q.captureOwnId(); // 'a1'
+
+    // Receive B with cancellation:'supported' — replaces A
+    q.receive(makePayload('b1', { cancellation: 'supported' }));
+    expect(q.activePayload?.actionId).toBe('b1');
+
+    // Simulate A's stale finally block: should be no-op
+    q.tryComplete(staleOwnId);
+
+    // B is still active — not wiped by stale cleanup
+    expect(q.activePayload?.actionId).toBe('b1');
+    expect(q.activeActionId).toBe('b1');
+    expect(q.inFlight).toBe(true);
+    // No extra null activation from stale cleanup
+    expect(activations.filter(p => p === null)).toHaveLength(0);
+  });
+
+  // ── fail-closed (Zapp B1) ───────────────────────────────────────────────
+
+  it('invalid confirmComponent → error, no activation', () => {
+    const { q, activations, errors } = makeQueue(alwaysInvalid);
+
+    q.receive(makePayload('a1', { confirmComponent: { component: 'UnknownWidget' } }));
+
+    expect(activations).toHaveLength(0);
+    expect(q.activePayload).toBeNull();
+    expect(q.inFlight).toBe(false);
+    expect(errors.filter(Boolean)).toHaveLength(1);
+    expect(errors[0]).toContain('Action not available');
+  });
+
+  // ── dismiss ──────────────────────────────────────────────────────────────
+
+  it('dismiss clears active action and dequeues next', () => {
+    const { q, activations } = makeQueue();
+
+    q.receive(makePayload('a1'));
+    q.receive(makePayload('b2'));
+
+    q.dismiss();
+
+    expect(q.activePayload?.actionId).toBe('b2');
+    expect(activations[activations.length - 1]?.actionId).toBe('b2');
   });
 });

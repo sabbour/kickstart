@@ -70,47 +70,158 @@ export async function dispatchUserActionResult(
 }
 
 // ---------------------------------------------------------------------------
-// UserAction queue (Zapp B1 + cancellation policy)
+// UserAction queue state machine (pure, no React — testable directly)
 // ---------------------------------------------------------------------------
 
 export type UserActionError = 'missing-confirm-component' | 'dispatch-failed';
 
 export interface UserActionQueueEntry {
   payload: UserActionReqPayload;
-  /** Populated only when cancellation === 'supported'. */
-  abortController?: AbortController;
 }
 
+export type ValidateConfirmFn = (payload: UserActionReqPayload) => boolean;
+
 /**
- * React hook for dispatching UserAction resume calls with:
- * - Fail-closed behavior: missing confirmComponent → error, no resume POST (Zapp B1)
- * - Cancellation queue:
- *   - `not-supported` (default): incoming action queued, processed after current resolves
- *   - `supported`: incoming action aborts the in-flight POST via AbortSignal, then activates
- * - Resume POST boundary: { sessionId, actionId, result } only (Zapp B2)
+ * Pure state machine for UserAction queuing and cancellation.
+ *
+ * No React dependencies — can be tested directly without a DOM or renderHook.
+ * The `useUserActionDispatch` hook is a thin React shim over this class.
+ *
+ * Cancellation policy:
+ *   - `not-supported` (default): incoming action is queued, processed in order
+ *   - `supported`: incoming action aborts the in-flight fetch signal and activates immediately
+ *
+ * Race-condition guard (Leela Defect 1):
+ *   `submitResult` captures `ownId` before the async `await`. The `finally` block
+ *   only clears state when `activeActionId` still matches `ownId`. If
+ *   `cancellation:'supported'` replaced the active action during the await,
+ *   the stale `finally` is a no-op and B's state is preserved.
+ */
+export class UserActionQueueManager {
+  private _activeActionId: string | null = null;
+  private _activePayload: UserActionReqPayload | null = null;
+  private _inFlight = false;
+  private _abortController: AbortController | null = null;
+  private _queue: UserActionQueueEntry[] = [];
+
+  constructor(
+    private readonly _validate: ValidateConfirmFn,
+    private readonly _onActivate: (payload: UserActionReqPayload | null) => void,
+    private readonly _onError: (msg: string | null) => void,
+  ) {}
+
+  get activePayload(): UserActionReqPayload | null { return this._activePayload; }
+  get activeActionId(): string | null { return this._activeActionId; }
+  get inFlight(): boolean { return this._inFlight; }
+  get queueLength(): number { return this._queue.length; }
+  /** AbortSignal for the active POST (only when cancellation: 'supported'). */
+  get abortSignal(): AbortSignal | undefined { return this._abortController?.signal; }
+
+  /**
+   * Receive a user_action_req payload.
+   * - Fail-closed: unknown confirmComponent → onError, no activation
+   * - 'supported': abort current, activate B immediately
+   * - 'not-supported': queue B, process after A completes
+   */
+  receive(payload: UserActionReqPayload): void {
+    if (!this._validate(payload)) {
+      this._onError(`Action not available: ${payload.toolName}`);
+      return;
+    }
+
+    if (this._inFlight) {
+      if (payload.cancellation === 'supported') {
+        // Abort A's in-flight POST; B takes over immediately
+        this._abortController?.abort();
+        this._queue = [];
+        this._activate(payload);
+      } else {
+        this._queue.push({ payload });
+      }
+      return;
+    }
+
+    this._activate(payload);
+  }
+
+  /**
+   * Capture the current action ID before an async dispatch.
+   * Pass to `tryComplete()` for the race-condition guard.
+   */
+  captureOwnId(): string | null {
+    return this._activeActionId;
+  }
+
+  /**
+   * Complete the action identified by `ownId`.
+   * No-op if the active action has already been replaced (race-condition guard).
+   */
+  tryComplete(ownId: string | null): void {
+    if (this._activeActionId !== ownId) return;
+    this._activePayload = null;
+    this._activeActionId = null;
+    this._inFlight = false;
+    this._abortController = null;
+    this._onActivate(null);
+    this._dequeueNext();
+  }
+
+  /** Dismiss without submitting (e.g. user cancels). */
+  dismiss(): void {
+    this._abortController?.abort();
+    this._abortController = null;
+    this._activePayload = null;
+    this._activeActionId = null;
+    this._inFlight = false;
+    this._onActivate(null);
+    this._onError(null);
+    this._dequeueNext();
+  }
+
+  private _activate(payload: UserActionReqPayload): void {
+    this._activeActionId = payload.actionId;
+    this._activePayload = payload;
+    this._inFlight = true;
+    this._abortController = payload.cancellation === 'supported'
+      ? new AbortController()
+      : null;
+    this._onError(null);
+    this._onActivate(payload);
+  }
+
+  private _dequeueNext(): void {
+    const next = this._queue.shift();
+    if (!next) return;
+    if (!this._validate(next.payload)) {
+      this._onError(`Action not available: ${next.payload.toolName}`);
+    } else {
+      this._activate(next.payload);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// React hook — thin shim over UserActionQueueManager
+// ---------------------------------------------------------------------------
+
+/**
+ * React hook for dispatching UserAction resume calls.
+ * Delegates queue/cancellation logic to `UserActionQueueManager`.
  */
 export function useUserActionDispatch() {
   const [isPending, setIsPending] = useState(false);
   const [activePayload, setActivePayload] = useState<UserActionReqPayload | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
-  const queueRef = useRef<UserActionQueueEntry[]>([]);
-  const inFlightRef = useRef(false);
-  // AbortController for the currently active POST (set only when cancellation: 'supported')
-  const activeAbortRef = useRef<AbortController | null>(null);
 
   /**
    * Validate that the confirmComponent is registered in the client registry.
-   * Returns true if the action can proceed; false if it should fail closed.
+   * Returns true if the action can proceed; false if it should fail closed (Zapp B1).
    */
   const validateConfirmComponent = useCallback((payload: UserActionReqPayload): boolean => {
     const { confirmComponent } = payload;
-    if (!confirmComponent) {
-      // No confirm component needed — action can auto-resolve (e.g. silent actions)
-      return true;
-    }
+    if (!confirmComponent) return true;
     const { component } = confirmComponent;
     if (!component) return false;
-
     if (!clientRegistry.isSealed) return false;
     const impl = clientRegistry.getImpl(component);
     if (!impl) {
@@ -123,117 +234,57 @@ export function useUserActionDispatch() {
     return true;
   }, []);
 
-  /** Activate a payload as the current in-flight action. */
-  const activate = useCallback((payload: UserActionReqPayload): void => {
-    setConfirmError(null);
-    setActivePayload(payload);
-    inFlightRef.current = true;
-    // Create AbortController only if this action supports cancellation
-    if (payload.cancellation === 'supported') {
-      activeAbortRef.current = new AbortController();
-    } else {
-      activeAbortRef.current = null;
-    }
+  const queueRef = useRef<UserActionQueueManager | null>(null);
+  if (!queueRef.current) {
+    queueRef.current = new UserActionQueueManager(
+      (p) => validateConfirmComponent(p),
+      (p) => setActivePayload(p),
+      (msg) => setConfirmError(msg),
+    );
+  }
+
+  const receiveUserActionReq = useCallback((payload: UserActionReqPayload): void => {
+    queueRef.current!.receive(payload);
   }, []);
 
-  /** Dequeue the next entry and activate it, or clear in-flight state. */
-  const dequeueNext = useCallback((): void => {
-    const next = queueRef.current.shift();
-    if (!next) {
-      inFlightRef.current = false;
-      activeAbortRef.current = null;
-      return;
-    }
-    if (!validateConfirmComponent(next.payload)) {
-      setConfirmError(`Action not available: ${next.payload.toolName}`);
-      inFlightRef.current = false;
-      activeAbortRef.current = null;
-    } else {
-      activate(next.payload);
-    }
-  }, [validateConfirmComponent, activate]);
-
-  /**
-   * Receive a user_action_req payload from the SSE stream.
-   *
-   * - Validates confirmComponent (fail closed if missing/unknown — Zapp B1)
-   * - cancellation: 'not-supported' → queue if in-flight, process in order
-   * - cancellation: 'supported' → abort in-flight POST, activate immediately
-   */
-  const receiveUserActionReq = useCallback((payload: UserActionReqPayload): void => {
-    if (!validateConfirmComponent(payload)) {
-      setConfirmError(`Action not available: ${payload.toolName}`);
-      return;
-    }
-
-    if (inFlightRef.current) {
-      if (payload.cancellation === 'supported') {
-        // Abort the current in-flight request and activate immediately
-        activeAbortRef.current?.abort();
-        activeAbortRef.current = null;
-        // Clear the queue — superseded by this cancellation
-        queueRef.current = [];
-        activate(payload);
-      } else {
-        // Default 'not-supported': queue this action
-        queueRef.current.push({ payload });
-      }
-      return;
-    }
-
-    activate(payload);
-  }, [validateConfirmComponent, activate]);
-
-  /**
-   * Submit a result for the active UserAction.
-   * Posts { sessionId, actionId, result } to /api/converse/resume (Zapp B2).
-   * Then dequeues and activates the next pending action if any.
-   */
   const submitResult = useCallback(
     async (result: unknown, options?: UserActionResumeOptions): Promise<void> => {
-      if (!activePayload) {
+      const q = queueRef.current!;
+      if (!q.activePayload) {
         options?.onError?.('No active UserAction to submit');
         return;
       }
 
-      const signal = activeAbortRef.current?.signal;
+      // Capture ownId BEFORE the await — race-condition guard (Leela Defect 1)
+      const ownId = q.captureOwnId();
+      const signal = q.abortSignal;
+
       setIsPending(true);
       try {
-        await dispatchUserActionResult(activePayload, result, options, signal);
+        await dispatchUserActionResult(q.activePayload, result, options, signal);
       } finally {
         setIsPending(false);
-        setActivePayload(null);
-        dequeueNext();
+        // Only clean up if this submitResult still owns the active action.
+        // If cancellation:'supported' replaced it during the await, ownId won't
+        // match and we leave B's state untouched.
+        q.tryComplete(ownId);
       }
     },
-    [activePayload, dequeueNext],
+    [],
   );
 
-  /** Dismiss the current action without submitting (e.g. user cancels). */
   const dismissAction = useCallback((): void => {
-    // Abort any in-flight POST for this action
-    activeAbortRef.current?.abort();
-    activeAbortRef.current = null;
-    setActivePayload(null);
-    setConfirmError(null);
-    dequeueNext();
-  }, [dequeueNext]);
+    queueRef.current!.dismiss();
+  }, []);
 
   return {
-    /** Receive a new user_action_req SSE payload. */
     receiveUserActionReq,
-    /** Submit the resolved result for the active action. */
     submitResult,
-    /** Dismiss the active action without posting a result. */
     dismissAction,
-    /** The payload of the currently active UserAction (null if none). */
     activePayload,
-    /** Error message if confirmComponent is missing or unregistered. */
     confirmError,
-    /** True while the resume POST is in flight. */
     isPending,
-    /** Number of queued actions waiting to be processed. */
-    queueLength: queueRef.current.length,
+    get queueLength() { return queueRef.current?.queueLength ?? 0; },
   };
 }
 
