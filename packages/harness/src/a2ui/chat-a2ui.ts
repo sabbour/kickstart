@@ -21,13 +21,14 @@ const SURFACE_SCOPE_SEPARATOR = '::';
 
 const PHASE_ALIASES = {
   discover: 'discover',
+  assess: 'assess',
   plan: 'design',
   design: 'design',
   build: 'generate',
   generate: 'generate',
   review: 'review',
   validate: 'review',
-  handoff: 'handoff',
+  handoff: 'assess',
   deploy: 'deploy',
 } as const;
 
@@ -58,23 +59,23 @@ const FILE_NAME_LANGUAGES: Record<string, string> = {
   '.env.template': 'dotenv',
 };
 
-export type ConversationPhaseId = 'discover' | 'design' | 'generate' | 'review' | 'handoff' | 'deploy';
+export type ConversationPhaseId = 'discover' | 'assess' | 'design' | 'generate' | 'review' | 'deploy';
 
 export const CONVERSATION_PHASE_ORDER = [
   'discover',
+  'assess',
   'design',
   'generate',
   'review',
-  'handoff',
   'deploy',
 ] as const satisfies readonly ConversationPhaseId[];
 
 export const CONVERSATION_PHASE_LABELS: Record<ConversationPhaseId, string> = {
   discover: 'Discover',
+  assess: 'Assess',
   design: 'Design',
   generate: 'Generate',
   review: 'Review',
-  handoff: 'Handoff',
   deploy: 'Deploy',
 };
 

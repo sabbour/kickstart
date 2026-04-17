@@ -3,8 +3,8 @@
  *
  * Verifies that the @kickstart/harness stub:
  *   1. exports compile and the module loads without throwing
- *   2. Phase enum matches the v2-rewrite order (no legacy "Assess" phase)
- *   3. PHASE_DEFINITIONS flows correctly (Discover → Design → … → Deploy)
+ *   2. Phase enum matches the current harness order with Assess
+ *   3. PHASE_DEFINITIONS flows correctly (Discover → Assess → … → Deploy)
  *   4. SETUP_GENERATION_STEP_ORDER is a non-empty, well-typed constant
  *   5. DEPLOYMENT_SAFEGUARDS contains the mandatory DS011–DS013 rules
  *   6. Runtime function stubs return the expected stub shapes
@@ -59,17 +59,17 @@ describe('harness module', () => {
 // ── 2. Phase enum ────────────────────────────────────────────────────────────
 
 describe('Phase enum', () => {
-  it('contains exactly the v2-rewrite phases (no legacy Assess phase)', () => {
+  it('contains exactly the current harness phases', () => {
     const phases = Object.values(Phase);
-    expect(phases).toEqual(['discover', 'design', 'generate', 'review', 'handoff', 'deploy']);
+    expect(phases).toEqual(['discover', 'assess', 'design', 'generate', 'review', 'deploy']);
   });
 
-  it('does not contain the legacy "assess" phase', () => {
-    expect(Object.values(Phase)).not.toContain('assess');
+  it('does not contain the legacy "handoff" phase', () => {
+    expect(Object.values(Phase)).not.toContain('handoff');
   });
 
-  it('contains the Handoff phase introduced in v2', () => {
-    expect(Phase.Handoff).toBe('handoff');
+  it('contains the Assess phase', () => {
+    expect(Phase.Assess).toBe('assess');
   });
 });
 
@@ -81,21 +81,21 @@ describe('PHASE_DEFINITIONS', () => {
     expect(PHASE_DEFINITIONS).toHaveLength(phaseCount);
   });
 
-  it('Discover advances to Design (v2-rewrite order)', () => {
+  it('Discover advances to Assess', () => {
     const result = advancePhase(Phase.Discover);
-    expect(result).toBe(Phase.Design);
+    expect(result).toBe(Phase.Assess);
+  });
+
+  it('Assess advances to Design', () => {
+    expect(advancePhase(Phase.Assess)).toBe(Phase.Design);
   });
 
   it('Design advances to Generate', () => {
     expect(advancePhase(Phase.Design)).toBe(Phase.Generate);
   });
 
-  it('Review advances to Handoff', () => {
-    expect(advancePhase(Phase.Review)).toBe(Phase.Handoff);
-  });
-
-  it('Handoff advances to Deploy', () => {
-    expect(advancePhase(Phase.Handoff)).toBe(Phase.Deploy);
+  it('Review advances to Deploy', () => {
+    expect(advancePhase(Phase.Review)).toBe(Phase.Deploy);
   });
 
   it('Deploy does not advance (terminal phase)', () => {
@@ -179,7 +179,8 @@ describe('runtime function stubs', () => {
 
   it('isPhase correctly identifies valid phases', () => {
     expect(isPhase('discover')).toBe(true);
-    expect(isPhase('assess')).toBe(false);
+    expect(isPhase('assess')).toBe(true);
+    expect(isPhase('handoff')).toBe(false);
     expect(isPhase('not-a-phase')).toBe(false);
   });
 
