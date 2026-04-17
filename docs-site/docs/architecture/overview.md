@@ -21,7 +21,7 @@ kickstart/
 │   │   ├── api/           Azure Functions (converse, health, proxies)
 │   │   │   └── src/lib/   session-store, openai-client, model-router, rate-limiter
 │   │   └── src/
-│   │       ├── catalog/   A2UI component implementations (28+ components)
+│   │       ├── catalog/   A2UI component implementations (22 custom; base catalog has 33 entries — asserted in `component-catalog.test.ts`)
 │   │       ├── components/ Chat UI, FileEditor sidebar, Landing
 │   │       └── services/  virtual-fs.ts (browser-side virtual file store with IndexedDB persistence)
 │   └── mcp-server/    @kickstart/mcp-server — optional IDE adapter
