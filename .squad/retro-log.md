@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #240 "fix: A2UI Markdown shows [Loading...] — 18 missing component types in backend validator" | L | impl=2m | review=175m | cycles=1 | merged | @sabbour
