@@ -8,37 +8,48 @@ import type {
   TokenUsageSummary,
 } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
+import { normalizeConversationPhase } from '../utils/chat-a2ui';
 
 // ---------------------------------------------------------------------------
 // Phase allowlist guard (C4) and A2UI item type guard (C1)
 // ---------------------------------------------------------------------------
 
-/** Known server-emitted phase identifiers. Values outside this set are silently dropped. */
-const KNOWN_SERVER_PHASES = new Set([
-  'discover', 'design', 'generate', 'review', 'handoff', 'deploy',
-]);
-
 /**
- * Validates a server-emitted phase string against the known-phases allowlist.
+ * Validates a server-emitted phase string using the shared UI phase normalizer.
  * Returns the normalised phase on success, or null if the value is unrecognised.
  * Emits a console.warn in non-production builds.
  */
 function guardServerPhase(phase: string): string | null {
-  const normalized = phase.trim().toLowerCase();
-  if (KNOWN_SERVER_PHASES.has(normalized)) return normalized;
+  const normalized = normalizeConversationPhase(phase);
+  if (normalized) return normalized;
   if (process.env.NODE_ENV !== 'production') {
     console.warn(`[useStreaming] ignoring unknown server phase: "${phase}"`);
   }
   return null;
 }
 
+/** Narrows to a non-null, non-array plain object. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Accepts A2UI protocol messages (discriminated by `version: 'v0.9'`). */
+function isRawA2uiMessage(item: unknown): item is A2uiPayloadItem {
+  return isRecord(item) && item['version'] === 'v0.9';
+}
+
+/** Accepts ConversationPhase payloads (discriminated by `type: 'ConversationPhase'`). */
+function isRawConversationPhasePayload(item: unknown): item is A2uiPayloadItem {
+  return isRecord(item) && item['type'] === 'ConversationPhase';
+}
+
 /**
  * Runtime type guard for A2UI items arriving over the wire.
- * The backend types `a2ui` as `object[]`; this guard ensures each element is
- * a non-null, non-array plain object before it is forwarded to callbacks.
+ * Only accepts shapes that match known discriminators so malformed payloads
+ * cannot enter the A2UI pipeline.
  */
 function isRawA2uiItem(item: unknown): item is A2uiPayloadItem {
-  return item !== null && typeof item === 'object' && !Array.isArray(item);
+  return isRawA2uiMessage(item) || isRawConversationPhasePayload(item);
 }
 
 // ---------------------------------------------------------------------------
@@ -440,8 +451,11 @@ export function useStreaming() {
             }
 
             if (event.a2ui && event.a2ui.length > 0) {
-              if (debugMode) debugA2uiMessages.push(...event.a2ui);
-              callbacks.onA2UI(event.a2ui);
+              const safeItems = event.a2ui.filter(isRawA2uiItem);
+              if (safeItems.length > 0) {
+                if (debugMode) debugA2uiMessages.push(...safeItems);
+                callbacks.onA2UI(safeItems);
+              }
             }
 
             if (event.phase) {

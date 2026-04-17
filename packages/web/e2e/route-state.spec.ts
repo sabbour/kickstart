@@ -12,6 +12,7 @@
  */
 
 import { test, expect } from './helpers';
+import type { Page } from '@playwright/test';
 
 // ---------------------------------------------------------------------------
 // SSE response builders
@@ -40,7 +41,7 @@ function sseResponse(message: string, phase: string, phaseLabel: string, session
  * These registrations take precedence over the auto-fixture's *\/api\/** → 503
  * because Playwright matches routes in LIFO order.
  */
-async function setupHealthRoute(page: Parameters<typeof test>[1]['page']) {
+async function setupHealthRoute(page: Page) {
   await page.route('**/api/health', route =>
     route.fulfill({
       status: 200,
@@ -141,10 +142,23 @@ test.describe('Route state — server-authored phase consumption', () => {
     // Health must succeed so the app bootstraps and becomes interactive.
     await setupHealthRoute(page);
 
-    // Route /api/converse to return 401 — no SSE mock, just an auth rejection.
-    // This simulates what the SWA auth gate returns for unauthenticated requests.
+    // Override the fixture's **/.auth/** abort so the browser can actually
+    // navigate to /.auth/login/... and waitForURL can observe the URL change.
+    // Test-body routes have LIFO priority and override the fixture route.
+    await page.route('**/.auth/**', route =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>login</body></html>' }),
+    );
+
+    // Return a 302 redirect from /api/converse.  apiFetch() uses redirect:'manual'
+    // so the browser does not follow the redirect — instead it returns an opaque
+    // response and apiFetch throws SessionExpiredError (res.status >= 300 < 400).
+    // A plain 401 would NOT trigger SessionExpiredError (checked separately).
     await page.route('**/api/converse', route =>
-      route.fulfill({ status: 401, body: '' }),
+      route.fulfill({
+        status: 302,
+        headers: { Location: '/.auth/login/aad?post_login_redirect_uri=/' },
+        body: '',
+      }),
     );
 
     const healthReady = page.waitForResponse('**/api/health', { timeout: 10_000 });
@@ -152,7 +166,7 @@ test.describe('Route state — server-authored phase consumption', () => {
     await page.waitForSelector('#landing-page', { timeout: 10_000 });
     await healthReady;
 
-    // Enter chat — auto-sends the track prompt; /api/converse returns 401.
+    // Enter chat — auto-sends the track prompt; /api/converse returns 302.
     // useStreaming catches SessionExpiredError and sets window.location.href
     // to /.auth/login/aad?post_login_redirect_uri=/ which triggers navigation.
     await page.locator('.track-card-link[data-track="web-app"]').click();

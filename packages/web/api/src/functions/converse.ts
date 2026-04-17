@@ -199,8 +199,13 @@ app.http("converse", {
 
       const { state } = session;
 
-      // Add user message to history
-      addMessage(state.sessionId, "user", body.message);
+      // Resolve request preferences before any state mutation so early rejection
+      // guards (e.g. the SDK 406 below) remain fully side-effect free.
+      const wantsStream = request.headers
+        .get("accept")
+        ?.includes("text/event-stream");
+      const debugMode = isDebugMode(request);
+      const setupControlAction = extractSetupControlAction(body.message);
 
       // Resolve kit skills for the current phase and build a fresh system prompt.
       // This ensures the LLM always has the correct phase-specific capabilities
@@ -210,16 +215,14 @@ app.http("converse", {
       const modelRoute = resolveConverseModelRoute(currentPhase, {
         trustedPhase: session.routingPhaseTrusted,
       });
-      const wantsStream = request.headers
-        .get("accept")
-        ?.includes("text/event-stream");
-      const debugMode = isDebugMode(request);
-      const setupControlAction = extractSetupControlAction(body.message);
 
       // #326 workspace-first contract: stepwise generation ALWAYS takes priority
       // over the SDK adapter flag. This preserves the ordered workspace streaming
       // path required by #326/#327/#328 — the SDK gate must never bypass it.
       if (shouldUseStepwiseGeneration(session, currentPhase)) {
+        // Add the user message here (inside the stepwise branch) so the SDK
+        // 406 guard below can remain side-effect free.
+        addMessage(state.sessionId, "user", body.message);
         const stepwiseModelRoute = resolveConverseModelRoute(currentPhase, {
           trustedPhase: true,
         });
@@ -248,8 +251,10 @@ app.http("converse", {
       // -----------------------------------------------------------------------
       if (isAgentsSdkEnabled()) {
         if (wantsStream) {
-          // SDK path does not yet emit SSE; reject rather than silently serve
-          // a JSON body into the client's streaming parser (thread 8).
+          // SDK path does not yet emit SSE; reject BEFORE addMessage so the
+          // session is not mutated on a request we will not process.  A client
+          // non-streaming retry will therefore not encounter a duplicate user
+          // message in the session history (addresses PR #455 review thread).
           return {
             status: 406,
             jsonBody: {
@@ -257,11 +262,12 @@ app.http("converse", {
             },
           };
         }
+        addMessage(state.sessionId, "user", body.message);
         return handleAgentsSdkTurn(session, principalId, body.message, context);
       }
 
-
-      // Build artifact summary from files generated in previous turns
+      // Standard path (non-SDK) — add the user message before processing.
+      addMessage(state.sessionId, "user", body.message);
       const artifactSummary = buildArtifactSummary(session.generatedArtifacts);
 
       const freshSystemPrompt = buildSystemPrompt({
