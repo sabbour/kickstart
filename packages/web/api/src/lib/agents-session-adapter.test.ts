@@ -11,7 +11,6 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Phase } from "@kickstart/core";
 import { createSession, hydrateSession } from "./session-store.js";
 import {
   sessionToAgentItems,
@@ -197,5 +196,27 @@ describe("KickstartSessionAdapter", () => {
       const popped = await adapter.popItem();
       expect(popped).toBeUndefined();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TTL / expiry tests (Zapp condition: "expired state cannot be resumed")
+// ---------------------------------------------------------------------------
+
+describe("KickstartSessionAdapter — TTL expiry", () => {
+  it("getItems() throws for an expired session", async () => {
+    const session = createSession("principal-ttl-test");
+    // Backdate lastAccessed to exceed the 1-hour TTL
+    session.lastAccessed = Date.now() - (61 * 60 * 1000);
+
+    const adapter = new KickstartSessionAdapter(session);
+    await expect(adapter.getItems()).rejects.toThrow(/expired/i);
+  });
+
+  it("getItems() does NOT throw for a fresh session", async () => {
+    const session = createSession("principal-ttl-fresh");
+    // lastAccessed is set to Date.now() by createSession — session is fresh
+    const adapter = new KickstartSessionAdapter(session);
+    await expect(adapter.getItems()).resolves.toBeInstanceOf(Array);
   });
 });

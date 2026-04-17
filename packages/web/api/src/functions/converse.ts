@@ -199,16 +199,6 @@ app.http("converse", {
       // Add user message to history
       addMessage(state.sessionId, "user", body.message);
 
-      // -----------------------------------------------------------------------
-      // Feature flag: @openai/agents SDK runtime adapter (KICKSTART_AGENTS_SDK)
-      // When enabled, the SDK handles LLM calls + tool execution. The session,
-      // SSE contract, and security controls are all preserved.
-      // -----------------------------------------------------------------------
-      if (isAgentsSdkEnabled()) {
-        const wantsStreamSdk = request.headers.get("accept")?.includes("text/event-stream");
-        return handleAgentsSdkTurn(session, body.message, context, wantsStreamSdk ?? false);
-      }
-
       // Resolve kit skills for the current phase and build a fresh system prompt.
       // This ensures the LLM always has the correct phase-specific capabilities
       // injected, even as the conversation advances through phases.
@@ -223,6 +213,9 @@ app.http("converse", {
       const debugMode = isDebugMode(request);
       const setupControlAction = extractSetupControlAction(body.message);
 
+      // #326 workspace-first contract: stepwise generation ALWAYS takes priority
+      // over the SDK adapter flag. This preserves the ordered workspace streaming
+      // path required by #326/#327/#328 — the SDK gate must never bypass it.
       if (shouldUseStepwiseGeneration(session, currentPhase)) {
         const stepwiseModelRoute = resolveConverseModelRoute(currentPhase, {
           trustedPhase: true,
@@ -242,6 +235,17 @@ app.http("converse", {
           debugMode,
           setupControlAction,
         );
+      }
+
+      // -----------------------------------------------------------------------
+      // Feature flag: @openai/agents SDK runtime adapter (KICKSTART_AGENTS_SDK)
+      // Checked AFTER the #326 workspace-first gate above — stepwise generation
+      // always takes priority. When enabled, the SDK handles LLM calls + tool
+      // execution. The session, SSE contract, and security controls are preserved.
+      // -----------------------------------------------------------------------
+      if (isAgentsSdkEnabled()) {
+        const wantsStreamSdk = wantsStream;
+        return handleAgentsSdkTurn(session, principalId, body.message, context, wantsStreamSdk ?? false);
       }
 
 
@@ -846,6 +850,7 @@ function extractImplicitFlags(rawJson: string): ParsedImplicitFlags {
  */
 async function handleAgentsSdkTurn(
   session: ApiSession,
+  principalId: string | undefined,
   userMessage: string,
   context: InvocationContext,
   wantsStream: boolean,
@@ -853,7 +858,7 @@ async function handleAgentsSdkTurn(
   // Non-streaming path (streaming via SDK is a follow-up iteration)
   void wantsStream; // streaming flag reserved for future use
 
-  const { adapted, currentPhase } = await runAgentTurn({ userMessage, session });
+  const { adapted, currentPhase } = await runAgentTurn({ userMessage, session, principalId });
 
   const safePhase = getSafeCurrentPhase(currentPhase);
   const phaseA2ui = buildPhaseIndicator(safePhase);

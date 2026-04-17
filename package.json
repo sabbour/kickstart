@@ -53,6 +53,6 @@
     "typescript-eslint": "^8.58.1"
   },
   "dependencies": {
-    "@openai/agents": "^0.8.3"
+    "@openai/agents": "0.8.3"
   }
 }

@@ -19,7 +19,6 @@ import {
 } from "@openai/agents";
 import type { RunResult } from "@openai/agents";
 import { processResponse } from "@kickstart/core";
-import type { UsageSummary } from "./usage-tracking.js";
 
 // ---------------------------------------------------------------------------
 // Allowlisted response shape — ONLY these fields reach the browser

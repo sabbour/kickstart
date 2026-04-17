@@ -36,7 +36,7 @@ import { adaptRunResult, adaptedUsageToChatUsage } from "./agents-sse-adapter.js
 import type { AdaptedRunResponse } from "./agents-sse-adapter.js";
 import { planRoute, applyRoutePlan, toSafePhase } from "./agents-route-planner.js";
 import type { ApiSession } from "./session-store.js";
-import { recordUsage, extractArtifactsFromA2UI, upsertArtifact } from "./session-store.js";
+import { recordUsage, extractArtifactsFromA2UI, upsertArtifact, isSessionOwnedBy } from "./session-store.js";
 import { sanitizeToolOutput } from "./sanitize-tool-output.js";
 import { buildTurnUsage } from "./usage-tracking.js";
 
@@ -100,6 +100,8 @@ function buildSdkTools(toolContext: ToolContext): import("@openai/agents").Funct
 export interface AgentRunInput {
   userMessage: string;
   session: ApiSession;
+  /** SWA principal ID of the caller. Used to enforce session ownership. */
+  principalId?: string;
 }
 
 export interface AgentRunOutput {
@@ -114,7 +116,17 @@ export interface AgentRunOutput {
  * This is the non-streaming path. Returns a fully resolved `AgentRunOutput`.
  */
 export async function runAgentTurn(input: AgentRunInput): Promise<AgentRunOutput> {
-  const { userMessage, session } = input;
+  const { userMessage, session, principalId } = input;
+
+  // Principal ownership check — fail-closed (Zapp condition: negative test for
+  // cross-user resume/hijack). Must run before any session data is accessed.
+  if (!isSessionOwnedBy(session, principalId)) {
+    throw Object.assign(
+      new Error("Session ownership mismatch: caller is not the session owner."),
+      { status: 403 },
+    );
+  }
+
   const currentPhase = toSafePhase(session.state.currentPhase);
 
   // Build system prompt (same as existing converse.ts path)

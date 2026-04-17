@@ -24,7 +24,7 @@
 
 import type { AgentInputItem } from "@openai/agents";
 import type { ApiSession } from "./session-store.js";
-import { addMessage } from "./session-store.js";
+import { addMessage, isSessionExpired } from "./session-store.js";
 
 /** Roles we accept from AgentInputItem when persisting back to session store. */
 const STORABLE_ROLES = new Set(["user", "assistant"]);
@@ -73,6 +73,13 @@ export class KickstartSessionAdapter {
   }
 
   async getItems(limit?: number): Promise<AgentInputItem[]> {
+    // Fail-closed on expired sessions — do not refresh TTL on an expired session
+    // (Zapp condition: "expired state cannot be resumed").
+    if (isSessionExpired(this.session)) {
+      throw new Error(
+        `Session ${this.session.state.sessionId} has expired and cannot be resumed.`,
+      );
+    }
     // Refresh TTL on read
     this.session.lastAccessed = Date.now();
     const items = sessionToAgentItems(this.session);
