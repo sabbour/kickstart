@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-16 | #354 "chore: enable stepwise-generation feature flag — set STEPWISE_GENERATION_V1 env var and document" | S | impl=0m | review=0m | cycles=1 | merged | @sabbour
