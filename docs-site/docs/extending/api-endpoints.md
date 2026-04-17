@@ -45,19 +45,51 @@ app.http("functionName", {
 
 ### Existing Endpoints
 
-| Endpoint | Method | Route | Response Format | Description |
-|---|---|---|---|---|
-| `converse` | POST | `/api/converse` | SSE or JSON | Main LLM conversation proxy — multi-round tool calling |
-| `action` | POST | `/api/action` | JSON | A2UI action event processing |
-| `generate` | POST | `/api/generate` | SSE or JSON | Codex-powered code generation |
-| `health` | GET | `/api/health` | JSON | Health check (`{ status: "ok" }`) |
-| `arm-proxy` | Various | `/api/arm-proxy/*` | JSON | Azure Resource Manager CORS proxy |
-| `github-proxy` | Various | `/api/github-proxy/*` | JSON | GitHub API CORS proxy |
-| `pricing-proxy` | Various | `/api/pricing-proxy/*` | JSON | Azure Pricing API CORS proxy |
-| `inspirations` | GET | `/api/inspirations` | JSON | App inspiration templates |
-| `widget-inspirations` | GET | `/api/widget-inspirations` | JSON | Widget catalog inspirations |
-| `github-oauth` | Various | `/api/github-oauth/*` | JSON | GitHub OAuth Device Flow |
-| `playground` | POST | `/api/playground` | SSE or JSON | Prompt playground for testing |
+#### Conversation & Session
+
+| Endpoint | Method | Route | Auth | Response Format | Description |
+|---|---|---|---|---|---|
+| `converse` | POST | `/api/converse` | Session required | SSE or JSON | Main LLM conversation proxy — multi-round tool calling |
+| `action` | POST | `/api/action` | Session required | JSON | A2UI action event processing |
+| `generate` | POST | `/api/generate` | Session required | SSE or JSON | Codex-powered code generation |
+| `health` | GET | `/api/health` | None | JSON | Health check (`{ status: "ok" }`) |
+
+#### GitHub Integration
+
+| Endpoint | Method | Route | Auth | Response Format | Description |
+|---|---|---|---|---|---|
+| `github-auth` | GET/POST | `/api/github-auth/{action}` | SWA principal | HTML / JSON | GitHub OAuth flow — login, callback, session state, logout |
+| `github-repos` | GET/POST | `/api/github/repos` | GitHub session cookie | JSON | List or create GitHub repositories |
+| `github-pulls` | POST | `/api/github/pulls` | GitHub session cookie | JSON | Commit files and open a pull request |
+
+#### Azure Integration
+
+| Endpoint | Method | Route | Auth | Response Format | Description |
+|---|---|---|---|---|---|
+| `arm-proxy` | GET/POST/PUT/PATCH/DELETE | `/api/arm-proxy/{*path}` | Azure access token | JSON | Azure Resource Manager CORS proxy |
+| `azure-target` | PUT | `/api/sessions/{sessionId}/azure-target` | Azure access token + session | JSON | Persist Azure subscription / resource group for a session |
+| `azure-deployments-start` | POST | `/api/sessions/{sessionId}/azure-deployments` | Azure access token + session | JSON | Kick off an ARM deployment for a session |
+| `azure-deployments-status` | GET | `/api/azure-deployments/{runId}` | Azure access token | JSON | Poll the status of a running ARM deployment |
+| `deploy-cost-gate` | POST | `/api/sessions/{sessionId}/deploy-gates/cost` | Session required | JSON | Record that the user acknowledged estimated deployment costs |
+| `cost-estimate` | POST | `/api/sessions/{sessionId}/cost-estimate` | Session required | JSON | Fetch a live Azure cost estimate for the session's resource line-items |
+
+#### Utility
+
+| Endpoint | Method | Route | Auth | Response Format | Description |
+|---|---|---|---|---|---|
+| `pricing-proxy` | GET | `/api/pricing-proxy` | None | JSON | CORS proxy for the Azure Retail Prices API |
+| `inspirations` | GET | `/api/inspirations` | None | JSON / SSE | Landing page inspiration ideas (LLM-generated or hardcoded fallback) |
+| `widget-inspirations` | GET | `/api/inspirations/widgets` | None | JSON / SSE | Playground widget inspiration prompts |
+| `playground` | POST | `/api/playground` | None | JSON | 🔧 Internal — A2UI Playground Create tab; iterates A2UI component designs |
+
+#### Deprecated (410 Gone)
+
+These routes are registered solely to return `410 Gone` to any client still calling them. Do not use them.
+
+| Endpoint | Route | Replacement |
+|---|---|---|
+| `github-proxy-legacy` | `/api/github-proxy/{*path}` | Use `/api/github-auth`, `/api/github/repos`, `/api/github/pulls` |
+| `github-oauth-legacy` | `/api/github-oauth/{*path}` | Use `/api/github-auth/login` |
 
 ### SSE Streaming Pattern
 
@@ -159,6 +191,227 @@ Endpoints share a set of utility modules in `packages/web/api/src/lib/`:
 | `content-safety.ts` | `checkContentSafety()` | Content safety pre-flight check on user messages |
 | `auto-continue.ts` | `chatCompletionWithAutoContinue()`, `isTruncated()` | Auto-continuation for truncated LLM responses |
 | `sanitize-tool-output.ts` | `sanitizeToolOutput()` | Sanitize tool results before feeding back to the LLM |
+
+---
+
+## Endpoint Reference
+
+### Conversation & Session
+
+#### `POST /api/converse`
+
+**Auth:** Session required (session cookie + SWA principal)  
+**Body:** `{ sessionId: string, message: string, stream?: boolean }`  
+**Returns:** SSE stream (if `Accept: text/event-stream`) or JSON `{ sessionId, message, a2ui, actions }`  
+**Source:** `packages/web/api/src/functions/converse.ts`
+
+Main LLM conversation endpoint. Manages multi-round tool calling and streams incremental output. Every request must include a valid `sessionId` from a previous `/api/converse` response (or use an existing in-memory session).
+
+#### `POST /api/action`
+
+**Auth:** Session required  
+**Body:** `{ sessionId: string, actionId: string, context: Record<string, unknown> }`  
+**Returns:** JSON `{ message, a2ui, actions }`  
+**Source:** `packages/web/api/src/functions/action.ts`
+
+Processes an A2UI action event — called when the user interacts with a button, picker, or other A2UI component. Resolves data bindings and dispatches the action to the LLM.
+
+#### `POST /api/generate`
+
+**Auth:** Session required  
+**Body:** `{ sessionId: string, ... }`  
+**Returns:** SSE stream (if `Accept: text/event-stream`) or JSON  
+**Source:** `packages/web/api/src/functions/generate.ts`
+
+Codex-powered code generation endpoint. Streams generated file content back to the client.
+
+#### `GET /api/health`
+
+**Auth:** None  
+**Returns:** JSON `{ status: "ok" }`  
+**Source:** `packages/web/api/src/functions/health.ts`
+
+Liveness probe. Returns immediately with no dependencies checked.
+
+---
+
+### GitHub Integration
+
+#### `GET/POST /api/github-auth/{action}`
+
+**Auth:** SWA principal (Kickstart sign-in required for `login`)  
+**Route param:** `action` — one of `login`, `callback`, `session`, `logout`  
+**Returns:** HTML (login/callback) or JSON (session/logout)  
+**Source:** `packages/web/api/src/functions/github-auth.ts`
+
+Manages the GitHub OAuth 2.0 popup flow:
+
+| Action | Method | Description |
+|---|---|---|
+| `login` | GET | Redirects the popup window to GitHub's OAuth authorization page |
+| `callback` | GET | Receives the OAuth code, exchanges it for a token, sets session cookies, closes popup |
+| `session` | GET | Returns current GitHub session state `{ login, avatarUrl, connected }` |
+| `logout` | POST | Clears GitHub session cookies (204 No Content) |
+
+The `login` action accepts an optional `?returnTo=` query parameter to redirect back after sign-in.
+
+#### `GET /api/github/repos`
+
+**Auth:** GitHub session cookie  
+**Query params:** `owner` (optional), `page` (default 1), `perPage` (default 20)  
+**Returns:** JSON `{ repos: GitHubRepo[] }`  
+**Source:** `packages/web/api/src/functions/github-repos.ts`
+
+Lists GitHub repositories accessible to the authenticated user. Refreshes the session cookie on each call.
+
+#### `POST /api/github/repos`
+
+**Auth:** GitHub session cookie  
+**Body:** `{ owner: string, name: string, description?: string, private?: boolean }`  
+**Returns:** JSON `{ repo: GitHubRepo }` (201 Created)  
+**Source:** `packages/web/api/src/functions/github-repos.ts`
+
+Creates a new GitHub repository on behalf of the authenticated user.
+
+#### `POST /api/github/pulls`
+
+**Auth:** GitHub session cookie  
+**Body:**
+```json
+{
+  "owner": "string",
+  "repo": "string",
+  "head": "string",
+  "base": "string (optional, defaults to default branch)",
+  "title": "string",
+  "body": "string (optional)",
+  "commitMessage": "string (optional)",
+  "files": [{ "path": "string", "content": "string" }]
+}
+```
+**Returns:** JSON `{ pullRequest, branch, commit }` (201 Created)  
+**Source:** `packages/web/api/src/functions/github-pulls.ts`
+
+Commits files to a new branch and opens a pull request in a single call.
+
+---
+
+### Azure Integration
+
+#### `ANY /api/arm-proxy/{*path}`
+
+**Auth:** Azure access token (`X-Azure-AccessToken` header or SWA Azure auth cookie)  
+**Returns:** Proxied response from `management.azure.com`  
+**Source:** `packages/web/api/src/functions/arm-proxy.ts`
+
+CORS proxy for Azure Resource Manager. Forwards the request path, query parameters, and body to `management.azure.com`, injecting the caller's Bearer token. Adds a default `api-version=2024-03-01` if the caller omits one. Host-allowlisted — only `management.azure.com` is accepted.
+
+#### `PUT /api/sessions/{sessionId}/azure-target`
+
+**Auth:** Azure access token + session ownership  
+**Body:**
+```json
+{
+  "subscriptionId": "string",
+  "resourceGroup": "string",
+  "location": "string",
+  "createIfMissing": "boolean (or use resourceGroupMode: 'new')"
+}
+```
+**Returns:** JSON `{ sessionId, azureContext, deployState }`  
+**Source:** `packages/web/api/src/functions/azure-target.ts`
+
+Stores the user's chosen Azure subscription and resource group against the session. Optionally creates the resource group if it doesn't exist.
+
+#### `POST /api/sessions/{sessionId}/azure-deployments`
+
+**Auth:** Azure access token + session ownership  
+**Body:**
+```json
+{
+  "mainFile": "string",
+  "files": [{ "path": "string", "content": "string" }],
+  "deploymentName": "string (optional)",
+  "parameters": "Record<string, unknown> (optional)",
+  "appUrlOutput": "string (optional)",
+  "healthCheckPath": "string (optional)"
+}
+```
+**Returns:** JSON `{ runId, status }` (202 Accepted)  
+**Source:** `packages/web/api/src/functions/azure-deployments.ts`
+
+Starts an ARM template deployment. Returns a `runId` that the client polls with the status endpoint below.
+
+#### `GET /api/azure-deployments/{runId}`
+
+**Auth:** Azure access token + principal ownership  
+**Returns:** JSON `{ runId, status, outputs, error }`  
+**Source:** `packages/web/api/src/functions/azure-deployments.ts`
+
+Polls deployment status. The `runId` is opaque and encodes the principal identifier — a deployment run can only be polled by the user who started it.
+
+#### `POST /api/sessions/{sessionId}/deploy-gates/cost`
+
+**Auth:** Session ownership  
+**Body:** `{ estimatedMonthlyTotal: number, currency?: string, source?: string }`  
+**Returns:** JSON `{ sessionId, deployState }`  
+**Source:** `packages/web/api/src/functions/deploy-cost-gate.ts`
+
+Records that the user has acknowledged the estimated monthly cost before deployment. Updates the session's `deployState.costGatePassed` flag. The frontend uses this as a gate before calling the start-deployment endpoint.
+
+#### `POST /api/sessions/{sessionId}/cost-estimate`
+
+**Auth:** Session ownership  
+**Rate limit:** 12 requests per minute (stricter than the default 30/min)  
+**Body:** `{ region: string, lineItems: CostLineItem[] }` (see `packages/web/api/src/lib/cost-estimate.ts` for the full schema)  
+**Returns:** JSON cost estimate with live prices, cache metadata, and fallback info  
+**Source:** `packages/web/api/src/functions/cost-estimate.ts`
+
+Fetches a cost estimate from the Azure Retail Prices API for the resource types in `lineItems`. Results are cached per region/SKU combination. Falls back to static prices if the upstream API is unavailable.
+
+---
+
+### Utility
+
+#### `GET /api/pricing-proxy`
+
+**Auth:** None  
+**Query params:** Any OData `$filter` / `$orderBy` supported by the Azure Retail Prices API  
+**Returns:** Proxied JSON from `prices.azure.com/api/retail/prices`  
+**Source:** `packages/web/api/src/functions/pricing-proxy.ts`
+
+Public CORS proxy for the Azure Retail Prices API. No authentication required — the pricing API is public. Responses are cached for 5 minutes (`Cache-Control: public, max-age=300`).
+
+Example: `GET /api/pricing-proxy?$filter=serviceName eq 'Azure Kubernetes Service'`
+
+#### `GET /api/inspirations`
+
+**Auth:** None  
+**Query params:** `stream=true` (optional) — stream a single idea token-by-token  
+**Returns:** JSON `{ ideas: InspirationIdea[] }` or SSE stream  
+**Source:** `packages/web/api/src/functions/inspirations.ts`
+
+Returns carousel inspiration ideas for the landing page. If Azure OpenAI is configured, generates creative app ideas via LLM (`AZURE_OPENAI_INSPIRE_DEPLOYMENT`). Otherwise returns a shuffled subset of hardcoded fallback ideas.
+
+#### `GET /api/inspirations/widgets`
+
+**Auth:** None  
+**Query params:** `stream=true` (optional) — stream a widget prompt token-by-token  
+**Returns:** JSON `{ prompt: string }` or SSE stream  
+**Source:** `packages/web/api/src/functions/widget-inspirations.ts`
+
+Returns Playground widget inspiration prompts. Used by the Playground Create tab to seed the prompt field.
+
+#### `POST /api/playground`
+
+> 🔧 **Internal** — used exclusively by the A2UI Playground Create tab. Not part of the public API contract.
+
+**Auth:** None (rate-limited)  
+**Body:** `{ message: string, sessionId?: string }`  
+**Returns:** JSON `{ sessionId: string, message: string, a2ui?: object[] }`  
+**Source:** `packages/web/api/src/functions/playground.ts`
+
+Dedicated A2UI component design endpoint. Uses a specialised system prompt focused on iterating over A2UI component structures. Maintains its own lightweight in-memory session store (separate from the main conversation sessions, 1-hour TTL).
 
 ---
 
