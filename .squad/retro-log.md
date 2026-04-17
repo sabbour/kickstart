@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #441 "fix(docs): correct conversation-phases and contributing accuracy (#435)" | L | impl=9m | review=13m | cycles=1 | merged | @sabbour
+
 - 2026-04-17 | #443 "test: custom component count contract test" | M | impl=1m | review=0m | cycles=1 | merged | @sabbour-squad-tester[bot]
 
 - 2026-04-17 | #444 "fix(docs): correct 19 API reference inaccuracies vs actual implementation" | M | impl=0m | review=8m | cycles=1 | merged | @sabbour-squad-frontend[bot]
