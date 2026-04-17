@@ -14,12 +14,14 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import {
-  DiagramEdge,
-  DiagramNode,
   FLUENT_DIAGRAM_PALETTE,
   loadMermaid,
   nodesToMermaid,
   renderArchitectureDiagramSvg,
+} from './architectureDiagramUtils';
+import type {
+  DiagramEdge,
+  DiagramNode,
 } from './architectureDiagramUtils';
 import {
   ARCHITECTURE_DIAGRAM_EMPTY_STATE_ICON_URL,
