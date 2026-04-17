@@ -287,3 +287,68 @@ export type ConversationPhaseComponent = {
   [key: string]: unknown;
 };
 export type GenerationProgressComponent = { type: string; [key: string]: unknown };
+
+export type { Pack, PlaygroundStub } from './types/pack.js';
+export type { AgentContribution, ContributionSource, Handoff, ModelRef } from './types/agent.js';
+export type { Skill } from './types/skill.js';
+export type { ToolContribution } from './types/tool.js';
+export type { UserActionContribution } from './types/user-action.js';
+export type { ComponentContribution } from './types/component.js';
+export type { GuardrailContribution, GuardrailVerdict } from './types/guardrail.js';
+export type { PlaygroundScenario } from './types/playground.js';
+export type {
+  A2UIComponent,
+  A2UIDataValue,
+  A2UIMessageEnvelope,
+  A2UIMessageInput,
+  A2UIMessageV09,
+  A2UIVersion,
+  CreateSurfaceMessage,
+  DeleteSurfaceMessage,
+  UpdateComponentsMessage,
+  UpdateDataModelMessage,
+} from './types/a2ui.js';
+export type {
+  AppIntent,
+  A2UICatalog,
+  AzureCredential,
+  PendingUserAction,
+  SessionCtx,
+  Turn,
+} from './types/session.js';
+export type { AgentOutputType } from './types/agent-output.js';
+
+export {
+  AgentOutput,
+} from './types/agent-output.js';
+export {
+  A2UI_VERSION,
+  A2UIMessageEnvelopeSchema,
+  A2UIMessageSchema,
+  CreateSurfaceMessagePayload,
+  CreateSurfaceMessageSchema,
+  DeleteSurfaceMessagePayload,
+  DeleteSurfaceMessageSchema,
+  UpdateComponentsMessagePayload,
+  UpdateComponentsMessageSchema,
+  UpdateDataModelMessagePayload,
+  UpdateDataModelMessageSchema,
+} from './types/a2ui.js';
+export {
+  CONVERSATION_PHASE_LABELS,
+  CONVERSATION_PHASE_ORDER,
+  extractConversationPhase,
+  getLatestConversationPhase,
+  isA2UIMessage,
+  normalizeConversationPhase,
+  prepareChatA2ui,
+  prepareChatA2uiPayload,
+  rebuildChatSessionState,
+} from './a2ui/chat-a2ui.js';
+export type {
+  ConversationPhaseId,
+  GeneratedChatFile,
+  PersistedChatTurn,
+  PreparedChatA2ui,
+  PrepareChatA2uiOptions,
+} from './a2ui/chat-a2ui.js';
