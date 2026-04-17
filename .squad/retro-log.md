@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #297 "fix(flow): end conversation at Review, add client: action routing (#271)" | XL | impl=50m | review=42m | cycles=1 | merged | @sabbour
