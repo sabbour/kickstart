@@ -75,3 +75,15 @@
 **Histories updated:** zapp (9,221 → 10,023 bytes — final PR #548 approval)
 **Scribe history summarised:** 14,126 → compact (Waves 3–17 archived to history-archive.md)
 **Checked / absent:** `fry-482-dp-revision.md`, `zapp-482-dp-recheck.md` — not yet landed
+
+## Wave 25 — 2026-04-17
+
+**Inbox scan:** 1 new file
+- `zapp-482-b3-signoff.md` → merged (DP #482 B3 arm_get regex: allowlist still missing, BLOCKED)
+
+**History updates:**
+- `zapp/history.md`: wave 25 entry appended (10,023 → 10,676 bytes)
+
+**Still absent:** `fry-482-dp-revision.md`, `zapp-482-dp-recheck.md` (full revision), `bender-pr548-fix.md`, `zapp-pr548-recheck.md` (C1/C3 still pending)
+
+**decisions.md:** 197,712 → 198,596 bytes

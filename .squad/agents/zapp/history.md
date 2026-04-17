@@ -132,3 +132,12 @@ Evidence at commit `cef36b3`:
 - `npm test -- --run fetch_webpage.test.ts` passed.
 
 PR #548 is now security-cleared. `zapp:approved` applied.
+
+## Wave 25 — 2026-04-17
+
+### DP #482 pack-azure B3 regex re-check — BLOCKED (B3 still open)
+- **Source:** `zapp-482-b3-signoff.md`
+- **Issue:** #482 — v2 Step 7: pack-azure
+- **Status:** BLOCKED — B3 not yet approved
+- **Finding:** `validateArmPath()` still executes allowlist (`ARM_PATH_RE`) test but only runs `ARM_PATH_DENY.test(path)`. B3 requires explicit allowlist-first, denylist-second: (1) reject when `!ARM_PATH_RE.test(path)`, (2) reject when `ARM_PATH_DENY.test(path)`. Denylist alone is not fail-closed.
+- **Next:** DP must be amended to show explicit allowlist enforcement before Zapp approval. B1–B2, B4–B5 status unchanged.

@@ -51,3 +51,4 @@ Fry's next role: implement #479 (Runner + SSE) once #477/#478 are fully merged.
 | #480 Skill resolver | 4-stage pipeline; estimateTokens; Skill[] | #issuecomment-4268290735 | APPROVED (Leela+Zapp A/C) |
 | #482 pack-azure | 6 phases; azureKit port; Zapp C1 pre-addressed | #issuecomment-4268944331 | Leela APPROVE_WITH_CONDITIONS; Zapp BLOCKED |
 | #482 DP Revision | Addressed Zapp B1–B5: managed identity model, azureToken storage boundary, arm_get exact regex+denylist, AzurePackDTO redaction contract, KICKSTART_PLAYGROUND gate | #issuecomment-4269070199 | Awaiting Zapp re-review |
+| #482 DP Revision B3 | Posted exact anchored ARM_PATH_RE regex + ARM_PATH_DENY denylist + validateArmPath() in response to Zapp B3 re-check failure | https://github.com/sabbour/kickstart/issues/482#issuecomment-4269105863 | Awaiting Zapp B3 sign-off |

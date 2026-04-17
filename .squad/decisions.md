@@ -3475,3 +3475,27 @@ C2 is **RESOLVED**.
 ## Outcome
 
 The DNS rebinding attack path called out in blocker C2 is closed on PR #548. `zapp:approved` can be applied.
+
+---
+# Zapp Decision — DP #482 B3 Anchored `arm_get` Regex Re-check
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Issue:** #482
+**Status:** BLOCKED
+
+## Decision
+
+B3 is **not** approved yet. The proposed anchored regex and denylist are directionally correct, but the revision still does not show the required **allowlist-first, denylist-second** enforcement path.
+
+## Remaining blocker
+
+1. **Explicit allowlist enforcement is missing.**
+   - The snippet defines `ARM_PATH_RE`, but `validateArmPath(path)` only executes `ARM_PATH_DENY.test(path)`.
+   - B3 requires concrete fail-closed sequencing:
+     1. reject when `!ARM_PATH_RE.test(path)`
+     2. then reject when `ARM_PATH_DENY.test(path)`
+
+## Outcome
+
+DP #482 is **not fully approved** from security yet. B3 remains open until the validation flow explicitly enforces the anchored allowlist before the denylist.
