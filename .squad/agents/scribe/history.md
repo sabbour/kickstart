@@ -171,3 +171,12 @@ Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v
 **Histories updated:** leela (12,843 bytes), zapp (6,972 bytes) — both below 15,360 threshold
 **Worktrees checked:** 547-security-review ← new worktree with `zapp-pr547-recheck.md`
 **No summarisation needed**
+
+## Wave 19 — 2026-06-10
+
+**Files merged:** 1 (`leela-pr548-review.md`)
+**decisions.md:** 177,571 → 179,382 bytes (+1,811)
+**PR #548 summary:** Leela APPROVED pack-core (closes #477) with conditions — C4 path bug (non-blocking, it.todo), `search_components.ts` orphan must be wired/removed before merge, `registration.test.ts` mock must use real import on activation; 40 components (ArchitectureDiagram bonus accepted); `leela:approved` applied.
+**Histories:** leela self-logged PR #548 entry (12,843 → 13,971 bytes, 91% threshold — monitor); fry 13,121 (85%) — both below 15,360; no summarisation needed.
+**Also committed:** fry/history.md +52 lines (DP #478/#479/#480), config.json (zapp→gpt-5.4, scribe→claude-sonnet-4.6), decisions-archive.md (+FSM removal entry), bender/step4-6-brief.md (Steps 4–6 routing brief), identity/now.md (Ralph status update)
+**Commit:** (pending)

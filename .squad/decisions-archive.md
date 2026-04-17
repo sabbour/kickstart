@@ -4233,3 +4233,64 @@ Define a "trivial change" gate: CSS-only, typo fix, config change, rename, or si
 Agents must create branch + draft PR immediately after DP approval, BEFORE writing code. This gives Ahmed a GitHub URL to watch within 30 seconds. Commits are pushed incrementally as work progresses.
 
 **Sequence:** DP approved → create branch → push empty commit → open draft PR → implement → push commits → mark PR ready for review.
+
+# Decision: Remove FSM from core engine (archived 2026-04-17)
+
+**Original Date:** 2025-07-18  
+**Author:** Bender (Backend Dev)  
+**Related issue:** #384
+**Archived:** 2026-04-17 (older than 7 days)
+
+**Date:** 2025-07-18  
+**Author:** Bender (Backend Dev)  
+**Related issue:** #384
+
+## Context
+
+Machine.ts (XState-style finite state machine) was implemented in `@kickstart/core` to manage phase transitions with explicit state maps and status tracking.
+
+## Decision
+
+Remove `machine.ts` and `phases.ts` FSM layer. Replace with:
+
+1. **Simple phase state:** `ConversationState.currentPhase: Phase`
+2. **Linear advancement:** Use `PHASE_DEFINITIONS.nextPhase` to advance
+3. **Position-based status:** Calculate "complete/active/pending" from phase order and current index
+
+## Rationale
+
+- FSM added complexity without benefit — phase transitions are strictly linear
+- `ConversationState` bloat: `phaseStatus` maps, `phaseData`, `isComplete` flag
+- All transitions collapsed to sequential; `USER_INPUT` was a no-op
+- Simpler code reduces maintenance burden and makes extensions clearer
+
+## Pattern
+
+```typescript
+interface ConversationState {
+  currentPhase: Phase;
+}
+
+function advancePhase(current: Phase): Phase {
+  const def = PHASE_DEFINITIONS.find(p => p.id === current);
+  return def?.nextPhase ?? current;
+}
+
+const order = getPhaseOrder();
+const currentIdx = order.indexOf(currentPhase);
+status = idx < currentIdx ? "complete" : idx === currentIdx ? "active" : "pending";
+```
+
+## What stays
+
+- `phases.ts`: PHASE_DEFINITIONS, getPhaseDefinition(), getPhaseOrder() — used everywhere
+- `Phase` enum: unchanged
+- All reducer logic: moved to inline handlers
+
+## Consequences
+
+- Conversation engine simpler and faster
+- Easier to add new phases or change order
+- Phase lifecycle now trackable in raw state (no mapping layer)
+
+---

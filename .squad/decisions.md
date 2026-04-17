@@ -3154,3 +3154,41 @@ The 4 blocking security findings previously raised on PR #547 are resolved in co
 ## Outcome
 
 Applied `zapp:approved` label to issue/PR gate path for #547.
+
+---
+# Decision: PR #548 pack-core — Leela Approval
+
+**Date:** 2026-04-17
+**Author:** Leela (Lead Architect)
+**PR:** #548 — feat(v2): pack-core Phases A–H
+**Issue:** #477
+
+## Verdict
+
+APPROVED with conditions.
+
+## DP Condition Outcomes
+
+| Condition | Status | Notes |
+|-----------|--------|-------|
+| C1 — dir-based manifest | ✅ PASS | `agentsDir`/`skillsDir` URLs used; no inline arrays |
+| C2 — `emit_ui` A2UIEmissions | ✅ PASS | `session.recordA2UIEmission(parsed)` after Zod; `SessionCtx` confirmed in harness |
+| C3 — Step 5 forwarding | ✅ NOTE | emit_ui correct; Step 5 DP must read `session.a2uiEmissions`, not `event.arguments` |
+| C4 — loader-from-disk test | ⚠️ BUG | `agents.test.ts:26` has `../../agents` (wrong); must be `../agents`; all tests are `it.todo()` so non-blocking for merge |
+| C5 — AuthCard domain-neutral | ✅ PASS | Zero Azure props; `providerLabel` is generic string |
+
+## Scope Decisions
+
+- **40 components (not 39)**: ArchitectureDiagram added as domain-neutral bonus. Accepted; Hermes must update test count from 39 → 40 when activating.
+- **`validate_artifacts` stub**: Accepted for Step 4. Real linter deferred.
+- **`list_files` as 6th tool**: Accepted — scoped (500-file cap), within domain-neutral charter.
+- **`search_components.ts` orphan**: File exists but not wired in `corePack`. Must be removed or wired before merge.
+- **`registration.test.ts` mock**: Must remove inline `corePack` mock and uncomment real import when Hermes activates — otherwise test validates nothing about loader path.
+
+## Pending for Step 5
+
+Step 5 DP must explicitly commit to forwarding from `session.a2uiEmissions` (post-validation), NOT from `event.arguments`. The brief §9 sketch is illustrative only.
+
+## Label Applied
+
+`leela:approved` applied to PR #548.

@@ -112,3 +112,55 @@ Leela + Zapp approval before implementation starts.
 ## Wave 3 — 2026-04-17 Playground Decision Filed
 
 - `fry-playground-component-grouping.md`: GitHub Components + Azure Components moved from `GALLERY_GROUPS` to `COMPONENT_GROUPS` in `Playground.tsx` — they are catalog components, not gallery scenarios. Playground stub connector guard removed; `AzureARMConnector` + `GitHubConnector` always registered unconditionally.
+
+## 2026-07-16 — #478 Design Proposal: v2 Step 4a Playground on registry
+
+Posted DP to https://github.com/sabbour/kickstart/issues/478#issuecomment-4268166333
+
+### Covered
+- 4-phase delivery order: A (replace GALLERY_GROUPS with registry.playgroundScenarios) → B (delete Widget tab + WidgetCard/WidgetPreview) → C (wire Components tab to registry.components) → D (stub dispatch via usePlaygroundDispatch)
+- Registry APIs: registry.components, registry.getComponent(), registry.playgroundScenarios, registry.playgroundStubs — all within #476 scope, none invented
+- Stub dispatch: canonical UserAction name keyed map, usePlaygroundDispatch hook, loud throw on unregistered action (not silent fallback), visible MessageBar error in UI
+- corePack minimum viable: 4+ components (Button/Text/Column/Row minimum), 2 scenarios (discover-flow + generate-files), empty stubs map
+- Hermes test plan: 5 tests in playground-registry.test.ts (registry count, KICKSTART_PACKS filter, unregistered stub throws, 2+ scenarios render, no unregistered component refs) + rewrite playground-surfaceids.test.ts to read from registry
+- Done criteria: 9 checkboxes
+- 3 open questions (registry aggregation scope for playgroundScenarios, dev getRegistry() vs /api/packs shortcut, ScenarioDef→PlaygroundScenario rename)
+
+### Awaiting
+Leela + Zapp approval. Blocked on #477 landing with real corePack.
+
+## 2026-04-17 — DP #479 (v2 Step 5: Runner + SSE)
+
+**Issue:** #479
+**Task:** Author Design Proposal for Runner + SSE step
+**Comment:** https://github.com/sabbour/kickstart/issues/479#issuecomment-4268255972
+
+**Key decisions in DP:**
+- 5-phase delivery order: startup → harness runtime → API handlers → React hooks → integration test
+- 9 typed SSE event names: chunk, a2ui, tool, artifact, user_action_required, handoff, intent, done, error
+- `writeSSE` helper with TypeScript discriminated union on event name
+- `useStreaming` rewrite: drops onPhase/onSetupEvent/406 fallback; keeps rAF reveal loop
+- `useActionDispatch` rewrite: adds `handleUserActionRequired` for interrupt/resume; retires APIConnectorContext
+- GET /api/packs returns catalog + userActions; replaces direct registry import from #478 TODO(Step 5)
+- SessionCtx shape with in-memory default + StorageTableAdapter stub
+- 5 open questions flagged: getSkillsForAgent scope, session persistence, non-playground UserAction stub, zodToJsonSchema availability, sessionId handshake in done event
+
+**Status:** Posted. Awaiting Leela + Zapp approval.
+
+## 2026-04-17 — DP #480 (v2 Step 6: Skill resolver) — drafted on behalf of Bender
+
+**Issue:** #480
+**Task:** Author Design Proposal for Skill resolver (Bender's issue; Fry drafting)
+**Comment:** https://github.com/sabbour/kickstart/issues/480#issuecomment-4268290735
+
+**Key decisions in DP:**
+- 4-phase delivery: token-budget util → resolver core → runner integration → unit tests
+- 4-stage pipeline: glob filter (appliesTo) → keyword score (distinct hits, case-insensitive) → priority+score+id sort (fully deterministic) → token budget (skip-not-stop, ceil(chars/4))
+- estimateTokens utility in harness/runtime/token-budget.ts; shared with pack-core guardrails (no duplication)
+- Resolver returns Skill[], not string — formatting stays in runner
+- Skills inject after agent base body, before catalog block
+- Per-turn, not per-session; no caching
+- Registry: listSkills() preferred over new getSkillsForAgent() method (resolver handles glob itself)
+- 3 open questions: listSkills vs getSkillsForAgent, turn window role filter, skills block separator format
+
+**Status:** Posted. Awaiting Leela + Zapp + Bender approval.

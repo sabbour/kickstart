@@ -2,7 +2,8 @@
   "version": 1,
   "defaultModel": "claude-opus-4.7",
   "agentModelOverrides": {
-    "zapp": "gpt-5.3-codex"
+    "zapp": "gpt-5.4",
+    "scribe": "claude-sonnet-4.6"
   },
   "worktrees": true
 }

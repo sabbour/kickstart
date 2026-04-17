@@ -171,3 +171,20 @@ M1: Empty scenario list → informational state; unregistered component → `Gal
 
 Unblocks: #479 (Step 4b) and pack-core integration (#477) once that PR merges.  
 Decision filed: `.squad/decisions/inbox/leela-pr547-review.md`
+
+
+## 2026-04-17 — PR #548 pack-core code review
+
+Working as **Leela (Lead Architect)**.
+
+Reviewed PR #548 (feat(v2): pack-core Phases A–H, closes #477). Checked all five DP conditions (C1–C5) against the actual implementation.
+
+**C1** ✅ `corePack` uses `agentsDir`/`skillsDir` URL dir-pointers. No inline arrays.
+**C2** ✅ `emit_ui` Zod-validates then calls `session.recordA2UIEmission()`. `SessionCtx.a2uiEmissions` confirmed in harness.
+**C3** ✅ Noted for Step 5 DP: must forward from `session.a2uiEmissions`, not `event.arguments`.
+**C4** ⚠️ Path bug in `agents.test.ts:26` — `../../agents` resolves to non-existent dir; should be `../agents`. All tests are `it.todo()` so non-blocking for merge; Hermes owns the fix on activation.
+**C5** ✅ AuthCard schema stripped of Azure-specific props. Generic `providerLabel` string.
+
+Scope: 3 agents ✅, 5 skills ✅, 6 tools wired ✅, 27 basic + 13 rich (40 total) ✅, 3 guardrails ✅. `search_components.ts` flagged as orphan (not wired in corePack).
+
+Approved. `leela:approved` label applied. Decision filed to `.squad/decisions/inbox/leela-pr548-review.md`.
