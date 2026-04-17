@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #123 "feat: Remote filesystem abstraction + Cloud Shell provider" | XL | impl=6m | review=26m | cycles=1 | merged | @sabbour
