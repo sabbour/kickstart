@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #180 "fix: Wave 2 quick fixes — Integration Kit visibility, carousel animation, debug panel (#168, #170, #175)" | S | impl=5m | review=31m | cycles=1 | merged | @sabbour
