@@ -3810,3 +3810,166 @@ DP uses `github.publisher` throughout — correctly matching the v2 brief. The r
 - `github.publisher` agent scope matches the brief exactly. Single-agent design is correct — the Handoff phase is a focused linear flow, not a multi-agent workflow.
 - `SecretSetter` using Fluent `PasswordField` with value posted directly to resume endpoint is acceptable. Confirm value is not held beyond the controlled input render cycle.
 - Skill split (oidc / workflow-structure / pr-conventions) is clean and maps directly to v1 prompt sections. Good decomposition.
+
+---
+# Decision — Zapp Security Review #484: pack-github
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Issue:** #484 — v2 Step 9: pack-github — agent, skills, tool, user actions, and components
+**Verdict:** BLOCKED
+
+---
+
+## Summary
+
+The DP is directionally right on two points: `github:login` returns a redacted DTO (`{ authenticated, viewer }`), and the proposed SSE/A2UI contract says the token never leaves the server-visible runtime. The security gate is still blocked because the highest-risk GitHub trust boundaries remain under-specified: `github.api_get` path validation is bypassable with encoded/traversal-like inputs, the token storage/redaction boundary is not fail-closed, browser→server secret transport requirements are not explicit, and playground stubs are not yet gated.
+
+---
+
+## Blocking Findings
+
+### B1 — `github.api_get` allowlist is anchored, but not normalized or encoding-safe
+
+**Status:** 🔴 Blocker
+
+What passes/fails from the DP regex as written:
+- `/repos/{owner}/{repo}/git/refs/../../../../etc` → **rejected** (good; exact path does not match any allowlisted pattern)
+- All 7 regexes are **anchored** with `^...$` (good)
+- URL-encoded traversal / delimiter payloads are **not blocked** (bad)
+
+Examples that still match the allowlist as written:
+- `/repos/o/r/git/trees/../../../../etc`
+- `/repos/o/r/contents/../../../../etc`
+- `/repos/o/r/contents/%2e%2e/%2e%2e/secrets`
+- `/repos/o%2fr/r/contents/README.md`
+
+The `contents/.+` and `git/trees/.+` tails are too broad, and `[^/]+` on the raw undecoded string still accepts `%2f` / `%2e` variants.
+
+**Required fix before approval:**
+- Normalize and validate the **decoded** path before matching
+- Reject `..`, `.`, `%2e`, `%2f`, `%5c`, double-encoding variants, fragments, and backslashes
+- Replace generic `.+` tails with per-endpoint exact schemas / segment validators
+- Prefer building supported GitHub API URLs from validated owner/repo/ref/path parameters instead of accepting a free-form `path`
+
+### B2 — GitHub token boundary is not least-privilege and `/api/packs` redaction is still unspecified
+
+**Status:** 🔴 Blocker
+
+The DP says the token lives in `SessionCtx.githubToken` and “never leaves SessionCtx.” That is not a sufficient boundary. A raw token on `SessionCtx` is too easy to accidentally serialize into SSE/debug state, logs, manifest DTOs, or future helper surfaces.
+
+The DP also says the token must never appear in `/api/packs`, but it does **not** define the GitHub pack DTO/redaction contract. Prior Zapp decisions already require `/api/packs` to return a safe DTO only.
+
+**Required fix before approval:**
+- Do **not** store a raw OAuth token on a broadly accessible `SessionCtx.githubToken` field
+- Store an opaque server-side session handle or capability-scoped auth handle that only server-side GitHub helpers can resolve
+- Explicitly define the GitHub `/api/packs` DTO: only client UX metadata; no token, scopes, auth state internals, callback URLs, or pack-private structures
+- Add a test/acceptance criterion that `github:login`, SSE `chunk`/`a2ui`, `done`, and `/api/packs` never contain the token or token-derived fields
+
+### B3 — `github:login` / `github:set_secret` transport security is not explicit enough
+
+**Status:** 🔴 Blocker
+
+For `github:login`, the correct model is: browser opens `/api/github-auth/login`, GitHub redirects back to `/api/github-auth/callback` with an authorization **code**, and the server exchanges that code for the token. The browser should never receive the raw token.
+
+That direction is good, but the DP does not make the transport fail-closed. It must explicitly require HTTPS-only login/callback/resume traffic in production, Secure + HttpOnly cookie/session storage, and no logging/echoing of auth codes, tokens, or `github:set_secret` values.
+
+**Required fix before approval:**
+- Reject non-HTTPS `github-auth` and resume requests in production
+- Require Secure + HttpOnly cookies (or equivalent server-only session store)
+- State that request bodies carrying `github:set_secret` values are never logged, echoed in responses, or surfaced in SSE/debug payloads
+- Keep `github:login` client-visible result limited to `{ authenticated, viewer }`
+
+### B4 — Playground auth/write stubs are not yet fail-closed
+
+**Status:** 🔴 Blocker
+
+Phase G says all 6 user actions get playground stubs. Q5 only asks whether `github:login` / `github:set_secret` stubs *should* be gated. For security review, this cannot stay as an open question.
+
+**Required fix before approval:**
+- Explicitly gate `github:login`, `github:create_repo`, `github:create_pr`, and `github:set_secret` playground stubs behind `KICKSTART_PLAYGROUND=true`
+- Non-playground environments must fail closed
+
+---
+
+## Required Major Conditions
+
+### M1 — `BRANCH_NAME_RE` is anchored and blocks the asked shell/path payloads, but still misses Git ref edge cases
+
+The regex is anchored. It blocks:
+- `../../...` (via denylist `..`)
+- `$(cmd)` / backticks / semicolons (rejected by the regex)
+
+But it still allows branch names that are risky or invalid under Git ref rules, such as:
+- leading `.`
+- leading `-`
+- trailing `.lock`
+
+**Required hardening:** adopt the stricter existing Git ref validation pattern already used in the current GitHub auth server path (or equivalent `git check-ref-format` semantics), not the simplified DP regex.
+
+### M2 — `sanitize.ts` strips HTML/script, not markdown-level abuse
+
+`packages/web/src/utils/sanitize.ts` uses DOMPurify with a strict allowlist. That is good for HTML/XSS in the web client, but it is the wrong primitive for a GitHub PR body, which is markdown.
+
+It will strip dangerous HTML/script, but it does **not** address markdown-native abuse such as `@mentions`, issue-closing keywords, misleading autolinks, huge nested lists/tables, or other rendering-spam patterns.
+
+**Required hardening:** use a markdown-safe composition strategy (template the PR body from controlled fields, or escape/untrusted markdown content before interpolation) instead of treating PR body safety as an HTML sanitization problem.
+
+---
+
+## Check-by-check answers
+
+1. **`github.api_get` allowlist**
+   - `/repos/{owner}/{repo}/git/refs/../../../../etc` bypass? **No**
+   - Anchored with `^` / `$`? **Yes**
+   - `%2f` / `%2e` blocked? **No**
+
+2. **GitHub token transport**
+   - `github:login` result limited to `{ authenticated, viewer }`? **Yes, in the DP**
+   - Token excluded from SSE `chunk` / `a2ui`? **Stated yes, but acceptance tests are required**
+   - `GET /api/packs` excludes token? **Not specified enough — blocker**
+
+3. **`github:create_pr` branch validation**
+   - Anchored? **Yes**
+   - Blocks `../../`, `$(cmd)`, backticks, semicolons? **Yes**
+   - Sufficient overall? **No — needs stricter Git ref validation**
+
+4. **PR body sanitization**
+   - Strips disallowed HTML/script? **Yes**
+   - Solves markdown injection / rendering abuse? **No**
+
+5. **`set_secret` / login transport**
+   - Raw token passed from browser to server during `github:login`? **It should not be; only the OAuth code should hit the callback**
+   - HTTPS-only + no client-visible secret echo/logging required? **Yes — must be made explicit**
+
+6. **Playground stubs gate**
+   - `KICKSTART_PLAYGROUND=true` required in DP text? **Not yet — blocker**
+
+---
+
+## Outcome
+
+**BLOCKED** pending B1–B4. Re-review once the DP explicitly narrows the GitHub path surface, moves token handling behind a server-only opaque boundary, defines `/api/packs` redaction, makes login/secret transport fail-closed over HTTPS, and gates playground stubs with `KICKSTART_PLAYGROUND=true`.
+
+---
+# Decision: #483 DP Re-check — APPROVE_WITH_CONDITIONS
+
+**Date:** 2026-04-17
+**Verdict:** APPROVE_WITH_CONDITIONS ✅
+
+## Conditions Assessed
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| C1 — skills micro-fix | ✅ Resolved | Revision confirms `skills?: Skill[]` is tracked as a separate harness micro-fix (via Bender's PR); `deployment-safeguards` registers inline once that patch lands |
+| C2 — ArchitectureDiagram move | ✅ Resolved | Phase E correctly framed as a cross-pack **move** from `packages/pack-core/src/components/rich/` → `packages/pack-aks-automatic/src/components/`; both manifests updated; ownership assigned to #525 implementer |
+| C3 — DeploymentConfirm in Phase E | ✅ Confirmed | `aks/DeploymentConfirm` explicitly added to Phase E scope |
+
+## Conditions for Step 8 PR Merge
+
+1. Harness micro-fix (`Pack.skills[]`) merged before pack-aks-automatic PR opens
+2. #525 implementer moves `ArchitectureDiagram` from pack-core; both pack manifests updated
+3. `aks/DeploymentConfirm` in Phase E scope confirmed
+
+Comment posted: https://github.com/sabbour/kickstart/issues/483#issuecomment-4269284877
+Label applied: `leela:approved-dp`

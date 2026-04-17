@@ -166,3 +166,16 @@ PR #548 is now security-cleared. `zapp:approved` applied.
 
 Non-blocking: warnings surface as UI output (not silent rewrite); no production debug bypass.
 `zapp:approved` not applied. Decision filed: `.squad/decisions/inbox/zapp-483-dp-review.md`
+
+## 2026-04-17 — DP #484 pack-github Security Review
+
+**Verdict:** BLOCKED (4 high, 2 major)
+
+1. **🔴 B1 — `github.api_get` allowlist not encoding-safe** — anchored regexes pass `%2f`/`%2e` traversal variants. Must decode path before matching; reject `.`, `..`, double-encoding; replace broad `.+` tails with per-endpoint segment validators; prefer constructing API URLs from validated owner/repo/ref params.
+2. **🔴 B2 — Token boundary not fail-closed** — raw `SessionCtx.githubToken` too easily serialized into logs/SSE/DTOs. Must use opaque server-side handle; define `/api/packs` GitHub DTO (UX metadata only, no token/scopes/auth internals); add acceptance tests that no token appears in SSE or `/api/packs`.
+3. **🔴 B3 — Login/secret transport not explicit** — OAuth code-exchange direction is right but must require HTTPS-only auth routes, Secure+HttpOnly cookies, no logging of auth codes/tokens/`set_secret` values.
+4. **🔴 B4 — Playground stubs not gated** — Q5 cannot remain open; `github:login`, `github:create_repo`, `github:create_pr`, `github:set_secret` stubs must require `KICKSTART_PLAYGROUND=true`; fail closed in production.
+5. **🟠 M1 — Branch name regex too permissive** — anchored and blocks traversal/shell, but still allows leading `.`/`-` and trailing `.lock`; must adopt stricter `git check-ref-format` semantics.
+6. **🟠 M2 — PR body uses DOMPurify (HTML), not markdown-safe composition** — strips HTML/XSS but does not prevent markdown abuse (`@mentions`, autolinks, spam). Must template PR body from controlled fields or escape untrusted markdown.
+
+`zapp:approved` not applied.

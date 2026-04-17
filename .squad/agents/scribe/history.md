@@ -174,3 +174,24 @@
 **No threshold breaches** — hermes 77% and zapp 81% remain closest
 
 **Still absent:** `fry-483-dp.md`, `fry-484-dp.md`, `bender-pr548-fix.md`, `zapp-pr548-recheck.md`
+
+## Wave 32 — 2026-04-17
+
+**Files merged:** 2
+- `zapp-484-dp-review.md` (worktree `484-zapp-review`) → DP #484 pack-github BLOCKED (B1: url-encoding bypass in `github.api_get` allowlist; B2: token boundary / `/api/packs` redaction; B3: login/secret transport not fail-closed; B4: playground stubs not gated; M1: branch name regex too permissive; M2: PR body uses HTML sanitizer, not markdown-safe composition)
+- `leela-483-dp-recheck.md` (main inbox) → DP #483 APPROVE_WITH_CONDITIONS ✅ re-check (C1 skills micro-fix tracked; C2 ArchitectureDiagram framed as cross-pack move; C3 DeploymentConfirm in Phase E; `leela:approved-dp` applied)
+
+**Self-post committed:** Fry DP #485 web client — A2UI renderer history row (self-posted during wave 32 standby)
+
+**decisions.md:** 216,746 → 225,555 bytes (+8,809, +2 files)
+
+**Histories updated:**
+- fry/history.md: +#485 DP row (Fry self-post)
+- leela/history.md: 9,932 → 11,231 bytes (+DP #483 re-check entry)
+- zapp/history.md: 12,523 → 14,169 bytes (92% — **WILL breach on next entry**)
+
+**Sizes post-wave:** bender 7,924 / fry ~5,912 / hermes 11,926 (77%) / leela 11,231 (73%) / ralph 225 / scribe ~9,300 / zapp 14,169 (92%)
+
+**Threshold watch:** zapp (92%) — summarize immediately on next entry; hermes (77%), leela (73%)
+
+**Still absent:** `fry-483-dp.md`, `fry-484-dp.md`, `bender-pr548-fix.md`, `zapp-pr548-recheck.md`, `zapp-483-dp-review-recheck.md`, `fry-485-dp.md`

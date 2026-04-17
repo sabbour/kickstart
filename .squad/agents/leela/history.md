@@ -173,3 +173,70 @@ Answered all 5 of Fry's open questions:
 
 Comment posted: https://github.com/sabbour/kickstart/issues/484#issuecomment-4269269795
 Decision filed: `.squad/decisions/inbox/leela-484-dp-review.md`
+
+---
+
+## #483 DP Re-check — 2026-04-17
+**Issue:** #483 (pack-aks-automatic deployment safeguards DP revision)
+**Verdict:** APPROVE_WITH_CONDITIONS ✅
+
+| Check | Status |
+|-------|--------|
+| C1 — skills micro-fix tracked separately; inline registration after harness patch | ✅ |
+| C2 — Phase E framed as cross-pack move (pack-core → pack-aks-automatic); #525 implementer owns it | ✅ |
+| C3 — aks/DeploymentConfirm added to Phase E scope | ✅ |
+
+Conditions for Step 8 PR merge:
+1. Harness micro-fix (`Pack.skills[]`) merged before pack-aks-automatic PR opens
+2. #525 implementer moves `ArchitectureDiagram` from pack-core; both manifests updated
+3. `aks/DeploymentConfirm` in Phase E scope confirmed
+
+Comment posted: https://github.com/sabbour/kickstart/issues/483#issuecomment-4269284877
+Label applied: `leela:approved-dp`
+Decision filed: `.squad/decisions/inbox/leela-483-dp-recheck.md`
+
+---
+
+## #485 DP Review — 2026-04-17
+**Issue:** #485 (web-client A2UI renderer from registry catalog, UserAction dispatcher)
+**Verdict:** APPROVE_WITH_CONDITIONS ✅
+
+| Condition | Summary |
+|-----------|---------|
+| C1 (blocking) | Bootstrap registration ordering: pack `register()` calls must be shown in `main.tsx` before `ReactDOM.render()` |
+| C2 (blocking) | Zapp review of Phase C (credential flow) is a hard gate before Phase C merges |
+
+Non-blocking:
+- N1: `APIConnectorContext` has 9 active consumers; cannot delete in Step 10
+- N2: `/api/packs` drift validation is follow-on, not blocking
+- N3: Phase B/C ordering is fine once C1 resolved
+- N4: `pack/PascalName` namespace is collision-free by design
+
+Q answers posted:
+- Q1: `main.tsx` registers packs synchronously before `createRoot().render()`
+- Q2: Bundle-registry is authoritative; `/api/packs` is dev-time validation only
+- Q3: Fluent `<Dialog>` handles portaling; no custom portal needed
+- Q4: Do not delete `APIConnectorContext` in Step 10; 9 consumers remain
+- Q5: Zapp review is a hard gate (C2)
+
+Comment: https://github.com/sabbour/kickstart/issues/485#issuecomment-4269301202
+Label applied: `leela:approved-dp`
+Decision filed: `.squad/decisions/inbox/leela-485-dp-review.md`
+
+---
+
+## #549 PR Review — fix(harness): Pack.skills[] for inline skill registration
+**Verdict:** APPROVE ✅
+
+| Check | Status |
+|-------|--------|
+| `Pack.skills?: Skill[]` typed correctly | ✅ |
+| `loadSkills()` merge handles all edge cases | ✅ |
+| Duplicate-ID guard via `assertUnique` | ✅ |
+| `Skill` exported from `index.ts` public API | ✅ |
+| 56 tests passing; 2 pre-existing failures unrelated | ✅ |
+
+Follow-up: Hermes to add targeted test for "both sources defined" merge path.
+Unblocks: #483 (pack-aks-automatic deployment-safeguards).
+Comment: https://github.com/sabbour/kickstart/pull/549#issuecomment-4269301873
+Label applied: `leela:approved`
