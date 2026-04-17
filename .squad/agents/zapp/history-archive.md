@@ -42,3 +42,38 @@ Initial block: `STEPWISE_GENERATION_V1` still in `infra/main.bicep:52-53,132-140
 
 ## Wave 6: PR #546 — REQUEST CHANGES
 `frontmatter.ts` lexical-only path confinement (`resolve()`/`relative()` + `statSync()` follows symlinks). Symlink inside pack root pointing outside passes check. Required: `realpath` canonicalization before comparison + `lstat` guard + regression test. Filed `zapp-pr546-review.md`.
+
+---
+## Archived from history.md — 2026-04-17 wave 34 summarization
+
+### DP #479 Runner+SSE — APPROVE_WITH_CONDITIONS
+6 conditions: resume ownership `(sessionId,runId,principalId)`, `/api/packs` safe DTO, SSE discriminated-schema validation, skill content off wire, UserAction resume data-only, pendingUserAction TTL.
+
+### DP #480 Skill Resolver — APPROVE_WITH_CONDITIONS
+Add registration-time skill text validators, rendered-string token accounting, immutable registry, tests for mutation/glob/no-content-logging.
+
+### PR #545 — APPROVED (recheck)
+`handoff`→`assess` normalization in `chat-a2ui.ts`. Phase ids: discover/assess/design/generate/review/deploy.
+
+### PR #546 — APPROVED (recheck)
+`confinePath()` in `frontmatter.ts` at `5c325db` uses `realpathSync()` before `startsWith` check.
+
+### PRs #545+#546 merged — Steps 2+3 complete
+
+### PR #547 — BLOCKED then APPROVED
+4 blockers (duplicate stubs, seal() no-freeze, prototype-pollution, dev error leaks). Fixed at `4eaa9ee`: throw on duplicate, `ReadonlyMap` snapshot, redacted production errors.
+
+### PR #548 — BLOCKED then APPROVED
+3 blockers (symlink confinement, SSRF DNS rebinding, guardrails unenforced). C2 (DNS rebinding) fixed at `cef36b3` with `resolveAndCheckHostname()`. `zapp:approved` applied.
+
+### DP #482 pack-azure — BLOCKED then APPROVED
+5 conditions (arm_get allowlist, deploy_bicep server-only, token storage, /api/packs redaction, playground gate). B3 re-check cycle: allowlist-first order (`!ARM_PATH_RE` → throw, then `ARM_PATH_DENY` → throw). Fully approved after B3 final.
+
+### DP #483 pack-aks-automatic — BLOCKED then APPROVED
+3 high blockers (aks:deploy credential boundary, block>rewrite precedence, playground gate). All cleared: `DefaultAzureCredential()` server-only, block short-circuit, `aksPlaygroundStubs` gated on `KICKSTART_PLAYGROUND=true`.
+
+### DP #484 pack-github — BLOCKED then APPROVED
+4 high blockers (api_get encoding bypass, token boundary, OAuth transport, playground gate) + 2 major (branch regex, PR body sanitizer). All cleared: `decodeURIComponent()` + forbidden-seq before allowlist, `SessionCtx.tokens` opaque, HTTPS-only + Secure+HttpOnly cookies, all 6 stubs fail-closed.
+
+### DP #485 Web Client A2UI Renderer — BLOCKED
+Crit1: component props not schema-validated before render (raw props reach GenericBinder without `schema.parse()`). B1: missing confirmComponent fails open. B2: resume/credential boundary under-specified. B3: registry sealing not evidenced. B4: Phase D event.args + props merge unsanitized. Non-blocking: CSP-compatible if pure React lookup, sanitizeHtml() already in use for HTML sinks, URL-bearing components need https: allowlist.

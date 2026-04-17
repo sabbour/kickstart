@@ -240,3 +240,24 @@ Follow-up: Hermes to add targeted test for "both sources defined" merge path.
 Unblocks: #483 (pack-aks-automatic deployment-safeguards).
 Comment: https://github.com/sabbour/kickstart/pull/549#issuecomment-4269301873
 Label applied: `leela:approved`
+
+---
+
+## 2025 — #484 DP Re-check (pack-github Design Proposal)
+
+**Verdict: APPROVE_WITH_CONDITIONS** ✅
+**Date:** 2025-07-15
+
+### C1–C4 Status
+- **C1** ✅ All 4 missing allowlist paths added with anchored patterns: `/user/repos`, `/pulls/\d+`, `/actions/runs/\d+`, `/branches`
+- **C2** ✅ `github-handoff.ts` split into `github-handoff.browser.ts` (browser-only, popup/PKCE) and `github-api.ts` (Node.js-safe, execute()-only); import boundary documented
+- **C3** ✅ `create_pr` parameters schema restricted to `{ files, branch, title }` only; `prBody` generated server-side in `execute()`
+- **C4** ✅ `SessionCtx.tokens: Record<string, string>` adopted, replacing flat `githubToken`; aligned with Bender #479
+
+### Merge Conditions for Step 9 PR
+1. `github-handoff.browser.ts` bundled for client only (no server import)
+2. `tokens` map never appears in GET /api/packs, SSE events, or LLM context
+3. Harness micro-fix (#549) merged before pack-github PR opens
+
+Comment: https://github.com/sabbour/kickstart/issues/484#issuecomment-4269311094
+Label applied: `leela:approved-dp`

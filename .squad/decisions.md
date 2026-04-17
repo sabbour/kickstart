@@ -4006,3 +4006,112 @@ The DP revision clears all three prior blockers. Security review is now **approv
 1. `aks:deploy` must use `DefaultAzureCredential()` only; no user token forwarding into deployment execution.
 2. #479 Runner implementation must enforce `block > rewrite` with short-circuit behavior.
 3. `aksPlaygroundStubs` must remain disabled unless `KICKSTART_PLAYGROUND=true`.
+
+---
+# Decision — Zapp DP #484 Security Re-check
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Issue:** #484 — v2 Step 9: pack-github
+**Verdict:** APPROVE_WITH_CONDITIONS
+
+---
+
+## Summary
+
+I re-checked the latest DP revision comment against the four blockers from the original #484 security review. All four blockers are now explicitly addressed in the revised proposal. The DP is security-cleared for implementation, with merge conditions that must remain enforceable in the Step 9 PR.
+
+---
+
+## Blocker Re-check
+
+### B1 — Path normalization
+
+**Status:** ✅ Resolved
+
+The revision now requires `decodeURIComponent()` before any allowlist regex match, rejects invalid encoding, and explicitly denies decoded `..`, `%`, and backslash sequences. Residual `%` rejection also closes the double-encoding bypass class.
+
+### B2 — Token boundary
+
+**Status:** ✅ Resolved
+
+The revision states that `SessionCtx.tokens` is never serialized in:
+- `GET /api/packs`
+- SSE events
+- LLM context payloads
+
+It also limits token access to server-side `execute()` paths only. That is the correct fail-closed boundary, provided the shared serializer enforces it.
+
+### B3 — OAuth transport
+
+**Status:** ✅ Resolved
+
+The revision now explicitly requires:
+- HTTPS-only production handling for `/api/github/callback`, `/api/converse/resume`, and login-completion endpoints
+- Secure + HttpOnly cookies
+- no logging or echoing of OAuth codes, access tokens, or `github:set_secret` values
+
+This closes the earlier transport and log-hygiene gap.
+
+### B4 — Playground gate
+
+**Status:** ✅ Resolved
+
+The revision enumerates all six GitHub playground stubs and gates them behind `KICKSTART_PLAYGROUND=true`, returning `null` otherwise. This fail-closed behavior includes the previously required sensitive actions:
+- `github:login`
+- `github:create_repo`
+- `github:create_pr`
+- `github:set_secret`
+
+---
+
+## Conditions for Step 9 PR merge
+
+1. `decodeURIComponent()` plus forbidden-sequence checks must execute before the allowlist regex.
+2. `tokens` redaction must be enforced centrally across all serialization paths.
+3. HTTPS-only transport must be enforced in host or middleware configuration, not only documented.
+4. All six GitHub playground stubs must remain fail-closed outside playground mode.
+
+---
+# Decision: DP #485 Security Review — Web client A2UI renderer
+
+**Author:** Zapp (Security Architect)
+**Date:** 2026-04-17
+**Issue:** [#485 — v2 Step 10: Web client — A2UI renderer from registry catalog, UserAction dispatcher](https://github.com/sabbour/kickstart/issues/485)
+**Verdict:** BLOCKED
+
+---
+
+## Zapp — #485 DP Security Review
+
+**Verdict: BLOCKED**
+
+### Critical
+**Crit1**: The DP assumes `propertySchema` is a safety boundary, but the current A2UI renderer path does not actually parse component props against the schema before render. `MessageProcessor.processUpdateComponentsMessage()` stores raw component properties, and `createReactComponent()` / `GenericBinder` consume them without `schema.parse()`. With LLM-controlled `componentName` + `props`, every registered component sink becomes reachable by unvalidated data. Before implementation proceeds, Step 10 must require exact-name lookup plus pre-render schema validation / projection, unknown-key stripping, depth-size ceilings, and URL-scheme allowlisting for URL-bearing props.
+
+### Blocking
+**B1**: `UserActionPanel` proposes missing `confirmComponent` → dismiss → auto-resolve `{}` so the Runner is not blocked. That is fail-open for consent/credential actions. A missing or unregistered confirm renderer must fail closed (visible error + explicit retry/cancel path), never synthesize a success-like resume payload.
+
+**B2**: The credential/resume boundary is still under-specified. Step 10 must explicitly inherit #479's rule: the browser POST body is only `{ sessionId, actionId, result }`; `result` is validated server-side against the stored `resultSchema`; ownership binds `(sessionId, actionId, runId/principalId)`; and no tool metadata, scopes, args, or credential values are echoed in SSE, `/api/packs`, client debug state, or logs.
+
+**B3**: Registry sealing is asserted but not evidenced. Because `componentName` comes from attacker-influenced LLM output, the client catalog must be a sealed immutable startup snapshot (`ReadonlyMap`, frozen contributions, no post-startup mutation). Exact string lookup only; no dynamic import/eval fallback. Production must still show a visible unknown-component fallback, not `null`.
+
+**B4**: Phase D merges `event.args` with `confirmComponent.props` and passes the result into arbitrary components. That merge must operate on schema-projected data only and strip dangerous keys (`__proto__`, `prototype`, `constructor`) with object depth / payload size limits. Raw SSE objects must not be forwarded directly into React trees.
+
+### Non-blocking
+- Dynamic registry lookup itself is CSP-compatible if it stays a pure React lookup/render path with no `eval`, no inline scripts, and no dynamic imports.
+- Existing HTML sinks in the web client already route `dangerouslySetInnerHTML` through `sanitizeHtml()`; Step 10 should codify that A2UI components may only use shared sanitizer wrappers, never raw prop HTML.
+- URL-bearing components (`Link`, `Image`, `Video`, `Audio`) should use an explicit `https:` / same-origin allowlist so LLM props cannot create dangerous navigation or mixed-content paths.
+
+---
+
+## Evidence
+
+- `packages/web/src/vendor/a2ui/web_core/processing/message-processor.ts` stores raw component properties on update instead of parsing against the component schema.
+- `packages/web/src/vendor/a2ui/react/adapter.tsx` creates `GenericBinder` from the schema, but the binder resolves/binds props without a `schema.parse()` enforcement step.
+- `packages/web/src/vendor/a2ui/react/A2uiSurface.tsx` shows unknown component types return visible fallback only in development; production currently returns `null`.
+- `packages/web/src/utils/sanitize.ts` confirms the codebase already treats HTML sinks as a special hardened path.
+
+## Outcome
+
+Security gate is **not clear** for DP #485 yet. Amend the DP to require fail-closed confirm rendering, explicit resume/credential boundaries, immutable registry semantics, and pre-render schema enforcement for all LLM-originated component props. Re-review after those conditions are written into the DP.

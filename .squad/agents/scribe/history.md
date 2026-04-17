@@ -208,3 +208,23 @@
 **No threshold breach this wave** (14,897 < 15,360) — but zapp is 463 B from limit
 
 **Still absent:** `fry-483-dp.md`, `fry-484-dp.md`, `bender-pr548-fix.md`, `zapp-pr548-recheck.md`, `fry-485-dp.md`, `zapp-484-dp-recheck.md`, `zapp-485-dp-review.md`
+
+## Wave 34 — 2026-04-17
+
+**Files merged:** 3
+- `zapp-484-dp-recheck.md` (worktree `484-zapp-review`) → DP #484 APPROVE_WITH_CONDITIONS ✅ all 4 blockers cleared
+- `zapp-483-dp-recheck.md` already committed wave 33
+- `zapp-485-dp-review.md` (main inbox) → DP #485 web client A2UI renderer BLOCKED (Crit1 props not schema-validated; B1–B4 fail-open confirms, resume boundary, registry sealing, props merge)
+
+**Self-posts staged:** fry +#486 Guardrails Engine DP row; leela +DP #484 re-check APPROVE_WITH_CONDITIONS row
+
+**decisions.md:** 227,308 → 233,696 bytes (+2 files)
+
+**Histories updated:**
+- zapp/history.md: **SUMMARIZED** 17,000 → 3,133 bytes; full detail archived to zapp/history-archive.md
+- fry/history.md: +#486 DP row (self-post)
+- leela/history.md: +DP #484 re-check entry (self-post)
+
+**Sizes post-wave:** bender 7,924 / fry ~6,090 / hermes 11,926 (77%) / leela ~12,000 / ralph 225 / scribe ~10,200 / zapp 3,133 (20%)
+
+**Watch:** hermes (77%), leela approaching threshold
