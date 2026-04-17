@@ -179,3 +179,26 @@ Non-blocking: warnings surface as UI output (not silent rewrite); no production 
 6. **🟠 M2 — PR body uses DOMPurify (HTML), not markdown-safe composition** — strips HTML/XSS but does not prevent markdown abuse (`@mentions`, autolinks, spam). Must template PR body from controlled fields or escape untrusted markdown.
 
 `zapp:approved` not applied.
+
+## 2026-04-17 — DP #483 pack-aks-automatic Security Re-check
+
+**Verdict:** APPROVE_WITH_CONDITIONS ✅ — all 3 blockers cleared
+
+- **B1 cleared:** `aks:deploy` uses `DefaultAzureCredential()` server-side; session `azureToken` restricted to read-only Contributor check only; bound to specific cluster `resourceId`.
+- **B2 cleared:** `block` verdicts are final; Runner short-circuits on first block.
+- **B3 cleared:** `aksPlaygroundStubs` gated on `process.env.KICKSTART_PLAYGROUND === 'true'`; returns `null` (fail-closed) when absent.
+
+Conditions for Step 8 PR: (1) `DefaultAzureCredential()` only in deploy path, (2) #479 Runner enforces `block > rewrite` short-circuit, (3) `aksPlaygroundStubs` disabled unless flag set.
+
+
+## 2026-04-17 — DP #485 Web Client A2UI Renderer Security Review
+
+**Verdict:** BLOCKED
+
+1. **🔴 Crit1 — component props are not currently schema-enforced before render** — the vendored renderer stores raw component properties and `GenericBinder` consumes them without a `schema.parse()` step, so LLM-originated `props` would reach registered component sinks unvalidated.
+2. **🔴 B1 — missing `confirmComponent` fails open** — auto-resolving `{}` from a missing/unregistered confirm component can bypass explicit consent/credential UX. Missing confirm renderers must fail closed.
+3. **🔴 B2 — resume/credential boundary still needs to be explicit** — Step 10 must inherit #479's rule: only `{ sessionId, actionId, result }` crosses the wire; server binds ownership and validates `result` against stored `resultSchema`; no credentials/tool metadata in SSE, `/api/packs`, debug state, or logs.
+4. **🔴 B3 — registry immutability is assumed, not guaranteed** — the client catalog used for attacker-controlled `componentName` lookups must be a sealed immutable snapshot (`ReadonlyMap`, frozen contributions, no post-startup mutation).
+5. **🟠 M1 — raw `event.args` + `confirmComponent.props` merge needs hardening** — strip dangerous keys, bound depth/size, and pass schema-projected DTOs only.
+
+Decision filed: `.squad/decisions/inbox/zapp-485-dp-review.md`

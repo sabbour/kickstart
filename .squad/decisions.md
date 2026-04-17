@@ -3973,3 +3973,36 @@ It will strip dangerous HTML/script, but it does **not** address markdown-native
 
 Comment posted: https://github.com/sabbour/kickstart/issues/483#issuecomment-4269284877
 Label applied: `leela:approved-dp`
+
+---
+# Zapp Decision — DP #483 pack-aks-automatic Security Re-check
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Issue:** #483
+**Status:** APPROVE_WITH_CONDITIONS
+
+## Verdict
+
+The DP revision clears all three prior blockers. Security review is now **approved with conditions** for implementation, provided the Step 8 PR preserves the deployment credential boundary, Runner block precedence, and fail-closed playground gating exactly as revised.
+
+## Blocker closeout
+
+1. **B1 — `aks:deploy` credential scope: cleared**
+   - The revision now specifies workload identity federation with `DefaultAzureCredential()` on the server side for the deployment call.
+   - The session `azureToken` is not forwarded to deployment; it is restricted to a read-only authorization check confirming Contributor access.
+   - The deployment credential is bound to the specific AKS cluster resourceId, satisfying the target-scope requirement.
+
+2. **B2 — `block` over `rewrite`: cleared**
+   - The revision now states that `block` verdicts are final.
+   - The Runner short-circuits on the first `block`, preventing any lower-priority `rewrite` guardrail from overriding a deny decision.
+
+3. **B3 — playground stub gate: cleared**
+   - The revision now gates `aksPlaygroundStubs` on `process.env.KICKSTART_PLAYGROUND === 'true'`.
+   - The export returns `null` when the flag is absent, which is the required fail-closed posture.
+
+## Conditions for the implementation PR
+
+1. `aks:deploy` must use `DefaultAzureCredential()` only; no user token forwarding into deployment execution.
+2. #479 Runner implementation must enforce `block > rewrite` with short-circuit behavior.
+3. `aksPlaygroundStubs` must remain disabled unless `KICKSTART_PLAYGROUND=true`.

@@ -195,3 +195,16 @@
 **Threshold watch:** zapp (92%) — summarize immediately on next entry; hermes (77%), leela (73%)
 
 **Still absent:** `fry-483-dp.md`, `fry-484-dp.md`, `bender-pr548-fix.md`, `zapp-pr548-recheck.md`, `zapp-483-dp-review-recheck.md`, `fry-485-dp.md`
+
+## Wave 33 — 2026-04-17
+
+**Files merged:** 1
+- `zapp-483-dp-recheck.md` (worktree `483-security-review`) → DP #483 pack-aks-automatic APPROVE_WITH_CONDITIONS ✅ re-check — all 3 blockers cleared: B1 `DefaultAzureCredential()` server-only, B2 block>rewrite short-circuit, B3 `aksPlaygroundStubs` fail-closed gate
+
+**decisions.md:** 225,555 → 227,308 bytes (+1,753)
+
+**Histories updated:** zapp/history.md: 14,169 → 14,897 bytes (97% — **CRITICAL: next entry MUST trigger summarization**)
+
+**No threshold breach this wave** (14,897 < 15,360) — but zapp is 463 B from limit
+
+**Still absent:** `fry-483-dp.md`, `fry-484-dp.md`, `bender-pr548-fix.md`, `zapp-pr548-recheck.md`, `fry-485-dp.md`, `zapp-484-dp-recheck.md`, `zapp-485-dp-review.md`
