@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #239 "fix: rehydrate session from client history on cold start" | M | impl=2m | review=4m | cycles=1 | merged | @sabbour
