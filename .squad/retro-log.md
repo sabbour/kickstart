@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #289 "docs: add Extending Kickstart guide" | XL | impl=1m | review=5m | cycles=1 | merged | @sabbour
