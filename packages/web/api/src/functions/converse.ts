@@ -42,6 +42,7 @@ import {
   adoptSessionPrincipal, isSessionOwnedBy, recordUsage,
   extractArtifactsFromA2UI, upsertArtifact,
 } from "../lib/session-store.js";
+import { isAgentsSdkEnabled, runAgentTurn } from "../lib/agents-runner.js";
 import type { ApiSession, ClientMessage, GeneratedArtifact } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
@@ -197,6 +198,16 @@ app.http("converse", {
 
       // Add user message to history
       addMessage(state.sessionId, "user", body.message);
+
+      // -----------------------------------------------------------------------
+      // Feature flag: @openai/agents SDK runtime adapter (KICKSTART_AGENTS_SDK)
+      // When enabled, the SDK handles LLM calls + tool execution. The session,
+      // SSE contract, and security controls are all preserved.
+      // -----------------------------------------------------------------------
+      if (isAgentsSdkEnabled()) {
+        const wantsStreamSdk = request.headers.get("accept")?.includes("text/event-stream");
+        return handleAgentsSdkTurn(session, body.message, context, wantsStreamSdk ?? false);
+      }
 
       // Resolve kit skills for the current phase and build a fresh system prompt.
       // This ensures the LLM always has the correct phase-specific capabilities
@@ -821,3 +832,43 @@ function extractImplicitFlags(rawJson: string): ParsedImplicitFlags {
 
 // extractArtifactsFromA2UI, upsertArtifact, inferLanguage, extractArtifactMetadata,
 // and MAX_TRACKED_ARTIFACTS are centralized in session-store.ts and imported above.
+
+// ---------------------------------------------------------------------------
+// Agents SDK path (KICKSTART_AGENTS_SDK=true)
+// ---------------------------------------------------------------------------
+
+/**
+ * Handle a converse turn through the @openai/agents SDK runtime adapter.
+ *
+ * The session, principal ownership, A2UI contract, and security controls are
+ * identical to the legacy path. This function gates all raw SDK output through
+ * agents-sse-adapter.ts (allowlist) and agents-route-planner.ts (phase control).
+ */
+async function handleAgentsSdkTurn(
+  session: ApiSession,
+  userMessage: string,
+  context: InvocationContext,
+  wantsStream: boolean,
+): Promise<HttpResponseInit> {
+  // Non-streaming path (streaming via SDK is a follow-up iteration)
+  void wantsStream; // streaming flag reserved for future use
+
+  const { adapted, currentPhase } = await runAgentTurn({ userMessage, session });
+
+  const safePhase = getSafeCurrentPhase(currentPhase);
+  const phaseA2ui = buildPhaseIndicator(safePhase);
+
+  const responseBody: ConverseResponse = {
+    sessionId: session.state.sessionId,
+    phase: safePhase,
+    message: adapted.message,
+    a2ui: [...phaseA2ui, ...adapted.a2uiMessages],
+  };
+
+  if (adapted.filesComplete === false) {
+    responseBody.autoContinue = true;
+    responseBody.autoContinuePrompt = "Generate next set of files";
+  }
+
+  return { status: 200, jsonBody: responseBody };
+}
