@@ -1,3 +1,4 @@
+// Proxy for GitHubConnector write operations (createIssue, updateFile, etc.) — provides token isolation.
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import {

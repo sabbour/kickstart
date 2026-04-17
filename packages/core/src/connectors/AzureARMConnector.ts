@@ -37,6 +37,12 @@ const DEFAULT_ARM_SCOPES = ['https://management.azure.com/.default'];
 /**
  * Connector for the Azure Resource Manager REST API.
  *
+ * **Execution model: all calls are proxied through `/api/arm-proxy` (server-side).**
+ * The connector never calls `management.azure.com` directly from the browser.
+ * Azure ARM does not permit browser CORS requests, so every request is forwarded
+ * through the server-side proxy which adds the Authorization header and enforces
+ * an SSRF host allowlist before forwarding to `management.azure.com`.
+ *
  * Auth: OAuth2 via MSAL (injected with `setTokenProvider()`).
  * When no token provider is set, domain methods return stub data so
  * the app can function offline during local development.

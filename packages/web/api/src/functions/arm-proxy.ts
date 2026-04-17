@@ -3,6 +3,9 @@
  *
  * ANY /api/arm-proxy/{*path} — CORS proxy for Azure Resource Manager API.
  *
+ * Proxy for AzureARMConnector — proxies all ARM management.azure.com requests.
+ * SSRF protected by allowlist.
+ *
  * Forwards requests to management.azure.com, passing the caller's
  * Authorization header and all query parameters. Adds a default api-version
  * if the caller omits one.

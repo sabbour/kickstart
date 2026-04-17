@@ -143,6 +143,17 @@ function connectorErrorCodeForStatus(status: number): ConnectorErrorCode {
 /**
  * Connector for the GitHub REST API.
  *
+ * **Execution model: reads are direct; writes are proxied.**
+ * - Read operations (`getRepo`, `listBranches`, `getTree`, `getFileContent`, etc.)
+ *   call `api.github.com` directly from the browser. GitHub's CORS policy allows
+ *   cross-origin read requests for public and authenticated endpoints.
+ * - Write operations (`commitFilesAndCreatePullRequest`) are routed through the
+ *   server-side `/api/github/pulls` proxy endpoint for token isolation — the OAuth
+ *   token never leaves the server session cookie.
+ *
+ * **Exception:** `createPullRequest()` calls `api.github.com` directly from the
+ * browser (see its JSDoc warning). This is a known inconsistency.
+ *
  * Auth: OAuth2 via an injected token provider.
  * When no token provider is set, domain methods return stub data so
  * the app can function offline during local development.
@@ -374,6 +385,13 @@ export class GitHubConnector extends BaseConnector {
   /**
    * Create a pull request on a repository.
    * Fails closed when the connector is not authenticated.
+   *
+   * @warning ⚠️ This method calls `api.github.com` **directly from the browser**,
+   * bypassing the server-side proxy. The OAuth token is sent in the Authorization
+   * header from the client. This is inconsistent with the "writes are proxied"
+   * pattern used by `commitFilesAndCreatePullRequest()` and is flagged as
+   * technical debt. Prefer `commitFilesAndCreatePullRequest()` for new write
+   * operations that require token isolation.
    */
   async createPullRequest(
     owner: string,
