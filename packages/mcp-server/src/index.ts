@@ -199,11 +199,20 @@ server.tool(
       content.push(...buildA2UIContent(a2uiMessages, isVsCode));
 
       // UserAction interrupt: always structured JSON, never human-readable text
-      if (pendingInterrupt) {
+      if (pendingInterrupt !== null) {
+        const interrupt = pendingInterrupt as {
+          actionId: string;
+          actionName: string;
+          confirmComponent?: { component: string; props?: Record<string, unknown> };
+          resultSchema: Record<string, unknown>;
+        };
         content.push(
           buildInterruptContent({
             type: 'interrupt',
-            ...pendingInterrupt,
+            actionId: interrupt.actionId,
+            actionName: interrupt.actionName,
+            confirmComponent: interrupt.confirmComponent,
+            resultSchema: interrupt.resultSchema,
           }),
         );
       }
