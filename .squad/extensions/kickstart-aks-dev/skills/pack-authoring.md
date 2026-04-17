@@ -13,18 +13,18 @@ See [`docs/v2-implementation-brief.md`](../../../../docs/v2-implementation-brief
 | Primitive | File convention | Registration |
 |-----------|-----------------|--------------|
 | **Pack** | `packages/pack-<name>/src/index.ts` exports `pack` | `harness.register(pack)` at startup |
-| **Agent** | `.agent.md` next to the pack's `index.ts` (one per file) | Declared in the Pack's `agents` array |
-| **Skill** | `SKILL.md` under `packages/pack-<name>/src/skills/<skill-name>/` | Declared in the Pack's `skills` array |
-| **Tool** | TypeScript function passed to `tool({ name, parameters, execute })` | Declared in the Pack's `tools` array |
-| **UserAction** | TypeScript function with `interrupt: true` | Declared in the Pack's `userActions` array |
-| **Component** | React component + manifest entry | Declared in the Pack's `components` array |
-| **Guardrail** | TypeScript config object | Declared in the Pack's `guardrails` array |
+| **Agent** | `.agent.md` under the pack's `agentsDir` (one per file) | Auto-scanned from `agentsDir`, or listed explicitly in the pack's `agents` array |
+| **Skill** | `SKILL.md` under the pack's `skillsDir` (e.g. `packages/pack-<name>/src/skills/<skill-name>/SKILL.md`) | Auto-scanned from `skillsDir`, or listed explicitly in the pack's `skills` array |
+| **Tool** | TypeScript function built with `tool({ name, parameters, execute })` | Declared in the pack's `tools` array |
+| **UserAction** | TypeScript function built with `userAction({ name, parameters, execute, confirmComponent })` (wraps the SDK's interrupt/resume contract) | Declared in the pack's `userActions` array |
+| **Component** | React renderer + `defineComponent({ name, schema, renderer })` | Declared in the pack's `components` array |
+| **Guardrail** | TypeScript config object | Declared in the pack's `guardrails` array |
 
 ## Naming and sigils
 
 - **Tools** use dot: `azure.list_resource_groups`, `core.emit_ui`, `github.get_workflow_runs`
-- **User actions** use colon: `azure:select_subscription`, `aks:confirm_deploy`
-- **Components** use slash: `core/card`, `azure/resource-picker`, `aks/progress-tree`
+- **User actions** use colon: `azure:select_subscription`, `aks:confirm_deploy` (wire-transliterated to `pack__verb_noun`)
+- **Components** use slash + PascalCase: `core/Card`, `azure/CostSummary`, `aks/ProgressTree`
 
 The pack name is the prefix. Never ship an unprefixed tool, action, or component.
 
@@ -53,10 +53,10 @@ The pack name is the prefix. Never ship an unprefixed tool, action, or component
 
 ## User actions
 
-- A user action is an SDK tool with `interrupt: true`.
-- It halts the Runner, emits a `user_action_required` SSE event, and waits for a resume payload.
+- A user action is declared via `userAction({ ... })`, which wraps the SDK's interrupt/resume contract. Do not hand-roll `interrupt: true` on a plain `tool()`.
+- When invoked, the Runner pauses and the harness emits a `user_action_required` SSE event. The client renders the declared `confirmComponent`, performs the work (MSAL popup, GitHub OAuth, etc.), and POSTs a typed result back to `/api/converse/resume`.
 - Resume payloads are typed. Never accept an unvalidated shape back from the client.
-- Timeout behaviour is declared in the pack.
+- Timeout and cancellation behaviour (default queue, opt-in `cancellation: "supported"`) are declared in the pack.
 
 ## Components (A2UI)
 
