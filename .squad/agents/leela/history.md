@@ -96,3 +96,39 @@ ARM tool security (Zapp C1 pre-addressed): 3-layer defence on `arm_get`+`what_if
 
 Comment posted: https://github.com/sabbour/kickstart/issues/482#issuecomment-4268990865
 Decision filed: `.squad/decisions/inbox/leela-482-dp-review.md`
+
+---
+
+## DP Review — #483 v2 Step 8: pack-aks-automatic
+
+**Date:** 2026-04-17
+**Verdict:** APPROVE_WITH_CONDITIONS
+
+Blocking conditions (C1, C2):
+- C1: `Pack` interface missing `skills?: Skill[]`; `PackRegistry.loadSkills()` is file-only. Harness micro-fix required before #523 ships. Brief has the field; #477 implementation dropped it.
+- C2: `ArchitectureDiagram` already landed in pack-core (PR #548) as `core/ArchitectureDiagram`. Brief says it belongs in pack-aks-automatic as `aks/ArchitectureDiagram`. #525 must do a cross-pack move (not a port from v1 catalog).
+
+Non-blocking: DeploymentConfirm missing from sub-issues (C3), package init not assigned (C4), Zapp Q2 must close before #524 (C5).
+
+Q3 answered: In-memory skills not supported yet; harness patch (C1) unblocks them. Once fixed, register `deployment-safeguards` as inline `Skill` — no .md file or codegen needed.
+Q4 answered: #525 implementer owns cross-pack move of ArchitectureDiagram from pack-core → pack-aks-automatic. Hermes not involved.
+
+Comment posted: https://github.com/sabbour/kickstart/issues/483#issuecomment-4269251949
+Decision filed: `.squad/decisions/inbox/leela-483-dp-review.md`
+
+## 2026-04-17 — DP #483 pack-aks-automatic Review
+
+**Verdict:** APPROVE_WITH_CONDITIONS (2 blocking, 3 non-blocking)
+
+**C1 (BLOCKING):** Harness `Pack` type missing `skills?: Skill[]` — `PackRegistry.loadSkills()` only file-walks `skillsDir`; no inline Skill registration path exists. Must add field to `Pack` interface + extend `loadSkills()` to merge `pack.skills ?? []`. File as micro-fix under #477 scope.
+
+**C2 (BLOCKING):** `ArchitectureDiagram` already in pack-core (registered as `core/ArchitectureDiagram`), not in pack-aks. #525 must MOVE files from `pack-core/src/components/rich/` to `pack-aks-automatic/src/components/`, re-register as `aks/ArchitectureDiagram`, remove from `core-pack.ts`.
+
+**C3 (non-blocking):** `aks/DeploymentConfirm` missing from sub-issues — add to #526 scope.
+
+**C4 (non-blocking):** `pack-aks-automatic` package.json/tsconfig.json unassigned — add to #523 scope.
+
+**C5 (non-blocking):** Deploy credential mechanism (re-use azure-auth vs new AKS-scoped token) must be answered before #524 ships.
+
+Architecture verdict: `safeguards.json` data/code separation correct; phase gating table accepted; `aks:deploy` resultSchema complete.
+Decision filed: `.squad/decisions/inbox/leela-483-dp-review.md`
