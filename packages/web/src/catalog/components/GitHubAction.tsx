@@ -126,7 +126,7 @@ const GitHubActionApi = {
     method: z.enum(['POST', 'PUT', 'PATCH', 'DELETE']),
     path: DynamicStringSchema,
     operationType: DynamicStringSchema,
-    body: z.record(z.unknown()).optional(),
+    body: z.record(z.string(), z.unknown()).optional(),
     confirmLabel: DynamicStringSchema.optional(),
     onSuccess: ActionSchema.optional(),
     onError: ActionSchema.optional(),
