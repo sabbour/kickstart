@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #252 "feat: file manager sidebar with tree view and file viewer (#201)" | L | impl=2m | review=170m | cycles=1 | merged | @sabbour
