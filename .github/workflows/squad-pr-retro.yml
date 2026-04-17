@@ -184,8 +184,12 @@ jobs:
             fi
 
             # Push — retry only on non-fast-forward; fail fast on auth/permission errors
-            PUSH_OUT=$(git push origin HEAD:main 2>&1)
+            # set +e to prevent set -e from exiting before we can inspect the result
+            set +e
+            git push origin HEAD:main > /tmp/push_out 2>&1
             PUSH_EXIT=$?
+            set -e
+            PUSH_OUT=$(cat /tmp/push_out)
             echo "$PUSH_OUT"
             if [ $PUSH_EXIT -eq 0 ]; then
               echo "Push succeeded on attempt ${attempt}"
