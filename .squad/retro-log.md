@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-15 | #290 "fix: Tabs component + unregistered component handling" | M | impl=2m | review=16m | cycles=1 | merged | @sabbour
+
 - 2026-04-15 | #293 "fix: replace emoji status indicators with Fluent UI icons" | M | impl=0m | review=36m | cycles=1 | merged | @sabbour
 - 2026-04-15 | #292 "fix: consistent assistant icon during streaming" | S | impl=0m | review=4m | cycles=1 | merged | @sabbour
 
