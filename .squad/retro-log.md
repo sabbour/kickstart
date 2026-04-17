@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #90 "fix(security): sanitize HTML rendering to prevent XSS" | L | impl=17m | review=7m | cycles=1 | merged | @sabbour
