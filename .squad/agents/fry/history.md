@@ -77,3 +77,24 @@ Working as **Fry (Frontend Dev)**.
 - `validate_artifacts` tool not yet implemented (Phase C) — referenced in frontmatter but no runtime code yet.
 - `#476` registry/loader (`parseAgentFrontmatter`, `PackRegistry`) not yet merged into v2-rewrite — harness types are still stubs.
 - Hermes' agent tests expect `core.triage`/`core.codesmith`/`core.reviewer` naming; Phases A+B use `core.orchestrator`/`core.architect`/`core.implementer` per task spec. Will need reconciliation once the loader ships.
+
+## 2026-04-17 — #477 pack-core Phase C (commit bc7f3fd)
+
+Working as **Fry (Frontend Dev)**.
+
+**Naming gap fix:** Updated Hermes' `agents.test.ts` to match DP-approved names (`core.orchestrator`, `core.architect`, `core.implementer`) instead of the Hermes-scaffold placeholders (`core.triage`, `core.codesmith`, `core.reviewer`).
+
+**Agent/skill frontmatter corrected** to match actual `loader-agent.ts` / `loader-skill.ts` schemas:
+- Agent: added required `model: { envVar: KICKSTART_MODEL }`, changed `handoffs` from string array to object array `{ label, agent }`, qualified tool names as `core.*`.
+- Skills: added required `version: 0.1.0`, moved `appliesTo`/`keywords`/`priority` under `x-kickstart:` namespace.
+
+**Phase C — 6 tool files** (`packages/pack-core/src/tools/`):
+- `fetch_webpage.ts` — SSRF guard (non-HTTPS and private IPs rejected), 32k char truncation, 15s timeout.
+- `read_file.ts` — workspace-root confinement, null-byte guard, UTF-8 read.
+- `write_file.ts` — confinement, mkdirSync recursive, records artifact on SessionCtx.
+- `validate_artifacts.ts` — stub returning `valid: true`; TODO marker for real linter (Phase D follow-up).
+- `emit_ui.ts` — validates via `A2UIMessageSchema` from `@kickstart/harness`, calls `session.recordA2UIEmission`.
+- `search_components.ts` — factory `createSearchComponentsTool(registry: ComponentRegistry)` using a structural interface (avoids depending on unexported `PackRegistry` type).
+- `tools/index.ts` barrel.
+
+**Blocker noted:** `PackRegistry` is not yet exported from `@kickstart/harness` index — raised as Phase D pre-condition.
