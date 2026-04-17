@@ -4,17 +4,19 @@ sidebar_position: 1
 
 # Custom Kickstart Catalog
 
-Kickstart extends the A2UI v0.9 basic catalog with **16 custom components** designed for the AKS deployment onboarding experience. These components are registered in `packages/web/src/catalog/kickstart-catalog.ts`.
+Kickstart extends the A2UI v0.9 basic catalog with **22 custom components** designed for the AKS deployment onboarding experience. These components are registered in `packages/web/src/catalog/kickstart-catalog.ts`.
 
 ## Component Categories
 
 | Category | Components |
 |----------|-----------|
-| **Forms & Input** | RadioGroup, FormGroup |
-| **Content** | CodeBlock, ProgressSteps, Markdown |
-| **GitHub** | GitHubLoginCard, GitHubRepoPicker, GitHubAction, GitHubCommit |
-| **Azure** | AzureLoginCard, AzureResourcePicker, AzureResourceForm |
-| **Deployment** | ArchitectureDiagram, FileEditor, CostEstimate, DeploymentProgress |
+| **Auth** | AuthCard, AzureLoginCard, GitHubLoginCard |
+| **Forms & Input** | RadioGroup, FormGroup, Questionnaire |
+| **Content & Display** | CodeBlock, Markdown, SummaryCard, DecisionCard |
+| **Navigation & Progress** | ProgressSteps, SteppedCarousel, GenerationProgress |
+| **GitHub** | GitHubRepoPicker, GitHubAction, GitHubCommit |
+| **Azure** | AzureResourcePicker, AzureResourceForm, AzureAction |
+| **Deployment** | ArchitectureDiagram, FileEditor, CostEstimate |
 
 ## Forms & Input
 
@@ -185,6 +187,6 @@ Interactive code editor for reviewing and editing generated deployment files. Ba
 
 Monthly cost breakdown by Azure service with a total. Line items include name, SKU, and monthly cost. Populated from the Azure Retail Prices API via `estimate_cost` tool.
 
-### DeploymentProgress
+### GenerationProgress
 
-Multi-step deployment tracker with per-step status (pending / running / success / error / skipped) and an overall status indicator. Used during the Deploy phase to show live state.
+Multi-step generation and deployment tracker with per-step status (pending / running / success / error / skipped) and an overall status indicator. Used during the Generate and Deploy phases to show live progress.
