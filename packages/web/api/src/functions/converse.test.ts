@@ -117,10 +117,9 @@ function createContext(): { log: ReturnType<typeof vi.fn>; error: ReturnType<typ
 }
 
 function setSessionPhase(
-  session: { engineState: { currentPhase: string }; state: { currentPhase: string } },
+  session: { state: { currentPhase: string } },
   phase: Phase,
 ): void {
-  session.engineState.currentPhase = phase;
   session.state.currentPhase = phase;
 }
 
@@ -198,7 +197,7 @@ describe("converse phase progression", () => {
         expect.objectContaining({ id: Phase.Design, status: "active" }),
       ]),
     });
-    expect(getSession(session.state.sessionId)?.engineState.currentPhase).toBe(
+    expect(getSession(session.state.sessionId)?.state.currentPhase).toBe(
       Phase.Design,
     );
 
@@ -270,7 +269,7 @@ describe("converse phase progression", () => {
         expect.objectContaining({ id: Phase.Design, status: "active" }),
       ]),
     });
-    expect(getSession(session.state.sessionId)?.engineState.currentPhase).toBe(
+    expect(getSession(session.state.sessionId)?.state.currentPhase).toBe(
       Phase.Design,
     );
   });
@@ -455,7 +454,6 @@ describe("converse model routing", () => {
 
   it("fails closed to chat for unknown server phases", async () => {
     const session = createSession();
-    session.engineState.currentPhase = "ship-it" as Phase;
     session.state.currentPhase = "ship-it" as Phase;
 
     chatCompletionWithTools.mockResolvedValueOnce({
@@ -687,7 +685,7 @@ describe("converse model routing", () => {
         },
       },
     });
-    expect(getSession(session.state.sessionId)?.engineState.currentPhase).toBe(Phase.Review);
+    expect(getSession(session.state.sessionId)?.state.currentPhase).toBe(Phase.Review);
   });
 
   it("uses generate pricing for trusted gpt-5.4 turns", async () => {

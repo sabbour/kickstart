@@ -20,12 +20,6 @@ export enum Phase {
   Deploy = "deploy",
 }
 
-/** Tracks the state of the conversation. */
-export interface ConversationState {
-  /** Current active phase */
-  currentPhase: Phase;
-}
-
 /** Definition of a conversation phase with its behavior. */
 export interface PhaseDefinition {
   /** Phase identifier */
@@ -34,12 +28,6 @@ export interface PhaseDefinition {
   label: string;
   /** Description shown to the user */
   description: string;
-  /** Conditions that must be true to enter this phase */
-  entryConditions: string[];
-  /** Conditions that must be true to exit this phase */
-  exitConditions: string[];
-  /** LLM system prompt template for this phase */
-  promptTemplate: string;
   /** Next phase after this one completes */
   nextPhase: Phase | null;
 }

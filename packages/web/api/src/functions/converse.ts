@@ -33,7 +33,6 @@ import {
 import type {
   PhaseItem,
   ToolContext,
-  ConversationState,
   SetupGenerationControlAction,
   SetupGenerationSnapshot,
   ConversationSkillsContext,
@@ -101,10 +100,8 @@ interface StreamDonePayload {
   renderDecisions?: string[];
 }
 
-function getSafeCurrentPhase(
-  engineState: Pick<ConversationState, "currentPhase">,
-): Phase {
-  return normalizeConversePhase(engineState.currentPhase) ?? Phase.Discover;
+function getSafeCurrentPhase(currentPhase: Phase | string): Phase {
+  return normalizeConversePhase(currentPhase) ?? Phase.Discover;
 }
 
 /** Return the next phase after the given one, or the same phase if already at the end. */
@@ -133,7 +130,6 @@ function extractSetupControlAction(
 }
 
 function syncSessionPhase(session: ApiSession, nextPhase: Phase): void {
-  session.engineState.currentPhase = nextPhase;
   session.state.currentPhase = nextPhase;
 }
 
@@ -203,7 +199,7 @@ app.http("converse", {
       }
       adoptSessionPrincipal(session, principalId);
 
-      const { state, engineState } = session;
+      const { state } = session;
 
       // Add user message to history
       addMessage(state.sessionId, "user", body.message);
@@ -211,7 +207,7 @@ app.http("converse", {
       // Resolve kit skills for the current phase and build a fresh system prompt.
       // This ensures the LLM always has the correct phase-specific capabilities
       // injected, even as the conversation advances through phases.
-      const currentPhase = getSafeCurrentPhase(engineState);
+      const currentPhase = getSafeCurrentPhase(session.state.currentPhase);
       const resolvedSkills = resolveSkills(currentPhase, defaultKitRegistry.getAll());
       const modelRoute = resolveConverseModelRoute(currentPhase, {
         trustedPhase: session.routingPhaseTrusted,
@@ -311,9 +307,8 @@ app.http("converse", {
 
       if (wantsStream) {
         return handleStreaming(
-          messages, state.sessionId, engineState, modelRoute, context,
+          messages, state.sessionId, session, modelRoute, context,
           toolContext, debugMode, session.generatedArtifacts,
-          (newState) => { session.engineState = newState; },
         );
       }
 
@@ -368,12 +363,11 @@ app.http("converse", {
       // Handle implicit state flags from LLM response
       const flags = extractImplicitFlags(finalContent);
       if (flags.phaseComplete) {
-        session.engineState.currentPhase = advancePhase(session.engineState.currentPhase);
-        session.state.currentPhase = session.engineState.currentPhase;
+        session.state.currentPhase = advancePhase(session.state.currentPhase);
       }
 
       // Compute phase indicator AFTER implicit flags so UI and metadata are consistent
-      const phaseA2ui = buildPhaseIndicator(session.engineState);
+      const phaseA2ui = buildPhaseIndicator(session.state.currentPhase);
 
       addMessage(state.sessionId, "assistant", processed.message);
 
@@ -381,7 +375,7 @@ app.http("converse", {
 
       const responseBody: ConverseResponse = {
         sessionId: state.sessionId,
-        phase: getSafeCurrentPhase(session.engineState),
+        phase: getSafeCurrentPhase(session.state.currentPhase),
         message: processed.message,
         model: modelRoute.model,
         a2ui: [...phaseA2ui, ...processed.a2uiMessages],
@@ -402,7 +396,7 @@ app.http("converse", {
           finalContent,
           processed.a2uiMessages.length,
           hadExplicitA2UI,
-          session.engineState.currentPhase,
+          session.state.currentPhase,
         );
         responseBody.debug = debugMeta;
         responseBody.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
@@ -415,11 +409,11 @@ app.http("converse", {
   },
 });
 
-/** Build a fresh ConversationPhase A2UI indicator from the current engine state. */
-function buildPhaseIndicator(engineState: ConversationState): object[] {
-  const currentPhase = getSafeCurrentPhase(engineState);
+/** Build a fresh ConversationPhase A2UI indicator from the current phase. */
+function buildPhaseIndicator(currentPhase: Phase): object[] {
+  const safePhase = getSafeCurrentPhase(currentPhase);
   const order = getPhaseOrder();
-  const currentIdx = order.indexOf(currentPhase);
+  const currentIdx = order.indexOf(safePhase);
   const phases: PhaseItem[] = order.map((phase, idx) => ({
     id: phase,
     label: getPhaseDefinition(phase).label,
@@ -434,7 +428,7 @@ function buildPhaseIndicator(engineState: ConversationState): object[] {
       type: "ConversationPhase",
       id: "phase-indicator",
       phases,
-      currentPhase,
+      currentPhase: safePhase,
     },
   ];
 }
@@ -464,7 +458,7 @@ async function handleSetupGenerationResponse(
     phase: result.currentPhase,
     message: result.message,
     model: modelRoute.model,
-    a2ui: [...buildPhaseIndicator(session.engineState), ...result.a2uiMessages],
+    a2ui: [...buildPhaseIndicator(session.state.currentPhase), ...result.a2uiMessages],
     ...(usageSummary ? { usage: usageSummary } : {}),
     setupGeneration: result.snapshot,
   };
@@ -475,7 +469,7 @@ async function handleSetupGenerationResponse(
       result.message,
       result.a2uiMessages.length,
       result.a2uiMessages.length > 0,
-      session.engineState.currentPhase,
+      session.state.currentPhase,
     );
     responseBody.debug = debugMeta;
     responseBody.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
@@ -541,7 +535,7 @@ function handleSetupGenerationStreaming(
             result.message,
             result.a2uiMessages.length,
             result.a2uiMessages.length > 0,
-            session.engineState.currentPhase,
+            session.state.currentPhase,
           );
           donePayload.debug = debugMeta;
           donePayload.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
@@ -576,16 +570,14 @@ function handleSetupGenerationStreaming(
 function handleStreaming(
   messages: import("../lib/openai-client.js").ChatMessage[],
   sessionId: string,
-  initialEngineState: ConversationState,
+  session: ApiSession,
   modelRoute: ConverseModelRoute,
   context: InvocationContext,
   toolContext: ToolContext,
   debugMode: boolean,
   sessionArtifacts: GeneratedArtifact[],
-  updateEngineState: (newState: ConversationState) => void,
 ): HttpResponseInit {
   const encoder = new TextEncoder();
-  let engineState = initialEngineState;
   let accumulatedUsage: ChatUsage | undefined;
 
   const stream = new ReadableStream({
@@ -641,10 +633,7 @@ function handleStreaming(
             // Handle implicit state flags
             const flags = extractImplicitFlags(fullContent);
             if (flags.phaseComplete) {
-              const nextPhase = advancePhase(engineState.currentPhase);
-              const updated: ConversationState = { currentPhase: nextPhase };
-              updateEngineState(updated);
-              engineState = updated;
+              session.state.currentPhase = advancePhase(session.state.currentPhase);
             }
 
             addMessage(sessionId, "assistant", processed.message);
@@ -658,7 +647,7 @@ function handleStreaming(
 
             // Compute phase indicator AFTER implicit flags so the SSE
             // response reflects the current phase, not the stale pre-flag one.
-            const currentPhaseA2ui = buildPhaseIndicator(engineState);
+            const currentPhaseA2ui = buildPhaseIndicator(session.state.currentPhase);
             const allA2ui = [...currentPhaseA2ui, ...processed.a2uiMessages];
             for (const msg of allA2ui) {
               controller.enqueue(
@@ -666,7 +655,7 @@ function handleStreaming(
               );
             }
 
-            const currentPhase = getSafeCurrentPhase(engineState);
+            const currentPhase = getSafeCurrentPhase(session.state.currentPhase);
             const phaseDef = getPhaseDefinition(currentPhase);
             const donePayload: StreamDonePayload = {
               sessionId,
@@ -689,7 +678,7 @@ function handleStreaming(
                 fullContent,
                 processed.a2uiMessages.length,
                 hadExplicitA2UI,
-                engineState.currentPhase,
+                session.state.currentPhase,
               );
               donePayload.debug = debugMeta;
               donePayload.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
