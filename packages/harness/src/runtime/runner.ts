@@ -287,7 +287,7 @@ export class Runner {
         sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
         return;
       }
-      guardedMessage = guardInput.userMessage ?? userMessage;
+      guardedMessage = inputResult.mutatedInput.userMessage ?? guardedMessage;
     } catch {
       // Fail-closed: unexpected throw from engine
       sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
@@ -429,7 +429,7 @@ export class Runner {
             sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
             return;
           }
-          outputText = outGuardInput.proposedOutput ?? outputText;
+          outputText = outResult.mutatedInput.proposedOutput ?? outputText;
         } catch {
           sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
           return;
