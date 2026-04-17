@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
-import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Body2,
   Button,
@@ -13,19 +11,19 @@ import {
   Subtitle2,
   tokens,
 } from '@fluentui/react-components';
+import type { ComponentContribution } from '@kickstart/harness';
 import {
-  DiagramEdge,
-  DiagramNode,
-  FLUENT_DIAGRAM_PALETTE,
+  type DiagramEdge,
+  type DiagramNode,
   loadMermaid,
   nodesToMermaid,
   renderArchitectureDiagramSvg,
-} from './architectureDiagramUtils';
+} from './architectureDiagramUtils.js';
 import {
   ARCHITECTURE_DIAGRAM_EMPTY_STATE_ICON_URL,
   ARCHITECTURE_DIAGRAM_HEADER_ICON_URL,
   getArchitectureDiagramIconRegistry,
-} from './architectureDiagramIconRegistry';
+} from './architectureDiagramIconRegistry.js';
 
 const VIEWPORT_MIN_HEIGHT = 320;
 const VIEWPORT_MAX_HEIGHT = 800;
@@ -34,28 +32,33 @@ const MAX_SCALE = 5;
 const FLUENT_DIAGRAM_ICON_FILTER =
   'brightness(0) saturate(100%) invert(30%) sepia(91%) saturate(1523%) hue-rotate(191deg) brightness(92%) contrast(88%)';
 
-const NodeSchema = z.object({
-  id: z.string(),
-  label: z.string(),
-  type: z.string().optional(),
+export const ArchitectureDiagramSchema = z.object({
+  diagram: z.string().optional().describe('Mermaid diagram source'),
+  nodes: z
+    .array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        type: z.string().optional(),
+      })
+    )
+    .optional()
+    .describe('Diagram nodes (used when diagram is not provided)'),
+  edges: z
+    .array(
+      z.object({
+        from: z.string(),
+        to: z.string(),
+        label: z.string().optional(),
+      })
+    )
+    .optional()
+    .describe('Diagram edges (used when diagram is not provided)'),
+  title: z.string().optional().describe('Diagram title'),
+  description: z.string().optional().describe('Diagram description'),
 });
 
-const EdgeSchema = z.object({
-  from: z.string(),
-  to: z.string(),
-  label: z.string().optional(),
-});
-
-const ArchitectureDiagramApi = {
-  name: 'ArchitectureDiagram',
-  schema: z.object({
-    diagram: DynamicStringSchema.optional(),
-    nodes: z.array(NodeSchema).optional(),
-    edges: z.array(EdgeSchema).optional(),
-    title: DynamicStringSchema.optional(),
-    description: DynamicStringSchema.optional(),
-  }),
-};
+type ArchitectureDiagramProps = z.infer<typeof ArchitectureDiagramSchema>;
 
 const useStyles = makeStyles({
   root: {
@@ -198,31 +201,23 @@ const useStyles = makeStyles({
 
 let diagramCounter = 0;
 
-
 function raiseClusterLabels(svg: SVGSVGElement): void {
   const overlay = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   overlay.setAttribute('class', 'cluster-label-overlay');
   overlay.setAttribute('pointer-events', 'none');
   svg.appendChild(overlay);
-
-  svg.querySelectorAll('.cluster-label').forEach((element) => {
-    overlay.appendChild(element);
-  });
+  svg.querySelectorAll('.cluster-label').forEach((el) => overlay.appendChild(el));
 }
 
 function insertSvgSafely(container: HTMLElement, svg: string): void {
   const template = document.createElement('template');
   template.innerHTML = svg;
-
-  template.content.querySelectorAll('script').forEach((script) => script.remove());
-  template.content.querySelectorAll('*').forEach((element) => {
-    Array.from(element.attributes).forEach((attribute) => {
-      if (attribute.name.toLowerCase().startsWith('on')) {
-        element.removeAttribute(attribute.name);
-      }
+  template.content.querySelectorAll('script').forEach((s) => s.remove());
+  template.content.querySelectorAll('*').forEach((el) => {
+    Array.from(el.attributes).forEach((attr) => {
+      if (attr.name.toLowerCase().startsWith('on')) el.removeAttribute(attr.name);
     });
   });
-
   container.innerHTML = '';
   container.appendChild(template.content);
 }
@@ -231,21 +226,19 @@ function measureSvg(svg: SVGSVGElement): { width: number; height: number } {
   try {
     const bounds = svg.getBBox();
     if (bounds.width > 0 && bounds.height > 0) {
-      return {
-        width: bounds.width + bounds.x * 2,
-        height: bounds.height + bounds.y * 2,
-      };
+      return { width: bounds.width + bounds.x * 2, height: bounds.height + bounds.y * 2 };
     }
   } catch {
-    // Ignore measurement fallback and use the SVG viewBox/attributes below.
+    // fall through to attribute fallback
   }
-
   const width = parseFloat(svg.getAttribute('width') || '0') || svg.viewBox.baseVal.width || 800;
   const height = parseFloat(svg.getAttribute('height') || '0') || svg.viewBox.baseVal.height || 400;
   return { width, height };
 }
 
-export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, ({ props }) => {
+export const ArchitectureDiagramRenderer: React.FC<{ props: ArchitectureDiagramProps }> = ({
+  props,
+}) => {
   const classes = useStyles();
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -276,34 +269,24 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
 
   const fitAndCenter = useCallback(() => {
     const viewport = viewportRef.current;
-    if (!viewport || diagramSize.current.width === 0 || diagramSize.current.height === 0) {
-      return;
-    }
-
-    const viewportWidth = viewport.clientWidth;
-    const viewportHeightValue = viewport.clientHeight || viewportHeight;
+    if (!viewport || diagramSize.current.width === 0 || diagramSize.current.height === 0) return;
+    const vw = viewport.clientWidth;
+    const vh = viewport.clientHeight || viewportHeight;
     const { width, height } = diagramSize.current;
-    const fitScale = Math.min((viewportWidth - 48) / width, (viewportHeightValue - 48) / height, 1);
+    const fitScale = Math.min((vw - 48) / width, (vh - 48) / height, 1);
     const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fitScale));
-    const scaledWidth = width * clampedScale;
-    const scaledHeight = height * clampedScale;
-
     setScale(clampedScale);
     setOffset({
-      x: Math.max(0, (viewportWidth - scaledWidth) / 2),
-      y: Math.max(0, (viewportHeightValue - scaledHeight) / 2),
+      x: Math.max(0, (vw - width * clampedScale) / 2),
+      y: Math.max(0, (vh - height * clampedScale) / 2),
     });
   }, [viewportHeight]);
 
   useEffect(() => {
-    if (!hasDiagram || !resolvedDiagram || !containerRef.current) {
-      return;
-    }
-
+    if (!hasDiagram || !resolvedDiagram || !containerRef.current) return;
     let cancelled = false;
     const container = containerRef.current;
-    const id = `mermaid-diagram-${++diagramCounter}`;
-
+    const id = `aks-diagram-${++diagramCounter}`;
     setIsRendering(true);
 
     loadMermaid()
@@ -312,78 +295,52 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
           mermaid.render.bind(mermaid),
           id,
           resolvedDiagram,
-          resolveIconUrl,
+          resolveIconUrl
         );
-
-        if (cancelled) {
-          return;
-        }
-
+        if (cancelled) return;
         insertSvgSafely(container, svgMarkup);
         const svg = container.querySelector('svg');
         if (svg instanceof SVGSVGElement) {
           raiseClusterLabels(svg);
-
           const { width, height } = measureSvg(svg);
           diagramSize.current = { width, height };
-
           setViewportHeight(Math.min(VIEWPORT_MAX_HEIGHT, Math.max(VIEWPORT_MIN_HEIGHT, height + 48)));
-
           svg.removeAttribute('height');
           svg.setAttribute('width', String(width));
           svg.style.maxWidth = 'none';
           svg.style.height = 'auto';
           svg.style.overflow = 'visible';
         }
-
         setRenderError(null);
-        requestAnimationFrame(() => {
-          if (!cancelled) {
-            fitAndCenter();
-          }
-        });
+        requestAnimationFrame(() => { if (!cancelled) fitAndCenter(); });
       })
-      .catch((error) => {
-        if (!cancelled) {
-          setRenderError(error instanceof Error ? error.message : 'Failed to render diagram');
-        }
+      .catch((err) => {
+        if (!cancelled) setRenderError(err instanceof Error ? err.message : 'Failed to render diagram');
       })
-      .finally(() => {
-        if (!cancelled) {
-          setIsRendering(false);
-        }
-      });
+      .finally(() => { if (!cancelled) setIsRendering(false); });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [fitAndCenter, hasDiagram, renderVersion, resolveIconUrl, resolvedDiagram]);
 
-  const handleWheel = useCallback((event: React.WheelEvent) => {
-    event.preventDefault();
-    const factor = event.deltaY > 0 ? 0.9 : 1.1;
-    setScale((currentScale) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, currentScale * factor)));
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 0.9 : 1.1;
+    setScale((s) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s * factor)));
   }, []);
 
-  const handleMouseDown = useCallback((event: React.MouseEvent) => {
-    if (event.button !== 0) {
-      return;
-    }
-
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
     dragging.current = true;
     setIsDragging(true);
-    dragStart.current = { x: event.clientX, y: event.clientY };
+    dragStart.current = { x: e.clientX, y: e.clientY };
     offsetAtDragStart.current = { ...offset };
   }, [offset]);
 
-  const handleMouseMove = useCallback((event: React.MouseEvent) => {
-    if (!dragging.current) {
-      return;
-    }
-
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragging.current) return;
     setOffset({
-      x: offsetAtDragStart.current.x + (event.clientX - dragStart.current.x),
-      y: offsetAtDragStart.current.y + (event.clientY - dragStart.current.y),
+      x: offsetAtDragStart.current.x + (e.clientX - dragStart.current.x),
+      y: offsetAtDragStart.current.y + (e.clientY - dragStart.current.y),
     });
   }, []);
 
@@ -391,11 +348,6 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
     dragging.current = false;
     setIsDragging(false);
   }, []);
-
-  const zoomOut = () => setScale((currentScale) => Math.max(MIN_SCALE, currentScale * 0.8));
-  const zoomIn = () => setScale((currentScale) => Math.min(MAX_SCALE, currentScale * 1.2));
-  const resetView = () => fitAndCenter();
-  const regenerateDiagram = () => setRenderVersion((currentVersion) => currentVersion + 1);
 
   return (
     <Card appearance="outline" className={classes.root}>
@@ -408,50 +360,18 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
           {props.description && <Body2 className={classes.description}>{props.description}</Body2>}
         </div>
         <div className={classes.controls} role="group" aria-label="Architecture diagram controls">
-          <Button
-            type="button"
-            size="small"
-            appearance="subtle"
-            className={classes.controlButton}
-            onClick={zoomOut}
-            aria-label="Zoom out"
-            title="Zoom out"
-          >
-            −
-          </Button>
+          <Button type="button" size="small" appearance="subtle" className={classes.controlButton}
+            onClick={() => setScale((s) => Math.max(MIN_SCALE, s * 0.8))} aria-label="Zoom out">−</Button>
           <Caption1 className={classes.percentage}>{Math.round(scale * 100)}%</Caption1>
-          <Button
-            type="button"
-            size="small"
-            appearance="subtle"
-            className={classes.controlButton}
-            onClick={zoomIn}
-            aria-label="Zoom in"
-            title="Zoom in"
-          >
-            +
-          </Button>
-          <Button
-            type="button"
-            size="small"
-            appearance="transparent"
+          <Button type="button" size="small" appearance="subtle" className={classes.controlButton}
+            onClick={() => setScale((s) => Math.min(MAX_SCALE, s * 1.2))} aria-label="Zoom in">+</Button>
+          <Button type="button" size="small" appearance="transparent"
             className={mergeClasses(classes.controlButton, classes.actionButton)}
-            onClick={resetView}
-            aria-label="Reset view"
-            title="Reset view"
-          >
-            Reset
-          </Button>
-          <Button
-            type="button"
-            size="small"
-            appearance="transparent"
+            onClick={fitAndCenter} aria-label="Reset view">Reset</Button>
+          <Button type="button" size="small" appearance="transparent"
             className={mergeClasses(classes.controlButton, classes.actionButton)}
-            onClick={regenerateDiagram}
-            aria-label="Regenerate layout"
-            title="Regenerate layout"
-            disabled={isRendering || !hasDiagram}
-          >
+            onClick={() => setRenderVersion((v) => v + 1)}
+            disabled={isRendering || !hasDiagram}>
             {isRendering ? 'Rendering' : 'Regenerate'}
           </Button>
         </div>
@@ -492,4 +412,10 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
       </div>
     </Card>
   );
-});
+};
+
+export const architectureDiagramContribution: ComponentContribution = {
+  name: 'aks/ArchitectureDiagram',
+  propertySchema: ArchitectureDiagramSchema,
+  renderer: ArchitectureDiagramRenderer,
+};
