@@ -15,6 +15,7 @@ Legend:
 <!-- entries below this line, newest at top -->
 | Date | PR | Title | Size | Impl | Review | Cycles | Outcome | Author |
 |------|-----|-------|------|------|--------|--------|---------|--------|
+| 2026-04-15 | [#288](https://github.com/sabbour/kickstart/pull/288) | fix: TextField editable + Markdown newline rendering | S | 3m | 13m | 1 | merged | @sabbour |
 | 2026-04-15 | [#287](https://github.com/sabbour/kickstart/pull/287) | ci: remove paths-ignore to fix docs PR merge deadlock | S | 1m | 0m | 1 | merged | @sabbour |
 | 2026-04-15 | [#281](https://github.com/sabbour/kickstart/pull/281) | docs: Integration Kits reference + A2UI catalog visual references | L | 3m | 87m | 1 | merged | @sabbour |
 | 2026-04-15 | [#283](https://github.com/sabbour/kickstart/pull/283) | Remove Raw Text Content and Render Decisions from debug panel | M | 3m | 69m | 1 | merged | @sabbour |
