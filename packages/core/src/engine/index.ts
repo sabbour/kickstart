@@ -15,6 +15,24 @@ export { resolveSkills } from "./skill-resolver.js";
 export type { ResolvedSkills } from "./skill-resolver.js";
 
 export {
+  DOCKER_KEYWORDS,
+  DOCKER_PATTERNS,
+  isDockerRelated,
+  AKS_KEYWORDS,
+  AKS_PATTERNS,
+  isAKSRelated,
+  CICD_KEYWORDS,
+  CICD_PATTERNS,
+  isCICDRelated,
+  AUTH_KEYWORDS,
+  AUTH_PATTERNS,
+  isAuthRelated,
+  DATABASE_KEYWORDS,
+  DATABASE_RELATIONAL_PATTERNS,
+  isDatabaseRelated,
+} from "./skill-vocabulary.js";
+
+export {
   CopilotSkillsRegistry,
   defaultCopilotSkillsRegistry,
   AZURE_COPILOT_SKILLS,
