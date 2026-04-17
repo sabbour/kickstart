@@ -25,6 +25,13 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Generate Squad lead token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.SQUAD_LEAD_APP_ID }}
+          private-key: ${{ secrets.SQUAD_LEAD_PRIVATE_KEY }}
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -81,7 +88,7 @@ jobs:
           npm run version
           git add -A
           git commit -m "chore(release): daily cadence [leela]" -m "Working as Leela — see .squad/agents/leela/charter.md"
-          git push --force-with-lease origin release/cadence
+          git push --force-with-lease https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}.git release/cadence
 
       - name: Open release PR (as Leela, with Scribe curating notes)
         if: steps.existing.outputs.exists == 'false'

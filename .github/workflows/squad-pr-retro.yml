@@ -31,6 +31,13 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Generate Squad lead token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.SQUAD_LEAD_APP_ID }}
+          private-key: ${{ secrets.SQUAD_LEAD_PRIVATE_KEY }}
+
       - name: Compute metrics
         id: metrics
         uses: actions/github-script@v7
@@ -150,7 +157,7 @@ jobs:
           git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
           for attempt in 1 2 3; do
             echo "Push attempt $attempt/3 to $BASE_REF"
-            if git push origin "HEAD:$BASE_REF"; then
+            if git push https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}.git "HEAD:$BASE_REF"; then
               break
             fi
             if [ "$attempt" -eq 3 ]; then
