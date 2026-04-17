@@ -126,3 +126,17 @@
 **decisions.md:** 200,872 bytes (unchanged)
 
 **No commit (no-op wave — committing alongside wave 27 entry)**
+
+## Wave 29 — 2026-04-17
+
+**Inbox scan:** 0 new inbox files — main inbox empty; worktree inbox files all confirmed known (39-file list unchanged)
+
+**Self-post detected:** Fry updated `.squad/agents/fry/history.md` directly — added row for DP #483 pack-aks-automatic (Phases A→G; 3 agents, 7 skills, safeguards.json; proposed, awaiting Leela + Zapp approval). Committed unstaged change.
+
+**History sizes (no summarization needed):**
+- bender 7,924 / fry 5,362 (34%) / hermes 11,926 (77%) / leela 6,259 / ralph 225 / scribe 6,346 / zapp 11,344 (73%)
+- hermes and zapp still approaching threshold; summarize on next meaningful entry
+
+**decisions.md:** 200,872 bytes (unchanged)
+
+**Still absent:** `fry-483-dp.md`, `leela-483-dp-review.md`, `zapp-483-dp-review.md`, `fry-484-dp.md`
