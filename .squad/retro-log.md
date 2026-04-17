@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #232 "Move 'Restart Tour' from footer to a discoverable hero-area link" | S | impl=1m | review=4m | cycles=1 | merged | @sabbour
