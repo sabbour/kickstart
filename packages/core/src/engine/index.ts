@@ -3,7 +3,6 @@ export type {
   ConversationState,
   PhaseDefinition,
   Skill,
-  SkillResolverContext,
 } from "./types.js";
 
 export {
@@ -12,14 +11,8 @@ export {
   getPhaseOrder,
 } from "./phases.js";
 
-export {
-  resolveSkills,
-  resolveSkillsAsync,
-  resolveSkillsFromList,
-  formatSkillsSection,
-  registerSkillMiddleware,
-} from "./skill-resolver.js";
-export type { ResolvedSkills, SkillResolverMiddleware } from "./skill-resolver.js";
+export { resolveSkills } from "./skill-resolver.js";
+export type { ResolvedSkills } from "./skill-resolver.js";
 
 export {
   CopilotSkillsRegistry,
