@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #132 "release: v0.5.0" | S | impl=3m | review=5m | cycles=1 | merged | @sabbour
