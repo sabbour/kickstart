@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #127 "feat(validation): full DS001-DS013 safeguards, auto-fix engine, post-generation injection" | S | impl=0m | review=658m | cycles=1 | merged | @sabbour
