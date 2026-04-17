@@ -24,7 +24,7 @@ concurrency:
 jobs:
   retro:
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'retro-log') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.pull_request.labels.*.name, 'retro-log') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -158,7 +158,6 @@ jobs:
 
           PR_COUNT="$(gh pr list \
             --state open \
-            --base "$BASE_REF" \
             --head "${SIDE_BRANCH}" \
             --json number \
             --jq 'length')"
@@ -170,7 +169,6 @@ jobs:
 
           PR_URL="$(gh pr list \
             --state open \
-            --base "$BASE_REF" \
             --head "${SIDE_BRANCH}" \
             --json url \
             --jq '.[0].url')"
