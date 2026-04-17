@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #279 "docs: add extension guide for phases, tools, kits, API, and MCP" | L | impl=2m | review=100m | cycles=1 | merged | @sabbour
