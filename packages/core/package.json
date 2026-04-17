@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Compatibility stub — redirects @kickstart/core to @kickstart/harness. Remove when all imports are migrated (Step 2+).",
   "type": "module",
+  "scripts": {
+    "build": "echo 'stub — no build needed'"
+  },
   "exports": {
     ".": {
       "import": "../harness/src/index.ts",

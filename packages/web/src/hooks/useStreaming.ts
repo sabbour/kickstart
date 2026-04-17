@@ -228,7 +228,7 @@ export function useStreaming() {
                 const delta = (parsed.delta as string) ?? '';
                 accumulated += delta;
                 updateRevealTarget(accumulated);
-                callbacks.onChunk(accumulated); {
+                callbacks.onChunk(accumulated);
                 if (isRawA2uiItem(parsed)) {
                   if (debugMode) debugA2uiMessages.push(parsed as A2uiPayloadItem);
                   callbacks.onA2UI([parsed as A2uiPayloadItem]);
