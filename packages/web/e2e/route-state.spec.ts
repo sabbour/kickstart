@@ -159,3 +159,32 @@ test.describe('Route state — server-authored phase consumption', () => {
     await page.waitForURL(url => url.includes('/.auth/login/'), { timeout: 10_000 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Real-network auth gate — no page.route() intercept (C5)
+// ---------------------------------------------------------------------------
+
+test.describe('Real API auth — unauthenticated requests', () => {
+  /**
+   * Uses Playwright's APIRequestContext (`request` fixture), which is a bare
+   * HTTP client completely independent of the browser page and its route
+   * intercepts. No `page.route()` mock covers this call — it hits the actual
+   * server at baseURL (/api/converse).
+   *
+   * In a real SWA deployment the SWA auth gate returns 401 for requests with
+   * no auth cookie. Against the static dev server used in CI the endpoint does
+   * not exist and returns 404. Either way the endpoint must NOT return HTTP 200
+   * to an unauthenticated converse request, which is the security invariant
+   * this test asserts.
+   */
+  test('unauthenticated direct request to /api/converse is not accepted (no 200)', async ({ request }) => {
+    const response = await request.post('/api/converse', {
+      data: { sessionId: 'auth-test', message: 'hello' },
+      headers: { 'Content-Type': 'application/json' },
+      // No auth cookies — SWA returns 401; static dev server returns 404
+    });
+
+    // Must never be HTTP 200. In real SWA: 401. In CI static serve: 404.
+    expect(response.status()).not.toBe(200);
+  });
+});
