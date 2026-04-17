@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #184 "fix: adopt official A2UI v0.9 wire format end-to-end (#166)" | L | impl=2m | review=19m | cycles=1 | merged | @sabbour
