@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #303 "fix(prompt): architecture diagram depth + KAITO full name" | M | impl=1m | review=45m | cycles=1 | merged | @sabbour
