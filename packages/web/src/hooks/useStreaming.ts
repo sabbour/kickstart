@@ -62,6 +62,12 @@ export async function _performSdkNonStreamingFetch(
   params: {
     sessionId: string | undefined;
     message: string;
+    /**
+     * Idempotency key generated at the start of the turn.  Both the initial
+     * streaming attempt and this fallback include the same value so the server
+     * can deduplicate the user message if the 406 path is not side-effect free.
+     */
+    clientMessageId?: string;
     clientMessages: unknown[] | undefined;
     signal: AbortSignal;
     debugMode: boolean;
@@ -69,13 +75,14 @@ export async function _performSdkNonStreamingFetch(
   callbacks: Pick<StreamCallbacks, 'onPhase' | 'onA2UI'>,
   debugA2uiMessages: A2uiPayloadItem[],
   apiFetchFn: typeof apiFetch = apiFetch,
-): Promise<{ text: string; model?: string; sessionId?: string; usage?: TokenUsageSummary }> {
+): Promise<{ text: string; model?: string; sessionId?: string; phase?: string; usage?: TokenUsageSummary }> {
   const jsonRes = await apiFetchFn('/api/converse', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       sessionId: params.sessionId,
       message: params.message,
+      ...(params.clientMessageId ? { clientMessageId: params.clientMessageId } : {}),
       ...(params.clientMessages?.length ? { messages: params.clientMessages } : {}),
     }),
     signal: params.signal,
@@ -92,9 +99,13 @@ export async function _performSdkNonStreamingFetch(
     usage?: TokenUsageSummary;
   };
 
+  let safePhase: string | undefined;
   if (response.phase) {
-    const safePhase = guardServerPhase(response.phase);
-    if (safePhase) callbacks.onPhase(safePhase);
+    const validated = guardServerPhase(response.phase);
+    if (validated) {
+      safePhase = validated;
+      callbacks.onPhase(validated);
+    }
   }
 
   const safeItems = (response.a2ui ?? []).filter(isRawA2uiItem);
@@ -107,6 +118,7 @@ export async function _performSdkNonStreamingFetch(
     text: response.message ?? '',
     model: response.model,
     sessionId: response.sessionId,
+    phase: safePhase,
     usage: response.usage,
   };
 }
@@ -214,6 +226,11 @@ export function useStreaming() {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    // One idempotency key per turn — included in both the streaming attempt
+    // and the 406 fallback so the server can deduplicate the user message if
+    // its 406 path is not side-effect free.
+    const clientMessageId = crypto.randomUUID();
+
     let accumulated = '';
     let displayText = '';
     let lastModel: string | undefined;
@@ -262,6 +279,7 @@ export function useStreaming() {
           sessionId,
           message,
           stream: true,
+          clientMessageId,
           ...(clientMessages?.length ? { messages: clientMessages } : {}),
         }),
         signal: controller.signal,
@@ -273,13 +291,14 @@ export function useStreaming() {
         // (phase, A2UI) still reaches the frontend through the same callbacks.
         if (res.status === 406) {
           const fallback = await _performSdkNonStreamingFetch(
-            { sessionId, message, clientMessages, signal: controller.signal, debugMode: !!debugMode },
+            { sessionId, message, clientMessageId, clientMessages, signal: controller.signal, debugMode: !!debugMode },
             { onPhase: callbacks.onPhase, onA2UI: callbacks.onA2UI },
             debugA2uiMessages,
           );
 
           if (fallback.model) lastModel = fallback.model;
           if (fallback.sessionId) lastSessionId = fallback.sessionId;
+          if (fallback.phase) lastPhase = fallback.phase;
           if (fallback.usage) lastUsage = fallback.usage;
 
           const nonStreamText = fallback.text;
@@ -291,7 +310,20 @@ export function useStreaming() {
           }
 
           if (!controller.signal.aborted) {
-            callbacks.onComplete(nonStreamText, lastModel, lastSessionId, undefined, lastUsage);
+            const debugInfo: DebugMetadata | undefined = debugMode
+              ? {
+                  model: lastModel,
+                  rawResponse: nonStreamText,
+                  fullEnvelope: {
+                    message: nonStreamText,
+                    a2ui: debugA2uiMessages.length > 0 ? debugA2uiMessages : undefined,
+                    model: lastModel,
+                    phase: lastPhase,
+                    usage: lastUsage,
+                  },
+                }
+              : undefined;
+            callbacks.onComplete(nonStreamText, lastModel, lastSessionId, debugInfo, lastUsage);
           }
           return;
         }

@@ -105,7 +105,7 @@ test.describe('Route state — server-authored phase consumption', () => {
             'Design',
             'route-test-revisit',
           );
-      route.fulfill({
+      return route.fulfill({
         status: 200,
         contentType: 'text/event-stream',
         headers: { 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' },
