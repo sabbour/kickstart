@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-15 | #314 "feat: upgrade architecture diagram renderer" | XL | impl=3m | review=144m | cycles=1 | merged | @sabbour
+
 - 2026-04-15 | #317 "fix: stop false heartbeat failures" | S | impl=0m | review=0m | cycles=1 | merged | @sabbour
 
 - 2026-04-15 | #315 "test: add SWA post-deploy health smoke" | M | impl=0m | review=0m | cycles=1 | merged | @sabbour
