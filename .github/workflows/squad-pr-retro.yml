@@ -123,7 +123,11 @@ Working as Scribe — see .squad/agents/scribe/charter.md"
               echo "git push failed after ${attempt} attempts"
               exit 1
             fi
-            git pull --rebase origin "${{ github.event.pull_request.base.ref }}"
+            echo "git push failed (attempt ${attempt}); rebasing latest base branch before retry"
+            if ! git pull --rebase origin "${{ github.event.pull_request.base.ref }}"; then
+              echo "git pull --rebase failed while preparing retry push"
+              exit 1
+            fi
             sleep 2
           done
 
