@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #97 "feat: CORS proxy security + auto-continue middleware (#34, #37)" | L | impl=0m | review=16m | cycles=1 | merged | @sabbour
