@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-17 | #736 "docs: Step 13 — scrub Azure identifiers, delete v1 refs, update docs (#488)" | XL | impl=1m | review=3m | cycles=1 | merged | @sabbour
