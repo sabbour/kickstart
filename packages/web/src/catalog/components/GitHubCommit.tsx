@@ -28,8 +28,8 @@ import {
 } from '@fluentui/react-icons';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
 import { useArtifacts } from '../../contexts/ArtifactContext';
-import type { GitHubConnector } from '@kickstart/core';
-import type { Artifact } from '@kickstart/core';
+import type { GitHubConnector } from '@kickstart/harness';
+import type { Artifact } from '@kickstart/harness';
 
 const GitHubCommitApi = {
   name: 'GitHubCommit',

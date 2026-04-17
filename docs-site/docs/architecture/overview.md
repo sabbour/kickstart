@@ -4,115 +4,93 @@ sidebar_position: 1
 
 # Architecture Overview
 
-Kickstart is a monorepo with three packages — a shared core engine, a React SPA, and an MCP server for IDE integration. The web surface runs on Azure Static Web Apps with a managed functions backend.
+Kickstart v2 is a **harness + packs** system. The harness is domain-agnostic; packs carry all product knowledge.
 
 ## Monorepo Structure
 
 ```
 kickstart/
 ├── packages/
-│   ├── core/          @kickstart/core — shared TypeScript engine
-│   │   ├── engine/        phase catalog (phases.ts), skill resolver (skill-resolver.ts)
-│   │   ├── kits/          IntegrationKit interface + defaultKitRegistry
-│   │   ├── prompts/       buildSystemPrompt(), phase templates, component catalog
-│   │   ├── services/      resolveConversationSkills (per-turn injection)
-│   │   └── tools/         ToolRegistry + built-in LLM-callable tools
-│   ├── web/           @kickstart/web — React SPA + Azure Functions API
-│   │   ├── api/           Azure Functions (converse, health, proxies)
-│   │   │   └── src/lib/   session-store, openai-client, model-router, rate-limiter
+│   ├── harness/           @kickstart/harness — runtime engine
 │   │   └── src/
-│   │       ├── catalog/   A2UI component implementations (22 custom — asserted in `custom-component-count.test.ts`; base catalog has 33 entries — asserted in `component-catalog.test.ts`)
-│   │       ├── components/ Chat UI, FileEditor sidebar, Landing
-│   │       └── services/  virtual-fs.ts (browser-side virtual file store with IndexedDB persistence)
-│   └── mcp-server/    @kickstart/mcp-server — optional IDE adapter
-└── infra/             Bicep templates for Azure provisioning
+│   │       ├── runtime/       Runner, session, SSE adapter
+│   │       ├── a2ui/          A2UI v0.9 message types and helpers
+│   │       ├── mcp/           MCP adapter utilities
+│   │       └── types/         Shared Zod schemas (AgentOutput, etc.)
+│   ├── pack-core/         @kickstart/pack-core — base agents, skills, tools, components
+│   ├── pack-azure/        @kickstart/pack-azure — Azure agents, tools, user actions
+│   ├── pack-aks-automatic/ @kickstart/pack-aks-automatic — AKS Automatic deployment pack
+│   ├── pack-github/       @kickstart/pack-github — GitHub agents, tools, user actions
+│   ├── web/               @kickstart/web — React SPA + Azure Functions API
+│   │   ├── api/               Azure Functions (converse, resume, packs manifest)
+│   │   └── src/               React app, A2UI renderer, catalog components
+│   └── mcp-server/        @kickstart/mcp-server — MCP adapter for IDE clients
+└── infra/                 Bicep templates for Azure provisioning
 ```
+
+## The Five Primitives
+
+Every harness interaction is built from five primitive types that packs contribute:
+
+| Primitive | Sigil | Example |
+|-----------|-------|---------|
+| **Agent** | `.` | `core.triage`, `azure.architect` |
+| **Tool** | `.` | `azure.arm_get`, `core.write_file` |
+| **UserAction** | `:` | `azure:login`, `github:oauth` |
+| **Component** | `/` | `pack-core/Button`, `azure/Login` |
+| **Guardrail** | — | `core/token-budget`, `azure/no-hardcoded-creds` |
 
 ## Request Flow
 
 ```
-POST /api/converse { sessionId, message, messages? }
-  1. Rate limit + content safety checks
-  2. Session lookup or creation (rehydrate from client messages[] on cold start)
-  3. resolveSkills(phase, kits)         ← kit prompts for system prompt (Mechanism A)
-  4. resolveConverseModelRoute()        ← trust-based model selection
-  5. buildSystemPrompt({ phase, kitPrompts, artifactSummary })
-  6. resolveConversationSkills(msg)     ← per-turn domain injection (Mechanism B)
-  7. Call Azure OpenAI
-  8. Parse JSON → if phaseComplete: true → advancePhase()
-  9. Extract FileEditor artifacts → session store
- 10. Stream SSE events to client
+POST /api/converse { sessionId, message }
+  1. Rate limit + guardrail input check
+  2. Session lookup or creation
+  3. Runner selects active Agent (session.activeAgent, default core.triage)
+  4. Dynamic instructions = agent body + resolvedSkills(agent, ctx) + catalog
+  5. Agent streams text, emits A2UI via core.emit_ui tool calls
+  6. Agent may call Tools or UserActions
+     └─ UserAction: pause → emit user_action_required SSE → browser acts → POST /api/converse/resume
+  7. Guardrails run at input, tool-call, and output stages
+  8. AgentOutput { message, intent } returned
+  9. Handoff → next Agent picks up future turns
+ 10. Stream typed SSE events to client: chunk | a2ui | tool | handoff | intent | done | error
 ```
 
-See [Prompt Pipeline](./prompt-pipeline.md) for the full assembly order with code references.
+See [Prompt Pipeline](./prompt-pipeline.md) for the per-turn assembly details.
 
 ## Server-Side vs Client-Side State
 
 | What | Where | Lifetime |
 |------|-------|----------|
-| Conversation messages | Server (memory) | 1 hour |
-| Phase string (`currentPhase`) | Server session | 1 hour |
-| Generated artifact metadata | Server (memory) | 1 hour |
-| Full generated file content | Client message history | Browser session |
-| Virtual FS (file content for sidebar) | Client memory + optional IndexedDB (`kickstart-vfs`) | No TTL |
-| `routingPhaseTrusted` flag | Server session | Reset on rehydration |
+| Conversation messages | Server session (memory) | 1 hour |
+| Active agent name | Server session | Per turn |
+| Generated artifact metadata | Server session | 1 hour |
+| Virtual FS (file content) | Client memory + IndexedDB (`kickstart-vfs`) | No TTL |
 
-**Cold start:** Server session expires → client resends up to 50 messages for rehydration. All messages content-safety checked. `routingPhaseTrusted` reset to `false` — client cannot self-elevate to generate-tier model.
-
-## AI Engine
-
-- **Azure OpenAI GPT-5.4-mini** for all conversation phases (`AZURE_OPENAI_CHAT_DEPLOYMENT`)
-- **Azure OpenAI GPT-5.4** for Generate phase when server-trusted (`AZURE_OPENAI_CODEX_DEPLOYMENT`)
-- Model selection is trust-based, not phase-based — see [Prompt Pipeline: Model Routing](./prompt-pipeline.md#model-routing)
-- Two skill injection mechanisms run every turn — see [Skill Injection](./skill-injection.md)
-- Phase tracking: `session.state.currentPhase` (plain string) — see [Phase System](./fsm.md)
-
-## A2UI Component Catalog
-
-Two FileEditor concepts, both backed by `services/virtual-fs.ts`:
-
-Both use `services/virtual-fs.ts` as the browser-side virtual file store: data lives in client memory and may also be persisted in IndexedDB for reuse across sessions. This module does not implement a 1-hour TTL eviction policy.
-
-- **A2UI FileEditor** (`catalog/components/FileEditor.tsx`) — ephemeral, per-turn in-chat component. LLM controls content.
-- **Sidebar FileEditor** (`components/FileEditor/`) — persistent panel with FileTree + Monaco. Shows all generated files across the session.
-
-Base catalog: `packages/core/src/prompts/component-catalog.ts`. Kit-contributed components merged at `buildSystemPrompt()` time.
-
-## Code Health Notes
-
-:::note Exported but uncalled APIs removed
-`resolveSkillsAsync()` and `resolveSkillsFromList()` were exported from `@kickstart/core` but never called in any production handler. They were removed in PR #402. Only `resolveSkills()` remains as the public entry point.
-:::
-
-:::info Both skill paths are active
-**`azure-kit.ts` uses the typed `kit.skills[]` path** (Path 1) — it registers `skills: azureIacSkills` (see `azure-kit.ts:573`). **`github-kit.ts` uses the legacy `kit.prompts[]` / `kit.phasePrompts{}` path** (Path 2). Both paths are valid for kit authors. Consolidation of the two paths into a single mechanism is tracked as future work.
-:::
-
-:::note Two keyword systems with no shared vocabulary
-Mechanism A (kit prompt classification) and Mechanism B (user message classification) both key on words like `"dockerfile"`, `"manifest"`, `"pipeline"` — but in separate files with separate formats. They will drift independently.
-:::
+**Cold start:** Server session expires → client resends message history. Session is restored from the conversation log.
 
 ## Session Lifecycle
 
 ```
 Client POST (no sessionId)
-  → createSession()  OR  hydrateSession(messages[])
-  → Session ID returned in response
+  → createSession() → Session ID returned
 
 Client POST (with sessionId, session alive)
   → getSession(sessionId) → found → continue
 
 Client POST (with sessionId, session expired)
-  → getSession(sessionId) → null
-  → body.messages[] present → hydrateSession() → new session, same conversation
-  → body.messages[] absent → createSession() → fresh start
+  → createSession() → fresh session
 
 Garbage collection
   → Every 10 minutes: delete sessions older than 1 hour
 ```
 
-## What Should Be Cleaned Up
+## A2UI Component Catalog
 
-1. ~~**`resolveSkillsAsync` / `resolveSkillsFromList`**~~ — **Done in #402.** Both removed from public exports.
-2. **Typed `Skill` path in `skill-resolver.ts`** — consolidate to one canonical resolution path. `azure-kit.ts` uses the typed `kit.skills[]` path; `github-kit.ts` uses the legacy `kit.prompts[]` / `kit.phasePrompts{}` path. Both paths are active and valid, but the dual-path design adds Agent SDK integration complexity.
-3. **Keyword vocabulary** — extract a shared constants module referenced by both mechanisms.
+Components are registered per pack at startup. The harness seals the registry before the first request. The negotiated catalog is served via `GET /api/packs`.
+
+- **In-chat components** — emitted via `core.emit_ui` tool calls during agent turns.
+- **Sidebar FileEditor** (`components/FileEditor/`) — persistent panel backed by `services/virtual-fs.ts`.
+
+See [A2UI Integration](./a2ui-integration.md) for the full component model.

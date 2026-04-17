@@ -11,12 +11,12 @@ import {
   getPhaseDefinition,
   buildSystemPrompt,
   Phase,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 import type {
   SessionState,
   ConversationPhaseComponent,
   PhaseItem,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 import { getSessionPhase, setSessionPhase } from "./kickstart.js";
 import { createA2UIResource } from "../a2ui.js";
 import type { A2UICapability } from "../a2ui.js";

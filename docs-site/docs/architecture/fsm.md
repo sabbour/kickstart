@@ -16,7 +16,7 @@ An earlier version of the codebase included a TypeScript state machine (`machine
 
 ### Phase Catalog
 
-Phases are defined in `packages/core/src/engine/phases.ts` as a static array:
+Phases are defined in the harness session types:
 
 ```typescript
 export interface PhaseDefinition {
@@ -50,20 +50,11 @@ This is the single source of truth. There is no separate FSM state slice, no `ph
 
 ### Phase Advancement
 
-`advancePhase()` in `converse.ts` looks up the current phase in `PHASE_DEFINITIONS` and returns `nextPhase`:
-
-```typescript
-function advancePhase(currentPhase: Phase): Phase {
-  const def = PHASE_DEFINITIONS.find((p) => p.id === currentPhase);
-  return def?.nextPhase ?? currentPhase;
-}
-```
-
-The LLM signals that a phase is complete via `phaseComplete: true` in its JSON response envelope. The `converse` handler reads this flag and calls `advancePhase()` — there is no event system or transition guard.
+`advancePhase()` looks up the current phase in `PHASE_DEFINITIONS` and returns `nextPhase`. The agent signals phase completion via the `intent: "advance"` field in `AgentOutput`.
 
 ### How the LLM Knows Its Phase
 
-The system prompt includes the current phase identifier and the `description` from its `PhaseDefinition`. This tells the LLM what to focus on and when to signal completion.
+The agent's dynamic instructions include the current phase identifier and description from its `PhaseDefinition`. This tells the LLM what to focus on and when to signal completion via `intent: "advance"` in `AgentOutput`.
 
 ---
 
@@ -81,8 +72,6 @@ The original `machine.ts` implemented a pure-function state machine with:
 
 The machine was removed because it duplicated the LLM's own phase judgment without adding correctness guarantees.
 
----
-
 ## Future Direction
 
-Phase behavior is expected to evolve significantly with the Agents SDK integration. See issue [#330](https://github.com/sabbour/kickstart/issues/330) for the planned redesign. The current plain-string approach is intentionally minimal — a clean baseline before that work begins.
+Phase behavior continues to evolve with the v2 harness + packs model. Phase transitions are now signalled via `AgentOutput.intent = "advance"` rather than a JSON envelope flag. See [Architecture Overview](./overview.md) for the current v2 request flow.

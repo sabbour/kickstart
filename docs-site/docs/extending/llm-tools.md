@@ -12,7 +12,7 @@ This guide covers the tool interface, the registry, and how to add a new tool.
 
 ### Tool Interface
 
-Every tool implements the `Tool<TArgs>` interface defined in `packages/core/src/tools/types.ts`:
+Every tool implements the `Tool<TArgs>` interface defined in `packages/pack-core/src/tools/types.ts`:
 
 ```typescript
 export interface Tool<TArgs = Record<string, unknown>> {
@@ -48,7 +48,7 @@ The `ToolContext` gives your tool access to:
 
 ### Tool Registry
 
-`packages/core/src/tools/registry.ts` exports a `ToolRegistry` class and a `defaultRegistry` singleton:
+`packages/pack-core/src/tools/registry.ts` exports a `ToolRegistry` class and a `defaultRegistry` singleton:
 
 ```typescript
 const registry = new ToolRegistry();
@@ -98,10 +98,10 @@ Tool call events are streamed to the client as SSE events of type `tool_call` an
 
 ### Step 1 — Create the tool file
 
-Create a new file in `packages/core/src/tools/`. Name it after your tool using kebab-case:
+Create a new file in `packages/pack-core/src/tools/`. Name it after your tool using kebab-case:
 
 ```
-packages/core/src/tools/my-tool.ts
+packages/pack-core/src/tools/my-tool.ts
 ```
 
 Implement the `Tool<TArgs>` interface:
@@ -155,7 +155,7 @@ The LLM decides when to call your tool based entirely on the `description`. Be e
 
 ### Step 2 — Add SSRF and input validation
 
-If your tool makes outbound HTTP requests, validate inputs to prevent SSRF attacks. See `packages/core/src/tools/fetch-webpage.ts` for the reference implementation — it validates the URL scheme, blocks private IP ranges, and restricts to HTTP/HTTPS:
+If your tool makes outbound HTTP requests, validate inputs to prevent SSRF attacks. See `packages/pack-core/src/tools/fetch-webpage.ts` for the reference implementation — it validates the URL scheme, blocks private IP ranges, and restricts to HTTP/HTTPS:
 
 ```typescript
 async execute(args, context) {
@@ -169,7 +169,7 @@ async execute(args, context) {
 
 ### Step 3 — Register the tool
 
-Open `packages/core/src/tools/index.ts` and add your tool to the registration block:
+Open `packages/pack-core/src/tools/index.ts` and add your tool to the registration block:
 
 ```typescript
 import { myTool } from "./my-tool.js";
@@ -181,7 +181,7 @@ defaultRegistry.registerAll([
 ]);
 ```
 
-Alternatively, if your tool belongs to an integration, add it to your `IntegrationKit`'s `tools` array instead. See [Integration Kits](./integration-kits.md) for details.
+Alternatively, if your tool belongs to an integration, add it to your pack's tool contributions instead. See [Packs](./integration-kits.md) for details.
 
 ### Step 4 — Write tests
 
@@ -226,8 +226,8 @@ Start the dev server and open a conversation. Ask the AI to do something that sh
 
 | File | Purpose |
 |---|---|
-| `packages/core/src/tools/types.ts` | `Tool<TArgs>` and `ToolContext` interfaces |
-| `packages/core/src/tools/registry.ts` | `ToolRegistry` class and `defaultRegistry` singleton |
-| `packages/core/src/tools/index.ts` | Tool registration entry point |
-| `packages/core/src/tools/fetch-webpage.ts` | Reference implementation with SSRF protection |
+| `packages/pack-core/src/tools/types.ts` | `Tool<TArgs>` and `ToolContext` interfaces |
+| `packages/pack-core/src/tools/registry.ts` | `ToolRegistry` class and `defaultRegistry` singleton |
+| `packages/pack-core/src/tools/index.ts` | Tool registration entry point |
+| `packages/pack-core/src/tools/fetch-webpage.ts` | Reference implementation with SSRF protection |
 | `packages/web/api/src/functions/converse.ts` | LLM wiring: `toOpenAIFormat()`, `execute()`, multi-round loop |

@@ -13,6 +13,7 @@
 - 2026-04-10: `/api/converse` currently exposes full system prompts to clients on new sessions; treat system prompts as sensitive control-plane data.
 - 2026-04-10: Security hardening backlog now tracked in Security milestone issues #81-#88 with severity and OWASP mapping.
 - 2026-04-10: DP #30 (IntegrationKit lifecycle/dependency/auth extension) approved with conditions requiring transactional lifecycle rollback, cycle detection on re-registration, explicit auth schema validation, and documented trusted-kit boundary.
+- 2026-04-17T12:06:45.293Z: For delete-first migrations like #474 Step 1, a temporary package-boundary compatibility seam is acceptable only as compile-time scaffolding; it must stay behavior-free, preserve existing auth/secret trust boundaries, and be removed once imports are rewired.
 
 ## Round 5: Multi-Round Security Reviews
 
@@ -104,3 +105,13 @@ All 4 critical security conditions from issue #445 acceptance criteria:
 - Integration with DP #329 + #330 security review validated
 
 **Consequence:** Unblocks merge when Leela approval also present (verified as received).
+
+## 2026-04-17T12:06:45Z — #474 DP Review + v2 Security Architecture Review
+
+- **#474 DP review:** APPROVE_WITH_CONDITIONS. Standard seam-cutting conditions; playground stubs must be gated behind `KICKSTART_PLAYGROUND`.
+- **v2 security architecture review (#473):** APPROVED WITH CONDITIONS. 10 conditions total.
+  - 5 Critical (before Step 5): SSRF/fetch_webpage URL denylist, path traversal/write_file workspace prefix, resume handler OID ownership, resume resultSchema validation, playground stub fail-closed gate.
+  - 3 High (before Step 7/12): ARM path injection Zod regex, MCP auth documented, MCP UserAction architectural separation confirmed.
+  - 6 Medium: secrets detection, PII detection, A2UI guardrail scope, token budget ceiling, CSP audit, CSRF.
+- **MCP UserAction resolution:** UserActions are NOT MCP tools. MCP client detects `user_action_required` and POSTs directly to `/api/converse/resume`. Residual conditions #3 and #4 (OID ownership + resultSchema) cover MCP-originated resume calls equally.
+- **Decision filed:** `zapp-v2-security-review.md` merged to decisions.md.

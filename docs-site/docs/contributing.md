@@ -10,36 +10,35 @@ Kickstart is built using the [Squad framework](./../) for AI-guided development.
 
 To add a component to the Kickstart catalog:
 
-1. Define the component type and data model in `packages/core/src/catalog/`
-2. Implement the React renderer in `packages/web/src/catalog/components/`
-3. Register the component in the catalog registry
-4. Update the system prompt to teach the AI when and how to use the new component
-5. Add documentation to `docs-site/docs/components/`
+1. Define the component type and data model in the appropriate pack's `src/components/`
+2. Implement the React renderer (basic or rich) in the pack
+3. Register the component contribution in the pack's index
+4. Add documentation to `docs-site/docs/components/`
 
 ## Adding New Conversation Phases
 
-The conversation flow is defined in `packages/core/src/engine/phases.ts`. To add a phase:
+See [Conversation Phases](./extending/conversation-phases.md) for the full walkthrough.
 
-1. Add a new phase entry to `PHASE_DEFINITIONS` in `packages/core/src/engine/phases.ts`
-2. Add transition rules from adjacent phases
-3. Update the system prompt with phase-specific instructions
-4. Add any phase-specific A2UI components
-5. Test the flow end-to-end
+In brief:
+1. Add a new phase to the `Phase` enum in `packages/harness/src/types/`
+2. Add a `PhaseDefinition` entry with `nextPhase` chaining
+3. Add phase-specific skills to relevant packs
+4. Test the flow end-to-end
 
-## Extending the System Prompt
+## Extending Agent Instructions
 
-The system prompt lives in `packages/core/src/prompts/`. Key guidelines:
+Agent instructions live in `.agent.md` files inside each pack's `src/agents/` directory. Skills are `SKILL.md` files in `src/skills/`. Key guidelines:
 
-- Keep phase instructions focused and concise
-- Use structured output format (JSON envelope) consistently
+- Keep agent base instructions concise — skills add the domain detail
+- Use `appliesTo` globs to scope skills to the right agents
 - Hide Kubernetes jargon in early phases (Discover, Design)
-- Include A2UI component examples for each phase
 
 ## Testing
 
 | Package | Tool | Command |
 |---------|------|---------|
-| `packages/core` | Vitest | `npm run test` (from root) |
+| `packages/harness` | Vitest | `npm run test` (from root) |
+| `packages/pack-*` | Vitest | `npm run test` (from root) |
 | `packages/web` | Vite build | `cd packages/web && npm run build` |
 
 Run all tests from the repo root:

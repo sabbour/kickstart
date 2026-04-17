@@ -1,4 +1,4 @@
-import { Phase } from "@kickstart/core";
+import { Phase } from "@kickstart/harness";
 import {
   getChatDeploymentName,
   getGenerateDeploymentName,

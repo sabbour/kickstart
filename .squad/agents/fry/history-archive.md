@@ -342,3 +342,39 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - Created `packages/web/public/assets/hero-bg-dark.svg` — a super-dark variant of the landing hero background using deep navy (#0a0f1a), indigo (#0d0b1a), and purple (#120e1e) gradients. Same 3-layer structure (base linear gradient + two radial glows) as the light version, but genuinely dark instead of inverted.
 - Updated `packages/web/css/landing.css` with a `[data-theme="dark"] .landing-page` rule that swaps `background-image` to the dark SVG. The existing `background` shorthand on `.landing-page` still provides `center/cover no-repeat` and the fallback color, so the dark override only needs to replace the image.
 - Theme attribute is applied on `<html>` by `ThemeContext.tsx` (line 55: `document.documentElement.setAttribute('data-theme', resolved)`).
+
+---
+
+## ARCHIVED 2026-04-17 (Scribe summarization — fry history exceeded 15 KB)
+
+### v0.5.7 Sprint + Wave Work (2026-04-14)
+- Fixed SSE A2UI rendering blocker (#166), PR #179. Fixed A2UI action interactivity (#192, PR #195). Removed "Got it" badge acknowledgment cards from phase prompts. Added hash-based browser back-button routing (#169, PR #211). Fixed ChoicePicker/RadioGroup action context injection — now injects `value` + `selectedLabel` (PR #214). Removed ~600 lines of `!important` CSS overrides from `a2ui-overrides.css` (PR #242). Debug panel improved: full A2UI JSON envelope + collapsible sections + syntax highlighting (PR #216). Implemented expanded demo scenarios (#188, PR #219).
+
+### Round 6: Bug Fixes (2026-04-15)
+- PR #247: 3 TypeScript fixes (missing module, null type, wrong variable). PR #248: E2E exact:true robustness fix. Issue #253: gray rectangle visual bug removed. Issue #254 / PR #256: unified Fluent UI button styling across all A2UI action buttons. Issue #255 created: ArchitectureDiagram alignment with try-aks.
+
+### Recovery Lane #328 (2026-04-15)
+- `squad/328-setup-frontend-recovery`: Wired `step_start`/`file_generated`/`step_complete`/`step_error` streaming into synthetic DeploymentProgress surface. Kept generate chat progress-only. Routed streamed files into workspace/FileManager. Added live-region announcement. Covered with targeted frontend regressions.
+
+### K8s Icons Batch (2026-04-16)
+- Added 7 new SVG icons (gateway, httproute, pdb, vpa, cronjob, role, rb) plus DRA batch (deviceclass, resourceclaim, resourceclaimtemplate, resourceslice), endpointslice, and Inference Extension (inferencepool, inferenceobjective, endpointpicker). Updated ALLOWED_ICON_KEYS, frontend registration, 27/27 tests passing. Icon naming conventions locked: `k8s/<lowercase-kind>`, full-word keys, `rslice` SVG label for ResourceSlice to avoid RS collision.
+
+### System Prompt Restructuring (2026-04-16)
+- Restructured `system-prompt.ts` into ═══ STEP N ═══ narrative blocks on `squad/384-fsm-removal-cleanup`. Aligns with Bender's FSM removal PR #385.
+
+### Ideas Tab Cleanup Assignment (2026-04-16)
+- Scope: Cut Ideas tab 36 → 16 scenarios (56% reduction), extract 3 components to Custom Controls. Files: `packages/web/src/pages/playground-scenarios.ts`, `Playground.tsx`.
+
+### Sprint Retro — Security + Generation Sprint (2026-04-16)
+- PRs merged: #370 (Playground surfaceIds fix), K8s icon batch, #372 (next-card phantom cleanup). Frontend audit confirmed FileEditor coupling intentional, `root` is reserved surface ID, ChoicePicker naming confusion surfaced.
+
+### Issues #453/#454 (2026-04-17)
+- Issue #454 (PR #457): A2UI Debug Visualization — `DebugA2UITree.tsx` uses `version === 'v0.9'` discriminant, leaf-level `KNOWN_COMPONENT_TYPES` lookup, debug-only component isolation in `debug/` subdirectory.
+- Issue #453 (PR #461): System Prompt Debug View frontend — new collapsible sections default-collapsed, system prompt string displayed verbatim from 8KB-capped `DebugMetadata.systemPrompt` field.
+
+### Selected Learnings Archived
+- A2UI double-source parsing (typed SSE events + JSON envelope), hash nav pattern, DataContext.resolveAction() API, never use `!important` in `.a2ui-surface-wrapper`, DebugMetadata.rawContent vs fullEnvelope.
+- ArchitectureDiagram: diagram-first contract (raw Mermaid in `diagram`), registry-backed icon allowlist, `sanitizeDiagramInput()` before Mermaid render, `%%icon:name%%` post-render expansion. Vendor list for minimal private-package replacement.
+- `packages/squad-sdk` may not be compiled in worktree — direct GitHub App JWT generation from `.squad/identity/keys/{role}.pem`.
+- `auto-continue.ts` only triggers on `complete:` and `continue:` prefixes; `navigate:` is secondary prefix after stripping outer. `skill-resolver.ts` phase group constants are module-private const Sets, not exported arrays.
+- K8s icon keys: `k8s/endpointslice` (full name, no hyphen); `endpointpicker` not `epp`; NetworkPolicy stays in azure-pack.

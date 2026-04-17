@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## [1.0.0] - 2026-04-17
+
+### Added
+
+- **Harness+packs architecture** — complete rewrite from v1 prompt-based system to composable harness with typed pack primitives: tools, user actions, A2UI components, guardrails, and skills
+- **`@openai/agents` SDK integration** — harness wraps the Agents SDK Runner; packs contribute tools and guardrails into the agent's tool registry
+- **Pack system** — four domain packs: `pack-core` (base tools, phase flow), `pack-azure` (Azure resource management), `pack-aks-automatic` (AKS Automatic cluster provisioning), `pack-github` (repo + Actions integration)
+- **A2UI renderer** — frontend web client renders A2UI embedded resources from agent responses; UserAction dispatcher handles structured user decisions
+- **Guardrails engine** — pack-contributed guardrails compose into a pipeline; each guardrail runs as a tool in the agent's tool registry
+- **MCP adapter** — thin MCP server wrapping the Runner; VS Code clientInfo detection, structured interrupt/resume with CAS + TTL, per-session mutex, `mcpExposed` tool filtering
+- **GitHub pack** (`pack-github`) — repo clone, branch management, Actions trigger and status polling
+- **AKS Automatic pack** — full provisioning flow: resource group, managed identity, OIDC federation, AKS cluster creation with Automatic SKU defaults
+- **Skills system** — agent-contributed skill vocabulary; packs declare skills that the harness registers and the frontend can surface
+
+### Changed
+
+- **Architecture** — replaced phase-prompt pipeline with harness+packs model; `phasePrompts` and `IntegrationKit` removed
+- **Runner** — `@openai/agents` Runner replaces custom streaming loop; SSE event stream unchanged for web client compatibility
+- **Pack authoring API** — `createPack()` factory, typed `ToolContribution`, `UserActionContribution`, `A2UIContribution`, `GuardrailContribution`
+- **MCP server** — rewritten as thin adapter over harness Runner; connectionId is server-assigned, not client-controlled
+
+### Removed
+
+- `phasePrompts` — replaced by typed tool contributions from packs
+- `IntegrationKit` — replaced by the pack system
+- Legacy `check()` guardrail API — replaced by `GuardrailContribution` in the harness
+- `packages/core` v1 references — docs and architecture overviews fully updated for v2
+
+---
+
 ## [0.7.0] - 2026-04-15
 
 ### Added

@@ -482,3 +482,37 @@ All DP reviewers approved; implementation complete per scope.
 - `.squad/decisions/inbox/leela-extension-package.md`
 
 **Findings:** ~150 early decisions are pre-A2UI and could be archived. 13 inbox files need Scribe merge. Some date inconsistencies in inbox files (2025 dates on 2026 features).
+
+---
+
+## ARCHIVED 2026-04-17 (Scribe summarization — leela history exceeded 15 KB)
+
+### Round 5: Design Review (2026-04-14)
+Reviewed and approved DP #188 (expanded demo scenarios). Approved Fry's implementation readiness.
+
+### 2026-04-15 E2E Demo Sprint Planning
+Built sprint plan for demo-readiness. GitHub OAuth App available (#274 unblocked). Azure auth/deployment in scope. Critical path: PR #297 → #298 → #275 + #274 → Azure MSAL. 4 parallel tracks post-#298: Wizard Flow, GitHub OAuth, Azure, Polish. Zapp mandatory on #274 and Azure auth. Deferred: #272, #277. Decision: `leela-e2e-sprint-plan.md`.
+
+### 2026-04-15 Sprint Planning Ceremony (v0.6.1)
+Board drift: 12/15 issues no milestone, all stale `go:needs-research`. Fixed: all demo-critical → v0.6.1, v0.7.0 for deferred, cleared stale labels. Burn now: PR #297, #298, #299, #274. Burn next: #300, #296, #275, #265, #266. Decision: `leela-sprint-planning-v061.md`.
+
+### 2026-04-15 PR Review Sprint
+Merged PR #252 (FileManagerSidebar + FileViewer). Merged PR #247, #248 bug fixes. 3 PRs merged, 5 issues closed, CI green.
+
+### 2026-04-15 Architecture Diagram Depth (#300)
+Three-tier model: Tier 1 (always: AKS subgraph), Tier 2 (conditional: DB/cache/queue/AI), Tier 3 (annotations: CI/CD). Use `diagram` prop with Mermaid subgraphs. Files: `system-prompt.ts`, `component-catalog.ts`, `demo-scenarios.ts`. Decision: `leela-architecture-diagram-depth.md`.
+
+### 2026-04-15 Priority Tracking Decision
+Priority labels (`priority:p1`, `priority:p2`) + cross-link comments on GitHub issues. Applied to #333, #328, #327, #326, #331, #332. Decision: `leela-priority-tracking-github.md`.
+
+### 2026-04-16 Post-v0.7.0 Triage
+Merge #341 security bump immediately; run sprint planning before feature code; proceed #330 Agents SDK design spike (P1) in parallel; #329 MCP App IDE follows; #332 blocked. Decision: `leela-post-v070-priority-lane.md`.
+
+### 2026-04-16 Vendor Hotfix (#342)
+Issue #342 removes `@sabbour/adaptive-ui-core` + `@sabbour/adaptive-ui-azure-pack` — surgical extraction of icon registry + 2 SVGs. Fry-routed. No DP needed (pure refactor). Decision: `leela-vendor-diagram-hotfix.md`.
+
+### 2026-04-16 PR #383 Documentation Rewrite
+7 engineering docs updated (ARCHITECTURE, PHASES, CONVERSATION-ENGINE, AUTHENTICATION, PERSISTENCE, INTEGRATION, TESTING). All review feedback addressed. 12 accuracy fixes. CI green, internal links validated.
+
+### 2026-04-16 Sprint Retro — Security + Generation Sprint
+Merged (cross-cutting): #341 DOMPurify, #354 STEPWISE_GENERATION_V1 default, #356 rename, #358 catalog guidance, #368 CI permissions, #372 phantom cleanup. Decisions: component rename discipline, sanitization standard, stepwise default.

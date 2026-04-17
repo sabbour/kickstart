@@ -1,0 +1,50 @@
+{
+  "name": "@kickstart/pack-core",
+  "version": "1.0.0",
+  "description": "Core pack — agents, skills, tools, and domain-neutral components for Kickstart v2",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kickstart/harness": "*",
+    "@openai/agents": "*",
+    "zod": "^3.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/jest-dom": "^6.0.0",
+    "typescript": "*",
+    "vitest": "*",
+    "jsdom": "*",
+    "@fluentui/react-components": "*",
+    "@fluentui/react-icons": "*",
+    "react-markdown": "*",
+    "remark-gfm": "*",
+    "highlight.js": "*",
+    "@monaco-editor/react": "*",
+    "dompurify": "*",
+    "@types/dompurify": "*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "@fluentui/react-components": "^9.0.0",
+    "@fluentui/react-icons": "^2.0.0",
+    "react-markdown": ">=9.0.0",
+    "remark-gfm": ">=4.0.0",
+    "highlight.js": ">=11.0.0",
+    "@monaco-editor/react": ">=4.0.0",
+    "dompurify": ">=3.0.0"
+  }
+}

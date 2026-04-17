@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Phase } from "@kickstart/core";
+import { Phase } from "@kickstart/harness";
 
 vi.mock("./openai-client.js", () => ({
   getChatDeploymentName: () => "gpt-5.4-mini",

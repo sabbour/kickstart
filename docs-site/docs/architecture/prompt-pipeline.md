@@ -4,231 +4,78 @@ sidebar_position: 2
 
 # Prompt Pipeline
 
-Every conversation turn assembles a fresh prompt from multiple sources before calling Azure OpenAI. This page describes the exact order and the code behind each step.
+Every conversation turn dynamically assembles agent instructions before calling the LLM via the `@openai/agents` SDK. This page describes how the harness builds per-turn context.
 
 > **Source files:**
-> - `packages/core/src/engine/skill-resolver.ts` — Mechanism A
-> - `packages/core/src/services/resolveConversationSkills.ts` — Mechanism B (live in main as of PR #382)
-> - `packages/core/src/prompts/system-prompt.ts` — `buildSystemPrompt()`
-> - `packages/web/api/src/functions/converse.ts` — assembly harness (~lines 210–300)
-> - `packages/web/api/src/lib/converse-model-router.ts` — model routing
-
-## Two Skill Mechanisms
-
-There are two independent skill injection mechanisms running every turn. They target different message positions and serve different purposes.
-
-| | Mechanism A | Mechanism B |
-|-|-------------|-------------|
-| **File** | `engine/skill-resolver.ts` | `services/resolveConversationSkills.ts` |
-| **Trigger** | Current FSM phase | Keywords in user message |
-| **Source** | Registered IntegrationKits | Hardcoded domain patterns |
-| **Injection point** | System prompt (`## Available Capabilities`) | User message turn before real message |
-| **Also injects** | — | `[Current session context]` appended to real user message |
+> - `packages/harness/src/runtime/skill-resolver.ts` — per-turn skill resolution
+> - `packages/harness/src/runtime/runner.ts` — turn orchestration
+> - `packages/web/api/src/functions/converse.ts` — HTTP handler
 
 ## Assembly Order
 
 ```
 POST /api/converse arrives
     │
-    ├─ 1. Session lookup / rehydration
-    ├─ 2. currentPhase = getSafeCurrentPhase(engineState)
+    ├─ 1. Session lookup or creation
+    ├─ 2. Guardrail input check (core/token-budget, etc.)
     │
-    ├─ 3. [MECHANISM A] resolveSkills(currentPhase, defaultKitRegistry.getAll())
-    │      returns resolvedSkills.prompts[]
+    ├─ 3. Runner selects active Agent
+    │      session.activeAgent ?? "core.triage"
     │
-    ├─ 4. resolveConverseModelRoute(currentPhase, { trustedPhase })
-    │      returns { deployment, model, pricingGroup }
+    ├─ 4. Dynamic instructions assembled per turn
+    │      = agent.body (base .agent.md text)
+    │      + resolvedSkills(agent.name, recentTurns)  ← skill resolver
+    │      + catalog snapshot (component type list)
     │
-    ├─ 5. buildArtifactSummary(session.generatedArtifacts)
-    │      returns markdown summary of files generated so far
+    ├─ 5. Agent streams via SDK — text chunks + tool calls
+    │      core.emit_ui → a2ui SSE events
+    │      core.write_file, azure.arm_get, etc.
     │
-    ├─ 6. buildSystemPrompt({ phase, appDefinition, kitPrompts, artifactSummary })
-    │      ┌──────────────────────────────────────────┐
-    │      │ KICKSTART_SYSTEM_PROMPT (persona + rules) │
-    │      │ ## Current Phase: {label}                 │
-    │      │ {phase description}                       │
-    │      │ {phase promptTemplate with {{vars}}}      │
-    │      │ {artifactSummary — if any}                │
-    │      │ ## Available Capabilities                 │  ← Mechanism A here
-    │      │ {kit prompts}                             │
-    │      └──────────────────────────────────────────┘
+    ├─ 6. UserAction encountered?
+    │      → pause, emit user_action_required SSE
+    │      → browser acts (MSAL popup, GitHub OAuth, etc.)
+    │      → POST /api/converse/resume with typed result
+    │      → Runner resumes
     │
-    ├─ 7. Build messages[] from session history
-    │      messages[0] = { role: "system", content: freshSystemPrompt }
+    ├─ 7. Guardrail output check
     │
-    ├─ 8. [MECHANISM B] resolveConversationSkills(message, phase, sessionContext)
-    │      ├─ domainKnowledge != null:
-    │      │    messages.splice(messages.length - 1, 0, { role: "user", content: domainKnowledge })  // ↑ inserted immediately before the real user message
-    │      └─ Append currentState to messages[last].content
-    │
-    └─ 9. chatCompletion(messages, { deployment, responseFormat: "json_object" })
+    └─ 8. AgentOutput { message, intent } → SSE done
 ```
 
-## Mechanism A — Kit Skill Resolver
+## Skill Resolution
 
-**File:** `packages/core/src/engine/skill-resolver.ts`
+`resolveSkills(agentName, context)` in `packages/harness/src/runtime/skill-resolver.ts`:
 
-```typescript
-// converse.ts ~line 210
-const resolvedSkills = resolveSkills(currentPhase, defaultKitRegistry.getAll());
+1. **Match `appliesTo`** — glob each skill's `appliesTo` field against the current agent name.
+2. **Keyword scoring** — score matched skills against the recent conversation turns.
+3. **Priority ordering** — sort by `priority` (higher first), apply token budget cap (2000 tokens default).
+4. **Inject** — append skill text to the agent's dynamic instructions.
 
-const freshSystemPrompt = buildSystemPrompt({
-  phase: currentPhase,
-  appDefinition: state.appDefinition,
-  kitPrompts: resolvedSkills.prompts,  // ← appended as ## Available Capabilities
-  artifactSummary: artifactSummary || undefined,
-});
-```
+Skills are authored as `SKILL.md` files inside packs. They are pure text — no code, no execution.
 
-**3-stage resolution:**
-1. **Typed skill resolution first** — resolve `kit.skills[]` entries matching the current phase; apply keyword activation rules and priority sorting.
-2. **Legacy prompt fallback** — if no typed skills, fall back to `kit.phasePrompts[phase]` (explicit per-phase), then flat `kit.prompts[]` classified by keyword groups.
-3. **Phase-specific tool handling** — `resolveLegacySkills()` synthesizes a tool-listing prompt in **Discover** only; in Design it collects `availableTools` but does **not** inject that prompt.
-
-**To add a skill:** Implement `IntegrationKit` and register with `defaultKitRegistry`. No config files.
-
-## Mechanism B — Per-Turn Domain Injection
-
-**File:** `packages/core/src/services/resolveConversationSkills.ts`  
-**Status:** Live in main (merged PR #382). Called in `converse.ts` lines ~278–299.
-
-```typescript
-// converse.ts ~line 278
-const { domainKnowledge, currentState } = resolveConversationSkills(
-  body.message,
-  currentPhase,
-  { phase: currentPhase, appDefinition: state.appDefinition, filesGenerated },
-);
-if (domainKnowledge) {
-  messages.splice(messages.length - 1, 0, { role: "user", content: domainKnowledge });  // ↑ inserted immediately before the real user message
-}
-const last = messages[messages.length - 1];
-messages[messages.length - 1] = {
-  ...last,
-  content: `${last.content}\n\n${currentState}`,
-};
-```
-
-**Detected domains:** `stack-node`, `stack-python`, `stack-dotnet`, `stack-java`, `stack-go`, `infra-docker`, `infra-aks`, `infra-cicd`, `auth`, `data-relational`, `data-nosql`, `data-cache`, `data-queue`, `component-form`, `component-table`, `component-chart`
-
-**Example:** User says `"generate the Dockerfile for my Node app"`:
-- Matched: `infra-docker`, `stack-node`
-- Injected user turn: `[Domain knowledge: Docker + Node.js]`
-- Real message becomes: `"generate the Dockerfile...\n\n[Current session context]\nPhase: generate\n..."`
-
-:::note Phase-conditional override in Mechanism B
-`resolveConversationSkills.ts` contains a hard-coded guard: when `phase === "generate"`, it unconditionally adds `infra-aks` and `infra-docker` domains regardless of the user message content. This ensures AKS/Docker knowledge is always present in Generate phase — the same goal Mechanism A achieves by routing kit prompts containing `"dockerfile"`/`"manifest"` to Generate phase. **This is overlapping coverage.** See Conflict Analysis below.
-:::
-
-## Conflict Analysis — Do the Two Mechanisms Overlap?
-
-**Different targets, shared vocabulary.** Mechanism A classifies *kit prompt text*; Mechanism B classifies *user message text*. They inject to different positions in `messages[]`. The design intent is layered, not redundant.
-
-**However, there is concrete overlap in the Generate phase:**
-
-| What fires | Condition | Content |
-|------------|-----------|---------|
-| Mechanism A | Kit prompts containing "dockerfile"/"manifest" classified to Generate | Kit generation-phase prompts in system prompt |
-| Mechanism B (unconditional) | `phase === "generate"` — always | `infra-aks` + `infra-docker` domain knowledge as user turn |
-
-Both mechanisms activate in Generate phase, both inject AKS/Docker context, through different channels. The channels are different (system prompt vs user turn) but the knowledge overlaps.
-
-**Keyword sets evolved independently.** Mechanism A uses string substring matching; Mechanism B uses regex patterns. No shared file. Overlapping terms: `"dockerfile"`, `"manifest"`, `"pipeline"`, `"deploy"`.
-
-**Recommendation for cleanup:** The unconditional Generate phase injection in Mechanism B should either be made conditional on user message content (matching B's general pattern), or removed and covered by kit prompts alone. The current state works but is not intentionally designed.
-
-## System Prompt Structure
-
-`buildSystemPrompt()` builds:
+## Agent Instructions Structure
 
 ```
-{KICKSTART_SYSTEM_PROMPT}
-  - Persona + COLLABORATOR VOICE
-  - K8s terminology rules by phase
-  - GUARDRAILS (DS001–DS013)
+{agent.body}                     ← base .agent.md text (persona + rules)
 
-## Current Phase: {label}
-{phase description}
-{phase promptTemplate}
-
-{artifactSummary — omitted if empty}
-
-## Available Capabilities
-{kit prompts — omitted if none}
-```
-
-Phase exit conditions in `phases.ts` are human-readable strings. Not code-enforced. See [FSM](./fsm.md).
-
-## Model Routing
-
-Trust-based, not phase-based:
-
-```typescript
-// packages/web/api/src/lib/converse-model-router.ts
-export function resolveConverseModelRoute(
-  phase: string | null | undefined,
-  options: { trustedPhase?: boolean } = {},
-): ConverseModelRoute {
-  if (options.trustedPhase && normalizeConversePhase(phase) === Phase.Generate) {
-    return { deployment: getGenerateDeploymentName(), pricingGroup: "generate" };
-    // Reads AZURE_OPENAI_CODEX_DEPLOYMENT — e.g. "gpt-5.4"
-  }
-  return { deployment: getChatDeploymentName(), pricingGroup: "chat" };
-  // Reads AZURE_OPENAI_CHAT_DEPLOYMENT — e.g. "gpt-5.4-mini"
-}
-```
-
-| Condition | Model | Env var |
-|-----------|-------|---------|
-| Generate + server-trusted | GPT-5.4 | `AZURE_OPENAI_CODEX_DEPLOYMENT` |
-| Any other phase | GPT-5.4-mini | `AZURE_OPENAI_CHAT_DEPLOYMENT` |
-| Client-rehydrated session | GPT-5.4-mini | `AZURE_OPENAI_CHAT_DEPLOYMENT` |
-
-## Code Health Notes
-
-:::note Exported but uncalled variants removed
-`resolveSkillsAsync()` and `resolveSkillsFromList()` were exported from `@kickstart/core` but never called in production. They were removed in PR #402. Only `resolveSkills()` is now the public entry point.
-:::
-
-:::note Typed Skill path is active in production
-`skill-resolver.ts` has two resolution paths: typed `kit.skills[]` and legacy `kit.prompts[]`. **`azure-kit.ts` uses the typed path** — it registers `skills: azureIacSkills`. `github-kit.ts` uses the legacy path. Both paths are active in production; consolidation to a single canonical path is tracked as future work.
-:::
-
-:::warning Keyword drift risk
-Two independent keyword systems. Changes in one are invisible to the other. A new kit whose prompts contain `"manifest"` will activate in AKS-related user turns through Mechanism A, but Mechanism B's `infra-aks` domain block will also activate if the user message contains `/\bmanifest\b/i`. No test exercises the combined behavior.
-:::
-
-## What Should Be Cleaned Up
-
-1. ~~**Remove `resolveSkillsAsync` / `resolveSkillsFromList` from public exports**~~ — **Done in #402.**
-2. **Resolve Generate-phase overlap** — remove the unconditional `infra-aks`/`infra-docker` injection from Mechanism B or document why the system prompt coverage is insufficient.
-3. **Consolidate typed `Skill` vs legacy path** — `azure-kit.ts` uses the typed path; `github-kit.ts` uses legacy. Pick one canonical resolution path before Agent SDK adapters are built.
-4. **Create a shared vocabulary file** for terms that must stay in sync between the two mechanisms.
-
+## Active Skills
+{skill1 text}
 ---
+{skill2 text}
 
-## Impact of FSM Removal
-
-:::warning phases.ts is being deleted
-`phases.ts` phase templates are confirmed for deletion. `buildSystemPrompt()` will no longer select a template by phase. See [FSM](./fsm.md).
-:::
-
-### What Changes
-
-`buildSystemPrompt()` replaces phase-template selection with a single full-sequence prompt using numbered blocks:
-
-```
-═══ 1. BEFORE YOU START ═══  [always present]
-═══ 2. GATHER REQUIREMENTS ═══  [always present]
-═══ 3. GENERATE ═══  [always present]
+## Component Catalog
+{registered component list with schemas}
 ```
 
-Model routing reads `session.state.currentPhase` (plain string) instead of `session.engineState.currentPhase` (FSM enum).
+## Guardrails
 
-### What Does NOT Change
+Guardrails contributed by packs run at three stages:
 
-Both skill injection mechanisms are unaffected:
-- `resolveSkills(phase, kits)` — same signature, same behavior
-- `resolveConversationSkills(message, phase, context)` — same signature; `if (phase === "generate")` guard works as plain string comparison
+| Stage | When |
+|-------|------|
+| `input` | Before the agent receives the user message |
+| `tool` | Before each tool call result is returned to the agent |
+| `output` | After `AgentOutput` is produced |
 
-The 6-part per-turn assembly order is unchanged.
+Built-in guardrails: `core/token-budget`, `core/content-safety`. Pack guardrails: `azure/no-hardcoded-creds`, `aks/no-privileged-containers`, etc.
+
