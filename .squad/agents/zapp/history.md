@@ -31,3 +31,20 @@
 ---
 
 **2026-04-15T22:40:15Z — Scribe**: Issue #326 Revision 4 approved. Security gate post on #326#issuecomment-4256162191 logged. Ready for closure.
+
+## 2026-04-17 DP #330 Security Review
+
+**Review Date:** 2026-04-17T01:57:58Z  
+**Issue:** #330 — spike: design OpenAI Agents SDK migration for less-rigid chat flow  
+**DP:** Hybrid route planner + manager agent architecture
+
+**Decision:** ✅ APPROVED WITH CONDITIONS
+
+**Security Conditions (implementation acceptance criteria):**
+1. Allowlist response adapter only — never expose raw SDK run items/traces/unfiltered tool outputs to browser
+2. Principal-bound resume/session ownership — enforce `(sessionId, runId, principalId)` with fail-closed behavior + audit logging
+3. Preserve session semantics — keep current TTL/expiry/ownership behavior; expired sessions/runs cannot be resumed
+4. Guardrails additive only — server-side controls remain authoritative (rate limiting, content safety, auth/ownership, sanitization, workspace validation)
+5. Dependency governance — pin SDK version, maintain lockfile integrity, run dependency/security scans, define upgrade/rollback procedure
+
+**Consequence:** Security gate clear when conditions added as implementation acceptance criteria and verified by tests.

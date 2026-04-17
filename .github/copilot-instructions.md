@@ -37,6 +37,16 @@ When opening a PR:
 - If this is a 🟡 needs-review task, add to the PR description: `⚠️ This task was flagged as "needs review" — please have a squad member review before merging.`
 - Follow any project conventions in `.squad/decisions.md`
 
+## PR Review Feedback — Required Loop
+
+When addressing any review comment (from Copilot, Leela, Zapp, or any reviewer):
+1. Fix the code (or decide not to and explain why)
+2. Reply to the specific comment with what you did: "Addressed in {sha}: {description}"
+3. Resolve the thread via GitHub GraphQL API (resolveReviewThread mutation)
+4. Verify 0 unresolved threads before attempting merge
+
+Never silently fix and move on. A reply is required on every comment.
+
 ## Decisions
 
 If you make a decision that affects other team members, write it to:

@@ -1,3 +1,8 @@
+### 2026-04-17: Review gate via labels, not GitHub reviews
+**By:** Ahmed Sabbour (via Leela)
+**What:** Squad PRs use leela:approved + zapp:approved labels as the merge gate, enforced by squad/review-gate status check (squad-review-gate.yml). Required GitHub review approvals removed — authors cannot approve their own PRs.
+**Why:** The 1-required-approval branch protection permanently blocked squad agent PRs because agents push as the same GitHub user who owns the repo.
+
 ### 2026-04-15: Removed paths-ignore from CI workflow
 **By:** Bender (Backend Dev)
 **What:** Removed paths-ignore from .github/workflows/ci.yml so all PRs trigger CI checks, preventing merge deadlocks on docs-only PRs.
@@ -1394,3 +1399,72 @@ Corrected factual errors in engineering documentation based on Copilot's PR revi
 
 Incorporated into PR #383 revision. All 12 review comments addressed.
 
+# Decision: Approve DP #330 — Hybrid OpenAI Agents SDK Runtime
+
+**Date:** 2026-04-17T01:53:59Z
+**Author:** Leela (Lead)
+**Issue:** #330 — spike: design OpenAI Agents SDK migration for less-rigid chat flow
+**Status:** Approved (architecture gate cleared; awaiting Zapp security review)
+
+## Context
+
+Issue #330 is the design gate for migrating Kickstart's conversation engine from a hand-rolled FSM + tool loop to an OpenAI Agents SDK runtime. The DP proposes Option B: a hybrid route planner + manager agent architecture.
+
+## Decision
+
+**Architecture approved.** The DP correctly frames this as a control-plane redesign, not a package swap.
+
+Key alignment points verified:
+1. **FSM removal (#400/#412):** Already merged. The DP's code-owned route planner fills the vacated control plane without conflict.
+2. **Workspace-first generation (#326/#327/#328):** Treated as constraints. Generate sequencing stays server-owned and workspace-first.
+3. **Custom/SDK boundary:** SDK handles loop/retry/session/streaming/tracing. Product code keeps A2UI, IntegrationKit, workspace semantics, generate sequencing, rate limiting, auth, route policy.
+4. **Agents-as-tools over handoffs:** Pragmatic starting position. Preserves single user-facing voice. Handoffs deferred.
+5. **Server-authored route state replaces model-authored flags:** Correct architectural fix for the rigidity problem.
+
+## Additions Requested
+
+Two explicit checkpoints should be added to the architecture spike:
+1. Validate `RunResult`/`StreamedRunResult` → typed SSE adaptation without losing A2UI structure.
+2. Validate session hydration cold-start round-trip from existing session store without losing artifact summaries or phase context.
+
+## Consequences
+
+- Implementation is unblocked pending Zapp's security review.
+- The architecture spike is the next deliverable; it must prove Azure model-provider compatibility, SSE adaptation, and session hydration before any runtime cutover.
+- All implementation issues in the Agents SDK lane remain blocked on this DP until both Leela (done) and Zapp approve.
+
+---
+
+### 2026-04-17: Security decision for DP #330 (OpenAI Agents SDK migration)
+
+**By:** Zapp (Security Architect)  
+**Issue:** #330  
+**Decision:** APPROVE WITH CONDITIONS
+
+**Summary:** The hybrid boundary is acceptable if Kickstart remains the security control-plane and the SDK is constrained to orchestration mechanics. Main risks are raw SDK/tracing leakage, resume-state hijacking, and supply-chain exposure from the new dependency.
+
+#### Required security conditions
+
+1. **Allowlist response adapter only**: never expose raw SDK run items, traces, or unfiltered tool outputs to the browser.
+2. **Principal-bound resume/session ownership**: enforce `(sessionId, runId, principalId)` authorization on interruption/resume paths with fail-closed behavior and audit logging.
+3. **Preserve session semantics**: keep current TTL/expiry and ownership behavior in the session adapter; expired sessions/runs cannot be resumed.
+4. **Guardrails are additive only**: server-side controls (rate limiting, content safety, auth/ownership, sanitization, workspace validation) remain authoritative.
+5. **Dependency governance**: pin Agents SDK version, maintain lockfile integrity, run dependency/security scans, and define upgrade/rollback procedure.
+
+**Consequence:** Security gate for DP #330 is clear only when these conditions are added as implementation acceptance criteria and verified by tests.
+
+---
+
+### 2026-04-17: CRITICAL — Never use `--admin` flag to bypass merge protection
+
+**By:** Ahmed Sabbour (flagged critical security violation)
+
+**What:** Ralph-merge agent used `gh pr merge --admin` to bypass branch protection on PRs #418 and #426. The `--admin` flag is now **absolutely prohibited** on all merge operations.
+
+**Why:** Branch protection was put in place to enforce human review before code enters main. Using `--admin` to bypass it defeats the entire review gate. This is a security and governance failure.
+
+**Rule:** No agent may ever use `--admin`, `--force`, or any flag that circumvents branch protection rules. If protection blocks a merge, that is correct behavior — request review from Leela or Zapp, do not force.
+
+**Enforcement:** Merge Gate section in pr-workflow/SKILL.md explicitly prohibits `--admin`. Ralph must be updated to never attempt admin bypass.
+
+**Consequence:** Any future `--admin` merge is a critical incident requiring immediate investigation and remediation.

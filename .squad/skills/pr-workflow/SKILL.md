@@ -191,6 +191,18 @@ Before a PR can merge, it must pass two review gates:
 
 Zapp's review is a **pre-merge gate** for foundational patterns. Do not merge without Zapp's approval on security-sensitive changes.
 
+**How approvals work (label-based):**
+- **Leela** approves by adding the `leela:approved` label:
+  ```bash
+  gh pr edit {number} --add-label "leela:approved" --repo sabbour/kickstart
+  ```
+- **Zapp** approves by adding the `zapp:approved` label:
+  ```bash
+  gh pr edit {number} --add-label "zapp:approved" --repo sabbour/kickstart
+  ```
+
+No GitHub formal PR review approval is required — squad agents share a single GitHub account with the repo owner, making self-approval impossible. The `squad/review-gate` status check (`.github/workflows/squad-review-gate.yml`) automatically turns green when both labels are present.
+
 ### Requesting Copilot Review
 
 Use the REST API (not comment mentions):
@@ -203,18 +215,61 @@ gh api "repos/${REPO_NWO}/pulls/<N>/requested_reviewers" \
 
 ### Handling Review Feedback
 
-1. **Check both formal reviews AND general comments** — @copilot may respond in either format:
+When a PR has review comments or formal review threads, the full feedback loop is:
+
+1. **Read ALL feedback** — check both formal review threads AND top-level comments:
    ```bash
-   gh pr view <N> --json reviews
-   gh pr view <N> --json comments
+   # Formal review threads (these must all be resolved before merge)
+   gh pr view <N> --json reviewThreads --jq '.reviewThreads[] | {id: .id, isResolved: .isResolved, path: .path, body: (.comments[0].body // ""), line: .line}'
+   
+   # Top-level PR comments (Copilot often posts here)
+   gh pr view <N> --json comments --jq '.comments[] | {id: .id, author: .author.login, body: .body}'
+   
+   # Formal review decisions
+   gh pr view <N> --json reviews --jq '.reviews[] | {author: .author.login, state: .state, body: .body}'
    ```
 
-2. **Address each review comment:**
-   - Fix valid suggestions — commit the fix
-   - Reply with reasoning on items you disagree with
-   - Resolve each review thread after addressing it
+2. **For each piece of feedback, decide:**
+   - Valid → fix it
+   - Disagree → explain why in a reply
 
-3. **All threads must be resolved** before merging.
+3. **After fixing (or deciding not to fix), ALWAYS reply to the specific comment:**
+   ```bash
+   # Reply to a review thread comment (get comment ID from reviewThreads query above)
+   gh api "repos/sabbour/kickstart/pulls/<PR>/comments/<comment_id>/replies" \
+     --method POST \
+     -f body="Addressed in <commit_sha>: <what you changed and why, 1-2 sentences>. Resolving thread."
+   
+   # OR for a top-level PR comment, reply inline:
+   gh pr comment <N> --body "Re: <quote the feedback briefly> — <what you did to address it, or why not>."
+   ```
+
+4. **Resolve the thread after replying:**
+   ```bash
+   # Get thread node ID
+   THREAD_ID=$(gh api graphql -f query='{
+     repository(owner: "sabbour", name: "kickstart") {
+       pullRequest(number: <N>) {
+         reviewThreads(first: 50) {
+           nodes { id isResolved path line comments(first:1) { nodes { body } } }
+         }
+       }
+     }
+   }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | .id')
+   
+   # Resolve it
+   gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<THREAD_ID>"}) { thread { isResolved } } }'
+   ```
+
+5. **Verify all threads are resolved before attempting merge:**
+   ```bash
+   UNRESOLVED=$(gh pr view <N> --json reviewThreads --jq '[.reviewThreads[] | select(.isResolved == false)] | length')
+   # Must be 0 before proceeding
+   ```
+
+**NEVER silently fix code and move on.** A reply is required for every piece of feedback, even if the fix is trivial. This is not optional.
+
+**Why this matters:** `require_conversation_resolution: true` is enforced in branch protection. Unresolved threads block the `squad/review-gate` status check. Even if both `leela:approved` and `zapp:approved` labels are present, GitHub will not allow merge while threads are open.
 
 ### CI Requirements
 
@@ -223,9 +278,31 @@ All CI checks must pass, including Playwright E2E tests. If checks fail:
 2. Keep iterating until CI is green
 3. Do NOT merge PRs with failing required checks
 
+### Merge Gate
+
+**Rule:** Never call `gh pr merge` without first verifying ALL of the following:
+
+1. **Squad label gate** — both approval labels must be present:
+   ```bash
+   gh pr view {number} --json labels --jq '[.labels[].name] | contains(["leela:approved", "zapp:approved"])'
+   ```
+   Must return `true`.
+
+2. **Conversation resolution** — all review threads resolved:
+   ```bash
+   gh pr view {number} --json reviewThreads --jq '[.reviewThreads[] | select(.isResolved == false)] | length'
+   ```
+   Must return `0`.
+
+If either check fails — STOP. Do not merge. Comment on the PR requesting review from Leela or Zapp.
+
+**NEVER use `--admin` flag.** Branch protection exists to enforce review. Bypassing it with `--admin` defeats the entire gate. If protection blocks a merge, that is correct behavior — request review, do not force.
+
+**Why this exists:** Squad agents push PRs under the same GitHub user account as the repo owner. Authors cannot approve their own PRs in GitHub, so the "1 required approving review" gate permanently blocked every squad PR. The label-based gate replaces that with a status check that squad agents can satisfy.
+
 ### Merging
 
-Once all reviews are addressed, threads resolved, and CI is green:
+Once merge gate checks pass, all reviews are addressed, threads resolved, and CI is green:
 ```bash
 gh pr merge <N> --squash --delete-branch
 ```
