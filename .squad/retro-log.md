@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #66 "feat: add Questionnaire + Markdown components (#2)" | L | impl=0m | review=124m | cycles=1 | merged | @sabbour
