@@ -173,6 +173,18 @@ jobs:
             exit 0
           fi
           git commit -m "chore(retro-log): #${PR_NUM} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
+
+          # Rebase on latest base to avoid conflicts when multiple retro PRs run in parallel.
+          git fetch origin "${BASE_REF}" --quiet
+          git rebase "origin/${BASE_REF}" || {
+            # On conflict, keep our entry by taking the base + appending our line.
+            OUR_LINE="$(git diff HEAD~1 HEAD -- .squad/retro-log.md | grep '^+' | grep -v '^+++' | sed 's/^+//')"
+            git rebase --abort
+            git reset --hard "origin/${BASE_REF}"
+            echo "${OUR_LINE}" >> .squad/retro-log.md
+            git add .squad/retro-log.md
+            git commit -m "chore(retro-log): #${PR_NUM} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
+          }
           git push --force-with-lease origin "${SIDE_BRANCH}"
 
           PR_COUNT="$(gh pr list \
