@@ -206,3 +206,9 @@ All 6 security conditions from DP #329 + DP #330 security reviews integrated as 
 - ✅ **Zapp (Security):** APPROVED — all 4 blocking conditions satisfied with test evidence
 
 **Next Step:** Merge by Ralph (coordinator) per implementation sequence lock from DP #330.
+
+## Round 5 Learnings (2026-04-17 — Issue #453 backend, PR #458)
+
+- (2026-04-17) **8KB cap pattern for debug metadata strings:** When threading large strings (e.g., system prompts, raw LLM payloads) through `DebugMetadata`, apply a hard cap (8 192 bytes / 8 KB) at the point of assignment — not at serialization time. Use `value.slice(0, 8192)` with a trailing `…` indicator if truncated. This keeps the debug payload bounded regardless of how the metadata object is consumed downstream.
+- (2026-04-17) **Prod startup warning pattern:** When a feature is debug-only (gated by `DEBUG_MODE` or equivalent), emit a `console.warn` on process startup if the flag is detected in a production environment (`NODE_ENV === 'production'`). The warning message should name the flag, describe what it exposes, and instruct the operator to unset it. This was a Zapp condition and is now a standing pattern for all debug-flag-guarded features.
+- (2026-04-17) **Threading optional fields through call stacks:** When adding an optional field to a deeply-nested type (`DebugMetadata`), trace every call site that constructs or passes the type and add the field with `undefined` as the default — do not rely on TypeScript's implicit `undefined` for optional properties, as some call sites use object spread patterns that will silently drop the field if it is not explicitly present in the spread source.
