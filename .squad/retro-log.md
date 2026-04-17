@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #80 "chore: release v0.2.0" | M | impl=1m | review=3m | cycles=1 | merged | @sabbour
