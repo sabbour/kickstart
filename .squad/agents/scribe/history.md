@@ -131,3 +131,13 @@
 **Sizes post-wave:** bender 7,924 (51%) / fry 3,040 (20%) / hermes 2,931 (19%) / leela 6,084 (39%) / ralph 225 (1%) / scribe ~7.5K (49%) / zapp 6,795 (44%)
 
 **Still absent:** `fry-483/484/487-dp-revision.md`, `leela-483/484/486-dp-recheck.md`, `zapp-486-b6-final.md`, `bender-pr550-fix.md`, `hermes-549-test.md`
+
+## Wave 41 — 2025-07-15
+
+**Scan result:** No-op — all inbox files stale, no new decisions to merge.
+**Inbox checked:** main inbox (12 files, all stale) + all .worktrees/ inboxes (all stale).
+**Self-posts:** None — git status clean.
+**decisions.md:** 271,339 bytes (unchanged)
+**History sizes:** bender 7,924 (51%) / fry 3,040 (20%) / hermes 2,931 (19%) / leela 6,084 (39%) / ralph 225 (1%) / scribe ~7.9K (51%) / zapp 6,795 (44%)
+**PR #551 status:** Open — feat(harness) Step 6 Skill Resolver (#480); Leela ⏳ Zapp ⏳ reviews pending; CI passing.
+**Still absent:** `fry-483/484/487-dp-revision.md`, `leela-483/484/486-dp-recheck.md`, `zapp-486-b6-final.md`, `bender-pr550-fix.md`, `hermes-549-test.md`
