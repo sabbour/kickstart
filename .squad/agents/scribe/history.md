@@ -59,3 +59,7 @@ Ready for QA handoff.
 - **Session log written:** `2026-04-17T12-06-45Z-v2-sprint-kickoff.md`
 - **Histories updated:** leela, fry, bender, zapp, hermes
 - **History summarization:** fry (29,842 bytes), leela (21,435 bytes), bender (17,814 bytes) — all exceed 15 KB; summarization in progress
+
+## 2026-04-17 Wave 3 — Inbox merge
+
+Merged 11 new decision files from worktree inboxes (mcp-apps-concept-smoke, docs-rewrite, leela-351, zapp-kickstart-app-security, 474-step1-nuke-v1 ×5, 475-harness-types-review, 476-security-review). decisions.md: 116,926 → 128,677 bytes. Updated histories: bender, leela, zapp, fry. All history files below 15 KB — no summarization needed.

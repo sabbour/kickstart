@@ -54,3 +54,61 @@ Shipped 406 fallback in `useStreaming.ts`. Added `route-state.spec.ts` with skip
 
 Analyzed #474 frontend surface. Preserve/delete/replace boundary defined (see Active Sprint above). Decision filed (`fry-474-frontend-cutline.md` → decisions.md).
 
+
+## 2026-07-16 — #474 Step 1 web-shell cleanup (commit ffa10ee)
+
+Working as Fry (Frontend Dev) on branch `squad/474-step1-nuke-v1`.
+
+### What I did
+- Replaced all 16 `@kickstart/core` import strings in `packages/web/src/` with `@kickstart/harness` (same shim, cleaner path)
+- Removed v1 kit registration dead code from `main.tsx`: `registerKit(azureKit)` and `registerKit(githubKit)` (no-op stubs, v1 pattern)
+- Added `names(): string[] { return []; }` stub to `APIConnectorRegistry` in `packages/harness/src/index.ts` — was missing from Bender's shim, required by `APIConnectorContext.tsx` and `useActionDispatch.ts`
+- Removed `@kickstart/core` path alias from `packages/web/vite.config.ts` and `packages/web/tsconfig.json`
+- Confirmed `npm run build` passes (19 files changed, build green)
+
+### Files changed
+**Modified imports:**
+- `packages/web/src/__tests__/azure-auth.test.ts`
+- `packages/web/src/services/azure-auth.ts`
+- `packages/web/src/services/github-handoff.ts`
+- `packages/web/src/hooks/useActionDispatch.ts`
+- `packages/web/src/catalog/components/` (7 files: AuthCard, AzureAction, AzureLoginCard, AzureResourceForm, AzureResourcePicker, GitHubAction, GitHubCommit, GitHubRepoPicker)
+- `packages/web/src/components/Chat/DebugA2UITree.tsx`
+- `packages/web/src/contexts/ArtifactContext.tsx`
+- `packages/web/src/contexts/APIConnectorContext.tsx`
+
+**Runtime cleanup:**
+- `packages/web/src/main.tsx` — removed v1 registerKit/azureKit/githubKit dead code
+
+**Shim fix:**
+- `packages/harness/src/index.ts` — added `names()` to APIConnectorRegistry stub
+
+**Config:**
+- `packages/web/vite.config.ts` — removed `@kickstart/core` alias
+- `packages/web/tsconfig.json` — removed `@kickstart/core` path
+
+### Remaining blockers for Step 1
+- `packages/web/src/types.ts` is `export {}` but imported by many files for A2UI types — needs Step 2 to fully resolve (deleting it would break vite module resolution)
+- `packages/core/` shim package directory still exists (kept for compile compat); Step 2 will drop it
+- `APIConnectorContext.tsx` and related connector infrastructure is v1 — will be replaced in Steps 5-7
+
+## 2026-07-16 — #477 Design Proposal: v2 Step 4 pack-core
+
+Posted DP to https://github.com/sabbour/kickstart/issues/477#issuecomment-4268128132
+
+### Covered
+- Delivery order: Phase A (scaffold) → B (agents+skills, parallel) → C (tools, after #475) → D (27 basic components, parallel batches) → E (12 rich, audited) → F (guardrails) → G (playground scenarios) → H (wire manifest)
+- Full file manifest: 3 agent.md, 5 SKILL.md, 6 tools, 27 basic + 12 rich components, 3 guardrails, 2 playground scenarios, index.ts
+- Registry contract: corePack: Pack shape, which #476 APIs are consumed at startup vs runtime
+- emit_ui contract: Zod-discriminated A2UI message union from #475, records to session.a2uiEmissions, no SSE in pack-core
+- Porting strategy: basic = mechanical path-rewrite; rich = audit 21 candidates, keep 12 domain-neutral, defer Azure/AKS/GitHub to later packs
+- Test plan for Hermes: frontmatter parse, tool Zod rejection, registration smoke, 4-component render smoke, guardrail verdicts
+- 5 risks flagged with mitigations (manifest-only-in-playground, v1 bleeding, A2UI union stability, PR size, FileEditor/Monaco)
+- 3 open questions for Bender (agent loader mode, SessionCtx.a2uiEmissions location, AuthCard split)
+
+### Awaiting
+Leela + Zapp approval before implementation starts.
+
+## Wave 3 — 2026-04-17 Playground Decision Filed
+
+- `fry-playground-component-grouping.md`: GitHub Components + Azure Components moved from `GALLERY_GROUPS` to `COMPONENT_GROUPS` in `Playground.tsx` — they are catalog components, not gallery scenarios. Playground stub connector guard removed; `AzureARMConnector` + `GitHubConnector` always registered unconditionally.

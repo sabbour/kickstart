@@ -2091,3 +2091,231 @@ Loader-agent.ts must produce both on load.
 - Step 4 (pack-core) depends on stable registry API. C1–C3 must be resolved before Step 4 starts.
 - Step 5 (Runner + SSE) depends on C2 (guardrail/tool enumeration) and C3 (wire name).
 - Step 6 (skill resolver) depends on C2 (`getSkillsForAgent`).
+
+---
+
+# MCP app schema isolation
+
+**Date:** 2026-04-15T19:34:42.265Z
+**Author:** Bender (Backend Dev)
+
+## Decision
+
+Keep the MCP app response schema local to `packages/mcp-server/src/a2ui.ts` until the HTML app renderer is migrated to the shared `@kickstart/core` catalog shape.
+
+## Why
+
+The current MCP app HTML and protocol tests consume nested objects with `type` and inline `children`. The shared core catalog models components as `component` plus child IDs. Importing core catalog types directly into the MCP server broke the build without improving runtime correctness because the app surface still expects the nested schema.
+
+## Impact
+
+- MCP server tool handlers must import app component types from `packages/mcp-server/src/a2ui.ts`.
+- Shared catalog changes in `packages/core` are not automatically safe for the MCP app surface.
+- A future migration must update the HTML renderer, protocol extraction, and server types together.
+
+---
+
+# Decision: Playground Tab Grouping + Real Connectors in Playground
+
+**Date:** 2026-04-16
+**Author:** Fry (Frontend Dev)
+
+## 1. GitHub Components and Azure Components belong in the Components tab
+
+`'GitHub Components'` and `'Azure Components'` are moved from `GALLERY_GROUPS` to `COMPONENT_GROUPS` in `packages/web/src/pages/Playground.tsx`. The **Ideas** tab is for mashups and demo scenarios; the **Components** tab is for catalog components. GitHub and Azure components are catalog components.
+
+## 2. Playground uses real connectors — stub mode removed
+
+The playground-mode connector guard (`shouldUsePlaygroundStubRegistry()`) is removed from `APIConnectorContext.tsx`. `AzureARMConnector` and `GitHubConnector` are always registered unconditionally. `shouldUsePlaygroundAuthStub()` always returns `false`. Offline-mode banners in components are kept — they are valid fallbacks for genuine misconfiguration, not stubs.
+
+---
+
+# Decision: A2UI Component Expansion — Audit Findings and Strategy
+
+**Date:** 2026-04-16
+**Author:** Leela (Lead)
+**Issue:** #351
+
+## Audit Findings
+
+- **46 types in `KNOWN_COMPONENT_TYPES`**, **28 in LLM-facing catalog**. Gap: 18 components existed but were never documented to the LLM.
+- Key overuse patterns: Markdown bold-label patterns instead of SummaryCard, `⚠️`/`ℹ️` emoji instead of Alert, Markdown tables instead of Table component, bare URL text instead of Link component.
+
+## Decision
+
+**Immediate (shipped in PR for #351):**
+1. Add Alert, Table, Link to catalog — existed in vendor `basicCatalog`, zero frontend work needed.
+2. Create **SummaryCard** — 2-column label-value grid with optional per-item badge. Replaces `Card > Column > (Row > Text > Text)` patterns.
+3. Create **DecisionCard** — recommendation + rationale + alternatives + decision-type Badge. Replaces `Card > Markdown` architecture recommendation patterns.
+4. Update system prompt MANDATORY section and Example 2 (Discover step).
+
+**Deferred:** ProgressSteps, CodeBlock, SteppedCarousel, Questionnaire.
+
+**Consequences:** LLM catalog grows 28 → 33 base components. `KNOWN_COMPONENT_TYPES` grows 46 → 48. Two new React components: `SummaryCard.tsx`, `DecisionCard.tsx`.
+
+---
+
+# Zapp decision: harden kickstart-app hotspot with fail-closed messaging + safe DOM APIs
+
+**Author:** Zapp (Security Architect)
+**Context:** CodeQL flagged `packages/mcp-server/src/app/kickstart-app.html` for wildcard `postMessage`, schema-driven `innerHTML` renderers, and dynamic renderer dispatch.
+
+## Decision
+
+- Resolve the parent target origin before messaging; reject inbound messages unless both `event.source === window.parent` and `event.origin` matches the trusted parent origin.
+- Replace schema-driven `innerHTML` rendering with explicit DOM construction and URL allowlisting for outbound links.
+- Validate dynamic renderer dispatch with an allowlisted own-property check before invoking a renderer.
+
+## Why
+
+Smallest slice that reduces real exploitability in the current hotspot without dragging the broader sanitizer cluster into the same PR.
+
+---
+
+# Leela Decision — v2 rewrite start gate
+
+**Date:** 2026-04-17T12:06:45.293Z
+**Author:** Leela (Lead)
+
+## Decision
+
+Do not start issue #474 until the overdue sprint planning ceremony completes. `.squad/identity/now.md` is explicit: no feature code starts until sprint planning finishes. The brief makes #474 the first implementation step, but it does not override the active focus gate.
+
+**Consequence:** Ralph should hold all v2 implementation nudges until planning finishes and the rewrite issues are milestone/priority scoped.
+
+---
+
+# Leela decision — DP #474 Step 1 compile seam
+
+**Date:** 2026-04-17T12:06:45.293Z
+**Author:** Leela (Lead)
+**Issue:** #474
+**Verdict:** APPROVE_WITH_CONDITIONS
+
+## Decision
+
+Step 1 may use a temporary `@kickstart/core` compatibility shim only as shrinking compile scaffolding while the repo cuts over to `@kickstart/harness`. The shim must not gain new runtime behavior or exports and must not preserve v1 semantics longer than required to keep the build green during deletion.
+
+Exit contract: deleted v1 files are gone, v1 feature flags are gone, `packages/harness` is the canonical target, and the repository builds cleanly. Bender is the primary implementation owner; Fry handles preserved web-shell fallout within that plan or immediately after.
+
+---
+
+# Decision: keep a temporary `@kickstart/core` compatibility seam during v2 Step 1
+
+**Date:** 2026-04-17T12:06:45.293Z
+**Author:** Bender (Backend Dev)
+**Issue:** #474
+
+## Decision
+
+Treat `packages/harness/` as the canonical Step 1 stub surface, but keep a temporary `@kickstart/core` compatibility seam until import/path-map fallout is fully absorbed. The seam is compile-preservation only; it must not become a new long-term runtime contract.
+
+## Why
+
+Keeps the delete-first slice surgical. Lets Fry and Bender split work cleanly: Fry preserves the UI shell while Bender removes backend/runtime v1 code and stabilizes package wiring.
+
+## Consequences
+
+- Step 1 can delete aggressively without breaking TypeScript on the first file removal.
+- Step 2+ must explicitly burn down remaining `@kickstart/core` imports and remove the seam once harness/pack surfaces are real.
+
+---
+
+# Decision: cut backend packages directly to `@kickstart/harness` in Step 1
+
+**Date:** 2026-04-17T12:06:45.293Z
+**Author:** Bender (Backend Dev)
+**Issue:** #474
+
+## Decision
+
+Move the backend-owned package graph straight to `@kickstart/harness` in Step 1: source imports, tsconfig path maps, esbuild aliases, and root build scripts all target harness directly. Keep the temporary `@kickstart/core` package only for preserved web-shell fallout until Fry finishes that cleanup.
+
+## Why
+
+Shrinks the compatibility seam without widening it. Lets Step 2 work against the real harness package boundary.
+
+## Consequences
+
+- Backend runtime no longer depends on the temporary compatibility package.
+- Dead SDK/route-planner adapter files can be deleted fail-closed with the converse stub in place.
+- Remaining `@kickstart/core` imports are a shell-cleanup problem, not a backend package-graph blocker.
+
+---
+
+# Zapp Decision — DP #474 Step 1 compatibility seam security
+
+**Date:** 2026-04-17T12:06:45.293Z
+**Author:** Zapp (Security Architect)
+**Issue:** #474
+**Status:** APPROVE WITH CONDITIONS
+
+## Decision
+
+The Step 1 delete-first migration is security-positive only if it remains a shrink-only change to reachable runtime surface. A temporary `@kickstart/core` → `packages/harness` compatibility seam is acceptable as a compile-preserving shim with no new behavior.
+
+## Required Conditions
+
+1. The compatibility seam is compile-only and time-bounded to Step 1; no new exports, fallback logic, or side effects may be introduced there.
+2. Deleting v1 helpers must fail closed — no silent fallback to demo, mock, or legacy paths.
+3. All v1 feature flags and step gates must be removed entirely.
+4. Existing secret/auth trust boundaries must not move client-side during file preservation or rename work.
+5. Step 1 merge requires proof that deleted module imports are gone and preserved packages did not gain broader runtime access.
+
+---
+
+# Zapp Decision — DP #475 Harness Types Security Review
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Issue:** #475
+**Status:** APPROVE_WITH_CONDITIONS
+**DP Comment:** https://github.com/sabbour/kickstart/issues/475#issuecomment-4268038324
+
+## Findings
+
+1. **Fail-closed schema behavior must be explicit.** `AgentOutput` and every nested A2UI object should reject unknown fields, not strip or pass them through.
+2. **Hybrid A2UI messages must be impossible.** A payload mixing `createSurface` with `deleteSurface` must fail validation outright — exactly one operation per message.
+3. **`SessionCtx` is too broad.** Raw identity (`upn`, `tid`, `oid`) and secret-returning helpers (`getGithubToken`) create unnecessary exposure. Default context should be least-privilege.
+4. **Compile-only needs enforcement, not just intent.** A static/CI check should lock in the absence of `eval`, `new Function`, or dynamic loading.
+5. **Transport-valid A2UI is not yet trusted A2UI.** Negotiated-catalog validation must remain mandatory before render/SSE trust.
+
+## Required Conditions
+
+1. `AgentOutput` uses a strict top-level schema; `intent` is a closed enum.
+2. All A2UI message schemas are strict at every object layer.
+3. A2UI union enforces one-and-only-one operation key.
+4. `SessionCtx` is narrowed/redacted; credential access is capability-scoped.
+5. CI/static checks enforce compile-only boundary and reject dynamic code-loading/execution primitives.
+6. Later runtime steps must treat catalog validation as a second mandatory gate, not optional hardening.
+
+## Outcome
+
+Security gate is conditionally clear. Conditions must be reflected in Step 2 acceptance criteria and verified in tests.
+
+---
+
+# Zapp Security Review — #476 v2 Step 3: Registry + loaders
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Issue:** #476
+**Verdict:** APPROVE_WITH_CONDITIONS
+**DP comment:** https://github.com/sabbour/kickstart/issues/476#issuecomment-4268049161
+
+## Summary
+
+Startup-only registry model is directionally sound and `seal()` is the right control surface. Key risks: namespace squatting across packs, unrestricted cross-pack tool/user-action references, unsafe YAML expansion, mutable post-seal registry state, and path escape in file-backed loaders.
+
+## Required Conditions
+
+1. **Pack-owned names only.** Every contribution name validated against owning pack before indexing (agents/tools: `${pack.name}.…`, user actions: `${pack.name}:…`, components/skills: `${pack.name}/…`).
+2. **Dependency-scoped reference resolution.** Agent allowlists may reference only same-pack contributions plus declared transitive dependencies. Reject wire names like `pack__action`; only canonical `:` names valid in frontmatter.
+3. **Frontmatter parser hardening.** If upgrading to a general YAML library: safe parsing only, no custom tags/functions, bounded aliases, bounded frontmatter/file size, schema validation immediately after parse.
+4. **Loader path confinement.** Canonicalize `agentsDir`/`skillsDir` with `realpath`-equivalent checks, reject symlink escapes, ensure every loaded file remains under pack root.
+5. **Seal must be immutable.** After `seal()`, no external code may mutate registry indexes through returned arrays/maps. Snapshot/freeze exported views; fail closed on concurrent lifecycle misuse.
+6. **Cycle detection must be iterative.** Bounded graph walk (iterative DFS or Kahn) with visited/in-progress tracking.
+
+## Security consequence
+
+With conditions above, Step 3 remains acceptable as design foundation for Step 4. Without them, the registry becomes a trust-boundary weak point.

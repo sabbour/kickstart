@@ -114,3 +114,33 @@ All 4 critical security conditions from issue #445 acceptance criteria:
   - 6 Medium: secrets detection, PII detection, A2UI guardrail scope, token budget ceiling, CSP audit, CSRF.
 - **MCP UserAction resolution:** UserActions are NOT MCP tools. MCP client detects `user_action_required` and POSTs directly to `/api/converse/resume`. Residual conditions #3 and #4 (OID ownership + resultSchema) cover MCP-originated resume calls equally.
 - **Decision filed:** `zapp-v2-security-review.md` merged to decisions.md.
+
+## Wave 3 — 2026-04-17 Security Reviews Filed
+
+### #474 Step 1 Shim Security (APPROVE_WITH_CONDITIONS)
+- Seam is compile-only and time-bounded; no new exports/fallback logic.
+- Delete v1 helpers fail-closed — no silent fallback to demo, mock, or legacy paths.
+- All v1 feature flags removed entirely.
+- Secret/auth trust boundaries must not move client-side during preservation work.
+- Step 1 merge requires proof: deleted imports gone, preserved packages did not gain broader runtime access.
+
+### Kickstart App Hotspot Hardening
+- Resolve parent target origin before messaging; reject messages unless `event.source === window.parent` and `event.origin` matches trusted parent.
+- Replace schema-driven `innerHTML` rendering with explicit DOM construction + URL allowlisting.
+- Dynamic renderer dispatch validated with allowlisted own-property check before invocation.
+- Decision filed as `zapp-kickstart-app-hotspot-hardening.md`.
+
+### #475 Harness Types (APPROVE_WITH_CONDITIONS)
+- `AgentOutput` must reject unknown fields; `intent` is closed enum.
+- A2UI union enforces one-and-only-one operation key; hybrid messages fail outright.
+- `SessionCtx` narrowed/redacted; credential access capability-scoped.
+- CI/static checks enforce compile-only boundary; dynamic code-loading primitives rejected.
+- Catalog validation remains a mandatory second gate at runtime.
+
+### #476 Registry + Loaders (APPROVE_WITH_CONDITIONS)
+- Pack-owned names only; namespace squatting prevented by name validation at index time.
+- Dependency-scoped reference resolution; only canonical `:` names valid in frontmatter.
+- Frontmatter parser: safe YAML only, no custom tags/functions, bounded aliases/size.
+- Loader path confinement: `realpath` canonicalization, symlink escape rejected.
+- Registry sealed after `seal()` — exported views frozen; concurrent lifecycle misuse fails closed.
+- Cycle detection: bounded iterative DFS or Kahn algorithm.

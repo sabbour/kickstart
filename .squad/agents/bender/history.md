@@ -59,3 +59,9 @@ DP posted on issue #474. Leela APPROVE_WITH_CONDITIONS + Zapp APPROVE_WITH_CONDI
 ## #476 DP — Registry + loaders
 
 Posted the Step 3 DP for issue #476: sealed `PackRegistry`, `.agent.md` and `SKILL.md` loaders, frontmatter parser port, catalog skeleton, sigil-based tool vs user-action resolution, and fail-fast collision/dependency checks for Hermes to validate before pack-core starts.
+
+## Wave 3 — 2026-04-17 #474 Step 1 Decisions Filed
+
+- Filed `bender-474-step1-compat-seam.md`: temporary `@kickstart/core` seam is compile-preservation only; no new behavior; burned down in Step 2+.
+- Filed `bender-474-step1-backend-cutover.md`: backend package graph moves straight to `@kickstart/harness`; `@kickstart/core` stub kept only for web-shell fallout during Fry's cleanup.
+- Filed `bender-mcp-app-schema-isolation.md`: MCP app response schema kept local to `packages/mcp-server/src/a2ui.ts` until HTML app renderer migrates to shared `@kickstart/core` catalog shape.
