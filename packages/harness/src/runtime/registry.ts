@@ -225,10 +225,16 @@ export class PackRegistry {
 
   private loadSkills(pack: Pack): Skill[] {
     const loaded: Skill[] = [];
-    if (!pack.skillsDir) return loaded;
-    const baseDir = directoryURLToPath(pack.skillsDir);
-    for (const entry of collectMarkdownFiles(baseDir, 'SKILL.md')) {
-      loaded.push(loadSkillFile(pack, entry));
+    if (pack.skillsDir) {
+      const baseDir = directoryURLToPath(pack.skillsDir);
+      for (const entry of collectMarkdownFiles(baseDir, 'SKILL.md')) {
+        loaded.push(loadSkillFile(pack, entry));
+      }
+    }
+    if (pack.skills) {
+      for (const skill of pack.skills) {
+        loaded.push(skill);
+      }
     }
     return loaded;
   }
