@@ -46,6 +46,7 @@ npm run dev:vite
 packages/
   core/           Core conversation engine, A2UI catalog, and code generators
   web/            Web frontend — Azure Portal-style UX
+  web/api/        Azure Functions backend (converse, health, proxies)
   mcp-server/     MCP server exposing conversation tools and A2UI responses
 infra/            Azure infrastructure (Bicep templates)
 ```
@@ -54,7 +55,12 @@ infra/            Azure infrastructure (Bicep templates)
 |---------|-------------|
 | `@kickstart/core` | Conversation engine, A2UI component catalog, code generators |
 | `@kickstart/web` | React 19 frontend with Fluent UI 2, Vite 6 dev server |
+| `@kickstart/web` (api) | Azure Functions backend; uses OpenAI Agents SDK for route management |
 | `@kickstart/mcp-server` | Model Context Protocol server for tool integration |
+
+### Conversation engine
+
+The conversation engine uses the **OpenAI Agents SDK** (migrated in #330/#445). The previous TypeScript state machine (`machine.ts`) and `phaseComplete`/`filesComplete` model flags were removed. Route management is now server-authored via the SDK — see [Architecture Overview](https://sabbour.github.io/kickstart/docs/architecture/overview) for current details.
 
 ## Development Workflow
 
@@ -85,6 +91,7 @@ For the full release workflow — cutting releases, tagging, deploying — see *
 
 - **Web UI:** `packages/web/index.html`
 - **Engine phases:** `packages/core/src/engine/phases.ts`
+- **Agents SDK backend:** `packages/web/api/src/functions/converse.ts`
 - **MCP server:** `packages/mcp-server/src/index.ts`
 
 ## Code Style

@@ -1,0 +1,147 @@
+name: Docs Freshness Check
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'packages/web/api/src/**'
+      - 'packages/web/src/**'
+      - 'packages/core/src/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check:
+    name: Docs freshness reminder
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine affected doc areas
+        id: areas
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD 2>/dev/null || git diff --name-only HEAD~1...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          NEEDS_API_DOCS=false
+          NEEDS_FRONTEND_DOCS=false
+          NEEDS_ENGINE_DOCS=false
+          NEEDS_PROMPTS_DOCS=false
+          NEEDS_KITS_DOCS=false
+
+          if echo "$CHANGED" | grep -q '^packages/web/api/src/'; then NEEDS_API_DOCS=true; fi
+          if echo "$CHANGED" | grep -q '^packages/web/src/'; then NEEDS_FRONTEND_DOCS=true; fi
+          if echo "$CHANGED" | grep -q '^packages/core/src/engine/'; then NEEDS_ENGINE_DOCS=true; fi
+          if echo "$CHANGED" | grep -q '^packages/core/src/prompts/'; then NEEDS_PROMPTS_DOCS=true; fi
+          if echo "$CHANGED" | grep -q '^packages/core/src/kits/'; then NEEDS_KITS_DOCS=true; fi
+
+          echo "needs_api_docs=$NEEDS_API_DOCS" >> "$GITHUB_OUTPUT"
+          echo "needs_frontend_docs=$NEEDS_FRONTEND_DOCS" >> "$GITHUB_OUTPUT"
+          echo "needs_engine_docs=$NEEDS_ENGINE_DOCS" >> "$GITHUB_OUTPUT"
+          echo "needs_prompts_docs=$NEEDS_PROMPTS_DOCS" >> "$GITHUB_OUTPUT"
+          echo "needs_kits_docs=$NEEDS_KITS_DOCS" >> "$GITHUB_OUTPUT"
+
+      - name: Print docs freshness reminder
+        run: |
+          echo "⚠️  This PR touches source files. Please verify relevant docs are up to date."
+          echo ""
+          if [ "${{ steps.areas.outputs.needs_api_docs }}" = "true" ]; then
+            echo "  📄 packages/web/api/src/ changed:"
+            echo "     - docs-site/docs/engineering/api-layer.md"
+            echo "     - docs-site/docs/architecture/json-envelope.md"
+            echo "     - Security docs: auth model, API boundaries"
+          fi
+          if [ "${{ steps.areas.outputs.needs_frontend_docs }}" = "true" ]; then
+            echo "  📄 packages/web/src/ changed:"
+            echo "     - docs-site/docs/engineering/frontend-context-map.md"
+            echo "     - docs-site/docs/architecture/a2ui-integration.md"
+          fi
+          if [ "${{ steps.areas.outputs.needs_engine_docs }}" = "true" ]; then
+            echo "  📄 packages/core/src/engine/ changed:"
+            echo "     - docs-site/docs/architecture/overview.md"
+            echo "     - docs-site/docs/architecture/prompt-pipeline.md"
+            echo "     - docs-site/docs/architecture/skill-injection.md"
+          fi
+          if [ "${{ steps.areas.outputs.needs_prompts_docs }}" = "true" ]; then
+            echo "  📄 packages/core/src/prompts/ changed:"
+            echo "     - docs-site/docs/architecture/prompt-pipeline.md"
+            echo "     - docs-site/docs/architecture/json-envelope.md"
+          fi
+          if [ "${{ steps.areas.outputs.needs_kits_docs }}" = "true" ]; then
+            echo "  📄 packages/core/src/kits/ changed:"
+            echo "     - docs-site/docs/architecture/skill-injection.md"
+            echo "     - docs-site/docs/architecture/a2ui-integration.md"
+          fi
+          echo ""
+          echo "  🔒 Always review security-relevant docs when changing API or auth code:"
+          echo "     - Auth model, connector model, debug gate, API boundaries"
+          echo ""
+          echo "  📋 Full sweep checklist: docs-site/docs/process/docs-freshness.md"
+          echo "  🏷️  Apply the 'needs-docs' label if this PR requires a documentation update."
+
+      - name: Post PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const areas = [];
+            if ('${{ steps.areas.outputs.needs_api_docs }}' === 'true') {
+              areas.push('**API layer** (`packages/web/api/src/`)\n  - `docs-site/docs/engineering/api-layer.md`\n  - `docs-site/docs/architecture/json-envelope.md`\n  - Security docs: auth model, API boundaries');
+            }
+            if ('${{ steps.areas.outputs.needs_frontend_docs }}' === 'true') {
+              areas.push('**Frontend** (`packages/web/src/`)\n  - `docs-site/docs/engineering/frontend-context-map.md`\n  - `docs-site/docs/architecture/a2ui-integration.md`');
+            }
+            if ('${{ steps.areas.outputs.needs_engine_docs }}' === 'true') {
+              areas.push('**Conversation engine** (`packages/core/src/engine/`)\n  - `docs-site/docs/architecture/overview.md`\n  - `docs-site/docs/architecture/prompt-pipeline.md`\n  - `docs-site/docs/architecture/skill-injection.md`');
+            }
+            if ('${{ steps.areas.outputs.needs_prompts_docs }}' === 'true') {
+              areas.push('**Prompts** (`packages/core/src/prompts/`)\n  - `docs-site/docs/architecture/prompt-pipeline.md`\n  - `docs-site/docs/architecture/json-envelope.md`');
+            }
+            if ('${{ steps.areas.outputs.needs_kits_docs }}' === 'true') {
+              areas.push('**Kits** (`packages/core/src/kits/`)\n  - `docs-site/docs/architecture/skill-injection.md`\n  - `docs-site/docs/architecture/a2ui-integration.md`');
+            }
+
+            if (areas.length === 0) return;
+
+            const body = [
+              '## 📋 Docs Freshness Check',
+              '',
+              'This PR touches source files. Please verify that the relevant docs are up to date before merging.',
+              '',
+              ...areas.map(a => `- ${a}`),
+              '',
+              '> 🔒 **Security reminder:** Always review auth model, connector model, debug gate, and API boundary docs when changing API or auth code.',
+              '> 📋 Full checklist: [`docs-site/docs/process/docs-freshness.md`](./docs-site/docs/process/docs-freshness.md)',
+              '> 🏷️  Apply the [`needs-docs`](https://github.com/${{ github.repository }}/labels/needs-docs) label if a documentation update is required.',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.startsWith('## 📋 Docs Freshness Check')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
