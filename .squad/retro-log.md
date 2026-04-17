@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #216 "fix: Debug panel shows full A2UI JSON envelope and action context" | L | impl=11m | review=520m | cycles=1 | merged | @sabbour
