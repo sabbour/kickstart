@@ -58,3 +58,9 @@ Prior blocker (`handoff` phase id) resolved. `chat-a2ui.ts` now normalizes `hand
 **Verdict:** APPROVED (`zapp:approved`)
 
 `confinePath()` in `frontmatter.ts` at `5c325db` now applies `realpathSync()` to both pack root and candidate path before the `startsWith` confinement check. Symlink-escape blocker cleared. PR #546 is security-approved from confinement perspective.
+
+## 2026-04-17 — PRs #545 and #546 merged
+
+- **PR #545 (Step 2):** Blocked on `handoff` legacy phase in `chat-a2ui.ts`. Resolved with remap to `assess`. `zapp:approved` applied after recheck.
+- **PR #546 (Step 3):** Blocked on symlink escape via lexical-only path confinement. Resolved with `realpathSync()` canonicalisation in `confinePath()`. `zapp:approved` applied after recheck.
+Both PRs merged into v2-rewrite. Harness foundation (Steps 1–3) complete.

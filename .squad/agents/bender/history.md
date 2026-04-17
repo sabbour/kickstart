@@ -73,3 +73,11 @@ Posted the Step 3 DP for issue #476: sealed `PackRegistry`, `.agent.md` and `SKI
 ## Wave 6 — 2026-04-17 #476 Subpath Decision Filed
 
 - `bender-476-runtime-subpaths.md`: Step 3 runtime modules (`PackRegistry`, loaders, frontmatter parser) exposed via `@kickstart/harness/runtime/*` subpath exports, NOT re-exported from root barrel. Root barrel stays browser-safe. Node-only consumers import from subpath. Future Node-backed additions follow same pattern.
+
+## 2026-04-17 — Steps 1–3 merged into v2-rewrite
+
+- **PR #544 (Step 1):** All 8 DP conditions met. v1 runtime deleted. `converse.ts` → 503. `@kickstart/core` shim compile-only. 407 tests green. ✅ MERGED.
+- **PR #545 (Step 2, co-owned with Fry):** `SessionCtx.a2uiEmissions: A2UIMessage[]` added; `Pack` inline `agents?`/`skills?` arrays removed (dir-based only). `chat-a2ui.ts` `handoff` → `assess` remap. 53 harness tests + full suite passing. ✅ MERGED.
+- **PR #546 (Step 3):** `PackRegistry` full lifecycle + 9-accessor read surface. `confinePath()` patched: `realpathSync()` on both base and candidate. Frontmatter YAML parser. `SessionCtx.a2uiEmissions` backported. ✅ MERGED.
+
+**Next:** Step 4 (pack-core, #477) Phases C–H once registry API locked; resume-handler ownership bind for Step 5.

@@ -2998,3 +2998,46 @@ Security gate is **conditionally clear** for the design proposal. Final implemen
 **What:** Re-verified `packages/harness/src/runtime/frontmatter.ts` at commit `5c325db` and cleared the prior symlink-escape blocker.
 **Why:** `confinePath()` now resolves both the pack root and the candidate file with `realpathSync()` before the `startsWith` confinement check, so symlinks inside the pack can no longer escape the real pack root. The remaining `statSync()` call only validates file existence/type; the security decision is made after canonicalization, so the earlier stat → compare concern now fails closed.
 **Impact:** PR #546 is security-approved (`zapp:approved`) from the symlink confinement perspective.
+
+---
+
+# PRs #545 and #546 merged into v2-rewrite — harness foundation complete (Steps 1–3)
+
+**Date:** 2026-04-17
+**Recorded by:** Scribe
+**Event type:** Milestone — v2 sprint Steps 1–3 shipped
+
+## What merged
+
+| PR | Issue | Step | Title |
+|----|-------|------|-------|
+| #544 | #474 | Step 1 | feat(v2): Nuke v1, cut to harness, web-shell cleanup |
+| #545 | #475 | Step 2 | feat(v2): Harness primitives, all types + Zod schemas |
+| #546 | #476 | Step 3 | feat(v2): PackRegistry, loaders, frontmatter parser |
+
+## Cumulative approval trail
+
+- **PR #544 (Step 1):** `leela:approved` (all 8 DP conditions met). PR merged.
+- **PR #545 (Step 2):** Zapp `REQUEST CHANGES` → fix (handoff→assess remap) → Zapp `APPROVED` (recheck `zapp-pr545-recheck`). Leela `REQUEST CHANGES` (2 blockers: missing `a2uiEmissions`, dual-registration on `Pack`) → fixes in commits `96c675bb`, `4d1e5dc`, `427c385b` → Leela re-verified and `APPROVED` (`leela-pr545-recheck`). PR merged.
+- **PR #546 (Step 3):** `leela:approved` (all #476 DP conditions met, including `SessionCtx.a2uiEmissions` backport). Zapp `REQUEST CHANGES` (symlink confinement bypass) → `confinePath()` patched to use `realpathSync()` at `5c325db` → Zapp `APPROVED` (`zapp-pr546-recheck`). PR merged.
+
+## What is now in v2-rewrite
+
+- `packages/core/` — compile-only redirect shim to harness (v1 runtime deleted)
+- `packages/harness/` — all 12 type files, Zod schemas, A2UI discriminated union, SessionCtx, AgentOutput, PackRegistry, loaders, frontmatter parser, catalog skeleton
+- v1 feature flags (`KICKSTART_AGENTS_SDK`, `KICKSTART_V2`) purged
+- `converse.ts` returns 503 fail-closed
+- 53 PackRegistry tests + full harness test suite passing
+
+## Unblocked by these merges
+
+- **#477 Step 4 (pack-core) — Phases A+B immediately unblocked.** Phases C–H unblocked on registry API being stable.
+- **#478 Step 4a (Playground on registry) — unblocked** (C1 registry extension confirmed, C2 pseudocode fix outstanding).
+- **#479 Step 5 (Runner + SSE) — implementation can begin** after #477 C1 (`getToolsForAgent`) confirmed.
+- **#480 Step 6 (Skill Resolver) — authored and approved**, awaiting #479 completion.
+
+## Known debt entering Step 4
+
+- `packages/web/src/types.ts` is `export {};` — 15+ web shell files still import named types. `tsc --noEmit` fails. **Step 5–7 must resolve before any tsc CI gate.**
+- `enable()` after `seal()` silently succeeds in PackRegistry — guard needed before Step 5 runner wires lifecycle.
+- No dedicated `frontmatter.test.ts` covering malformed-YAML edge cases — Hermes should add before Step 5.

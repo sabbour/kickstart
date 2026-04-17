@@ -126,3 +126,13 @@ Re-check after commits `96c675bb`, `4d1e5dc`, `427c385b`:
 
 Step 3 (#476 / PR #546) unblocked after this approval (pending Zapp security gate).  
 Decision filed: `.squad/decisions/inbox/leela-pr545-recheck.md`
+
+## 2026-04-17 — PRs #544, #545, #546 merged into v2-rewrite
+
+Steps 1–3 of the v2 harness spine are shipped.
+- **#544/#474 (Step 1):** Nuke v1, harness seam, web-shell cleanup. ✅ MERGED.
+- **#545/#475 (Step 2):** Harness types + Zod schemas. Two-round review cycle (missing `a2uiEmissions`, dual-registration on `Pack`). ✅ MERGED after `96c675bb`/`4d1e5dc`/`427c385b` fixes.
+- **#546/#476 (Step 3):** PackRegistry, loaders, frontmatter parser. Symlink confinement fix at `5c325db`. ✅ MERGED.
+
+**Unblocked:** #477 Phases A+B (immediate), #478 (pending C2 pseudocode fix), #479 (after #477 C1 confirmed), #480 (authored + approved).
+**Known debt:** `types.ts` tsc gap, `enable()`-after-`seal()` guard, frontmatter edge-case tests.

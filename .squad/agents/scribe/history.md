@@ -129,3 +129,12 @@ Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v
 **Histories:** fry 13,121 bytes, hermes 11,251 bytes — both below 15,360 threshold; no summarisation needed
 **Sweep result:** All 31 worktree inbox filenames confirmed already merged. Main inbox empty. No new files found.
 **Commit:** (none — no changes)
+
+## Wave 14 (Final) — 2026-04-17
+
+**New files merged:** 0 (all inbox clear; all 31 worktree filenames confirmed already merged)
+**Merge milestone recorded:** PRs #544, #545, #546 → v2-rewrite (Steps 1–3 complete)
+**decisions.md:** 169,430 → 172,046 bytes
+**Histories updated:** leela (10,698), zapp (5,265), bender (7,924) — all below 15,360 threshold
+**History summarisation:** none needed
+**All agents:** bender 7,924 / fry 13,121 / hermes 11,251 / leela 10,698 / ralph 225 / scribe 8,xxx / zapp 5,265
