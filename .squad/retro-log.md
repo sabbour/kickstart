@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #292 "fix: consistent assistant icon during streaming" | S | impl=0m | review=4m | cycles=1 | merged | @sabbour
