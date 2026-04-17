@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #421 "docs: fix phantom paths in getting-started + contributing" | M | impl=0m | review=1m | cycles=1 | merged | @sabbour
+
 - 2026-04-17 | #422 "docs: fix component-count drift (33 base, 22 custom)" | S | impl=0m | review=2m | cycles=1 | merged | @sabbour
 - 2026-04-17 | #426 "docs: rewrite FSM docs to reflect completed cleanup" | L | impl=0m | review=13m | cycles=1 | merged | @sabbour
 
