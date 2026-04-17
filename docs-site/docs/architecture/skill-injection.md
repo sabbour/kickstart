@@ -74,8 +74,8 @@ interface IntegrationKit {
 }
 ```
 
-:::warning Typed `Skill` path is dormant
-**Neither production kit (`azure-kit.ts`, `github-kit.ts`) uses `kit.skills[]`.** Both use `prompts[]` / `phasePrompts{}`. The typed path is exercised only in tests. In practice, 100% of runtime skill resolution goes through the legacy path. Anyone building an Agent SDK adapter who reads the interface and chooses the typed path will be using the non-production code path.
+:::info Both skill paths are active
+**`azure-kit.ts` uses the typed `kit.skills[]` path** (Path 1) — it registers `skills: azureIacSkills` (see `azure-kit.ts:573`). **`github-kit.ts` uses the legacy `kit.prompts[]` / `kit.phasePrompts{}` path** (Path 2). Both paths are valid for kit authors. Consolidation of the two paths into a single mechanism is tracked as future work.
 :::
 
 ### Public API
