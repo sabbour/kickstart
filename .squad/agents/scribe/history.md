@@ -130,6 +130,14 @@ Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v
 **Sweep result:** All 31 worktree inbox filenames confirmed already merged. Main inbox empty. No new files found.
 **Commit:** (none — no changes)
 
+## Wave 15 — 2026-06-10 (no-op)
+
+**Files merged:** 0
+**decisions.md:** 172,046 bytes (unchanged)
+**Sweep result:** Main inbox empty. All 31 worktree filenames re-verified by content grep in decisions.md — all present. No new files found in any worktree.
+**History sizes:** bender 7,924 / fry 13,121 (85% of 15K — monitor) / hermes 11,251 / leela 10,698 / ralph 225 / scribe 8,681 / zapp 5,265 — no summarisation needed.
+**Commit:** (none — no changes to Scribe-owned files)
+
 ## Wave 14 (Final) — 2026-04-17
 
 **New files merged:** 0 (all inbox clear; all 31 worktree filenames confirmed already merged)
