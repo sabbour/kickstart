@@ -20,6 +20,7 @@ Legend:
 <!-- entries below this line, newest at top -->
 
 - 2026-04-15 | #293 "fix: replace emoji status indicators with Fluent UI icons" | M | impl=0m | review=36m | cycles=1 | merged | @sabbour
+- 2026-04-15 | #292 "fix: consistent assistant icon during streaming" | S | impl=0m | review=4m | cycles=1 | merged | @sabbour
 
 - 2026-04-15 | #297 "fix(flow): end conversation at Review, add client: action routing (#271)" | XL | impl=50m | review=42m | cycles=1 | merged | @sabbour
 
