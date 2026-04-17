@@ -7,9 +7,13 @@
  *  - Satisfies the ReactComponentImplementation shape (name, schema, render).
  *  - Renders without throwing when given empty props.
  *
- * Fluent UI deps are stubbed with noop React components so the tests run
- * entirely within the worktree's React 18 instance (the root node_modules
- * carries React 19 which would cause "Invalid hook call" errors otherwise).
+ * Fluent UI deps are stubbed so the tests run entirely within the worktree's
+ * React 18 instance (the root node_modules carries React 19 which would cause
+ * "Invalid hook call" errors if the real Fluent components were rendered).
+ *
+ * NOTE: vi.mock factories are hoisted to the top of the compiled output, so
+ * they cannot reference variables declared in the module body. All stub values
+ * must be inlined inside the factory functions.
  *
  * @depends Phase D of #477
  */
@@ -18,76 +22,80 @@
 
 import { vi } from 'vitest';
 
-// ── Fluent UI stubs (hoisted before all imports by Vite) ─────────────────────
+// ── Fluent UI stubs ───────────────────────────────────────────────────────────
 
-// Returns null (valid empty React render) for all unknown component keys.
-const noopComp = () => null;
-const fluentStubs = {
-  makeStyles: () => () => ({}),
-  mergeClasses: (...a: unknown[]) => (a.filter(Boolean) as string[]).join(' '),
-  tokens: new Proxy({} as Record<string, string>, { get: () => '' }),
-  useId: () => 'test-id',
-  // Accordion
-  Accordion: noopComp, AccordionItem: noopComp, AccordionHeader: noopComp, AccordionPanel: noopComp,
-  // Alert / MessageBar
-  MessageBar: noopComp, MessageBarBody: noopComp, MessageBarActions: noopComp,
-  // Badge
-  Badge: noopComp,
-  // Button
-  Button: noopComp,
-  // Card
-  Card: noopComp, Subtitle1: noopComp,
-  // CheckBox
-  Checkbox: noopComp, Field: noopComp,
-  // ChoicePicker / RadioGroup
-  RadioGroup: noopComp, Radio: noopComp, Dropdown: noopComp, Option: noopComp,
-  // ComboBox
-  Combobox: noopComp,
-  // DateTimeInput
-  DatePicker: noopComp,
-  // Divider
-  Divider: noopComp,
-  // Icon
-  Icon: noopComp,
-  // Image
-  Image: noopComp,
-  // Link
-  Link: noopComp,
-  // List / Row / Column
-  // Modal / Dialog
-  Dialog: noopComp, DialogSurface: noopComp, DialogBody: noopComp,
-  DialogTitle: noopComp, DialogContent: noopComp, DialogActions: noopComp,
-  DialogTrigger: noopComp,
-  // MultiSelect
-  Listbox: noopComp,
-  // Slider
-  Slider: noopComp,
-  // Table
-  Table: noopComp, TableHeader: noopComp, TableHeaderCell: noopComp,
-  TableBody: noopComp, TableRow: noopComp, TableCell: noopComp, TableCellLayout: noopComp,
-  TableSelectionCell: noopComp,
-  // Tabs
-  TabList: noopComp, Tab: noopComp, TabPanel: noopComp,
-  // Text variants
-  Title1: noopComp, Title2: noopComp, Title3: noopComp,
-  Subtitle2: noopComp, Caption1: noopComp, Body1: noopComp, Text: noopComp,
-  // TextField
-  Input: noopComp, Textarea: noopComp,
-  // Toggle
-  Switch: noopComp,
-  // Video
-  // General
-  Tooltip: noopComp, Spinner: noopComp, Skeleton: noopComp, Label: noopComp,
-};
+vi.mock('@fluentui/react-components', () => {
+  const noop = () => null;
+  return {
+    makeStyles: () => () => ({}),
+    mergeClasses: (...a: unknown[]) => (a.filter(Boolean) as string[]).join(' '),
+    tokens: new Proxy({} as Record<string, string>, { get: () => '' }),
+    useId: () => 'test-id',
+    // Accordion
+    Accordion: noop, AccordionItem: noop, AccordionHeader: noop, AccordionPanel: noop,
+    // Alert / MessageBar
+    MessageBar: noop, MessageBarBody: noop, MessageBarActions: noop,
+    // Badge
+    Badge: noop,
+    // Button
+    Button: noop,
+    // Card
+    Card: noop, Subtitle1: noop,
+    // CheckBox
+    Checkbox: noop, Field: noop,
+    // ChoicePicker
+    RadioGroup: noop, Radio: noop, Dropdown: noop, Option: noop,
+    // ComboBox
+    Combobox: noop,
+    // Divider
+    Divider: noop,
+    // Dialog (Modal)
+    Dialog: noop, DialogSurface: noop, DialogBody: noop,
+    DialogTitle: noop, DialogContent: noop, DialogActions: noop,
+    DialogTrigger: noop,
+    // Image
+    Image: noop,
+    // Link
+    Link: noop,
+    // Slider
+    Slider: noop,
+    // Table
+    Table: noop, TableHeader: noop, TableHeaderCell: noop,
+    TableBody: noop, TableRow: noop, TableCell: noop, TableCellLayout: noop,
+    TableSelectionCell: noop,
+    // Tabs
+    TabList: noop, Tab: noop,
+    // Text variants
+    Title1: noop, Title2: noop, Title3: noop,
+    Subtitle2: noop, Caption1: noop, Body1: noop, Text: noop,
+    // TextField
+    Input: noop, Textarea: noop,
+    // Toggle
+    Switch: noop,
+    // Misc
+    Label: noop, Tooltip: noop,
+  };
+});
 
-vi.mock('@fluentui/react-components', () => fluentStubs);
-
-vi.mock('@fluentui/react-icons', () => ({
-  // Each icon is a noop component; list the ones used in basic components
-  OpenRegular: noopComp,
-  DismissRegular: noopComp,
-  // Wildcard: any unknown icon will be undefined at runtime (components guard with ?.)
-}));
+vi.mock('@fluentui/react-icons', () => {
+  const noop = () => null;
+  return {
+    // Used by Text.tsx
+    OpenRegular: noop,
+    // Used by Alert.tsx
+    DismissRegular: noop,
+    // Used by fluent-icons.ts (Icon.tsx) — all icons in FLUENT_REACT_ICON_REGISTRY
+    DocumentRegular: noop, FolderRegular: noop, CodeRegular: noop, SettingsRegular: noop,
+    HomeRegular: noop, PersonRegular: noop, SearchRegular: noop, AddRegular: noop,
+    DeleteRegular: noop, EditRegular: noop, SaveRegular: noop, SendRegular: noop,
+    StarRegular: noop, CloudRegular: noop, GlobeRegular: noop, LockClosedRegular: noop,
+    KeyRegular: noop, TagRegular: noop, ChatRegular: noop, ClockRegular: noop,
+    FilterRegular: noop, ArrowLeftRegular: noop, ChevronDownRegular: noop,
+    LinkRegular: noop, CheckmarkCircleRegular: noop, WarningRegular: noop,
+    InfoRegular: noop, CopyRegular: noop, ArrowUploadRegular: noop,
+    ArrowDownloadRegular: noop, ErrorCircleRegular: noop,
+  };
+});
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
@@ -116,7 +124,7 @@ const noBuildChild = (_id: string): React.ReactNode => null;
 /**
  * Smoke-render a ReactComponentImplementation.
  * Casts render to the full { props, buildChild, context } shape the underlying
- * FC actually expects. The adapter's TypeScript type only exposes
+ * FC actually expects. The adapter TypeScript type only exposes
  * { context, buildChild }, but the runtime function receives all three.
  */
 function smokeRender(comp: ReactComponentImplementation): void {
