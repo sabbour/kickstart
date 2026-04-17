@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #77 "feat: add anonymous route for /api/action endpoint" | S | impl=0m | review=3m | cycles=1 | merged | @sabbour
