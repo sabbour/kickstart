@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #138 "fix: bump version to 0.5.4" | S | impl=0m | review=4m | cycles=1 | merged | @sabbour
