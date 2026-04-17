@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-16 | #382 "feat(core): make conversation flow LLM-driven instead of scripted" | L | impl=0m | review=25m | cycles=1 | merged | @sabbour
+
 - 2026-04-16 | #381 "feat: render architecture diagrams inside FileEditor" | L | impl=0m | review=29m | cycles=1 | merged | @sabbour
 
 - 2026-04-16 | #383 "docs: engineering accuracy rewrite — prompt pipeline, FSM, skill injection" | XL | impl=1m | review=189m | cycles=1 | merged | @sabbour
