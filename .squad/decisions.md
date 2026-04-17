@@ -4115,3 +4115,102 @@ The revision enumerates all six GitHub playground stubs and gates them behind `K
 ## Outcome
 
 Security gate is **not clear** for DP #485 yet. Amend the DP to require fail-closed confirm rendering, explicit resume/credential boundaries, immutable registry semantics, and pre-render schema enforcement for all LLM-originated component props. Re-review after those conditions are written into the DP.
+
+---
+# Decision — #485 DP Review: Web client A2UI renderer from registry catalog
+
+**Date:** 2026-04-17
+**Author:** Leela (Lead)
+**Issue:** #485 — v2 Step 10: Web client A2UI renderer + UserAction dispatcher
+**Verdict:** APPROVE_WITH_CONDITIONS
+
+---
+
+## Decisions recorded
+
+1. **Web bootstrap registration ordering is a hard invariant.** Pack `register()` calls must run synchronously in `main.tsx` before `ReactDOM.createRoot().render()`. The `useA2UIRegistry()` hook uses `useMemo([], [])` and captures the registry state at first render. Any async or lazy registration will produce an empty Map and silent rendering failures. All Step 10 implementation PRs must demonstrate this bootstrap sequence.
+
+2. **Bundle-registry is authoritative for A2UI rendering; `/api/packs` is validation-only.** The client bundle's sealed registry is the rendering source of truth. The `GET /api/packs` response should be cross-checked at startup to warn (not block) on any component the server advertises that the client bundle cannot render. No loading state, no render gate on this fetch.
+
+3. **Fluent `<Dialog>` is the correct portal mechanism for `UserActionPanel`.** No custom `ReactDOM.createPortal` is needed. `UserActionPanel` renders as a sibling of `ConversationThread` in `ChatShell`; Fluent's Dialog manages the portal, focus trap, and `aria-modal` internally.
+
+4. **`APIConnectorContext` is NOT deleted in Step 10.** Grep audit shows 9 active consumers in `catalog/components/` (v1 components pending pack migration). The context file should be annotated `// TODO: remove when last catalog/component/ migrates to a pack`. Deletion is deferred to the last pack-component migration PR.
+
+5. **Zapp review of Phase C (credential flow) is a mandatory hard gate.** Phase C passes MSAL tokens and GitHub OAuth results through `UserActionPanel.onResolve → POST /api/converse/resume`. This must not merge without Zapp's explicit sign-off. Zapp must verify: (a) server strips credentials from SSE replay/logs, (b) `actionId` is unguessable, (c) resume endpoint validates session ownership. Add `needs-zapp-review` label when Phase C PR opens.
+
+6. **Component namespace `pack/PascalName` is collision-free.** Pack IDs are unique; the slash-qualified name format is the full Map key. No additional namespace protection needed.
+
+---
+# Decision: #485 DP Re-check — APPROVE_WITH_CONDITIONS
+
+**Date:** 2025-07-15
+**Verdict:** APPROVE_WITH_CONDITIONS ✅
+
+## Conditions Assessed
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| C1 — Bootstrap ordering | ✅ Resolved | Revision explicitly lists 4-step sequence in main.tsx: (1) corePack.register(), (2) other pack register() calls, (3) registry.seal(), (4) ReactDOM.createRoot().render(); states useA2UIRegistry() throws (fail-closed) if seal() not called |
+| C2 — Zapp gate satisfied | ✅ Resolved | Revision acknowledges Zapp has reviewed; Phase C can proceed once Zapp re-checks this revision |
+
+## Merge Conditions for Step 10 PR
+
+1. Bootstrap sequence enforced in main.tsx (seal before render)
+2. useA2UIRegistry() throws (not returns empty Map) if called pre-seal
+3. Zapp re-check on this revision required before Phase C implementation
+
+Comment posted: https://github.com/sabbour/kickstart/issues/485#issuecomment-4269345744
+Label applied: `leela:approved-dp`
+
+---
+# Decision: #486 Guardrails Engine — Interface Shape Supersedes Brief
+
+**Author:** Leela (Lead)
+**Date:** 2025-07-15
+**Issue:** #486 — Step 11: Guardrails Engine
+
+## Decision
+
+The `GuardrailContribution` interface and `GuardrailVerdict` type in `docs/v2-implementation-brief.md` are superseded by the shape codified in `pack-core/src/__tests__/guardrails.test.ts` and adopted by this DP:
+
+**Superseded (brief §Guardrail):**
+```ts
+export type GuardrailVerdict =
+  | { kind: "pass" }
+  | { kind: "block"; reason: string }
+  | { kind: "rewrite"; payload: unknown };
+
+export interface GuardrailContribution {
+  check: (ctx: SessionCtx, payload: unknown) => Promise<GuardrailVerdict>;
+}
+```
+
+**Adopted (Step 11 DP + test scaffolding):**
+```ts
+export type GuardrailVerdict = 'pass' | 'block' | 'redact';
+
+export interface GuardrailResult {
+  verdict: GuardrailVerdict;
+  reason?: string;
+  redacted?: unknown;  // string for text stages; Record<string,unknown> for tool stage
+}
+
+export interface GuardrailContribution {
+  name: string;
+  stage: GuardrailStage | GuardrailStage[];
+  appliesTo?: string | string[];
+  evaluate(input: GuardrailInput): Promise<GuardrailResult>;
+}
+```
+
+## Rationale
+
+- Test scaffolding authored in Step 4 (#477) already codified `redact` + `evaluate`. Diverging from tests at this stage creates a compile-time break.
+- The Step 8 (#483) pack-aks-automatic guardrails used the brief's old shape (`check` + `{ kind }`). The Step 11 PR must migrate them.
+- `evaluate(input: GuardrailInput)` is richer and more structured than `check(ctx, payload: unknown)` — the payload bag solves the "which field to mutate on redact" problem cleanly.
+
+## Action Items
+
+1. Step 11 PR updates `docs/v2-implementation-brief.md` §Guardrail to the adopted shape.
+2. Step 11 PR migrates the 3 Step-8 guardrails (`no-latest-tag`, `safeguards-compliance`, `no-k8s-terminology-pre-deploy`) from `check()` to `evaluate()`.
+3. `applyRedact()` must be explicitly defined in `guardrails.ts` — not left to implementer inference.

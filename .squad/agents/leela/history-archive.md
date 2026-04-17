@@ -595,3 +595,38 @@ Step 1 (nuke v1, harness seam), Step 2 (harness types + Zod), Step 3 (PackRegist
 
 #### PR #547 (Step 4a Playground on Registry) — APPROVED
 Phases A–D all complete. C1 resolved (registry surface used, `getComponent` not needed). C2 resolved (`if (!stub)` guard present). M1: empty scenario → informational; unregistered → `GalleryCardErrorBoundary`. `leela:approved` applied. Unblocks #479.
+
+---
+
+## Archived from history.md — Wave 35 (2025-07-15)
+
+#### PR #548 (Step 4b pack-core) — APPROVED
+C1 ✅ `corePack` uses `agentsDir`/`skillsDir` URL dir-pointers. C2 ✅ `emit_ui` Zod-validates. C3 ✅ forward from `session.a2uiEmissions`. C4 ⚠️ Path bug `agents.test.ts:26` non-blocking (all todo). C5 ✅ AuthCard generic. Scope 3+5+6+40+3 ✅. `search_components.ts` orphan flagged. `leela:approved`. Filed: leela-pr548-review.md.
+
+#### DP #482 (pack-azure, Step 7) — APPROVE_WITH_CONDITIONS
+C1 `auditLog` not harness primitive. C2 `azure/Login` must use core `AuthCard`. C3 phase gating explicit. C4 `validate_bicep` switch to npm. C5 no generic `azure:arm_write`. All 5 Fry Qs answered. Filed: leela-482-dp-review.md.
+
+#### DP #483 (pack-aks-automatic, Step 8) — APPROVE_WITH_CONDITIONS
+C1 (BLOCKING): `Pack.skills?: Skill[]` missing — harness micro-fix required. C2 (BLOCKING): `ArchitectureDiagram` in pack-core must MOVE to pack-aks. C3: `aks/DeploymentConfirm` add to #526. C4: package.json unassigned → #523. C5: deploy credential unresolved → before #524. Filed: leela-483-dp-review.md.
+
+#### DP #483 Re-check — APPROVE_WITH_CONDITIONS ✅
+C1 ✅ skills micro-fix tracked separately. C2 ✅ Phase E = cross-pack move, #525 owns it. C3 ✅ `aks/DeploymentConfirm` in Phase E. Merge conditions: harness micro-fix first, #525 completes move, Phase E confirmed. Filed: leela-483-dp-recheck.md. Label: `leela:approved-dp`.
+
+#### DP #484 (pack-github, Step 9) — APPROVE_WITH_CONDITIONS
+C1 (BLOCKING): 4 missing allowlist paths (`/user/repos`, PR/run/branch patterns). C2 (BLOCKING): split `github-handoff.ts` into browser + server modules. C3 (BLOCKING): `github:create_pr` needs param schema; body generated server-side. C4: `tokens: Record<string, string>` coordinate with Bender. All 5 Fry Qs answered. Filed: leela-484-dp-review.md.
+
+#### DP #484 Re-check — APPROVE_WITH_CONDITIONS ✅
+C1 ✅ All 4 allowlist paths added. C2 ✅ `github-handoff.browser.ts` + `github-api.ts` split done. C3 ✅ `create_pr` schema restricted to `{files, branch, title}`. C4 ✅ `SessionCtx.tokens` adopted. Merge conditions: browser-only bundle, tokens not in /api/packs, harness micro-fix (#549) first. Filed: leela-484-dp-recheck.md. Label: `leela:approved-dp`.
+
+#### DP #485 (web client A2UI renderer, Step 10) — APPROVE_WITH_CONDITIONS
+C1 (BLOCKING): bootstrap registration ordering must be shown in `main.tsx`. C2 (BLOCKING): Zapp review of Phase C is a hard gate. N1–N4 non-blocking. All 5 Fry Qs answered. Filed: leela-485-dp-review.md. Label: `leela:approved-dp`.
+
+#### DP #485 Re-check — APPROVE_WITH_CONDITIONS ✅
+C1 ✅ 4-step sequence confirmed: corePack.register → packs.register → registry.seal() → ReactDOM.render(); `useA2UIRegistry()` throws fail-closed pre-seal. C2 ✅ Zapp gate acknowledged; Phase C gated. Merge conditions: seal-before-render, throws (not empty Map), Zapp re-check first. Filed: self-post. Label: `leela:approved-dp`.
+
+#### DP #486 (Guardrails Engine, Step 11) — APPROVE_WITH_CONDITIONS
+C1 (BLOCKING): Interface divergence — brief uses `{kind:"rewrite"}+check()`; DP uses `{verdict:"redact"}+evaluate()`. PR must update brief + migrate Step 8 guardrails in same commit. C2 (BLOCKING): `applyRedact()` never defined; `redacted?: string` must be `unknown` or add `redactedArgs`. N1–N5 non-blocking. Q1–Q4 answered. Filed: self-post.
+
+#### PR #549 (harness: Pack.skills[] micro-fix) — APPROVE ✅
+`Pack.skills?: Skill[]` typed. `loadSkills()` merge handles edge cases. Duplicate-ID guard via `assertUnique`. `Skill` exported from `index.ts`. 56 tests pass. Follow-up: Hermes targeted test for both-sources merge. Unblocks #483. Label: `leela:approved`.
+

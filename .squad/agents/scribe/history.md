@@ -228,3 +228,29 @@
 **Sizes post-wave:** bender 7,924 / fry ~6,090 / hermes 11,926 (77%) / leela ~12,000 / ralph 225 / scribe ~10,200 / zapp 3,133 (20%)
 
 **Watch:** hermes (77%), leela approaching threshold
+
+## Wave 35 — 2025-07-15
+
+**Files merged:** 3
+- `leela-485-dp-review.md` (main inbox) → DP #485 web client A2UI renderer APPROVE_WITH_CONDITIONS (C1: bootstrap ordering hard invariant; C2: Zapp Phase C gate mandatory; 6 architecture decisions recorded)
+- `leela-485-dp-recheck.md` (main inbox) → DP #485 re-check APPROVE_WITH_CONDITIONS ✅ (C1 bootstrap 4-step sequence confirmed; C2 Zapp gate acknowledged; Zapp re-check still required before Phase C)
+- `leela-486-dp-review.md` (main inbox) → DP #486 Guardrails Engine — interface shape supersedes brief (adopted `evaluate()+GuardrailResult` over `check()+{kind}`; 3 migration action items; Step 11 PR must update brief + migrate Step 8 guardrails)
+
+**Self-posts staged:**
+- fry/history.md: +DP #486 revision row (Fry addressed Leela C1/C2 + Zapp Crit1/Crit2/B1–B6)
+
+**Summarization:**
+- leela/history.md: **SUMMARIZED** 17,526 → 3,832 bytes (114% → 25%); detailed sections archived to leela/history-archive.md (54,444 → 58,175 B)
+
+**decisions.md:** 233,696 → 239,049 bytes (+5,353, +3 files)
+
+**Sizes post-wave:** bender 7,924 / fry ~9,200 / hermes 11,926 (77%) / leela 3,832 (25%) / ralph 225 / scribe ~11,800 / zapp 3,133 (20%)
+
+**Threshold watch:** hermes (77%), scribe approaching 75%; all others clear
+
+**DP status update:**
+- #485 web client A2UI: Leela ✅ + Leela re-check ✅ (Zapp re-check pending on revision)
+- #486 Guardrails Engine: Leela ✅ + Fry revision done (Zapp review pending)
+
+**Still absent:** `fry-485-dp.md`, `fry-486-dp.md` formal inbox files; `zapp-485-dp-recheck.md`, `zapp-486-dp-review.md`
+
