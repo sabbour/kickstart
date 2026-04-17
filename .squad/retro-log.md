@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #455 "feat(web): Agents SDK UI adaptation — route state consumption + E2E" | L | impl=98m | review=23m | cycles=1 | merged | @sabbour-squad-frontend[bot]
+
 - 2026-04-17 | #457 "feat(web): add DebugA2UITree component for A2UI message visualization" | L | impl=1m | review=4m | cycles=1 | merged | @sabbour
 
 - 2026-04-17 | #458 "feat(api): add systemPrompt to DebugMetadata for debug panel" | M | impl=1m | review=11m | cycles=1 | merged | @sabbour
