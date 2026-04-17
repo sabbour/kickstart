@@ -165,3 +165,24 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - Prompt-catalog contract tests (#374) guard phantom references automatically going forward
 
 **Next:** Address architecture spikes #349, #350, #351; review DPs for #329 and #330.
+
+## 2026-04-17 DP #330 Architecture Review
+
+**Review Date:** 2026-04-17T01:53:59Z  
+**Issue:** #330 — spike: design OpenAI Agents SDK migration for less-rigid chat flow  
+**DP:** Hybrid route planner + manager agent architecture
+
+**Decision:** ✅ APPROVED
+
+**Architecture Alignment Verified:**
+1. FSM removal (#400/#412) — merged; DP's route planner fills control plane
+2. Workspace-first generation (#326/#327/#328) — treated as constraints
+3. Custom/SDK boundary — SDK handles loop/retry/session/streaming/tracing
+4. Agents-as-tools — pragmatic starting position (handoffs deferred)
+5. Server-authored route state — replaces model-authored flags
+
+**Checkpoints Requested:**
+1. Validate `RunResult`/`StreamedRunResult` → typed SSE adaptation without losing A2UI
+2. Validate session hydration cold-start round-trip from existing session store
+
+**Consequence:** Implementation unblocked pending Zapp's security review (approved with conditions).
