@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@fluentui/react-components": "^9.73.7",
-    "@fluentui/react-icons": "^2.0.323",
+    "@fluentui/react-icons": "^2.0.324",
     "@mermaid-js/layout-elk": "0.2.1",
     "@monaco-editor/react": "^4.7.0",
     "@preact/signals-core": "^1.13.0",
@@ -20,7 +20,7 @@
     "highlight.js": "^11.11.1",
     "jszip": "^3.10.1",
     "mermaid": "^11.14.0",
-    "monaco-editor": "^0.53.0",
+    "monaco-editor": "^0.55.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
@@ -29,7 +29,7 @@
     "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
-    "@types/dompurify": "^3.0.5",
+    "@types/dompurify": "^3.2.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.5.2",
