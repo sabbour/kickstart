@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #137 "feat(playground): debug mode + create-to-widget flow" | M | impl=0m | review=5m | cycles=1 | merged | @sabbour
