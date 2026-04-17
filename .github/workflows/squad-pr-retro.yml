@@ -124,6 +124,7 @@ Working as Scribe — see .squad/agents/scribe/charter.md"
               exit 1
             fi
             git pull --rebase origin "${{ github.event.pull_request.base.ref }}"
+            sleep 2
           done
 
       - name: Mirror line as PR comment
