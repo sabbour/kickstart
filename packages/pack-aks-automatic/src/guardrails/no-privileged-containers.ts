@@ -1,43 +1,36 @@
-import type { GuardrailContribution, GuardrailVerdict } from '@kickstart/harness';
+import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@kickstart/harness';
 
 /**
- * no-privileged-containers guardrail.
- *
  * Blocks tool calls that would write Kubernetes manifests containing
  * privileged containers (securityContext.privileged: true).
- *
- * Operates at the tool stage — intercepts before core.write_file executes.
  */
-
-interface WriteFilePayload {
-  toolName?: string;
-  parameters?: {
-    content?: string;
-    path?: string;
-  };
-  content?: string;
-}
 
 function isKubernetesManifest(content: string): boolean {
   return /apiVersion:\s*\S/.test(content) && /kind:\s*\w+/.test(content);
 }
 
+const DANGEROUS_CAPS = ['SYS_ADMIN', 'NET_ADMIN', 'ALL', 'SYS_PTRACE', 'SYS_MODULE', 'DAC_READ_SEARCH'];
+
 export const noPrivilegedContainersGuardrail: GuardrailContribution = {
-  name: 'aks/no-privileged-containers',
-  stage: 'tool',
-  appliesTo: ['core.write_file', 'aks.*'],
-  check: async (_ctx, payload): Promise<GuardrailVerdict> => {
-    const p = payload as WriteFilePayload | null;
-    if (!p) return { kind: 'pass' };
+  id: 'aks/no-privileged-containers',
+  appliesTo: ['*'],
+  stages: ['tool'],
+  async evaluate(input: GuardrailInput): Promise<GuardrailResult> {
+    const args = input.toolArgs;
+    if (!args) return { verdict: 'pass' };
 
     const content =
-      (p.parameters?.['content'] as string | undefined) ?? p.content;
-    if (!content || typeof content !== 'string') return { kind: 'pass' };
-    if (!isKubernetesManifest(content)) return { kind: 'pass' };
+      (args['content'] as string | undefined) ??
+      (args['parameters'] != null && typeof args['parameters'] === 'object'
+        ? ((args['parameters'] as Record<string, unknown>)['content'] as string | undefined)
+        : undefined);
+
+    if (!content || typeof content !== 'string') return { verdict: 'pass' };
+    if (!isKubernetesManifest(content)) return { verdict: 'pass' };
 
     if (/privileged:\s*true/.test(content)) {
       return {
-        kind: 'block',
+        verdict: 'block',
         reason:
           'AKS safeguard violation: manifest contains a privileged container ' +
           '(securityContext.privileged: true). Privileged containers are prohibited ' +
@@ -48,7 +41,7 @@ export const noPrivilegedContainersGuardrail: GuardrailContribution = {
 
     if (/allowPrivilegeEscalation:\s*true/.test(content)) {
       return {
-        kind: 'block',
+        verdict: 'block',
         reason:
           'AKS safeguard violation: manifest sets allowPrivilegeEscalation: true. ' +
           'This is prohibited by the AKS Automatic Restricted pod security standard. ' +
@@ -56,13 +49,12 @@ export const noPrivilegedContainersGuardrail: GuardrailContribution = {
       };
     }
 
-    const DANGEROUS_CAPS = ['SYS_ADMIN', 'NET_ADMIN', 'ALL', 'SYS_PTRACE', 'SYS_MODULE', 'DAC_READ_SEARCH'];
     const foundCap = DANGEROUS_CAPS.find((cap) =>
       new RegExp(`-\\s+${cap}\\b`, 'i').test(content)
     );
     if (foundCap) {
       return {
-        kind: 'block',
+        verdict: 'block',
         reason:
           `AKS safeguard violation: manifest adds dangerous capability: ${foundCap.toUpperCase()}. ` +
           'Containers must not add capabilities beyond the restricted set. ' +
@@ -70,6 +62,6 @@ export const noPrivilegedContainersGuardrail: GuardrailContribution = {
       };
     }
 
-    return { kind: 'pass' };
+    return { verdict: 'pass' };
   },
 };

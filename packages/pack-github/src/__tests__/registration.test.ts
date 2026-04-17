@@ -49,8 +49,8 @@ describe('githubPack registration', () => {
   });
 
   it('registers the no-secret-exposure guardrail', () => {
-    const guardrailNames = githubPack.guardrails?.map((g) => g.name) ?? [];
-    expect(guardrailNames).toContain('github/no-secret-exposure');
+    const guardrailIds = githubPack.guardrails?.map((g) => g.id) ?? [];
+    expect(guardrailIds).toContain('github/no-secret-exposure');
   });
 
   it('points agentsDir to a URL', () => {

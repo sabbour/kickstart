@@ -14,6 +14,7 @@ import { createSearchComponentsTool } from './tools/search_components.js';
 import { tokenBudgetGuardrail } from './guardrails/token_budget.js';
 import { noPiiInLogsGuardrail } from './guardrails/no_pii_in_logs.js';
 import { noSecretsInArtifactsGuardrail } from './guardrails/no_secrets_in_artifacts.js';
+import { noCredentialLeakGuardrail } from './guardrails/no-credential-leak.js';
 
 // Basic components (27 Fluent renderers)
 import { fluentOverrides } from './components/basic/index.js';
@@ -86,5 +87,6 @@ export const corePack: Pack = {
     tokenBudgetGuardrail,
     noPiiInLogsGuardrail,
     noSecretsInArtifactsGuardrail,
+    noCredentialLeakGuardrail,
   ],
 };

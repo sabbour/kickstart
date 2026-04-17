@@ -1,12 +1,7 @@
-import type { GuardrailContribution, GuardrailVerdict } from '@kickstart/harness';
+import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@kickstart/harness';
 
 /**
- * require-subscription-scope guardrail.
- *
- * Blocks azure tool calls that provide ARM paths without a subscription UUID prefix.
- * Enforces that all ARM paths are subscription-scoped per the ARM allowlist.
- *
- * Operates at the tool stage.
+ * Blocks Azure tool calls with ARM paths that are not subscription-scoped.
  */
 
 const SUBSCRIPTION_UUID_RE =
@@ -15,29 +10,21 @@ const SUBSCRIPTION_UUID_RE =
 const AZURE_PATH_TOOLS = new Set([
   'azure.arm_get',
   'azure.what_if',
-  'azure__arm_write',
-  'azure__deploy',
+  'azure.arm_write',
+  'azure.deploy',
 ]);
 
-interface ToolPayload {
-  toolName?: string;
-  parameters?: Record<string, unknown>;
-}
-
 export const requireSubscriptionScopeGuardrail: GuardrailContribution = {
-  name: 'azure/require-subscription-scope',
-  stage: 'tool',
-  appliesTo: ['azure.*'],
-  check: async (_ctx, payload): Promise<GuardrailVerdict> => {
-    const toolPayload = payload as ToolPayload | null;
-    if (!toolPayload) return { kind: 'pass' };
+  id: 'azure/require-subscription-scope',
+  appliesTo: ['*'],
+  stages: ['tool'],
+  async evaluate(input: GuardrailInput): Promise<GuardrailResult> {
+    const toolName = input.toolName;
+    if (!toolName || !AZURE_PATH_TOOLS.has(toolName)) return { verdict: 'pass' };
 
-    const toolName = toolPayload.toolName;
-    if (!toolName || !AZURE_PATH_TOOLS.has(toolName)) return { kind: 'pass' };
-
-    const params = toolPayload.parameters ?? {};
-    const rawPath = (params['path'] as string | undefined) ?? (params['scopePath'] as string | undefined);
-    if (!rawPath) return { kind: 'pass' };
+    const args = input.toolArgs ?? {};
+    const rawPath = (args['path'] as string | undefined) ?? (args['scopePath'] as string | undefined);
+    if (!rawPath) return { verdict: 'pass' };
 
     let decoded: string;
     try {
@@ -48,7 +35,7 @@ export const requireSubscriptionScopeGuardrail: GuardrailContribution = {
 
     if (!SUBSCRIPTION_UUID_RE.test(decoded)) {
       return {
-        kind: 'block',
+        verdict: 'block',
         reason:
           `ARM path "${decoded}" is not subscription-scoped. ` +
           `All Azure ARM paths must begin with /subscriptions/{uuid}. ` +
@@ -56,6 +43,6 @@ export const requireSubscriptionScopeGuardrail: GuardrailContribution = {
       };
     }
 
-    return { kind: 'pass' };
+    return { verdict: 'pass' };
   },
 };

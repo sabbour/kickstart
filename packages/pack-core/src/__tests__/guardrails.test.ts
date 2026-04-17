@@ -1,163 +1,192 @@
 /**
- * @file guardrails.test.ts
- * @suite 6e — Guardrail verdict tests (pack-core)
+ * Pack-core guardrail tests — Step 11.
  *
- * Verifies each of the three guardrails shipped with pack-core:
- *   token-budget          — blocks payloads that exceed the token ceiling
- *   no-pii-in-logs        — redacts log payloads containing PII (email, phone, etc.)
- *   no-secrets-in-artifacts — blocks artifacts containing credential patterns
- *
- * Each guardrail must return a `GuardrailVerdict` object:
- *   { verdict: 'pass' | 'block' | 'redact'; reason?: string }
- *
- * Guards are evaluated synchronously (or async with fast resolution).
- * They must NEVER throw — all error paths must return a structured verdict.
- *
- * Zapp must review this file before #477 merges (per DP §8 done criteria).
- *
- * Tests are `it.todo()` scaffolding until Fry delivers Phase F (#477).
- * The `vi.mock` below prevents module-resolution failure in the meantime.
- *
- * @depends Phase F of #477 (guardrail implementation)
- * @depends #476 GuardrailVerdict type / GuardrailContribution interface
- * @security Zapp review required before merge (§8 done criteria)
+ * Tests the real implementations (no mocks) for:
+ *   token-budget          — input stage
+ *   no-pii-in-logs        — output + tool stages (redact)
+ *   no-secrets-in-artifacts — tool stage (block)
+ *   no-credential-leak    — all 3 stages (always block)
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import { tokenBudgetGuardrail } from '../guardrails/token_budget.js';
+import { noPiiInLogsGuardrail } from '../guardrails/no_pii_in_logs.js';
+import { noSecretsInArtifactsGuardrail } from '../guardrails/no_secrets_in_artifacts.js';
+import { noCredentialLeakGuardrail } from '../guardrails/no-credential-leak.js';
+import type { GuardrailInput } from '@kickstart/harness';
 
-// ── Type definition (mirrors what #476 will export on @kickstart/harness) ────
-// When #476 ships GuardrailVerdict, import it from '@kickstart/harness' instead.
-export type GuardrailVerdict = {
-  verdict: 'pass' | 'block' | 'redact';
-  reason?: string;
-};
-
-// ── Module stub — remove when pack-core ships ────────────────────────────────
-vi.mock('@kickstart/pack-core', () => ({
-  tokenBudgetGuardrail: {
-    name: 'token-budget',
-    evaluate: vi.fn(async (): Promise<GuardrailVerdict> => ({ verdict: 'pass' })),
-  },
-  noPiiInLogsGuardrail: {
-    name: 'no-pii-in-logs',
-    evaluate: vi.fn(async (): Promise<GuardrailVerdict> => ({ verdict: 'pass' })),
-  },
-  noSecretsInArtifactsGuardrail: {
-    name: 'no-secrets-in-artifacts',
-    evaluate: vi.fn(async (): Promise<GuardrailVerdict> => ({ verdict: 'pass' })),
-  },
-}));
-
-// When pack-core ships, replace with real imports:
-// import {
-//   tokenBudgetGuardrail,
-//   noPiiInLogsGuardrail,
-//   noSecretsInArtifactsGuardrail,
-// } from '@kickstart/pack-core';
-
-// ── GuardrailVerdict shape contract ──────────────────────────────────────────
-
-describe('GuardrailVerdict shape', () => {
-  it('verdict values are exactly: pass | block | redact', () => {
-    // This is a live schema-documentation test — no pack-core needed.
-    const validVerdicts: GuardrailVerdict['verdict'][] = ['pass', 'block', 'redact'];
-    expect(validVerdicts).toHaveLength(3);
-    expect(validVerdicts).toContain('pass');
-    expect(validVerdicts).toContain('block');
-    expect(validVerdicts).toContain('redact');
-  });
-
-  it('reason field is optional', () => {
-    const withReason: GuardrailVerdict = { verdict: 'block', reason: 'over budget' };
-    const withoutReason: GuardrailVerdict = { verdict: 'pass' };
-    expect(withReason.reason).toBeDefined();
-    expect(withoutReason.reason).toBeUndefined();
-  });
-});
-
-// ── token-budget guardrail ───────────────────────────────────────────────────
+// ── token-budget ─────────────────────────────────────────────────────────────
 
 describe('token-budget guardrail', () => {
-
-  describe('pass cases', () => {
-    it.todo('payload within the token budget returns { verdict: "pass" }');
-    it.todo('empty payload returns { verdict: "pass" }');
-    it.todo('payload exactly at the token limit returns { verdict: "pass" }');
+  it('has correct id and stages', () => {
+    expect(tokenBudgetGuardrail.id).toBe('core/token-budget');
+    expect(tokenBudgetGuardrail.stages).toContain('input');
   });
 
-  describe('block cases', () => {
-    it.todo('payload exceeding the token budget returns { verdict: "block" }');
-    it.todo('returned verdict includes a reason string when blocked');
-    it.todo('reason string includes the token count and budget limit');
-    it.todo('payload at 2× the token limit still returns { verdict: "block" } (no throw)');
-  });
-
-  describe('contract', () => {
-    it.todo('guardrail never throws — always returns a GuardrailVerdict');
-    it.todo('guardrail name is "token-budget"');
-    it.todo('evaluate function is async (returns a Promise)');
+  it('passes when no token budget exceeded', async () => {
+    const result = await tokenBudgetGuardrail.evaluate({ stage: 'input', userMessage: 'hello' });
+    expect(result.verdict).toBe('pass');
   });
 });
 
-// ── no-pii-in-logs guardrail ─────────────────────────────────────────────────
+// ── no-pii-in-logs ───────────────────────────────────────────────────────────
 
 describe('no-pii-in-logs guardrail', () => {
-
-  describe('pass cases', () => {
-    it.todo('log payload with no PII returns { verdict: "pass" }');
-    it.todo('log payload with generic identifiers (e.g., "user-123") returns { verdict: "pass" }');
+  it('has correct id and stages', () => {
+    expect(noPiiInLogsGuardrail.id).toBe('core/no-pii-in-logs');
+    expect(noPiiInLogsGuardrail.stages).toContain('output');
+    expect(noPiiInLogsGuardrail.stages).toContain('tool');
   });
 
-  describe('redact cases', () => {
-    it.todo('log payload containing an email address returns { verdict: "redact" }');
-    it.todo('log payload containing a phone number pattern returns { verdict: "redact" }');
-    it.todo('log payload containing a credit card pattern returns { verdict: "redact" }');
-    it.todo('log payload containing a UUID-shaped value passes (UUIDs are not PII)');
-    it.todo('reason string identifies which PII pattern was matched');
+  it('passes clean output', async () => {
+    const result = await noPiiInLogsGuardrail.evaluate({
+      stage: 'output',
+      proposedOutput: 'Deployment successful for my-app',
+    });
+    expect(result.verdict).toBe('pass');
   });
 
-  describe('block cases', () => {
-    it.todo('log payload containing a national ID number pattern returns { verdict: "block" }');
+  it('redacts email from output', async () => {
+    const result = await noPiiInLogsGuardrail.evaluate({
+      stage: 'output',
+      proposedOutput: 'Contact user@example.com for details',
+    });
+    expect(result.verdict).toBe('redact');
+    expect(result.redacted as string).toContain('[REDACTED-EMAIL]');
+    expect(result.redacted as string).not.toContain('user@example.com');
   });
 
-  describe('contract', () => {
-    it.todo('guardrail never throws — always returns a GuardrailVerdict');
-    it.todo('guardrail name is "no-pii-in-logs"');
-    it.todo('evaluate function is async (returns a Promise)');
+  it('redacts SSN from output', async () => {
+    const result = await noPiiInLogsGuardrail.evaluate({
+      stage: 'output',
+      proposedOutput: 'SSN 123-45-6789',
+    });
+    expect(result.verdict).toBe('redact');
+    expect(result.redacted as string).toContain('[REDACTED-SSN]');
+  });
+
+  it('redacts phone number from output', async () => {
+    const result = await noPiiInLogsGuardrail.evaluate({
+      stage: 'output',
+      proposedOutput: 'Call 555-123-4567 for support',
+    });
+    expect(result.verdict).toBe('redact');
+    expect(result.redacted as string).toContain('[REDACTED-PHONE]');
+  });
+
+  it('passes on tool stage without PII', async () => {
+    const result = await noPiiInLogsGuardrail.evaluate({
+      stage: 'tool',
+      toolName: 'core.write_file',
+      toolArgs: { content: 'clean content', path: 'output.txt' },
+    });
+    expect(result.verdict).toBe('pass');
   });
 });
 
-// ── no-secrets-in-artifacts guardrail ────────────────────────────────────────
+// ── no-secrets-in-artifacts ──────────────────────────────────────────────────
 
 describe('no-secrets-in-artifacts guardrail', () => {
-
-  describe('pass cases', () => {
-    it.todo('clean Kubernetes Deployment manifest returns { verdict: "pass" }');
-    it.todo('manifest with placeholder values like "<YOUR_TOKEN>" returns { verdict: "pass" }');
-    it.todo('manifest with base64-encoded image data (not a secret) returns { verdict: "pass" }');
+  it('has correct id and stages', () => {
+    expect(noSecretsInArtifactsGuardrail.id).toBe('core/no-secrets-in-artifacts');
+    expect(noSecretsInArtifactsGuardrail.stages).toContain('tool');
   });
 
-  describe('block cases', () => {
-    it.todo('artifact containing "BEGIN PRIVATE KEY" pattern returns { verdict: "block" }');
-    it.todo('artifact containing "BEGIN RSA PRIVATE KEY" returns { verdict: "block" }');
-    it.todo('artifact containing an AWS access key pattern returns { verdict: "block" }');
-    it.todo('artifact containing a GitHub personal access token pattern ("ghp_...") returns { verdict: "block" }');
-    it.todo('artifact containing a generic high-entropy secret (base64, 40+ chars) returns { verdict: "block" }');
-    it.todo('reason string identifies which secret pattern was detected');
+  it('passes non-write_file tools', async () => {
+    const result = await noSecretsInArtifactsGuardrail.evaluate({
+      stage: 'tool',
+      toolName: 'core.read_file',
+      toolArgs: { path: 'file.txt' },
+    });
+    expect(result.verdict).toBe('pass');
   });
 
-  describe('contract', () => {
-    it.todo('guardrail never throws — always returns a GuardrailVerdict');
-    it.todo('guardrail name is "no-secrets-in-artifacts"');
-    it.todo('evaluate function is async (returns a Promise)');
-    it.todo('blocked verdict includes a reason that does NOT echo the secret value (redaction hygiene)');
+  it('blocks write with GitHub PAT', async () => {
+    const result = await noSecretsInArtifactsGuardrail.evaluate({
+      stage: 'tool',
+      toolName: 'core.write_file',
+      toolArgs: { content: 'token: ghp_abcdefghijklmnopqrstuvwxyz123456789', path: 'config.yaml' },
+    });
+    expect(result.verdict).toBe('block');
+  });
+
+  it('blocks write with private key', async () => {
+    const result = await noSecretsInArtifactsGuardrail.evaluate({
+      stage: 'tool',
+      toolName: 'core.write_file',
+      toolArgs: { content: '-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...', path: 'key.pem' },
+    });
+    expect(result.verdict).toBe('block');
+  });
+
+  it('passes clean file write', async () => {
+    const result = await noSecretsInArtifactsGuardrail.evaluate({
+      stage: 'tool',
+      toolName: 'core.write_file',
+      toolArgs: { content: 'name: myapp\nversion: 1.0.0', path: 'package.yaml' },
+    });
+    expect(result.verdict).toBe('pass');
   });
 });
 
-// ── Cross-guardrail integration ───────────────────────────────────────────────
+// ── no-credential-leak ────────────────────────────────────────────────────────
 
-describe('guardrail pipeline (all three in sequence)', () => {
-  it.todo('a clean payload passes all three guardrails in order');
-  it.todo('a payload blocked by token-budget is not evaluated by subsequent guardrails');
-  it.todo('each guardrail is independently callable (no shared mutable state between calls)');
+describe('no-credential-leak guardrail', () => {
+  it('has correct id and all 3 stages', () => {
+    expect(noCredentialLeakGuardrail.id).toBe('core/no-credential-leak');
+    expect(noCredentialLeakGuardrail.stages).toContain('input');
+    expect(noCredentialLeakGuardrail.stages).toContain('output');
+    expect(noCredentialLeakGuardrail.stages).toContain('tool');
+  });
+
+  it('blocks input stage with GitHub PAT', async () => {
+    const result = await noCredentialLeakGuardrail.evaluate({
+      stage: 'input',
+      userMessage: 'my token is ghp_abcdefghijklmnopqrstuvwxyz1234567',
+    });
+    expect(result.verdict).toBe('block');
+  });
+
+  it('blocks output stage with JWT Bearer token', async () => {
+    const result = await noCredentialLeakGuardrail.evaluate({
+      stage: 'output',
+      proposedOutput: 'Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.signature',
+    });
+    expect(result.verdict).toBe('block');
+  });
+
+  it('blocks tool stage with SSH private key', async () => {
+    const result = await noCredentialLeakGuardrail.evaluate({
+      stage: 'tool',
+      toolName: 'core.write_file',
+      toolArgs: { content: '-----BEGIN OPENSSH PRIVATE KEY-----\nkeydata\n-----END OPENSSH PRIVATE KEY-----' },
+    });
+    expect(result.verdict).toBe('block');
+  });
+
+  it('blocks SAS token in tool args', async () => {
+    const result = await noCredentialLeakGuardrail.evaluate({
+      stage: 'tool',
+      toolName: 'azure.upload',
+      toolArgs: { url: 'https://storage.blob.core.windows.net/container?sv=2023-01-01&sp=r&sig=ABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234' },
+    });
+    expect(result.verdict).toBe('block');
+  });
+
+  it('passes clean input', async () => {
+    const result = await noCredentialLeakGuardrail.evaluate({
+      stage: 'input',
+      userMessage: 'Deploy my app to production',
+    });
+    expect(result.verdict).toBe('pass');
+  });
+
+  it('always blocks (never redacts)', async () => {
+    const result = await noCredentialLeakGuardrail.evaluate({
+      stage: 'output',
+      proposedOutput: 'Bearer eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.signaturesig',
+    });
+    expect(result.verdict).toBe('block');
+    expect(result.verdict).not.toBe('redact');
+  });
 });

@@ -17,6 +17,7 @@ import { deploymentProgressContribution } from './components/DeploymentProgress/
 import { noPrivilegedContainersGuardrail } from './guardrails/no-privileged-containers.js';
 import { requireResourceLimitsGuardrail } from './guardrails/require-resource-limits.js';
 import { noHostpathVolumesGuardrail } from './guardrails/no-hostpath-volumes.js';
+import { noLatestTagGuardrail } from './guardrails/no-latest-tag.js';
 
 const aksComponents: ComponentContribution[] = [
   architectureDiagramContribution,
@@ -49,6 +50,7 @@ export const aksAutomaticPack: Pack = {
     noPrivilegedContainersGuardrail,
     requireResourceLimitsGuardrail,
     noHostpathVolumesGuardrail,
+    noLatestTagGuardrail,
   ],
 };
 

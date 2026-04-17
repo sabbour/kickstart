@@ -1,12 +1,8 @@
-import type { GuardrailContribution, GuardrailVerdict } from '@kickstart/harness';
+import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@kickstart/harness';
 
 /**
- * no-privileged-operations guardrail.
- *
- * Blocks tool calls that attempt to modify RBAC role assignments or role definitions
- * outside of the approved user-action path.
- *
- * Operates at the tool stage — intercepts before any ARM tool executes.
+ * Blocks tool calls that attempt to modify RBAC role assignments or role
+ * definitions outside of the approved user-action path.
  */
 
 const PRIVILEGED_PATH_PATTERNS = [
@@ -16,28 +12,20 @@ const PRIVILEGED_PATH_PATTERNS = [
   /microsoft\.classiccompute\/virtualmachines\/extensions/i,
 ];
 
-interface ToolPayload {
-  toolName?: string;
-  parameters?: Record<string, unknown>;
-  path?: string;
-}
-
 export const noPrivilegedOperationsGuardrail: GuardrailContribution = {
-  name: 'azure/no-privileged-operations',
-  stage: 'tool',
-  appliesTo: ['azure.*'],
-  check: async (_ctx, payload): Promise<GuardrailVerdict> => {
-    const toolPayload = payload as ToolPayload | null;
-    if (!toolPayload) return { kind: 'pass' };
+  id: 'azure/no-privileged-operations',
+  appliesTo: ['*'],
+  stages: ['tool'],
+  async evaluate(input: GuardrailInput): Promise<GuardrailResult> {
+    const args = input.toolArgs;
+    if (!args) return { verdict: 'pass' };
 
     const pathToCheck =
-      (toolPayload.parameters?.['path'] as string | undefined) ??
-      (toolPayload.parameters?.['scopePath'] as string | undefined) ??
-      toolPayload.path;
+      (args['path'] as string | undefined) ??
+      (args['scopePath'] as string | undefined);
 
-    if (!pathToCheck) return { kind: 'pass' };
+    if (!pathToCheck) return { verdict: 'pass' };
 
-    // Decode before checking to catch encoded traversals
     let decoded: string;
     try {
       decoded = decodeURIComponent(String(pathToCheck));
@@ -48,7 +36,7 @@ export const noPrivilegedOperationsGuardrail: GuardrailContribution = {
     for (const pattern of PRIVILEGED_PATH_PATTERNS) {
       if (pattern.test(decoded)) {
         return {
-          kind: 'block',
+          verdict: 'block',
           reason:
             `Privileged operation blocked: path "${decoded}" targets a protected Azure resource type ` +
             `(${String(pattern)}). RBAC modifications must go through an approved user-action.`,
@@ -56,6 +44,6 @@ export const noPrivilegedOperationsGuardrail: GuardrailContribution = {
       }
     }
 
-    return { kind: 'pass' };
+    return { verdict: 'pass' };
   },
 };

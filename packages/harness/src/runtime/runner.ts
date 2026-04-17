@@ -13,6 +13,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { Agent, Runner as SDKRunner, tool, setDefaultModelProvider, OpenAIProvider } from '@openai/agents';
+import type { FunctionTool } from '@openai/agents';
 import type { AgentContribution, ModelRef } from '../types/agent.js';
 import type { ToolContribution } from '../types/tool.js';
 import type { UserActionContribution } from '../types/user-action.js';
@@ -20,6 +21,7 @@ import type { PackRegistry } from './registry.js';
 import type { Session } from './session.js';
 import type { SSEWriter } from './sse.js';
 import { AgentOutput } from '../types/agent-output.js';
+import { runGuardrails } from './guardrails.js';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -80,12 +82,89 @@ function getSdkRunner(): SDKRunner {
 // Tool wrapping
 // ---------------------------------------------------------------------------
 
+/** Opaque SSE payload emitted on any guardrail block — never includes details. */
+const GUARDRAIL_BLOCK_EVENT = { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' } as const;
+
 /**
- * Wrap a ToolContribution as an @openai/agents function tool.
- * The inner tool.tool is already an @openai/agents Tool — return it directly.
+ * Wrap a ToolContribution as an @openai/agents function tool, injecting
+ * guardrail checks before each execution.
+ *
+ * Only FunctionTool types are wrapped — other tool types (ShellTool etc.)
+ * are returned as-is since they lack the execute/invoke surface.
+ *
+ * On a tool-stage block: emits opaque GUARDRAIL_BLOCK SSE, sets the
+ * haltedByGuardrail flag, and aborts the run so no further tools execute.
  */
-function wrapTool(contrib: ToolContribution) {
-  return contrib.tool;
+function wrapTool(
+  contrib: ToolContribution,
+  guardrails: ReturnType<PackRegistry['getGuardrailsByStage']>,
+  agentName: string,
+  sseWrite: SSEWriter,
+  abortCtrl: AbortController,
+  isHalted: () => boolean,
+  setHalted: () => void,
+) {
+  const inner = contrib.tool;
+
+  // Only FunctionTool has description/parameters/invoke
+  if (inner.type !== 'function') {
+    return inner;
+  }
+
+  const fnTool = inner as FunctionTool;
+
+  // Create a wrapped FunctionTool object directly (bypasses tool() overload complexity)
+  const wrapped: FunctionTool = {
+    type: 'function',
+    name: fnTool.name,
+    description: fnTool.description ?? '',
+    parameters: fnTool.parameters,
+    strict: fnTool.strict,
+    invoke: async (runContext, input, details) => {
+      const typedArgs = (() => {
+        try { return JSON.parse(input) as Record<string, unknown>; } catch { return {} as Record<string, unknown>; }
+      })();
+      // If a prior guardrail already halted the turn, skip execution silently
+      if (isHalted()) {
+        return '[tool blocked — guardrail halted this turn]';
+      }
+
+      const guardInput = {
+        stage: 'tool' as const,
+        toolName: fnTool.name,
+        toolArgs: typedArgs,
+      };
+
+      let guardResult;
+      try {
+        guardResult = await runGuardrails('tool', guardInput, guardrails, agentName);
+      } catch {
+        // Fail-closed: runGuardrails itself threw — treat as block
+        setHalted();
+        sseWrite('error', GUARDRAIL_BLOCK_EVENT);
+        abortCtrl.abort();
+        return '[tool blocked — guardrail error]';
+      }
+
+      if (guardResult.blocked) {
+        setHalted();
+        sseWrite('error', GUARDRAIL_BLOCK_EVENT);
+        abortCtrl.abort();
+        return '[tool blocked by guardrail]';
+      }
+
+      // Use possibly-redacted args from the guardrail result
+      const finalArgs = guardResult.mutatedInput.toolArgs ?? typedArgs;
+
+      // Delegate to the inner FunctionTool via its invoke() using the real run context
+      return fnTool.invoke(runContext, JSON.stringify(finalArgs), details) as Promise<string>;
+    },
+    needsApproval: fnTool.needsApproval,
+    isEnabled: fnTool.isEnabled,
+    inputGuardrails: fnTool.inputGuardrails,
+    outputGuardrails: fnTool.outputGuardrails,
+  };
+  return wrapped;
 }
 
 /**
@@ -198,6 +277,29 @@ export class Runner {
       signal.addEventListener('abort', () => abortCtrl.abort(signal.reason), { once: true });
     }
 
+    // ── Input guardrail hook ────────────────────────────────────────────────
+    const inputGuardrails = this.registry.getGuardrailsByStage('input');
+    const guardInput = { stage: 'input' as const, userMessage };
+    let guardedMessage = userMessage;
+    try {
+      const inputResult = await runGuardrails('input', guardInput, inputGuardrails, agentName);
+      if (inputResult.blocked) {
+        sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
+        return;
+      }
+      guardedMessage = inputResult.mutatedInput.userMessage ?? guardedMessage;
+    } catch {
+      // Fail-closed: unexpected throw from engine
+      sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
+      return;
+    }
+
+    // ── Tool guardrail setup ────────────────────────────────────────────────
+    const toolGuardrails = this.registry.getGuardrailsByStage('tool');
+    let guardrailHalted = false;
+    const isHalted = () => guardrailHalted;
+    const setHalted = () => { guardrailHalted = true; };
+
     // Build tools list
     const toolContribs = this.registry.getToolsForAgent(agentName);
     const tools = toolContribs.map((contrib) => {
@@ -211,7 +313,15 @@ export class Runner {
           this.registry,
         );
       }
-      return wrapTool(contrib as ToolContribution);
+      return wrapTool(
+        contrib as ToolContribution,
+        toolGuardrails,
+        agentName,
+        sseWrite,
+        abortCtrl,
+        isHalted,
+        setHalted,
+      );
     });
 
     // Build dynamic instructions: base + skills stub + catalog hint
@@ -239,10 +349,12 @@ export class Runner {
     });
 
     let fullText = '';
+    // Buffer all text chunks — output guardrails must pass before any chunk is sent to the client.
+    const chunkBuffer: string[] = [];
 
     try {
       const sdkRunner = getSdkRunner();
-      const result = await sdkRunner.run(agent, userMessage, {
+      const result = await sdkRunner.run(agent, guardedMessage, {
         stream: true,
         context: session,
         signal: abortCtrl.signal,
@@ -260,7 +372,9 @@ export class Runner {
           if (data.type === 'output_text_delta') {
             const delta = (data as { delta: string }).delta;
             fullText += delta;
-            sseWrite('chunk', { delta });
+            // Buffer instead of writing live — output guardrails run after the
+            // full stream, so no chunk leaves the server until they pass.
+            chunkBuffer.push(delta);
           }
         } else if (event.type === 'run_item_stream_event') {
           const { name, item } = event;
@@ -292,13 +406,9 @@ export class Runner {
         sseWrite('a2ui', msg);
       }
 
-      // Record assistant turn
-      if (fullText) {
-        session.recordTurn({ role: 'assistant', content: fullText });
-      }
-
       // Extract intent from final output if structured
       let intent: string | undefined;
+      let outputText = fullText;
       try {
         const finalOutput = await result.finalOutput;
         if (finalOutput && typeof finalOutput === 'object' && 'intent' in finalOutput) {
@@ -309,15 +419,54 @@ export class Runner {
         }
       } catch { /* finalOutput not available when interrupted */ }
 
+      // ── Output guardrail hook (runs BEFORE any chunk is sent to the client) ─
+      if (!guardrailHalted) {
+        const outputGuardrails = this.registry.getGuardrailsByStage('output');
+        const outGuardInput = { stage: 'output' as const, proposedOutput: outputText };
+        try {
+          const outResult = await runGuardrails('output', outGuardInput, outputGuardrails, agentName);
+          if (outResult.blocked) {
+            sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
+            return;
+          }
+          outputText = outResult.mutatedInput.proposedOutput ?? outputText;
+        } catch {
+          sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
+          return;
+        }
+      }
+
+      // Record assistant turn AFTER guardrails — persist only the guardrail-approved
+      // (possibly redacted) output, never raw LLM content that may contain PII/credentials.
+      if (outputText) {
+        session.recordTurn({ role: 'assistant', content: outputText });
+      }
+
+      // ── Flush buffered chunks now that output guardrails have passed ────────
+      if (chunkBuffer.length > 0) {
+        if (outputText !== fullText) {
+          // Output was redacted — send the redacted version as a single chunk
+          sseWrite('chunk', { delta: outputText });
+        } else {
+          // No redaction — replay original buffered chunks preserving granularity
+          for (const delta of chunkBuffer) {
+            sseWrite('chunk', { delta });
+          }
+        }
+      }
+
       sseWrite('end', {
         sessionId: session.sessionId,
         intent,
       });
     } catch (err: unknown) {
-      // AbortError indicates a UserAction interrupt — already emitted user_action_req
+      // AbortError: may be a UserAction interrupt OR a guardrail halt
       if (err instanceof Error && err.name === 'AbortError') {
-        // The run was intentionally aborted for a UserAction interrupt.
-        // user_action_req was already written by the tool wrapper.
+        if (guardrailHalted) {
+          // Already emitted GUARDRAIL_BLOCK error in the tool wrapper
+          return;
+        }
+        // UserAction interrupt — user_action_req was already written by the tool wrapper.
         return;
       }
       sseWrite('error', {

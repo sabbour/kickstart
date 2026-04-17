@@ -62,8 +62,9 @@ An A2UI v0.9 component definition + a React renderer.
 
 ### Guardrail
 Cross-cutting check at input, output, or tool boundary.
-- `{ name, stage: "input" | "output" | "tool", check(ctx, payload) → Verdict }`.
+- `{ id, stages: ("input" | "output" | "tool")[], evaluate(input: GuardrailInput) → GuardrailResult }`.
 - Replaces today's scattered regex checks.
+- IDs are namespaced (`core/token-budget`). Core guardrails run first and fail-closed.
 
 ### How they compose per turn
 
@@ -488,16 +489,25 @@ export interface ComponentContribution {
 
 ```ts
 // packages/harness/src/types/guardrail.ts
-export type GuardrailVerdict =
-  | { kind: "pass" }
-  | { kind: "block"; reason: string }
-  | { kind: "rewrite"; payload: unknown };
+export interface GuardrailInput {
+  stage: 'input' | 'output' | 'tool';
+  userMessage?: string;
+  assistantMessage?: string;
+  toolName?: string;
+  toolArgs?: Record<string, unknown>;
+}
+
+export interface GuardrailResult {
+  verdict: 'pass' | 'block' | 'redact';
+  reason?: string;
+  redacted?: string;  // replaced content for 'redact' verdict
+}
 
 export interface GuardrailContribution {
-  name: string;
-  stage: "input" | "output" | "tool";
-  appliesTo?: string[];                   // agent-name globs; default all
-  check: (ctx: SessionCtx, payload: unknown) => Promise<GuardrailVerdict>;
+  id: string;                              // namespaced, e.g. "core/token-budget"
+  stages: ('input' | 'output' | 'tool')[]; // which stages to fire on
+  appliesTo?: string[];                    // agent-name globs; default all
+  evaluate: (input: GuardrailInput) => Promise<GuardrailResult>;
 }
 ```
 
