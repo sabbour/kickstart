@@ -18,6 +18,23 @@ const skillFrontmatterSchema = z.object({
   }).strict(),
 }).strict();
 
+export const inlineSkillSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().min(1),
+  version: z.string().min(1),
+  author: z.string().min(1).optional(),
+  license: z.string().min(1).optional(),
+  instructions: z.string().min(1),
+  appliesTo: z.array(z.string().min(1)).min(1),
+  keywords: z.array(z.string().min(1)).min(1),
+  priority: z.number().int(),
+  source: z.object({
+    kind: z.enum(['inline', 'file']),
+    path: z.string().optional(),
+  }),
+});
+
 function validateSkillName(name: string): string {
   if (name.includes('..') || name.includes('/') || name.includes('\\')) {
     throw new Error(`Skill name contains an invalid path-like segment: ${name}`);
