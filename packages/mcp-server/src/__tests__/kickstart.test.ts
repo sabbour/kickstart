@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { handleKickstart, getEngineState } from "../tools/kickstart.js";
+import { handleKickstart, getSessionPhase } from "../tools/kickstart.js";
 import type { SessionState } from "@kickstart/core";
 import { Phase } from "@kickstart/core";
 
@@ -36,9 +36,9 @@ describe("handleKickstart", () => {
   it("initialises engine state at Discover phase", async () => {
     await handleKickstart(sessions);
     const [sessionId] = [...sessions.keys()];
-    const engineState = getEngineState(sessionId);
-    expect(engineState).toBeDefined();
-    expect(engineState!.currentPhase).toBe(Phase.Discover);
+    const phase = getSessionPhase(sessionId);
+    expect(phase).toBeDefined();
+    expect(phase).toBe(Phase.Discover);
     // isComplete was removed with the FSM; currentPhase being Discover means not complete
   });
 

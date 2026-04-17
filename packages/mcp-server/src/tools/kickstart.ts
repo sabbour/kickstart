@@ -17,7 +17,6 @@ import {
 } from "@kickstart/core";
 import type {
   SessionState,
-  ConversationState,
   ConversationPhaseComponent,
   PhaseItem,
 } from "@kickstart/core";
@@ -29,22 +28,22 @@ type ContentItem =
   | { type: "text"; text: string }
   | { type: "resource"; resource: { uri: string; mimeType: string; text: string } };
 
-/** In-memory conversation engine state keyed by session ID. */
-const engineStates = new Map<string, ConversationState>();
+/** In-memory session phase state keyed by session ID. */
+const sessionPhases = new Map<string, Phase>();
 
-/** Retrieve the engine state for a session. */
-export function getEngineState(sessionId: string): ConversationState | undefined {
-  return engineStates.get(sessionId);
+/** Retrieve the current phase for a session. */
+export function getSessionPhase(sessionId: string): Phase | undefined {
+  return sessionPhases.get(sessionId);
 }
 
-/** Store engine state for a session. */
-export function setEngineState(sessionId: string, state: ConversationState): void {
-  engineStates.set(sessionId, state);
+/** Store the current phase for a session. */
+export function setSessionPhase(sessionId: string, phase: Phase): void {
+  sessionPhases.set(sessionId, phase);
 }
 
-/** Delete engine state for a session. */
-export function deleteEngineState(sessionId: string): void {
-  engineStates.delete(sessionId);
+/** Delete the phase state for a session. */
+export function deleteSessionPhase(sessionId: string): void {
+  sessionPhases.delete(sessionId);
 }
 
 /**
@@ -61,14 +60,13 @@ export async function handleKickstart(
 ): Promise<{ content: ContentItem[] }> {
   const sessionId = randomUUID();
   const now = new Date().toISOString();
-  const engineState: ConversationState = { currentPhase: Phase.Discover };
 
-  // Persist engine state for future tool calls
-  engineStates.set(sessionId, engineState);
+  // Persist phase state for future tool calls
+  setSessionPhase(sessionId, Phase.Discover);
 
   const session: SessionState = {
     sessionId,
-    currentPhase: engineState.currentPhase,
+    currentPhase: Phase.Discover,
     createdAt: now,
     updatedAt: now,
     appDefinition: {},

@@ -76,7 +76,6 @@ export {
   formatCopilotSkillsPrompt,
 } from "./engine/index.js";
 export type {
-  ConversationState,
   PhaseDefinition,
   ResolvedSkills,
   Skill,

@@ -1,6 +1,5 @@
 export { Phase } from "./types.js";
 export type {
-  ConversationState,
   PhaseDefinition,
   Skill,
 } from "./types.js";

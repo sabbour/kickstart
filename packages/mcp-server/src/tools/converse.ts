@@ -17,7 +17,7 @@ import type {
   ConversationPhaseComponent,
   PhaseItem,
 } from "@kickstart/core";
-import { getEngineState, setEngineState } from "./kickstart.js";
+import { getSessionPhase, setSessionPhase } from "./kickstart.js";
 import { createA2UIResource } from "../a2ui.js";
 import type { A2UICapability } from "../a2ui.js";
 
@@ -60,27 +60,26 @@ export async function handleConverse(
   session.messages.push({ role: "user", content: message, timestamp: now });
   session.updatedAt = now;
 
-  // Retrieve or recover engine state
-  let engineState = getEngineState(sessionId);
-  if (!engineState) {
-    engineState = { currentPhase: Phase.Discover };
-    setEngineState(sessionId, engineState);
+  // Retrieve or recover current phase
+  const currentPhase = getSessionPhase(sessionId) ?? Phase.Discover;
+  if (!getSessionPhase(sessionId)) {
+    setSessionPhase(sessionId, currentPhase);
   }
 
   // Recompose system prompt for the (possibly new) current phase
   const systemPrompt = buildSystemPrompt({
-    phase: engineState.currentPhase,
+    phase: currentPhase,
     appDefinition: session.appDefinition,
     azureContext: session.azureContext,
     githubContext: session.githubContext,
   });
 
-  // Update session phase to match engine
-  session.currentPhase = engineState.currentPhase;
+  // Update session phase
+  session.currentPhase = currentPhase;
 
   // Build A2UI phase indicator
   const order = getPhaseOrder();
-  const currentIdx = order.indexOf(engineState.currentPhase);
+  const currentIdx = order.indexOf(currentPhase);
   const phases: PhaseItem[] = order.map((phase, idx) => ({
     id: phase,
     label: getPhaseDefinition(phase).label,
@@ -91,7 +90,7 @@ export async function handleConverse(
     type: "ConversationPhase",
     id: "phase-indicator",
     phases,
-    currentPhase: engineState.currentPhase,
+    currentPhase,
   };
 
   const a2uiResource = createA2UIResource(
@@ -100,7 +99,7 @@ export async function handleConverse(
     capability,
   );
 
-  const phaseDef = getPhaseDefinition(engineState.currentPhase);
+  const phaseDef = getPhaseDefinition(currentPhase);
 
   const responseText = `**Session:** \`${sessionId}\`
 **Phase:** ${phaseDef.label}

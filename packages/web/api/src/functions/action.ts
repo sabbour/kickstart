@@ -131,7 +131,7 @@ function actionToMessage(action: A2UIAction): string {
 async function callLLM(
   sessionId: string,
   userMessage: string,
-  engineState: { currentPhase: string },
+  currentPhase: string,
   context: InvocationContext,
 ): Promise<{ message: string; a2uiMessages: A2UIMessage[]; phase: string; model: string }> {
   addMessage(sessionId, "user", userMessage);
@@ -146,7 +146,7 @@ async function callLLM(
 
   // Build phase indicator A2UI message
   const order = getPhaseOrder();
-  const currentIdx = order.indexOf(engineState.currentPhase as Phase);
+  const currentIdx = order.indexOf(currentPhase as Phase);
   const phases: PhaseItem[] = order.map((phase, idx) => ({
     id: phase,
     label: getPhaseDefinition(phase as Phase).label,
@@ -163,7 +163,7 @@ async function callLLM(
       surfaceId: "phase-indicator",
       component: "ConversationPhase",
       phases,
-      currentPhase: engineState.currentPhase,
+      currentPhase,
     } as unknown as A2UIMessage,
   ];
 
@@ -174,12 +174,12 @@ async function callLLM(
   const processed = processResponse(result.content);
   addMessage(sessionId, "assistant", processed.message);
 
-  context.log(`[action] LLM response for session ${sessionId}, phase=${engineState.currentPhase}`);
+  context.log(`[action] LLM response for session ${sessionId}, phase=${currentPhase}`);
 
   return {
     message: processed.message,
     a2uiMessages: [...phaseA2ui, ...processed.a2uiMessages],
-    phase: engineState.currentPhase,
+    phase: currentPhase,
     model: getChatDeploymentName(),
   };
 }
@@ -263,8 +263,9 @@ app.http("action", {
       }
       adoptSessionPrincipal(session, principalId);
 
-      const { engineState } = session;
-      const sessionId = session.state.sessionId;
+      const { state } = session;
+      const sessionId = state.sessionId;
+      const currentPhase = state.currentPhase;
       const category = categorize(body.action.name);
 
       context.log(
@@ -280,7 +281,7 @@ app.http("action", {
           sessionId,
           status: "not_implemented",
           message: "API actions require APIConnector (B-11)",
-          phase: engineState.currentPhase,
+          phase: currentPhase,
         };
         return { status: 200, jsonBody: response };
       }
@@ -294,7 +295,7 @@ app.http("action", {
         const llmResult = await callLLM(
           sessionId,
           navMessage,
-          engineState,
+          currentPhase,
           context,
         );
 
@@ -314,7 +315,7 @@ app.http("action", {
       const llmResult = await callLLM(
         sessionId,
         userMessage,
-        engineState,
+        currentPhase,
         context,
       );
 

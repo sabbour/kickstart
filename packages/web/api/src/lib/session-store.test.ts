@@ -9,7 +9,6 @@ import {
 describe("session-store phase hydration", () => {
   it("starts new sessions in discover", () => {
     const session = createSession("principal-123");
-    expect(session.engineState.currentPhase).toBe(Phase.Discover);
     expect(session.state.currentPhase).toBe(Phase.Discover);
     expect(session.routingPhaseTrusted).toBe(true);
   });
@@ -23,7 +22,6 @@ describe("session-store phase hydration", () => {
       { role: "assistant", content: "Ready to deploy", phase: Phase.Deploy },
     ], "principal-123");
 
-    expect(session.engineState.currentPhase).toBe(Phase.Deploy);
     expect(session.state.currentPhase).toBe(Phase.Deploy);
     expect(session.routingPhaseTrusted).toBe(false);
   });
@@ -34,7 +32,6 @@ describe("session-store phase hydration", () => {
       { role: "user", content: "continue" },
     ], "principal-123");
 
-    expect(session.engineState.currentPhase).toBe(Phase.Discover);
     expect(session.state.currentPhase).toBe(Phase.Discover);
     expect(session.routingPhaseTrusted).toBe(false);
   });

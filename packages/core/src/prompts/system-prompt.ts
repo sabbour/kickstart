@@ -740,9 +740,6 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
 
   // Compose: unified narrative + phase marker + context + artifact summary + capabilities
   const unified = interpolate(KICKSTART_SYSTEM_PROMPT, vars);
-  const phaseHint = phaseDefinition.promptTemplate
-    ? interpolate(phaseDefinition.promptTemplate, vars)
-    : "";
 
   const parts = [
     PROMPT_BOUNDARY_INSTRUCTION + unified,
@@ -750,8 +747,10 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
     phaseDefinition.description,
   ];
 
-  if (phaseHint) {
-    parts.push("", phaseHint);
+  // Inject collected app context so the LLM has the current session state.
+  // Previously this was driven by per-phase promptTemplates; now injected uniformly.
+  if (context.appDefinition && Object.keys(context.appDefinition).length > 0) {
+    parts.push(`\n## Collected App Info\n\n${vars["knownInfo"]}`);
   }
 
   // Artifact summary — gives the LLM running context of generated files.
