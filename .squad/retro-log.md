@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #105 "feat: GitHub A2UI fat components (fixes #32)" | XL | impl=1m | review=0m | cycles=1 | merged | @sabbour
