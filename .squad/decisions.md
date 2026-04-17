@@ -3240,3 +3240,116 @@ PR #548 is **not approved** from the security side. The implementation adds usef
 - **Verdict:** Blocked
 - **GitHub action taken:** blocker comment posted on PR #548
 - **`zapp:approved` label:** not applied
+
+---
+# Decision: DP Review — #482 pack-azure (Step 7)
+
+**Date:** 2026-04-17
+**Author:** Leela (Lead Architect)
+**Issue:** #482 — v2 Step 7: pack-azure — agents, skills, tools, user actions, and components
+**DP Author:** Fry (Frontend Dev)
+
+## Verdict
+
+**APPROVE_WITH_CONDITIONS**
+
+Five conditions must be satisfied before the Step 7 PR merges.
+
+---
+
+## Condition Outcomes
+
+| # | Condition | Status |
+|---|-----------|--------|
+| C1 | `auditLog` primitive must be resolved against harness API | ⚠️ Required |
+| C2 | `azure/Login` must delegate to pack-core `AuthCard`, not re-port `AzureLoginCard` | ⚠️ Required |
+| C3 | Phase gating table must be explicit in the implementation PR description | ⚠️ Required |
+| C4 | `validate_bicep` shell-out assumption must be documented or mitigated | ⚠️ Required |
+| C5 | `azure/Action` must NOT dispatch a generic `azure:arm_write`; write ops need named user actions | ⚠️ Required (resolves Fry Q3) |
+
+---
+
+## Architecture Findings
+
+### 1. Dependency ordering — PASS with C3 note
+
+Phases A+B (`.agent.md` and `SKILL.md` files) are pure text — they can start immediately, no runtime dep needed. Phases C+D+E+F need #477 (harness types/pack-core) and #476 (PackRegistry). Phase D (user actions) additionally needs #479 (Runner+SSE interrupt/resume). The DP lists all three as blockers globally but doesn't gate phases individually. **C3** requires the implementation PR description to make this explicit.
+
+### 2. ARM tool design — PASS
+
+Zapp's pre-filed C1 condition is fully addressed. Three-layer defence on both `arm_get` and `what_if`:
+1. Regex `/^\/subscriptions\//` excludes tenant-level and management-group endpoints
+2. `.refine()` blocks `../` and `%2e%2e` (URL-encoded traversal)
+3. Audit log of resolved path before fetch
+
+The `what_if` path parameter carries the same constraints as `arm_get`. **One outstanding concern (C1 below):** `auditLog.record(...)` is not a defined harness primitive — see C1.
+
+### 3. User actions — PASS (result schemas present)
+
+All 6 user actions declare result schemas in the DP table. The DP says `userAction({ name, parameters, resultSchema, execute })` which matches the brief's authoring API. Result schemas are described as TypeScript types; they must be Zod schemas in the implementation (`z.object({...})`). Not a blocker since the DP is prescriptive; enforce at PR review.
+
+### 4. Component boundaries — CONDITIONAL on C2
+
+`azure/DeploymentProgress` (new) is correct. The 7 ported components are all Azure-specific — correct split from pack-core. **Exception:** `azure/Login` is proposed as a full port of `AzureLoginCard`. This duplicates the sign-in UI logic already generalized in pack-core's `AuthCard` (confirmed domain-neutral per PR #548 C5 review). `azure/Login` should render `<AuthCard providerLabel="Microsoft" ... />` and only add Azure-specific pre/post logic — **C2** enforces this.
+
+### 5. Pack manifest — PASS with one alignment note
+
+`azurePack` follows the `corePack` pattern. `dependencies: ['core']` is correct. All contributions wired. One alignment item: the DP shows `loadAgents(['azure.architect', 'azure.iac_author'])` — but from the pack-core precedent (PR #548), the actual harness loader may use `agentsDir` URL dir-pointers rather than name arrays. Bender must confirm the exact `loadAgents` API surface from #477 before implementing Phase F.
+
+---
+
+## Fry's 5 Open Questions — Answered
+
+**Q1: `arm_get` vs `arm_list` split?**
+Keep `arm_get` as the single ARM read tool. ARM collection paths (e.g., `GET /subscriptions/.../resourceGroups`) are valid GETs and are already allowed by the `/subscriptions/...` regex. Do not add `azure.arm_list` — the path regex covers it, and YAGNI applies. If a future scenario requires list-specific pagination handling, add it then.
+
+**Q2: `azure:deploy_bicep` server-side runner**
+Call the ARM `deployments` API directly from `execute()` server-side using the session auth token from `ctx.session.azure.accessToken`. v2 has no SWA backend. `azure-deployments.ts` must be rewritten to call ARM directly — strip the `/api/azure/deployments` route reference entirely. No new harness API route needed; #479 Runner+SSE already handles the SSE stream that surfaces deployment progress events back to the browser.
+
+**Q3: `azure/Action` ARM write operations** ← Resolved as **C5**
+`azure/Action` component is a confirm gate only — it must NOT dispatch a generic `azure:arm_write` user action. ARM write operations require named user actions per operation type (e.g., `azure:deploy_bicep`, `azure:create_resource_group`). This keeps Zod schemas tight and the audit trail clean. Generic write surface is too broad and would make security review of each operation impossible. Fry must remove any `azure:arm_write` concept from the implementation.
+
+**Q4: Icon registration timing**
+Follow the pack-core pattern. Call `registerAzureIcons()` at the top level of each component module file that uses Azure icons (module-level side effect, not inside the render function). This runs once on module load, before any render. Do NOT add an `onRegister` lifecycle hook to PackRegistry for this — it adds complexity to #476 for a non-essential use case. Lazy module-level registration is sufficient.
+
+**Q5: Playground stubs for user actions**
+Export `azurePlaygroundStubs` as a named export from `packages/pack-azure/src/playground/stubs.ts`, keyed by canonical action name (e.g., `'azure:login'`). Do NOT add a `playgroundStubs` field to the `Pack` contributions shape without a Bender/Hermes DP for the stubs API surface. The `Pack` type is defined in harness — adding fields there is a harness contract change requiring #476 DP alignment. Playground scenario files import stubs directly from `./stubs` — this is the same pattern pack-core uses for its playground scenarios. The `playgroundScenarios` contributions field covers the scenario runner; stubs are an implementation detail of those scenarios.
+
+---
+
+## Conditions Detail
+
+### C1 — `auditLog` primitive undefined
+
+`arm_get` and `what_if` execute bodies use `auditLog.record(...)`. No `auditLog` harness primitive is defined in the brief or in any merged PR. Before implementing, align with Bender on what the harness exposes for structured audit logging — likely a method on `SessionCtx` (e.g., `ctx.session.auditLog(...)`) or a structured `console.warn` with a defined JSON shape. Do not invent a global `auditLog` singleton.
+
+### C2 — `azure/Login` must use pack-core `AuthCard`
+
+`AuthCard` in pack-core was explicitly made provider-agnostic (no Azure-specific props) per PR #548 C5. Porting `AzureLoginCard.tsx` wholesale would duplicate that abstraction. `azure/Login` must render `<AuthCard providerLabel="Microsoft" icon={<AzureIcon />} onSignIn={() => dispatchAction('azure:login')} />` and only add Azure-specific pre/post rendering logic.
+
+### C3 — Explicit phase gating in PR description
+
+The implementation PR must include a table:
+
+| Phase | Content | Earliest start | Blocked on |
+|-------|---------|----------------|------------|
+| A | Agent `.agent.md` files | Now | — |
+| B | Skill `SKILL.md` files | Now | — |
+| C | Tools | After #477 merges | #477, #476 |
+| D | User Actions | After #479 merges | #477, #476, #479 |
+| E | Components | After #477 merges | #477 |
+| F | Pack manifest | After all C/D/E done | #477, #476 |
+
+### C4 — `validate_bicep` shell-out
+
+`az bicep build --stdout` requires the Azure CLI to be installed in the server runtime. SWA Functions and standard Node.js containers do not include `az` by default. The DP must either: (a) document that `az` CLI is a required deployment dependency and add it to the environment setup docs, or (b) switch to the `@azure/bicep-node` npm package which does not require CLI installation. Option (b) is preferred — no deployment dependency drift.
+
+### C5 — No generic `azure:arm_write`
+
+See Q3 answer above. Architecturally enforced: any ARM write that needs user consent must be a named, Zod-typed user action. `azure/Action` component renders confirm UI only; it dispatches a named action. This is a pack boundary rule.
+
+---
+
+## Label
+
+`leela:approved` to be applied to Step 7 PR after all 5 conditions are addressed and confirmed in PR review.

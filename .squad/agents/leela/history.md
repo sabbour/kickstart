@@ -68,3 +68,31 @@ Scope: 3 agents ✅, 5 skills ✅, 6 tools ✅, 40 components (27+13; Architectu
 
 **`leela:approved` applied.** Zapp security review pending; PR currently blocked by Zapp (3 findings: workspace symlink confinement, SSRF, guardrail enforcement).
 Filed: `.squad/decisions/inbox/leela-pr548-review.md`
+
+## 2026-04-17 — DP Review #482 pack-azure (Step 7)
+
+Working as **Leela (Lead Architect)**.
+
+Reviewed DP for #482 (v2 Step 7: pack-azure — agents, skills, tools, user actions, and components). Author: Fry.
+
+**Verdict: APPROVE_WITH_CONDITIONS** — 5 conditions.
+
+| Condition | Summary |
+|-----------|---------|
+| C1 | `auditLog` not a harness primitive — align with Bender on `SessionCtx` API before implementing |
+| C2 | `azure/Login` must use pack-core `AuthCard` (generic) rather than re-porting `AzureLoginCard` |
+| C3 | Phase gating must be explicit: A+B now, C+E after #477+#476, D after #479 |
+| C4 | `validate_bicep` shell-out — switch to `@azure/bicep-node` or document `az` as deployment dep |
+| C5 | No generic `azure:arm_write`; ARM writes need named per-operation user actions |
+
+Answered all 5 of Fry's open questions:
+- Q1: Keep single `arm_get` (collection paths allowed by regex)
+- Q2: `deploy_bicep` calls ARM directly server-side; no new harness route
+- Q3 → C5: Named user actions per write op; `azure/Action` is confirm-gate only
+- Q4: Module-level icon registration (lazy); no `onRegister` hook in PackRegistry
+- Q5: `azurePlaygroundStubs` named export in `playground/stubs.ts`; no `Pack` type change
+
+ARM tool security (Zapp C1 pre-addressed): 3-layer defence on `arm_get`+`what_if` is sound. Only concern is `auditLog` API surface (C1).
+
+Comment posted: https://github.com/sabbour/kickstart/issues/482#issuecomment-4268990865
+Decision filed: `.squad/decisions/inbox/leela-482-dp-review.md`
