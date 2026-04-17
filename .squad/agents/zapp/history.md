@@ -78,3 +78,29 @@
 
 **Gate Status:** Conditionally clear for design proposal. Final implementation PRs must demonstrate all conditions with tests/evidence before Zapp sign-off.
 - 2026-04-17: DP #329 (MCP App IDE surface) approved with conditions; key risks were app-tool overexposure, host-variant postMessage trust, missing mandatory CSP, and unbounded A2UI payload validation.
+
+## 2026-04-17 Round 3: PR #447 Security Approval
+
+**Sponsor Issue:** #445 — Backend SDK adapter for OpenAI Agents SDK migration  
+**PR:** #447 — squad/445-backend-adapter
+
+**Security Review Scope:**
+All 4 critical security conditions from issue #445 acceptance criteria:
+1. Server-enforced allowlist of app-callable MCP tools (default-deny)
+2. Workspace gate bypass protection 
+3. TTL expiry enforcement 
+4. Test coverage for hijack scenarios + lockfile pinning
+
+**Verification:**
+- ✅ **MCP tool allowlist:** Backend route validates `toolName` against allowlist before forwarding to MCP server. Disabled tools return 403 Forbidden. Tests cover both positive (allowed) and negative (blocklisted) cases.
+- ✅ **Workspace gate bypass:** Session ownership binding enforced at API boundary. Principal/channel checks block cross-workspace access. Audit logging captures attempted bypasses.
+- ✅ **TTL expiry:** Session TTL strictly enforced; expired sessions return 401 Unauthorized. Resume semantics fail-closed when token invalid. No guest fallbacks.
+- ✅ **Hijack tests:** Invalid/cross-principal sessionId rejected. Token tampering detected. Lockfile integrity enforced.
+
+**Security Verdict:** ✅ **APPROVED WITH CONDITIONS** (applied `zapp:approved` label)
+- All 4 blocking conditions satisfied with test evidence
+- Dependencies pinned in package-lock.json (no floating semver)
+- Dependency scans passed
+- Integration with DP #329 + #330 security review validated
+
+**Consequence:** Unblocks merge when Leela approval also present (verified as received).

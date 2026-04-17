@@ -1836,3 +1836,39 @@ Security review of PR #444 (`squad/430-api-docs-accuracy`) updating API endpoint
 
 ## Outcome
 No new security risk introduced and no misleading auth guidance detected. Applied `zapp:approved` label to PR #444.
+
+---
+
+## Decision: Frontend UI Adaptation for Agents SDK (#446)
+
+**Date:** 2026-04-17T06:28:51Z
+**Author:** Fry (Frontend Dev)
+**Issue:** #446 | **PR:** #455
+
+### 1. 406 fallback in useStreaming.ts is the canonical SDK bridge pattern
+
+When `KICKSTART_AGENTS_SDK=true`, the backend returns HTTP 406 for streaming requests. The correct frontend pattern is an inline fallback in `useStreaming.ts`'s `send()` function: detect 406, retry as non-streaming JSON (`ConverseResponse`), and fire the same callbacks (`onPhase`, `onA2UI`, `onComplete`). Progressive text reveal is preserved.
+
+**Rejected alternatives:**
+- Separate `useNonStreamingConverse` hook — breaks caller API, two entry points
+- Backend streaming support for SDK path — out of scope; deferred
+
+### 2. No new frontend phase routing logic — server is the sole authority
+
+The frontend trusts the `phase` field from the SSE `done` event (or the JSON `ConverseResponse.phase` in the non-streaming fallback) as the sole authoritative phase source. `phaseComplete`/`filesComplete` model flags are backend-advisory-only. No frontend-side phase advancement or skip/revisit logic.
+
+**Implication:** Any future behavior changes (multi-hop skip, conditional revisit, dynamic lane switching) are backend route planner changes, not frontend changes.
+
+### 3. E2E route-state tests use page.route() interception, not ?mock mode
+
+Playwright tests for skip-ahead and revisit scenarios intercept `/api/converse` directly with crafted SSE responses. This exercises the real `useStreaming.ts` SSE parser path. Mock mode (`?mock`) uses `useMockStreaming`, which bypasses `useStreaming.ts` and cannot test the 406 fallback or SSE phase parsing.
+
+**Test pattern:** Register `/api/health` → 200 and `/api/converse` → SSE in test body before `page.goto()`. Use `page.waitForResponse('**/api/health')` to ensure `isApiAvailable` resolves before auto-send. **CRITICAL:** `waitForResponse` must be registered BEFORE `page.goto()` to avoid a race condition.
+
+### 4. addMessage placement in converse.ts
+
+`addMessage` must be called inside each processing branch in `converse.ts`, not before the branch. This ensures the 406 early-return path is fully side-effect free — session state remains unmutated on 406.
+
+### 5. Session cold-start unchanged
+
+`hydrateSession()` + `getLatestConversationPhase(messages)` correctly restores phase for the SDK-backed session. The `agents-session-adapter.ts` wraps the same session store. No frontend changes needed for cold-start.

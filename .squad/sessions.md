@@ -111,3 +111,109 @@ All 2 files in `.squad/decisions/inbox/` processed:
 - `leela-dp-reviews-apr17.md` → merged
 - `zapp-dp-329-security.md` → merged
 Inbox now empty and ready for next session.
+
+---
+
+## Session: 2026-04-17 (Round 3) — PR #447 Review & Approvals + Merge Unblock
+
+**Trigger:** Completion of code review cycles on PR #447 (Bender's issue #445 implementation).
+
+**Session Type:** Code review + security review + merge approval.
+
+### Reviews Completed
+
+**Leela (Lead, Code Review):**
+- ✅ PR #447: APPROVED (applied `leela:approved` label)
+  - Issue: #445 Backend SDK adapter for OpenAI Agents SDK migration
+  - Finding: Duplicate-message bug in conversation streaming (blocking)
+  - Resolution: Bender applied de-duplication filter in streaming loop (commit a3899e5) with unit tests
+  - Push cycles: 3 (initial → fix → final verification)
+  - Tests: 1511 passing, zero regression
+  - Unresolved threads: 0
+  - Implementation quality: Clean, focused, demonstrates no-lockout directive
+
+**Zapp (Security Architect):**
+- ✅ PR #447: APPROVED WITH CONDITIONS (applied `zapp:approved` label)
+  - All 4 critical security conditions from issue #445 acceptance criteria verified:
+    1. ✅ Server-enforced MCP tool allowlist (default-deny)
+    2. ✅ Workspace gate bypass protection
+    3. ✅ TTL expiry enforcement
+    4. ✅ Test coverage for hijack scenarios + lockfile pinning
+  - Dependencies: Pinned in package-lock.json, no floating semver
+  - Scans: Passed
+  - Integration: DP #329 + #330 security review conditions validated
+  - Gate: Clear for merge
+
+### Merge Unblocked
+
+- ✅ **Leela approval:** `leela:approved` label applied
+- ✅ **Zapp approval:** `zapp:approved` label applied  
+- ✅ **Status:** Ready for merge by Ralph (coordinator)
+- ⏳ **Next step in sequence:** Merge PR #447 → close #445 → spawn #446 (Fry, Chat/workspace UI adaptation)
+
+### Decisions Recorded
+
+None new (all conditions tracked in issue #445 acceptance criteria).
+
+### Inbox Status
+
+Ready for Scribe orchestration log + session log entry.
+
+---
+
+## Session: 2026-04-17 (Round 4) — PR #455 Merged, #446 Closed
+
+**Trigger:** Implementation and review cycle for issue #446 (Fry, Chat/workspace UI adaptation for Agents SDK).
+
+**Session Type:** Feature implementation + review cycle + merge.
+
+### PRs Merged
+
+| PR | Branch | Issue | Summary |
+|----|--------|-------|---------|
+| #455 | squad/446-agents-sdk-ui-adaptation | #446 | Chat/workspace UI adaptation for Agents SDK — 406 fallback in `useStreaming.ts`, `isRawA2uiItem()` type guard, `clientMessageId` idempotency key, `converse.ts` `addMessage` placement fix, unit + E2E tests |
+
+### Implementation Highlights
+
+- **`useStreaming.ts` 406 fallback:** When SSE gate returns HTTP 406 (`KICKSTART_AGENTS_SDK=true`), retries as non-streaming JSON (`ConverseResponse`); routes `phase`/`a2ui`/`complete` callbacks through the same pipeline with progressive text reveal
+- **`isRawA2uiItem()` type guard:** Discriminated-union guards (`version==='v0.9'` for A2uiMsg, `type==='ConversationPhase'` for phase payloads); no raw casts
+- **`SetupGenerationSnapshot` invariant JSDoc:** SDK non-streaming path does not emit incremental `SetupGenerationEvent` items — documented explicitly
+- **`KNOWN_SERVER_PHASES` / `guardServerPhase()` → removed:** Replaced with wrapper around `normalizeConversationPhase()` from `chat-a2ui.ts` to stay in sync with `PHASE_ALIASES`
+- **`clientMessageId` idempotency key:** Added per-turn, forwarded in both streaming and 406 fallback paths
+- **`converse.ts` backend:** `addMessage` moved after 406 early-return guard — 406 path is now fully side-effect free
+- **New unit tests:** `streaming-406-fallback.test.ts` — 4 tests covering 406 detection, JSON fallback, callback routing, idempotency key forwarding
+- **New E2E file:** `packages/web/e2e/route-state.spec.ts` — skip-ahead (phase jumps to `deploy`), revisit (phase steps back from `review` to `design`), unauthenticated redirect (real `request.post()` fixture, no mock, asserts `!== 200`)
+
+### Review Cycle
+
+| Round | Reviewer | Verdict | Notes |
+|-------|----------|---------|-------|
+| C1 | Leela | APPROVED WITH CONDITIONS | 5 conditions |
+| C1 | Zapp | APPROVE WITH CONDITIONS | 2 conditions |
+| C2 | Fry | — | Addressed all 5+2 conditions in `cbd7be8` |
+| C3 | Leela | BLOCKED | Auth test still used `page.route()` mock (C5) |
+| C3 | Zapp | BLOCKED | Auth test still used `page.route()` mock (C5) |
+| C4 | Fry | — | Fixed C5 in `eff87aa` — real `request.post()` test, no mock |
+| C5 | Leela | APPROVED | Applied `leela:approved` |
+| C5 | Zapp | APPROVED | Applied `zapp:approved` |
+| CI | — | FAILED | Playwright race condition (`waitForResponse` after `goto`) |
+| Fix | Fry | — | Fixed race in `c34b3b5` (moved `waitForResponse` setup before `page.goto()`) |
+| Final | Copilot | 6 threads | Addressed in `3ccbe9a` + `79f683d` |
+| Final CI | — | ✅ GREEN | Playwright E2E pass, Lint/Build/Unit pass, squad/review-gate pass |
+
+### Decisions Made
+
+- **`addMessage` placement in `converse.ts`:** Must be called inside each processing branch, not before the branch — ensures 406 early-return leaves session state unmutated. Filed as `fry-446-ui-adaptation.md` (merged below).
+
+### Board State
+
+- ✅ #446 closed (auto-closed by PR #455 squash-merge)
+- ✅ #445 closed (prior session)
+- 🟡 #46 remains open — v0.6.0 epic (umbrella, not a sprint issue)
+- **Board is clear of active squad sprint issues.**
+
+### Inbox Cleared
+
+1 file processed and merged into `decisions.md`:
+- `fry-446-ui-adaptation.md` → merged
+Inbox now empty and ready for next session.
