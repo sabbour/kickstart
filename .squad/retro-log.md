@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-15 | #294 "fix: code block theme — dark palette, readable font, line numbers" | L | impl=0m | review=8m | cycles=1 | merged | @sabbour
+
 - 2026-04-15 | #303 "fix(prompt): architecture diagram depth + KAITO full name" | M | impl=1m | review=45m | cycles=1 | merged | @sabbour
 - 2026-04-15 | #302 "fix: restore chat surface ownership, phase bar rendering, and debug action log placement" | XL | impl=100m | review=11m | cycles=1 | merged | @sabbour
 
