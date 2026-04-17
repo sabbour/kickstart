@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #157 "fix: Add prompt injection boundary + A2UI payload validation" | XL | impl=1m | review=75m | cycles=1 | merged-with-rework | @sabbour-squad-backend[bot]
