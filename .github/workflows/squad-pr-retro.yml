@@ -53,7 +53,7 @@ jobs:
             } else {
               pr = context.payload.pull_request;
             }
-            if (pr.state === 'open' || (pr.closed_at == null && pr.merged_at == null)) {
+            if (pr.state === 'open') {
               throw new Error(
                 `PR #${pr.number} is not closed yet (state: ${pr.state}). Retro metrics can only be generated for closed or merged pull requests.`
               );
