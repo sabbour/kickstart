@@ -28,6 +28,14 @@ function getMsalInstance(): PublicClientApplication {
   return msalInstance;
 }
 
+/**
+ * ARM-only token provider — always requests `management.azure.com/.default`
+ * regardless of the `scopes` argument supplied by the `TokenProvider` contract.
+ * This is intentional: the Playground Azure connector is exclusively ARM-scoped,
+ * and MSAL requires a concrete resource scope string rather than a delegated
+ * connector-level scope list.  If this provider is ever reused for a non-ARM
+ * connector the caller should wrap it and supply the appropriate scope.
+ */
 export async function acquireAzureToken(_scopes: string[]): Promise<TokenInfo> {
   const msal = getMsalInstance();
   await msal.initialize();
