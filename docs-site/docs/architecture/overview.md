@@ -80,8 +80,8 @@ Base catalog: `packages/core/src/prompts/component-catalog.ts`. Kit-contributed 
 
 ## Code Health Notes
 
-:::warning Exported but uncalled APIs
-`resolveSkillsAsync()` and `resolveSkillsFromList()` are exported from `@kickstart/core` and tested, but never called in any production handler. Only `resolveSkills()` is used. These inflate the public API surface without runtime callers.
+:::note Exported but uncalled APIs removed
+`resolveSkillsAsync()` and `resolveSkillsFromList()` were exported from `@kickstart/core` but never called in any production handler. They were removed in PR #402. Only `resolveSkills()` remains as the public entry point.
 :::
 
 :::info Both skill paths are active
@@ -113,6 +113,6 @@ Garbage collection
 
 ## What Should Be Cleaned Up
 
-1. **`resolveSkillsAsync` / `resolveSkillsFromList`** — remove or mark `@internal` before Agent SDK integration.
-2. **Typed `Skill` path in `skill-resolver.ts`** — consolidate to one path; both existing kits use legacy.
+1. ~~**`resolveSkillsAsync` / `resolveSkillsFromList`**~~ — **Done in #402.** Both removed from public exports.
+2. **Typed `Skill` path in `skill-resolver.ts`** — consolidate to one canonical resolution path. `azure-kit.ts` uses the typed `kit.skills[]` path; `github-kit.ts` uses the legacy `kit.prompts[]` / `kit.phasePrompts{}` path. Both paths are active and valid, but the dual-path design adds Agent SDK integration complexity.
 3. **Keyword vocabulary** — extract a shared constants module referenced by both mechanisms.

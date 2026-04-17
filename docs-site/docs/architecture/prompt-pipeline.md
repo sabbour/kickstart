@@ -186,12 +186,12 @@ export function resolveConverseModelRoute(
 
 ## Code Health Notes
 
-:::warning Exported but uncalled variants
-`resolveSkillsAsync()` and `resolveSkillsFromList()` are exported from `@kickstart/core` and tested, but `converse.ts` only calls `resolveSkills()`. These inflate the SDK surface without runtime callers.
+:::note Exported but uncalled variants removed
+`resolveSkillsAsync()` and `resolveSkillsFromList()` were exported from `@kickstart/core` but never called in production. They were removed in PR #402. Only `resolveSkills()` is now the public entry point.
 :::
 
-:::warning Typed Skill path is dormant
-`skill-resolver.ts` has two resolution paths: typed `kit.skills[]` and legacy `kit.prompts[]`. No production kit uses the typed path. The dual-path resolver will confuse Agent SDK implementors.
+:::note Typed Skill path is active in production
+`skill-resolver.ts` has two resolution paths: typed `kit.skills[]` and legacy `kit.prompts[]`. **`azure-kit.ts` uses the typed path** — it registers `skills: azureIacSkills`. `github-kit.ts` uses the legacy path. Both paths are active in production; consolidation to a single canonical path is tracked as future work.
 :::
 
 :::warning Keyword drift risk
@@ -200,9 +200,9 @@ Two independent keyword systems. Changes in one are invisible to the other. A ne
 
 ## What Should Be Cleaned Up
 
-1. **Remove `resolveSkillsAsync` / `resolveSkillsFromList` from public exports** — or document exactly which Agent SDK scenario needs them.
+1. ~~**Remove `resolveSkillsAsync` / `resolveSkillsFromList` from public exports**~~ — **Done in #402.**
 2. **Resolve Generate-phase overlap** — remove the unconditional `infra-aks`/`infra-docker` injection from Mechanism B or document why the system prompt coverage is insufficient.
-3. **Consolidate typed `Skill` vs legacy path** — one canonical resolution path before Agent SDK adapters are built.
+3. **Consolidate typed `Skill` vs legacy path** — `azure-kit.ts` uses the typed path; `github-kit.ts` uses legacy. Pick one canonical resolution path before Agent SDK adapters are built.
 4. **Create a shared vocabulary file** for terms that must stay in sync between the two mechanisms.
 
 ---
