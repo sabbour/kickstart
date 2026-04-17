@@ -378,3 +378,26 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 - `packages/squad-sdk` may not be compiled in worktree — direct GitHub App JWT generation from `.squad/identity/keys/{role}.pem`.
 - `auto-continue.ts` only triggers on `complete:` and `continue:` prefixes; `navigate:` is secondary prefix after stripping outer. `skill-resolver.ts` phase group constants are module-private const Sets, not exported arrays.
 - K8s icon keys: `k8s/endpointslice` (full name, no hyphen); `endpointpicker` not `epp`; NetworkPolicy stays in azure-pack.
+
+
+### 2026-04-17: v2 Step 1 web-shell cleanup (PR #544 / branch squad/474-step1-nuke-v1)
+
+- Replaced all 16 `@kickstart/core` import strings in `packages/web/src/` with `@kickstart/harness`
+- Removed v1 kit registration dead code from `main.tsx` (`registerKit(azureKit)`, `registerKit(githubKit)`)
+- Added `names(): string[] { return []; }` stub to `APIConnectorRegistry` in harness `index.ts`
+- Removed `@kickstart/core` path alias from `vite.config.ts` and `tsconfig.json`
+- Build green (19 files changed). Remaining blockers: `types.ts` → Step 2; `@kickstart/core` shim package → Step 2; `APIConnectorContext.tsx` → Steps 5-7.
+
+### 2026-07-16: DP posts for #477, #478, #479, #480, #482
+
+| DP | Issue | Key points |
+|----|-------|-----------|
+| #477 pack-core | Phases A→H; full manifest (3 agents, 5 skills, 6 tools, 39→40 components, 3 guardrails); emit_ui via Zod + session.a2uiEmissions; porting strategy; test plan for Hermes |
+| #478 Playground | 4-phase; GALLERY_GROUPS→registry.playgroundScenarios; Widgets tab deleted; Components tab wired; usePlaygroundDispatch hook |
+| #479 Runner+SSE | 9 typed SSE events; writeSSE helper; useStreaming + useActionDispatch rewrites; GET /api/packs; 5 OQs |
+| #480 Skill resolver | 4-stage pipeline (glob→keyword→priority→budget); estimateTokens in harness; Skill[], not string; per-turn, no cache |
+| #482 pack-azure | 6 phases; 2 agents, 9 skills, 5 ARM tools, 6 user-actions, 8 components; Zapp C1 pre-addressed; ported from v1 azureKit |
+
+### Wave 3 — 2026-04-17 Playground Decision Filed
+
+`fry-playground-component-grouping.md`: GitHub + Azure Components moved from `GALLERY_GROUPS` to `COMPONENT_GROUPS`. Stub connector guard removed; connectors always registered unconditionally.

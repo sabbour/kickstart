@@ -18,149 +18,35 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - **Accessibility:** WCAG 2.1 AA — aria-label on all A2UI components, roving tabIndex for RadioGroup, live regions on dynamic content
 
 ## Recent Work
-- v2 #474 frontend cut line analysis: seam-cutting pass approach confirmed for Step 1
-- v0.6.x: 406 fallback in useStreaming.ts for SDK path; K8s icon catalog expansion; A2UI debug visualization; system-prompt context var injection fix
-- v0.5.x: SSE parser fixes, action context enrichment, hash-based routing, ArchitectureDiagram diagram-first contract, theme system
+- v2 DPs authored: #477 (pack-core), #478 (Playground), #479 (Runner+SSE), #480 (Skill resolver), #482 (pack-azure)
+- #474 Step 1 web-shell cleanup: 16 `@kickstart/core` imports → `@kickstart/harness`, build green
+- #474 cut line analysis filed; seam-cutting approach confirmed
 
 ## Active Sprint: v2 (harness + packs)
 
-Sprint 1 locked: #474 (Nuke v1) → #475 (Harness types) → #476 (Registry + loaders). Fry's role in #474 is seam-cutting: remove mock/demo surfaces first, then hard-delete after introducing temporary replacement exports.
-
-**#474 cut line:**
-- **Preserve:** `components/` shell, `contexts/`, streaming hooks, `services/api-client.ts`, `services/virtual-fs.ts`, catalog components/icons, Playground page shell
-- **Delete:** `demo-scenarios.ts`, `mock-streaming.ts`, `playground-auth-stub.ts`, `playground-scenarios.ts`, `useMockStreaming.ts`, `useWidgets.tsx` (post cleanup)
-- **Replace:** `kickstart-catalog.ts` (registry-driven), `packages/web/src/types.ts` (new contracts first)
-- **Compile blockers:** `@kickstart/core` imports (broad), `packages/web/src/types.ts` imports (broad), `Playground.tsx` depends on all three deleted playground sources
+Steps 1–4a merged. Current chain: **#477** (PR #548, Leela✅/Zapp blocked) → #479 → #480 → domain packs (#482–#488).
+Fry's next role: implement #479 (Runner + SSE) once #477/#478 are fully merged.
 
 ## Learnings
 
-- (2026-04-17T12:06:45Z) For #474 Step 1, safe frontend cut line is "preserve the shell, delete the fixtures." Treat `kickstart-catalog.ts`, playground demo/stub sources, and `types.ts` as replace-in-place seams because too many live files depend on them for hard-delete without immediate successors.
-- (2026-04-17T06:28:51Z) **Playwright race condition:** `waitForResponse` MUST be registered before `page.goto()` — registering after creates a race where the response arrives before the listener is attached.
-- (2026-04-17T06:28:51Z) **Auth E2E tests:** Must use `request.post()` (real HTTP) not `page.route()` mock interception; `page.route()` short-circuits before auth headers are evaluated.
-- (2026-04-17T06:28:51Z) **`addMessage` placement in `converse.ts`:** Must be inside each processing branch, not before it — placing before means 406 early-return path mutates session state on no-message turns.
-- (2026-04-17T06:28:51Z) **Phase allowlist** should delegate to `normalizeConversationPhase()` from `chat-a2ui.ts`, not maintain a separate set — separate set drifts when `PHASE_ALIASES` is updated.
-- (2026-04-17T03:30:17Z) When `KICKSTART_AGENTS_SDK=true`, backend returns HTTP 406 for streaming. Correct pattern: inline 406 fallback in `useStreaming.ts` retrying as non-streaming JSON, not a separate hook.
-- (2026-04-17T03:30:17Z) Playwright SSE route interception: register `**/api/health` → 200 and `**/api/converse` → SSE BEFORE `page.goto()`. Use closure counter for multi-turn SSE responses.
-- (2026-04-17T03:01:07Z) `buildSystemPrompt()` context vars (`appDefinition`, `azureContext`, `repoInfo`) must be explicitly pushed to `parts` as `## Section` blocks — `interpolate()` only substitutes `{{placeholder}}` tokens, narrative text alone does not inject context.
-- (2026-04-17T03:01:07Z) `auto-continue.ts` only triggers on `complete:` and `continue:` prefixes; `navigate:` is secondary. `skill-resolver.ts` phase group constants are module-private `const Set<Phase>`, not exported arrays.
-- (2026-04-16T06:38:32Z) New K8s icons: create static SVGs under `packages/web/public/assets/icons/k8s/`, register via `registerDiagramIcons()` in `ensureDiagramIconsRegistered()`, update `ALLOWED_ICON_KEYS` in tandem.
-- (2026-04-15T15:20:24Z) `ArchitectureDiagram` uses diagram-first contract: raw Mermaid in `diagram`, all render prep through `architectureDiagramUtils.ts`. Secure path: `sanitizeDiagramInput()` before Mermaid render + `%%icon:name%%` expansion after.
+- (2026-04-17T12:06:45Z) For #474 Step 1, safe frontend cut line: "preserve the shell, delete the fixtures." Treat `kickstart-catalog.ts`, playground demo/stub sources, and `types.ts` as replace-in-place seams.
+- (2026-04-17T06:28:51Z) **Playwright race condition:** `waitForResponse` MUST be registered before `page.goto()` — registering after creates race where response arrives before listener.
+- (2026-04-17T06:28:51Z) **Auth E2E tests:** Must use `request.post()` (real HTTP) not `page.route()` mock interception.
+- (2026-04-17T06:28:51Z) **`addMessage` placement in `converse.ts`:** Must be inside each processing branch, not before — placing before means 406 early-return path mutates session state.
+- (2026-04-17T06:28:51Z) **Phase allowlist** should delegate to `normalizeConversationPhase()` from `chat-a2ui.ts`, not maintain a separate set.
+- (2026-04-17T03:30:17Z) When `KICKSTART_AGENTS_SDK=true`, backend returns HTTP 406. Correct pattern: inline 406 fallback in `useStreaming.ts`.
+- (2026-04-17T03:30:17Z) Playwright SSE route interception: register `**/api/health` and `**/api/converse` BEFORE `page.goto()`.
+- (2026-04-17T03:01:07Z) `buildSystemPrompt()` context vars must be explicitly pushed to `parts` as `## Section` blocks — `interpolate()` only substitutes `{{placeholder}}` tokens.
+- (2026-04-17T03:01:07Z) `auto-continue.ts` only triggers on `complete:` and `continue:` prefixes; `navigate:` is secondary.
+- (2026-04-16T06:38:32Z) New K8s icons: create static SVGs under `packages/web/public/assets/icons/k8s/`, register via `registerDiagramIcons()`, update `ALLOWED_ICON_KEYS`.
+- (2026-04-15T15:20:24Z) `ArchitectureDiagram` uses diagram-first contract: raw Mermaid in `diagram`, sanitize before Mermaid render, `%%icon:name%%` expansion after.
 
-## 2026-04-17 Issue #446 — Agents SDK UI Adaptation (PR #455)
+## 2026-04-17 — DPs for #477–#480, #482
 
-Shipped 406 fallback in `useStreaming.ts`. Added `route-state.spec.ts` with skip-ahead and revisit Playwright scenarios using `page.route()` API interception. Issue closed.
-
-## 2026-04-17T12:06:45Z — #474 Frontend Cut Line Analysis
-
-Analyzed #474 frontend surface. Preserve/delete/replace boundary defined (see Active Sprint above). Decision filed (`fry-474-frontend-cutline.md` → decisions.md).
-
-
-## 2026-07-16 — #474 Step 1 web-shell cleanup (commit ffa10ee)
-
-Working as Fry (Frontend Dev) on branch `squad/474-step1-nuke-v1`.
-
-### What I did
-- Replaced all 16 `@kickstart/core` import strings in `packages/web/src/` with `@kickstart/harness` (same shim, cleaner path)
-- Removed v1 kit registration dead code from `main.tsx`: `registerKit(azureKit)` and `registerKit(githubKit)` (no-op stubs, v1 pattern)
-- Added `names(): string[] { return []; }` stub to `APIConnectorRegistry` in `packages/harness/src/index.ts` — was missing from Bender's shim, required by `APIConnectorContext.tsx` and `useActionDispatch.ts`
-- Removed `@kickstart/core` path alias from `packages/web/vite.config.ts` and `packages/web/tsconfig.json`
-- Confirmed `npm run build` passes (19 files changed, build green)
-
-### Files changed
-**Modified imports:**
-- `packages/web/src/__tests__/azure-auth.test.ts`
-- `packages/web/src/services/azure-auth.ts`
-- `packages/web/src/services/github-handoff.ts`
-- `packages/web/src/hooks/useActionDispatch.ts`
-- `packages/web/src/catalog/components/` (7 files: AuthCard, AzureAction, AzureLoginCard, AzureResourceForm, AzureResourcePicker, GitHubAction, GitHubCommit, GitHubRepoPicker)
-- `packages/web/src/components/Chat/DebugA2UITree.tsx`
-- `packages/web/src/contexts/ArtifactContext.tsx`
-- `packages/web/src/contexts/APIConnectorContext.tsx`
-
-**Runtime cleanup:**
-- `packages/web/src/main.tsx` — removed v1 registerKit/azureKit/githubKit dead code
-
-**Shim fix:**
-- `packages/harness/src/index.ts` — added `names()` to APIConnectorRegistry stub
-
-**Config:**
-- `packages/web/vite.config.ts` — removed `@kickstart/core` alias
-- `packages/web/tsconfig.json` — removed `@kickstart/core` path
-
-### Remaining blockers for Step 1
-- `packages/web/src/types.ts` is `export {}` but imported by many files for A2UI types — needs Step 2 to fully resolve (deleting it would break vite module resolution)
-- `packages/core/` shim package directory still exists (kept for compile compat); Step 2 will drop it
-- `APIConnectorContext.tsx` and related connector infrastructure is v1 — will be replaced in Steps 5-7
-
-## 2026-07-16 — #477 Design Proposal: v2 Step 4 pack-core
-
-Posted DP to https://github.com/sabbour/kickstart/issues/477#issuecomment-4268128132
-
-### Covered
-- Delivery order: Phase A (scaffold) → B (agents+skills, parallel) → C (tools, after #475) → D (27 basic components, parallel batches) → E (12 rich, audited) → F (guardrails) → G (playground scenarios) → H (wire manifest)
-- Full file manifest: 3 agent.md, 5 SKILL.md, 6 tools, 27 basic + 12 rich components, 3 guardrails, 2 playground scenarios, index.ts
-- Registry contract: corePack: Pack shape, which #476 APIs are consumed at startup vs runtime
-- emit_ui contract: Zod-discriminated A2UI message union from #475, records to session.a2uiEmissions, no SSE in pack-core
-- Porting strategy: basic = mechanical path-rewrite; rich = audit 21 candidates, keep 12 domain-neutral, defer Azure/AKS/GitHub to later packs
-- Test plan for Hermes: frontmatter parse, tool Zod rejection, registration smoke, 4-component render smoke, guardrail verdicts
-- 5 risks flagged with mitigations (manifest-only-in-playground, v1 bleeding, A2UI union stability, PR size, FileEditor/Monaco)
-- 3 open questions for Bender (agent loader mode, SessionCtx.a2uiEmissions location, AuthCard split)
-
-### Awaiting
-Leela + Zapp approval before implementation starts.
-
-## Wave 3 — 2026-04-17 Playground Decision Filed
-
-- `fry-playground-component-grouping.md`: GitHub Components + Azure Components moved from `GALLERY_GROUPS` to `COMPONENT_GROUPS` in `Playground.tsx` — they are catalog components, not gallery scenarios. Playground stub connector guard removed; `AzureARMConnector` + `GitHubConnector` always registered unconditionally.
-
-## 2026-07-16 — #478 Design Proposal: v2 Step 4a Playground on registry
-
-Posted DP to https://github.com/sabbour/kickstart/issues/478#issuecomment-4268166333
-
-### Covered
-- 4-phase delivery order: A (replace GALLERY_GROUPS with registry.playgroundScenarios) → B (delete Widget tab + WidgetCard/WidgetPreview) → C (wire Components tab to registry.components) → D (stub dispatch via usePlaygroundDispatch)
-- Registry APIs: registry.components, registry.getComponent(), registry.playgroundScenarios, registry.playgroundStubs — all within #476 scope, none invented
-- Stub dispatch: canonical UserAction name keyed map, usePlaygroundDispatch hook, loud throw on unregistered action (not silent fallback), visible MessageBar error in UI
-- corePack minimum viable: 4+ components (Button/Text/Column/Row minimum), 2 scenarios (discover-flow + generate-files), empty stubs map
-- Hermes test plan: 5 tests in playground-registry.test.ts (registry count, KICKSTART_PACKS filter, unregistered stub throws, 2+ scenarios render, no unregistered component refs) + rewrite playground-surfaceids.test.ts to read from registry
-- Done criteria: 9 checkboxes
-- 3 open questions (registry aggregation scope for playgroundScenarios, dev getRegistry() vs /api/packs shortcut, ScenarioDef→PlaygroundScenario rename)
-
-### Awaiting
-Leela + Zapp approval. Blocked on #477 landing with real corePack.
-
-## 2026-04-17 — DP #479 (v2 Step 5: Runner + SSE)
-
-**Issue:** #479
-**Task:** Author Design Proposal for Runner + SSE step
-**Comment:** https://github.com/sabbour/kickstart/issues/479#issuecomment-4268255972
-
-**Key decisions in DP:**
-- 5-phase delivery order: startup → harness runtime → API handlers → React hooks → integration test
-- 9 typed SSE event names: chunk, a2ui, tool, artifact, user_action_required, handoff, intent, done, error
-- `writeSSE` helper with TypeScript discriminated union on event name
-- `useStreaming` rewrite: drops onPhase/onSetupEvent/406 fallback; keeps rAF reveal loop
-- `useActionDispatch` rewrite: adds `handleUserActionRequired` for interrupt/resume; retires APIConnectorContext
-- GET /api/packs returns catalog + userActions; replaces direct registry import from #478 TODO(Step 5)
-- SessionCtx shape with in-memory default + StorageTableAdapter stub
-- 5 open questions flagged: getSkillsForAgent scope, session persistence, non-playground UserAction stub, zodToJsonSchema availability, sessionId handshake in done event
-
-**Status:** Posted. Awaiting Leela + Zapp approval.
-
-## 2026-04-17 — DP #480 (v2 Step 6: Skill resolver) — drafted on behalf of Bender
-
-**Issue:** #480
-**Task:** Author Design Proposal for Skill resolver (Bender's issue; Fry drafting)
-**Comment:** https://github.com/sabbour/kickstart/issues/480#issuecomment-4268290735
-
-**Key decisions in DP:**
-- 4-phase delivery: token-budget util → resolver core → runner integration → unit tests
-- 4-stage pipeline: glob filter (appliesTo) → keyword score (distinct hits, case-insensitive) → priority+score+id sort (fully deterministic) → token budget (skip-not-stop, ceil(chars/4))
-- estimateTokens utility in harness/runtime/token-budget.ts; shared with pack-core guardrails (no duplication)
-- Resolver returns Skill[], not string — formatting stays in runner
-- Skills inject after agent base body, before catalog block
-- Per-turn, not per-session; no caching
-- Registry: listSkills() preferred over new getSkillsForAgent() method (resolver handles glob itself)
-- 3 open questions: listSkills vs getSkillsForAgent, turn window role filter, skills block separator format
-
-**Status:** Posted. Awaiting Leela + Zapp + Bender approval.
+| Issue | DP | Comment | Status |
+|-------|----|---------|--------|
+| #477 pack-core | Phases A→H; 40 components; emit_ui via Zod + a2uiEmissions | #issuecomment-4268128132 | APPROVED (Leela+Zapp A/C) |
+| #478 Playground | 4-phase; registry-driven gallery; usePlaygroundDispatch | #issuecomment-4268166333 | APPROVED; PR #547 ✅ merged |
+| #479 Runner+SSE | 9 SSE events; writeSSE; useStreaming rewrite | #issuecomment-4268255972 | APPROVED (Leela+Zapp A/C) |
+| #480 Skill resolver | 4-stage pipeline; estimateTokens; Skill[] | #issuecomment-4268290735 | APPROVED (Leela+Zapp A/C) |
+| #482 pack-azure | 6 phases; azureKit port; Zapp C1 pre-addressed | #issuecomment-4268944331 | Awaiting Leela+Zapp |

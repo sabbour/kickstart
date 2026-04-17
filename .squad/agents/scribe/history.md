@@ -180,3 +180,14 @@ Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v
 **Histories:** leela self-logged PR #548 entry (12,843 → 13,971 bytes, 91% threshold — monitor); fry 13,121 (85%) — both below 15,360; no summarisation needed.
 **Also committed:** fry/history.md +52 lines (DP #478/#479/#480), config.json (zapp→gpt-5.4, scribe→claude-sonnet-4.6), decisions-archive.md (+FSM removal entry), bender/step4-6-brief.md (Steps 4–6 routing brief), identity/now.md (Ralph status update)
 **Commit:** (pending)
+
+## Wave 20 — 2026-04-17
+
+**Files merged:** 1 (`zapp-pr548-review.md` — PR #548 pack-core BLOCKED, 3 high security findings)
+**Residuals deleted:** `leela-pr548-review.md` (already merged in wave 19)
+**decisions.md:** 179,382 → 182,061 bytes (+2,679)
+**Histories summarised:**
+- leela/history.md: 13,971 → 4,735 bytes (pre-#548 DP/PR review sections archived to history-archive.md)
+- fry/history.md: 14,982 → 4,506 bytes (#474 impl + individual DP detail sections archived to history-archive.md)
+**Histories updated:** zapp (6,972 → 8,199 bytes — PR #548 blocked verdict)
+**No threshold breaches after summarisation:** leela 4,735 / fry 4,506 / zapp 8,199 / hermes 11,251 / bender 7,924 / scribe (this update)

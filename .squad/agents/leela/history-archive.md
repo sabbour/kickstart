@@ -571,3 +571,27 @@ M1: "Fail loudly" must cover both unregistered component (error badge) and empty
 **PR #544 (Closes #474) — APPROVED + `leela:approved` applied**
 All 8 DP conditions verified: shim compile-only, flags gone, fail-closed 503, 16 web files on harness, 34 smoke tests, no new exports, vite build green, deferred items correct. 407 tests total green.
 Hard gate on Step 2: `types.ts` is `export {};` but 15+ web shell files still import named types — `tsc --noEmit` would fail. Bender + Fry must resolve before any tsc CI gate lands.
+
+
+### 2026-06-10 / 2026-04-17: v2 Step 2–4a Reviews (archived wave 20)
+
+#### DP #479 (Runner + SSE) — APPROVE_WITH_CONDITIONS
+9 SSE events locked. Runner/registry coupling correct. C1–C5 conditions set (Phase gates and merge gates). Zapp Critical 1–3 remain merge gates. Filed `leela-479-dp-review.md`.
+
+#### PR #545 (Step 2) — Initial REQUEST CHANGES (2 blockers)
+Missing `SessionCtx.a2uiEmissions: A2UIMessageV09[]`; `Pack` had dual-registration model. Filed `leela-pr545-review.md`.
+
+#### DP #480 (Skill Resolver) — APPROVE_WITH_CONDITIONS
+C1 BLOCKER: `*` glob self-contradiction; C2 BLOCKER: `listSkills()` not in #476 surface; C3: export `estimateTokens` from harness index. OQ2: all roles; OQ3: XML tags. Filed `leela-480-dp-review.md`.
+
+#### PR #546 (Step 3) — APPROVED
+All #476 conditions verified. `yaml` npm package, 9-accessor surface, `UserActionContribution.wireName`, Zapp security conditions, `SessionCtx.a2uiEmissions` backported. Build + 53/53 tests. Filed `leela-pr546-review.md`.
+
+#### PR #545 Re-verification — APPROVED (after fixes)
+`Pack` dir-based only ✅, `a2uiEmissions` present ✅, `handoff`→`assess` remap ✅. Filed `leela-pr545-recheck.md`.
+
+#### PRs #544 / #545 / #546 MERGED (Steps 1–3)
+Step 1 (nuke v1, harness seam), Step 2 (harness types + Zod), Step 3 (PackRegistry + loaders) all shipped into v2-rewrite. Known debt: `types.ts` tsc gap, `enable()`-after-`seal()` guard.
+
+#### PR #547 (Step 4a Playground on Registry) — APPROVED
+Phases A–D all complete. C1 resolved (registry surface used, `getComponent` not needed). C2 resolved (`if (!stub)` guard present). M1: empty scenario → informational; unregistered → `GalleryCardErrorBoundary`. `leela:approved` applied. Unblocks #479.

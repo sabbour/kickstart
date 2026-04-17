@@ -92,3 +92,16 @@ All 4 blockers resolved:
 
 Validation: harness build ✅, web build ✅. Test failures in `mcp-server` action tests (pre-existing — expect old `discover → design` phase order, not `discover → assess → design`).
 Decision filed: `.squad/decisions/inbox/zapp-pr547-recheck.md`
+
+## 2026-04-17 — PR #548 Security Review (v2 Step 4: pack-core)
+
+**Verdict:** BLOCKED (`zapp:approved` not applied)
+
+Three high-severity findings:
+1. **Workspace symlink confinement bypass** — `core.read_file`, `core.write_file`, `core.list_files` use `path.resolve()` prefix checks without `fs.realpath()`. Symlink inside workspace can escape. Fix: `realpath()` before confinement check + regression test.
+2. **SSRF incomplete on `core.fetch_webpage`** — HTTPS + timeout enforced, but only literal hostname validated. Public hostnames resolving to private IPs and redirect chains to private hosts not blocked. Fix: post-DNS resolution validation or block-list; log + reject private-range hits.
+3. **Registered guardrails not visibly enforced** — `token-budget`, `no-pii-in-logs`, `no-secrets-in-artifacts` registered in corePack but no runtime path calls `getGuardrailsByStage()`. Controls appear non-operative. Fix: runner must call `getGuardrailsByStage(stage)` and execute each guardrail before/after agent turn.
+
+Additional: `validate_artifacts` returns `valid: true` unconditionally — stub that JSON consumers may trust too easily.
+
+Clear: `emit_ui` validates via `A2UIMessageSchema`. No hardcoded credentials.

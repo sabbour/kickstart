@@ -3192,3 +3192,51 @@ Step 5 DP must explicitly commit to forwarding from `session.a2uiEmissions` (pos
 ## Label Applied
 
 `leela:approved` applied to PR #548.
+
+---
+# Zapp Decision — PR #548 Security Review
+
+**Date:** 2026-04-17  
+**Author:** Zapp (Security Architect)  
+**PR:** #548 — v2 Step 4: pack-core (all phases A–H)  
+**Issue:** #477  
+**Status:** Blocked
+
+## Decision
+
+PR #548 is **not approved** from the security side. The implementation adds useful primitives, but three of the claimed security controls are currently bypassable or unenforced: filesystem confinement, SSRF protection, and guardrail execution.
+
+## Blocking Findings
+
+1. **High — workspace confinement is bypassable via symlinks**
+   - `core.read_file`, `core.write_file`, and `core.list_files` use `path.resolve()` prefix checks without `fs.realpath()` / symlink resolution.
+   - A symlink created inside the workspace can point outside the workspace and still pass the current confinement check.
+   - Affected files: `packages/pack-core/src/tools/read_file.ts`, `packages/pack-core/src/tools/write_file.ts`, `packages/pack-core/src/tools/list_files.ts`.
+
+2. **High — `core.fetch_webpage` SSRF guard is incomplete**
+   - The tool enforces HTTPS and a timeout, but only validates the literal hostname before calling `fetch()`.
+   - Public hostnames that resolve to private addresses, and redirect chains that land on private hosts, are not blocked by the current implementation.
+   - Affected file: `packages/pack-core/src/tools/fetch_webpage.ts`.
+
+3. **High — registered guardrails are not visibly enforced by the runtime**
+   - `corePack` registers `token-budget`, `no-pii-in-logs`, and `no-secrets-in-artifacts`, but the harness currently exposes registration/access only.
+   - I could not find any runtime path that executes `getGuardrailsByStage()`, so the controls appear non-operative despite being advertised as active.
+   - Affected files: `packages/pack-core/src/core-pack.ts`, `packages/harness/src/runtime/registry.ts`.
+
+## Additional Concern
+
+4. **Medium — `validate_artifacts` returns `valid: true` unconditionally**
+   - The stub explicitly reports success while the reviewer agent is instructed to use it as an automated validator.
+   - The summary string says `stub validation`, which helps, but JSON consumers can still trust `valid: true` too easily.
+   - Affected files: `packages/pack-core/src/tools/validate_artifacts.ts`, `packages/pack-core/src/agents/reviewer.agent.md`.
+
+## Checked / Clear
+
+- `emit_ui` validates via `A2UIMessageSchema` before recording emissions and rejects invalid payloads.
+- No hardcoded credentials, tokens, `.env` files, or private keys were found in the diff.
+
+## Outcome
+
+- **Verdict:** Blocked
+- **GitHub action taken:** blocker comment posted on PR #548
+- **`zapp:approved` label:** not applied
