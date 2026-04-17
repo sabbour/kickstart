@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #251 "fix: browser back button + duplicate session bugs (#228, #229)" | S | impl=1m | review=223m | cycles=1 | merged | @sabbour
