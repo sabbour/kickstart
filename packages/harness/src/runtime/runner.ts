@@ -406,11 +406,6 @@ export class Runner {
         sseWrite('a2ui', msg);
       }
 
-      // Record assistant turn
-      if (fullText) {
-        session.recordTurn({ role: 'assistant', content: fullText });
-      }
-
       // Extract intent from final output if structured
       let intent: string | undefined;
       let outputText = fullText;
@@ -439,6 +434,12 @@ export class Runner {
           sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
           return;
         }
+      }
+
+      // Record assistant turn AFTER guardrails — persist only the guardrail-approved
+      // (possibly redacted) output, never raw LLM content that may contain PII/credentials.
+      if (outputText) {
+        session.recordTurn({ role: 'assistant', content: outputText });
       }
 
       // ── Flush buffered chunks now that output guardrails have passed ────────
