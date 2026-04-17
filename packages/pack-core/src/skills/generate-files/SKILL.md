@@ -1,15 +1,17 @@
 ---
 name: generate-files
 description: Guides the implementer agent in generating production-quality Bicep templates, Kubernetes manifests, Dockerfiles, and GitHub Actions workflows for AKS deployments.
-appliesTo:
-  - implementer
-keywords:
-  - generate
-  - files
-  - code
-  - bicep
-  - terraform
-priority: 85
+version: 0.1.0
+x-kickstart:
+  appliesTo:
+    - core.implementer
+  keywords:
+    - generate
+    - files
+    - code
+    - bicep
+    - terraform
+  priority: 85
 ---
 
 ## Generating Kickstart Infrastructure Files

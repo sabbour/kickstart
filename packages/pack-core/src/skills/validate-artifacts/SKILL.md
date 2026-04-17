@@ -1,15 +1,17 @@
 ---
 name: validate-artifacts
 description: Guides agents in validating generated infrastructure artifacts (Bicep templates, Kubernetes YAML, GitHub Actions workflows) before they are presented to the user or used in a deployment.
-appliesTo:
-  - orchestrator
-  - implementer
-keywords:
-  - validate
-  - artifacts
-  - bicep
-  - yaml
-priority: 70
+version: 0.1.0
+x-kickstart:
+  appliesTo:
+    - core.orchestrator
+    - core.implementer
+  keywords:
+    - validate
+    - artifacts
+    - bicep
+    - yaml
+  priority: 70
 ---
 
 ## Validating Kickstart Artifacts

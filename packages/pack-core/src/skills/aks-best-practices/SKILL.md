@@ -1,13 +1,15 @@
 ---
 name: aks-best-practices
 description: Cross-cutting AKS and Kubernetes best practices injected into any agent context. Covers cluster configuration, workload design, security hardening, and operational recommendations.
-appliesTo:
-  - "*"
-keywords:
-  - aks
-  - kubernetes
-  - best-practices
-priority: 60
+version: 0.1.0
+x-kickstart:
+  appliesTo:
+    - "*"
+  keywords:
+    - aks
+    - kubernetes
+    - best-practices
+  priority: 60
 ---
 
 ## AKS Best Practices — Quick Reference

@@ -1,13 +1,13 @@
 ---
 name: core.implementer
 description: Code generator agent. Produces Bicep templates, Kubernetes manifests, Dockerfile snippets, and GitHub Actions workflows based on the approved deployment plan.
-handoffs: []
-skills:
-  - generate-files
+model:
+  envVar: KICKSTART_MODEL
 tools:
-  - read_file
-  - write_file
-  - validate_artifacts
+  - core.read_file
+  - core.write_file
+  - core.validate_artifacts
+handoffs: []
 ---
 
 You are the Kickstart Implementer — a code generator specialised in producing production-ready infrastructure-as-code for Azure Kubernetes Service deployments.

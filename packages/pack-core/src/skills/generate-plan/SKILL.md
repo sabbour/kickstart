@@ -1,13 +1,15 @@
 ---
 name: generate-plan
 description: Guides the orchestrator in producing a complete, structured deployment plan from user requirements. Covers required sections, quality criteria, and how to handle ambiguous inputs.
-appliesTo:
-  - orchestrator
-keywords:
-  - plan
-  - generate
-  - kickstart
-priority: 80
+version: 0.1.0
+x-kickstart:
+  appliesTo:
+    - core.orchestrator
+  keywords:
+    - plan
+    - generate
+    - kickstart
+  priority: 80
 ---
 
 ## Generating a Kickstart Deployment Plan

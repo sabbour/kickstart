@@ -1,13 +1,15 @@
 ---
 name: architecture-review
 description: Guides the architect agent in performing a structured review of a Kickstart deployment plan against AKS and Azure Well-Architected Framework principles.
-appliesTo:
-  - architect
-keywords:
-  - architecture
-  - review
-  - patterns
-priority: 75
+version: 0.1.0
+x-kickstart:
+  appliesTo:
+    - core.architect
+  keywords:
+    - architecture
+    - review
+    - patterns
+  priority: 75
 ---
 
 ## Architecture Review — AKS Deployment Plans
