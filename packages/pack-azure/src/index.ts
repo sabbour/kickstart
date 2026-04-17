@@ -8,7 +8,9 @@ import { validateBicepTool } from './tools/validate-bicep.js';
 import { whatIfTool } from './tools/what-if.js';
 
 // User actions
-import { armWriteUserAction } from './user-actions/arm-write.js';
+import { deployResourceUserAction } from './user-actions/deploy-resource.js';
+import { deleteResourceUserAction } from './user-actions/delete-resource.js';
+import { updateResourceUserAction } from './user-actions/update-resource.js';
 import { deployUserAction } from './user-actions/deploy.js';
 import { selectSubscriptionUserAction } from './user-actions/select-subscription.js';
 
@@ -55,7 +57,9 @@ export const azurePack: Pack = {
   ],
 
   userActions: [
-    armWriteUserAction,
+    deployResourceUserAction,
+    deleteResourceUserAction,
+    updateResourceUserAction,
     deployUserAction,
     selectSubscriptionUserAction,
   ],
@@ -75,7 +79,9 @@ export { estimateCostTool } from './tools/estimate-cost.js';
 export { validateBicepTool } from './tools/validate-bicep.js';
 export { whatIfTool } from './tools/what-if.js';
 
-export { armWriteUserAction } from './user-actions/arm-write.js';
+export { deployResourceUserAction } from './user-actions/deploy-resource.js';
+export { deleteResourceUserAction } from './user-actions/delete-resource.js';
+export { updateResourceUserAction } from './user-actions/update-resource.js';
 export { deployUserAction } from './user-actions/deploy.js';
 export { selectSubscriptionUserAction } from './user-actions/select-subscription.js';
 

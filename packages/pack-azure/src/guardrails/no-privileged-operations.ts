@@ -12,7 +12,7 @@ import type { GuardrailContribution, GuardrailVerdict } from '@kickstart/harness
 const PRIVILEGED_PATH_PATTERNS = [
   /microsoft\.authorization\/roleassignments/i,
   /microsoft\.authorization\/roledefinitions/i,
-  /microsoft\.authorization\/denyas signments/i,
+  /microsoft\.authorization\/denyassignments/i,
   /microsoft\.classiccompute\/virtualmachines\/extensions/i,
 ];
 

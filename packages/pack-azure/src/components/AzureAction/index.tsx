@@ -23,9 +23,6 @@ import type { ComponentContribution } from '@kickstart/harness';
 const AzureActionSchema = z.object({
   title: z.string().describe('Action title, e.g. "Deploy to Azure"'),
   description: z.string().optional().describe('What this action will do'),
-  userActionName: z
-    .enum(['azure:arm_write', 'azure:deploy'])
-    .describe('The user action to dispatch on confirm'),
   status: z
     .enum(['pending', 'confirming', 'executing', 'succeeded', 'failed', 'canceled'])
     .default('pending'),
@@ -133,7 +130,7 @@ export const AzureActionRenderer: React.FC<{ props: AzureActionProps }> = ({ pro
               style={props.destructive ? { backgroundColor: tokens.colorPaletteRedBackground3 } : undefined}
               disabled
             >
-              Confirm {String(props.userActionName).replace('azure:', '').replace('_', ' ')}
+              Confirm
             </Button>
             <Button appearance="secondary" disabled>Cancel</Button>
           </div>

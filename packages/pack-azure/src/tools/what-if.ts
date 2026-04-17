@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { ToolContribution } from '@kickstart/harness';
 import type { SessionCtx } from '@kickstart/harness';
 import { validateArmPath } from './arm-get.js';
+import { getAzureToken } from '../services/azure-auth.js';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -63,18 +64,18 @@ export const whatIfTool: ToolContribution = {
       // Two-step ARM path validation (Zapp C1 — same constraint as arm-get)
       const safePath = validateArmPath(input.scopePath);
 
-      const token = (session as unknown as { tokens?: Record<string, string> })?.tokens?.['azure']
-        ?? (session as unknown as { tokens?: Record<string, string> })?.tokens?.['azure-token'];
-      if (!token) {
-        throw new Error('No Azure token found in session. Please authenticate first via azure:select_subscription.');
-      }
+      const token = getAzureToken(session);
 
       const deploymentName = input.deploymentName ?? `kickstart-whatif-${Date.now()}`;
       const isRgScope = safePath.toLowerCase().includes('/resourcegroups/');
 
+      // Build the what-if URL for the correct scope:
+      // - RG scope:  .../resourceGroups/{rg}/providers/Microsoft.Resources/deployments/{name}/whatIf
+      // - Sub scope: .../subscriptions/{sub}/providers/Microsoft.Resources/deployments/{name}/whatIf
+      // safePath already encodes the full scope prefix, so the same template works for both.
       const whatIfUrl = isRgScope
         ? `${ARM_BASE_URL}${safePath}/providers/Microsoft.Resources/deployments/${deploymentName}/whatIf?api-version=2021-04-01`
-        : `${ARM_BASE_URL}${safePath}/providers/Microsoft.Resources/deployments/${deploymentName}/whatIf?api-version=2021-04-01`;
+        : `${ARM_BASE_URL}${safePath}/providers/Microsoft.Resources/deployments/${deploymentName}/whatIf?api-version=2021-04-01&%24expand=resourceChanges`;
 
       const body = {
         properties: {
