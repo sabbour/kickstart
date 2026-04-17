@@ -18,7 +18,7 @@
 | Hermes | Tester | `.squad/agents/hermes/charter.md` | ✅ Active |
 | Zapp | Security Architect | `.squad/agents/zapp/charter.md` | ✅ Active |
 | Scribe | Scribe | `.squad/agents/scribe/charter.md` | 📋 Silent |
-| Ralph | Work Monitor | `.squad/agents/ralph/charter.md` | 🔄 Monitor |
+| Ralph | Work Monitor | - | 🔄 Monitor |
 
 ## Coding Agent
 
