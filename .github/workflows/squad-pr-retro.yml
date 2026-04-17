@@ -111,7 +111,7 @@ jobs:
 
             core.setOutput('line', line);
             core.setOutput('pr', String(pr.number));
-            core.setOutput('base_ref', pr.base?.ref ?? context.payload.repository?.default_branch ?? 'main');
+            core.setOutput('base_ref', 'main');
 
       - name: Append to retro log (as Scribe)
         env:
