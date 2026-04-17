@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #136 "fix: debug panel model leak + render decisions (v0.5.3)" | M | impl=3m | review=11m | cycles=1 | merged | @sabbour
