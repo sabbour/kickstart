@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #156 "fix: add AuthCard adapter for Azure/GitHub login (#150)" | M | impl=0m | review=4m | cycles=1 | merged | @sabbour
