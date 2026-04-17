@@ -24,7 +24,7 @@ cd kickstart
 npm install
 ```
 
-The root `npm install` installs dependencies for all workspace packages (`packages/core` and `packages/web`).
+The root `npm install` installs dependencies for all workspace packages (`packages/harness` and `packages/web`).
 
 ### 2. Configure environment variables
 

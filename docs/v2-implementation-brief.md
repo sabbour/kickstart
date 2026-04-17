@@ -1,7 +1,7 @@
 # Kickstart v2 — Implementation Brief
 
 **Audience:** the implementing agent.
-**Status:** design locked. Ready to execute.
+**Status:** ✅ All 13 steps merged into `v2-rewrite`. Implementation complete.
 **Scope:** greenfield rewrite on `main`. v1 does not need to keep working. Delete aggressively. No user state to preserve.
 
 ---
@@ -1066,33 +1066,33 @@ export async function initPacks(): Promise<void> {
 
 Each step compiles, tests green, before moving on. Land as sequential PRs on `main`.
 
-**Step 1 — nuke v1.** Delete v1 paths listed in §4. Rename `packages/core` → `packages/harness`. Preserve: Azure OpenAI client, `@kickstart/mcp-server` shell, web shell (`components/`, `contexts/`, auditable `hooks/`), Playground page files, `catalog/components/` + `catalog/fluent-components/` + `catalog/icons/` (to be redistributed), `services/api-client.ts`, `services/virtual-fs.ts`, frontmatter parser. Repo compiles; no runtime yet.
+**✅ Step 1 — nuke v1.** Delete v1 paths listed in §4. Rename `packages/core` → `packages/harness`. Preserve: Azure OpenAI client, `@kickstart/mcp-server` shell, web shell (`components/`, `contexts/`, auditable `hooks/`), Playground page files, `catalog/components/` + `catalog/fluent-components/` + `catalog/icons/` (to be redistributed), `services/api-client.ts`, `services/virtual-fs.ts`, frontmatter parser. Repo compiles; no runtime yet.
 
-**Step 2 — harness types.** Add every file under `packages/harness/src/types/`. Zod schemas for `AgentOutput` and A2UI v0.9 messages. Move `utils/chat-a2ui.ts` into harness. No runtime yet.
+**✅ Step 2 — harness types.** Add every file under `packages/harness/src/types/`. Zod schemas for `AgentOutput` and A2UI v0.9 messages. Move `utils/chat-a2ui.ts` into harness. No runtime yet.
 
-**Step 3 — registry + loaders.** `PackRegistry` (register/enable/seal). `.agent.md` loader. `SKILL.md` loader. Unit tests covering frontmatter parsing, tool-reference resolution, collision detection, dependency ordering.
+**✅ Step 3 — registry + loaders.** `PackRegistry` (register/enable/seal). `.agent.md` loader. `SKILL.md` loader. Unit tests covering frontmatter parsing, tool-reference resolution, collision detection, dependency ordering.
 
-**Step 4 — pack-core.** Author the three `.agent.md` files. Author the five `SKILL.md` files. Implement `core.emit_ui`, `core.write_file`, `core.read_file`, `core.list_files`, `core.validate_artifacts`, `core.fetch_webpage`. Port 27 basic Fluent renderers + 12 rich components from `catalog/` into `pack-core/src/components/{basic,rich}/`.
+**✅ Step 4 — pack-core.** Author the three `.agent.md` files. Author the five `SKILL.md` files. Implement `core.emit_ui`, `core.write_file`, `core.read_file`, `core.list_files`, `core.validate_artifacts`, `core.fetch_webpage`. Port 27 basic Fluent renderers + 12 rich components from `catalog/` into `pack-core/src/components/{basic,rich}/`.
 
-**Step 4a — playground on registry.** Rewrite `Playground.tsx` / `PlaygroundWorkspace.tsx` to read from the registry. Port a handful of core-domain scenarios into `pack-core/playground/`. Useful validation of the registry shape before domain packs land.
+**✅ Step 4a — playground on registry.** Rewrite `Playground.tsx` / `PlaygroundWorkspace.tsx` to read from the registry. Port a handful of core-domain scenarios into `pack-core/playground/`. Useful validation of the registry shape before domain packs land.
 
-**Step 5 — runner + SSE.** Converse handler. Resume handler. `/api/packs` manifest. Rewrite `hooks/useStreaming.ts` for typed SSE. Rewrite `hooks/useActionDispatch.ts` as the UserAction dispatcher. Integration test: triage → codesmith with a mocked model, asserting SSE event order (`chunk`, `a2ui`, `handoff`, `intent`, `done`).
+**✅ Step 5 — runner + SSE.** Converse handler. Resume handler. `/api/packs` manifest. Rewrite `hooks/useStreaming.ts` for typed SSE. Rewrite `hooks/useActionDispatch.ts` as the UserAction dispatcher. Integration test: triage → codesmith with a mocked model, asserting SSE event order (`chunk`, `a2ui`, `handoff`, `intent`, `done`).
 
-**Step 6 — skill resolver.** Per-turn selection by `appliesTo` glob + keyword scoring + priority + token budget (2000 tokens default). Unit tests.
+**✅ Step 6 — skill resolver.** Per-turn selection by `appliesTo` glob + keyword scoring + priority + token budget (2000 tokens default). Unit tests.
 
-**Step 7 — pack-azure.** Port 2 agents, 9 skills. Port 5 tools. Port 6 user actions (using ported `services/azure-auth.ts`, `services/azure-deployments.ts`). Port 8 components including `AzureLoginCard`→`Login`, `AzureResourcePicker`→`SubscriptionPicker`/`RegionPicker`/`ResourceGroupPicker`, `AzureResourceForm`→`ResourceForm`, `AzureAction`→`Action`, `CostEstimate`→`CostSummary`. Port Azure icon assets. Author playground scenarios + stubs.
+**✅ Step 7 — pack-azure.** Port 2 agents, 9 skills. Port 5 tools. Port 6 user actions (using ported `services/azure-auth.ts`, `services/azure-deployments.ts`). Port 8 components including `AzureLoginCard`→`Login`, `AzureResourcePicker`→`SubscriptionPicker`/`RegionPicker`/`ResourceGroupPicker`, `AzureResourceForm`→`ResourceForm`, `AzureAction`→`Action`, `CostEstimate`→`CostSummary`. Port Azure icon assets. Author playground scenarios + stubs.
 
-**Step 8 — pack-aks-automatic.** Port 3 agents, 7 skills, `safeguards.json`. 2 tools. 1 user action. Port `ArchitectureDiagram.tsx` + `architectureDiagramIconRegistry.ts` + `architectureDiagramUtils.ts` (with tests) + k8s icons. 3 new components. 3 guardrails. Playground scenarios.
+**✅ Step 8 — pack-aks-automatic.** Port 3 agents, 7 skills, `safeguards.json`. 2 tools. 1 user action. Port `ArchitectureDiagram.tsx` + `architectureDiagramIconRegistry.ts` + `architectureDiagramUtils.ts` (with tests) + k8s icons. 3 new components. 3 guardrails. Playground scenarios.
 
-**Step 9 — pack-github.** 1 agent, 3 skills. 1 tool. 6 user actions (port from adaptive-ui-github-pack logic and `services/github-handoff.ts`). Port `GitHubLoginCard`→`Login`, `GitHubRepoPicker`→`RepoPicker`, `GitHubCommit`→`CreatePRFlow`, `GitHubAction`→`Action`. Playground scenarios + stubs.
+**✅ Step 9 — pack-github.** 1 agent, 3 skills. 1 tool. 6 user actions (port from adaptive-ui-github-pack logic and `services/github-handoff.ts`). Port `GitHubLoginCard`→`Login`, `GitHubRepoPicker`→`RepoPicker`, `GitHubCommit`→`CreatePRFlow`, `GitHubAction`→`Action`. Playground scenarios + stubs.
 
-**Step 10 — web client.** Rewrite `components/A2UI/` to consume the negotiated catalog from the registry. `useActionDispatch` routes `user_action_required` → pack handlers (real or stub). Queue policy (cancellation opt-in per action).
+**✅ Step 10 — web client.** Rewrite `components/A2UI/` to consume the negotiated catalog from the registry. `useActionDispatch` routes `user_action_required` → pack handlers (real or stub). Queue policy (cancellation opt-in per action).
 
-**Step 11 — guardrails engine.** Wire stages into Runner lifecycle. Port existing ad-hoc checks (today's regex scattered across v1) into `GuardrailContribution`s.
+**✅ Step 11 — guardrails engine.** Wire stages into Runner lifecycle. Port existing ad-hoc checks (today's regex scattered across v1) into `GuardrailContribution`s.
 
-**Step 12 — MCP.** Rewrite `@kickstart/mcp-server` shell to wrap Runner turns. Emit A2UI as MCP embedded resources with `mimeType: "application/json+a2ui"` and `audience: ["user"]`. UserActions surfaced as MCP `action` tool calls.
+**✅ Step 12 — MCP.** Rewrite `@kickstart/mcp-server` shell to wrap Runner turns. Emit A2UI as MCP embedded resources with `mimeType: "application/json+a2ui"` and `audience: ["user"]`. UserActions surfaced as MCP `action` tool calls.
 
-**Step 13 — docs + cleanup.** Rewrite `docs/` and `docs-site/` around harness + packs. Delete every reference to phases, stepwise, v1 flags, `IntegrationKit`, `converse-model-router`, `response-processor`.
+**✅ Step 13 — docs + cleanup.** Rewrite `docs/` and `docs-site/` around harness + packs. Delete every reference to phases, stepwise, v1 flags, `IntegrationKit`, `converse-model-router`, `response-processor`.
 
 ---
 
@@ -1119,4 +1119,4 @@ Each step compiles, tests green, before moving on. Land as sequential PRs on `ma
 
 ---
 
-**End of brief.** Hand to the implementing agent. Start with Step 1.
+**End of brief.** All 13 steps are merged. The v2 rewrite is complete.
