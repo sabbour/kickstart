@@ -147,6 +147,14 @@ Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v
 **History summarisation:** none needed
 **All agents:** bender 7,924 / fry 13,121 / hermes 11,251 / leela 10,698 / ralph 225 / scribe 8,xxx / zapp 5,265
 
+## Wave 17 — 2026-06-10 (no-op)
+
+**Files merged:** 0 — `leela-pr547` and `zapp-pr547` still absent from all inboxes and worktrees.
+**Worktrees checked:** all 37 (same 31 known filenames, all already merged).
+**decisions.md:** 172,046 bytes (unchanged)
+**History sizes:** fry 13,121 (85%) / hermes 11,251 (73%) / leela 10,698 (69%) — no threshold breaches.
+**Commit:** (none — no changes)
+
 ## Wave 16 — 2026-06-10 (no-op)
 
 **Files merged:** 0 — `leela-pr547` and `zapp-pr547` have not yet landed in any inbox or worktree.
