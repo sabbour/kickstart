@@ -11,14 +11,14 @@ Kickstart is built using the [Squad framework](./../) for AI-guided development.
 To add a component to the Kickstart catalog:
 
 1. Define the component type and data model in `packages/core/src/catalog/`
-2. Implement the React renderer in `packages/web/src/components/`
+2. Implement the React renderer in `packages/web/src/catalog/components/`
 3. Register the component in the catalog registry
 4. Update the system prompt to teach the AI when and how to use the new component
 5. Add documentation to `docs-site/docs/components/`
 
 ## Adding New Conversation Phases
 
-The conversation flow is defined in `packages/core/src/phases/`. To add a phase:
+The conversation flow is defined in `packages/core/src/engine/phases.ts`. To add a phase:
 
 1. Create a new phase definition file
 2. Add transition rules from adjacent phases
