@@ -113,3 +113,11 @@ Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v
 - decisions.md: 161,186 → 167,271 bytes (+2 files).
 - Zapp history exceeded 15 KB (16,400 bytes) — summarised: 16,400 → 4,106 bytes; all older review sections (DP #329–#478, PRs #444–#546) archived to new `history-archive.md` (4,125 bytes).
 - scribe/history.md updated; no other histories updated this wave.
+
+## Wave 13 — 2026-06-10
+
+**Files merged:** 2 (`zapp-pr545-recheck.md`, `zapp-pr546-recheck.md`)
+**decisions.md:** 161,186 → 169,430 bytes
+**Histories updated:** zapp (4,106 → 4,803 bytes)
+**Inbox cleared:** worktrees `545-security-review`, `546-security-review`
+**Commit:** pending

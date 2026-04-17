@@ -46,3 +46,15 @@ Step 6 implementation must add:
 - Rendered-string token accounting (not just char/4 approximation for budget cap).
 - Immutable registry returns (no mutation of resolved Skill objects after `seal()`).
 - Tests covering: mutation attempts on resolved skills, glob pattern rejection on invalid syntax, no-content logging (skill bodies must not appear in observability output).
+
+## 2026-04-17 — PR #545 Security Recheck
+
+**Verdict:** APPROVED
+
+Prior blocker (`handoff` phase id) resolved. `chat-a2ui.ts` now normalizes `handoff` → `assess`. Phase contract exports only valid v2 ids: `discover`, `assess`, `design`, `generate`, `review`, `deploy`. Targeted harness build + 4 test suites passed on PR head. No new regressions.
+
+## 2026-04-17 — PR #546 Symlink Confinement Recheck
+
+**Verdict:** APPROVED (`zapp:approved`)
+
+`confinePath()` in `frontmatter.ts` at `5c325db` now applies `realpathSync()` to both pack root and candidate path before the `startsWith` confinement check. Symlink-escape blocker cleared. PR #546 is security-approved from confinement perspective.

@@ -2966,3 +2966,35 @@ Security gate is **conditionally clear** for the design proposal. Final implemen
 **What:** APPROVE_WITH_CONDITIONS. The resolver can ship only if implementation treats skill text as privileged prompt-control data, not benign content, and adds hard guards around selection, matching, immutability, and logging.
 **Why:** Raw `SKILL.md` bodies and raw turn text both influence prompt composition. Without bounded text normalization, user-only scoring, validated glob grammar, deep immutability after `seal()`, and redacted observability, a malicious pack or adversarial prompt can steer agent behavior or leak internal prompt engineering.
 **Impact:** Step 6 must add registration-time validators, rendered-string token accounting, immutable registry returns, and tests covering mutation attempts, glob rejection, and no-content logging.
+
+---
+
+## 2026-04-17 — PR #545 security recheck
+
+- **Reviewer:** Zapp (Security Architect)
+- **Verdict:** APPROVED
+- **Scope:** Re-verify the prior blocker in `packages/harness/src/a2ui/chat-a2ui.ts` after Bender's fix.
+
+### Verification
+
+1. `gh pr diff 545` shows `chat-a2ui.ts` now normalizes legacy `handoff` to `assess`.
+2. `ConversationPhaseId` and `CONVERSATION_PHASE_ORDER` expose only the current harness phases: `discover`, `assess`, `design`, `generate`, `review`, `deploy`.
+3. `Phase` / `PHASE_DEFINITIONS` in the harness seam match that same order, with `Discover -> Assess -> Design -> Generate -> Review -> Deploy`.
+4. Targeted validation passed on PR head:
+   - `npm run build -w @kickstart/harness`
+   - `npx vitest run packages/harness/src/__tests__/chat-a2ui.test.ts packages/harness/src/__tests__/harness-exports.test.ts packages/harness/src/__tests__/a2ui.test.ts packages/harness/src/__tests__/agent-output.test.ts`
+
+### Security assessment
+
+- **Blocked issue resolved:** no invalid phase ids remain in the exported chat A2UI phase contract.
+- **Semantic check:** remapping `handoff` to `assess` is correct for v2 because legacy handoff state now represents agent-to-agent assessment / requirements transfer, and the current harness phase model explicitly places that work in `assess`.
+- **Additional review:** no new auth, injection, secret-handling, or trust-boundary regressions found elsewhere in the PR diff.
+
+---
+
+### 2026-04-17: PR #546 symlink confinement re-check
+
+**By:** Zapp (Security Architect)
+**What:** Re-verified `packages/harness/src/runtime/frontmatter.ts` at commit `5c325db` and cleared the prior symlink-escape blocker.
+**Why:** `confinePath()` now resolves both the pack root and the candidate file with `realpathSync()` before the `startsWith` confinement check, so symlinks inside the pack can no longer escape the real pack root. The remaining `statSync()` call only validates file existence/type; the security decision is made after canonicalization, so the earlier stat → compare concern now fails closed.
+**Impact:** PR #546 is security-approved (`zapp:approved`) from the symlink confinement perspective.
