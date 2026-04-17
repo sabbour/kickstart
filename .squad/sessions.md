@@ -111,3 +111,50 @@ All 2 files in `.squad/decisions/inbox/` processed:
 - `leela-dp-reviews-apr17.md` → merged
 - `zapp-dp-329-security.md` → merged
 Inbox now empty and ready for next session.
+
+---
+
+## Session: 2026-04-17 (Round 3) — PR #447 Review & Approvals + Merge Unblock
+
+**Trigger:** Completion of code review cycles on PR #447 (Bender's issue #445 implementation).
+
+**Session Type:** Code review + security review + merge approval.
+
+### Reviews Completed
+
+**Leela (Lead, Code Review):**
+- ✅ PR #447: APPROVED (applied `leela:approved` label)
+  - Issue: #445 Backend SDK adapter for OpenAI Agents SDK migration
+  - Finding: Duplicate-message bug in conversation streaming (blocking)
+  - Resolution: Bender applied de-duplication filter in streaming loop (commit a3899e5) with unit tests
+  - Push cycles: 3 (initial → fix → final verification)
+  - Tests: 1511 passing, zero regression
+  - Unresolved threads: 0
+  - Implementation quality: Clean, focused, demonstrates no-lockout directive
+
+**Zapp (Security Architect):**
+- ✅ PR #447: APPROVED WITH CONDITIONS (applied `zapp:approved` label)
+  - All 4 critical security conditions from issue #445 acceptance criteria verified:
+    1. ✅ Server-enforced MCP tool allowlist (default-deny)
+    2. ✅ Workspace gate bypass protection
+    3. ✅ TTL expiry enforcement
+    4. ✅ Test coverage for hijack scenarios + lockfile pinning
+  - Dependencies: Pinned in package-lock.json, no floating semver
+  - Scans: Passed
+  - Integration: DP #329 + #330 security review conditions validated
+  - Gate: Clear for merge
+
+### Merge Unblocked
+
+- ✅ **Leela approval:** `leela:approved` label applied
+- ✅ **Zapp approval:** `zapp:approved` label applied  
+- ✅ **Status:** Ready for merge by Ralph (coordinator)
+- ⏳ **Next step in sequence:** Merge PR #447 → close #445 → spawn #446 (Fry, Chat/workspace UI adaptation)
+
+### Decisions Recorded
+
+None new (all conditions tracked in issue #445 acceptance criteria).
+
+### Inbox Status
+
+Ready for Scribe orchestration log + session log entry.
