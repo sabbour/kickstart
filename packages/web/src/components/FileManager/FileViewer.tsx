@@ -77,7 +77,7 @@ const useStyles = makeStyles({
     height: '100%',
     backgroundColor: tokens.colorNeutralBackground1,
     ...shorthands.borderLeft(tokens.strokeWidthThin, 'solid', tokens.colorNeutralStroke2),
-    overflowY: 'auto',
+    overflow: 'hidden',
   },
   header: {
     display: 'flex',
@@ -110,6 +110,7 @@ const useStyles = makeStyles({
   },
   codeWrapper: {
     flex: 1,
+    minHeight: 0,
     overflowY: 'auto',
     backgroundColor: '#1e1e1e',
     color: '#d4d4d4',
@@ -345,7 +346,7 @@ export function FileViewer({
         </div>
       </div>
 
-      <div className={mergeClasses(styles.codeWrapper, isGenerating && styles.generating)}>
+      <div className={mergeClasses(styles.codeWrapper, isGenerating && styles.generating)} data-testid="code-wrapper">
         <pre className={styles.codePre}>
           <code className="hljs">
             {highlightedLines.map((lineHtml, i) => (
