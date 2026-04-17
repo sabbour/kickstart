@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-17 | #568 "feat(pack-github): Step 9 — GitHub pack (#484)" | XL | impl=0m | review=15m | cycles=1 | merged | @sabbour
