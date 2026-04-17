@@ -39,7 +39,7 @@ import type {
 } from "@kickstart/core";
 import { getSession, createSession, getPrincipalId, hydrateSession, addMessage,
   adoptSessionPrincipal, isSessionOwnedBy, recordUsage,
-  extractArtifactsFromA2UI, upsertArtifact,
+  extractArtifactsFromA2UI, upsertArtifact, SessionCapExceededError,
 } from "../lib/session-store.js";
 import type { ApiSession, ClientMessage, GeneratedArtifact } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools } from "../lib/openai-client.js";
@@ -433,6 +433,9 @@ app.http("converse", {
 
       return { status: 200, jsonBody: responseBody };
     } catch (err) {
+      if (err instanceof SessionCapExceededError) {
+        return { status: 503, jsonBody: { error: err.message } };
+      }
       return safeErrorResponse(err, context, "Converse error");
     }
   },

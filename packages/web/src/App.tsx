@@ -20,7 +20,7 @@ import { ConversationSessionProvider } from './contexts/ConversationSessionConte
 import { useTheme } from './contexts/ThemeContext';
 import { useDebug } from './contexts/DebugContext';
 import { useVirtualFS } from './contexts/VirtualFSContext';
-import { healthCheck } from './services/api-client';
+import { healthCheck, provisionSession } from './services/api-client';
 import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
 import { VirtualFileSystem } from './services/virtual-fs';
 import {
@@ -82,6 +82,9 @@ export function App() {
   const streaming = useStreaming();
   const mockStreaming = useMockStreaming();
   const progressiveQueue = useProgressiveQueue();
+
+  // Holds a provisioned backend session ID until the first client session is created
+  const provisionedBackendSessionIdRef = useRef<string | null>(null);
 
   // Single VFS instance for the app lifetime
   const fs = useMemo(() => new VirtualFileSystem(), []);
@@ -161,6 +164,19 @@ export function App() {
     if (!mockEnabled) {
       healthCheck().then(setIsApiAvailable);
     }
+  }, []);
+
+  // Pre-provision a backend session for playground users so the first converse
+  // call reuses it instead of creating an orphaned new session.
+  useEffect(() => {
+    if (!playgroundEnabled || mockEnabled) return;
+    provisionSession()
+      .then(({ sessionId }) => {
+        provisionedBackendSessionIdRef.current = sessionId;
+      })
+      .catch(() => {
+        // Non-fatal — converse.ts will create a session on first message
+      });
   }, []);
 
   // Sync messages from session store when session changes
@@ -441,6 +457,11 @@ export function App() {
       sessionId = newSession.id;
       clearActionLog();
       setConversationPhase(null);
+      // Apply any pre-provisioned backend session ID so converse.ts reuses it
+      if (provisionedBackendSessionIdRef.current) {
+        sessions.updateSession(sessionId, { backendSessionId: provisionedBackendSessionIdRef.current });
+        provisionedBackendSessionIdRef.current = null;
+      }
     }
 
     const assistantMessageId = msgId('assistant');

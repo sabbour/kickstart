@@ -96,6 +96,9 @@ const sessions = new Map<string, ApiSession>();
 /** Session TTL: 1 hour. */
 const SESSION_TTL_MS = 60 * 60 * 1000;
 
+/** Hard cap on active sessions. Prevents heap exhaustion under load. */
+export const MAX_SESSIONS = 10_000;
+
 /** Purge stale sessions every 10 minutes. */
 const cleanupInterval = setInterval(() => {
   const now = Date.now();
@@ -147,8 +150,23 @@ export function adoptSessionPrincipal(session: ApiSession, principalId?: string)
   }
 }
 
+/**
+ * Error thrown when session creation is rejected because MAX_SESSIONS is reached.
+ * Callers should surface this as a 503 Service Unavailable.
+ */
+export class SessionCapExceededError extends Error {
+  constructor() {
+    super("Server is at session capacity. Please try again later.");
+    this.name = "SessionCapExceededError";
+  }
+}
+
 /** Create a new session with Discover-phase system prompt. */
 export function createSession(principalId?: string): ApiSession {
+  if (sessions.size >= MAX_SESSIONS) {
+    throw new SessionCapExceededError();
+  }
+
   const sessionId = randomUUID();
   const now = new Date().toISOString();
 

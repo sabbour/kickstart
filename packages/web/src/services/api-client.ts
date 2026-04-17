@@ -72,3 +72,20 @@ export async function converse(req: ConversationRequest): Promise<ConversationRe
 
   return res.json();
 }
+
+/**
+ * Call POST /api/session/provision to create an anonymous backend session
+ * before the playground user sends their first message.
+ *
+ * Returns the backend sessionId that should be stored as backendSessionId
+ * so converse.ts reuses the provisioned session instead of creating a new one.
+ *
+ * Throws on network errors or if the server returns 503 (session cap exceeded).
+ */
+export async function provisionSession(): Promise<{ sessionId: string }> {
+  const res = await apiFetch('/api/session/provision', { method: 'POST' });
+  if (!res.ok) {
+    throw new Error(`Session provision failed: ${res.status}`);
+  }
+  return res.json() as Promise<{ sessionId: string }>;
+}
