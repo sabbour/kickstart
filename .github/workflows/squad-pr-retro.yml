@@ -24,6 +24,7 @@ concurrency:
 jobs:
   retro:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.pull_request.labels.*.name, 'retro-log') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -111,7 +112,7 @@ jobs:
 
             core.setOutput('line', line);
             core.setOutput('pr', String(pr.number));
-            core.setOutput('base_ref', pr.base?.ref ?? context.payload.repository?.default_branch ?? 'main');
+            core.setOutput('base_ref', 'main');
 
       - name: Append to retro log (as Scribe)
         env:
@@ -157,7 +158,6 @@ jobs:
 
           PR_COUNT="$(gh pr list \
             --state open \
-            --base "$BASE_REF" \
             --head "${SIDE_BRANCH}" \
             --json number \
             --jq 'length')"
@@ -169,7 +169,6 @@ jobs:
 
           PR_URL="$(gh pr list \
             --state open \
-            --base "$BASE_REF" \
             --head "${SIDE_BRANCH}" \
             --json url \
             --jq '.[0].url')"
