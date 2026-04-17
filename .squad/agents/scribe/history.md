@@ -71,3 +71,7 @@ Merged 2 new files into decisions.md (bender-475-a2ui-discriminator + leela-477-
 ## Wave 5 — 2026-05-28 Inbox sweep (no new decisions)
 
 Swept main inbox and all worktrees (including new: 477-security-review, 544-pr-head, 544-security-review). All 13 inbox files were wave-3/4 residuals or already-merged entries — no new decisions found. Cleared inbox. Pending: zapp-477-dp-review, leela-478-dp-review, zapp-478-dp-review — not yet filed in any worktree.
+
+## Wave 6 — 2026-04-17 Inbox merge
+
+Merged 5 new files from worktree inboxes (477-security-review, 478-security-review, 544-security-review ×2, 476-registry-loaders). decisions.md: 133,820 → 139,295 bytes. Updated histories: bender, zapp. All history files below 15 KB — no summarization needed.

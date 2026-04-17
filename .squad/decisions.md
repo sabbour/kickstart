@@ -2401,3 +2401,113 @@ v1 `AuthCard` may have MSAL-specific props inline. Ported `pack-core/AuthCard` m
 - **#478 (Playground)**: Unblocked once pack-core has real components/scenarios. C1 resolution determines playground registry read API shape.
 - **#479 (Runner + SSE)**: C3 is a hard dependency — Step 5 DP must commit to `session.a2uiEmissions` forwarding before authoring starts.
 - **#480 (Skill resolver)**: No direct impact.
+
+---
+
+# Decision: keep Step 3 runtime modules on harness subpath exports
+
+**Date:** 2026-04-17T12:06:45.293Z
+**Author:** Bender (Backend Dev)
+**Scope:** v2 Step 3 (`packages/harness/src/runtime/*`)
+
+## Decision
+
+Expose the new PackRegistry / loader / frontmatter runtime via `@kickstart/harness/runtime/*` package subpaths rather than re-exporting from the root `@kickstart/harness` barrel.
+
+## Why
+
+The registry/loaders are intentionally Node-backed (`node:fs`, `node:path`, file URL helpers). Re-exporting from the root barrel caused the browser web build to traverse those modules and fail even when the web app did not use them.
+
+## Consequences
+
+- Node/runtime consumers import Step 3 modules from `@kickstart/harness/runtime/*`.
+- Root `@kickstart/harness` barrel stays browser-safe.
+- Future runtime additions with Node-only dependencies follow the same subpath pattern.
+
+---
+
+# Zapp Security Review — Issue #477 (v2 Step 4: pack-core)
+
+**Date:** 2026-04-17T13:04:15Z
+**Author:** Zapp (Security Architect)
+**Issue:** #477 — v2 Step 4: pack-core
+**Verdict:** APPROVE_WITH_CONDITIONS
+**Comment:** https://github.com/sabbour/kickstart/issues/477#issuecomment-4268206578
+
+## Summary
+
+Security gate conditionally clear. Largest unresolved risks: SSRF in `core.fetch_webpage`, no explicit workspace confinement for file tools, and under-specified `core.validate_artifacts` execution model.
+
+## Required conditions
+
+1. Make `core.fetch_webpage` public-web-only: redirect blocking, DNS/IP private-range rejection, strict size/time bounds.
+2. Bind file tools (`core.write_file`/`read_file`/`list_files`) to session-scoped workspace/VFS root; reject absolute paths, traversal, symlink escapes, oversized operations.
+3. Keep `core.validate_artifacts` pure and bounded: no shell-outs, no eval, safe parsers only.
+4. Add registered-component validation before forwarding `emit_ui` payloads; preserve DOMPurify/escape handling in `CodeBlock`, `Markdown`, and `FileEditor`.
+5. Preserve #476 loader protections: strict frontmatter parsing, out-of-scope tool rejection, handoff-target validation.
+6. Deep-freeze or clone pack manifests/contributions at registration time so `corePack` cannot be mutated after registration.
+
+## Notes
+
+- `dangerouslySetInnerHTML` found in `CodeBlock.tsx`, `Markdown.tsx`, `FileEditor.tsx`; no `eval` usage in the 39 ported components.
+- #475 A2UI envelope validation is strict, but emitted component payloads still need per-component schema validation to be fully fail-closed.
+
+---
+
+### 2026-04-17: Security gate for DP #478 playground-on-registry
+
+**By:** Zapp (Security Architect)
+**What:** DP #478 approved with conditions. Registry-driven playground rendering is acceptable only if stub registration inherits the same pack-owned naming, duplicate rejection, and post-`seal()` immutability guarantees already required for PackRegistry in #476.
+**Why:** The new attack surface is not the UI chrome; it is the registry becoming executable browser behavior. A malicious or buggy pack could otherwise hijack user-action stub names, mutate dispatch targets after startup, or leak raw internal errors into the playground UI.
+**Impact:** Step 4a may proceed only if implementation: (1) validates `playgroundStubs` against registered canonical UserAction names, (2) exposes a frozen read-only snapshot after `seal()`, (3) keeps packs in-tree/trusted for v2, (4) redacts fail-loud UI errors to fixed user-safe text.
+
+---
+
+# Zapp Decision — PR #544 Security Review
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**PR:** #544 — feat(v2): Step 1 — Nuke v1, cut to harness, web-shell cleanup
+**Decision:** REQUEST CHANGES
+
+## Blocking finding
+
+**🟡 Medium — Dead legacy gate remains in production infra**
+- `infra/main.bicep:52-53` still defines `enableStepwiseGeneration` for `STEPWISE_GENERATION_V1`.
+- `infra/main.bicep:132-140` still injects `STEPWISE_GENERATION_V1` into SWA app settings.
+- DP #474 required complete removal of v1 feature flags and stepwise gates.
+
+## Checks that passed
+
+- `KICKSTART_AGENTS_SDK` and `KICKSTART_V2` are gone from runtime code.
+- `packages/web/api/src/functions/converse.ts` fails closed (HTTP 503) instead of degrading to demo/mock.
+- `@kickstart/core` shim narrowed to a private compatibility redirect — did not widen export map.
+- Vite alias change is isolated and safe.
+- 34 harness smoke tests assert exports, phase order, safeguards, and stub shapes.
+
+## Follow-up required
+
+1. Remove `STEPWISE_GENERATION_V1` from `infra/main.bicep` and all deployment/config surfaces.
+2. Re-run build/test evidence after flag removal.
+
+## Validation notes
+
+- `npx vitest run packages/harness/src/__tests__/harness-exports.test.ts` ✅ (34/34)
+- `npm run build` ❌ fails in `packages/harness/src/index.ts` on missing DOM globals (`AbortSignal`, `fetch`, `DOMException`) — not the security blocker, but the "build green" claim is not reproducible.
+
+---
+
+# Zapp Decision — PR #544 Security Recheck
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**PR:** #544 — feat(v2): Step 1 — Nuke v1, cut to harness, web-shell cleanup
+**Decision:** APPROVED
+
+## Recheck outcome
+
+Re-reviewed commit `1a62989`. `infra/main.bicep` no longer defines the `STEPWISE_GENERATION_V1` parameter. No remaining runtime occurrences of `STEPWISE_GENERATION_V1`, `KICKSTART_AGENTS_SDK`, or `KICKSTART_V2` across `infra/` and `packages/`.
+
+## Outcome
+
+Prior blocker resolved cleanly. Applied label: `zapp:approved`

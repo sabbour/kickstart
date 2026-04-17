@@ -69,3 +69,7 @@ Posted the Step 3 DP for issue #476: sealed `PackRegistry`, `.agent.md` and `SKI
 ## Wave 4 — 2026-04-17 #475 A2UI Discriminator Decision
 
 - Filed `bender-475-a2ui-discriminator.md`: Raw A2UI v0.9 messages preprocessed into internal `{ op, ...raw }` envelope before validation; discriminated union runs on `op`; parsed result drops synthetic discriminator so downstream callers see raw A2UI shape. Satisfies Leela/Zapp strict-schema requirements without mutating wire contract.
+
+## Wave 6 — 2026-04-17 #476 Subpath Decision Filed
+
+- `bender-476-runtime-subpaths.md`: Step 3 runtime modules (`PackRegistry`, loaders, frontmatter parser) exposed via `@kickstart/harness/runtime/*` subpath exports, NOT re-exported from root barrel. Root barrel stays browser-safe. Node-only consumers import from subpath. Future Node-backed additions follow same pattern.

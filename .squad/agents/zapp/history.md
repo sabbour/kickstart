@@ -144,3 +144,22 @@ All 4 critical security conditions from issue #445 acceptance criteria:
 - Loader path confinement: `realpath` canonicalization, symlink escape rejected.
 - Registry sealed after `seal()` — exported views frozen; concurrent lifecycle misuse fails closed.
 - Cycle detection: bounded iterative DFS or Kahn algorithm.
+
+## Wave 6 — 2026-04-17 Security Reviews Filed
+
+### #477 pack-core (APPROVE_WITH_CONDITIONS)
+- `core.fetch_webpage`: public-web-only, redirect blocking, DNS/IP private-range rejection, strict size/time bounds.
+- File tools bound to session-scoped workspace/VFS; absolute paths, traversal, symlink escapes rejected.
+- `core.validate_artifacts` pure + bounded: no shell-outs, no eval, safe parsers only.
+- Registered-component validation required before forwarding `emit_ui` payloads.
+- Pack manifests deep-frozen/cloned at registration time.
+- Found `dangerouslySetInnerHTML` in `CodeBlock.tsx`, `Markdown.tsx`, `FileEditor.tsx`.
+
+### #478 playground-on-registry (APPROVE_WITH_CONDITIONS)
+- `playgroundStubs` validated against registered canonical UserAction names.
+- Registry exposes frozen read-only snapshot after `seal()`.
+- Packs in-tree/trusted only for v2. Fail-loud UI errors redacted to fixed user-safe text.
+
+### PR #544 — REQUEST CHANGES → APPROVED
+- Initial review blocked: `STEPWISE_GENERATION_V1` still in `infra/main.bicep:52-53,132-140`. Also noted `npm run build` fails on missing DOM globals in harness.
+- Recheck (commit `1a62989`): flag fully removed from infra. No runtime occurrences. Applied `zapp:approved`.
