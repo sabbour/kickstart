@@ -191,6 +191,18 @@ Before a PR can merge, it must pass two review gates:
 
 Zapp's review is a **pre-merge gate** for foundational patterns. Do not merge without Zapp's approval on security-sensitive changes.
 
+**How approvals work (label-based):**
+- **Leela** approves by adding the `leela:approved` label:
+  ```bash
+  gh pr edit {number} --add-label "leela:approved" --repo sabbour/kickstart
+  ```
+- **Zapp** approves by adding the `zapp:approved` label:
+  ```bash
+  gh pr edit {number} --add-label "zapp:approved" --repo sabbour/kickstart
+  ```
+
+No GitHub formal PR review approval is required — squad agents share a single GitHub account with the repo owner, making self-approval impossible. The `squad/review-gate` status check (`.github/workflows/squad-review-gate.yml`) automatically turns green when both labels are present.
+
 ### Requesting Copilot Review
 
 Use the REST API (not comment mentions):
@@ -223,9 +235,31 @@ All CI checks must pass, including Playwright E2E tests. If checks fail:
 2. Keep iterating until CI is green
 3. Do NOT merge PRs with failing required checks
 
+### Merge Gate
+
+**Rule:** Never call `gh pr merge` without first verifying ALL of the following:
+
+1. **Squad label gate** — both approval labels must be present:
+   ```bash
+   gh pr view {number} --json labels --jq '[.labels[].name] | contains(["leela:approved", "zapp:approved"])'
+   ```
+   Must return `true`.
+
+2. **Conversation resolution** — all review threads resolved:
+   ```bash
+   gh pr view {number} --json reviewThreads --jq '[.reviewThreads[] | select(.isResolved == false)] | length'
+   ```
+   Must return `0`.
+
+If either check fails — STOP. Do not merge. Comment on the PR requesting review from Leela or Zapp.
+
+**NEVER use `--admin` flag.** Branch protection exists to enforce review. Bypassing it with `--admin` defeats the entire gate. If protection blocks a merge, that is correct behavior — request review, do not force.
+
+**Why this exists:** Squad agents push PRs under the same GitHub user account as the repo owner. Authors cannot approve their own PRs in GitHub, so the "1 required approving review" gate permanently blocked every squad PR. The label-based gate replaces that with a status check that squad agents can satisfy.
+
 ### Merging
 
-Once all reviews are addressed, threads resolved, and CI is green:
+Once merge gate checks pass, all reviews are addressed, threads resolved, and CI is green:
 ```bash
 gh pr merge <N> --squash --delete-branch
 ```
