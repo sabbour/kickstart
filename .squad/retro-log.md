@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #263 "fix(ArchitectureDiagram): accept nodes/edges JSON and convert to Mermaid" | M | impl=0m | review=6m | cycles=1 | merged | @sabbour
