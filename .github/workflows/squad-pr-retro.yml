@@ -1,0 +1,135 @@
+name: Squad · PR Retro
+
+# Fires on every PR close. Scribe computes metrics, appends a line to
+# .squad/retro-log.md, and mirrors the line as a PR comment for visibility.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  retro:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute metrics
+        id: metrics
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title = (pr.title || '').replace(/"/g, "'");
+            const author = pr.user?.login ?? 'unknown';
+            const changed = (pr.additions ?? 0) + (pr.deletions ?? 0);
+            const size =
+              changed <= 50 ? 'S' :
+              changed <= 250 ? 'M' :
+              changed <= 1000 ? 'L' : 'XL';
+
+            // Implementation window = created_at - first commit
+            const commits = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+            const firstCommitAt = commits.data.length
+              ? new Date(commits.data[0].commit.author.date)
+              : new Date(pr.created_at);
+            const implMin = Math.max(0, Math.round(
+              (new Date(pr.created_at) - firstCommitAt) / 60000
+            ));
+
+            // Review window = merged_at (or closed_at) - ready_for_review event (fallback: created_at)
+            const events = await github.paginate(github.rest.issues.listEvents, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            const readyEvent = events.find(e => e.event === 'ready_for_review');
+            const readyAt = readyEvent ? new Date(readyEvent.created_at) : new Date(pr.created_at);
+            const closedAt = new Date(pr.merged_at ?? pr.closed_at);
+            const reviewMin = Math.max(0, Math.round((closedAt - readyAt) / 60000));
+
+            // Review cycles = number of push-after-review events (approximation)
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+            const requestedChanges = reviews.filter(r => r.state === 'CHANGES_REQUESTED').length;
+            const cycles = Math.max(1, requestedChanges + (pr.merged ? 0 : 0));
+
+            const outcome = pr.merged
+              ? (requestedChanges > 0 ? 'merged-with-rework' : 'merged')
+              : 'closed';
+
+            const date = closedAt.toISOString().slice(0, 10);
+            const line = `- ${date} | #${pr.number} "${title}" | ${size} | impl=${implMin}m | review=${reviewMin}m | cycles=${cycles} | ${outcome} | @${author}`;
+
+            core.setOutput('line', line);
+            core.setOutput('pr', String(pr.number));
+
+      - name: Append to retro log (as Scribe)
+        env:
+          LINE: ${{ steps.metrics.outputs.line }}
+        run: |
+          set -e
+          mkdir -p .squad
+          touch .squad/retro-log.md
+          # Insert the new line directly after the entries marker
+          awk -v line="$LINE" '
+            /^<!-- entries below this line, newest at top -->$/ {
+              print
+              print ""
+              print line
+              next
+            }
+            { print }
+          ' .squad/retro-log.md > .squad/retro-log.md.new
+          mv .squad/retro-log.md.new .squad/retro-log.md
+
+          git config user.name "squad-scribe[bot]"
+          git config user.email "scribe@squad.local"
+          git add .squad/retro-log.md
+          if git diff --cached --quiet; then
+            echo "No retro-log changes to commit (duplicate event?)"
+            exit 0
+          fi
+          git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]
+
+Working as Scribe — see .squad/agents/scribe/charter.md"
+          git push
+
+      - name: Mirror line as PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const line = `${{ steps.metrics.outputs.line }}`;
+            const body = [
+              '**Working as Scribe** · see `.squad/agents/scribe/charter.md`',
+              '',
+              '### Retro entry',
+              '```',
+              line,
+              '```',
+              '',
+              'Appended to `.squad/retro-log.md`. Used by the daily and weekly pulse.',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });

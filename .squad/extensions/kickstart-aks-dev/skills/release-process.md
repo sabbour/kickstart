@@ -1,64 +1,89 @@
 # Release Process
 
-**When to use:** You need to cut a release, bump versions, update the changelog, or deploy to production.
+**When to use:** you are reviewing the daily release PR, publishing release notes, or troubleshooting the cadence workflow.
 
 ## Context
 
-Kickstart is a monorepo with 3 npm workspace packages (`@kickstart/core`, `@kickstart/mcp-server`, `@kickstart/web`) using `@changesets/cli` for coordinated versioning. All packages are linked for lockstep version bumps. Tagged releases trigger production deploys to Azure Static Web Apps.
+Kickstart is a monorepo with linked packages (`@kickstart/harness`, `@kickstart/pack-core`, `@kickstart/pack-azure`, `@kickstart/pack-aks-automatic`, `@kickstart/pack-github`, `@kickstart/web`, `@kickstart/mcp-server`) versioned in lockstep via `@changesets/cli`.
 
-## Steps
+- **Pre-prod SWA** is the runtime surface. It deploys from `main` on every merge.
+- **Tags (`v*`)** mark versioned releases and cut GitHub Release notes. They do not trigger a separate production deploy today.
+- **Cadence is automated.** `.github/workflows/squad-release-cadence.yml` runs every day at 17:00 Pacific, checks for pending changesets, and opens a draft Release PR if any exist. Nobody asks Ralph to "run the release." The workflow does it.
 
-### 1. Create a Changeset
+## Ownership
 
-For each meaningful change, create a changeset describing the bump type:
+- **Leela (Lead)** is the author-of-record on the daily Release PR. Review for scope and correctness.
+- **Scribe** curates the GitHub Release notes. When the cadence workflow opens the PR, it comments `@copilot — work as Scribe` so @copilot adopts the Scribe persona for note curation.
+- **Hermes** validates via CI + Playwright + pack conformance. No manual test-run ceremony is required; CI is the gate.
+- **Zapp** reviews any release that touches auth, secrets, CORS, ARM proxy, or SDK tool schemas.
+- **Ralph** nags if CI expires on an open Release PR.
+
+## Steps (Leela's review, not a manual release ritual)
+
+### 1. Confirm the cadence workflow opened the PR
+
+Branch: `release/cadence`. Label: `squad:leela` + `release`. Body starts with `Working as Leela (Lead)`.
+
+If no PR opened and you expected one, check `.github/workflows/squad-release-cadence.yml` run history. The workflow skips quietly when there are no pending changesets.
+
+### 2. Review the version bump
+
+Verify:
+- `npm run version` consumed all pending changesets from `.changeset/`.
+- Every package bumped in lockstep.
+- `CHANGELOG.md` entries match the changeset bodies.
+
+### 3. Confirm Scribe's release notes
+
+Scribe (via @copilot persona on this PR) posts the curated notes as a comment:
+- Grouped **Added / Changed / Fixed / Removed / Security**
+- Breaking changes called out at the top with a migration note
+- Each bullet links to its PR
+
+Request revisions if the grouping is off or a breaking change is missed.
+
+### 4. Merge
+
+Merge to `main`. Main is pre-prod. The usual `.github/workflows/deploy-swa.yml` picks up the merge.
+
+### 5. Tag and publish release notes
+
+After merge:
+
 ```bash
-npm run changeset
-```
-Select the affected packages and the bump type (patch/minor/major). Changesets are committed as `.md` files in `.changeset/` — reviewable in PRs.
-
-### 2. Version Bump
-
-When ready to release, consume all pending changesets:
-```bash
-npm run version
-```
-This bumps versions across all linked packages and updates `CHANGELOG.md`.
-
-### 3. Commit and Tag
-
-```bash
-git add -A
-git commit -m "chore: release vX.Y.Z"
-git tag vX.Y.Z
-git push origin main --tags
+git checkout main && git pull
+VERSION=$(node -e "console.log(require('./package.json').version)")
+git tag "v${VERSION}"
+git push origin "v${VERSION}"
+gh release create "v${VERSION}" --notes-file <(gh pr view <RELEASE_PR> --json comments --jq '.comments[-1].body')
 ```
 
-### 4. Deploy
+The tag is a marker. No separate production deploy runs today.
 
-Tag push (`v*`) triggers `.github/workflows/deploy-swa.yml` automatically.
+### 6. Announce (optional)
 
-- **Version tags (`v*`):** Production deploy to SWA
-- **Manual dispatch (`workflow_dispatch`):** Emergency deploys
-- **Main branch:** Pre-prod / staging environment
+Open a Discussion under **Announcements** only when the release changes the top-line pitch or introduces a breaking change. Silent weeks are fine.
 
-### 5. CI on PRs
+## Bump semantics
 
-Before any release, CI must pass (`.github/workflows/ci.yml`):
-1. Lint (`npm run lint`)
-2. TypeScript check (`cd packages/web && npx tsc --noEmit`)
-3. Build core, API, web
-4. Unit tests (`vitest`)
-5. Playwright E2E tests
+| Change | Bump |
+|--------|------|
+| Bug fix, internal refactor that affects user behaviour | patch |
+| New pack, new component, new agent, new tool | minor |
+| Renamed or removed primitive, SSE event shape change, tool schema narrowing | major |
 
-## Key Rules
+## Rules
 
-- **Release early, release often** — small, frequent releases over big batches
-- **Semver levels matter** — use appropriate bump levels (patch for fixes, minor for features, major for breaking changes)
-- **All packages version in lockstep** — linked in `.changeset/config.json`
-- **No direct pushes to main** — all work goes through PRs
-- **Infra/docs deploys** still trigger on push to main (path-scoped, lower risk)
+- **All packages version in lockstep.** Linked in `.changeset/config.json`.
+- **No direct pushes to main.** Release PRs go through review.
+- **Main = pre-prod SWA.** Every merge deploys. Tags mark versioned releases but do not cut a separate production deploy today.
+- **Infra + docs** deploy on push to main, path-scoped (`.github/workflows/deploy-infra.yml`, `.github/workflows/deploy-docs.yml`).
+- **Release early, release often.** Small, frequent releases over big batches.
 
-## Who Can Tag Releases
+## Failure modes
 
-- **Ahmed (human):** Manual releases at any time
-- **Ralph (automated):** Can tag releases after N PRs merge (future automation)
+- **Cadence workflow didn't run:** check `.github/workflows/squad-release-cadence.yml` run history. Dispatch manually via `workflow_dispatch` if a scheduled run was missed.
+- **Release PR already open and stale:** rebase it. The workflow is idempotent and won't open a duplicate.
+- **Changeset missed on a merged PR:** open a follow-up PR that adds a changeset describing the historical impact. The next cadence run picks it up.
+- **CHANGELOG drift:** regenerate with `npm run version`. Do not hand-edit.
+- **Tag pushed by mistake:** delete the tag locally and remotely (`git push --delete origin vX.Y.Z`), then re-tag the correct commit. Never force-update an existing tag that's already in a published release.

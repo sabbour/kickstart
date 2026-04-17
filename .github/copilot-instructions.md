@@ -4,11 +4,18 @@ You are working on a project that uses **Squad**, an AI team framework. When pic
 
 ## Team Context
 
-Before starting work on any issue:
+Before starting work on any issue, PR, comment, or workflow-driven task:
 
 1. Read `.squad/team.md` for the team roster, member roles, and your capability profile.
 2. Read `.squad/routing.md` for work routing rules.
-3. If the issue has a `squad:{member}` label, read that member's charter at `.squad/agents/{member}/charter.md` to understand their domain expertise and coding style — work in their voice.
+3. **Adopt the named persona.** The persona is signalled in priority order:
+   1. An explicit instruction in the comment or issue body like `work as Scribe` or `Working as Leela (Lead)`.
+   2. A `squad:{member}` label on the issue or PR.
+   3. The `squad:{member}` label on the parent issue linked from a PR.
+
+   Once the persona is known, read `.squad/agents/{member}/charter.md` and work in that voice. Match their boundaries, model preferences, and style. Do not default to generic Copilot behaviour when a persona is specified.
+4. Read `.squad/ceremonies.md` if the task came from an automated workflow (daily pulse, weekly pulse, release cadence, PR retro) so you understand what artifact the workflow expects.
+5. If no persona is specified **and** the task clearly belongs to one (e.g. release notes → Scribe, architecture review → Leela, security review → Zapp), adopt that persona and state it in your first reply.
 
 ## Capability Self-Check
 
@@ -28,6 +35,24 @@ Use the squad branch convention:
 squad/{issue-number}-{kebab-case-slug}
 ```
 Example: `squad/42-fix-login-validation`
+
+## Worktrees are mandatory
+
+Never run `git checkout -b` in the top-level working tree. Every piece of issue work happens inside its own worktree under `.worktrees/`. This prevents agents from stomping on each other's uncommitted changes, branching off the wrong base, or producing mixed-diff PRs.
+
+Before starting work:
+
+```bash
+git fetch origin
+git worktree list                    # see what's already in flight; reuse if yours exists
+git worktree add .worktrees/<issue-number-or-slug> \
+  -b squad/<issue-number>-<slug> origin/main
+cd .worktrees/<issue-number-or-slug>
+```
+
+All subsequent edits, commits, and `gh pr create` calls run from inside the worktree. After the PR merges or closes, run `git worktree remove .worktrees/<name> && git worktree prune` from another checkout.
+
+If you find yourself about to branch from `main` in the top-level checkout, stop and create a worktree instead.
 
 ## PR Guidelines
 

@@ -1,6 +1,6 @@
 # Squad Team
 
-> Kickstart — AI-guided onboarding experience for deploying apps to AKS
+> Kickstart — AI-guided onboarding experience for deploying apps to AKS. v2 runs on `@openai/agents` SDK with a harness + packs architecture. See [`docs/v2-implementation-brief.md`](../docs/v2-implementation-brief.md).
 
 ## Coordinator
 
@@ -15,10 +15,10 @@
 | Leela | Lead | `.squad/agents/leela/charter.md` | ✅ Active |
 | Fry | Frontend Dev | `.squad/agents/fry/charter.md` | ✅ Active |
 | Bender | Backend Dev | `.squad/agents/bender/charter.md` | ✅ Active |
-| Hermes | Tester | `.squad/agents/hermes/charter.md` | ✅ Active |
+| Hermes | Tester + Observability | `.squad/agents/hermes/charter.md` | ✅ Active |
 | Zapp | Security Architect | `.squad/agents/zapp/charter.md` | ✅ Active |
-| Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 📋 Silent |
-| Ralph | Work Monitor | — | 🔄 Monitor |
+| Scribe | Scribe + Product/DX | `.squad/agents/scribe/charter.md` | 📋 Silent |
+| Ralph | Work Monitor | - | 🔄 Monitor |
 
 ## Coding Agent
 
@@ -26,7 +26,7 @@
 
 | Name | Role | Charter | Status |
 |------|------|---------|--------|
-| @copilot | Coding Agent | — | 🤖 Coding Agent |
+| @copilot | Coding Agent | — (adopts persona from `squad:{member}` label) | 🤖 Coding Agent |
 
 ### Capabilities
 
@@ -36,20 +36,24 @@
 - Lint/format fixes and code style cleanup
 - Dependency updates and version bumps
 - Small isolated features with clear specs
-- Boilerplate/scaffolding generation
-- Documentation fixes and README updates
+- Boilerplate/scaffolding generation (new pack skeletons, new skill scaffolds)
+- Documentation fixes, `docs-site/docs/` updates, changeset additions
+- Release notes curation (as Scribe persona)
 
 **🟡 Needs review — route to @copilot but flag for squad member PR review:**
 - Medium features with clear specs and acceptance criteria
 - Refactoring with existing test coverage
+- New SDK tools with narrow schemas (Zapp reviews)
 - API endpoint additions following established patterns
 - Migration scripts with well-defined schemas
 
 **🔴 Not suitable — route to squad member instead:**
 - Architecture decisions and system design
+- Changes to pack boundaries or primitive surface
+- SSE event taxonomy or A2UI contract changes
 - Multi-system integration requiring coordination
 - Ambiguous requirements needing clarification
-- Security-critical changes (auth, encryption, access control)
+- Security-critical changes (auth, encryption, access control, guardrail design)
 - Performance-critical paths requiring benchmarking
 - Changes requiring cross-team discussion
 
@@ -64,6 +68,6 @@
 
 - **Owner:** Ahmed Sabbour
 - **Project:** Kickstart — AI-guided onboarding for AKS
-- **Stack:** HTML/CSS/JS (Portal Prototyper), TypeScript, Azure/AKS, AI/LLM
-- **Description:** A web-based experience that guides developers from app idea to production deployment on AKS Automatic, without requiring Kubernetes expertise
-- **Created:** 2026-04-08
+- **Stack:** TypeScript, React, Fluent UI v9, `@openai/agents` SDK, Azure/AKS, Bicep, Vite, Playwright, Vitest, Changesets
+- **Architecture:** harness + packs (`@kickstart/harness`, `pack-core`, `pack-azure`, `pack-aks-automatic`, `pack-github`)
+- **Description:** A web experience that guides developers from app idea to production deployment on AKS Automatic, without requiring Kubernetes expertise

@@ -1,57 +1,116 @@
 # Testing Strategy
 
-**When to use:** You need to write tests, validate changes, or set up the testing pipeline.
+**When to use:** you are writing tests, validating a change, or wiring up a CI step.
 
 ## Context
 
-Kickstart uses a dual testing approach: Vitest for unit/integration tests and Playwright for end-to-end tests. All feature work must include or be validated by both layers. A rules engine provides extensible validation with a canonical registry.
+Kickstart v2 has four test layers. A PR is not complete until the layers it touches are green.
 
-## Steps
+| Layer | Tool | What it proves |
+|-------|------|----------------|
+| Unit | Vitest | Individual functions, pure components, utility code |
+| Pack conformance | Vitest | Every pack registers cleanly, every primitive round-trips the registry, tool schemas are valid |
+| Contract | Vitest + recorded fixtures | SSE events and tool outputs match pinned shapes |
+| End-to-end | Playwright | Real agent runs through the web client, real streaming, real UI |
 
-### 1. Unit Tests (Vitest)
+## Layer rules
 
-Run unit tests:
-```bash
-npm run test
-```
+### Unit (Vitest)
 
-- Tests live alongside source files or in `__tests__/` directories
-- Use `vitest` with the workspace config at `vitest.config.ts`
-- Mock external dependencies (Azure APIs, LLM calls)
+- Tests co-locate with source (`foo.ts` + `foo.test.ts`) or live in `__tests__/`.
+- Mock only what crosses a process boundary (Azure SDK, OpenAI, fs when destructive).
+- Tests are deterministic. No random, no time-sensitive assertions without a fake clock.
 
-### 2. End-to-End Tests (Playwright)
+### Pack conformance
 
-Run E2E tests:
-```bash
-npx playwright test
-```
+Every pack under `packages/pack-*/src/__tests__/` has:
 
-- Config at `playwright.config.ts` with `webServer` set to Vite preview
-- Tests validate full user flows (landing → chat → component rendering)
-- **All feature work must be validated by Playwright tests** (user directive)
-- Playwright E2E runs in a separate CI job for isolation
+- `conformance.test.ts` — registers the pack against a fresh harness and asserts every declared primitive is reachable.
+- `schema.test.ts` — snapshot test of every tool and user-action schema.
+- `components.test.ts` — renders every component with its sample props.
 
-### 3. Validation Engine & Rules Registry
+Packs that fail conformance cannot ship.
 
-The validation system uses a canonical `ALL_RULES` array:
+### Contract
 
-- `ALL_RULES` in `validation/index.ts` is the single source of truth
-- Both `createDefaultValidationEngine()` and `createDefaultRulesEngine()` iterate over it
-- New validators go in `ALL_RULES` — never in individual factory functions
+`packages/harness/src/__tests__/contract/` pins:
 
-Each `ValidationRule` has metadata:
-- `category` — maps to AKS Automatic constraint families
-- `tags` — for filtering
-- `aksConstraint` — optional policy alignment
-- `autoFixAvailable` — whether auto-remediation is possible
+- The SSE event taxonomy (`chunk`, `a2ui`, `tool`, `user_action_required`, `handoff`, `intent`, `done`, `error`).
+- The `core.emit_ui` payload shape.
+- The user-action resume payload shape.
 
-### 4. CI Pipeline
+Breaking these is a major version bump.
 
-All CI checks must pass before merge (`.github/workflows/ci.yml`):
+### End-to-end (Playwright)
+
+- Config: `playwright.config.ts`.
+- Tests under `packages/web/e2e/`.
+- Register `page.waitForResponse()` before `page.goto()` when intercepting SSE routes. Route registrations in the test body use LIFO and override auto-fixtures.
+- Mock mode (`?mock`) exercises the UI without hitting the API. Use it for deterministic UI tests.
+- Live mode exercises the real SSE parser path. Use it for streaming regressions.
+
+## CI pipeline
+
+`.github/workflows/ci.yml` runs on every PR:
+
 1. Lint (`npm run lint`)
-2. TypeScript check (`cd packages/web && npx tsc --noEmit`)
-3. Build core, API, web
-4. Unit tests (Vitest)
-5. Playwright E2E tests
+2. TypeScript check across all packages
+3. Build harness, all packs, web, API
+4. Unit + conformance + contract tests (`npx vitest run`)
+5. Changeset status (surfaces missing changesets)
+6. Playwright E2E (`npx playwright test`)
 
-Do NOT merge PRs with failing required checks. If checks fail, spawn the owning agent to fix failures and iterate until green.
+All required. A red CI blocks merge.
+
+## Writing a good test
+
+- Name describes expected behaviour, not the method under test. `renders empty state when data is null` beats `test_render_1`.
+- One assertion cluster per test. Multiple unrelated assertions belong in separate tests.
+- Prefer real objects and integration-style tests to deep mock chains.
+- For streaming: assert on the sequence of events, not just the final output.
+- For components: assert user-observable behaviour (role, text, aria) over implementation detail.
+
+## Flake policy
+
+- A flaky test is a broken test. Fix it or delete it. Do not skip it "for now."
+- Retries in CI hide problems. Do not add them without a Zapp + Hermes review.
+
+## Coverage
+
+- 80% is a floor, not a target.
+- Coverage without contract and conformance is theatre. A pack with 100% unit coverage but a broken conformance test still fails.
+
+## Performance budgets
+
+Hermes owns the perf budget on every DP that introduces or materially changes a user-facing path.
+
+A DP must state:
+
+| Metric | Required for |
+|--------|--------------|
+| p95 latency | Any new `/api/*` endpoint or tool invocation path |
+| First-chunk time | Any new streaming path (SSE, agent response) |
+| Token budget | Any new LLM-backed tool, agent, or prompt |
+| Cold-start delta | Any change to SWA Functions API bundle or dependencies |
+| Resource footprint | Any change to pack infra, AKS Automatic defaults, or deployment manifests |
+
+Defaults (adjust per feature):
+
+- `/api/converse` p95 under 500 ms excluding LLM call time
+- First SSE chunk under 800 ms from request receipt
+- Cold start under 3 s for the Functions host
+- Token budget stated per-call with a hard ceiling
+
+Enforcement:
+
+- PRs that regress a stated budget without a written justification are blocked.
+- Regression tests live next to the feature. Playwright timing assertions are acceptable for UI paths.
+- Budget changes themselves are a DP item, not a silent PR edit.
+
+Observability:
+
+- Emit structured logs with `trace_id`, `session_id`, `agent`, `tool`, `latency_ms`, `tokens_in`, `tokens_out`, `first_chunk_ms`, and `outcome` on every agent turn.
+- Every new tool, agent, or endpoint gets an OpenTelemetry span. Span names: `tool.{name}`, `agent.{name}`, `emit_ui`, `sse.chunk`. Trace IDs propagate from the Functions API through harness and packs.
+- No `console.log` in shipped code. Secrets and user content are redacted at source; redaction rules go through Zapp.
+- Dropping a span, breaking trace propagation, or emitting unstructured logs is a block-merge regression on par with a perf-budget regression.
+- Surface regressions in the weekly pulse when available.

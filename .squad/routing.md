@@ -6,13 +6,17 @@ How to decide who handles what.
 
 | Work Type | Route To | Examples |
 |-----------|----------|----------|
-| Frontend UX | Fry | Portal Prototyper pages, guided flows, wizards, styling, accessibility |
-| Backend & AI | Bender | API endpoints, LLM integration, Azure infra, Bicep, Dockerfiles, K8s manifests |
-| Code review | Leela | Review PRs, check quality, suggest improvements |
-| Testing | Hermes | Write tests, find edge cases, verify fixes, accessibility audits |
+| Frontend UX | Fry | Web client routes, A2UI rendering, component authoring, SSE client, playground |
+| Backend & runtime | Bender | Harness, non-UI packs, SDK tools, user actions, guardrails, SWA Functions API, Azure infra |
+| Code review | Leela | Review PRs, check architecture alignment, suggest improvements |
+| Testing | Hermes | Four test layers: unit, pack conformance, contract, Playwright E2E |
+| Performance & observability | Hermes | Perf budgets on DPs, p95 latency, first-chunk time, token ceilings, cold-start, resource sizing, tracing spans, structured logging |
 | Scope & priorities | Leela | What to build next, trade-offs, decisions |
-| Architecture | Leela | System design, component boundaries, tech choices |
-| Session logging | Scribe | Automatic — never needs routing |
+| Architecture | Leela | Pack boundaries, primitive surface, harness contract |
+| Security | Zapp | DP security review, tool schema review, guardrail design |
+| Release notes, docs | Scribe | Release PR curation, pulse issues, decision merging, public docs, CHANGELOG, README |
+| Product & DX review | Scribe | Advisory review on DPs and PRs for naming, defaults, newcomer experience |
+| Queue monitoring | Ralph | Stuck PRs, expired gates, missed cron runs |
 
 ## Issue Routing
 

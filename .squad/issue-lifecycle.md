@@ -159,20 +159,17 @@ GH_TOKEN=$TOKEN gh api graphql -f query='
 
 > **Board IDs:** The coordinator resolves project/item/field/option IDs before spawning and passes them in the ISSUE CONTEXT block. See spawn prompt additions below.
 
-**Branch creation commands:**
+**Branch creation — worktree required:**
 
-**Standard (single-agent, no parallelism):**
+Agents always branch inside a dedicated worktree under `.worktrees/`. Branching in the top-level checkout is not allowed: multiple agents on the same checkout cause dirty diffs, wrong-base branches, and lost work.
+
 ```bash
-git checkout main && git pull && git checkout -b squad/{issue-number}-{slug}
+git fetch origin
+git worktree list                                      # reuse if one already exists
+git worktree add .worktrees/{issue-number-or-slug} \
+  -b squad/{issue-number}-{slug} origin/main
+cd .worktrees/{issue-number-or-slug}
 ```
-
-**Worktree (parallel multi-agent):**
-```bash
-git worktree add ../worktrees/{issue-number} -b squad/{issue-number}-{slug}
-cd ../worktrees/{issue-number}
-```
-
-> **Note:** Worktree support is in progress (#525). Current implementation uses standard checkout.
 
 ### 3. Implementation & Commit
 
@@ -327,24 +324,20 @@ az repos pr update --id {pr-id} --status completed --delete-source-branch true
 
 **Post-merge actions:**
 1. Issue automatically closes (if "Closes #{number}" is in PR description)
-2. Feature branch is deleted
+2. Feature branch is deleted on the remote
 3. Squad board state transitions to `done`
-4. Worktree cleanup (if worktree was used — #525)
+4. Worktree is removed locally
 
 ### 7. Cleanup
 
-**Standard workflow cleanup:**
+From any checkout other than the worktree you're removing:
+
 ```bash
-git checkout main
-git pull
-git branch -d squad/{issue-number}-{slug}
+git worktree remove .worktrees/{issue-number-or-slug}
+git worktree prune
 ```
 
-**Worktree cleanup (future, #525):**
-```bash
-cd {original-cwd}
-git worktree remove ../worktrees/{issue-number}
-```
+If the worktree has uncommitted changes, move them first. `git worktree remove` refusing to delete is usually a signal that something went wrong and needs attention.
 
 ## Spawn Prompt Additions for Issue Work
 
@@ -505,7 +498,7 @@ Research documented → Research PR merged → Implementation issue created →
 Implementation agent spawned → Feature built → PR merged
 ```
 
-### Pattern 4: Parallel Multi-Agent (Future, #525)
+### Pattern 4: Parallel Multi-Agent
 ```
 Epic issue created → Decomposed into sub-issues → Each sub-issue assigned → 
 Multiple agents work in parallel worktrees → PRs opened concurrently → 
@@ -519,15 +512,6 @@ All PRs reviewed → All PRs merged → Epic closed
 - ❌ Opening PRs without "Closes #{number}" in description
 - ❌ Merging PRs before CI passes
 - ❌ Leaving feature branches undeleted after merge
-- ❌ Using `checkout -b` when parallel agents are active (causes working directory conflicts)
+- ❌ Running `git checkout -b` in the top-level checkout — always use a worktree under `.worktrees/`
 - ❌ Manually transitioning issue states — let the platform and Squad automation handle it
 - ❌ Skipping the branch naming convention — breaks Ralph's tracking logic
-
-## Migration Notes
-
-**v0.8.x → v0.9.x (Worktree Support):**
-- `checkout -b` → `git worktree add` for parallel agents
-- Worktree cleanup added to post-merge flow
-- `TEAM_ROOT` passing to agents to support worktree-aware state resolution
-
-This template will be updated as worktree lifecycle support lands in #525.
