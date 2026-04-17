@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #92 "fix(security): integrate Key Vault for secret management" | M | impl=3m | review=4m | cycles=1 | merged | @sabbour
