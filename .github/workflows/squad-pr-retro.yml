@@ -115,7 +115,12 @@ jobs:
         run: |
           set -e
           git fetch origin "$BASE_REF"
-          git checkout -B "$BASE_REF" "origin/$BASE_REF"
+          if git show-ref --verify --quiet "refs/heads/$BASE_REF"; then
+            git checkout "$BASE_REF"
+            git reset --hard "origin/$BASE_REF"
+          else
+            git checkout -b "$BASE_REF" "origin/$BASE_REF"
+          fi
           mkdir -p .squad
           touch .squad/retro-log.md
           # Insert the new line directly after the entries marker
@@ -139,6 +144,7 @@ jobs:
           fi
           git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
           for attempt in 1 2 3; do
+            echo "Push attempt $attempt/3 to $BASE_REF"
             if git push origin "HEAD:$BASE_REF"; then
               break
             fi
@@ -147,6 +153,7 @@ jobs:
               exit 1
             fi
             git pull --rebase origin "$BASE_REF"
+            sleep 2
           done
 
       - name: Mirror line as PR comment
