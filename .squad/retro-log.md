@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #107 "feat: knowledge imports — system prompt + AKS/ARM (#6,#7,#8,#10,#11,#14,#15)" | L | impl=21m | review=1m | cycles=1 | merged | @sabbour
