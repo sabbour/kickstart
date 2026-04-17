@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #440 "docs: fix stale skill-path claims in architecture docs" | S | impl=1m | review=0m | cycles=1 | merged | @sabbour-squad-frontend[bot]
+
 - 2026-04-17 | #442 "docs: replace hardcoded Azure env values with placeholders (#432)" | S | impl=4m | review=12m | cycles=1 | merged | @sabbour-squad-frontend[bot]
 
 - 2026-04-17 | #441 "fix(docs): correct conversation-phases and contributing accuracy (#435)" | L | impl=9m | review=13m | cycles=1 | merged | @sabbour
