@@ -50,7 +50,7 @@ export const readFileTool: ToolContribution = {
       const workspaceRoot = (session as unknown as { workspaceRoot?: string })?.workspaceRoot
         ?? process.cwd();
 
-      const fullPath = resolveConfinedPath(resolve(workspaceRoot) + '/', input.path);
+      const fullPath = resolveConfinedPath(resolve(workspaceRoot), input.path);
 
       let content: string;
       try {

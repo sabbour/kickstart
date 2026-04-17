@@ -46,8 +46,9 @@ export const emitUiTool: ToolContribution = {
         session.recordA2UIEmission(parsed);
       }
 
-      // Return a short acknowledgement so the model can reason about what was emitted.
-      const op = (parsed as Record<string, unknown>)['op'] as string | undefined ?? 'unknown';
+      // Derive op name from the key that isn't 'version' (A2UIMessageSchema strips the 'op' field).
+      const op = Object.keys(parsed as Record<string, unknown>)
+        .find(k => k !== 'version') ?? 'unknown';
       return `emitted: ${op}`;
     },
   }),

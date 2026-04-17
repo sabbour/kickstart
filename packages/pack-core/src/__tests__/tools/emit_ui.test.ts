@@ -3,13 +3,13 @@
  * @suite Phase C — core.emit_ui tool
  *
  * Tests A2UI v0.9 message validation, session recording, and error handling
- * against the real implementation in packages/pack-core/src/tools/emit_ui.ts.
+ * against the real implementation.
  *
- * Tool is invoked via FunctionTool.invoke(runCtx, jsonInput).
+ * NOTE: The SDK wraps execution errors in a string result rather than
+ * rejecting. Error-case tests check the returned string.
  *
  * @depends Phase C of #477 (emit_ui.ts must exist)
  * @depends #475 A2UIMessageSchema on @kickstart/harness
- * @depends #476 SessionCtx.recordA2UIEmission
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -48,10 +48,8 @@ const validDeleteSurface = {
 describe('core.emit_ui', () => {
   let session: ReturnType<typeof makeSessionCtx>;
 
-  const invoke = (message: unknown) => {
-    const runCtx = new RunContext(session);
-    return emitUiTool.tool.invoke(runCtx, JSON.stringify({ message }));
-  };
+  const invoke = (message: unknown) =>
+    emitUiTool.tool.invoke(new RunContext(session), JSON.stringify({ message }));
 
   beforeEach(() => {
     session = makeSessionCtx();
@@ -63,23 +61,19 @@ describe('core.emit_ui', () => {
   describe('valid A2UI v0.9 messages — return value', () => {
     it('createSurface returns a string acknowledgement containing "createSurface"', async () => {
       const result = await invoke(validCreateSurface);
-      expect(typeof String(result)).toBe('string');
       expect(String(result)).toContain('createSurface');
     });
 
     it('updateComponents returns a string acknowledgement', async () => {
-      const result = await invoke(validUpdateComponents);
-      expect(String(result)).toContain('updateComponents');
+      expect(String(await invoke(validUpdateComponents))).toContain('updateComponents');
     });
 
     it('updateDataModel returns a string acknowledgement', async () => {
-      const result = await invoke(validUpdateDataModel);
-      expect(String(result)).toContain('updateDataModel');
+      expect(String(await invoke(validUpdateDataModel))).toContain('updateDataModel');
     });
 
     it('deleteSurface returns a string acknowledgement', async () => {
-      const result = await invoke(validDeleteSurface);
-      expect(String(result)).toContain('deleteSurface');
+      expect(String(await invoke(validDeleteSurface))).toContain('deleteSurface');
     });
   });
 
@@ -105,7 +99,7 @@ describe('core.emit_ui', () => {
 
   // ── Multiple emissions accumulate in order ────────────────────────────────
 
-  describe('multiple emissions', () => {
+  describe('multiple emissions accumulate in array order', () => {
     it('two calls accumulate two entries in order', async () => {
       await invoke(validCreateSurface);
       await invoke(validUpdateComponents);
@@ -120,49 +114,50 @@ describe('core.emit_ui', () => {
     });
   });
 
-  // ── Invalid messages → rejection ─────────────────────────────────────────
+  // ── Invalid messages → error string ──────────────────────────────────────
 
-  describe('invalid messages → error thrown', () => {
-    it('rejects a message with wrong version', async () => {
-      await expect(
-        invoke({ version: 'v0.1', createSurface: { surfaceId: 'x', catalogId: 'y' } }),
-      ).rejects.toThrow();
+  describe('invalid message → error result string', () => {
+    it('wrong version returns an error result', async () => {
+      const result = String(
+        await invoke({ version: 'v0.1', createSurface: { surfaceId: 'x', catalogId: 'y' } }),
+      );
+      expect(result).toMatch(/An error occurred|invalid/i);
     });
 
-    it('rejects a message with unknown op key', async () => {
-      await expect(
-        invoke({ version: A2UI_VERSION, unknownOp: { surfaceId: 'x' } }),
-      ).rejects.toThrow();
+    it('unknown op key returns an error result', async () => {
+      const result = String(
+        await invoke({ version: A2UI_VERSION, unknownOp: { surfaceId: 'x' } }),
+      );
+      expect(result).toMatch(/An error occurred|invalid/i);
     });
 
-    it('rejects createSurface missing required surfaceId', async () => {
-      await expect(
-        invoke({ version: A2UI_VERSION, createSurface: { catalogId: 'cat' } }),
-      ).rejects.toThrow();
+    it('createSurface missing surfaceId returns an error result', async () => {
+      const result = String(
+        await invoke({ version: A2UI_VERSION, createSurface: { catalogId: 'cat' } }),
+      );
+      expect(result).toMatch(/An error occurred|invalid/i);
     });
 
-    it('rejects updateComponents with empty components array', async () => {
-      await expect(
-        invoke({
-          version: A2UI_VERSION,
-          updateComponents: { surfaceId: 'x', components: [] },
-        }),
-      ).rejects.toThrow();
+    it('updateComponents with empty components array returns an error result', async () => {
+      const result = String(
+        await invoke({ version: A2UI_VERSION, updateComponents: { surfaceId: 'x', components: [] } }),
+      );
+      expect(result).toMatch(/An error occurred|invalid/i);
     });
 
     it('does not push to a2uiEmissions when message is invalid', async () => {
-      await expect(
-        invoke({ version: A2UI_VERSION, badOp: {} }),
-      ).rejects.toThrow();
+      await invoke({ version: A2UI_VERSION, badOp: {} });
       expect(session.a2uiEmissions).toHaveLength(0);
     });
 
-    it('rejects null message', async () => {
-      await expect(invoke(null)).rejects.toThrow();
+    it('null message returns an error result', async () => {
+      const result = String(await invoke(null));
+      expect(result).toMatch(/An error occurred|invalid/i);
     });
 
-    it('rejects completely empty object', async () => {
-      await expect(invoke({})).rejects.toThrow();
+    it('empty object returns an error result', async () => {
+      const result = String(await invoke({}));
+      expect(result).toMatch(/An error occurred|invalid/i);
     });
   });
 

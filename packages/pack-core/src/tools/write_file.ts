@@ -53,7 +53,7 @@ export const writeFileTool: ToolContribution = {
       const workspaceRoot = (session as unknown as { workspaceRoot?: string })?.workspaceRoot
         ?? process.cwd();
 
-      const fullPath = resolveConfinedPath(resolve(workspaceRoot) + '/', input.path);
+      const fullPath = resolveConfinedPath(resolve(workspaceRoot), input.path);
 
       // Record the artifact in the session so downstream tools (validate, search) can find it.
       session?.recordArtifact({ path: input.path, kind: 'file' });

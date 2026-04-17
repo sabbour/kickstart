@@ -3,19 +3,18 @@
  * @suite Phase C — core.write_file tool
  *
  * Tests path-confinement guards and successful write + overwrite behaviour
- * against the real implementation in packages/pack-core/src/tools/write_file.ts.
+ * against the real implementation.
  *
- * `node:fs` is mocked so no actual filesystem writes occur.
- * Tool is invoked via FunctionTool.invoke(runCtx, jsonInput).
+ * NOTE: The SDK wraps execution errors in a string result rather than
+ * rejecting. Error-case tests check the returned string.
  *
  * @depends Phase C of #477 (write_file.ts must exist)
- * @depends path-confinement policy (no traversal, no absolute paths)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeSessionCtx } from './_session-stub.js';
 
-// ── Mock node:fs (hoisted before module imports) ─────────────────────────────
+// ── Mock node:fs ─────────────────────────────────────────────────────────────
 
 const _fsStore = new Map<string, string>();
 
@@ -38,13 +37,11 @@ import { resolve } from 'node:path';
 
 const WORKSPACE_ROOT = '/workspace/kickstart-test';
 
-function makeRunCtx() {
-  const session = {
-    ...makeSessionCtx(),
-    workspaceRoot: WORKSPACE_ROOT,
-  };
-  return new RunContext(session);
-}
+const invoke = (path: string, content: string) =>
+  writeFileTool.tool.invoke(
+    new RunContext({ ...makeSessionCtx(), workspaceRoot: WORKSPACE_ROOT }),
+    JSON.stringify({ path, content }),
+  );
 
 function storedContent(relativePath: string): string | undefined {
   return _fsStore.get(resolve(WORKSPACE_ROOT, relativePath));
@@ -53,9 +50,6 @@ function storedContent(relativePath: string): string | undefined {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('core.write_file', () => {
-  const invoke = (path: string, content: string) =>
-    writeFileTool.tool.invoke(makeRunCtx(), JSON.stringify({ path, content }));
-
   beforeEach(() => {
     _fsStore.clear();
     vi.clearAllMocks();
@@ -63,11 +57,10 @@ describe('core.write_file', () => {
 
   // ── Happy path ─────────────────────────────────────────────────────────────
 
-  describe('valid relative path', () => {
-    it('returns a string confirming the write', async () => {
-      const result = await invoke('src/main.ts', 'const x = 1;');
-      expect(typeof String(result)).toBe('string');
-      expect(String(result)).toContain('src/main.ts');
+  describe('valid relative path writes content', () => {
+    it('returns a string confirming the write with the path', async () => {
+      const result = String(await invoke('src/main.ts', 'const x = 1;'));
+      expect(result).toContain('src/main.ts');
     });
 
     it('stores the content via writeFileSync', async () => {
@@ -88,8 +81,10 @@ describe('core.write_file', () => {
 
     it('records the artifact on the session via recordArtifact', async () => {
       const session = { ...makeSessionCtx(), workspaceRoot: WORKSPACE_ROOT };
-      const runCtx = new RunContext(session);
-      await writeFileTool.tool.invoke(runCtx, JSON.stringify({ path: 'infra/main.bicep', content: 'param env string' }));
+      await writeFileTool.tool.invoke(
+        new RunContext(session),
+        JSON.stringify({ path: 'infra/main.bicep', content: 'param env string' }),
+      );
       expect(session.artifacts.has('infra/main.bicep')).toBe(true);
     });
 
@@ -109,14 +104,15 @@ describe('core.write_file', () => {
     const traversalPaths = ['../outside', '../../etc/passwd', 'subdir/../../escape'];
 
     it.each(traversalPaths)(
-      'rejects traversal path: %s',
+      'returns an error result for traversal path: %s',
       async (path) => {
-        await expect(invoke(path, 'x')).rejects.toThrow();
+        const result = String(await invoke(path, 'x'));
+        expect(result).toMatch(/An error occurred|escapes workspace root/i);
       },
     );
 
     it('does not write to the fs store when traversal is detected', async () => {
-      await expect(invoke('../outside.txt', 'leaked')).rejects.toThrow();
+      await invoke('../outside.txt', 'leaked');
       expect(_fsStore.size).toBe(0);
     });
   });
@@ -124,12 +120,14 @@ describe('core.write_file', () => {
   // ── Path confinement — absolute paths ────────────────────────────────────
 
   describe('absolute path → confinement error', () => {
-    it('rejects /etc/passwd', async () => {
-      await expect(invoke('/etc/passwd', 'x')).rejects.toThrow();
+    it('returns an error result for /etc/passwd', async () => {
+      const result = String(await invoke('/etc/passwd', 'x'));
+      expect(result).toMatch(/An error occurred|escapes workspace root/i);
     });
 
-    it('rejects any path starting with /', async () => {
-      await expect(invoke('/home/user/file.txt', 'x')).rejects.toThrow();
+    it('returns an error result for any path starting with /', async () => {
+      const result = String(await invoke('/home/user/file.txt', 'x'));
+      expect(result).toMatch(/An error occurred/i);
     });
   });
 
