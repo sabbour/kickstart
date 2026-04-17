@@ -264,6 +264,13 @@ export function DebugPanel({ debugInfo, a2uiMessages }: DebugPanelProps) {
             )}
           </div>
 
+          {/* System Prompt */}
+          {debugInfo?.systemPrompt && (
+            <CollapsibleSection label="System Prompt" defaultOpen={false} styles={styles}>
+              <pre className={codeBlockClass}>{debugInfo.systemPrompt}</pre>
+            </CollapsibleSection>
+          )}
+
           {/* Full LLM Response Envelope */}
           <CollapsibleSection label="Full LLM Response (JSON)" defaultOpen={true} styles={styles}>
             {debugInfo?.fullEnvelope ? (
