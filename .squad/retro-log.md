@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #102 "chore: add sprint plan and retro files" | L | impl=0m | review=11m | cycles=1 | merged | @sabbour
