@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-11 | #118 "feat: Frontend Wave 2 — inspiration button, URL links, 5 Fluent components" | XL | impl=1m | review=27m | cycles=1 | merged | @sabbour
