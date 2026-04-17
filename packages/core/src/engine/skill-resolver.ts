@@ -21,6 +21,13 @@
 import { Phase } from "./types.js";
 import type { Skill, SkillResolverContext } from "./types.js";
 import type { IntegrationKit } from "../kits/types.js";
+import {
+  AKS_KEYWORDS,
+  AUTH_KEYWORDS,
+  CICD_KEYWORDS,
+  DATABASE_KEYWORDS,
+  DOCKER_KEYWORDS,
+} from "./skill-vocabulary.js";
 
 // ---------------------------------------------------------------------------
 // Phase groups — used to filter general prompts to relevant phases
@@ -53,13 +60,18 @@ const DISCOVER_KEYWORDS = [
 ];
 
 const DESIGN_KEYWORDS = [
-  "architecture", "recommend", "prefer", "design", "database", "service",
-  "plan", "default", "unless", "aks automatic", "managed",
+  "architecture", "recommend", "prefer", "design", "service",
+  "plan", "default", "unless", "managed",
+  ...DATABASE_KEYWORDS,  // database, sql, postgres, mysql
+  ...AKS_KEYWORDS,       // aks, kubernetes, k8s, helm, manifest, bicep, workload identity, gateway api
 ];
 
 const GENERATE_KEYWORDS = [
-  "generat", "workflow", "dockerfile", "manifest", "artifact", "ci/cd",
-  "pipeline", "template", "oidc", "credential",
+  "generat", "artifact", "template",
+  ...DOCKER_KEYWORDS,    // dockerfile, container, multi-stage, docker
+  ...AKS_KEYWORDS,       // manifest, helm, aks, kubernetes, k8s, bicep, workload identity, gateway api
+  ...CICD_KEYWORDS,      // ci/cd, pipeline, workflow, github actions
+  ...AUTH_KEYWORDS,      // oidc, credential, managed identity, token
 ];
 
 const DEPLOYMENT_KEYWORDS = [

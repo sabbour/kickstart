@@ -22,6 +22,14 @@
  *   // snapshot without relying on conversation history alone.
  */
 
+import {
+  AKS_PATTERNS,
+  AUTH_PATTERNS,
+  CICD_PATTERNS,
+  DATABASE_RELATIONAL_PATTERNS,
+  DOCKER_PATTERNS,
+} from "../engine/skill-vocabulary.js";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -104,23 +112,23 @@ const DOMAIN_PATTERNS: Array<{ domain: Domain; patterns: RegExp[] }> = [
   },
   {
     domain: "infra-docker",
-    patterns: [/\bdocker(file)?\b/i, /\bcontainer\b/i, /\bimage\b.*\btag\b/i, /\bmulti.?stage\b/i],
+    patterns: DOCKER_PATTERNS,
   },
   {
     domain: "infra-aks",
-    patterns: [/\baks\b/i, /\bkubernetes\b/i, /\bk8s\b/i, /\bhelm\b/i, /\bmanifest\b/i, /\bbicep\b/i, /\bworkload identity\b/i, /\bgateway api\b/i],
+    patterns: AKS_PATTERNS,
   },
   {
     domain: "infra-cicd",
-    patterns: [/\bci\/?cd\b/i, /\bgithub actions?\b/i, /\bpipeline\b/i, /\bbuild.*push\b/i, /\bdeploy.*workflow\b/i],
+    patterns: CICD_PATTERNS,
   },
   {
     domain: "auth",
-    patterns: [/\bauth(entication|orization)?\b/i, /\blogin\b/i, /\boauth\b/i, /\bjwt\b/i, /\bmsal\b/i, /\btoken\b/i, /\bmanaged identity\b/i, /\bentra\b/i],
+    patterns: AUTH_PATTERNS,
   },
   {
     domain: "data-relational",
-    patterns: [/\bpostgres(ql)?\b/i, /\bmysql\b/i, /\bsql\b/i, /\bdatabase\b/i, /\bprisma\b/i, /\bsequelize\b/i, /\borm\b/i],
+    patterns: DATABASE_RELATIONAL_PATTERNS,
   },
   {
     domain: "data-nosql",
