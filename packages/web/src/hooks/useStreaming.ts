@@ -40,8 +40,8 @@ export interface UserActionReqPayload {
 // ---------------------------------------------------------------------------
 
 export interface StreamCallbacks {
-  /** Text delta from the model (chunk events). */
-  onDelta: (text: string) => void;
+  /** Accumulated text from all chunk events (passed on each chunk and at completion). */
+  onChunk: (text: string) => void;
   /** A2UI protocol messages validated by type guard before dispatch. */
   onA2UI: (messages: A2uiPayloadItem[]) => void;
   /** Stepwise generation events (v1 compat, may not fire in v2). */
@@ -226,11 +226,7 @@ export function useStreaming() {
                 const delta = (parsed.delta as string) ?? '';
                 accumulated += delta;
                 updateRevealTarget(accumulated);
-                callbacks.onDelta(accumulated);
-                break;
-              }
-
-              case 'a2ui': {
+                callbacks.onChunk(accumulated); {
                 if (isRawA2uiItem(parsed)) {
                   if (debugMode) debugA2uiMessages.push(parsed as A2uiPayloadItem);
                   callbacks.onA2UI([parsed as A2uiPayloadItem]);
@@ -292,7 +288,7 @@ export function useStreaming() {
                 if (parsed.delta) {
                   accumulated += parsed.delta as string;
                   updateRevealTarget(accumulated);
-                  callbacks.onDelta(accumulated);
+                  callbacks.onChunk(accumulated);
                 }
                 if (parsed.a2ui && Array.isArray(parsed.a2ui)) {
                   const safeItems = (parsed.a2ui as unknown[]).filter(isRawA2uiItem);

@@ -51,15 +51,7 @@ async function packs(
       propertySchema: zodToJsonSchema(c.propertySchema),
     }));
 
-    const userActions: UserActionDTO[] = [];
-    for (const agent of registry.components) {
-      void agent; // components iteration is separate
-    }
-
-    // Collect UserActions via registry
-    // We iterate components separately — get userActions from agents' allowlists
-    // The registry exposes getToolsForAgent, but for the DTO we want all registered UserActions.
-    // Use the catalog which lists all userAction names.
+    // Collect UserActions via registry catalog
     const catalog = registry.catalog;
     const userActionDTOs: UserActionDTO[] = [];
     for (const uaName of catalog.userActions ?? []) {

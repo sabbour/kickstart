@@ -29,6 +29,8 @@ export class Session implements SessionCtx {
   pendingUserAction: PendingUserAction | null = null;
   workspaceRoot: string;
   currentPhase: Phase;
+  /** Leela BLOCK-1: real first-class field; no type-cast side-channel needed. */
+  lastActiveAt: number = Date.now();
 
   constructor(opts: {
     sessionId: string;
@@ -68,6 +70,10 @@ export class Session implements SessionCtx {
     return undefined;
   }
 
+  touch(): void {
+    this.lastActiveAt = Date.now();
+  }
+
   /** Drain all pending a2uiEmissions and clear the array, returning what was drained. */
   drainA2UIEmissions(): A2UIMessage[] {
     const drained = this.a2uiEmissions.splice(0);
@@ -87,9 +93,7 @@ export const sessionStore = new Map<string, Session>();
 const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [id, session] of sessionStore) {
-    // Sessions without an activeAt tracking fall back to creation time heuristic
-    const lastActive = (session as unknown as { _lastActiveAt?: number })._lastActiveAt ?? now;
-    if (now - lastActive > SESSION_TTL_MS) {
+    if (now - session.lastActiveAt > SESSION_TTL_MS) {
       sessionStore.delete(id);
     }
   }
@@ -114,7 +118,7 @@ export function getOrCreateSession(
     // B1: Prevent cross-user session attachment
     throw new Error('SESSION_OID_MISMATCH');
   }
-  // Track last-active time for TTL cleanup
-  (session as unknown as { _lastActiveAt: number })._lastActiveAt = Date.now();
+  // Update last-active time for TTL cleanup
+  session.touch();
   return session;
 }
