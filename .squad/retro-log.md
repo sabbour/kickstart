@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #238 "feat: break down LLM response in debug panel and list A2UI component names" | L | impl=6m | review=4m | cycles=1 | merged | @sabbour
