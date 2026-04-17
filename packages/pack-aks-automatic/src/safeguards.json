@@ -1,0 +1,52 @@
+{
+  "rules": [
+    {
+      "id": "no-privileged",
+      "severity": "high",
+      "description": "Containers must not run in privileged mode.",
+      "check": "spec.containers[*].securityContext.privileged != true"
+    },
+    {
+      "id": "require-limits",
+      "severity": "medium",
+      "description": "All containers must declare resource limits (CPU and memory).",
+      "check": "spec.containers[*].resources.limits"
+    },
+    {
+      "id": "no-hostpath",
+      "severity": "high",
+      "description": "Pods must not use hostPath volumes.",
+      "check": "spec.volumes[*].hostPath == null"
+    },
+    {
+      "id": "no-latest-tag",
+      "severity": "high",
+      "description": "Container images must not use the ':latest' tag.",
+      "check": "spec.containers[*].image not endsWith ':latest'"
+    },
+    {
+      "id": "no-privilege-escalation",
+      "severity": "high",
+      "description": "Containers must not allow privilege escalation.",
+      "check": "spec.containers[*].securityContext.allowPrivilegeEscalation != true"
+    },
+    {
+      "id": "run-as-non-root",
+      "severity": "medium",
+      "description": "Containers must run as a non-root user.",
+      "check": "spec.securityContext.runAsNonRoot == true"
+    },
+    {
+      "id": "no-host-network",
+      "severity": "high",
+      "description": "Pods must not use host networking.",
+      "check": "spec.hostNetwork != true"
+    },
+    {
+      "id": "no-host-pid",
+      "severity": "high",
+      "description": "Pods must not share the host PID namespace.",
+      "check": "spec.hostPID != true"
+    }
+  ]
+}
