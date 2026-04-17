@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #458 "feat(api): add systemPrompt to DebugMetadata for debug panel" | M | impl=1m | review=11m | cycles=1 | merged | @sabbour
+
 - 2026-04-17 | #461 "feat(web): add systemPrompt collapsible section to DebugPanel" | S | impl=0m | review=6m | cycles=1 | merged | @sabbour
 
 - 2026-04-17 | #465 "docs(connectors): document client vs proxy execution model" | S | impl=1m | review=18m | cycles=1 | merged | @sabbour-squad-tester[bot]
