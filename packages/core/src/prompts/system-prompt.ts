@@ -751,6 +751,19 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
   // Previously this was driven by per-phase promptTemplates; now injected uniformly.
   if (context.appDefinition && Object.keys(context.appDefinition).length > 0) {
     parts.push(`\n## Collected App Info\n\n${vars["knownInfo"]}`);
+    parts.push(`\n## App Definition\n\n${vars["appDefinition"]}`);
+  }
+
+  // Inject Azure subscription/resource context so the LLM can reference real
+  // resource names, locations, and subscription IDs in DEPLOY/REVIEW phases.
+  if (context.azureContext) {
+    parts.push(`\n## Azure Context\n\n${vars["azureContext"]}`);
+  }
+
+  // Inject GitHub repo context so the LLM can reference the real repo owner,
+  // name, and default branch in the HANDOFF phase.
+  if (context.githubContext) {
+    parts.push(`\n## Repository Info\n\n${vars["repoInfo"]}`);
   }
 
   // Artifact summary — gives the LLM running context of generated files.

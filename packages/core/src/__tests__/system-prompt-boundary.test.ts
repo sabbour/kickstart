@@ -92,6 +92,15 @@ describe("buildSystemPrompt — prompt injection boundary", () => {
     expect(prompt).toContain("<<<USER_CONTEXT_END>>>");
   });
 
+  it("injects azureContext as ## Azure Context section", () => {
+    const prompt = buildSystemPrompt({
+      phase: Phase.Deploy,
+      azureContext: { subscriptionId: "sub-abc", location: "eastus" } as never,
+    });
+    expect(prompt).toContain("## Azure Context");
+    expect(prompt).toContain("sub-abc");
+  });
+
   it("wraps githubContext with boundary markers", () => {
     const prompt = buildSystemPrompt({
       phase: Phase.Discover,
@@ -99,6 +108,25 @@ describe("buildSystemPrompt — prompt injection boundary", () => {
     });
     expect(prompt).toContain("<<<USER_CONTEXT_START>>>");
     expect(prompt).toContain("<<<USER_CONTEXT_END>>>");
+  });
+
+  it("injects githubContext as ## Repository Info section", () => {
+    const prompt = buildSystemPrompt({
+      phase: Phase.Handoff,
+      githubContext: { owner: "sabbour", repo: "kickstart" } as never,
+    });
+    expect(prompt).toContain("## Repository Info");
+    expect(prompt).toContain("sabbour");
+    expect(prompt).toContain("kickstart");
+  });
+
+  it("injects appDefinition full JSON as ## App Definition section", () => {
+    const prompt = buildSystemPrompt({
+      phase: Phase.Generate,
+      appDefinition: { name: "my-app", runtime: "node" as never },
+    });
+    expect(prompt).toContain("## App Definition");
+    expect(prompt).toContain("my-app");
   });
 
   it("neutralizes delimiter injection in appDefinition values", () => {
