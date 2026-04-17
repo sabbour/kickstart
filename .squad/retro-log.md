@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #72 "fix: use full URL for playground links in README (#71)" | S | impl=0m | review=1m | cycles=1 | merged | @sabbour
