@@ -21,20 +21,19 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { Search20Regular, Star20Regular } from "@fluentui/react-icons";
-import type { GitHubRepo } from "@kickstart/core";
+import type { GitHubRepo } from "@kickstart/harness";
 import {
   createGitHubRepo,
   getGitHubSession,
   listGitHubRepos,
   type GitHubSessionState,
 } from "../../services/github-handoff";
-import {
-  createGitHubStubRepo,
-  createGitHubStubSession,
-  DEFAULT_GITHUB_STUB_OWNER,
-  listGitHubStubRepos,
-  shouldUsePlaygroundAuthStub,
-} from "../../services/playground-auth-stub";
+// TODO(Step 9): playground-auth-stub removed in Step 1 — stubs always return false/empty
+const createGitHubStubRepo = (_args: unknown): undefined => undefined;
+const createGitHubStubSession = (_connected: boolean): undefined => undefined;
+const DEFAULT_GITHUB_STUB_OWNER = '';
+const listGitHubStubRepos = (_owner: string): unknown[] => [];
+const shouldUsePlaygroundAuthStub = () => false;
 import { sanitizeActionContext } from "../../utils/sanitize-action-context";
 
 const GitHubRepoPickerApi = {

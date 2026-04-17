@@ -12,7 +12,7 @@ import {
   signOutAzure,
   type AzureAuthSessionState,
 } from "../services/azure-auth";
-import type { AzureARMConnector, AzureSubscription } from "@kickstart/core";
+import type { AzureARMConnector, AzureSubscription } from "@kickstart/harness";
 
 // ---------------------------------------------------------------------------
 // Helpers

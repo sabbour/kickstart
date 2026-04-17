@@ -213,3 +213,37 @@ After initial deployment, configure custom domains via the Azure Portal:
 - **Production:** `kickstart.aks.azure.com` (future)
 
 SWA automatically provisions and manages TLS certificates for custom domains.
+
+## MCP Server — Sticky Routing Requirement
+
+The MCP server (`@kickstart/mcp-server`) stores interrupt state (pending UserActions) in
+**process memory**. This has important deployment implications:
+
+### Single-instance deployments
+
+No special configuration required — all requests for a given stdio connection hit the same
+process automatically.
+
+### Multi-instance / load-balanced deployments
+
+When running multiple MCP server instances behind a load balancer (e.g., HTTP-SSE transport),
+you **must configure sticky sessions** so that all requests from a given MCP connection are
+routed to the same process instance. Without sticky routing:
+
+- A resume request may land on a different instance that has no record of the pending interrupt.
+- The resume endpoint will return **404** even though the interrupt was issued successfully.
+
+Configure your load balancer (Azure Application Gateway, NGINX, etc.) with cookie-based or
+header-based session affinity keyed on the MCP `connectionId` header or session cookie.
+
+### Process restart → 404
+
+In-memory interrupt state does **not** survive a process restart. If the MCP server process
+is restarted while a UserAction is pending:
+
+- The interrupt store is cleared.
+- Any subsequent `resume` call returns **404**.
+- The MCP client must start a new conversation via the `converse` tool.
+
+This is expected and correct behaviour — do not attempt to persist interrupt state across
+restarts, as the CAS replay guard relies on the in-memory `consumed` flag.

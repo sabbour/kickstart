@@ -3,184 +3,358 @@
 /**
  * @module @kickstart/mcp-server
  *
- * MCP server entry point for AKS Kickstart.
- * Exposes tools for guided AKS onboarding via the Model Context Protocol.
- * Serves the MCP App HTML surface for IDE-native UX.
+ * MCP server entry point — v2 thin adapter that wraps the harness Runner.
+ *
+ * Design principles:
+ * - Each tool call drives one Runner turn (session management, skill injection,
+ *   guardrails all flow through the harness — no duplicate runtime logic here).
+ * - A2UI messages from `core.emit_ui` are forwarded as embedded resources for
+ *   VS Code Copilot clients (detected via `clientInfo` in initialize handshake).
+ *   Non-VS Code clients receive plain-text summaries.
+ * - Only tools with `mcpExposed: true` appear in the tool manifest.
+ *   Tools with `requiresSession: true` are excluded entirely.
+ *   File-system tools are excluded by name (defence-in-depth).
+ * - UserActions are NEVER in the tool manifest — they surface as structured
+ *   interrupt blocks returned inline from the `converse` tool.
+ * - `connectionId` is server-assigned at the `initialize` handshake. The client
+ *   cannot supply or override it (Zapp condition 2).
+ * - Interrupt resume is single-use (CAS), action-bound, TTL-guarded, and
+ *   replay-protected. A process restart clears all in-memory interrupt state,
+ *   so pending interrupts return 404 after restart (Zapp conditions 5 & 6).
+ * - A per-session mutex serialises concurrent tool calls for the same session.
  */
 
-import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
 
 import {
-  Phase,
-} from "@kickstart/core";
-import type { SessionState } from "@kickstart/core";
+  PackRegistry,
+  Runner,
+  getOrCreateSession,
+  isVsCodeClient,
+  buildMcpManifest,
+  buildA2UIContent,
+  buildInterruptContent,
+} from '@kickstart/harness';
+import type { McpContentItem } from '@kickstart/harness';
 
-import { handleKickstart, deleteEngineState } from "./tools/kickstart.js";
-import { handleConverse } from "./tools/converse.js";
-import { handleGenerateManifests } from "./tools/generate-manifests.js";
-import { handleCheckStatus } from "./tools/check-status.js";
-import { handleAction } from "./tools/action.js";
-import { resolveA2UICapability, KICKSTART_CATALOG_ID } from "./a2ui.js";
-import type { A2UICapability } from "./a2ui.js";
-import { parseAppMessage, handleAppMessage } from "./app/protocol.js";
+import {
+  registerInterrupt,
+  claimInterrupt,
+  purgeExpiredInterrupts,
+} from './adapter/interrupt-store.js';
+import { withSessionMutex } from './adapter/session-mutex.js';
 
-// ── In-memory session store (Phase 1 — no persistence) ─────────────
-
-const sessions = new Map<string, SessionState>();
-
-/** Session TTL: 1 hour in milliseconds. */
-const SESSION_TTL_MS = 60 * 60 * 1000;
-
-/** Purge sessions that haven't been touched in over TTL. */
-function cleanStaleSessions(): void {
-  const now = Date.now();
-  for (const [id, session] of sessions) {
-    const updatedAt = new Date(session.updatedAt).getTime();
-    if (now - updatedAt > SESSION_TTL_MS) {
-      sessions.delete(id);
-      deleteEngineState(id);
-    }
-  }
-}
-
-// Run cleanup every 10 minutes
-const cleanupInterval = setInterval(cleanStaleSessions, 10 * 60 * 1000);
-cleanupInterval.unref(); // Don't keep process alive for cleanup
-
-// ── Client A2UI capability (resolved during initialize) ─────────────
-
-let clientCapability: A2UICapability = "kickstart";
-
-// ── Load MCP App HTML ───────────────────────────────────────────────
+// ── Load app HTML ──────────────────────────────────────────────────
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-/** The MCP App HTML content, loaded once at startup. */
 let appHtml: string;
 try {
-  appHtml = readFileSync(resolve(__dirname, "app", "kickstart-app.html"), "utf-8");
+  appHtml = readFileSync(resolve(__dirname, 'app', 'kickstart-app.html'), 'utf-8');
 } catch {
-  appHtml = "<html><body><p>Kickstart App failed to load.</p></body></html>";
-  process.stderr.write("Warning: kickstart-app.html not found in dist/app/\n");
+  appHtml = '<html><body><p>Kickstart App failed to load.</p></body></html>';
+  process.stderr.write('Warning: kickstart-app.html not found in dist/app/\n');
 }
 
-/** Resource URI for the MCP App HTML. */
-const APP_RESOURCE_URI = "kickstart://app/main" as const;
+const APP_RESOURCE_URI = 'kickstart://app/main' as const;
 
-// ── MCP Server Setup ────────────────────────────────────────────────
+// ── Harness setup ──────────────────────────────────────────────────
 
-const server = new McpServer({
-  name: "kickstart",
-  version: "0.1.0",
+const registry = new PackRegistry();
+// TODO(pack registration): register packs at startup once pack-core etc. are available.
+// import { corePack } from '@kickstart/pack-core';
+// registry.register(corePack);
+// registry.seal();
+
+const runner = new Runner(registry);
+
+// ── Connection-level state ─────────────────────────────────────────
+// Assigned at initialize handshake; never client-supplied (Zapp condition 2).
+
+let connectionId: string | null = null;
+let isVsCode = false;
+
+// ── Periodic cleanup ───────────────────────────────────────────────
+
+const cleanupTimer = setInterval(() => {
+  purgeExpiredInterrupts();
+}, 5 * 60 * 1_000);
+cleanupTimer.unref();
+
+// ── MCP Server ─────────────────────────────────────────────────────
+
+export const server = new McpServer({
+  name: 'kickstart',
+  version: '2.0.0',
 });
 
-// ── Tool: kickstart ─────────────────────────────────────────────────
+// ── Initialize hook — assign connectionId, detect VS Code ──────────
+//
+// oninitialized fires after the MCP initialize handshake completes.
+// We read clientInfo from the underlying Server instance.
+// connectionId is ALWAYS server-assigned — the client has no say.
+
+server.server.oninitialized = () => {
+  const clientInfo = server.server.getClientVersion();
+
+  // Server assigns connectionId — never read from client params.
+  connectionId = randomUUID();
+  isVsCode = isVsCodeClient(clientInfo as { name?: string; version?: string } | undefined);
+
+  process.stderr.write(
+    `[kickstart-mcp] connection=${connectionId} vsCode=${isVsCode} client=${clientInfo?.name ?? 'unknown'}\n`,
+  );
+};
+
+// ── Tool: converse ─────────────────────────────────────────────────
+//
+// Primary entry point. Routes user messages through the Runner.
+// Returns buffered text + A2UI resources (VS Code) or plain-text (others).
+// Returns structured interrupt block when the Runner hits a UserAction.
+// UserAction interrupt blocks are structured JSON — never listed as tools.
 
 server.tool(
-  "kickstart",
-  "Start a new AKS Kickstart conversation. Returns an A2UI conversation phase indicator and intro text.",
+  'converse',
+  'Send a message to the Kickstart AI assistant. Returns the assistant reply plus ' +
+    'UI update resources. Returns a structured interrupt block when user confirmation is needed.',
   {
-    message: z.string().optional().describe("Optional initial message from the user"),
+    message: z.string().describe('User message to process'),
+    sessionId: z.string().optional().describe(
+      'Existing session ID to continue a conversation. Omit to start a new session.',
+    ),
   },
-  async (params) => handleKickstart(sessions, params.message, clientCapability),
-);
+  async ({ message, sessionId: requestedSessionId }) => {
+    const oid = connectionId ?? randomUUID();
+    const session = getOrCreateSession(requestedSessionId, oid);
 
-// ── Tool: converse ──────────────────────────────────────────────────
+    return withSessionMutex(session.sessionId, async () => {
+      const textChunks: string[] = [];
+      const a2uiMessages: Record<string, unknown>[] = [];
+      let pendingInterrupt: {
+        actionId: string;
+        actionName: string;
+        confirmComponent?: { component: string; props?: Record<string, unknown> };
+        resultSchema: Record<string, unknown>;
+      } | null = null;
 
-server.tool(
-  "converse",
-  "Continue a multi-turn Kickstart conversation. Processes user message through the phase machine and returns the phase-appropriate system prompt with A2UI phase indicator.",
-  {
-    sessionId: z.string().describe("Active session ID from a kickstart conversation"),
-    message: z.string().describe("User message to process"),
-  },
-  async (params) => handleConverse(sessions, params.sessionId, params.message, clientCapability),
-);
+      const sseWrite = (event: string, data: unknown): void => {
+        if (event === 'chunk') {
+          const d = data as { delta?: string };
+          if (d.delta) textChunks.push(d.delta);
+        } else if (event === 'a2ui') {
+          a2uiMessages.push(data as Record<string, unknown>);
+        } else if (event === 'user_action_req') {
+          const d = data as {
+            actionId?: string;
+            toolName?: string;
+            wireName?: string;
+            confirmComponent?: unknown;
+          };
+          const actionId = d.actionId ?? randomUUID();
+          const actionName = d.toolName ?? d.wireName ?? 'unknown_action';
 
-// ── Tool: generate-manifests ────────────────────────────────────────
+          let confirmComponent: { component: string; props?: Record<string, unknown> } | undefined;
+          if (d.confirmComponent && typeof d.confirmComponent === 'object') {
+            const cc = d.confirmComponent as Record<string, unknown>;
+            if (typeof cc['component'] === 'string') {
+              confirmComponent = {
+                component: cc['component'],
+                props: cc['props'] as Record<string, unknown> | undefined,
+              };
+            }
+          }
 
-server.tool(
-  "generate-manifests",
-  "Generate Kubernetes manifests and GitHub Actions workflows from the current conversation state.",
-  {
-    sessionId: z.string().describe("Active session ID from a kickstart conversation"),
-  },
-  async (params) => handleGenerateManifests(sessions, params.sessionId, clientCapability),
-);
+          // Minimal result schema — full JSON Schema generation deferred
+          const resultSchema: Record<string, unknown> = { type: 'object' };
 
-// ── Tool: check-status ──────────────────────────────────────────────
+          pendingInterrupt = { actionId, actionName, confirmComponent, resultSchema };
 
-server.tool(
-  "check-status",
-  "Check the deployment status for an active session.",
-  {
-    sessionId: z.string().describe("Active session ID"),
-  },
-  async (params) => handleCheckStatus(sessions, params.sessionId),
-);
-
-// ── Tool: action ────────────────────────────────────────────────────
-
-server.tool(
-  "action",
-  "Handle a user action from the A2UI interface (button click, form submission, resource selection).",
-  {
-    sessionId: z.string().describe("Active session ID"),
-    actionType: z.enum(["advance", "skip", "select", "submit"]).describe("Type of user action"),
-    payload: z.record(z.string(), z.unknown()).optional().describe("Action-specific data"),
-  },
-  async (params) =>
-    handleAction(sessions, params.sessionId, params.actionType, params.payload),
-);
-
-// ── Tool: app-message ──────────────────────────────────────────────
-// Relay for postMessage protocol — routes messages from the MCP App iframe
-// through the appropriate tool handler.
-
-server.tool(
-  "app-message",
-  "Relay a message from the MCP App HTML surface. Routes kickstart/converse/action messages through the appropriate handler.",
-  {
-    message: z.record(z.string(), z.unknown()).describe("App-to-server message object with a 'type' field"),
-  },
-  async (params) => {
-    const parsed = parseAppMessage(params.message);
-    if (!parsed) {
-      return {
-        content: [{ type: "text" as const, text: "Invalid app message format." }],
+          // Register in the interrupt store for single-use resume (Zapp condition 5)
+          registerInterrupt({
+            sessionId: session.sessionId,
+            actionId,
+            actionName,
+            confirmComponent,
+            resultSchema,
+            issuedAt: Date.now(),
+          });
+        }
       };
-    }
-    const response = await handleAppMessage(parsed, sessions, clientCapability);
-    return {
-      content: [{ type: "text" as const, text: JSON.stringify(response) }],
-    };
+
+      await runner.run(session, message, sseWrite);
+
+      const content: McpContentItem[] = [];
+
+      const fullText = textChunks.join('');
+      if (fullText) content.push({ type: 'text', text: fullText });
+
+      // A2UI: embedded resources for VS Code, plain-text summary for others
+      content.push(...buildA2UIContent(a2uiMessages, isVsCode));
+
+      // UserAction interrupt: always structured JSON, never human-readable text
+      if (pendingInterrupt) {
+        content.push(
+          buildInterruptContent({
+            type: 'interrupt',
+            ...pendingInterrupt,
+          }),
+        );
+      }
+
+      if (content.length === 0) content.push({ type: 'text', text: '(no output)' });
+
+      return { content };
+    });
   },
 );
+
+// ── Tool: resume ───────────────────────────────────────────────────
+//
+// Resume a paused Runner run after the MCP client resolved a UserAction.
+// CAS single-use: second call with the same actionId returns 404 error.
+// Process restart → 404: interrupt state is in-memory only.
+
+server.tool(
+  'resume',
+  'Resume an interrupted Kickstart conversation after completing a required user action.',
+  {
+    sessionId: z.string().describe('Session ID from the interrupted conversation'),
+    actionId: z.string().describe('Action ID from the interrupt block returned by converse'),
+    result: z.record(z.string(), z.unknown()).describe(
+      'Result payload for the completed user action',
+    ),
+  },
+  async ({ sessionId, actionId, result }) => {
+    return withSessionMutex(sessionId, async () => {
+      // CAS single-use claim — marks the entry consumed atomically
+      const entry = claimInterrupt(sessionId, actionId);
+      if (!entry) {
+        // 404: entry missing (process restart, already consumed, expired, or wrong ID)
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({
+                type: 'error',
+                code: 404,
+                message:
+                  'No pending interrupt found. It may have been already resumed, expired, ' +
+                  'or the server was restarted.',
+              }),
+            },
+          ],
+        };
+      }
+
+      const oid = connectionId ?? randomUUID();
+      let session;
+      try {
+        session = getOrCreateSession(sessionId, oid);
+      } catch {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ type: 'error', code: 404, message: 'Session not found.' }),
+            },
+          ],
+        };
+      }
+
+      const textChunks: string[] = [];
+      const a2uiMessages: Record<string, unknown>[] = [];
+
+      const sseWrite = (event: string, data: unknown): void => {
+        if (event === 'chunk') {
+          const d = data as { delta?: string };
+          if (d.delta) textChunks.push(d.delta);
+        } else if (event === 'a2ui') {
+          a2uiMessages.push(data as Record<string, unknown>);
+        }
+      };
+
+      await runner.resume(session, result, sseWrite);
+
+      const content: McpContentItem[] = [];
+      const fullText = textChunks.join('');
+      if (fullText) content.push({ type: 'text', text: fullText });
+      content.push(...buildA2UIContent(a2uiMessages, isVsCode));
+      if (content.length === 0) content.push({ type: 'text', text: '(no output)' });
+
+      return { content };
+    });
+  },
+);
+
+// ── Dynamically registered tools from registry ─────────────────────
+//
+// Only tools with mcpExposed: true and !requiresSession appear here.
+// File-system tools are excluded by name (defence-in-depth).
+// UserActions are NEVER registered here — they surface as interrupt blocks.
+
+const manifestTools = buildMcpManifest(registry);
+for (const descriptor of manifestTools) {
+  server.tool(
+    descriptor.name,
+    descriptor.description,
+    {},
+    async (params: Record<string, unknown>) => {
+      const oid = connectionId ?? randomUUID();
+      const session = getOrCreateSession(undefined, oid);
+
+      return withSessionMutex(session.sessionId, async () => {
+        const textChunks: string[] = [];
+        const a2uiMessages: Record<string, unknown>[] = [];
+
+        const sseWrite = (event: string, data: unknown): void => {
+          if (event === 'chunk') {
+            const d = data as { delta?: string };
+            if (d.delta) textChunks.push(d.delta);
+          } else if (event === 'a2ui') {
+            a2uiMessages.push(data as Record<string, unknown>);
+          }
+        };
+
+        const toolMessage = `[tool:${descriptor.name}] ${JSON.stringify(params)}`;
+        await runner.run(session, toolMessage, sseWrite);
+
+        const content: McpContentItem[] = [];
+        const fullText = textChunks.join('');
+        if (fullText) content.push({ type: 'text', text: fullText });
+        content.push(...buildA2UIContent(a2uiMessages, isVsCode));
+        if (content.length === 0) content.push({ type: 'text', text: '(no output)' });
+
+        return { content };
+      });
+    },
+  );
+}
 
 // ── Resource: MCP App HTML ─────────────────────────────────────────
 
 server.resource(
-  "kickstart-app",
+  'kickstart-app',
   APP_RESOURCE_URI,
-  { mimeType: "text/html", description: "Kickstart MCP App — IDE-native conversation UI" },
+  { mimeType: 'text/html', description: 'Kickstart MCP App — IDE-native conversation UI' },
   async () => ({
     contents: [
       {
         uri: APP_RESOURCE_URI,
-        mimeType: "text/html" as const,
+        mimeType: 'text/html' as const,
         text: appHtml,
       },
     ],
   }),
 );
 
-// ── Start Server ────────────────────────────────────────────────────
+// ── Start ──────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
@@ -192,3 +366,6 @@ main().catch((error: unknown) => {
   process.stderr.write(`Kickstart MCP server error: ${message}\n`);
   process.exit(1);
 });
+
+// Expose for testing
+export { connectionId, isVsCode, registry, runner };

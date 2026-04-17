@@ -23,9 +23,9 @@ import {
   processResponse,
   isPhase,
   Phase,
-} from "@kickstart/core";
-import type { PhaseItem } from "@kickstart/core";
-import type { A2UIMessage } from "@kickstart/core";
+} from "@kickstart/harness";
+import type { PhaseItem } from "@kickstart/harness";
+import type { A2UIMessage } from "@kickstart/harness";
 import {
   getSession,
   getPrincipalId,

@@ -4,7 +4,7 @@ import {
   type CostEstimatePricingLineItem,
   type CostEstimatePricingRequest,
   type CostEstimateResource,
-} from '@kickstart/core';
+} from '@kickstart/harness';
 import type { ApiSession, CostEstimateCacheEntry } from './session-store.js';
 
 const HOURS_PER_MONTH = 730;

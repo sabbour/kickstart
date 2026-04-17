@@ -13,13 +13,12 @@ import {
   getPhaseDefinition,
   buildSystemPrompt,
   DEPLOYMENT_SAFEGUARDS,
-  InMemoryArtifactStore,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 import type {
   SessionState,
   ConversationPhaseComponent,
   PhaseItem,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 import { createA2UIResource } from "../a2ui.js";
 import type { A2UICapability } from "../a2ui.js";
 
@@ -44,6 +43,15 @@ export function setSessionPhase(sessionId: string, phase: Phase): void {
 /** Delete the phase state for a session. */
 export function deleteSessionPhase(sessionId: string): void {
   sessionPhases.delete(sessionId);
+}
+
+/** No-op stub — v1 engine state was removed in Step 1. */
+export function deleteEngineState(_sessionId: string): void {}
+
+function createStubArtifactStore(): NonNullable<SessionState["artifactStore"]> {
+  return {
+    put(): void {},
+  };
 }
 
 /**
@@ -71,7 +79,7 @@ export async function handleKickstart(
     updatedAt: now,
     appDefinition: {},
     messages: [],
-    artifactStore: new InMemoryArtifactStore(),
+    artifactStore: createStubArtifactStore(),
   };
 
   if (initialMessage) {
