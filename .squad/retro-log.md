@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-16 | #383 "docs: engineering accuracy rewrite — prompt pipeline, FSM, skill injection" | XL | impl=1m | review=189m | cycles=1 | merged | @sabbour
+
 - 2026-04-16 | #385 "refactor(core): remove FSM — plain state variables" | L | impl=10m | review=197m | cycles=1 | merged | @sabbour
 
 - 2026-04-16 | #386 "chore(squad): enable per-session worktree isolation" | L | impl=0m | review=32m | cycles=1 | merged | @sabbour
