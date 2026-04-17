@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #246 "Hide footer metadata behind debug mode" | S | impl=0m | review=34m | cycles=1 | merged | @sabbour
