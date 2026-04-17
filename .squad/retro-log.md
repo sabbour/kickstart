@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #73 "fix: update 15 Playwright E2E tests (#69)" | S | impl=1m | review=1m | cycles=1 | merged | @sabbour
