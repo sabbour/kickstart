@@ -116,6 +116,21 @@ C1–C3 block Step 4 (pack-core), Step 5 (Runner), and Step 6 (skill resolver).
 - `leela-dp-474-step1.md`: Step 1 seam APPROVE_WITH_CONDITIONS — shim must be shrinking only, no new exports or runtime behavior; Bender owns implementation, Fry handles web-shell fallout. Exit contract: v1 files deleted, v1 flags gone, `packages/harness` canonical.
 - `leela-351-component-expansion.md`: A2UI catalog expanded 28→33 components; Alert, Table, Link added; SummaryCard + DecisionCard new React components; `KNOWN_COMPONENT_TYPES` 46→48; ProgressSteps/CodeBlock/SteppedCarousel/Questionnaire deferred.
 
+## 2026-05-28 — DP Review #478 v2 Step 4a: Playground on registry
+
+**Verdict:** APPROVE_WITH_CONDITIONS  
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/478#issuecomment-4268203830  
+**Decision record:** `.squad/decisions/inbox/leela-478-dp-review.md`
+
+Key findings:
+- GALLERY_GROUPS removal via `registry.playgroundScenarios` is architecturally clean. ✅
+- Widgets tab full deletion (not gating) is correct — v1 coupling, no v2 pack provides it. ✅
+- Step 5 boundary is respected; Create tab excluded; `usePlaygroundDispatch` stays at hook layer. ✅
+- corePack MVP (4 components + 2 scenarios + empty stubs) is sufficient for registry shape validation. ✅
+- C1 (BLOCKER): Three of four registry APIs used by this DP (`getComponent`, `playgroundScenarios`, `playgroundStubs`) are not in the #476-approved surface. Bender must extend the Step 3 spec before #478 starts.
+- C2 (Fix before coding): `usePlaygroundDispatch` pseudocode has missing `if (!stub)` guard — throw executes unconditionally. Must be fixed in DP text.
+- M1 (Minor): "Fail loudly" scope must be explicit — unregistered component references → error badge; empty scenario list → empty state. Two different failure modes.
+
 ## 2026-05-28 — DP Review #477 v2 Step 4: pack-core
 
 **Verdict:** APPROVE_WITH_CONDITIONS  
@@ -147,3 +162,22 @@ Key findings:
 - C4 (Required for merge): §6c test must exercise loader-from-disk path, not just manifest shape.
 - C5 (Required Phase E): `pack-core/AuthCard` must be domain-neutral — no MSAL props. MSAL wiring lives in `pack-azure`'s `azure:login` UserAction.
 - #478 unblocked once pack-core has real components. #479 hard-depends on C3.
+
+## 2026-06-10 — PR #544 Code Review (v2 Step 1)
+
+**PR:** #544 — feat(v2): Step 1 — Nuke v1, cut to harness, web-shell cleanup (Closes #474)
+**Verdict:** APPROVED + `leela:approved` label applied
+
+All 8 DP approval conditions verified:
+- Core shim compile-only ✅ (package.json redirect only, no src/index.ts)
+- Feature flags gone ✅ (KICKSTART_AGENTS_SDK + KICKSTART_V2 purged from production)
+- Fail closed ✅ (converse.ts → 503, mock/demo files deleted)
+- 16 web files on harness ✅
+- 34 harness smoke tests ✅ (407 total green)
+- No new exports ✅ (stubs only)
+- Build green ✅ (vite build passes)
+- Deferred items correct ✅ (types.ts as empty module, connector infra intact)
+
+**Known debt — Step 2 prerequisite:** `types.ts` emptied to `export {};` but ~15 web shell files still import named types from it. `tsc --noEmit` would fail (TS2305). Vite build passes (strips types). Step 2 must resolve tsc errors before any tsc CI gate lands. Bender + Fry co-own.
+
+Decision filed: `.squad/decisions/inbox/leela-pr544-review.md`
