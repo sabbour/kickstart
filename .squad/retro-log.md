@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #96 "feat: implement ServiceConnector pattern (fixes #25)" | XL | impl=251m | review=29m | cycles=1 | merged | @sabbour
