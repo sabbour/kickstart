@@ -44,6 +44,14 @@
     "./runtime/resume": {
       "import": "./dist/runtime/resume.js",
       "types": "./dist/runtime/resume.d.ts"
+    },
+    "./mcp/server": {
+      "import": "./dist/mcp/server.js",
+      "types": "./dist/mcp/server.d.ts"
+    },
+    "./mcp/client": {
+      "import": "./dist/mcp/client.js",
+      "types": "./dist/mcp/client.d.ts"
     }
   },
   "scripts": {

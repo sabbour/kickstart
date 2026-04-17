@@ -359,3 +359,24 @@ export { matchesSkill } from './runtime/skill-matcher.js';
 export { PackRegistry } from './runtime/registry.js';
 export { resolveSkills } from './runtime/skill-resolver.js';
 export type { ResolveSkillsOptions } from './runtime/skill-resolver.js';
+
+// ── Step 11–12: Runner + Resume ──────────────────────────────────────────────
+export { Runner } from './runtime/runner.js';
+export { Session, sessionStore, getOrCreateSession } from './runtime/session.js';
+export { handleResume } from './runtime/resume.js';
+export type { ResumeHandlerInput, ResumeHandlerResult, ClientPrincipal } from './runtime/resume.js';
+
+// ── Step 12: MCP adapter utilities ──────────────────────────────────────────
+export {
+  isVsCodeClient,
+  buildMcpManifest,
+  buildA2UIContent,
+  buildInterruptContent,
+} from './mcp/server.js';
+export type {
+  McpToolDescriptor,
+  McpInterruptBlock,
+  McpContentItem,
+  McpTextContent,
+  A2UIEmbeddedResource,
+} from './mcp/server.js';
