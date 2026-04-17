@@ -112,3 +112,22 @@
 **History sizes:** bender 7,924 (51%) / fry 12,289 (80%) / hermes 11,926 (77%) / leela 6,084 (39%) / ralph 225 (1%) / scribe ~5.7K / zapp 6,795 (44%)
 **Watch:** fry (80%) and hermes (77%) approaching threshold; no new entries this wave.
 **Still absent:** `bender-pr550-fix`, `leela-pr549-review`, `zapp-pr549-recheck`, `hermes-549-test`, `zapp-486-b6-final`, `leela-484-dp-recheck`, `fry-484-dp-revision`
+
+## Wave 40 — 2025-07-15
+
+**Inbox scan:** No new files — all expected inbox files ABSENT (fry-483/484/487-dp-revision, leela-483/484/486-dp-recheck, zapp-486-b6-final, bender-pr550-fix, zapp-483/486/487-dp-recheck, leela/zapp-485-dp-recheck). All worktree inboxes STALE.
+
+**Milestones recorded** (user-declared, 5 DPs + 1 PR + 1 note):
+- DP #483 FULLY APPROVED ✅, DP #484 FULLY APPROVED ✅, DP #485 FULLY APPROVED ✅
+- DP #486 FULLY APPROVED ✅ (B6 payload-coercion test included), DP #487 FULLY APPROVED ✅
+- PR #550 MERGED at 624450b (1,379 insertions, Step 5 complete); Step 6 in progress
+
+**Summarized:**
+- fry/history.md: 12,289 → 3,040 bytes (80% → 20%); archived to fry/history-archive.md (48,565 → 50,579 B)
+- hermes/history.md: 11,926 → 2,931 bytes (77% → 19%); archived to hermes/history-archive.md (21,599 → 23,054 B)
+
+**decisions.md:** 267,983 → 271,339 bytes (+3,356)
+
+**Sizes post-wave:** bender 7,924 (51%) / fry 3,040 (20%) / hermes 2,931 (19%) / leela 6,084 (39%) / ralph 225 (1%) / scribe ~7.5K (49%) / zapp 6,795 (44%)
+
+**Still absent:** `fry-483/484/487-dp-revision.md`, `leela-483/484/486-dp-recheck.md`, `zapp-486-b6-final.md`, `bender-pr550-fix.md`, `hermes-549-test.md`

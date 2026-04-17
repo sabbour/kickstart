@@ -401,3 +401,36 @@ Fry (Frontend Dev) has shipped the web surface for Kickstart. The stack evolved 
 ### Wave 3 — 2026-04-17 Playground Decision Filed
 
 `fry-playground-component-grouping.md`: GitHub + Azure Components moved from `GALLERY_GROUPS` to `COMPONENT_GROUPS`. Stub connector guard removed; connectors always registered unconditionally.
+
+---
+
+## Archived from history.md — Wave 40 (2025-07-15)
+
+### Learnings (selected)
+
+- For #474 Step 1, safe frontend cut line: "preserve the shell, delete the fixtures." Treat `kickstart-catalog.ts`, playground demo/stub sources, and `types.ts` as replace-in-place seams.
+- Playwright race condition: `waitForResponse` MUST be registered before `page.goto()`.
+- Auth E2E tests: Must use `request.post()` (real HTTP) not `page.route()` mock interception.
+- `addMessage` in `converse.ts`: Must be inside each processing branch, not before.
+- Phase allowlist should delegate to `normalizeConversationPhase()` from `chat-a2ui.ts`.
+- When `KICKSTART_AGENTS_SDK=true`, backend returns HTTP 406. Correct pattern: inline 406 fallback in `useStreaming.ts`.
+- `buildSystemPrompt()` context vars must be explicitly pushed to `parts` as `## Section` blocks.
+- `auto-continue.ts` only triggers on `complete:` and `continue:` prefixes; `navigate:` is secondary.
+- New K8s icons: create static SVGs under `packages/web/public/assets/icons/k8s/`, register via `registerDiagramIcons()`.
+- `ArchitectureDiagram` uses diagram-first contract: raw Mermaid in `diagram`, sanitize before render, `%%icon:name%%` expansion after.
+
+### v2 DP History (full table → compact below)
+
+| Issue | Final Status |
+|-------|-------------|
+| #477 pack-core | APPROVED (Leela+Zapp A/C); PR #548 ✅ merged |
+| #478 Playground | APPROVED; PR #547 ✅ merged |
+| #479 Runner+SSE | APPROVED (Leela+Zapp A/C); PR #550 ✅ merged |
+| #480 Skill resolver | APPROVED (Leela+Zapp A/C) |
+| #482 pack-azure | Leela A/C + Zapp A/C (B3 arm_get resolved); FULLY APPROVED |
+| #483 pack-aks-automatic | FULLY APPROVED (Leela+Zapp re-checks complete) |
+| #484 pack-github | FULLY APPROVED (Leela+Zapp re-checks complete) |
+| #485 web client A2UI | FULLY APPROVED (Leela+Zapp re-checks complete) |
+| #486 Guardrails Engine | FULLY APPROVED (Leela C1+C2, Zapp Crit1+Crit2+B1–B6) |
+| #487 MCP rewrite | FULLY APPROVED (Leela C1+C2+C3, Zapp Crit1+Crit2+B1–B4) |
+

@@ -4713,3 +4713,70 @@ All 7 prior security findings resolved:
 - Leela APPROVE_WITH_CONDITIONS: C1 (`audience` field / degradation), C2 (interrupt storage contract), C3 (`context:null` exclusion) — all cleared in combined revision
 - Zapp APPROVE_WITH_CONDITIONS: Crit1 (UserActions off manifest), Crit2 (session binding tuple), B1 (default-deny), B2 (zod+guardrail at adapter), B3 (single-use interrupt), B4 (in-memory/mutex) — all resolved
 - Implementation may proceed with Step 12 PR merge conditions (4 Leela + 6 Zapp) satisfied in code.
+
+---
+
+# Milestone: DP #483 (pack-aks-automatic, Step 8) — FULLY APPROVED
+
+**Date:** 2025-07-15
+**Status:** ✅ FULLY APPROVED — Leela ✅ + Zapp ✅
+- Leela A/C (C1: Pack.skills[] micro-fix; C2: ArchitectureDiagram cross-pack move; C3: DeploymentConfirm in Phase E) — all cleared
+- Zapp A/C (B1: workload identity/DefaultAzureCredential server-only; B2: block>rewrite precedence; B3: aksPlaygroundStubs fail-closed) — all cleared
+- Implementation may proceed. Depends on harness micro-fix (PR #549 ✅ merged).
+
+---
+
+# Milestone: DP #484 (pack-github, Step 9) — FULLY APPROVED
+
+**Date:** 2025-07-15
+**Status:** ✅ FULLY APPROVED — Leela ✅ + Zapp ✅
+- Leela A/C (C1: 4 allowlist paths; C2: handoff.browser.ts split; C3: create_pr param schema; C4: tokens map) — all cleared
+- Zapp A/C (B1: decode+forbidden-seq; B2: tokens never in DTO/SSE/LLM; B3: HTTPS+Secure+HttpOnly; B4: 6 playground stubs gated) — all cleared
+- Implementation may proceed. Requires PR #549 merged before pack-github PR opens.
+
+---
+
+# Milestone: DP #485 (web-client A2UI renderer, Step 10) — FULLY APPROVED
+
+**Date:** 2025-07-15
+**Status:** ✅ FULLY APPROVED — Leela ✅ + Zapp ✅
+- Leela A/C (C1: bootstrap ordering; C2: Zapp Phase C gate) — both cleared in combined revision
+- Zapp A/C (Crit1: schema.parse pre-render; B1: confirmComponent fail-closed; B2: resume boundary; B3: ReadonlyMap+freeze; B4: schema-projected merge with __proto__ strip) — all cleared
+- Phase C (credential flow) requires Zapp re-check before merge. All other phases clear.
+
+---
+
+# Milestone: DP #486 (Guardrails Engine, Step 11) — FULLY APPROVED
+
+**Date:** 2025-07-15
+**Status:** ✅ FULLY APPROVED — Leela ✅ + Zapp ✅
+- Leela A/C (C1: evaluate()+GuardrailResult supersedes brief shape; C2: applyRedact() spec all 3 stages) — both cleared
+- Zapp A/C (Crit1: opaque GUARDRAIL_BLOCK; Crit2: no-credential-leak guardrail; B1–B5: tool abort, core-first, sentinel, @internal, duplicate rejection; B6: payload-coercion fail-closed test) — all cleared
+- Step 11 PR must update brief §Guardrail and migrate 3 pack-core guardrails (check→evaluate) in same commit.
+
+---
+
+# Milestone: DP #487 (MCP Adapter, Step 12) — FULLY APPROVED
+
+**Date:** 2025-07-15
+**Status:** ✅ FULLY APPROVED — Leela ✅ + Zapp ✅
+- Leela A/C (C1: audience/degradation contract; C2: interrupt storage = in-process + sticky routing; C3: requiresSession:true tools excluded from manifest) — all cleared
+- Zapp A/C (Crit1: UserActions off manifest; Crit2: auth tuple sessionId+connectionId+principalId+runId; B1: mcpExposed default false; B2: zod+guardrail at adapter; B3: single-use CAS; B4: in-memory+mutex) — all resolved
+- connectionId server-assigned at initialize. Implementation may proceed with all 4+6 Step 12 PR conditions.
+
+---
+
+# Milestone: PR #550 Merged — Step 5 Runner + SSE (closes #479)
+
+**Date:** 2025-07-15
+**Commit:** 624450b (squash merge into v2-rewrite)
+**Status:** ✅ MERGED — 1,379 insertions
+- All 7 Zapp security findings resolved: lastActiveAt first-class field, session ownership check, pending action schema keyed by (sessionId,actionId), etc.
+- Step 5 (Runner+SSE) complete. Unblocks Step 6 (Skill Resolver, #480).
+
+---
+
+# Note: Step 6 (Skill Resolver, #480) — In Progress
+
+**Date:** 2025-07-15
+**Status:** Fry implementing now; PR expected shortly.

@@ -107,3 +107,23 @@
 
 - **2026-07-27 — #43 WCAG 2.1 AA Accessibility Audit (v0.5.0):** Audited all 27 fluent-components + 19 catalog components + A2UI rendering pipeline. Fixed 15 components across 16 files. Key findings: (1) **A2UI schema defines `accessibility.label`/`description` on all components via CommonProps, but zero components consumed these props** — wired them in Icon, List, Badge, Image, Video, Slider, AudioPlayer. (2) **ProgressSteps used Unicode symbols (✓, ✕, ●) without ARIA labels and non-semantic `<div>` structure** — rewrote to `<ol>/<li>` with `role="list"`, `aria-current="step"`, and `role="img"` + descriptive labels on status dots. (3) **RadioGroup was click-only with no keyboard navigation** — added roving tabIndex pattern with arrow key cycling, Enter/Space selection, `role="radiogroup"` on container. (4) **No `aria-live` regions for dynamic content** — added `aria-live="polite"` to DeploymentProgress and SteppedCarousel. (5) **External link icons in Link component had no screen reader context** — added `aria-hidden="true"` on icon and visually-hidden "(opens in new window)" text. (6) **Questionnaire labels disconnected from inputs** — added `htmlFor`/`id` association, `aria-required`, `aria-hidden` on decorative asterisks. 47 new tests, 580/580 full suite passing. PR #124.
 
+
+---
+
+## Archived from history.md — Wave 40 (2025-07-15)
+
+### Key Learnings
+
+- **`systemPrompt` call sites — 4, not 3:** `agents-runner.ts`, `action.ts`, `chat-action.ts`, plus one more. State incorrect count → blocking DP condition from Leela.
+- **`agents-runner.ts` descope pattern:** When a file is migration-targeted, explicitly note DP descope.
+- **DP approval-with-conditions gate:** Both Leela + Zapp verdicts are blocking before first impl PR.
+- Prior learnings (2026-04-15/16): Fluent 2 restyle TDD-red tests, K8s icon test expansion, Playwright strict mode, E2E auth fixture, Kubernetes safeguard categories, custom component count contract test.
+
+### #474 Step-1 Triage (2026-04-17)
+
+Branch: `squad/474-step1-nuke-v1` @ `2105148`. Fixed 12 test failures → 407 passing, 0 failing. Root causes: Phase enum stub used Assess (v2 uses Design), `buildSystemPrompt` returned empty, `DEPLOYMENT_SAFEGUARDS` and `SETUP_GENERATION_STEP_ORDER` were `[]`, `PricingConnector` stub missing `fetchRetailPrices`/`lookupVmPrice`. Added `harness-exports.test.ts` (34 tests). Key fix: `PricingConnector` constructor accepts `{ retry: { maxRetries } }`.
+
+### Connector Execution ADR (2026-04-17)
+
+AzureARMConnector: always proxy via `/api/arm-proxy`. GitHubConnector: reads direct, writes proxied. `createPullRequest()` direct call = known debt. Rule: new connector write methods MUST use server proxy pattern. Filed: `hermes-connector-execution-adr.md`.
+
