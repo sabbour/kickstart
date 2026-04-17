@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-11 | #115 "feat: FileEditor Monaco + tabs, CostEstimate SKU selector + projection, add-component prompt" | L | impl=1m | review=13m | cycles=1 | merged | @sabbour
