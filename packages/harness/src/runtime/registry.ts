@@ -43,6 +43,7 @@ export class PackRegistry {
   private readonly playgroundScenariosById = new Map<string, PlaygroundScenario>();
   private activePackNames: string[] | null = null;
   private sealed = false;
+  private _sealedPlaygroundStubs: ReadonlyMap<string, PlaygroundStub> | null = null;
 
   register(pack: Pack): void {
     if (this.sealed) {
@@ -111,6 +112,18 @@ export class PackRegistry {
 
   seal(): void {
     this.sealed = true;
+    // Snapshot and freeze playground stubs at seal time — post-seal mutations blocked.
+    const stubs = new Map<string, PlaygroundStub>();
+    for (const registeredPack of this.packs.values()) {
+      if (!this.isPackActive(registeredPack.pack.name) || !registeredPack.pack.playgroundStubs) continue;
+      for (const [key, stub] of Object.entries(registeredPack.pack.playgroundStubs)) {
+        if (stubs.has(key)) {
+          throw new Error(`Duplicate playground stub key across packs: "${key}"`);
+        }
+        stubs.set(key, stub);
+      }
+    }
+    this._sealedPlaygroundStubs = stubs;
   }
 
   getAgent(name: string): AgentContribution {
@@ -165,13 +178,18 @@ export class PackRegistry {
     return [...this.playgroundScenariosById.values()].filter((scenario) => this.isPackActive(this.packNameFromScenario(scenario.id)));
   }
 
-  get playgroundStubs(): Record<string, PlaygroundStub> {
-    const stubs: Record<string, PlaygroundStub> = {};
+  get playgroundStubs(): ReadonlyMap<string, PlaygroundStub> {
+    if (this._sealedPlaygroundStubs) return this._sealedPlaygroundStubs;
+    // Pre-seal: compute on demand (dev/test only), collision detection included.
+    const stubs = new Map<string, PlaygroundStub>();
     for (const registeredPack of this.packs.values()) {
-      if (!this.isPackActive(registeredPack.pack.name) || !registeredPack.pack.playgroundStubs) {
-        continue;
+      if (!this.isPackActive(registeredPack.pack.name) || !registeredPack.pack.playgroundStubs) continue;
+      for (const [key, stub] of Object.entries(registeredPack.pack.playgroundStubs)) {
+        if (stubs.has(key)) {
+          throw new Error(`Duplicate playground stub key across packs: "${key}"`);
+        }
+        stubs.set(key, stub);
       }
-      Object.assign(stubs, registeredPack.pack.playgroundStubs);
     }
     return stubs;
   }
@@ -196,11 +214,8 @@ export class PackRegistry {
     pack: Pack,
     scope: { tools: Map<string, ToolContribution>; userActions: Map<string, UserActionContribution> },
   ): AgentContribution[] {
-    const loaded = [...(pack.agents ?? [])].map((agent) => this.normalizeInlineAgent(pack, agent, scope));
-    if (!pack.agentsDir) {
-      return loaded;
-    }
-
+    const loaded: AgentContribution[] = [];
+    if (!pack.agentsDir) return loaded;
     const baseDir = directoryURLToPath(pack.agentsDir);
     for (const entry of collectMarkdownFiles(baseDir, '.agent.md')) {
       loaded.push(loadAgentFile(pack, entry, scope));
@@ -209,11 +224,8 @@ export class PackRegistry {
   }
 
   private loadSkills(pack: Pack): Skill[] {
-    const loaded = [...(pack.skills ?? [])].map((skill) => this.normalizeInlineSkill(pack, skill));
-    if (!pack.skillsDir) {
-      return loaded;
-    }
-
+    const loaded: Skill[] = [];
+    if (!pack.skillsDir) return loaded;
     const baseDir = directoryURLToPath(pack.skillsDir);
     for (const entry of collectMarkdownFiles(baseDir, 'SKILL.md')) {
       loaded.push(loadSkillFile(pack, entry));
