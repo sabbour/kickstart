@@ -8,6 +8,9 @@ export const FORBIDDEN_PATTERN_RE = /[;|&$`\\]/;
  * Throws if the pattern contains shell metacharacters.
  */
 export function validateGlobPattern(pattern: string): void {
+  if (pattern.length > 256) {
+    throw new Error(`Glob pattern too long: max 256 chars`);
+  }
   if (FORBIDDEN_PATTERN_RE.test(pattern)) {
     throw new Error(
       `Glob pattern "${pattern}" contains forbidden shell metacharacters (;|&$\`\\). ` +

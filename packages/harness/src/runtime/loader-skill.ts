@@ -52,7 +52,7 @@ export function loadSkillFile(pack: Pack, filePath: string): Skill {
   const parsed = skillFrontmatterSchema.parse(attributes);
   const validatedName = validateSkillName(parsed.name);
 
-  return {
+  return Object.freeze({
     id: `${pack.name}/${validatedName}`,
     name: validatedName,
     description: parsed.description,
@@ -60,12 +60,12 @@ export function loadSkillFile(pack: Pack, filePath: string): Skill {
     ...(parsed.author ? { author: parsed.author } : {}),
     ...(parsed.license ? { license: parsed.license } : {}),
     instructions: body,
-    appliesTo: [...parsed['x-kickstart'].appliesTo],
-    keywords: [...parsed['x-kickstart'].keywords],
+    appliesTo: Object.freeze([...parsed['x-kickstart'].appliesTo]),
+    keywords: Object.freeze([...parsed['x-kickstart'].keywords]),
     priority: parsed['x-kickstart'].priority,
-    source: {
-      kind: 'file',
+    source: Object.freeze({
+      kind: 'file' as const,
       path: relative(resolve(baseDir), resolve(filePath)).replace(/\\/g, '/'),
-    },
-  };
+    }),
+  }) as Skill;
 }

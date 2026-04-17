@@ -263,21 +263,26 @@ export class PackRegistry {
       }
     }
 
-    // Validate glob patterns for file-backed skills at registration time
-    for (const skill of fileSkills) {
+    // Validate glob patterns for file-backed skills at registration time, then freeze
+    const frozenFileSkills: Skill[] = fileSkills.map((skill) => {
       for (const pattern of skill.appliesTo ?? []) {
         validateGlobPattern(pattern);
       }
-    }
+      return Object.freeze({
+        ...skill,
+        appliesTo: Object.freeze([...(skill.appliesTo ?? [])]),
+        keywords: Object.freeze([...(skill.keywords ?? [])]),
+      }) as Skill;
+    });
 
     // Fix 3: detect duplicates within the merged batch before any insertion
     const seen = new Set<string>();
-    for (const id of [...fileSkills.map((s) => s.id), ...inlineSkills.map((s) => s.id)]) {
+    for (const id of [...frozenFileSkills.map((s) => s.id), ...inlineSkills.map((s) => s.id)]) {
       if (seen.has(id)) throw new Error(`Duplicate skill id "${id}" in pack "${pack.name}"`);
       seen.add(id);
     }
 
-    return [...fileSkills, ...inlineSkills];
+    return [...frozenFileSkills, ...inlineSkills];
   }
 
   private buildDependencyScope(pack: Pack): { tools: Map<string, ToolContribution>; userActions: Map<string, UserActionContribution> } {

@@ -82,6 +82,14 @@ describe('validateGlobPattern', () => {
     expect(() => validateGlobPattern(`${char}rm-rf`)).toThrow(/forbidden shell metacharacters/);
   });
 
+  it('rejects pattern longer than 256 chars', () => {
+    expect(() => validateGlobPattern('a'.repeat(257))).toThrow(/Glob pattern too long/);
+  });
+
+  it('accepts pattern of exactly 256 chars', () => {
+    expect(() => validateGlobPattern('a'.repeat(256))).not.toThrow();
+  });
+
   it('FORBIDDEN_PATTERN_RE matches dangerous chars', () => {
     expect(FORBIDDEN_PATTERN_RE.test(';echo')).toBe(true);
     expect(FORBIDDEN_PATTERN_RE.test('safe-pattern')).toBe(false);
@@ -112,7 +120,33 @@ describe('PackRegistry — glob injection at registration', () => {
   });
 });
 
-// ── Phase B: listSkills ──────────────────────────────────────────────────────
+describe('PackRegistry — frozen skills (Crit1)', () => {
+  it('skill returned by listSkills() has frozen appliesTo — mutation silently fails (non-strict) or throws (strict)', () => {
+    const registry = new PackRegistry();
+    registry.register({
+      name: 'my-pack',
+      skills: [
+        {
+          id: 'my-pack/frozen-skill',
+          name: 'frozen-skill',
+          description: 'Should be frozen',
+          version: '1.0.0',
+          instructions: 'Some instructions',
+          appliesTo: ['*'],
+          keywords: ['test'],
+          priority: 0,
+          source: { kind: 'inline' },
+        },
+      ],
+    });
+    registry.enable(['my-pack']);
+    const skill = registry.listSkills()[0];
+    // Object.freeze'd arrays throw in strict mode, silently fail otherwise
+    expect(() => {
+      (skill.appliesTo as string[]).push('*;rm -rf /');
+    }).toThrow();
+  });
+});
 
 describe('PackRegistry.listSkills', () => {
   function buildRegistry(): PackRegistry {
@@ -251,26 +285,35 @@ describe('fitSkillsInBudget', () => {
   });
 
   it('includes skills that exactly fit the budget', () => {
-    // 'abcd' → 1 token; 'efgh' → 1 token; budget = 2
+    // rendered: '## pack/s1\nabcd' = 15 chars → ceil(15/4) = 4 tokens each; budget = 8
     const skills = [
       makeSkill({ id: 'pack/s1', instructions: 'abcd' }),
       makeSkill({ id: 'pack/s2', instructions: 'efgh' }),
     ];
-    const result = fitSkillsInBudget(skills, 2);
+    const result = fitSkillsInBudget(skills, 8);
     expect(result).toHaveLength(2);
   });
 
-  it('truncates at the first skill that overflows budget', () => {
-    // s1: 'abcd' → 1 token; s2: 'a'.repeat(400) → 100 tokens
+  it('skips oversized skills and includes subsequent skills that fit', () => {
+    // s1: rendered ~4 tokens; s2: rendered ~103 tokens; s3: rendered ~4 tokens
     const skills = [
       makeSkill({ id: 'pack/s1', instructions: 'abcd' }),
       makeSkill({ id: 'pack/s2', instructions: 'a'.repeat(400) }),
       makeSkill({ id: 'pack/s3', instructions: 'xyz' }),
     ];
-    // budget = 10: s1 fits (1), s2 overflows (100) — stops there, s3 never checked
+    // budget = 10: s1 fits (4), s2 overflows (103) — skipped, s3 fits (4)
     const result = fitSkillsInBudget(skills, 10);
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('pack/s1');
+    expect(result).toHaveLength(2);
+    expect(result.map((s) => s.id)).toEqual(['pack/s1', 'pack/s3']);
+  });
+
+  it('[small, huge, small] — both smalls included when huge overflows', () => {
+    const small1 = makeSkill({ id: 'pack/small1', instructions: 'tiny' });
+    const huge = makeSkill({ id: 'pack/huge', instructions: 'x'.repeat(2000) });
+    const small2 = makeSkill({ id: 'pack/small2', instructions: 'also tiny' });
+    // budget = 20 — both smalls render well under 20 tokens; huge does not
+    const result = fitSkillsInBudget([small1, huge, small2], 20);
+    expect(result.map((s) => s.id)).toEqual(['pack/small1', 'pack/small2']);
   });
 
   it('returns all skills when budget is large enough', () => {

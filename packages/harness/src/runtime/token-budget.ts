@@ -13,15 +13,16 @@ export function buildSkillPrompt(skills: Skill[]): string {
 
 /**
  * Greedily select skills that fit within the given token budget.
- * Skills are taken in order; the first skill that would exceed the budget
- * stops iteration.
+ * Each skill is costed as its fully-rendered block (header + instructions).
+ * Oversized skills are skipped (continue) so later smaller skills can still fit.
  */
 export function fitSkillsInBudget(skills: Skill[], budgetTokens: number): Skill[] {
   const result: Skill[] = [];
   let used = 0;
   for (const skill of skills) {
-    const tokens = estimateTokens(skill.instructions);
-    if (used + tokens > budgetTokens) break;
+    const rendered = buildSkillPrompt([skill]);
+    const tokens = estimateTokens(rendered);
+    if (used + tokens > budgetTokens) continue; // SKIP oversized, not break
     result.push(skill);
     used += tokens;
   }
