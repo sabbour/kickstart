@@ -107,21 +107,23 @@ docs-site/        Docusaurus documentation site
 
 📖 **Full docs:** [sabbour.github.io/kickstart](https://sabbour.github.io/kickstart/)
 
+> **Single source of truth:** `docs-site/docs/` is the canonical documentation. All doc updates go there. The `docs/` directory contains redirect stubs only.
+
 - **[Architecture](https://sabbour.github.io/kickstart/docs/architecture/overview)** — System design, A2UI integration, JSON envelope format
 - **[Getting Started](https://sabbour.github.io/kickstart/docs/getting-started/local-setup)** — Local setup, project structure
+- **[Deployment Guide](https://sabbour.github.io/kickstart/docs/getting-started/deployment)** — Azure resources, CI/CD, environment variables
 - **[Custom Components](https://sabbour.github.io/kickstart/docs/components/custom-catalog)** — Kickstart A2UI catalog
 - **[Contributing](./CONTRIBUTING.md)** — Dev setup, code style
-- **[Development Guide](./DEVELOPMENT.md)** — Credentials, scripts, testing
 
 ## Extending Kickstart
 
-Want to build on the platform? The [Extension Guide](./docs/extending.md) covers five extension points:
+Want to build on the platform? The [Extension Guide](https://sabbour.github.io/kickstart/docs/extending/overview) covers five extension points:
 
-- **[Conversation Phases](./docs/extending.md#a-adding-a-new-conversation-phase)** — Add new phases to the guided flow (e.g., Monitor, Test)
-- **[LLM Tools](./docs/extending.md#b-adding-a-new-llm-tool)** — Expose new functions to the LLM via OpenAI function calling
-- **[Integration Kits](./docs/extending.md#c-adding-a-new-integration-kit)** — Bundle tools, connectors, prompts, and auth into a composable unit
-- **[API Endpoints](./docs/extending.md#d-adding-a-new-api-endpoint)** — Add Azure Functions endpoints with SSE streaming
-- **[MCP Tools](./docs/extending.md#e-adding-mcp-tools)** — Extend the IDE integration for VS Code Copilot and Claude Code
+- **[Conversation Phases](https://sabbour.github.io/kickstart/docs/extending/conversation-phases)** — Add new phases to the guided flow (e.g., Monitor, Test)
+- **[LLM Tools](https://sabbour.github.io/kickstart/docs/extending/llm-tools)** — Expose new functions to the LLM via OpenAI function calling
+- **[Integration Kits](https://sabbour.github.io/kickstart/docs/extending/integration-kits)** — Bundle tools, connectors, prompts, and auth into a composable unit
+- **[API Endpoints](https://sabbour.github.io/kickstart/docs/extending/api-endpoints)** — Add Azure Functions endpoints with SSE streaming
+- **[MCP Tools](https://sabbour.github.io/kickstart/docs/extending/mcp-tools)** — Extend the IDE integration for VS Code Copilot and Claude Code
 
 ## License
 

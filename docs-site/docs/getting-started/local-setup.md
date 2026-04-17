@@ -64,6 +64,118 @@ Navigate to [http://localhost:4280](http://localhost:4280) in your browser.
 
 The SWA CLI proxies API requests from the frontend to the local Azure Functions runtime, matching the production Azure Static Web App behavior.
 
+## Dev Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Full-stack dev server (Vite + SWA CLI in parallel, port 4280) |
+| `npm run dev:vite` | Vite dev server only (HMR, port 5173, no API) |
+| `npm run build` | Build all packages (`core` → `web` + `mcp-server`) |
+| `npm run api:build` | Build `@kickstart/core` + API only |
+| `npm test` | Unit/integration tests (vitest, all workspaces) |
+| `npm run test:e2e` | Playwright E2E tests (headless) |
+| `npm run test:e2e:ui` | Playwright E2E tests with interactive UI |
+| `npm run lint` | ESLint across all TypeScript packages |
+
+## Running Tests
+
+### Unit and integration tests (vitest)
+
+```bash
+# All workspaces
+npm test
+
+# Specific workspace
+npm test -w @kickstart/core
+npm test -w @kickstart/mcp-server
+```
+
+Or directly with vitest for more control:
+
+```bash
+npx vitest run            # run once
+npx vitest watch          # watch mode
+npx vitest run --coverage # with coverage
+```
+
+The root `vitest.config.ts` collects tests from all `packages/*/src/**/__tests__/*.test.ts` files and excludes Playwright specs.
+
+### End-to-end tests (Playwright)
+
+```bash
+npm run test:e2e       # headless
+npm run test:e2e:ui    # with Playwright UI (trace viewer, time-travel debugging)
+```
+
+E2E tests use their own dev server on port 4281 — they don't conflict with the SWA CLI dev server on port 4280.
+
+## Build Commands
+
+```bash
+# Build everything (recommended)
+npm run build
+
+# Build individual packages
+npm run build -w @kickstart/core
+npm run build -w @kickstart/web
+npm run build -w @kickstart/mcp-server
+npm run api:build   # core + API (for deployment)
+```
+
+Build order matters: `@kickstart/core` must be built before the web API and MCP server because they reference it via TypeScript project references.
+
+## Frontend-Only Development
+
+When working on React components without needing the API:
+
+```bash
+npm run dev:vite
+```
+
+The app opens at **http://localhost:5173** with HMR. It detects the API is unavailable and falls back to **demo mode** automatically (yellow "Demo" badge in the chat header).
+
+## MCP Server Development
+
+```bash
+npm run build -w @kickstart/core
+npm run build -w @kickstart/mcp-server
+
+# Run via stdio (for testing with an MCP client)
+node packages/mcp-server/dist/index.js
+```
+
+See [MCP Tools](../extending/mcp-tools.md) for connecting to VS Code Copilot or Claude Code.
+
+## Dev Container
+
+The repo ships a `.devcontainer` configuration. Open in a GitHub Codespace or VS Code Dev Container for a pre-configured environment:
+
+1. **Codespace:** Click **Code → Codespaces → New codespace**
+2. **VS Code:** Open the repo, then **Ctrl+Shift+P → Dev Containers: Reopen in Container**
+
+The container installs all dependencies, builds packages, and starts `npm run dev` automatically. Ports forwarded: **4280** (SWA CLI) and **5173** (Vite).
+
+## Infrastructure (Bicep)
+
+```bash
+# Validate
+az bicep build --file infra/main.bicep
+
+# Dry run
+az deployment group what-if \
+  --resource-group rg-kickstart-dev \
+  --template-file infra/main.bicep \
+  --parameters @infra/parameters.dev.json
+
+# Deploy
+az deployment group create \
+  --resource-group rg-kickstart-dev \
+  --template-file infra/main.bicep \
+  --parameters @infra/parameters.dev.json
+```
+
+See [Deployment Guide](./deployment.md) for the full infrastructure and CI/CD setup.
+
 ## Common Issues
 
 ### Functions not starting
