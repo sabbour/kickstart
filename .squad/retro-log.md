@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #418 "refactor: deduplicate advancePhase() — move to @kickstart/core" | S | impl=0m | review=13m | cycles=1 | merged | @sabbour
+
 - 2026-04-17 | #421 "docs: fix phantom paths in getting-started + contributing" | M | impl=0m | review=1m | cycles=1 | merged | @sabbour
 - 2026-04-17 | #420 "docs: remove stale 'typed skill path dormant' warning" | S | impl=0m | review=9m | cycles=1 | merged | @sabbour
 
