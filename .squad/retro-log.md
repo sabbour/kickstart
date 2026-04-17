@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #248 "fix: LLM announces next phase instead of producing content" | S | impl=2m | review=198m | cycles=1 | merged | @sabbour
