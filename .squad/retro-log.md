@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #283 "Remove Raw Text Content and Render Decisions from debug panel" | M | impl=3m | review=69m | cycles=1 | merged | @sabbour
