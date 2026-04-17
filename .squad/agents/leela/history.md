@@ -106,3 +106,23 @@ All DP #476 conditions verified: `yaml` npm package ✅, full 9-accessor read su
 Non-blocking follow-ups: `enable()`-after-`seal()` missing guard, no dedicated `frontmatter.test.ts`, `wireName` auto-compute not enforced.  
 **Unblocked:** Step 4 (pack-core), Step 4a (playground), Step 5 (runner pending `enable()` fix), #477 C2 resolved.  
 Decision filed: `.squad/decisions/inbox/leela-pr546-review.md`
+
+## 2026-06-10 — PR #545 Re-verification (v2 Step 2)
+
+**PR:** #545 — feat(v2): Step 2 — Harness primitives (re-check after Bender's fixes)  
+**Verdict:** APPROVED — `leela:approved` applied
+
+Re-checked three previously-raised blockers against commits `96c675bb`, `4d1e5dc`, `427c385b`. All cleared: `Pack` is dir-based only (no inline `agents`/`skills` arrays) ✅, `SessionCtx.a2uiEmissions: A2UIMessage[]` present at `session.ts` ✅, `chat-a2ui.ts` maps legacy `handoff` → `assess` with test coverage ✅. No further architecture blockers.  
+Decision filed: `.squad/decisions/inbox/leela-pr545-recheck.md`
+
+## 2026-06-10 — PR #545 Re-verification
+
+**PR #545 (Closes #475) — APPROVED — `leela:approved` applied**
+
+Re-check after commits `96c675bb`, `4d1e5dc`, `427c385b`:
+1. `Pack` inline arrays removed ✅ — no `agents?` or `skills?`; `agentsDir?`/`skillsDir?` dir-based only.
+2. `SessionCtx.a2uiEmissions: A2UIMessage[]` present ✅ — #477 C2 prerequisite satisfied.
+3. `chat-a2ui.ts` remap ✅ — `normalizeConversationPhase('handoff')` → `'assess'`; `'triage'` → `null`; tests pass.
+
+Step 3 (#476 / PR #546) unblocked after this approval (pending Zapp security gate).  
+Decision filed: `.squad/decisions/inbox/leela-pr545-recheck.md`

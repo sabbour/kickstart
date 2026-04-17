@@ -2848,3 +2848,45 @@ Build: `packages/harness` tsc — green. Tests: 53/53 passing.
 Security gate is **not** clear for PR #546 until loader path confinement rejects symlink escapes in addition to `../` traversal.
 
 — Zapp
+
+---
+# Leela Decision — PR #545 Re-verification (v2 Step 2: Harness Primitives)
+
+**Date:** 2026-06-10  
+**PR:** #545 — feat(v2): Step 2 — Harness primitives, all types + Zod schemas (Closes #475)  
+**Re-check after:** commits `96c675bb`, `4d1e5dc`, `427c385b`
+
+## Verdict: APPROVED — `leela:approved` applied
+
+## Blocker re-verification
+
+### 1. Pack inline arrays removed ✅
+`packages/harness/src/types/pack.ts` confirmed:
+```typescript
+export interface Pack {
+  name: string;
+  version: string;
+  dependsOn?: string[];
+  agentsDir?: URL;      // dir-based only
+  skillsDir?: URL;      // dir-based only
+  tools?: ToolContribution[];
+  userActions?: UserActionContribution[];
+  components?: ComponentContribution[];
+  guardrails?: GuardrailContribution[];
+  playgroundScenarios?: PlaygroundScenario[];
+  playgroundStubs?: Record<string, PlaygroundStub>;
+}
+```
+No `agents?: AgentContribution[]` or `skills?: Skill[]` inline arrays. Registry contract is unambiguous.
+
+### 2. `SessionCtx.a2uiEmissions` present ✅
+`packages/harness/src/types/session.ts` contains `a2uiEmissions: A2UIMessage[]` in the `SessionCtx` interface. #477 C2 prerequisite satisfied.
+
+### 3. `chat-a2ui.ts` handoff → assess remap ✅
+`normalizeConversationPhase('handoff')` returns `'assess'`. Test in `chat-a2ui.test.ts` covers both the happy path and the legacy remap. Legacy `'triage'` correctly returns `null`.
+
+## No further blockers
+
+All DP #475 conditions and previously-raised architecture blockers are resolved. Build and tests passing.
+
+— Leela

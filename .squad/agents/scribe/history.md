@@ -99,3 +99,10 @@ Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v
 - leela history updated (8,693 bytes; under 15 KB threshold).
 - zapp history updated (14,603 bytes; approaching threshold — watch next cycle).
 - No summarisation needed this wave.
+
+## Wave 11 — 2026-06-10 Merge cycle (same session)
+
+- Inbox: `leela-pr545-recheck.md` (PR #545 APPROVED re-verification after 3 fix commits).
+- decisions.md: 159,647 → 161,186 bytes (+1 file).
+- leela history updated (9,959 bytes; under threshold).
+- Also resolved: 2 accidentally-tracked inbox files untracked (`leela-479-dp-review.md`, `leela-pr545-review.md`) from 87ff63b/c84d9f3 commits.
