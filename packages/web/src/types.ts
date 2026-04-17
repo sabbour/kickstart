@@ -1,5 +1,7 @@
 // Shared TypeScript types for the Kickstart chat application
 
+import type { PromptTraceStep } from "@kickstart/core";
+
 /** A logged action dispatch event for debug visibility. */
 export interface ActionDebugEvent {
   /** Timestamp (ms) when the action was dispatched. */
@@ -31,6 +33,8 @@ export interface DebugMetadata {
   };
   /** System prompt used for this LLM call (truncated at 8 KB). */
   systemPrompt?: string;
+  /** Prompt construction trace — one entry per named section assembled. */
+  promptTrace?: PromptTraceStep[];
 }
 
 export interface SetupStepStartEvent {

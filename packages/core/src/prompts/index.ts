@@ -25,4 +25,5 @@ export type {
   DeploymentSafeguard,
   SafeguardSeverity,
   SystemPromptContext,
+  PromptTraceStep,
 } from "./system-prompt.js";

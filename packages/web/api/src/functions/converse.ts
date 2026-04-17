@@ -50,6 +50,7 @@ import { chatCompletionWithAutoContinue, isTruncated } from "../lib/auto-continu
 import { sanitizeToolOutput } from "../lib/sanitize-tool-output.js";
 import { isDebugMode, buildConverseDebugMeta, formatRenderDecisions } from "../lib/debug-mode.js";
 import type { DebugMetadata } from "../lib/debug-mode.js";
+import type { PromptTraceStep } from "@kickstart/core";
 import { buildTurnUsage, sumChatUsage } from "../lib/usage-tracking.js";
 import type { UsageSummary, ChatUsage } from "../lib/usage-tracking.js";
 import {
@@ -270,11 +271,13 @@ app.http("converse", {
       addMessage(state.sessionId, "user", body.message);
       const artifactSummary = buildArtifactSummary(session.generatedArtifacts);
 
+      const promptTrace: PromptTraceStep[] | undefined = debugMode ? [] : undefined;
       const freshSystemPrompt = buildSystemPrompt({
         phase: currentPhase,
         appDefinition: state.appDefinition,
         kitPrompts: resolvedSkills.prompts,
         artifactSummary: artifactSummary || undefined,
+        trace: promptTrace,
       });
       // Note: azureContext and githubContext are intentionally excluded from DebugMetadata to prevent tenant ID leakage
 
@@ -336,7 +339,7 @@ app.http("converse", {
       if (wantsStream) {
         return handleStreaming(
           messages, state.sessionId, session, modelRoute, context,
-          toolContext, debugMode, session.generatedArtifacts, freshSystemPrompt,
+          toolContext, debugMode, session.generatedArtifacts, freshSystemPrompt, promptTrace,
         );
       }
 
@@ -419,14 +422,15 @@ app.http("converse", {
       // Attach debug metadata when requested
       if (debugMode) {
         const hadExplicitA2UI = processed.a2uiMessages.length > 0;
-        const debugMeta = buildConverseDebugMeta(
-          modelRoute.model,
-          finalContent,
-          processed.a2uiMessages.length,
+        const debugMeta = buildConverseDebugMeta({
+          model: modelRoute.model,
+          rawContent: finalContent,
+          a2uiCount: processed.a2uiMessages.length,
           hadExplicitA2UI,
-          session.state.currentPhase,
-          freshSystemPrompt,
-        );
+          currentPhase: session.state.currentPhase,
+          systemPrompt: freshSystemPrompt,
+          promptTrace,
+        });
         responseBody.debug = debugMeta;
         responseBody.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
       }
@@ -493,13 +497,13 @@ async function handleSetupGenerationResponse(
   };
 
   if (debugMode) {
-    const debugMeta = buildConverseDebugMeta(
-      modelRoute.model,
-      result.message,
-      result.a2uiMessages.length,
-      result.a2uiMessages.length > 0,
-      session.state.currentPhase,
-    );
+    const debugMeta = buildConverseDebugMeta({
+      model: modelRoute.model,
+      rawContent: result.message,
+      a2uiCount: result.a2uiMessages.length,
+      hadExplicitA2UI: result.a2uiMessages.length > 0,
+      currentPhase: session.state.currentPhase,
+    });
     responseBody.debug = debugMeta;
     responseBody.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
   }
@@ -559,13 +563,13 @@ function handleSetupGenerationStreaming(
         };
 
         if (debugMode) {
-          const debugMeta = buildConverseDebugMeta(
-            modelRoute.model,
-            result.message,
-            result.a2uiMessages.length,
-            result.a2uiMessages.length > 0,
-            session.state.currentPhase,
-          );
+          const debugMeta = buildConverseDebugMeta({
+            model: modelRoute.model,
+            rawContent: result.message,
+            a2uiCount: result.a2uiMessages.length,
+            hadExplicitA2UI: result.a2uiMessages.length > 0,
+            currentPhase: session.state.currentPhase,
+          });
           donePayload.debug = debugMeta;
           donePayload.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
         }
@@ -606,6 +610,7 @@ function handleStreaming(
   debugMode: boolean,
   sessionArtifacts: GeneratedArtifact[],
   systemPrompt?: string,
+  promptTrace?: PromptTraceStep[],
 ): HttpResponseInit {
   const encoder = new TextEncoder();
   let accumulatedUsage: ChatUsage | undefined;
@@ -703,14 +708,15 @@ function handleStreaming(
 
             if (debugMode) {
               const hadExplicitA2UI = processed.a2uiMessages.length > 0;
-              const debugMeta = buildConverseDebugMeta(
-                modelRoute.model,
-                fullContent,
-                processed.a2uiMessages.length,
+              const debugMeta = buildConverseDebugMeta({
+                model: modelRoute.model,
+                rawContent: fullContent,
+                a2uiCount: processed.a2uiMessages.length,
                 hadExplicitA2UI,
-                session.state.currentPhase,
+                currentPhase: session.state.currentPhase,
                 systemPrompt,
-              );
+                promptTrace,
+              });
               donePayload.debug = debugMeta;
               donePayload.renderDecisions = formatRenderDecisions(debugMeta.renderDecisions);
             }

@@ -137,6 +137,7 @@ export type {
   SystemPromptContext,
   ComponentCatalogEntry,
   ComponentCategory,
+  PromptTraceStep,
 } from "./prompts/index.js";
 
 // Tool registry

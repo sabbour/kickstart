@@ -23,6 +23,19 @@ import type { ComponentCatalogEntry } from "./component-catalog.js";
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * A single step captured during buildSystemPrompt() assembly.
+ * Canonical definition — consumed by @kickstart/core consumers (e.g. Fry #460).
+ */
+export interface PromptTraceStep {
+  /** Logical section name, e.g. "base-prompt", "azure-context". */
+  name: string;
+  /** Text this step contributed; capped at 8 KB. */
+  content: string;
+  /** content.length before truncation. */
+  charCount: number;
+}
+
 /** Severity of a deployment safeguard violation. */
 export type SafeguardSeverity = "error" | "warning";
 
@@ -76,6 +89,11 @@ export interface SystemPromptContext {
    * Built by the harness each turn so the LLM has running context.
    */
   artifactSummary?: string;
+  /**
+   * When provided, each prompt section is recorded here as it is assembled.
+   * Zero overhead when omitted. Consumed by debug-mode metadata (#459).
+   */
+  trace?: PromptTraceStep[];
 }
 
 // ---------------------------------------------------------------------------
@@ -741,50 +759,79 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
   // Compose: unified narrative + phase marker + context + artifact summary + capabilities
   const unified = interpolate(KICKSTART_SYSTEM_PROMPT, vars);
 
+  /** Record a section into context.trace when tracing is active. */
+  function recordTrace(name: string, content: string): void {
+    if (!context.trace) return;
+    context.trace.push({
+      name,
+      content: content.length > 8192 ? content.slice(0, 8192) + "\u2026[truncated]" : content,
+      charCount: content.length,
+    });
+  }
+
+  const baseContent = PROMPT_BOUNDARY_INSTRUCTION + unified;
+  const phaseContent = `## Current Phase: ${phaseDefinition.label}\n\n${phaseDefinition.description}`;
+
   const parts = [
-    PROMPT_BOUNDARY_INSTRUCTION + unified,
+    baseContent,
     `## Current Phase: ${phaseDefinition.label}`,
     phaseDefinition.description,
   ];
 
+  recordTrace("base-prompt", baseContent);
+  recordTrace("phase-context", phaseContent);
+
   // Inject collected app context so the LLM has the current session state.
   // Previously this was driven by per-phase promptTemplates; now injected uniformly.
   if (context.appDefinition && Object.keys(context.appDefinition).length > 0) {
-    parts.push(`\n## Collected App Info\n\n${vars["knownInfo"]}`);
-    parts.push(`\n## App Definition\n\n${vars["appDefinition"]}`);
+    const knownSection = `\n## Collected App Info\n\n${vars["knownInfo"]}`;
+    const defSection = `\n## App Definition\n\n${vars["appDefinition"]}`;
+    parts.push(knownSection);
+    parts.push(defSection);
+    recordTrace("app-info", knownSection + "\n\n" + defSection);
   }
 
   // Inject Azure subscription/resource context so the LLM can reference real
   // resource names, locations, and subscription IDs in DEPLOY/REVIEW phases.
   if (context.azureContext) {
-    parts.push(`\n## Azure Context\n\n${vars["azureContext"]}`);
+    const azureSection = `\n## Azure Context\n\n${vars["azureContext"]}`;
+    parts.push(azureSection);
+    // Note: contains tenant/subscription identifiers and GitHub username — debug only
+    recordTrace("azure-context", azureSection);
   }
 
   // Inject GitHub repo context so the LLM can reference the real repo owner,
   // name, and default branch in the HANDOFF phase.
   if (context.githubContext) {
-    parts.push(`\n## Repository Info\n\n${vars["repoInfo"]}`);
+    const githubSection = `\n## Repository Info\n\n${vars["repoInfo"]}`;
+    parts.push(githubSection);
+    // Note: contains tenant/subscription identifiers and GitHub username — debug only
+    recordTrace("github-context", githubSection);
   }
 
   // Artifact summary — gives the LLM running context of generated files.
   // Sanitize to prevent prompt injection via LLM-generated file names/content.
   if (context.artifactSummary) {
-    parts.push(
-      `\n## Generated Artifacts\n\n${wrapWithBoundary(
-        sanitizePromptValue(context.artifactSummary, 10000),
-      )}`,
-    );
+    const artifactSection = `\n## Generated Artifacts\n\n${wrapWithBoundary(
+      sanitizePromptValue(context.artifactSummary, 10000),
+    )}`;
+    parts.push(artifactSection);
+    recordTrace("artifact-summary", artifactSection);
   }
 
   // Inject resolved kit skills as "Available Capabilities"
   if (context.kitPrompts && context.kitPrompts.length > 0) {
     const capabilities = context.kitPrompts.map((p) => p.trim()).join("\n\n");
-    parts.push(`\n## Available Capabilities\n\n${capabilities}`);
+    const kitSection = `\n## Available Capabilities\n\n${capabilities}`;
+    parts.push(kitSection);
+    recordTrace("kit-capabilities", kitSection);
   }
 
   // Copilot extension skills — suggest public extensions when relevant
   if (context.copilotSkillsPrompt) {
-    parts.push(`\n${context.copilotSkillsPrompt}`);
+    const skillsSection = `\n${context.copilotSkillsPrompt}`;
+    parts.push(skillsSection);
+    recordTrace("copilot-skills", skillsSection);
   }
 
   return parts.join("\n\n");

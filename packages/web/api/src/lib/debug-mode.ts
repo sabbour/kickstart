@@ -9,6 +9,7 @@
  */
 
 import type { HttpRequest } from "@azure/functions";
+import type { PromptTraceStep } from "@kickstart/core";
 
 // Warn at module load time if debug is allowed in production.
 if (process.env.KICKSTART_DEBUG_ALLOWED && process.env.NODE_ENV === "production") {
@@ -43,6 +44,8 @@ export interface DebugMetadata {
   renderDecisions: RenderDecision[];
   /** System prompt used for this LLM call (truncated at 8 KB). */
   systemPrompt?: string;
+  /** Prompt construction trace — one entry per named section assembled. */
+  promptTrace?: PromptTraceStep[];
 }
 
 /** Maximum characters of raw LLM content exposed in debug metadata. */
@@ -60,24 +63,31 @@ function redactRawContent(raw: string): string {
 /** Maximum characters of system prompt exposed in debug metadata (8 KB soft cap). */
 const SYSTEM_PROMPT_MAX_LENGTH = 8192;
 
+/** Options for buildConverseDebugMeta — grouped to avoid long positional param lists. */
+export interface ConverseDebugMetaOptions {
+  /** The deployment/model name used. */
+  model: string;
+  /** The raw LLM output before processing. */
+  rawContent: string;
+  /** Number of A2UI messages extracted. */
+  a2uiCount: number;
+  /** Whether the LLM returned explicit A2UI JSON. */
+  hadExplicitA2UI: boolean;
+  /** Current conversation phase name. */
+  currentPhase?: string;
+  /** System prompt used for this LLM call (truncated at 8 KB). */
+  systemPrompt?: string;
+  /** Prompt construction trace captured by buildSystemPrompt(). */
+  promptTrace?: PromptTraceStep[];
+}
+
 /**
  * Build debug metadata for a converse response.
- *
- * @param model      - The deployment/model name used
- * @param rawContent - The raw LLM output before processing
- * @param a2uiCount  - Number of A2UI messages extracted
- * @param hadExplicitA2UI - Whether the LLM returned explicit A2UI JSON
- * @param currentPhase - Current conversation phase name
- * @param systemPrompt - System prompt used for this LLM call (truncated at 8 KB)
  */
 export function buildConverseDebugMeta(
-  model: string,
-  rawContent: string,
-  a2uiCount: number,
-  hadExplicitA2UI: boolean,
-  currentPhase?: string,
-  systemPrompt?: string,
+  options: ConverseDebugMetaOptions,
 ): DebugMetadata {
+  const { model, rawContent, a2uiCount, hadExplicitA2UI, currentPhase, systemPrompt, promptTrace } = options;
   const renderDecisions: RenderDecision[] = [];
 
   // Phase indicator is always injected
@@ -107,7 +117,13 @@ export function buildConverseDebugMeta(
     ? systemPrompt.slice(0, SYSTEM_PROMPT_MAX_LENGTH) + "\u2026[truncated]"
     : systemPrompt;
 
-  return { model, rawContent: redactRawContent(rawContent), renderDecisions, ...(truncatedPrompt !== undefined ? { systemPrompt: truncatedPrompt } : {}) };
+  return {
+    model,
+    rawContent: redactRawContent(rawContent),
+    renderDecisions,
+    ...(truncatedPrompt !== undefined ? { systemPrompt: truncatedPrompt } : {}),
+    ...(promptTrace !== undefined ? { promptTrace } : {}),
+  };
 }
 
 /**

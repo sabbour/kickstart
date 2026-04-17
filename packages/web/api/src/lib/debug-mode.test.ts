@@ -54,21 +54,21 @@ describe("isDebugMode", () => {
 describe("buildConverseDebugMeta", () => {
   it("includes systemPrompt in metadata", async () => {
     const { buildConverseDebugMeta } = await import("./debug-mode.js");
-    const meta = buildConverseDebugMeta("gpt-4o", "raw", 0, false, "idea", "my system prompt");
+    const meta = buildConverseDebugMeta({ model: "gpt-4o", rawContent: "raw", a2uiCount: 0, hadExplicitA2UI: false, currentPhase: "idea", systemPrompt: "my system prompt" });
     expect(meta.systemPrompt).toBe("my system prompt");
   });
 
   it("truncates systemPrompt exceeding 8192 chars", async () => {
     const { buildConverseDebugMeta } = await import("./debug-mode.js");
     const longPrompt = "x".repeat(9000);
-    const meta = buildConverseDebugMeta("gpt-4o", "raw", 0, false, "idea", longPrompt);
+    const meta = buildConverseDebugMeta({ model: "gpt-4o", rawContent: "raw", a2uiCount: 0, hadExplicitA2UI: false, currentPhase: "idea", systemPrompt: longPrompt });
     expect(meta.systemPrompt).toHaveLength(8192 + "\u2026[truncated]".length);
     expect(meta.systemPrompt?.endsWith("\u2026[truncated]")).toBe(true);
   });
 
   it("omits systemPrompt when not provided", async () => {
     const { buildConverseDebugMeta } = await import("./debug-mode.js");
-    const meta = buildConverseDebugMeta("gpt-4o", "raw", 0, false, "idea");
+    const meta = buildConverseDebugMeta({ model: "gpt-4o", rawContent: "raw", a2uiCount: 0, hadExplicitA2UI: false, currentPhase: "idea" });
     expect(meta.systemPrompt).toBeUndefined();
   });
 });
