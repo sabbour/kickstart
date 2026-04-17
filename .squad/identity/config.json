@@ -28,6 +28,13 @@
       "installationId": 122992338,
       "roleSlug": "lead",
       "tier": "per-role"
+    },
+    "scribe": {
+      "appId": 3414032,
+      "appSlug": "sabbour-squad-scribe",
+      "installationId": 124811932,
+      "roleSlug": "scribe",
+      "tier": "per-role"
     }
   }
 }
