@@ -20,6 +20,7 @@ Legend:
 <!-- entries below this line, newest at top -->
 
 - 2026-04-15 | #306 "feat(web): wire generated files into workspace" | L | impl=0m | review=11m | cycles=1 | merged | @sabbour
+- 2026-04-15 | #307 "test: pacing directive regression tests for system prompt (#275)" | L | impl=9m | review=2m | cycles=1 | merged | @sabbour
 
 - 2026-04-15 | #308 "feat: real Azure auth and deployment flow" | XL | impl=50m | review=10m | cycles=1 | merged | @sabbour
 
