@@ -1,0 +1,35 @@
+{
+  "name": "@kickstart/pack-core",
+  "version": "0.1.0",
+  "description": "Core pack — agents, skills, tools, and domain-neutral components for Kickstart v2",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kickstart/harness": "*",
+    "@openai/agents": "*",
+    "zod": "^3.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/jest-dom": "^6.0.0",
+    "typescript": "*",
+    "vitest": "*",
+    "jsdom": "*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  }
+}
