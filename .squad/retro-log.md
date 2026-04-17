@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #247 "fix: address frontend critical + important findings from code quality audit (#234)" | M | impl=2m | review=205m | cycles=1 | merged | @sabbour
