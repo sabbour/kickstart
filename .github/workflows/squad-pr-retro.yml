@@ -117,6 +117,7 @@ jobs:
         env:
           BASE_REF: ${{ steps.metrics.outputs.base_ref }}
           LINE: ${{ steps.metrics.outputs.line }}
+          GH_TOKEN: ${{ secrets.SQUAD_BOT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -e
           git fetch origin "$BASE_REF"
@@ -140,26 +141,54 @@ jobs:
           ' .squad/retro-log.md > .squad/retro-log.md.new
           mv .squad/retro-log.md.new .squad/retro-log.md
 
+          PR_NUM="${{ steps.metrics.outputs.pr }}"
+          SIDE_BRANCH="retro-log/pr-${PR_NUM}"
+
           git config user.name "squad-scribe[bot]"
           git config user.email "scribe@squad.local"
+          git checkout -B "${SIDE_BRANCH}"
           git add .squad/retro-log.md
           if git diff --cached --quiet; then
             echo "No retro-log changes to commit (duplicate event?)"
             exit 0
           fi
-          git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
-          for attempt in 1 2 3; do
-            echo "Push attempt $attempt/3 to $BASE_REF"
-            if git push origin "HEAD:$BASE_REF"; then
-              break
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "Push failed after 3 attempts."
-              exit 1
-            fi
-            git pull --rebase origin "$BASE_REF"
-            sleep 2
-          done
+          git commit -m "chore(retro-log): #${PR_NUM} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
+          git push --force-with-lease origin "${SIDE_BRANCH}"
+
+          PR_COUNT="$(gh pr list \
+            --state open \
+            --base "$BASE_REF" \
+            --head "${SIDE_BRANCH}" \
+            --json number \
+            --jq 'length')"
+
+          if [ "$PR_COUNT" -gt 1 ]; then
+            echo "Multiple open PRs found for ${SIDE_BRANCH} (expected 0 or 1): found ${PR_COUNT}"
+            exit 1
+          fi
+
+          PR_URL="$(gh pr list \
+            --state open \
+            --base "$BASE_REF" \
+            --head "${SIDE_BRANCH}" \
+            --json url \
+            --jq '.[0].url')"
+
+          if [ -n "$PR_URL" ]; then
+            echo "Reusing existing PR: ${PR_URL}"
+          else
+            PR_URL="$(gh pr create \
+              --title "chore(retro-log): #${PR_NUM} [scribe]" \
+              --body "Automated retro log entry for #${PR_NUM}. Opened by \`.github/workflows/squad-pr-retro.yml\`." \
+              --base "$BASE_REF" \
+              --head "${SIDE_BRANCH}" \
+              --label "retro-log" \
+              --label "leela:approved" \
+              --label "zapp:approved")"
+            echo "Created PR: ${PR_URL}"
+          fi
+
+          gh pr merge "$PR_URL" --squash --auto --delete-branch
 
       - name: Mirror line as PR comment
         uses: actions/github-script@v7
