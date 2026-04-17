@@ -141,3 +141,16 @@
 **History sizes:** bender 7,924 (51%) / fry 3,040 (20%) / hermes 2,931 (19%) / leela 6,084 (39%) / ralph 225 (1%) / scribe ~7.9K (51%) / zapp 6,795 (44%)
 **PR #551 status:** Open — feat(harness) Step 6 Skill Resolver (#480); Leela ⏳ Zapp ⏳ reviews pending; CI passing.
 **Still absent:** `fry-483/484/487-dp-revision.md`, `leela-483/484/486-dp-recheck.md`, `zapp-486-b6-final.md`, `bender-pr550-fix.md`, `hermes-549-test.md`
+
+## Wave 42 (user-labelled Wave 41) — 2025-07-15
+
+**Files merged / authored:** 1 DP + 3 milestones
+- **Authored:** `scribe-488-dp.md` — DP #488 Docs+Cleanup (Step 13): 7 deletes, 5 creates, 20 updates; awaiting Leela + Zapp review
+- **Milestone:** DP #482 (pack-azure, Step 7) FULLY APPROVED ✅ — `leela:approved-dp` + `zapp:approved-dp` applied; unblocked once PR #551 merges
+- **Milestone:** PR #551 opened — Step 6 Skill Resolver (#480), 34 tests, reviews pending
+- **Milestone:** DP #488 proposed — Leela + Zapp review dispatched
+
+**decisions.md:** 271,339 → 275,427 bytes (+4,088)
+**Self-posts:** None. All inbox files remain stale (file absent, user-declared).
+**Sizes post-wave:** bender 7,924 (51%) / fry 3,040 (19%) / hermes 2,931 (19%) / leela 6,084 (39%) / ralph 225 / scribe ~9.4K (61%) / zapp 6,795 (44%)
+**Watch:** scribe approaching 61%; no agent above 65%

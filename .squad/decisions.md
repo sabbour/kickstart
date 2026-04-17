@@ -4780,3 +4780,94 @@ All 7 prior security findings resolved:
 
 **Date:** 2025-07-15
 **Status:** Fry implementing now; PR expected shortly.
+
+---
+
+# Decision: DP #488 — Docs + Cleanup (Step 13)
+
+**Date:** 2025-07-15
+**Author:** Scribe
+**Issue:** #488 — v2 Step 13: Docs + cleanup
+**Verdict:** PROPOSED — awaiting Leela + Zapp review
+
+## Scope
+
+Final housekeeping step before v2 master tracking issue closes. Rewrites docs around harness+packs, deletes all v1 references.
+
+## Deletes (7)
+
+1. `HERMES-271-TEST-PLAN.md` — v1 test plan, superseded by v2 harness tests
+2. `QUALITY-DECISION-271.md` — v1 quality decision, no longer applicable
+3. `docs-site/` v1 stepwise-generation page(s)
+4. `docs-site/` phase-based routing page(s)
+5. `docs/v1-architecture.md` (if present) — replaced by v2 architecture docs
+6. Any lingering `IntegrationKit` / `converse-model-router` / `response-processor` reference files
+7. CI references to `KICKSTART_V2` / `KICKSTART_AGENTS_SDK` feature flag docs
+
+## Creates (5)
+
+1. `docs/harness-primitives.md` — Pack, Agent, Skill, Tool, UserAction, Guardrail contracts
+2. `docs/pack-authoring-guide.md` — How to write `.agent.md`, `SKILL.md`, a tool, a UserAction, a component, a guardrail
+3. `docs/sse-event-taxonomy.md` — All SSE event types, shapes, and consumer contracts
+4. `docs/registry-lifecycle.md` — PackRegistry seal/load/enable cycle, worktree isolation, component namespacing
+5. `docs/pack-dependency-model.md` — Pack ordering, harness micro-fix (#549), phase gating table
+
+## Updates (20)
+
+- `docs/v2-implementation-brief.md` — Mark all Steps 1–12 as "implemented"; update §Guardrail to `evaluate()` shape
+- `README.md` — Remove v1 stepwise/phase references; add v2 harness quickstart
+- `CONTRIBUTING.md` — Update with v2 DP-gate process, DP template link
+- `docs-site/` navigation — Replace v1 pages with v2 pack authoring structure
+- Per-pack README stubs: `pack-core`, `pack-azure`, `pack-aks-automatic`, `pack-github`
+- `docs/architecture.md` — Rewrite to v2 harness spine + domain packs model
+- Plus misc cleanup of 13 additional inline comment / file-header references to v1 concepts
+
+## Open Questions
+
+- Q1: Is `docs-site/` Docusaurus or another SSG? (affects build + link-check CI step)
+- Q2: Should pack authoring guide live under `docs/` or `packages/harness/docs/`?
+
+## Dependencies
+
+Step 12 (#487) must merge before #488 implementation begins.
+
+## Done Criteria
+
+- Zero references to "phases", "stepwise", `IntegrationKit`, `converse-model-router`, `response-processor`, `KICKSTART_V2`, `KICKSTART_AGENTS_SDK` in any doc or source
+- Pack authoring guide complete and accurate
+- CI green on v2-rewrite after PR
+- `packages/harness/` compiles standalone (only pack-core registered)
+
+---
+
+# Milestone: DP #482 (pack-azure, Step 7) — FULLY APPROVED
+
+**Date:** 2025-07-15
+**Status:** ✅ FULLY APPROVED — Leela ✅ + Zapp ✅
+- Leela APPROVE_WITH_CONDITIONS (C1–C5) — all resolved
+- Zapp B3 final sign-off: `validateArmPath()` allowlist-first, then denylist (fail-closed order confirmed)
+- `leela:approved-dp` + `zapp:approved-dp` labels applied on issue #482
+- Implementation unblocked once PR #551 (#480 Skill Resolver) merges
+
+---
+
+# Milestone: PR #551 Opened — Step 6 Skill Resolver (#480)
+
+**Date:** 2025-07-15
+**Status:** OPEN — feat(harness) Step 6 Skill Resolver; 34 tests; Leela + Zapp code review in progress
+- Phase A: `matchesSkill()` + `validateGlobPattern()` (shell metacharacter rejection)
+- Phase B: `listSkills(agentName?)` on PackRegistry
+- Phase C: `estimateTokens` / `buildSkillPrompt` / `fitSkillsInBudget` (fail-safe on null/undefined)
+- Phase D: all utilities re-exported from `packages/harness/src/index.ts`
+- Phase E: 34 tests in `skill-resolver.test.ts`
+
+---
+
+# Milestone: DP #488 (Docs+Cleanup, Step 13) — Authored by Scribe
+
+**Date:** 2025-07-15
+**Status:** Proposed — Leela + Zapp review dispatched
+- 7 deletes (v1 docs, test plans, feature-flag references)
+- 5 creates (harness-primitives, pack-authoring-guide, sse-event-taxonomy, registry-lifecycle, pack-dependency-model)
+- 20 updates (brief, README, CONTRIBUTING, docs-site/, per-pack READMEs)
+- Depends on Step 12 (#487) merge before implementation
