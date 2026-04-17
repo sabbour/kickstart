@@ -15,6 +15,7 @@ Legend:
 <!-- entries below this line, newest at top -->
 | Date | PR | Title | Size | Impl | Review | Cycles | Outcome | Author |
 |------|-----|-------|------|------|--------|--------|---------|--------|
+| 2026-04-15 | [#279](https://github.com/sabbour/kickstart/pull/279) | docs: add extension guide for phases, tools, kits, API, and MCP | L | 2m | 100m | 1 | merged | @sabbour |
 | 2026-04-15 | [#278](https://github.com/sabbour/kickstart/pull/278) | feat: Rewrite system prompt — unified narrative with Try-AKS conversation architecture | L | 1m | 100m | 1 | merged | @sabbour |
 | 2026-04-15 | [#290](https://github.com/sabbour/kickstart/pull/290) | fix: Tabs component + unregistered component handling | M | 2m | 16m | 1 | merged | @sabbour |
 | 2026-04-15 | [#291](https://github.com/sabbour/kickstart/pull/291) | fix: action button labels + ChoicePicker primary styling | S | 1m | 6m | 1 | merged | @sabbour |
