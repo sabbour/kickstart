@@ -98,3 +98,31 @@
 **Histories updated:** zapp/history.md (10,676 → 11,344 bytes)
 **All histories below 15 KB:** bender 7,924 / fry 5,025 / hermes 11,926 / leela 6,259 / ralph 225 / scribe (this update) / zapp 11,344
 **No summarization needed**
+
+## Wave 27 — 2026-04-17
+
+**Inbox scan:** 0 new files (all worktree copies of `zapp-482-b3-final.md` already merged in wave 26)
+
+**Still absent:** `fry-482-dp-revision.md`, `zapp-482-dp-recheck.md`, `bender-pr548-fix.md`, `zapp-pr548-recheck.md`
+
+**History sizes (no summarization needed):**
+- bender 7,924 / fry 5,025 / hermes 11,926 (77%) / leela 6,259 / ralph 225 / scribe 5,216 / zapp 11,344 (73%)
+- hermes and zapp approaching 15 KB threshold (~1–2 waves out)
+
+**decisions.md:** 200,872 bytes (unchanged)
+
+**No commit (no-op wave)**
+
+## Wave 28 — 2026-04-17
+
+**Inbox scan:** 0 new files — all worktree inbox files confirmed against known-files list (39 known); no new entries in main inbox
+
+**Still absent:** `fry-483-dp.md`, `bender-pr548-fix.md`, `zapp-pr548-recheck.md`, `zapp-482-dp-recheck.md`
+
+**History sizes (no summarization needed):**
+- bender 7,924 / fry 5,025 / hermes 11,926 (77%) / leela 6,259 / ralph 225 / zapp 11,344 (73%)
+- hermes and zapp approaching threshold; summarize on next entry
+
+**decisions.md:** 200,872 bytes (unchanged)
+
+**No commit (no-op wave — committing alongside wave 27 entry)**
