@@ -1,3 +1,104 @@
+# Decision: DP Reviews — April 17, 2026
+
+**Date:** 2026-04-17T03:30:17Z
+**Author:** Leela (Lead)
+**Status:** Proposed
+
+---
+
+## DP #329 — MCP App IDE Surface (A2UI + ext-apps)
+
+**Verdict:** APPROVED WITH CONDITIONS
+
+### Architecture decisions recorded
+
+1. **Resource registration approach is canonical.** `ui://kickstart/wizard.html` via `registerAppResource` + `registerAppTool` with `RESOURCE_MIME_TYPE` from `@modelcontextprotocol/ext-apps/server` is the correct pattern per MCP Apps Quickstart §2. No bespoke protocol. This is the standard for all future MCP App registrations in this repo.
+
+2. **Single-file bundle (vite-plugin-singlefile) is required for MCP App surfaces.** `script-src 'unsafe-inline'` + `style-src 'unsafe-inline'` in the CSP meta tag is unavoidable with this bundling strategy. `connect-src 'none'` is mandatory — all communication must go through `postMessage`.
+
+3. **`event.source === window.parent` guard is required.** Under the null-origin sandbox (`allow-scripts` only, no `allow-same-origin`), `event.source` validation is the primary incoming-message check. `"*"` as targetOrigin is acceptable in the null-origin context. If any host grants `allow-same-origin`, we must switch to explicit origin checking.
+
+4. **Runtime duplication is a blocking risk.** The PoC adds `runtime/conversation.ts`, `runtime/openai-client.ts`, `runtime/session-store.ts` inside `packages/mcp-server`. These parallel the existing `packages/web/api/src/lib/openai-client.ts` and `session-store.ts`. Combined with the Agents SDK migration (#330), we could have three LLM runtime forks. The implementation issue must define the canonical client before any code lands.
+
+5. **Bundle size validation is a Slice 1 ship requirement.** `vite-plugin-singlefile` output must be measured with full React + Fluent 2 + A2UI before the PR merges. Any known host size limits must be documented.
+
+### Conditions on implementation issue
+- Define canonical LLM client / session infrastructure (no third fork)
+- Bundle size validation added to acceptance criteria
+- A2UI surface disabled (or host serialization documented) while tool call is in flight
+- Error state defined and rendered when `tools/call` fails
+- S7 text-only fallback covered by tests
+
+---
+
+## DP #330 — OpenAI Agents SDK Migration
+
+**Verdict:** APPROVED (architecture, 2026-04-17T01:53Z) + CLOSED OUT this session
+
+### Closeout decisions recorded
+
+1. **Option B (hybrid route planner + manager agent) is the adopted migration shape.** Not a loop-only swap (Option A — rejected) and not a full handoff-first rewrite (Option C — deferred). The SDK handles run/tool/session/streaming/tracing; product code handles route policy, generation sequencing, and A2UI output.
+
+2. **`phaseComplete`/`filesComplete` model flags are retired.** Server-authored route state replaces them. Model-emitted booleans are no longer the main control plane. This is a hard contract change — backends must emit explicit route metadata.
+
+3. **Generate step orchestration stays custom.** The SDK does not get to invent artifact routing. Workspace-first generation (#326/#327/#328) is a constraint, not an option.
+
+4. **Implementation sequence is locked.** Gate (DP #330) → arch spike + Azure compat → backend runtime (#445, Bender) → chat/workspace UI (#446, Fry) → cleanup. UI work cannot start until backend contract is stable.
+
+5. **Follow-on issues created:**
+   - **#445** — Backend SDK adapter (Bender), v1.0.0. Includes all Zapp security conditions as acceptance criteria.
+   - **#446** — Chat/workspace UI adaptation (Fry), v1.0.0. Depends on #445.
+
+---
+
+# Zapp Decision — DP #329 MCP App IDE Surface Security Review
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Issue:** #329
+**Status:** APPROVE WITH CONDITIONS
+
+## Decision
+
+DP #329 is approved to proceed **only with mandatory implementation-time controls**. The architecture is directionally sound, but its current trust model is too dependent on host behavior and must be hardened with explicit server-side authorization, message validation, and payload safety limits.
+
+## Findings by Severity
+
+1. **🔴 High — MCP tool exposure from iframe runtime**
+   - The app runtime uses `app.callServerTool()` and the server exposes multiple tools; without server-side allowlisting for app-originated calls, a compromised iframe can attempt broader tool access.
+
+2. **🟠 Major — postMessage trust model under host variance**
+   - `"*"` target origin in null-origin sandbox can be acceptable, but only with strict message/source/session validation. If any host enables `allow-same-origin`, explicit `event.origin` allowlisting becomes mandatory.
+
+3. **🟠 Major — CSP missing in PoC; must be required in production**
+   - Security posture relies on sandbox + renderer discipline. CSP must be baked into shipped app as defense-in-depth, not optional documentation.
+
+4. **🟠 Major — A2UI payload parsing lacks strict bounds**
+   - Unbounded payload/component processing can enable UI tampering or render-path DoS.
+
+5. **🟡 Minor — Session ownership/replay protections not explicit**
+   - Session-bound authz checks and replay-resistant message semantics should be explicitly required.
+
+6. **🟢 Low — Credential handling generally sound**
+   - API keys stay server-side; retain strict no-token-in-iframe invariant and redaction guarantees.
+
+## Required Security Conditions (Implementation Acceptance Criteria)
+
+1. Server-enforced allowlist of app-callable MCP tools with default-deny behavior.
+2. Mode-aware message verification:
+   - null-origin sandbox: strict source + schema + nonce/session binding.
+   - same-origin sandbox: strict origin allowlist + source validation.
+3. Mandatory restrictive CSP in bundled app, verified in CI.
+4. Strict A2UI validation: schema checks, payload size limits, component count/depth limits, fail-closed fallback.
+5. Per-session principal/channel ownership checks and replay/audit protections on every app tool call.
+6. Security compatibility matrix across VS Code, Claude Code, and ChatGPT hosts.
+
+## Outcome
+
+Security gate for the **design proposal** is conditionally clear. Final implementation PR(s) must demonstrate all conditions with tests/evidence before receiving Zapp implementation sign-off.
+
+---
+
 ### 2026-04-17: Review gate via labels, not GitHub reviews
 **By:** Ahmed Sabbour (via Leela)
 **What:** Squad PRs use leela:approved + zapp:approved labels as the merge gate, enforced by squad/review-gate status check (squad-review-gate.yml). Required GitHub review approvals removed — authors cannot approve their own PRs.

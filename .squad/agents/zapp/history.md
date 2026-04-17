@@ -48,3 +48,33 @@
 5. Dependency governance — pin SDK version, maintain lockfile integrity, run dependency/security scans, define upgrade/rollback procedure
 
 **Consequence:** Security gate clear when conditions added as implementation acceptance criteria and verified by tests.
+
+## 2026-04-17 DP #329 Security Review (Round 6 – MCP App IDE Surface)
+
+**Review Date:** 2026-04-17T03:30:17Z  
+**Issue:** #329 — DP: MCP App IDE surface (A2UI + ext-apps)
+**DP:** Single-file React bundle deployed as MCP App resource, zero-trust postMessage sandbox
+
+**Decision:** APPROVE WITH CONDITIONS
+
+**Findings by Severity:**
+- 🔴 **High:** MCP tool exposure from iframe runtime — without server-side allowlisting for app-originated calls, compromised iframe can attempt broader tool access
+- 🟠 **Major (3):**
+  1. postMessage trust model under host variance — `"*"` targetOrigin acceptable in null-origin sandbox only; `allow-same-origin` hosts must use explicit `event.origin` allowlist
+  2. CSP missing in PoC — must be required in production as defense-in-depth
+  3. A2UI payload parsing lacks strict bounds — unbounded component processing enables UI tampering / render-path DoS
+- 🟡 **Minor:** Session ownership/replay protections not explicit — should be requirement
+- 🟢 **Low:** Credential handling generally sound — API keys server-side, no token-in-iframe invariant enforced
+
+**Required Security Conditions (implementation acceptance criteria):**
+1. Server-enforced allowlist of app-callable MCP tools with default-deny behavior
+2. Mode-aware message verification:
+   - null-origin sandbox: strict source + schema + nonce/session binding
+   - same-origin sandbox: strict origin allowlist + source validation
+3. Mandatory restrictive CSP in bundled app, verified in CI
+4. Strict A2UI validation: schema checks, payload size limits, component count/depth limits, fail-closed fallback
+5. Per-session principal/channel ownership checks and replay/audit protections on every app tool call
+6. Security compatibility matrix across VS Code, Claude Code, ChatGPT hosts
+
+**Gate Status:** Conditionally clear for design proposal. Final implementation PRs must demonstrate all conditions with tests/evidence before Zapp sign-off.
+- 2026-04-17: DP #329 (MCP App IDE surface) approved with conditions; key risks were app-tool overexposure, host-variant postMessage trust, missing mandatory CSP, and unbounded A2UI payload validation.
