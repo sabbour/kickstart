@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #437 "fix(core): inject appDefinition, azureContext, repoInfo into system prompt" | S | impl=0m | review=0m | cycles=1 | merged | @sabbour
+
 - 2026-04-17 | #438 "fix(core): make vocabulary arrays readonly; keep as internal-only exports" | S | impl=1m | review=0m | cycles=1 | merged | @sabbour
 
 - 2026-04-17 | #440 "docs: fix stale skill-path claims in architecture docs" | S | impl=1m | review=0m | cycles=1 | merged | @sabbour-squad-frontend[bot]
