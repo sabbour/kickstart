@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #444 "fix(docs): correct 19 API reference inaccuracies vs actual implementation" | M | impl=0m | review=8m | cycles=1 | merged | @sabbour-squad-frontend[bot]
+
 - 2026-04-17 | #447 "feat(api): OpenAI Agents SDK backend runtime adapter" | XL | impl=39m | review=0m | cycles=1 | merged | @sabbour
 
 - 2026-04-17 | #455 "feat(web): Agents SDK UI adaptation — route state consumption + E2E" | L | impl=98m | review=23m | cycles=1 | merged | @sabbour-squad-frontend[bot]
