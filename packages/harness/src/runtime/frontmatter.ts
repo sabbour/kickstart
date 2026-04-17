@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { parseDocument } from 'yaml';
 
@@ -26,7 +26,13 @@ export function confinePath(baseDir: string, filePath: string): string {
   if (!stat?.isFile()) {
     throw new Error(`Expected a file inside ${baseDir}: ${filePath}`);
   }
-  return normalizedPath;
+  // Resolve symlinks so a symlink inside the pack dir cannot escape the pack root.
+  const realBase = realpathSync(resolve(baseDir));
+  const realPath = realpathSync(normalizedPath);
+  if (!realPath.startsWith(realBase + sep)) {
+    throw new Error(`Path confinement violation: ${filePath} resolves outside pack root`);
+  }
+  return realPath;
 }
 
 export function parseFrontmatter(content: string): ParsedFrontmatter {
