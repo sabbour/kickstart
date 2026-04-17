@@ -31,7 +31,7 @@ import type {
   AzureResource,
   AzureSubscription,
   AzureResourceGroup,
-} from '@kickstart/core';
+} from '@kickstart/harness';
 import { getAzureSession } from '../../services/azure-auth';
 import {
   persistAzureTarget,

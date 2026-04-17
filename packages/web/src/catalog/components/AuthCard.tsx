@@ -16,7 +16,7 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import type { AzureARMConnector } from "@kickstart/core";
+import type { AzureARMConnector } from "@kickstart/harness";
 import { useAPIConnector } from "../../contexts/APIConnectorContext";
 import {
   getGitHubSession,

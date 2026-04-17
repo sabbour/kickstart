@@ -4,8 +4,8 @@ import {
   AzureARMConnector,
   GitHubConnector,
   PricingConnector,
-} from '@kickstart/core';
-import type { APIConnector } from '@kickstart/core';
+} from '@kickstart/harness';
+import type { APIConnector } from '@kickstart/harness';
 
 interface APIConnectorContextValue {
   registry: APIConnectorRegistry;

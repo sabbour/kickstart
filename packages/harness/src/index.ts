@@ -63,6 +63,7 @@ export class APIConnectorRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   register(_connector: any): void {}
   get(_name: string): APIConnector | undefined { return undefined; }
+  names(): string[] { return []; }
 }
 
 // AzureARMConnector stub — replaced by pack-azure in Step 7

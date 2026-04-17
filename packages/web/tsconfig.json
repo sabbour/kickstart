@@ -15,8 +15,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@kickstart/harness": ["../harness/src/index.ts"],
-      "@kickstart/core": ["../harness/src/index.ts"]
+      "@kickstart/harness": ["../harness/src/index.ts"]
     }
   },
   "include": ["src"],
