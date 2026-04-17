@@ -20,6 +20,7 @@ Legend:
 <!-- entries below this line, newest at top -->
 
 - 2026-04-17 | #392 "feat(playground): Workspace tab, Codespaces buttons, Ideas cleanup" | XL | impl=0m | review=280m | cycles=1 | merged | @sabbour
+- 2026-04-16 | #390 "fix(e2e): update playground AuthCard tests to match reorganized tab layout" | S | impl=82m | review=117m | cycles=1 | merged | @sabbour
 
 - 2026-04-16 | #391 "test(e2e): harden Playwright E2E tests — auth route mock + openScenario robustness" | S | impl=0m | review=119m | cycles=1 | merged | @sabbour
 
