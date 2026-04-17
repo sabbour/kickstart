@@ -194,7 +194,7 @@ export const githubKit: unknown = {};
 
 // ── Runtime function stubs — replaced by harness runtime in Steps 3-5 ───────
 export function buildSystemPrompt(_opts: unknown): string { return 'You are Kickstart, an AI-guided deployment assistant.'; }
-export function resolveSkills(_phase: unknown, _skills: unknown[]): unknown[] { return []; }
+// resolveSkills is now exported from ./runtime/skill-resolver (Step 6b)
 export function resolveConversationSkills(_ctx: unknown): unknown[] { return []; }
 export function processResponse(_text: string): unknown { return {}; }
 export function getPhaseDefinition(_phase: unknown): { label: string; description: string; nextPhase?: Phase } {
@@ -357,3 +357,5 @@ export type {
 export { estimateTokens, buildSkillPrompt, fitSkillsInBudget } from './runtime/token-budget.js';
 export { matchesSkill } from './runtime/skill-matcher.js';
 export { PackRegistry } from './runtime/registry.js';
+export { resolveSkills } from './runtime/skill-resolver.js';
+export type { ResolveSkillsOptions } from './runtime/skill-resolver.js';

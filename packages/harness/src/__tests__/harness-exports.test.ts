@@ -166,7 +166,7 @@ describe('runtime function stubs', () => {
   });
 
   it('resolveSkills returns an array', () => {
-    expect(Array.isArray(resolveSkills(Phase.Discover, []))).toBe(true);
+    expect(Array.isArray(resolveSkills([], { agentName: 'agent', userMessage: '', budgetTokens: 9999 }))).toBe(true);
   });
 
   it('processResponse returns an object', () => {
