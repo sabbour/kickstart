@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #112 "chore: bump version to v0.4.0" | S | impl=0m | review=5m | cycles=1 | merged | @sabbour
