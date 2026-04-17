@@ -118,3 +118,17 @@ Five security conditions must be satisfied before DP #482 can be re-reviewed:
 5. Gate playground stubs on `KICKSTART_PLAYGROUND=true`; fail closed in non-playground environments
 
 Passes: `resultSchema` coverage correct on all 6 user actions.
+
+## 2026-04-17 — PR #548 Final Re-check (C2 DNS Rebinding)
+
+**Verdict:** APPROVED — `zapp:approved` applied
+
+Scope: C2 (SSRF DNS rebinding) only — the final outstanding blocker on PR #548.
+Evidence at commit `cef36b3`:
+- `resolveAndCheckHostname()` pre-fetches via `dns.resolve4()` + `dns.resolve6()`, checks all returned IPs against private/loopback regex, throws before `fetch()` on match.
+- `fetch()` uses `redirect: 'error'` — redirect-based SSRF remains blocked.
+- HTTPS-only enforcement still present in `assertSafeUrl()`.
+- DNS rebinding tests cover public→private IPv4 (`192.168.1.1`) and public→loopback IPv6 (`::1`); verify `fetch()` not called on rebinding detection.
+- `npm test -- --run fetch_webpage.test.ts` passed.
+
+PR #548 is now security-cleared. `zapp:approved` applied.

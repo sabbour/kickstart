@@ -3440,3 +3440,38 @@ Not ready for Zapp approval yet. Once the DP is amended to define the credential
 **What:** AzureARMConnector always proxies through /api/arm-proxy (CORS constraint). GitHubConnector splits: reads direct, writes proxied for token security. Exception: createPullRequest() calls api.github.com directly — flagged as technical debt.
 **Why:** ARM management API does not allow browser CORS; GitHub reads are public/CORS-enabled; GitHub writes need token isolation. createPullRequest() direct call is a known inconsistency to be addressed.
 **Impact:** Any new connector methods that write data MUST use the server proxy pattern.
+
+---
+# Zapp Decision — PR #548 Final Re-check
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**PR:** #548
+**Commit Reviewed:** `cef36b3`
+**Status:** APPROVED
+
+## Scope
+
+Final re-check of blocker **C2 — SSRF DNS rebinding** only.
+
+## Verdict
+
+C2 is **RESOLVED**.
+
+## Evidence
+
+1. `packages/pack-core/src/tools/fetch_webpage.ts` now performs **pre-fetch DNS resolution** with `resolveAndCheckHostname(hostname)`.
+2. That helper resolves **both** `dns.resolve4()` and `dns.resolve6()`.
+3. It checks **each returned address** against a private/loopback regex and throws before `fetch()` on a match.
+4. `fetch()` still uses `redirect: 'error'`, so redirect-based SSRF remains blocked.
+5. HTTPS-only enforcement is still present in `assertSafeUrl()`.
+6. `packages/pack-core/src/__tests__/tools/fetch_webpage.test.ts` includes DNS rebinding tests for:
+   - public hostname → private IPv4 (`192.168.1.1`)
+   - public hostname → loopback IPv6 (`::1`)
+   - verification that `fetch()` is **not** called when rebinding is detected
+7. Validation run passed:
+   - `npm test -- --run packages/pack-core/src/__tests__/tools/fetch_webpage.test.ts`
+
+## Outcome
+
+The DNS rebinding attack path called out in blocker C2 is closed on PR #548. `zapp:approved` can be applied.

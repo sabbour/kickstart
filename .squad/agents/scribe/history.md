@@ -18,207 +18,60 @@
 
 ## Learnings
 
-- **2026-04-09 — Orchestration & decision merge workflow:** Created 3 orchestration logs (B-24 action endpoint, B-13 tool system, Hermes tool tests). Merged 3 inbox decision files to decisions.md: changesets versioning, action session store pattern, tool registry extension. Deleted inbox files after merge. Updated Bender and Hermes histories with task outcomes and learnings. Created summary documents for large histories (Bender 42KB, Fry 80KB) as orientation aids. Pattern: Always timestamp in UTC, format decisions with author/date/status/rationale/impact, cross-reference related tasks and decisions.
+- **2026-04-09:** Pattern: always timestamp UTC, format decisions with author/date/status/rationale/impact, cross-reference related tasks. Summarize histories >15 KB immediately.
+- **Wave scanning:** `grep -c` can return misleading 0 when file content exists under different header text — always verify with `grep -n` or `tail` when unsure.
+- **Wave numbering:** Internal wave counter (23+) differs from user-labelled waves (1–22). Use "Wave N" consistently in commits; match user label in commit message when given.
+- **Worktree inbox stale files:** Many worktrees carry copies of already-merged inbox files. Verify by content grep in decisions.md, not just filename presence.
+- **Scribe charter:** `.squad/decisions/inbox/` is gitignored — never `git add` inbox files. Stage only: decisions.md, agents/*/history.md, agents/*/history-archive.md, log/*, orchestration-log/*.
 
-## 2026-04-09T20:57Z — Wave 10 P0 Finalization
+## Archived Waves Summary (Waves 3–17)
 
-Merged 6 decision inbox entries into `decisions.md`:
-- B-25: handleAction unified action model
-- B-11: api: action routing convention
-- B-17: defaultArtifactStore singleton pattern
-- B-16: CORS proxy authorization policies
-- B-15: phasePrompts field on IntegrationKit
-- B-10: IntegrationKit abstraction (AzureKit/GitHubKit)
+*Full detail in `.squad/agents/scribe/history-archive.md`*
 
-All 9 spawn manifest tasks reported complete and merged to main.
-Documented orchestration log and session log summary.
-Ready for QA handoff.
-
----
-
-**2026-04-15T22:40:15Z — Scribe Orchestration**:
-- Inbox merged: 10 files, 48.8 KB
-- decisions.md appended (pre: 71.1 KB, post: TBD)
-- No archival needed (all entries ≤ 7 days)
-- 3 orchestration logs written (Zapp, Hermes, Copilot)
-- 1 session log written
-- All agent history files < 15 KB (no summarization)
-
-## 2026-04-17 v2 kickoff session — Leela + Zapp spawned for DP and security review
-
-- Leela: Creating master tracking issue + design proposal + 13 sub-issues
-- Zapp: Upfront security architecture review
-- Session log recorded (2026-04-17T11-06-session-v2-kickoff.md)
-- Orchestration logs recorded (Leela + Zapp)
-
-## 2026-04-17T12:06:45Z — Scribe Session: v2 Sprint Kickoff + #474 DP Cycle
-
-- **Inbox merged:** 8 files (connector ADR, Leela v2 DP review, Leela sprint plan, Zapp v2 security review, 3 Copilot directives, Fry #474 cut line)
-- **decisions.md:** 100,900 → 112,298 bytes. No archival needed (all entries within 7 days).
-- **Orchestration logs written:** leela, fry, bender, zapp, coordinator (all 2026-04-17T12-06-45Z)
-- **Session log written:** `2026-04-17T12-06-45Z-v2-sprint-kickoff.md`
-- **Histories updated:** leela, fry, bender, zapp, hermes
-- **History summarization:** fry (29,842 bytes), leela (21,435 bytes), bender (17,814 bytes) — all exceed 15 KB; summarization in progress
-
-## 2026-04-17 Wave 3 — Inbox merge
-
-Merged 11 new decision files from worktree inboxes (mcp-apps-concept-smoke, docs-rewrite, leela-351, zapp-kickstart-app-security, 474-step1-nuke-v1 ×5, 475-harness-types-review, 476-security-review). decisions.md: 116,926 → 128,677 bytes. Updated histories: bender, leela, zapp, fry. All history files below 15 KB — no summarization needed.
-
-## Wave 4 — 2026-04-17 Inbox merge
-
-Merged 2 new files into decisions.md (bender-475-a2ui-discriminator + leela-477-dp-review). Also cleared 13 wave-3 residual inbox files that were left undeleted. decisions.md: 128,677 → 133,820 bytes. All history files below 15 KB — no summarization needed.
-
-## Wave 5 — 2026-05-28 Inbox sweep (no new decisions)
-
-Swept main inbox and all worktrees (including new: 477-security-review, 544-pr-head, 544-security-review). All 13 inbox files were wave-3/4 residuals or already-merged entries — no new decisions found. Cleared inbox. Pending: zapp-477-dp-review, leela-478-dp-review, zapp-478-dp-review — not yet filed in any worktree.
-
-## Wave 6 — 2026-04-17 Inbox merge
-
-Merged 5 new files from worktree inboxes (477-security-review, 478-security-review, 544-security-review ×2, 476-registry-loaders). decisions.md: 133,820 → 139,295 bytes. Updated histories: bender, zapp. All history files below 15 KB — no summarization needed.
-
-## Wave 7 — 2026-05-28 Inbox sweep (no new decisions)
-
-Swept main inbox and all worktrees (new: bender-deps, bender-sec-san, ceremony-reference-redirect, copilot-471-feedback, dompurify-monaco-fix, dompurify-monaco-override, fry-355, hermes-heartbeat-validation, pr-545-review). All files were known-merged stale entries (hermes-connector-execution-adr, bender-azure-auth-handler-fix, bender-ci-paths-ignore-fix, leela-271-deployment-flow variants, leela-e2e-sprint-plan, leela-sprint-planning-v061). No new decisions. decisions.md unchanged at 139,295 bytes. Pending: leela-478-dp-review — not yet filed in any worktree.
-
-## Wave 8 (user-labelled Wave 5) — 2026-06-10 Inbox merge
-
-Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v2 Step 1 all 8 conditions clear, tsc debt gate recorded) and `zapp-pr545-review.md` (PR #545 REQUEST CHANGES, legacy `handoff` phase in `chat-a2ui.ts` blocking). decisions.md: 139,295 → 143,112 bytes. Histories updated: leela, zapp. No history files exceed 15 KB threshold (leela at 14,833 bytes — nearest).
-
-## Wave 9 — 2026-06-10 Merge cycle
-
-- Inbox: `leela-pr545-review.md` (PR #545 REQUEST CHANGES — 2 blockers: missing `a2uiEmissions` array, dual-registration on `Pack`), `leela-479-dp-review.md` (#479 Runner+SSE APPROVE_WITH_CONDITIONS, 5 gated conditions).
-- decisions.md: 143,112 → 148,557 bytes (+2 files).
-- Residuals cleared: `leela-pr544-review.md`, `zapp-pr545-review.md` (already merged in wave 5).
-- Leela history exceeded 15 KB (17,457 bytes) — summarised: 17,457 → 5,683 bytes; pre-2026-06-10 DP reviews archived to `history-archive.md`.
-- scribe/history.md updated; no other histories updated this wave.
-
-## Wave 10 — 2026-06-10 Merge cycle (within same session)
-
-- Inbox: `leela-480-dp-review.md` (#480 Skill Resolver APPROVE_WITH_CONDITIONS, 2 blockers), `leela-pr546-review.md` (PR #546 Step 3 APPROVED), `zapp-pr546-review.md` (PR #546 security REQUEST CHANGES — symlink path bypass).
-- decisions.md: 148,557 → 159,647 bytes (+3 files, +11,090 bytes).
-- leela history updated (8,693 bytes; under 15 KB threshold).
-- zapp history updated (14,603 bytes; approaching threshold — watch next cycle).
-- No summarisation needed this wave.
-
-## Wave 11 — 2026-06-10 Merge cycle (same session)
-
-- Inbox: `leela-pr545-recheck.md` (PR #545 APPROVED re-verification after 3 fix commits).
-- decisions.md: 159,647 → 161,186 bytes (+1 file).
-- leela history updated (9,959 bytes; under threshold).
-- Also resolved: 2 accidentally-tracked inbox files untracked (`leela-479-dp-review.md`, `leela-pr545-review.md`) from 87ff63b/c84d9f3 commits.
-
-## Wave 12 — 2026-04-17 Merge cycle (wave 6 user-named)
-
-- Swept worktrees: found `zapp-479-dp-review.md` in `479-security-review/`, `zapp-480-dp-review.md` in `480-security-review/`.
-- decisions.md: 161,186 → 167,271 bytes (+2 files).
-- Zapp history exceeded 15 KB (16,400 bytes) — summarised: 16,400 → 4,106 bytes; all older review sections (DP #329–#478, PRs #444–#546) archived to new `history-archive.md` (4,125 bytes).
-- scribe/history.md updated; no other histories updated this wave.
-
-## Wave 13 — 2026-06-10
-
-**Files merged:** 2 (`zapp-pr545-recheck.md`, `zapp-pr546-recheck.md`)
-**decisions.md:** 161,186 → 169,430 bytes
-**Histories updated:** zapp (4,106 → 4,803 bytes)
-**Inbox cleared:** worktrees `545-security-review`, `546-security-review`
-**Commit:** 6942994
-
-## Wave 8 — 2026-06-10 (no-op)
-
-**Files merged:** 0
-**decisions.md:** 169,430 bytes (unchanged)
-**Histories:** fry 13,121 bytes, hermes 11,251 bytes — both below 15,360 threshold; no summarisation needed
-**Sweep result:** All 31 worktree inbox filenames confirmed already merged. Main inbox empty. No new files found.
-**Commit:** (none — no changes)
-
-## Wave 15 — 2026-06-10 (no-op)
-
-**Files merged:** 0
-**decisions.md:** 172,046 bytes (unchanged)
-**Sweep result:** Main inbox empty. All 31 worktree filenames re-verified by content grep in decisions.md — all present. No new files found in any worktree.
-**History sizes:** bender 7,924 / fry 13,121 (85% of 15K — monitor) / hermes 11,251 / leela 10,698 / ralph 225 / scribe 8,681 / zapp 5,265 — no summarisation needed.
-**Commit:** (none — no changes to Scribe-owned files)
-
-## Wave 14 (Final) — 2026-04-17
-
-**New files merged:** 0 (all inbox clear; all 31 worktree filenames confirmed already merged)
-**Merge milestone recorded:** PRs #544, #545, #546 → v2-rewrite (Steps 1–3 complete)
-**decisions.md:** 169,430 → 172,046 bytes
-**Histories updated:** leela (10,698), zapp (5,265), bender (7,924) — all below 15,360 threshold
-**History summarisation:** none needed
-**All agents:** bender 7,924 / fry 13,121 / hermes 11,251 / leela 10,698 / ralph 225 / scribe 8,xxx / zapp 5,265
-
-## Wave 17 — 2026-06-10 (no-op)
-
-**Files merged:** 0 — `leela-pr547` and `zapp-pr547` still absent from all inboxes and worktrees.
-**Worktrees checked:** all 37 (same 31 known filenames, all already merged).
-**decisions.md:** 172,046 bytes (unchanged)
-**History sizes:** fry 13,121 (85%) / hermes 11,251 (73%) / leela 10,698 (69%) — no threshold breaches.
-**Commit:** (none — no changes)
-
-## Wave 16 — 2026-06-10 (no-op)
-
-**Files merged:** 0 — `leela-pr547` and `zapp-pr547` have not yet landed in any inbox or worktree.
-**decisions.md:** 172,046 bytes (unchanged)
-**New worktrees checked:** 477-pack-core, 478-playground, 545-pr-head, fry-332, fry-diagram-editor, leela-380 — none have inbox files.
-**History sizes:** fry 13,121 (85%) / hermes 11,251 (73%) / leela 10,698 (69%) — no threshold breaches.
-**Commit:** (none — no changes)
+- **Waves 3–6 (2026-04-17):** decisions.md grew from 112,298 → 139,295 bytes across merges of 20+ inbox files (v2 kickoff, #474–#477 DP/security reviews, PR #544 reviews, Step 1–3 early pipeline).
+- **Waves 7, 15, 16, 17 (no-ops):** Inbox empty; all worktree filenames re-verified as already merged.
+- **Waves 8–13 (2026-06-10):** Merged PR #544/545/546 reviews, DP #479/480 reviews, rechecks. Summarised leela history (17,457→5,683B) and zapp history (16,400→4,106B). decisions.md: 139,295 → 169,430 bytes.
+- **Wave 14 (Final):** PRs #544/#545/#546 merge milestone recorded; decisions.md → 172,046 bytes.
 
 ## Wave 18 — 2026-04-17
 
 **Files merged:** 3 (`leela-pr547-review`, `zapp-pr547-review`, `zapp-pr547-recheck`)
-**decisions.md:** 172,046 → 177,571 bytes (+5,525)
-**PR #547 summary:** Leela APPROVED; Zapp initially BLOCKED (4 findings), then APPROVED at `4eaa9ee`. PR #547 merged → v2-rewrite (Step 4a complete). Test debt noted: mcp-server action tests expect old `discover → design` phase order.
-**Histories updated:** leela (12,843 bytes), zapp (6,972 bytes) — both below 15,360 threshold
-**Worktrees checked:** 547-security-review ← new worktree with `zapp-pr547-recheck.md`
-**No summarisation needed**
+**decisions.md:** 172,046 → 177,571 bytes
+**Summary:** Leela APPROVED PR #547; Zapp initially BLOCKED (4 findings), then APPROVED at `4eaa9ee`. PR #547 merged → v2-rewrite (Step 4a complete).
 
 ## Wave 19 — 2026-06-10
 
-**Files merged:** 1 (`leela-pr548-review.md`)
-**decisions.md:** 177,571 → 179,382 bytes (+1,811)
-**PR #548 summary:** Leela APPROVED pack-core (closes #477) with conditions — C4 path bug (non-blocking, it.todo), `search_components.ts` orphan must be wired/removed before merge, `registration.test.ts` mock must use real import on activation; 40 components (ArchitectureDiagram bonus accepted); `leela:approved` applied.
-**Histories:** leela self-logged PR #548 entry (12,843 → 13,971 bytes, 91% threshold — monitor); fry 13,121 (85%) — both below 15,360; no summarisation needed.
-**Also committed:** fry/history.md +52 lines (DP #478/#479/#480), config.json (zapp→gpt-5.4, scribe→claude-sonnet-4.6), decisions-archive.md (+FSM removal entry), bender/step4-6-brief.md (Steps 4–6 routing brief), identity/now.md (Ralph status update)
-**Commit:** (pending)
+**Files merged:** 1 (`leela-pr548-review.md` — Leela APPROVED pack-core PR #548 with conditions)
+**decisions.md:** 177,571 → 179,382 bytes
+**Also committed:** fry/history.md +52 lines, config.json model updates, decisions-archive.md FSM entry, bender/step4-6-brief.md, identity/now.md
 
 ## Wave 20 — 2026-04-17
 
-**Files merged:** 1 (`zapp-pr548-review.md` — PR #548 pack-core BLOCKED, 3 high security findings)
-**Residuals deleted:** `leela-pr548-review.md` (already merged in wave 19)
+**Files merged:** 1 (`zapp-pr548-review.md` — PR #548 BLOCKED, 3 high findings: symlink confinement, SSRF, guardrails not enforced)
 **decisions.md:** 179,382 → 182,061 bytes (+2,679)
-**Histories summarised:**
-- leela/history.md: 13,971 → 4,735 bytes (pre-#548 DP/PR review sections archived to history-archive.md)
-- fry/history.md: 14,982 → 4,506 bytes (#474 impl + individual DP detail sections archived to history-archive.md)
-**Histories updated:** zapp (6,972 → 8,199 bytes — PR #548 blocked verdict)
-**No threshold breaches after summarisation:** leela 4,735 / fry 4,506 / zapp 8,199 / hermes 11,251 / bender 7,924 / scribe (this update)
+**Histories summarised:** leela 13,971→4,735B, fry 14,982→4,506B
 
 ## Wave 21 — 2026-04-17
 
-**Files merged:** 1 (`leela-482-dp-review.md` — DP #482 pack-azure Step 7 APPROVE_WITH_CONDITIONS)
-**Checked / skipped:** `zapp-pr548-review.md` (worktree `.worktrees/548-security-review/`) — already in decisions.md (line 3211+)
-**decisions.md:** 179,382 → 190,348 bytes (+leela-482-dp-review.md, +leela-pr548-review.md from prior staged work)
-**Histories updated:**
-- leela/history.md: appended DP #482 pack-azure APPROVE_WITH_CONDITIONS entry (4,735 → 6,259 bytes)
-- scribe/history.md: this entry
-**No threshold breaches:** leela 6,259 / fry 4,506 / zapp 8,199 / hermes 11,251 / bender 7,924 / scribe (post-update)
-**Inbox deleted:** none (leela-482-dp-review.md is gitignored)
+**Files merged:** 1 (`leela-482-dp-review.md` — DP #482 pack-azure APPROVE_WITH_CONDITIONS, 5 conditions)
+**decisions.md:** ~182,061 → 195,588 bytes (also includes zapp-482-dp-review from prior staged work)
 
 ## Wave 22 — 2026-04-17
 
 **Files merged:** 1 (`zapp-482-dp-review.md` — DP #482 pack-azure BLOCKED, 5 security conditions)
-**Checked / skipped:** `zapp-pr548-recheck.md`, `bender-pr548-fix.md` — not yet landed in any inbox or worktree
-**Inbox cleaned:** deleted stale `leela-482-dp-review.md` residual (already merged wave 21)
-**decisions.md:** 190,348 → 195,588 bytes (+5,240)
+**decisions.md:** 190,348 → 195,588 bytes
 **Histories updated:** zapp (8,199 → 9,221 bytes)
-**No threshold breaches:** all histories below 15,360
 
 ## Wave 23 — 2026-04-17
 
-**Files merged:** 1 (`hermes-connector-execution-adr.md` — Connector execution model client vs proxy ADR, by Hermes + Leela)
-**Checked / skipped:** `zapp-pr548-recheck.md`, `bender-pr548-fix.md` — not yet landed; `zapp-482-dp-review.md` — already merged (wave 22)
-**decisions.md:** 195,588 → 196,437 bytes (+849)
-**Histories updated:**
-- hermes/history.md: Connector ADR entry appended (11,251 → 11,926 bytes)
-- scribe/history.md: this entry
-**No threshold breaches:** hermes 11,926 / scribe (post-update ~13,784) — both under 15,360
-**Inbox cleaned:** n/a (all inbox files gitignored; no tracked copies to remove)
+**Files merged:** 1 (`hermes-connector-execution-adr.md` — Connector execution model client vs proxy ADR)
+**decisions.md:** 195,588 → 196,437 bytes
+**Histories updated:** hermes (11,251 → 11,926 bytes)
+
+## Wave 24 — 2026-04-17
+
+**Files merged:** 1 (`zapp-pr548-final.md` — PR #548 C2 DNS rebinding RESOLVED, `zapp:approved` applied)
+**decisions.md:** 196,437 → 197,712 bytes
+**Histories updated:** zapp (9,221 → 10,023 bytes — final PR #548 approval)
+**Scribe history summarised:** 14,126 → compact (Waves 3–17 archived to history-archive.md)
+**Checked / absent:** `fry-482-dp-revision.md`, `zapp-482-dp-recheck.md` — not yet landed
