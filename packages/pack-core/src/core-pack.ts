@@ -8,6 +8,7 @@ import { readFileTool } from './tools/read_file.js';
 import { writeFileTool } from './tools/write_file.js';
 import { listFilesTool } from './tools/list_files.js';
 import { validateArtifactsTool } from './tools/validate_artifacts.js';
+import { createSearchComponentsTool } from './tools/search_components.js';
 
 // Guardrails
 import { tokenBudgetGuardrail } from './guardrails/token_budget.js';
@@ -56,6 +57,11 @@ const richComponents: ReactComponentImplementation[] = [
   SummaryCard,
 ];
 
+const coreComponents: ComponentContribution[] = [
+  ...fluentOverrides.map(toContrib),
+  ...richComponents.map(toContrib),
+];
+
 export const corePack: Pack = {
   name: 'core',
   version: '0.1.0',
@@ -71,12 +77,10 @@ export const corePack: Pack = {
     writeFileTool,
     listFilesTool,
     validateArtifactsTool,
+    createSearchComponentsTool({ components: coreComponents }),
   ],
 
-  components: [
-    ...fluentOverrides.map(toContrib),
-    ...richComponents.map(toContrib),
-  ],
+  components: coreComponents,
 
   guardrails: [
     tokenBudgetGuardrail,

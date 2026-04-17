@@ -23,7 +23,7 @@ import path from 'node:path';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const AGENTS_DIR = path.resolve(__dirname, '../../agents');
+const AGENTS_DIR = path.resolve(__dirname, '../agents');
 const AGENT_NAMES = ['core.triage', 'core.codesmith', 'core.reviewer'];
 
 /** Regex for the pack.verb_noun tool-name format required by the DP §6a. */
