@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #291 "fix: action button labels + ChoicePicker primary styling" | S | impl=1m | review=6m | cycles=1 | merged | @sabbour
