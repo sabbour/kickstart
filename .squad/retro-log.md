@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #179 "fix: parse SSE event types and JSON envelope for A2UI rendering" | S | impl=3m | review=5m | cycles=1 | merged | @sabbour
