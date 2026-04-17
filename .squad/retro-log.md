@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #227 "feat: public Copilot skill system — build-time bundling + security pipeline (#186)" | XL | impl=1m | review=6m | cycles=1 | merged | @sabbour
