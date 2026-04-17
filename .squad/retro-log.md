@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #135 "feat: add debug metadata to SSE streaming responses (v0.5.2)" | L | impl=1m | review=4m | cycles=1 | merged | @sabbour
