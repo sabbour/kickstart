@@ -376,14 +376,7 @@ describe('cancellation queue policy', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    let resolveFirst: (() => void) | null = null;
-    fetchMock = vi.fn().mockImplementation(() => {
-      return new Promise<{ ok: boolean; json: () => Promise<unknown> }>((resolve) => {
-        resolveFirst = () => resolve({ ok: true, json: async () => ({}) });
-        // Auto-resolve after 10ms
-        setTimeout(() => resolveFirst?.(), 10);
-      });
-    });
+    fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
     vi.stubGlobal('fetch', fetchMock);
   });
 
@@ -391,38 +384,59 @@ describe('cancellation queue policy', () => {
     vi.unstubAllGlobals();
   });
 
-  it('queues second action while first is in-flight', async () => {
-    // This tests the queue logic via the registry context validation path.
-    // The full React hook queue is tested via integration; here we test the
-    // component-level validation that the queue relies on.
-    const reg = new ClientComponentRegistry();
-    reg.register(makeImpl('ConfirmDialog', z.object({ message: z.string() })));
-    reg.seal();
-
-    const payload1: UserActionReqPayload = {
+  it('dispatchUserActionResult forwards AbortSignal to fetch (cancellation: supported)', async () => {
+    const ac = new AbortController();
+    const payload: UserActionReqPayload = {
       sessionId: 's1',
       actionId: 'a1',
       toolName: 'core:confirm',
       wireName: 'core__confirm',
       parameters: {},
-      confirmComponent: { component: 'ConfirmDialog' },
       scopes: [],
+      cancellation: 'supported',
     };
 
-    const payload2: UserActionReqPayload = {
+    await dispatchUserActionResult(payload, { confirmed: true }, {}, ac.signal);
+
+    const [, opts] = fetchMock.mock.calls[0];
+    expect(opts.signal).toBe(ac.signal);
+  });
+
+  it('dispatchUserActionResult with AbortSignal — AbortError is swallowed (not rethrown)', async () => {
+    const ac = new AbortController();
+    fetchMock.mockRejectedValue(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+
+    const payload: UserActionReqPayload = {
       sessionId: 's1',
-      actionId: 'a2',
+      actionId: 'a1',
       toolName: 'core:confirm',
       wireName: 'core__confirm',
       parameters: {},
-      confirmComponent: { component: 'ConfirmDialog' },
+      scopes: [],
+      cancellation: 'supported',
+    };
+
+    const onError = vi.fn();
+    // Should NOT throw, and onError should NOT be called for AbortError
+    await expect(dispatchUserActionResult(payload, {}, { onError }, ac.signal)).resolves.toBeUndefined();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('dispatchUserActionResult without signal — non-abort errors call onError', async () => {
+    fetchMock.mockRejectedValue(new Error('Network failure'));
+
+    const payload: UserActionReqPayload = {
+      sessionId: 's1',
+      actionId: 'a1',
+      toolName: 'core:confirm',
+      wireName: 'core__confirm',
+      parameters: {},
       scopes: [],
     };
 
-    // Both payloads have valid confirmComponents
-    expect(reg.getImpl('ConfirmDialog')).toBeDefined();
-    expect(reg.getImpl(payload1.confirmComponent!.component)).toBeDefined();
-    expect(reg.getImpl(payload2.confirmComponent!.component)).toBeDefined();
+    const onError = vi.fn();
+    await dispatchUserActionResult(payload, {}, { onError });
+    expect(onError).toHaveBeenCalledWith('Network failure');
   });
 
   it('dispatchUserActionResult can be called sequentially for queued actions', async () => {

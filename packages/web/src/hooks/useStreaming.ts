@@ -33,6 +33,8 @@ export interface UserActionReqPayload {
   parameters: unknown;
   confirmComponent?: { component: string; props?: Record<string, unknown> };
   scopes: string[];
+  /** Cancellation policy declared by the UserAction. Default: 'not-supported' (queue). */
+  cancellation?: 'supported' | 'not-supported';
 }
 
 // ---------------------------------------------------------------------------
@@ -255,6 +257,7 @@ export function useStreaming() {
                   parameters: parsed.parameters,
                   confirmComponent: parsed.confirmComponent as { component: string; props?: Record<string, unknown> } | undefined,
                   scopes: (parsed.scopes as string[]) ?? [],
+                  cancellation: (parsed.cancellation as 'supported' | 'not-supported' | undefined) ?? 'not-supported',
                 });
                 // Pause streaming — caller is responsible for dispatching to /resume
                 setIsStreaming(false);
