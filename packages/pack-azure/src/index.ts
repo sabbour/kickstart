@@ -106,5 +106,5 @@ export { locationSelectorContribution } from './components/LocationSelector/inde
 export { noPrivilegedOperationsGuardrail } from './guardrails/no-privileged-operations.js';
 export { requireSubscriptionScopeGuardrail } from './guardrails/require-subscription-scope.js';
 
-export { getAzureToken, armAuthHeaders, armBaseUrl, armUrl, pollArmLro } from './services/azure-auth.js';
+export { getAzureToken, armAuthHeaders, armBaseUrl, armUrl, pollArmLro, assertArmPollingUrl, ARM_POLLING_HOSTS } from './services/azure-auth.js';
 export { getDeploymentStatus, listDeployments, waitForDeployment } from './services/azure-deployments.js';

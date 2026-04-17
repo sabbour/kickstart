@@ -57,6 +57,33 @@ export function armUrl(path: string, apiVersion: string): string {
   return `${armBaseUrl()}${path}?api-version=${encodeURIComponent(apiVersion)}`;
 }
 
+/** ARM hosts that are permitted as LRO polling targets. */
+export const ARM_POLLING_HOSTS = new Set([
+  'management.azure.com',
+  'management.usgovcloudapi.net',
+  'management.chinacloudapi.cn',
+  'management.microsoftazure.de',
+]);
+
+/**
+ * Validates that an LRO polling URL uses HTTPS and targets a known ARM host.
+ * Throws if the URL is invalid, non-HTTPS, or targets an unrecognised host.
+ */
+export function assertArmPollingUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`Invalid LRO polling URL: ${url}`);
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error(`LRO polling URL must use HTTPS`);
+  }
+  if (!ARM_POLLING_HOSTS.has(parsed.hostname)) {
+    throw new Error(`LRO polling URL host not in ARM allowlist: ${parsed.hostname}`);
+  }
+}
+
 /**
  * Handles ARM LRO (Long-Running Operation) polling.
  * Polls Azure-AsyncOperation or Location header until the operation completes.
@@ -66,6 +93,8 @@ export async function pollArmLro(
   token: string,
   options: { maxAttempts?: number; intervalMs?: number } = {},
 ): Promise<Record<string, unknown>> {
+  assertArmPollingUrl(operationUrl);
+
   const maxAttempts = options.maxAttempts ?? 30;
   const intervalMs = options.intervalMs ?? 5_000;
 
