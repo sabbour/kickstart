@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #243 "fix: address 10 unresolved review comments from PRs #225, #232, #236, #241" | M | impl=1m | review=7m | cycles=1 | merged | @sabbour
