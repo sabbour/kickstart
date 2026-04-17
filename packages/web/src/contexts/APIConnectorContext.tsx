@@ -6,6 +6,8 @@ import {
   PricingConnector,
 } from '@kickstart/core';
 import type { APIConnector } from '@kickstart/core';
+import { isPlaygroundMode } from '../services/mock-streaming';
+import { acquireAzureToken } from '../services/playground-azure-token';
 
 interface APIConnectorContextValue {
   registry: APIConnectorRegistry;
@@ -45,12 +47,16 @@ export function APIConnectorProvider({
     if (externalRegistry) return externalRegistry;
 
     const r = new APIConnectorRegistry();
-    r.register(new AzureARMConnector({
+    const armConnector = new AzureARMConnector({
       auth: { kind: 'oauth2', scopes: ['https://management.azure.com/.default'] },
       corsProxy: {
         proxyBaseUrl: '/api/arm-proxy',
       },
-    }));
+    });
+    if (isPlaygroundMode()) {
+      armConnector.setTokenProvider(acquireAzureToken);
+    }
+    r.register(armConnector);
     r.register(new GitHubConnector({
       auth: { kind: 'oauth2', scopes: ['read:user'] },
       serverBaseUrl: '/api/github',

@@ -58,6 +58,17 @@ const GITHUB_STUB_REPOS: GitHubRepo[] = [
 
 export const DEFAULT_GITHUB_STUB_OWNER = GITHUB_STUB_VIEWER.login;
 
+/**
+ * Whether the E2E auth stub is enabled.
+ *
+ * In production builds, this requires the VITE_E2E_STUB_ENABLED=true build-time
+ * flag to prevent accidental stub activation via URL params alone.
+ * For local dev, ?playground&e2e is still supported when the flag is set.
+ */
+export function shouldUseE2EAuthStub(): boolean {
+  return import.meta.env.VITE_E2E_STUB_ENABLED === 'true';
+}
+
 export function shouldUsePlaygroundAuthStub(): boolean {
   return typeof window !== "undefined" && isPlaygroundMode();
 }
