@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #100 "feat: Implement LLM tool system (function calling)" | L | impl=1m | review=58m | cycles=1 | merged | @sabbour
