@@ -140,3 +140,17 @@
 **decisions.md:** 200,872 bytes (unchanged)
 
 **Still absent:** `fry-483-dp.md`, `leela-483-dp-review.md`, `zapp-483-dp-review.md`, `fry-484-dp.md`
+
+## Wave 30 — 2026-04-17
+
+**Inbox scan:** 0 new files — main inbox empty; worktree inbox files all confirmed against known-39 list; stale `zapp-482-b3-final.md` copy in `.worktrees/482-dp-security-review/` confirmed already merged (wave 26)
+
+**Still absent:** `fry-483-dp.md`, `leela-483-dp-review.md`, `zapp-483-dp-review.md`, `fry-484-dp.md`, `bender-pr548-fix.md`
+
+**History sizes (no summarization needed):**
+- bender 7,924 / fry 5,362 (34%) / hermes 11,926 (77%) / leela 6,259 / ralph 225 / scribe 7,132 (46%) / zapp 11,344 (73%)
+- hermes and zapp still approaching threshold
+
+**decisions.md:** 200,872 bytes (unchanged)
+
+**No commit (no-op wave)**
