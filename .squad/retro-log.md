@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-16 | #345 "fix(auth): silence A2UI no-handler warning and suppress playground ARM 401s" | XL | impl=470m | review=76m | cycles=1 | merged | @sabbour
+
 - 2026-04-16 | #348 "feat: align ArchitectureDiagram styling with Fluent 2" | L | impl=0m | review=3m | cycles=1 | merged | @sabbour
 - 2026-04-16 | #356 "feat: rename DeploymentProgress to GenerationProgress (#350)" | M | impl=1m | review=0m | cycles=1 | merged | @sabbour
 
