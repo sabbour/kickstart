@@ -14,10 +14,22 @@ How to deploy the Kickstart platform — from Azure resources to CI/CD workflows
 | Azure OpenAI | LLM backend for conversation | — |
 | Entra App Registration | Authentication (SPA Auth Code + PKCE) | — |
 
-All resources are deployed to a single resource group. The default dev environment uses:
+All resources are deployed to a single resource group.
 
-- **Subscription:** `4498459e-01d5-4a3f-b07e-8f1f36598c16`
-- **Resource Group:** `rg-kickstart-dev`
+:::info Replace with your environment values
+The commands and examples throughout this guide use placeholder values. Replace them with your actual Azure environment details before running any commands:
+
+| Placeholder | Replace with |
+|-------------|-------------|
+| `<subscription-id>` | Your Azure subscription ID |
+| `<resource-group>` | Your resource group name (e.g. `rg-kickstart-dev`) |
+| `<your-tenant-id-or-domain>` | Your Entra tenant ID (GUID) or domain (e.g. `contoso.onmicrosoft.com`) |
+:::
+
+Example configuration:
+
+- **Subscription:** `<subscription-id>`
+- **Resource Group:** `<resource-group>`
 - **Region:** `centralus`
 
 ## Bicep Template
@@ -162,7 +174,7 @@ Kickstart uses an Entra ID (Azure AD) app registration for authentication via SP
 
 ```bash
 # Login to the correct tenant
-az login --tenant caglobaldemos2605.onmicrosoft.com
+az login --tenant <your-tenant-id-or-domain>
 
 # Run the setup script
 chmod +x infra/setup-entra.sh
