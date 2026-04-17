@@ -486,13 +486,7 @@ export function App() {
     // Use mock streaming when ?mock is active, real streaming otherwise
     if (mockEnabled) {
       mockStreaming.send(text, sessionId, {
-        onDelta: () => {},
-        onA2UI: handleIncomingA2UI,
-        onSetupEvent: handleIncomingSetupEvent,
-        onPhase: (phase) => setConversationPhase(phase),
-        onComplete: (fullText, model) => {
-          if (finalizeStepwiseAssistantTurn({
-            assistantMessageId,
+        onChunk: () => {},
             sessionId: sessionId!,
             model,
           })) {
@@ -554,11 +548,7 @@ export function App() {
       const backendSessionId = activeSession?.backendSessionId;
       
       streaming.send(text, backendSessionId, {
-        onDelta: () => {},
-        onA2UI: handleIncomingA2UI,
-        onSetupEvent: handleIncomingSetupEvent,
-        onPhase: (phase) => setConversationPhase(phase),
-        onComplete: (fullText, model, receivedSessionId, debugInfo, usage) => {
+        onChunk: () => {},
           const phase = currentPhaseRef.current || undefined;
           // Store the backend session ID on first response
           if (receivedSessionId && !activeSession?.backendSessionId) {

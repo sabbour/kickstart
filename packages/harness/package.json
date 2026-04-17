@@ -28,6 +28,22 @@
     "./runtime/registry": {
       "import": "./dist/runtime/registry.js",
       "types": "./dist/runtime/registry.d.ts"
+    },
+    "./runtime/session": {
+      "import": "./dist/runtime/session.js",
+      "types": "./dist/runtime/session.d.ts"
+    },
+    "./runtime/sse": {
+      "import": "./dist/runtime/sse.js",
+      "types": "./dist/runtime/sse.d.ts"
+    },
+    "./runtime/runner": {
+      "import": "./dist/runtime/runner.js",
+      "types": "./dist/runtime/runner.d.ts"
+    },
+    "./runtime/resume": {
+      "import": "./dist/runtime/resume.js",
+      "types": "./dist/runtime/resume.d.ts"
     }
   },
   "scripts": {

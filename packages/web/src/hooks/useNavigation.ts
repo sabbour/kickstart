@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
+import type { AppIntent } from '@kickstart/harness';
 
 /**
  * Hash-based navigation for browser back/forward button support.
@@ -12,6 +13,16 @@ export interface NavState {
   view: 'landing' | 'session';
   sessionId?: string;
 }
+
+/**
+ * onIntent callback type — invoked when the v2 streaming layer receives an
+ * intent value from the `end` SSE event.
+ *
+ * TODO(Step 6, #480): Full intent→navigation routing will be implemented when
+ * the skill resolver and agent phase FSM arrive. For now, callers may register
+ * this callback to receive intent signals but no automatic navigation occurs.
+ */
+export type OnIntentCallback = (intent: AppIntent) => void;
 
 /** Parse current hash into a NavState. */
 export function parseHash(hash: string): NavState {
