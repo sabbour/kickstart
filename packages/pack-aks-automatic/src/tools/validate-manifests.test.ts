@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { validateManifestsTool, staticValidateManifest } from './validate-manifests.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { validateManifestsTool, staticValidateManifest, kubectlDryRun } from './validate-manifests.js';
+
+vi.mock('node:child_process', () => ({
+  execFile: vi.fn(),
+}));
 
 const VALID_DEPLOYMENT = `
 apiVersion: apps/v1
@@ -137,5 +141,39 @@ describe('validate-manifests static checks', () => {
       (d) => d.severity === 'error' && d.message.includes('apiVersion')
     );
     expect(errors.length).toBeGreaterThan(0);
+  });
+});
+
+describe('kubectlDryRun — fail-closed on kubectl absence', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('returns valid:false (toolMissing) when kubectl is not found (ENOENT)', async () => {
+    const childProcess = await import('node:child_process');
+    vi.mocked(childProcess.execFile).mockImplementation(
+      (_cmd: string, _args: readonly string[], callback: unknown) => {
+        const err = Object.assign(new Error('spawn kubectl ENOENT'), { code: 'ENOENT' });
+        (callback as (e: Error, out: string, errOut: string) => void)(err, '', '');
+      }
+    );
+
+    const result = await kubectlDryRun('apiVersion: v1\nkind: Pod\nmetadata:\n  name: test');
+    expect(result.passed).toBe(false);
+    expect(result.toolMissing).toBe(true);
+  });
+
+  it('returns valid:false (toolMissing) when kubectl access is denied (EACCES)', async () => {
+    const childProcess = await import('node:child_process');
+    vi.mocked(childProcess.execFile).mockImplementation(
+      (_cmd: string, _args: readonly string[], callback: unknown) => {
+        const err = Object.assign(new Error('spawn kubectl EACCES'), { code: 'EACCES' });
+        (callback as (e: Error, out: string, errOut: string) => void)(err, '', '');
+      }
+    );
+
+    const result = await kubectlDryRun('apiVersion: v1\nkind: Pod\nmetadata:\n  name: test');
+    expect(result.passed).toBe(false);
+    expect(result.toolMissing).toBe(true);
   });
 });

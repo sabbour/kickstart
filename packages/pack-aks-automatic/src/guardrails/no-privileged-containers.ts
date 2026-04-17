@@ -46,6 +46,30 @@ export const noPrivilegedContainersGuardrail: GuardrailContribution = {
       };
     }
 
+    if (/allowPrivilegeEscalation:\s*true/.test(content)) {
+      return {
+        kind: 'block',
+        reason:
+          'AKS safeguard violation: manifest sets allowPrivilegeEscalation: true. ' +
+          'This is prohibited by the AKS Automatic Restricted pod security standard. ' +
+          'Set allowPrivilegeEscalation: false or omit the field.',
+      };
+    }
+
+    const DANGEROUS_CAPS = ['SYS_ADMIN', 'NET_ADMIN', 'ALL', 'SYS_PTRACE', 'SYS_MODULE', 'DAC_READ_SEARCH'];
+    const foundCap = DANGEROUS_CAPS.find((cap) =>
+      new RegExp(`-\\s+${cap}\\b`, 'i').test(content)
+    );
+    if (foundCap) {
+      return {
+        kind: 'block',
+        reason:
+          `AKS safeguard violation: manifest adds dangerous capability: ${foundCap.toUpperCase()}. ` +
+          'Containers must not add capabilities beyond the restricted set. ' +
+          'Remove the capability or use a more restrictive permission model.',
+      };
+    }
+
     return { kind: 'pass' };
   },
 };

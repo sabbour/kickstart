@@ -130,7 +130,7 @@ export function staticValidateManifest(yaml: string): ManifestDiagnostic[] {
 
 export async function kubectlDryRun(
   yaml: string
-): Promise<{ passed: boolean; output: string }> {
+): Promise<{ passed: boolean; output: string; toolMissing?: boolean }> {
   // Write manifest to a temp file to avoid shell interpolation of user content
   const dir = await mkdtemp(join(tmpdir(), 'aks-validate-'));
   const manifestPath = join(dir, 'manifest.yaml');
@@ -148,6 +148,12 @@ export async function kubectlDryRun(
 
     return { passed: true, output: stdout || stderr };
   } catch (err: unknown) {
+    if (err instanceof Error) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT' || code === 'EACCES') {
+        return { passed: false, output: err.message, toolMissing: true };
+      }
+    }
     const message =
       err instanceof Error
         ? err.message
@@ -176,20 +182,29 @@ export const validateManifestsTool: ToolContribution = {
       const name = input.manifestName ?? 'manifest';
       const staticDiagnostics = staticValidateManifest(input.manifest);
 
-      // Run kubectl dry-run; treat kubectl absence as a warning, not an error
+      // Run kubectl dry-run; fail closed if kubectl is not available
       let kubectlDiagnostic: ManifestDiagnostic | null = null;
       const dryRun = await kubectlDryRun(input.manifest);
+      // If kubectl is not available, fail closed — never return valid:true without actual validation
+      if (dryRun.toolMissing) {
+        return {
+          valid: false,
+          errorCount: 1,
+          warningCount: 0,
+          diagnostics: [
+            {
+              severity: 'error',
+              message:
+                'kubectl is not available on this server — manifest validation requires kubectl',
+            },
+          ],
+          summary: `${name}: kubectl unavailable — validation cannot proceed`,
+        };
+      }
       if (!dryRun.passed) {
-        // Only add as error if it's a real validation failure, not a missing tool
-        const isToolMissing =
-          dryRun.output.includes('ENOENT') ||
-          dryRun.output.includes('not found') ||
-          dryRun.output.includes('command not found');
         kubectlDiagnostic = {
-          severity: isToolMissing ? 'warning' : 'error',
-          message: isToolMissing
-            ? 'kubectl not available — skipping server-side dry-run'
-            : `kubectl dry-run: ${dryRun.output.slice(0, 400)}`,
+          severity: 'error',
+          message: `kubectl dry-run: ${dryRun.output.slice(0, 400)}`,
         };
       }
 
