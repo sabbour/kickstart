@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #225 "fix: progressive streaming — show text as SSE chunks arrive (#223)" | M | impl=0m | review=49m | cycles=1 | merged | @sabbour
