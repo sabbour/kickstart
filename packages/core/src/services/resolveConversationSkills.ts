@@ -89,7 +89,7 @@ type Domain =
   | "component-table"
   | "component-chart";
 
-const DOMAIN_PATTERNS: Array<{ domain: Domain; patterns: RegExp[] }> = [
+const DOMAIN_PATTERNS: Array<{ domain: Domain; patterns: readonly RegExp[] }> = [
   {
     domain: "stack-node",
     patterns: [/\bnode(\.?js)?\b/i, /\btypescript\b/i, /\bexpress\b/i, /\bnestjs\b/i, /\bnpm\b/i],

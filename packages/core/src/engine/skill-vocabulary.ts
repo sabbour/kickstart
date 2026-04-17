@@ -25,7 +25,7 @@ export const DOCKER_KEYWORDS = [
 ] as const;
 
 /** Regex patterns for Docker-related user messages (Mechanism B). */
-export const DOCKER_PATTERNS: RegExp[] = [
+export const DOCKER_PATTERNS: readonly RegExp[] = [
   /\bdocker(file)?\b/i,
   /\bcontainer\b/i,
   /\bimage\b.*\btag\b/i,
@@ -48,7 +48,7 @@ export const AKS_KEYWORDS = [
 ] as const;
 
 /** Regex patterns for AKS/Kubernetes-related user messages (Mechanism B). */
-export const AKS_PATTERNS: RegExp[] = [
+export const AKS_PATTERNS: readonly RegExp[] = [
   /\baks\b/i,
   /\bkubernetes\b/i,
   /\bk8s\b/i,
@@ -74,7 +74,7 @@ export const CICD_KEYWORDS = [
 ] as const;
 
 /** Regex patterns for CI/CD-related user messages (Mechanism B). */
-export const CICD_PATTERNS: RegExp[] = [
+export const CICD_PATTERNS: readonly RegExp[] = [
   /\bci\/?cd\b/i,
   /\bgithub actions?\b/i,
   /\bpipeline\b/i,
@@ -97,7 +97,7 @@ export const AUTH_KEYWORDS = [
 ] as const;
 
 /** Regex patterns for auth/identity-related user messages (Mechanism B). */
-export const AUTH_PATTERNS: RegExp[] = [
+export const AUTH_PATTERNS: readonly RegExp[] = [
   /\bauth(entication|orization)?\b/i,
   /\blogin\b/i,
   /\boauth\b/i,
@@ -123,7 +123,7 @@ export const DATABASE_KEYWORDS = [
 ] as const;
 
 /** Regex patterns for relational-database-related user messages (Mechanism B). */
-export const DATABASE_RELATIONAL_PATTERNS: RegExp[] = [
+export const DATABASE_RELATIONAL_PATTERNS: readonly RegExp[] = [
   /\bpostgres(ql)?\b/i,
   /\bmysql\b/i,
   /\bsql\b/i,
