@@ -15,6 +15,7 @@ Legend:
 <!-- entries below this line, newest at top -->
 | Date | PR | Title | Size | Impl | Review | Cycles | Outcome | Author |
 |------|-----|-------|------|------|--------|--------|---------|--------|
+| 2026-04-15 | [#281](https://github.com/sabbour/kickstart/pull/281) | docs: Integration Kits reference + A2UI catalog visual references | L | 3m | 87m | 1 | merged | @sabbour |
 | 2026-04-15 | [#279](https://github.com/sabbour/kickstart/pull/279) | docs: add extension guide for phases, tools, kits, API, and MCP | L | 2m | 100m | 1 | merged | @sabbour |
 | 2026-04-15 | [#280](https://github.com/sabbour/kickstart/pull/280) | docs: A2UI component extension guide + playground docs | L | 1m | 96m | 1 | merged | @sabbour |
 | 2026-04-15 | [#278](https://github.com/sabbour/kickstart/pull/278) | feat: Rewrite system prompt — unified narrative with Try-AKS conversation architecture | L | 1m | 100m | 1 | merged | @sabbour |
