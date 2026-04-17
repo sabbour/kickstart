@@ -12,7 +12,7 @@ Kickstart is a monorepo with three packages — a shared core engine, a React SP
 kickstart/
 ├── packages/
 │   ├── core/          @kickstart/core — shared TypeScript engine
-│   │   ├── engine/        Skill Resolver (machine.ts ⚠️ DELETE, skill-resolver.ts)
+│   │   ├── engine/        phase catalog (phases.ts), skill resolver (skill-resolver.ts)
 │   │   ├── kits/          IntegrationKit interface + defaultKitRegistry
 │   │   ├── prompts/       buildSystemPrompt(), phase templates, component catalog
 │   │   ├── services/      resolveConversationSkills (per-turn injection)
@@ -39,7 +39,7 @@ POST /api/converse { sessionId, message, messages? }
   5. buildSystemPrompt({ phase, kitPrompts, artifactSummary })
   6. resolveConversationSkills(msg)     ← per-turn domain injection (Mechanism B)
   7. Call Azure OpenAI
-  8. Parse JSON → handleImplicitFlags() → may advance FSM phase
+  8. Parse JSON → if phaseComplete: true → advancePhase()
   9. Extract FileEditor artifacts → session store
  10. Stream SSE events to client
 ```
@@ -51,7 +51,7 @@ See [Prompt Pipeline](./prompt-pipeline.md) for the full assembly order with cod
 | What | Where | Lifetime |
 |------|-------|----------|
 | Conversation messages | Server (memory) | 1 hour |
-| FSM phase state | Server (memory) | 1 hour |
+| Phase string (`currentPhase`) | Server session | 1 hour |
 | Generated artifact metadata | Server (memory) | 1 hour |
 | Full generated file content | Client message history | Browser session |
 | Virtual FS (file content for sidebar) | Client memory + optional IndexedDB (`kickstart-vfs`) | No TTL |
@@ -65,11 +65,7 @@ See [Prompt Pipeline](./prompt-pipeline.md) for the full assembly order with cod
 - **Azure OpenAI GPT-5.4** for Generate phase when server-trusted (`AZURE_OPENAI_CODEX_DEPLOYMENT`)
 - Model selection is trust-based, not phase-based — see [Prompt Pipeline: Model Routing](./prompt-pipeline.md#model-routing)
 - Two skill injection mechanisms run every turn — see [Skill Injection](./skill-injection.md)
-- FSM (`machine.ts`, `phases.ts`) **is scheduled for deletion** — see [FSM](./fsm.md)
-
-:::danger FSM scheduled for deletion
-`machine.ts` and `phases.ts` are confirmed for deletion per architectural decision in `.squad/decisions.md`. The FSM is being replaced by a plain `session.state.currentPhase` string + numbered `═══ N. SECTION ═══` blocks in the system prompt. Do not add new FSM dependencies. See [FSM](./fsm.md) for the migration plan.
-:::
+- Phase tracking: `session.state.currentPhase` (plain string) — see [Phase System](./fsm.md)
 
 ## A2UI Component Catalog
 
@@ -117,8 +113,6 @@ Garbage collection
 
 ## What Should Be Cleaned Up
 
-1. **Delete `machine.ts` and `phases.ts`** (confirmed architectural decision) — see [FSM](./fsm.md) for migration checklist.
-2. **`resolveSkillsAsync` / `resolveSkillsFromList`** — remove or mark `@internal` before Agent SDK integration.
-3. **Typed `Skill` path in `skill-resolver.ts`** — consolidate to one path; both existing kits use legacy.
-4. **Keyword vocabulary** — extract a shared constants module referenced by both mechanisms.
-5. **`exitConditions`/`entryConditions` in `phases.ts`** — moot on FSM removal; will be deleted with `phases.ts`.
+1. **`resolveSkillsAsync` / `resolveSkillsFromList`** — remove or mark `@internal` before Agent SDK integration.
+2. **Typed `Skill` path in `skill-resolver.ts`** — consolidate to one path; both existing kits use legacy.
+3. **Keyword vocabulary** — extract a shared constants module referenced by both mechanisms.
