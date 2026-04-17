@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #177 "feat: continuous SWA deployment from main + version-SHA footer" | L | impl=3m | review=5m | cycles=1 | merged | @sabbour
