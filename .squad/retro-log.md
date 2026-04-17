@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #104 "feat: Azure A2UI fat components (fixes #31)" | XL | impl=1m | review=0m | cycles=1 | merged | @sabbour
