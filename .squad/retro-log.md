@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #68 "fix: resolve ~50 TypeScript errors blocking CI (#67)" | L | impl=1m | review=21m | cycles=1 | merged | @sabbour
