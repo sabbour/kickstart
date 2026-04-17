@@ -9,17 +9,13 @@ import {
 } from '@kickstart/harness';
 import { sanitizeActionContext } from '../utils/sanitize-action-context';
 import type { UserActionReqPayload } from './useStreaming';
+import { clientRegistry } from '../contexts/A2UIRegistryContext';
 
 // ---------------------------------------------------------------------------
 // v2 UserAction resume dispatch
 // ---------------------------------------------------------------------------
 
 export interface UserActionResumeOptions {
-  /**
-   * Called when the resume SSE stream starts emitting events.
-   * Provide the same callbacks you'd pass to useStreaming.send().
-   */
-  onResumeStream?: (eventSource: ReadableStreamDefaultReader<Uint8Array>) => void;
   /**
    * Called on successful resume (200 OK, stream started).
    */
@@ -33,10 +29,8 @@ export interface UserActionResumeOptions {
 /**
  * Dispatches a UserAction result to POST /api/converse/resume.
  *
- * Client input ONLY — the result payload is provided by the browser (MSAL token,
- * user form input, etc.). Never pass server-internal primitives.
- *
- * Zapp Critical 3: Playground stub invocation is guarded server-side.
+ * Resume POST boundary (Zapp B2): body contains ONLY { sessionId, actionId, result }.
+ * No toolName, scopes, wireName, or server-internal fields are echoed back.
  */
 export async function dispatchUserActionResult(
   payload: UserActionReqPayload,
@@ -52,7 +46,6 @@ export async function dispatchUserActionResult(
       body: JSON.stringify({
         sessionId: payload.sessionId,
         actionId: payload.actionId,
-        toolName: payload.toolName,
         result,
       }),
     });
@@ -71,28 +64,154 @@ export async function dispatchUserActionResult(
   }
 }
 
+// ---------------------------------------------------------------------------
+// UserAction queue (Zapp B1 + cancellation policy)
+// ---------------------------------------------------------------------------
+
+export type UserActionError = 'missing-confirm-component' | 'dispatch-failed';
+
+export interface UserActionQueueEntry {
+  payload: UserActionReqPayload;
+  resolve: (result: unknown) => void;
+  reject: (err: Error) => void;
+  abortController?: AbortController;
+}
+
 /**
- * React hook for dispatching UserAction resume calls.
- * Returns a stable `handleUserActionRequired` callback and loading state.
+ * React hook for dispatching UserAction resume calls with:
+ * - Fail-closed behavior: missing confirmComponent → error, no resume POST (Zapp B1)
+ * - Cancellation queue: `not-supported` actions queue subsequent requests
+ * - Resume POST boundary: { sessionId, actionId, result } only (Zapp B2)
  */
 export function useUserActionDispatch() {
   const [isPending, setIsPending] = useState(false);
+  const [activePayload, setActivePayload] = useState<UserActionReqPayload | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const queueRef = useRef<UserActionQueueEntry[]>([]);
+  const inFlightRef = useRef(false);
 
-  const handleUserActionRequired = useCallback(
-    async (payload: UserActionReqPayload, result: unknown, options?: UserActionResumeOptions) => {
+  /**
+   * Validate that the confirmComponent is registered in the client registry.
+   * Returns true if the action can proceed; false if it should fail closed.
+   */
+  const validateConfirmComponent = useCallback((payload: UserActionReqPayload): boolean => {
+    const { confirmComponent } = payload;
+    if (!confirmComponent) {
+      // No confirm component needed — action can auto-resolve (e.g. silent actions)
+      return true;
+    }
+    const { component } = confirmComponent;
+    if (!component) return false;
+
+    if (!clientRegistry.isSealed) return false;
+    const impl = clientRegistry.getImpl(component);
+    if (!impl) {
+      console.error(
+        `[UserAction] confirmComponent "${component}" is not registered in the client catalog. ` +
+        `Action "${payload.toolName}" fails closed — no resume POST will be emitted.`,
+      );
+      return false;
+    }
+    return true;
+  }, []);
+
+  /**
+   * Receive a user_action_req payload from the SSE stream.
+   * - Validates confirmComponent (fail closed if missing/unknown — Zapp B1)
+   * - Queues if another action is in-flight with cancellation: "not-supported"
+   */
+  const receiveUserActionReq = useCallback((payload: UserActionReqPayload): void => {
+    if (!validateConfirmComponent(payload)) {
+      setConfirmError(`Action not available: ${payload.toolName}`);
+      return;
+    }
+
+    if (inFlightRef.current) {
+      // Queue this request — will be processed after the current action resolves
+      queueRef.current.push({
+        payload,
+        resolve: () => { /* no-op: receiveUserActionReq will handle dispatch */ },
+        reject: () => { /* no-op */ },
+      });
+      return;
+    }
+
+    setConfirmError(null);
+    setActivePayload(payload);
+    inFlightRef.current = true;
+  }, [validateConfirmComponent]);
+
+  /**
+   * Submit a result for the active UserAction.
+   * Posts { sessionId, actionId, result } to /api/converse/resume (Zapp B2).
+   * Then dequeues and activates the next pending action if any.
+   */
+  const submitResult = useCallback(
+    async (result: unknown, options?: UserActionResumeOptions): Promise<void> => {
+      if (!activePayload) {
+        options?.onError?.('No active UserAction to submit');
+        return;
+      }
+
       setIsPending(true);
       try {
-        await dispatchUserActionResult(payload, result, options);
+        await dispatchUserActionResult(activePayload, result, options);
       } finally {
         setIsPending(false);
+        inFlightRef.current = false;
+        setActivePayload(null);
+
+        // Dequeue next action if any
+        const next = queueRef.current.shift();
+        if (next) {
+          if (!validateConfirmComponent(next.payload)) {
+            setConfirmError(`Action not available: ${next.payload.toolName}`);
+          } else {
+            setConfirmError(null);
+            setActivePayload(next.payload);
+            inFlightRef.current = true;
+          }
+        }
       }
     },
-    [],
+    [activePayload, validateConfirmComponent],
   );
 
-  return { handleUserActionRequired, isPending };
-}
+  /** Dismiss the current action without submitting (e.g. user cancels). */
+  const dismissAction = useCallback((): void => {
+    inFlightRef.current = false;
+    setActivePayload(null);
+    setConfirmError(null);
 
+    // Dequeue next
+    const next = queueRef.current.shift();
+    if (next) {
+      if (!validateConfirmComponent(next.payload)) {
+        setConfirmError(`Action not available: ${next.payload.toolName}`);
+      } else {
+        setActivePayload(next.payload);
+        inFlightRef.current = true;
+      }
+    }
+  }, [validateConfirmComponent]);
+
+  return {
+    /** Receive a new user_action_req SSE payload. */
+    receiveUserActionReq,
+    /** Submit the resolved result for the active action. */
+    submitResult,
+    /** Dismiss the active action without posting a result. */
+    dismissAction,
+    /** The payload of the currently active UserAction (null if none). */
+    activePayload,
+    /** Error message if confirmComponent is missing or unregistered. */
+    confirmError,
+    /** True while the resume POST is in flight. */
+    isPending,
+    /** Number of queued actions waiting to be processed. */
+    queueLength: queueRef.current.length,
+  };
+}
 
 /**
  * Action routing categories.
