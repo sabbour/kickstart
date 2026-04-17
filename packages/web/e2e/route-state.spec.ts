@@ -136,4 +136,26 @@ test.describe('Route state — server-authored phase consumption', () => {
       page.getByRole('status', { name: /Current phase: Design/i }),
     ).toBeVisible({ timeout: 10_000 });
   });
+
+  test('unauthenticated converse request redirects to SWA login', async ({ page }) => {
+    // Health must succeed so the app bootstraps and becomes interactive.
+    await setupHealthRoute(page);
+
+    // Route /api/converse to return 401 — no SSE mock, just an auth rejection.
+    // This simulates what the SWA auth gate returns for unauthenticated requests.
+    await page.route('**/api/converse', route =>
+      route.fulfill({ status: 401, body: '' }),
+    );
+
+    await page.goto('/');
+    await page.waitForSelector('#landing-page', { timeout: 10_000 });
+    await page.waitForResponse('**/api/health', { timeout: 5_000 });
+
+    // Enter chat — auto-sends the track prompt; /api/converse returns 401.
+    // useStreaming catches SessionExpiredError and sets window.location.href
+    // to /.auth/login/aad?post_login_redirect_uri=/ which triggers navigation.
+    await page.locator('.track-card-link[data-track="web-app"]').click();
+
+    await page.waitForURL(url => url.includes('/.auth/login/'), { timeout: 10_000 });
+  });
 });

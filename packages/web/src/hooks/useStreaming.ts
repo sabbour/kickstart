@@ -9,6 +9,108 @@ import type {
 } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
 
+// ---------------------------------------------------------------------------
+// Phase allowlist guard (C4) and A2UI item type guard (C1)
+// ---------------------------------------------------------------------------
+
+/** Known server-emitted phase identifiers. Values outside this set are silently dropped. */
+const KNOWN_SERVER_PHASES = new Set([
+  'discover', 'design', 'generate', 'review', 'handoff', 'deploy',
+]);
+
+/**
+ * Validates a server-emitted phase string against the known-phases allowlist.
+ * Returns the normalised phase on success, or null if the value is unrecognised.
+ * Emits a console.warn in non-production builds.
+ */
+function guardServerPhase(phase: string): string | null {
+  const normalized = phase.trim().toLowerCase();
+  if (KNOWN_SERVER_PHASES.has(normalized)) return normalized;
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn(`[useStreaming] ignoring unknown server phase: "${phase}"`);
+  }
+  return null;
+}
+
+/**
+ * Runtime type guard for A2UI items arriving over the wire.
+ * The backend types `a2ui` as `object[]`; this guard ensures each element is
+ * a non-null, non-array plain object before it is forwarded to callbacks.
+ */
+function isRawA2uiItem(item: unknown): item is A2uiPayloadItem {
+  return item !== null && typeof item === 'object' && !Array.isArray(item);
+}
+
+// ---------------------------------------------------------------------------
+// SDK 406 fallback — exported for unit testing (C2, C3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Executes the non-streaming JSON request used when the SDK path rejects
+ * streaming (HTTP 406).  Validates the response and fires `onPhase` /
+ * `onA2UI` callbacks.  `onComplete` is the caller's responsibility so that
+ * progressive text reveal can be awaited before signalling completion.
+ *
+ * setupGeneration is intentionally NOT forwarded: the SDK non-streaming path
+ * may return a SetupGenerationSnapshot (final state only), but `onSetupEvent`
+ * expects incremental SetupGenerationEvent items (step_start / file_generated
+ * / …).  Translating a snapshot into synthetic events is not safe here.
+ *
+ * @internal Exported for unit testing only; not part of the public hook API.
+ */
+export async function _performSdkNonStreamingFetch(
+  params: {
+    sessionId: string | undefined;
+    message: string;
+    clientMessages: unknown[] | undefined;
+    signal: AbortSignal;
+    debugMode: boolean;
+  },
+  callbacks: Pick<StreamCallbacks, 'onPhase' | 'onA2UI'>,
+  debugA2uiMessages: A2uiPayloadItem[],
+  apiFetchFn: typeof apiFetch = apiFetch,
+): Promise<{ text: string; model?: string; sessionId?: string; usage?: TokenUsageSummary }> {
+  const jsonRes = await apiFetchFn('/api/converse', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: params.sessionId,
+      message: params.message,
+      ...(params.clientMessages?.length ? { messages: params.clientMessages } : {}),
+    }),
+    signal: params.signal,
+  }, params.debugMode);
+
+  if (!jsonRes.ok) throw new Error(`API error: ${jsonRes.status}`);
+
+  const response = await jsonRes.json() as {
+    sessionId?: string;
+    phase?: string;
+    message?: string;
+    model?: string;
+    a2ui?: unknown[];
+    usage?: TokenUsageSummary;
+  };
+
+  if (response.phase) {
+    const safePhase = guardServerPhase(response.phase);
+    if (safePhase) callbacks.onPhase(safePhase);
+  }
+
+  const safeItems = (response.a2ui ?? []).filter(isRawA2uiItem);
+  if (safeItems.length > 0) {
+    if (params.debugMode) debugA2uiMessages.push(...safeItems);
+    callbacks.onA2UI(safeItems);
+  }
+
+  return {
+    text: response.message ?? '',
+    model: response.model,
+    sessionId: response.sessionId,
+    usage: response.usage,
+  };
+}
+
 interface StreamCallbacks {
   onDelta: (text: string) => void;
   onA2UI: (messages: A2uiPayloadItem[]) => void;
@@ -170,43 +272,18 @@ export function useStreaming() {
         // JSON request so the SDK turn completes and the server-emitted route state
         // (phase, A2UI) still reaches the frontend through the same callbacks.
         if (res.status === 406) {
-          const jsonRes = await apiFetch('/api/converse', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId,
-              message,
-              ...(clientMessages?.length ? { messages: clientMessages } : {}),
-            }),
-            signal: controller.signal,
-          }, debugMode);
+          const fallback = await _performSdkNonStreamingFetch(
+            { sessionId, message, clientMessages, signal: controller.signal, debugMode: !!debugMode },
+            { onPhase: callbacks.onPhase, onA2UI: callbacks.onA2UI },
+            debugA2uiMessages,
+          );
 
-          if (!jsonRes.ok) throw new Error(`API error: ${jsonRes.status}`);
+          if (fallback.model) lastModel = fallback.model;
+          if (fallback.sessionId) lastSessionId = fallback.sessionId;
+          if (fallback.usage) lastUsage = fallback.usage;
 
-          const response = await jsonRes.json() as {
-            sessionId?: string;
-            phase?: string;
-            message?: string;
-            model?: string;
-            a2ui?: A2uiPayloadItem[];
-            usage?: TokenUsageSummary;
-          };
-
-          if (response.phase) {
-            lastPhase = response.phase;
-            callbacks.onPhase(response.phase);
-          }
-          if (response.sessionId) lastSessionId = response.sessionId;
-          if (response.model) lastModel = response.model;
-          if (response.usage) lastUsage = response.usage;
-
-          const nonStreamText = response.message ?? '';
+          const nonStreamText = fallback.text;
           updateRevealTarget(nonStreamText);
-
-          if (Array.isArray(response.a2ui) && response.a2ui.length > 0) {
-            if (debugMode) debugA2uiMessages.push(...response.a2ui);
-            callbacks.onA2UI(response.a2ui);
-          }
 
           // Wait for progressive reveal before firing completion
           if (targetTextRef.current.length > 0 && revealedLenRef.current < targetTextRef.current.length) {
@@ -284,8 +361,11 @@ export function useStreaming() {
                if (parsed.model) lastModel = parsed.model;
               if (parsed.sessionId) lastSessionId = parsed.sessionId;
               if (parsed.phase) {
-                lastPhase = parsed.phase;
-                callbacks.onPhase(parsed.phase);
+                const safePhase = guardServerPhase(parsed.phase);
+                if (safePhase) {
+                  lastPhase = safePhase;
+                  callbacks.onPhase(safePhase);
+                }
               }
               if (parsed.usage) {
                 lastUsage = parsed.usage as TokenUsageSummary;
@@ -333,8 +413,11 @@ export function useStreaming() {
             }
 
             if (event.phase) {
-              lastPhase = event.phase;
-              callbacks.onPhase(event.phase);
+              const safePhase = guardServerPhase(event.phase);
+              if (safePhase) {
+                lastPhase = safePhase;
+                callbacks.onPhase(safePhase);
+              }
             }
 
             if (event.model) {
