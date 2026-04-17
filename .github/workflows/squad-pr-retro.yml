@@ -53,6 +53,11 @@ jobs:
             } else {
               pr = context.payload.pull_request;
             }
+            if (pr.state !== 'closed' || (pr.closed_at == null && pr.merged_at == null)) {
+              throw new Error(
+                `PR #${pr.number} is not closed yet (state: ${pr.state}). Retro metrics can only be generated for closed or merged pull requests.`
+              );
+            }
             const title = (pr.title || '').replace(/"/g, "'");
             const author = pr.user?.login ?? 'unknown';
             const changed = (pr.additions ?? 0) + (pr.deletions ?? 0);
