@@ -59,6 +59,18 @@ jobs:
                 `PR #${pr.number} is not closed yet (state: ${pr.state}). Retro metrics can only be generated for closed or merged pull requests.`
               );
             }
+
+            // Skip metadata/bot PRs — only log "work" PRs
+            const SKIP_PREFIXES = ['scribe:', 'chore(deps):', 'chore(deps-dev):'];
+            const isBot = pr.user?.type === 'Bot';
+            const isMetadata = SKIP_PREFIXES.some(p => (pr.title ?? '').startsWith(p));
+            if (isBot || isMetadata) {
+              core.setOutput('skip', 'true');
+              core.warning(`Skipping metadata PR #${pr.number}: "${pr.title}" (isBot=${isBot})`);
+              return;
+            }
+            core.setOutput('skip', 'false');
+
             const title = (pr.title || '').replace(/"/g, "'");
             const author = pr.user?.login ?? 'unknown';
             const changed = (pr.additions ?? 0) + (pr.deletions ?? 0);
@@ -115,6 +127,7 @@ jobs:
             core.setOutput('base_ref', 'main');
 
       - name: Append to retro log (as Scribe)
+        if: steps.metrics.outputs.skip != 'true'
         env:
           BASE_REF: ${{ steps.metrics.outputs.base_ref }}
           LINE: ${{ steps.metrics.outputs.line }}
@@ -190,6 +203,7 @@ jobs:
           gh pr merge "$PR_URL" --squash --auto --delete-branch
 
       - name: Mirror line as PR comment
+        if: steps.metrics.outputs.skip != 'true'
         uses: actions/github-script@v7
         with:
           script: |
