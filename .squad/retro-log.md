@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #91 "fix(security): add Content-Security-Policy and security headers (fixes #86)" | S | impl=2m | review=7m | cycles=1 | merged | @sabbour
