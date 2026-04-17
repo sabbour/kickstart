@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #109 "docs: Update README and architecture docs for v0.3.0 features" | M | impl=0m | review=41m | cycles=1 | merged | @sabbour
