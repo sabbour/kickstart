@@ -49,4 +49,5 @@ Fry's next role: implement #479 (Runner + SSE) once #477/#478 are fully merged.
 | #478 Playground | 4-phase; registry-driven gallery; usePlaygroundDispatch | #issuecomment-4268166333 | APPROVED; PR #547 ✅ merged |
 | #479 Runner+SSE | 9 SSE events; writeSSE; useStreaming rewrite | #issuecomment-4268255972 | APPROVED (Leela+Zapp A/C) |
 | #480 Skill resolver | 4-stage pipeline; estimateTokens; Skill[] | #issuecomment-4268290735 | APPROVED (Leela+Zapp A/C) |
-| #482 pack-azure | 6 phases; azureKit port; Zapp C1 pre-addressed | #issuecomment-4268944331 | Awaiting Leela+Zapp |
+| #482 pack-azure | 6 phases; azureKit port; Zapp C1 pre-addressed | #issuecomment-4268944331 | Leela APPROVE_WITH_CONDITIONS; Zapp BLOCKED |
+| #482 DP Revision | Addressed Zapp B1–B5: managed identity model, azureToken storage boundary, arm_get exact regex+denylist, AzurePackDTO redaction contract, KICKSTART_PLAYGROUND gate | #issuecomment-4269070199 | Awaiting Zapp re-review |
