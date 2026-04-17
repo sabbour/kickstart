@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-16 | #340 "feat: validate Playground fat components" | L | impl=0m | review=0m | cycles=1 | merged | @sabbour
+
 - 2026-04-16 | #354 "chore: enable stepwise-generation feature flag — set STEPWISE_GENERATION_V1 env var and document" | S | impl=0m | review=0m | cycles=1 | merged | @sabbour
 
 - 2026-04-16 | #346 "Use canonical icon paths for ArchitectureDiagram" | M | impl=0m | review=1m | cycles=1 | merged | @sabbour
