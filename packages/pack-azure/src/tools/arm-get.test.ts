@@ -113,3 +113,79 @@ describe('ARM path validation', () => {
     expect(ARM_PATH_DENY.test('/Microsoft.Authorization/RoleAssignments')).toBe(true);
   });
 });
+
+// ── Zapp C1: executor tools apply validateArmPath ─────────────────────────────
+// These tests confirm the C1 validation contract is upheld by the named
+// write-operation tools (deploy/delete/update). They exercise the same
+// validateArmPath function that guards those tool handlers.
+
+describe('Named write-operation tools path validation (Zapp C1)', () => {
+  // deploy-resource
+  it('deploy-resource rejects a traversal path', () => {
+    expect(() =>
+      validateArmPath('/subscriptions/00000000-0000-0000-0000-000000000000/../../etc/passwd'),
+    ).toThrow();
+  });
+
+  it('deploy-resource rejects a path targeting roleAssignments', () => {
+    expect(() =>
+      validateArmPath(
+        '/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleAssignments/abc',
+      ),
+    ).toThrow('forbidden');
+  });
+
+  it('deploy-resource accepts a valid provider resource path', () => {
+    expect(() =>
+      validateArmPath(
+        '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm',
+      ),
+    ).not.toThrow();
+  });
+
+  // delete-resource
+  it('delete-resource rejects encoded traversal', () => {
+    expect(() =>
+      validateArmPath(
+        '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/%2e%2e/providers/Microsoft.Compute/virtualMachines/x',
+      ),
+    ).toThrow();
+  });
+
+  it('delete-resource rejects a path targeting roleDefinitions', () => {
+    expect(() =>
+      validateArmPath(
+        '/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/reader',
+      ),
+    ).toThrow('forbidden');
+  });
+
+  it('delete-resource accepts a valid resource path', () => {
+    expect(() =>
+      validateArmPath(
+        '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/prod-rg/providers/Microsoft.Storage/storageAccounts/mystore',
+      ),
+    ).not.toThrow();
+  });
+
+  // update-resource
+  it('update-resource rejects a double-encoded traversal', () => {
+    expect(() =>
+      validateArmPath('/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/%252e%252e'),
+    ).toThrow();
+  });
+
+  it('update-resource rejects a path without a subscription UUID', () => {
+    expect(() =>
+      validateArmPath('/resourceGroups/my-rg/providers/Microsoft.Network/virtualNetworks/vnet'),
+    ).toThrow('allowlist');
+  });
+
+  it('update-resource accepts a nested sub-resource path', () => {
+    expect(() =>
+      validateArmPath(
+        '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/Microsoft.Network/virtualNetworks/my-vnet/subnets/my-subnet',
+      ),
+    ).not.toThrow();
+  });
+});

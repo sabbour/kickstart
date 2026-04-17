@@ -2,6 +2,9 @@ import type { Pack, ComponentContribution } from '@kickstart/harness';
 
 // Tools
 import { armGetTool } from './tools/arm-get.js';
+import { armDeployResourceTool } from './tools/arm-deploy-resource.js';
+import { armDeleteResourceTool } from './tools/arm-delete-resource.js';
+import { armUpdateResourceTool } from './tools/arm-update-resource.js';
 import { pricingLookupTool } from './tools/pricing-lookup.js';
 import { estimateCostTool } from './tools/estimate-cost.js';
 import { validateBicepTool } from './tools/validate-bicep.js';
@@ -50,6 +53,9 @@ export const azurePack: Pack = {
 
   tools: [
     armGetTool,
+    armDeployResourceTool,
+    armDeleteResourceTool,
+    armUpdateResourceTool,
     pricingLookupTool,
     estimateCostTool,
     validateBicepTool,
@@ -74,6 +80,9 @@ export const azurePack: Pack = {
 
 // Named exports for individual contributions
 export { armGetTool, validateArmPath, ARM_PATH_RE, ARM_PATH_DENY } from './tools/arm-get.js';
+export { armDeployResourceTool } from './tools/arm-deploy-resource.js';
+export { armDeleteResourceTool } from './tools/arm-delete-resource.js';
+export { armUpdateResourceTool } from './tools/arm-update-resource.js';
 export { pricingLookupTool } from './tools/pricing-lookup.js';
 export { estimateCostTool } from './tools/estimate-cost.js';
 export { validateBicepTool } from './tools/validate-bicep.js';
