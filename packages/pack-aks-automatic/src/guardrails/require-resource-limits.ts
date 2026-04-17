@@ -1,47 +1,38 @@
-import type { GuardrailContribution, GuardrailVerdict } from '@kickstart/harness';
+import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@kickstart/harness';
 
 /**
- * require-resource-limits guardrail.
- *
- * Blocks tool calls that would write Kubernetes manifests where a container
- * section is present but no resource limits are defined.
- *
- * Operates at the tool stage — intercepts before core.write_file executes.
+ * Blocks tool calls that would write Kubernetes manifests where containers
+ * are present but no resource limits are defined.
  */
-
-interface WriteFilePayload {
-  toolName?: string;
-  parameters?: {
-    content?: string;
-    path?: string;
-  };
-  content?: string;
-}
 
 function isKubernetesManifest(content: string): boolean {
   return /apiVersion:\s*\S/.test(content) && /kind:\s*\w+/.test(content);
 }
 
 export const requireResourceLimitsGuardrail: GuardrailContribution = {
-  name: 'aks/require-resource-limits',
-  stage: 'tool',
-  appliesTo: ['core.write_file', 'aks.*'],
-  check: async (_ctx, payload): Promise<GuardrailVerdict> => {
-    const p = payload as WriteFilePayload | null;
-    if (!p) return { kind: 'pass' };
+  id: 'aks/require-resource-limits',
+  appliesTo: ['*'],
+  stages: ['tool'],
+  async evaluate(input: GuardrailInput): Promise<GuardrailResult> {
+    const args = input.toolArgs;
+    if (!args) return { verdict: 'pass' };
 
     const content =
-      (p.parameters?.['content'] as string | undefined) ?? p.content;
-    if (!content || typeof content !== 'string') return { kind: 'pass' };
-    if (!isKubernetesManifest(content)) return { kind: 'pass' };
+      (args['content'] as string | undefined) ??
+      (args['parameters'] != null && typeof args['parameters'] === 'object'
+        ? ((args['parameters'] as Record<string, unknown>)['content'] as string | undefined)
+        : undefined);
+
+    if (!content || typeof content !== 'string') return { verdict: 'pass' };
+    if (!isKubernetesManifest(content)) return { verdict: 'pass' };
 
     const hasContainers = /^\s+containers:/m.test(content);
-    if (!hasContainers) return { kind: 'pass' };
+    if (!hasContainers) return { verdict: 'pass' };
 
     const hasLimits = /^\s+limits:/m.test(content);
     if (!hasLimits) {
       return {
-        kind: 'block',
+        verdict: 'block',
         reason:
           'AKS safeguard violation: manifest has containers without resource limits. ' +
           'All containers in an AKS Automatic cluster must declare resources.limits ' +
@@ -50,6 +41,6 @@ export const requireResourceLimitsGuardrail: GuardrailContribution = {
       };
     }
 
-    return { kind: 'pass' };
+    return { verdict: 'pass' };
   },
 };

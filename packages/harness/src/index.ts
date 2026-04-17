@@ -294,7 +294,7 @@ export type { Skill } from './types/skill.js';
 export type { ToolContribution } from './types/tool.js';
 export type { UserActionContribution } from './types/user-action.js';
 export type { ComponentContribution } from './types/component.js';
-export type { GuardrailContribution, GuardrailVerdict } from './types/guardrail.js';
+export type { GuardrailContribution, GuardrailInput, GuardrailResult } from './types/guardrail.js';
 export type { PlaygroundScenario } from './types/playground.js';
 export type {
   A2UIComponent,

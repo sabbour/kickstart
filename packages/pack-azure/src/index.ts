@@ -30,6 +30,8 @@ import { locationSelectorContribution } from './components/LocationSelector/inde
 // Guardrails
 import { noPrivilegedOperationsGuardrail } from './guardrails/no-privileged-operations.js';
 import { requireSubscriptionScopeGuardrail } from './guardrails/require-subscription-scope.js';
+import { noHardcodedCredentialsGuardrail } from './guardrails/no-hardcoded-credentials.js';
+import { noSubscriptionScopedOwnerGuardrail } from './guardrails/no-subscription-scoped-owner.js';
 
 const azureComponents: ComponentContribution[] = [
   azureResourceCardContribution,
@@ -75,6 +77,8 @@ export const azurePack: Pack = {
   guardrails: [
     noPrivilegedOperationsGuardrail,
     requireSubscriptionScopeGuardrail,
+    noHardcodedCredentialsGuardrail,
+    noSubscriptionScopedOwnerGuardrail,
   ],
 };
 
@@ -105,6 +109,8 @@ export { locationSelectorContribution } from './components/LocationSelector/inde
 
 export { noPrivilegedOperationsGuardrail } from './guardrails/no-privileged-operations.js';
 export { requireSubscriptionScopeGuardrail } from './guardrails/require-subscription-scope.js';
+export { noHardcodedCredentialsGuardrail } from './guardrails/no-hardcoded-credentials.js';
+export { noSubscriptionScopedOwnerGuardrail } from './guardrails/no-subscription-scoped-owner.js';
 
 export { getAzureToken, armAuthHeaders, armBaseUrl, armUrl, pollArmLro, assertArmPollingUrl, ARM_POLLING_HOSTS } from './services/azure-auth.js';
 export { getDeploymentStatus, listDeployments, waitForDeployment } from './services/azure-deployments.js';

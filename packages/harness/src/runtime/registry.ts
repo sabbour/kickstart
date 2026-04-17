@@ -41,6 +41,7 @@ export class PackRegistry {
     output: [],
     tool: [],
   };
+  private readonly guardrailsById = new Map<string, GuardrailContribution>();
   private readonly playgroundScenariosById = new Map<string, PlaygroundScenario>();
   private activePackNames: string[] | null = null;
   private sealed = false;
@@ -101,7 +102,17 @@ export class PackRegistry {
       this.userActionsByWireName.set(userAction.wireName, userAction);
     }
     for (const component of components) this.componentsByName.set(component.name, component);
-    for (const guardrail of guardrails) this.guardrailsByStage[guardrail.stage].push(guardrail);
+    for (const guardrail of guardrails) {
+      this.assertUnique(this.guardrailsById, guardrail.id, 'guardrail');
+      // Reserve core/ namespace — only the 'core' pack may register core/ ids
+      if (guardrail.id.startsWith('core/') && pack.name !== 'core') {
+        throw new Error(`Pack "${pack.name}" may not register a guardrail in the core/ namespace: ${guardrail.id}`);
+      }
+      this.guardrailsById.set(guardrail.id, guardrail);
+      for (const stage of guardrail.stages) {
+        this.guardrailsByStage[stage].push(guardrail);
+      }
+    }
     for (const scenario of playgroundScenarios) this.playgroundScenariosById.set(scenario.id, scenario);
 
     this.assertNoCycles();
@@ -178,7 +189,7 @@ export class PackRegistry {
   }
 
   getGuardrailsByStage(stage: 'input' | 'output' | 'tool'): GuardrailContribution[] {
-    return this.guardrailsByStage[stage].filter((guardrail) => this.isPackActive(this.packNameFromGuardrail(guardrail.name)));
+    return this.guardrailsByStage[stage].filter((guardrail) => this.isPackActive(this.packNameFromGuardrail(guardrail.id)));
   }
 
   get playgroundScenarios(): PlaygroundScenario[] {
@@ -351,8 +362,8 @@ export class PackRegistry {
   }
 
   private normalizeGuardrail(pack: Pack, guardrail: GuardrailContribution): GuardrailContribution {
-    if (!guardrail.name.startsWith(`${pack.name}.`)) {
-      return { ...guardrail, name: `${pack.name}.${guardrail.name}` };
+    if (!guardrail.id.startsWith(`${pack.name}/`)) {
+      return { ...guardrail, id: `${pack.name}/${guardrail.id}` };
     }
     return guardrail;
   }
@@ -542,8 +553,8 @@ export class PackRegistry {
     return id.split('/', 1)[0] ?? id;
   }
 
-  private packNameFromGuardrail(name: string): string {
-    return name.split('.', 1)[0] ?? name;
+  private packNameFromGuardrail(id: string): string {
+    return id.split('/', 1)[0] ?? id;
   }
 
   private assertUnique<T>(map: Map<string, T>, name: string, label: string): void {
