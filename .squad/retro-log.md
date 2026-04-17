@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #288 "fix: TextField editable + Markdown newline rendering" | S | impl=3m | review=13m | cycles=1 | merged | @sabbour
