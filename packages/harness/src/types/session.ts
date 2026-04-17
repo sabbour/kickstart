@@ -1,4 +1,4 @@
-import type { A2UIMessageV09 } from './a2ui.js';
+import type { A2UIMessageV09 as A2UIMessage } from './a2ui.js';
 
 export interface AppIntent {
   id?: string;
@@ -43,11 +43,12 @@ export interface SessionCtx {
   };
   intent: AppIntent | null;
   artifacts: Map<string, Artifact>;
+  a2uiEmissions: A2UIMessage[];
   negotiatedCatalog: A2UICatalog;
   recentTurns: Turn[];
   activeAgent: string;
   pendingUserAction: PendingUserAction | null;
-  recordA2UIEmission(msg: A2UIMessageV09): void;
+  recordA2UIEmission(msg: A2UIMessage): void;
   recordArtifact(artifact: Artifact): void;
   recordTurn(turn: Turn): void;
   getAzureCreds(): Promise<AzureCredential>;

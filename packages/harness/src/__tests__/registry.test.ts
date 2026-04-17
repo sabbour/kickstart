@@ -178,6 +178,9 @@ Bad.
       tools: [makeTool('core.emit_ui')],
       userActions: [makeUserAction('core:confirm')],
       components: [{ name: 'core/Text', propertySchema: z.object({}).strict(), renderer: null }],
+      playgroundStubs: {
+        'core:confirm': async () => ({ ok: true }),
+      },
       skills: [{
         id: 'chat-foundations',
         name: 'chat-foundations',
@@ -211,7 +214,10 @@ Bad.
     expect(registry.getToolsForAgent('azure.architect').map((entry) => entry.name)).toEqual(['core.emit_ui', 'core:confirm']);
     expect(registry.getUserAction('core__confirm').name).toBe('core:confirm');
     expect(registry.getSkillsForAgent('azure.architect').map((skill) => skill.id)).toEqual(['core/chat-foundations']);
+    expect(registry.getComponent('core/Text').name).toBe('core/Text');
     expect(registry.components.map((component) => component.name)).toEqual(['core/Text']);
+    expect(Object.keys(registry.playgroundStubs)).toEqual(['core:confirm']);
+    expect(registry.playgroundScenarios).toEqual([]);
   });
 
   it('rejects agent references to tools outside declared dependencies', () => {

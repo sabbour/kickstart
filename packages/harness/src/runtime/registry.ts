@@ -7,7 +7,7 @@ import { loadSkillFile } from './loader-skill.js';
 import type { AgentContribution } from '../types/agent.js';
 import type { ComponentContribution } from '../types/component.js';
 import type { GuardrailContribution } from '../types/guardrail.js';
-import type { Pack } from '../types/pack.js';
+import type { Pack, PlaygroundStub } from '../types/pack.js';
 import type { PlaygroundScenario } from '../types/playground.js';
 import type { Skill } from '../types/skill.js';
 import type { ToolContribution } from '../types/tool.js';
@@ -149,12 +149,31 @@ export class PackRegistry {
     return action;
   }
 
+  getComponent(name: string): ComponentContribution {
+    const component = this.componentsByName.get(name);
+    if (!component || !this.isPackActive(this.packNameFromComponent(component.name))) {
+      throw new Error(`Unknown component: ${name}`);
+    }
+    return component;
+  }
+
   getGuardrailsByStage(stage: 'input' | 'output' | 'tool'): GuardrailContribution[] {
     return this.guardrailsByStage[stage].filter((guardrail) => this.isPackActive(this.packNameFromGuardrail(guardrail.name)));
   }
 
   get playgroundScenarios(): PlaygroundScenario[] {
     return [...this.playgroundScenariosById.values()].filter((scenario) => this.isPackActive(this.packNameFromScenario(scenario.id)));
+  }
+
+  get playgroundStubs(): Record<string, PlaygroundStub> {
+    const stubs: Record<string, PlaygroundStub> = {};
+    for (const registeredPack of this.packs.values()) {
+      if (!this.isPackActive(registeredPack.pack.name) || !registeredPack.pack.playgroundStubs) {
+        continue;
+      }
+      Object.assign(stubs, registeredPack.pack.playgroundStubs);
+    }
+    return stubs;
   }
 
   get components(): ComponentContribution[] {
