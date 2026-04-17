@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #230 "fix: update tour — remove playground, add MCP step, add restart button" | XL | impl=3m | review=13m | cycles=1 | merged | @sabbour
