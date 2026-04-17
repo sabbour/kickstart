@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #316 "feat: add live Azure session cost estimates" | XL | impl=1m | review=0m | cycles=1 | merged | @sabbour
