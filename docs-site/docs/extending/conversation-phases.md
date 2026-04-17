@@ -61,7 +61,7 @@ if (llmResponse.phaseComplete) {
 
 `advancePhase()` looks up the current phase in `PHASE_DEFINITIONS` and returns `nextPhase`. There is no event system or transition guard — the LLM's signal is the only trigger.
 
-A2UI actions with `navigate:` or `complete:` prefixes (handled in `packages/core/src/engine/auto-continue.ts`) can also trigger phase transitions from button clicks in the UI.
+A2UI actions with `complete:` or `continue:` prefixes (handled in `packages/core/src/engine/auto-continue.ts`) can trigger phase transitions from button clicks in the UI. After stripping the `complete:`/`continue:` prefix, if the resulting action name starts with `navigate:` or `nav:`, it is treated as a phase-navigation signal — for example, the full action name is `complete:navigate:design`.
 
 ### How the LLM Navigates Phases
 
@@ -69,20 +69,14 @@ The system prompt includes the current phase identifier and the `description` fr
 
 ### Skill Resolution
 
-Skills are filtered by phase. `packages/core/src/engine/skill-resolver.ts` runs a middleware chain:
+Skills are filtered by phase. `packages/core/src/engine/skill-resolver.ts` exports a single `resolveSkills()` function that:
 
-1. **phaseFilter** — drops skills whose `phases` array doesn't include `currentPhase`
-2. **keywordActivation** — boosts skills that match keywords in the user message
-3. **priorityOrder** — sorts remaining skills by priority
+1. Filters typed `Skill` objects to those whose `phases` array includes `currentPhase`
+2. Keyword-activates additional skills from conversation history that weren't initially phase-matched
+3. Sorts the combined set by `priority` (higher first)
+4. Merges in legacy `phasePrompts` and heuristically-classified flat prompts for backward compatibility
 
-Phase group constants for skill registration:
-
-```typescript
-export const DISCOVERY_PHASES  = [Phase.Discover];
-export const DESIGN_PHASES     = [Phase.Discover, Phase.Design];
-export const GENERATE_PHASES   = [Phase.Generate, Phase.Review];
-export const DEPLOYMENT_PHASES = [Phase.Handoff, Phase.Deploy];
-```
+Skill phase membership is declared on the `Skill` object itself via the `phases` array property.
 
 ### System Prompt Architecture
 
@@ -133,10 +127,16 @@ Also update the `Design` entry so its `nextPhase` is `Phase.Validate`.
 
 ### Step 3 — Register skills for the new phase
 
-Add `Phase.Validate` to the `phases` array of any skills that should activate during this phase. Define a phase group constant in `skill-resolver.ts` if needed:
+Add `Phase.Validate` to the `phases` array of any skills that should activate during this phase:
 
 ```typescript
-export const VALIDATE_PHASES = [Phase.Validate];
+const mySkill: Skill = {
+  id: "my-skill",
+  name: "My Skill",
+  phases: [Phase.Validate],
+  keywords: [...],
+  content: "...",
+};
 ```
 
 ### Step 4 — Add phase-specific prompts to kits (optional)
@@ -156,7 +156,7 @@ const myKit: IntegrationKit = {
 
 ### Step 5 — Write tests
 
-Add test cases to `packages/core/src/__tests__/phases.test.ts` to verify your `PhaseDefinition` is well-formed and `nextPhase` chains correctly.
+Add test cases to `packages/core/src/__tests__/skill-resolver.test.ts` to verify your phase's skill filtering behavior. Also confirm that `PHASE_DEFINITIONS` in `packages/core/src/engine/phases.ts` correctly chains `nextPhase` through all phases.
 
 ---
 

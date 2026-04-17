@@ -20,7 +20,7 @@ To add a component to the Kickstart catalog:
 
 The conversation flow is defined in `packages/core/src/engine/phases.ts`. To add a phase:
 
-1. Create a new phase definition file
+1. Add a new phase entry to `PHASE_DEFINITIONS` in `packages/core/src/engine/phases.ts`
 2. Add transition rules from adjacent phases
 3. Update the system prompt with phase-specific instructions
 4. Add any phase-specific A2UI components
