@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #211 "feat: browser back button support with History API" | M | impl=0m | review=22m | cycles=1 | merged | @sabbour
