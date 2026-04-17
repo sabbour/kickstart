@@ -34,10 +34,15 @@ jobs:
           script: |
             let pr;
             if (context.eventName === 'workflow_dispatch') {
+              const prNumberInput = context.payload.inputs.pr_number;
+              const prNumber = parseInt(prNumberInput, 10);
+              if (Number.isNaN(prNumber)) {
+                throw new Error(`Invalid workflow_dispatch input "pr_number": "${prNumberInput}". Expected a numeric pull request number.`);
+              }
               const { data } = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                pull_number: parseInt(context.payload.inputs.pr_number),
+                pull_number: prNumber,
               });
               pr = data;
               pr.merged = pr.merged_at != null;
