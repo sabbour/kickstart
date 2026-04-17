@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #281 "docs: Integration Kits reference + A2UI catalog visual references" | L | impl=3m | review=87m | cycles=1 | merged | @sabbour
