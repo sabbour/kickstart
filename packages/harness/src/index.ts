@@ -352,3 +352,8 @@ export type {
   PreparedChatA2ui,
   PrepareChatA2uiOptions,
 } from './a2ui/chat-a2ui.js';
+
+// ── Step 6: Skill Resolver ───────────────────────────────────────────────────
+export { estimateTokens, buildSkillPrompt, fitSkillsInBudget } from './runtime/token-budget.js';
+export { matchesSkill } from './runtime/skill-matcher.js';
+export { PackRegistry } from './runtime/registry.js';

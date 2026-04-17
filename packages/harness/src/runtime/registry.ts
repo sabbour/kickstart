@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { buildCatalogSnapshot, negotiateCatalog } from './catalog.js';
 import { loadAgentFile } from './loader-agent.js';
 import { loadSkillFile, inlineSkillSchema } from './loader-skill.js';
+import { matchesSkill, validateGlobPattern } from './skill-matcher.js';
 import type { AgentContribution } from '../types/agent.js';
 import type { ComponentContribution } from '../types/component.js';
 import type { GuardrailContribution } from '../types/guardrail.js';
@@ -136,7 +137,13 @@ export class PackRegistry {
 
   getSkillsForAgent(agentName: string): Skill[] {
     this.getAgent(agentName);
-    return this.activeSkills().filter((skill) => matchesAnyPattern(agentName, skill.appliesTo));
+    return this.activeSkills().filter((skill) => matchesSkill(agentName, skill));
+  }
+
+  listSkills(agentName?: string): Skill[] {
+    const all = this.activeSkills();
+    if (!agentName) return all;
+    return all.filter((skill) => matchesSkill(agentName, skill));
   }
 
   getToolsForAgent(agentName: string): AgentCallableContribution[] {
@@ -242,6 +249,10 @@ export class PackRegistry {
         // Fix 1: zod validation — same rigor as file-backed skills
         const parsed = inlineSkillSchema.parse(raw);
         const normalized = this.normalizeInlineSkill(pack, parsed as Skill);
+        // Validate glob patterns at registration (Zapp: prevent injection)
+        for (const pattern of normalized.appliesTo ?? []) {
+          validateGlobPattern(pattern);
+        }
         // Fix 4: freeze to prevent post-registration mutation
         const frozen = Object.freeze({
           ...normalized,
@@ -249,6 +260,13 @@ export class PackRegistry {
           keywords: Object.freeze([...(normalized.keywords ?? [])]),
         }) as Skill;
         inlineSkills.push(frozen);
+      }
+    }
+
+    // Validate glob patterns for file-backed skills at registration time
+    for (const skill of fileSkills) {
+      for (const pattern of skill.appliesTo ?? []) {
+        validateGlobPattern(pattern);
       }
     }
 
@@ -534,19 +552,6 @@ export class PackRegistry {
       throw new Error(`Invalid pack name: ${name}`);
     }
   }
-}
-
-function matchesAnyPattern(value: string, patterns: readonly string[]): boolean {
-  return patterns.some((pattern) => globMatches(value, pattern));
-}
-
-function globMatches(value: string, pattern: string): boolean {
-  if (pattern === '*') {
-    return true;
-  }
-
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-  return new RegExp(`^${escaped}$`).test(value);
 }
 
 function collectMarkdownFiles(baseDir: string, expectedSuffix: string): string[] {
