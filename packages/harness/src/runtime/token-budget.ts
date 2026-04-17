@@ -8,7 +8,7 @@ export function estimateTokens(text: string | null | undefined): number {
 
 /** Build a single prompt string from a list of skills. */
 export function buildSkillPrompt(skills: Skill[]): string {
-  return skills.map((s) => `## ${s.id}\n${s.instructions}`).join('\n\n');
+  return skills.map((s) => `<skill name="${s.id}">\n${s.instructions}\n</skill>`).join('\n');
 }
 
 /**

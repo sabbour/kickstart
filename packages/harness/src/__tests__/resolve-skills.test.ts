@@ -49,14 +49,15 @@ describe('resolveSkills', () => {
 
   // Test 3: Budget truncation — skill too large for budget is excluded, smaller skill fits
   it('truncates skills that exceed token budget', () => {
-    // giant: 100 chars → 25 tokens; tiny: 4 chars → 1 token; budget = 5
+    // tiny rendered: '<skill name="pack/tiny">\nXXXX\n</skill>' = 38 chars → 10 tokens
+    // giant rendered: '<skill name="pack/giant">\n' + 100 chars + '\n</skill>' = 127 chars → 32 tokens
     // tiny has keyword match → ranks first; giant ranks second; giant doesn't fit after tiny
     const tiny = makeSkill({ id: 'pack/tiny', instructions: 'X'.repeat(4), keywords: ['deploy'] });
     const giant = makeSkill({ id: 'pack/giant', instructions: 'Y'.repeat(100), keywords: [] });
     const result = resolveSkills([giant, tiny], {
       agentName: 'agent',
       userMessage: 'deploy my app',
-      budgetTokens: 5, // tiny (1 token) fits; giant (25 tokens) does not
+      budgetTokens: 15, // tiny (10 tokens) fits; giant (32 tokens) does not
     });
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('pack/tiny');

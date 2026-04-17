@@ -266,7 +266,7 @@ describe('buildSkillPrompt', () => {
 
   it('formats a single skill', () => {
     const skill = makeSkill({ id: 'pack/s1', instructions: 'Do this.' });
-    expect(buildSkillPrompt([skill])).toBe('## pack/s1\nDo this.');
+    expect(buildSkillPrompt([skill])).toBe('<skill name="pack/s1">\nDo this.\n</skill>');
   });
 
   it('joins multiple skills with double newline', () => {
@@ -274,7 +274,7 @@ describe('buildSkillPrompt', () => {
       makeSkill({ id: 'pack/s1', instructions: 'First.' }),
       makeSkill({ id: 'pack/s2', instructions: 'Second.' }),
     ];
-    expect(buildSkillPrompt(skills)).toBe('## pack/s1\nFirst.\n\n## pack/s2\nSecond.');
+    expect(buildSkillPrompt(skills)).toBe('<skill name="pack/s1">\nFirst.\n</skill>\n<skill name="pack/s2">\nSecond.\n</skill>');
   });
 });
 
@@ -285,24 +285,24 @@ describe('fitSkillsInBudget', () => {
   });
 
   it('includes skills that exactly fit the budget', () => {
-    // rendered: '## pack/s1\nabcd' = 15 chars → ceil(15/4) = 4 tokens each; budget = 8
+    // rendered: '<skill name="pack/s1">\nabcd\n</skill>' = 36 chars → ceil(36/4) = 9 tokens each; budget = 18
     const skills = [
       makeSkill({ id: 'pack/s1', instructions: 'abcd' }),
       makeSkill({ id: 'pack/s2', instructions: 'efgh' }),
     ];
-    const result = fitSkillsInBudget(skills, 8);
+    const result = fitSkillsInBudget(skills, 18);
     expect(result).toHaveLength(2);
   });
 
   it('skips oversized skills and includes subsequent skills that fit', () => {
-    // s1: rendered ~4 tokens; s2: rendered ~103 tokens; s3: rendered ~4 tokens
+    // s1 rendered: ~9 tokens; s2 rendered: ~108 tokens; s3 rendered: ~9 tokens
     const skills = [
       makeSkill({ id: 'pack/s1', instructions: 'abcd' }),
       makeSkill({ id: 'pack/s2', instructions: 'a'.repeat(400) }),
       makeSkill({ id: 'pack/s3', instructions: 'xyz' }),
     ];
-    // budget = 10: s1 fits (4), s2 overflows (103) — skipped, s3 fits (4)
-    const result = fitSkillsInBudget(skills, 10);
+    // budget = 20: s1 fits (9), s2 overflows (108) — skipped, s3 fits (9+9=18)
+    const result = fitSkillsInBudget(skills, 20);
     expect(result).toHaveLength(2);
     expect(result.map((s) => s.id)).toEqual(['pack/s1', 'pack/s3']);
   });
@@ -311,8 +311,8 @@ describe('fitSkillsInBudget', () => {
     const small1 = makeSkill({ id: 'pack/small1', instructions: 'tiny' });
     const huge = makeSkill({ id: 'pack/huge', instructions: 'x'.repeat(2000) });
     const small2 = makeSkill({ id: 'pack/small2', instructions: 'also tiny' });
-    // budget = 20 — both smalls render well under 20 tokens; huge does not
-    const result = fitSkillsInBudget([small1, huge, small2], 20);
+    // budget = 30 — both smalls render well under 30 tokens; huge does not
+    const result = fitSkillsInBudget([small1, huge, small2], 30);
     expect(result.map((s) => s.id)).toEqual(['pack/small1', 'pack/small2']);
   });
 
