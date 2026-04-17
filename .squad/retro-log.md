@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #89 "fix(security): API security hardening" | L | impl=0m | review=23m | cycles=1 | merged | @sabbour
