@@ -6,10 +6,12 @@ import {
 } from '@fluentui/react-components';
 import { CheckmarkRegular, CopyRegular } from '@fluentui/react-icons';
 import { useTheme } from '../../contexts/ThemeContext';
-import type { DebugMetadata } from '../../types';
+import type { DebugMetadata, A2uiPayloadItem } from '../../types';
+import { DebugA2UITree } from './DebugA2UITree';
 
 interface DebugPanelProps {
   debugInfo?: DebugMetadata;
+  a2uiMessages?: A2uiPayloadItem[];
 }
 
 const useStyles = makeStyles({
@@ -196,7 +198,7 @@ function CollapsibleSection({ label, defaultOpen = false, children, styles: s }:
   );
 }
 
-export function DebugPanel({ debugInfo }: DebugPanelProps) {
+export function DebugPanel({ debugInfo, a2uiMessages }: DebugPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const styles = useStyles();
@@ -276,6 +278,13 @@ export function DebugPanel({ debugInfo }: DebugPanelProps) {
               <Text className={styles.notAvailable} size={200}>Not available</Text>
             )}
           </CollapsibleSection>
+
+          {/* A2UI Messages tree */}
+          {a2uiMessages && a2uiMessages.length > 0 && (
+            <CollapsibleSection label="A2UI Messages" defaultOpen={false} styles={styles}>
+              <DebugA2UITree a2uiMessages={a2uiMessages} />
+            </CollapsibleSection>
+          )}
 
         </div>
       )}
