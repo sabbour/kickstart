@@ -41,15 +41,15 @@
     "@changesets/cli": "^2.30.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
-    "@types/jszip": "^3.4.0",
-    "@types/node": "^25.5.2",
-    "@typescript-eslint/eslint-plugin": "^8.58.1",
-    "@typescript-eslint/parser": "^8.58.1",
+    "@types/jszip": "^3.4.1",
+    "@types/node": "^25.6.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.2",
+    "@typescript-eslint/parser": "^8.58.2",
     "concurrently": "^9.2.1",
     "eslint": "^10.2.0",
-    "monaco-editor": "0.53.0",
+    "monaco-editor": "0.55.1",
     "serve": "^14.2.6",
     "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.1"
+    "typescript-eslint": "^8.58.2"
   }
 }

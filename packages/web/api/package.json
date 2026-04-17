@@ -13,12 +13,14 @@
   },
   "dependencies": {
     "@azure/functions": "^4.6.0",
+    "@fluentui/react-icons": "^2.0.324",
     "@openai/agents": "0.8.3",
+    "@types/dompurify": "^3.2.0",
     "bicep-node": "^0.0.9",
     "dompurify": "^3.4.0",
     "openai": "6.34.0"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.28.0"
   }
 }
