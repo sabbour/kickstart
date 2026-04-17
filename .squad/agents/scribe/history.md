@@ -75,3 +75,7 @@ Swept main inbox and all worktrees (including new: 477-security-review, 544-pr-h
 ## Wave 6 — 2026-04-17 Inbox merge
 
 Merged 5 new files from worktree inboxes (477-security-review, 478-security-review, 544-security-review ×2, 476-registry-loaders). decisions.md: 133,820 → 139,295 bytes. Updated histories: bender, zapp. All history files below 15 KB — no summarization needed.
+
+## Wave 7 — 2026-05-28 Inbox sweep (no new decisions)
+
+Swept main inbox and all worktrees (new: bender-deps, bender-sec-san, ceremony-reference-redirect, copilot-471-feedback, dompurify-monaco-fix, dompurify-monaco-override, fry-355, hermes-heartbeat-validation, pr-545-review). All files were known-merged stale entries (hermes-connector-execution-adr, bender-azure-auth-handler-fix, bender-ci-paths-ignore-fix, leela-271-deployment-flow variants, leela-e2e-sprint-plan, leela-sprint-planning-v061). No new decisions. decisions.md unchanged at 139,295 bytes. Pending: leela-478-dp-review — not yet filed in any worktree.
