@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #257 "feat: align ArchitectureDiagram with try-aks reference styling" | L | impl=4m | review=6m | cycles=1 | merged | @sabbour
