@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #165 "release: v0.5.6" | S | impl=1m | review=5m | cycles=1 | merged | @sabbour-squad-lead[bot]
