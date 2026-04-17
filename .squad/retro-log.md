@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-16 | #374 "test: add prompt-catalog contract tests (#355)" | M | impl=0m | review=0m | cycles=1 | merged | @sabbour
