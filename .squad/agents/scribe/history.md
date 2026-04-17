@@ -120,4 +120,12 @@ Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v
 **decisions.md:** 161,186 → 169,430 bytes
 **Histories updated:** zapp (4,106 → 4,803 bytes)
 **Inbox cleared:** worktrees `545-security-review`, `546-security-review`
-**Commit:** pending
+**Commit:** 6942994
+
+## Wave 8 — 2026-06-10 (no-op)
+
+**Files merged:** 0
+**decisions.md:** 169,430 bytes (unchanged)
+**Histories:** fry 13,121 bytes, hermes 11,251 bytes — both below 15,360 threshold; no summarisation needed
+**Sweep result:** All 31 worktree inbox filenames confirmed already merged. Main inbox empty. No new files found.
+**Commit:** (none — no changes)
