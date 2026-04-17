@@ -1872,3 +1872,42 @@ Playwright tests for skip-ahead and revisit scenarios intercept `/api/converse` 
 ### 5. Session cold-start unchanged
 
 `hydrateSession()` + `getLatestConversationPhase(messages)` correctly restores phase for the SDK-backed session. The `agents-session-adapter.ts` wraps the same session store. No frontend changes needed for cold-start.
+
+---
+
+# Decision: Dependabot PR Policy for Major Version Bumps
+
+**Date:** 2026-04-17  
+**Author:** Leela (Lead)  
+**Status:** Accepted
+
+## Context
+
+Dependabot automatically opens PRs for dependency updates, including major version bumps that may contain breaking changes. During triage of PRs #448–#452, a clear split emerged between safe minor/patch bumps and breaking major bumps.
+
+## Decision
+
+**Minor and patch version bumps** that pass CI are approved and merged without manual compatibility review.
+
+**Major version bumps** that fail CI are **closed immediately** and tracked as explicit upgrade tasks. They are not left open as stale Dependabot PRs. The rationale:
+
+- Failing CI on a major bump indicates breaking changes that require deliberate migration work (API changes, config updates, type fixes, etc.).
+- Auto-bumping major versions without green CI risks landing broken builds on the main branch.
+- Explicit upgrade issues ensure the work is scoped, planned, and reviewed intentionally rather than sneaking in via an auto-merge.
+
+## Rule Summary
+
+| Bump type | CI status | Action |
+|-----------|-----------|--------|
+| patch / minor | ✅ pass | Approve and merge |
+| patch / minor | ❌ fail | Investigate; fix or close |
+| major | ✅ pass | Review diff carefully; approve if safe |
+| major | ❌ fail | Close PR; open a planned upgrade task |
+
+## Applied To
+
+- **#448** (non-breaking group, 10 minor/patch updates) → `leela:approved`
+- **#449** (vite 6→8) → `leela:approved` (CI green, lock-file only changes verified)
+- **#450** (typescript 5→6) → Closed; needs compatibility work
+- **#451** (@vitejs/plugin-react 4→6) → Closed; needs compatibility work (lint + E2E failures)
+- **#452** (zod 3→4) → Closed; needs API migration work

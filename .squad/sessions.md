@@ -217,3 +217,62 @@ Ready for Scribe orchestration log + session log entry.
 1 file processed and merged into `decisions.md`:
 - `fry-446-ui-adaptation.md` → merged
 Inbox now empty and ready for next session.
+
+---
+
+## Session: 2026-04-17 (Round 5) — Dependabot Triage + Issues #453 #454
+
+**Trigger:** Dependabot PR batch (#448–#452) triage + feature implementation for A2UI Debug Visualization (#454) and System Prompt Debug View (#453).
+
+**Session Type:** Dependabot triage + feature implementation + review cycle + merge.
+
+### Dependabot Triage
+
+| PR | Description | Action |
+|----|-------------|--------|
+| #448 | Non-breaking group (10 minor/patch updates) | `leela:approved` + `zapp:approved` → merged ✅ |
+| #449 | vite 6 → 8.0.8 | `leela:approved` + `zapp:approved` → merged ✅ |
+| #450 | TypeScript 5 → 6 | CI failing → closed ❌ |
+| #451 | @vitejs/plugin-react 4 → 6 | CI failing → closed ❌ |
+| #452 | zod 3 → 4 | CI failing → closed ❌ |
+
+**Policy Decision:** Major version bumps with failing CI → close immediately and track as planned upgrade tasks. Written by Leela to `.squad/decisions/inbox/leela-dependabot-policy.md` and merged below.
+
+### PRs Merged
+
+| PR | Branch | Issue | Agent | Summary |
+|----|--------|-------|-------|---------|
+| #448 | dependabot/… | — | Dependabot | Non-breaking dependency group (10 minor/patch updates) |
+| #449 | dependabot/… | — | Dependabot | vite 6 → 8.0.8 |
+| #457 | squad/454-debug-a2ui-tree | #454 | Fry | `DebugA2UITree.tsx` — A2UI debug visualization with version discriminant filtering and KNOWN_COMPONENT_TYPES |
+| #458 | squad/453-system-prompt-backend | #453 | Bender | `systemPrompt` in `DebugMetadata`, 8KB cap, prod startup warning, unit tests |
+| #461 | squad/453-system-prompt-frontend | #453 | Fry | Collapsible "System Prompt" section in `DebugPanel.tsx` |
+
+### Issue #454 — A2UI Debug Visualization (squad:fry)
+
+- Fry posted DP → Leela `approved-with-conditions` (3 conditions) + Zapp `approved-with-conditions` (4 conditions)
+- Fry implemented `DebugA2UITree.tsx` addressing all 7 conditions
+- PR #457 opened → both reviewed + approved → CI green → merged ✅
+- Issue #454 auto-closed
+
+### Issue #453 — System Prompt Debug View (squad:hermes + squad:bender + squad:fry)
+
+- Hermes posted DP → Leela `approved-with-conditions` (4 conditions, notably 4 call sites not 3) + Zapp `approved-with-conditions` (3 conditions, notably prod startup warning)
+- **Bender** (backend): `systemPrompt` in `DebugMetadata`, 8KB cap, prod startup warning, unit tests → PR #458 merged ✅
+- **Fry** (frontend): collapsible "System Prompt" section in `DebugPanel.tsx` → PR #461 merged ✅
+- Issue #453 closed ✅
+
+### Reviews
+
+**Leela** reviewed all feature PRs — approved via `leela:approved` label.
+**Zapp** reviewed all feature PRs — approved via `zapp:approved` label.
+
+### Decisions Logged
+
+- `leela-dependabot-policy.md` — Major bumps with failing CI → close and handle as planned upgrade (merged from inbox)
+
+### Inbox Cleared
+
+1 file processed and merged into `decisions.md`:
+- `leela-dependabot-policy.md` → merged
+Inbox now empty and ready for next session.

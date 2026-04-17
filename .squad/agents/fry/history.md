@@ -226,3 +226,16 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - (2026-04-17T06:28:51Z) **Auth E2E tests must use real `request` fixture:** Authentication boundary tests must use Playwright's `request.post()` (real HTTP, no browser context) rather than `page.route()` mock interception. `page.route()` short-circuits the network stack before auth headers are evaluated, making the test assert nothing meaningful about auth enforcement.
 - (2026-04-17T06:28:51Z) **`addMessage` placement in `converse.ts`:** `addMessage` must be called inside each processing branch, not before the branch. Placing it before means the 406 early-return path mutates session state even when no message is processed — leaves the session in an inconsistent state. Side-effect-free 406 path requires `addMessage` to be gated behind the non-406 branch.
 - (2026-04-17T06:28:51Z) **Phase allowlist must delegate to `normalizeConversationPhase()`:** `KNOWN_SERVER_PHASES` allowlist and `guardServerPhase()` should be a wrapper around `normalizeConversationPhase()` from `chat-a2ui.ts`, not a separate maintained set. Maintaining a separate list creates drift when `PHASE_ALIASES` in `chat-a2ui.ts` is updated — any new alias or canonical phase must be added in two places instead of one.
+
+## Round 5 Learnings (2026-04-17 — Issues #454 and #453 frontend)
+
+### Issue #454 — A2UI Debug Visualization (PR #457)
+
+- (2026-04-17) **`DebugA2UITree.tsx` version discriminant:** Use `version === 'v0.9'` (or the current canonical version string) as the primary discriminant when filtering A2UI messages from a mixed event stream. Do not rely on structural duck-typing alone — the version field is the correct type-narrowing key.
+- (2026-04-17) **`KNOWN_COMPONENT_TYPES` usage:** Lookup against `KNOWN_COMPONENT_TYPES` (the registry of valid A2UI component names) must happen at the leaf-render level, not at the tree root. Unknown types should render as a labelled fallback, not silently drop — this preserves debuggability when new components are in-flight.
+- (2026-04-17) **Debug-only component isolation:** Debug visualization components (`DebugA2UITree.tsx`) must be guarded behind the debug flag and never imported in the production bundle path. Co-locate them in a `debug/` subdirectory or equivalent to make the isolation explicit to future readers.
+
+### Issue #453 — System Prompt Debug View, frontend (PR #461)
+
+- (2026-04-17) **Collapsible sections in `DebugPanel.tsx`:** New debug sections must be opt-in collapsed by default to avoid overwhelming the panel on first open. Use the existing `<details>`/`<summary>` (or Fluent `Accordion`) pattern already established in the panel.
+- (2026-04-17) **System prompt display:** The system prompt string from `DebugMetadata.systemPrompt` is already 8KB-capped by the backend before it arrives on the wire; the frontend does not need to truncate it again. Display it verbatim in a `<pre>` block for readability.
