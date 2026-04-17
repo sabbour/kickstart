@@ -49,9 +49,9 @@ app.http("functionName", {
 
 | Endpoint | Method | Route | Auth | Response Format | Description |
 |---|---|---|---|---|---|
-| `converse` | POST | `/api/converse` | Session required | SSE or JSON | Main LLM conversation proxy — multi-round tool calling |
+| `converse` | POST | `/api/converse` | None (rate-limited) | SSE or JSON | Main LLM conversation proxy — multi-round tool calling |
 | `action` | POST | `/api/action` | Session required | JSON | A2UI action event processing |
-| `generate` | POST | `/api/generate` | Session required | SSE or JSON | Codex-powered code generation |
+| `generate` | POST | `/api/generate` | None (rate-limited) | SSE or JSON | Codex-powered code generation |
 | `health` | GET | `/api/health` | None | JSON | Health check (`{ status: "ok" }`) |
 
 #### GitHub Integration
@@ -66,11 +66,11 @@ app.http("functionName", {
 
 | Endpoint | Method | Route | Auth | Response Format | Description |
 |---|---|---|---|---|---|
-| `arm-proxy` | GET/POST/PUT/PATCH/DELETE | `/api/arm-proxy/{*path}` | Azure access token | JSON | Azure Resource Manager CORS proxy |
-| `azure-target` | PUT | `/api/sessions/{sessionId}/azure-target` | Azure access token + session | JSON | Persist Azure subscription / resource group for a session |
-| `azure-deployments-start` | POST | `/api/sessions/{sessionId}/azure-deployments` | Azure access token + session | JSON | Kick off an ARM deployment for a session |
-| `azure-deployments-status` | GET | `/api/azure-deployments/{runId}` | Azure access token | JSON | Poll the status of a running ARM deployment |
-| `deploy-cost-gate` | POST | `/api/sessions/{sessionId}/deploy-gates/cost` | Session required | JSON | Record that the user acknowledged estimated deployment costs |
+| `arm-proxy` | GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS | `/api/arm-proxy/{*path}` | Azure access token | JSON | Azure Resource Manager CORS proxy |
+| `azure-target` | PUT | `/api/sessions/{sessionId}/azure-target` | Azure access token + SWA sign-in + session | JSON | Persist Azure subscription / resource group for a session |
+| `azure-deployments-start` | POST | `/api/sessions/{sessionId}/azure-deployments` | Azure access token + SWA sign-in + session | JSON | Kick off an ARM deployment for a session |
+| `azure-deployments-status` | GET | `/api/azure-deployments/{runId}` | Azure access token + SWA sign-in | JSON | Poll the status of a running ARM deployment |
+| `deploy-cost-gate` | POST | `/api/sessions/{sessionId}/deploy-gates/cost` | SWA sign-in + session | JSON | Record that the user acknowledged estimated deployment costs |
 | `cost-estimate` | POST | `/api/sessions/{sessionId}/cost-estimate` | Session required | JSON | Fetch a live Azure cost estimate for the session's resource line-items |
 
 #### Utility
@@ -200,30 +200,38 @@ Endpoints share a set of utility modules in `packages/web/api/src/lib/`:
 
 #### `POST /api/converse`
 
-**Auth:** Session required (session cookie + SWA principal)  
-**Body:** `{ sessionId: string, message: string, stream?: boolean }`  
-**Returns:** SSE stream (if `Accept: text/event-stream`) or JSON `{ sessionId, message, a2ui, actions }`  
+**Auth:** None (rate-limited)  
+**Body:** `{ sessionId?: string, message: string, messages?: ClientMessage[] }`  
+**Returns:** SSE stream (if `Accept: text/event-stream`) or JSON `{ sessionId, phase, message, a2ui?, model?, usage?, ... }`  
 **Source:** `packages/web/api/src/functions/converse.ts`
 
-Main LLM conversation endpoint. Manages multi-round tool calling and streams incremental output. Every request must include a valid `sessionId` from a previous `/api/converse` response (or use an existing in-memory session).
+Main LLM conversation endpoint. Manages multi-round tool calling and streams incremental output. `sessionId` is optional — if omitted or the in-memory session has expired, a new session is created automatically. Pass `messages` (client-side message history) to rehydrate context across cold starts.
 
 #### `POST /api/action`
 
 **Auth:** Session required  
-**Body:** `{ sessionId: string, actionId: string, context: Record<string, unknown> }`  
-**Returns:** JSON `{ message, a2ui, actions }`  
+**Body:**
+```json
+{
+  "sessionId": "string",
+  "action": { "name": "string", "context": "Record<string, unknown> (optional)" },
+  "context": { "phase": "string (optional)" },
+  "messages": "ClientMessage[] (optional, for cold-start rehydration)"
+}
+```
+**Returns:** JSON `{ success: boolean, sessionId, message?, phase?, a2uiMessages?, model? }`  
 **Source:** `packages/web/api/src/functions/action.ts`
 
-Processes an A2UI action event — called when the user interacts with a button, picker, or other A2UI component. Resolves data bindings and dispatches the action to the LLM.
+Processes an A2UI action event — called when the user interacts with a button, picker, or other A2UI component. Routes by action name prefix (`navigate:` / `nav:` = navigation, `api:` = stubbed, default = reply) and re-prompts the LLM.
 
 #### `POST /api/generate`
 
-**Auth:** Session required  
-**Body:** `{ sessionId: string, ... }`  
-**Returns:** SSE stream (if `Accept: text/event-stream`) or JSON  
+**Auth:** None (rate-limited)  
+**Body:** `{ prompt: string, type?: "dockerfile" | "kubernetes" | "pipeline" | "bicep" | "generic", context?: string }`  
+**Returns:** SSE stream (if `Accept: text/event-stream`) or JSON `{ type, code, responseId }`  
 **Source:** `packages/web/api/src/functions/generate.ts`
 
-Codex-powered code generation endpoint. Streams generated file content back to the client.
+Codex-powered code generation endpoint. Accepts a prompt and optional type hint; returns generated code. No session state — stateless per-request. Streaming is opted into via `Accept: text/event-stream`.
 
 #### `GET /api/health`
 
@@ -301,6 +309,7 @@ Commits files to a new branch and opens a pull request in a single call.
 #### `ANY /api/arm-proxy/{*path}`
 
 **Auth:** Azure access token (`X-Azure-AccessToken` header or SWA Azure auth cookie)  
+**Methods:** GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS  
 **Returns:** Proxied response from `management.azure.com`  
 **Source:** `packages/web/api/src/functions/arm-proxy.ts`
 
@@ -308,7 +317,7 @@ CORS proxy for Azure Resource Manager. Forwards the request path, query paramete
 
 #### `PUT /api/sessions/{sessionId}/azure-target`
 
-**Auth:** Azure access token + session ownership  
+**Auth:** Azure access token + SWA sign-in (`x-ms-client-principal-id` header required) + session ownership  
 **Body:**
 ```json
 {
@@ -325,7 +334,7 @@ Stores the user's chosen Azure subscription and resource group against the sessi
 
 #### `POST /api/sessions/{sessionId}/azure-deployments`
 
-**Auth:** Azure access token + session ownership  
+**Auth:** Azure access token + SWA sign-in (`x-ms-client-principal-id` header required) + session ownership  
 **Body:**
 ```json
 {
@@ -344,7 +353,7 @@ Starts an ARM template deployment. Returns a `runId` that the client polls with 
 
 #### `GET /api/azure-deployments/{runId}`
 
-**Auth:** Azure access token + principal ownership  
+**Auth:** Azure access token + SWA sign-in (`x-ms-client-principal-id` header required) + principal ownership  
 **Returns:** JSON `{ runId, status, outputs, error }`  
 **Source:** `packages/web/api/src/functions/azure-deployments.ts`
 
@@ -352,7 +361,7 @@ Polls deployment status. The `runId` is opaque and encodes the principal identif
 
 #### `POST /api/sessions/{sessionId}/deploy-gates/cost`
 
-**Auth:** Session ownership  
+**Auth:** SWA sign-in (`x-ms-client-principal-id` header required) + session ownership  
 **Body:** `{ estimatedMonthlyTotal: number, currency?: string, source?: string }`  
 **Returns:** JSON `{ sessionId, deployState }`  
 **Source:** `packages/web/api/src/functions/deploy-cost-gate.ts`
@@ -388,19 +397,19 @@ Example: `GET /api/pricing-proxy?$filter=serviceName eq 'Azure Kubernetes Servic
 
 **Auth:** None  
 **Query params:** `stream=true` (optional) — stream a single idea token-by-token  
-**Returns:** JSON `{ ideas: InspirationIdea[] }` or SSE stream  
+**Returns:** JSON `InspirationIdea[]` (array of `{ title, subtitle, prompt }`) or SSE stream  
 **Source:** `packages/web/api/src/functions/inspirations.ts`
 
-Returns carousel inspiration ideas for the landing page. If Azure OpenAI is configured, generates creative app ideas via LLM (`AZURE_OPENAI_INSPIRE_DEPLOYMENT`). Otherwise returns a shuffled subset of hardcoded fallback ideas.
+Returns carousel inspiration ideas for the landing page. Requires Azure OpenAI to be configured — returns `503 Service Unavailable` if `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and a deployment name are not set. When configured, generates creative app ideas via LLM (`AZURE_OPENAI_INSPIRE_DEPLOYMENT` is used if set, otherwise falls back to the chat deployment).
 
 #### `GET /api/inspirations/widgets`
 
 **Auth:** None  
 **Query params:** `stream=true` (optional) — stream a widget prompt token-by-token  
-**Returns:** JSON `{ prompt: string }` or SSE stream  
+**Returns:** JSON `WidgetIdea[]` (array of `{ title: string, subtitle: string, prompt: string }`) or SSE stream  
 **Source:** `packages/web/api/src/functions/widget-inspirations.ts`
 
-Returns Playground widget inspiration prompts. Used by the Playground Create tab to seed the prompt field.
+Returns Playground widget inspiration prompts. If Azure OpenAI is configured, generates AKS operational widget ideas via LLM. Otherwise returns a shuffled fallback idea from a built-in list. Used by the Playground Create tab to seed the prompt field.
 
 #### `POST /api/playground`
 
