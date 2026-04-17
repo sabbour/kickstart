@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #213 "fix: LLM now generates interactive choice components for questions" | S | impl=1m | review=4m | cycles=1 | merged | @sabbour
