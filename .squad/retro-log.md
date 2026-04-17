@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-11 | #113 "docs: Add A2UI v0.9 component authoring SKILL.md" | L | impl=0m | review=5m | cycles=1 | merged | @Copilot
