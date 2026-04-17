@@ -2,7 +2,7 @@ import { tool } from '@openai/agents';
 import { z } from 'zod';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { writeFile, unlink, mkdtemp } from 'node:fs/promises';
+import { writeFile, unlink, mkdtemp, rmdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ToolContribution } from '@kickstart/harness';
@@ -161,6 +161,7 @@ export async function kubectlDryRun(
     return { passed: false, output: message };
   } finally {
     await unlink(manifestPath).catch(() => undefined);
+    await rmdir(dir).catch(() => undefined);
     // Best-effort cleanup — ignore if already removed
   }
 }
