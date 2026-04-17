@@ -10,9 +10,9 @@
  * replace each todo with a live assertion.
  *
  * Expected agent files (Phase A names approved in #477 DP):
- *   packages/pack-core/src/agents/core.orchestrator.agent.md
- *   packages/pack-core/src/agents/core.architect.agent.md
- *   packages/pack-core/src/agents/core.implementer.agent.md
+ *   packages/pack-core/src/agents/core.triage.agent.md
+ *   packages/pack-core/src/agents/core.codesmith.agent.md
+ *   packages/pack-core/src/agents/core.reviewer.agent.md
  *
  * @depends #476 loader-agent.ts (AgentLoader / parseAgentFrontmatter)
  * @depends Phase A of #477 (the three .agent.md files)
@@ -24,7 +24,7 @@ import path from 'node:path';
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const AGENTS_DIR = path.resolve(__dirname, '../../agents');
-const AGENT_NAMES = ['core.orchestrator', 'core.architect', 'core.implementer'];
+const AGENT_NAMES = ['core.triage', 'core.codesmith', 'core.reviewer'];
 
 /** Regex for the pack.verb_noun tool-name format required by the DP §6a. */
 const TOOL_NAME_PATTERN = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9_]*$/;
@@ -54,9 +54,9 @@ describe('pack-core agent frontmatter', () => {
   // ── File existence ──────────────────────────────────────────────────────
 
   describe('file presence', () => {
-    it.todo('core.orchestrator.agent.md exists on disk');
-    it.todo('core.architect.agent.md exists on disk');
-    it.todo('core.implementer.agent.md exists on disk');
+    it.todo('core.triage.agent.md exists on disk');
+    it.todo('core.codesmith.agent.md exists on disk');
+    it.todo('core.reviewer.agent.md exists on disk');
   });
 
   // ── Parse without error ─────────────────────────────────────────────────
@@ -93,9 +93,9 @@ describe('pack-core agent frontmatter', () => {
 
     it('AGENT_NAME_PATTERN matches expected format', () => {
       // Sanity-check the regex itself — this test is live
-      expect(AGENT_NAME_PATTERN.test('core.orchestrator')).toBe(true);
-      expect(AGENT_NAME_PATTERN.test('core.architect')).toBe(true);
-      expect(AGENT_NAME_PATTERN.test('core.implementer')).toBe(true);
+      expect(AGENT_NAME_PATTERN.test('core.triage')).toBe(true);
+      expect(AGENT_NAME_PATTERN.test('core.codesmith')).toBe(true);
+      expect(AGENT_NAME_PATTERN.test('core.reviewer')).toBe(true);
       expect(AGENT_NAME_PATTERN.test('azure.provision')).toBe(false);
       expect(AGENT_NAME_PATTERN.test('core')).toBe(false);
     });
@@ -112,10 +112,10 @@ describe('pack-core agent frontmatter', () => {
   // ── Invocability flags ──────────────────────────────────────────────────
 
   describe('invocability flags', () => {
-    it.todo('core.orchestrator: "user-invocable" is true (entry-point agent)');
-    it.todo('core.orchestrator: "model-invocable" is a boolean when present');
-    it.todo('core.architect: "user-invocable" is false (model-only agent)');
-    it.todo('core.implementer: "model-invocable" is true');
+    it.todo('core.triage: "user-invocable" is true (entry-point agent)');
+    it.todo('core.triage: "model-invocable" is a boolean when present');
+    it.todo('core.codesmith: "user-invocable" is false (model-only agent)');
+    it.todo('core.reviewer: "model-invocable" is true');
     it.todo('agent with "user-invocable: true" appears in registry.listUserAgents()');
   });
 

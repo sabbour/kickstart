@@ -22,7 +22,7 @@ export function makeSessionCtx(
       userActions: ['confirm', 'cancel'],
     },
     recentTurns: [],
-    activeAgent: 'core.orchestrator',
+    activeAgent: 'core.triage',
     pendingUserAction: null,
     recordA2UIEmission(msg) {
       this.a2uiEmissions.push(msg);
