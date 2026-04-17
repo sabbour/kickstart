@@ -3,11 +3,9 @@ name: CI
 on:
   push:
     branches:
-      - v2-rewrite
-  pull_request:
-    branches:
       - main
       - v2-rewrite
+  pull_request:
 
 permissions:
   contents: read
@@ -38,17 +36,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Build core
-        run: npm run build -w @kickstart/core
+      - name: Build all workspaces
+        run: npm run build
 
       - name: TypeScript check (web)
         run: cd packages/web && npx tsc --noEmit
-
-      - name: Build API
-        run: cd packages/web/api && npm run build
-
-      - name: Build web app (Vite)
-        run: cd packages/web && npx vite build
 
       - name: Unit tests
         run: npx vitest run
@@ -79,14 +71,28 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build core
-        run: npm run build -w @kickstart/core
-
-      - name: Build web app (Vite)
-        run: cd packages/web && npx vite build
+      - name: Build all workspaces
+        run: npm run build
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
       - name: Playwright E2E tests
         run: npx playwright test
+
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    needs: [lint-build, e2e]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          lint_build_result="${{ needs.lint-build.result }}"
+          e2e_result="${{ needs.e2e.result }}"
+
+          if [[ ! "$lint_build_result" =~ ^(success|skipped)$ || ! "$e2e_result" =~ ^(success|skipped)$ ]]; then
+            echo "CI failed: lint-build=${lint_build_result}, e2e=${e2e_result}"
+            exit 1
+          fi
+          echo "CI passed: lint-build=${lint_build_result}, e2e=${e2e_result}"
