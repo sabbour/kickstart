@@ -3499,3 +3499,63 @@ B3 is **not** approved yet. The proposed anchored regex and denylist are directi
 ## Outcome
 
 DP #482 is **not fully approved** from security yet. B3 remains open until the validation flow explicitly enforces the anchored allowlist before the denylist.
+
+---
+# Zapp Decision — DP #482 B3 Final Sign-off
+
+**Date:** 2026-04-17  
+**Author:** Zapp (Security Architect)  
+**Issue:** #482 — v2 Step 7: pack-azure  
+**Status:** APPROVE WITH CONDITIONS
+
+## Decision
+
+B3 is now approved based on the latest clarification comment for `validateArmPath()`.
+
+## Evidence Verified
+
+1. **Allowlist guard is explicit and first**
+   - `if (!ARM_PATH_RE.test(path)) throw`
+   - Rejects anything outside the anchored subscription UUID ARM path shape.
+
+2. **Denylist guard is explicit and second**
+   - `if (ARM_PATH_DENY.test(path)) throw`
+   - Rejects encoded traversal payloads and privileged/admin paths.
+
+3. **Fail-closed order is correct**
+   - The DP now shows allowlist enforcement before denylist enforcement, which resolves the prior B3 blocker.
+
+## Outcome
+
+DP #482 is **APPROVE_WITH_CONDITIONS** from the security side. Implementation may proceed once dependencies **#479** and **#480** merge.
+
+---
+# Milestone: PR #548 MERGED — Step 4 pack-core (closes #477 and #503–#506)
+
+**Date:** 2026-04-17
+**Merged by:** Leela (Lead)
+**PR:** #548 — feat(v2): pack-core Phases A–H
+**Into:** v2-rewrite
+**Closes:** #477 (pack-core), #503–#506 (related sub-issues)
+
+## What Shipped
+
+All 8 phases of v2 Step 4 (pack-core) are now in `v2-rewrite`:
+- 3 agents (`corePack` agents with dir-based `.agent.md` manifests)
+- 5 skills (`SKILL.md` files)
+- 6 tools: `read_file`, `write_file`, `list_files`, `fetch_webpage`, `emit_ui`, `validate_artifacts`
+- 40 components (27 basic + 13 rich, including ArchitectureDiagram)
+- 3 guardrails: `token-budget`, `no-pii-in-logs`, `no-secrets-in-artifacts`
+
+## Security clearance history
+
+- **C1 (workspace symlink bypass):** Fixed by adding `fs.realpath()` to all file tools.
+- **C2 (SSRF DNS rebinding):** Fixed at commit `cef36b3` — `resolveAndCheckHostname()` pre-fetches DNS, checks all IPs against private/loopback regex before `fetch()`.
+- **C3 (guardrails not enforced):** Runner calls `getGuardrailsByStage()` — resolved.
+- **`zapp:approved`** applied after DNS rebinding recheck passed.
+
+## Unblocks
+
+- #479 (Runner + SSE) — immediate start
+- #482 (pack-azure) — implementation may proceed once #479/#480 merge (DP now fully approved)
+- #503–#506 sub-issues — closed with this merge

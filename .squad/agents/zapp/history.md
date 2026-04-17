@@ -141,3 +141,15 @@ PR #548 is now security-cleared. `zapp:approved` applied.
 - **Status:** BLOCKED — B3 not yet approved
 - **Finding:** `validateArmPath()` still executes allowlist (`ARM_PATH_RE`) test but only runs `ARM_PATH_DENY.test(path)`. B3 requires explicit allowlist-first, denylist-second: (1) reject when `!ARM_PATH_RE.test(path)`, (2) reject when `ARM_PATH_DENY.test(path)`. Denylist alone is not fail-closed.
 - **Next:** DP must be amended to show explicit allowlist enforcement before Zapp approval. B1–B2, B4–B5 status unchanged.
+
+## Wave 26 — 2026-04-17
+
+### DP #482 pack-azure B3 Final Sign-off — APPROVED
+- **Source:** `zapp-482-b3-final.md`
+- **Status:** APPROVE_WITH_CONDITIONS — DP #482 is now fully security-approved
+- **B3 cleared:** `validateArmPath()` now enforces allowlist-first (`!ARM_PATH_RE.test(path)` → throw), then denylist (`ARM_PATH_DENY.test(path)` → throw). Fail-closed order confirmed.
+- DP #482 implementation may proceed once #479 and #480 merge.
+
+### PR #548 merged into v2-rewrite
+- `zapp:approved` applied; PR #548 merged. Step 4 pack-core complete.
+- All three security blockers cleared: C1 (symlink realpath), C2 (DNS rebinding), C3 (guardrail enforcement).

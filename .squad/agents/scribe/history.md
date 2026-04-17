@@ -87,3 +87,14 @@
 **Still absent:** `fry-482-dp-revision.md`, `zapp-482-dp-recheck.md` (full revision), `bender-pr548-fix.md`, `zapp-pr548-recheck.md` (C1/C3 still pending)
 
 **decisions.md:** 197,712 → 198,596 bytes
+
+## Wave 26 — 2026-04-17
+
+**Files merged:** 2
+- `zapp-482-b3-final.md` → B3 final sign-off: DP #482 is now fully APPROVE_WITH_CONDITIONS from Zapp (implementation proceeds after #479/#480 merge)
+- PR #548 merge milestone recorded: Steps 1–4 complete in v2-rewrite (#477 closed)
+
+**decisions.md:** 198,596 → 200,872 bytes
+**Histories updated:** zapp/history.md (10,676 → 11,344 bytes)
+**All histories below 15 KB:** bender 7,924 / fry 5,025 / hermes 11,926 / leela 6,259 / ralph 225 / scribe (this update) / zapp 11,344
+**No summarization needed**
