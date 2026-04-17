@@ -2,6 +2,7 @@ import type { z } from 'zod';
 
 export interface UserActionContribution {
   name: string;
+  wireName: string;
   description: string;
   parameters: z.ZodTypeAny;
   resultSchema: z.ZodTypeAny;
