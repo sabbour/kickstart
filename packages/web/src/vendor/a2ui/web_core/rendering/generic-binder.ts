@@ -64,64 +64,66 @@ function getFieldBehavior(
   type: z.ZodTypeAny,
   propertyName?: string,
 ): BehaviorNode {
-  let current = type;
+  let current: z.ZodTypeAny = type;
 
   // Unwrap optionals/nullables/defaults
   while (
-    current._def.typeName === 'ZodOptional' ||
-    current._def.typeName === 'ZodNullable' ||
-    current._def.typeName === 'ZodDefault'
+    current instanceof z.ZodOptional ||
+    current instanceof z.ZodNullable ||
+    current instanceof z.ZodDefault
   ) {
-    current = current._def.innerType;
+    current = (
+      current as z.ZodOptional<z.ZodTypeAny> | z.ZodNullable<z.ZodTypeAny> | z.ZodDefault<z.ZodTypeAny>
+    ).unwrap() as z.ZodTypeAny;
   }
 
   if (propertyName === 'checks') {
     return {type: 'CHECKABLE'};
   }
 
-  // Structural matching for A2UI primitives using typeName to avoid dual-module instanceof issues
-  if (current._def.typeName === 'ZodUnion') {
-    const options = current._def.options as z.ZodTypeAny[];
+  // Structural matching for A2UI primitives using instanceof to avoid dual-module issues
+  if (current instanceof z.ZodUnion) {
+    const options = (current as z.ZodUnion<any>).options as z.ZodTypeAny[];
 
     // ActionSchema is a union containing { event: ... }
     const isAction = options.some(
-      o => o._def.typeName === 'ZodObject' && o._def.shape().event,
+      o => o instanceof z.ZodObject && (o as z.ZodObject<any>).shape.event,
     );
     if (isAction) return {type: 'ACTION'};
 
     // Dynamic strings/values are unions containing DataBindingSchema { path: ... } but NOT { componentId: ... }
     const isDynamic = options.some(
       o =>
-        o._def.typeName === 'ZodObject' &&
-        o._def.shape().path &&
-        !o._def.shape().componentId,
+        o instanceof z.ZodObject &&
+        (o as z.ZodObject<any>).shape.path &&
+        !(o as z.ZodObject<any>).shape.componentId,
     );
     if (isDynamic) return {type: 'DYNAMIC'};
 
     // ChildList is a union containing an array and an object with { componentId, path }
     const isChildList = options.some(
       o =>
-        o._def.typeName === 'ZodObject' &&
-        o._def.shape().componentId &&
-        o._def.shape().path,
+        o instanceof z.ZodObject &&
+        (o as z.ZodObject<any>).shape.componentId &&
+        (o as z.ZodObject<any>).shape.path,
     );
     if (isChildList) return {type: 'STRUCTURAL'};
-  } else if (current._def.typeName === 'ZodString') {
+  } else if (current instanceof z.ZodString) {
     // ComponentId falls back to STATIC since we can't perfectly identify it, which is fine because STATIC returns strings as-is.
   }
 
   // Recursive array scraping
-  if (current._def.typeName === 'ZodArray') {
+  if (current instanceof z.ZodArray) {
     return {
       type: 'ARRAY',
-      element: getFieldBehavior(current._def.type),
+      element: getFieldBehavior((current as z.ZodArray<z.ZodTypeAny>).element),
     };
   }
 
   // Recursive object scraping
-  if (current._def.typeName === 'ZodObject') {
+  if (current instanceof z.ZodObject) {
     const shape: Record<string, BehaviorNode> = {};
-    const objShape = current._def.shape();
+    const objShape = (current as z.ZodObject<any>).shape;
     for (const [key, value] of Object.entries(objShape)) {
       shape[key] = getFieldBehavior(value as z.ZodTypeAny, key);
     }

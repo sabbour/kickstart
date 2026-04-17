@@ -101,7 +101,7 @@ export class DataContext {
       const args: Record<string, any> = {};
 
       for (const [key, argVal] of Object.entries(call.args)) {
-        args[key] = this.resolveDynamicValue(argVal);
+        args[key] = this.resolveDynamicValue(argVal as DynamicValue);
       }
 
       const abortController = new AbortController();
@@ -193,7 +193,7 @@ export class DataContext {
       const argSignals: Record<string, Signal<any>> = {};
 
       for (const [key, argVal] of Object.entries(call.args)) {
-        argSignals[key] = this.resolveSignal(argVal);
+        argSignals[key] = this.resolveSignal(argVal as DynamicValue);
       }
 
       if (Object.keys(argSignals).length === 0) {
@@ -285,7 +285,7 @@ export class DataContext {
       const resolvedContext: Record<string, any> = {};
       if (action.event.context) {
         for (const [key, value] of Object.entries(action.event.context)) {
-          resolvedContext[key] = this.resolveDynamicValue(value);
+          resolvedContext[key] = this.resolveDynamicValue(value as DynamicValue);
         }
       }
       return {
