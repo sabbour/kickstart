@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #219 "feat: Expanded demo scenarios covering all conversation phases (#188)" | M | impl=2m | review=4m | cycles=1 | merged | @sabbour
