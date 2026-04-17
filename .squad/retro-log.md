@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #237 "feat: add 19 missing playground components + fix carousel animation" | L | impl=3m | review=5m | cycles=1 | merged | @sabbour
