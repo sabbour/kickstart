@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #108 "feat: Fluent 2 overhaul + remove dark mode (#55, #57)" | XL | impl=1m | review=30m | cycles=1 | merged | @sabbour
