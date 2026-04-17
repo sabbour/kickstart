@@ -153,3 +153,16 @@ PR #548 is now security-cleared. `zapp:approved` applied.
 ### PR #548 merged into v2-rewrite
 - `zapp:approved` applied; PR #548 merged. Step 4 pack-core complete.
 - All three security blockers cleared: C1 (symlink realpath), C2 (DNS rebinding), C3 (guardrail enforcement).
+
+## 2026-04-17 — DP #483 pack-aks-automatic Security Review
+
+**Verdict:** BLOCKED (3 high, 1 major, 1 medium)
+
+1. **🔴 High — `aks:deploy` credential boundary unresolved** — must specify server-only credential path, session-bound target validation, least-privilege namespace-scoped RBAC, explicit ban on cluster-admin.
+2. **🔴 High — guardrail verdict precedence unspecified** — DP introduces `block`+`rewrite` verdicts without priority rule; must define: all guardrails run, any `block` wins, rewrites cannot downgrade a block.
+3. **🔴 High — `aks:deploy` playground stub not gated** — must require `KICKSTART_PLAYGROUND=true` gate; fail-closed; stubs excluded from production runtime.
+4. **🟠 Major — `safeguards.json` load path inconsistent** — must be bundled/static import only; no runtime `fs`/path-based load.
+5. **🟡 Medium — `aks.validate_safeguards` ReDoS** — linear-time regexes, compiled once at module load, manifest size/count ceilings required.
+
+Non-blocking: warnings surface as UI output (not silent rewrite); no production debug bypass.
+`zapp:approved` not applied. Decision filed: `.squad/decisions/inbox/zapp-483-dp-review.md`

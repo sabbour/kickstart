@@ -132,3 +132,44 @@ Decision filed: `.squad/decisions/inbox/leela-483-dp-review.md`
 
 Architecture verdict: `safeguards.json` data/code separation correct; phase gating table accepted; `aks:deploy` resultSchema complete.
 Decision filed: `.squad/decisions/inbox/leela-483-dp-review.md`
+
+## 2026-04-17 — DP #484 pack-github Review
+
+**Verdict:** APPROVE_WITH_CONDITIONS (3 blocking, 2 non-blocking)
+
+**C1 (BLOCKING):** `GITHUB_PATH_ALLOWLIST` missing 4 paths — add `/user/repos`, PR/run/branch status GET patterns. All anchored GET-only, no security regression.
+
+**C2 (BLOCKING):** `github-handoff.ts` must split into browser (`signInWithGitHubPopup` etc.) and server (`listGitHubRepos`, `createGitHubRepo` etc.) modules — single file breaks harness Node.js `execute()` context.
+
+**C3 (BLOCKING):** `github:create_pr` missing `parameters` Zod schema. PR body must be generated server-side from `files` list template, not accepted as raw LLM string (injection vector).
+
+**C4 (non-blocking):** Coordinate with Bender to use `tokens: Record<string, string>` on `SessionCtx` instead of flat `githubToken` field (follows `azureToken` pattern concern).
+
+**C5 (non-blocking):** Agent name `github.publisher` confirmed correct; review request had stale `github.codereviewer` name — no code change.
+
+Open Q answers: token storage = encrypted session record; `set_secret` via TLS resume POST OK (resume route must scrub logs); `github.api_get` single-tool + allowlist correct for v2.
+Decision filed: `.squad/decisions/inbox/leela-484-dp-review.md`
+
+---
+
+## DP Review — #484 (pack-github, Step 9)
+
+**Date:** 2025-07-15
+**Verdict:** APPROVE_WITH_CONDITIONS
+
+| Condition | Summary |
+|-----------|---------|
+| C1 | Add 4 missing paths to `GITHUB_PATH_ALLOWLIST`: `/user/repos`, `/repos/{o}/{r}/pulls/{n}`, `/repos/{o}/{r}/actions/runs/{id}`, `/repos/{o}/{r}/branches` |
+| C2 | Split `github-handoff.ts` into `github-handoff.browser.ts` + `github-api.ts` — cannot mix browser DOM and Node.js in one file |
+| C3 | Specify `github:create_pr` parameters schema explicitly; generate PR body server-side from files list, not as raw LLM string |
+| C4 | Coordinate `tokens: Record<string, string>` on `SessionCtx` with Bender/#479; avoid flat `githubToken` field proliferation |
+
+Answered all 5 of Fry's open questions:
+- Q1: Raw token in encrypted session record — assumption correct
+- Q2 → C2: Browser/server split is mandatory, not optional
+- Q3: TLS + session auth sufficient; Zapp to confirm resume log scrubbing
+- Q4: Single `github.api_get` with allowlist is correct; named tools are a future addition
+- Q5: Gate playground stubs behind `KICKSTART_PLAYGROUND` flag, following #482 precedent
+
+Comment posted: https://github.com/sabbour/kickstart/issues/484#issuecomment-4269269795
+Decision filed: `.squad/decisions/inbox/leela-484-dp-review.md`

@@ -154,3 +154,23 @@
 **decisions.md:** 200,872 bytes (unchanged)
 
 **No commit (no-op wave)**
+
+## Wave 31 — 2026-04-17
+
+**Files merged:** 3
+- `zapp-483-dp-review.md` (worktree `483-security-review`) → DP #483 pack-aks-automatic BLOCKED (3 high: aks:deploy credentials, guardrail precedence, playground stub gate)
+- `leela-483-dp-review.md` (main inbox) → DP #483 APPROVE_WITH_CONDITIONS (C1: harness `skills?` field missing; C2: ArchitectureDiagram already in pack-core → must MOVE; 3 non-blocking)
+- `leela-484-dp-review.md` (main inbox) → DP #484 pack-github APPROVE_WITH_CONDITIONS (C1: allowlist 4 paths; C2: browser/server split; C3: `create_pr` params schema; 2 non-blocking)
+
+**Self-post committed:** Fry DP #484 pack-github history row (added during wave 29 standby)
+
+**decisions.md:** 200,872 → 216,746 bytes (+15,874, +3 files)
+
+**Histories updated:**
+- leela/history.md: 6,259 → 9,932 bytes (+DP #483 + #484 review entries)
+- zapp/history.md: 11,344 → 12,523 bytes (81% — watch next wave)
+
+**Sizes post-wave:** bender 7,924 / fry 5,838 / hermes 11,926 (77%) / leela 9,932 (64%) / ralph 225 / scribe 7,790 / zapp 12,523 (81%)
+**No threshold breaches** — hermes 77% and zapp 81% remain closest
+
+**Still absent:** `fry-483-dp.md`, `fry-484-dp.md`, `bender-pr548-fix.md`, `zapp-pr548-recheck.md`

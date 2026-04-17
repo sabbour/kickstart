@@ -3559,3 +3559,254 @@ All 8 phases of v2 Step 4 (pack-core) are now in `v2-rewrite`:
 - #479 (Runner + SSE) — immediate start
 - #482 (pack-azure) — implementation may proceed once #479/#480 merge (DP now fully approved)
 - #503–#506 sub-issues — closed with this merge
+
+---
+# Zapp Decision — DP #483 pack-aks-automatic Security Review
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Issue:** #483
+**Status:** BLOCKED
+
+## Verdict
+
+The design proposal is **blocked** pending three security clarifications: deployment credential scope, guardrail precedence, and playground stub gating. The rest of the design is directionally acceptable if the conditions below are folded into the DP before implementation starts.
+
+## Findings
+
+1. **🔴 High — `aks:deploy` credential boundary is unresolved**
+   - The DP asks which credential performs AKS deployment, but does not answer it.
+   - It must not use cluster-admin or any broad kubeconfig. The design must specify a server-only credential path, session-bound target validation, and least-privilege scope to the intended cluster and namespace.
+
+2. **🔴 High — guardrail verdict integrity is unspecified**
+   - The DP introduces both `block` and `rewrite` guardrails, but does not define precedence.
+   - The harness types currently expose verdict kinds only, with no priority/deny-overrides rule. The DP must require: evaluate all applicable guardrails, any `block` wins, and rewrites only apply when no block exists.
+
+3. **🔴 High — playground deploy stub is not gated**
+   - The DP includes an `aks:deploy` playground stub but does not require `KICKSTART_PLAYGROUND=true` or production exclusion.
+   - Prior Zapp guidance already made this a critical condition for v2 playground work. The DP must inherit that requirement explicitly.
+
+4. **🟠 Major — `safeguards.json` integrity needs an immutable load path**
+   - The proposal is inconsistent: some text says pack-load/disk semantics, while the tool section says static import.
+   - Security requirement: no runtime `fs`/path-based load for safeguard rules. Ship the rules as a bundled import (JSON import or generated TypeScript constant) and keep the runtime read-only from the pack's perspective.
+
+5. **🟡 Medium — `aks.validate_safeguards` ReDoS posture is underspecified**
+   - The current DP keeps the tool content-only (`{ manifests: string[] }`), so there is no direct manifest-path traversal surface in this tool as written.
+   - However, regexes are executed against attacker-controlled manifest content. The DP should require linear-time regexes only, precompilation once at module load, and hard limits on manifest size/count before validation.
+
+6. **🟢 Low — `ArchitectureDiagram` is acceptable if ported unchanged**
+   - The existing component escapes diagram input, uses Mermaid `securityLevel: 'antiscript'`, strips `<script>` and inline event handlers before DOM insertion, and renders title/description as React text.
+   - That keeps API-derived topology data in the low-risk bucket unless the port weakens those controls.
+
+## Required changes before approval
+
+1. Define `aks:deploy` authn/authz precisely:
+   - server-only credential acquisition
+   - target binding to the approved subscription/resource group/cluster/namespace
+   - namespace-scoped RBAC where possible
+   - explicit ban on cluster-admin credentials
+2. Define guardrail engine precedence:
+   - all applicable guardrails run
+   - any `block` verdict is final
+   - `rewrite` cannot downgrade or mask a block
+   - deterministic ordering for multiple rewrites
+3. Add the playground control:
+   - `KICKSTART_PLAYGROUND=true` gate
+   - fail-closed behavior when the gate is absent
+   - stubs excluded from production builds/runtime
+4. Clarify safeguard rule loading:
+   - bundled/static import only
+   - no runtime file-path load
+5. Add safeguard validator hardening notes:
+   - linear/safe regex subset only
+   - compile once
+   - manifest count/size ceilings
+
+## Non-blocking answers to the DP questions
+
+- **Should warnings trigger rewrite?** No. Warnings should be surfaced as structured validation output/UI, not as a rewrite that silently mutates model output.
+- **Should there be a debug escape hatch for terminology rewrites?** No production bypass. If debugging is needed, make it server-controlled and audit-visible rather than session-controlled by packs.
+
+---
+# Decision — Leela Design Review #483: pack-aks-automatic
+
+**Date:** 2026-04-17
+**Author:** Leela (Lead)
+**Issue:** #483 — v2 Step 8: pack-aks-automatic — agents, skills, safeguards, components, guardrails
+**Verdict:** APPROVE_WITH_CONDITIONS
+
+---
+
+## Summary
+
+The DP is architecturally sound on the `safeguards.json` data/code separation. Two blocking conditions must be resolved before code is written.
+
+---
+
+## Blocking Conditions
+
+### C1 — Harness `Pack` type missing `skills?: Skill[]`
+
+The actual shipped `Pack` interface (`packages/harness/src/types/pack.ts` as of PR #548) does NOT include a `skills?: Skill[]` field. `PackRegistry.loadSkills()` only walks `skillsDir` for `.md` files — there is no code path to register inline `Skill` objects.
+
+The DP's `deployment-safeguards` skill requires dynamic body generation from `safeguards.json` at pack load time, which requires an in-memory `Skill` registration path.
+
+**Resolution required before #523 ships:**
+- Add `skills?: Skill[]` to `Pack` interface in `packages/harness/src/types/pack.ts`
+- Extend `PackRegistry.loadSkills()` to merge `pack.skills ?? []` after file-walking
+- Set `source: { kind: "inline" }` on programmatically built `Skill` objects
+- The brief already specifies this field; the implementation simply didn't include it (scope gap in #477)
+
+### C2 — `ArchitectureDiagram` already in pack-core (wrong pack)
+
+PR #548 placed `ArchitectureDiagram.tsx`, `architectureDiagramIconRegistry.ts`, and `architectureDiagramUtils.ts` into `pack-core/src/components/rich/`, registering as `core/ArchitectureDiagram`. The v2 brief (§7 pack inventory) lists ArchitectureDiagram under `pack-aks-automatic` as `aks/ArchitectureDiagram`, not pack-core. Pack-core's rich component list in the brief does not include it.
+
+The DP says "port from v1 catalog" — but the source has already moved to pack-core. The v1 catalog version at `packages/web/src/catalog/components/` is now superseded.
+
+**Resolution required before #525 ships:**
+- #525 implementer must MOVE (not copy) `ArchitectureDiagram.tsx`, `architectureDiagramIconRegistry.ts`, `architectureDiagramUtils.ts`, and their tests from `pack-core/src/components/rich/` to `pack-aks-automatic/src/components/`
+- Remove the imports and registration from `pack-core/src/core-pack.ts`; adjust component count
+- Re-register as `aks/ArchitectureDiagram` (name prefix changes from `core/` to `aks/`)
+- Delete the v1 source at `packages/web/src/catalog/components/ArchitectureDiagram*`
+- The #525 PR must include the pack-core modification — this is a cross-pack change, not just a port
+- The porter owns this cleanup entirely — Hermes is not in scope for it
+
+---
+
+## Non-blocking Conditions
+
+### C3 — `aks/DeploymentConfirm` component missing from all sub-issues
+
+`aks:deploy` user action declares `confirmComponent: "aks/DeploymentConfirm"` but this component appears in no sub-issue's "Files affected." Add to #526's scope.
+
+### C4 — `package.json` / `tsconfig.json` not assigned
+
+The `pack-aks-automatic` package initialization (package.json, tsconfig.json) is not in any sub-issue. Add to #523.
+
+### C5 — Zapp's Q2 must be answered before #524 ships
+
+The deploy credential mechanism (re-use azure-auth token from pack-azure vs. new AKS-scoped token) determines the implementation of `deploy.ts`. Do not merge #524 until Zapp closes Q2.
+
+---
+
+## Architecture Findings
+
+### `safeguards.json` — data/code separation is correct
+
+No conflict with `GuardrailContribution`. `safeguards.json` is the rule data; `GuardrailContribution.check()` is TypeScript code that consumes it. The guardrail engine calls `check(ctx, payload)` — a typed async function — never JSON directly. The "single source of truth" claim is valid: three consumers (skill prose, tool validation, guardrail enforcement) all import the same JSON array. Zero duplication of rule definitions.
+
+### Phase gating
+
+| Phase | Can start when | Hard dependency |
+|-------|---------------|-----------------|
+| A+B: agent MD, SKILL.md, safeguards.json (#523) | Now | None (text files) |
+| C: tools, user action (#524) | #477 types accessible | Harness types only |
+| D: safeguards.json (in #523) | Now | None (data only) |
+| E: ArchitectureDiagram port (#525) | C1+C2 resolved | #477 + pack-core modification |
+| F+G: guardrails, remaining components, manifest (#526) | #477 + #482 merge | pack-azure needed for deploy |
+
+### `aks:deploy` resultSchema
+
+Present and complete: `{ status: "Succeeded" | "Failed", url?: string }`. Confirms deployment outcome, not just intent. Playground stub returns correctly shaped object. No change needed.
+
+### Scope vs sub-issues
+
+| DP Phase | Sub-issue | Coverage |
+|----------|-----------|----------|
+| A+B: agents, skills, safeguards.json | #523 | ✅ Covered |
+| C: tools + user action | #524 | ✅ Covered (minus C5 credential Q) |
+| E: ArchitectureDiagram port | #525 | ⚠️ Must address C2 |
+| F+G: guardrails, components, manifest | #526 | ⚠️ Must add DeploymentConfirm (C3) |
+
+---
+
+## Q3 Answer — In-memory skills
+
+**Not currently supported; harness patch required.** `PackRegistry.loadSkills()` only reads from `skillsDir` (file walk). The `Pack` interface has no `skills?: Skill[]` field in the shipped implementation. To support the `deployment-safeguards` skill being built at load time from `safeguards.json`, add `skills?: Skill[]` to `Pack` type and extend `loadSkills()` to merge them. This matches the brief's intent (the brief shows this field in the spec but it was omitted from #477's implementation). File as a micro-fix under #477 scope, implement in `squad/477-pack-core-test-scaffold` or equivalent.
+
+## Q4 Answer — ArchitectureDiagram port ownership
+
+**The #525 implementer owns the full cross-pack move.** The file was already ported from v1 catalog to pack-core in PR #548. The DP's premise ("port from catalog/") is outdated. #525 must move the files from pack-core to pack-aks-automatic, update both pack manifests, move tests, and delete the v1 source. Hermes is not involved. The PR must touch both `pack-core` and `pack-aks-automatic`.
+
+---
+# Decision: pack-github DP Review — Issue #484
+
+**Author:** Leela (Lead)
+**Date:** 2025-07-15
+**Issue:** [#484 — v2 Step 9: pack-github](https://github.com/sabbour/kickstart/issues/484)
+**Verdict:** APPROVE_WITH_CONDITIONS
+
+---
+
+## Conditions
+
+### C1 — Expand `GITHUB_PATH_ALLOWLIST` (required before merge)
+
+Current 7-pattern allowlist is insufficient for `github.publisher`'s full use case. Missing paths:
+
+| Missing path | Why needed |
+|---|---|
+| `/user/repos(\?.*)?` | List user's personal repos (not just org repos) |
+| `/repos/[^/]+/[^/]+/pulls/[0-9]+` | Check PR status after creation |
+| `/repos/[^/]+/[^/]+/actions/runs/[0-9]+` | Individual run status (not just list) |
+| `/repos/[^/]+/[^/]+/branches(\?.*)?` | Check branch existence before create |
+
+Add these four patterns. All four are anchored GET-only reads — no security regression.
+
+### C2 — Split `github-handoff.ts` into browser and server modules (required before merge)
+
+A single `github-handoff.ts` file mixing browser DOM APIs (`window`, `popup`) with Node.js-safe REST calls will break in the harness `execute()` server context. The bundler cannot tree-shake across `userAction` boundaries.
+
+Required split:
+- `services/github-handoff.browser.ts` — `signInWithGitHubPopup`, `buildGitHubLoginUrl`, `signOutGitHub` (browser only, imported by component layer)
+- `services/github-api.ts` — `listGitHubRepos`, `createGitHubRepo`, `getGitHubRepo` (Node.js-safe, imported by `execute()` functions)
+
+Do **not** import browser module from any `execute()` function. Vitest/Node will fail at import time.
+
+### C3 — Specify `github:create_pr` parameter schema (required before merge)
+
+The DP shows `resultSchema` (what the browser returns) but omits the `parameters` Zod schema (what the LLM passes in). If `prBody` is a direct free-form LLM string parameter, it's an injection vector regardless of downstream sanitization.
+
+Required: show the `parameters` schema in the DP and restrict accordingly:
+- `files: z.array(z.string())` — list of generated artifact paths (no free-form content)
+- `branch: z.string().regex(BRANCH_NAME_RE)` — pre-validated
+- `title: z.string().max(255)` — reasonable
+
+The PR body should be **generated server-side** from the `files` list (template: "Generated AKS deployment artifacts: {files}"), not accepted as a raw LLM string. The LLM should not be able to inject arbitrary markdown into a git commit or PR body.
+
+### C4 — Use `tokens: Record<string, string>` on `SessionCtx` (coordinate with Bender/#479)
+
+Adding `githubToken: string` as a flat field on `SessionCtx` after `pack-azure` added `azureToken` would give us two provider-specific fields. This won't scale to future packs.
+
+Before implementing: coordinate with Bender to update `SessionCtx` in #479 scope to:
+```typescript
+tokens: Record<string, string>;  // keyed by provider: "github", "azure", etc.
+```
+then access as `ctx.session.tokens["github"]`. If #479 is already merged with `azureToken` flat, file a follow-up refactor issue rather than blocking this DP.
+
+### C5 — Agent name confirmation (minor — documentation only)
+
+DP uses `github.publisher` throughout — correctly matching the v2 brief. The review request incorrectly referred to `github.codereviewer` (stale name). No code change needed; just confirming the DP is right.
+
+---
+
+## Open Questions — Answers
+
+**Q1 — Token storage boundary:** Raw OAuth access token stored in encrypted session record, loaded into `SessionCtx` on every turn. Same pattern as azure auth (#482). Fry's assumption is correct — no per-request exchange needed. The session record is the encryption boundary.
+
+**Q2 — `github-handoff.ts` split:** Browser-side functions (`signInWithGitHubPopup`, `buildGitHubLoginUrl`) must stay in the browser component layer. Server-side API calls (`listGitHubRepos`, `createGitHubRepo`) must live in `execute()` or a server-safe service module. **This is C2 above — not optional.** A single shared file will fail in the harness Node.js context.
+
+**Q3 — `github:set_secret` transport:** TLS + session auth is sufficient for the resume POST body transit. The secret value flow (SecretSetter → HTTPS resume POST → Runner → github-handoff execute → GitHub API over HTTPS) is acceptable. **Condition:** the resume route must scrub request bodies from structured logs. The `no-pii-in-logs` guardrail from pack-core is the enforcement point — Zapp should verify the resume endpoint's log middleware applies this guardrail before #484 merges.
+
+**Q4 — `github.api_get` vs named tools:** Single generic tool with allowlist is the correct call for v2. Backwards-compatible named tools (`github.list_repos`, `github.get_repo`) can be added later for observability without schema migration. Proceed as proposed.
+
+**Q5 — Playground auth stubs:** Gate behind `KICKSTART_PLAYGROUND` flag, same as pack-azure (#482) precedent. This is the right answer. All 6 user-action stubs should be in `playground/stubs.ts` as a named export (see pattern from #482).
+
+---
+
+## Architecture Notes
+
+- Token isolation design is solid. Three-layer defence (no-param token, allowlist, GET-only) matches pack-azure pattern.
+- `github.publisher` agent scope matches the brief exactly. Single-agent design is correct — the Handoff phase is a focused linear flow, not a multi-agent workflow.
+- `SecretSetter` using Fluent `PasswordField` with value posted directly to resume endpoint is acceptable. Confirm value is not held beyond the controlled input render cycle.
+- Skill split (oidc / workflow-structure / pr-conventions) is clean and maps directly to v1 prompt sections. Good decomposition.
