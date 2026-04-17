@@ -241,7 +241,7 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
     const artifactPath = str(activeFile.artifactPath);
     if (artifactPath) {
       const artifact = getArtifact(artifactPath);
-      return artifact ? artifact.content : null;
+      return artifact ? String(artifact.content ?? '') : null;
     }
     return str(activeFile.content) ?? null;
   }, [activeFile, getArtifact]);

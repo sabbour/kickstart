@@ -29,7 +29,7 @@ export const DataBindingSchema = z
 export const FunctionCallSchema = z
   .object({
     call: z.string().describe('The name of the function to call.'),
-    args: z.record(z.any()).describe('Arguments passed to the function.'),
+    args: z.record(z.string(), z.any()).describe('Arguments passed to the function.'),
     returnType: z
       .enum(['string', 'number', 'boolean', 'array', 'object', 'any', 'void'])
       .default('boolean'),
@@ -127,7 +127,7 @@ export const ActionSchema = z
       .object({
         event: z.object({
           name: z.string(),
-          context: z.record(DynamicValueSchema).optional(),
+          context: z.record(z.string(), DynamicValueSchema).optional(),
         }),
       })
       .describe('Triggers a server-side event.'),
