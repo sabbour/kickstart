@@ -13,8 +13,10 @@
   },
   "dependencies": {
     "@azure/functions": "^4.6.0",
+    "@openai/agents": "0.8.3",
     "bicep-node": "^0.0.9",
-    "dompurify": "^3.4.0"
+    "dompurify": "^3.4.0",
+    "openai": "6.34.0"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"

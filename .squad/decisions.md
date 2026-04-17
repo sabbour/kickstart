@@ -1468,3 +1468,270 @@ Two explicit checkpoints should be added to the architecture spike:
 **Enforcement:** Merge Gate section in pr-workflow/SKILL.md explicitly prohibits `--admin`. Ralph must be updated to never attempt admin bypass.
 
 **Consequence:** Any future `--admin` merge is a critical incident requiring immediate investigation and remediation.
+
+---
+
+### 2026-04-17: PR feedback must be explicitly acknowledged and threads resolved
+**By:** Ahmed Sabbour (process fix after #405 audit)
+**What:** When any agent addresses PR review feedback (from Copilot, Leela, Zapp, or any reviewer), they MUST:
+  1. Reply to the specific comment explaining what was done
+  2. Resolve the review thread via the GitHub GraphQL resolveReviewThread mutation
+  3. Verify 0 unresolved threads before attempting merge
+Silently fixing code without acknowledging the comment is a process violation. Unresolved threads will block the branch protection gate (require_conversation_resolution: true).
+**Why:** #407–#426 were merged without addressing Copilot review comments. The branch protection's require_conversation_resolution was not enforced at the time but is now. This prevents that class of merge-blocking from recurring.
+
+---
+
+# Decision: Retroactive Audit Findings for PRs #407–#426
+
+**Author:** Hermes (Tester)
+**Date:** 2026-04-17
+**Context:** 11 PRs merged without human review during #405 audit session
+
+## Summary
+
+Audited all 11 PRs. Found 52 unresolved Copilot review threads. Created 8 follow-up issues:
+
+### P1 — Runtime Risk
+- **#428** — `advancePhase()` throws on invalid phase strings (PRs #412, #418)
+- **#429** — System prompt context variables not injected (PR #412)
+
+### P2 — Quality / Correctness
+- **#430** — API reference docs: 19 inaccuracies vs implementation (PR #424)
+- **#431** — Skill vocabulary: mutable shared arrays + missing public export (PR #416)
+- **#432** — Deployment docs: hardcoded subscription/tenant/resource group (PR #408)
+- **#435** — Phase docs: deleted test refs, wrong code examples (PRs #421, #426)
+
+### P3 — Tech Debt
+- **#433** — Custom component count hardcoded without automated assertion (PR #422)
+- **#434** — Cross-doc inconsistency: stale "both kits use legacy" claims (PRs #415, #420, #426)
+
+## Decision
+
+P1 issues (#428, #429) should be prioritized immediately. All merged code PRs had substantive unaddressed review comments — merging without review should not be repeated.
+
+## Tracking Issue
+
+**#436** — Full summary with per-PR breakdown table.
+
+---
+
+# Decision: advancePhase() must be crash-safe at all call sites
+
+**Date:** 2026-04-17
+**Author:** Bender
+**Issue:** #428
+
+## Decision
+
+`advancePhase()` in `packages/core/src/engine/phases.ts` now accepts `Phase | string` and falls back to `Phase.Discover` for any unrecognised input. It must never throw because it is called on every LLM turn, and client rehydration can restore stale phase strings that no longer exist in the current enum.
+
+All API boundary callers (converse, action) must validate phase strings with `isPhase()` before trusting them as `Phase` enum values. Do not cast raw strings to `Phase` without guarding first.
+
+## Rationale
+
+A single unrecognised phase string from a rehydrated session caused `getPhaseDefinition()` to throw, crashing the entire turn. The fix is fail-closed-but-safe: fall back to `Phase.Discover` (first phase) rather than propagating an error.
+
+## Affected files
+
+- `packages/core/src/engine/phases.ts` — implementation
+- `packages/web/api/src/functions/action.ts` — caller updated
+- `packages/web/api/src/functions/converse.ts` — already guarded via `normalizeConversePhase`
+
+---
+
+# Decision: Vocabulary arrays — readonly but not public API
+
+**Issue:** #431
+**PR:** #438
+**Date:** 2026-04-17
+
+## Decision
+
+`*_PATTERNS` arrays in `skill-vocabulary.ts` are typed `readonly RegExp[]`.
+`*_KEYWORDS` were already readonly via `as const`.
+
+Vocabulary symbols are **not** added to the public `src/index.ts`.
+They remain in `engine/index.ts` (internal barrel only).
+
+## Rationale
+
+No consumers outside `packages/core` import these symbols (grep confirmed).
+They are an implementation detail of the skill-injection mechanism (Mechanism A + B).
+Exposing them as public API would create a contract with no real consumers and require
+semver bumps for any future vocab changes.
+
+## Type fix
+
+`DOMAIN_PATTERNS` in `resolveConversationSkills.ts` widened its `patterns` field from
+`RegExp[]` to `readonly RegExp[]` so the narrower vocabulary types assign cleanly.
+
+---
+
+# Decision: Explicit Parts Injection for System Prompt Context Vars
+
+**Date:** 2026-04-17
+**Author:** Fry
+**Issue:** #429
+**PR:** #437
+
+## Decision
+
+In `buildSystemPrompt()`, every runtime context variable that the LLM narrative references as "injected" MUST be explicitly pushed as a `## Section` block into the `parts` array. Storing a value in `vars` and relying on `interpolate()` is not sufficient unless the narrative template contains a matching `{{placeholder}}` token.
+
+## Rationale
+
+The `interpolate()` call only substitutes `{{token}}` markers in the narrative string. If no such marker exists for a variable, the computed value is silently dropped. The narrative text "Read appDefinition (injected)" is an LLM instruction, not an automatic injection mechanism. The three context vars (`appDefinition`, `azureContext`, `repoInfo`) were built but never reached the LLM.
+
+## Pattern Going Forward
+
+When adding new runtime context (e.g., pricing data, deployment state), always do both:
+1. Assign to `vars["myKey"]` for use in any narrative `{{myKey}}` placeholders.
+2. Push an explicit section: `parts.push(\`\n## My Section\n\n${vars["myKey"]}\`)` so the LLM reliably receives it.
+
+## Affected Files
+
+- `packages/core/src/prompts/system-prompt.ts` — `buildSystemPrompt()` parts composition
+
+---
+
+# Decision: azure-kit.ts uses the typed skill path — docs must reflect this
+
+**Date:** 2026-04-17
+**Author:** Fry
+**Issue:** #434
+**PR:** #440
+
+## Decision
+
+The typed `kit.skills[]` (Path 1) in `skill-resolver.ts` is **active in production**.
+`azure-kit.ts` registers `skills: azureIacSkills` at line 573.
+`github-kit.ts` uses the legacy `kit.prompts[]` / `kit.phasePrompts{}` path.
+
+Both paths are valid and both are used. "Both existing kits use legacy" is incorrect.
+
+## Impact on Docs
+
+Any architecture doc that claims the typed skill path is "dormant", "unused", or "no production kit uses it" is incorrect and must be updated. The canonical truth is:
+
+| Kit | Resolution Path |
+|-----|----------------|
+| `azure-kit.ts` | Typed `kit.skills[]` (Path 1) |
+| `github-kit.ts` | Legacy `kit.prompts[]` / `kit.phasePrompts{}` (Path 2) |
+
+## Files Updated
+
+- `docs-site/docs/architecture/overview.md` — corrected cleanup item 2 and the exported-but-uncalled warning (done in #402)
+- `docs-site/docs/architecture/prompt-pipeline.md` — corrected dormant warning and cleanup item 3; marked item 1 done (#402)
+- `docs-site/docs/architecture/skill-injection.md` — corrected cleanup item 3 description
+
+---
+
+# Decision: Custom Component Count Contract Test (Issue #433)
+
+**Date:** 2026-04-17
+**Author:** Hermes (Tester)
+**Issue:** #433
+**PR:** #443
+
+## Decision
+
+Chose **Option A** (contract test) over Option B (remove hardcoded count from docs).
+
+## Rationale
+
+The `.tsx` file extension in `packages/web/src/catalog/components/` is a reliable source of truth: every component implementation is a `.tsx` file, and every non-component file in that directory (test files, utilities, registry, setup) uses `.ts`. This makes a filesystem count unambiguous and maintenance-free.
+
+## Test Location
+
+`packages/core/src/__tests__/custom-component-count.test.ts` — consistent with where `catalog.test.ts` enforces the base-33 count.
+
+## Change Protocol
+
+When a new custom component is added:
+1. Bump `CUSTOM_COMPONENT_COUNT` in the test file
+2. Add the component name to `EXPECTED_CUSTOM_COMPONENTS`
+3. Update `docs-site/docs/architecture/overview.md`
+4. Update `docs-site/docs/components/custom-catalog.md`
+
+The failing test acts as the reminder.
+
+---
+
+# Decision: PR Batch Review #437–#443
+
+**Date:** 2026-04-17
+**Author:** Leela (Lead)
+**Status:** All approved
+
+## Summary
+
+Reviewed 7 PRs from the retroactive audit follow-up (issues #428–#435). All approved via `leela:approved` label.
+
+## PR Decisions
+
+| PR | Verdict | Notes |
+|----|---------|-------|
+| #437 | ✅ Approved | `buildSystemPrompt()` vars (`azureContext`, `repoInfo`, `appDefinition`) are properly built before injection; tests added for all 3 sections. |
+| #438 | ✅ Approved | `readonly RegExp[]` is a correct type safety improvement; `DOMAIN_PATTERNS` consumer updated consistently. |
+| #439 | ✅ Approved | Core fix (non-throwing `advancePhase`, `isPhase()` export) is complete. Copilot thread about partial `action.ts` propagation addressed: `safePhase` improves the phase-indicator index; full propagation through A2UI payload is a follow-up. Thread resolved. |
+| #440 | ✅ Approved | Doc fixes accurate — azure-kit typed path marked active, github-kit legacy description corrected, stale cleanup items struck through. |
+| #441 | ✅ Approved | 3 Copilot threads resolved: (1) jq `contains` is order-insensitive for arrays — existing command correct; (2) wide scope accepted given cohesive audit context; (3) Phase enum gap acknowledged, follow-up logged. |
+| #442 | ✅ Approved | Hardcoded subscription ID and tenant domain replaced with placeholders + `:::info` callout. Clean. |
+| #443 | ✅ Approved | Contract test count (22) verified against live file system. `import.meta.url` path resolution is correct across workspaces. Both count and exact-set assertions provide good coverage. |
+
+## Follow-Up Items Logged
+
+1. **Full `safePhase` propagation in `action.ts`** — `currentPhase` (original string) still flows into the A2UI payload and response phase field when it's invalid. A follow-up issue should propagate `safePhase` end-to-end through the `callLLM` return and the A2UI `ConversationPhase` component payload.
+
+2. **`contributing.md` Phase enum step** — Adding a phase requires updating `Phase` enum in `packages/core/src/engine/types.ts` in addition to `PHASE_DEFINITIONS`. A follow-up should add step "Add the new phase as a member of the `Phase` enum in `packages/core/src/engine/types.ts`" to the contributing guide.
+
+3. **Process:** Future squad PRs should separate process/workflow changes from documentation fixes — opening separate PRs per concern area.
+
+---
+
+# Zapp Decision — PR Security Gate Batch (#437–#443)
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Status:** Approved (all 7 PRs)
+
+## Scope
+Security review of PRs **#437, #438, #439, #440, #441, #442, #443**.
+
+## Findings Summary
+- **#437** (`buildSystemPrompt` context injection): reviewed prompt-injection boundary handling. `appDefinition`, `azureContext`, and `githubContext` are sanitized (`sanitizePromptValue`), delimiter-neutralized, JSON-encoded, and wrapped with context boundaries before prompt insertion. **No exploitable injection path found in this delta.**
+- **#438** (`readonly RegExp[]` typing): type-only hardening; no runtime security impact.
+- **#439** (`advancePhase` fallback): no auth/authz bypass introduced by fallback behavior; change is state-guard behavior.
+- **#440** docs-only updates; no security risk introduced.
+- **#441** docs/workflow accuracy updates; no security vulnerability introduced.
+- **#442** deployment docs placeholders: verified removal of hardcoded real subscription/tenant values; retained values are placeholders/examples.
+- **#443** test/docs-only updates; no security risk introduced.
+
+## Review Feedback Loop Compliance
+- Replied to and resolved all open review threads found during this batch (PRs #439, #441).
+- Verified unresolved thread count is **0** on all seven PRs before applying Zapp gate label.
+
+## Gate Action
+Applied label **`zapp:approved`** to PRs: #437, #438, #439, #440, #441, #442, #443.
+
+---
+
+# Zapp Decision — PR #444 API Auth Docs Accuracy
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Status:** Approved
+
+## Scope
+Security review of PR #444 (`squad/430-api-docs-accuracy`) updating API endpoint reference docs.
+
+## Security Validation
+- Verified Azure-sensitive endpoint auth docs now match implementation:
+  - `azure-target`, `azure-deployments-start`, `azure-deployments-status`, `deploy-cost-gate` all require SWA principal via `x-ms-client-principal-id` (`getPrincipalId` / `requireAzureAccessToken`) plus ownership checks.
+- Verified `arm-proxy` method list includes `HEAD` and `OPTIONS`, matching handler registration.
+- Verified `converse` and `generate` are anonymous with rate limiting; no misleading "session required" claim remains for those endpoints.
+- Verified inspirations endpoint behavior docs align with runtime behavior (`/inspirations` 503 when OpenAI unconfigured; `/inspirations/widgets` fallback behavior).
+
+## Outcome
+No new security risk introduced and no misleading auth guidance detected. Applied `zapp:approved` label to PR #444.

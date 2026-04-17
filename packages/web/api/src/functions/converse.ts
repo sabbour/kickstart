@@ -37,8 +37,7 @@ import type {
   SetupGenerationSnapshot,
   ConversationSkillsContext,
 } from "@kickstart/core";
-import {
-  getSession, createSession, getPrincipalId, hydrateSession, addMessage,
+import { getSession, createSession, getPrincipalId, hydrateSession, addMessage,
   adoptSessionPrincipal, isSessionOwnedBy, recordUsage,
   extractArtifactsFromA2UI, upsertArtifact,
 } from "../lib/session-store.js";
@@ -64,6 +63,11 @@ import {
   serializeSetupGenerationEvent,
   shouldUseStepwiseGeneration,
 } from "../lib/setup-generation.js";
+
+/** Return true when the @openai/agents SDK runtime flag is set. */
+function isAgentsSdkEnabled(): boolean {
+  return process.env.KICKSTART_AGENTS_SDK === "true";
+}
 
 interface ConverseRequest {
   sessionId?: string;
@@ -212,6 +216,9 @@ app.http("converse", {
       const debugMode = isDebugMode(request);
       const setupControlAction = extractSetupControlAction(body.message);
 
+      // #326 workspace-first contract: stepwise generation ALWAYS takes priority
+      // over the SDK adapter flag. This preserves the ordered workspace streaming
+      // path required by #326/#327/#328 — the SDK gate must never bypass it.
       if (shouldUseStepwiseGeneration(session, currentPhase)) {
         const stepwiseModelRoute = resolveConverseModelRoute(currentPhase, {
           trustedPhase: true,
@@ -231,6 +238,26 @@ app.http("converse", {
           debugMode,
           setupControlAction,
         );
+      }
+
+      // -----------------------------------------------------------------------
+      // Feature flag: @openai/agents SDK runtime adapter (KICKSTART_AGENTS_SDK)
+      // Checked AFTER the #326 workspace-first gate above — stepwise generation
+      // always takes priority. When enabled, the SDK handles LLM calls + tool
+      // execution. The session, SSE contract, and security controls are preserved.
+      // -----------------------------------------------------------------------
+      if (isAgentsSdkEnabled()) {
+        if (wantsStream) {
+          // SDK path does not yet emit SSE; reject rather than silently serve
+          // a JSON body into the client's streaming parser (thread 8).
+          return {
+            status: 406,
+            jsonBody: {
+              error: "Streaming responses are not supported when the Agents SDK is enabled.",
+            },
+          };
+        }
+        return handleAgentsSdkTurn(session, principalId, body.message, context);
       }
 
 
@@ -821,3 +848,47 @@ function extractImplicitFlags(rawJson: string): ParsedImplicitFlags {
 
 // extractArtifactsFromA2UI, upsertArtifact, inferLanguage, extractArtifactMetadata,
 // and MAX_TRACKED_ARTIFACTS are centralized in session-store.ts and imported above.
+
+// ---------------------------------------------------------------------------
+// Agents SDK path (KICKSTART_AGENTS_SDK=true)
+// ---------------------------------------------------------------------------
+
+/**
+ * Handle a converse turn through the @openai/agents SDK runtime adapter.
+ *
+ * The session, principal ownership, A2UI contract, and security controls are
+ * identical to the legacy path. This function gates all raw SDK output through
+ * agents-sse-adapter.ts (allowlist) and agents-route-planner.ts (phase control).
+ *
+ * The agents-runner module is dynamically imported here so that
+ * setTracingDisabled() (a module-load side effect in agents-azure-provider.ts)
+ * only fires when the feature flag is actually enabled, keeping the cold-start
+ * path and non-SDK request handlers free of SDK side effects (thread 9).
+ */
+async function handleAgentsSdkTurn(
+  session: ApiSession,
+  principalId: string | undefined,
+  userMessage: string,
+  context: InvocationContext,
+): Promise<HttpResponseInit> {
+  void context;
+  const { runAgentTurn } = await import("../lib/agents-runner.js");
+  const { adapted, currentPhase } = await runAgentTurn({ userMessage, session, principalId });
+
+  const safePhase = getSafeCurrentPhase(currentPhase);
+  const phaseA2ui = buildPhaseIndicator(safePhase);
+
+  const responseBody: ConverseResponse = {
+    sessionId: session.state.sessionId,
+    phase: safePhase,
+    message: adapted.message,
+    a2ui: [...phaseA2ui, ...adapted.a2uiMessages],
+  };
+
+  if (adapted.filesComplete === false) {
+    responseBody.autoContinue = true;
+    responseBody.autoContinuePrompt = "Generate next set of files";
+  }
+
+  return { status: 200, jsonBody: responseBody };
+}

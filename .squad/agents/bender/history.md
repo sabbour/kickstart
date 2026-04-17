@@ -25,6 +25,7 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 
 ## Work Log
 
+- (2026-05-15) Agents SDK adapter: Implemented `@openai/agents` SDK backend runtime adapter for Issue #445 — 5 new modules (agents-azure-provider, agents-session-adapter, agents-route-planner, agents-sse-adapter, agents-runner), feature-flagged via `KICKSTART_AGENTS_SDK=true`. PR #447 opened as draft.
 - (2026-04-15 16:26) Heartbeat workflow fix: traced failing Ralph checks on merged PRs to the project-board step requiring `COPILOT_ASSIGN_TOKEN`; patched `.github/workflows/squad-heartbeat.yml` to fall back to `GITHUB_TOKEN`, then audited sibling workflows and added explicit `github-token` inputs/fallbacks in `squad-triage.yml`, `squad-issue-assign.yml`, `squad-label-enforce.yml`, and `sync-squad-labels.yml`.
 - (2026-04-14 13:04) Triage pipeline fix: added project board assignment to squad-triage.yml, squad-heartbeat.yml, squad-issue-assign.yml. Added triage checklist to routing.md.
 - (2026-04-14 11:02) Wave 1: SWA continuous deploy + version footer → PR #177 opened. Auto-deploy from main, version shows SHA.
@@ -130,3 +131,23 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - All useA2UI() calls must supply an actionHandler; omitting it silently swallows actions
 
 **Next:** Monitor #359–#363 (remaining CodeQL alerts not yet addressed in this sprint).
+
+---
+
+## 2026-05-15 Agents SDK Backend Adapter
+
+**PR #447 — feat(api): OpenAI Agents SDK backend runtime adapter**
+- **Commit:** 58a6d50 (squad/445-agents-sdk-backend-adapter)
+- **Issue:** #445 (implements DP approved in #330)
+- **New files:** agents-azure-provider.ts, agents-session-adapter.ts, agents-route-planner.ts, agents-sse-adapter.ts, agents-runner.ts (+ 4 test files)
+- **Modified:** converse.ts (feature flag gate), package.json (@openai/agents ^0.8.3 + openai ^6.34.0)
+- **Pattern:** SDK is behind `KICKSTART_AGENTS_SDK=true`; existing path unchanged when unset
+- **Security:** tracing disabled globally, SSE adapter uses explicit allowlist, TTL/principal ownership preserved
+
+**Learnings:**
+- `@openai/agents` `run()` top-level function does NOT accept `modelProvider` in options — it belongs in the `Runner` constructor: `new Runner({ modelProvider })`. The `run()` options type is `NonStreamRunOptions`.
+- `AzureOpenAI` from `openai` pkg has a `#private` field preventing direct structural assignment to `OpenAI`. The cross-package ESM/CJS resolution mode mismatch also triggers TypeScript errors. Use `azureClient as any` for the `openAIClient` field of `OpenAIProvider`.
+- `vi.stubEnv` sets env vars to strings, including empty strings. Use `||` (falsy coalescing) instead of `??` (nullish coalescing) when falling back on deployment names — `"" ?? fallback` returns `""`, not `fallback`.
+- SDK `tool()` parameters field requires `ZodObjectLike | JsonObjectSchemaStrict | JsonObjectSchemaNonStrict | undefined`. Raw JSON Schema objects from the tool registry must be cast via `as any` to satisfy the union.
+- `AgentInputItem` is a Zod-validated union type — the `role` property is not on the union itself. Access it via `(item as { role?: string }).role` in tests and type guards.
+- `AssistantMessageItem` in the SDK requires a `status` field (`"completed" | "in_progress" | "incomplete"`). Omitting it fails Zod validation at `addItems()` call time.

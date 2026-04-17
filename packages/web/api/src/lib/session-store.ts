@@ -107,10 +107,25 @@ const cleanupInterval = setInterval(() => {
 }, 10 * 60 * 1000);
 cleanupInterval.unref();
 
-/** Retrieve an existing session, refreshing its TTL. */
+/**
+ * Return true if the session has exceeded its TTL.
+ * Used by the session adapter to fail-closed on expired sessions, and by
+ * getSession() to proactively reject them between cleanup sweeps.
+ */
+export function isSessionExpired(session: ApiSession): boolean {
+  return Date.now() - session.lastAccessed > SESSION_TTL_MS;
+}
+
+/** Retrieve an existing session, refreshing its TTL.
+ * Returns undefined if the session does not exist or has expired. */
 export function getSession(sessionId: string): ApiSession | undefined {
   const session = sessions.get(sessionId);
-  if (session) session.lastAccessed = Date.now();
+  if (!session) return undefined;
+  if (isSessionExpired(session)) {
+    sessions.delete(sessionId);
+    return undefined;
+  }
+  session.lastAccessed = Date.now();
   return session;
 }
 
