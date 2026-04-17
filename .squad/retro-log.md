@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #412 "cleanup: finish FSM removal — remove engineState and dead phase fields" | L | impl=0m | review=5m | cycles=1 | merged | @sabbour
+
 - 2026-04-17 | #408 "docs: pick canonical docs tree — collapse docs/ into docs-site/docs/" | XL | impl=0m | review=1m | cycles=1 | merged | @sabbour
 
 - 2026-04-17 | #415 "refactor: narrow @kickstart/core skill-resolver public API" | L | impl=0m | review=1m | cycles=1 | merged | @sabbour
