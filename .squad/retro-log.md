@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #199 "fix: CodeBlock highlighting, Home button, session delete (#167, #173, #178)" | L | impl=26m | review=135m | cycles=1 | merged | @sabbour
