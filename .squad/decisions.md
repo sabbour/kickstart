@@ -4214,3 +4214,315 @@ export interface GuardrailContribution {
 1. Step 11 PR updates `docs/v2-implementation-brief.md` §Guardrail to the adopted shape.
 2. Step 11 PR migrates the 3 Step-8 guardrails (`no-latest-tag`, `safeguards-compliance`, `no-k8s-terminology-pre-deploy`) from `check()` to `evaluate()`.
 3. `applyRedact()` must be explicitly defined in `guardrails.ts` — not left to implementer inference.
+
+---
+### 2026-04-17: Zapp re-check — DP #485 Step 10 web client
+
+**By:** Zapp (Security Architect)
+**Issue:** #485
+**Decision:** APPROVE_WITH_CONDITIONS
+
+Revision review confirms all previously blocking security requirements are now explicit in the DP.
+
+#### Status
+- **Crit1 — Pre-render schema validation:** Resolved
+- **B1 — Missing confirmComponent fails closed:** Resolved
+- **B2 — Resume boundary inherits #479 contract:** Resolved
+- **B3 — Registry immutability post-seal:** Resolved
+- **B4 — Safe prop merge constraints:** Resolved
+
+#### Security conditions for Step 10 PR merge
+1. `schema.parse(rawProps)` must run before any React component receives `a2ui_emit` props, including unknown-key stripping, schema bounds, and `https:`/same-origin URL allowlisting.
+2. Missing or unregistered `confirmComponent` must render `MessageBar intent='error'`, emit no resume POST, and log `console.error`.
+3. Resume POST body remains exactly `{ sessionId, actionId, result }`; the server validates `result` against the stored `resultSchema`, enforces session ownership, and never echoes metadata, scopes, args, or credential values.
+4. Registry state exposed to the web client must be a sealed immutable snapshot: `ReadonlyMap` plus frozen contributions after `seal()`, with a visible unknown-component fallback that cannot be overridden.
+5. `UserActionPanel` prop merge must operate only on schema-projected data, strip dangerous keys (`__proto__`, `prototype`, `constructor`, `__*`), reject payloads over 64KB serialized size, and cap nesting depth at 5.
+
+#### Consequence
+Security gate for the DP is clear. Zapp implementation sign-off remains contingent on the Step 10 PR demonstrating these controls in code and tests.
+
+---
+# Zapp Decision — DP #486 Guardrails Engine Security Review
+
+**Date:** 2026-04-17T15:35:22Z
+**Author:** Zapp (Security Architect)
+**Issue:** #486
+**Status:** BLOCKED
+
+## Decision
+
+DP #486 is **not ready for implementation**. The proposal moves guardrails into the harness, but it still leaves several high-risk bypass and information-leak paths open. The most serious defects are (1) a client-visible oracle that reveals guardrail internals via SSE error payloads, and (2) incomplete credential-leak coverage because secrets are only blocked at tool stage, not at output stage.
+
+## Critical Findings
+
+1. **Client-visible block oracle**
+   - The DP emits `error` SSE events with `guardrail` and a human-readable `reason`.
+   - Example reasons disclose detection class/pattern names (for example, `PRIVATE_KEY`), which lets an attacker probe the policy surface and tune payloads to evade it.
+   - Required fix: public SSE payloads must expose only an opaque code/message. Guardrail name, matched pattern, and diagnostic detail stay server-side in logs/traces.
+
+2. **Credential leak coverage is incomplete**
+   - The proposal blocks secrets only in tool-stage artifact writes (`core/no-secrets-in-artifacts` and `azure/no-hardcoded-credentials`).
+   - Output stage is covered only by a PII filter, so the model can still emit credentials directly to the client.
+   - Required fix: add a dedicated `no-credential-leak` guardrail for input/output/tool stages with always-`block` semantics.
+
+## Blocking Findings
+
+1. **Tool-stage bypass via continued execution**
+   - A blocked tool call is skipped, but the turn continues and remaining tool calls still execute.
+   - This permits split-action bypasses and unsafe partial-state progress after a security denial.
+   - Required fix: after any security block, stop the remaining tool sequence for the turn unless the runtime can prove independence.
+
+2. **Guardrail precedence is not explicit**
+   - Evaluation order is pack load order.
+   - A pack can redact/mutate payload before core guardrails inspect the original input.
+   - Required fix: core guardrails must run first on the original payload, and core `block` decisions must be non-overridable.
+
+3. **Redact chaining can poison downstream evaluation**
+   - Guardrail B runs on guardrail A's replacement text (`[REDACTED:<type>]`).
+   - That changes the security input and can create false negatives/positives or policy-shaping attacks.
+   - Required fix: use a non-user-controllable sentinel plus structured metadata, or evaluate downstream rules against both original and sanitized forms.
+
+4. **`validate_artifacts` stub creates false assurance**
+   - A tool that always returns valid is exploitable if callers or downstream policy treat it as a real gate.
+   - Required fix: keep it non-exposed, make it fail closed, or rename it clearly as a stub until real validation exists.
+
+5. **Registry poisoning is not fully prevented**
+   - Namespaced naming helps conventionally, but the DP does not require registry-time duplicate-name rejection.
+   - Required fix: reject duplicate guardrail names when packs register/seal, and reserve core namespaces.
+
+6. **Fail-closed guarantee needs hook-complete coverage**
+   - The DP covers `evaluate()` throws, but the acceptance criteria do not require explicit input/output/tool failure-path tests or post-evaluation failures such as redact-application errors.
+   - Required fix: add tests proving fail-closed behavior for every stage hook and every mutation path.
+
+## Non-blocking Notes
+
+- PII policy should be stage-sensitive: redact may be acceptable for user-visible output, but persistence/execution paths should typically block on PII rather than redact.
+- Regex-only PII detection is acceptable as a baseline for obvious patterns, but it is not comprehensive. Do not claim complete PII coverage without a stronger detector.
+- The proposed secret patterns are not yet comprehensive for Azure access tokens/JWT bearer tokens, full Azure connection strings, SAS variants, and future GitHub token formats.
+
+## Required Conditions to Clear Security Gate
+
+1. Public SSE block events become generic/non-enumerating.
+2. Add a cross-stage `no-credential-leak` guardrail with always-block semantics.
+3. Fail the remainder of the turn after a security block in tool stage.
+4. Enforce core-first evaluation on original payload plus duplicate-name rejection.
+5. Remove or hard-fail the `validate_artifacts` stub until implemented.
+6. Add explicit fail-closed tests for input, output, and tool hooks, including redact/mutation failures.
+
+## Outcome
+
+Security gate remains **blocked** until the design is revised to close the oracle, bypass, precedence, and stub-validation gaps above.
+
+---
+# Leela — DP #486 Re-check Decision
+
+**Date:** 2025-07-15
+**Issue:** #486 (Guardrails Engine — Step 11)
+**Verdict:** APPROVE_WITH_CONDITIONS ✅
+
+## C1 — Interface Contract: RESOLVED
+
+1. `evaluate(input: GuardrailInput): Promise<GuardrailResult>` confirmed as authoritative interface
+2. Step 11 PR must update `docs/v2-implementation-brief.md` §Guardrail to match
+3. Step 11 PR must migrate 3 pack-core guardrails (`pii-filter`, `no-credential-leak`, `validate-artifacts`) from `check()` → `evaluate()` in the same commit
+4. `rewrite` terminology superseded by `redact` (per test scaffolding)
+
+## C2 — `applyRedact()` Spec: RESOLVED
+
+- All 3 stages specified (input, output, tool)
+- Tool stage uses `redactedArgs?: Record<string, unknown>` for structured replacement
+- `GuardrailResult.redacted?: unknown` and `redactedArgs?: Record<string, unknown>` both optional and correctly typed
+
+## Merge Conditions for Step 11 PR
+
+1. Brief §Guardrail updated to `evaluate()` shape in same commit
+2. 3 existing pack-core guardrails migrated from `check()` → `evaluate()`
+3. `applyRedact()` implemented as specified for all 3 stages
+
+---
+# Decision: PR #550 — Step 5 Runner + SSE Review
+
+**Date:** 2025-07-15
+**Author:** Leela (Lead)
+**PR:** #550 (closes #479)
+**Status:** APPROVE_WITH_CONDITIONS
+
+## Verdict
+
+All five DP conditions (C1–C5) pass. One blocking condition must be resolved before merge.
+
+## Blocking
+
+**BLOCK-1 — `_lastActiveAt` must be a first-class `Session` field**
+
+`session.ts` tracks TTL via a side-channel property set with a double type cast outside the class. Sessions constructed directly (e.g. in unit tests) have `_lastActiveAt === undefined`; the cleanup fallback `?? now` means they never expire. Fix: add `lastActiveAt: number` initialized in the constructor, updated by `getOrCreateSession`.
+
+## Architectural Decisions Recorded
+
+1. **Runner/SSE contract is established.** The `Runner` class is stateless; `Session` carries all per-conversation mutable state. `SSEWriter` is the opaque boundary between runtime and transport. This shape is locked for Steps 6–9.
+
+2. **UserAction interrupt pattern is canonical.** `AbortController` abort from inside a tool's `execute()` handler, with `user_action_req` SSE event emitted first, is the interrupt mechanism for all future UserAction implementations.
+
+3. **Resume creates a new continuation turn, not a replay.** `Runner.resume()` calls `this.run()` with a synthetic `[UserAction xxx result]: ...` message. History accumulates naturally; bounded by the 50-turn sliding window in `Session.recordTurn()`.
+
+4. **HTTP 200 for resume auth failures is acknowledged debt.** Pre-stream auth check in `functions/resume.ts` is the correct shape; deferring to Step 6 auth hardening pass. Flagged for Zapp.
+
+5. **`z.unknown()` stubs in `server-manifest.ts` are explicitly temporary.** 18 stubs (5 Fluent-only + 13 rich) are clearly marked with TODO. Acceptable for this step.
+
+---
+# Zapp Decision — PR #550 Security Review
+
+**Date:** 2026-04-17  
+**Author:** Zapp (Security Architect)  
+**PR:** #550 — feat(v2): #479 Step 5 — Runner + SSE  
+**Issue:** #479  
+**Status:** BLOCKED
+
+## Decision
+
+PR #550 does not clear the security gate. The implementation contains the right ownership/schema ideas in the harness layer, but the API boundary still violates the approved security contract and the new `/api/converse` session model is vulnerable to cross-user session attachment.
+
+## Findings by Severity
+
+1. **🔴 High — `/api/converse/resume` does not return the required HTTP authn/authz status codes**
+   - `packages/harness/src/runtime/resume.ts:77-109` computes 403/400 outcomes, but `packages/web/api/src/functions/resume.ts:66-98` always returns HTTP 200 and downgrades failures into SSE `error` frames.
+   - That breaks the explicit DP requirement for real 403/400 responses at the HTTP boundary and makes client enforcement/auditing harder.
+
+2. **🔴 High — Session fixation / hijack on `/api/converse`**
+   - `packages/web/api/src/functions/converse.ts:63-65` accepts a caller-provided `sessionId` and `packages/harness/src/runtime/session.ts:108-116` reuses the existing session object without verifying that the authenticated OID matches `session.user.oid`.
+   - Random UUID generation only protects server-created IDs; once any session ID is disclosed, another caller can attach to that session.
+
+3. **🔴 High — Pending action schema is not bound to the exact action instance**
+   - `packages/harness/src/runtime/runner.ts:136-141` stores only `name/runId/issuedAt` in `pendingUserAction`.
+   - `packages/harness/src/runtime/resume.ts:96-105` reloads `resultSchema` by `toolName`, so the schema is not stored with the pending `(sessionId, actionId)` pair as required.
+
+4. **🟠 Medium — Client disconnect leaves the runner alive**
+   - `packages/web/api/src/functions/converse.ts:69-85` and `packages/web/api/src/functions/resume.ts:66-90` never wire stream cancellation back into the runner's abort path.
+   - Tool execution can continue after the EventSource consumer disconnects.
+
+5. **🟠 Medium — Concurrent resume replay race**
+   - `handleResume()` validates `session.pendingUserAction` before `Runner.resume()` clears it, with no session-level lock.
+   - Two simultaneous resume requests can both pass validation and launch duplicate continuations.
+
+## Positive checks
+
+- `packages/pack-core/src/server-manifest.ts:85-109` exports no playground stubs, so the manifest fails closed.
+- `packages/harness/src/runtime/runner.ts:116-134` gates stub execution behind `KICKSTART_PLAYGROUND === 'true'`.
+- I found no `tokens: Record<string, string>` / `azureToken` / `githubToken` exposure in the changed SSE payloads or the `/api/packs` DTO.
+
+## Required fixes before approval
+
+1. Return real HTTP 403/400/404 statuses from `POST /api/converse/resume` instead of tunneling them through SSE.
+2. Enforce ownership on `/api/converse` when a `sessionId` is supplied; reject cross-principal reuse and consider server-issued opaque session binding rather than trusting client-chosen IDs.
+3. Store the pending action's server-authored schema/binding (or an immutable server-side reference keyed by actionId) and validate against that exact pending record.
+4. Abort the runner on stream cancellation / client disconnect.
+5. Add atomic compare-and-clear or per-session locking around resume so one actionId can only be resumed once.
+
+## Outcome
+
+Security gate remains **blocked** until the API boundary enforces the required status codes and the session ownership/race issues are fixed.
+
+---
+# Decision — Zapp DP #484 Security Re-check
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Issue:** #484 — v2 Step 9: pack-github
+**Verdict:** APPROVE_WITH_CONDITIONS
+
+---
+
+## Summary
+
+I re-checked the latest DP revision comment against the four blockers from the original #484 security review. All four blockers are now explicitly addressed in the revised proposal. The DP is security-cleared for implementation, with merge conditions that must remain enforceable in the Step 9 PR.
+
+---
+
+## Blocker Re-check
+
+### B1 — Path normalization
+
+**Status:** ✅ Resolved
+
+The revision now requires `decodeURIComponent()` before any allowlist regex match, rejects invalid encoding, and explicitly denies decoded `..`, `%`, and backslash sequences. Residual `%` rejection also closes the double-encoding bypass class.
+
+### B2 — Token boundary
+
+**Status:** ✅ Resolved
+
+The revision states that `SessionCtx.tokens` is never serialized in:
+- `GET /api/packs`
+- SSE events
+- LLM context payloads
+
+It also limits token access to server-side `execute()` paths only. That is the correct fail-closed boundary, provided the shared serializer enforces it.
+
+### B3 — OAuth transport
+
+**Status:** ✅ Resolved
+
+The revision now explicitly requires:
+- HTTPS-only production handling for `/api/github/callback`, `/api/converse/resume`, and login-completion endpoints
+- Secure + HttpOnly cookies
+- no logging or echoing of OAuth codes, access tokens, or `github:set_secret` values
+
+This closes the earlier transport and log-hygiene gap.
+
+### B4 — Playground gate
+
+**Status:** ✅ Resolved
+
+The revision enumerates all six GitHub playground stubs and gates them behind `KICKSTART_PLAYGROUND=true`, returning `null` otherwise. This fail-closed behavior includes the previously required sensitive actions:
+- `github:login`
+- `github:create_repo`
+- `github:create_pr`
+- `github:set_secret`
+
+---
+
+## Conditions for Step 9 PR merge
+
+1. `decodeURIComponent()` plus forbidden-sequence checks must execute before the allowlist regex.
+2. `tokens` redaction must be enforced centrally across all serialization paths.
+3. HTTPS-only transport must be enforced in host or middleware configuration, not only documented.
+4. All six GitHub playground stubs must remain fail-closed outside playground mode.
+
+---
+# Milestone: PR #549 Merged — Pack.skills[] Inline Registration
+
+**Date:** 2026-04-17
+**PR:** #549 — fix(harness): Pack.skills[] inline skill registration
+**Closes:** Harness micro-fix (Leela C1 from #483 DP)
+**Status:** ✅ MERGED into v2-rewrite
+
+## What shipped
+- `Pack.skills?: Skill[]` field added to harness `Pack` interface
+- `loadSkills()` extended to merge `pack.skills ?? []` alongside file-walked skills
+- Runtime Zod validation on each inline skill at load time
+- Namespace prefix enforcement (`pack-id/skill-name`) at registration
+- Intra-batch duplicate detection via `assertUnique`
+- `Object.freeze` on registered Skill objects post-load
+- 56 tests passing
+
+## Unblocks
+- #483 pack-aks-automatic (deployment-safeguards inline skill can now register)
+
+---
+
+# Milestone: DP #484 (pack-github) — FULLY APPROVED
+
+**Date:** 2026-04-17
+**Status:** ✅ FULLY APPROVED — Leela ✅ + Zapp ✅
+- Leela APPROVE_WITH_CONDITIONS (C1–C4 all cleared in revision)
+- Zapp APPROVE_WITH_CONDITIONS (B1–B4 all cleared in revision)
+- Implementation may proceed. Harness micro-fix (#549) must merge first.
+
+---
+
+# Milestone: DP #485 (web-client A2UI renderer) — FULLY APPROVED
+
+**Date:** 2026-04-17
+**Status:** ✅ FULLY APPROVED — Leela ✅ + Zapp ✅
+- Leela APPROVE_WITH_CONDITIONS (C1 bootstrap ordering + C2 Zapp gate — both cleared)
+- Zapp APPROVE_WITH_CONDITIONS (Crit1+B1–B4 — all cleared in combined revision)
+- Phase C (credential flow) requires Zapp re-check before merge. All other phases clear.

@@ -62,3 +62,16 @@ Merged zapp-pr545-recheck, zapp-pr546-recheck. decisions.md: 161,186 → 169,430
 
 Wave 14: PR merge milestone recorded (Steps 1–3 complete); decisions.md: 169,430 → 172,046 bytes.
 Waves 8/15/16/17: No-op sweeps — inbox empty, all 31+ worktree filenames verified already merged.
+
+## Waves 18–30 — 2026-04-17
+
+- **W18:** Merged 3 (leela/zapp/zapp PR #547 reviews); PR #547 MERGED. decisions.md: 172,046 → 177,571B.
+- **W19:** Merged 1 (leela-pr548-review); PR #548 Leela approved. decisions.md: 177,571 → 179,382B.
+- **W20:** Merged 1 (zapp-pr548-review BLOCKED: symlink/SSRF/guardrails). Summarised leela 13,971→4,735B + fry 14,982→4,506B. decisions.md: → 182,061B.
+- **W21:** Merged 1 (leela-482-dp-review A/C). decisions.md: → 195,588B.
+- **W22:** Merged 1 (zapp-482-dp-review BLOCKED, 5 conditions). zapp history → 9,221B. decisions.md: 190,348 → 195,588B.
+- **W23:** Merged 1 (hermes-connector-execution-adr). hermes → 11,926B. decisions.md: → 196,437B.
+- **W24:** Merged 1 (zapp-pr548-final APPROVED). Summarised scribe 14,126 → compact (Waves 3–17 archived). decisions.md: → 197,712B.
+- **W25:** Merged 1 (zapp-482-b3-signoff BLOCKED: allowlist missing). decisions.md: → 198,596B.
+- **W26:** Merged 2 (zapp-482-b3-final ✅ + PR #548 milestone). decisions.md: → 200,872B.
+- **W27–W30 (no-ops):** Inbox empty across 4 sweeps; worktree stale files re-verified. decisions.md: 200,872B unchanged.

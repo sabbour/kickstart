@@ -36,3 +36,17 @@
 | DP #483 pack-aks | APPROVED (re-check) | DefaultAzureCredential, block>rewrite, aksPlaygroundStubs gate |
 | DP #484 pack-github | APPROVED (re-check) | decode+forbidden-seq, SessionCtx.tokens opaque, HTTPS, stubs gated |
 | DP #485 web client A2UI | **BLOCKED** | Crit1: props not schema-validated; B1: confirmComponent fails open; B2: resume boundary; B3: registry sealing; B4: props merge unsanitized |
+
+## Wave 36 — 2026-04-17
+
+### DP #484 pack-github — Re-check APPROVE_WITH_CONDITIONS ✅
+B1 ✅ `decodeURIComponent()` before allowlist + `..`/`%`/backslash rejection. B2 ✅ `SessionCtx.tokens` excluded from /api/packs, SSE, LLM context. B3 ✅ HTTPS-only OAuth routes, Secure+HttpOnly cookies, no log echoing. B4 ✅ All 6 GitHub playground stubs gated `KICKSTART_PLAYGROUND=true`. Security gate cleared for Step 9 implementation.
+
+### DP #485 web-client A2UI renderer — Re-check APPROVE_WITH_CONDITIONS ✅
+Crit1 ✅ `schema.parse()` pre-render validated. B1 ✅ missing confirmComponent → MessageBar + no resume POST. B2 ✅ resume POST body exactly `{sessionId,actionId,result}`. B3 ✅ `ReadonlyMap` + frozen contributions post-seal. B4 ✅ schema-projected merge, `__proto__` strip, 64KB/5-level limits. Implementation sign-off contingent on Step 10 PR demonstrating controls in code+tests.
+
+### DP #486 Guardrails Engine — BLOCKED
+Crit1: SSE block events expose guardrail name+reason = client oracle → must emit only opaque `{code,message}`. Crit2: secrets only blocked at tool stage; output stage still leaks → add `no-credential-leak` guardrail (input+output+tool, always-block). B1: blocked tool call continues turn execution → abort all remaining tool calls. B2: pack-ordering means packs can redact before core guardrails → core must run first on original payload, non-overridable. B3: redact chaining evaluates downstream on replacement text → use non-controllable sentinel or evaluate against both original+redacted. B4: `validate_artifacts` always-valid stub creates false assurance → fail-closed or @internal. B5: no duplicate-name rejection at registration → reject + reserve `core/` namespace. B6: fail-closed guarantee incomplete → add tests for all stage hooks including mutation paths.
+
+### PR #550 (Step 5 Runner+SSE) — BLOCKED
+3 high: (1) `POST /api/converse/resume` returns HTTP 200 for auth failures instead of 403/400. (2) Session fixation — `/api/converse` accepts caller-provided `sessionId` without OID ownership check. (3) Pending action schema stored by tool name only, not by `(sessionId,actionId)` pair. 2 medium: runner not aborted on client disconnect; no per-session lock on resume (duplicate continuation race). Positive: manifest fails closed (no stubs), playground gated, no token exposure in SSE/api/packs.

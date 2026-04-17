@@ -57,3 +57,38 @@ In queue: **#485 Step 10 (Zapp re-check pending) → #486 Step 11 → #488**
 | 2025-07-15 | DP #486 re-check | DP re-check | ✅ APPROVE_WITH_CONDITIONS — C1+C2 cleared | leela-486-dp-recheck.md |
 
 *Detailed review notes archived in history-archive.md*
+
+---
+
+## 2025 — PR #550 Code Review (Step 5: Runner + SSE)
+
+**Verdict: APPROVE_WITH_CONDITIONS**
+**Date:** 2025-07-15
+
+### DP Conditions
+- **C1** ✅ Pack startup: `getRegistry()` seals before `Runner` constructed — ordering guaranteed
+- **C2** ✅ `a2uiEmissions` drained per-event in loop + before UserAction abort + final post-stream drain
+- **C3** ✅ Resume OID binding: live `registry.getUserAction()` lookup, never stored in session
+- **C4** ✅ `OnIntentCallback` type in `useNavigation.ts`; `onIntent` callback in `StreamCallbacks`; no direct `navigate()` call
+- **C5** ✅ `playgroundScenarios` included in `GET /api/packs` response
+
+### Blocking Condition
+- **BLOCK-1**: `_lastActiveAt` in `session.ts` is a side-channel type cast — must be a first-class `Session` field to avoid test leaks and guarantee TTL cleanup coverage
+
+### Non-blocking Notes
+- N1: Dead code in `functions/packs.ts` (`userActions` variable + no-op loop)
+- N2: Resume endpoint returns HTTP 200 for 403/400 — auth check happens inside stream; defer to Step 6 auth hardening
+- N3: `onDelta` callback receives accumulated text, not delta — semantic mismatch
+- N4: AbortController re-run on resume verified safe — no deadlock path
+- N5: `z.unknown()` stubs clearly marked; acceptable for this step
+- N6: Single-instance session store acknowledged
+
+Comment: https://github.com/sabbour/kickstart/pull/550#issuecomment-4269378881
+Label applied: `leela:approved`
+
+## Wave 36 — 2025-07-15
+
+| Date | Item | Type | Verdict | Filed |
+|------|------|------|---------|-------|
+| 2025-07-15 | PR #550 (#479 Runner+SSE) | PR review | ✅ A/C: BLOCK-1 `_lastActiveAt` must be first-class Session field; 4 arch decisions recorded | leela-pr550-review.md |
+| 2025-07-15 | DP #486 re-check | DP re-check | ✅ A/C ✅ C1+C2 resolved; migrate Step 8 guardrails in same commit | leela-486-dp-recheck.md |
