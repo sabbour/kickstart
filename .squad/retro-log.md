@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #209 "feat: Continue button with auto-selection for ChoicePicker (#190)" | M | impl=5m | review=9m | cycles=1 | merged | @sabbour
