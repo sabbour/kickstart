@@ -69,6 +69,13 @@ export const listFilesTool: ToolContribution = {
         return { error: `Not a directory: ${subdir}` };
       }
 
+      // Resolve symlinks to prevent symlink-based escape after logical check.
+      const realRoot = fs.realpathSync(root);
+      const realTarget = fs.realpathSync(target);
+      if (!realTarget.startsWith(realRoot + path.sep) && realTarget !== realRoot) {
+        return { error: 'Access denied: directory is outside the workspace.' };
+      }
+
       const files = listDir(target, input.recursive ?? false, root);
       return { files, truncated: files.length >= MAX_FILES };
     },

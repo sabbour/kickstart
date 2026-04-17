@@ -22,6 +22,7 @@ vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
+    realpathSync: vi.fn((p: string) => p),
     readFileSync: vi.fn((filePath: string) => {
       const content = _fsStore.get(filePath);
       if (content === undefined) {

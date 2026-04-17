@@ -1,6 +1,6 @@
 import { tool } from '@openai/agents';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdirSync, writeFileSync, realpathSync } from 'node:fs';
+import { dirname, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import type { ToolContribution } from '@kickstart/harness';
 import type { SessionCtx } from '@kickstart/harness';
@@ -13,8 +13,25 @@ function resolveConfinedPath(workspaceRoot: string, relativePath: string): strin
   }
 
   const resolved = resolve(workspaceRoot, relativePath);
+  const realBase = realpathSync(workspaceRoot);
 
-  if (!resolved.startsWith(workspaceRoot + '/') && resolved !== workspaceRoot) {
+  // The file being written may not exist yet; walk up to the closest existing
+  // ancestor directory to check for symlink escape.
+  let checkDir = dirname(resolved);
+  let realCheck: string;
+  while (true) {
+    try {
+      realCheck = realpathSync(checkDir);
+      break;
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+      const parent = dirname(checkDir);
+      if (parent === checkDir) throw new Error(`write_file: path escapes workspace root: ${relativePath}`);
+      checkDir = parent;
+    }
+  }
+
+  if (!realCheck.startsWith(realBase + sep) && realCheck !== realBase) {
     throw new Error(`write_file: path escapes workspace root: ${relativePath}`);
   }
 

@@ -1,6 +1,6 @@
 import { tool } from '@openai/agents';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { resolve, sep } from 'node:path';
 import { z } from 'zod';
 import type { ToolContribution } from '@kickstart/harness';
 import type { SessionCtx } from '@kickstart/harness';
@@ -14,12 +14,15 @@ function resolveConfinedPath(workspaceRoot: string, relativePath: string): strin
 
   const resolved = resolve(workspaceRoot, relativePath);
 
-  // Ensure the resolved path is inside the workspace root (no traversal).
-  if (!resolved.startsWith(workspaceRoot + '/') && resolved !== workspaceRoot) {
+  // Resolve symlinks before checking confinement to prevent symlink escape.
+  const real = realpathSync(resolved);
+  const realBase = realpathSync(workspaceRoot);
+
+  if (!real.startsWith(realBase + sep) && real !== realBase) {
     throw new Error(`read_file: path escapes workspace root: ${relativePath}`);
   }
 
-  return resolved;
+  return real;
 }
 
 // ── Schema ────────────────────────────────────────────────────────────────────

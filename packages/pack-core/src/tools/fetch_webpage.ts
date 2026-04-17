@@ -66,6 +66,7 @@ export const fetchWebpageTool: ToolContribution = {
           'Accept': 'text/html,text/markdown,text/plain,*/*',
           'User-Agent': 'Kickstart/2 (https://github.com/sabbour/kickstart)',
         },
+        redirect: 'error',
         signal: AbortSignal.timeout(15_000),
       });
 

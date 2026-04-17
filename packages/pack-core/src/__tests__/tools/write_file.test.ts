@@ -22,6 +22,7 @@ vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
+    realpathSync: vi.fn((p: string) => p),
     mkdirSync: vi.fn(),
     writeFileSync: vi.fn((filePath: string, content: string) => {
       _fsStore.set(filePath, content);
