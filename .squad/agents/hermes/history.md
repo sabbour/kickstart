@@ -99,3 +99,16 @@ None identified — the test files exist but tested against the stub; no test fi
 ### Key decisions
 - `getPhaseDefinition` now delegates to `PHASE_DEFINITIONS` (was returning empty stub)
 - `PricingConnector` constructor accepts `{ retry: { maxRetries } }` to mirror call-site config; retry loop matches v2-rewrite BaseConnector behaviour so `fetchMock.toHaveBeenCalledTimes(3)` assertion holds
+
+## 2026-04-17 — Connector Execution ADR
+
+**Type:** Architecture Research Decision
+**Status:** Filed
+
+Documented connector execution model (client vs server proxy) co-authored with Leela:
+- **AzureARMConnector**: always proxies through `/api/arm-proxy` — ARM management API blocks browser CORS
+- **GitHubConnector**: reads direct (public/CORS-enabled), writes proxied for token isolation
+- **Technical debt flagged**: `createPullRequest()` calls `api.github.com` directly — inconsistency to be addressed
+- **Rule established**: Any new connector write method MUST use the server proxy pattern
+
+Decision filed: `.squad/decisions/inbox/hermes-connector-execution-adr.md`

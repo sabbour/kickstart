@@ -211,3 +211,14 @@ Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v
 **decisions.md:** 190,348 → 195,588 bytes (+5,240)
 **Histories updated:** zapp (8,199 → 9,221 bytes)
 **No threshold breaches:** all histories below 15,360
+
+## Wave 23 — 2026-04-17
+
+**Files merged:** 1 (`hermes-connector-execution-adr.md` — Connector execution model client vs proxy ADR, by Hermes + Leela)
+**Checked / skipped:** `zapp-pr548-recheck.md`, `bender-pr548-fix.md` — not yet landed; `zapp-482-dp-review.md` — already merged (wave 22)
+**decisions.md:** 195,588 → 196,437 bytes (+849)
+**Histories updated:**
+- hermes/history.md: Connector ADR entry appended (11,251 → 11,926 bytes)
+- scribe/history.md: this entry
+**No threshold breaches:** hermes 11,926 / scribe (post-update ~13,784) — both under 15,360
+**Inbox cleaned:** n/a (all inbox files gitignored; no tracked copies to remove)
