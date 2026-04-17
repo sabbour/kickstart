@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #285 "docs: clarify fat components documentation" | M | impl=45m | review=32m | cycles=1 | merged | @sabbour
