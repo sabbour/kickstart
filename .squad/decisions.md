@@ -2890,3 +2890,79 @@ No `agents?: AgentContribution[]` or `skills?: Skill[]` inline arrays. Registry 
 All DP #475 conditions and previously-raised architecture blockers are resolved. Build and tests passing.
 
 — Leela
+
+---
+# Zapp Decision — DP #479 Runner + SSE Security Review
+
+**Date:** 2026-04-17  
+**Author:** Zapp (Security Architect)  
+**Issue:** #479 — v2 Step 5: Runner + SSE  
+**Status:** APPROVE WITH CONDITIONS
+
+## Decision
+
+DP #479 is directionally sound, but the current design text is not yet explicit enough about trust boundaries at the SSE, resume, and manifest edges. The design may proceed only if the implementation treats the session as a security boundary and exposes a strictly projected client manifest rather than raw registry state.
+
+## Findings by Severity
+
+1. **🔴 High — Resume endpoint is under-bound in the DP**
+   - The DP says `POST /api/converse/resume` loads a session by ID and validates the resume payload against `resultSchema`, but it does not explicitly require ownership binding to the originating principal nor binding to the exact pending action/run.
+   - Validation of the result shape alone is insufficient. A caller who learns another session ID must not be able to resume that session, and a caller must not be able to swap in a different `toolName`, `runId`, or action result target.
+
+2. **🔴 High — `/api/packs` can become a control-plane data leak if it returns raw registry objects**
+   - The registry contains security-sensitive authoring metadata: agent instructions, skill bodies, tool wiring, prompt examples/notes, and pack-private structure.
+   - The client only needs a negotiated component catalog plus a minimal UserAction manifest. Returning raw registry entries would leak internal prompt engineering and implementation detail.
+
+3. **🟠 Medium — Raw `core.emit_ui` payload forwarding needs server-side validation before SSE**
+   - The DP sketch forwards `event.arguments` from `core.emit_ui` directly into `writeSSE("a2ui", ...)`.
+   - That payload must be validated against the A2UI schema and the negotiated per-session catalog before it reaches the browser, otherwise malformed or over-broad payloads can become UI injection or render-path abuse.
+
+4. **🟠 Medium — UserAction dispatch must remain data-only**
+   - `useActionDispatch` will send browser-produced data back to the API. That path must never let the client pick the resumed tool, scopes, or any server-executed primitive.
+   - The server must look up the pending action from session state and use only its server-authored `resultSchema`, `toolName`, `confirmComponent`, and run binding.
+
+5. **🟡 Low — In-memory persistence must fail closed on restart/expiry**
+   - In-memory storage means pending runs and user actions disappear on restart or cold-loss. That is acceptable only if resume fails closed with a fresh-turn requirement.
+   - Do not silently recreate or hydrate `pendingUserAction` from client input.
+
+## Required Conditions
+
+1. **Bind resume to ownership + pending action identity**
+   - `loadSession(sessionId, req)` must enforce session ownership against the request principal.
+   - Resume must require a server-issued opaque `actionId`/`runId` pair stored in `session.pendingUserAction`, and reject if the pair does not match exactly.
+   - Anonymous sessions are not exempt: if auth is unavailable, add an unguessable per-session secret/nonce cookie or equivalent origin-bound token before allowing resume.
+
+2. **Project `/api/packs` to a safe DTO**
+   - Return only:
+     - component names + client-facing property schemas needed for rendering/validation
+     - UserAction names + descriptions + confirm component metadata + scopes/cancellation flags actually needed by the browser
+   - Do **not** return agent instructions, skill bodies, prompt examples/notes, tool executors, file paths, or registry internals.
+
+3. **Validate every SSE event server-side before writing**
+   - `a2ui`: validate against the discriminated A2UI schema, enforce payload bounds, and enforce negotiated-catalog membership.
+   - `user_action_required`: validate with a dedicated schema and emit only server-authored fields.
+   - `done` / `handoff` / `intent` / `tool`: construct fresh allowlisted objects; never serialize raw SDK event objects.
+
+4. **Keep skill content and prompt material off the wire**
+   - Do not stream raw SDK traces, raw tool arguments/results, system prompts, skill bodies, or debug prompt state to the browser.
+   - `chunk` must be text-delta only; any debug mode must remain server-only or separately access-controlled.
+
+5. **Make UserAction resume data-only and server-authoritative**
+   - Client request body should be limited to `{ sessionId, actionId, result }` (or equivalent narrow shape).
+   - The server must validate `result` with the stored `resultSchema` for the pending action and ignore any client attempt to specify tool name, scopes, or target run outside the stored binding.
+
+6. **Document restart / TTL behavior explicitly**
+   - Pending runs and `pendingUserAction` state expire with the in-memory session.
+   - Resume after restart/expiry must return a fail-closed error and require the user to restart the turn.
+
+## Outcome
+
+Security gate is **conditionally clear** for the design proposal. Final implementation PR(s) must demonstrate ownership-bound resume, safe manifest projection, SSE allowlist validation, and fail-closed restart semantics before Zapp implementation sign-off.
+
+---
+### 2026-04-17: Security review of DP #480 skill resolver
+
+**By:** Zapp
+**What:** APPROVE_WITH_CONDITIONS. The resolver can ship only if implementation treats skill text as privileged prompt-control data, not benign content, and adds hard guards around selection, matching, immutability, and logging.
+**Why:** Raw `SKILL.md` bodies and raw turn text both influence prompt composition. Without bounded text normalization, user-only scoring, validated glob grammar, deep immutability after `seal()`, and redacted observability, a malicious pack or adversarial prompt can steer agent behavior or leak internal prompt engineering.
+**Impact:** Step 6 must add registration-time validators, rendered-string token accounting, immutable registry returns, and tests covering mutation attempts, glob rejection, and no-content logging.

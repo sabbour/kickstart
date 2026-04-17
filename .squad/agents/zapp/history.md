@@ -9,194 +9,40 @@
 
 ## Learnings
 
-- 2026-04-10: Pre-v0.3.0 security audit completed. Highest-risk patterns were frontend HTML injection paths (`dangerouslySetInnerHTML`) and public AI endpoints lacking auth/throttling.
-- 2026-04-10: `/api/converse` currently exposes full system prompts to clients on new sessions; treat system prompts as sensitive control-plane data.
-- 2026-04-10: Security hardening backlog now tracked in Security milestone issues #81-#88 with severity and OWASP mapping.
-- 2026-04-10: DP #30 (IntegrationKit lifecycle/dependency/auth extension) approved with conditions requiring transactional lifecycle rollback, cycle detection on re-registration, explicit auth schema validation, and documented trusted-kit boundary.
+- 2026-04-10: Highest-risk patterns: frontend HTML injection (`dangerouslySetInnerHTML`) and unauthenticated AI endpoints. Security backlog #81–#88 OWASP-mapped.
+- 2026-04-17: Resume semantics must bind `(sessionId, runId, principalId)` — validation of result shape alone is insufficient. Any DP/PR that introduces a resume handler must enforce ownership before resultSchema.
+- 2026-04-17: `/api/packs` (or any registry-serving endpoint) must project a safe DTO. Registry contains agent instructions, skill bodies, prompt examples, and pack-private structure — never return raw registry objects to the browser.
+- 2026-04-17: Skill SKILL.md bodies are privileged prompt-control data, not benign content. SSRF, prompt injection, and model-steering risks apply to selection logic.
+- 2026-04-17: Path confinement with `resolve()`/`relative()` is lexical only — `statSync()` follows symlinks. Always canonicalize with `realpath` before comparing base to candidate path.
 
-## Round 5: Multi-Round Security Reviews
+## Recent Review History (archived detail → history-archive.md)
 
-**2026-04-14**
-- Security review of DP #188 (demo scenarios) — approved
-- Re-review of DP #186 (round 2) — identified 3 concerns
-- Final review and sign-off on DP #186 (round 3) — approved for implementation
-## 2026-04-14 Round 2: DP Security Review
+- DP #330 (#445 backend) APPROVED WITH CONDITIONS; all 4 conditions verified in PR #447 → applied `zapp:approved`.
+- DP #329 (MCP App IDE) APPROVED WITH CONDITIONS — 6 conditions: tool allowlist, mode-aware origin, CSP, A2UI bounds, session ownership, host compat matrix.
+- v2 architecture #473 APPROVED (10 conditions). MCP UserActions = NOT MCP tools; POSTs to `/api/converse/resume`.
+- #474/#475/#476/#477/#478 DPs all APPROVE_WITH_CONDITIONS (see decisions.md and history-archive.md for details).
+- PR #544 APPROVED (after `STEPWISE_GENERATION_V1` removed from infra).
+- PR #545 REQUEST CHANGES (fixed → approved by Leela; Zapp was waiting on re-check).
+- PR #546 REQUEST CHANGES — symlink path-confinement bypass in `frontmatter.ts`; pending fix + regression test.
 
-- **Reviewed DPs #186 & #187**: #187 approved (low risk), #186 flagged with High/Medium concerns.
-- **#186 blockers**: Immutable source pinning, prompt-safety validation, fail-closed + provenance.
-- **Coordination**: Communicated security requirements to Leela; provided detailed guidance for Phase 1 hardening.
+## 2026-04-17 — DP #479 Runner + SSE Security Review
 
-- 2026-04-15: Revision 4 on issue #326 approved from security side; prior blockers remained resolved with no regression, clearing security gate for #327/#328.
+**Verdict:** APPROVE WITH CONDITIONS
 
----
+6 required conditions before implementation PR merges:
+1. **Resume ownership bind** — `loadSession()` must enforce principal ownership. Server-issued opaque `actionId`/`runId` pair stored in `session.pendingUserAction`; reject mismatch exactly. Anonymous sessions: unguessable per-session nonce/cookie.
+2. **`/api/packs` safe DTO** — return only component names + client-facing schemas + UserAction names/descriptions/confirm metadata. Never return agent instructions, skill bodies, prompt notes, tool executors, or registry internals.
+3. **SSE server-side validation** — `a2ui`: discriminated schema + payload bounds + negotiated-catalog membership. `user_action_required`: dedicated schema, server-authored fields only. `done`/`handoff`/`intent`/`tool`: fresh allowlisted objects, never raw SDK event objects.
+4. **Skill content + prompt material off wire** — no raw SDK traces, tool args/results, system prompts, skill bodies, or debug state. `chunk` = text-delta only.
+5. **UserAction resume data-only** — client sends `{ sessionId, actionId, result }` only; server validates with stored `resultSchema`; client cannot specify tool name, scopes, or target run.
+6. **Restart / TTL documented** — `pendingUserAction` expires with in-memory session; resume post-expiry fails closed with fresh-turn requirement.
 
-**2026-04-15T22:40:15Z — Scribe**: Issue #326 Revision 4 approved. Security gate post on #326#issuecomment-4256162191 logged. Ready for closure.
+## 2026-04-17 — DP #480 Skill Resolver Security Review
 
-## 2026-04-17 DP #330 Security Review
+**Verdict:** APPROVE WITH CONDITIONS
 
-**Review Date:** 2026-04-17T01:57:58Z  
-**Issue:** #330 — spike: design OpenAI Agents SDK migration for less-rigid chat flow  
-**DP:** Hybrid route planner + manager agent architecture
-
-**Decision:** ✅ APPROVED WITH CONDITIONS
-
-**Security Conditions (implementation acceptance criteria):**
-1. Allowlist response adapter only — never expose raw SDK run items/traces/unfiltered tool outputs to browser
-2. Principal-bound resume/session ownership — enforce `(sessionId, runId, principalId)` with fail-closed behavior + audit logging
-3. Preserve session semantics — keep current TTL/expiry/ownership behavior; expired sessions/runs cannot be resumed
-4. Guardrails additive only — server-side controls remain authoritative (rate limiting, content safety, auth/ownership, sanitization, workspace validation)
-5. Dependency governance — pin SDK version, maintain lockfile integrity, run dependency/security scans, define upgrade/rollback procedure
-
-**Consequence:** Security gate clear when conditions added as implementation acceptance criteria and verified by tests.
-
-## 2026-04-17 DP #329 Security Review (Round 6 – MCP App IDE Surface)
-
-**Review Date:** 2026-04-17T03:30:17Z  
-**Issue:** #329 — DP: MCP App IDE surface (A2UI + ext-apps)
-**DP:** Single-file React bundle deployed as MCP App resource, zero-trust postMessage sandbox
-
-**Decision:** APPROVE WITH CONDITIONS
-
-**Findings by Severity:**
-- 🔴 **High:** MCP tool exposure from iframe runtime — without server-side allowlisting for app-originated calls, compromised iframe can attempt broader tool access
-- 🟠 **Major (3):**
-  1. postMessage trust model under host variance — `"*"` targetOrigin acceptable in null-origin sandbox only; `allow-same-origin` hosts must use explicit `event.origin` allowlist
-  2. CSP missing in PoC — must be required in production as defense-in-depth
-  3. A2UI payload parsing lacks strict bounds — unbounded component processing enables UI tampering / render-path DoS
-- 🟡 **Minor:** Session ownership/replay protections not explicit — should be requirement
-- 🟢 **Low:** Credential handling generally sound — API keys server-side, no token-in-iframe invariant enforced
-
-**Required Security Conditions (implementation acceptance criteria):**
-1. Server-enforced allowlist of app-callable MCP tools with default-deny behavior
-2. Mode-aware message verification:
-   - null-origin sandbox: strict source + schema + nonce/session binding
-   - same-origin sandbox: strict origin allowlist + source validation
-3. Mandatory restrictive CSP in bundled app, verified in CI
-4. Strict A2UI validation: schema checks, payload size limits, component count/depth limits, fail-closed fallback
-5. Per-session principal/channel ownership checks and replay/audit protections on every app tool call
-6. Security compatibility matrix across VS Code, Claude Code, ChatGPT hosts
-
-**Gate Status:** Conditionally clear for design proposal. Final implementation PRs must demonstrate all conditions with tests/evidence before Zapp sign-off.
-- 2026-04-17: DP #329 (MCP App IDE surface) approved with conditions; key risks were app-tool overexposure, host-variant postMessage trust, missing mandatory CSP, and unbounded A2UI payload validation.
-
-## 2026-04-17 Round 3: PR #447 Security Approval
-
-**Sponsor Issue:** #445 — Backend SDK adapter for OpenAI Agents SDK migration  
-**PR:** #447 — squad/445-backend-adapter
-
-**Security Review Scope:**
-All 4 critical security conditions from issue #445 acceptance criteria:
-1. Server-enforced allowlist of app-callable MCP tools (default-deny)
-2. Workspace gate bypass protection 
-3. TTL expiry enforcement 
-4. Test coverage for hijack scenarios + lockfile pinning
-
-**Verification:**
-- ✅ **MCP tool allowlist:** Backend route validates `toolName` against allowlist before forwarding to MCP server. Disabled tools return 403 Forbidden. Tests cover both positive (allowed) and negative (blocklisted) cases.
-- ✅ **Workspace gate bypass:** Session ownership binding enforced at API boundary. Principal/channel checks block cross-workspace access. Audit logging captures attempted bypasses.
-- ✅ **TTL expiry:** Session TTL strictly enforced; expired sessions return 401 Unauthorized. Resume semantics fail-closed when token invalid. No guest fallbacks.
-- ✅ **Hijack tests:** Invalid/cross-principal sessionId rejected. Token tampering detected. Lockfile integrity enforced.
-
-**Security Verdict:** ✅ **APPROVED WITH CONDITIONS** (applied `zapp:approved` label)
-- All 4 blocking conditions satisfied with test evidence
-- Dependencies pinned in package-lock.json (no floating semver)
-- Dependency scans passed
-- Integration with DP #329 + #330 security review validated
-
-**Consequence:** Unblocks merge when Leela approval also present (verified as received).
-
-## 2026-04-17T12:06:45Z — #474 DP Review + v2 Security Architecture Review
-
-- **#474 DP review:** APPROVE_WITH_CONDITIONS. Standard seam-cutting conditions; playground stubs must be gated behind `KICKSTART_PLAYGROUND`.
-- **v2 security architecture review (#473):** APPROVED WITH CONDITIONS. 10 conditions total.
-  - 5 Critical (before Step 5): SSRF/fetch_webpage URL denylist, path traversal/write_file workspace prefix, resume handler OID ownership, resume resultSchema validation, playground stub fail-closed gate.
-  - 3 High (before Step 7/12): ARM path injection Zod regex, MCP auth documented, MCP UserAction architectural separation confirmed.
-  - 6 Medium: secrets detection, PII detection, A2UI guardrail scope, token budget ceiling, CSP audit, CSRF.
-- **MCP UserAction resolution:** UserActions are NOT MCP tools. MCP client detects `user_action_required` and POSTs directly to `/api/converse/resume`. Residual conditions #3 and #4 (OID ownership + resultSchema) cover MCP-originated resume calls equally.
-- **Decision filed:** `zapp-v2-security-review.md` merged to decisions.md.
-
-## Wave 3 — 2026-04-17 Security Reviews Filed
-
-### #474 Step 1 Shim Security (APPROVE_WITH_CONDITIONS)
-- Seam is compile-only and time-bounded; no new exports/fallback logic.
-- Delete v1 helpers fail-closed — no silent fallback to demo, mock, or legacy paths.
-- All v1 feature flags removed entirely.
-- Secret/auth trust boundaries must not move client-side during preservation work.
-- Step 1 merge requires proof: deleted imports gone, preserved packages did not gain broader runtime access.
-
-### Kickstart App Hotspot Hardening
-- Resolve parent target origin before messaging; reject messages unless `event.source === window.parent` and `event.origin` matches trusted parent.
-- Replace schema-driven `innerHTML` rendering with explicit DOM construction + URL allowlisting.
-- Dynamic renderer dispatch validated with allowlisted own-property check before invocation.
-- Decision filed as `zapp-kickstart-app-hotspot-hardening.md`.
-
-### #475 Harness Types (APPROVE_WITH_CONDITIONS)
-- `AgentOutput` must reject unknown fields; `intent` is closed enum.
-- A2UI union enforces one-and-only-one operation key; hybrid messages fail outright.
-- `SessionCtx` narrowed/redacted; credential access capability-scoped.
-- CI/static checks enforce compile-only boundary; dynamic code-loading primitives rejected.
-- Catalog validation remains a mandatory second gate at runtime.
-
-### #476 Registry + Loaders (APPROVE_WITH_CONDITIONS)
-- Pack-owned names only; namespace squatting prevented by name validation at index time.
-- Dependency-scoped reference resolution; only canonical `:` names valid in frontmatter.
-- Frontmatter parser: safe YAML only, no custom tags/functions, bounded aliases/size.
-- Loader path confinement: `realpath` canonicalization, symlink escape rejected.
-- Registry sealed after `seal()` — exported views frozen; concurrent lifecycle misuse fails closed.
-- Cycle detection: bounded iterative DFS or Kahn algorithm.
-
-## Wave 6 — 2026-04-17 Security Reviews Filed
-
-### #477 pack-core (APPROVE_WITH_CONDITIONS)
-- `core.fetch_webpage`: public-web-only, redirect blocking, DNS/IP private-range rejection, strict size/time bounds.
-- File tools bound to session-scoped workspace/VFS; absolute paths, traversal, symlink escapes rejected.
-- `core.validate_artifacts` pure + bounded: no shell-outs, no eval, safe parsers only.
-- Registered-component validation required before forwarding `emit_ui` payloads.
-- Pack manifests deep-frozen/cloned at registration time.
-- Found `dangerouslySetInnerHTML` in `CodeBlock.tsx`, `Markdown.tsx`, `FileEditor.tsx`.
-
-### #478 playground-on-registry (APPROVE_WITH_CONDITIONS)
-- `playgroundStubs` validated against registered canonical UserAction names.
-- Registry exposes frozen read-only snapshot after `seal()`.
-- Packs in-tree/trusted only for v2. Fail-loud UI errors redacted to fixed user-safe text.
-
-### PR #544 — REQUEST CHANGES → APPROVED
-- Initial review blocked: `STEPWISE_GENERATION_V1` still in `infra/main.bicep:52-53,132-140`. Also noted `npm run build` fails on missing DOM globals in harness.
-- Recheck (commit `1a62989`): flag fully removed from infra. No runtime occurrences. Applied `zapp:approved`.
-
-### PR #545 — REQUEST CHANGES
-- Blocking finding: `packages/harness/src/a2ui/chat-a2ui.ts` still preserves legacy `handoff` phase logic while the harness phase contract is now `discover/assess/design/generate/review/deploy`.
-- Security impact: exported phase normalizer accepts deprecated state and rejects current `assess`, creating a control-plane mismatch that could become unsafe once runtime/UI wiring consumes the harness helper.
-- Other checks passed: strict/discriminated schemas, closed `AgentOutput.intent`, opaque credential typing in `SessionCtx`, no dynamic code-loading primitives, harness build + targeted schema tests green.
-- Decision filed: `.squad/decisions/inbox/zapp-pr545-review.md`.
-
-## Wave 5 — 2026-04-17 PR #545 Security Review (v2 Step 2)
-
-**PR #545 (Closes #475) — REQUEST CHANGES**
-- **Blocking finding:** `packages/harness/src/a2ui/chat-a2ui.ts` still normalizes legacy `handoff` phase. Current harness contract has no `handoff` phase (`discover → assess → design → generate → review → deploy`). Helper rejects current `assess` phase — trust-boundary mismatch on persisted state. Fails DP check #5.
-- **Required fix:** Align `chat-a2ui.ts` with current phase contract; add tests for accept/reject.
-- **All other checks passed:** `AgentOutput` strict + closed enum, A2UI discriminated union fail-closed, `SessionCtx` credentials opaque (`unknown`), no `eval`/dynamic `import`, harness build + tsc + vitest green.
-- **Process note:** GitHub blocked `REQUEST_CHANGES` (author = reviewer = repo owner). Finding posted as PR comment instead.
-- Filed `zapp-pr545-review.md` → decisions.md.
-
-## Wave 6 — 2026-04-17 PR #546 Security Review (v2 Step 3)
-
-**PR #546 (Closes #476) — REQUEST CHANGES**
-- **Blocking finding:** `packages/harness/src/runtime/frontmatter.ts` confines paths lexically with `resolve()`/`relative()` but does not canonicalize symlinks. A file inside the pack tree that points outside the pack root can still be loaded by `loadAgentFile()` / `loadSkillFile()`.
-- **Security impact:** loader trust boundary can be escaped, violating the DP requirement that pack file loading stay confined to the owning pack directory.
-- **Other reviewed checks passed:** duplicate registrations fail loud, tool/user-action resolution is dependency-scoped, YAML frontmatter is schema-validated before use, post-`seal()` registration throws synchronously, cycle detection is iterative, and no secrets were found in reviewed files.
-- **Process note:** GitHub blocked `REQUEST_CHANGES` because the PR author and reviewer are the same account; blocker posted as a PR comment instead.
-- **Decision filed:** `.squad/decisions/inbox/zapp-pr546-review.md`.
-
-## 2026-06-10 — PR #546 Security Review (v2 Step 3)
-
-**PR #546 (Closes #476) — REQUEST CHANGES — 1 blocker**
-
-Passed: pack-owned namespaces, dep-scoped resolution, frontmatter Zod strict validation, `seal()` gate, iterative cycle detection, no secrets found.
-
-**Blocker 1 — Path confinement bypassed via symlinks:** `frontmatter.ts` uses `resolve()` + `relative()` (lexical only) then calls `statSync()` which follows symlinks. A symlink from inside the pack root to a path outside passes containment check. Both `loadAgentFile()` and `loadSkillFile()` are affected.
-
-**Required fix:** Canonicalize both base dir and candidate with `realpath` before comparing, OR reject symlinked entries with `lstat`. Add regression test proving symlink escape is rejected.
-
-Security gate not clear until fix merges.  
-Decision filed: `.squad/decisions/inbox/zapp-pr546-review.md`
+Step 6 implementation must add:
+- Registration-time skill text validators (SKILL.md bodies treated as privileged prompt-control data).
+- Rendered-string token accounting (not just char/4 approximation for budget cap).
+- Immutable registry returns (no mutation of resolved Skill objects after `seal()`).
+- Tests covering: mutation attempts on resolved skills, glob pattern rejection on invalid syntax, no-content logging (skill bodies must not appear in observability output).
