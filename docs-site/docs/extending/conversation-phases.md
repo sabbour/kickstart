@@ -4,15 +4,13 @@ sidebar_position: 2
 
 # Conversation Phases
 
-Kickstart guides users through a multi-phase conversation — Discover, Design, Generate, Review, Handoff, Deploy. The phase engine is a pure-function state machine that determines what the AI focuses on, which skills are available, and how the system prompt is assembled at each step.
-
-This guide explains the phase system and walks you through adding a new phase.
+Kickstart guides users through six phases — Discover, Design, Generate, Review, Handoff, Deploy. This guide explains how the phase system works and how to extend it.
 
 ## How Phases Work
 
 ### The Phase Enum
 
-Every phase is identified by a string-valued enum, defined in `packages/core/src/engine/types.ts`:
+Every phase is a string constant defined in `packages/core/src/engine/types.ts`:
 
 ```typescript
 export enum Phase {
@@ -27,54 +25,47 @@ export enum Phase {
 
 ### Phase Definitions
 
-Each phase has a `PhaseDefinition` that describes its purpose, transition conditions, and system prompt template. Definitions live in `packages/core/src/engine/phases.ts`:
+Each phase has a `PhaseDefinition` in `packages/core/src/engine/phases.ts`:
 
 ```typescript
 export interface PhaseDefinition {
   id: Phase;
   label: string;
   description: string;
-  entryConditions: string[];  // Human-readable — used in system prompt
-  exitConditions: string[];   // Human-readable — used in system prompt
-  promptTemplate: string;     // Injected as Layer 3 of the system prompt
-  nextPhase: Phase | null;    // null = terminal phase
+  nextPhase: Phase | null;   // null = terminal phase
 }
 ```
 
-The `PHASE_DEFINITIONS` array in `phases.ts` is the authoritative phase order. The first entry is the initial phase; `nextPhase` chains them.
+The `PHASE_DEFINITIONS` array is the authoritative phase order. The first entry is the initial phase; `nextPhase` chains them together.
 
-### The State Machine
+### Session State
 
-`packages/core/src/engine/machine.ts` implements a pure state machine:
+The current phase is a plain string stored on the server-side session:
 
 ```typescript
-export interface ConversationState {
-  currentPhase: Phase;
-  phaseStatus: Record<Phase, "pending" | "active" | "complete" | "skipped">;
-  phaseData: Record<Phase, unknown>;
-  isComplete: boolean;
-}
-
-// Pure transition function — no side effects
-transition(state: ConversationState, event: PhaseEvent): ConversationState
+session.state.currentPhase  // e.g. "generate"
 ```
 
-Valid events:
+This is the single source of truth. No FSM state slice, no `phaseStatuses` map.
 
-| Event | Description |
-|---|---|
-| `START` | Begin the conversation (activates first phase) |
-| `ADVANCE` | Move to `nextPhase` |
-| `SKIP` | Skip current phase, same as ADVANCE but marks it `skipped` |
-| `RESET` | Return to the first phase |
-| `USER_INPUT` | Notify state of new user message |
-| `PHASE_COMPLETE` | Mark current phase complete without advancing |
+### Phase Advancement
 
-### Auto-Advance
+Phase transitions happen in `converse.ts` when the LLM returns `phaseComplete: true` in its JSON response envelope:
 
-The LLM can trigger a phase transition autonomously. When the LLM response includes `phaseComplete: true` in the JSON envelope, `handleImplicitFlags()` in `machine.ts` fires a `PHASE_COMPLETE` event automatically — no user action required.
+```typescript
+// converse.ts — simplified
+if (llmResponse.phaseComplete) {
+  session.state.currentPhase = advancePhase(session.state.currentPhase);
+}
+```
 
-Similarly, A2UI actions with `navigate:` or `complete:` prefixes (handled in `packages/core/src/engine/auto-continue.ts`) can trigger transitions from button clicks in the UI.
+`advancePhase()` looks up the current phase in `PHASE_DEFINITIONS` and returns `nextPhase`. There is no event system or transition guard — the LLM's signal is the only trigger.
+
+A2UI actions with `navigate:` or `complete:` prefixes (handled in `packages/core/src/engine/auto-continue.ts`) can also trigger phase transitions from button clicks in the UI.
+
+### How the LLM Navigates Phases
+
+The system prompt includes the current phase identifier and the `description` from its `PhaseDefinition`. The LLM reads this context, determines when the phase goals are met, and signals `phaseComplete: true`. There are no TypeScript-enforced entry or exit conditions — the LLM decides.
 
 ### Skill Resolution
 
@@ -84,7 +75,7 @@ Skills are filtered by phase. `packages/core/src/engine/skill-resolver.ts` runs 
 2. **keywordActivation** — boosts skills that match keywords in the user message
 3. **priorityOrder** — sorts remaining skills by priority
 
-Convenience groups are exported for registration:
+Phase group constants for skill registration:
 
 ```typescript
 export const DISCOVERY_PHASES  = [Phase.Discover];
@@ -95,15 +86,15 @@ export const DEPLOYMENT_PHASES = [Phase.Handoff, Phase.Deploy];
 
 ### System Prompt Architecture
 
-The system prompt builder (`packages/core/src/prompts/system-prompt.ts`) stacks three layers per turn:
+The system prompt builder (`packages/core/src/prompts/system-prompt.ts`) assembles context per turn:
 
 | Layer | Content |
 |---|---|
-| Layer 1 | Active skills (resolved for current phase) |
-| Layer 2 | Copilot extension instructions |
-| Layer 3 | Phase-specific `promptTemplate` from `PhaseDefinition` |
+| Active skills | Resolved for current phase (Mechanism A) |
+| Copilot extension instructions | Static per-turn context |
+| Per-turn domain injection | Resolved from user message (Mechanism B) |
 
-This means the `promptTemplate` you write in a `PhaseDefinition` is injected verbatim as the innermost context ring for that phase.
+Phase context (current phase + description) is included in the prompt so the LLM knows where it is in the conversation.
 
 ---
 
@@ -125,42 +116,24 @@ export enum Phase {
 }
 ```
 
-### Step 2 — Define the phase
+### Step 2 — Add the phase definition
 
-Open `packages/core/src/engine/phases.ts` and add a `PhaseDefinition` to the `PHASE_DEFINITIONS` array at the correct position. Update the `nextPhase` of the preceding phase to point to your new one:
+Open `packages/core/src/engine/phases.ts` and insert a `PhaseDefinition` at the correct position in `PHASE_DEFINITIONS`. Update the `nextPhase` of the preceding entry to point to your new phase:
 
 ```typescript
 {
   id: Phase.Validate,
   label: "Validate",
-  description: "Verify that the proposed architecture meets the user's requirements before generating artifacts.",
-  entryConditions: [
-    "Architecture design is complete",
-    "User has confirmed service selection",
-  ],
-  exitConditions: [
-    "User has approved the architecture",
-    "All required fields are populated",
-  ],
-  promptTemplate: `
-You are in the VALIDATE phase. Your goal is to confirm the architecture before generating files.
-
-Review the proposed design with the user:
-- Confirm service tiers and scaling settings
-- Highlight any cost or security implications
-- Ask for explicit approval before proceeding
-
-When the user approves, set phaseComplete: true in your response envelope.
-  `.trim(),
+  description: "Verify that the proposed architecture meets requirements before generating artifacts.",
   nextPhase: Phase.Generate,
 },
 ```
 
-Also update the `Design` phase definition so its `nextPhase` points to `Phase.Validate` instead of `Phase.Generate`.
+Also update the `Design` entry so its `nextPhase` is `Phase.Validate`.
 
 ### Step 3 — Register skills for the new phase
 
-If you have skills that should be active during this phase, add `Phase.Validate` to their `phases` array in your `IntegrationKit` definitions. You can also define a new phase group constant in `skill-resolver.ts`:
+Add `Phase.Validate` to the `phases` array of any skills that should activate during this phase. Define a phase group constant in `skill-resolver.ts` if needed:
 
 ```typescript
 export const VALIDATE_PHASES = [Phase.Validate];
@@ -168,7 +141,7 @@ export const VALIDATE_PHASES = [Phase.Validate];
 
 ### Step 4 — Add phase-specific prompts to kits (optional)
 
-If an `IntegrationKit` needs to inject additional context during your phase, add it to `phasePrompts`:
+If an `IntegrationKit` needs to inject extra context during your phase, use `phasePrompts`:
 
 ```typescript
 const myKit: IntegrationKit = {
@@ -183,23 +156,7 @@ const myKit: IntegrationKit = {
 
 ### Step 5 — Write tests
 
-Add test cases to:
-
-- `packages/core/src/__tests__/phases.test.ts` — verify your `PhaseDefinition` is well-formed, `entryConditions` and `exitConditions` are populated, `nextPhase` chains correctly
-- `packages/core/src/__tests__/machine.test.ts` — verify state transitions flow through your new phase correctly, auto-advance works, SKIP routes past it
-
-```typescript
-it("transitions through Validate phase", () => {
-  const state = transition(initialState, { type: "START" });
-  // advance to Validate
-  const validated = transition(
-    transition(state, { type: "ADVANCE" }), // Design
-    { type: "ADVANCE" }                      // Validate
-  );
-  expect(validated.currentPhase).toBe(Phase.Validate);
-  expect(validated.phaseStatus[Phase.Validate]).toBe("active");
-});
-```
+Add test cases to `packages/core/src/__tests__/phases.test.ts` to verify your `PhaseDefinition` is well-formed and `nextPhase` chains correctly.
 
 ---
 
@@ -208,10 +165,7 @@ it("transitions through Validate phase", () => {
 | File | Purpose |
 |---|---|
 | `packages/core/src/engine/types.ts` | `Phase` enum and `PhaseDefinition` interface |
-| `packages/core/src/engine/phases.ts` | `PHASE_DEFINITIONS` array — phase order and templates |
-| `packages/core/src/engine/machine.ts` | State machine: `ConversationState`, `transition()`, `handleImplicitFlags()` |
+| `packages/core/src/engine/phases.ts` | `PHASE_DEFINITIONS` — phase catalog and order |
 | `packages/core/src/engine/skill-resolver.ts` | Phase-aware skill filtering and phase group constants |
 | `packages/core/src/engine/auto-continue.ts` | A2UI action → phase transition wiring |
-| `packages/core/src/prompts/system-prompt.ts` | 3-layer system prompt assembly |
-| `packages/core/src/__tests__/phases.test.ts` | Phase definition tests |
-| `packages/core/src/__tests__/machine.test.ts` | State machine transition tests |
+| `packages/core/src/prompts/system-prompt.ts` | System prompt assembly including phase context |
