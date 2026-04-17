@@ -88,8 +88,8 @@ Base catalog: `packages/core/src/prompts/component-catalog.ts`. Kit-contributed 
 `resolveSkillsAsync()` and `resolveSkillsFromList()` are exported from `@kickstart/core` and tested, but never called in any production handler. Only `resolveSkills()` is used. These inflate the public API surface without runtime callers.
 :::
 
-:::warning Typed Skill path is dormant
-`skill-resolver.ts` has two resolution paths: a typed `kit.skills[]` (Skill objects) and a legacy `kit.prompts[]`/`kit.phasePrompts[]` path. Neither production kit (`azure-kit.ts`, `github-kit.ts`) uses the typed path. The typed path is exercised only in tests.
+:::info Both skill paths are active
+**`azure-kit.ts` uses the typed `kit.skills[]` path** (Path 1) — it registers `skills: azureIacSkills` (see `azure-kit.ts:573`). **`github-kit.ts` uses the legacy `kit.prompts[]` / `kit.phasePrompts{}` path** (Path 2). Both paths are valid for kit authors. Consolidation of the two paths into a single mechanism is tracked as future work.
 :::
 
 :::note Two keyword systems with no shared vocabulary
