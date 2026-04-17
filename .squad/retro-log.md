@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #336 "feat: keep setup generation in chat progress and workspace" | XL | impl=0m | review=0m | cycles=1 | merged | @sabbour
