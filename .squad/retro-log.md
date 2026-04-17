@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-11 | #119 "feat(core): Knowledge skills middleware + IaC best practices" | L | impl=1m | review=36m | cycles=1 | merged | @sabbour
