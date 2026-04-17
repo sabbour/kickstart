@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #122 "feat: Implement state binding & data interpolation" | L | impl=1m | review=520m | cycles=1 | merged | @sabbour
