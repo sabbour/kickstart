@@ -15,6 +15,7 @@ Legend:
 <!-- entries below this line, newest at top -->
 | Date | PR | Title | Size | Impl | Review | Cycles | Outcome | Author |
 |------|-----|-------|------|------|--------|--------|---------|--------|
+| 2026-04-15 | [#289](https://github.com/sabbour/kickstart/pull/289) | docs: add Extending Kickstart guide | XL | 1m | 5m | 1 | merged | @sabbour |
 | 2026-04-15 | [#285](https://github.com/sabbour/kickstart/pull/285) | docs: clarify fat components documentation | M | 45m | 32m | 1 | merged | @sabbour |
 | 2026-04-15 | [#288](https://github.com/sabbour/kickstart/pull/288) | fix: TextField editable + Markdown newline rendering | S | 3m | 13m | 1 | merged | @sabbour |
 | 2026-04-15 | [#287](https://github.com/sabbour/kickstart/pull/287) | ci: remove paths-ignore to fix docs PR merge deadlock | S | 1m | 0m | 1 | merged | @sabbour |
