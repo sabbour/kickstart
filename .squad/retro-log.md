@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #133 "fix: footer shows correct version from package.json" | S | impl=0m | review=4m | cycles=1 | merged | @sabbour
