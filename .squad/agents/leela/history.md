@@ -63,3 +63,49 @@ All open v2 issues should carry milestone **v2**.
 - Sprint plan: #474 → #475 → #476 blocking chain. Step 4+ frozen until #476.
 - #474 DP: APPROVE_WITH_CONDITIONS. Seam-cutting pass approach confirmed.
 - v2 architecture DP (#473): APPROVED. Guardrail enforcement semantics must be pinned before Step 11 (`error` SSE with `guardrail_block`). UserAction resume authz must be a done criterion in Step 5.
+
+## 2026-05-28 — DP Review #476 v2 Step 3: Registry + loaders
+
+**Verdict:** APPROVE_WITH_CONDITIONS  
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/476#issuecomment-4268074355  
+**Decision record:** `.squad/decisions/inbox/leela-476-dp-review.md`
+
+Key findings:
+- Registry lifecycle (`register → enable → seal`) and sigil resolution (`.`/`:`) are sound. ✅
+- Circular dependency detection and collision rules correctly specified. ✅
+- Catalog skeleton scope (typed data assembly only, no UI runtime) is correct. ✅
+- C1 (BLOCKER): Custom frontmatter mini-parser can't handle arrays; must use `yaml` npm package. All agent/skill frontmatter uses arrays.
+- C2 (BLOCKER): Registry read accessor surface underspecified; only `getAgent` + `components` listed. Step 5+6 need `getSkillsForAgent`, `getToolsForAgent`, `getUserAction`, `getGuardrailsByStage` — must be locked in Step 3.
+- C3 (REQUIRED): UserAction wire transliteration (`azure:login` → `azure__login`) unspecified. `UserActionContribution` must carry both `.name` and `.wireName`.
+- M1/M2 (minor): `enable()` dep enforcement and `enable()` after `seal()` behavior unspecified in DP text.
+
+## 2026-05-28 — DP Review #475 v2 Step 2: Harness types
+
+**Verdict:** APPROVE_WITH_CONDITIONS  
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/475#issuecomment-4268063788  
+**Decision record:** `.squad/decisions/inbox/leela-475-dp-review.md`
+
+Key findings:
+- Primitive coverage complete (all 12 type files match brief). ✅
+- AgentOutput Zod contract correct. ✅
+- A2UI schemas must be discriminated unions with `version: 'v0.9'` literal — not v1 all-optional transcription. (C1)
+- `SessionCtx` forward refs (`AppIntent`, `Artifact`, `A2UICatalog`, `Turn`, `PendingUserAction`, `AzureCredential`) must be resolved. (C2)
+- `ComponentContribution.renderer` typed as `unknown` in harness — React-aware narrowing deferred to pack-core. (C3)
+- `package.json` missing `zod` and `@openai/agents` as runtime dependencies. (C4)
+- `chat-a2ui.ts` port must drop all v1 phase-model code; PR needs explicit keep/drop inventory. (C5)
+
+## 2026-05-28 — DP Reviews #475 + #476
+
+**#475 (Harness Types) — APPROVE_WITH_CONDITIONS:**
+1. A2UI Zod schemas must be discriminated unions with `version: z.literal("v0.9")` — not all-optional.
+2. `ComponentContribution.renderer` typed as `unknown` in harness; React-aware type deferred to pack-core.
+3. `SessionCtx` forward refs (`AppIntent`, `Artifact`, `A2UICatalog`, `Turn`, `PendingUserAction`, `AzureCredential`) must be stubbed with `// TODO(Step 3)` before merge.
+4. `zod` + `@openai/agents` must be `dependencies`, not `devDependencies`, in `@kickstart/harness`.
+5. `chat-a2ui.ts` port must drop all v1 phase-model code — explicit keep/drop inventory required in PR.
+All five conditions are blocking. Step 3 gated on standalone compile.
+
+**#476 (Registry + Loaders) — APPROVE_WITH_CONDITIONS:**
+- C1 (BLOCKER): Drop custom mini-parser; use `yaml` npm package — mini-parser doesn't support arrays needed for `tools:`, `handoffs:`, `appliesTo:`, `keywords:`.
+- C2 (BLOCKER): Full registry read accessor surface required in Step 3 (6 methods/properties defined — see decisions.md).
+- C3 (BLOCKER): `UserActionContribution` must carry both `.name` (canonical, `:` sigil) and `.wireName` (transliterated, `__`); loader-agent.ts produces both.
+C1–C3 block Step 4 (pack-core), Step 5 (Runner), and Step 6 (skill resolver).

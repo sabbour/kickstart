@@ -2005,3 +2005,89 @@ Step 1 should preserve the web shell and only delete the obviously v1-only demo/
 ## Recommendation for Bender + Leela
 
 Treat Step 1 frontend work as a seam-cutting pass: remove mock/demo imports, park Playground on empty registry-backed data, introduce temporary replacement exports for type/core contracts the shell still needs, then hard-delete legacy files and point the web app at `packages/harness`/future packs.
+
+---
+
+# Decision: DP Review — #475 v2 Step 2 Harness Types
+
+**Date:** 2026-05-28
+**Author:** Leela (Lead)
+**Issue:** #475 — v2 Step 2: Harness types — all primitives + Zod schemas
+**Status:** APPROVE_WITH_CONDITIONS
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/475#issuecomment-4268063788
+
+## Architecture decisions recorded
+
+1. **A2UI Zod schemas must be discriminated unions, not all-optional transcription.** The v1 `A2uiMsg` all-optional-keys pattern does not enforce v2's "exactly one operation per emit_ui call" semantics. `a2ui.ts` Zod schemas must use `z.discriminatedUnion` (or per-shape `z.object` with a required operation key). Every shape must include `version: z.literal("v0.9")`.
+
+2. **`ComponentContribution.renderer` is typed as `unknown` in the harness.** The harness is a server-side package with no DOM/JSX context. `ComponentContribution` in `packages/harness/src/types/component.ts` must type `renderer` as `unknown`. The React-aware narrowed type (`ComponentContributionWithRenderer<P>`) is deferred to `pack-core`.
+
+3. **`SessionCtx` forward refs must be resolved in Step 2.** `AppIntent`, `Artifact`, `A2UICatalog`, `Turn`, `PendingUserAction`, and `AzureCredential` are referenced in `SessionCtx` but not defined in any Step 2 file. Author must define minimal versions or stub as `unknown` with `// TODO(Step 3)` annotations.
+
+4. **`zod` and `@openai/agents` are runtime dependencies of `@kickstart/harness`.** Both must appear in `dependencies`, not `devDependencies`. Zod schemas run in production; `ToolContribution` imports `Tool as SDKTool` from `@openai/agents`.
+
+5. **`chat-a2ui.ts` port must drop all v1 phase-model code.** `ConversationPhaseId`, `SetupGenerationEvent`, `PHASE_ALIASES`, `PHASE_COMPONENT_NAME`, and ConversationPhase surface helpers are v1 concepts. The PR must include an explicit keep/drop function inventory.
+
+## Conditions
+
+All five conditions are blocking on the Step 2 PR before it merges. Step 3 is gated on this step compiling standalone with no errors.
+
+---
+
+# Decision: Architecture review — #476 v2 Step 3 (registry + loaders)
+
+**Date:** 2026-05-28
+**Author:** Leela (Lead)
+**Issue:** #476 — v2 Step 3: Registry + loaders
+**Status:** APPROVE_WITH_CONDITIONS
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/476#issuecomment-4268074355
+
+## What's approved
+
+- `seal()` lifecycle model: post-startup, pre-runner. `register()` after seal throws.
+- Sigil-based tool-reference resolution: `.` → Tool, `:` → UserAction. Fail-fast at registration.
+- Per-namespace collision detection: correct.
+- Circular dependency detection: sufficient for Hermes to test.
+- Catalog skeleton scope: typed registry data assembly only, no UI renderer.
+
+## Conditions
+
+### C1 — YAML parser array support (BLOCKER)
+
+The existing `packages/core/src/skills/frontmatter-parser.ts` mini-parser does not support arrays. Both `.agent.md` and `SKILL.md` frontmatter require arrays (`tools:`, `handoffs:`, `appliesTo:`, `keywords:`).
+
+**Decision:** Drop the custom mini-parser. Use the `yaml` npm package in `packages/harness`. Harness is a server package; a YAML dependency is not a concern.
+
+### C2 — Registry read accessor surface (BLOCKER)
+
+The following read surface must be included in Step 3 done criteria (stubs acceptable if full impl is deferred):
+
+```ts
+registry.getAgent(name: string): AgentContribution
+registry.getSkillsForAgent(agent: string): Skill[]
+registry.getToolsForAgent(agent: string): ToolContribution[]
+registry.getUserAction(name: string): UserActionContribution
+registry.getGuardrailsByStage(stage: 'input'|'output'|'tool'): GuardrailContribution[]
+registry.components: ComponentContribution[]
+```
+
+### C3 — Wire transliteration for UserAction names (BLOCKER)
+
+UserAction canonical name uses `:` sigil (`azure:login`); OpenAI SDK disallows `:` in tool names. Wire name is `azure__login`.
+
+**Decision:** `UserActionContribution` must carry both:
+- `.name` = canonical (`azure:login`) — registry lookup key
+- `.wireName` = transliterated (`azure__login`) — SDK agent tool list construction
+
+Loader-agent.ts must produce both on load.
+
+## Minor clarifications (non-blocking)
+
+- `enable(["B"])` where B depends on A but A is not enabled → should throw.
+- `enable()` after `seal()` → should throw, same as `register()` after `seal()`.
+
+## Impact on downstream steps
+
+- Step 4 (pack-core) depends on stable registry API. C1–C3 must be resolved before Step 4 starts.
+- Step 5 (Runner + SSE) depends on C2 (guardrail/tool enumeration) and C3 (wire name).
+- Step 6 (skill resolver) depends on C2 (`getSkillsForAgent`).
