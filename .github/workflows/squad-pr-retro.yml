@@ -126,7 +126,8 @@ jobs:
               : 'closed';
 
             const date = closedAt.toISOString().slice(0, 10);
-            const line = `- ${date} | #${pr.number} "${title}" | ${size} | impl=${implMin}m | review=${reviewMin}m | cycles=${cycles} | ${outcome} | @${author}`;
+            const prUrl = pr.html_url;
+            const line = `| ${date} | [#${pr.number}](${prUrl}) | ${title} | ${size} | ${implMin}m | ${reviewMin}m | ${cycles} | ${outcome} | @${author} |`;
 
             core.setOutput('line', line);
             core.setOutput('pr', String(pr.number));
@@ -163,7 +164,7 @@ jobs:
             fi
 
             awk -v line="$LINE" \
-              '/^<!-- entries below this line, newest at top -->$/ { print; print ""; print line; next } { print }' \
+              'BEGIN{inserted=0} /^\|[-| ]+\|$/ && !inserted { print; print line; inserted=1; next } { print }' \
               .squad/retro-log.md > .squad/retro-log.md.new
             mv .squad/retro-log.md.new .squad/retro-log.md
 
@@ -217,9 +218,10 @@ jobs:
               '**Working as Scribe** · see `.squad/agents/scribe/charter.md`',
               '',
               '### Retro entry',
-              '```',
+              '',
+              '| Date | PR | Title | Size | Impl | Review | Cycles | Outcome | Author |',
+              '|------|-----|-------|------|------|--------|--------|---------|--------|',
               line,
-              '```',
               '',
               'Appended to `.squad/retro-log.md`. Used by the daily and weekly pulse.',
             ].join('\n');
