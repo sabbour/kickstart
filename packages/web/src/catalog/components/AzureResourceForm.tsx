@@ -21,7 +21,9 @@ import {
 } from '@fluentui/react-components';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
 import type { AzureARMConnector, AzureLocation } from '@kickstart/core';
-import { isMockMode, isPlaygroundMode } from '../../services/mock-streaming';
+// TODO(Step 7): mock-streaming removed in Step 1 — stubs always return false
+const isMockMode = () => false;
+const isPlaygroundMode = () => false;
 
 /** Skip real ARM proxy calls when running in mock or playground mode. */
 const SKIP_LIVE_ARM_CALLS = isMockMode() || isPlaygroundMode();

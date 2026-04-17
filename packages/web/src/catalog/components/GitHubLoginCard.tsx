@@ -22,10 +22,9 @@ import {
   signOutGitHub,
   type GitHubSessionState,
 } from "../../services/github-handoff";
-import {
-  createGitHubStubSession,
-  shouldUsePlaygroundAuthStub,
-} from "../../services/playground-auth-stub";
+// TODO(Step 9): playground-auth-stub removed in Step 1 — stubs always return false/undefined
+const createGitHubStubSession = (_connected: boolean): undefined => undefined;
+const shouldUsePlaygroundAuthStub = () => false;
 
 const GitHubLoginCardApi = {
   name: "GitHubLoginCard",

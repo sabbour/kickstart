@@ -4,10 +4,13 @@
     "outDir": "dist",
     "rootDir": "src",
     "composite": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "@kickstart/harness": ["../../harness/src/index.ts"],
+    }
   },
   "references": [
-    { "path": "../../core" }
+    { "path": "../../harness" }
   ],
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

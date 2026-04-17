@@ -17,8 +17,8 @@ import { z } from "zod";
 
 import {
   Phase,
-} from "@kickstart/core";
-import type { SessionState } from "@kickstart/core";
+} from "@kickstart/harness";
+import type { SessionState } from "@kickstart/harness";
 
 import { handleKickstart, deleteEngineState } from "./tools/kickstart.js";
 import { handleConverse } from "./tools/converse.js";

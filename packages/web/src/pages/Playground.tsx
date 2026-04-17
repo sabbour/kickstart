@@ -22,19 +22,19 @@ import {
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import type { ActionHandler } from '../hooks/useActionDispatch';
-import { WidgetsProvider, useWidgets } from '../hooks/useWidgets';
+// TODO(Step 4a): restore useWidgets from pack-core once packs are implemented
 import { useDebug } from '../contexts/DebugContext';
-import { getDemoResponse, resetDemoState } from '../services/demo-scenarios';
+// TODO(Step 4a): restore demo-scenarios from pack-core playground scenarios
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
 import { DebugPanel } from '../components/Chat/DebugPanel';
 import type { A2uiMsg, ChatMessage, DebugMetadata } from '../types';
 import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
-import {
-  KICKSTART_SCENARIOS,
-  CONTROL_SCENARIOS,
-  type ScenarioDef,
-} from './playground-scenarios';
+// TODO(Step 4a): restore playground scenarios from packs registry
+// import { KICKSTART_SCENARIOS, CONTROL_SCENARIOS, type ScenarioDef } from './playground-scenarios';
+type ScenarioDef = { group: string; name: string; keyword?: string };
+const KICKSTART_SCENARIOS: ScenarioDef[] = [];
+const CONTROL_SCENARIOS: ScenarioDef[] = [];
 import { PlaygroundWorkspace } from './PlaygroundWorkspace';
 import {
   AZURE_ICON_CATEGORIES,
@@ -765,14 +765,11 @@ const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
     } else if (scenario.keyword) {
       const keyword = scenario.keyword;
       if (keyword === '__welcome__') {
-        resetDemoState();
-        const resp = getDemoResponse('anything');
-        createdIds = processMessages(resp.a2uiMessages);
+        // TODO(Step 4a): restore demo scenarios from packs
+        createdIds = [];
       } else {
-        resetDemoState();
-        getDemoResponse('skip'); // burn turn 1 (WELCOME)
-        const resp = getDemoResponse(keyword);
-        createdIds = processMessages(resp.a2uiMessages);
+        // TODO(Step 4a): restore demo scenarios from packs
+        createdIds = [];
       }
     }
     return () => {
@@ -959,7 +956,12 @@ function PlaygroundInner() {
   const galleryRef = useRef<HTMLDivElement>(null);
   const createInputRef = useRef<HTMLTextAreaElement>(null);
   const [createMessages, setCreateMessages] = useState<ChatMessage[]>([]);
-  const { widgets, addWidget, updateWidget: _updateWidget, deleteWidget, duplicateWidget } = useWidgets();
+  // TODO(Step 4a): restore useWidgets from pack-core
+  const widgets: unknown[] = [];
+  const addWidget = (_name: string, _msgs: unknown[]): string => '';
+  const _updateWidget = undefined;
+  const deleteWidget = (_id: string): void => {};
+  const duplicateWidget = (_id: string): void => {};
   const [inspireLoading, setInspireLoading] = useState(false);
   const inspireAbortRef = useRef<AbortController | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -1250,8 +1252,7 @@ function PlaygroundInner() {
     customA2ui.reset();
     setJsonInput('');
     setJsonError('');
-    resetDemoState();
-    // Also reset the Create tab chat
+    // TODO(Step 4a): restore resetDemoState from packs
     createA2ui.reset();
     setCreateMessages([]);
     createSessionIdRef.current = undefined;
@@ -1294,18 +1295,8 @@ function PlaygroundInner() {
       const msgs = selectedScenario.generate();
       return JSON.stringify(msgs, null, 2);
     }
-
-    const keyword = selectedScenario.keyword!;
-    let msgs: A2uiMsg[];
-    if (keyword === '__welcome__') {
-      resetDemoState();
-      msgs = getDemoResponse('anything').a2uiMessages;
-    } else {
-      resetDemoState();
-      getDemoResponse('skip'); // burn turn 1 (WELCOME)
-      msgs = getDemoResponse(keyword).a2uiMessages;
-    }
-    return JSON.stringify(msgs, null, 2);
+    // TODO(Step 4a): restore demo scenarios from packs
+    return '[]';
   }, [selectedScenario]);
 
   const customSurfaceEntries = Array.from(customA2ui.surfaces.entries());
@@ -2005,12 +1996,10 @@ function PlaygroundInner() {
   );
 }
 
-// ---- Wrapper Component with WidgetsProvider ----
+// ---- Playground export (WidgetsProvider removed in Step 1; TODO restore in Step 4a) ----
 
 export function Playground() {
   return (
-    <WidgetsProvider>
-      <PlaygroundInner />
-    </WidgetsProvider>
+    <PlaygroundInner />
   );
 }

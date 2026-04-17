@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { handleKickstart, getSessionPhase } from "../tools/kickstart.js";
-import type { SessionState } from "@kickstart/core";
-import { Phase } from "@kickstart/core";
+import type { SessionState } from "@kickstart/harness";
+import { Phase } from "@kickstart/harness";
 
 describe("handleKickstart", () => {
   let sessions: Map<string, SessionState>;

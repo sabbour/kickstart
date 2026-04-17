@@ -16,7 +16,7 @@
     "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
   },
   "dependencies": {
-    "@kickstart/core": "*",
+    "@kickstart/harness": "*",
     "@modelcontextprotocol/sdk": "^1.12.1"
   },
   "devDependencies": {

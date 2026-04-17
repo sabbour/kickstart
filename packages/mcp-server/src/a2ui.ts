@@ -10,7 +10,7 @@
  * - No A2UI support → text-only responses
  */
 
-import type { A2UIDocument, Component, CardComponent, TextComponent, ColumnComponent } from "@kickstart/core";
+import type { A2UIDocument, Component, CardComponent, TextComponent, ColumnComponent } from "@kickstart/harness";
 
 /** MIME type for A2UI JSON payloads in MCP embedded resources. */
 export const A2UI_MIME_TYPE = "application/json+a2ui" as const;

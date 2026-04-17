@@ -1,7 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import type { AzureContext } from "@kickstart/core";
+import type { AzureContext } from "@kickstart/harness";
 import {
   createResourceGroup,
   getResourceGroupDeployment,

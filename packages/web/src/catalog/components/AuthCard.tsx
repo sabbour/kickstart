@@ -30,11 +30,10 @@ import {
   signOutAzure,
   type AzureAuthSessionState,
 } from "../../services/azure-auth";
-import {
-  createAzureStubSession,
-  createGitHubStubSession,
-  shouldUsePlaygroundAuthStub,
-} from "../../services/playground-auth-stub";
+// TODO(Step 7/9): playground-auth-stub removed in Step 1 — stubs always return false/undefined
+const createAzureStubSession = (_connected: boolean): undefined => undefined;
+const createGitHubStubSession = (_connected: boolean): undefined => undefined;
+const shouldUsePlaygroundAuthStub = () => false;
 
 const AuthCardApi = {
   name: "AuthCard",

@@ -35,6 +35,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      '@kickstart/harness': resolve(__dirname, '../harness/src/index.ts'),
+      '@kickstart/core': resolve(__dirname, '../harness/src/index.ts'),
     },
   },
   server: {

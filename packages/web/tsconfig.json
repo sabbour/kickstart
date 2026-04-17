@@ -14,7 +14,9 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@kickstart/harness": ["../harness/src/index.ts"],
+      "@kickstart/core": ["../harness/src/index.ts"]
     }
   },
   "include": ["src"],

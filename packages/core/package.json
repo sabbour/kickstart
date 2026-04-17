@@ -1,39 +1,13 @@
 {
   "name": "@kickstart/core",
-  "version": "0.7.0",
-  "description": "Kickstart conversation engine, A2UI catalog, and code generators",
+  "version": "2.0.0-stub",
+  "description": "Compatibility stub — redirects @kickstart/core to @kickstart/harness. Remove when all imports are migrated (Step 2+).",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./catalog": {
-      "types": "./dist/catalog/index.d.ts",
-      "import": "./dist/catalog/index.js"
+      "import": "../harness/src/index.ts",
+      "types": "../harness/src/index.ts"
     }
   },
-  "scripts": {
-    "build": "tsc",
-    "test": "vitest run",
-    "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
-  },
-  "files": [
-    "dist/",
-    "src/catalog/kickstart-catalog.json"
-  ],
-  "keywords": [
-    "kickstart",
-    "a2ui",
-    "aks",
-    "kubernetes"
-  ],
-  "devDependencies": {
-    "vitest": "^4.1.4"
-  },
-  "dependencies": {
-    "zod": "^3.25.76"
-  }
+  "private": true
 }
