@@ -18,5 +18,3 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
-
-- 2026-04-10 | #65 "feat: batch prompt knowledge updates" | M | impl=0m | review=98m | cycles=1 | merged | @sabbour
