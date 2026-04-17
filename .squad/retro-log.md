@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #151 "fix: Code block syntax highlighting broken with thick black border" | S | impl=1m | review=6m | cycles=1 | merged | @sabbour
