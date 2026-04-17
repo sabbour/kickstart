@@ -70,3 +70,15 @@
 **Watch:** hermes (77%) — summarize next meaningful entry
 
 **Still absent:** `zapp-pr549-review/recheck`, `hermes-549-test`, `fry-486-dp-revision`, `fry-485-dp-revision`, `bender-pack-skills-fix`, `leela-484-dp-recheck`, `fry-484-dp-revision`
+
+## Wave 37 — 2025-07-15
+
+**Files merged:** 3
+- `leela-487-dp-review.md` APPROVE_WITH_CONDITIONS (C1: `audience` field unvalidated; C2: Runner restart contract unresolved; C3: `context: null` breaks stateful pack tools)
+- `zapp-486-dp-recheck.md` REMAINS BLOCKED (B6: payload-coercion fail-closed test still absent; B1–B5 + Crit1+Crit2 all resolved)
+- `zapp-487-dp-review.md` BLOCKED (6 blockers: UserActions as MCP tools; session binding; default-deny; schema validation; single-use interrupt; guardrails gate)
+**decisions.md:** 255,922 → 262,354 bytes (+6,432)
+**Self-posts staged:** leela +DP #487 review row (wave 36 table)
+**Sizes post-wave:** bender 7,924 / fry 10,997 (71%) / hermes 11,926 (77%) / leela ~4.3K / ralph 225 / scribe ~5K / zapp 6,315 (41%)
+**Watch:** hermes (77%) — no new entries this wave; summarize on next crossing
+**Status:** DP #486 one re-check away (B6 only); DP #487 needs full revision (Leela C1–C3 + Zapp 6 blockers)

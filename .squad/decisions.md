@@ -4526,3 +4526,93 @@ The revision enumerates all six GitHub playground stubs and gates them behind `K
 - Leela APPROVE_WITH_CONDITIONS (C1 bootstrap ordering + C2 Zapp gate — both cleared)
 - Zapp APPROVE_WITH_CONDITIONS (Crit1+B1–B4 — all cleared in combined revision)
 - Phase C (credential flow) requires Zapp re-check before merge. All other phases clear.
+
+---
+
+# Decision: MCP Adapter (Step 12) — Approved with Conditions
+
+**Date:** 2025-07-15
+**Author:** Leela (Lead)
+**Issue:** #487 — v2 Step 12: MCP adapter
+
+## Decision
+
+APPROVE_WITH_CONDITIONS. Three blocking conditions before code is written.
+
+## Blocking Conditions
+
+**C1 — `audience: ["user"]` is unspecified in MCP spec**
+`audience` is not a standard field in the MCP embedded resource spec. The DP asserts VS Code Copilot renders `application/json+a2ui` natively via this field. This is unvalidated. Before implementation: verify VS Code actually consumes this field or document graceful degradation behavior (A2UI degrades to text-only for non-VS Code clients).
+
+**C2 — Runner interrupt storage contract unresolved (Q1)**
+Phase E `resumeMcpTurn` calls `runner.resume(runId, ...)` but the DP doesn't settle whether the paused Runner instance survives a process restart. If the Runner is in-memory only, MCP UserAction resume breaks across restarts. The storage contract must be documented explicitly: either (a) in-process only with sticky routing required, or (b) SessionStore holds enough state for a fresh Runner to reconstruct. The brief says "find the paused Runner" — that needs a concrete answer.
+
+**C3 — Phase D `context: null` is broken for stateful pack tools (Q5)**
+`registerPackTools` calls `execute(params, { context: null })`. Any pack tool that reads SessionCtx (subscription resolution, credential lookup) will fail silently or throw. The DP must either: (a) require `sessionId` param for all directly-exposed pack tools and load the session, or (b) introduce a `requiresSession` flag on ToolContribution and exclude flagged tools from Phase D. Leaving `context: null` is not acceptable.
+
+## Non-Blocking Notes
+
+- D2 timeout: no configurable timeout on `runMcpTurn`. Add a ~55s timeout wrapper so VS Code's ~60s MCP timeout doesn't hard-error. Return partial result with `timeout: true`.
+- Q2: include structured interrupt signal alongside prose (LLMs need machine-readable, not just human-readable).
+- Phase E: `ua.resultSchema.shape` assumes Zod object schema. Defensive check required — will crash for non-object schemas.
+- D6: "VS Code understands application/json+a2ui natively" — treat as risk, not established fact, until C1 is resolved.
+
+## Q Answers
+
+- **Q1**: See C2 above. Must be settled before code is written.
+- **Q2**: Yes, include structured interrupt field (`{ type: "interrupt", toolName, actionId }` as JSON content block). Prose alongside is fine; machine-readable is required.
+- **Q5**: See C3 above. Phase D needs `sessionId` param + session load for stateful tools, or explicit exclusion.
+- **Q6**: Default `false`, opt-in. Already settled by Zapp's High 1 condition. The security default is correct and must be enforced.
+
+---
+
+# Zapp — DP #486 Re-check
+
+- **Issue:** #486 — v2 Step 11: Guardrails engine
+- **Date:** 2026-04-17
+- **Verdict:** REMAINS BLOCKED
+
+## Resolved
+
+- Crit1 — SSE block event is opaque `GUARDRAIL_BLOCK` only
+- Crit2 — `core/no-credential-leak` covers input, output, and tool stages with always-`block`
+- B1 — tool-stage block aborts remaining tool calls and halts the turn
+- B2 — core guardrails run first on original payload and core `block` short-circuits non-core evaluation
+- B3 — downstream evaluation checks both original and redacted forms using a non-user-controllable sentinel
+- B4 — `validate_artifacts` is `@internal`, not exported, and fails closed with `{ valid: false, reason: 'not-implemented' }`
+- B5 — duplicate guardrail names are rejected and `core/` is reserved
+
+## Remaining blocker
+
+- **B6 — fail-closed acceptance tests incomplete:** payload coercion is described as fail-closed, but the explicit required tests still omit a payload-coercion failure case. The current test list only names input-hook throw, output-hook throw, tool-hook throw, and `applyRedact()` throw.
+
+## Required follow-up
+
+Add an explicit payload-coercion fail-closed test requirement, then request another Zapp review.
+
+---
+
+# Zapp Decision Inbox — DP #487 MCP adapter security review
+
+**Date:** 2026-04-17
+**Issue:** #487 — v2 Step 12: MCP
+**Reviewer:** Zapp (Security Architect)
+**Verdict:** BLOCKED
+
+## Summary
+
+The DP materially weakens the current v2 security boundary in two places: it turns UserActions into MCP-callable tools, and it authorizes MCP turns/resume by caller-supplied `sessionId` without an equivalent of the existing principal ownership check. As written, this would reintroduce credential-flow ambiguity, replayable resume semantics, and session hijack risk on any shared or persisted session store.
+
+## Blocking items
+
+1. **UserActions must not be MCP tools.** Keep them off the MCP tool manifest. MCP clients may observe `user_action_required`, perform provider-native auth/consent out-of-band, then resume through the typed server endpoint.
+2. **Bind execution and resume to owner + channel.** Enforce `(sessionId, runId/actionId, principalId or MCP connectionId)` before any session state is read or mutated. Reject arbitrary `sessionId` reuse with 403/404.
+3. **Default-deny MCP exposure.** `mcpExposed` must default to `false`; only explicitly reviewed tools may appear. Internal/file-system tools stay permanently unexposed.
+4. **Validate at the adapter boundary.** MCP arguments must be parsed by the exact same parameter schemas used on the web path. UserAction resume payloads must be parsed by `resultSchema` before `runner.resume()`.
+5. **Single-use interrupt semantics.** Resume must be atomic, action-bound, TTL-bound, and replay-safe. Wrong action, stale action, or duplicate replay must fail closed.
+6. **Guardrails must still gate buffered responses.** The synchronous MCP path must not concatenate raw deltas/A2UI and return them before output-stage guardrails run.
+
+## Q answers
+
+- **Q3:** Do not pass raw bearer tokens through generic MCP tool/result payloads. If VS Code auth is used, bind credentials to the expected provider/action and validate issuer, audience, scopes, tenant, and subject; prefer opaque proofs/handles over token strings. No cross-provider token reuse.
+- **Q4:** Yes — the same ownership invariant applies here. For MCP, bind the session to the transport connection at `start`, and if any web-backed resume/API path is involved also bind to principal OID. Authorization should be `(sessionId, connectionId, principalId, runId/actionId)`, not `sessionId` alone.

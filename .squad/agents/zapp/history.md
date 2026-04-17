@@ -50,3 +50,11 @@ Crit1: SSE block events expose guardrail name+reason = client oracle → must em
 
 ### PR #550 (Step 5 Runner+SSE) — BLOCKED
 3 high: (1) `POST /api/converse/resume` returns HTTP 200 for auth failures instead of 403/400. (2) Session fixation — `/api/converse` accepts caller-provided `sessionId` without OID ownership check. (3) Pending action schema stored by tool name only, not by `(sessionId,actionId)` pair. 2 medium: runner not aborted on client disconnect; no per-session lock on resume (duplicate continuation race). Positive: manifest fails closed (no stubs), playground gated, no token exposure in SSE/api/packs.
+
+## Wave 37 — 2025-07-15
+
+### DP #486 Guardrails Engine — Re-check REMAINS BLOCKED
+B6 still outstanding: fail-closed acceptance tests omit payload-coercion failure case. Crit1+Crit2 and B1–B5 all resolved. One more revision required — add explicit payload-coercion test, then re-check.
+
+### DP #487 MCP Adapter — BLOCKED (6 blockers)
+High-severity: (1) UserActions must not be MCP tools; (2) bind execution+resume to `(sessionId, runId/actionId, principalId/connectionId)`; (3) `mcpExposed` must default `false`; (4) MCP args must be validated by same schemas as web path; (5) single-use interrupt semantics (atomic, TTL-bound, replay-safe); (6) guardrails must gate buffered MCP responses before return. Q3/Q4 answers provided (no raw bearer tokens; bind session to connectionId+principalId).
