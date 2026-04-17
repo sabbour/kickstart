@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #307 "test: pacing directive regression tests for system prompt (#275)" | L | impl=9m | review=2m | cycles=1 | merged | @sabbour
