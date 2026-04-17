@@ -55,9 +55,22 @@ export const PHASE_DEFINITIONS: readonly PhaseDefinition[] = [
   },
 ] as const;
 
-/** Advance to the next phase, or return the same phase if already at the terminal phase. */
-export function advancePhase(phase: Phase): Phase {
-  return getPhaseDefinition(phase).nextPhase ?? phase;
+const KNOWN_PHASE_SET = new Set<string>(Object.values(Phase));
+
+/** Type guard — returns true when `s` is a valid Phase enum value. */
+export function isPhase(s: string): s is Phase {
+  return KNOWN_PHASE_SET.has(s);
+}
+
+/**
+ * Advance to the next phase.
+ * Accepts any string; unrecognised values fall back to Phase.Discover
+ * rather than throwing so stale/hydrated phase strings never crash callers.
+ */
+export function advancePhase(phase: Phase | string): Phase {
+  const def = PHASE_DEFINITIONS.find((p) => p.id === phase);
+  if (!def) return Phase.Discover;
+  return def.nextPhase ?? (phase as Phase);
 }
 
 /** Look up a phase definition by its ID. */
