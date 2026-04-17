@@ -115,11 +115,12 @@ jobs:
           git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]
 
 Working as Scribe — see .squad/agents/scribe/charter.md"
-          for attempt in 1 2 3; do
+          max_attempts=3
+          for attempt in $(seq 1 "$max_attempts"); do
             if git push; then
               break
             fi
-            if [ "$attempt" -eq 3 ]; then
+            if [ "$attempt" -eq "$max_attempts" ]; then
               echo "git push failed after ${attempt} attempts"
               exit 1
             fi
@@ -128,7 +129,8 @@ Working as Scribe — see .squad/agents/scribe/charter.md"
               echo "git pull --rebase failed while preparing retry push"
               exit 1
             fi
-            sleep 2
+            sleep_seconds=$((2 ** attempt))
+            sleep "$sleep_seconds"
           done
 
       - name: Mirror line as PR comment
