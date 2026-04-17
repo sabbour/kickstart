@@ -1,64 +1,66 @@
-# A2UI Component Patterns
+# A2UI Components
 
-**When to use:** You need to build, register, or render A2UI custom components in Kickstart.
+**When to use:** you are rendering UI from an agent, adding a component to a pack, or debugging the A2UI stream.
 
 ## Context
 
-Kickstart uses A2UI (Adaptive UI) for dynamic component rendering driven by LLM output. Components follow the "fat component" pattern — self-contained React components that handle their own data fetching, state, and error display.
+Kickstart v2 streams UI through one mechanism: the `core.emit_ui` tool. Agents call it. The harness forwards the payload as an SSE `a2ui` event. The web client renders the payload against the registered component catalog. There is no envelope. There is no JSON parser. There is no FSM.
 
-## Steps
+See [`docs/v2-implementation-brief.md`](../../../../docs/v2-implementation-brief.md) sections on A2UI streaming and components.
 
-### 1. Fat Component Pattern
+## The contract
 
-Each custom A2UI component is self-contained:
-1. Receives config props from LLM (API path, bind key, labels)
-2. Uses `useServiceConnector()` to get auth + make API calls
-3. Manages its own loading/error/empty states (Fluent UI v9 `Spinner`, `MessageBar`)
-4. Reports selection back via A2UI `action.event` → orchestrator updates data model
+```ts
+// Agent-side (from any pack)
+await emitUi({
+  component: "azure/resource-picker",
+  props: { subscriptionId, resourceType: "Microsoft.Web/sites" },
+  data: [...],
+  actions: { onSelect: "azure:select_resource" },
+});
+```
 
-Register via `createReactComponent()` in the component catalog.
+The payload is validated against the component's manifest before it leaves the server. An invalid payload produces an `error` SSE event, never a half-rendered component.
 
-### 2. Fluent 2 Compliance
+## Component rules
 
-All components must follow the Fluent 2 audit checklist:
-- Use `makeStyles()` + design tokens — no inline styles, no raw CSS classes
-- Use Fluent UI React v9 components (`Button`, `Card`, `Spinner`, etc.)
-- No emoji in UI — use Fluent UI icons or Material Symbols
-- Theme via `resolvedTheme` pattern (standard for all themed components)
+1. **Pure render.** No fetches, no setTimeout beyond CSS animation, no localStorage.
+2. **Typed props.** Props are declared in the component manifest. TypeScript types are generated from the manifest, not hand-written.
+3. **Fluent UI v9 only.** `makeStyles` + design tokens. No custom class systems.
+4. **Action dispatch.** Interaction produces an A2UI `action.event` that maps to a user action tool (sigil `pack:action`). Never call APIs directly from a component.
+5. **Deterministic keys.** Every list item needs a stable key derived from the data, not the render index.
+6. **Past-turn safety.** Components receive an `isActive` prop. When false, they render read-only and run no effects.
 
-### 3. Progressive Rendering
+## Progressive rendering
 
-Components use a three-layer progressive rendering pipeline:
+- The harness emits `a2ui` events as the agent produces them.
+- The client uses a short stagger (≈60ms per item) for entry animation via the `--enter-index` CSS custom property.
+- The stagger is a render concern, not a stream concern. Do not add delays on the server.
 
-1. **`useProgressiveQueue` hook** — stagger incoming components with 150ms delay
-2. **Mock streaming stagger** — `sendMock()` emits surface messages with 200ms delays
-3. **CSS animation** — `a2ui-component--entering` class with `--enter-index` custom property:
-   ```css
-   animation-delay: calc(var(--enter-index) * 60ms);
-   ```
+## Adding a new component
 
-Any future A2UI component rendering path should use `--enter-index` for consistent animated entry.
+1. Create the component under `packages/pack-<name>/src/components/<Component>.tsx`.
+2. Declare its manifest entry in the pack's `components` array.
+3. Add a sample render to the playground fixture.
+4. Add a render test under the pack's `__tests__/`.
+5. Update `docs-site/docs/components/` with a usage page.
+6. Update `docs-site/docs/extending/<pack>.md` to list the new component.
 
-### 4. Accessibility
+## Registering with the LLM
 
-- All interactive components must have proper ARIA labels
-- Keyboard navigation support required
-- Focus management for dynamic component insertion
-- Color contrast via Fluent design tokens (automatic with theme compliance)
+The LLM only knows about components that appear in the pack's agent prompt. If you add a component but forget to list it in an agent's allowed catalog, it will never be emitted. See the **component ↔ prompt sync rule** in the root memory notes.
 
-### 5. Schema Props
+## Debugging the stream
 
-A2UI schema props require type narrowing for native HTML attributes. Don't pass A2UI props directly to HTML elements — narrow first.
+- Use the web client's debug panel (`?debug=true`) to see raw SSE events.
+- `a2ui` events include the full payload. Inspect `props` and `data` to confirm the manifest shape.
+- If a component renders empty, check that the agent's prompt lists it in the allowed catalog.
+- If a component renders but actions no-op, verify the `actions` map points at a registered user action in the pack.
 
-### 6. Past-Turn Isolation
+## Key files (v2)
 
-Past-turn components become read-only:
-- Check `isActive` prop before running effects
-- Prevent `useEffect` in past turns
-- Components deactivate gracefully (no stale API calls)
-
-## Key Files
-
-- `packages/web/src/components/` — all A2UI component implementations
-- `packages/core/src/` — component registration and catalog
-- Component catalog defines available components for LLM to use
+- `packages/pack-core/src/components/` — shared primitives (card, list, button, form)
+- `packages/pack-<domain>/src/components/` — domain components
+- `packages/pack-core/src/tools/emit-ui.ts` — the `core.emit_ui` tool
+- `packages/harness/src/sse/` — SSE event emission
+- `packages/web/src/a2ui/` — client-side registry and renderer

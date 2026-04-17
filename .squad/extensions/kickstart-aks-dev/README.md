@@ -1,8 +1,6 @@
 # Kickstart AKS Development Extension
 
-Codifies development workflows for **Kickstart** — an AI-guided AKS onboarding app built as a monorepo with npm workspaces (`@kickstart/core`, `@kickstart/web`, `@kickstart/mcp-server`).
-
-Extracted from 200+ team decisions, 13 inbox proposals, 4 ceremonies, and 1 existing skill accumulated over the project's development lifecycle.
+Codifies development workflows for **Kickstart** — an AI-guided AKS onboarding app built on the `@openai/agents` SDK. Two-layer architecture: `@kickstart/harness` (runtime glue) plus packs (`pack-core`, `pack-azure`, `pack-aks-automatic`, `pack-github`). Design north star: [`docs/v2-implementation-brief.md`](../../../docs/v2-implementation-brief.md).
 
 ## Install
 
@@ -16,33 +14,40 @@ squad plugin install github/sabbour/kickstart-aks-dev-extension
 
 | Skill | Description |
 |-------|-------------|
-| **pr-workflow** | Full issue → branch → PR → review → merge lifecycle, including project board updates, Design Proposal process, and review gates |
-| **release-process** | Changesets-based monorepo versioning, changelog generation, tag-triggered SWA deploys |
-| **swa-deployment** | Azure Static Web Apps deployment patterns — CSP, build metadata stamping via Vite `define`, slot strategy |
-| **debug-mode** | Debug metadata convention for SSE endpoints — activation, payload shape, frontend/backend contract |
-| **a2ui-components** | A2UI custom component patterns — fat components, progressive rendering, Fluent 2 compliance, accessibility |
-| **testing-strategy** | Playwright E2E + Vitest unit testing, validation engine patterns, rules registry |
+| **pr-workflow** | Issue → DP → branch → draft PR → review → merge lifecycle, with project board updates and review gates |
+| **pack-authoring** | Rules for adding/modifying Pack, Agent, Skill, Tool, UserAction, Component, Guardrail |
+| **a2ui-components** | A2UI streaming contract (`core.emit_ui`), component manifests, progressive rendering, Fluent v9 compliance |
+| **testing-strategy** | Four-layer testing: unit, pack conformance, contract, Playwright E2E |
+| **release-process** | Automated daily cadence via `.github/workflows/squad-release-cadence.yml`, changesets, release-notes curation |
+| **swa-deployment** | Pre-prod SWA from `main`, CSP, OIDC, Vite `define` build metadata |
+| **debug-mode** | Debug metadata convention for SSE endpoints, opt-in, backward-compatible |
+| **docs-changelog** | Pre-merge docs + changeset contract, updates the brief and the docs-site in the same PR |
+| **continuous-improvement** | Data loop: per-PR metrics → daily pulse → weekly pulse → `process` issues |
 
-### Ceremonies
+### Ceremonies (all automated, see `.squad/ceremonies.md`)
 
-| Ceremony | Description |
-|----------|-------------|
-| **design-review** | Pre-implementation architecture + security review of Design Proposals on issues |
-| **retrospective** | Post-failure and post-sprint retrospectives with root cause analysis and velocity tracking |
-| **sprint-planning** | MMM-aligned sprint planning with milestone roadmaps and capacity estimates |
+| Ceremony | Trigger | Workflow |
+|----------|---------|----------|
+| **design-review** | DP comment on issue | in-session, facilitated by Leela |
+| **retrospective** | per PR (auto), on failure (ad-hoc), weekly (auto) | `squad-pr-retro.yml`, `squad-weekly-pulse.yml` |
+| Daily Pulse | 17:00 Pacific daily | `squad-daily-pulse.yml` |
+| Weekly Pulse | Monday 17:00 Pacific | `squad-weekly-pulse.yml` |
+| Release Cadence | 17:00 Pacific daily | `squad-release-cadence.yml` |
 
 ### Directives
 
 | Directive | Description |
 |-----------|-------------|
-| **project-conventions** | Consolidated user preferences: branching, deployment, process, tooling, and team rules |
+| **project-conventions** | Branching, deployment, docs, changelogs, releases, testing, security, UI standards |
 
 ## Conventions Summary
 
+- **Architecture:** harness + packs; no domain logic in the harness; A2UI streams through `core.emit_ui`
 - **Branch naming:** `squad/{issue-number}-{kebab-case-slug}`
-- **Releases:** Tagged releases (`v*`) deploy to SWA production; main = pre-prod
-- **Model:** Claude Opus 4.6 for all code-writing work
+- **Releases:** `main` deploys the pre-prod SWA; tags (`v*`) mark versioned releases
+- **Model:** Claude for code-writing, GPT-5 class for Zapp and stuck architecture calls
 - **PRs:** Always draft first, squash-merge, delete branch
 - **Design:** DP comment on issue before code; Leela (architecture) + Zapp (security) approve
-- **Testing:** Playwright E2E required for all feature work
+- **Testing:** four layers (unit, pack conformance, contract, Playwright E2E); all required
 - **Work tracking:** GitHub Issues is the source of truth; post major findings as comments
+- **Docs:** every user-facing PR updates `docs-site/docs/` and adds a changeset

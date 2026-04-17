@@ -1,0 +1,115 @@
+name: Squad · Docs & Changeset Gate
+
+# Soft gate: warn (but don't block) when a PR lacks a changeset or docs update.
+# Posts a sticky comment on the PR. Hermes reviews the comment during PR review.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Inspect changed files
+        id: changed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const paths = files.map(f => f.filename);
+
+            const hasChangeset = paths.some(p => p.startsWith('.changeset/') && p.endsWith('.md') && !p.endsWith('README.md'));
+            const hasDocsSite = paths.some(p => p.startsWith('docs-site/docs/'));
+            const hasBriefUpdate = paths.some(p => p === 'docs/v2-implementation-brief.md');
+            const hasApiRef = paths.some(p => p === 'docs/api-reference.md');
+
+            // User-facing signal: touches packages/** src but is not test/config only
+            const userFacing = paths.some(p =>
+              /^packages\/(web|pack-|harness)\//.test(p) &&
+              !p.includes('__tests__') &&
+              !p.endsWith('.test.ts') &&
+              !p.endsWith('.test.tsx') &&
+              !p.includes('/e2e/')
+            );
+
+            core.setOutput('hasChangeset', String(hasChangeset));
+            core.setOutput('hasDocsSite', String(hasDocsSite));
+            core.setOutput('hasBriefUpdate', String(hasBriefUpdate));
+            core.setOutput('hasApiRef', String(hasApiRef));
+            core.setOutput('userFacing', String(userFacing));
+
+      - name: Post or update sticky comment
+        uses: actions/github-script@v7
+        env:
+          HAS_CHANGESET: ${{ steps.changed.outputs.hasChangeset }}
+          HAS_DOCS_SITE: ${{ steps.changed.outputs.hasDocsSite }}
+          HAS_BRIEF: ${{ steps.changed.outputs.hasBriefUpdate }}
+          HAS_API: ${{ steps.changed.outputs.hasApiRef }}
+          USER_FACING: ${{ steps.changed.outputs.userFacing }}
+        with:
+          script: |
+            const marker = '<!-- squad-docs-gate -->';
+            const mark = v => v === 'true' ? '✅' : '⚠️';
+            const userFacing = process.env.USER_FACING === 'true';
+            const hasChangeset = process.env.HAS_CHANGESET === 'true';
+
+            const lines = [
+              marker,
+              '## Docs & changeset gate',
+              '',
+              `- ${mark(process.env.HAS_CHANGESET)} changeset added (\`.changeset/*.md\`)`,
+              `- ${mark(process.env.HAS_DOCS_SITE)} \`docs-site/docs/\` updated`,
+              `- ${mark(process.env.HAS_BRIEF)} \`docs/v2-implementation-brief.md\` updated (if architectural)`,
+              `- ${mark(process.env.HAS_API)} \`docs/api-reference.md\` updated (if API surface changed)`,
+              '',
+            ];
+
+            if (userFacing && !hasChangeset) {
+              lines.push('> ⚠️ This PR touches `packages/` source but has no changeset. If the change is user-visible, run `npm run changeset` before merging. If it is internal-only, note that in the PR body.');
+            } else if (!userFacing) {
+              lines.push('_Touches no user-facing source; changeset may be unnecessary._');
+            } else {
+              lines.push('_Changeset present. Good._');
+            }
+
+            lines.push('', '---', '_Soft gate. Does not block merge. Hermes reviews during PR review._');
+
+            const body = lines.join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body,
+              });
+            }

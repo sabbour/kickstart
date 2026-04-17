@@ -1,119 +1,131 @@
 # PR & Issue Workflow
 
-**When to use:** You need to pick up an issue, create a branch, open a PR, navigate the review process, or merge work.
+**When to use:** you are picking up an issue, opening a PR, navigating review, or merging.
 
 ## Context
 
-Kickstart uses a structured issue → DP → PR → review → merge lifecycle. Design discussion happens on the **issue** (via Design Proposals), not on the PR. PRs are for code review only.
+Kickstart uses a structured issue → Design Proposal → PR → review → merge lifecycle. Design discussion happens on the **issue** (via a Design Proposal comment), not on the PR. PRs are for code review only.
 
 ## Steps
 
-### 1. Pick Up an Issue
+### 1. Pick up an issue
 
-1. Assign to the current user:
-   ```bash
-   gh issue edit <N> --add-assignee "$(gh api user -q .login)"
-   ```
-2. Set the milestone to tie the issue to a release:
-   ```bash
-   gh issue edit <N> --milestone "<milestone-name>"
-   ```
-3. Update the project board status to **In progress** (use GraphQL — see Board Updates below).
+```bash
+gh issue edit <N> --add-assignee "$(gh api user -q .login)"
+gh issue edit <N> --milestone "<milestone-name>"
+```
+
+Move the project board status to **In progress**.
 
 ### 2. Post a Design Proposal (DP)
 
-Before writing any code, post a structured DP comment on the issue:
+Before writing code, post a DP comment on the issue with:
 
 - Problem statement (reference the issue body)
-- Proposed approach
-- Files to modify / create
-- Patterns and dependencies
-- API contracts (if applicable)
-- Security considerations
+- Proposed approach (reference the relevant section of `docs/v2-implementation-brief.md`)
+- Files to modify or create
+- Pack boundaries affected (which pack owns which change)
+- Tool / user-action / component surface changes
+- Security considerations (tool schema changes, trust boundaries)
+- Docs and changeset plan
 - Alternatives considered
 
-Wait for **Leela** (architecture) and **Zapp** (security) to approve the DP before proceeding.
+Wait for **Leela** (architecture) and **Zapp** (security) to approve the DP. Do not start coding before.
 
-### 3. Create a Branch
+### 3. Create the branch
 
 ```bash
 git checkout -b squad/<issue-number>-<kebab-case-slug>
 ```
 
-### 4. Open a Draft PR
+### 4. Open a draft PR
 
-Always open as draft — never open a ready PR directly:
+Always draft, never ready on first push.
+
 ```bash
 gh pr create --draft \
   --title "<title>" \
   --body "Closes #<issue-number>
 
 ## Summary
-<what changed>
+<what the user gains or loses>
 
 ## Changes
 - <change 1>
 - <change 2>
 
 ## Testing
-<how tested>" \
+<how tested>
+
+## Docs and changeset
+- [ ] Changeset added (or marked internal-only with reason)
+- [ ] docs-site/docs/ updated (or N/A)
+- [ ] docs/v2-implementation-brief.md updated (or N/A)
+- [ ] docs/api-reference.md updated (or N/A)
+- [ ] Pack docs updated (or N/A)
+- [ ] Tests added or covered
+" \
   --head squad/<issue-number>-<slug> \
   --base main
 ```
 
-### 5. Keep the Branch Current
+### 5. Keep the branch current
 
-When behind `main`, **always rebase** — never merge:
+Rebase, never merge.
+
 ```bash
 git fetch origin && git rebase origin/main
 git push --force-with-lease
 ```
 
-### 6. Mark Ready for Review
+### 6. Mark ready for review
 
-Only after work is complete AND CI passes:
+Only after:
+- All CI checks are green.
+- Pre-merge checklist is complete.
+- Docs and changeset are in place.
+
 ```bash
 gh pr ready <N>
 ```
 
-### 7. Review Gates
+### 7. Review gates
 
-Two gates must pass before merge:
+| Reviewer | Checks |
+|----------|--------|
+| Leela | Architecture alignment, scope, code quality, docs |
+| Zapp | Security, auth, secrets, tool schemas, guardrails |
+| Hermes | Test coverage across the layers the PR touches |
 
-1. **Leela** — code quality, architecture alignment with the approved DP
-2. **Zapp** — security concerns (auth, injection, secrets, CORS)
+Both Leela and Zapp must approve. The `.github/workflows/squad-review-gate.yml` workflow enforces this as a required status check.
 
-Request Copilot review via REST API:
-```bash
-REPO_NWO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-gh api "repos/${REPO_NWO}/pulls/<N>/requested_reviewers" \
-  --method POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
-```
+### 8. Address review comments
 
-### 8. Address Feedback
+Before you start addressing individual review comments, post a comment acknowledging the feedback and that you will respond.
 
-- Check both formal reviews AND general comments
-- Fix valid suggestions, reply with reasoning on disagreements
-- **All threads must be resolved** before merging
+For every comment (Copilot, Leela, Zapp, any reviewer):
+
+1. Fix the code, or decide not to and explain why.
+2. Reply to the specific comment with `Addressed in {sha}: {description}`.
+3. Resolve the thread via the GraphQL `resolveReviewThread` mutation.
+4. Confirm zero unresolved threads before merging.
+
+Never silently fix and move on.
 
 ### 9. Merge
 
-```bash
-gh pr merge <N> --squash --delete-branch
-```
+- Squash merge.
+- Delete the branch.
+- Verify the issue auto-closes via `Closes #N`.
+- Move the project board card to **Done**.
 
-### 10. Board Updates
+## Copilot Coding Agent
 
-Move items through project board stages:
+When @copilot picks up an issue autonomously:
 
-| Event | Status |
-|-------|--------|
-| Issue picked up | **In progress** |
-| PR opened | **In review** |
-| PR merged + issue closed | **Done** |
+- It checks its capability tier in `.squad/team.md` before starting.
+- 🟢 Good fit: proceeds and opens a PR.
+- 🟡 Needs review: proceeds but flags in the PR body.
+- 🔴 Not suitable: refuses and asks for reassignment.
 
-Use the GraphQL API to update project board fields. Cache field/option IDs in `.squad/config.json`.
-
-## GitHub Account Selection
-
-Before `gh` commands, ensure you're authenticated with the correct account. If the repo owner is a personal account (no `_` suffix), use your personal GitHub account. Run `gh auth status` to check.
+Copilot still follows this workflow: DP on the issue, draft PR, docs and changeset, respond to every comment. No shortcuts.
