@@ -17,6 +17,10 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: squad-pr-retro-log
+  cancel-in-progress: false
+
 jobs:
   retro:
     runs-on: ubuntu-latest
@@ -102,12 +106,16 @@ jobs:
 
             core.setOutput('line', line);
             core.setOutput('pr', String(pr.number));
+            core.setOutput('base_ref', pr.base?.ref ?? context.payload.repository?.default_branch ?? 'main');
 
       - name: Append to retro log (as Scribe)
         env:
+          BASE_REF: ${{ steps.metrics.outputs.base_ref }}
           LINE: ${{ steps.metrics.outputs.line }}
         run: |
           set -e
+          git fetch origin "$BASE_REF"
+          git checkout -B "$BASE_REF" "origin/$BASE_REF"
           mkdir -p .squad
           touch .squad/retro-log.md
           # Insert the new line directly after the entries marker
@@ -130,7 +138,16 @@ jobs:
             exit 0
           fi
           git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
-          git push
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:$BASE_REF"; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Push failed after 3 attempts."
+              exit 1
+            fi
+            git pull --rebase origin "$BASE_REF"
+          done
 
       - name: Mirror line as PR comment
         uses: actions/github-script@v7
@@ -150,6 +167,6 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: parseInt('${{ steps.metrics.outputs.pr }}'),
+              issue_number: parseInt('${{ steps.metrics.outputs.pr }}', 10),
               body,
             });
