@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #543 "Redirect ceremony-reference.md pointers to .squad/ceremonies.md" | S | impl=0m | review=3m | cycles=1 | merged | @sabbour
+
 - 2026-04-17 | #481 "Address Copilot review feedback from #471" | L | impl=1m | review=34m | cycles=1 | merged | @sabbour
 - 2026-04-17 | #552 "fix(workflows): fix YAML syntax errors in squad ceremony workflows" | M | impl=0m | review=43m | cycles=1 | merged | @sabbour
 
