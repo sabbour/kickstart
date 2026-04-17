@@ -197,4 +197,4 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - **Branch protection:** Removed `required_approving_review_count`, added `squad/review-gate` to required status checks. `required_conversation_resolution` kept enabled.
 - **SKILL updated:** `.squad/skills/pr-workflow/SKILL.md` — new Merge Gate section with label verification commands.
 - **PR:** #427
-- **Decision file:** `.squad/decisions/inbox/leela-review-gate-labels.md`
+- **Status:** ✅ Archived to decisions.md (2026-04-17T01:57:58Z)
