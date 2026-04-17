@@ -110,7 +110,7 @@ jobs:
           lint_build_result="${{ needs.lint-build.result }}"
           e2e_result="${{ needs.e2e.result }}"
 
-          if [[ ! " success skipped " =~ (^|[[:space:]])${lint_build_result}($|[[:space:]]) || ! " success skipped " =~ (^|[[:space:]])${e2e_result}($|[[:space:]]) ]]; then
+          if [[ ! "$lint_build_result" =~ ^(success|skipped)$ || ! "$e2e_result" =~ ^(success|skipped)$ ]]; then
             echo "CI failed: lint-build=${lint_build_result}, e2e=${e2e_result}"
             exit 1
           fi
