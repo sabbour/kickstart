@@ -16,6 +16,7 @@ import {
   sessionToAgentItems,
   KickstartSessionAdapter,
 } from "./agents-session-adapter.js";
+import { resumeRun } from "./agents-runner.js";
 
 describe("sessionToAgentItems", () => {
   it("excludes system messages", () => {
@@ -226,5 +227,52 @@ describe("KickstartSessionAdapter — TTL expiry", () => {
     // lastAccessed is set to Date.now() by createSession — session is fresh
     const adapter = new KickstartSessionAdapter(session);
     await expect(adapter.getItems()).resolves.toBeInstanceOf(Array);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resumeRun — cross-principal hijack rejection (Zapp security condition)
+// ---------------------------------------------------------------------------
+
+describe("resumeRun — cross-principal session hijack prevention", () => {
+  it("throws 403 when a different principal tries to resume an owned session", async () => {
+    const session = createSession("hijack-test-session");
+    session.principalId = "owner-alice";
+    session.state.messages.push({
+      role: "user",
+      content: "previous turn",
+      timestamp: new Date().toISOString(),
+    });
+
+    await expect(
+      resumeRun(session, "run-001", "attacker-bob"),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("throws 403 when no principalId is provided for a session that has an owner", async () => {
+    const session = createSession("hijack-test-anon");
+    session.principalId = "owner-alice";
+
+    await expect(
+      resumeRun(session, "run-002", undefined),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("does NOT throw for the session owner resuming their own run", async () => {
+    const session = createSession("owner-alice"); // principalId = "owner-alice"
+
+    // runAgentTurn will fail at the Azure call stage, not at the ownership gate
+    await expect(
+      resumeRun(session, "run-003", "owner-alice"),
+    ).rejects.not.toMatchObject({ status: 403 });
+  });
+
+  it("does NOT throw for anonymous sessions (no principalId set)", async () => {
+    const session = createSession(); // no principalId → open session
+    // Any caller may resume an anonymous session
+
+    await expect(
+      resumeRun(session, "run-004", "anyone"),
+    ).rejects.not.toMatchObject({ status: 403 });
   });
 });

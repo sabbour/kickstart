@@ -28,6 +28,7 @@ import {
   defaultKitRegistry,
   defaultRegistry,
   InMemoryArtifactStore,
+  processResponse,
 } from "@kickstart/core";
 import type { ToolContext, ConversationSkillsContext } from "@kickstart/core";
 import { createAzureModelProvider, getAgentsDeployment, getAgentsGenerateDeployment } from "./agents-azure-provider.js";
@@ -202,6 +203,19 @@ export async function runAgentTurn(input: AgentRunInput): Promise<AgentRunOutput
   // Adapt output — allowlist enforced here
   const adapted = adaptRunResult(result as Parameters<typeof adaptRunResult>[0]);
 
+  // #326 workspace-first gate: funnel any file/artifact content from SDK tool
+  // outputs through response-processor.ts before they reach the SSE stream.
+  // Tool outputs may contain A2UI FileEditor components from IntegrationKit tools
+  // (e.g., Bicep generators, Dockerfile writers). Routing them through
+  // processResponse() ensures the workspace pipeline runs on ALL file emissions,
+  // not just the final LLM message.
+  const toolOutputArtifacts = extractWorkspaceArtifactsFromToolOutputs(
+    (result as { newItems: Array<{ type: string; rawItem?: { output?: string } }> }).newItems,
+  );
+  for (const art of toolOutputArtifacts) {
+    upsertArtifact(session.generatedArtifacts, art);
+  }
+
   // Apply advisory flags to route plan
   const finalPlan = planRoute(
     session,
@@ -239,6 +253,39 @@ export async function runAgentTurn(input: AgentRunInput): Promise<AgentRunOutput
 }
 
 // ---------------------------------------------------------------------------
+// resumeRun — explicit run-resume with principal ownership check
+// ---------------------------------------------------------------------------
+
+/**
+ * Resume an in-progress or prior agent run for a session.
+ *
+ * Performs the same principal ownership check as `runAgentTurn()`.
+ * Throws `{ status: 403 }` if the caller's `principalId` does not match
+ * the session owner — preventing cross-user hijack of an in-progress run.
+ *
+ * `runId` is accepted for API symmetry and future distributed-run tracing;
+ * it is not yet used for state lookup (single-node in-memory store).
+ */
+export async function resumeRun(
+  session: ApiSession,
+  _runId: string | undefined,
+  principalId: string | undefined,
+): Promise<AgentRunOutput> {
+  if (!isSessionOwnedBy(session, principalId)) {
+    throw Object.assign(
+      new Error(
+        "Session ownership mismatch: resumeRun rejected — caller is not the session owner.",
+      ),
+      { status: 403 },
+    );
+  }
+  // Continuation is a new turn against the existing session history.
+  // The session adapter (KickstartSessionAdapter) loads prior messages via
+  // getItems() so the LLM receives full context.
+  return runAgentTurn({ userMessage: "", session, principalId });
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -267,4 +314,34 @@ function buildArtifactSummary(artifacts: import("./session-store.js").GeneratedA
     lines.push("Kubernetes resources declared: " + k8sResources.join(", "));
   }
   return lines.join("\n");
+}
+
+/**
+ * #326 workspace gate: scan SDK tool output items for any file/artifact
+ * content and route it through `processResponse()` + `extractArtifactsFromA2UI()`.
+ *
+ * IntegrationKit tools (Bicep generators, Dockerfile writers, etc.) may emit
+ * A2UI FileEditor components inside their result payload. Without this funnel,
+ * those emissions bypass the workspace-first pipeline.
+ *
+ * Only `tool_call_output_item` entries are inspected — assistant message text
+ * is already processed in `adaptRunResult()` → `adaptRawText()` → `processResponse()`.
+ */
+function extractWorkspaceArtifactsFromToolOutputs(
+  newItems: Array<{ type: string; rawItem?: { output?: string } }>,
+): import("./session-store.js").GeneratedArtifact[] {
+  const artifacts: import("./session-store.js").GeneratedArtifact[] = [];
+  for (const item of newItems) {
+    if (item.type !== "tool_call_output_item") continue;
+    const outputStr = item.rawItem?.output;
+    if (!outputStr || typeof outputStr !== "string") continue;
+    try {
+      const processed = processResponse(outputStr);
+      const found = extractArtifactsFromA2UI(processed.a2uiMessages);
+      artifacts.push(...found);
+    } catch {
+      // Tool output is not a valid A2UI envelope — not workspace content, skip
+    }
+  }
+  return artifacts;
 }
