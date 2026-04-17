@@ -20,6 +20,7 @@ Legend:
 <!-- entries below this line, newest at top -->
 
 - 2026-04-16 | #346 "Use canonical icon paths for ArchitectureDiagram" | M | impl=0m | review=1m | cycles=1 | merged | @sabbour
+- 2026-04-16 | #344 "Vendor ArchitectureDiagram assets locally" | L | impl=1m | review=0m | cycles=1 | merged | @sabbour
 
 - 2026-04-16 | #345 "fix(auth): silence A2UI no-handler warning and suppress playground ARM 401s" | XL | impl=470m | review=76m | cycles=1 | merged | @sabbour
 
