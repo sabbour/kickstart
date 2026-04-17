@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-16 | #373 "sec: fix incomplete sanitization, bad tag filter, and ReDoS (#359 #360 #361)" | M | impl=4m | review=0m | cycles=1 | merged | @sabbour
+
 - 2026-04-16 | #375 "chore: upgrade hono and follow-redirects (#366 #367)" | S | impl=0m | review=0m | cycles=1 | merged | @sabbour
 
 - 2026-04-16 | #376 "chore: post-sprint retro — update decisions, clean prompts, agent histories" | M | impl=1m | review=5m | cycles=1 | merged | @sabbour
