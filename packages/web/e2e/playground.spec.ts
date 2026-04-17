@@ -3,11 +3,8 @@ import { test, expect } from './helpers';
 
 const PLAYGROUND_URL = '/?playground';
 
-async function openScenario(page: Page, label: string, tab: 'gallery' | 'components' = 'gallery') {
-  if (tab === 'components') {
-    await page.getByRole('tab', { name: 'Components' }).click();
-    await expect(page.getByRole('tab', { name: 'Components' })).toHaveAttribute('aria-selected', 'true');
-  }
+async function openScenario(page: Page, label: string, tab: 'Ideas' | 'Components' = 'Ideas') {
+  await page.getByRole('tab', { name: tab }).click();
   const searchBox = page.getByPlaceholder('Filter scenarios...');
   await searchBox.fill(label);
   const card = page.getByRole('button', { name: label }).first();
@@ -25,8 +22,8 @@ test.describe('Playground', () => {
   // ---- Tab Navigation ----
 
   test.describe('Tab navigation', () => {
-    test('all five tabs are visible', async ({ page }) => {
-      for (const tab of ['Create', 'Ideas', 'Components', 'Icons', 'Widgets']) {
+    test('all six tabs are visible', async ({ page }) => {
+      for (const tab of ['Create', 'Ideas', 'Components', 'Icons', 'Widgets', 'Workspace']) {
         await expect(page.getByRole('tab', { name: tab })).toBeVisible();
       }
     });
@@ -142,39 +139,26 @@ test.describe('Playground', () => {
   });
 
   test.describe('Fat component slices', () => {
-    test('Azure AuthCard signs in with the playground stub flow', async ({ page }) => {
-      await openScenario(page, 'Azure AuthCard', 'components');
+    test('AzureLoginCard signs in with the playground auth flow', async ({ page }) => {
+      await openScenario(page, 'AzureLoginCard', 'Components');
 
       const dialog = page.getByRole('dialog');
       await dialog.getByRole('button', { name: 'Sign in to Azure' }).click();
 
       await expect(dialog.getByText('Connected')).toBeVisible({ timeout: 3_000 });
-      await expect(dialog.getByRole('button', { name: 'Disconnect' })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Sign out' })).toBeVisible();
     });
 
-    test('GitHub AuthCard signs in with the playground stub flow', async ({ page }) => {
-      await openScenario(page, 'GitHub AuthCard', 'components');
+    test('GitHubLoginCard signs in with the playground auth flow', async ({ page }) => {
+      await openScenario(page, 'GitHubLoginCard', 'Components');
 
       const dialog = page.getByRole('dialog');
-      await dialog.getByRole('button', { name: 'Sign in to GitHub' }).click();
-
-      await expect(dialog.getByText('Connected')).toBeVisible({ timeout: 3_000 });
-      await expect(dialog.getByRole('button', { name: 'Disconnect' })).toBeVisible();
-    });
-
-    test('fat slice scenario renders stub Azure and GitHub data', async ({ page }) => {
-      await openScenario(page, 'Fat slice: Azure + GitHub', 'components');
-
-      const dialog = page.getByRole('dialog');
-      await expect(dialog.getByText('kickstart-aks')).toBeVisible({ timeout: 5_000 });
-      await expect(dialog.getByText('stub-user/my-web-app')).toBeVisible({ timeout: 5_000 });
-
-      await dialog.getByRole('button', { name: 'Sign in to Azure' }).click();
-      await expect(dialog.getByText('Kickstart Dev Subscription')).toBeVisible({ timeout: 5_000 });
-
       await dialog.getByRole('button', { name: 'Sign in with GitHub' }).click();
-      await expect(dialog.getByText('Signed in via GitHub')).toBeVisible({ timeout: 5_000 });
+
+      await expect(dialog.getByText('Connected')).toBeVisible({ timeout: 3_000 });
+      await expect(dialog.getByRole('button', { name: 'Disconnect' })).toBeVisible();
     });
+
   });
 
   // ---- Components Tab ----

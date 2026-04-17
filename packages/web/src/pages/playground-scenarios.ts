@@ -417,26 +417,30 @@ const customMarkdown = (): A2uiMsg[] => {
   ] as A2uiComponent[]);
 };
 
-// ---------------------------------------------------------------------------
+const customGenerationProgress = (): A2uiMsg[] => {
+  const sid = uid('gen-progress-demo');
+  return surface(sid, [
+    { id: 'root', component: 'Column', children: ['heading', 'desc', 'progress'], gap: 'medium' },
+    { id: 'heading', component: 'Text', text: 'GenerationProgress', variant: 'h3' },
+    { id: 'desc', component: 'Text', text: 'Multi-step progress tracker with per-step status, detail text, and timestamps.', variant: 'body2' },
+    { id: 'progress', component: 'GenerationProgress',
+      title: 'Resource Provisioning',
+      overallStatus: 'running',
+      steps: [
+        { id: 'rg', label: 'Create Resource Group', status: 'complete', detail: 'rg-kickstart created', timestamp: '14:23:01' },
+        { id: 'acr', label: 'Provision Container Registry', status: 'complete', detail: 'kickstartacr.azurecr.io', timestamp: '14:23:45' },
+        { id: 'aks', label: 'Provision AKS Cluster', status: 'running', detail: 'Provisioning 3-node cluster...', timestamp: '14:28:12' },
+        { id: 'pg', label: 'Provision PostgreSQL', status: 'pending' },
+        { id: 'deploy', label: 'Deploy Application', status: 'pending' },
+      ],
+    },
+  ] as A2uiComponent[]);
+};
+
 // Advanced Scenarios — Data Binding, Events, Lifecycle, Dynamic Patterns
 // ---------------------------------------------------------------------------
 
 // --- Data Binding ---
-
-const dataBindingBasic = (): A2uiMsg[] => {
-  const sid = uid('databind-basic');
-  return [
-    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/app/name', value: 'My Web App' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/app/region', value: 'East US 2' } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
-      { id: 'root', component: 'Column', children: ['heading', 'name-display', 'region-display'], gap: 'medium' },
-      { id: 'heading', component: 'Text', text: 'Data Binding Demo', variant: 'h3' },
-      { id: 'name-display', component: 'Text', text: { path: '/app/name' }, variant: 'body1' },
-      { id: 'region-display', component: 'Text', text: { path: '/app/region' }, variant: 'body2' },
-    ] } } as A2uiMsg,
-  ];
-};
 
 const dataBindingForm = (): A2uiMsg[] => {
   const sid = uid('databind-form');
@@ -514,27 +518,6 @@ const dataBindingJsonPointerLive = (): A2uiMsg[] => {
   ];
 };
 
-const dataBindingSequence = (): A2uiMsg[] => {
-  const sid = uid('databind-sequence');
-  return [
-    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
-      { id: 'root', component: 'Column', children: ['heading', 'status-card'], gap: 'medium' },
-      { id: 'heading', component: 'Text', text: 'Progressive Updates', variant: 'h3' },
-      { id: 'status-card', component: 'Card', children: ['status-col'], title: 'Deployment Status' },
-      { id: 'status-col', component: 'Column', children: ['status-text', 'progress-text'], gap: 'medium' },
-      { id: 'status-text', component: 'Text', text: { path: '/deployment/status' }, variant: 'h4' },
-      { id: 'progress-text', component: 'Text', text: { path: '/deployment/progress' }, variant: 'body1' },
-    ] } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/status', value: 'Initializing' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/progress', value: '0%' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/status', value: 'Building' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/progress', value: '40%' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/status', value: 'Deploying' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/progress', value: '80%' } } as A2uiMsg,
-  ];
-};
-
 // --- Events & Actions ---
 
 const eventsButtonActions = (): A2uiMsg[] => {
@@ -549,26 +532,6 @@ const eventsButtonActions = (): A2uiMsg[] => {
       { id: 'deploy-btn', component: 'Button', label: 'Deploy', variant: 'primary', action: { event: { name: 'deploy', context: { environment: 'production', appName: { path: '/app/name' } } } } },
       { id: 'config-btn', component: 'Button', label: 'Configure', variant: 'outlined', action: { event: { name: 'configure', context: { step: 'networking' } } } },
       { id: 'cancel-btn', component: 'Button', label: 'Cancel', variant: 'text', action: { event: { name: 'cancel' } } },
-    ] } } as A2uiMsg,
-  ];
-};
-
-const eventsFormSubmit = (): A2uiMsg[] => {
-  const sid = uid('events-form');
-  return [
-    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/form/name', value: 'John Doe' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/form/email', value: 'john@example.com' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/form/message', value: 'I need help with AKS deployment' } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
-      { id: 'root', component: 'Column', children: ['heading', 'form-card'], gap: 'medium' },
-      { id: 'heading', component: 'Text', text: 'Contact Form', variant: 'h3' },
-      { id: 'form-card', component: 'Card', children: ['form-col'], title: 'Send a message' },
-      { id: 'form-col', component: 'Column', children: ['name-field', 'email-field', 'msg-field', 'submit-btn'], gap: 'medium' },
-      { id: 'name-field', component: 'TextField', label: 'Name', value: { path: '/form/name' } },
-      { id: 'email-field', component: 'TextField', label: 'Email', value: { path: '/form/email' } },
-      { id: 'msg-field', component: 'TextField', label: 'Message', value: { path: '/form/message' }, multiline: true },
-      { id: 'submit-btn', component: 'Button', label: 'Submit', variant: 'primary', action: { event: { name: 'submit_contact', context: { name: { path: '/form/name' }, email: { path: '/form/email' }, message: { path: '/form/message' } } } } },
     ] } } as A2uiMsg,
   ];
 };
@@ -615,119 +578,7 @@ const lifecycleMultiSurface = (): A2uiMsg[] => {
   ];
 };
 
-const lifecycleSurfaceUpdate = (): A2uiMsg[] => {
-  const sid = uid('surface-update');
-  return [
-    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
-      { id: 'root', component: 'Column', children: ['loading'], gap: 'medium' },
-      { id: 'loading', component: 'Text', text: 'Loading deployment status...', variant: 'h4' },
-    ] } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
-      { id: 'root', component: 'Column', children: ['heading', 'content-card'], gap: 'medium' },
-      { id: 'heading', component: 'Text', text: 'Deployment Complete', variant: 'h3' },
-      { id: 'content-card', component: 'Card', children: ['content-col'], title: 'Status' },
-      { id: 'content-col', component: 'Column', children: ['status-text', 'endpoint-text'], gap: 'medium' },
-      { id: 'status-text', component: 'Text', text: 'All services running', variant: 'body1' },
-      { id: 'endpoint-text', component: 'Text', text: 'https://my-app.azurewebsites.net', variant: 'body2' },
-    ] } } as A2uiMsg,
-  ];
-};
-
-const lifecycleDeleteSurface = (): A2uiMsg[] => {
-  const sidA = uid('delete-surface-a');
-  const sidB = uid('delete-surface-b');
-  return [
-    // Create surface A
-    { version: 'v0.9', createSurface: { surfaceId: sidA, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sidA, components: [
-      { id: 'root', component: 'Card', children: ['text'], title: 'Surface A (will be deleted)' },
-      { id: 'text', component: 'Text', text: 'This surface will be removed', variant: 'body1' },
-    ] } } as A2uiMsg,
-    // Create surface B
-    { version: 'v0.9', createSurface: { surfaceId: sidB, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sidB, components: [
-      { id: 'root', component: 'Card', children: ['text'], title: 'Surface B (remains)' },
-      { id: 'text', component: 'Text', text: 'This surface stays visible', variant: 'body1' },
-    ] } } as A2uiMsg,
-    // Delete surface A
-    { version: 'v0.9', deleteSurface: { surfaceId: sidA } } as A2uiMsg,
-  ];
-};
-
 // --- Dynamic Patterns ---
-
-const dynamicNestedScopes = (): A2uiMsg[] => {
-  const sid = uid('dynamic-nested');
-  return [
-    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/services/0', value: { name: 'Web API', status: 'Running', port: 8080 } } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/services/1', value: { name: 'Worker', status: 'Stopped', port: 8081 } } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
-      { id: 'root', component: 'Column', children: ['heading', 'service0', 'service1'], gap: 'medium' },
-      { id: 'heading', component: 'Text', text: 'Service Status', variant: 'h3' },
-      { id: 'service0', component: 'Card', children: ['s0-col'], title: 'Service 0' },
-      { id: 's0-col', component: 'Column', children: ['s0-name', 's0-status', 's0-port'], gap: 'small' },
-      { id: 's0-name', component: 'Text', text: { path: '/services/0/name' }, variant: 'h4' },
-      { id: 's0-status', component: 'Text', text: { path: '/services/0/status' }, variant: 'body1' },
-      { id: 's0-port', component: 'Text', text: { path: '/services/0/port' }, variant: 'body2' },
-      { id: 'service1', component: 'Card', children: ['s1-col'], title: 'Service 1' },
-      { id: 's1-col', component: 'Column', children: ['s1-name', 's1-status', 's1-port'], gap: 'small' },
-      { id: 's1-name', component: 'Text', text: { path: '/services/1/name' }, variant: 'h4' },
-      { id: 's1-status', component: 'Text', text: { path: '/services/1/status' }, variant: 'body1' },
-      { id: 's1-port', component: 'Text', text: { path: '/services/1/port' }, variant: 'body2' },
-    ] } } as A2uiMsg,
-  ];
-};
-
-const dynamicConditionalContent = (): A2uiMsg[] => {
-  const sid = uid('dynamic-conditional');
-  return [
-    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/feature/enabled', value: true } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/feature/name', value: 'Auto-scaling' } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
-      { id: 'root', component: 'Column', children: ['heading', 'feature-card'], gap: 'medium' },
-      { id: 'heading', component: 'Text', text: 'Feature Flags', variant: 'h3' },
-      { id: 'feature-card', component: 'Card', children: ['feature-col'], title: 'Feature Status' },
-      { id: 'feature-col', component: 'Column', children: ['feature-name', 'feature-enabled'], gap: 'medium' },
-      { id: 'feature-name', component: 'Text', text: { path: '/feature/name' }, variant: 'h4' },
-      { id: 'feature-enabled', component: 'Text', text: { path: '/feature/enabled' }, variant: 'body1' },
-    ] } } as A2uiMsg,
-  ];
-};
-
-const dynamicComplexDashboard = (): A2uiMsg[] => {
-  const sid = uid('dynamic-dashboard');
-  return [
-    { version: 'v0.9', createSurface: { surfaceId: sid, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/name', value: 'production-cluster' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/status', value: 'Healthy' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/replicas', value: 5 } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/region', value: 'eastus2' } } as A2uiMsg,
-    { version: 'v0.9', updateDataModel: { surfaceId: sid, path: '/deployment/tier', value: 'Standard_D4s_v3' } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sid, components: [
-      { id: 'root', component: 'Column', children: ['heading', 'dashboard-card'], gap: 'medium' },
-      { id: 'heading', component: 'Text', text: 'Deployment Dashboard', variant: 'h3' },
-      { id: 'dashboard-card', component: 'Card', children: ['tabs'], title: { path: '/deployment/name' } },
-      { id: 'tabs', component: 'Tabs', children: ['tab-overview', 'tab-config', 'tab-logs'] },
-      { id: 'tab-overview', component: 'Card', children: ['overview-col'], title: 'Overview' },
-      { id: 'overview-col', component: 'Column', children: ['status-text', 'replicas-text'], gap: 'medium' },
-      { id: 'status-text', component: 'Text', text: { path: '/deployment/status' }, variant: 'h4' },
-      { id: 'replicas-text', component: 'Text', text: { path: '/deployment/replicas' }, variant: 'body1' },
-      { id: 'tab-config', component: 'Card', children: ['config-col'], title: 'Configuration' },
-      { id: 'config-col', component: 'Column', children: ['region-field', 'tier-field', 'replica-slider'], gap: 'medium' },
-      { id: 'region-field', component: 'TextField', label: 'Region', value: { path: '/deployment/region' } },
-      { id: 'tier-field', component: 'TextField', label: 'VM Tier', value: { path: '/deployment/tier' } },
-      { id: 'replica-slider', component: 'Slider', label: 'Replicas', min: 1, max: 10, value: { path: '/deployment/replicas' } },
-      { id: 'tab-logs', component: 'Card', children: ['logs-code'], title: 'Logs' },
-      { id: 'logs-code', component: 'CodeBlock', code: `[2025-07-28 14:23:45] Deployment started
-[2025-07-28 14:24:12] Scaling to 5 replicas
-[2025-07-28 14:25:01] Health check passed
-[2025-07-28 14:25:30] Deployment complete`, language: 'text', filename: 'deployment.log' },
-    ] } } as A2uiMsg,
-  ];
-};
 
 // ---------------------------------------------------------------------------
 // File Operations Scenarios — FileEditor component demos
@@ -891,73 +742,6 @@ const fileEditorCreateFlow = (): A2uiMsg[] => {
   ] as A2uiComponent[]);
 };
 
-const fileEditorEditDeleteFlow = (): A2uiMsg[] => {
-  const sidA = uid('file-edit-a');
-  const sidB = uid('file-edit-b');
-  return [
-    // First surface: original file
-    { version: 'v0.9', createSurface: { surfaceId: sidA, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sidA, components: [
-      { id: 'root', component: 'Column', children: ['heading', 'desc', 'editor'], gap: 'medium' },
-      { id: 'heading', component: 'Text', text: 'Edit & Delete — Before', variant: 'h3' },
-      { id: 'desc', component: 'Text', text: 'Original file content before modifications.', variant: 'body2' },
-      { id: 'editor', component: 'FileEditor',
-        filename: 'src/routes.ts',
-        language: 'typescript',
-        readOnly: true,
-        content: `import { Router } from 'express';
-
-const router = Router();
-
-router.get('/api/users', (_req, res) => {
-  res.json([{ id: 1, name: 'Alice' }]);
-});
-
-export default router;`,
-      },
-    ] } } as A2uiMsg,
-    // Second surface: modified file
-    { version: 'v0.9', createSurface: { surfaceId: sidB, catalogId: CATALOG_ID } } as A2uiMsg,
-    { version: 'v0.9', updateComponents: { surfaceId: sidB, components: [
-      { id: 'root', component: 'Column', children: ['heading', 'desc', 'editor', 'actions'], gap: 'medium' },
-      { id: 'heading', component: 'Text', text: 'Edit & Delete — After', variant: 'h3' },
-      { id: 'desc', component: 'Text', text: 'Updated file with new endpoints added. The old temp file was deleted.', variant: 'body2' },
-      { id: 'editor', component: 'FileEditor',
-        filename: 'src/routes.ts',
-        language: 'typescript',
-        content: `import { Router } from 'express';
-import { db } from './database';
-
-const router = Router();
-
-router.get('/api/users', async (_req, res) => {
-  const users = await db.query('SELECT * FROM users');
-  res.json(users.rows);
-});
-
-router.post('/api/users', async (req, res) => {
-  const { name, email } = req.body;
-  const result = await db.query(
-    'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
-    [name, email]
-  );
-  res.status(201).json(result.rows[0]);
-});
-
-router.delete('/api/users/:id', async (req, res) => {
-  await db.query('DELETE FROM users WHERE id = $1', [req.params.id]);
-  res.status(204).send();
-});
-
-export default router;`,
-      },
-      { id: 'actions', component: 'Row', children: ['save-btn', 'revert-btn'], gap: 'medium' },
-      { id: 'save-btn', component: 'Button', label: 'Save Changes', variant: 'primary', action: { event: { name: 'save-file' } } },
-      { id: 'revert-btn', component: 'Button', label: 'Revert', variant: 'outlined', action: { event: { name: 'revert-file' } } },
-    ] } } as A2uiMsg,
-  ];
-};
-
 // ---------------------------------------------------------------------------
 // CostEstimate Scenario — Azure pricing breakdown
 // ---------------------------------------------------------------------------
@@ -999,422 +783,7 @@ const costEstimateScenario = (): A2uiMsg[] => {
 };
 
 // ---------------------------------------------------------------------------
-// Multi-Phase Demo Scenarios — Discover → Design → Generate → Review → Deploy
-// ---------------------------------------------------------------------------
 
-const phaseDiscoverScenario = (): A2uiMsg[] => {
-  const sid = uid('phase-discover');
-  return surface(sid, [
-    { id: 'root', component: 'Column', children: ['heading', 'progress', 'desc', 'questionnaire'], gap: 'medium' },
-    { id: 'heading', component: 'Text', text: 'Phase: Discover', variant: 'h3' },
-    { id: 'progress', component: 'ProgressSteps', steps: [
-      { id: 'discover', label: 'Discover', status: 'active' },
-      { id: 'design', label: 'Design', status: 'pending' },
-      { id: 'generate', label: 'Generate', status: 'pending' },
-      { id: 'review', label: 'Review', status: 'pending' },
-      { id: 'deploy', label: 'Deploy', status: 'pending' },
-    ] },
-    { id: 'desc', component: 'Text', text: 'Tell me about the application you want to build. I\'ll ask a few questions to understand your requirements before designing the architecture.', variant: 'body1' },
-    { id: 'questionnaire', component: 'Questionnaire', questions: [
-      { id: 'app-type', label: 'What kind of application are you building?', type: 'choice', required: true, choices: [
-        { id: 'web', label: 'Web Application' },
-        { id: 'api', label: 'REST API / Microservices' },
-        { id: 'fullstack', label: 'Full-Stack (Frontend + Backend)' },
-      ] },
-      { id: 'scale', label: 'What scale do you expect?', type: 'choice', required: true, choices: [
-        { id: 'small', label: 'Small (< 100 users)' },
-        { id: 'medium', label: 'Medium (100–10k users)' },
-        { id: 'large', label: 'Large (10k+ users)' },
-      ] },
-      { id: 'features', label: 'Which features matter most?', type: 'multiChoice', choices: [
-        { id: 'auth', label: 'Authentication & Authorization' },
-        { id: 'db', label: 'Database / Data Storage' },
-        { id: 'cache', label: 'Caching Layer' },
-        { id: 'cicd', label: 'CI/CD Pipeline' },
-        { id: 'monitoring', label: 'Monitoring & Alerts' },
-      ] },
-    ], submitLabel: 'Start Designing' },
-  ] as A2uiComponent[]);
-};
-
-const phaseDesignScenario = (): A2uiMsg[] => {
-  const sid = uid('phase-design');
-  return surface(sid, [
-    { id: 'root', component: 'Column', children: ['heading', 'progress', 'desc', 'arch-diagram', 'services-tabs'], gap: 'medium' },
-    { id: 'heading', component: 'Text', text: 'Phase: Design', variant: 'h3' },
-    { id: 'progress', component: 'ProgressSteps', steps: [
-      { id: 'discover', label: 'Discover', status: 'complete' },
-      { id: 'design', label: 'Design', status: 'active' },
-      { id: 'generate', label: 'Generate', status: 'pending' },
-      { id: 'review', label: 'Review', status: 'pending' },
-      { id: 'deploy', label: 'Deploy', status: 'pending' },
-    ] },
-    { id: 'desc', component: 'Text', text: 'Based on your requirements, here\'s the proposed architecture for your full-stack application on AKS.', variant: 'body1' },
-    { id: 'arch-diagram', component: 'ArchitectureDiagram',
-      title: 'Proposed Architecture',
-      description: 'Full-stack application grouped by AKS namespace and Azure dependencies',
-      diagram: `graph LR
-  Client([Browser]) --> GW[%%icon:k8s/gateway%%Gateway API<br/>approuting-istio]
-
-  subgraph cicd[GitHub Actions]
-    GHA[GitHub Actions<br/>build + push]
-  end
-
-  subgraph azure[Azure Services]
-    ACR[%%icon:azure/acr%%ACR<br/>fullstackacr<br/>frontend:sha]
-    PG[%%icon:azure/postgresql%%PostgreSQL<br/>Flexible Server]
-    Redis[%%icon:azure/redis%%Redis Cache<br/>Basic C0]
-    SB[Service Bus]
-    Blob[%%icon:azure/storage%%Blob Storage<br/>assets]
-    KV[%%icon:azure/key-vault%%Key Vault<br/>app secrets]
-  end
-
-  subgraph aks[%%icon:azure/aks%%AKS Automatic]
-    subgraph ns[%%icon:k8s/ns%%namespace: full-stack-app]
-      Route[%%icon:k8s/httproute%%HTTPRoute<br/>/ → web]
-      SVC[%%icon:k8s/svc%%Service<br/>web]
-      DEP[%%icon:k8s/deploy%%Deployment<br/>React + Node API<br/>2-10 replicas]
-      SA[%%icon:k8s/sa%%ServiceAccount<br/>workload identity]
-      HPA[%%icon:k8s/hpa%%HPA<br/>cpu 70%]
-      GW --> Route --> SVC --> DEP
-      DEP --> SA
-      HPA -.-> DEP
-    end
-  end
-
-  ACR -.->|image pull| DEP
-  DEP --> PG
-  DEP --> Redis
-  DEP --> SB
-  DEP --> Blob
-  DEP -->|Workload Identity| KV
-  GHA -.->|build + push| ACR`,
-    },
-    { id: 'services-tabs', component: 'Tabs', tabs: [
-      { title: 'Frontend', child: 'svc-frontend' },
-      { title: 'API', child: 'svc-api' },
-      { title: 'Database', child: 'svc-db' },
-    ] },
-    { id: 'svc-frontend', component: 'Column', children: ['fe-title', 'fe-desc'], gap: 'small' },
-    { id: 'fe-title', component: 'Text', text: 'React Frontend', variant: 'subtitle1' },
-    { id: 'fe-desc', component: 'Text', text: 'Static React SPA served via Nginx container. Auto-scaled 2–5 replicas. Assets cached via CDN.', variant: 'body2' },
-    { id: 'svc-api', component: 'Column', children: ['api-title', 'api-desc'], gap: 'small' },
-    { id: 'api-title', component: 'Text', text: 'Node.js REST API', variant: 'subtitle1' },
-    { id: 'api-desc', component: 'Text', text: 'Express.js API with OpenAPI spec. Connects to PostgreSQL and Redis. Horizontal pod autoscaler 2–8 replicas.', variant: 'body2' },
-    { id: 'svc-db', component: 'Column', children: ['db-title', 'db-desc'], gap: 'small' },
-    { id: 'db-title', component: 'Text', text: 'Azure Database for PostgreSQL', variant: 'subtitle1' },
-    { id: 'db-desc', component: 'Text', text: 'Flexible Server, General Purpose tier, 4 vCores. Automatic backups with 7-day retention. Private endpoint access only.', variant: 'body2' },
-  ] as A2uiComponent[]);
-};
-
-const phaseGenerateScenario = (): A2uiMsg[] => {
-  const sid = uid('phase-generate');
-  return surface(sid, [
-    { id: 'root', component: 'Column', children: ['heading', 'progress', 'desc', 'editor'], gap: 'medium' },
-    { id: 'heading', component: 'Text', text: 'Phase: Generate', variant: 'h3' },
-    { id: 'progress', component: 'ProgressSteps', steps: [
-      { id: 'discover', label: 'Discover', status: 'complete' },
-      { id: 'design', label: 'Design', status: 'complete' },
-      { id: 'generate', label: 'Generate', status: 'active' },
-      { id: 'review', label: 'Review', status: 'pending' },
-      { id: 'deploy', label: 'Deploy', status: 'pending' },
-    ] },
-    { id: 'desc', component: 'Text', text: 'Generating infrastructure-as-code and application scaffolding based on your approved design.', variant: 'body1' },
-    { id: 'editor', component: 'FileEditor',
-      files: [
-        {
-          filename: 'infra/main.bicep',
-          language: 'plaintext',
-          content: `targetScope = 'resourceGroup'
-
-param location string = resourceGroup().location
-param appName string = 'kickstart-app'
-
-module aks 'modules/aks.bicep' = {
-  name: 'aks-deploy'
-  params: {
-    location: location
-    clusterName: '\${appName}-aks'
-    nodeCount: 3
-    vmSize: 'Standard_D4s_v5'
-  }
-}
-
-module acr 'modules/acr.bicep' = {
-  name: 'acr-deploy'
-  params: {
-    location: location
-    registryName: '\${appName}acr'
-  }
-}
-
-module postgres 'modules/postgres.bicep' = {
-  name: 'postgres-deploy'
-  params: {
-    location: location
-    serverName: '\${appName}-pgdb'
-    skuName: 'Standard_D4s_v3'
-  }
-}`,
-        },
-        {
-          filename: '.github/workflows/deploy.yml',
-          language: 'yaml',
-          content: `name: Build & Deploy
-on:
-  push:
-    branches: [main]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/build-push-action@v5
-        with:
-          push: true
-          tags: kickstartacr.azurecr.io/app:latest
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: azure/k8s-deploy@v5
-        with:
-          namespace: production
-          manifests: k8s/
-          images: kickstartacr.azurecr.io/app:latest`,
-        },
-        {
-          filename: 'k8s/deployment.yaml',
-          language: 'yaml',
-          content: `apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: kickstart-web
-  namespace: production
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: kickstart-web
-  template:
-    metadata:
-      labels:
-        app: kickstart-web
-    spec:
-      containers:
-        - name: web
-          image: kickstartacr.azurecr.io/app:latest
-          ports:
-            - containerPort: 3000
-          env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: database-url`,
-        },
-      ],
-    },
-  ] as A2uiComponent[]);
-};
-
-const phaseReviewScenario = (): A2uiMsg[] => {
-  const sid = uid('phase-review');
-  return surface(sid, [
-    { id: 'root', component: 'Column', children: ['heading', 'progress', 'desc', 'cost', 'checklist-card', 'actions'], gap: 'medium' },
-    { id: 'heading', component: 'Text', text: 'Phase: Review', variant: 'h3' },
-    { id: 'progress', component: 'ProgressSteps', steps: [
-      { id: 'discover', label: 'Discover', status: 'complete' },
-      { id: 'design', label: 'Design', status: 'complete' },
-      { id: 'generate', label: 'Generate', status: 'complete' },
-      { id: 'review', label: 'Review', status: 'active' },
-      { id: 'deploy', label: 'Deploy', status: 'pending' },
-    ] },
-    { id: 'desc', component: 'Text', text: 'Review deployment safeguards, estimated costs, and best-practice checks before proceeding to deploy.', variant: 'body1' },
-    { id: 'cost', component: 'CostEstimate',
-      title: 'Monthly Cost Estimate',
-      currency: 'USD',
-      resources: [
-        { name: 'AKS Cluster (3 nodes)', sku: 'Standard_D4s_v5', monthlyEstimate: 840.96 },
-        { name: 'Container Registry', sku: 'Basic', monthlyEstimate: 5.00 },
-        { name: 'PostgreSQL Flexible Server', sku: 'GP_Standard_D4s_v3', monthlyEstimate: 295.00 },
-        { name: 'Redis Cache', sku: 'C1 Standard', monthlyEstimate: 81.76 },
-        { name: 'Log Analytics', sku: 'Pay-as-you-go', monthlyEstimate: 12.50 },
-      ],
-      total: 1235.22,
-      source: 'stub',
-    },
-    { id: 'checklist-card', component: 'Card', child: 'checklist-col' },
-    { id: 'checklist-col', component: 'Column', children: ['ck-title', 'ck1', 'ck2', 'ck3', 'ck4', 'ck5'], gap: 'small' },
-    { id: 'ck-title', component: 'Text', text: 'Deployment Safeguard Checks', variant: 'subtitle1' },
-    { id: 'ck1', component: 'CheckBox', label: '✅ HTTPS-only ingress configured', value: true },
-    { id: 'ck2', component: 'CheckBox', label: '✅ Network policies applied', value: true },
-    { id: 'ck3', component: 'CheckBox', label: '✅ Secrets stored in Key Vault', value: true },
-    { id: 'ck4', component: 'CheckBox', label: '⚠️ Autoscaler max replicas set to 8 (consider increasing for production)', value: true },
-    { id: 'ck5', component: 'CheckBox', label: '✅ Resource quotas defined', value: true },
-    { id: 'actions', component: 'Row', children: ['deploy-btn', 'back-btn'], gap: 'medium' },
-    { id: 'deploy-btn', component: 'Button', label: 'Approve & Deploy', variant: 'primary', action: { event: { name: 'approve-deploy' } } },
-    { id: 'back-btn', component: 'Button', label: 'Back to Generate', variant: 'outlined', action: { event: { name: 'back-to-generate' } } },
-  ] as A2uiComponent[]);
-};
-
-const phaseDeployScenario = (): A2uiMsg[] => {
-  const sid = uid('phase-deploy');
-  return surface(sid, [
-    { id: 'root', component: 'Column', children: ['heading', 'progress', 'desc', 'deployment', 'summary-card'], gap: 'medium' },
-    { id: 'heading', component: 'Text', text: 'Phase: Deploy', variant: 'h3' },
-    { id: 'progress', component: 'ProgressSteps', steps: [
-      { id: 'discover', label: 'Discover', status: 'complete' },
-      { id: 'design', label: 'Design', status: 'complete' },
-      { id: 'generate', label: 'Generate', status: 'complete' },
-      { id: 'review', label: 'Review', status: 'complete' },
-      { id: 'deploy', label: 'Deploy', status: 'active' },
-    ] },
-    { id: 'desc', component: 'Text', text: 'Deploying your application to Azure. Resource provisioning in progress.', variant: 'body1' },
-    { id: 'deployment', component: 'GenerationProgress',
-      title: 'Deployment Progress',
-      overallStatus: 'running',
-      steps: [
-        { id: 'rg', label: 'Create Resource Group', status: 'complete', detail: 'kickstart-app-rg created', timestamp: '14:23:01' },
-        { id: 'acr', label: 'Provision Container Registry', status: 'complete', detail: 'kickstartappacr.azurecr.io ready', timestamp: '14:23:45' },
-        { id: 'aks', label: 'Provision AKS Cluster', status: 'complete', detail: '3-node cluster provisioned', timestamp: '14:28:12' },
-        { id: 'pg', label: 'Provision PostgreSQL', status: 'running', detail: 'Creating flexible server...', timestamp: '14:28:30' },
-        { id: 'build', label: 'Build & Push Container Image', status: 'pending' },
-        { id: 'deploy', label: 'Deploy to AKS', status: 'pending' },
-        { id: 'dns', label: 'Configure DNS & TLS', status: 'pending' },
-      ],
-    },
-    { id: 'summary-card', component: 'Card', child: 'summary-col' },
-    { id: 'summary-col', component: 'Column', children: ['sum-title', 'sum-endpoint', 'sum-repo', 'sum-note'], gap: 'small' },
-    { id: 'sum-title', component: 'Text', text: 'Deployment Summary', variant: 'subtitle1' },
-    { id: 'sum-endpoint', component: 'Text', text: '🌐 Endpoint: https://kickstart-app.eastus2.cloudapp.azure.com (pending DNS)', variant: 'body2' },
-    { id: 'sum-repo', component: 'Text', text: '📦 Repository: github.com/contoso/kickstart-app', variant: 'body2' },
-    { id: 'sum-note', component: 'Text', text: '⏱️ Estimated remaining: ~4 minutes', variant: 'caption' },
-  ] as A2uiComponent[]);
-};
-
-// ---------------------------------------------------------------------------
-// Integration Kit Scenarios — exercise Azure & GitHub kit components
-// ---------------------------------------------------------------------------
-
-const kitAzureAuth = (): A2uiMsg[] => {
-  const sid = uid('kit-azure-auth');
-  return surface(sid, [
-    { id: 'root', component: 'Column', children: ['heading', 'desc', 'auth-card', 'note'], gap: 'medium' },
-    { id: 'heading', component: 'Text', text: 'Azure Integration Kit — AuthCard', variant: 'h3' },
-    {
-      id: 'desc',
-      component: 'Text',
-      text: 'The AuthCard component is registered by the Azure kit. In Playground it uses the offline stub flow so you can verify the UI without wiring real Azure credentials first.',
-      variant: 'body2',
-    },
-    { id: 'auth-card', component: 'AuthCard', provider: 'azure' },
-    {
-      id: 'note',
-      component: 'Text',
-      text: 'Kit: azure · Connector: azure-arm · Auth: azure-msal',
-      variant: 'caption',
-    },
-  ] as A2uiComponent[]);
-};
-
-const kitGitHubAuth = (): A2uiMsg[] => {
-  const sid = uid('kit-github-auth');
-  return surface(sid, [
-    { id: 'root', component: 'Column', children: ['heading', 'desc', 'auth-card', 'note'], gap: 'medium' },
-    { id: 'heading', component: 'Text', text: 'GitHub Integration Kit — AuthCard', variant: 'h3' },
-    {
-      id: 'desc',
-      component: 'Text',
-      text: 'The GitHub kit registers an AuthCard with the github-oauth provider. In Playground it falls back to the local offline flow so the sign-in card stays testable without a live GitHub session.',
-      variant: 'body2',
-    },
-    { id: 'auth-card', component: 'AuthCard', provider: 'github' },
-    {
-      id: 'note',
-      component: 'Text',
-      text: 'Kit: github · Connector: github · Auth: github-oauth',
-      variant: 'caption',
-    },
-  ] as A2uiComponent[]);
-};
-
-const kitMultiProvider = (): A2uiMsg[] => {
-  const sid = uid('kit-multi-provider');
-  return surface(sid, [
-    { id: 'root', component: 'Column', children: ['heading', 'desc', 'cards-row', 'status-card'], gap: 'medium' },
-    { id: 'heading', component: 'Text', text: 'Multi-Provider Sign-In', variant: 'h3' },
-    {
-      id: 'desc',
-      component: 'Text',
-      text: 'Both Azure and GitHub kits are registered side-by-side. In Playground each AuthCard runs its own offline stub flow so the multi-provider layout is easy to verify without live auth.',
-      variant: 'body2',
-    },
-    { id: 'cards-row', component: 'Row', children: ['azure-card', 'github-card'], gap: 'medium' },
-    { id: 'azure-card', component: 'AuthCard', provider: 'azure', title: 'Azure', description: 'Connect your Azure subscription' },
-    { id: 'github-card', component: 'AuthCard', provider: 'github', title: 'GitHub', description: 'Connect your source repository' },
-    { id: 'status-card', component: 'Card', children: ['status-col'], title: 'Connection Status' },
-    { id: 'status-col', component: 'Column', children: ['status-note'], gap: 'small' },
-    {
-      id: 'status-note',
-      component: 'Text',
-      text: 'Sign in to both providers to enable the full Kickstart workflow — Azure for infrastructure, GitHub for source code.',
-      variant: 'body2',
-    },
-  ] as A2uiComponent[]);
-};
-
-const fatAzureGitHubSlice = (): A2uiMsg[] => {
-  const sid = uid('fat-slice-azure-github');
-  return surface(sid, [
-    {
-      id: 'root',
-      component: 'Column',
-      children: ['heading', 'desc', 'auth-row', 'azure-picker-card', 'github-picker-card', 'note'],
-      gap: 'medium',
-    },
-    { id: 'heading', component: 'Text', text: 'Fat slice: Azure + GitHub', variant: 'h3' },
-    {
-      id: 'desc',
-      component: 'Text',
-      text: 'This is the first real Playground smoke slice for fat components. Sign-in is simulated in Playground mode and the pickers use built-in stub data so you can validate the UX without live credentials.',
-      variant: 'body2',
-    },
-    { id: 'auth-row', component: 'Row', children: ['azure-login', 'github-login'], gap: 'medium' },
-    { id: 'azure-login', component: 'AzureLoginCard' },
-    { id: 'github-login', component: 'GitHubLoginCard' },
-    { id: 'azure-picker-card', component: 'Card', child: 'azure-picker-col' },
-    { id: 'azure-picker-col', component: 'Column', children: ['azure-picker-title', 'azure-picker-copy', 'azure-picker'], gap: 'small' },
-    { id: 'azure-picker-title', component: 'Text', text: 'Azure resource selection', variant: 'subtitle1' },
-    {
-      id: 'azure-picker-copy',
-      component: 'Text',
-      text: 'The picker loads stub subscriptions, resource groups, and resources so the cascading flow is easy to test inside Playground.',
-      variant: 'caption',
-    },
-    { id: 'azure-picker', component: 'AzureResourcePicker', label: 'Pick an Azure cluster', resourceType: 'Microsoft.ContainerService/managedClusters' },
-    { id: 'github-picker-card', component: 'Card', child: 'github-picker-col' },
-    { id: 'github-picker-col', component: 'Column', children: ['github-picker-title', 'github-picker-copy', 'github-picker'], gap: 'small' },
-    { id: 'github-picker-title', component: 'Text', text: 'GitHub repository selection', variant: 'subtitle1' },
-    {
-      id: 'github-picker-copy',
-      component: 'Text',
-      text: 'The picker loads stub repositories so search and selection work even when no GitHub auth is configured.',
-      variant: 'caption',
-    },
-    { id: 'github-picker', component: 'GitHubRepoPicker', placeholder: 'Search repositories...' },
-    {
-      id: 'note',
-      component: 'Text',
-      text: 'Use the Playground at /?playground and open this card for the quickest end-to-end fat-component check.',
-      variant: 'caption',
-    },
-  ] as A2uiComponent[]);
-};
-
-// ---------------------------------------------------------------------------
 // Missing Layout scenarios
 // ---------------------------------------------------------------------------
 
@@ -1709,41 +1078,21 @@ export const CONTROL_SCENARIOS: ScenarioDef[] = [
   { id: 'ctrl-arch',     label: 'ArchitectureDiagram', description: 'ELK Mermaid architecture diagram with Azure/Kubernetes grouping', group: 'Custom Controls', catalog: 'kickstart', generate: customArchitectureDiagram },
   { id: 'ctrl-questionnaire', label: 'Questionnaire', description: 'Multi-question form with text/choice/multiChoice', group: 'Custom Controls', catalog: 'kickstart', generate: customQuestionnaire },
   { id: 'ctrl-markdown', label: 'Markdown', description: 'Rich markdown with tables and code blocks', group: 'Custom Controls', catalog: 'kickstart', generate: customMarkdown },
+  { id: 'ctrl-gen-progress', label: 'GenerationProgress', description: 'Multi-step deployment progress tracker', group: 'Custom Controls', catalog: 'kickstart', generate: customGenerationProgress },
+  { id: 'ctrl-file-single', label: 'FileEditor', description: 'Syntax-highlighted file viewer/editor', group: 'Custom Controls', catalog: 'kickstart', generate: fileEditorSingleFile },
+  { id: 'ctrl-file-multi', label: 'FileEditor (Multi)', description: 'Tabbed multi-file editor', group: 'Custom Controls', catalog: 'kickstart', generate: fileEditorMultiFile },
+  { id: 'ctrl-cost-estimate', label: 'CostEstimate', description: 'Azure pricing breakdown with SKU options', group: 'Custom Controls', catalog: 'kickstart', generate: costEstimateScenario },
   // Data Binding
-  { id: 'data-basic',    label: 'Basic Data Binding',     description: 'Text components bound to data paths',        group: 'Data Binding',    generate: dataBindingBasic },
   { id: 'data-form',     label: 'Data-Bound Form',        description: 'Form fields with path bindings',             group: 'Data Binding',    generate: dataBindingForm },
-  { id: 'data-sequence', label: 'Data Update Sequence',   description: 'Progressive data model updates',             group: 'Data Binding',    generate: dataBindingSequence },
   { id: 'data-jsonptr',  label: 'JSON Pointer Live Binding', description: 'TextField ↔ Text via /data/* JSON Pointer paths (B-22 verification)', group: 'Data Binding', generate: dataBindingJsonPointerLive },
   // Events & Actions
   { id: 'event-buttons', label: 'Button Events',          description: 'Actions with event context data',            group: 'Events & Actions', generate: eventsButtonActions },
-  { id: 'event-form',    label: 'Form Submit Action',     description: 'Submit with context path bindings',          group: 'Events & Actions', generate: eventsFormSubmit },
   { id: 'event-func',    label: 'Function Call Action',   description: 'Button with functionCall action',            group: 'Events & Actions', generate: eventsFunctionCall },
   // Surface Lifecycle
   { id: 'life-multi',    label: 'Multi-Surface',          description: 'Three parallel surfaces',                    group: 'Surface Lifecycle', generate: lifecycleMultiSurface },
-  { id: 'life-update',   label: 'Surface Update',         description: 'Replace components on existing surface',     group: 'Surface Lifecycle', generate: lifecycleSurfaceUpdate },
-  { id: 'life-delete',   label: 'Delete Surface',         description: 'Create and delete surfaces',                 group: 'Surface Lifecycle', generate: lifecycleDeleteSurface },
   // Dynamic Patterns
-  { id: 'dyn-nested',    label: 'Nested Data Scopes',     description: 'Components with nested path bindings',       group: 'Dynamic Patterns', generate: dynamicNestedScopes },
-  { id: 'dyn-conditional', label: 'Conditional Content',  description: 'Feature flags with data binding',            group: 'Dynamic Patterns', generate: dynamicConditionalContent },
-  { id: 'dyn-dashboard', label: 'Complex Dashboard',      description: 'Multi-tab dashboard with data binding',      group: 'Dynamic Patterns', generate: dynamicComplexDashboard },
-  // Integration Kits
-  { id: 'fat-slice-azure-github', label: 'Fat slice: Azure + GitHub', description: 'Offline smoke test for login cards + pickers', group: 'Integration Kits', catalog: 'kickstart', generate: fatAzureGitHubSlice },
-  { id: 'kit-azure-auth',    label: 'Azure AuthCard',         description: 'Azure MSAL sign-in via kit registration',  group: 'Integration Kits', catalog: 'kickstart', generate: kitAzureAuth },
-  { id: 'kit-github-auth',   label: 'GitHub AuthCard',        description: 'GitHub OAuth sign-in via kit registration', group: 'Integration Kits', catalog: 'kickstart', generate: kitGitHubAuth },
-  { id: 'kit-multi-provider', label: 'Multi-Provider Sign-In', description: 'Azure + GitHub AuthCards side by side',    group: 'Integration Kits', catalog: 'kickstart', generate: kitMultiProvider },
-  // File Operations
-  { id: 'file-single',       label: 'Single File',            description: 'FileEditor with syntax-highlighted YAML',       group: 'File Operations', catalog: 'kickstart', generate: fileEditorSingleFile },
-  { id: 'file-multi',        label: 'Multi-File Tabs',        description: 'Tabbed FileEditor with TS + Dockerfile',        group: 'File Operations', catalog: 'kickstart', generate: fileEditorMultiFile },
   { id: 'file-create',       label: 'Create Workflow',        description: 'File generation with progress tracker',         group: 'File Operations', catalog: 'kickstart', generate: fileEditorCreateFlow },
-  { id: 'file-edit-delete',  label: 'Edit & Delete',          description: 'Before/after file edit with dual surfaces',     group: 'File Operations', catalog: 'kickstart', generate: fileEditorEditDeleteFlow },
-  // Cost Estimate
-  { id: 'cost-estimate',     label: 'CostEstimate',           description: 'Azure pricing breakdown with SKU options',      group: 'Cost Estimate',   catalog: 'kickstart', generate: costEstimateScenario },
-  // Multi-Phase Demo
-  { id: 'phase-discover',    label: 'Discover Phase',         description: 'Questionnaire for application requirements',    group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDiscoverScenario },
-  { id: 'phase-design',      label: 'Design Phase',           description: 'Architecture diagram + service breakdown',      group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDesignScenario },
-  { id: 'phase-generate',    label: 'Generate Phase',         description: 'IaC + CI/CD + K8s manifests in FileEditor',     group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseGenerateScenario },
-  { id: 'phase-review',      label: 'Review Phase',           description: 'Cost estimate + deployment safeguard checks',   group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseReviewScenario },
-  { id: 'phase-deploy',      label: 'Deploy Phase',           description: 'GenerationProgress with live provisioning',     group: 'Multi-Phase Demo', catalog: 'kickstart', generate: phaseDeployScenario },
+
   // GitHub Components
   { id: 'ctrl-gh-login',   label: 'GitHubLoginCard',    description: 'Device code authentication flow',      group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubLogin },
   { id: 'ctrl-gh-repo',    label: 'GitHubRepoPicker',   description: 'Repository search and selection',      group: 'GitHub Components', catalog: 'kickstart', generate: domainGitHubRepoPicker },
@@ -1761,7 +1110,6 @@ export const SCENARIO_GROUPS = [
   'Kickstart Scenarios',
   'Multi-Phase Demo',
   'File Operations',
-  'Cost Estimate',
   'Layout',
   'Content',
   'Inputs',

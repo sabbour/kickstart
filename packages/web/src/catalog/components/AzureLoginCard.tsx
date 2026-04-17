@@ -18,6 +18,7 @@ import {
 } from '@fluentui/react-components';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
 import type { AzureARMConnector, AzureSubscription } from '@kickstart/core';
+import { createAzureStubSession, shouldUsePlaygroundAuthStub } from '../../services/playground-auth-stub';
 
 const AzureLoginCardApi = {
   name: 'AzureLoginCard',
@@ -72,22 +73,13 @@ const useStyles = makeStyles({
   },
 });
 
-/** Stub subscriptions shown when connector is unavailable. */
-const STUB_SUBSCRIPTIONS: AzureSubscription[] = [
-  {
-    subscriptionId: '00000000-0000-0000-0000-000000000001',
-    displayName: 'Kickstart Dev Subscription',
-    state: 'Enabled',
-    tenantId: '00000000-0000-0000-0000-000000000099',
-  },
-];
-
 export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }) => {
   const classes = useStyles();
   const connector = useAPIConnector('azure-arm') as AzureARMConnector | undefined;
+  const usePlaygroundStub = shouldUsePlaygroundAuthStub();
 
   const [loading, setLoading] = useState(false);
-  const [authenticated, setAuthenticated] = useState(() => connector?.isAuthenticated() ?? false);
+  const [authenticated, setAuthenticated] = useState(() => usePlaygroundStub ? false : connector?.isAuthenticated() ?? false);
   const [subscriptions, setSubscriptions] = useState<AzureSubscription[]>([]);
   const [error, setError] = useState<string | undefined>();
   // Track token metadata in React state (per Leela: NOT connector accessor)
@@ -106,16 +98,20 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
 
   // Fetch subscriptions on mount if already authenticated
   useEffect(() => {
+    if (usePlaygroundStub) {
+      return;
+    }
     if (connector?.isAuthenticated()) {
       fetchSubscriptions(connector);
     }
-  }, [connector, fetchSubscriptions]);
+  }, [connector, fetchSubscriptions, usePlaygroundStub]);
 
   const handleSignIn = async () => {
-    if (!connector) {
+    if (usePlaygroundStub || !connector) {
       // Stub mode — show stub subscriptions
-      setAuthenticated(true);
-      setSubscriptions(STUB_SUBSCRIPTIONS);
+      const stubSession = createAzureStubSession(true);
+      setAuthenticated(stubSession.authenticated);
+      setSubscriptions(stubSession.subscriptions);
       setAuthTime(new Date());
       if (props.onSignIn) (props.onSignIn as () => void)();
       return;

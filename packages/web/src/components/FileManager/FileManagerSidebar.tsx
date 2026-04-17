@@ -16,6 +16,7 @@ import {
   Button,
   Text,
   Spinner,
+  Tooltip,
   mergeClasses,
 } from '@fluentui/react-components';
 import {
@@ -26,6 +27,8 @@ import {
   ChevronDownRegular,
   DismissRegular,
   ArrowDownloadRegular,
+  WindowDevTools24Regular,
+  Cloud24Regular,
 } from '@fluentui/react-icons';
 import type { VirtualFile, VFSFile, FileTreeNode } from '../../services/virtual-fs';
 import { buildFileTree } from '../../services/virtual-fs';
@@ -199,6 +202,30 @@ function buildWorkspaceAnnouncement(paths: string[]): string {
   return `${paths.length} new files added to workspace`;
 }
 
+function parseGitHubOwnerRepo(githubRepoUrl?: string): string | null {
+  if (!githubRepoUrl) {
+    return null;
+  }
+
+  try {
+    const url = new URL(githubRepoUrl);
+    if (url.hostname !== 'github.com') {
+      return null;
+    }
+
+    const [owner, repoSegment] = url.pathname.replace(/^\/|\/$/g, '').split('/');
+    const repo = repoSegment?.replace(/\.git$/i, '');
+
+    if (!owner || !repo) {
+      return null;
+    }
+
+    return `${owner}/${repo}`;
+  } catch {
+    return null;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Tree node component                                                */
 /* ------------------------------------------------------------------ */
@@ -306,6 +333,8 @@ export interface FileManagerSidebarProps {
   onDownloadZip?: () => void;
   /** Called to dismiss / close the sidebar. */
   onDismiss: () => void;
+  /** Optional GitHub repo URL (e.g. https://github.com/owner/repo) — enables vscode.dev and Codespaces buttons. */
+  githubRepoUrl?: string;
 }
 
 export function FileManagerSidebar({
@@ -315,6 +344,7 @@ export function FileManagerSidebar({
   onSelectFile,
   onDownloadZip,
   onDismiss,
+  githubRepoUrl,
 }: FileManagerSidebarProps) {
   const styles = useStyles();
   const [workspaceAnnouncement, setWorkspaceAnnouncement] = React.useState('');
@@ -326,6 +356,7 @@ export function FileManagerSidebar({
     [streamingFiles, persistedFiles],
   );
   const mergedFilePaths = useMemo(() => collectFilePaths(tree), [tree]);
+  const ownerRepo = useMemo(() => parseGitHubOwnerRepo(githubRepoUrl), [githubRepoUrl]);
 
   // Count all leaf (non-directory) files
   const fileCount = useMemo(() => {
@@ -398,6 +429,28 @@ export function FileManagerSidebar({
           Files{fileCount > 0 ? ` (${fileCount})` : ''}
         </Text>
         <div className={styles.headerActions}>
+          {ownerRepo && (
+            <>
+              <Tooltip content="Open in vscode.dev" relationship="label">
+                <Button
+                  appearance="subtle"
+                  size="small"
+                  icon={<WindowDevTools24Regular />}
+                  aria-label="Open in vscode.dev"
+                  onClick={() => window.open(`https://vscode.dev/github/${ownerRepo}`, '_blank', 'noopener,noreferrer')}
+                />
+              </Tooltip>
+              <Tooltip content="Open in GitHub Codespaces" relationship="label">
+                <Button
+                  appearance="subtle"
+                  size="small"
+                  icon={<Cloud24Regular />}
+                  aria-label="Open in GitHub Codespaces"
+                  onClick={() => window.open(`https://codespaces.new/${ownerRepo}`, '_blank', 'noopener,noreferrer')}
+                />
+              </Tooltip>
+            </>
+          )}
           {onDownloadZip && fileCount > 0 && (
             <Button
               appearance="subtle"

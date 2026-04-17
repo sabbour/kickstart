@@ -18,7 +18,7 @@ import {
 import {
   Dismiss24Regular, Delete24Regular, DocumentCopy24Regular, Sparkle24Regular,
   Add24Regular, Lightbulb24Regular, Grid24Regular, Icons24Regular,
-  CardUi24Regular, Navigation24Regular,
+  CardUi24Regular, Navigation24Regular, FolderOpen24Regular,
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import type { ActionHandler } from '../hooks/useActionDispatch';
@@ -35,6 +35,7 @@ import {
   CONTROL_SCENARIOS,
   type ScenarioDef,
 } from './playground-scenarios';
+import { PlaygroundWorkspace } from './PlaygroundWorkspace';
 import {
   AZURE_ICON_CATEGORIES,
   UI_ICON_CATEGORIES,
@@ -175,8 +176,8 @@ function normalizePlaygroundComponents(raw: any[]): any[] {
 }
 
 // Scenario grouping for tabs
-const GALLERY_GROUPS = ['Kickstart Scenarios', 'Multi-Phase Demo', 'File Operations', 'Cost Estimate', 'Data Binding', 'Events & Actions', 'Surface Lifecycle', 'Dynamic Patterns', 'GitHub Components', 'Azure Components'];
-const COMPONENT_GROUPS = ['Layout', 'Content', 'Inputs', 'Custom Controls', 'Integration Kits'];
+const GALLERY_GROUPS = ['Kickstart Scenarios', 'File Operations', 'Data Binding', 'Events & Actions', 'Surface Lifecycle', 'Dynamic Patterns'];
+const COMPONENT_GROUPS = ['Layout', 'Content', 'Inputs', 'Custom Controls', 'GitHub Components', 'Azure Components'];
 
 const GALLERY_SCENARIOS = [...KICKSTART_SCENARIOS, ...CONTROL_SCENARIOS].filter(s => GALLERY_GROUPS.includes(s.group));
 const COMPONENT_SCENARIOS = CONTROL_SCENARIOS.filter(s => COMPONENT_GROUPS.includes(s.group));
@@ -930,7 +931,7 @@ const ICON_SECTIONS = [
 function PlaygroundInner() {
   const classes = useStyles();
   const { debugEnabled, toggleDebug } = useDebug();
-  const [activeTab, setActiveTab] = useState<'create' | 'gallery' | 'components' | 'icons' | 'widgets'>('gallery');
+  const [activeTab, setActiveTab] = useState<'create' | 'gallery' | 'components' | 'icons' | 'widgets' | 'workspace'>('gallery');
   const [filterQuery, setFilterQuery] = useState('');
   const [iconFilter, setIconFilter] = useState('');
   const [iconSection, setIconSection] = useState<string>('Azure Services');
@@ -1328,6 +1329,7 @@ function PlaygroundInner() {
     components: 'Components',
     icons: 'Icons',
     widgets: 'Widgets',
+    workspace: 'Workspace',
   };
   const TAB_DESCRIPTIONS: Record<string, string> = {
     create: 'Build A2UI components with AI',
@@ -1335,6 +1337,7 @@ function PlaygroundInner() {
     components: 'A2UI component reference',
     icons: 'Fluent icon browser',
     widgets: 'Your saved widget library',
+    workspace: 'Test the full file manager, editor, and diagram experience.',
   };
 
   const handleTabSelect = useCallback((_e: any, data: any) => {
@@ -1376,6 +1379,7 @@ function PlaygroundInner() {
               <Tab id="tab-components" value="components" aria-controls="panel-components" icon={<Grid24Regular />}>Components</Tab>
               <Tab id="tab-icons" value="icons" aria-controls="panel-icons" icon={<Icons24Regular />}>Icons</Tab>
               <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets" icon={<CardUi24Regular />}>Widgets</Tab>
+              <Tab id="tab-workspace" value="workspace" aria-controls="panel-workspace" icon={<FolderOpen24Regular />}>Workspace</Tab>
             </TabList>
 
 
@@ -1922,6 +1926,13 @@ function PlaygroundInner() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ---- Tab 6: Workspace ---- */}
+      {activeTab === 'workspace' && (
+        <div id="panel-workspace" role="tabpanel" aria-labelledby="tab-workspace" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
+          <PlaygroundWorkspace />
         </div>
       )}
 
