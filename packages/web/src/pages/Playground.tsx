@@ -2,7 +2,10 @@
  * Playground — A2UI Gallery (sidebar layout).
  *
  * Access via ?playground URL parameter.
- * Left sidebar navigation: Create | Ideas | Components | Icons | Widgets
+ * Left sidebar navigation: Create | Ideas | Components | Icons
+ *
+ * Step 4a: Gallery and Components tabs are now registry-driven.
+ * TODO(Step 5): replace stubRegistry with server-provided PackRegistry.
  */
 
 import React, { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react';
@@ -11,30 +14,25 @@ import {
   Card, CardHeader,
   Textarea, Subtitle2, Caption1, Body1Strong,
   MessageBar, MessageBarBody,
-  TabList, Tab, Input,
+  TabList, Tab,
   Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions,
   makeStyles, tokens,
 } from '@fluentui/react-components';
 import {
-  Dismiss24Regular, Delete24Regular, DocumentCopy24Regular, Sparkle24Regular,
+  Dismiss24Regular, Sparkle24Regular,
   Add24Regular, Lightbulb24Regular, Grid24Regular, Icons24Regular,
-  CardUi24Regular, Navigation24Regular, FolderOpen24Regular,
+  Navigation24Regular, FolderOpen24Regular,
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import type { ActionHandler } from '../hooks/useActionDispatch';
-// TODO(Step 4a): restore useWidgets from pack-core once packs are implemented
+import type { PlaygroundRegistryView } from '../hooks/usePlaygroundDispatch';
+import type { PlaygroundScenario, ComponentContribution } from '@kickstart/harness';
 import { useDebug } from '../contexts/DebugContext';
-// TODO(Step 4a): restore demo-scenarios from pack-core playground scenarios
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
 import { DebugPanel } from '../components/Chat/DebugPanel';
-import type { A2uiMsg, ChatMessage, DebugMetadata } from '../types';
+import type { ChatMessage, DebugMetadata } from '../types';
 import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
-// TODO(Step 4a): restore playground scenarios from packs registry
-// import { KICKSTART_SCENARIOS, CONTROL_SCENARIOS, type ScenarioDef } from './playground-scenarios';
-type ScenarioDef = { group: string; name: string; keyword?: string };
-const KICKSTART_SCENARIOS: ScenarioDef[] = [];
-const CONTROL_SCENARIOS: ScenarioDef[] = [];
 import { PlaygroundWorkspace } from './PlaygroundWorkspace';
 import {
   AZURE_ICON_CATEGORIES,
@@ -45,6 +43,14 @@ import {
 } from './playground-icons';
 import { getFluentIcon } from '../catalog/icons/fluent-icons';
 import { apiFetch } from '../services/api-client';
+
+// ── Module-level stub registry ────────────────────────────────────────────────
+// TODO(Step 5): replace with server-provided registry
+const stubRegistry: PlaygroundRegistryView = {
+  playgroundScenarios: [],
+  components: [],
+  playgroundStubs: {},
+};
 
 // ── LLM → A2UI component normalizer ─────────────────────────────────────
 // The LLM may output components in two formats:
@@ -175,12 +181,25 @@ function normalizePlaygroundComponents(raw: any[]): any[] {
   return flat;
 }
 
-// Scenario grouping for tabs
-const GALLERY_GROUPS = ['Kickstart Scenarios', 'File Operations', 'Data Binding', 'Events & Actions', 'Surface Lifecycle', 'Dynamic Patterns'];
-const COMPONENT_GROUPS = ['Layout', 'Content', 'Inputs', 'Custom Controls', 'GitHub Components', 'Azure Components'];
+// Registry-derived groupings — populated from registry at render time.
+// Scenarios are grouped by pack name (prefix of scenario.id, e.g. "core" for "core/discover-flow").
+// Components are grouped by pack name (prefix of component.name, e.g. "core" for "core/Button").
+// Both lists are empty until pack-core lands (Step 4) and registry is wired in (Step 5).
 
-const GALLERY_SCENARIOS = [...KICKSTART_SCENARIOS, ...CONTROL_SCENARIOS].filter(s => GALLERY_GROUPS.includes(s.group));
-const COMPONENT_SCENARIOS = CONTROL_SCENARIOS.filter(s => COMPONENT_GROUPS.includes(s.group));
+function packNameFromId(id: string): string {
+  return id.split('/')[0] ?? id;
+}
+
+function groupByPack<T>(items: T[], getId: (item: T) => string): Map<string, T[]> {
+  const grouped = new Map<string, T[]>();
+  for (const item of items) {
+    const pack = packNameFromId(getId(item));
+    const list = grouped.get(pack) ?? [];
+    list.push(item);
+    grouped.set(pack, list);
+  }
+  return grouped;
+}
 
 const SIDEBAR_WIDTH = '240px';
 const SIDEBAR_COLLAPSED_BP = '768px';
@@ -251,34 +270,6 @@ const useStyles = makeStyles({
     overflowX: 'hidden',
     paddingTop: tokens.spacingVerticalS,
     paddingBottom: tokens.spacingVerticalS,
-  },
-  sidebarWidgets: {
-    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
-    paddingTop: tokens.spacingVerticalS,
-    paddingBottom: tokens.spacingVerticalS,
-    paddingLeft: tokens.spacingHorizontalM,
-    paddingRight: tokens.spacingHorizontalM,
-    maxHeight: '200px',
-    overflowY: 'auto',
-  },
-  sidebarWidgetItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    paddingTop: tokens.spacingVerticalXS,
-    paddingBottom: tokens.spacingVerticalXS,
-    paddingLeft: tokens.spacingHorizontalS,
-    paddingRight: tokens.spacingHorizontalS,
-    borderRadius: tokens.borderRadiusMedium,
-    cursor: 'pointer',
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground2,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap' as const,
-    ':hover': {
-      backgroundColor: tokens.colorNeutralBackground1Hover,
-    },
   },
   sidebarFooter: {
     flexShrink: 0,
@@ -547,24 +538,6 @@ const useStyles = makeStyles({
     marginLeft: 'auto',
     marginRight: 'auto',
   },
-  widgetGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: tokens.spacingVerticalM,
-    marginTop: tokens.spacingVerticalM,
-  },
-  widgetCard: {
-    cursor: 'pointer',
-    transition: 'box-shadow 0.2s ease',
-    ':hover': {
-      boxShadow: tokens.shadow8,
-    },
-  },
-  widgetActions: {
-    display: 'flex',
-    gap: tokens.spacingHorizontalXS,
-    marginTop: tokens.spacingVerticalS,
-  },
   groupHeader: {
     display: 'block',
     marginTop: tokens.spacingVerticalXXL,
@@ -743,8 +716,8 @@ class GalleryCardErrorBoundary extends React.Component<
 
 // ---- GalleryCard Component ----
 interface GalleryCardProps {
-  scenario: ScenarioDef;
-  onCardClick: (scenario: ScenarioDef, surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>) => void;
+  scenario: PlaygroundScenario;
+  onCardClick: (scenario: PlaygroundScenario, surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>) => void;
 }
 
 const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
@@ -758,20 +731,10 @@ const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
   // Process scenario messages in useEffect.
   // Cleanup deletes surfaces so React 19 Strict Mode double-fire doesn't crash.
   useEffect(() => {
-    let createdIds: string[] = [];
-    if (scenario.generate) {
-      const msgs = scenario.generate();
-      createdIds = processMessages(msgs);
-    } else if (scenario.keyword) {
-      const keyword = scenario.keyword;
-      if (keyword === '__welcome__') {
-        // TODO(Step 4a): restore demo scenarios from packs
-        createdIds = [];
-      } else {
-        // TODO(Step 4a): restore demo scenarios from packs
-        createdIds = [];
-      }
-    }
+    const createdIds = scenario.a2ui.length > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? processMessages(scenario.a2ui as any)
+      : [];
     return () => {
       for (const id of createdIds) {
         try { processor.model.deleteSurface(id); } catch { /* already gone */ }
@@ -787,15 +750,12 @@ const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
       className={classes.galleryCard}
       role="button"
       tabIndex={0}
-      aria-label={scenario.label}
+      aria-label={scenario.title}
       onClick={() => onCardClick(scenario, surfaces)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(scenario, surfaces); } }}
     >
       <Caption1 className={classes.cardLabel}>
-        {scenario.label}
-        {scenario.catalog && (
-          <span className={classes.catalogBadge}>{scenario.catalog}</span>
-        )}
+        {scenario.title}
       </Caption1>
       {scenario.description && (
         <Caption1 className={classes.cardDescription}>{scenario.description}</Caption1>
@@ -819,101 +779,6 @@ const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
 
 GalleryCard.displayName = 'GalleryCard';
 
-// ---- WidgetCard Component ----
-interface WidgetCardProps {
-  widget: { id: string; name: string; createdAt: number; messages: A2uiMsg[] };
-  onWidgetClick: (widgetId: string) => void;
-  onDuplicate: (widgetId: string) => void;
-  onDelete: (widgetId: string) => void;
-}
-
-const WidgetCard = memo(({ widget, onWidgetClick, onDuplicate, onDelete }: WidgetCardProps) => {
-  const classes = useStyles();
-  const widgetCardActionHandler = useCallback<ActionHandler>(() => {}, []);
-  const { surfaces, processMessages, processor } = useA2UI({ actionHandler: widgetCardActionHandler });
-
-  useEffect(() => {
-    const createdIds = processMessages(widget.messages);
-    return () => {
-      for (const id of createdIds) {
-        try { processor.model.deleteSurface(id); } catch { /* already gone */ }
-      }
-    };
-  }, [widget.messages]);
-
-  const surfaceEntries = Array.from(surfaces.entries());
-
-  return (
-    <Card
-      appearance="outline"
-      className={classes.widgetCard}
-      onClick={() => onWidgetClick(widget.id)}
-    >
-      <CardHeader header={<Body1Strong>{widget.name}</Body1Strong>} />
-      <div className={classes.cardBody}>
-        {surfaceEntries.map(([id, surface]) => (
-          <div key={id} className="a2ui-component">
-            <A2UISurfaceWrapper surface={surface} />
-          </div>
-        ))}
-      </div>
-      <div className={classes.widgetActions} onClick={(e) => e.stopPropagation()}>
-        <Button
-          appearance="subtle"
-          size="small"
-          aria-label="Duplicate widget"
-          icon={<DocumentCopy24Regular />}
-          onClick={() => onDuplicate(widget.id)}
-        />
-        <Button
-          appearance="subtle"
-          size="small"
-          aria-label="Delete widget"
-          icon={<Delete24Regular />}
-          onClick={() => onDelete(widget.id)}
-        />
-      </div>
-    </Card>
-  );
-});
-
-WidgetCard.displayName = 'WidgetCard';
-
-// ---- WidgetPreview Component (for dialog) ----
-interface WidgetPreviewProps {
-  widget: { id: string; name: string; createdAt: number; messages: A2uiMsg[] };
-}
-
-const WidgetPreview = memo(({ widget }: WidgetPreviewProps) => {
-  const widgetPreviewActionHandler = useCallback<ActionHandler>(() => {}, []);
-  const { surfaces, processMessages, processor } = useA2UI({ actionHandler: widgetPreviewActionHandler });
-
-  useEffect(() => {
-    const createdIds = processMessages(widget.messages);
-    return () => {
-      for (const id of createdIds) {
-        try { processor.model.deleteSurface(id); } catch { /* already gone */ }
-      }
-    };
-  }, [widget.messages]);
-
-  const surfaceEntries = Array.from(surfaces.entries());
-
-  return (
-    <>
-      {surfaceEntries.map(([id, surface]) => (
-        <div key={id} style={{ marginBottom: tokens.spacingVerticalM }}>
-          <div className="a2ui-component">
-            <A2UISurfaceWrapper surface={surface} />
-          </div>
-        </div>
-      ))}
-    </>
-  );
-});
-
-WidgetPreview.displayName = 'WidgetPreview';
-
 // Icon sections for the Icons tab (Azure, UI, Fluent 2, Fluent React)
 // Icon category sections for the Icons tab
 const ICON_SECTIONS = [
@@ -928,19 +793,17 @@ const ICON_SECTIONS = [
 function PlaygroundInner() {
   const classes = useStyles();
   const { debugEnabled, toggleDebug } = useDebug();
-  const [activeTab, setActiveTab] = useState<'create' | 'gallery' | 'components' | 'icons' | 'widgets' | 'workspace'>('gallery');
+  const [activeTab, setActiveTab] = useState<'create' | 'gallery' | 'components' | 'icons' | 'workspace'>('gallery');
   const [filterQuery, setFilterQuery] = useState('');
   const [iconFilter, setIconFilter] = useState('');
   const [iconSection, setIconSection] = useState<string>('Azure Services');
   const [jsonInput, setJsonInput] = useState('');
-  const [widgetName, setWidgetName] = useState('My Widget');
   const [jsonError, setJsonError] = useState('');
   const [createPrompt, setCreatePrompt] = useState('');
   const [showAdvancedJson, setShowAdvancedJson] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedScenario, setSelectedScenario] = useState<ScenarioDef | null>(null);
+  const [selectedScenario, setSelectedScenario] = useState<PlaygroundScenario | null>(null);
   const [selectedSurfaces, setSelectedSurfaces] = useState<Map<string, SurfaceModel<ReactComponentImplementation>>>(new Map());
-  const [selectedWidget, setSelectedWidget] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<'preview' | 'json'>('preview');
   const customCounter = useRef(0);
   // No-op handler: neither the JSON editor nor the Create tab widget previews
@@ -956,15 +819,12 @@ function PlaygroundInner() {
   const galleryRef = useRef<HTMLDivElement>(null);
   const createInputRef = useRef<HTMLTextAreaElement>(null);
   const [createMessages, setCreateMessages] = useState<ChatMessage[]>([]);
-  // TODO(Step 4a): restore useWidgets from pack-core
-  const widgets: unknown[] = [];
-  const addWidget = (_name: string, _msgs: unknown[]): string => '';
-  const _updateWidget = undefined;
-  const deleteWidget = (_id: string): void => {};
-  const duplicateWidget = (_id: string): void => {};
   const [inspireLoading, setInspireLoading] = useState(false);
   const inspireAbortRef = useRef<AbortController | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Registry-driven data (read at render time)
+  const registry = stubRegistry; // TODO(Step 5): replace with server-provided registry
 
   // Abort in-flight inspiration stream on unmount
   useEffect(() => {
@@ -1031,24 +891,24 @@ function PlaygroundInner() {
     }
   }, [debugEnabled]);
 
-  // Filter scenarios
+  // Registry-driven filtered scenarios (Phase A)
   const filteredGalleryScenarios = useMemo(() => {
-    if (!filterQuery.trim()) return GALLERY_SCENARIOS;
+    const scenarios = registry.playgroundScenarios;
+    if (!filterQuery.trim()) return scenarios;
     const query = filterQuery.toLowerCase();
-    return GALLERY_SCENARIOS.filter(s => 
-      s.label.toLowerCase().includes(query) || 
-      s.description.toLowerCase().includes(query)
+    return scenarios.filter(s =>
+      s.title.toLowerCase().includes(query) ||
+      (s.description ?? '').toLowerCase().includes(query),
     );
-  }, [filterQuery]);
+  }, [filterQuery, registry]);
 
-  const filteredComponentScenarios = useMemo(() => {
-    if (!filterQuery.trim()) return COMPONENT_SCENARIOS;
+  // Registry-driven filtered components (Phase C)
+  const filteredComponents = useMemo((): ComponentContribution[] => {
+    const comps = registry.components;
+    if (!filterQuery.trim()) return comps;
     const query = filterQuery.toLowerCase();
-    return COMPONENT_SCENARIOS.filter(s => 
-      s.label.toLowerCase().includes(query) || 
-      s.description.toLowerCase().includes(query)
-    );
-  }, [filterQuery]);
+    return comps.filter(c => c.name.toLowerCase().includes(query));
+  }, [filterQuery, registry]);
 
   // Filter icons across selected section
   const filteredIconCategories = useMemo(() => {
@@ -1069,11 +929,8 @@ function PlaygroundInner() {
     [filteredIconCategories],
   );
 
-  // Filter scenarios (old variable for compatibility)
-  const _filteredScenarios = filteredGalleryScenarios;
-
   // Handle card click → open detail dialog
-  const handleCardClick = useCallback((scenario: ScenarioDef, surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>) => {
+  const handleCardClick = useCallback((scenario: PlaygroundScenario, surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>) => {
     setSelectedScenario(scenario);
     setSelectedSurfaces(surfaces);
     setDetailTab('preview');
@@ -1085,11 +942,12 @@ function PlaygroundInner() {
     setJsonError('');
     try {
       const parsed = JSON.parse(jsonInput);
-      const msgs: A2uiMsg[] = Array.isArray(parsed) ? parsed : [parsed];
-      for (const m of msgs) {
+      const msgs: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+      for (const m of msgs as any[]) {
         if (!m.version) throw new Error('Each message must have a "version" field');
       }
-      customA2ui.processMessages(msgs);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      customA2ui.processMessages(msgs as any);
       customCounter.current++;
       setJsonInput('');
     } catch (err: any) {
@@ -1097,36 +955,35 @@ function PlaygroundInner() {
     }
   }, [jsonInput, customA2ui]);
 
-  // Handle save as widget
+  // Handle save as JSON — render the pasted JSON and reset
   const handleSaveAsWidget = useCallback(() => {
     setJsonError('');
     try {
       const parsed = JSON.parse(jsonInput);
-      const msgs: A2uiMsg[] = Array.isArray(parsed) ? parsed : [parsed];
-      for (const m of msgs) {
+      const msgs: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+      for (const m of msgs as any[]) {
         if (!m.version) throw new Error('Each message must have a "version" field');
       }
-      addWidget(widgetName, msgs);
-      setWidgetName('My Widget');
       setJsonInput('');
-      setActiveTab('widgets');
     } catch (err: any) {
       setJsonError(err.message || 'Invalid JSON');
     }
-  }, [jsonInput, widgetName, addWidget]);
+  }, [jsonInput]);
 
-  // Handle "Start Blank" — create empty widget and switch to widgets tab
+  // Handle "Start Blank" — render a blank A2UI surface in the JSON editor
   const handleStartBlank = useCallback(() => {
-    const blankMessages: A2uiMsg[] = [
+    const blankMessages = [
       { version: 'v0.9', createSurface: { surfaceId: 'blank-widget', catalogId: 'kickstart' } },
       { version: 'v0.9', updateComponents: { surfaceId: 'blank-widget', components: [
         { id: 'root', component: 'Column', children: ['t1'] },
-        { id: 't1', component: 'Text', text: 'New widget — edit the JSON to build something!', variant: 'body1' },
+        { id: 't1', component: 'Text', text: 'New surface — edit the JSON to build something!', variant: 'body1' },
       ] } },
     ];
-    addWidget('Untitled widget', blankMessages);
-    setActiveTab('widgets');
-  }, [addWidget]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    customA2ui.processMessages(blankMessages as any);
+    setActiveTab('create');
+    setShowAdvancedJson(true);
+  }, [customA2ui]);
 
   // Auto-scroll to bottom when messages update
   useEffect(() => {
@@ -1198,26 +1055,15 @@ function PlaygroundInner() {
 
       // Process A2UI components through the surface system
       let surfaceIds: string[] | undefined;
-      let a2uiMessages: A2uiMsg[] | undefined;
       if (data.a2ui && data.a2ui.length > 0) {
         const surfaceId = `pg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const components = normalizePlaygroundComponents(data.a2ui as any[]);
-        a2uiMessages = [
+        const a2uiMessages = [
           { version: 'v0.9', createSurface: { surfaceId, catalogId: 'kickstart' } },
           { version: 'v0.9', updateComponents: { surfaceId, components } },
         ];
-        surfaceIds = createA2ui.processMessages(a2uiMessages);
-
-        // Save the A2UI spec as a widget and navigate to Widgets
-        const widgetName = text.length > 40 ? text.slice(0, 40) + '…' : text;
-        const widgetId = addWidget(widgetName, a2uiMessages);
-        // Defer navigation so the widget list re-renders first
-        setTimeout(() => {
-          setActiveTab('widgets');
-          setSelectedWidget(widgetId);
-          setDetailTab('preview');
-          setDialogOpen(true);
-        }, 0);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        surfaceIds = createA2ui.processMessages(a2uiMessages as any);
       }
 
       // Capture debug metadata when debug mode is on
@@ -1245,14 +1091,13 @@ function PlaygroundInner() {
     } finally {
       setCreateLoading(false);
     }
-  }, [createLoading, createA2ui, debugEnabled, addWidget]);
+  }, [createLoading, createA2ui, debugEnabled]);
 
   // Handle clear all
   const handleClearAll = useCallback(() => {
     customA2ui.reset();
     setJsonInput('');
     setJsonError('');
-    // TODO(Step 4a): restore resetDemoState from packs
     createA2ui.reset();
     setCreateMessages([]);
     createSessionIdRef.current = undefined;
@@ -1278,25 +1123,10 @@ function PlaygroundInner() {
     navigator.clipboard.writeText(icon.path);
   }, []);
 
-  // Handle widget click
-  const handleWidgetClick = useCallback((widgetId: string) => {
-    setSelectedWidget(widgetId);
-    setDetailTab('preview');
-    setDialogOpen(true);
-  }, []);
-
-  // Memoize the JSON for the selected scenario so that re-renders don't call
-  // generate() again (which would increment the uid() counter and produce new
-  // surfaceId values for an unchanged scenario).
+  // Memoize the JSON for the selected scenario
   const scenarioJson = useMemo(() => {
     if (!selectedScenario) return '';
-
-    if (selectedScenario.generate) {
-      const msgs = selectedScenario.generate();
-      return JSON.stringify(msgs, null, 2);
-    }
-    // TODO(Step 4a): restore demo scenarios from packs
-    return '[]';
+    return JSON.stringify(selectedScenario.a2ui, null, 2);
   }, [selectedScenario]);
 
   const customSurfaceEntries = Array.from(customA2ui.surfaces.entries());
@@ -1305,9 +1135,8 @@ function PlaygroundInner() {
   const getCounter = () => {
     switch (activeTab) {
       case 'gallery': return filteredGalleryScenarios.length;
-      case 'components': return filteredComponentScenarios.length;
+      case 'components': return filteredComponents.length;
       case 'icons': return filteredIconCount;
-      case 'widgets': return widgets.length;
       case 'create': return customSurfaceEntries.length;
       default: return 0;
     }
@@ -1319,15 +1148,13 @@ function PlaygroundInner() {
     gallery: 'Ideas',
     components: 'Components',
     icons: 'Icons',
-    widgets: 'Widgets',
     workspace: 'Workspace',
   };
   const TAB_DESCRIPTIONS: Record<string, string> = {
     create: 'Build A2UI components with AI',
-    gallery: 'Browse pre-built demo scenarios',
+    gallery: 'Browse pre-built registry scenarios',
     components: 'A2UI component reference',
     icons: 'Fluent icon browser',
-    widgets: 'Your saved widget library',
     workspace: 'Test the full file manager, editor, and diagram experience.',
   };
 
@@ -1369,39 +1196,11 @@ function PlaygroundInner() {
               <Tab id="tab-gallery" value="gallery" aria-controls="panel-gallery" icon={<Lightbulb24Regular />}>Ideas</Tab>
               <Tab id="tab-components" value="components" aria-controls="panel-components" icon={<Grid24Regular />}>Components</Tab>
               <Tab id="tab-icons" value="icons" aria-controls="panel-icons" icon={<Icons24Regular />}>Icons</Tab>
-              <Tab id="tab-widgets" value="widgets" aria-controls="panel-widgets" icon={<CardUi24Regular />}>Widgets</Tab>
               <Tab id="tab-workspace" value="workspace" aria-controls="panel-workspace" icon={<FolderOpen24Regular />}>Workspace</Tab>
             </TabList>
 
 
           </nav>
-
-          {/* Quick widget list in sidebar */}
-          {widgets.length > 0 && (
-            <div className={classes.sidebarWidgets}>
-              <Caption1 style={{ color: tokens.colorNeutralForeground3, display: 'block', marginBottom: tokens.spacingVerticalXS, fontWeight: tokens.fontWeightSemibold }}>
-                Widgets ({widgets.length})
-              </Caption1>
-              {widgets.slice(0, 8).map(w => (
-                <div
-                  key={w.id}
-                  className={classes.sidebarWidgetItem}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => { handleWidgetClick(w.id); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleWidgetClick(w.id); } }}
-                >
-                  <CardUi24Regular style={{ fontSize: '14px', flexShrink: 0 }} />
-                  {w.name}
-                </div>
-              ))}
-              {widgets.length > 8 && (
-                <Caption1 style={{ color: tokens.colorNeutralForeground3, paddingLeft: tokens.spacingHorizontalS }}>
-                  +{widgets.length - 8} more
-                </Caption1>
-              )}
-            </div>
-          )}
 
           <div className={classes.sidebarFooter}>
             {debugEnabled && (
@@ -1549,13 +1348,6 @@ function PlaygroundInner() {
           {/* Collapsible JSON editor */}
           {showAdvancedJson && (
             <div className={classes.jsonEditorContainer}>
-              <Input
-                value={widgetName}
-                onChange={(_e, data) => setWidgetName(data.value)}
-                placeholder="Widget name..."
-                aria-label="Widget name"
-                style={{ marginBottom: tokens.spacingVerticalM }}
-              />
               <Textarea
                 className={classes.jsonTextarea}
                 value={jsonInput}
@@ -1590,9 +1382,9 @@ function PlaygroundInner() {
                   appearance="outline"
                   size="medium"
                   onClick={handleSaveAsWidget}
-                  disabled={!jsonInput.trim() || !widgetName.trim()}
+                  disabled={!jsonInput.trim()}
                 >
-                  Save as Widget
+                  Reset
                 </Button>
               </div>
 
@@ -1660,12 +1452,6 @@ function PlaygroundInner() {
             {showAdvancedJson && (
               <div style={{ maxWidth: '760px', width: '100%', margin: `${tokens.spacingVerticalL} auto 0` }}>
                 <div className={classes.jsonEditorContainer} style={{ padding: 0 }}>
-                  <Input
-                    value={widgetName}
-                    onChange={(_e, data) => setWidgetName(data.value)}
-                    placeholder="Widget name..."
-                    style={{ marginBottom: tokens.spacingVerticalM }}
-                  />
                   <Textarea
                     className={classes.jsonTextarea}
                     value={jsonInput}
@@ -1686,8 +1472,8 @@ function PlaygroundInner() {
                     <Button appearance="primary" size="medium" onClick={handleJsonRender} disabled={!jsonInput.trim()}>
                       Render JSON
                     </Button>
-                    <Button appearance="outline" size="medium" onClick={handleSaveAsWidget} disabled={!jsonInput.trim() || !widgetName.trim()}>
-                      Save as Widget
+                    <Button appearance="outline" size="medium" onClick={handleSaveAsWidget} disabled={!jsonInput.trim()}>
+                      Reset
                     </Button>
                   </div>
                   {customSurfaceEntries.length > 0 && (
@@ -1771,38 +1557,68 @@ function PlaygroundInner() {
         </div>
       )}
 
-      {/* ---- Tab 2: Gallery (Scenarios) ---- */}
+      {/* ---- Tab 2: Gallery (Scenarios grouped by pack name — Phase A) ---- */}
       {activeTab === 'gallery' && (
         <div id="panel-gallery" role="tabpanel" aria-labelledby="tab-gallery" className="playground-gallery-scroll">
-          <div className="playground-gallery" ref={galleryRef} onKeyDown={handleGalleryKeyDown}>
-            {filteredGalleryScenarios.map(scenario => (
-              <GalleryCardErrorBoundary key={scenario.id} label={scenario.label}>
-                <GalleryCard scenario={scenario} onCardClick={handleCardClick} />
-              </GalleryCardErrorBoundary>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ---- Tab 3: Basic Components ---- */}
-      {activeTab === 'components' && (
-        <div id="panel-components" role="tabpanel" aria-labelledby="tab-components" className="playground-gallery-scroll">
-          {COMPONENT_GROUPS.map(group => {
-            const groupScenarios = filteredComponentScenarios.filter(s => s.group === group);
-            if (groupScenarios.length === 0) return null;
-            return (
-              <div key={group}>
-                <Subtitle2 className={classes.groupHeader}>{group}</Subtitle2>
-                <div className="playground-gallery">
-                  {groupScenarios.map(scenario => (
-                    <GalleryCardErrorBoundary key={scenario.id} label={scenario.label}>
+          {filteredGalleryScenarios.length === 0 ? (
+            <div className={classes.emptyState}>
+              <div className={classes.emptyIcon}>
+                <img src="/assets/icons/fluent/lightbulb.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
+              </div>
+              <Body1Strong>No scenarios registered</Body1Strong>
+              <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
+                Scenarios come from registered packs. This will populate once pack-core lands (Step 4).
+              </Caption1>
+            </div>
+          ) : (
+            Array.from(groupByPack(filteredGalleryScenarios, s => s.id).entries()).map(([pack, scenarios]) => (
+              <div key={pack}>
+                <Subtitle2 className={classes.groupHeader}>{pack}</Subtitle2>
+                <div className="playground-gallery" ref={galleryRef} onKeyDown={handleGalleryKeyDown}>
+                  {scenarios.map(scenario => (
+                    <GalleryCardErrorBoundary key={scenario.id} label={scenario.title}>
                       <GalleryCard scenario={scenario} onCardClick={handleCardClick} />
                     </GalleryCardErrorBoundary>
                   ))}
                 </div>
               </div>
-            );
-          })}
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ---- Tab 3: Components (grouped by pack name — Phase C) ---- */}
+      {activeTab === 'components' && (
+        <div id="panel-components" role="tabpanel" aria-labelledby="tab-components" className="playground-gallery-scroll">
+          {filteredComponents.length === 0 ? (
+            <div className={classes.emptyState}>
+              <div className={classes.emptyIcon}>
+                <img src="/assets/icons/fluent/grid.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
+              </div>
+              <Body1Strong>No components registered</Body1Strong>
+              <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
+                Components come from registered packs. This will populate once pack-core lands (Step 4).
+              </Caption1>
+            </div>
+          ) : (
+            Array.from(groupByPack(filteredComponents, c => c.name).entries()).map(([pack, comps]) => (
+              <div key={pack}>
+                <Subtitle2 className={classes.groupHeader}>{pack}</Subtitle2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: tokens.spacingVerticalM, padding: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalL}` }}>
+                  {comps.map(comp => (
+                    <Card key={comp.name} appearance="outline" style={{ padding: tokens.spacingVerticalM }}>
+                      <Body1Strong style={{ fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200 }}>
+                        {comp.name.split('/')[1] ?? comp.name}
+                      </Body1Strong>
+                      <Caption1 style={{ color: tokens.colorNeutralForeground3, fontFamily: tokens.fontFamilyMonospace }}>
+                        {comp.name}
+                      </Caption1>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -1886,41 +1702,7 @@ function PlaygroundInner() {
         </div>
       )}
 
-      {/* ---- Tab 5: Widgets ---- */}
-      {activeTab === 'widgets' && (
-        <div id="panel-widgets" role="tabpanel" aria-labelledby="tab-widgets" className="playground-create-scroll">
-          <div className={classes.jsonEditorContainer}>
-            <Body1Strong style={{ marginBottom: tokens.spacingVerticalM }}>
-              My Widgets
-            </Body1Strong>
-            {widgets.length === 0 ? (
-              <div className={classes.emptyState}>
-                <div className={classes.emptyIcon}>
-                  <img src="/assets/icons/fluent/card-ui.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
-                </div>
-                <Body1Strong>No widgets yet</Body1Strong>
-                <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
-                  Go to the Create tab to build your first widget.
-                </Caption1>
-              </div>
-            ) : (
-              <div className={classes.widgetGrid}>
-                {widgets.map(widget => (
-                  <WidgetCard
-                    key={widget.id}
-                    widget={widget}
-                    onWidgetClick={handleWidgetClick}
-                    onDuplicate={duplicateWidget}
-                    onDelete={deleteWidget}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ---- Tab 6: Workspace ---- */}
+      {/* ---- Tab 5: Workspace ---- */}
       {activeTab === 'workspace' && (
         <div id="panel-workspace" role="tabpanel" aria-labelledby="tab-workspace" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
           <PlaygroundWorkspace />
@@ -1941,11 +1723,11 @@ function PlaygroundInner() {
                 />
               }
             >
-              {selectedScenario?.label || widgets.find(w => w.id === selectedWidget)?.name}
+              {selectedScenario?.title}
             </DialogTitle>
             <DialogContent>
               <div className={classes.dialogContent}>
-                {selectedScenario && (
+                {selectedScenario?.description && (
                   <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
                     {selectedScenario.description}
                   </Caption1>
@@ -1971,15 +1753,10 @@ function PlaygroundInner() {
                         </div>
                       </div>
                     ))}
-                    {selectedWidget && (() => {
-                      const widget = widgets.find(w => w.id === selectedWidget);
-                      if (!widget) return null;
-                      return <WidgetPreview widget={widget} />;
-                    })()}
                   </div>
                 ) : (
                   <div className={classes.jsonCodeBlock}>
-                    {selectedScenario ? scenarioJson : JSON.stringify(widgets.find(w => w.id === selectedWidget)?.messages, null, 2)}
+                    {scenarioJson}
                   </div>
                 )}
               </div>
@@ -1996,7 +1773,7 @@ function PlaygroundInner() {
   );
 }
 
-// ---- Playground export (WidgetsProvider removed in Step 1; TODO restore in Step 4a) ----
+// ---- Playground export ----
 
 export function Playground() {
   return (
