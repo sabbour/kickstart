@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #215 "feat: expanded playground scenarios + file ops + CostEstimate (#174, #188)" | L | impl=2m | review=4m | cycles=1 | merged | @sabbour
