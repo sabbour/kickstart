@@ -79,3 +79,7 @@ Merged 5 new files from worktree inboxes (477-security-review, 478-security-revi
 ## Wave 7 — 2026-05-28 Inbox sweep (no new decisions)
 
 Swept main inbox and all worktrees (new: bender-deps, bender-sec-san, ceremony-reference-redirect, copilot-471-feedback, dompurify-monaco-fix, dompurify-monaco-override, fry-355, hermes-heartbeat-validation, pr-545-review). All files were known-merged stale entries (hermes-connector-execution-adr, bender-azure-auth-handler-fix, bender-ci-paths-ignore-fix, leela-271-deployment-flow variants, leela-e2e-sprint-plan, leela-sprint-planning-v061). No new decisions. decisions.md unchanged at 139,295 bytes. Pending: leela-478-dp-review — not yet filed in any worktree.
+
+## Wave 8 (user-labelled Wave 5) — 2026-06-10 Inbox merge
+
+Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v2 Step 1 all 8 conditions clear, tsc debt gate recorded) and `zapp-pr545-review.md` (PR #545 REQUEST CHANGES, legacy `handoff` phase in `chat-a2ui.ts` blocking). decisions.md: 139,295 → 143,112 bytes. Histories updated: leela, zapp. No history files exceed 15 KB threshold (leela at 14,833 bytes — nearest).

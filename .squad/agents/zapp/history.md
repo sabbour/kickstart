@@ -163,3 +163,18 @@ All 4 critical security conditions from issue #445 acceptance criteria:
 ### PR #544 — REQUEST CHANGES → APPROVED
 - Initial review blocked: `STEPWISE_GENERATION_V1` still in `infra/main.bicep:52-53,132-140`. Also noted `npm run build` fails on missing DOM globals in harness.
 - Recheck (commit `1a62989`): flag fully removed from infra. No runtime occurrences. Applied `zapp:approved`.
+
+### PR #545 — REQUEST CHANGES
+- Blocking finding: `packages/harness/src/a2ui/chat-a2ui.ts` still preserves legacy `handoff` phase logic while the harness phase contract is now `discover/assess/design/generate/review/deploy`.
+- Security impact: exported phase normalizer accepts deprecated state and rejects current `assess`, creating a control-plane mismatch that could become unsafe once runtime/UI wiring consumes the harness helper.
+- Other checks passed: strict/discriminated schemas, closed `AgentOutput.intent`, opaque credential typing in `SessionCtx`, no dynamic code-loading primitives, harness build + targeted schema tests green.
+- Decision filed: `.squad/decisions/inbox/zapp-pr545-review.md`.
+
+## Wave 5 — 2026-04-17 PR #545 Security Review (v2 Step 2)
+
+**PR #545 (Closes #475) — REQUEST CHANGES**
+- **Blocking finding:** `packages/harness/src/a2ui/chat-a2ui.ts` still normalizes legacy `handoff` phase. Current harness contract has no `handoff` phase (`discover → assess → design → generate → review → deploy`). Helper rejects current `assess` phase — trust-boundary mismatch on persisted state. Fails DP check #5.
+- **Required fix:** Align `chat-a2ui.ts` with current phase contract; add tests for accept/reject.
+- **All other checks passed:** `AgentOutput` strict + closed enum, A2UI discriminated union fail-closed, `SessionCtx` credentials opaque (`unknown`), no `eval`/dynamic `import`, harness build + tsc + vitest green.
+- **Process note:** GitHub blocked `REQUEST_CHANGES` (author = reviewer = repo owner). Finding posted as PR comment instead.
+- Filed `zapp-pr545-review.md` → decisions.md.

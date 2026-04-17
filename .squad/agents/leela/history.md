@@ -181,3 +181,10 @@ All 8 DP approval conditions verified:
 **Known debt — Step 2 prerequisite:** `types.ts` emptied to `export {};` but ~15 web shell files still import named types from it. `tsc --noEmit` would fail (TS2305). Vite build passes (strips types). Step 2 must resolve tsc errors before any tsc CI gate lands. Bender + Fry co-own.
 
 Decision filed: `.squad/decisions/inbox/leela-pr544-review.md`
+
+## Wave 5 — 2026-06-10 PR #544 Code Review (v2 Step 1)
+
+**PR #544 (Closes #474) — APPROVED**
+- All 8 DP conditions verified. `packages/core/` shim is compile-only (package.json redirect only). Feature flags (`KICKSTART_AGENTS_SDK`, `KICKSTART_V2`) deleted from production. `converse.ts` returns 503 fail-closed. 34 smoke tests green. 407 tests total green.
+- **Hard gate on Step 2:** `packages/web/src/types.ts` is `export {};` but 15+ web shell files still import named types from it. `tsc --noEmit` would fail. Step 2 must resolve this first (re-export from harness or inline). Bender + Fry co-own tsc clean-up before any new type-safe code.
+- Filed `leela-pr544-review.md` → decisions.md.
