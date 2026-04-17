@@ -8,6 +8,91 @@ import {
   AUTO_CONTINUE_MAX_CONSECUTIVE,
 } from '@kickstart/harness';
 import { sanitizeActionContext } from '../utils/sanitize-action-context';
+import type { UserActionReqPayload } from './useStreaming';
+
+// ---------------------------------------------------------------------------
+// v2 UserAction resume dispatch
+// ---------------------------------------------------------------------------
+
+export interface UserActionResumeOptions {
+  /**
+   * Called when the resume SSE stream starts emitting events.
+   * Provide the same callbacks you'd pass to useStreaming.send().
+   */
+  onResumeStream?: (eventSource: ReadableStreamDefaultReader<Uint8Array>) => void;
+  /**
+   * Called on successful resume (200 OK, stream started).
+   */
+  onSuccess?: () => void;
+  /**
+   * Called when the resume request fails (network error, 400, 403, etc.).
+   */
+  onError?: (message: string) => void;
+}
+
+/**
+ * Dispatches a UserAction result to POST /api/converse/resume.
+ *
+ * Client input ONLY — the result payload is provided by the browser (MSAL token,
+ * user form input, etc.). Never pass server-internal primitives.
+ *
+ * Zapp Critical 3: Playground stub invocation is guarded server-side.
+ */
+export async function dispatchUserActionResult(
+  payload: UserActionReqPayload,
+  result: unknown,
+  options: UserActionResumeOptions = {},
+): Promise<void> {
+  const { onSuccess, onError } = options;
+
+  try {
+    const res = await fetch('/api/converse/resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: payload.sessionId,
+        actionId: payload.actionId,
+        toolName: payload.toolName,
+        result,
+      }),
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      const msg = (errorBody as { error?: string }).error ?? `Resume failed: ${res.status}`;
+      onError?.(msg);
+      return;
+    }
+
+    onSuccess?.();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'UserAction resume failed';
+    onError?.(msg);
+  }
+}
+
+/**
+ * React hook for dispatching UserAction resume calls.
+ * Returns a stable `handleUserActionRequired` callback and loading state.
+ */
+export function useUserActionDispatch() {
+  const [isPending, setIsPending] = useState(false);
+
+  const handleUserActionRequired = useCallback(
+    async (payload: UserActionReqPayload, result: unknown, options?: UserActionResumeOptions) => {
+      setIsPending(true);
+      try {
+        await dispatchUserActionResult(payload, result, options);
+      } finally {
+        setIsPending(false);
+      }
+    },
+    [],
+  );
+
+  return { handleUserActionRequired, isPending };
+}
+
 
 /**
  * Action routing categories.
