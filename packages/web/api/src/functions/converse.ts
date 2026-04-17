@@ -61,8 +61,19 @@ async function converse(
   }
 
   const registry = getRegistry();
-  const session = getOrCreateSession(body.sessionId, oid);
+  let session;
+  try {
+    session = getOrCreateSession(body.sessionId, oid);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'SESSION_OID_MISMATCH') {
+      return new Response('Forbidden', { status: 403 });
+    }
+    throw err;
+  }
   const runner = new Runner(registry);
+
+  // B2: AbortController to signal runner when client disconnects
+  const abortController = new AbortController();
 
   // Build SSE ReadableStream
   const encoder = new TextEncoder();
@@ -75,7 +86,7 @@ async function converse(
       };
 
       try {
-        await runner.run(session, body.message, write);
+        await runner.run(session, body.message, write, abortController.signal);
       } catch (err) {
         try {
           write("error", { message: err instanceof Error ? err.message : String(err) });
@@ -83,6 +94,10 @@ async function converse(
       } finally {
         try { controller.close(); } catch { /* already closed */ }
       }
+    },
+    cancel() {
+      // B2: client disconnected — abort the runner
+      abortController.abort('client-disconnect');
     },
   });
 

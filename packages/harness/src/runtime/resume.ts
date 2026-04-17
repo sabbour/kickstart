@@ -80,17 +80,21 @@ export async function handleResume(
   }
 
   // Verify there is a pending action and it matches
-  if (!session.pendingUserAction) {
+  // B3: compare-and-swap — clear pendingUserAction BEFORE validating to prevent concurrent replay
+  const pending = session.pendingUserAction;
+  if (!pending) {
     return { status: 404, error: 'No pending UserAction on this session.' };
   }
-  if (session.pendingUserAction.name !== toolName) {
+  session.pendingUserAction = null;
+
+  if (pending.name !== toolName) {
     return {
       status: 400,
-      error: `Pending action is "${session.pendingUserAction.name}", not "${toolName}".`,
+      error: `Pending action is "${pending.name}", not "${toolName}".`,
     };
   }
-  if (runId && session.pendingUserAction.runId !== runId) {
-    return { status: 400, error: `Run ID mismatch. Expected "${session.pendingUserAction.runId}".` };
+  if (runId && pending.runId !== runId) {
+    return { status: 400, error: `Run ID mismatch. Expected "${pending.runId}".` };
   }
 
   // Zapp Critical 2: resultSchema server-side validation

@@ -13,7 +13,8 @@ import { getRegistry } from "../startup/packs.js";
 import { sessionStore } from "@kickstart/harness/runtime/session";
 import { Runner } from "@kickstart/harness/runtime/runner";
 import { SSE_RESPONSE_HEADERS, formatSSEFrame } from "@kickstart/harness/runtime/sse";
-import { handleResume, getOidFromPrincipalHeader } from "@kickstart/harness/runtime/resume";
+import { getOidFromPrincipalHeader } from "@kickstart/harness/runtime/resume";
+import { z } from "zod";
 import type { SSEEventType } from "@kickstart/harness/runtime/sse";
 
 interface ResumeRequest {
@@ -56,8 +57,45 @@ async function resume(
     });
   }
 
-  // Extract OID from Azure SWA principal header (Zapp Critical 1)
+  // Crit1: OID check — return 403 (not 200 SSE) on mismatch
   const requesterOid = getOidFromPrincipalHeader(request.headers.get("x-ms-client-principal"));
+  if (requesterOid === null || session.user.oid !== requesterOid) {
+    return new Response('Forbidden', { status: 403 });
+  }
+
+  // B3: compare-and-swap — clear pendingUserAction BEFORE validation to prevent concurrent replay
+  const pending = session.pendingUserAction;
+  if (!pending) {
+    return new Response(JSON.stringify({ error: "No pending UserAction on this session" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  session.pendingUserAction = null;
+
+  if (pending.name !== toolName) {
+    return new Response(JSON.stringify({ error: `Pending action is "${pending.name}", not "${toolName}"` }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (actionId && pending.runId !== actionId) {
+    return new Response(JSON.stringify({ error: `Run ID mismatch` }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Crit2: validate resultPayload against stored resultSchema — return 400 (not 200 SSE) on failure
+  let validatedResult: unknown = resultPayload;
+  if (pending.resultSchema) {
+    const schema = pending.resultSchema as z.ZodTypeAny;
+    const parsed = schema.safeParse(resultPayload);
+    if (!parsed.success) {
+      return new Response('Bad Request', { status: 400 });
+    }
+    validatedResult = parsed.data;
+  }
 
   const registry = getRegistry();
   const runner = new Runner(registry);
@@ -72,16 +110,7 @@ async function resume(
       };
 
       try {
-        const handlerResult = await handleResume(
-          { session, requesterOid, toolName, runId: actionId, resultPayload },
-          runner,
-          registry,
-          write,
-        );
-
-        if (handlerResult.status !== 200) {
-          write("error", { message: handlerResult.error, status: handlerResult.status });
-        }
+        await runner.resume(session, validatedResult, write);
       } catch (err) {
         try {
           write("error", { message: err instanceof Error ? err.message : String(err) });

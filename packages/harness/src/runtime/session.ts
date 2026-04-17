@@ -110,6 +110,9 @@ export function getOrCreateSession(
   if (!session) {
     session = new Session({ sessionId: id, user: { oid }, workspaceRoot });
     sessionStore.set(id, session);
+  } else if (session.user.oid !== oid) {
+    // B1: Prevent cross-user session attachment
+    throw new Error('SESSION_OID_MISMATCH');
   }
   // Track last-active time for TTL cleanup
   (session as unknown as { _lastActiveAt: number })._lastActiveAt = Date.now();

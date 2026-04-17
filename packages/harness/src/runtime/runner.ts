@@ -133,11 +133,12 @@ function wrapUserAction(
         // If no stub found in playground mode, fall through to interrupt
       }
 
-      // Store pending action on session (toolName, no resultSchema — looked up from registry on resume)
+      // Store pending action on session including resultSchema for API-layer validation (Zapp Crit2b)
       session.pendingUserAction = {
         name: contrib.name,
         runId,
         issuedAt: new Date().toISOString(),
+        resultSchema: contrib.resultSchema,
       };
 
       // Emit user_action_req SSE event — browser will dispatch and call /resume
@@ -177,6 +178,7 @@ export class Runner {
     session: Session,
     userMessage: string,
     sseWrite: SSEWriter,
+    signal?: AbortSignal,
   ): Promise<void> {
     sseWrite('start', { sessionId: session.sessionId });
     session.recordTurn({ role: 'user', content: userMessage });
@@ -191,6 +193,10 @@ export class Runner {
     }
 
     const abortCtrl = new AbortController();
+    // B2: forward external client-disconnect signal into the runner's abort controller
+    if (signal) {
+      signal.addEventListener('abort', () => abortCtrl.abort(signal.reason), { once: true });
+    }
 
     // Build tools list
     const toolContribs = this.registry.getToolsForAgent(agentName);
