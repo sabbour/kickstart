@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #129 "feat: Theme customization system — dark mode support" | M | impl=0m | review=26m | cycles=1 | merged | @sabbour
