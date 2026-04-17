@@ -487,6 +487,12 @@ export function App() {
     if (mockEnabled) {
       mockStreaming.send(text, sessionId, {
         onChunk: () => {},
+        onA2UI: handleIncomingA2UI,
+        onSetupEvent: handleIncomingSetupEvent,
+        onPhase: (phase) => setConversationPhase(phase),
+        onComplete: (fullText, model) => {
+          if (finalizeStepwiseAssistantTurn({
+            assistantMessageId,
             sessionId: sessionId!,
             model,
           })) {
@@ -549,6 +555,10 @@ export function App() {
       
       streaming.send(text, backendSessionId, {
         onChunk: () => {},
+        onA2UI: handleIncomingA2UI,
+        onSetupEvent: handleIncomingSetupEvent,
+        onPhase: (phase) => setConversationPhase(phase),
+        onComplete: (fullText, model, receivedSessionId, debugInfo, usage) => {
           const phase = currentPhaseRef.current || undefined;
           // Store the backend session ID on first response
           if (receivedSessionId && !activeSession?.backendSessionId) {
