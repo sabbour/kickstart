@@ -157,7 +157,7 @@ test.describe('Route state — server-authored phase consumption', () => {
     // to /.auth/login/aad?post_login_redirect_uri=/ which triggers navigation.
     await page.locator('.track-card-link[data-track="web-app"]').click();
 
-    await page.waitForURL(url => url.includes('/.auth/login/'), { timeout: 10_000 });
+    await page.waitForURL(url => url.href.includes('/.auth/login/'), { timeout: 10_000 });
   });
 });
 
