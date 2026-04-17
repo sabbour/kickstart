@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCatalogSnapshot, negotiateCatalog } from './catalog.js';
 import { loadAgentFile } from './loader-agent.js';
-import { loadSkillFile } from './loader-skill.js';
+import { loadSkillFile, inlineSkillSchema } from './loader-skill.js';
 import type { AgentContribution } from '../types/agent.js';
 import type { ComponentContribution } from '../types/component.js';
 import type { GuardrailContribution } from '../types/guardrail.js';
@@ -224,19 +224,42 @@ export class PackRegistry {
   }
 
   private loadSkills(pack: Pack): Skill[] {
-    const loaded: Skill[] = [];
+    const fileSkills: Skill[] = [];
     if (pack.skillsDir) {
       const baseDir = directoryURLToPath(pack.skillsDir);
       for (const entry of collectMarkdownFiles(baseDir, 'SKILL.md')) {
-        loaded.push(loadSkillFile(pack, entry));
+        fileSkills.push(loadSkillFile(pack, entry));
       }
     }
+
+    const inlineSkills: Skill[] = [];
     if (pack.skills) {
-      for (const skill of pack.skills) {
-        loaded.push(skill);
+      for (const raw of pack.skills) {
+        // Fix 2: enforce pack-name prefix — fail-closed, no auto-correction
+        if (!raw.id.startsWith(`${pack.name}/`)) {
+          throw new Error(`Inline skill id "${raw.id}" must be namespaced under "${pack.name}/"`);
+        }
+        // Fix 1: zod validation — same rigor as file-backed skills
+        const parsed = inlineSkillSchema.parse(raw);
+        const normalized = this.normalizeInlineSkill(pack, parsed as Skill);
+        // Fix 4: freeze to prevent post-registration mutation
+        const frozen = Object.freeze({
+          ...normalized,
+          appliesTo: Object.freeze([...(normalized.appliesTo ?? [])]),
+          keywords: Object.freeze([...(normalized.keywords ?? [])]),
+        }) as Skill;
+        inlineSkills.push(frozen);
       }
     }
-    return loaded;
+
+    // Fix 3: detect duplicates within the merged batch before any insertion
+    const seen = new Set<string>();
+    for (const id of [...fileSkills.map((s) => s.id), ...inlineSkills.map((s) => s.id)]) {
+      if (seen.has(id)) throw new Error(`Duplicate skill id "${id}" in pack "${pack.name}"`);
+      seen.add(id);
+    }
+
+    return [...fileSkills, ...inlineSkills];
   }
 
   private buildDependencyScope(pack: Pack): { tools: Map<string, ToolContribution>; userActions: Map<string, UserActionContribution> } {
