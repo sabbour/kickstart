@@ -93,3 +93,4 @@ Label applied: `leela:approved`
 | 2025-07-15 | PR #550 (#479 Runner+SSE) | PR review | ✅ A/C: BLOCK-1 `_lastActiveAt` must be first-class Session field; 4 arch decisions recorded | leela-pr550-review.md |
 | 2025-07-15 | DP #486 re-check | DP re-check | ✅ A/C ✅ C1+C2 resolved; migrate Step 8 guardrails in same commit | leela-486-dp-recheck.md |
 | 2025-07-15 | DP #487 (MCP adapter) | DP review | ✅ A/C (C1–C3 blocking) | leela-487-dp-review.md |
+| 2025-07-15 | DP #487 re-check | DP re-check | ✅ APPROVE_WITH_CONDITIONS — C1+C2+C3 cleared; 4 merge conditions for Step 12 PR | leela-487-dp-recheck.md |

@@ -58,3 +58,6 @@ B6 still outstanding: fail-closed acceptance tests omit payload-coercion failure
 
 ### DP #487 MCP Adapter — BLOCKED (6 blockers)
 High-severity: (1) UserActions must not be MCP tools; (2) bind execution+resume to `(sessionId, runId/actionId, principalId/connectionId)`; (3) `mcpExposed` must default `false`; (4) MCP args must be validated by same schemas as web path; (5) single-use interrupt semantics (atomic, TTL-bound, replay-safe); (6) guardrails must gate buffered MCP responses before return. Q3/Q4 answers provided (no raw bearer tokens; bind session to connectionId+principalId).
+
+### DP #487 MCP Adapter — Re-check APPROVE_WITH_CONDITIONS ✅
+Crit1–Crit2 and B1–B4 are now explicitly resolved in the latest revision. Step 12 merge remains conditioned on: UserActions staying out of the MCP manifest, server-assigned `connectionId` bound for session lifetime, `mcpExposed` default-deny allowlisting, shared zod+guardrail validation, single-use action-bound TTL resume semantics, and in-memory session state with per-session mutex / restart-404 behavior.

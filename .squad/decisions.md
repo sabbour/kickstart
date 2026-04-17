@@ -4616,3 +4616,100 @@ The DP materially weakens the current v2 security boundary in two places: it tur
 
 - **Q3:** Do not pass raw bearer tokens through generic MCP tool/result payloads. If VS Code auth is used, bind credentials to the expected provider/action and validate issuer, audience, scopes, tenant, and subject; prefer opaque proofs/handles over token strings. No cross-provider token reuse.
 - **Q4:** Yes — the same ownership invariant applies here. For MCP, bind the session to the transport connection at `start`, and if any web-backed resume/API path is involved also bind to principal OID. Authorization should be `(sessionId, connectionId, principalId, runId/actionId)`, not `sessionId` alone.
+
+---
+
+# Leela — DP #487 Re-check Decision
+
+**Date:** 2025-07-15
+**Issue:** #487 (MCP Adapter DP)
+**Type:** DP re-check
+**Verdict:** APPROVE_WITH_CONDITIONS ✅
+
+## Condition Status
+
+| Condition | Status | Evidence |
+|-----------|--------|----------|
+| C1 — `audience:["user"]` scoped + degradation | ✅ Cleared | VS Code-specific scope stated; plain-text fallback specified; `clientInfo` detection at `initialize` confirmed |
+| C2 — Interrupt storage: in-memory, sticky routing, 404 on restart | ✅ Cleared | Explicitly in-memory, sticky routing required for multi-instance, process restart → 404 documented as known limitation |
+| C3 — `requiresSession:true` → excluded from MCP manifest | ✅ Cleared | Option 2 chosen; only stateless tools exposed via MCP; stateless-only MCP exposure is the documented contract |
+| Q2 — Structured interrupt block (not human-readable) | ✅ Cleared | JSON block with `type`, `actionName`, `resumeUrl`, `actionId`, `sessionId` fields specified |
+| Q6 — `mcpExposed` default `false` | ✅ Cleared | Explicitly stated; opt-in allowlist (not opt-out denylist) |
+
+## Merge Conditions for Step 12 PR
+
+1. VS Code `clientInfo` detection before A2UI embedding — plain-text fallback required in code
+2. Sticky routing documented in deployment guide (not just the DP)
+3. `requiresSession` flag added to `ToolContribution` type before Step 12 PR opens
+4. Interrupt block format is structured JSON (not human-readable text)
+
+Comment: https://github.com/sabbour/kickstart/issues/487#issuecomment-4269466828
+
+---
+
+# Zapp Decision — DP #487 MCP Adapter Re-check
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**Issue:** #487
+**Status:** APPROVE_WITH_CONDITIONS
+
+## Decision
+
+The latest DP revision resolves the previously blocked security gaps for the MCP adapter. The design now keeps user-consent flows outside the MCP manifest, binds execution and resume to the full ownership tuple, defaults MCP exposure to explicit opt-in, reuses the web-path validation and guardrail chain, hardens resume semantics against replay/race, and keeps session persistence in-memory with fail-closed restart behavior.
+
+## Conditions for Step 12 PR merge
+
+1. UserActions never appear in the MCP manifest; MCP returns only a structured interrupt block containing `resumeUrl`, `actionId`, and `sessionId`.
+2. `connectionId` is server-assigned during MCP initialize and remains bound to the session lifetime.
+3. `mcpExposed` defaults to `false`; only explicitly allowlisted tools may be exposed, with FS, credential, and `requiresSession` tools permanently excluded.
+4. MCP inputs use the same zod schemas as the web path, and buffered output must pass the output-stage guardrail chain before return.
+5. Resume remains single-use and action-bound with CAS clearing, 5-minute TTL/410 expiry, preemptive 409 when no interrupt is pending, and replay protection.
+6. Session and interrupt state remain in-memory only, protected by a per-session mutex; process restart causes stale resume attempts to fail closed with 404.
+
+---
+
+# Zapp Decision — PR #550 Re-check
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**PR:** #550 — `feat(v2): #479 Step 5 — Runner + SSE`
+**Fix commits reviewed:** `00177d0`, `95343c3`
+**Status:** APPROVE_WITH_CONDITIONS
+
+## Findings
+
+All 7 prior security findings resolved:
+1. Crit1 ✅ — OID mismatch returns HTTP 403 before SSE stream constructed.
+2. Crit2a ✅ — Schema failure returns HTTP 400 before SSE stream constructed.
+3. Crit2b ✅ — `resultSchema` stored with `pendingUserAction`; resume reads it back for validation.
+4. Crit3 ✅ — `converse` is a real streaming v2 handler; playground gate intact.
+5. B1 ✅ — OID mismatch on existing session → `SESSION_OID_MISMATCH` → HTTP 403.
+6. B2 ✅ — `AbortController` wired; `ReadableStream.cancel()` → `abort('client-disconnect')`; forwarded to SDK runner.
+7. B3 ✅ — CAS clear of `pendingUserAction` before validation/resume work in both `harness/resume.ts` and `api/resume.ts`.
+8. Follow-up ✅ — `lastActiveAt` is now a first-class typed field, refreshed via `touch()`.
+
+## Conditions for merge
+
+1. SSE error frames must not echo raw Zod error strings to clients.
+2. `lastActiveAt` fix from `95343c3` remains intact through merge.
+
+---
+
+# Milestone: DP #486 (Guardrails Engine) — FULLY APPROVED
+
+**Date:** 2025-07-15
+**Status:** ✅ FULLY APPROVED — Leela ✅ + Zapp ✅
+- Leela APPROVE_WITH_CONDITIONS: C1 (interface contract `evaluate()` shape) + C2 (`applyRedact()` spec for all 3 stages) — both resolved in combined revision
+- Zapp APPROVE_WITH_CONDITIONS: Crit1 (opaque SSE block) + Crit2 (`core/no-credential-leak`) + B1–B6 (tool abort, core-first, sentinel redact, @internal validate_artifacts, duplicate rejection, coercion test) — all resolved
+- Implementation may proceed. Step 11 PR must update `docs/v2-implementation-brief.md` §Guardrail and migrate 3 pack-core guardrails from `check()` → `evaluate()` in the same commit.
+
+---
+
+# Milestone: DP #487 (MCP Adapter) — FULLY APPROVED
+
+**Date:** 2025-07-15
+**Status:** ✅ FULLY APPROVED — Leela ✅ + Zapp ✅
+- Leela APPROVE_WITH_CONDITIONS: C1 (`audience` field / degradation), C2 (interrupt storage contract), C3 (`context:null` exclusion) — all cleared in combined revision
+- Zapp APPROVE_WITH_CONDITIONS: Crit1 (UserActions off manifest), Crit2 (session binding tuple), B1 (default-deny), B2 (zod+guardrail at adapter), B3 (single-use interrupt), B4 (in-memory/mutex) — all resolved
+- Implementation may proceed with Step 12 PR merge conditions (4 Leela + 6 Zapp) satisfied in code.

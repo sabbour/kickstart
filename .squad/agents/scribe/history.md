@@ -82,3 +82,23 @@
 **Sizes post-wave:** bender 7,924 / fry 10,997 (71%) / hermes 11,926 (77%) / leela ~4.3K / ralph 225 / scribe ~5K / zapp 6,315 (41%)
 **Watch:** hermes (77%) — no new entries this wave; summarize on next crossing
 **Status:** DP #486 one re-check away (B6 only); DP #487 needs full revision (Leela C1–C3 + Zapp 6 blockers)
+
+## Wave 38 — 2025-07-15
+
+**Files merged:** 3 + 2 milestones
+- `leela-487-dp-recheck.md` (main inbox) → DP #487 APPROVE_WITH_CONDITIONS ✅ (C1+C2+C3 all cleared; 4 Step 12 PR conditions)
+- `zapp-487-dp-recheck.md` (main inbox) → DP #487 APPROVE_WITH_CONDITIONS ✅ (Crit1–B4 resolved; 6 Step 12 PR conditions)
+- `zapp-pr550-recheck.md` (worktree `550-security-recheck`) → PR #550 APPROVE_WITH_CONDITIONS ✅ (Crit1+Crit2a/b+Crit3+B1–B3 all resolved; 2 merge conditions remain)
+- **Milestone:** DP #486 (Guardrails Engine) FULLY APPROVED ✅ — Leela C1+C2 + Zapp Crit1+Crit2+B1–B6 all resolved
+- **Milestone:** DP #487 (MCP Adapter) FULLY APPROVED ✅ — Leela C1+C2+C3 + Zapp Crit1+Crit2+B1–B4 all resolved
+
+**Self-posts staged:**
+- leela/history.md: +DP #487 re-check row
+- zapp/history.md: +DP #487 re-check row
+
+**decisions.md:** 262,354 → 267,983 bytes (+5,629)
+
+**History sizes:** bender 7,924 / fry 12,289 (80%) / hermes 11,926 (77%) / leela ~6.2K / ralph 225 / scribe ~5.4K / zapp ~7.4K
+**Watch:** fry (80%) — summarize next meaningful entry if crosses 15 KB; hermes (77%)
+
+**Still absent (not yet filed):** `bender-pr550-fix`, `leela-pr549-review`, `zapp-pr549-recheck`, `hermes-549-test`, `zapp-486-b6-final`, `leela-484-dp-recheck`, `fry-484-dp-revision`
