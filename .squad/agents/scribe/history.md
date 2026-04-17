@@ -102,3 +102,13 @@
 **Watch:** fry (80%) — summarize next meaningful entry if crosses 15 KB; hermes (77%)
 
 **Still absent (not yet filed):** `bender-pr550-fix`, `leela-pr549-review`, `zapp-pr549-recheck`, `hermes-549-test`, `zapp-486-b6-final`, `leela-484-dp-recheck`, `fry-484-dp-revision`
+
+## Wave 39 — 2025-07-15
+
+**Scan result:** No-op — all inbox files stale, no new decisions to merge.
+**Inbox checked:** main inbox (12 files, all stale) + all .worktrees/ inboxes (all stale including hermes-connector-execution-adr.md, zapp-pr550-recheck.md)
+**Self-posts:** leela + zapp history.md show phantom `M` in git status; git diff confirms no actual change (filesystem cache artifact).
+**decisions.md:** 267,983 bytes (unchanged)
+**History sizes:** bender 7,924 (51%) / fry 12,289 (80%) / hermes 11,926 (77%) / leela 6,084 (39%) / ralph 225 (1%) / scribe ~5.7K / zapp 6,795 (44%)
+**Watch:** fry (80%) and hermes (77%) approaching threshold; no new entries this wave.
+**Still absent:** `bender-pr550-fix`, `leela-pr549-review`, `zapp-pr549-recheck`, `hermes-549-test`, `zapp-486-b6-final`, `leela-484-dp-recheck`, `fry-484-dp-revision`
