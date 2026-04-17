@@ -11,6 +11,10 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: squad-pr-retro-${{ github.repository }}-${{ github.event.pull_request.base.ref }}
+  cancel-in-progress: false
+
 jobs:
   retro:
     runs-on: ubuntu-latest
@@ -111,7 +115,16 @@ jobs:
           git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]
 
 Working as Scribe — see .squad/agents/scribe/charter.md"
-          git push
+          for attempt in 1 2 3; do
+            if git push; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "git push failed after ${attempt} attempts"
+              exit 1
+            fi
+            git pull --rebase origin "${{ github.event.pull_request.base.ref }}"
+          done
 
       - name: Mirror line as PR comment
         uses: actions/github-script@v7
