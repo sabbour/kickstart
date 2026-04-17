@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #160 "fix: add Integration Kit playground scenarios" | M | impl=0m | review=0m | cycles=1 | merged | @sabbour-squad-frontend[bot]
