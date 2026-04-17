@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #304 "fix: normalize A2UI component titles to Subtitle1" | M | impl=0m | review=9m | cycles=1 | merged | @sabbour
