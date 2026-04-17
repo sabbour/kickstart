@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #76 "feat: Restructure Playground to use sidebar layout (#59)" | L | impl=1m | review=20m | cycles=1 | merged | @sabbour
