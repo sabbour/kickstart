@@ -61,7 +61,7 @@ export async function handleConverse(
   session.updatedAt = now;
 
   // Retrieve or recover current phase
-  let currentPhase = getSessionPhase(sessionId) ?? Phase.Discover;
+  const currentPhase = getSessionPhase(sessionId) ?? Phase.Discover;
   if (!getSessionPhase(sessionId)) {
     setSessionPhase(sessionId, currentPhase);
   }
