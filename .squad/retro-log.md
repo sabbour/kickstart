@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #155 "fix: align FileEditor schema prop fileName → filename (#141)" | S | impl=0m | review=20m | cycles=1 | merged | @sabbour
