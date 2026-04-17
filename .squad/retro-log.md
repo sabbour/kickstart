@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-17 | #442 "docs: replace hardcoded Azure env values with placeholders (#432)" | S | impl=4m | review=12m | cycles=1 | merged | @sabbour-squad-frontend[bot]
