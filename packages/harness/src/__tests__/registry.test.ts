@@ -257,4 +257,93 @@ Bad.
     registry.register({ name: 'a', version: '1.0.0', dependsOn: ['b'] });
     expect(() => registry.register({ name: 'b', version: '1.0.0', dependsOn: ['a'] })).toThrow(/Circular dependency/);
   });
+
+  it('merges skillsDir file skills with inline skills[] and detects cross-source duplicates', () => {
+    // Create a skill file on disk
+    const skillsDir = fileDir('merge-test/skills/dir-skill');
+    writeFixture('merge-test/skills/dir-skill/SKILL.md', `---
+name: dir-skill
+description: Skill loaded from directory
+version: 1.0.0
+x-kickstart:
+  appliesTo:
+    - mergetest.*
+  keywords:
+    - dir
+  priority: 10
+---
+
+Use the dir skill.
+`);
+
+    // Create an agent file so we can retrieve skills via getSkillsForAgent
+    const agentsDir = fileDir('merge-test/agents');
+    writeFixture('merge-test/agents/mergetest.tester.agent.md', `---
+name: mergetest.tester
+description: Test agent for merge coverage
+model:
+  envVar: MODEL
+tools: []
+---
+
+Tester agent.
+`);
+
+    const registry = new PackRegistry();
+    registry.register({
+      name: 'mergetest',
+      version: '1.0.0',
+      skillsDir,
+      agentsDir,
+      skills: [{
+        id: 'mergetest/inline-skill',
+        name: 'inline-skill',
+        description: 'Inline skill without a .md file',
+        version: '1.0.0',
+        instructions: 'Use the inline skill.',
+        appliesTo: ['mergetest.*'],
+        keywords: ['inline'],
+        priority: 20,
+        source: { kind: 'inline' },
+      }],
+    });
+
+    // Both the dir-loaded and inline skills must be visible for the agent
+    const ids = registry.getSkillsForAgent('mergetest.tester').map((s) => s.id).sort();
+    expect(ids).toEqual(['mergetest/dir-skill', 'mergetest/inline-skill']);
+
+    // Deduplication: same id in both skillsDir and skills[] must throw
+    const dedupSkillsDir = fileDir('dedup-test/skills/same-skill');
+    writeFixture('dedup-test/skills/same-skill/SKILL.md', `---
+name: same-skill
+description: Dir version
+version: 1.0.0
+x-kickstart:
+  appliesTo:
+    - deduptest.*
+  keywords:
+    - dup
+  priority: 10
+---
+
+Dir version.
+`);
+    const registry2 = new PackRegistry();
+    expect(() => registry2.register({
+      name: 'deduptest',
+      version: '1.0.0',
+      skillsDir: dedupSkillsDir,
+      skills: [{
+        id: 'deduptest/same-skill',
+        name: 'same-skill',
+        description: 'Inline duplicate',
+        version: '1.0.0',
+        instructions: 'Dup.',
+        appliesTo: ['deduptest.*'],
+        keywords: ['dup'],
+        priority: 10,
+        source: { kind: 'inline' },
+      }],
+    })).toThrow(/Duplicate skill id/);
+  });
 });
