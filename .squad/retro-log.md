@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #415 "refactor: narrow @kickstart/core skill-resolver public API" | L | impl=0m | review=1m | cycles=1 | merged | @sabbour
+
 - 2026-04-17 | #416 "refactor: unify skill-injection keyword vocabulary into shared module" | L | impl=0m | review=1m | cycles=1 | merged | @sabbour
 
 - 2026-04-17 | #418 "refactor: deduplicate advancePhase() — move to @kickstart/core" | S | impl=0m | review=13m | cycles=1 | merged | @sabbour
