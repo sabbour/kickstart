@@ -136,3 +136,38 @@ Steps 1–3 of the v2 harness spine are shipped.
 
 **Unblocked:** #477 Phases A+B (immediate), #478 (pending C2 pseudocode fix), #479 (after #477 C1 confirmed), #480 (authored + approved).
 **Known debt:** `types.ts` tsc gap, `enable()`-after-`seal()` guard, frontmatter edge-case tests.
+
+## 2026-04-17 — PR #547 (Closes #478) — Step 4a Playground on Registry — APPROVED
+
+**Verdict: APPROVED** — `leela:approved` applied.
+
+All four phases verified complete:
+- Phase A: `GALLERY_GROUPS` / static scenario arrays gone; `registry.playgroundScenarios` + `groupByPack()` drives gallery. ✅
+- Phase B: Widgets tab, `WidgetCard`, `WidgetPreview`, all widget state deleted. ✅
+- Phase C: Components tab wired to `registry.components`, grouped by pack with empty state. ✅
+- Phase D: `usePlaygroundDispatch` hook created; `if (!stub)` guard confirmed before error path (C2 ✅). Dormant until #477 stubs land — acceptable for Step 4a.
+
+C1 (resolved pre-coding): `playgroundScenarios`, `playgroundStubs`, `components` from #476-confirmed surface all used. `getComponent` method not needed — array property sufficient.
+M1: Empty scenario list = informational state; unregistered component ref = `GalleryCardErrorBoundary`. Distinct. ✅
+No v1 imports. `TODO(Step 5)` markers precise. ✅
+
+Decision filed: `.squad/decisions/inbox/leela-pr547-review.md`
+Unblocks: #479 (Step 4b), #477 integration.
+
+## 2026-04-17 — PR #547 Code Review (v2 Step 4a: Playground on registry)
+
+**Closes:** #478  
+**Verdict:** APPROVED — `leela:approved` applied
+
+All four phases verified:
+- Phase A: `GALLERY_GROUPS` removed; `registry.playgroundScenarios` + `groupByPack()` drives gallery. ✅
+- Phase B: Widgets tab, `WidgetCard`, `WidgetPreview`, all widget state deleted. ✅
+- Phase C: Components tab renders `registry.components` grouped by pack. ✅
+- Phase D: `usePlaygroundDispatch` hook created; dormant until #477 stubs land (intentional). ✅
+
+C1 resolved: `playgroundScenarios`, `playgroundStubs`, `components` from #476-confirmed surface used. `getComponent` not needed for iteration use case.  
+C2 resolved: `if (!stub)` guard present with explicit comment crediting C2.  
+M1: Empty scenario list → informational state; unregistered component → `GalleryCardErrorBoundary`. Correct.  
+
+Unblocks: #479 (Step 4b) and pack-core integration (#477) once that PR merges.  
+Decision filed: `.squad/decisions/inbox/leela-pr547-review.md`

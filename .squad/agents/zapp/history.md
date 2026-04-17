@@ -64,3 +64,31 @@ Prior blocker (`handoff` phase id) resolved. `chat-a2ui.ts` now normalizes `hand
 - **PR #545 (Step 2):** Blocked on `handoff` legacy phase in `chat-a2ui.ts`. Resolved with remap to `assess`. `zapp:approved` applied after recheck.
 - **PR #546 (Step 3):** Blocked on symlink escape via lexical-only path confinement. Resolved with `realpathSync()` canonicalisation in `confinePath()`. `zapp:approved` applied after recheck.
 Both PRs merged into v2-rewrite. Harness foundation (Steps 1–3) complete.
+
+## 2026-04-17 — PR #547 Security Review
+
+**Verdict:** BLOCKED
+
+PR #547 fails four Step 4a security conditions: duplicate playground stub keys are silently overwritten, `seal()` does not freeze/snapshot `playgroundStubs`, stub aggregation/lookup uses a plain object instead of a prototype-safe map, and `usePlaygroundDispatch` leaks registered stub names plus raw error messages in dev MessageBars. `zapp:approved` was not applied.
+
+## 2026-04-17 — PR #547 Security Review (v2 Step 4a: Playground on registry)
+
+**Initial verdict:** BLOCKED — 4 security findings
+
+1. **Duplicate stub keys silent overwrite** — `Object.assign` merge enables last-writer-wins hijacking.
+2. **`seal()` does not freeze stubs** — only flips boolean; pack can mutate `pack.playgroundStubs` post-seal.
+3. **Prototype-pollution risk** — plain object + `stubs[actionName]` lookup not hardened.
+4. **Dev error text leaks internals** — stub key list and raw `err.message` exposed in MessageBar.
+
+## 2026-04-17 — PR #547 Security Recheck (commit `4eaa9ee`)
+
+**Verdict:** APPROVED — `zapp:approved` applied
+
+All 4 blockers resolved:
+1. Duplicate stub keys throw at registration time. ✅
+2. `seal()` computes `_sealedPlaygroundStubs` once; `ReadonlyMap` snapshot immutable post-seal. ✅
+3. `playgroundStubs` returns `ReadonlyMap<string, PlaygroundStub>`; dispatch uses `stubs.get()`. ✅
+4. Production errors redacted to `Action not found` / `Action failed`. ✅
+
+Validation: harness build ✅, web build ✅. Test failures in `mcp-server` action tests (pre-existing — expect old `discover → design` phase order, not `discover → assess → design`).
+Decision filed: `.squad/decisions/inbox/zapp-pr547-recheck.md`

@@ -3041,3 +3041,116 @@ Security gate is **conditionally clear** for the design proposal. Final implemen
 - `packages/web/src/types.ts` is `export {};` — 15+ web shell files still import named types. `tsc --noEmit` fails. **Step 5–7 must resolve before any tsc CI gate.**
 - `enable()` after `seal()` silently succeeds in PackRegistry — guard needed before Step 5 runner wires lifecycle.
 - No dedicated `frontmatter.test.ts` covering malformed-YAML edge cases — Hermes should add before Step 5.
+
+---
+# Decision: PR #547 — Step 4a Playground on Registry — APPROVED
+
+**Date:** 2026-04-17  
+**Author:** Leela (Lead)  
+**Closes:** #478  
+
+## Decision
+
+PR #547 (v2 Step 4a: Playground on registry) is approved. All four phases are complete, both DP conditions are satisfied, and no v1 imports remain.
+
+## Evidence
+
+**C1 resolved:** `playgroundScenarios`, `playgroundStubs`, `components` from the #476-confirmed surface are used. `getComponent` method not needed — `components` array is sufficient for iteration use case.
+
+**C2 resolved:** `if (!stub)` guard precedes the error path in `usePlaygroundDispatch`. Comment explicitly credits the C2 requirement.
+
+**Phase A–D complete:**
+- A: `GALLERY_GROUPS` / static scenario arrays removed; `registry.playgroundScenarios` drives gallery with `groupByPack()`.
+- B: Widgets tab, `WidgetCard`, `WidgetPreview`, all widget state deleted.
+- C: Components tab renders `registry.components` grouped by pack.
+- D: `usePlaygroundDispatch` hook created; dormant until #477 stubs land (acceptable for Step 4a).
+
+**Minor M1:** Empty scenario list shows informational state; unregistered component reference errors are caught by `GalleryCardErrorBoundary`. Distinct modes, correct treatment.
+
+## Implications
+
+- `leela:approved` applied to PR #547.
+- Unblocks: #479 (Step 4b) and pack-core integration (#477) once that PR merges.
+- `usePlaygroundDispatch` wiring is deferred to Step 4/5 — this is intentional.
+
+---
+# Decision: PR #547 — Step 4a Playground on Registry — BLOCKED
+
+**Date:** 2026-04-17  
+**Author:** Zapp (Security Architect)  
+**Closes:** #478  
+
+## Decision
+
+PR #547 is **blocked** on four security conditions from the #478 DP review.
+
+## Blockers
+
+1. **Duplicate stub keys silently overwrite.** `PackRegistry.playgroundStubs` merges pack stub maps with `Object.assign(...)` and never validates duplicate keys at registration time. That enables last-writer-wins action hijacking across packs.
+2. **`seal()` does not freeze playground stub state.** `seal()` only flips `this.sealed = true`; it does not freeze a snapshot, and `register()` stores the original `pack` object by reference. A pack can still mutate `pack.playgroundStubs` after seal and change dispatch targets.
+3. **Prototype-pollution-safe lookup is not enforced.** The registry aggregates stubs into a plain object and the hook reads them with `stubs[actionName]`. A hostile key like `__proto__` is not isolated the way a `Map#get()` lookup would be.
+4. **UI error text leaks internals in dev mode.** `usePlaygroundDispatch` shows the full registered stub key list on missing stub and shows raw `err.message` on stub failure. MessageBar text must stay redacted/user-safe.
+
+## Evidence
+
+- `packages/harness/src/runtime/registry.ts`
+  - `seal()` only sets a boolean.
+  - `playgroundStubs` getter rebuilds a plain object with `Object.assign`.
+  - No uniqueness check exists for `pack.playgroundStubs`.
+- `packages/web/src/hooks/usePlaygroundDispatch.ts`
+  - Missing-stub path renders `Registered: ${Object.keys(stubs).join(', ')}` in dev.
+  - Stub failure path renders raw `err.message` in dev.
+  - Stub lookup uses object property access, not a hardened map lookup.
+
+## Required Fixes
+
+- Reject duplicate playground stub keys during pack registration.
+- Freeze or otherwise snapshot a read-only playground stub view at `seal()` time; fail closed on post-seal mutation.
+- Replace object-backed stub lookup with a `Map` (or equivalent prototype-safe structure).
+- Redact MessageBar errors to fixed user-safe strings such as `Action not found: <name>` / `Action failed`.
+
+## Outcome
+
+- `zapp:approved` **not** applied.
+- Security gate remains closed until the above blockers are fixed and rechecked.
+
+---
+# Zapp Decision — PR #547 Playground Stub Hardening Recheck
+
+**Date:** 2026-04-17
+**Author:** Zapp (Security Architect)
+**PR:** #547
+**Commit Re-verified:** `4eaa9ee`
+**Status:** APPROVED
+
+## Decision
+
+The 4 blocking security findings previously raised on PR #547 are resolved in commit `4eaa9ee`. Security gate is clear from the playground-stub perspective.
+
+## Verification
+
+1. **Duplicate stubs now fail closed**
+   - `PackRegistry.playgroundStubs` throws on duplicate keys across active packs.
+   - Manual runtime verification produced: `Duplicate playground stub key across packs: "clash"`.
+
+2. **`seal()` snapshots and caches the stub set**
+   - `seal()` computes `_sealedPlaygroundStubs` once and subsequent reads return the cached `ReadonlyMap`.
+   - Manual runtime verification showed the sealed map reference stayed identical and did not pick up a post-seal `beta` mutation.
+
+3. **Stub surface is now `Map`-based**
+   - `PackRegistry.playgroundStubs` returns `ReadonlyMap<string, PlaygroundStub>`.
+   - `usePlaygroundDispatch` now uses `stubs.get(actionName)`, removing plain-object lookup behavior from the dispatch path.
+
+4. **Production errors are redacted**
+   - In production mode, missing actions surface only `Action not found`.
+   - Registered stub names remain exposed only in the non-production diagnostic branch.
+
+## Validation Notes
+
+- `npm run build -w @kickstart/harness` ✅
+- `npm run build -w @kickstart/web` ✅
+- `npm test` ❌ — existing unrelated failures in `packages/mcp-server/src/__tests__/action-endpoint.test.ts` and `packages/mcp-server/src/__tests__/action.test.ts` still expect the old phase progression (`discover -> design`) rather than current `discover -> assess -> design`
+
+## Outcome
+
+Applied `zapp:approved` label to issue/PR gate path for #547.

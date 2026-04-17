@@ -162,3 +162,12 @@ Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v
 **New worktrees checked:** 477-pack-core, 478-playground, 545-pr-head, fry-332, fry-diagram-editor, leela-380 — none have inbox files.
 **History sizes:** fry 13,121 (85%) / hermes 11,251 (73%) / leela 10,698 (69%) — no threshold breaches.
 **Commit:** (none — no changes)
+
+## Wave 18 — 2026-04-17
+
+**Files merged:** 3 (`leela-pr547-review`, `zapp-pr547-review`, `zapp-pr547-recheck`)
+**decisions.md:** 172,046 → 177,571 bytes (+5,525)
+**PR #547 summary:** Leela APPROVED; Zapp initially BLOCKED (4 findings), then APPROVED at `4eaa9ee`. PR #547 merged → v2-rewrite (Step 4a complete). Test debt noted: mcp-server action tests expect old `discover → design` phase order.
+**Histories updated:** leela (12,843 bytes), zapp (6,972 bytes) — both below 15,360 threshold
+**Worktrees checked:** 547-security-review ← new worktree with `zapp-pr547-recheck.md`
+**No summarisation needed**
