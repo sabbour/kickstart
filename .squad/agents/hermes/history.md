@@ -48,3 +48,10 @@ QA engineer and test infrastructure owner. Expertise in Playwright E2E testing, 
 - (2026-04-17) **`systemPrompt` call sites — 4, not 3:** When auditing call sites for `buildSystemPrompt()` (or any system-prompt builder), count them from `git grep` output before writing the DP. The actual count in this repo was **4** call sites (`agents-runner.ts`, `action.ts`, `chat-action.ts`, and one more). Stating an incorrect count in a DP causes a blocking condition from Leela.
 - (2026-04-17) **`agents-runner.ts` descope pattern:** When a backend file is being migrated or replaced (e.g., `agents-runner.ts` under the Agents SDK migration), explicitly note in the DP that it is a descope target and will not need the new feature wired in. Leela's condition was specifically that the DP must account for this call site even if only to document that it's intentionally excluded.
 - (2026-04-17) **DP approval-with-conditions blocking merge gate:** Both Leela and Zapp `approved-with-conditions` verdicts on a DP are blocking — implementation must address all listed conditions before opening the first implementation PR. Do not open PRs against a conditionally-approved DP without confirming condition closure.
+
+## 2026-04-17T12:06:45Z — Connector Execution Model ADR
+
+- **Connector execution research completed:** AzureARMConnector always proxies through `/api/arm-proxy` (CORS constraint). GitHubConnector splits: reads direct, writes proxied for token security.
+- **Known technical debt flagged:** `createPullRequest()` calls `api.github.com` directly — inconsistency to be addressed.
+- **Standing rule established:** Any new connector methods that write data MUST use the server proxy pattern.
+- **Decision filed:** `hermes-connector-execution-adr.md` merged to decisions.md.

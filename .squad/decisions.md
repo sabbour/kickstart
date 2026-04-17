@@ -1305,62 +1305,6 @@ Key findings from the overnight audit:
 
 ---
 
-# Decision: Remove FSM from core engine
-
-**Date:** 2025-07-18  
-**Author:** Bender (Backend Dev)  
-**Related issue:** #384
-
-## Context
-
-Machine.ts (XState-style finite state machine) was implemented in `@kickstart/core` to manage phase transitions with explicit state maps and status tracking.
-
-## Decision
-
-Remove `machine.ts` and `phases.ts` FSM layer. Replace with:
-
-1. **Simple phase state:** `ConversationState.currentPhase: Phase`
-2. **Linear advancement:** Use `PHASE_DEFINITIONS.nextPhase` to advance
-3. **Position-based status:** Calculate "complete/active/pending" from phase order and current index
-
-## Rationale
-
-- FSM added complexity without benefit — phase transitions are strictly linear
-- `ConversationState` bloat: `phaseStatus` maps, `phaseData`, `isComplete` flag
-- All transitions collapsed to sequential; `USER_INPUT` was a no-op
-- Simpler code reduces maintenance burden and makes extensions clearer
-
-## Pattern
-
-```typescript
-interface ConversationState {
-  currentPhase: Phase;
-}
-
-function advancePhase(current: Phase): Phase {
-  const def = PHASE_DEFINITIONS.find(p => p.id === current);
-  return def?.nextPhase ?? current;
-}
-
-const order = getPhaseOrder();
-const currentIdx = order.indexOf(currentPhase);
-status = idx < currentIdx ? "complete" : idx === currentIdx ? "active" : "pending";
-```
-
-## What stays
-
-- `phases.ts`: PHASE_DEFINITIONS, getPhaseDefinition(), getPhaseOrder() — used everywhere
-- `Phase` enum: unchanged
-- All reducer logic: moved to inline handlers
-
-## Consequences
-
-- Conversation engine simpler and faster
-- Easier to add new phases or change order
-- Phase lifecycle now trackable in raw state (no mapping layer)
-
----
-
 # Directive: Worktree-per-session isolation
 
 **Date:** 2026-04-16T17:52:34Z
@@ -1911,3 +1855,153 @@ Dependabot automatically opens PRs for dependency updates, including major versi
 - **#450** (typescript 5→6) → Closed; needs compatibility work
 - **#451** (@vitejs/plugin-react 4→6) → Closed; needs compatibility work (lint + E2E failures)
 - **#452** (zod 3→4) → Closed; needs API migration work
+
+---
+
+### 2026-04-17: Connector execution model — client vs proxy
+
+**By:** Hermes (via research), Leela (architecture review)
+**What:** AzureARMConnector always proxies through /api/arm-proxy (CORS constraint). GitHubConnector splits: reads direct, writes proxied for token security. Exception: createPullRequest() calls api.github.com directly — flagged as technical debt.
+**Why:** ARM management API does not allow browser CORS; GitHub reads are public/CORS-enabled; GitHub writes need token isolation. createPullRequest() direct call is a known inconsistency to be addressed.
+**Impact:** Any new connector methods that write data MUST use the server proxy pattern.
+
+---
+
+### 2026-04-17: v2 Architecture DP — Lead Review
+**Author:** Leela
+**Master Issue:** #473
+**Status:** APPROVED (pending Zapp security review)
+
+**Architecture verdict:** The harness + packs model is sound. The harness is correctly domain-agnostic — it will compile standalone with only `pack-core` registered, and all product knowledge flows through the pack boundary. The `PackRegistry` seal-at-startup invariant is the right enforcement mechanism; it prevents dynamic injection and makes pack composition statically verifiable. The `@openai/agents` SDK is used as intended: Runner handles orchestration, product code handles routing policy and A2UI output. No deviations from the decisions recorded in DP #330.
+
+**Pack boundaries:** Boundaries are clear and enforced by the dependency graph (`core ← azure ← aks-automatic`, `core ← github`). Sigil conventions (`.` tools, `:` user-actions, `/` components, `/` skill ids) are globally unique by kind and will prevent naming collisions across packs. The one area to watch is `pack-core` scope creep — the 39-component load in Step 4 is large; if any of those components carry Azure or AKS knowledge they must move to the correct domain pack before Step 4 lands.
+
+**Implementation order:** The §14 ordering is correct. The dependency chain (types → registry → pack-core → playground validation → runner → skill resolver → domain packs → web client → guardrails → MCP → docs) is the right sequence. Step 4a (playground on registry) is correctly placed before Step 5 (runner) as an early validation of the registry shape. Steps 7, 8, and 9 can proceed in parallel after Step 6 if team capacity allows — they have no cross-pack dependencies. Steps 10 and 11 correctly block on all domain packs being present.
+
+**Concerns:**
+- **Guardrail enforcement semantics** — The brief specifies `block` halts execution, but does not specify whether the Runner surfaces a `block` as an `error` SSE event or as a structured `AgentOutput`. This must be pinned before Step 11. Recommend: `error` SSE event with `{ message, code: "guardrail_block" }` so the browser can distinguish it from model errors.
+- **UserAction resume authz** — The brief acknowledges session-ownership checks as open (§15 open items, and DP #329 §5). Step 5 must include explicit `sessionId` + `runId` ownership validation on the resume endpoint — this should be a done criterion, not an open item. Flagging for Zapp's attention.
+- **`core.emit_ui` tagged-union vs. per-type tools** — The brief defaults to tagged union; this is the right starting point. If the model struggles, the split to per-type tools is a localized change to pack-core only (Step 4 / Step 4a), not a harness change. Low risk.
+- **Step 4 size** — Step 4 (pack-core) includes 3 agents, 5 skills, 6 tools, and 39 components in one PR. Consider splitting off the component port into a Step 4b if the PR becomes unwieldy. This does not affect the overall ordering.
+
+---
+
+### 2026-04-17: v2 Security Architecture Review
+
+**Author:** Zapp (Security Architect)
+**Status:** APPROVED WITH CONDITIONS
+**Master Issue:** #473
+
+**Conditions:**
+
+1. `core.fetch_webpage` — URL allowlist/denylist with IMDS and RFC1918 blocks, implemented with tests (Critical — before Step 5)
+2. `core.write_file` / `read_file` / `list_files` — workspace-prefix path validation, no `../`, implemented with tests (Critical — before Step 5)
+3. Resume handler — per-session OID ownership check before any `runner.resume()` call (Critical — before Step 5)
+4. Resume handler — `resultSchema.parse()` validation of incoming resume payload, 400 on failure (Critical — before Step 5)
+5. Playground stubs — explicit `KICKSTART_PLAYGROUND` gate with fail-closed throw in the dispatcher; stubs excluded from production builds (Critical — before Step 5)
+6. MCP server — `mcpExposed` defaults to `false`; file system tools explicitly unexposed; auth mechanism documented before Step 12 (High — before Step 12)
+7. MCP UserActions — resolved by architectural separation: UserActions are NOT in the MCP tool schema; MCP client detects `user_action_required` notifications and POSTs results to `/api/converse/resume` directly. Residual condition: resume handler must enforce `resultSchema` validation (already Critical #4) and OID session-ownership check (already Critical #3) for MCP-originated resume calls. (High — before Step 12)
+8. `azure.arm_get` — path parameter Zod regex constraint (`/^\/subscriptions\//`), `../` rejection (High — before Step 7)
+9. `core.token_budget` — hard ceiling values (tokens/turn, tokens/session) documented and configurable (Medium)
+10. `no-secrets-in-artifacts` — detection approach (entropy threshold + regex patterns for known formats) specified in guardrail design doc (Medium)
+
+**Summary of findings:**
+- 5 Critical: SSRF (fetch_webpage), path traversal (write_file), resume ownership, resultSchema enforcement, playground stub gate
+- 3 High: ARM path injection, MCP auth, MCP UserAction consent bypass
+- 6 Medium: secrets detection, PII detection, A2UI guardrail scope, token budget ceiling, CSP/component renderer audit, CSRF
+- 4 Low/Informational: billing account ID format, SSE arg exposure, skill context leakage, pack trust-on-declaration
+
+---
+
+### 2026-04-17T10:21:36Z: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Design proposals (DPs) must not be skipped — even when the brief says "design locked." DP review gates apply to all implementation steps.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-17T11:42: Design clarification — UserActions are NOT MCP tools
+**By:** Ahmed Sabbour (via Copilot)
+**What:** UserActions in the MCP path are NOT surfaced as MCP tool schema items. They are direct API calls executed by the MCP client. The MCP server (harness) exposes the conversation/agent surface; UserActions are a client-side responsibility — the MCP client implements them as direct calls against the web API (e.g. POST /api/converse/resume or pack-registered proxy endpoints).
+**Why:** UserActions require a human interaction loop (consent, credentials, UI confirmation). The MCP client — not the MCP server — owns that loop. Surfacing them as MCP tools would push that responsibility into the wrong layer.
+**Implication for Step 12 (#487):**
+- MCP server exposes: agents (as conversation turns), tools marked `mcpExposed: true`, A2UI as embedded resources.
+- MCP server does NOT expose: UserActions as MCP tools.
+- MCP client responsibility: detect `user_action_required` SSE events (or equivalent MCP notification), execute the UserAction as a direct API call against the harness, POST result to /api/converse/resume.
+**Note:** Supersedes earlier directive (copilot-directive-20260417T1140) on two-phase MCP consent, which assumed MCP-tool exposure. That design is rejected.
+
+---
+
+# Decision: v2 sprint planning — foundation first
+
+**Date:** 2026-04-17T12:06:45.293Z
+**Author:** Leela
+
+## Context
+
+The active focus file blocked feature-code work until sprint planning completed. The open squad backlog is now almost entirely the v2 harness + packs rewrite lane (#473 onward). Every open v2 issue lacked a milestone, 32 open v2 issues still carried `go:needs-research`, and 29 of 33 v2 issues were routed to Fry even when the work is runtime-heavy.
+
+## Decision
+
+Run the next sprint as a strict dependency-compression sprint:
+
+1. **#474 — Step 1: Nuke v1**
+2. **#475 — Step 2: Harness types**
+3. **#476 — Step 3: Registry + loaders**
+
+No Step 4+ implementation starts before #476 merges.
+
+After #476, the next executable batch is:
+
+- **#542 + #503 + #504 + #505 + #506 + #478** — pack-core authoring, component ports, manifest, and playground validation
+- then **#479 + #480** — runner/SSE and skill resolver
+- then domain packs and downstream surfaces: **#482 → #483 / #484 → #485 → #486 → #487 → #488**
+
+## Why
+
+This is the shortest path to production. The brief is explicit: the harness owns primitives and runtime; packs consume that contract. Starting domain packs, web-client rewrite, or MCP before the harness/registry spine exists just manufactures churn across pack boundaries.
+
+## Hard gates
+
+- `#474 → #475 → #476` is the blocking chain for the whole v2 lane.
+- Milestone hygiene was missing; all open v2 issues should sit on milestone **v2**.
+- Historical timing data is currently absent from `.squad/retro-log.md`, so this sprint uses dependency-driven sequencing rather than calibrated duration estimates.
+
+---
+
+# Fry handoff — #474 frontend cut line
+
+**Date:** 2026-04-17T12:06:45.293Z
+**Author:** Fry (Frontend Dev)
+**Issue:** #474
+
+## Summary
+
+Step 1 should preserve the web shell and only delete the obviously v1-only demo/mock surfaces. The risky part is not the deleted files themselves; it is the number of live imports that still flow from `@kickstart/core`, `packages/web/src/types.ts`, and the old catalog bootstrap.
+
+## Preserve now
+
+- `packages/web/src/components/` shell UI
+- `packages/web/src/contexts/`
+- `packages/web/src/hooks/useStreaming.ts`, `useA2UI.ts`, `useProgressiveQueue.ts`, `useSessions.ts`, `useNavigation.ts`
+- `packages/web/src/services/api-client.ts`, `virtual-fs.ts`
+- `packages/web/src/utils/chat-a2ui.ts` and related chat/session utilities
+- `packages/web/src/catalog/components/`, `fluent-components/`, `icons/`
+- `packages/web/src/pages/Playground.tsx`, `PlaygroundWorkspace.tsx`, `playground-icons.ts`
+
+## Delete or replace in Step 1
+
+- Delete outright: `demo-scenarios.ts`, `mock-streaming.ts`, `playground-auth-stub.ts`, `playground-scenarios.ts`, `useMockStreaming.ts`
+- Delete after consumer cleanup: `useWidgets.tsx`
+- Replace with registry-driven source: `kickstart-catalog.ts`
+- Replace with new shared contracts before full removal: `packages/web/src/types.ts`
+
+## Compile blockers to plan around
+
+1. `main.tsx`, `APIConnectorContext.tsx`, `ArtifactContext.tsx`, `useActionDispatch.ts`, `DebugA2UITree.tsx`, multiple catalog components, and service helpers still import `@kickstart/core`.
+2. `App.tsx`, chat components, session/debug contexts, `useStreaming.ts`, `Playground.tsx`, and chat utilities still import from `packages/web/src/types.ts`.
+3. `Playground.tsx` currently depends on all three deleted playground sources (`useWidgets`, `demo-scenarios`, `playground-scenarios`).
+
+## Recommendation for Bender + Leela
+
+Treat Step 1 frontend work as a seam-cutting pass: remove mock/demo imports, park Playground on empty registry-backed data, introduce temporary replacement exports for type/core contracts the shell still needs, then hard-delete legacy files and point the web app at `packages/harness`/future packs.

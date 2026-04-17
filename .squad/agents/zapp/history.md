@@ -104,3 +104,13 @@ All 4 critical security conditions from issue #445 acceptance criteria:
 - Integration with DP #329 + #330 security review validated
 
 **Consequence:** Unblocks merge when Leela approval also present (verified as received).
+
+## 2026-04-17T12:06:45Z — #474 DP Review + v2 Security Architecture Review
+
+- **#474 DP review:** APPROVE_WITH_CONDITIONS. Standard seam-cutting conditions; playground stubs must be gated behind `KICKSTART_PLAYGROUND`.
+- **v2 security architecture review (#473):** APPROVED WITH CONDITIONS. 10 conditions total.
+  - 5 Critical (before Step 5): SSRF/fetch_webpage URL denylist, path traversal/write_file workspace prefix, resume handler OID ownership, resume resultSchema validation, playground stub fail-closed gate.
+  - 3 High (before Step 7/12): ARM path injection Zod regex, MCP auth documented, MCP UserAction architectural separation confirmed.
+  - 6 Medium: secrets detection, PII detection, A2UI guardrail scope, token budget ceiling, CSP audit, CSRF.
+- **MCP UserAction resolution:** UserActions are NOT MCP tools. MCP client detects `user_action_required` and POSTs directly to `/api/converse/resume`. Residual conditions #3 and #4 (OID ownership + resultSchema) cover MCP-originated resume calls equally.
+- **Decision filed:** `zapp-v2-security-review.md` merged to decisions.md.

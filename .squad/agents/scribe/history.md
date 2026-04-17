@@ -50,3 +50,12 @@ Ready for QA handoff.
 - Zapp: Upfront security architecture review
 - Session log recorded (2026-04-17T11-06-session-v2-kickoff.md)
 - Orchestration logs recorded (Leela + Zapp)
+
+## 2026-04-17T12:06:45Z — Scribe Session: v2 Sprint Kickoff + #474 DP Cycle
+
+- **Inbox merged:** 8 files (connector ADR, Leela v2 DP review, Leela sprint plan, Zapp v2 security review, 3 Copilot directives, Fry #474 cut line)
+- **decisions.md:** 100,900 → 112,298 bytes. No archival needed (all entries within 7 days).
+- **Orchestration logs written:** leela, fry, bender, zapp, coordinator (all 2026-04-17T12-06-45Z)
+- **Session log written:** `2026-04-17T12-06-45Z-v2-sprint-kickoff.md`
+- **Histories updated:** leela, fry, bender, zapp, hermes
+- **History summarization:** fry (29,842 bytes), leela (21,435 bytes), bender (17,814 bytes) — all exceed 15 KB; summarization in progress
