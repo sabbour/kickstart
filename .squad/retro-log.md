@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #103 "feat: extend IntegrationKit with ServicePack capabilities" | XL | impl=0m | review=21m | cycles=1 | merged | @sabbour
