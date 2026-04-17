@@ -166,6 +166,59 @@ export function useStreaming() {
       }, debugMode);
 
       if (!res.ok) {
+        // HTTP 406: the SDK path rejected streaming. Fall back to a non-streaming
+        // JSON request so the SDK turn completes and the server-emitted route state
+        // (phase, A2UI) still reaches the frontend through the same callbacks.
+        if (res.status === 406) {
+          const jsonRes = await apiFetch('/api/converse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId,
+              message,
+              ...(clientMessages?.length ? { messages: clientMessages } : {}),
+            }),
+            signal: controller.signal,
+          }, debugMode);
+
+          if (!jsonRes.ok) throw new Error(`API error: ${jsonRes.status}`);
+
+          const response = await jsonRes.json() as {
+            sessionId?: string;
+            phase?: string;
+            message?: string;
+            model?: string;
+            a2ui?: A2uiPayloadItem[];
+            usage?: TokenUsageSummary;
+          };
+
+          if (response.phase) {
+            lastPhase = response.phase;
+            callbacks.onPhase(response.phase);
+          }
+          if (response.sessionId) lastSessionId = response.sessionId;
+          if (response.model) lastModel = response.model;
+          if (response.usage) lastUsage = response.usage;
+
+          const nonStreamText = response.message ?? '';
+          updateRevealTarget(nonStreamText);
+
+          if (Array.isArray(response.a2ui) && response.a2ui.length > 0) {
+            if (debugMode) debugA2uiMessages.push(...response.a2ui);
+            callbacks.onA2UI(response.a2ui);
+          }
+
+          // Wait for progressive reveal before firing completion
+          if (targetTextRef.current.length > 0 && revealedLenRef.current < targetTextRef.current.length) {
+            await new Promise<void>(resolve => { revealDoneRef.current = resolve; });
+          }
+
+          if (!controller.signal.aborted) {
+            callbacks.onComplete(nonStreamText, lastModel, lastSessionId, undefined, lastUsage);
+          }
+          return;
+        }
+
         throw new Error(`API error: ${res.status}`);
       }
 
