@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-16 | #340 "feat: validate Playground fat components" | L | impl=0m | review=0m | cycles=1 | merged | @sabbour
