@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-17 | #543 "Redirect ceremony-reference.md pointers to .squad/ceremonies.md" | S | impl=0m | review=3m | cycles=1 | merged | @sabbour
