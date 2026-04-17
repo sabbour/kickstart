@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #302 "fix: restore chat surface ownership, phase bar rendering, and debug action log placement" | XL | impl=100m | review=11m | cycles=1 | merged | @sabbour
