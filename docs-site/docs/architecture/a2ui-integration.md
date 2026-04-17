@@ -121,6 +121,35 @@ Updates just the data of an existing component (without replacing it):
 }
 ```
 
+## Fat Components
+
+Starting in v0.3.0, Kickstart includes **fat components** — self-managing implementations of common workflows with built-in authentication, validation, and security controls. Registered as part of the `azure` and `github` IntegrationKits.
+
+### Azure Fat Components
+
+| Component | Purpose | Auth | Security |
+|-----------|---------|------|----------|
+| **AzureLoginCard** | Device code auth flow for Azure MSAL | MSAL | Token in memory; logout clears session |
+| **AzureResourcePicker** | Browse subscriptions and list resources | AzureARMConnector | Rate-limit handling; stub fallback |
+| **AzureResourceForm** | Collect deployment parameters and estimate cost | AzureARMConnector | Input validation; cost preview before submit |
+
+### GitHub Fat Components
+
+| Component | Purpose | Auth | Security |
+|-----------|---------|------|----------|
+| **GitHubLoginCard** | Device code auth flow for GitHub OAuth | GitHub OAuth | Token in memory; no localStorage |
+| **GitHubRepoPicker** | Search and select from user's repositories | GitHubConnector | Debounced search; pagination; rate-limit warnings |
+| **GitHubAction** | Execute allowlisted GitHub API operations | GitHubConnector | Operation allowlisting; typed confirmation for DELETE |
+| **GitHubCommit** | Create pull request with artifact selection | GitHubConnector | Branch validation; protected-branch guards; diff preview |
+
+**Key security features:**
+- **In-memory token storage** — No localStorage; tokens cleared on logout
+- **Operation allowlisting** — Write operations must be explicitly approved
+- **Typed confirmation** — DELETE and merge operations require developer confirmation
+- **Protected-branch blocking** — Cannot push to `main`/`master`/`production`
+
+See [Extending the A2UI Component System](../components/extending-a2ui.md) for how to build your own fat component.
+
 ## Custom Kickstart Catalog
 
 Kickstart extends the basic catalog with 4 custom components tailored for the deployment onboarding experience. See [Custom Kickstart Catalog](../components/custom-catalog.md) for details.

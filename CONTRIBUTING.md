@@ -93,6 +93,18 @@ For the full release workflow — cutting releases, tagging, deploying — see *
 - `editor.formatOnSave` is enabled in the devcontainer
 - Follow existing patterns in the codebase
 
+## Documentation
+
+The canonical documentation lives in **`docs-site/docs/`** and is published to [sabbour.github.io/kickstart](https://sabbour.github.io/kickstart/). This is the single source of truth.
+
+**Do not edit files in `docs/`** — that directory contains redirect stubs only. All documentation updates go to `docs-site/docs/`.
+
+### Editing docs
+
+- Docs are Markdown files in `docs-site/docs/`
+- Run the site locally: `cd docs-site && npm install && npm start`
+- New pages are auto-added to the sidebar based on directory structure and `sidebar_position` frontmatter
+
 ## Infrastructure
 
-Azure infrastructure lives in `infra/` and uses Bicep. See `infra/README.md` for deployment details.
+Azure infrastructure lives in `infra/` and uses Bicep. See the [Deployment Guide](https://sabbour.github.io/kickstart/docs/getting-started/deployment) for full details.

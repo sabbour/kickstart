@@ -96,6 +96,25 @@ Base catalog: `packages/core/src/prompts/component-catalog.ts`. Kit-contributed 
 Mechanism A (kit prompt classification) and Mechanism B (user message classification) both key on words like `"dockerfile"`, `"manifest"`, `"pipeline"` — but in separate files with separate formats. They will drift independently.
 :::
 
+## Session Lifecycle
+
+```
+Client POST (no sessionId)
+  → createSession()  OR  hydrateSession(messages[])
+  → Session ID returned in response
+
+Client POST (with sessionId, session alive)
+  → getSession(sessionId) → found → continue
+
+Client POST (with sessionId, session expired)
+  → getSession(sessionId) → null
+  → body.messages[] present → hydrateSession() → new session, same conversation
+  → body.messages[] absent → createSession() → fresh start
+
+Garbage collection
+  → Every 10 minutes: delete sessions older than 1 hour
+```
+
 ## What Should Be Cleaned Up
 
 1. **Delete `machine.ts` and `phases.ts`** (confirmed architectural decision) — see [FSM](./fsm.md) for migration checklist.
