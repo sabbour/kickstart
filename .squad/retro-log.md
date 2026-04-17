@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #290 "fix: Tabs component + unregistered component handling" | M | impl=2m | review=16m | cycles=1 | merged | @sabbour
