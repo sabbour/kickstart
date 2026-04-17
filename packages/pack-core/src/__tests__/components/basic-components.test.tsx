@@ -3,62 +3,91 @@
  * @suite Phase D — basic component smoke tests
  * @vitest-environment jsdom
  *
- * Verifies that every component contribution exported from
- * packages/pack-core/src/components/basic/ satisfies the
- * ReactComponentImplementation contract and renders without throwing.
+ * Verifies every component in packages/pack-core/src/components/basic/:
+ *  - Satisfies the ReactComponentImplementation shape (name, schema, render).
+ *  - Renders without throwing when given empty props.
  *
- * Strategy:
- * - Mock @fluentui/react-components and @fluentui/react-icons with lightweight
- *   div/span stubs so all tests run against a single React 18 instance (the
- *   worktree local copy). The root node_modules carries React 19 (used by the
- *   real Fluent packages), which would cause "Invalid hook call / useContext
- *   null" errors if the real Fluent components were rendered inside jsdom.
- * - Import fluentOverrides (26 contributions) and ChildList (utility helper).
- * - For each entry: check name / schema / render metadata, then smoke render.
- * - Props passed as empty object; components use null-coalescing everywhere.
+ * Fluent UI deps are stubbed with noop React components so the tests run
+ * entirely within the worktree's React 18 instance (the root node_modules
+ * carries React 19 which would cause "Invalid hook call" errors otherwise).
  *
- * @depends Phase D of #477 (components/basic/ must exist)
+ * @depends Phase D of #477
  */
 
 // @vitest-environment jsdom
 
 import { vi } from 'vitest';
 
-// ── Fluent UI stubs — must be declared before component imports ───────────────
-// vi.mock calls are hoisted by Vite so they intercept every
-// `from '@fluentui/...'` in the component source files.
+// ── Fluent UI stubs (hoisted before all imports by Vite) ─────────────────────
 
-vi.mock('@fluentui/react-components', async () => {
-  const { default: React } = await import('react');
+// Returns null (valid empty React render) for all unknown component keys.
+const noopComp = () => null;
+const fluentStubs = {
+  makeStyles: () => () => ({}),
+  mergeClasses: (...a: unknown[]) => (a.filter(Boolean) as string[]).join(' '),
+  tokens: new Proxy({} as Record<string, string>, { get: () => '' }),
+  useId: () => 'test-id',
+  // Accordion
+  Accordion: noopComp, AccordionItem: noopComp, AccordionHeader: noopComp, AccordionPanel: noopComp,
+  // Alert / MessageBar
+  MessageBar: noopComp, MessageBarBody: noopComp, MessageBarActions: noopComp,
+  // Badge
+  Badge: noopComp,
+  // Button
+  Button: noopComp,
+  // Card
+  Card: noopComp, Subtitle1: noopComp,
+  // CheckBox
+  Checkbox: noopComp, Field: noopComp,
+  // ChoicePicker / RadioGroup
+  RadioGroup: noopComp, Radio: noopComp, Dropdown: noopComp, Option: noopComp,
+  // ComboBox
+  Combobox: noopComp,
+  // DateTimeInput
+  DatePicker: noopComp,
+  // Divider
+  Divider: noopComp,
+  // Icon
+  Icon: noopComp,
+  // Image
+  Image: noopComp,
+  // Link
+  Link: noopComp,
+  // List / Row / Column
+  // Modal / Dialog
+  Dialog: noopComp, DialogSurface: noopComp, DialogBody: noopComp,
+  DialogTitle: noopComp, DialogContent: noopComp, DialogActions: noopComp,
+  DialogTrigger: noopComp,
+  // MultiSelect
+  Listbox: noopComp,
+  // Slider
+  Slider: noopComp,
+  // Table
+  Table: noopComp, TableHeader: noopComp, TableHeaderCell: noopComp,
+  TableBody: noopComp, TableRow: noopComp, TableCell: noopComp, TableCellLayout: noopComp,
+  TableSelectionCell: noopComp,
+  // Tabs
+  TabList: noopComp, Tab: noopComp, TabPanel: noopComp,
+  // Text variants
+  Title1: noopComp, Title2: noopComp, Title3: noopComp,
+  Subtitle2: noopComp, Caption1: noopComp, Body1: noopComp, Text: noopComp,
+  // TextField
+  Input: noopComp, Textarea: noopComp,
+  // Toggle
+  Switch: noopComp,
+  // Video
+  // General
+  Tooltip: noopComp, Spinner: noopComp, Skeleton: noopComp, Label: noopComp,
+};
 
-  const makeDiv = (name: string) => {
-    const C = ({ children, ...rest }: any) =>
-      React.createElement('div', { 'data-fluent': name, ...rest }, children);
-    C.displayName = `Fluent(${name})`;
-    return C;
-  };
+vi.mock('@fluentui/react-components', () => fluentStubs);
 
-  const base: Record<string, unknown> = {
-    makeStyles: () => () => ({}),
-    mergeClasses: (...args: string[]) => args.filter(Boolean).join(' '),
-    tokens: new Proxy({} as Record<string, string>, { get: () => '' }),
-    useId: () => 'test-id',
-  };
-
-  return new Proxy(base, {
-    get(target, prop: string) {
-      if (prop in target) return target[prop];
-      return makeDiv(prop);
-    },
-  });
-});
-
-vi.mock('@fluentui/react-icons', async () => {
-  const { default: React } = await import('react');
-  return new Proxy({} as Record<string, unknown>, {
-    get: (_t, k: string) => () => React.createElement('span', { 'data-icon': k }),
-  });
-});
+vi.mock('@fluentui/react-icons', () => ({
+  // Each icon is a noop component; list the ones used in basic components
+  OpenRegular: noopComp,
+  DismissRegular: noopComp,
+  // Wildcard: any unknown icon will be undefined at runtime (components guard with ?.)
+}));
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
@@ -82,14 +111,13 @@ const mockContext = {
   dispatchAction: (_action: unknown) => {},
 };
 
-const noBuildChild = (_id: string) => null;
+const noBuildChild = (_id: string): React.ReactNode => null;
 
 /**
  * Smoke-render a ReactComponentImplementation.
- * Casts render to the full { props, buildChild, context } shape that the
- * underlying FC actually expects (the TypeScript type only exposes
- * { context, buildChild } due to the adapter cast, but the runtime function
- * receives all three).
+ * Casts render to the full { props, buildChild, context } shape the underlying
+ * FC actually expects. The adapter's TypeScript type only exposes
+ * { context, buildChild }, but the runtime function receives all three.
  */
 function smokeRender(comp: ReactComponentImplementation): void {
   const Impl = comp.render as React.FC<{
@@ -97,17 +125,10 @@ function smokeRender(comp: ReactComponentImplementation): void {
     buildChild: (id: string) => React.ReactNode;
     context: typeof mockContext;
   }>;
-
-  render(
-    <Impl
-      props={{} as Record<string, unknown>}
-      buildChild={noBuildChild}
-      context={mockContext}
-    />
-  );
+  render(<Impl props={{}} buildChild={noBuildChild} context={mockContext} />);
 }
 
-// ── Metadata tests ────────────────────────────────────────────────────────────
+// ── Metadata tests ─────────────────────────────────────────────────────────────
 
 describe('fluentOverrides — metadata', () => {
   it('exports a non-empty array', () => {
@@ -131,7 +152,7 @@ describe('fluentOverrides — metadata', () => {
   });
 });
 
-// ── Smoke render tests ────────────────────────────────────────────────────────
+// ── Smoke render tests ─────────────────────────────────────────────────────────
 
 describe('fluentOverrides — smoke renders', () => {
   it.each(fluentOverrides.map(c => [c.name, c] as [string, ReactComponentImplementation]))(
@@ -142,7 +163,7 @@ describe('fluentOverrides — smoke renders', () => {
   );
 });
 
-// ── ChildList (utility component, not in fluentOverrides) ─────────────────────
+// ── ChildList (utility component) ─────────────────────────────────────────────
 
 describe('ChildList', () => {
   it('is a React function component', () => {
@@ -157,7 +178,8 @@ describe('ChildList', () => {
   });
 
   it('renders children from a string-id list', () => {
-    const buildChild = (id: string) => <span key={id} data-testid={`child-${id}`}>{id}</span>;
+    const buildChild = (id: string): React.ReactNode =>
+      <span key={id} data-testid={`child-${id}`}>{id}</span>;
     const { getByTestId } = render(
       <ChildList childList={['a', 'b']} context={mockContext} buildChild={buildChild} />
     );
@@ -166,7 +188,8 @@ describe('ChildList', () => {
   });
 
   it('renders children from an object-id list', () => {
-    const buildChild = (id: string) => <span key={id} data-testid={`child-${id}`}>{id}</span>;
+    const buildChild = (id: string): React.ReactNode =>
+      <span key={id} data-testid={`child-${id}`}>{id}</span>;
     const { getByTestId } = render(
       <ChildList
         childList={[{ id: 'x' }, { id: 'y', basePath: '/base' }]}
