@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #205 "fix: prevent UI freeze after A2UI component interaction" | S | impl=1m | review=6m | cycles=1 | merged | @sabbour
