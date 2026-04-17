@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #194 "fix: quick frontend fixes — SHA link, auth button, clear all, folder icon, phase indicator (#181, #169, #172, #171, #182)" | M | impl=2m | review=6m | cycles=1 | merged | @sabbour-squad-frontend[bot]
