@@ -74,11 +74,12 @@ test.describe('Route state — server-authored phase consumption', () => {
       }),
     );
 
+    // Register the health-response waiter BEFORE goto to avoid the race where
+    // the response fires before the listener is attached.
+    const healthReady = page.waitForResponse('**/api/health', { timeout: 10_000 });
     await page.goto('/');
     await page.waitForSelector('#landing-page', { timeout: 10_000 });
-
-    // Wait for the health check response so isApiAvailable is set before auto-send
-    await page.waitForResponse('**/api/health', { timeout: 5_000 });
+    await healthReady;
 
     // Enter chat via track card (auto-sends the track prompt)
     await page.locator('.track-card-link[data-track="web-app"]').click();
@@ -113,11 +114,10 @@ test.describe('Route state — server-authored phase consumption', () => {
       });
     });
 
+    const healthReady = page.waitForResponse('**/api/health', { timeout: 10_000 });
     await page.goto('/');
     await page.waitForSelector('#landing-page', { timeout: 10_000 });
-    await page.waitForResponse('**/api/health', { timeout: 5_000 });
-
-    // Enter chat — auto-sends first message → review phase
+    await healthReady;
     await page.locator('.track-card-link[data-track="web-app"]').click();
     await page.waitForSelector('#landing-page', { state: 'detached', timeout: 5_000 });
 
@@ -147,9 +147,10 @@ test.describe('Route state — server-authored phase consumption', () => {
       route.fulfill({ status: 401, body: '' }),
     );
 
+    const healthReady = page.waitForResponse('**/api/health', { timeout: 10_000 });
     await page.goto('/');
     await page.waitForSelector('#landing-page', { timeout: 10_000 });
-    await page.waitForResponse('**/api/health', { timeout: 5_000 });
+    await healthReady;
 
     // Enter chat — auto-sends the track prompt; /api/converse returns 401.
     // useStreaming catches SessionExpiredError and sets window.location.href
