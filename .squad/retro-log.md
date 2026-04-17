@@ -20,6 +20,7 @@ Legend:
 <!-- entries below this line, newest at top -->
 
 - 2026-04-16 | #348 "feat: align ArchitectureDiagram styling with Fluent 2" | L | impl=0m | review=3m | cycles=1 | merged | @sabbour
+- 2026-04-16 | #356 "feat: rename DeploymentProgress to GenerationProgress (#350)" | M | impl=1m | review=0m | cycles=1 | merged | @sabbour
 
 - 2026-04-16 | #358 "feat: document that LLM can combine built-in + custom catalog components in A2UI" | S | impl=0m | review=0m | cycles=1 | merged | @sabbour
 
