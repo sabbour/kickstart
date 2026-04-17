@@ -54,3 +54,26 @@ Shipped 406 fallback in `useStreaming.ts`. Added `route-state.spec.ts` with skip
 
 Analyzed #474 frontend surface. Preserve/delete/replace boundary defined (see Active Sprint above). Decision filed (`fry-474-frontend-cutline.md` → decisions.md).
 
+
+## 2026-04-17 — #477 pack-core Phases A+B (commit c950d61)
+
+Working as **Fry (Frontend Dev)**.
+
+**Phase A — 3 agent files** (`packages/pack-core/src/agents/`):
+- `orchestrator.agent.md` (`core.orchestrator`) — main orchestrator; collects requirements, drafts deployment plan, hands off to architect for review or implementer for code gen. Skills: `generate-plan`, `validate-artifacts`. No tools.
+- `architect.agent.md` (`core.architect`) — architecture advisor; reviews plans against Azure WAF (Reliability, Security, Cost, OE, Performance). Skills: `architecture-review`. Tools: `fetch_webpage`.
+- `implementer.agent.md` (`core.implementer`) — code generator; produces Bicep, Kubernetes manifests, Dockerfile, GitHub Actions workflow. Skills: `generate-files`. Tools: `read_file`, `write_file`, `validate_artifacts`.
+
+**Phase B — 5 skill files** (`packages/pack-core/src/skills/`):
+- `generate-plan/SKILL.md` — orchestrator-only; required plan sections, quality criteria, ambiguity handling. Priority 80.
+- `validate-artifacts/SKILL.md` — orchestrator + implementer; Bicep, Kubernetes, and GitHub Actions validation rules. Priority 70.
+- `architecture-review/SKILL.md` — architect-only; WAF five-pillar checklist with AKS-specific items. Priority 75.
+- `generate-files/SKILL.md` — implementer-only; file inventory, Bicep/YAML/workflow code standards, pinned SHA requirement. Priority 85.
+- `aks-best-practices/SKILL.md` — all agents (`*`); cross-cutting AKS cluster, workload, security, OpEx, and cost guidance with reference links. Priority 60.
+
+**Hermes test scaffold cherry-picked** from `12579cd` (branch `squad/477-pack-core-test-scaffold`). Tests are `it.todo()` scaffolding; Hermes will activate them in a follow-up pass once the #476 loader and Phase C tools ship.
+
+**Blockers noted for Phase C:**
+- `validate_artifacts` tool not yet implemented (Phase C) — referenced in frontmatter but no runtime code yet.
+- `#476` registry/loader (`parseAgentFrontmatter`, `PackRegistry`) not yet merged into v2-rewrite — harness types are still stubs.
+- Hermes' agent tests expect `core.triage`/`core.codesmith`/`core.reviewer` naming; Phases A+B use `core.orchestrator`/`core.architect`/`core.implementer` per task spec. Will need reconciliation once the loader ships.
