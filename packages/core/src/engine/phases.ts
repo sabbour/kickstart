@@ -55,6 +55,11 @@ export const PHASE_DEFINITIONS: readonly PhaseDefinition[] = [
   },
 ] as const;
 
+/** Advance to the next phase, or return the same phase if already at the terminal phase. */
+export function advancePhase(phase: Phase): Phase {
+  return getPhaseDefinition(phase).nextPhase ?? phase;
+}
+
 /** Look up a phase definition by its ID. */
 export function getPhaseDefinition(phase: Phase): PhaseDefinition {
   const def = PHASE_DEFINITIONS.find((p) => p.id === phase);
