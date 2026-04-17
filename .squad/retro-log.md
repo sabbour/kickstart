@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-15 | #308 "feat: real Azure auth and deployment flow" | XL | impl=50m | review=10m | cycles=1 | merged | @sabbour
+
 - 2026-04-15 | #310 "fix: ship real GitHub commit PR flow" | L | impl=13m | review=15m | cycles=1 | merged | @sabbour
 
 - 2026-04-15 | #312 "fix: keep SWA API startup imports clean" | S | impl=0m | review=114m | cycles=1 | merged | @sabbour
