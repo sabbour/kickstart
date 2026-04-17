@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-17 | #555 "fix(retro-log): side branch + PR approach with CI bypass" | M | impl=4m | review=16m | cycles=1 | merged | @sabbour
