@@ -21,6 +21,13 @@ import { RunContext } from '@openai/agents';
 import { fetchWebpageTool } from '../../tools/fetch_webpage.js';
 import { makeSessionCtx } from './_session-stub.js';
 
+vi.mock('node:dns/promises', () => ({
+  resolve4: vi.fn().mockResolvedValue(['93.184.216.34']),
+  resolve6: vi.fn().mockResolvedValue([]),
+}));
+
+import * as dnsPromises from 'node:dns/promises';
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeResponse(body: string, status = 200): Response {
@@ -40,6 +47,9 @@ const invoke = (url: string) =>
 describe('core.fetch_webpage', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
+    // Default: DNS resolves to non-private IPs so happy-path tests pass without network.
+    vi.mocked(dnsPromises.resolve4).mockResolvedValue(['93.184.216.34'] as never);
+    vi.mocked(dnsPromises.resolve6).mockResolvedValue([] as never);
   });
 
   afterEach(() => {
@@ -107,6 +117,31 @@ describe('core.fetch_webpage', () => {
 
     it('does not call fetch for private-IP URLs', async () => {
       await invoke('https://192.168.1.1');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── SSRF guard — DNS rebinding ────────────────────────────────────────────
+
+  describe('SSRF guard — DNS rebinding → reject', () => {
+    it('blocks URL that resolves to private IP via A record (DNS rebinding)', async () => {
+      vi.mocked(dnsPromises.resolve4).mockResolvedValue(['192.168.1.1'] as never);
+      vi.mocked(dnsPromises.resolve6).mockResolvedValue([] as never);
+      const result = String(await invoke('https://evil-public-domain.com/page'));
+      expect(result).toMatch(/An error occurred|private IP|SSRF/i);
+    });
+
+    it('blocks URL that resolves to loopback via AAAA record (DNS rebinding)', async () => {
+      vi.mocked(dnsPromises.resolve4).mockResolvedValue([] as never);
+      vi.mocked(dnsPromises.resolve6).mockResolvedValue(['::1'] as never);
+      const result = String(await invoke('https://evil-public-domain.com/page'));
+      expect(result).toMatch(/An error occurred|private IP|SSRF/i);
+    });
+
+    it('does not call fetch when DNS rebinding is detected', async () => {
+      vi.mocked(dnsPromises.resolve4).mockResolvedValue(['10.0.0.1'] as never);
+      vi.mocked(dnsPromises.resolve6).mockResolvedValue([] as never);
+      await invoke('https://evil-public-domain.com/page');
       expect(globalThis.fetch).not.toHaveBeenCalled();
     });
   });

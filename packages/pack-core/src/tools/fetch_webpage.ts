@@ -1,5 +1,6 @@
 import { tool } from '@openai/agents';
 import { z } from 'zod';
+import * as dnsPromises from 'node:dns/promises';
 import type { ToolContribution } from '@kickstart/harness';
 import type { SessionCtx } from '@kickstart/harness';
 
@@ -16,8 +17,22 @@ const PRIVATE_IP_PATTERNS: RegExp[] = [
   /^169\.254\./, // link-local
 ];
 
+// Covers DNS rebinding: even a public hostname is rejected if it resolves to a private IP.
+const PRIVATE_IP_RE =
+  /^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|::1$|0\.0\.0\.0$|169\.254\.)/;
+
 function isPrivateOrLoopback(hostname: string): boolean {
   return PRIVATE_IP_PATTERNS.some((pattern) => pattern.test(hostname));
+}
+
+async function resolveAndCheckHostname(hostname: string): Promise<void> {
+  const v4 = await dnsPromises.resolve4(hostname).catch(() => [] as string[]);
+  const v6 = await dnsPromises.resolve6(hostname).catch(() => [] as string[]);
+  for (const addr of [...v4, ...v6]) {
+    if (PRIVATE_IP_RE.test(addr)) {
+      throw new Error(`URL resolves to private IP address (${addr}) — SSRF blocked`);
+    }
+  }
 }
 
 function assertSafeUrl(rawUrl: string): URL {
@@ -60,6 +75,8 @@ export const fetchWebpageTool: ToolContribution = {
       const _session = runCtx?.context as SessionCtx | undefined;
 
       const safeUrl = assertSafeUrl(input.url);
+
+      await resolveAndCheckHostname(safeUrl.hostname);
 
       const response = await fetch(safeUrl.toString(), {
         headers: {
