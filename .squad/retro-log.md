@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #334 "fix: stabilize file surfaces and workspace artifacts" | XL | impl=9m | review=10m | cycles=1 | merged | @sabbour
