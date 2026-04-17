@@ -18,7 +18,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: squad-pr-retro-log
+  group: squad-pr-retro-log-${{ inputs.pr_number }}
   cancel-in-progress: false
 
 jobs:
