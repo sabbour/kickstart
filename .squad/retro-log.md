@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-16 | #372 "fix: resolve next-card missing component (#352)" | S | impl=0m | review=0m | cycles=1 | merged | @sabbour
