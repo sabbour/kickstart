@@ -6,17 +6,17 @@ import type { SessionCtx } from '@kickstart/harness';
 // ── GitHub path validation (Zapp conditions) ──────────────────────────────────
 
 /**
- * Allowlist: 7 anchored patterns covering valid GitHub file paths.
+ * Allowlist: anchored patterns covering valid GitHub REST API paths.
  * decodeURIComponent is applied FIRST, then the two-step check.
  */
-export const GITHUB_PATH_ALLOWLIST = [
-  /^[\w\-. ]+$/,                                   // simple filename: README.md
-  /^[\w\-. ]+\/[\w\-. /]+$/,                       // subpath: src/index.ts
-  /^\.github\/[\w\-. /]+$/,                         // .github dir: .github/workflows/ci.yml
-  /^[\w][\w\-. /]*[\w\-.]$/,                        // general path not starting with ./ or /
-  /^docs\/[\w\-. /]+$/,                             // docs subpath
-  /^k8s\/[\w\-. /]+$/,                              // k8s manifests
-  /^[\w\-. ]+\.[\w]+$/,                             // file with extension at root
+export const GITHUB_API_PATH_ALLOWLIST = [
+  /^\/repos\/[\w\-_.]+\/[\w\-_.]+(?:\/[\w\-_.~/]+)*$/, // /repos/owner/repo/...
+  /^\/orgs\/[\w\-_.]+(?:\/[\w\-_.]+)*$/,               // /orgs/org/...
+  /^\/user(?:\/[\w\-_.]+)*$/,                           // /user or /user/...
+  /^\/users\/[\w\-_.]+(?:\/[\w\-_.]+)*$/,               // /users/username/...
+  /^\/search\/(?:code|issues|repositories|users)(?:\/[\w\-_.]+)*$/, // /search/...
+  /^\/gists(?:\/[\w\-_.]+)*$/,                          // /gists/...
+  /^\/rate_limit$/,                                     // /rate_limit
 ];
 
 /**
@@ -24,23 +24,17 @@ export const GITHUB_PATH_ALLOWLIST = [
  */
 export const FORBIDDEN_SEQ = /(\.\.|%2e%2e|%252e|\/\/|\\)/i;
 
-export function validateGithubPath(rawPath: string): string {
+export function validateGithubPath(rawPath: string): void {
   const decoded = decodeURIComponent(rawPath);
 
   // Two-step: allowlist first, then forbidden-sequence rejection
-  const isAllowed = GITHUB_PATH_ALLOWLIST.some((re) => re.test(decoded));
+  const isAllowed = GITHUB_API_PATH_ALLOWLIST.some((re) => re.test(decoded));
   if (!isAllowed) {
-    throw new Error(
-      `GitHub path not in allowlist: "${decoded}". Path must be a valid relative file path.`,
-    );
+    throw new Error(`GitHub API path not in allowlist: ${decoded}`);
   }
   if (FORBIDDEN_SEQ.test(decoded)) {
-    throw new Error(
-      `GitHub path contains a forbidden sequence (traversal or double-slash): "${decoded}"`,
-    );
+    throw new Error(`GitHub path contains forbidden sequence`);
   }
-
-  return decoded;
 }
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -80,6 +74,7 @@ export const apiGetTool: ToolContribution = {
         );
       }
 
+      validateGithubPath(input.path);
       const url = new URL(`${GITHUB_API_BASE}${input.path}`);
       if (input.params) {
         for (const [key, value] of Object.entries(input.params)) {
