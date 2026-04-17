@@ -159,7 +159,9 @@ jobs:
             --body "Automated retro log entry for #${PR_NUM}. Opened by \`.github/workflows/squad-pr-retro.yml\`." \
             --base "$BASE_REF" \
             --head "${SIDE_BRANCH}" \
-            --label "retro-log"
+            --label "retro-log" \
+            --label "leela:approved" \
+            --label "zapp:approved"
           gh pr merge "${SIDE_BRANCH}" --squash --auto --delete-branch
 
       - name: Mirror line as PR comment
