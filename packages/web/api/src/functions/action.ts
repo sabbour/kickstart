@@ -21,8 +21,10 @@ import {
   getPhaseDefinition,
   getPhaseOrder,
   processResponse,
+  isPhase,
+  Phase,
 } from "@kickstart/core";
-import type { Phase, PhaseItem } from "@kickstart/core";
+import type { PhaseItem } from "@kickstart/core";
 import type { A2UIMessage } from "@kickstart/core";
 import {
   getSession,
@@ -146,7 +148,8 @@ async function callLLM(
 
   // Build phase indicator A2UI message
   const order = getPhaseOrder();
-  const currentIdx = order.indexOf(currentPhase as Phase);
+  const safePhase: Phase = isPhase(currentPhase) ? currentPhase : Phase.Discover;
+  const currentIdx = order.indexOf(safePhase);
   const phases: PhaseItem[] = order.map((phase, idx) => ({
     id: phase,
     label: getPhaseDefinition(phase as Phase).label,
