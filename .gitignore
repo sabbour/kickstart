@@ -43,3 +43,10 @@ local.settings.json
 # Squad: SubSquad activation file (local to this machine)
 .squad-workstream
 dp-46-body.md
+
+# Squad: GitHub App identity (keys, config, tokens — never commit)
+.squad/identity/keys/
+.squad/identity/apps/
+.squad/identity/config.json
+.squad-*-token
+.squad-*-token.json
