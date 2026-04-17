@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #125 "feat: IndexedDB virtual filesystem with file tree + Monaco editor" | L | impl=0m | review=693m | cycles=1 | merged | @sabbour
