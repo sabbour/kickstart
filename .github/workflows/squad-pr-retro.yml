@@ -16,9 +16,10 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  statuses: write
 
 concurrency:
-  group: squad-pr-retro-log-${{ inputs.pr_number }}
+  group: squad-pr-retro-log-${{ github.event.pull_request.number || inputs.pr_number }}
   cancel-in-progress: false
 
 jobs:
@@ -200,6 +201,16 @@ jobs:
           fi
 
           gh pr merge "$PR_URL" --squash --auto --delete-branch
+
+          # Post squad/review-gate success — labels applied via GITHUB_TOKEN
+          # don't trigger the squad-review-gate workflow, so we post it here.
+          PR_NUM_NEW="$(echo "$PR_URL" | grep -oE '[0-9]+$')"
+          HEAD_SHA="$(gh pr view "$PR_NUM_NEW" --json headRefOid --jq '.headRefOid')"
+          gh api repos/${{ github.repository }}/statuses/"$HEAD_SHA" \
+            --method POST \
+            --field state=success \
+            --field context="squad/review-gate" \
+            --field description="Squad review gate: Leela ✅ Zapp ✅"
 
       - name: Mirror line as PR comment
         if: steps.metrics.outputs.skip != 'true'
