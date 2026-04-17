@@ -51,8 +51,5 @@
     "serve": "^14.2.6",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.1"
-  },
-  "dependencies": {
-    "@openai/agents": "0.8.3"
   }
 }

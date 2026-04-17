@@ -37,12 +37,10 @@ import type {
   SetupGenerationSnapshot,
   ConversationSkillsContext,
 } from "@kickstart/core";
-import {
-  getSession, createSession, getPrincipalId, hydrateSession, addMessage,
+import { getSession, createSession, getPrincipalId, hydrateSession, addMessage,
   adoptSessionPrincipal, isSessionOwnedBy, recordUsage,
   extractArtifactsFromA2UI, upsertArtifact,
 } from "../lib/session-store.js";
-import { isAgentsSdkEnabled, runAgentTurn } from "../lib/agents-runner.js";
 import type { ApiSession, ClientMessage, GeneratedArtifact } from "../lib/session-store.js";
 import { chatCompletion, chatCompletionWithTools } from "../lib/openai-client.js";
 import { checkContentSafety } from "../lib/content-safety.js";
@@ -65,6 +63,11 @@ import {
   serializeSetupGenerationEvent,
   shouldUseStepwiseGeneration,
 } from "../lib/setup-generation.js";
+
+/** Return true when the @openai/agents SDK runtime flag is set. */
+function isAgentsSdkEnabled(): boolean {
+  return process.env.KICKSTART_AGENTS_SDK === "true";
+}
 
 interface ConverseRequest {
   sessionId?: string;
@@ -244,8 +247,17 @@ app.http("converse", {
       // execution. The session, SSE contract, and security controls are preserved.
       // -----------------------------------------------------------------------
       if (isAgentsSdkEnabled()) {
-        const wantsStreamSdk = wantsStream;
-        return handleAgentsSdkTurn(session, principalId, body.message, context, wantsStreamSdk ?? false);
+        if (wantsStream) {
+          // SDK path does not yet emit SSE; reject rather than silently serve
+          // a JSON body into the client's streaming parser (thread 8).
+          return {
+            status: 406,
+            jsonBody: {
+              error: "Streaming responses are not supported when the Agents SDK is enabled.",
+            },
+          };
+        }
+        return handleAgentsSdkTurn(session, principalId, body.message, context);
       }
 
 
@@ -847,17 +859,20 @@ function extractImplicitFlags(rawJson: string): ParsedImplicitFlags {
  * The session, principal ownership, A2UI contract, and security controls are
  * identical to the legacy path. This function gates all raw SDK output through
  * agents-sse-adapter.ts (allowlist) and agents-route-planner.ts (phase control).
+ *
+ * The agents-runner module is dynamically imported here so that
+ * setTracingDisabled() (a module-load side effect in agents-azure-provider.ts)
+ * only fires when the feature flag is actually enabled, keeping the cold-start
+ * path and non-SDK request handlers free of SDK side effects (thread 9).
  */
 async function handleAgentsSdkTurn(
   session: ApiSession,
   principalId: string | undefined,
   userMessage: string,
   context: InvocationContext,
-  wantsStream: boolean,
 ): Promise<HttpResponseInit> {
-  // Non-streaming path (streaming via SDK is a follow-up iteration)
-  void wantsStream; // streaming flag reserved for future use
-
+  void context;
+  const { runAgentTurn } = await import("../lib/agents-runner.js");
   const { adapted, currentPhase } = await runAgentTurn({ userMessage, session, principalId });
 
   const safePhase = getSafeCurrentPhase(currentPhase);

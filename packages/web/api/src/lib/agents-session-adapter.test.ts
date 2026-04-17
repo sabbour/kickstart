@@ -130,12 +130,15 @@ describe("KickstartSessionAdapter", () => {
       expect(lastMsg.content).toBe("Architecture is ready.");
     });
 
-    it("persists user messages to session store", async () => {
+    it("does NOT persist user messages (SDK path — raw user input may include internal context)", async () => {
+      const before = session.state.messages.length;
       const adapter = new KickstartSessionAdapter(session);
       await adapter.addItems([{ role: "user", content: "Deploy now." }]);
-      const lastMsg = session.state.messages[session.state.messages.length - 1];
-      expect(lastMsg.role).toBe("user");
-      expect(lastMsg.content).toBe("Deploy now.");
+      // User messages are intentionally excluded from STORABLE_ROLES in the SDK
+      // path: the user input passed to the agent may include appended
+      // domainKnowledge/currentState that must not be written to the store.
+      // The raw user message is persisted by converse.ts before the SDK turn.
+      expect(session.state.messages.length).toBe(before);
     });
 
     it("drops system messages silently", async () => {
@@ -151,7 +154,12 @@ describe("KickstartSessionAdapter", () => {
       const before = session.lastAccessed;
       await new Promise((r) => setTimeout(r, 5));
       const adapter = new KickstartSessionAdapter(session);
-      await adapter.addItems([{ role: "user", content: "hello" }]);
+      // Use an assistant item — user items are not stored and do not refresh TTL
+      await adapter.addItems([{
+        role: "assistant",
+        status: "completed",
+        content: [{ type: "output_text", text: "hello" }],
+      } as Parameters<typeof adapter.addItems>[0][number]]);
       expect(session.lastAccessed).toBeGreaterThanOrEqual(before);
     });
   });

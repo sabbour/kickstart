@@ -26,8 +26,16 @@ import type { AgentInputItem } from "@openai/agents";
 import type { ApiSession } from "./session-store.js";
 import { addMessage, isSessionExpired } from "./session-store.js";
 
-/** Roles we accept from AgentInputItem when persisting back to session store. */
-const STORABLE_ROLES = new Set(["user", "assistant"]);
+/**
+ * Roles we accept from AgentInputItem when persisting back to session store.
+ *
+ * Only assistant messages are persisted here. User messages are intentionally
+ * excluded: in the SDK path, the user input passed to the agent may include
+ * appended domainKnowledge/currentState context (internal prompt-only material)
+ * that must not be persisted or returned to clients. The raw user message is
+ * already persisted in converse.ts before the SDK turn runs.
+ */
+const STORABLE_ROLES = new Set(["assistant"]);
 
 /**
  * Build the full history `AgentInputItem[]` from the session messages.
@@ -116,6 +124,14 @@ export class KickstartSessionAdapter {
     const idx = msgs.length - 1 - lastNonSystemIdx;
     const [popped] = msgs.splice(idx, 1);
     if (!popped) return undefined;
+
+    // Refresh TTL on mutation — popItem() is a session access
+    const now = Date.now();
+    this.session.lastAccessed = now;
+    const stateWithUpdatedAt = this.session.state as { updatedAt?: number };
+    if ("updatedAt" in stateWithUpdatedAt) {
+      stateWithUpdatedAt.updatedAt = now;
+    }
 
     if (popped.role === "user") {
       return { role: "user", content: popped.content ?? "" } as AgentInputItem;

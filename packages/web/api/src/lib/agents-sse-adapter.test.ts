@@ -111,6 +111,62 @@ describe("adaptRunResult", () => {
     expect(adapted.usage!.totalTokens).toBe(150);
   });
 
+  it("extracts text from newItems when message_output_item present", () => {
+    // Use a duck-typed mock — RunMessageOutputItem requires a real Agent to
+    // construct, but extractFinalText only needs type === "message_output_item"
+    // and a `.content` string (consistent with how RunMessageOutputItem works).
+    const mockMsgItem = {
+      type: "message_output_item",
+      content: "extracted from newItems",
+    } as unknown as NonNullable<Parameters<typeof adaptRunResult>[0]["newItems"]>[number];
+
+    const resultWithItems = {
+      input: "",
+      newItems: [mockMsgItem],
+      rawResponses: [],
+      lastResponseId: undefined,
+      lastAgent: undefined,
+      inputGuardrailResults: [],
+      outputGuardrailResults: [],
+      toolInputGuardrailResults: [],
+      toolOutputGuardrailResults: [],
+      finalOutput: "should not use fallback",
+      interruptions: [],
+      state: {} as never,
+      runContext: {} as never,
+    } as unknown as Parameters<typeof adaptRunResult>[0];
+
+    const adapted = adaptRunResult(resultWithItems);
+    expect(adapted.message).toBe("extracted from newItems");
+  });
+
+  it("ignores non-message newItems (tool calls etc.)", () => {
+    const toolCallItem = {
+      type: "tool_call_item",
+      content: "secret tool args that must not leak",
+    } as unknown as NonNullable<Parameters<typeof adaptRunResult>[0]["newItems"]>[number];
+
+    const resultWithTool = {
+      input: "",
+      newItems: [toolCallItem],
+      rawResponses: [],
+      lastResponseId: undefined,
+      lastAgent: undefined,
+      inputGuardrailResults: [],
+      outputGuardrailResults: [],
+      toolInputGuardrailResults: [],
+      toolOutputGuardrailResults: [],
+      finalOutput: "fallback used",
+      interruptions: [],
+      state: {} as never,
+      runContext: {} as never,
+    } as unknown as Parameters<typeof adaptRunResult>[0];
+
+    const adapted = adaptRunResult(resultWithTool);
+    // Tool call item is not a message_output_item; falls back to finalOutput
+    expect(adapted.message).toBe("fallback used");
+  });
+
   it("returns undefined usage when no rawResponses", () => {
     const result = makeRunResult("{}");
     const adapted = adaptRunResult(result);
@@ -129,7 +185,7 @@ describe("validateA2UIPreserved (spike checkpoint)", () => {
     expect(validateA2UIPreserved(adapted)).toBe(true);
   });
 
-  it("returns true when a2uiMessages contains objects", () => {
+  it("returns true when a2uiMessages contains objects with type+id", () => {
     const adapted: AdaptedRunResponse = {
       message: "ok",
       a2uiMessages: [{ type: "ConversationPhase", id: "phase-indicator", phases: [], currentPhase: "discover" }],
@@ -143,6 +199,16 @@ describe("validateA2UIPreserved (spike checkpoint)", () => {
     const adapted: AdaptedRunResponse = {
       message: "ok",
       a2uiMessages: [null as unknown as object],
+      phaseComplete: false,
+      filesComplete: null,
+    };
+    expect(validateA2UIPreserved(adapted)).toBe(false);
+  });
+
+  it("returns false when no a2uiMessages have type+id fields", () => {
+    const adapted: AdaptedRunResponse = {
+      message: "ok",
+      a2uiMessages: [{ someField: "value" }],
       phaseComplete: false,
       filesComplete: null,
     };

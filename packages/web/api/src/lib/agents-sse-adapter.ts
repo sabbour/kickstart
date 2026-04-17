@@ -13,10 +13,6 @@
  * on the final text output, maintaining the existing A2UI extraction pipeline.
  */
 
-import {
-  extractAllTextOutput,
-  RunMessageOutputItem,
-} from "@openai/agents";
 import type { RunResult } from "@openai/agents";
 import { processResponse } from "@kickstart/core";
 
@@ -57,15 +53,16 @@ export function adaptRunResult(result: RunResult<any, any>): AdaptedRunResponse 
 }
 
 function extractFinalText(result: RunResult<any, any>): string {
-  // newItems contains the items produced in this turn only.
-  // We want only message output — never tool call payloads.
-  const msgItems = result.newItems.filter(
-    (item): item is RunMessageOutputItem =>
-      item instanceof RunMessageOutputItem,
-  );
+  // Use duck-typing on `type` rather than instanceof so this is testable
+  // without constructing a real RunMessageOutputItem (which requires an Agent).
+  // Only message_output_item entries carry displayable text; tool/reasoning
+  // items are intentionally excluded here (allowlist enforcement).
+  const msgItems = (
+    result.newItems as Array<{ type: string; content?: string }>
+  ).filter((item) => item.type === "message_output_item");
 
   if (msgItems.length > 0) {
-    return extractAllTextOutput(msgItems);
+    return msgItems.map((item) => item.content ?? "").join("");
   }
 
   // Fall back to finalOutput if it's a string
@@ -244,14 +241,22 @@ export function adaptedUsageToChatUsage(
  * Validate that A2UI structure is preserved through the adapter.
  * Used in tests (spike checkpoint from Leela review).
  *
- * Returns true if `a2uiMessages` from `adaptRunResult` would contain
- * valid A2UI message objects (type + id fields present on at least one).
+ * Returns true when:
+ * - `a2uiMessages` is empty (valid — no A2UI this turn), OR
+ * - all entries are non-null objects AND at least one has both `type` and `id`
+ *   fields (the minimum envelope shape of a real A2UI message).
  */
 export function validateA2UIPreserved(adapted: AdaptedRunResponse): boolean {
-  if (adapted.a2uiMessages.length === 0) return true; // No A2UI is valid
-  return adapted.a2uiMessages.every(
+  if (adapted.a2uiMessages.length === 0) return true;
+
+  const allAreObjects = adapted.a2uiMessages.every(
+    (msg) => msg !== null && typeof msg === "object",
+  );
+  if (!allAreObjects) return false;
+
+  return adapted.a2uiMessages.some(
     (msg) =>
-      msg !== null &&
-      typeof msg === "object",
+      "type" in (msg as Record<string, unknown>) &&
+      "id" in (msg as Record<string, unknown>),
   );
 }

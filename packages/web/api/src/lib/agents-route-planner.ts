@@ -95,7 +95,12 @@ export function planRoute(
  */
 export function applyRoutePlan(session: ApiSession, plan: RoutePlan): void {
   if (plan.shouldAdvancePhase) {
-    session.state.currentPhase = advancePhase(session.state.currentPhase as Phase);
+    // Normalise to a known Phase before advancing — an invalid stored value
+    // would crash advancePhase/getPhaseDefinition. Write the safe value back
+    // so the session stays consistent.
+    const currentPhase = toSafePhase(session.state.currentPhase);
+    session.state.currentPhase = currentPhase;
+    session.state.currentPhase = advancePhase(currentPhase);
   }
 }
 
