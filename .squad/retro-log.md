@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #241 "Remove topbar brand title text" | S | impl=20m | review=76m | cycles=1 | merged | @sabbour
