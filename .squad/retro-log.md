@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #294 "fix: code block theme — dark palette, readable font, line numbers" | L | impl=0m | review=8m | cycles=1 | merged | @sabbour
