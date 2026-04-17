@@ -36,7 +36,7 @@ import { adaptRunResult, adaptedUsageToChatUsage } from "./agents-sse-adapter.js
 import type { AdaptedRunResponse } from "./agents-sse-adapter.js";
 import { planRoute, applyRoutePlan, toSafePhase } from "./agents-route-planner.js";
 import type { ApiSession } from "./session-store.js";
-import { addMessage, recordUsage, extractArtifactsFromA2UI, upsertArtifact } from "./session-store.js";
+import { recordUsage, extractArtifactsFromA2UI, upsertArtifact } from "./session-store.js";
 import { sanitizeToolOutput } from "./sanitize-tool-output.js";
 import { buildTurnUsage } from "./usage-tracking.js";
 
@@ -203,8 +203,10 @@ export async function runAgentTurn(input: AgentRunInput): Promise<AgentRunOutput
     upsertArtifact(session.generatedArtifacts, art);
   }
 
-  // Persist assistant message to session
-  addMessage(session.state.sessionId, "assistant", adapted.message);
+  // NOTE: do NOT call addMessage("assistant", ...) here.
+  // KickstartSessionAdapter.addItems() is called by the SDK after run completion
+  // and is the authoritative persistence path for SDK-generated assistant messages.
+  // A manual call here would duplicate the write on every turn.
 
   // Apply route plan (phase advancement)
   applyRoutePlan(session, finalPlan);
