@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #220 "feat: Copilot skills registry and system prompt integration (#186)" | L | impl=1m | review=4m | cycles=1 | merged | @sabbour
