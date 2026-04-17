@@ -4,7 +4,13 @@
     "outDir": "dist",
     "rootDir": "src",
     "jsx": "react-jsx",
-    "moduleResolution": "bundler"
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "zod": ["../../node_modules/zod/index.d.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["**/*.test.ts", "**/*.test.tsx"]
