@@ -29,6 +29,8 @@ export interface DebugMetadata {
     phase?: string;
     usage?: TokenUsageSummary;
   };
+  /** System prompt used for this LLM call (truncated at 8 KB). */
+  systemPrompt?: string;
 }
 
 export interface SetupStepStartEvent {
