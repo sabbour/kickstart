@@ -20,6 +20,7 @@ Legend:
 <!-- entries below this line, newest at top -->
 
 - 2026-04-16 | #382 "feat(core): make conversation flow LLM-driven instead of scripted" | L | impl=0m | review=25m | cycles=1 | merged | @sabbour
+- 2026-04-16 | #379 "docs: clarify FileEditor A2UI vs sidebar architecture" | S | impl=0m | review=6m | cycles=1 | merged | @sabbour
 
 - 2026-04-16 | #381 "feat: render architecture diagrams inside FileEditor" | L | impl=0m | review=29m | cycles=1 | merged | @sabbour
 
