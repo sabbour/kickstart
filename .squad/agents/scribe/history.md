@@ -202,3 +202,12 @@ Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v
 - scribe/history.md: this entry
 **No threshold breaches:** leela 6,259 / fry 4,506 / zapp 8,199 / hermes 11,251 / bender 7,924 / scribe (post-update)
 **Inbox deleted:** none (leela-482-dp-review.md is gitignored)
+
+## Wave 22 — 2026-04-17
+
+**Files merged:** 1 (`zapp-482-dp-review.md` — DP #482 pack-azure BLOCKED, 5 security conditions)
+**Checked / skipped:** `zapp-pr548-recheck.md`, `bender-pr548-fix.md` — not yet landed in any inbox or worktree
+**Inbox cleaned:** deleted stale `leela-482-dp-review.md` residual (already merged wave 21)
+**decisions.md:** 190,348 → 195,588 bytes (+5,240)
+**Histories updated:** zapp (8,199 → 9,221 bytes)
+**No threshold breaches:** all histories below 15,360

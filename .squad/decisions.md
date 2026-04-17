@@ -3353,3 +3353,77 @@ See Q3 answer above. Architecturally enforced: any ARM write that needs user con
 ## Label
 
 `leela:approved` to be applied to Step 7 PR after all 5 conditions are addressed and confirmed in PR review.
+
+---
+# Zapp Decision — DP #482 pack-azure Security Review
+
+**Date:** 2026-04-17  
+**Author:** Zapp (Security Architect)  
+**Issue:** #482 — v2 Step 7: pack-azure  
+**Status:** BLOCKED
+
+## Decision
+
+Security gate is **blocked** on the current DP revision. The proposal gets one important thing right — all six Azure user actions declare `resultSchema` — but it leaves the highest-risk Azure trust boundaries under-specified: ARM path constraints are still too loose, `azure:deploy_bicep` credential flow is unresolved, token storage is not explicitly server-only, and the `/api/packs` manifest redaction rules are missing.
+
+## Findings by Severity
+
+1. **🔴 High — `azure:deploy_bicep` credential model is unresolved**
+   - The DP leaves an explicit open question on whether deployment runs through a harness API route or direct ARM calls from the server-side user action.
+   - It does not commit to a server-only credential source, does not rule out browser-provided bearer tokens, and does not state that deployment is hard-scoped to the session's selected subscription.
+
+2. **🔴 High — Azure auth token storage boundary is not defined**
+   - The DP references session Azure state for subscription selection, but never states where the Azure access token lives.
+   - This must be server-side only. No raw token may appear in `SessionCtx` fields exposed to app code, SSE payloads, `/api/packs`, playground state, or browser-managed stores.
+
+3. **🟠 Medium — `azure.arm_get` path validation is directionally right but still too broad**
+   - The DP adds `^/subscriptions/`, traversal rejection for `../` and `%2e%2e`, and per-call audit logging.
+   - That is not yet the constrained allowlist requested. `^/subscriptions/` is broader than an anchored subscription/resource path allowlist, and admin-path blocking is only implicit. The design should explicitly deny sensitive control-plane paths such as `/providers/Microsoft.Authorization/elevateAccess` and validate the resolved path after `{sub-id}` expansion.
+
+4. **🟠 Medium — `GET /api/packs` DTO redaction is unspecified**
+   - The brief establishes `/api/packs` as a user-action manifest, but this DP does not define what pack-azure contributes to that client DTO.
+   - Without an explicit redaction contract, there is risk of leaking ARM base URLs, subscription IDs, tenant/client identifiers, or other control-plane metadata into the browser.
+
+5. **🟠 Medium — Playground Azure stubs lack a production gate**
+   - The DP plans playground stubs for all six Azure user actions and asks an open question about the stubs API surface.
+   - It does not require a `KICKSTART_PLAYGROUND=true` gate or equivalent fail-closed registration rule for non-playground environments.
+
+6. **🟢 Low / Pass — `resultSchema` coverage is present**
+   - All six proposed Azure user actions define a typed `resultSchema` in the DP.
+   - This is the right control to prevent arbitrary browser payloads from flowing back into the runner context.
+
+## Required Security Conditions for Re-review
+
+1. **Lock down `azure.arm_get` / `azure.what_if` paths**
+   - Replace the broad `^/subscriptions/` check with a stricter allowlist for supported ARM read/deployment scopes.
+   - Validate **after** `{sub-id}` expansion.
+   - Explicitly deny `../`, `%2e%2e`, double-encoding variants, and sensitive admin paths including `/providers/Microsoft.Authorization/elevateAccess`.
+   - Keep per-call audit logging.
+
+2. **Define `azure:deploy_bicep` credentials as server-only**
+   - The browser may authorize/confirm, but deployment execution must use a server-side credential acquisition path only.
+   - No hardcoded tokens, no client-provided ARM bearer token passthrough.
+   - Deployment must be bound to the session's active subscription/resource-group selection and rejected on mismatch.
+
+3. **Define Azure token storage explicitly**
+   - Prefer an accessor such as `SessionCtx.getAzureCreds()` or an opaque server-side session handle.
+   - Do **not** add raw Azure access tokens to client-visible state, SSE events, or manifest DTOs.
+
+4. **Define the `/api/packs` redaction boundary**
+   - Expose only static UX metadata needed by the client: action name, description, confirm component, scopes, and schemas/shape metadata.
+   - Do not expose ARM endpoint URLs, subscription IDs, tenant IDs, client IDs, or secrets/tokens.
+
+5. **Gate playground stubs**
+   - Azure user-action playground stubs must only register/execute when `KICKSTART_PLAYGROUND=true`.
+   - Non-playground environments must fail closed.
+
+## Evidence Reviewed
+
+- Issue #482, latest DP comment by `sabbour` (`2026-04-17T14:33:37Z`)
+- `docs/v2-implementation-brief.md` (pack types, `SessionCtx`, user-action contracts, playground stubs)
+- `packages/core/src/tools/fetch-webpage.ts` (current SSRF/allowlist precedent)
+- Existing Azure auth/deployment code under `packages/web/src/services/` and `packages/web/api/src/lib/` for current server-only token handling precedent
+
+## Outcome
+
+Not ready for Zapp approval yet. Once the DP is amended to define the credential boundary, token storage, manifest redaction, and playground gate — and tightens the ARM path allowlist — this should be re-submitted for security review.

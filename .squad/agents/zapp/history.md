@@ -105,3 +105,16 @@ Three high-severity findings:
 Additional: `validate_artifacts` returns `valid: true` unconditionally — stub that JSON consumers may trust too easily.
 
 Clear: `emit_ui` validates via `A2UIMessageSchema`. No hardcoded credentials.
+
+## 2026-04-17 — DP #482 pack-azure Security Review
+
+**Verdict:** BLOCKED
+
+Five security conditions must be satisfied before DP #482 can be re-reviewed:
+1. Tighten `azure.arm_get`/`azure.what_if` path allowlist (replace `^/subscriptions/` with stricter scoped allowlist, validate after `{sub-id}` expansion, explicitly deny admin paths including `/providers/Microsoft.Authorization/elevateAccess`)
+2. Define `azure:deploy_bicep` as server-only credential flow — no browser-provided bearer token passthrough; bound to session subscription/resource-group
+3. Define Azure token storage explicitly — prefer `SessionCtx.getAzureCreds()` accessor; no raw token in client-visible state, SSE events, or manifest DTOs
+4. Define `/api/packs` redaction boundary — expose only static UX metadata; no ARM endpoint URLs, subscription/tenant/client IDs, or secrets
+5. Gate playground stubs on `KICKSTART_PLAYGROUND=true`; fail closed in non-playground environments
+
+Passes: `resultSchema` coverage correct on all 6 user actions.
