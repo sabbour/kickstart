@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #74 "chore: PR workflow skill + team.md issue source" | L | impl=16m | review=2m | cycles=1 | merged | @sabbour
