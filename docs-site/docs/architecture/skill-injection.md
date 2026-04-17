@@ -217,7 +217,7 @@ The `if (phase === "generate")` guard in `resolveConversationSkills.ts` is not c
 
 2. **Create a shared vocabulary module** — a single `src/engine/domain-vocab.ts` (or similar) exporting the keyword/domain taxonomy used by both mechanisms. This prevents divergence and makes the combined behavior testable.
 
-3. **Consolidate the typed `Skill` vs legacy path in Mechanism A** — pick one canonical resolution API. Currently the typed path exists, is exported, and is tested but used by no production kit. This is the highest-risk surface area for Agent SDK integration confusion.
+3. **Consolidate the typed `Skill` vs legacy path in Mechanism A** — pick one canonical resolution API. `azure-kit.ts` uses the typed `kit.skills[]` path; `github-kit.ts` uses the legacy path. Both are active in production, but the dual-path design is the highest-risk surface area for Agent SDK integration confusion.
 
 4. ~~**Remove `resolveSkillsAsync` / `resolveSkillsFromList` from public exports**~~ — **Done in #402.** Only `resolveSkills()` is now exported.
 
