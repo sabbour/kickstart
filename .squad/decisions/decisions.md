@@ -183,3 +183,203 @@ This is a focused bug-fix sprint with a single critical blocker (#166). Wave 1 m
 **Rationale:** User request — captured for team memory.
 
 ---
+
+## 2026-04-17 v2 Rewrite Merge & 1.0.0 Release Milestone
+
+### v2 Step 8: pack-aks-automatic DP Review
+
+**Date:** 2026-04-17  
+**Issue:** #483  
+**Verdict:** ✅ APPROVE_WITH_CONDITIONS
+
+**Conditions Satisfied:**
+| Check | Status | Notes |
+|-------|--------|-------|
+| C1 — harness micro-fix | ✅ Resolved | `skills?: Skill[]` tracked as separate harness micro-fix (Bender PR); `deployment-safeguards` registers inline once patch lands |
+| C2 — ArchitectureDiagram move | ✅ Resolved | Correctly framed as cross-pack move from `packages/pack-core/src/components/rich/` → `packages/pack-aks-automatic/src/components/`; both manifests updated; ownership assigned to #525 |
+| C3 — DeploymentConfirm in Phase E | ✅ Confirmed | `aks/DeploymentConfirm` explicitly added to Phase E scope |
+
+**Comment:** https://github.com/sabbour/kickstart/issues/483#issuecomment-4269284877  
+**Label Applied:** `leela:approved-dp`
+
+---
+
+### v2 Step 9: pack-github DP Review
+
+**Date:** 2026-04-17  
+**Issue:** #484  
+**Verdict:** ✅ APPROVE_WITH_CONDITIONS
+
+**Blocking Conditions Before Merge:**
+
+1. **Expand `GITHUB_PATH_ALLOWLIST`** (required before merge)
+   - Add `/user/repos(\?.*)?` — list user's personal repos
+   - Add `/repos/[^/]+/[^/]+/pulls/[0-9]+` — check PR status after creation
+   - Add `/repos/[^/]+/[^/]+/actions/runs/[0-9]+` — individual run status
+   - Add `/repos/[^/]+/[^/]+/branches(\?.*)?` — check branch existence
+
+2. **Split `github-handoff.ts` into browser and server modules** (required before merge)
+   - `services/github-handoff.browser.ts` — `signInWithGitHubPopup`, `buildGitHubLoginUrl`, `signOutGitHub` (browser only)
+   - `services/github-api.ts` — `listGitHubRepos`, `createGitHubRepo`, `getGitHubRepo` (Node.js-safe)
+   - No browser module imports allowed from `execute()` functions
+
+3. **Specify `github:create_pr` parameter schema** (required before merge)
+   - `files: z.array(z.string())` — list of generated artifact paths
+   - `branch: z.string().regex(BRANCH_NAME_RE)` — pre-validated
+   - `title: z.string().max(255)` — reasonable length
+   - PR body generated server-side from `files` list template, not free-form LLM string
+
+4. **Use `tokens: Record<string, string>` on `SessionCtx`** (coordinate with Bender/#479)
+   - Prevents scaling issues with multiple provider-specific fields
+   - Access as `ctx.session.tokens["github"]`
+   - If #479 already merged with `azureToken` flat, file follow-up refactor issue
+
+5. **Agent name confirmation** — DP correctly uses `github.publisher` (matches v2 brief)
+
+**Architecture Notes:** Token isolation design solid (three-layer defence: no-param token, allowlist, GET-only). Skill decomposition clean. Matches pack-azure pattern.
+
+---
+
+### v2 Step 10: Web client A2UI renderer DP Review
+
+**Date:** 2026-04-17  
+**Issue:** #485  
+**Verdict:** ✅ APPROVE_WITH_CONDITIONS (Leela); 🔴 BLOCKED (Zapp security review)
+
+**Leela Conditions for Implementation:**
+
+1. **Web bootstrap registration ordering is a hard invariant** — pack `register()` calls must run synchronously in `main.tsx` before `ReactDOM.createRoot().render()`. The `useA2UIRegistry()` hook captures registry state at first render via `useMemo([], [])`. Async registration produces empty Map and silent failures.
+
+2. **Bundle-registry is authoritative** — client bundle's sealed registry is the rendering source of truth. `GET /api/packs` response is validation-only, cross-checked at startup to warn (not block) on any unrenderable components.
+
+3. **Fluent `<Dialog>` is correct portal** — `UserActionPanel` uses Fluent's Dialog for portal management, focus trap, and `aria-modal`. No custom `ReactDOM.createPortal` needed.
+
+4. **`APIConnectorContext` NOT deleted** — Grep audit shows 9 active consumers in `catalog/components/`. Annotate `// TODO: remove when last catalog/component/ migrates to a pack`. Deletion deferred to last pack-component migration.
+
+5. **Zapp review of Phase C is mandatory hard gate** — Phase C passes MSAL tokens and GitHub OAuth results through `UserActionPanel.onResolve → POST /api/converse/resume`. Must not merge without Zapp sign-off. Add `needs-zapp-review` label when Phase C PR opens.
+
+6. **Component namespace collision-free** — `pack/PascalName` format with unique pack IDs is the full Map key. No additional namespace protection needed.
+
+**Zapp Critical Blocking Issues:**
+
+| Issue | Requirement |
+|-------|------------|
+| **Crit1** | Pre-render schema validation required. `propertySchema` must enforce validation before component render; unknown keys stripped; depth ceilings; URL-scheme allowlist for URL props |
+| **B1** | `UserActionPanel` confirm must fail closed (visible error + explicit retry/cancel), not synthesize success-like resume on missing renderer |
+| **B2** | Credential/resume boundary explicit: browser POST only `{ sessionId, actionId, result }`; result validated server-side against stored schema |
+| **B3** | Registry must be immutable startup snapshot (`ReadonlyMap`); exact string lookup only; no dynamic import/eval; fallback visible, not `null` |
+| **B4** | Phase D merge must use schema-projected data only; strip dangerous keys (`__proto__`, `prototype`, `constructor`); depth/size limits |
+
+**Outcome:** Requires DP amendment to address Zapp security conditions before re-review.
+
+---
+
+### v2 Step 11: Guardrails Engine DP Review
+
+**Date:** 2026-04-17  
+**Issue:** #486  
+**Verdict:** ✅ APPROVE_WITH_CONDITIONS
+
+**Architectural Decision:** Test-scaffolded interface supersedes brief. `GuardrailContribution` interface and `GuardrailVerdict` type in test scaffolding are authoritative.
+
+**Superseded (brief):**
+```ts
+type GuardrailVerdict = { kind: "pass" } | { kind: "block"; reason: string } | { kind: "rewrite"; payload: unknown };
+interface GuardrailContribution { check(ctx, payload): Promise<GuardrailVerdict>; }
+```
+
+**Adopted (Step 11 + tests):**
+```ts
+type GuardrailVerdict = 'pass' | 'block' | 'redact';
+interface GuardrailResult { verdict: GuardrailVerdict; reason?: string; redacted?: unknown; }
+interface GuardrailContribution { name: string; stage: GuardrailStage | GuardrailStage[]; appliesTo?: string | string[]; evaluate(input: GuardrailInput): Promise<GuardrailResult>; }
+```
+
+**Merge Conditions:**
+
+1. Brief §Guardrail updated to `evaluate()` shape in same commit
+2. 3 existing pack-core guardrails migrated: `pii-filter`, `no-credential-leak`, `validate-artifacts` from `check()` → `evaluate()`
+3. `applyRedact()` explicitly defined in `guardrails.ts` for all 3 stages (input, output, tool)
+
+**Rationale:** Test scaffolding already codified `redact` + `evaluate`. Diverging at this stage creates compile-time break.
+
+---
+
+### v2 Step 12: MCP Adapter DP Review
+
+**Date:** 2026-04-17  
+**Issue:** #487  
+**Verdict (Leela):** ✅ APPROVE_WITH_CONDITIONS  
+**Verdict (Zapp):** ✅ APPROVE_WITH_CONDITIONS (follow-up re-check)
+
+**Leela Blocking Conditions:**
+
+1. VS Code `clientInfo` detection before A2UI embedding with plain-text fallback required in code
+2. Sticky routing documented in deployment guide (not just DP)
+3. `requiresSession` flag added to `ToolContribution` type before Step 12 PR opens
+4. Interrupt block format is structured JSON (not human-readable text)
+
+**Zapp Conditions for Step 12 PR Merge:**
+
+1. UserActions never in MCP manifest; MCP returns only structured interrupt (`resumeUrl`, `actionId`, `sessionId`)
+2. `connectionId` server-assigned during MCP initialize, bound to session lifetime
+3. `mcpExposed` defaults to `false`; explicit allowlist only; FS, credential, `requiresSession` tools permanently excluded
+4. MCP inputs use same Zod schemas as web path; buffered output passes output-stage guardrail chain before return
+5. Resume single-use, action-bound with CAS clearing, 5-minute TTL/410 expiry, preemptive 409 on no pending interrupt, replay protection enabled
+6. Session and interrupt state in-memory only, per-session mutex protection; process restart → 404 on stale resume attempts
+
+**Outcome:** Both security and architecture gates clear with implementation conditions preserved in PR and validated in code/tests.
+
+---
+
+### Step 5 Runner + SSE (PR #550) DP Review
+
+**Date:** 2026-04-17  
+**Issue:** #479  
+**PR:** #550  
+**Verdict:** ✅ APPROVE_WITH_CONDITIONS
+
+**Blocking Condition:**
+- `_lastActiveAt` must be first-class `Session` field (not side-channel property). Add `lastActiveAt: number` initialized in constructor, updated by `getOrCreateSession`.
+
+**Architectural Decisions Locked for Steps 6–9:**
+
+1. **Runner/SSE contract:** `Runner` stateless; `Session` carries all mutable state; `SSEWriter` opaque boundary
+2. **UserAction interrupt pattern canonical:** `AbortController.abort()` from inside tool's `execute()` handler, with `user_action_req` SSE event emitted first
+3. **Resume creates new continuation turn** (not replay): `Runner.resume()` calls `this.run()` with synthetic `[UserAction xxx result]: ...` message. History accumulates in 50-turn sliding window.
+4. **HTTP 200 for resume auth failures acknowledged debt:** Pre-stream auth check in `functions/resume.ts` correct shape; defer to Step 6 auth hardening pass
+5. **`z.unknown()` stubs in `server-manifest.ts` explicitly temporary:** 18 stubs (5 Fluent + 13 rich) marked TODO; acceptable for this step
+
+---
+
+### Ceremony Workflows Authentication — GitHub App Pattern
+
+**Date:** 2026-04-17  
+**Author:** Leela (Lead)  
+**Status:** Accepted
+
+**Decision:** Ceremony workflows (`squad-pr-retro.yml`, `squad-release-cadence.yml`) authenticate for `git push` via the `sabbour-squad-lead` GitHub App (appId `3340358`) using `actions/create-github-app-token@v1` with repository secrets `SQUAD_LEAD_APP_ID` and `SQUAD_LEAD_PRIVATE_KEY`.
+
+**Rationale:** `github-actions[bot]` cannot be added as bypass actor in GitHub branch protection rulesets. GitHub Apps can be registered as bypass actors.
+
+**Consequences:**
+- Ceremony workflows require `SQUAD_LEAD_APP_ID` and `SQUAD_LEAD_PRIVATE_KEY` repository secrets to be set
+- `sabbour-squad-lead` must remain registered as bypass actor in branch protection ruleset
+- Future ceremony workflows follow same pattern
+
+---
+
+### Connector Execution Model — Client vs Proxy
+
+**Date:** 2026-04-17  
+**Author:** Hermes (via research), Leela (architecture review)
+
+**Decision:** AzureARMConnector always proxies through `/api/arm-proxy` (CORS constraint). GitHubConnector splits: reads direct, writes proxied for token security. Exception: `createPullRequest()` calls `api.github.com` directly — flagged as technical debt.
+
+**Rationale:** 
+- ARM management API does not allow browser CORS
+- GitHub reads are public/CORS-enabled
+- GitHub writes need token isolation
+- `createPullRequest()` direct call is known inconsistency to be addressed
+
+**Impact:** Any new connector methods that write data MUST use the server proxy pattern.
