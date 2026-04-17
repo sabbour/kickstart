@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #249 "fix: exact match for JSON tab in Playwright E2E tests" | M | impl=0m | review=4m | cycles=1 | merged | @sabbour
