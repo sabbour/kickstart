@@ -16,8 +16,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  statuses: write
-  checks: write
 
 concurrency:
   group: squad-pr-retro-log-${{ github.event.pull_request.number || inputs.pr_number }}
@@ -28,11 +26,18 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.pull_request.labels.*.name, 'retro-log') }}
     steps:
+      - name: Generate squad app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: 3340358
+          private-key: ${{ secrets.SQUAD_LEAD_APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Compute metrics
         id: metrics
@@ -132,7 +137,7 @@ jobs:
         env:
           BASE_REF: ${{ steps.metrics.outputs.base_ref }}
           LINE: ${{ steps.metrics.outputs.line }}
-          GH_TOKEN: ${{ secrets.SQUAD_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -e
           git fetch origin "$BASE_REF"
@@ -202,23 +207,6 @@ jobs:
           fi
 
           gh pr merge "$PR_URL" --squash --auto --delete-branch
-
-          # Post squad/review-gate success — labels applied via GITHUB_TOKEN
-          # don't trigger the squad-review-gate workflow, so we post it here.
-          PR_NUM_NEW="$(echo "$PR_URL" | grep -oE '[0-9]+$')"
-          HEAD_SHA="$(gh pr view "$PR_NUM_NEW" --json headRefOid --jq '.headRefOid')"
-          gh api repos/${{ github.repository }}/statuses/"$HEAD_SHA" \
-            --method POST \
-            --field state=success \
-            --field context="squad/review-gate" \
-            --field description="Squad review gate: Leela ✅ Zapp ✅"
-
-          # Dispatch ci-gate-retro.yml on the retro-log branch. CI is not triggered
-          # for GITHUB_TOKEN-opened PRs; this runs a job named "ci-gate" via the
-          # GitHub Actions app (integration_id 15368) to satisfy the ruleset check.
-          gh workflow run ci-gate-retro.yml \
-            --ref "${SIDE_BRANCH}" \
-            --field pr_number="${PR_NUM_NEW}"
 
       - name: Mirror line as PR comment
         if: steps.metrics.outputs.skip != 'true'
