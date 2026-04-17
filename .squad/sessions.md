@@ -52,3 +52,62 @@ All Copilot review threads resolved and verified before each merge.
 ### Inbox Cleared
 
 All 11 files in `.squad/decisions/inbox/` processed and merged into `decisions.md`. Inbox ready for next session.
+
+---
+
+## Session: 2026-04-17 (Round 2) — Design Proposal Reviews + SDK Migration Closeout
+
+**Trigger:** Completion of architecture reviews on Design Proposals #329 and #330.
+
+**Session Type:** Decision capture + spawn orchestration (Bender #445, follow-on issues #445 + #446).
+
+### Reviews Completed
+
+**Leela (Lead, Architecture):**
+- ✅ DP #329 (MCP App IDE Surface): APPROVED WITH CONDITIONS
+  - Resource registration approach canonical per MCP Apps Quickstart §2
+  - Single-file bundle with CSP headers required
+  - postMessage validation via `event.source === window.parent`
+  - Runtime duplication risk identified: canonical LLM client required before code lands
+  - Bundle size validation required at merge time
+  
+- ✅ DP #330 (OpenAI Agents SDK Migration): APPROVED + CLOSEOUT
+  - Option B (hybrid route planner + manager agent) adopted
+  - `phaseComplete`/`filesComplete` retired; server-authored route state replaces them
+  - Generate step orchestration remains custom (workspace-first constraint enforced)
+  - Implementation sequence locked: Gate → arch spike + Azure compat → backend (#445, Bender) → UI (#446, Fry) → cleanup
+  - Follow-on issues created: #445, #446
+
+**Zapp (Security Architect):**
+- ✅ DP #329 (MCP App IDE Surface): APPROVE WITH CONDITIONS
+  - 6 security conditions identified and recorded as implementation acceptance criteria
+  - 🔴 High: MCP tool exposure from iframe runtime
+  - 🟠 Major (3): postMessage trust model, missing CSP, unbounded A2UI payload parsing
+  - 🟡 Minor: Session ownership/replay protections not explicit
+  - 🟢 Low: Credential handling generally sound
+  - Gate: Conditionally clear for implementation PRs
+
+### Agents Spawned
+
+- **Bender #445:** Backend SDK adapter (Bender, Backend Dev) — spawned per DP #330 locked sequence
+  - Includes all Zapp security conditions as acceptance criteria
+  - Status: Still running
+
+### Decisions Recorded
+
+- 2 new decisions merged to `.squad/decisions.md`:
+  1. **DP #329 Architecture Review** (Leela, 2026-04-17T03:30:17Z) — conditions on implementation
+  2. **DP #330 Closeout** (Leela, 2026-04-17T03:30:17Z) — Option B adopted, implementation sequence locked
+  3. **DP #329 Security Review** (Zapp, 2026-04-17T03:30:17Z) — 6 conditions, conditional gate clear
+
+- 3 orchestration logs written to `.squad/orchestration-log/`:
+  1. `2026-04-17T03-30-17-leela-dp-review.md`
+  2. `2026-04-17T03-30-17-zapp-security-review.md`
+  3. `2026-04-17T03-30-17-bender-445.md`
+
+### Inbox Status
+
+All 2 files in `.squad/decisions/inbox/` processed:
+- `leela-dp-reviews-apr17.md` → merged
+- `zapp-dp-329-security.md` → merged
+Inbox now empty and ready for next session.

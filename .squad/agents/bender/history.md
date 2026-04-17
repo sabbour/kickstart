@@ -32,6 +32,8 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - (2026-04-15 16:06) SWA outage triage: latest deploy was packaging 18 API entrypoints, including `converse.test.ts`, and bundling `bicep-node` into the function ESM output. Both crashed module import before handlers registered, which explains the live `/api/*` 404s. Fixed `packages/web/api/esbuild.config.mjs` to exclude `*.test.ts`/`*.spec.ts` and keep `bicep-node` external.
 
 ## Learnings
+- (2026-04-17) `readonly RegExp[]` is the correct type annotation for shared pattern arrays in TypeScript — consumers doing `.some(p => p.test())` work fine; only push/pop/splice operations break. When downstream code has a typed struct with `patterns: RegExp[]`, widen it to `readonly RegExp[]` rather than casting the source.
+- (2026-04-17) Before adding vocabulary/helper symbols to a package's public `src/index.ts`, grep the entire workspace for external consumers. If all imports are within the package, keep the symbols in the internal barrel only — prevents needless API surface and semver churn.
 - Heartbeat board-assignment steps that use `actions/github-script` must always fall back from `COPILOT_ASSIGN_TOKEN` to `GITHUB_TOKEN`. If the PAT secret is unset, the action fails before the script can early-return or downgrade GraphQL/project errors to warnings.
 - SWA deploy workflow (`deploy-swa.yml`) needs explicit `push → branches: [main]` trigger — tag-only triggers mean no continuous deployment from main.
 - `__BUILD_VERSION__` in `vite.config.ts` can embed git SHA via `execSync('git rev-parse --short HEAD')` — works both locally and in CI without relying on `GITHUB_SHA` env var.
@@ -84,6 +86,8 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - (2026-04-15T19:24:36.732Z) For routed model regressions, test the helper layer where the inner loops actually live: `chatCompletionWithTools()` owns tool-call rounds and `chatCompletionWithAutoContinue()` owns continuation retries. A top-level endpoint test alone cannot prove the deployment survives those internal hops.
 - (2026-04-16) `BaseConnector.isAuthenticated()` returns `true` for `auth: { kind: 'none' }` connectors (SWA cookie auth). Components guarding live API calls with `isAuthenticated()` must also check `isMockMode() || isPlaygroundMode()` — the connector doesn't distinguish offline/playground from production for this auth kind.
 - (2026-04-16) All `useA2UI()` calls must supply an `actionHandler` (even a no-op) if the component may host surfaces that fire `continue:` or other actions. Omitting the handler silently swallows actions and can stall wizard flows.
+- (2026-04-17) `advancePhase()` must use `PHASE_DEFINITIONS.find()` + a safe fallback rather than `getPhaseDefinition()` which throws. Any function called on every LLM turn must be hardened against stale/hydrated strings from client rehydration. Use `isPhase()` type guard at API boundaries before trusting a string as a `Phase`.
+- (2026-04-17) `Phase` enum values are lowercase strings (`"discover"`, `"design"`, etc.) — not PascalCase. Type guards and tests must use the actual runtime values, not the enum key names.
 
 ---
 
@@ -151,3 +155,25 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - SDK `tool()` parameters field requires `ZodObjectLike | JsonObjectSchemaStrict | JsonObjectSchemaNonStrict | undefined`. Raw JSON Schema objects from the tool registry must be cast via `as any` to satisfy the union.
 - `AgentInputItem` is a Zod-validated union type — the `role` property is not on the union itself. Access it via `(item as { role?: string }).role` in tests and type guards.
 - `AssistantMessageItem` in the SDK requires a `status` field (`"completed" | "in_progress" | "incomplete"`). Omitting it fails Zod validation at `addItems()` call time.
+## 2026-04-17 Issue #445 Spawn — OpenAI Agents SDK Backend Adapter
+
+**Context:** Leela's DP #330 closeout approved the hybrid route planner + manager agent architecture. Locked implementation sequence: Gate approval (received 2026-04-17T01:53Z) → arch spike + Azure compat → **[CURRENT: Bender #445]** backend runtime adapter → UI adaptation (#446, Fry) → cleanup.
+
+**Issue #445:** Backend SDK adapter (v1.0.0 implementation)
+
+**Acceptance Criteria include all Zapp security conditions:**
+1. Server-enforced allowlist of app-callable MCP tools (default-deny behavior)
+2. Mode-aware message verification (null-origin + same-origin sandbox variants)
+3. Mandatory restrictive CSP in bundled app, verified in CI
+4. Strict A2UI validation: schema checks, payload size limits, component count/depth limits, fail-closed fallback
+5. Per-session principal/channel ownership checks and replay/audit protections on every app tool call
+6. Security compatibility matrix across VS Code, Claude Code, ChatGPT hosts
+
+**Plus DP #330 architecture requirements:**
+- SDK handles run/tool/session/streaming/tracing
+- Route state authoritative (server-authored, no model-emitted `phaseComplete`/`filesComplete`)
+- Generate orchestration custom (workspace-first constraint enforced)
+- Result adapter allowlist-only (no raw SDK traces/unfiltered outputs to browser)
+- Principal-bound resume: `(sessionId, runId, principalId)` with fail-closed + audit logging
+
+**Status:** Spawned 2026-04-17T03:30:17Z, still running.

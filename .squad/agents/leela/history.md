@@ -26,6 +26,10 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 
 ## Learnings
 
+- **2026-04-17T03:30:17Z — MCP App IDE DP (#329) architecture review:** Approved with conditions. Key finding: PoC adds \`runtime/\` modules inside \`packages/mcp-server\` that parallel the existing \`packages/web/api/\` LLM client + session store. If both the MCP App runtime and the Agents SDK migration (#330) proceed, we risk a third forked LLM runtime. Implementation issue must define which client is canonical before code lands. Bundle size validation of vite-plugin-singlefile output with full React + Fluent 2 + A2UI is required before Slice 1 ships. Decision file: \`.squad/decisions/inbox/leela-dp-reviews-apr17.md\`
+
+- **2026-04-17T03:30:17Z — Agents SDK DP (#330) closeout:** Both Leela architecture and Zapp security reviews complete. Verified all five acceptance criteria satisfied. Created follow-on issues: #445 (Bender — backend SDK adapter) and #446 (Fry — chat/workspace UI adaptation), both v1.0.0, #446 depends on #445. Closed #330 as completed.
+
 - **2026-04-16T06:00:45.448Z — User directive: vendor adaptive-ui instead of depending:** When a user says "do not depend on X, vendor it instead," the right action is surgical extraction of the minimal surface + create a tracked issue. Issue #342 removes `@sabbour/adaptive-ui-core` + `@sabbour/adaptive-ui-azure-pack` from web app by extracting icon registry + two SVGs into native code. Router: Fry. Scope: hotfix, no design proposal needed (pure refactor). Decision file: `.squad/decisions/inbox/leela-vendor-diagram-hotfix.md`
 - **2026-04-15T22:27:37.636Z — Priority lane tracking on GitHub:** Encode sprint priority directly on GitHub issues using existing labels (`priority:p1`, `priority:p2`) plus cross-link comments. Each issue gets a pinned comment listing its related issues in the same lane. This makes priority visible on the issue page without requiring users to check local squad notes. Decision file: `.squad/decisions/inbox/leela-priority-tracking-github.md`
 - **2026-04-15T09:46:31.308Z — Issue #265 smallest ship:** Treat `FileEditor` payloads as workspace data, not chat bubble content. The no-mock v1 is frontend-first: transform incoming `FileEditor` A2UI into compact file cards, mirror those files into `VirtualFileSystem`, auto-open the sidebar/viewer, and override generate-phase progress title client-side. Key paths: `packages/web/src/utils/chat-a2ui.ts`, `packages/web/src/App.tsx`, `packages/web/src/components/FileManager/`, `packages/web/api/src/lib/session-store.ts`.
@@ -36,6 +40,28 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 **2026-04-14**
 - Reviewed and approved DP #188 (expanded demo scenarios)
 - Approved Fry's implementation readiness for issue #188
+
+## 2026-04-17 Design Proposal Reviews (Round 6)
+
+**DP #329 (MCP App IDE Surface) — Architecture Review**
+- **Verdict:** APPROVED WITH CONDITIONS
+- **Conditions:**
+  1. Resource registration approach canonical per MCP Apps Quickstart §2
+  2. Single-file bundle with CSP headers required (`script-src 'unsafe-inline'`, `style-src 'unsafe-inline'`, `connect-src 'none'`)
+  3. postMessage validation via `event.source === window.parent` guard
+  4. **Blocking risk:** Runtime duplication. PoC adds `runtime/conversation.ts`, `runtime/openai-client.ts`, `runtime/session-store.ts` inside `packages/mcp-server` that parallel `packages/web/api/src/lib/openai-client.ts` + `session-store.ts`. Combined with Agents SDK migration (#330), could fork LLM runtime 3 ways. Implementation issue must define canonical client before code lands.
+  5. Bundle size validation required: `vite-plugin-singlefile` output measured with full React + Fluent 2 + A2UI before Slice 1 ships.
+
+**DP #330 (OpenAI Agents SDK Migration) — Architecture Review & Closeout**
+- **Verdict:** APPROVED + SESSION CLOSE
+- **Architecture decisions adopted:**
+  1. **Option B (hybrid route planner + manager agent)** — not Option A (loop-only) or Option C (full handoff rewrite)
+  2. SDK handles run/tool/session/streaming/tracing; product code owns route policy, generation sequencing, A2UI output
+  3. `phaseComplete`/`filesComplete` flags retired; server-authored route state replaces model-emitted booleans
+  4. Generate step orchestration stays custom; workspace-first (#326/#327/#328) is enforced constraint
+  5. Implementation sequence locked: Gate approval → arch spike + Azure compat → backend (#445, Bender) → UI (#446, Fry) → cleanup
+- **Follow-on issues created:** #445 (Backend SDK adapter, Bender), #446 (Chat/workspace UI, Fry)
+- **Design Proposal closed:** All 5 acceptance criteria verified; conditions integrated into implementation roadmap.
 
 ## 2026-04-15 PR Review & Merge Sprint
 
