@@ -188,3 +188,19 @@ Decision filed: `.squad/decisions/inbox/leela-pr544-review.md`
 - All 8 DP conditions verified. `packages/core/` shim is compile-only (package.json redirect only). Feature flags (`KICKSTART_AGENTS_SDK`, `KICKSTART_V2`) deleted from production. `converse.ts` returns 503 fail-closed. 34 smoke tests green. 407 tests total green.
 - **Hard gate on Step 2:** `packages/web/src/types.ts` is `export {};` but 15+ web shell files still import named types from it. `tsc --noEmit` would fail. Step 2 must resolve this first (re-export from harness or inline). Bender + Fry co-own tsc clean-up before any new type-safe code.
 - Filed `leela-pr544-review.md` → decisions.md.
+
+## 2026-06-10 — PR #545 Code Review (v2 Step 2)
+
+**PR:** #545 — feat(v2): Step 2 — Harness primitives, all types + Zod schemas (Closes #475)  
+**Verdict:** REQUEST CHANGES — 2 blockers (no `leela:approved` applied)
+
+C1, C3, C4, C5 all pass. Two blockers:
+
+1. **`SessionCtx.a2uiEmissions: A2UIMessageV09[]` missing** — session.ts has write-only `recordA2UIEmission()` method but no readable array property. Required by C2 (late addition) and #477 F3/C2. Step 5 SSE forwarding reads this array as its post-validation buffer.
+
+2. **`Pack` has dual-registration model** — both `agentsDir?: URL` and `agents?: AgentContribution[]` present. #477 F1 called these incompatible. Brief §11 resolves to dir-based. Inline `agents`/`skills` arrays must be removed from the interface.
+
+Non-blocking notes: `tsconfig.json` includes `DOM` lib (unnecessary), `index.ts` `// TODO(Step 2)` header is stale.
+
+Step 3 (#476) remains gated on this PR. Both fixes are small diffs — no scope expansion needed.  
+Decision filed: `.squad/decisions/inbox/leela-pr545-review.md`
