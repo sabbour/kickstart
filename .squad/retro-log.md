@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #164 "fix: surface IndexedDB filesystem in main app UI" | XL | impl=2m | review=41m | cycles=1 | merged | @sabbour-squad-frontend[bot]
