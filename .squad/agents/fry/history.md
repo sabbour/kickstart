@@ -113,6 +113,10 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - (2026-04-15 22:40Z) Recovery lane for #328 on `squad/328-setup-frontend-recovery`: wired `step_start`/`file_generated`/`step_complete`/`step_error` streaming into a synthetic DeploymentProgress surface, kept generate chat progress-only, routed streamed files into the workspace/FileManager, added a polite live-region announcement, and covered the slice with targeted frontend regressions.
 
 ## Learnings
+- (2026-04-17T03:01:07Z) For `/api/inspirations` (non-streaming), the handler returns 503 if Azure OpenAI is not configured — there is NO hardcoded fallback in the non-streaming path. The fallback ideas are only used in `/api/inspirations/widgets` and in the streaming path of `/api/inspirations`.
+- (2026-04-17T03:01:07Z) The `/api/action` endpoint uses `action: { name: string, context?: Record<string, unknown> }` in the body (not `actionId`). Action routing is by name prefix: `navigate:`/`nav:` = navigate, `api:` = stubbed, default = reply.
+- (2026-04-17T03:01:07Z) The `/api/generate` endpoint is fully stateless — no sessionId, no session store. Auth is rate-limit-only. Streaming is opt-in via `Accept: text/event-stream` header (same pattern as `/api/converse`).
+- (2026-04-17T03:01:07Z) All Azure-facing session endpoints (azure-target, azure-deployments-start, azure-deployments-status, deploy-cost-gate) require `x-ms-client-principal-id` header (SWA sign-in), not just an Azure access token. Docs must reflect this separately from the Azure access token requirement.
 - (2026-04-16T06:38:32Z) New K8s resource icons that don't exist in the azure-pack should be created as static SVGs under `packages/web/public/assets/icons/k8s/` and registered via `registerDiagramIcons()` in `ensureDiagramIconsRegistered()`. The registration call is additive and idempotent — local icons merge with pack-provided ones without conflict. Always update `ALLOWED_ICON_KEYS` in `architectureDiagramUtils.ts` in tandem.
 - (2026-04-16T06:38:32Z) K8s icon SVGs follow the community convention: blue hexagonal shield (#326ce5) with white glyph and abbreviated label. At 20×20 rendered size in Mermaid diagrams, simple Fluent-inspired glyphs (geometric shapes, arrows) are more readable than detailed illustrations. Match the existing viewBox ratio (≈18×17.5) and keep file sizes minimal.
 
@@ -129,6 +133,7 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 ## Work Log (continued)
 
 - (2026-04-16T09:32:00Z) Issue #352: Investigated `next-card` phantom reference. Zero matches anywhere in codebase. Chose Option B (don't implement). Also fixed holdover `DeploymentProgress` reference in system-prompt.ts example list (PR #356 rename leftover). → PR #372 opened (draft).
+- (2026-04-17T03:01Z) Issue #432 (P2 Security): Removed hardcoded Azure subscription ID, resource group, and tenant domain from `docs-site/docs/getting-started/deployment.md`. Replaced with `<subscription-id>`, `<resource-group>`, `<your-tenant-id-or-domain>` placeholders. Added Docusaurus `:::info` callout listing all three placeholders with descriptions. squad-sdk dist was absent; generated GitHub App installation token directly via Node.js crypto + HTTPS from the PEM key. → PR #442 opened and marked ready.
 
 ---
 
@@ -175,3 +180,42 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - NetworkPolicy stays in azure-pack, never in K8S_EXTRA_ICONS
 
 **Next:** Unblock #349 FileEditor decision; address ChoicePicker naming in system prompt.
+
+## Learnings (continued)
+
+- (2026-04-17T03:01Z) `packages/squad-sdk` is not always present as a compiled package in the worktree. When `resolveToken()` is unavailable, generate a GitHub App installation token directly: sign a JWT (RS256) from the PEM in `.squad/identity/keys/{role}.pem` with `appId` + `installationId` from `.squad/identity/config.json`, then POST to `/app/installations/{id}/access_tokens`. Use `iss: String(appId)` (string, not number) and `exp: now + 540` (9 min) to avoid GitHub's clock-skew rejection.
+
+## Learnings
+- (2026-04-17T03:01:07Z) `auto-continue.ts` only triggers on `complete:` and `continue:` prefixes (`AUTO_CONTINUE_PREFIXES`). The `navigate:`/`nav:` pattern is a *secondary* prefix checked after stripping the outer `complete:`/`continue:` — the full action name looks like `complete:navigate:design`. Docs that say `navigate:` alone triggers auto-continue are wrong.
+- (2026-04-17T03:01:07Z) `skill-resolver.ts` phase group constants (`DISCOVERY_PHASES`, `DESIGN_PHASES`, etc.) are module-private `const Set<Phase>` values — not exported, not arrays. Docs or code examples showing `export const DISCOVERY_PHASES = [Phase.Discover]` are incorrect on both counts.
+- (2026-04-17T03:01:07Z) `packages/core/src/__tests__/phases.test.ts` does not exist in this repo. The closest existing test for phase behavior is `skill-resolver.test.ts`, which exercises phase-based filtering via `resolveSkills()`. Always verify test file names against the actual `__tests__/` listing before referencing them in docs.
+
+
+## Learnings
+- (2026-04-17) `buildSystemPrompt()` builds `vars["appDefinition"]`, `vars["azureContext"]`, `vars["repoInfo"]` but previously only `vars["knownInfo"]` was pushed to `parts`. The `interpolate()` call only substitutes `{{placeholder}}` tokens — if the narrative has no such token, the var is silently lost. Always explicitly push context vars as `## Section` blocks in `parts`.
+- (2026-04-17) The system-prompt narrative text "Read X (injected)" is LLM instruction to reference a section of that name. The section must be added as an explicit `parts.push()` block to actually reach the LLM. Narrative text alone does not inject context.
+
+## Work Log (continued)
+- (2026-04-17) Issue #429: Fixed `buildSystemPrompt()` to inject `appDefinition` (full JSON), `azureContext`, and `repoInfo` as explicit prompt sections. 3 new test assertions. → PR #437 opened.
+
+## 2026-04-17T03:30:17Z — Issue #446: Agents SDK UI Adaptation
+
+**Goal:** Adapt the web frontend to consume server-authored route state from the Agents SDK backend (PR #447, merged).
+
+**Analysis:** Frontend already trusted `phase` from the SSE `done` event and `setConversationPhase()` already allowed non-monotonic transitions. The four less-rigid behaviors were architecturally sound. The only gap was the SDK streaming gate: when `KICKSTART_AGENTS_SDK=true`, the backend returns HTTP 406 for streaming, which `useStreaming.ts` had no fallback for.
+
+**Changes shipped (PR #455):**
+- `useStreaming.ts`: Added 406 fallback — retries as non-streaming JSON (`ConverseResponse`), routes `phase`/`a2ui`/`complete` callbacks through the same pipeline. Progressive text reveal preserved.
+- `route-state.spec.ts` (new): Playwright E2E — skip-ahead (phase jumps to `deploy`) and revisit (phase steps back to `design`) scenarios using `page.route()` API interception.
+
+**Board:** Issue moved to "In review".
+
+## Learnings
+- (2026-04-17T03:30:17Z) The `done` SSE event's `phase` field is already the server-authoritative phase post-route-planner in both the legacy streaming path and the SDK non-streaming path. The frontend never needs to infer phase from model output flags — it only reads from `onPhase()` callback sourced from `done.phase`.
+- (2026-04-17T03:30:17Z) When `KICKSTART_AGENTS_SDK=true`, the backend returns HTTP 406 for streaming requests. The 406 fallback in `useStreaming.ts` (non-streaming JSON retry) is the correct frontend pattern — not a separate hook, not a separate code path in App.tsx.
+- (2026-04-17T03:30:17Z) Playwright E2E tests for SSE route interception: register `**/api/health` → 200 and `**/api/converse` → SSE in the test body BEFORE `page.goto()`. Since Playwright matches routes LIFO, test registrations take precedence over the auto-fixture's `**/api/**` → 503. Use `page.waitForResponse('**/api/health')` to ensure `isApiAvailable` resolves before the auto-send fires.
+- (2026-04-17T03:30:17Z) For revisit tests with multiple SSE turns, use a closure counter (`let callCount = 0`) inside `page.route()` to return different responses on different calls. Playwright's route handler is stateful per test.
+
+## Learnings
+- (2026-04-17T03:01:07Z) When docs mention "no production kit uses the typed skill path" or "both kits use legacy," always verify against the actual kit files. `azure-kit.ts` registers `skills: azureIacSkills` (typed path), while `github-kit.ts` uses legacy. This split is intentional and both paths are live in production.
+- (2026-04-17T03:01:07Z) "What Should Be Cleaned Up" sections in architecture docs can drift from reality after PRs merge. Always strike through or update completed cleanup items (e.g., #402 removed resolveSkillsAsync/resolveSkillsFromList) to prevent future contributors from doing redundant work.
