@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-15 | #317 "fix: stop false heartbeat failures" | S | impl=0m | review=0m | cycles=1 | merged | @sabbour
+
 - 2026-04-15 | #315 "test: add SWA post-deploy health smoke" | M | impl=0m | review=0m | cycles=1 | merged | @sabbour
 
 - 2026-04-15 | #316 "feat: add live Azure session cost estimates" | XL | impl=1m | review=0m | cycles=1 | merged | @sabbour
