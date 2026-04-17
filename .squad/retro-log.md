@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-15 | #320 "fix: harden kickstart-app CodeQL hotspot" | L | impl=1m | review=0m | cycles=1 | merged | @sabbour
+
 - 2026-04-15 | #322 "feat(chat): add token usage tracker" | L | impl=1m | review=0m | cycles=1 | merged | @sabbour
 - 2026-04-15 | #321 "fix(deps): clear root dompurify alerts via monaco-editor pin" | S | impl=5m | review=0m | cycles=1 | merged | @sabbour
 
