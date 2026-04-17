@@ -78,6 +78,16 @@ interface IntegrationKit {
 **Neither production kit (`azure-kit.ts`, `github-kit.ts`) uses `kit.skills[]`.** Both use `prompts[]` / `phasePrompts{}`. The typed path is exercised only in tests. In practice, 100% of runtime skill resolution goes through the legacy path. Anyone building an Agent SDK adapter who reads the interface and chooses the typed path will be using the non-production code path.
 :::
 
+### Public API
+
+The only supported public entry point for Mechanism A is:
+
+```typescript
+resolveSkills(phase: Phase, kits: IntegrationKit[], conversationHistory?: string[]): ResolvedSkills
+```
+
+All other resolver functions (`resolveSkillsAsync`, `resolveSkillsFromList`, `formatSkillsSection`, `registerSkillMiddleware`) have been removed — they had zero non-test production callers and the entire resolver surface is being redesigned in the Agents SDK migration (#330).
+
 ### Keyword Classification (Legacy Path)
 
 ```typescript
@@ -198,7 +208,7 @@ The `if (phase === "generate")` guard in `resolveConversationSkills.ts` is not c
 :::
 
 :::warning Dead Skill API in Mechanism A
-`resolveSkillsAsync()` and `resolveSkillsFromList()` are exported but never called in production. The typed `Skill` object path in `collectSkills()` is exercised by zero production kits.
+`resolveSkillsAsync()` and `resolveSkillsFromList()` were exported but never called in production. They have been removed in #402. Only `resolveSkills()` remains as the public entry point.
 :::
 
 ## What Should Be Cleaned Up
@@ -209,6 +219,6 @@ The `if (phase === "generate")` guard in `resolveConversationSkills.ts` is not c
 
 3. **Consolidate the typed `Skill` vs legacy path in Mechanism A** — pick one canonical resolution API. Currently the typed path exists, is exported, and is tested but used by no production kit. This is the highest-risk surface area for Agent SDK integration confusion.
 
-4. **Remove `resolveSkillsAsync` / `resolveSkillsFromList` from public exports** — or document exactly what async/list scenarios they serve for Agent SDK callers.
+4. ~~**Remove `resolveSkillsAsync` / `resolveSkillsFromList` from public exports**~~ — **Done in #402.** Only `resolveSkills()` is now exported.
 
 5. **After FSM removal** — both `resolveSkills(phase, kits)` and `resolveConversationSkills(message, phase, context)` accept a phase string. Neither needs code changes when the FSM is removed. The `if (phase === "generate")` guard in Mechanism B continues to work as a plain string comparison. The source of the phase string changes (was `engineState.currentPhase`, becomes `session.state.currentPhase`) but the function signatures and behavior are identical.

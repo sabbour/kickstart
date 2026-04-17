@@ -7,7 +7,6 @@
  *   • Keyword heuristic fallback for kits with only flat prompts
  *   • Discover phase: synthetic tool-listing prompt
  *   • Empty kits produce empty result
- *   • formatSkillsSection — markdown formatting
  *   • buildSystemPrompt kitPrompts injection
  */
 
@@ -16,9 +15,6 @@ import { Phase } from "../engine/types.js";
 import type { Skill } from "../engine/types.js";
 import {
   resolveSkills,
-  resolveSkillsAsync,
-  resolveSkillsFromList,
-  formatSkillsSection,
 } from "../engine/skill-resolver.js";
 import { buildSystemPrompt } from "../prompts/system-prompt.js";
 import type { IntegrationKit } from "../kits/types.js";
@@ -233,24 +229,6 @@ describe("resolveSkills — multiple kits", () => {
   });
 });
 
-// ── formatSkillsSection ──────────────────────────────────────────────────────
-
-describe("formatSkillsSection", () => {
-  it("returns empty string when no prompts", () => {
-    expect(formatSkillsSection({ prompts: [], availableTools: [] })).toBe("");
-  });
-
-  it("formats a section with the correct markdown header", () => {
-    const section = formatSkillsSection({
-      prompts: ["Prompt one", "Prompt two"],
-      availableTools: [],
-    });
-    expect(section).toContain("## Available Capabilities");
-    expect(section).toContain("Prompt one");
-    expect(section).toContain("Prompt two");
-  });
-});
-
 // ── buildSystemPrompt kitPrompts injection ───────────────────────────────────
 
 describe("buildSystemPrompt with kitPrompts", () => {
@@ -410,42 +388,6 @@ describe("resolveSkills — typed Skill objects", () => {
     const result = resolveSkills(Phase.Generate, [kit]);
     expect(result.prompts.some((p) => p.includes("Skill content here"))).toBe(true);
     expect(result.prompts.some((p) => p.includes("Legacy phase prompt"))).toBe(true);
-  });
-});
-
-// ── resolveSkillsFromList ────────────────────────────────────────────────────
-
-describe("resolveSkillsFromList", () => {
-  it("resolves skills from a flat list", () => {
-    const skills: Skill[] = [
-      makeSkill("direct-a", { phases: [Phase.Generate], content: "Direct A" }),
-      makeSkill("direct-b", { phases: [Phase.Review], content: "Direct B" }),
-    ];
-
-    const genResult = resolveSkillsFromList(Phase.Generate, skills);
-    expect(genResult.prompts.some((p) => p.includes("Direct A"))).toBe(true);
-    expect(genResult.prompts.some((p) => p.includes("Direct B"))).toBe(false);
-
-    const revResult = resolveSkillsFromList(Phase.Review, skills);
-    expect(revResult.prompts.some((p) => p.includes("Direct B"))).toBe(true);
-  });
-});
-
-// ── resolveSkillsAsync ───────────────────────────────────────────────────────
-
-describe("resolveSkillsAsync", () => {
-  it("returns same results as sync version", async () => {
-    const skill = makeSkill("async-test", {
-      phases: [Phase.Generate],
-      content: "Async skill content",
-    });
-    const kit = makeKit("async-kit", { skills: [skill] });
-
-    const syncResult = resolveSkills(Phase.Generate, [kit]);
-    const asyncResult = await resolveSkillsAsync(Phase.Generate, [kit]);
-
-    expect(asyncResult.prompts).toEqual(syncResult.prompts);
-    expect(asyncResult.availableTools).toEqual(syncResult.availableTools);
   });
 });
 

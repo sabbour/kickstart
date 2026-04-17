@@ -19,7 +19,7 @@
  */
 
 import { Phase } from "./types.js";
-import type { Skill, SkillResolverContext } from "./types.js";
+import type { Skill } from "./types.js";
 import type { IntegrationKit } from "../kits/types.js";
 
 // ---------------------------------------------------------------------------
@@ -101,27 +101,9 @@ function classifyPrompt(prompt: string): Set<Phase> {
 }
 
 // ---------------------------------------------------------------------------
-// Middleware (#33)
+// Internal helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Async middleware function in the skill resolver chain.
- *
- * Each middleware receives the current phase, a mutable context, and a `next`
- * callback.  It may modify `context.activeSkillIds` to control which skills
- * are injected, then call `next()` to run the remaining chain.
- *
- * The signature is async from day one so that future middleware (e.g.
- * TokenBudgetMiddleware with tiktoken) can perform async work without a
- * breaking contract change.
- */
-export type SkillResolverMiddleware = (
-  phase: Phase,
-  context: SkillResolverContext,
-  next: () => Promise<ResolvedSkills>,
-) => Promise<ResolvedSkills>;
-
-/** All skills extracted from kits, organized for middleware consumption. */
 function collectSkills(kits: IntegrationKit[]): Skill[] {
   const skills: Skill[] = [];
   for (const kit of kits) {
@@ -130,125 +112,6 @@ function collectSkills(kits: IntegrationKit[]): Skill[] {
     }
   }
   return skills;
-}
-
-/**
- * Phase-filter middleware — keeps only skills whose `phases` array includes
- * the current phase.
- */
-const phaseFilterMiddleware: SkillResolverMiddleware = async (
-  phase,
-  context,
-  next,
-) => {
-  const allSkills = collectSkills(context.kits);
-  const phaseSkills = allSkills.filter((s) => s.phases.includes(phase));
-  context.activeSkillIds = new Set(phaseSkills.map((s) => s.id));
-  return next();
-};
-
-/**
- * Keyword-activation middleware — if conversation history is provided, scans
- * recent messages for skill keywords and activates matching skills.  When no
- * conversation history is available, all phase-eligible skills remain active
- * (safe default).
- *
- * Security note (Zapp): keyword activation only toggles predefined skill IDs.
- * No raw user text is injected into system prompts — only first-party skill
- * content from the `Skill.content` field.
- */
-const keywordActivationMiddleware: SkillResolverMiddleware = async (
-  _phase,
-  context,
-  next,
-) => {
-  const history = context.conversationHistory;
-  if (!history || history.length === 0) {
-    return next();
-  }
-
-  const combined = history.join(" ").toLowerCase();
-  const allSkills = collectSkills(context.kits);
-
-  for (const skill of allSkills) {
-    if (context.activeSkillIds?.has(skill.id)) continue; // already active
-    const match = skill.keywords.some((kw) => combined.includes(kw.toLowerCase()));
-    if (match) {
-      context.activeSkillIds ??= new Set();
-      context.activeSkillIds.add(skill.id);
-    }
-  }
-
-  return next();
-};
-
-/**
- * Priority-order middleware — sorts the final resolved prompts so that
- * higher-priority skills appear first in the system prompt.
- */
-const priorityOrderMiddleware: SkillResolverMiddleware = async (
-  _phase,
-  context,
-  next,
-) => {
-  const result = await next();
-
-  const allSkills = collectSkills(context.kits);
-  const activeIds = context.activeSkillIds ?? new Set<string>();
-
-  const activeSkills = allSkills
-    .filter((s) => activeIds.has(s.id))
-    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
-
-  // Prepend skill content before legacy prompts (skills are higher-signal)
-  const skillPrompts = activeSkills.map((s) => s.content);
-  result.prompts = [...skillPrompts, ...result.prompts];
-
-  return result;
-};
-
-/** Default middleware stack. */
-const DEFAULT_MIDDLEWARE: SkillResolverMiddleware[] = [
-  phaseFilterMiddleware,
-  keywordActivationMiddleware,
-  priorityOrderMiddleware,
-];
-
-/** Custom middleware registered via `registerSkillMiddleware`. */
-const customMiddleware: SkillResolverMiddleware[] = [];
-
-/**
- * Register a custom middleware that will be appended to the default stack.
- *
- * Security: only first-party code should call this.  Do not expose to
- * user input or runtime plugin registration.
- */
-export function registerSkillMiddleware(
-  middleware: SkillResolverMiddleware,
-): void {
-  customMiddleware.push(middleware);
-}
-
-/**
- * Build a middleware chain and execute it, returning resolved skills.
- */
-async function runMiddlewareChain(
-  phase: Phase,
-  context: SkillResolverContext,
-  baseFn: () => Promise<ResolvedSkills>,
-): Promise<ResolvedSkills> {
-  const stack = [...DEFAULT_MIDDLEWARE, ...customMiddleware];
-
-  let idx = 0;
-  const runNext = async (): Promise<ResolvedSkills> => {
-    if (idx < stack.length) {
-      const mw = stack[idx++];
-      return mw(phase, context, runNext);
-    }
-    return baseFn();
-  };
-
-  return runNext();
 }
 
 // ---------------------------------------------------------------------------
@@ -274,10 +137,6 @@ export interface ResolvedSkills {
  *
  * Additionally, for the Discover phase, a synthetic tool-listing prompt is
  * prepended so the LLM knows which tools it can call.
- *
- * This synchronous facade applies skill resolution inline (phase filter +
- * keyword activation + priority sort).  For the full async middleware chain
- * (including custom middleware), use `resolveSkillsAsync`.
  */
 export function resolveSkills(
   phase: Phase,
@@ -309,46 +168,6 @@ export function resolveSkills(
   legacy.prompts = [...skillPrompts, ...legacy.prompts];
 
   return legacy;
-}
-
-/**
- * Async version of resolveSkills for callers that can await.
- * Runs the full middleware chain including any async custom middleware.
- */
-export async function resolveSkillsAsync(
-  phase: Phase,
-  kits: IntegrationKit[],
-  conversationHistory?: string[],
-): Promise<ResolvedSkills> {
-  const context: SkillResolverContext = {
-    kits,
-    conversationHistory,
-    activeSkillIds: new Set(),
-  };
-
-  const baseFn = async (): Promise<ResolvedSkills> =>
-    resolveLegacySkills(phase, kits);
-
-  return runMiddlewareChain(phase, context, baseFn);
-}
-
-/**
- * Resolve skills directly from a flat list of Skill objects.
- * Useful for testing and tooling without constructing full IntegrationKits.
- */
-export function resolveSkillsFromList(
-  phase: Phase,
-  skills: Skill[],
-  conversationHistory?: string[],
-): ResolvedSkills {
-  const pseudoKit: IntegrationKit = {
-    name: "__direct",
-    description: "Direct skill resolution",
-    tools: [],
-    connectors: [],
-    skills,
-  };
-  return resolveSkills(phase, [pseudoKit], conversationHistory);
 }
 
 /**
@@ -411,17 +230,4 @@ function resolveLegacySkills(
   }
 
   return { prompts, availableTools };
-}
-
-/**
- * Format resolved skills into a "## Available Capabilities" markdown section
- * ready for appending to a system prompt.
- *
- * Returns an empty string if there are no prompts to inject.
- */
-export function formatSkillsSection(skills: ResolvedSkills): string {
-  if (skills.prompts.length === 0) return "";
-
-  const items = skills.prompts.map((p) => p.trim()).join("\n\n");
-  return `## Available Capabilities\n\n${items}`;
 }
