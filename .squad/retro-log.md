@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #128 "feat(validation): K8s rules engine + 7 new validators (23 total)" | XL | impl=14m | review=512m | cycles=1 | merged | @sabbour
