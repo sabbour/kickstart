@@ -43,3 +43,10 @@ Ready for QA handoff.
 - 3 orchestration logs written (Zapp, Hermes, Copilot)
 - 1 session log written
 - All agent history files < 15 KB (no summarization)
+
+## 2026-04-17 v2 kickoff session — Leela + Zapp spawned for DP and security review
+
+- Leela: Creating master tracking issue + design proposal + 13 sub-issues
+- Zapp: Upfront security architecture review
+- Session log recorded (2026-04-17T11-06-session-v2-kickoff.md)
+- Orchestration logs recorded (Leela + Zapp)
