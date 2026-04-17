@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #207 "fix: restore A2UI on session reload + FileEditor highlighting (#193, #200)" | M | impl=1m | review=4m | cycles=1 | merged | @sabbour
