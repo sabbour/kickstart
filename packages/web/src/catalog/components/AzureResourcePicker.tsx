@@ -25,13 +25,13 @@ import {
   useConversationSession,
   type DeploymentSourceFile,
 } from '../../contexts/ConversationSessionContext';
+import type { AzureARMConnector } from '@kickstart/harness';
 import type {
-  AzureARMConnector,
   AzureLocation,
   AzureResource,
   AzureSubscription,
   AzureResourceGroup,
-} from '@kickstart/harness';
+} from '../../types';
 import { getAzureSession } from '../../services/azure-auth';
 import {
   persistAzureTarget,
@@ -424,7 +424,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
       result = result.filter((resource) =>
         resource.name.toLowerCase().includes(query)
         || friendlyType(resource.type).toLowerCase().includes(query)
-        || resource.location.toLowerCase().includes(query));
+        || (resource.location ?? '').toLowerCase().includes(query));
     }
     return result;
   }, [resourceTypeFilter, resources, searchQuery, selectedRg]);

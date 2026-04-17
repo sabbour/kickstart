@@ -29,7 +29,7 @@ import {
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
 import { useArtifacts } from '../../contexts/ArtifactContext';
 import type { GitHubConnector } from '@kickstart/harness';
-import type { Artifact } from '@kickstart/harness';
+import type { WebArtifact as Artifact } from '../../types';
 
 const GitHubCommitApi = {
   name: 'GitHubCommit',

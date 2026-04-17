@@ -115,7 +115,7 @@ interface SurfaceOps {
   creates: Array<{ catalogId: string }>;
   updates: Array<{ components: A2uiComponent[] }>;
   deletes: number;
-  dataModelUpdates: Array<{ path: string }>;
+  dataModelUpdates: Array<{ path?: string }>;
 }
 
 function groupBySurface(messages: A2uiMsg[]): Map<string, SurfaceOps> {
@@ -147,7 +147,7 @@ function groupBySurface(messages: A2uiMsg[]): Map<string, SurfaceOps> {
 }
 
 function ComponentBadge({ componentType, styles }: { componentType: string; styles: ReturnType<typeof useStyles> }) {
-  const isKnown = KNOWN_COMPONENT_TYPES.has(componentType as never);
+  const isKnown = KNOWN_COMPONENT_TYPES.includes(componentType);
   return (
     <span className={`${styles.badge} ${isKnown ? styles.badgeOk : styles.badgeWarn}`}>
       {isKnown ? '✅ resolved' : '⚠️ unknown type'}

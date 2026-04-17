@@ -1,11 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import {
   APIConnectorRegistry,
-  AzureARMConnector,
-  GitHubConnector,
-  PricingConnector,
 } from '@kickstart/harness';
-import type { APIConnector } from '@kickstart/harness';
+import type { APIConnector, AzureARMConnector, GitHubConnector } from '@kickstart/harness';
 
 interface APIConnectorContextValue {
   registry: APIConnectorRegistry;
@@ -19,10 +16,40 @@ interface APIConnectorProviderProps {
   children: ReactNode;
   /**
    * Optional: pass a pre-configured registry (useful in tests or Storybook).
-   * When omitted, a default registry with AzureARM + GitHub + Pricing connectors
+   * When omitted, a default registry with AzureARM + GitHub stub connectors
    * is created automatically.
    */
   registry?: APIConnectorRegistry;
+}
+
+function createAzureARMConnectorStub(): AzureARMConnector {
+  let subscriptionId: string | undefined;
+  return {
+    name: 'azure-arm',
+    isAuthenticated: () => false,
+    getToken: async () => null,
+    getTenantId: () => undefined,
+    getSubscriptionId: () => subscriptionId,
+    setSubscriptionId: (id) => { subscriptionId = id; },
+    authenticate: async () => undefined,
+    request: async () => new Response(null, { status: 501, statusText: 'Not Implemented' }),
+    listSubscriptions: async () => [],
+    listLocations: async () => [],
+    listResourceGroups: async () => [],
+    listResources: async () => [],
+  };
+}
+
+function createGitHubConnectorStub(): GitHubConnector {
+  return {
+    name: 'github',
+    isAuthenticated: () => false,
+    getToken: async () => null,
+    getLogin: () => undefined,
+    authenticate: async () => undefined,
+    request: async () => new Response(null, { status: 501, statusText: 'Not Implemented' }),
+    commitFilesAndCreatePullRequest: async () => { throw new Error('github connector not yet wired by pack'); },
+  };
 }
 
 /**
@@ -45,17 +72,8 @@ export function APIConnectorProvider({
     if (externalRegistry) return externalRegistry;
 
     const r = new APIConnectorRegistry();
-    r.register(new AzureARMConnector({
-      auth: { kind: 'oauth2', scopes: ['https://management.azure.com/.default'] },
-      corsProxy: {
-        proxyBaseUrl: '/api/arm-proxy',
-      },
-    }));
-    r.register(new GitHubConnector({
-      auth: { kind: 'oauth2', scopes: ['read:user'] },
-      serverBaseUrl: '/api/github',
-    }));
-    r.register(new PricingConnector());
+    r.register(createAzureARMConnectorStub());
+    r.register(createGitHubConnectorStub());
     return r;
   }, [externalRegistry]);
 
@@ -65,7 +83,7 @@ export function APIConnectorProvider({
     for (const name of registry.names()) {
       const connector = registry.get(name);
       if (connector && connector.name !== 'github' && !connector.isAuthenticated()) {
-        connector.authenticate().catch(() => {
+        void connector.authenticate().catch(() => {
           // Intentionally silent — stub connectors warn inside authenticate()
         });
       }

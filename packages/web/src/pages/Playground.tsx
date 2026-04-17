@@ -49,7 +49,7 @@ import { apiFetch } from '../services/api-client';
 const stubRegistry: PlaygroundRegistryView = {
   playgroundScenarios: [],
   components: [],
-  playgroundStubs: {},
+  playgroundStubs: new Map(),
 };
 
 // ── LLM → A2UI component normalizer ─────────────────────────────────────

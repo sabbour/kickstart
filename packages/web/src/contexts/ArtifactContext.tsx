@@ -23,13 +23,14 @@ import React, {
   type ReactNode,
 } from 'react';
 import JSZip from 'jszip';
-import type { Artifact, ArtifactStore } from '@kickstart/harness';
+import type { ArtifactStore } from '@kickstart/harness';
+import type { WebArtifact } from '../types';
 
 interface ArtifactContextValue {
   /** Current snapshot of all stored artifacts. Refreshes after every tool call. */
-  artifacts: Artifact[];
+  artifacts: WebArtifact[];
   /** Retrieve a single artifact by path. Returns null if not found. */
-  getArtifact: (path: string) => Artifact | null;
+  getArtifact: (path: string) => WebArtifact | null;
   /**
    * Download all artifacts as a zip file named `kickstart-artifacts.zip`.
    * Returns false if there are no artifacts.
@@ -55,6 +56,32 @@ interface ArtifactProviderProps {
   pollIntervalMs?: number;
 }
 
+async function materializeArtifacts(store: ArtifactStore): Promise<WebArtifact[]> {
+  if (!store.list || !store.get) return [];
+  const paths = await Promise.resolve(store.list());
+  const getter = store.get;
+  const entries = await Promise.all(
+    paths.map(async (path) => {
+      const content = await Promise.resolve(getter(path));
+      return content == null ? null : ({ path, content } as WebArtifact);
+    }),
+  );
+  return entries.filter((e): e is WebArtifact => e !== null);
+}
+
+function materializeArtifactsSync(store: ArtifactStore): WebArtifact[] {
+  if (!store.list || !store.get) return [];
+  const maybePaths = store.list();
+  if (!Array.isArray(maybePaths)) return [];
+  const getter = store.get;
+  const out: WebArtifact[] = [];
+  for (const path of maybePaths) {
+    const content = getter(path);
+    if (typeof content === 'string') out.push({ path, content });
+  }
+  return out;
+}
+
 export function ArtifactProvider({
   children,
   store,
@@ -66,11 +93,11 @@ export function ArtifactProvider({
       'Create an InMemoryArtifactStore and pass it explicitly.',
     );
   }
-  const [artifacts, setArtifacts] = useState<Artifact[]>(() => store.list());
+  const [artifacts, setArtifacts] = useState<WebArtifact[]>(() => materializeArtifactsSync(store));
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(() => {
-    setArtifacts(store.list());
+    void materializeArtifacts(store).then(setArtifacts);
   }, [store]);
 
   // Poll for new artifacts written by tools (tool execution happens outside React)
@@ -83,12 +110,14 @@ export function ArtifactProvider({
   }, [refresh, pollIntervalMs]);
 
   const getArtifact = useCallback(
-    (path: string): Artifact | null => store.get(path),
-    [store]
+    (path: string): WebArtifact | null => {
+      return artifacts.find((a) => a.path === path) ?? null;
+    },
+    [artifacts]
   );
 
   const downloadAll = useCallback(async (): Promise<boolean> => {
-    const all = store.list();
+    const all = await materializeArtifacts(store);
     if (all.length === 0) return false;
 
     const zip = new JSZip();

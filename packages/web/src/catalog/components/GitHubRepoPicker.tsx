@@ -21,7 +21,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { Search20Regular, Star20Regular } from "@fluentui/react-icons";
-import type { GitHubRepo } from "@kickstart/harness";
+import type { GitHubRepo } from "../../types";
 import {
   createGitHubRepo,
   getGitHubSession,
@@ -29,10 +29,20 @@ import {
   type GitHubSessionState,
 } from "../../services/github-handoff";
 // TODO(Step 9): playground-auth-stub removed in Step 1 — stubs always return false/empty
-const createGitHubStubRepo = (_args: unknown): undefined => undefined;
-const createGitHubStubSession = (_connected: boolean): undefined => undefined;
+const createGitHubStubRepo = (args: { owner: string; name: string; description?: string; private?: boolean }): GitHubRepo => ({
+  id: `stub:${args.owner}/${args.name}`,
+  name: args.name,
+  full_name: `${args.owner}/${args.name}`,
+  private: Boolean(args.private),
+  description: args.description ?? null,
+});
+const createGitHubStubSession = (_connected: boolean): GitHubSessionState => ({
+  authenticated: false,
+  configured: true,
+  owners: [],
+});
 const DEFAULT_GITHUB_STUB_OWNER = '';
-const listGitHubStubRepos = (_owner: string): unknown[] => [];
+const listGitHubStubRepos = (_owner: string): GitHubRepo[] => [];
 const shouldUsePlaygroundAuthStub = () => false;
 import { sanitizeActionContext } from "../../utils/sanitize-action-context";
 

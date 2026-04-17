@@ -1,9 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  loadMermaid,
-  prepareArchitectureDiagramSource,
-  injectDiagramStyles,
-} from '../../catalog/components/architectureDiagramUtils';
+
+// Inlined from the v1 catalog/components/architectureDiagramUtils — the
+// original module was deleted in the v2 rewrite. Keep these minimal: load
+// mermaid lazily and pass the source through untouched. The Fluent theming
+// hook (`injectDiagramStyles`) was a no-op in the previous implementation.
+
+async function loadMermaid(): Promise<typeof import('mermaid').default> {
+  const mod = await import('mermaid');
+  const mermaid = mod.default;
+  mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'neutral' });
+  return mermaid;
+}
+
+function prepareArchitectureDiagramSource(content: string): string {
+  return content;
+}
+
+function injectDiagramStyles(svg: string): string {
+  return svg;
+}
 
 interface DiagramPreviewProps {
   content: string;
@@ -53,7 +68,7 @@ export function DiagramPreview({ content }: DiagramPreviewProps) {
         if (cancelled) return;
         insertSvgSafely(container, injectDiagramStyles(svg));
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to render diagram');
       })
       .finally(() => {

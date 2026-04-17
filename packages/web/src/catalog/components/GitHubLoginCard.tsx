@@ -23,7 +23,11 @@ import {
   type GitHubSessionState,
 } from "../../services/github-handoff";
 // TODO(Step 9): playground-auth-stub removed in Step 1 — stubs always return false/undefined
-const createGitHubStubSession = (_connected: boolean): undefined => undefined;
+const createGitHubStubSession = (_connected: boolean): GitHubSessionState => ({
+  authenticated: false,
+  configured: true,
+  owners: [],
+});
 const shouldUsePlaygroundAuthStub = () => false;
 
 const GitHubLoginCardApi = {

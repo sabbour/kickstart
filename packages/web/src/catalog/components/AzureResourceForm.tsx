@@ -20,7 +20,8 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
-import type { AzureARMConnector, AzureLocation } from '@kickstart/harness';
+import type { AzureARMConnector } from '@kickstart/harness';
+import type { AzureLocation } from '../../types';
 // TODO(Step 7): mock-streaming removed in Step 1 — stubs always return false
 const isMockMode = () => false;
 const isPlaygroundMode = () => false;

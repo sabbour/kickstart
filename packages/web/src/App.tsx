@@ -82,7 +82,11 @@ export function App() {
   const sessions = useSessions();
   const streaming = useStreaming();
   // TODO(Step 5): mockStreaming removed — use real streaming only
-  const mockStreaming = { isStreaming: false, streamText: '', send: () => {} } as const;
+  const mockStreaming = {
+    isStreaming: false,
+    streamText: '',
+    send: (_text: string, _sessionId: string, _handlers: unknown) => {},
+  } as const;
   const progressiveQueue = useProgressiveQueue();
 
   // Single VFS instance for the app lifetime
@@ -489,8 +493,8 @@ export function App() {
         onChunk: () => {},
         onA2UI: handleIncomingA2UI,
         onSetupEvent: handleIncomingSetupEvent,
-        onPhase: (phase) => setConversationPhase(phase),
-        onComplete: (fullText, model) => {
+        onPhase: (phase: ConversationPhaseId) => setConversationPhase(phase),
+        onComplete: (fullText: string, model: string) => {
           if (finalizeStepwiseAssistantTurn({
             assistantMessageId,
             sessionId: sessionId!,
@@ -523,7 +527,7 @@ export function App() {
           setMessages(prev => [...prev, assistantMsg]);
           sessions.addMessage(sessionId!, assistantMsg);
         },
-        onError: (error) => {
+        onError: (error: string) => {
           if (finalizeStepwiseAssistantTurn({
             assistantMessageId,
             sessionId: sessionId!,

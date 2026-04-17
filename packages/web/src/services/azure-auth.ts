@@ -1,4 +1,5 @@
-import type { AzureARMConnector, AzureSubscription } from '@kickstart/harness';
+import type { AzureARMConnector } from '@kickstart/harness';
+import type { AzureSubscription } from '../types';
 
 export interface AzureUserSummary {
   name?: string;
