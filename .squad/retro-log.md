@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-15 | #297 "fix(flow): end conversation at Review, add client: action routing (#271)" | XL | impl=50m | review=42m | cycles=1 | merged | @sabbour
+
 - 2026-04-15 | #294 "fix: code block theme — dark palette, readable font, line numbers" | L | impl=0m | review=8m | cycles=1 | merged | @sabbour
 
 - 2026-04-15 | #303 "fix(prompt): architecture diagram depth + KAITO full name" | M | impl=1m | review=45m | cycles=1 | merged | @sabbour
