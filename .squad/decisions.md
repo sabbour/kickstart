@@ -2319,3 +2319,85 @@ Startup-only registry model is directionally sound and `seal()` is the right con
 ## Security consequence
 
 With conditions above, Step 3 remains acceptable as design foundation for Step 4. Without them, the registry becomes a trust-boundary weak point.
+
+---
+
+# Decision: validate raw A2UI messages through an internal op discriminator
+
+**Date:** 2026-04-17T12:06:45.293Z
+**Author:** Bender (Backend Dev)
+**Issue:** #475
+
+## Context
+
+Step 2 requires strict A2UI Zod schemas, one operation per message, and a `z.discriminatedUnion` on the operation key. Raw A2UI v0.9 messages do not carry an explicit shared discriminator field; they encode the operation as one top-level key (`createSurface`, `updateComponents`, `updateDataModel`, or `deleteSurface`).
+
+## Decision
+
+Keep the raw wire shape unchanged, but preprocess each message into an internal `{ op, ...raw }` envelope before validation. The discriminated union runs on `op`, every message shape stays `.strict()`, and the parsed result drops the synthetic discriminator so downstream callers still see the raw A2UI shape.
+
+## Why
+
+Satisfies Leela/Zapp's structural requirements without mutating the wire contract that later packs and SSE code will emit. Guarantees that multi-op or extra-key payloads fail closed during validation.
+
+## Consequences
+
+- Step 4 `core.emit_ui` can validate raw A2UI payloads without teaching agents a new `op` field.
+- Future runtime code should reuse the shared schema helper rather than re-implementing top-level key detection.
+
+---
+
+# Decision: Architecture review — #477 v2 Step 4: pack-core
+
+**Date:** 2026-05-28
+**Author:** Leela (Lead)
+**Issue:** #477 — v2 Step 4: pack-core
+**Status:** APPROVE_WITH_CONDITIONS
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/477#issuecomment-4268164127
+
+## What's approved
+
+- pack-core scope: 3 agents + 5 skills + 6 tools + 39 components (27 basic + 12 rich) + 3 guardrails + 2 playground scenarios. Domain-neutral boundary is correct.
+- Delivery order: Phase A → B‖C → D → E → F → G → H. Parallel B‖C is sound.
+- `emit_ui` Zod union usage: `A2UIMessageSchema` tagged union from #475, discriminated on `type`. Fail-closed at Zod layer before `execute` runs.
+- `session.a2uiEmissions.push()` decoupling model is architecturally correct. pack-core records; Step 5 forwards.
+- Component split: 27 basic (fluent-components mechanical ports) + 12 rich (domain-neutral catalog components). Azure/GitHub/AKS-specific components correctly excluded.
+- Phase A+B unblocked immediately once #476 is green.
+
+## Conditions
+
+### C1 — Pack type shape: dir-pointers vs inline arrays (BLOCKER for Phase C)
+
+The brief (§11) says `register()` "walks `agentsDir` and `skillsDir`", implying dir-pointer fields. The DP's manifest skeleton shows inline contribution arrays. These are incompatible.
+
+**Decision:** Fry must resolve this against #476's `Pack` type before Phase C starts. Either model is acceptable, but they must match. If `Pack` uses inline arrays, `src/index.ts` eagerly invokes loaders at import time.
+
+### C2 — `SessionCtx.a2uiEmissions` must exist in #475 (BLOCKER for Phase C)
+
+`emit_ui`'s `execute` depends on `SessionCtx.a2uiEmissions: A2UIMessage[]`. If not in the merged #475 `SessionCtx`, Fry must raise a targeted PR against #475 before Phase C starts.
+
+### C3 — Step 5 DP must forward from `session.a2uiEmissions`, not `event.arguments` (Required for merge)
+
+The brief §9 Step 5 sketch reads `event.arguments` directly from the SDK `tool_call_item` stream — raw args, before Zod validation. This bypasses the fail-closed guarantee in `emit_ui`. The normative contract is: Step 5 forwards from `session.a2uiEmissions` (post-validation).
+
+**Decision:** Step 5 DP (#479) must explicitly commit to reading `session.a2uiEmissions` for SSE forwarding, not `event.arguments`.
+
+### C4 — §6c registration test must exercise loader-from-disk path (Required for merge)
+
+Depends on C1 resolution. For inline arrays (option B), add a second test that directly invokes `loader-agent.ts` against the `agents/` directory and asserts loaded contributions match the manifest.
+
+### C5 — AuthCard must have zero Azure-specific props (Required for Phase E)
+
+v1 `AuthCard` may have MSAL-specific props inline. Ported `pack-core/AuthCard` must be domain-neutral: accepts `callbackActionName: string`, has no `msalConfig`, no Azure scope strings, no MSAL tenant IDs. MSAL wiring lives in pack-azure's `azure:login` UserAction.
+
+## Minor observations (non-blocking)
+
+- CatalogId validation is a Step 5 concern — `emit_ui` correctly only pushes; harness validator in Step 5 checks `catalogId` before SSE forwarding.
+- `ComponentContribution.renderer` typed as `unknown` in harness (from #475 C3). pack-core narrows to `React.ComponentType<Props>` at contribution definition time.
+- 39 components in one PR: basic components (Phase D) are mechanical ports — Hermes smoke tests are the right gate. Leela reviews pack manifest shape, tool contracts, and agent frontmatter only.
+
+## Impact on downstream steps
+
+- **#478 (Playground)**: Unblocked once pack-core has real components/scenarios. C1 resolution determines playground registry read API shape.
+- **#479 (Runner + SSE)**: C3 is a hard dependency — Step 5 DP must commit to `session.a2uiEmissions` forwarding before authoring starts.
+- **#480 (Skill resolver)**: No direct impact.

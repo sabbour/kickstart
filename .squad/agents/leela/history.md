@@ -115,3 +115,35 @@ C1–C3 block Step 4 (pack-core), Step 5 (Runner), and Step 6 (skill resolver).
 - `leela-v2-rewrite-start-gate.md`: Do not start #474 implementation until sprint planning ceremony completes; HOLD gate honored.
 - `leela-dp-474-step1.md`: Step 1 seam APPROVE_WITH_CONDITIONS — shim must be shrinking only, no new exports or runtime behavior; Bender owns implementation, Fry handles web-shell fallout. Exit contract: v1 files deleted, v1 flags gone, `packages/harness` canonical.
 - `leela-351-component-expansion.md`: A2UI catalog expanded 28→33 components; Alert, Table, Link added; SummaryCard + DecisionCard new React components; `KNOWN_COMPONENT_TYPES` 46→48; ProgressSteps/CodeBlock/SteppedCarousel/Questionnaire deferred.
+
+## 2026-05-28 — DP Review #477 v2 Step 4: pack-core
+
+**Verdict:** APPROVE_WITH_CONDITIONS  
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/477#issuecomment-4268164127  
+**Decision record:** `.squad/decisions/inbox/leela-477-dp-review.md`
+
+Key findings:
+- pack-core scope (3 agents + 5 skills + 6 tools + 39 components + 3 guardrails) and domain-neutral boundary are correct. ✅
+- Delivery order (A → B‖C → D → E → F → G → H) is coherent; no circular dependencies. Phases A+B unblocked immediately once #476 green. ✅
+- `emit_ui` Zod union usage correct; `session.a2uiEmissions` decoupling model is architecturally sound. ✅
+- 27/12 component split correct; audit table domain classification is accurate. ✅
+- C1 (BLOCKER for Phase C): `Pack` type shape ambiguity — brief says `register()` walks `agentsDir`/`skillsDir`, DP shows inline arrays. Must resolve against #476 before Phase C starts.
+- C2 (BLOCKER for Phase C): `SessionCtx.a2uiEmissions: A2UIMessage[]` must be confirmed in #475; raise targeted PR against #475 if missing.
+- C3 (Required for merge): Brief §9 Step 5 sketch reads `event.arguments` (raw) — contradicts DP's `session.a2uiEmissions` contract (post-validation). Step 5 DP must commit explicitly to `session.a2uiEmissions` forwarding before Step 5 is authored.
+- C4 (Required for merge): §6c registration test must exercise real loader-from-disk path once C1 resolved; add second test if Pack uses inline arrays.
+- C5 (Required for Phase E): `AuthCard` schema must be stripped of all Azure-specific props before Phase E porting.
+
+## Wave 4 — 2026-05-28 DP Review #477 v2 Step 4: pack-core
+
+**Verdict:** APPROVE_WITH_CONDITIONS  
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/477#issuecomment-4268164127
+
+- Pack-core scope approved: 3 agents, 5 skills, 6 tools, 39 components, 3 guardrails, 2 playground scenarios. Domain-neutral boundary correct.
+- `emit_ui` Zod union + `session.a2uiEmissions.push()` decoupling model approved.
+- Phase A+B unblocked once #476 is green.
+- C1 (BLOCKER Phase C): Pack type shape — dir-pointers vs inline arrays must be resolved against #476 before Phase C.
+- C2 (BLOCKER Phase C): `SessionCtx.a2uiEmissions: A2UIMessage[]` must exist in merged #475; if not, targeted PR against #475 required.
+- C3 (Required for merge): Step 5 DP (#479) must commit to forwarding from `session.a2uiEmissions`, NOT `event.arguments` (raw, pre-validation).
+- C4 (Required for merge): §6c test must exercise loader-from-disk path, not just manifest shape.
+- C5 (Required Phase E): `pack-core/AuthCard` must be domain-neutral — no MSAL props. MSAL wiring lives in `pack-azure`'s `azure:login` UserAction.
+- #478 unblocked once pack-core has real components. #479 hard-depends on C3.

@@ -65,3 +65,7 @@ Posted the Step 3 DP for issue #476: sealed `PackRegistry`, `.agent.md` and `SKI
 - Filed `bender-474-step1-compat-seam.md`: temporary `@kickstart/core` seam is compile-preservation only; no new behavior; burned down in Step 2+.
 - Filed `bender-474-step1-backend-cutover.md`: backend package graph moves straight to `@kickstart/harness`; `@kickstart/core` stub kept only for web-shell fallout during Fry's cleanup.
 - Filed `bender-mcp-app-schema-isolation.md`: MCP app response schema kept local to `packages/mcp-server/src/a2ui.ts` until HTML app renderer migrates to shared `@kickstart/core` catalog shape.
+
+## Wave 4 — 2026-04-17 #475 A2UI Discriminator Decision
+
+- Filed `bender-475-a2ui-discriminator.md`: Raw A2UI v0.9 messages preprocessed into internal `{ op, ...raw }` envelope before validation; discriminated union runs on `op`; parsed result drops synthetic discriminator so downstream callers see raw A2UI shape. Satisfies Leela/Zapp strict-schema requirements without mutating wire contract.
