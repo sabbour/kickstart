@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #236 "fix: clean up user display in topbar — friendly name + dropdown sign-out" | M | impl=1m | review=4m | cycles=1 | merged | @sabbour
