@@ -19,6 +19,8 @@ Legend:
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-17 | #422 "docs: fix component-count drift (33 base, 22 custom)" | S | impl=0m | review=2m | cycles=1 | merged | @sabbour
+
 - 2026-04-17 | #424 "docs: rewrite api-reference — document all 19 endpoints" | L | impl=0m | review=8m | cycles=1 | merged | @sabbour
 
 - 2026-04-17 | #427 "fix: replace required-approval gate with label-based squad/review-gate" | L | impl=1m | review=25m | cycles=1 | merged | @sabbour
