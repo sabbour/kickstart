@@ -198,3 +198,12 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - **SKILL updated:** `.squad/skills/pr-workflow/SKILL.md` — new Merge Gate section with label verification commands.
 - **PR:** #427
 - **Status:** ✅ Archived to decisions.md (2026-04-17T01:57:58Z)
+
+## 2026-04-17 Comment Acknowledgment + Thread Resolution — Process Fix
+
+- **Problem:** Agents were fixing code from PR review feedback but never replying to the specific comment or resolving the review thread. This left reviewers blind and blocked merge when `require_conversation_resolution: true` is enforced.
+- **Fix:** Updated three files to make the full feedback loop mandatory:
+  1. `.squad/skills/pr-workflow/SKILL.md` — replaced "Handling Review Feedback" section with 5-step loop (read → decide → reply → resolve → verify)
+  2. `.github/copilot-instructions.md` — added "PR Review Feedback — Required Loop" section
+  3. `.squad/decisions/inbox/leela-comment-resolution-process.md` — decision record
+- **Learnings:** Comment-acknowledgment and thread-resolution are now documented as non-optional steps in every agent's PR workflow. Silently fixing code is a process violation.

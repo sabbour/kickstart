@@ -215,18 +215,61 @@ gh api "repos/${REPO_NWO}/pulls/<N>/requested_reviewers" \
 
 ### Handling Review Feedback
 
-1. **Check both formal reviews AND general comments** — @copilot may respond in either format:
+When a PR has review comments or formal review threads, the full feedback loop is:
+
+1. **Read ALL feedback** — check both formal review threads AND top-level comments:
    ```bash
-   gh pr view <N> --json reviews
-   gh pr view <N> --json comments
+   # Formal review threads (these must all be resolved before merge)
+   gh pr view <N> --json reviewThreads --jq '.reviewThreads[] | {id: .id, isResolved: .isResolved, path: .path, body: (.comments[0].body // ""), line: .line}'
+   
+   # Top-level PR comments (Copilot often posts here)
+   gh pr view <N> --json comments --jq '.comments[] | {id: .id, author: .author.login, body: .body}'
+   
+   # Formal review decisions
+   gh pr view <N> --json reviews --jq '.reviews[] | {author: .author.login, state: .state, body: .body}'
    ```
 
-2. **Address each review comment:**
-   - Fix valid suggestions — commit the fix
-   - Reply with reasoning on items you disagree with
-   - Resolve each review thread after addressing it
+2. **For each piece of feedback, decide:**
+   - Valid → fix it
+   - Disagree → explain why in a reply
 
-3. **All threads must be resolved** before merging.
+3. **After fixing (or deciding not to fix), ALWAYS reply to the specific comment:**
+   ```bash
+   # Reply to a review thread comment (get comment ID from reviewThreads query above)
+   gh api "repos/sabbour/kickstart/pulls/<PR>/comments/<comment_id>/replies" \
+     --method POST \
+     -f body="Addressed in <commit_sha>: <what you changed and why, 1-2 sentences>. Resolving thread."
+   
+   # OR for a top-level PR comment, reply inline:
+   gh pr comment <N> --body "Re: <quote the feedback briefly> — <what you did to address it, or why not>."
+   ```
+
+4. **Resolve the thread after replying:**
+   ```bash
+   # Get thread node ID
+   THREAD_ID=$(gh api graphql -f query='{
+     repository(owner: "sabbour", name: "kickstart") {
+       pullRequest(number: <N>) {
+         reviewThreads(first: 50) {
+           nodes { id isResolved path line comments(first:1) { nodes { body } } }
+         }
+       }
+     }
+   }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | .id')
+   
+   # Resolve it
+   gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<THREAD_ID>"}) { thread { isResolved } } }'
+   ```
+
+5. **Verify all threads are resolved before attempting merge:**
+   ```bash
+   UNRESOLVED=$(gh pr view <N> --json reviewThreads --jq '[.reviewThreads[] | select(.isResolved == false)] | length')
+   # Must be 0 before proceeding
+   ```
+
+**NEVER silently fix code and move on.** A reply is required for every piece of feedback, even if the fix is trivial. This is not optional.
+
+**Why this matters:** `require_conversation_resolution: true` is enforced in branch protection. Unresolved threads block the `squad/review-gate` status check. Even if both `leela:approved` and `zapp:approved` labels are present, GitHub will not allow merge while threads are open.
 
 ### CI Requirements
 
