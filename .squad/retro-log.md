@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #75 "fix(action): wire action handler for A2UI components" | S | impl=0m | review=8m | cycles=1 | merged | @sabbour
