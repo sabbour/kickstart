@@ -13,7 +13,7 @@ See [`docs/v2-implementation-brief.md`](../../../../docs/v2-implementation-brief
 ```ts
 // Agent-side (from any pack)
 await emitUi({
-  component: "azure/resource-picker",
+  component: "azure/ResourcePicker",
   props: { subscriptionId, resourceType: "Microsoft.Web/sites" },
   data: [...],
   actions: { onSelect: "azure:select_resource" },

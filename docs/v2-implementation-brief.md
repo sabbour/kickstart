@@ -3,6 +3,7 @@
 **Audience:** the implementing agent.
 **Status:** design locked. Ready to execute.
 **Scope:** greenfield rewrite on `main`. v1 does not need to keep working. Delete aggressively. No user state to preserve.
+**Last updated:** 2026-04-17
 
 ---
 
@@ -17,9 +18,9 @@ The product "Kickstart" = harness + a chosen set of packs (core + azure + aks-au
 
 ---
 
-## 2. The five primitives
+## 2. The seven primitives
 
-Internalize these before writing code. They are the only vocabulary the harness understands.
+Internalize these before writing code. They are the only vocabulary the harness understands: Pack, Agent, Skill, Tool, UserAction (a flavor of Tool), Component, and Guardrail.
 
 ### Pack
 A bundle of contributions. The unit of extensibility and distribution. Declares dependencies on other packs. Registered at startup, sealed after startup. Third-party packs deferred; everything in-tree for v2.
