@@ -8,6 +8,7 @@ export {
   PHASE_DEFINITIONS,
   getPhaseDefinition,
   getPhaseOrder,
+  advancePhase,
 } from "./phases.js";
 
 export { resolveSkills } from "./skill-resolver.js";

@@ -21,7 +21,7 @@ import {
   Phase,
   getPhaseDefinition,
   getPhaseOrder,
-  PHASE_DEFINITIONS,
+  advancePhase,
   processResponse,
   resolveConversationSkills,
   defaultRegistry,
@@ -102,12 +102,6 @@ interface StreamDonePayload {
 
 function getSafeCurrentPhase(currentPhase: Phase | string): Phase {
   return normalizeConversePhase(currentPhase) ?? Phase.Discover;
-}
-
-/** Return the next phase after the given one, or the same phase if already at the end. */
-function advancePhase(currentPhase: Phase): Phase {
-  const def = PHASE_DEFINITIONS.find((p) => p.id === currentPhase);
-  return def?.nextPhase ?? currentPhase;
 }
 
 function extractSetupControlAction(

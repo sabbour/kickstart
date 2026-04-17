@@ -10,6 +10,7 @@ import {
   getPhaseOrder,
   PHASE_DEFINITIONS,
   Phase,
+  advancePhase,
 } from "@kickstart/core";
 import type {
   SessionState,
@@ -63,12 +64,6 @@ export async function handleAction(
       label: getPhaseDefinition(phase).label,
       status: idx < currentIdx ? "complete" : idx === currentIdx ? "active" : "pending",
     }));
-  }
-
-  // Helper: advance to the next phase
-  function advancePhase(phase: Phase): Phase {
-    const def = PHASE_DEFINITIONS.find((p) => p.id === phase);
-    return def?.nextPhase ?? phase;
   }
 
   // Process action

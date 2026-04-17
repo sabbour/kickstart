@@ -60,6 +60,7 @@ export {
   PHASE_DEFINITIONS,
   getPhaseDefinition,
   getPhaseOrder,
+  advancePhase,
   resolveSkills,
   AUTO_CONTINUE_PREFIXES,
   AUTO_CONTINUE_MAX_CONSECUTIVE,
