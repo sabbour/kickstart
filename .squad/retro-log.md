@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #101 "chore: consolidate process directives into skills + charters" | M | impl=0m | review=6m | cycles=1 | merged | @sabbour
