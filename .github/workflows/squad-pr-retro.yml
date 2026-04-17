@@ -24,6 +24,7 @@ concurrency:
 jobs:
   retro:
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'retro-log') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
