@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-14 | #206 "fix: debug panel shows raw LLM JSON envelope (#198)" | M | impl=1m | review=38m | cycles=1 | merged | @sabbour
