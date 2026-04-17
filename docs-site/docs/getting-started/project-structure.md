@@ -9,73 +9,67 @@ Kickstart is organized as an npm workspaces monorepo.
 ```
 kickstart/
 ├── packages/
-│   ├── core/              # AI engine — phases, prompts, catalog, tools
-│   │   ├── src/
-│   │   │   ├── engine/    # Phase definitions, state, skill resolver
-│   │   │   │   └── phases.ts  # Conversation phase definitions
-│   │   │   ├── prompts/   # System prompt templates
-│   │   │   ├── catalog/   # A2UI component catalog definitions
-│   │   │   ├── tools/     # LLM tool definitions
-│   │   │   └── index.ts   # Package entry point
-│   │   └── package.json
+│   ├── harness/           # @kickstart/harness — runtime engine
+│   │   └── src/
+│   │       ├── runtime/   # Runner, session, skill resolver, SSE adapter
+│   │       ├── a2ui/      # A2UI v0.9 message types and helpers
+│   │       ├── mcp/       # MCP adapter utilities
+│   │       └── types/     # Zod schemas (AgentOutput, pack primitives)
 │   │
-│   ├── web/               # React frontend + Azure Functions API
-│   │   ├── src/            # React app source
-│   │   │   ├── vendor/     # Vendored A2UI renderer
-│   │   │   ├── catalog/    # A2UI catalog component implementations
-│   │   │   │   └── components/  # Rendered A2UI components (CodeBlock, AuthCard, …)
+│   ├── pack-core/         # @kickstart/pack-core — base agents, skills, tools, components
+│   │   └── src/
+│   │       ├── agents/    # .agent.md files for triage, codesmith, reviewer
+│   │       ├── skills/    # SKILL.md files
+│   │       ├── tools/     # core.emit_ui, core.write_file, etc.
+│   │       └── components/ # Basic + rich A2UI component renderers
+│   │
+│   ├── pack-azure/        # @kickstart/pack-azure — Azure agents, tools, user actions
+│   ├── pack-aks-automatic/ # @kickstart/pack-aks-automatic — AKS Automatic deployment pack
+│   ├── pack-github/       # @kickstart/pack-github — GitHub agents, tools, user actions
+│   │
+│   ├── web/               # @kickstart/web — React frontend + Azure Functions API
+│   │   ├── src/           # React app source
+│   │   │   ├── vendor/    # Vendored A2UI renderer
 │   │   │   ├── components/ # App-shell components (Layout, Sidebar, Topbar, …)
-│   │   │   ├── pages/      # Route-level pages (Chat, Playground, Landing, …)
-│   │   │   ├── hooks/      # React hooks (useStreaming, useNavigation, …)
-│   │   │   └── App.tsx     # Root component
-│   │   ├── api/            # Azure Functions (SWA managed)
-│   │   │   └── src/
-│   │   │       └── functions/  # Individual function handlers
-│   │   │           └── converse.ts  # /api/converse endpoint
-│   │   ├── public/         # Static assets (icons, favicon)
-│   │   ├── dist/           # Vite build output
+│   │   │   ├── pages/     # Route-level pages (Chat, Playground, Landing, …)
+│   │   │   └── hooks/     # React hooks (useStreaming, useActionDispatch, …)
+│   │   ├── api/           # Azure Functions (SWA managed)
+│   │   │   └── src/functions/  # converse.ts, resume.ts, packs.ts
 │   │   └── package.json
 │   │
-│   └── mcp-server/        # MCP server — exposes Kickstart tools via Model Context Protocol
-│       ├── src/
-│       │   ├── app/        # Server bootstrap and protocol handler
-│       │   ├── tools/      # MCP tool implementations
-│       │   └── index.ts    # Package entry point
-│       └── package.json
+│   └── mcp-server/        # @kickstart/mcp-server — MCP adapter wrapping the Runner
+│       └── src/
+│           └── index.ts   # MCP server entry point
 │
-├── docs-site/              # This documentation site (Docusaurus)
-├── infra/                  # Azure infrastructure (Bicep)
-├── .squad/                 # AI team configuration (Squad framework)
-├── package.json            # Root workspace config
-├── tsconfig.json           # Shared TypeScript config
-└── vitest.config.ts        # Test configuration
+├── docs-site/             # This documentation site (Docusaurus)
+├── infra/                 # Azure infrastructure (Bicep)
+├── .squad/                # AI team configuration (Squad framework)
+├── package.json           # Root workspace config
+├── tsconfig.json          # Shared TypeScript config
+└── vitest.config.ts       # Test configuration
 ```
 
 ## Package Details
 
-### `packages/core`
+### `packages/harness`
 
-The AI engine package. Contains:
+The domain-agnostic runtime. Manages pack registration, runs agents via the `@openai/agents` SDK, streams typed SSE events, mediates A2UI, enforces guardrails. Does not know about Azure, AKS, or GitHub — packs carry all product knowledge.
 
-- **Phase definitions** — the 6-phase conversation flow (Discover → Design → Generate → Review → Handoff → Deploy), defined in `src/engine/phases.ts`
-- **System prompts** — templates that instruct the LLM on response format, tone, and behavior
-- **A2UI catalog** — component type definitions for the custom Kickstart catalog
-- **LLM tools** — tool definitions used by the AI engine
+### `packages/pack-core`
 
-This package has no UI dependencies and can be used independently.
+The base pack. Contributes the core agents (triage, codesmith, reviewer), cross-cutting skills (file generation, code review), basic tools (`core.emit_ui`, `core.write_file`, `core.read_file`, etc.), and the full A2UI component catalog.
+
+### `packages/pack-azure` / `pack-aks-automatic` / `pack-github`
+
+Domain packs. Each contributes agents, skills, tools, user actions, and components for its domain.
 
 ### `packages/web`
 
-The frontend application and API layer. Contains:
-
-- **React SPA** — the main user interface, built with React 19 and Vite 6
-- **A2UI renderer** — vendored renderer in `src/vendor/`
-- **Catalog components** — A2UI component implementations in `src/catalog/components/`
-- **Azure Functions** — the `/api/converse` endpoint in `api/src/functions/converse.ts`
+The frontend application and API layer. React 19 + Vite 6 SPA with Azure Functions backend. The web client reads the negotiated catalog from `GET /api/packs` at startup and dispatches user actions through `useActionDispatch`.
 
 ### `packages/mcp-server`
 
-The Model Context Protocol (MCP) server. Exposes Kickstart's AI tools to MCP-compatible clients (e.g. GitHub Copilot, Claude Desktop). Lives alongside `core` and `web` in the monorepo.
+MCP adapter wrapping the Runner. Exposes Kickstart turns to MCP-compatible clients (VS Code Copilot, Claude Code). A2UI surfaces emitted as MCP embedded resources with `mimeType: "application/json+a2ui"`.
 
 ### `docs-site`
 

@@ -183,14 +183,10 @@ Endpoints share a set of utility modules in `packages/web/api/src/lib/`:
 
 | Module | Exports | Purpose |
 |---|---|---|
-| `openai-client.ts` | `chatCompletion()`, `chatCompletionWithTools()`, `chatCompletionStream()`, `codexCompletion()` | Azure OpenAI client with JSON mode and tool support |
-| `session-store.ts` | `getSession()`, `createSession()`, `hydrateSession()`, `addMessage()` | In-memory session management with 1-hour TTL |
+| `runner.ts` | `Runner` | Orchestrates agent turns, guardrails, tool dispatch, and UserAction pause/resume |
+| `session-store.ts` | `getSession()`, `createSession()`, `addMessage()` | In-memory session management with 1-hour TTL |
 | `error-response.ts` | `safeErrorResponse()`, `safeStreamError()` | Generic error responses — logs details server-side, returns safe messages to clients |
 | `rate-limiter.ts` | `checkRateLimit()`, `rateLimitResponse()` | Sliding-window rate limiting (30 req/min per client, 300 req/min global backstop) |
-| `response-processor.ts` | `processResponse()` | Parse LLM JSON envelope into message + A2UI components |
-| `content-safety.ts` | `checkContentSafety()` | Content safety pre-flight check on user messages |
-| `auto-continue.ts` | `chatCompletionWithAutoContinue()`, `isTruncated()` | Auto-continuation for truncated LLM responses |
-| `sanitize-tool-output.ts` | `sanitizeToolOutput()` | Sanitize tool results before feeding back to the LLM |
 
 ---
 

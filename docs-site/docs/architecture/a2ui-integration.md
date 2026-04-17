@@ -123,7 +123,7 @@ Updates just the data of an existing component (without replacing it):
 
 ## Fat Components
 
-Starting in v0.3.0, Kickstart includes **fat components** — self-managing implementations of common workflows with built-in authentication, validation, and security controls. Registered as part of the `azure` and `github` IntegrationKits.
+Starting in v0.3.0, Kickstart includes **fat components** — self-managing implementations of common workflows with built-in authentication, validation, and security controls. Contributed by the `pack-azure` and `pack-github` packs.
 
 ### Azure Fat Components
 
