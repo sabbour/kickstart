@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Phase } from "@kickstart/core";
+import { Phase } from "@kickstart/harness";
 import {
   createSession,
   extractArtifactsFromA2UI,

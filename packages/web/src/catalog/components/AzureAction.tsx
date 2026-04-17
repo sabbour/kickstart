@@ -25,7 +25,7 @@ import {
   Warning20Regular,
 } from '@fluentui/react-icons';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
-import type { AzureARMConnector } from '@kickstart/core';
+import type { AzureARMConnector } from '@kickstart/harness';
 
 // ── Validation helpers (per Zapp's security conditions) ──
 

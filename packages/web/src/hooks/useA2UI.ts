@@ -1,11 +1,14 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { MessageProcessor, Catalog } from '../vendor/a2ui/web_core/index';
-import { kickstartCatalog } from '../catalog/kickstart-catalog';
+// TODO(Step 4): kickstartCatalog replaced by registry-driven catalog from @kickstart/harness
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
 import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
 import type { A2uiClientAction } from '../vendor/a2ui/web_core/schema/client-to-server';
 import type { A2uiMsg } from '../types';
 import type { ActionHandler } from './useActionDispatch';
+
+// Stub catalog — empty until Step 4 wires up the registry-driven catalog
+const kickstartCatalog = {} as Catalog<ReactComponentImplementation>;
 
 export interface A2UIOptions {
   /** Handler invoked when any A2UI component fires an action event. */

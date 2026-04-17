@@ -23,7 +23,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import JSZip from 'jszip';
-import type { Artifact, ArtifactStore } from '@kickstart/core';
+import type { Artifact, ArtifactStore } from '@kickstart/harness';
 
 interface ArtifactContextValue {
   /** Current snapshot of all stored artifacts. Refreshes after every tool call. */

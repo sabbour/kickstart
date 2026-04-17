@@ -6,7 +6,7 @@ import {
 import type {
   AppToServerMessage,
 } from "../app/protocol.js";
-import type { SessionState } from "@kickstart/core";
+import type { SessionState } from "@kickstart/harness";
 
 // ── parseAppMessage ─────────────────────────────────────────────────
 

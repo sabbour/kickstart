@@ -11,11 +11,11 @@ import {
   PHASE_DEFINITIONS,
   Phase,
   advancePhase,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 import type {
   SessionState,
   PhaseItem,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 import { createA2UIResource } from "../a2ui.js";
 
 type ActionType = "advance" | "skip" | "select" | "submit" | "reply" | "navigate" | "api";
@@ -26,6 +26,7 @@ interface ConversationPhaseComponent {
   id: string;
   phases: PhaseItem[];
   currentPhase: Phase;
+  [key: string]: unknown;
 }
 
 /**

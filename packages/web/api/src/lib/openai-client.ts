@@ -10,7 +10,7 @@
 // Shared types
 // ---------------------------------------------------------------------------
 
-import type { OpenAIToolDefinition, ToolCall } from "@kickstart/core";
+import type { OpenAIToolDefinition, ToolCall } from "@kickstart/harness";
 import { sanitizeToolOutput } from "./sanitize-tool-output.js";
 import { normalizeChatUsage, sumChatUsage } from "./usage-tracking.js";
 import type { ChatUsage } from "./usage-tracking.js";
