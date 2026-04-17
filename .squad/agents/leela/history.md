@@ -18,10 +18,10 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - **Process directives:** Always stored in .squad/decisions/inbox/ for Scribe merge; not versioned inline
 
 ## Recent Work
-- v2 sprint planning + #474 DP review: #474 → #475 → #476 blocking chain; APPROVE_WITH_CONDITIONS on #474
-- DP #329 (MCP App IDE) APPROVED WITH CONDITIONS; DP #330 (Agents SDK) APPROVED + closed out
-- PR #383 engineering docs rewrite (7 files); label-based review gate; comment-resolution process fix
-- v0.6.1 deployment prep: vendor diagram assets, CI hardening, stepwise generation default
+- v2 Sprint 1 chain: #474 (Nuke v1) → #475 (Harness types) → #476 (Registry + loaders)
+- PR #544 (Step 1) APPROVED; PR #545 (Step 2) REQUEST CHANGES — 2 blockers outstanding
+- DP #479 (Runner + SSE) APPROVE_WITH_CONDITIONS; 5 gated conditions locked
+- DP Reviews archived: #475, #476, #477, #478 (all APPROVE_WITH_CONDITIONS; see history-archive.md)
 
 ## Active Sprint: v2 (harness + packs)
 
@@ -39,170 +39,19 @@ All open v2 issues should carry milestone **v2**.
 - (2026-04-16T05:51:43.085Z) Design spikes producing DPs are process-compatible with sprint planning reset — blocking them on ceremony is circular. Spikes (DPs) run in parallel with ceremony.
 - (2026-04-15T09:46:31.308Z) Issue #265 smallest ship: treat FileEditor payloads as workspace data, not chat bubble content. Paths: `chat-a2ui.ts`, `App.tsx`, `FileManager/`, `session-store.ts`.
 
-## 2026-04-17 DP Reviews
-
-**DP #329 (MCP App IDE Surface) — APPROVED WITH CONDITIONS**
-- Resource registration via `registerAppResource` + `registerAppTool` canonical
-- Single-file bundle with `vite-plugin-singlefile` required; CSP headers mandatory
-- `event.source === window.parent` guard required
-- Bundle size validation (vite-plugin-singlefile with full React + Fluent 2 + A2UI) before Slice 1 ships
-
-**DP #330 (Agents SDK Migration) — APPROVED + CLOSED**
-- Option B (hybrid route planner + manager agent) adopted
-- Server-authored route state replaces model-emitted booleans
-- Implementation: #445 (Bender backend), #446 (Fry UI)
-
-## 2026-04-17 PR #447 Code Review + Approval
-
-- Found duplicate-message bug in SDK streaming loop (blocking). Bender fixed in commit a3899e5.
-- Applied `leela:approved`. 1511 tests passing, 0 unresolved threads.
-
-## 2026-04-17 v2 Sprint Planning + #474 DP Review
-
-- HOLD_FOR_PLANNING gate honored; sprint planning run first.
-- Sprint plan: #474 → #475 → #476 blocking chain. Step 4+ frozen until #476.
-- #474 DP: APPROVE_WITH_CONDITIONS. Seam-cutting pass approach confirmed.
-- v2 architecture DP (#473): APPROVED. Guardrail enforcement semantics must be pinned before Step 11 (`error` SSE with `guardrail_block`). UserAction resume authz must be a done criterion in Step 5.
-
-## 2026-05-28 — DP Review #476 v2 Step 3: Registry + loaders
+## 2026-06-10 — DP Review #479 v2 Step 5: Runner + SSE
 
 **Verdict:** APPROVE_WITH_CONDITIONS  
-**GitHub comment:** https://github.com/sabbour/kickstart/issues/476#issuecomment-4268074355  
-**Decision record:** `.squad/decisions/inbox/leela-476-dp-review.md`
-
-Key findings:
-- Registry lifecycle (`register → enable → seal`) and sigil resolution (`.`/`:`) are sound. ✅
-- Circular dependency detection and collision rules correctly specified. ✅
-- Catalog skeleton scope (typed data assembly only, no UI runtime) is correct. ✅
-- C1 (BLOCKER): Custom frontmatter mini-parser can't handle arrays; must use `yaml` npm package. All agent/skill frontmatter uses arrays.
-- C2 (BLOCKER): Registry read accessor surface underspecified; only `getAgent` + `components` listed. Step 5+6 need `getSkillsForAgent`, `getToolsForAgent`, `getUserAction`, `getGuardrailsByStage` — must be locked in Step 3.
-- C3 (REQUIRED): UserAction wire transliteration (`azure:login` → `azure__login`) unspecified. `UserActionContribution` must carry both `.name` and `.wireName`.
-- M1/M2 (minor): `enable()` dep enforcement and `enable()` after `seal()` behavior unspecified in DP text.
-
-## 2026-05-28 — DP Review #475 v2 Step 2: Harness types
-
-**Verdict:** APPROVE_WITH_CONDITIONS  
-**GitHub comment:** https://github.com/sabbour/kickstart/issues/475#issuecomment-4268063788  
-**Decision record:** `.squad/decisions/inbox/leela-475-dp-review.md`
-
-Key findings:
-- Primitive coverage complete (all 12 type files match brief). ✅
-- AgentOutput Zod contract correct. ✅
-- A2UI schemas must be discriminated unions with `version: 'v0.9'` literal — not v1 all-optional transcription. (C1)
-- `SessionCtx` forward refs (`AppIntent`, `Artifact`, `A2UICatalog`, `Turn`, `PendingUserAction`, `AzureCredential`) must be resolved. (C2)
-- `ComponentContribution.renderer` typed as `unknown` in harness — React-aware narrowing deferred to pack-core. (C3)
-- `package.json` missing `zod` and `@openai/agents` as runtime dependencies. (C4)
-- `chat-a2ui.ts` port must drop all v1 phase-model code; PR needs explicit keep/drop inventory. (C5)
-
-## 2026-05-28 — DP Reviews #475 + #476
-
-**#475 (Harness Types) — APPROVE_WITH_CONDITIONS:**
-1. A2UI Zod schemas must be discriminated unions with `version: z.literal("v0.9")` — not all-optional.
-2. `ComponentContribution.renderer` typed as `unknown` in harness; React-aware type deferred to pack-core.
-3. `SessionCtx` forward refs (`AppIntent`, `Artifact`, `A2UICatalog`, `Turn`, `PendingUserAction`, `AzureCredential`) must be stubbed with `// TODO(Step 3)` before merge.
-4. `zod` + `@openai/agents` must be `dependencies`, not `devDependencies`, in `@kickstart/harness`.
-5. `chat-a2ui.ts` port must drop all v1 phase-model code — explicit keep/drop inventory required in PR.
-All five conditions are blocking. Step 3 gated on standalone compile.
-
-**#476 (Registry + Loaders) — APPROVE_WITH_CONDITIONS:**
-- C1 (BLOCKER): Drop custom mini-parser; use `yaml` npm package — mini-parser doesn't support arrays needed for `tools:`, `handoffs:`, `appliesTo:`, `keywords:`.
-- C2 (BLOCKER): Full registry read accessor surface required in Step 3 (6 methods/properties defined — see decisions.md).
-- C3 (BLOCKER): `UserActionContribution` must carry both `.name` (canonical, `:` sigil) and `.wireName` (transliterated, `__`); loader-agent.ts produces both.
-C1–C3 block Step 4 (pack-core), Step 5 (Runner), and Step 6 (skill resolver).
-
-## Wave 3 — 2026-04-17 #474 Step 1 + A2UI #351 Decisions Filed
-
-- `leela-v2-rewrite-start-gate.md`: Do not start #474 implementation until sprint planning ceremony completes; HOLD gate honored.
-- `leela-dp-474-step1.md`: Step 1 seam APPROVE_WITH_CONDITIONS — shim must be shrinking only, no new exports or runtime behavior; Bender owns implementation, Fry handles web-shell fallout. Exit contract: v1 files deleted, v1 flags gone, `packages/harness` canonical.
-- `leela-351-component-expansion.md`: A2UI catalog expanded 28→33 components; Alert, Table, Link added; SummaryCard + DecisionCard new React components; `KNOWN_COMPONENT_TYPES` 46→48; ProgressSteps/CodeBlock/SteppedCarousel/Questionnaire deferred.
-
-## 2026-05-28 — DP Review #478 v2 Step 4a: Playground on registry
-
-**Verdict:** APPROVE_WITH_CONDITIONS  
-**GitHub comment:** https://github.com/sabbour/kickstart/issues/478#issuecomment-4268203830  
-**Decision record:** `.squad/decisions/inbox/leela-478-dp-review.md`
-
-Key findings:
-- GALLERY_GROUPS removal via `registry.playgroundScenarios` is architecturally clean. ✅
-- Widgets tab full deletion (not gating) is correct — v1 coupling, no v2 pack provides it. ✅
-- Step 5 boundary is respected; Create tab excluded; `usePlaygroundDispatch` stays at hook layer. ✅
-- corePack MVP (4 components + 2 scenarios + empty stubs) is sufficient for registry shape validation. ✅
-- C1 (BLOCKER): Three of four registry APIs used by this DP (`getComponent`, `playgroundScenarios`, `playgroundStubs`) are not in the #476-approved surface. Bender must extend the Step 3 spec before #478 starts.
-- C2 (Fix before coding): `usePlaygroundDispatch` pseudocode has missing `if (!stub)` guard — throw executes unconditionally. Must be fixed in DP text.
-- M1 (Minor): "Fail loudly" scope must be explicit — unregistered component references → error badge; empty scenario list → empty state. Two different failure modes.
-
-## 2026-05-28 — DP Review #477 v2 Step 4: pack-core
-
-**Verdict:** APPROVE_WITH_CONDITIONS  
-**GitHub comment:** https://github.com/sabbour/kickstart/issues/477#issuecomment-4268164127  
-**Decision record:** `.squad/decisions/inbox/leela-477-dp-review.md`
-
-Key findings:
-- pack-core scope (3 agents + 5 skills + 6 tools + 39 components + 3 guardrails) and domain-neutral boundary are correct. ✅
-- Delivery order (A → B‖C → D → E → F → G → H) is coherent; no circular dependencies. Phases A+B unblocked immediately once #476 green. ✅
-- `emit_ui` Zod union usage correct; `session.a2uiEmissions` decoupling model is architecturally sound. ✅
-- 27/12 component split correct; audit table domain classification is accurate. ✅
-- C1 (BLOCKER for Phase C): `Pack` type shape ambiguity — brief says `register()` walks `agentsDir`/`skillsDir`, DP shows inline arrays. Must resolve against #476 before Phase C starts.
-- C2 (BLOCKER for Phase C): `SessionCtx.a2uiEmissions: A2UIMessage[]` must be confirmed in #475; raise targeted PR against #475 if missing.
-- C3 (Required for merge): Brief §9 Step 5 sketch reads `event.arguments` (raw) — contradicts DP's `session.a2uiEmissions` contract (post-validation). Step 5 DP must commit explicitly to `session.a2uiEmissions` forwarding before Step 5 is authored.
-- C4 (Required for merge): §6c registration test must exercise real loader-from-disk path once C1 resolved; add second test if Pack uses inline arrays.
-- C5 (Required for Phase E): `AuthCard` schema must be stripped of all Azure-specific props before Phase E porting.
-
-## Wave 4 — 2026-05-28 DP Review #477 v2 Step 4: pack-core
-
-**Verdict:** APPROVE_WITH_CONDITIONS  
-**GitHub comment:** https://github.com/sabbour/kickstart/issues/477#issuecomment-4268164127
-
-- Pack-core scope approved: 3 agents, 5 skills, 6 tools, 39 components, 3 guardrails, 2 playground scenarios. Domain-neutral boundary correct.
-- `emit_ui` Zod union + `session.a2uiEmissions.push()` decoupling model approved.
-- Phase A+B unblocked once #476 is green.
-- C1 (BLOCKER Phase C): Pack type shape — dir-pointers vs inline arrays must be resolved against #476 before Phase C.
-- C2 (BLOCKER Phase C): `SessionCtx.a2uiEmissions: A2UIMessage[]` must exist in merged #475; if not, targeted PR against #475 required.
-- C3 (Required for merge): Step 5 DP (#479) must commit to forwarding from `session.a2uiEmissions`, NOT `event.arguments` (raw, pre-validation).
-- C4 (Required for merge): §6c test must exercise loader-from-disk path, not just manifest shape.
-- C5 (Required Phase E): `pack-core/AuthCard` must be domain-neutral — no MSAL props. MSAL wiring lives in `pack-azure`'s `azure:login` UserAction.
-- #478 unblocked once pack-core has real components. #479 hard-depends on C3.
-
-## 2026-06-10 — PR #544 Code Review (v2 Step 1)
-
-**PR:** #544 — feat(v2): Step 1 — Nuke v1, cut to harness, web-shell cleanup (Closes #474)
-**Verdict:** APPROVED + `leela:approved` label applied
-
-All 8 DP approval conditions verified:
-- Core shim compile-only ✅ (package.json redirect only, no src/index.ts)
-- Feature flags gone ✅ (KICKSTART_AGENTS_SDK + KICKSTART_V2 purged from production)
-- Fail closed ✅ (converse.ts → 503, mock/demo files deleted)
-- 16 web files on harness ✅
-- 34 harness smoke tests ✅ (407 total green)
-- No new exports ✅ (stubs only)
-- Build green ✅ (vite build passes)
-- Deferred items correct ✅ (types.ts as empty module, connector infra intact)
-
-**Known debt — Step 2 prerequisite:** `types.ts` emptied to `export {};` but ~15 web shell files still import named types from it. `tsc --noEmit` would fail (TS2305). Vite build passes (strips types). Step 2 must resolve tsc errors before any tsc CI gate lands. Bender + Fry co-own.
-
-Decision filed: `.squad/decisions/inbox/leela-pr544-review.md`
-
-## Wave 5 — 2026-06-10 PR #544 Code Review (v2 Step 1)
-
-**PR #544 (Closes #474) — APPROVED**
-- All 8 DP conditions verified. `packages/core/` shim is compile-only (package.json redirect only). Feature flags (`KICKSTART_AGENTS_SDK`, `KICKSTART_V2`) deleted from production. `converse.ts` returns 503 fail-closed. 34 smoke tests green. 407 tests total green.
-- **Hard gate on Step 2:** `packages/web/src/types.ts` is `export {};` but 15+ web shell files still import named types from it. `tsc --noEmit` would fail. Step 2 must resolve this first (re-export from harness or inline). Bender + Fry co-own tsc clean-up before any new type-safe code.
-- Filed `leela-pr544-review.md` → decisions.md.
-
-## Wave 6 — 2026-06-10 DP Review #479 v2 Step 5: Runner + SSE
-
-**Verdict:** APPROVE_WITH_CONDITIONS
 **GitHub comment:** https://github.com/sabbour/kickstart/issues/479#issuecomment-4268302933
 
-- SSE 9-event taxonomy approved and locked: `chunk | a2ui | tool | artifact | user_action_required | handoff | intent | done | error`. No envelope. Separation of `a2ui` / `chunk` is canonical.
+- SSE 9-event taxonomy locked: `chunk | a2ui | tool | artifact | user_action_required | handoff | intent | done | error`. No envelope. `a2ui`/`chunk` separation canonical.
 - Runner/registry coupling correct: read-only calls on sealed registry, per-turn `Agent` construction from `AgentContribution`.
-- Step 6 boundary clean: skill resolver stubbed with explicit `// Step 6 / #480` deferral. No pre-emption.
-- C1 (Phase A+B gate): Confirm `getToolsForAgent(agentName)` on #476 PackRegistry — OQ1 only asked about skills, not tools.
-- C2 (Phase B gate): Spec `runner.ts` to drain `a2uiEmissions` immediately on each SDK `tool_call_item`, not end-of-turn. Array is a log, not the streaming path.
-- C3 (Phase C gate): Drop `resultSchema: z.ZodTypeAny` from `SessionCtx.pendingUserAction` — Zod schemas can't serialize to JSON; redundant with registry lookup on resume.
-- C4 (merge gate): Address `useNavigation.ts` + `onIntent` wiring — hook listed as "untouched" but its prior feed (`onPhase`) is removed.
-- C5 (Phase C gate): Clarify playground scenario listing in `/api/packs` — scenarios missing from response, `TODO(Step 5)` can only be partially resolved without them.
-- Zapp Critical 1–3 remain merge gates (session ownership, resultSchema validation, playground env gate).
+- C1 (Phase A+B gate): Confirm `getToolsForAgent(agentName)` on #476 PackRegistry.
+- C2 (Phase B gate): Drain `a2uiEmissions` immediately on each SDK `tool_call_item`; array is log, not stream.
+- C3 (Phase C gate): Drop `resultSchema` from `SessionCtx.pendingUserAction`; use `registry.getUserAction().resultSchema` on resume.
+- C4 (merge gate): Wire `useNavigation.ts` to `onIntent` — `onPhase` feed removed; hook must not be "untouched".
+- C5 (Phase C gate): Clarify `/api/packs` playground scenario listing (Options A/B/C; pick one, document before Phase C).
+- Zapp Critical 1–3 remain merge gates: session ownership check, resultSchema validation, playground env gate.
 - Filed `leela-479-dp-review.md` → decisions inbox.
 
 ## 2026-06-10 — PR #545 Code Review (v2 Step 2)
@@ -212,11 +61,48 @@ Decision filed: `.squad/decisions/inbox/leela-pr544-review.md`
 
 C1, C3, C4, C5 all pass. Two blockers:
 
-1. **`SessionCtx.a2uiEmissions: A2UIMessageV09[]` missing** — session.ts has write-only `recordA2UIEmission()` method but no readable array property. Required by C2 (late addition) and #477 F3/C2. Step 5 SSE forwarding reads this array as its post-validation buffer.
+1. **`SessionCtx.a2uiEmissions: A2UIMessageV09[]` missing** — `session.ts` exposes write-only `recordA2UIEmission()` but no readable array. Required by C2 and #477 F3/C2. Step 5 SSE forwarding reads this array.
 
-2. **`Pack` has dual-registration model** — both `agentsDir?: URL` and `agents?: AgentContribution[]` present. #477 F1 called these incompatible. Brief §11 resolves to dir-based. Inline `agents`/`skills` arrays must be removed from the interface.
+2. **`Pack` has dual-registration model** — `agentsDir?: URL` and `agents?: AgentContribution[]` both present. Brief §11 resolves to dir-based only. Remove `agents?` and `skills?` inline arrays from `Pack`.
 
-Non-blocking notes: `tsconfig.json` includes `DOM` lib (unnecessary), `index.ts` `// TODO(Step 2)` header is stale.
-
-Step 3 (#476) remains gated on this PR. Both fixes are small diffs — no scope expansion needed.  
+Non-blocking: `tsconfig.json` includes unneeded `DOM` lib; `index.ts` has stale `// TODO(Step 2)` header.  
+Step 3 (#476) gated on this PR. Both fixes are small diffs.  
 Decision filed: `.squad/decisions/inbox/leela-pr545-review.md`
+
+## 2026-06-10 — DP Review #480 v2 Step 6: Skill Resolver
+
+**Verdict:** APPROVE_WITH_CONDITIONS
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/480#issuecomment-4268325601
+**Decision record:** `.squad/decisions/inbox/leela-480-dp-review.md`
+
+Four-stage pipeline, runner hook placement, per-turn scope, "skip not stop" budget, empty result safety, and Step 7 boundary all correct.
+
+- C1 (BLOCKER, Phase B): Glob `*` rule self-contradicts — Rule A says `*` doesn't cross `.`; Rule B says bare `*` matches all agents. Fix: explicit `if (pattern === "*") return true` short-circuit before glob processing, or adopt `micromatch { dot: true }`.
+- C2 (BLOCKER, Phase C): `listSkills()` not in #476-approved accessor surface. Must lock against #476 before runner wiring.
+- C3 (Required, Phase C): `estimateTokens` must be exported from harness `index.ts`; deep path imports will break.
+- OQ2 answered: use last N turns of any role (not user-only).
+- OQ3 answered: XML skill tags preferred over `---` separators.
+
+## 2026-06-10 — DP Review #480 v2 Step 6: Skill Resolver
+
+**Verdict:** APPROVE_WITH_CONDITIONS  
+**GitHub comment:** #480
+
+- Four-stage pipeline (glob filter → keyword score → priority sort → budget cap) approved.
+- Runner hook inside `instructions: (_runCtx) => string` callback correct.
+- C1 (BLOCKER Phase B): Fix `*` glob contradiction — add explicit `if (pattern === "*") return true;` short-circuit OR adopt `micromatch`/`minimatch` with `{ dot: true }`. Do NOT change generic glob segment rule (breaks `aks.*`).
+- C2 (BLOCKER Phase C): Lock `listSkills()` vs `getSkillsForAgent()` against #476 before runner wiring. Either amend #476 spec to add `listSkills()` (Option A) or use already-mandated `getSkillsForAgent()` (Option B).
+- C3 (Required Phase C): Export `estimateTokens` from harness `index.ts`; verify with `tsc --noEmit`.
+- M1 (OQ2 answered): All roles (user + agent) for context window, not user-only.
+- M2 (OQ3 answered): XML `<skill name="…">` tags for skills block injection, not `---` separators.
+- Filed `leela-480-dp-review.md` → decisions inbox.
+
+## 2026-06-10 — PR #546 Code Review (v2 Step 3)
+
+**PR:** #546 — feat(v2): Step 3 — PackRegistry, loaders, frontmatter parser (Closes #476)  
+**Verdict:** APPROVED — `leela:approved` applied
+
+All DP #476 conditions verified: `yaml` npm package ✅, full 9-accessor read surface ✅, `UserActionContribution.wireName` dual-key indexing ✅, Zapp security conditions (pack namespaces, dep-scoped resolution, path confinement, iterative cycle detection, immutable `seal()`) ✅, `SessionCtx.a2uiEmissions: A2UIMessage[]` backported ✅. Build green, 53/53 tests passing.  
+Non-blocking follow-ups: `enable()`-after-`seal()` missing guard, no dedicated `frontmatter.test.ts`, `wireName` auto-compute not enforced.  
+**Unblocked:** Step 4 (pack-core), Step 4a (playground), Step 5 (runner pending `enable()` fix), #477 C2 resolved.  
+Decision filed: `.squad/decisions/inbox/leela-pr546-review.md`

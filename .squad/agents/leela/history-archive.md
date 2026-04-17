@@ -516,3 +516,58 @@ Issue #342 removes `@sabbour/adaptive-ui-core` + `@sabbour/adaptive-ui-azure-pac
 
 ### 2026-04-16 Sprint Retro — Security + Generation Sprint
 Merged (cross-cutting): #341 DOMPurify, #354 STEPWISE_GENERATION_V1 default, #356 rename, #358 catalog guidance, #368 CI permissions, #372 phantom cleanup. Decisions: component rename discipline, sanitization standard, stepwise default.
+
+
+### 2026-04-17 / 2026-05-28: v2 Sprint Kickoff DP Reviews
+
+#### DP #329 (MCP App IDE Surface) — APPROVED WITH CONDITIONS
+- Resource registration via `registerAppResource` + `registerAppTool` canonical. Single-file bundle + CSP headers + `event.source` guard required. Bundle size validation required before Slice 1.
+
+#### DP #330 (Agents SDK Migration) — APPROVED + CLOSED
+- Option B (hybrid route planner + manager agent) adopted. Server-authored route state replaces model-emitted booleans. Implementation: #445 (Bender), #446 (Fry).
+
+#### PR #447 Code Review + Approval
+- Found duplicate-message bug in SDK streaming loop (blocking). Fixed in a3899e5. Applied `leela:approved`.
+
+#### v2 Sprint Planning + #474 DP Review
+- Sprint plan: #474 → #475 → #476 blocking chain. Step 4+ frozen until #476.
+- #474 APPROVE_WITH_CONDITIONS. Seam-cutting approach confirmed.
+- v2 architecture DP (#473) APPROVED. Guardrail semantics pinned before Step 11.
+
+#### #474 Step 1 + A2UI #351 (Wave 3 inbox)
+- `leela-v2-rewrite-start-gate.md`: HOLD gate honored, sprint planning first.
+- `leela-dp-474-step1.md`: APPROVE_WITH_CONDITIONS — shim shrinking-only, no new exports/runtime.
+- `leela-351-component-expansion.md`: A2UI catalog 28→33 components; SummaryCard + DecisionCard added.
+
+### 2026-05-28: DP Reviews #475 / #476 / #477 / #478
+
+#### DP #475 v2 Step 2: Harness types — APPROVE_WITH_CONDITIONS
+C1 A2UI Zod schemas must be discriminated unions with `version: z.literal("v0.9")`.
+C2 `ComponentContribution.renderer: unknown`; narrowing deferred to pack-core.
+C3 `SessionCtx` forward refs stubbed with `// TODO(Step 3)`.
+C4 `zod` + `@openai/agents` in `dependencies` (not devDeps).
+C5 `chat-a2ui.ts` must drop all v1 phase-model code; keep/drop inventory required.
+
+#### DP #476 v2 Step 3: Registry + loaders — APPROVE_WITH_CONDITIONS
+C1 Drop custom mini-parser; use `yaml` npm package (arrays in frontmatter).
+C2 Full registry read surface locked in Step 3: `getAgent`, `getSkillsForAgent`, `getToolsForAgent`, `getUserAction`, `getGuardrailsByStage`, `components`.
+C3 `UserActionContribution` must carry both `.name` (`:` sigil) and `.wireName` (`__`); loader-agent.ts produces both.
+
+#### DP #477 v2 Step 4: pack-core — APPROVE_WITH_CONDITIONS
+Scope: 3 agents, 5 skills, 6 tools, 39 components, 3 guardrails, 2 playground scenarios. Domain-neutral boundary.
+C1 (BLOCKER Phase C): Pack type shape — `agentsDir`/dir-based vs inline arrays must resolve against #476.
+C2 (BLOCKER Phase C): `SessionCtx.a2uiEmissions: A2UIMessage[]` must exist in merged #475.
+C3 (merge gate): Step 5 DP must commit to `session.a2uiEmissions` forwarding.
+C4 (merge gate): §6c test must exercise loader-from-disk path.
+C5 (Phase E): `AuthCard` must be domain-neutral (no MSAL props).
+
+#### DP #478 v2 Step 4a: Playground on registry — APPROVE_WITH_CONDITIONS
+C1 (BLOCKER): Three registry APIs used by this DP (`getComponent`, `playgroundScenarios`, `playgroundStubs`) not in #476-approved surface — Bender must extend Step 3 spec.
+C2 `usePlaygroundDispatch` pseudocode: add `if (!stub)` guard.
+M1: "Fail loudly" must cover both unregistered component (error badge) and empty scenario (empty state).
+
+### 2026-06-10: PR #544 Code Review (v2 Step 1)
+
+**PR #544 (Closes #474) — APPROVED + `leela:approved` applied**
+All 8 DP conditions verified: shim compile-only, flags gone, fail-closed 503, 16 web files on harness, 34 smoke tests, no new exports, vite build green, deferred items correct. 407 tests total green.
+Hard gate on Step 2: `types.ts` is `export {};` but 15+ web shell files still import named types — `tsc --noEmit` would fail. Bender + Fry must resolve before any tsc CI gate lands.

@@ -178,3 +178,25 @@ All 4 critical security conditions from issue #445 acceptance criteria:
 - **All other checks passed:** `AgentOutput` strict + closed enum, A2UI discriminated union fail-closed, `SessionCtx` credentials opaque (`unknown`), no `eval`/dynamic `import`, harness build + tsc + vitest green.
 - **Process note:** GitHub blocked `REQUEST_CHANGES` (author = reviewer = repo owner). Finding posted as PR comment instead.
 - Filed `zapp-pr545-review.md` → decisions.md.
+
+## Wave 6 — 2026-04-17 PR #546 Security Review (v2 Step 3)
+
+**PR #546 (Closes #476) — REQUEST CHANGES**
+- **Blocking finding:** `packages/harness/src/runtime/frontmatter.ts` confines paths lexically with `resolve()`/`relative()` but does not canonicalize symlinks. A file inside the pack tree that points outside the pack root can still be loaded by `loadAgentFile()` / `loadSkillFile()`.
+- **Security impact:** loader trust boundary can be escaped, violating the DP requirement that pack file loading stay confined to the owning pack directory.
+- **Other reviewed checks passed:** duplicate registrations fail loud, tool/user-action resolution is dependency-scoped, YAML frontmatter is schema-validated before use, post-`seal()` registration throws synchronously, cycle detection is iterative, and no secrets were found in reviewed files.
+- **Process note:** GitHub blocked `REQUEST_CHANGES` because the PR author and reviewer are the same account; blocker posted as a PR comment instead.
+- **Decision filed:** `.squad/decisions/inbox/zapp-pr546-review.md`.
+
+## 2026-06-10 — PR #546 Security Review (v2 Step 3)
+
+**PR #546 (Closes #476) — REQUEST CHANGES — 1 blocker**
+
+Passed: pack-owned namespaces, dep-scoped resolution, frontmatter Zod strict validation, `seal()` gate, iterative cycle detection, no secrets found.
+
+**Blocker 1 — Path confinement bypassed via symlinks:** `frontmatter.ts` uses `resolve()` + `relative()` (lexical only) then calls `statSync()` which follows symlinks. A symlink from inside the pack root to a path outside passes containment check. Both `loadAgentFile()` and `loadSkillFile()` are affected.
+
+**Required fix:** Canonicalize both base dir and candidate with `realpath` before comparing, OR reject symlinked entries with `lstat`. Add regression test proving symlink escape is rejected.
+
+Security gate not clear until fix merges.  
+Decision filed: `.squad/decisions/inbox/zapp-pr546-review.md`

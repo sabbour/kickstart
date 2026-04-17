@@ -1,33 +1,41 @@
 ---
-updated_at: 2026-04-16T05:51:43.085Z
-mode: process-reset-then-design
-focus_area: Sprint planning ceremony, then architecture design spikes (#330, #329)
-active_issues: [330, 329]
-blocked_issues: [332]
+updated_at: 2026-04-17T14:30:00.000Z
+mode: sprint-active
+focus_area: v2 foundation — #475 + #476 in PR review; #477 A+B in flight; DPs #479–#480 in review
+active_issues: [475, 476, 477, 479, 480]
+blocked_issues: [478, 481, 482, 483, 484, 485, 486, 487, 488]
+merged_issues: [474]
 ---
 
 # What We're Focused On
 
-**v0.7.0 shipped. The burndown is complete. Process reset starts NOW.**
+**#474 MERGED into v2-rewrite.** The v1 runtime is gone. Harness is the new spine.
 
-The demo-sprint lanes (297, 298, 299, 274, 301, 265, 300, 331) are all done. #338 confirmed fixed. #332 remains blocked on live credentials (P2, v1.0.0 — no action until external deps clear).
+## Current State
+
+| Issue | Status | Branch | Gate |
+|-------|--------|--------|------|
+| #474 Step 1 | ✅ MERGED (PR #544) | v2-rewrite | — |
+| #475 Step 2 | 🔄 PR #545 open | squad/475-harness-types | leela:approved pending + zapp:approved pending (fixes in flight) |
+| #476 Step 3 | 🔄 PR #546 open | squad/476-registry-loaders | leela:approved ✅, zapp:approved pending (symlink fix pushed) |
+| #477 Step 4 | 🏗️ Phases A+B in impl | squad/477-pack-core | unblocked per Leela; C+D need #476 merged |
+| #478 Step 4a | ⏳ Waiting on #476 merge | — | C1 resolved (registry extended); C2 pseudocode fix needed |
+| #479 Step 5 | 📋 DP approved (conditions) | — | Leela+Zapp APPROVE_WITH_CONDITIONS |
+| #480 Step 6 | 📋 DP in review | — | Leela APPROVE_WITH_CONDITIONS; Zapp in progress |
 
 ## Immediate Priority Order
 
-1. **Merge PR #341** — DOMPurify 3.4.0 security bump. Fixes mXSS and prototype pollution. Safety-first.
-2. **Sprint planning ceremony** — scope post-v0.7.0 milestones, reassess board, calibrate estimates. Leela facilitates. This was committed to and is now overdue.
-3. **#330 — Agents SDK migration design** (P1, v1.0.0) — Leela writes the DP. Architecture spike, no code. Can proceed in parallel with ceremony since it doesn't consume implementation capacity.
-4. **#329 — MCP App IDE surface design** (important, v0.7.0) — Leela writes the DP after #330, or in parallel if bandwidth allows. Depends on #46 epic direction.
+1. **Merge PR #546** (#476) — leela:approved done; zapp recheck in flight
+2. **Merge PR #545** (#475) — Pack type + handoff fixes pushed; re-reviews needed
+3. **#477 Phases C–H** — tools, components, guardrails, pack manifest (after #476 merges)
+4. **#478 implementation** — after #476 merges, pseudocode fix, full approvals
+5. **#479 implementation** — after #477+#478 are green
+6. **#480 implementation** — after #479
 
 ## What's NOT Happening
 
-- **No feature code** until sprint planning completes and the next sprint is scoped.
-- **#332** stays blocked — needs live Azure/GitHub credentials and cross-system auth.
-- **#46** stays as the parent epic — #329 is the active design slice.
-
-## Rationale
-
-Design spikes are process-compatible with a reset — they're architecture planning, exactly what a healthy process produces. The reset prevents premature code without proper DP gates. Writing DPs IS the gate.
+- **No Step 7-12 domain work before Step 5/6.** Azure, AKS, GitHub, web-client, guardrails, and MCP all sit behind the harness spine.
+- **No reopening of old demo-sprint scope.** v2 is the lane; #332 remains externally blocked.
 
 ## Reference Projects
 

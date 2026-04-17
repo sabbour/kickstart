@@ -83,3 +83,19 @@ Swept main inbox and all worktrees (new: bender-deps, bender-sec-san, ceremony-r
 ## Wave 8 (user-labelled Wave 5) — 2026-06-10 Inbox merge
 
 Merged 2 new files from main inbox: `leela-pr544-review.md` (PR #544 APPROVED, v2 Step 1 all 8 conditions clear, tsc debt gate recorded) and `zapp-pr545-review.md` (PR #545 REQUEST CHANGES, legacy `handoff` phase in `chat-a2ui.ts` blocking). decisions.md: 139,295 → 143,112 bytes. Histories updated: leela, zapp. No history files exceed 15 KB threshold (leela at 14,833 bytes — nearest).
+
+## Wave 9 — 2026-06-10 Merge cycle
+
+- Inbox: `leela-pr545-review.md` (PR #545 REQUEST CHANGES — 2 blockers: missing `a2uiEmissions` array, dual-registration on `Pack`), `leela-479-dp-review.md` (#479 Runner+SSE APPROVE_WITH_CONDITIONS, 5 gated conditions).
+- decisions.md: 143,112 → 148,557 bytes (+2 files).
+- Residuals cleared: `leela-pr544-review.md`, `zapp-pr545-review.md` (already merged in wave 5).
+- Leela history exceeded 15 KB (17,457 bytes) — summarised: 17,457 → 5,683 bytes; pre-2026-06-10 DP reviews archived to `history-archive.md`.
+- scribe/history.md updated; no other histories updated this wave.
+
+## Wave 10 — 2026-06-10 Merge cycle (within same session)
+
+- Inbox: `leela-480-dp-review.md` (#480 Skill Resolver APPROVE_WITH_CONDITIONS, 2 blockers), `leela-pr546-review.md` (PR #546 Step 3 APPROVED), `zapp-pr546-review.md` (PR #546 security REQUEST CHANGES — symlink path bypass).
+- decisions.md: 148,557 → 159,647 bytes (+3 files, +11,090 bytes).
+- leela history updated (8,693 bytes; under 15 KB threshold).
+- zapp history updated (14,603 bytes; approaching threshold — watch next cycle).
+- No summarisation needed this wave.

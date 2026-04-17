@@ -2575,3 +2575,276 @@ Prior blocker resolved cleanly. Applied label: `zapp:approved`
 ## Review note
 
 GitHub blocked `REQUEST_CHANGES` (author = reviewer = repo owner). Finding posted as PR comment instead.
+
+---
+# Leela Decision — PR #545 Code Review (v2 Step 2 Harness Primitives)
+
+**Date:** 2026-06-10  
+**PR:** #545 — feat(v2): Step 2 — Harness primitives, all types + Zod schemas  
+**Closes:** #475  
+**Verdict:** REQUEST CHANGES — 2 blockers  
+
+## Review outcome
+
+### Passed conditions (C1, C3, C4, C5)
+- **C1:** `z.discriminatedUnion('op', […])` on A2UI envelope, `version: z.literal('v0.9')` in every shape, `.strict()` throughout. ✅
+- **C3:** `ComponentContribution.renderer: unknown`, no React/JSX imports in any harness file. ✅
+- **C4:** `zod` and `@openai/agents` in `dependencies` (not devDeps) in `packages/harness/package.json`. ✅
+- **C5:** `chat-a2ui.ts` has function-level keep/drop block at top; v1 step-model code absent. ✅
+
+### Blocking issues
+
+**Blocker 1 — C2+: `SessionCtx.a2uiEmissions: A2UIMessageV09[]` missing**  
+`session.ts` exposes `recordA2UIEmission(msg: A2UIMessageV09): void` (write-only) but no readable `a2uiEmissions` array property. This was a late C2 addition flagged in #477 F3/C2 as "This is not optional — `execute` won't compile without it." Step 5's SSE forwarding reads `session.a2uiEmissions` as its post-validation buffer. Without the property, the Step 5 forward-from-accumulator contract has no type anchor.  
+**Required fix:** Add `a2uiEmissions: A2UIMessageV09[]` to `SessionCtx`.
+
+**Blocker 2 — #477-C1: `Pack` interface has incompatible dual-registration models**  
+`pack.ts` exposes both `agentsDir?: URL` and `agents?: AgentContribution[]` (same for skills). #477 F1 called these "incompatible models." The brief (§11) resolves this: `register()` walks `agentsDir`/`skillsDir` — dir-based only. Keeping the inline arrays creates an indeterminate loading contract for Step 3's registry.  
+**Required fix:** Remove `agents?: AgentContribution[]` and `skills?: Skill[]` from `Pack`. Dir-based is canonical. `tools`, `userActions`, `components`, `guardrails`, `playgroundScenarios` (no dir alternatives) stay as inline arrays.
+
+### Non-blocking observations
+- `tsconfig.json` includes `"DOM"` lib — unnecessary for a server-side package; trim in follow-on.
+- `index.ts` still has `// TODO(Step 2)` header — stale since this IS Step 2; clean up.
+
+## Consequence for Step 3
+Step 3 (`#476` registry + loaders) remains gated on this PR merging. Both blockers are small diffs; no scope expansion needed. Bender should be able to resolve in the same branch.
+
+— Leela
+
+---
+# Decision: DP #479 — v2 Step 5: Runner + SSE
+
+**Date:** 2026-06-10
+**Author:** Leela (Lead)
+**Issue:** #479
+**Comment:** https://github.com/sabbour/kickstart/issues/479#issuecomment-4268302933
+**Status:** APPROVE_WITH_CONDITIONS
+
+---
+
+## Architecture decisions recorded
+
+1. **Runner/registry coupling model is correct.** Registry calls per turn (`getAgent`, `getToolsForAgent`, `listComponents`, `getSkillsForAgent`) are read-only. The sealed registry cannot be mutated at runtime. `Agent` is constructed per-turn from `AgentContribution` — the contribution is never mutated. This pattern is canonical for all future runner implementations.
+
+2. **9 SSE event taxonomy is locked.** `chunk | a2ui | tool | artifact | user_action_required | handoff | intent | done | error` is the complete typed event surface for v2. The `a2ui`/`chunk` separation is canonical per brief §3. No envelope. One `core.emit_ui` call = one `event: a2ui` line. No `resume_ack` event — new SSE stream IS the acknowledgement.
+
+3. **`a2uiEmissions` drain must be immediate, not end-of-turn.** The runner must emit SSE `a2ui` events immediately on each SDK `tool_call_item` for `core.emit_ui`. The `session.a2uiEmissions` array is a record/log, not the streaming path. Buffering until end of turn is incorrect and would prevent real-time A2UI rendering.
+
+4. **`resultSchema` is not stored on `SessionCtx.pendingUserAction`.** Zod schemas cannot be serialized to JSON and cannot survive a persistence adapter. The resume endpoint uses `registry.getUserAction(toolName).resultSchema` for validation. The `pendingUserAction` shape carries only `runId`, `toolName`, and `args`. This is the canonical `pendingUserAction` shape.
+
+5. **`useNavigation.ts` must be explicitly wired to `onIntent`** in Step 5 or deferred with an explicit TODO. It must not be listed as "untouched" while its prior feed (`onPhase`) has been removed.
+
+6. **`/api/packs` response shape does not include `playgroundScenarios`** as of this DP. The Playground.tsx `TODO(Step 5)` scope is narrowed to catalog+userActions replacement only; scenario listing is resolved separately (Option A/B/C per C5 condition). Any choice is acceptable — it must be documented before Phase C.
+
+7. **`getToolsForAgent(agentName)` is required on #476 PackRegistry.** Open question §8.1 asks only about skills. The runner's per-turn Agent construction also needs `getToolsForAgent`. If missing from #476, file as an addendum before Phase A+B starts.
+
+## Conditions on implementation
+
+- C1: Confirm `getToolsForAgent(agentName)` on #476 PackRegistry (Phase A+B gate)
+- C2: Spec `runner.ts` to forward `a2uiEmissions` immediately (Phase B gate)
+- C3: Drop `resultSchema` from `SessionCtx.pendingUserAction` (Phase C gate)
+- C4: Address `useNavigation.ts` + `onIntent` wiring (merge gate)
+- C5: Clarify playground scenario listing in `/api/packs` (Phase C gate)
+- Zapp Critical 1-3: session ownership check, resultSchema validation, playground env gate (merge gate, Zapp-owned)
+
+---
+# Decision: DP Review #480 — v2 Step 6: Skill Resolver
+
+**Date:** 2026-06-10
+**Author:** Leela (Lead)
+**Issue:** #480
+**Status:** APPROVE_WITH_CONDITIONS
+
+---
+
+## Verdict
+
+**APPROVE_WITH_CONDITIONS** — Two blocking conditions must be resolved before implementation starts. Three minor conditions answer open questions that must be locked before Phase C.
+
+---
+
+## Findings
+
+### ✅ What is correct
+
+1. **Four-stage pipeline is architecturally correct.** Glob filter → keyword score → priority sort → budget cap is the right shape. Stages are pure transformations; no I/O, no side effects.
+
+2. **Runner hook placement is correct.** Resolver inside the `instructions: (_runCtx) => string` callback is precisely the right injection point — after agent lookup, before LLM call. This fills the `// Step 6 / #480` stub approved in #479.
+
+3. **Per-turn scope is correct.** Instructions callback fires each turn. No cross-turn caching of skill selections. Session turns grow between turns, so re-scoring is necessary and correct.
+
+4. **"Skip, not stop" budget accumulation is correct.** A large high-priority skill that busts the budget is skipped; smaller lower-priority skills can still fit. This prevents a 2000-token monolith from zeroing out all other skills.
+
+5. **Empty result handling is safe.** When `selected.length === 0`, `skillsBlock` is `''`. Agent base body + catalog + session snapshot form valid instructions without any skills block. Runner code correctly conditionals this.
+
+6. **Step 7 boundary is clean.** Nothing in this DP touches auth, connectors, UserActions, or pack-azure. Step 7 (#481) is unaffected.
+
+7. **Token budget approximation (`ceil(chars/4)`) is acceptable.** Skills are prose, not code. The 4-chars-per-token approximation is the industry standard for a soft cap. At v2 pack scale (20–30 skills total), this is fine without a real tokenizer.
+
+8. **`resolveSkills` returns `Skill[]`, not a string.** Correct separation of concerns — the runner assembles the string; the resolver stays a pure function testable without string formatting concerns.
+
+9. **Three-level sort is deterministic.** `priority desc → keyword score desc → id asc` guarantees identical outputs for identical inputs. Required for reproducible agent behaviour.
+
+---
+
+### 🔴 C1 — BLOCKER, Phase B gate: Glob `*` rule is self-contradicting
+
+Stage 1 spec states two rules that directly contradict each other:
+
+> Rule A: "`*` matches any number of characters within a single path segment (not `.`)"
+> Rule B: "`*` (bare wildcard) matches every agent name"
+
+Under Rule A, bare `*` does NOT match `aks.architect` because the string contains a dot. Under Rule B it does. A `globMatch("*", "aks.architect")` call using a naïve segment-aware implementation returns `false`, which breaks `appliesTo: ["*"]` for every pack-level universal skill (collaborator-voice, a2ui-output-discipline, etc.). This is the first test case in the Done Criteria.
+
+**Required fix — choose one:**
+- Option 1: Add an explicit short-circuit before glob processing: `if (pattern === "*") return true;`. Document this as a first-class special case, not a glob rule.
+- Option 2: Adopt `micromatch` or `minimatch` with `{ dot: true }` to get a glob library with unambiguous semantics. No custom implementation.
+
+Do NOT attempt to fix this inside the generic `globMatch` utility by changing the segment rule — that would break `aks.*` (which must NOT match `core.triage`).
+
+---
+
+### 🔴 C2 — BLOCKER, Phase C gate: `listSkills()` not in the #476-approved accessor surface
+
+From Leela's #476 C2: "Step 5+6 need `getSkillsForAgent`, `getToolsForAgent`, `getUserAction`, `getGuardrailsByStage` — must be locked in Step 3."
+
+The DP proposes using `registry.listSkills()` (OQ §8 item 1) as the simpler API. `listSkills()` was not included in the #476-mandated surface. Two valid resolutions:
+
+- **Option A:** Amend the #476 registry spec to add `listSkills(): Skill[]` before Phase C starts. Bender must open a targeted update to #476.
+- **Option B:** Use `registry.getSkillsForAgent(agentName)` as already mandated in #476. The resolver's Stage 1 glob filter is still needed even with pre-filtered results, because `getSkillsForAgent` may do broad glob pre-filtering while the resolver does exact per-pattern matching.
+
+Either option is acceptable. Must be locked before Phase C. Cannot leave as an open question while writing runner.ts.
+
+---
+
+### 🟡 C3 — Required before Phase C: `estimateTokens` export path must be in harness public `index.ts`
+
+The DP says `pack-core/guardrails/token-budget.ts` imports from `@kickstart/harness/runtime/token-budget`. This import path works only if `token-budget.ts` is a named export from `packages/harness/src/index.ts`. Deep path imports (`/runtime/token-budget`) break with most TypeScript `exports` field configurations.
+
+**Required:** Add `export * from './runtime/token-budget';` (or a named re-export) to `packages/harness/src/index.ts`. Verify this with `tsc --noEmit` before PR.
+
+---
+
+### ℹ️ M1 — OQ2 answered: Use last N turns of any role
+
+**Answer:** Last N turns of any role (user + agent text concatenated) is correct. Agent responses frequently contain task keywords that should keep domain skills active in subsequent turns (e.g., if the agent said "let's configure workload identity" in turn N, the `workload-identity-mandatory` skill should score high in turn N+1). User-turns-only would miss this continuity signal.
+
+No DP change needed; implement as recommended.
+
+---
+
+### ℹ️ M2 — OQ3 answered: Use XML skill tags, not `---` separators
+
+**Answer:** Use XML tag wrapping.
+
+```
+## Active Skills
+<skill name="workload-identity-mandatory">
+{skill.instructions}
+</skill>
+
+<skill name="collaborator-voice">
+{skill.instructions}
+</skill>
+```
+
+Rationale: skill bodies may contain markdown `---` horizontal rules as prose structure (many SKILL.md files do). Using `---` as a separator would confuse any parser or LLM reading the injected block. XML tags provide unambiguous boundary detection regardless of skill body content.
+
+Update the runner assembly in Phase C to use this format. Update test §6f to assert tag presence.
+
+---
+
+## Conditions Summary
+
+| ID | Severity | Phase gate | Action |
+|----|----------|-----------|--------|
+| C1 | BLOCKER | Phase B | Fix `*` glob contradiction (explicit special-case or adopt `micromatch`) |
+| C2 | BLOCKER | Phase C | Lock `listSkills()` vs `getSkillsForAgent()` in #476 before runner wiring |
+| C3 | Required | Phase C | Export `estimateTokens` from harness `index.ts`; verify with `tsc --noEmit` |
+| M1 | Info | Phase B | OQ2 answered: all roles, not user-only |
+| M2 | Required | Phase C | OQ3 answered: XML tags, not `---` separators |
+
+C1 and C2 are blocking. Implementation cannot start until C1 is resolved in DP text and C2 is locked against #476.
+
+---
+# Decision — PR #546 Code Review (v2 Step 3: PackRegistry, loaders, frontmatter parser)
+
+**Date:** 2026-04-17  
+**Author:** Leela (Lead)  
+**PR:** https://github.com/sabbour/kickstart/pull/546  
+**Issue:** #476  
+**Verdict:** APPROVED — `leela:approved` applied
+
+---
+
+## What merged
+
+- `packages/harness/src/runtime/registry.ts` — `PackRegistry` with full lifecycle + read surface
+- `packages/harness/src/runtime/loader-agent.ts` — `.agent.md` frontmatter → `AgentContribution`
+- `packages/harness/src/runtime/loader-skill.ts` — `SKILL.md` frontmatter → `Skill`
+- `packages/harness/src/runtime/frontmatter.ts` — YAML frontmatter parser using `yaml` npm package
+- `packages/harness/src/runtime/catalog.ts` — A2UI catalog skeleton
+- `SessionCtx.a2uiEmissions: A2UIMessage[]` backported into `session.ts`
+
+---
+
+## DP conditions verified
+
+| Condition | Status |
+|-----------|--------|
+| C1: `yaml` npm package, arrays work | ✅ |
+| C2: Full 9-accessor read surface | ✅ |
+| C3: `UserActionContribution.wireName` + dual-key indexing | ✅ |
+| Zapp: Pack-owned namespaces, dep-scoped resolution, path confinement, iterative cycle detection, immutable `seal()` | ✅ |
+| Bonus: `SessionCtx.a2uiEmissions` | ✅ |
+
+Build: `packages/harness` tsc — green. Tests: 53/53 passing.
+
+---
+
+## Follow-up items (non-blocking)
+
+1. **`enable()` after `seal()` silently succeeds** — add `if (this.sealed) throw` guard in `enable()`, same as `register()`. Must land before Step 5 (runner) wires the lifecycle.
+
+2. **Frontmatter edge case tests are indirect** — no dedicated `frontmatter.test.ts` covering missing delimiter / malformed YAML explicitly. Hermes should add these before Step 5.
+
+3. **`normalizeUserAction` does not auto-compute `wireName`** — pack authors must provide both fields. No runtime validation that `wireName === name.replace(/:/g, '__')`. Acceptable for now; enforce in pack-core's contribution builder.
+
+---
+
+## Impact on downstream work
+
+- **Step 4 (pack-core) — UNBLOCKED** (Pack type shape and registry API stable)
+- **Step 4a (playground) — UNBLOCKED** (`getComponent`, `playgroundScenarios`, `playgroundStubs` present)
+- **Step 5 (runner) — UNBLOCKED** pending the `enable()`-after-`seal()` fix
+- **#477 C2 prerequisite resolved** (`SessionCtx.a2uiEmissions` present)
+
+---
+# Zapp Decision — PR #546 Security Review (v2 Step 3: PackRegistry, loaders, frontmatter parser)
+
+**Date:** 2026-04-17  
+**PR:** #546 — feat(v2): Step 3 — PackRegistry, loaders, frontmatter parser  
+**Closes:** #476  
+**Verdict:** REQUEST CHANGES — 1 blocker
+
+## Review outcome
+
+### Passed checks
+- **Pack-owned namespaces / collisions:** `register()` rejects duplicate names and cross-pack namespace misuse instead of silently overwriting entries.
+- **Dependency-scoped resolution:** agent tool/user-action allowlists resolve only against same-pack + declared dependency scope.
+- **Frontmatter validation:** YAML is parsed in strict mode and validated with Zod before contribution fields are consumed.
+- **Seal gate:** post-`seal()` `register()` fails synchronously.
+- **Cycle detection:** dependency walk is iterative, not recursive.
+- **Secrets review:** no credentials or obvious secret material found in reviewed Step 3 files.
+
+### Blocking issue
+
+**Blocker 1 — Path confinement can be bypassed via symlinks**  
+`packages/harness/src/runtime/frontmatter.ts` enforces containment with `resolve()` + `relative()`, then calls `statSync()` on the candidate path. That is only a lexical check. A file path under the pack directory that is actually a symlink to a file outside the pack root still passes containment, and `statSync()` follows the symlink target. Because both `loadAgentFile()` and `loadSkillFile()` rely on `parseFrontmatterFile()`, this permits pack loaders to read content outside the owning pack boundary.  
+
+**Required fix:** canonicalize both base directory and candidate with `realpath` before comparing containment (or reject symlinked entries with `lstat`), and add a regression test proving symlink escape is rejected.
+
+## Consequence
+Security gate is **not** clear for PR #546 until loader path confinement rejects symlink escapes in addition to `../` traversal.
+
+— Zapp
