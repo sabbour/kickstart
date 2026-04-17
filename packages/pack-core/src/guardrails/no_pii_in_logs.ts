@@ -55,8 +55,9 @@ export const noPiiInLogsGuardrail: GuardrailContribution = {
       const newArgs = JSON.parse(redacted) as Record<string, unknown>;
       return { verdict: 'redact', redactedArgs: newArgs, reason: 'PII detected in tool args — redacted.' };
     } catch {
-      // If args can't be re-parsed after redaction, return redacted as raw string
-      return { verdict: 'redact', redacted, reason: 'PII detected in tool args — redacted.' };
+      // JSON re-parse failed after substitution — fail-closed: block rather than
+      // risk passing through partially-redacted or malformed args.
+      return { verdict: 'block', reason: 'PII detected in tool args — could not safely redact structured args.' };
     }
   },
 };

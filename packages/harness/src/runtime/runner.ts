@@ -349,6 +349,8 @@ export class Runner {
     });
 
     let fullText = '';
+    // Buffer all text chunks — output guardrails must pass before any chunk is sent to the client.
+    const chunkBuffer: string[] = [];
 
     try {
       const sdkRunner = getSdkRunner();
@@ -370,7 +372,9 @@ export class Runner {
           if (data.type === 'output_text_delta') {
             const delta = (data as { delta: string }).delta;
             fullText += delta;
-            sseWrite('chunk', { delta });
+            // Buffer instead of writing live — output guardrails run after the
+            // full stream, so no chunk leaves the server until they pass.
+            chunkBuffer.push(delta);
           }
         } else if (event.type === 'run_item_stream_event') {
           const { name, item } = event;
@@ -420,7 +424,7 @@ export class Runner {
         }
       } catch { /* finalOutput not available when interrupted */ }
 
-      // ── Output guardrail hook ─────────────────────────────────────────────
+      // ── Output guardrail hook (runs BEFORE any chunk is sent to the client) ─
       if (!guardrailHalted) {
         const outputGuardrails = this.registry.getGuardrailsByStage('output');
         const outGuardInput = { stage: 'output' as const, proposedOutput: outputText };
@@ -434,6 +438,19 @@ export class Runner {
         } catch {
           sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
           return;
+        }
+      }
+
+      // ── Flush buffered chunks now that output guardrails have passed ────────
+      if (chunkBuffer.length > 0) {
+        if (outputText !== fullText) {
+          // Output was redacted — send the redacted version as a single chunk
+          sseWrite('chunk', { delta: outputText });
+        } else {
+          // No redaction — replay original buffered chunks preserving granularity
+          for (const delta of chunkBuffer) {
+            sseWrite('chunk', { delta });
+          }
         }
       }
 
