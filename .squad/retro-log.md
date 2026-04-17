@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-13 | #124 "feat(a11y): WCAG 2.1 AA accessibility audit — ARIA labels, keyboard nav, live regions" | XL | impl=1m | review=629m | cycles=1 | merged | @sabbour
