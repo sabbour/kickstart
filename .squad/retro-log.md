@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-10 | #78 "fix: unify button action format to A2UI ActionSchema" | S | impl=0m | review=37m | cycles=1 | merged | @sabbour
