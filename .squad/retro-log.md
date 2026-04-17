@@ -18,3 +18,5 @@ Legend:
 ---
 
 <!-- entries below this line, newest at top -->
+
+- 2026-04-15 | #293 "fix: replace emoji status indicators with Fluent UI icons" | M | impl=0m | review=36m | cycles=1 | merged | @sabbour
