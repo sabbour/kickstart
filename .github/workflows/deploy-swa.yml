@@ -39,8 +39,7 @@ jobs:
       - name: Install dependencies and build
         run: |
           npm ci
-          npm run build -w @kickstart/core
-          npm run build -w @kickstart/api
+          npm run build
 
       - name: Build web app (Vite)
         run: cd packages/web && npx vite build
