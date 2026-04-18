@@ -7,32 +7,32 @@ import {
 } from '../a2ui/chat-a2ui.js';
 
 describe('chat-a2ui phase normalization', () => {
-  it('accepts the current harness assess phase', () => {
-    expect(normalizeConversationPhase('assess')).toBe('assess');
+  it('accepts the canonical handoff phase', () => {
+    expect(normalizeConversationPhase('handoff')).toBe('handoff');
   });
 
-  it('maps legacy handoff to assess', () => {
-    expect(normalizeConversationPhase('handoff')).toBe('assess');
+  it('maps legacy assess to handoff', () => {
+    expect(normalizeConversationPhase('assess')).toBe('handoff');
   });
 
-  it('uses the current harness phase order', () => {
+  it('uses the canonical brief phase order', () => {
     expect(CONVERSATION_PHASE_ORDER).toEqual([
       'discover',
-      'assess',
       'design',
       'generate',
       'review',
+      'handoff',
       'deploy',
     ]);
   });
 
-  it('extracts assess from ConversationPhase components', () => {
+  it('extracts handoff from ConversationPhase components', () => {
     expect(extractConversationPhase([
       {
         component: 'ConversationPhase',
-        currentPhase: 'assess',
+        currentPhase: 'handoff',
       },
-    ])).toBe('assess');
+    ])).toBe('handoff');
   });
 
   it('rejects legacy-only phases', () => {
