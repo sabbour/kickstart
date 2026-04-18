@@ -1,7 +1,6 @@
 ---
-id: aks.aks-security
-name: AKS Security
-description: Security hardening for AKS Automatic — pod security, workload identity, image hygiene, and safeguard rules.
+name: deployment-safeguards
+description: Deployment safeguards are the built-in Azure Policy assignments enforced by AKS Automatic. Teaches each rule and severity and how to author manifests that satisfy them (single source of truth: safeguards.json).
 version: 1.0.0
 author: kickstart-squad
 license: MIT

@@ -1,7 +1,6 @@
 ---
-id: aks.aks-monitoring
-name: AKS Monitoring
-description: Observability for AKS Automatic — Azure Monitor managed Prometheus, Grafana, Container Insights, and alerting.
+name: aks-terminology-rules
+description: Terminology rules for pre-deploy conversations. Use product-facing terms (app, workload, deployment, URL) before deployment; Kubernetes terms (pod, ingress, HPA) only after deployment or when the user explicitly asks.
 version: 1.0.0
 author: kickstart-squad
 license: MIT

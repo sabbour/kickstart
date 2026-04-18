@@ -1,7 +1,6 @@
 ---
-id: aks.aks-identity
-name: AKS Identity
-description: Identity and access for AKS Automatic — Azure Workload Identity, managed identities, RBAC, and AAD integration.
+name: workload-identity-mandatory
+description: Workload Identity is mandatory for AKS Automatic. Teaches the Azure Workload Identity wiring — managed identity, federated credential, service account annotation, and pod label. Forbids secretKeyRef for Azure credentials.
 version: 1.0.0
 author: kickstart-squad
 license: MIT
