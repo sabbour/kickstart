@@ -29,11 +29,18 @@ import {
   type GitHubSessionState,
 } from "../../services/github-handoff";
 // TODO(Step 9): playground-auth-stub removed in Step 1 — stubs always return false/empty
-const createGitHubStubRepo = (_args: unknown): undefined => undefined;
-const createGitHubStubSession = (_connected: boolean): undefined => undefined;
-const DEFAULT_GITHUB_STUB_OWNER = '';
-const listGitHubStubRepos = (_owner: string): unknown[] => [];
-const shouldUsePlaygroundAuthStub = () => false;
+const createGitHubStubRepo = (args: { owner: string; name: string; description?: string; private?: boolean }): GitHubRepo => ({
+  name: args.name,
+  full_name: `${args.owner}/${args.name}`,
+  owner: { login: args.owner },
+  description: args.description ?? null,
+  private: args.private,
+  default_branch: 'main',
+});
+const DEFAULT_GITHUB_STUB_OWNER = 'stub-owner';
+const listGitHubStubRepos = (_owner: string): GitHubRepo[] => [];
+const createGitHubStubSession = (_connected: boolean): GitHubSessionState => ({ authenticated: false, configured: false, owners: [] });
+const shouldUsePlaygroundAuthStub = (): false => false;
 import { sanitizeActionContext } from "../../utils/sanitize-action-context";
 
 const GitHubRepoPickerApi = {

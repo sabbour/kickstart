@@ -21,14 +21,112 @@ export type A2UIDocument = Record<string, unknown>;
 export type ChatMessage = Record<string, unknown>;
 export type ConversationMessage = Record<string, unknown>;
 export type CostEstimateProps = Record<string, unknown>;
-export type Artifact = Record<string, unknown>;
-export type ArtifactStore = Record<string, unknown>;
-export type APIConnector = Record<string, unknown>;
-export type AzureSubscription = Record<string, unknown>;
-export type AzureLocation = Record<string, unknown>;
+export interface Artifact {
+  path: string;
+  content: string;
+  [key: string]: unknown;
+}
+
+export interface ArtifactStore {
+  list(): Artifact[];
+  get(path: string): Artifact | null;
+  put(path: string, content: string, opts?: unknown): void;
+  clear?(): void;
+  [key: string]: unknown;
+}
+export interface APIConnector {
+  readonly name: string;
+  isAuthenticated?: () => boolean;
+  authenticate?: () => Promise<void>;
+}
+
+export interface AzureSubscription {
+  id?: string;
+  subscriptionId: string;
+  displayName: string;
+  tenantId?: string;
+  state?: string;
+  [key: string]: unknown;
+}
+
+export interface AzureLocation {
+  name: string;
+  displayName: string;
+  regionalDisplayName?: string;
+  subscriptionId?: string;
+  [key: string]: unknown;
+}
+
+export interface AzureResourceGroup {
+  id: string;
+  name: string;
+  location: string;
+  subscriptionId?: string;
+  tags?: Record<string, string>;
+  properties?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface AzureResource {
+  id: string;
+  name: string;
+  type: string;
+  location: string;
+  kind?: string;
+  resourceGroup?: string;
+  subscriptionId?: string;
+  properties?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 export type AzureContext = Record<string, unknown>;
-export type GitHubRepo = Record<string, unknown>;
-export type GitHubPullRequest = Record<string, unknown>;
+
+export interface GitHubRepoOwner {
+  login: string;
+  id?: number;
+  avatar_url?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
+export interface GitHubRepo {
+  id?: number;
+  name: string;
+  full_name: string;
+  owner: GitHubRepoOwner;
+  private?: boolean;
+  html_url?: string;
+  default_branch?: string;
+  description?: string | null;
+  language?: string | null;
+  stargazers_count?: number;
+  updated_at?: string;
+  [key: string]: unknown;
+}
+
+export interface GitHubPullRequest {
+  number: number;
+  html_url: string;
+  title?: string;
+  state?: string;
+  [key: string]: unknown;
+}
+
+export interface GitHubCommitFilesInput {
+  owner: string;
+  repo: string;
+  title: string;
+  head: string;
+  base: string;
+  body?: string;
+  commitMessage: string;
+  files: Array<{ path: string; content: string }>;
+}
+
+export interface GitHubCommitFilesResult {
+  pullRequest: GitHubPullRequest;
+  committedFilesCount: number;
+}
 export type OpenAIToolDefinition = Record<string, unknown>;
 export type ToolCall = Record<string, unknown>;
 export type ToolContext = Record<string, unknown>;
@@ -57,26 +155,56 @@ export type SetupGenerationStepState = Record<string, unknown>;
 
 // ── Class stubs (need runtime value, not just type) ──────────────────────────
 
-export class InMemoryArtifactStore {}
+export class InMemoryArtifactStore implements ArtifactStore {
+  private readonly items = new Map<string, Artifact>();
+  list(): Artifact[] { return Array.from(this.items.values()); }
+  get(path: string): Artifact | null { return this.items.get(path) ?? null; }
+  put(path: string, content: string, _opts?: unknown): void {
+    this.items.set(path, { path, content });
+  }
+  clear(): void { this.items.clear(); }
+  [key: string]: unknown;
+}
 
 // APIConnectorRegistry stub — replaced by harness PackRegistry in Step 5
 export class APIConnectorRegistry {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  register(_connector: any): void {}
-  get(_name: string): APIConnector | undefined { return undefined; }
-  names(): string[] { return []; }
+  private readonly connectors = new Map<string, APIConnector>();
+  register(connector: APIConnector): void {
+    if (connector && typeof connector.name === 'string') {
+      this.connectors.set(connector.name, connector);
+    }
+  }
+  get(name: string): APIConnector | undefined { return this.connectors.get(name); }
+  names(): string[] { return Array.from(this.connectors.keys()); }
 }
 
 // AzureARMConnector stub — replaced by pack-azure in Step 7
 export class AzureARMConnector {
   constructor(_opts?: unknown) {}
-  readonly name = 'azure-arm';
+  readonly name: string = 'azure-arm';
+  isAuthenticated(): boolean { return false; }
+  async authenticate(): Promise<void> { /* stub */ }
+  async listSubscriptions(): Promise<AzureSubscription[]> { return []; }
+  async listLocations(_subscriptionId: string): Promise<AzureLocation[]> { return []; }
+  async listResourceGroups(_subscriptionId: string): Promise<AzureResourceGroup[]> { return []; }
+  async listResources(_subscriptionId: string): Promise<AzureResource[]> { return []; }
+  async request(_method: string, _path: string, _body?: unknown): Promise<Response> {
+    throw new Error('AzureARMConnector.request is a stub — replaced by pack-azure in Step 7.');
+  }
 }
 
 // GitHubConnector stub — replaced by pack-github in Step 9
 export class GitHubConnector {
   constructor(_opts?: unknown) {}
-  readonly name = 'github';
+  readonly name: string = 'github';
+  isAuthenticated(): boolean { return false; }
+  async authenticate(): Promise<void> { /* stub */ }
+  async request(_method: string, _path: string, _body?: unknown): Promise<Response> {
+    throw new Error('GitHubConnector.request is a stub — replaced by pack-github in Step 9.');
+  }
+  async commitFilesAndCreatePullRequest(_input: GitHubCommitFilesInput): Promise<GitHubCommitFilesResult> {
+    throw new Error('GitHubConnector.commitFilesAndCreatePullRequest is a stub — replaced by pack-github in Step 9.');
+  }
 }
 
 // PricingConnector stub — replaced by pack-azure in Step 7
@@ -115,6 +243,7 @@ export interface VmPriceResult {
 const RETAIL_PRICES_BASE = 'https://prices.azure.com';
 
 export class PricingConnector {
+  readonly name: string = 'pricing';
   private _maxRetries: number;
 
   constructor(opts?: { retry?: { maxRetries?: number } }, _cacheTtlMs?: number) {
