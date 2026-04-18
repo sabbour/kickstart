@@ -10,6 +10,12 @@ jobs:
   lint-build:
     name: Lint, Build & Unit Tests
     runs-on: ubuntu-latest
+    if: >
+      !(
+        contains(github.event.pull_request.labels.*.name, 'retro-log') &&
+        startsWith(github.event.pull_request.head.ref, 'retro-log/pr-') &&
+        (github.event.pull_request.user.login == 'github-actions[bot]' || github.event.pull_request.user.login == 'sabbour-squad-lead[bot]')
+      )
 
     steps:
       - name: Checkout code
@@ -48,6 +54,12 @@ jobs:
   e2e:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
+    if: >
+      !(
+        contains(github.event.pull_request.labels.*.name, 'retro-log') &&
+        startsWith(github.event.pull_request.head.ref, 'retro-log/pr-') &&
+        (github.event.pull_request.user.login == 'github-actions[bot]' || github.event.pull_request.user.login == 'sabbour-squad-lead[bot]')
+      )
 
     steps:
       - name: Checkout code

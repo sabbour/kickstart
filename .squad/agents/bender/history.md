@@ -27,6 +27,32 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 
 Sprint 1 role: implement #474 (Nuke v1) after DP gate cleared. DP APPROVE_WITH_CONDITIONS — seam-cutting pass required. `@kickstart/core` imports and `packages/web/src/types.ts` must be managed incrementally.
 
+## Work Summary (Apr 2026)
+
+Recent major accomplishments: v0.5.6 security sprint (API hardening, rate limiting), v0.5.0 multi-surface (MCP App iframe, postMessage validation, session signing), Agents SDK adapter implementation (#445 draft PR #447), SWA deployment pipeline fix (package/bundle exclusions), GitHub Projects V2 integration, heartbeat workflow PAT fallback hardening.
+
+Key learnings: TypeScript `readonly RegExp[]` patterns, API surface minimization via internal barrels, GitHub Actions PAT fallback required, SWA needs explicit main branch trigger, build version embedding via git SHA, user-owned projects require specific PAT scopes, WSL line-ending awareness, concurrent git lock contention mitigation.
+- For prompt-injection defense, transforming third-party content into a constrained structured representation (JSON with extracted facts only) is stronger than delimiter sandboxing around raw markdown — the LLM never sees free-form prose it could interpret as instructions.
+- (2026-04-14 17:44) Implemented #186 (Public Copilot Skills): 10 new files in packages/core/src/skills/ with full build-time sync pipeline, zero-network runtime loader, policy scanner, frontmatter parser, phase mapper, knowledge extractor. 60 tests. PR #227.
+- Core package (packages/core) is browser-compatible — uses "lib": ["ES2022", "DOM"] with no @types/node. Use Web Crypto API (crypto.subtle) and atob() instead of Node.js crypto and Buffer. Accept data as parameters rather than reading filesystem directly.
+
+## Round 5: Multi-Round DP Cycle (#186) + Implementation (Pending)
+
+**2026-04-14**
+- Updated DP #186 addressing Zapp security concerns (round 2)
+- Received round 3 feedback from Zapp (3 remaining concerns)
+- Final DP update (#186 round 3) addressing all security issues
+- DP #186 approved by Zapp for implementation
+- Implemented public Copilot skills (10 files, 60 tests) in PR #227
+- Implementation PR awaiting code review
+
+## 2026-04-14 Round 2: Infrastructure + Bug Fixes
+
+- **PR #213**: Fixed missing choice components in system prompt. Root cause identified and fixed purely additively.
+- **Approved by Leela**: Set to auto-merge.
+- **SWA automation**: Implemented continuous deployment on main + version-SHA footer (PR #177).
+- **Project board triage**: Implemented auto-assignment workflow for issues.
+- **Team notes**: Coordinated with Fry on footer components; ensured Leela's approval before merge.
 ## Learnings
 
 - (2026-04-17T12:06:45Z) #474 implementation must follow seam-cutting pass: remove mock/demo sources first, introduce temporary replacement exports for `@kickstart/core` and `types.ts` contracts, then hard-delete legacy files.
