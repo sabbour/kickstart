@@ -17,6 +17,10 @@
   },
   "dependencies": {
     "@kickstart/harness": "*",
+    "@kickstart/pack-core": "*",
+    "@kickstart/pack-azure": "*",
+    "@kickstart/pack-aks-automatic": "*",
+    "@kickstart/pack-github": "*",
     "@modelcontextprotocol/sdk": "^1.12.1"
   },
   "devDependencies": {

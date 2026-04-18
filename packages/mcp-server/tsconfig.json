@@ -9,6 +9,10 @@
     "baseUrl": ".",
     "paths": {
       "@kickstart/harness": ["../../packages/harness/src/index.ts"],
+      "@kickstart/pack-core/server-manifest": ["../pack-core/dist/server-manifest.d.ts"],
+      "@kickstart/pack-azure/server-manifest": ["../pack-azure/dist/server-manifest.d.ts"],
+      "@kickstart/pack-aks-automatic/server-manifest": ["../pack-aks-automatic/dist/server-manifest.d.ts"],
+      "@kickstart/pack-github/server-manifest": ["../pack-github/dist/server-manifest.d.ts"],
     }
   },
   "references": [
