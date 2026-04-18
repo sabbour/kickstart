@@ -1,7 +1,6 @@
 ---
-id: aks.aks-storage
-name: AKS Storage
-description: Persistent storage for AKS Automatic — Azure Disk, Azure Files, NFS, and storage class selection guidance.
+name: acr-integration
+description: ACR integration for AKS Automatic. Teaches attaching an ACR, image reference conventions (digest pinning, no :latest), and pull-secret-free authentication via the managed identity.
 version: 1.0.0
 author: kickstart-squad
 license: MIT

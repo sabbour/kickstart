@@ -1,7 +1,6 @@
 ---
-id: aks.aks-networking
-name: AKS Networking
-description: Networking fundamentals for AKS Automatic — Gateway API, network policies, DNS, and private cluster topology.
+name: gateway-api-mandatory
+description: Gateway API is the mandatory ingress mechanism for AKS Automatic. Teaches Gateway and HTTPRoute authoring, listener configuration, and cross-namespace references. Forbids legacy Ingress.
 version: 1.0.0
 author: kickstart-squad
 license: MIT

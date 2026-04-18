@@ -1,7 +1,6 @@
 ---
-id: aks.aks-upgrades
-name: AKS Upgrades
-description: Cluster and node upgrade strategy for AKS Automatic — auto-upgrade channels, maintenance windows, and blue-green rollout patterns.
+name: aks-automatic-cluster-creation
+description: How to create an AKS Automatic cluster. Teaches the minimum and recommended arguments, Microsoft-managed defaults (auto-upgrade, auto node-provisioning, maintenance windows), and day-2 expectations (no manual node pool management).
 version: 1.0.0
 author: kickstart-squad
 license: MIT

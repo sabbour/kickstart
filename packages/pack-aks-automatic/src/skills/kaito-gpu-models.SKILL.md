@@ -1,7 +1,6 @@
 ---
-id: aks.aks-scaling
-name: AKS Scaling
-description: Autoscaling patterns for AKS Automatic — node auto-provisioning, HPA, KEDA, and VPA guidance.
+name: kaito-gpu-models
+description: KAITO (Kubernetes AI Toolchain Operator) for GPU workloads and OSS model serving on AKS Automatic. Teaches workspace definitions, supported preset models, and GPU node auto-provisioning.
 version: 1.0.0
 author: kickstart-squad
 license: MIT
