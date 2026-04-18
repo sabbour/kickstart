@@ -60,7 +60,7 @@ export const readFileTool: ToolContribution = {
         content = readFileSync(fullPath, { encoding: 'utf-8' });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(`read_file: cannot read "${input.path}": ${msg}`);
+        throw new Error(`read_file: cannot read "${input.path}": ${msg}`, { cause: err });
       }
 
       return content;
