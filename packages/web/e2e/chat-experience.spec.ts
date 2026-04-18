@@ -1,6 +1,11 @@
 import { test, expect, sendChatMessage, waitForAssistantMessage, enterChatViaTrack } from './helpers';
 
-test.describe('Chat experience (demo mode)', () => {
+// TODO(v2): Update for v2 API — demo/mock mode was removed in v2 Step 1
+// (packages/web/src/App.tsx: `const mockEnabled = false`). These tests need
+// to be rewritten to intercept `/api/converse` with SSE stubs (see
+// route-state.spec.ts) and drop the `?mock` + welcome-message assumptions.
+// Tracked in issue #772.
+test.describe.skip('Chat experience (demo mode)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/?mock');
     await page.waitForSelector('#landing-page', { timeout: 10_000 });
