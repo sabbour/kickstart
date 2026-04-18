@@ -1,5 +1,9 @@
-// Step 2 harness seam exports.
-// This file temporarily satisfies legacy @kickstart/core imports during the v2 migration.
+// @kickstart/harness barrel — canonical harness surface for packs, runtime, and adapters.
+//
+// Historical stubs retained here are still referenced by v1 callers in
+// mcp-server/src/tools/*, mcp-server/src/a2ui.ts, and web/api/src/lib/session-store.ts.
+// Each stub block is annotated with the pack / runtime module that will own it
+// once the remaining v1 callers are migrated; see docs/v2-implementation-brief.md §2.
 
 // ── Phase (was an enum in v1) ────────────────────────────────────────────────
 // Canonical order per docs/v2-implementation-brief.md §2:
@@ -130,7 +134,6 @@ export interface GitHubCommitFilesResult {
 export type OpenAIToolDefinition = Record<string, unknown>;
 export type ToolCall = Record<string, unknown>;
 export type ToolContext = Record<string, unknown>;
-export type ConversationSkillsContext = Record<string, unknown>;
 export interface SessionState {
   updatedAt: string;
   currentPhase: string;
@@ -317,15 +320,8 @@ export const SETUP_GENERATION_STEP_ORDER = [
 export type SetupGenerationStepId = typeof SETUP_GENERATION_STEP_ORDER[number];
 export const AUTO_CONTINUE_MAX_CONSECUTIVE = 5;
 
-// ── Function stubs (kit registration — replaced by packs in Steps 4-9) ──────
-export function registerKit(_kit: unknown): void {}
-export const azureKit: unknown = {};
-export const githubKit: unknown = {};
-
 // ── Runtime function stubs — replaced by harness runtime in Steps 3-5 ───────
 export function buildSystemPrompt(_opts: unknown): string { return 'You are Kickstart, an AI-guided deployment assistant.'; }
-// resolveSkills is now exported from ./runtime/skill-resolver (Step 6b)
-export function resolveConversationSkills(_ctx: unknown): unknown[] { return []; }
 export function processResponse(_text: string): unknown { return {}; }
 export function getPhaseDefinition(_phase: unknown): { label: string; description: string; nextPhase?: Phase } {
   return PHASE_DEFINITIONS.find((d) => d.id === _phase) ?? { label: '', description: '' };
