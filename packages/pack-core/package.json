@@ -1,7 +1,7 @@
 {
   "name": "@kickstart/pack-core",
   "version": "0.1.0",
-  "description": "Core pack — agents, skills, tools, and domain-neutral components for Kickstart v2",
+  "description": "Core pack \u2014 agents, skills, tools, and domain-neutral components for Kickstart v2",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,6 +9,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./server-manifest": {
+      "import": "./dist/server-manifest.js",
+      "types": "./dist/server-manifest.d.ts"
     }
   },
   "scripts": {

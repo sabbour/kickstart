@@ -33,7 +33,6 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 
 import {
-  PackRegistry,
   Runner,
   getOrCreateSession,
   isVsCodeClient,
@@ -49,6 +48,7 @@ import {
   purgeExpiredInterrupts,
 } from './adapter/interrupt-store.js';
 import { withSessionMutex } from './adapter/session-mutex.js';
+import { getRegistry } from './startup/packs.js';
 
 // ── Load app HTML ──────────────────────────────────────────────────
 
@@ -67,11 +67,7 @@ const APP_RESOURCE_URI = 'kickstart://app/main' as const;
 
 // ── Harness setup ──────────────────────────────────────────────────
 
-const registry = new PackRegistry();
-// TODO(pack registration): register packs at startup once pack-core etc. are available.
-// import { corePack } from '@kickstart/pack-core';
-// registry.register(corePack);
-// registry.seal();
+const registry = getRegistry();
 
 const runner = new Runner(registry);
 

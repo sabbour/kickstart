@@ -1,7 +1,7 @@
 {
   "name": "@kickstart/pack-github",
   "version": "0.1.0",
-  "description": "GitHub pack — agents, skills, tools, user actions, and components for Kickstart v2",
+  "description": "GitHub pack \u2014 agents, skills, tools, user actions, and components for Kickstart v2",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,6 +9,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./server-manifest": {
+      "import": "./dist/server-manifest.js",
+      "types": "./dist/server-manifest.d.ts"
     }
   },
   "scripts": {
