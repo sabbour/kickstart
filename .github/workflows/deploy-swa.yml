@@ -55,7 +55,7 @@ jobs:
           api_location: "packages/web/api"
           output_location: ""
           skip_app_build: true
-          skip_api_build: true
+          skip_api_build: false
           api_build_command: "echo 'API already built'"
 
       - name: Resolve production smoke target
