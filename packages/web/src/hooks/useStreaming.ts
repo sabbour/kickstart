@@ -7,6 +7,7 @@ import type {
   TokenUsageSummary,
 } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
+import { normalizeConversationPhase } from '../utils/chat-a2ui';
 import type { AppIntent } from '@kickstart/harness';
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,82 @@ export interface StreamCallbacks {
 
 // Target ~80 rAF frames to reveal all text (~1.3s at 60fps)
 const REVEAL_FRAMES = 80;
+
+// ---------------------------------------------------------------------------
+// SDK 406 non-streaming fallback
+// ---------------------------------------------------------------------------
+
+export interface SdkNonStreamingFetchParams {
+  sessionId: string | undefined;
+  message: string;
+  clientMessages: Array<{ role: 'user' | 'assistant'; content: string; phase?: string; usage?: TokenUsageSummary }> | undefined;
+  signal: AbortSignal;
+  debugMode: boolean;
+}
+
+export interface SdkNonStreamingFetchResult {
+  text: string;
+  model?: string;
+  sessionId?: string;
+}
+
+/**
+ * Non-streaming fallback used when the server responds 406 to an
+ * `Accept: text/event-stream` request, or when streaming is otherwise
+ * unavailable. Exported so it can be exercised without a React rendering
+ * context; not intended as a public hook API.
+ *
+ * Contract: HTTP 406 on streaming request → retry as JSON, surface any phase /
+ * a2ui the server produced, and return the final text/model/session.
+ */
+export async function _performSdkNonStreamingFetch(
+  params: SdkNonStreamingFetchParams,
+  callbacks: Pick<StreamCallbacks, 'onPhase' | 'onA2UI'>,
+  debugA2uiMessages: A2uiPayloadItem[],
+  fetchFn: typeof apiFetch = apiFetch,
+): Promise<SdkNonStreamingFetchResult> {
+  const { sessionId, message, clientMessages, signal, debugMode } = params;
+
+  const res = await fetchFn('/api/converse', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      sessionId,
+      message,
+      stream: false,
+      ...(clientMessages?.length ? { messages: clientMessages } : {}),
+    }),
+    signal,
+  }, debugMode);
+
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+
+  const body = (await res.json()) as Record<string, unknown>;
+
+  if (typeof body.phase === 'string') {
+    const normalized = normalizeConversationPhase(body.phase);
+    if (normalized) callbacks.onPhase(normalized);
+  }
+
+  if (Array.isArray(body.a2ui)) {
+    const safeItems = (body.a2ui as unknown[]).filter(isRawA2uiItem);
+    if (safeItems.length > 0) {
+      if (debugMode) debugA2uiMessages.push(...safeItems);
+      callbacks.onA2UI(safeItems);
+    }
+  }
+
+  return {
+    text: typeof body.message === 'string' ? body.message : '',
+    model: typeof body.model === 'string' ? body.model : undefined,
+    sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
+  };
+}
 
 export function useStreaming() {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -185,6 +262,43 @@ export function useStreaming() {
         }),
         signal: controller.signal,
       }, debugMode);
+
+      if (res.status === 406) {
+        // Streaming not available — fall back to non-streaming JSON path.
+        const result = await _performSdkNonStreamingFetch(
+          {
+            sessionId,
+            message,
+            clientMessages,
+            signal: controller.signal,
+            debugMode: Boolean(debugMode),
+          },
+          {
+            onPhase: callbacks.onPhase,
+            onA2UI: callbacks.onA2UI,
+          },
+          debugA2uiMessages,
+          apiFetch,
+        );
+        updateRevealTarget(result.text);
+        if (result.text) callbacks.onChunk(result.text);
+        if (targetTextRef.current.length > 0 && revealedLenRef.current < targetTextRef.current.length) {
+          await new Promise<void>(resolve => { revealDoneRef.current = resolve; });
+        }
+        const debugInfo: DebugMetadata | undefined = debugMode
+          ? {
+              model: result.model,
+              rawResponse: result.text,
+              fullEnvelope: {
+                message: result.text,
+                a2ui: debugA2uiMessages.length > 0 ? debugA2uiMessages : undefined,
+                model: result.model,
+              },
+            }
+          : undefined;
+        callbacks.onComplete(result.text, result.model, result.sessionId, debugInfo);
+        return;
+      }
 
       if (!res.ok) {
         throw new Error(`API error: ${res.status}`);
