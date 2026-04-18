@@ -19,6 +19,10 @@ import { requireResourceLimitsGuardrail } from './guardrails/require-resource-li
 import { noHostpathVolumesGuardrail } from './guardrails/no-hostpath-volumes.js';
 import { noLatestTagGuardrail } from './guardrails/no-latest-tag.js';
 
+// Playground scenarios
+import { aksClusterCardScenario } from './playground/cluster-card.scenario.js';
+import { safeguardViolationsScenario } from './playground/safeguard-violations.scenario.js';
+
 const aksComponents: ComponentContribution[] = [
   architectureDiagramContribution,
   aksClusterCardContribution,
@@ -52,6 +56,8 @@ export const aksAutomaticPack: Pack = {
     noHostpathVolumesGuardrail,
     noLatestTagGuardrail,
   ],
+
+  playgroundScenarios: [aksClusterCardScenario, safeguardViolationsScenario],
 };
 
 // Named exports for individual contributions

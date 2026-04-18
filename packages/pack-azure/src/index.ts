@@ -33,6 +33,10 @@ import { requireSubscriptionScopeGuardrail } from './guardrails/require-subscrip
 import { noHardcodedCredentialsGuardrail } from './guardrails/no-hardcoded-credentials.js';
 import { noSubscriptionScopedOwnerGuardrail } from './guardrails/no-subscription-scoped-owner.js';
 
+// Playground scenarios
+import { azureResourceCardScenario } from './playground/resource-card.scenario.js';
+import { costEstimateScenario } from './playground/cost-estimate.scenario.js';
+
 const azureComponents: ComponentContribution[] = [
   azureResourceCardContribution,
   costEstimateContribution,
@@ -80,6 +84,8 @@ export const azurePack: Pack = {
     noHardcodedCredentialsGuardrail,
     noSubscriptionScopedOwnerGuardrail,
   ],
+
+  playgroundScenarios: [azureResourceCardScenario, costEstimateScenario],
 };
 
 // Named exports for individual contributions

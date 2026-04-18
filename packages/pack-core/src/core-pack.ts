@@ -34,6 +34,10 @@ import { RadioGroup } from './components/rich/RadioGroup.js';
 import { SteppedCarousel } from './components/rich/SteppedCarousel.js';
 import { SummaryCard } from './components/rich/SummaryCard.js';
 
+// Playground scenarios
+import { questionnaireScenario } from './playground/questionnaire.scenario.js';
+import { generationProgressScenario } from './playground/generation-progress.scenario.js';
+
 function toContrib(impl: ReactComponentImplementation): ComponentContribution {
   return {
     name: `core/${impl.name}`,
@@ -89,4 +93,6 @@ export const corePack: Pack = {
     noSecretsInArtifactsGuardrail,
     noCredentialLeakGuardrail,
   ],
+
+  playgroundScenarios: [questionnaireScenario, generationProgressScenario],
 };
