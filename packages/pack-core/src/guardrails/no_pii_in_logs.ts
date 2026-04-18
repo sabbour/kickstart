@@ -6,7 +6,7 @@ import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@ki
  */
 const PII_PATTERNS: Array<{ name: string; pattern: RegExp; replacement: string }> = [
   // Email addresses
-  { name: 'email', pattern: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, replacement: '[REDACTED-EMAIL]' },
+  { name: 'email', pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: '[REDACTED-EMAIL]' },
   // Social Security Number: 123-45-6789
   { name: 'SSN', pattern: /\b\d{3}-\d{2}-\d{4}\b/g, replacement: '[REDACTED-SSN]' },
   // US phone numbers: (123) 456-7890, 123-456-7890, +1-123-456-7890

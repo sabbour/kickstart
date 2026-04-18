@@ -39,7 +39,7 @@ export const emitUiTool: ToolContribution = {
         parsed = A2UIMessageSchema.parse(input.message) as A2UIMessageV09;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(`emit_ui: invalid A2UI message — ${msg}`);
+        throw new Error(`emit_ui: invalid A2UI message — ${msg}`, { cause: err });
       }
 
       if (session) {

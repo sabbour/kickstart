@@ -26,7 +26,7 @@ function resolveConfinedPath(workspaceRoot: string, relativePath: string): strin
     } catch (err: unknown) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
       const parent = dirname(checkDir);
-      if (parent === checkDir) throw new Error(`write_file: path escapes workspace root: ${relativePath}`);
+      if (parent === checkDir) throw new Error(`write_file: path escapes workspace root: ${relativePath}`, { cause: err });
       checkDir = parent;
     }
   }
@@ -80,7 +80,7 @@ export const writeFileTool: ToolContribution = {
         writeFileSync(fullPath, input.content, { encoding: 'utf-8' });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(`write_file: cannot write "${input.path}": ${msg}`);
+        throw new Error(`write_file: cannot write "${input.path}": ${msg}`, { cause: err });
       }
 
       return `Written: ${input.path} (${input.content.length} bytes)`;
