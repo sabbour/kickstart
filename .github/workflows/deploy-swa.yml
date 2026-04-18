@@ -47,7 +47,7 @@ jobs:
       - name: Prepare API dist for SWA
         run: |
           cp packages/web/api/host.json packages/web/api/dist/host.json
-          echo '{"name":"kickstart-api","version":"1.0.0","type":"module","dependencies":{"@azure/functions":"^4.6.0","bicep-node":"^0.0.9"}}' > packages/web/api/dist/package.json
+          echo '{"name":"kickstart-api","version":"1.0.0","type":"module","main":"functions/*.js","dependencies":{"@azure/functions":"^4.6.0","bicep-node":"^0.0.9"}}' > packages/web/api/dist/package.json
           cd packages/web/api/dist && npm install --omit=dev --no-package-lock
 
       - name: Deploy to Azure Static Web Apps
