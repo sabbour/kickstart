@@ -10,14 +10,14 @@ import {
   Phase,
   SETUP_GENERATION_STEP_ORDER,
   buildSystemPrompt,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 import type {
   SessionState,
   ConversationMessage,
   CostEstimateProps,
   SetupGenerationRunState,
   SetupGenerationSnapshot,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 import {
   cloneSetupGenerationRun,
   isValidSetupGenerationSnapshot,

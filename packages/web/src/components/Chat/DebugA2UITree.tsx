@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { makeStyles, tokens, Text } from '@fluentui/react-components';
-import { KNOWN_COMPONENT_TYPES } from '@kickstart/core';
+import { KNOWN_COMPONENT_TYPES } from '@kickstart/harness';
 import type { A2uiPayloadItem, A2uiMsg, A2uiComponent } from '../../types';
 
 const KICKSTART_CATALOG_ID = 'kickstart';
@@ -115,7 +115,7 @@ interface SurfaceOps {
   creates: Array<{ catalogId: string }>;
   updates: Array<{ components: A2uiComponent[] }>;
   deletes: number;
-  dataModelUpdates: Array<{ path: string }>;
+  dataModelUpdates: Array<{ path?: string }>;
 }
 
 function groupBySurface(messages: A2uiMsg[]): Map<string, SurfaceOps> {
@@ -147,7 +147,7 @@ function groupBySurface(messages: A2uiMsg[]): Map<string, SurfaceOps> {
 }
 
 function ComponentBadge({ componentType, styles }: { componentType: string; styles: ReturnType<typeof useStyles> }) {
-  const isKnown = KNOWN_COMPONENT_TYPES.has(componentType as never);
+  const isKnown = KNOWN_COMPONENT_TYPES.includes(componentType);
   return (
     <span className={`${styles.badge} ${isKnown ? styles.badgeOk : styles.badgeWarn}`}>
       {isKnown ? '✅ resolved' : '⚠️ unknown type'}
@@ -202,7 +202,7 @@ function SurfaceTree({ surfaceId, ops, styles }: {
                   <span>{comp.id}</span>
                   <span className={styles.hidden}>·</span>
                   <span>{comp.component}</span>
-                  <ComponentBadge componentType={comp.component} styles={styles} />
+                  <ComponentBadge componentType={comp.component ?? 'unknown'} styles={styles} />
                 </div>
               ))}
             </div>

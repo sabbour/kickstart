@@ -12,12 +12,12 @@
     "worktrees": true
   },
   "scripts": {
-    "build": "npm run clean --workspaces --if-present && npm run build --workspaces --if-present",
+    "build": "npm run clean --workspaces --if-present && npm run build -w @kickstart/harness && npm run build -w @kickstart/pack-core -w @kickstart/pack-azure -w @kickstart/pack-aks-automatic -w @kickstart/pack-github && npm run build -w @kickstart/mcp-server && npm run build -w @kickstart/web && npm run build -w @kickstart/api",
     "test": "npx vitest run",
     "lint": "eslint packages/*/src/**/*.ts packages/*/src/**/*.tsx",
-    "api:build": "npm run build -w @kickstart/core && npm run build -w @kickstart/api",
+    "api:build": "npm run build -w @kickstart/harness && npm run build -w @kickstart/api",
     "clean": "npm run clean --workspaces --if-present",
-    "dev": "npm run build -w @kickstart/core && concurrently \"npm run dev:vite\" \"npx swa start\"",
+    "dev": "npm run build -w @kickstart/harness && concurrently \"npm run dev:vite\" \"npx swa start\"",
     "dev:vite": "cd packages/web && npx vite --port 5173",
     "dev:web": "npx serve packages/web -l 4280 --no-clipboard",
     "test:e2e": "npx playwright test",

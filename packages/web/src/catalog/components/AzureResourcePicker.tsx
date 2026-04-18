@@ -31,13 +31,15 @@ import type {
   AzureResource,
   AzureSubscription,
   AzureResourceGroup,
-} from '@kickstart/core';
+} from '@kickstart/harness';
 import { getAzureSession } from '../../services/azure-auth';
 import {
   persistAzureTarget,
   startAzureDeployment,
 } from '../../services/azure-deployments';
-import { isMockMode, isPlaygroundMode } from '../../services/mock-streaming';
+// TODO(Step 7): mock-streaming removed in Step 1 — stubs always return false
+const isMockMode = () => false;
+const isPlaygroundMode = () => false;
 import { sanitizeActionContext } from '../../utils/sanitize-action-context';
 
 const AzureResourcePickerApi = {

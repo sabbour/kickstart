@@ -145,13 +145,7 @@ vi.mock('../hooks/useStreaming', () => ({
   }),
 }));
 
-vi.mock('../hooks/useMockStreaming', () => ({
-  useMockStreaming: () => ({
-    isStreaming: false,
-    streamText: '',
-    send: () => undefined,
-  }),
-}));
+// TODO(Step 5): useMockStreaming removed in Step 1 — mock removed
 
 vi.mock('../contexts/APIConnectorContext', () => ({
   useAPIConnectorRegistry: () => ({}),
@@ -198,10 +192,7 @@ vi.mock('../services/api-client', () => ({
   healthCheck: () => Promise.resolve(true),
 }));
 
-vi.mock('../services/mock-streaming', () => ({
-  isMockMode: () => false,
-  isPlaygroundMode: () => false,
-}));
+// TODO(Step 5): mock-streaming removed in Step 1 — mock removed
 
 let App: typeof import('../App').App;
 

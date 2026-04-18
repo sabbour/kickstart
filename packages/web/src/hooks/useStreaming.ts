@@ -1,144 +1,65 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type {
-  StreamEvent,
   A2uiPayloadItem,
   DebugMetadata,
   ChatMessage,
   SetupGenerationEvent,
   TokenUsageSummary,
+  TurnUsage,
 } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
 import { normalizeConversationPhase } from '../utils/chat-a2ui';
+import type { AppIntent } from '@kickstart/harness';
 
 // ---------------------------------------------------------------------------
-// Phase allowlist guard (C4) and A2UI item type guard (C1)
+// A2UI item type guard (validate before passing to renderer)
 // ---------------------------------------------------------------------------
 
-/**
- * Validates a server-emitted phase string using the shared UI phase normalizer.
- * Returns the normalised phase on success, or null if the value is unrecognised.
- * Emits a console.warn in non-production builds.
- */
-function guardServerPhase(phase: string): string | null {
-  const normalized = normalizeConversationPhase(phase);
-  if (normalized) return normalized;
-  if (process.env.NODE_ENV !== 'production') {
-    console.warn(`[useStreaming] ignoring unknown server phase: "${phase}"`);
-  }
-  return null;
-}
-
-/** Narrows to a non-null, non-array plain object. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** Accepts A2UI protocol messages (discriminated by `version: 'v0.9'`). */
-function isRawA2uiMessage(item: unknown): item is A2uiPayloadItem {
-  return isRecord(item) && item['version'] === 'v0.9';
-}
-
-/** Accepts ConversationPhase payloads (discriminated by `type: 'ConversationPhase'`). */
-function isRawConversationPhasePayload(item: unknown): item is A2uiPayloadItem {
-  return isRecord(item) && item['type'] === 'ConversationPhase';
-}
-
-/**
- * Runtime type guard for A2UI items arriving over the wire.
- * Only accepts shapes that match known discriminators so malformed payloads
- * cannot enter the A2UI pipeline.
- */
 function isRawA2uiItem(item: unknown): item is A2uiPayloadItem {
-  return isRawA2uiMessage(item) || isRawConversationPhasePayload(item);
+  return isRecord(item) && (item['version'] === 'v0.9' || item['type'] === 'ConversationPhase');
 }
 
 // ---------------------------------------------------------------------------
-// SDK 406 fallback — exported for unit testing (C2, C3)
+// UserAction request payload
 // ---------------------------------------------------------------------------
 
-/**
- * Executes the non-streaming JSON request used when the SDK path rejects
- * streaming (HTTP 406).  Validates the response and fires `onPhase` /
- * `onA2UI` callbacks.  `onComplete` is the caller's responsibility so that
- * progressive text reveal can be awaited before signalling completion.
- *
- * setupGeneration is intentionally NOT forwarded: the SDK non-streaming path
- * may return a SetupGenerationSnapshot (final state only), but `onSetupEvent`
- * expects incremental SetupGenerationEvent items (step_start / file_generated
- * / …).  Translating a snapshot into synthetic events is not safe here.
- *
- * @internal Exported for unit testing only; not part of the public hook API.
- */
-export async function _performSdkNonStreamingFetch(
-  params: {
-    sessionId: string | undefined;
-    message: string;
-    /**
-     * Idempotency key generated at the start of the turn.  Both the initial
-     * streaming attempt and this fallback include the same value so the server
-     * can deduplicate the user message if the 406 path is not side-effect free.
-     */
-    clientMessageId?: string;
-    clientMessages: unknown[] | undefined;
-    signal: AbortSignal;
-    debugMode: boolean;
-  },
-  callbacks: Pick<StreamCallbacks, 'onPhase' | 'onA2UI'>,
-  debugA2uiMessages: A2uiPayloadItem[],
-  apiFetchFn: typeof apiFetch = apiFetch,
-): Promise<{ text: string; model?: string; sessionId?: string; phase?: string; usage?: TokenUsageSummary }> {
-  const jsonRes = await apiFetchFn('/api/converse', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId: params.sessionId,
-      message: params.message,
-      ...(params.clientMessageId ? { clientMessageId: params.clientMessageId } : {}),
-      ...(params.clientMessages?.length ? { messages: params.clientMessages } : {}),
-    }),
-    signal: params.signal,
-  }, params.debugMode);
-
-  if (!jsonRes.ok) throw new Error(`API error: ${jsonRes.status}`);
-
-  const response = await jsonRes.json() as {
-    sessionId?: string;
-    phase?: string;
-    message?: string;
-    model?: string;
-    a2ui?: unknown[];
-    usage?: TokenUsageSummary;
-  };
-
-  let safePhase: string | undefined;
-  if (response.phase) {
-    const validated = guardServerPhase(response.phase);
-    if (validated) {
-      safePhase = validated;
-      callbacks.onPhase(validated);
-    }
-  }
-
-  const safeItems = (response.a2ui ?? []).filter(isRawA2uiItem);
-  if (safeItems.length > 0) {
-    if (params.debugMode) debugA2uiMessages.push(...safeItems);
-    callbacks.onA2UI(safeItems);
-  }
-
-  return {
-    text: response.message ?? '',
-    model: response.model,
-    sessionId: response.sessionId,
-    phase: safePhase,
-    usage: response.usage,
-  };
+export interface UserActionReqPayload {
+  sessionId: string;
+  actionId: string;
+  toolName: string;
+  wireName: string;
+  parameters: unknown;
+  confirmComponent?: { component: string; props?: Record<string, unknown> };
+  scopes: string[];
+  /** Cancellation policy declared by the UserAction. Default: 'not-supported' (queue). */
+  cancellation?: 'supported' | 'not-supported';
 }
 
-interface StreamCallbacks {
-  onDelta: (text: string) => void;
+// ---------------------------------------------------------------------------
+// Stream callbacks
+// ---------------------------------------------------------------------------
+
+export interface StreamCallbacks {
+  /** Accumulated text from all chunk events (passed on each chunk and at completion). */
+  onChunk: (text: string) => void;
+  /** A2UI protocol messages validated by type guard before dispatch. */
   onA2UI: (messages: A2uiPayloadItem[]) => void;
+  /** Stepwise generation events (v1 compat, may not fire in v2). */
   onSetupEvent: (event: SetupGenerationEvent) => void;
+  /** Phase transition announced via v1 phase event. */
   onPhase: (phase: string) => void;
+  /**
+   * Turn complete.
+   * @param fullText - Accumulated text from all chunk events.
+   * @param model - Model name, if reported.
+   * @param sessionId - Session ID from the end event.
+   * @param debugInfo - Debug metadata when debug mode is active.
+   * @param usage - Token usage summary if available.
+   */
   onComplete: (
     fullText: string,
     model?: string,
@@ -147,26 +68,96 @@ interface StreamCallbacks {
     usage?: TokenUsageSummary,
   ) => void;
   onError: (error: string) => void;
+  /**
+   * v2: fired when the server emits a `user_action_req` event.
+   * The hook pauses — caller should dispatch to /api/converse/resume via useActionDispatch.
+   */
+  onUserActionReq?: (payload: UserActionReqPayload) => void;
+  /**
+   * v2: fired when the `end` event carries an intent field.
+   * Used by useNavigation to trigger onIntent routing without direct phase leakage.
+   * TODO(Step N, #480): Full intent→navigation wiring will land when skill resolver ships.
+   */
+  onIntent?: (intent: AppIntent) => void;
 }
 
 // Target ~80 rAF frames to reveal all text (~1.3s at 60fps)
 const REVEAL_FRAMES = 80;
 
-function extractHydrationA2uiMessages(items: A2uiPayloadItem[] | undefined): A2uiPayloadItem[] | undefined {
-  const artifactMessages = items?.filter((item) => {
-    if (!('updateComponents' in item) || !Array.isArray(item.updateComponents?.components)) {
-      return false;
+// ---------------------------------------------------------------------------
+// SDK 406 non-streaming fallback
+// ---------------------------------------------------------------------------
+
+export interface SdkNonStreamingFetchParams {
+  sessionId: string | undefined;
+  message: string;
+  clientMessages: Array<{ role: 'user' | 'assistant'; content: string; phase?: string; usage?: TurnUsage }> | undefined;
+  signal: AbortSignal;
+  debugMode: boolean;
+}
+
+export interface SdkNonStreamingFetchResult {
+  text: string;
+  model?: string;
+  sessionId?: string;
+}
+
+/**
+ * Non-streaming fallback used when the server responds 406 to an
+ * `Accept: text/event-stream` request, or when streaming is otherwise
+ * unavailable. Exported so it can be exercised without a React rendering
+ * context; not intended as a public hook API.
+ *
+ * Contract: HTTP 406 on streaming request → retry as JSON, surface any phase /
+ * a2ui the server produced, and return the final text/model/session.
+ */
+export async function _performSdkNonStreamingFetch(
+  params: SdkNonStreamingFetchParams,
+  callbacks: Pick<StreamCallbacks, 'onPhase' | 'onA2UI'>,
+  debugA2uiMessages: A2uiPayloadItem[],
+  fetchFn: typeof apiFetch = apiFetch,
+): Promise<SdkNonStreamingFetchResult> {
+  const { sessionId, message, clientMessages, signal, debugMode } = params;
+
+  const res = await fetchFn('/api/converse', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      sessionId,
+      message,
+      stream: false,
+      ...(clientMessages?.length ? { messages: clientMessages } : {}),
+    }),
+    signal,
+  }, debugMode);
+
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+
+  const body = (await res.json()) as Record<string, unknown>;
+
+  if (typeof body.phase === 'string') {
+    const normalized = normalizeConversationPhase(body.phase);
+    if (normalized) callbacks.onPhase(normalized);
+  }
+
+  if (Array.isArray(body.a2ui)) {
+    const safeItems = (body.a2ui as unknown[]).filter(isRawA2uiItem);
+    if (safeItems.length > 0) {
+      if (debugMode) debugA2uiMessages.push(...safeItems);
+      callbacks.onA2UI(safeItems);
     }
+  }
 
-    return item.updateComponents.components.some((component) =>
-      Boolean(component)
-      && typeof component === 'object'
-      && !Array.isArray(component)
-      && (component as { component?: unknown }).component === 'FileEditor',
-    );
-  });
-
-  return artifactMessages?.length ? artifactMessages : undefined;
+  return {
+    text: typeof body.message === 'string' ? body.message : '',
+    model: typeof body.model === 'string' ? body.model : undefined,
+    sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
+  };
 }
 
 export function useStreaming() {
@@ -174,9 +165,7 @@ export function useStreaming() {
   const [streamText, setStreamText] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
-  // Progressive text reveal — buffers incoming text and reveals it
-  // character-by-character via requestAnimationFrame so the user sees
-  // a typing effect even when all SSE events arrive in one burst.
+  // Progressive text reveal
   const targetTextRef = useRef('');
   const revealedLenRef = useRef(0);
   const rafRef = useRef(0);
@@ -225,7 +214,6 @@ export function useStreaming() {
     sessionId: string | undefined,
     callbacks: StreamCallbacks,
     debugMode?: boolean,
-    /** Full message history for session rehydration on cold starts. */
     chatHistory?: ChatMessage[],
   ) => {
     setIsStreaming(true);
@@ -236,50 +224,30 @@ export function useStreaming() {
 
     const controller = new AbortController();
     abortRef.current = controller;
-
-    // One idempotency key per turn — included in both the streaming attempt
-    // and the 406 fallback so the server can deduplicate the user message if
-    // its 406 path is not side-effect free.
     const clientMessageId = crypto.randomUUID();
 
     let accumulated = '';
-    let displayText = '';
     let lastModel: string | undefined;
-      let lastSessionId: string | undefined;
-      let lastPhase: string | undefined;
-      let lastUsage: TokenUsageSummary | undefined;
-      let sawStepwiseEvent = false;
-      const debugA2uiMessages: A2uiPayloadItem[] = [];
+    let lastSessionId: string | undefined;
+    let lastUsage: TokenUsageSummary | undefined;
+    const debugA2uiMessages: A2uiPayloadItem[] = [];
+
+    // Build client messages for potential session rehydration
+    const clientMessages = chatHistory
+      ?.filter((m) => {
+        const text = m.text?.trim();
+        if (!text) return false;
+        if (m.role === 'user') return true;
+        return m.role === 'assistant' && Boolean(m.model);
+      })
+      .map((m) => ({
+        role: m.role === 'user' ? 'user' as const : 'assistant' as const,
+        content: m.text.trim(),
+        ...(m.phase ? { phase: m.phase } : {}),
+        ...(m.usage ? { usage: m.usage } : {}),
+      }));
 
     try {
-      // Build client message history for rehydration. The server rebuilds its
-      // own system prompt, so only user/assistant text is required. For
-      // assistant turns we also forward compact artifact-bearing A2UI payloads
-      // so generated files can be rebuilt after cold starts without re-leaking
-      // them into chat.
-      // Filter assistant messages to only model-produced ones (m.model present)
-      // to prevent client-generated error bubbles from spoofing assistant turns.
-      const clientMessages = chatHistory
-        ?.filter((m) => {
-          const text = m.text?.trim();
-          if (!text) return false;
-          if (m.role === 'user') return true;
-          return m.role === 'assistant' && Boolean(m.model);
-        })
-        .map((m) => {
-          const a2uiMessages = m.role === 'assistant'
-            ? extractHydrationA2uiMessages(m.a2uiMessages)
-            : undefined;
-
-          return {
-            role: m.role === 'user' ? 'user' as const : 'assistant' as const,
-            content: m.text.trim(),
-            ...(m.phase ? { phase: m.phase } : {}),
-            ...(m.usage ? { usage: m.usage } : {}),
-            ...(a2uiMessages ? { a2uiMessages } : {}),
-          };
-        });
-
       const res = await apiFetch('/api/converse', {
         method: 'POST',
         headers: {
@@ -296,49 +264,44 @@ export function useStreaming() {
         signal: controller.signal,
       }, debugMode);
 
-      if (!res.ok) {
-        // HTTP 406: the SDK path rejected streaming. Fall back to a non-streaming
-        // JSON request so the SDK turn completes and the server-emitted route state
-        // (phase, A2UI) still reaches the frontend through the same callbacks.
-        if (res.status === 406) {
-          const fallback = await _performSdkNonStreamingFetch(
-            { sessionId, message, clientMessageId, clientMessages, signal: controller.signal, debugMode: !!debugMode },
-            { onPhase: callbacks.onPhase, onA2UI: callbacks.onA2UI },
-            debugA2uiMessages,
-          );
-
-          if (fallback.model) lastModel = fallback.model;
-          if (fallback.sessionId) lastSessionId = fallback.sessionId;
-          if (fallback.phase) lastPhase = fallback.phase;
-          if (fallback.usage) lastUsage = fallback.usage;
-
-          const nonStreamText = fallback.text;
-          updateRevealTarget(nonStreamText);
-
-          // Wait for progressive reveal before firing completion
-          if (targetTextRef.current.length > 0 && revealedLenRef.current < targetTextRef.current.length) {
-            await new Promise<void>(resolve => { revealDoneRef.current = resolve; });
-          }
-
-          if (!controller.signal.aborted) {
-            const debugInfo: DebugMetadata | undefined = debugMode
-              ? {
-                  model: lastModel,
-                  rawResponse: nonStreamText,
-                  fullEnvelope: {
-                    message: nonStreamText,
-                    a2ui: debugA2uiMessages.length > 0 ? debugA2uiMessages : undefined,
-                    model: lastModel,
-                    phase: lastPhase,
-                    usage: lastUsage,
-                  },
-                }
-              : undefined;
-            callbacks.onComplete(nonStreamText, lastModel, lastSessionId, debugInfo, lastUsage);
-          }
-          return;
+      if (res.status === 406) {
+        // Streaming not available — fall back to non-streaming JSON path.
+        const result = await _performSdkNonStreamingFetch(
+          {
+            sessionId,
+            message,
+            clientMessages,
+            signal: controller.signal,
+            debugMode: Boolean(debugMode),
+          },
+          {
+            onPhase: callbacks.onPhase,
+            onA2UI: callbacks.onA2UI,
+          },
+          debugA2uiMessages,
+          apiFetch,
+        );
+        updateRevealTarget(result.text);
+        if (result.text) callbacks.onChunk(result.text);
+        if (targetTextRef.current.length > 0 && revealedLenRef.current < targetTextRef.current.length) {
+          await new Promise<void>(resolve => { revealDoneRef.current = resolve; });
         }
+        const debugInfo: DebugMetadata | undefined = debugMode
+          ? {
+              model: result.model,
+              rawResponse: result.text,
+              fullEnvelope: {
+                message: result.text,
+                a2ui: debugA2uiMessages.length > 0 ? debugA2uiMessages : undefined,
+                model: result.model,
+              },
+            }
+          : undefined;
+        callbacks.onComplete(result.text, result.model, result.sessionId, debugInfo);
+        return;
+      }
 
+      if (!res.ok) {
         throw new Error(`API error: ${res.status}`);
       }
 
@@ -347,7 +310,6 @@ export function useStreaming() {
 
       const decoder = new TextDecoder();
       let buffer = '';
-      // Track the SSE event type so typed events (e.g. `event: a2ui`) are routed correctly
       let currentEventType = '';
 
       while (true) {
@@ -359,7 +321,6 @@ export function useStreaming() {
         buffer = lines.pop() || '';
 
         for (const line of lines) {
-          // Track SSE event type field
           if (line.startsWith('event: ')) {
             currentEventType = line.slice(7).trim();
             continue;
@@ -370,135 +331,106 @@ export function useStreaming() {
           if (data === '[DONE]') continue;
 
           try {
-            // --- Typed SSE events ---
+            const parsed: Record<string, unknown> = JSON.parse(data);
 
-            if (currentEventType === 'a2ui') {
-              const a2uiMsg: A2uiPayloadItem = JSON.parse(data);
-              if (debugMode) debugA2uiMessages.push(a2uiMsg);
-              callbacks.onA2UI([a2uiMsg]);
-              currentEventType = '';
-              continue;
-            }
+            switch (currentEventType) {
+              // v2 typed events
+              case 'start':
+                if (parsed.sessionId) lastSessionId = parsed.sessionId as string;
+                break;
 
-            if (currentEventType === 'chunk') {
-              // Raw LLM output fragment — accumulate for debug but don't display
-              const parsed = JSON.parse(data);
-              if (parsed.content) accumulated += parsed.content;
-              currentEventType = '';
-              continue;
-            }
-
-            if (currentEventType === 'message') {
-              // Processed display text — progressive reveal target
-              const parsed = JSON.parse(data);
-              if (parsed.content) {
-                displayText = parsed.content;
-                updateRevealTarget(displayText);
-              }
-              currentEventType = '';
-              continue;
-            }
-
-             if (currentEventType === 'done') {
-               const parsed = JSON.parse(data);
-               if (parsed.model) lastModel = parsed.model;
-              if (parsed.sessionId) lastSessionId = parsed.sessionId;
-              if (parsed.phase) {
-                const safePhase = guardServerPhase(parsed.phase);
-                if (safePhase) {
-                  lastPhase = safePhase;
-                  callbacks.onPhase(safePhase);
+              case 'chunk': {
+                const delta = (parsed.delta as string) ?? '';
+                accumulated += delta;
+                updateRevealTarget(accumulated);
+                callbacks.onChunk(accumulated);
+                if (isRawA2uiItem(parsed)) {
+                  if (debugMode) debugA2uiMessages.push(parsed as A2uiPayloadItem);
+                  callbacks.onA2UI([parsed as A2uiPayloadItem]);
                 }
+                break;
               }
-              if (parsed.usage) {
-                lastUsage = parsed.usage as TokenUsageSummary;
+
+              case 'tool_start':
+              case 'tool_done':
+                // Tool lifecycle — no UI callback needed for v2 core; future steps may add one
+                break;
+
+              case 'phase':
+                if (typeof parsed.agent === 'string') {
+                  // Agent handoff — treat as a phase-like transition signal
+                  callbacks.onPhase(parsed.agent);
+                }
+                break;
+
+              case 'user_action_req': {
+                callbacks.onUserActionReq?.({
+                  sessionId: parsed.sessionId as string,
+                  actionId: parsed.actionId as string,
+                  toolName: parsed.toolName as string,
+                  wireName: parsed.wireName as string,
+                  parameters: parsed.parameters,
+                  confirmComponent: parsed.confirmComponent as { component: string; props?: Record<string, unknown> } | undefined,
+                  scopes: (parsed.scopes as string[]) ?? [],
+                  cancellation: (parsed.cancellation as 'supported' | 'not-supported' | undefined) ?? 'not-supported',
+                });
+                // Pause streaming — caller is responsible for dispatching to /resume
+                setIsStreaming(false);
+                return;
               }
-               currentEventType = '';
-               continue;
-             }
 
-             if (isStepwiseEventType(currentEventType)) {
-               sawStepwiseEvent = true;
-               callbacks.onSetupEvent({
-                 type: currentEventType,
-                 ...JSON.parse(data),
-               } as SetupGenerationEvent);
-               currentEventType = '';
-               continue;
-             }
+              case 'end': {
+                if (parsed.sessionId) lastSessionId = parsed.sessionId as string;
+                if (parsed.intent && typeof parsed.intent === 'string') {
+                  callbacks.onIntent?.({ summary: parsed.intent });
+                }
+                break;
+              }
 
-             // --- Generic (untyped) events — backward compatibility ---
-             const event: StreamEvent = JSON.parse(data);
+              case 'error': {
+                const msg = (parsed.message as string) ?? 'Unknown error from server';
+                await reader.cancel();
+                controller.abort();
+                callbacks.onError(msg);
+                return;
+              }
+
+              default: {
+                // v1 / generic event fallback — backward compat
+                if (parsed.error) {
+                  await reader.cancel();
+                  controller.abort();
+                  callbacks.onError(parsed.error as string);
+                  return;
+                }
+                if (parsed.delta) {
+                  accumulated += parsed.delta as string;
+                  updateRevealTarget(accumulated);
+                  callbacks.onChunk(accumulated);
+                }
+                if (parsed.a2ui && Array.isArray(parsed.a2ui)) {
+                  const safeItems = (parsed.a2ui as unknown[]).filter(isRawA2uiItem);
+                  if (safeItems.length > 0) {
+                    if (debugMode) debugA2uiMessages.push(...safeItems);
+                    callbacks.onA2UI(safeItems);
+                  }
+                }
+                if (parsed.phase && typeof parsed.phase === 'string') {
+                  callbacks.onPhase(parsed.phase);
+                }
+                if (parsed.model) lastModel = parsed.model as string;
+                if (parsed.sessionId) lastSessionId = parsed.sessionId as string;
+                if (parsed.usage) lastUsage = parsed.usage as TokenUsageSummary;
+                if (parsed.step_start || parsed.file_generated || parsed.step_complete || parsed.step_error) {
+                  callbacks.onSetupEvent({ type: currentEventType, ...parsed } as SetupGenerationEvent);
+                }
+                break;
+              }
+            }
+
             currentEventType = '';
-
-            if (event.error) {
-              await reader.cancel();
-              controller.abort();
-              callbacks.onError(event.error);
-              return;
-            }
-
-            if (event.delta) {
-              accumulated += event.delta;
-              updateRevealTarget(accumulated);
-              callbacks.onDelta(accumulated);
-            }
-
-            if (event.content) {
-              accumulated = event.content;
-              updateRevealTarget(accumulated);
-              callbacks.onDelta(accumulated);
-            }
-
-            if (event.a2ui && event.a2ui.length > 0) {
-              const safeItems = event.a2ui.filter(isRawA2uiItem);
-              if (safeItems.length > 0) {
-                if (debugMode) debugA2uiMessages.push(...safeItems);
-                callbacks.onA2UI(safeItems);
-              }
-            }
-
-            if (event.phase) {
-              const safePhase = guardServerPhase(event.phase);
-              if (safePhase) {
-                lastPhase = safePhase;
-                callbacks.onPhase(safePhase);
-              }
-            }
-
-            if (event.model) {
-              lastModel = event.model;
-            }
-
-            if (event.sessionId) {
-              lastSessionId = event.sessionId;
-            }
-
-            if (event.usage) {
-              lastUsage = event.usage;
-            }
-
           } catch { /* skip malformed JSON */ }
         }
-      }
-
-      // Determine the final display text
-      let finalText = sawStepwiseEvent ? displayText : (displayText || accumulated);
-
-      // If no typed `message` event was received, try extracting from JSON envelope
-      if (!displayText && !sawStepwiseEvent) {
-        try {
-          const envelope = JSON.parse(accumulated);
-          if (typeof envelope?.message === 'string') {
-            finalText = envelope.message;
-          }
-          if (Array.isArray(envelope?.a2ui) && envelope.a2ui.length > 0) {
-            if (debugMode) debugA2uiMessages.push(...envelope.a2ui);
-            callbacks.onA2UI(envelope.a2ui);
-          }
-        } catch { /* plain text, not JSON — use as-is */ }
-
-        updateRevealTarget(finalText);
       }
 
       // Wait for progressive reveal to finish before completing
@@ -508,42 +440,39 @@ export function useStreaming() {
         });
       }
 
-      // Don't fire completion if aborted during the reveal
       if (controller.signal.aborted) return;
 
-      // Build debug info when debug mode is active
       const debugInfo: DebugMetadata | undefined = debugMode
         ? {
             model: lastModel,
-            rawResponse: finalText,
-            rawContent: accumulated !== finalText ? accumulated : undefined,
+            rawResponse: accumulated,
             fullEnvelope: {
-              message: finalText,
+              message: accumulated,
               a2ui: debugA2uiMessages.length > 0 ? debugA2uiMessages : undefined,
               model: lastModel,
-              phase: lastPhase,
               usage: lastUsage,
             },
           }
         : undefined;
 
-      callbacks.onComplete(finalText, lastModel, lastSessionId, debugInfo, lastUsage);
-    } catch (err: any) {
-      if (err.name === 'AbortError') return;
+      callbacks.onComplete(accumulated, lastModel, lastSessionId, debugInfo, lastUsage);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       cancelReveal();
       if (err instanceof SessionExpiredError) {
         callbacks.onError(err.message);
         window.location.href = '/.auth/login/aad?post_login_redirect_uri=/';
         return;
       }
-      callbacks.onError(err.message || 'Connection failed');
+      const errMsg = err instanceof Error ? err.message : 'Connection failed';
+      callbacks.onError(errMsg);
     } finally {
       setIsStreaming(false);
       abortRef.current = null;
     }
   }, [updateRevealTarget, cancelReveal]);
 
-  // Cancel any in-flight rAF on unmount to avoid setState on an unmounted component
+  // Cancel rAF on unmount
   useEffect(() => {
     return () => cancelReveal();
   }, [cancelReveal]);
@@ -555,11 +484,4 @@ export function useStreaming() {
   }, [cancelReveal]);
 
   return { send, isStreaming, streamText, abort };
-}
-
-function isStepwiseEventType(value: string): value is SetupGenerationEvent['type'] {
-  return value === 'step_start'
-    || value === 'file_generated'
-    || value === 'step_complete'
-    || value === 'step_error';
 }

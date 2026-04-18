@@ -117,7 +117,7 @@ export class MessageProcessor<T extends ComponentApi> {
 
     const functions: any[] = [];
     for (const api of catalog.functions.values()) {
-      const zodSchema = zodToJsonSchema(api.schema, {
+      const zodSchema = zodToJsonSchema(api.schema as any, {
         target: 'jsonSchema2019-09',
       }) as any;
 
@@ -133,7 +133,7 @@ export class MessageProcessor<T extends ComponentApi> {
 
     let theme: Record<string, any> | undefined;
     if (catalog.themeSchema) {
-      const zodSchema = zodToJsonSchema(catalog.themeSchema, {
+      const zodSchema = zodToJsonSchema(catalog.themeSchema as any, {
         target: 'jsonSchema2019-09',
       }) as any;
 

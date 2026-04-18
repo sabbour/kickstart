@@ -25,7 +25,7 @@ import {
   Warning20Regular,
 } from '@fluentui/react-icons';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
-import type { AzureARMConnector } from '@kickstart/core';
+import type { AzureARMConnector } from '@kickstart/harness';
 
 // ── Validation helpers (per Zapp's security conditions) ──
 
@@ -90,7 +90,7 @@ const AzureActionApi = {
     description: DynamicStringSchema.optional(),
     method: z.enum(['PUT', 'POST', 'PATCH', 'DELETE']),
     path: DynamicStringSchema,
-    body: z.record(z.unknown()).optional(),
+    body: z.record(z.string(), z.unknown()).optional(),
     apiVersion: DynamicStringSchema.optional(),
     confirmLabel: DynamicStringSchema.optional(),
     onSuccess: ActionSchema.optional(),

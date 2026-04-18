@@ -18,110 +18,108 @@ Lead engineer and architect. Owns roadmap prioritization, design reviews, techni
 - **Process directives:** Always stored in .squad/decisions/inbox/ for Scribe merge; not versioned inline
 
 ## Recent Work
-- v0.6.1 deployment prep: vendor diagram assets, eliminate GitHub Packages auth dependency
-- v0.5.6 retro: sprint timing analysis, DP compliance audit, cross-branch contamination fix
-- v0.5.0 multi-surface: security review intensive, postMessage origin validation, session auth spec
-- v0.4.0 planning: wave structure refinement, velocity tracking, dependency mapping
-- v0.3.0 retrospective: DP gate success, no-lockout directive validation, review cycle improvement
+- v2 sprint planning + #474 DP review: #474 → #475 → #476 blocking chain; APPROVE_WITH_CONDITIONS on #474
+- DP #329 (MCP App IDE) APPROVED WITH CONDITIONS; DP #330 (Agents SDK) APPROVED + closed out
+- PR #383 engineering docs rewrite (7 files); label-based review gate; comment-resolution process fix
+- v0.6.1 deployment prep: vendor diagram assets, CI hardening, stepwise generation default
+
+## Active Sprint: v2 (harness + packs)
+
+Sprint 1 blocking chain: **#474 → #475 → #476**. No Step 4+ work before #476 merges.
+After #476: pack-core batch (#542, #503–#506, #478) → runner/SSE (#479, #480) → domain packs (#482–#488).
+All open v2 issues should carry milestone **v2**.
 
 ## Learnings
 
+- (2026-04-17T12:06:45.293Z) Sprint planning always required before backlog pickup when `.squad/identity/now.md` gate is active. Shortest v2 slice is harness spine, not pack work: `#474 → #475 → #476` must land before pack-core batch.
+- (2026-04-17T03:30:17Z) DP #329: runtime duplication is the blocking risk — PoC adds `runtime/` inside `packages/mcp-server` that parallels `packages/web/api/` LLM client + session store. Third fork risk with SDK migration. Implementation issue must define canonical client before code lands.
+- (2026-04-17T03:30:17Z) DP #330 closeout: Option B (hybrid route planner + manager agent) adopted. `phaseComplete`/`filesComplete` flags retired. Implementation sequence locked: Gate → arch spike → backend (#445, Bender) → UI (#446, Fry) → cleanup. Follow-ons #445 and #446 created.
+- (2026-04-17T01:53:59Z) Review gate must be label-based, not GitHub approval-required, because repo owners cannot self-approve. `leela:approved` + `zapp:approved` labels drive `squad/review-gate` status check.
+- (2026-04-17) Comment acknowledgment and thread resolution are non-optional — silently fixing code is a process violation. Reply to specific comment with SHA + description; resolve thread via GraphQL; verify 0 unresolved before merge.
+- (2026-04-16T05:51:43.085Z) Design spikes producing DPs are process-compatible with sprint planning reset — blocking them on ceremony is circular. Spikes (DPs) run in parallel with ceremony.
+- (2026-04-15T09:46:31.308Z) Issue #265 smallest ship: treat FileEditor payloads as workspace data, not chat bubble content. Paths: `chat-a2ui.ts`, `App.tsx`, `FileManager/`, `session-store.ts`.
+- **2026-04-17T12:06:45.293Z — DP #474 Step 1 review:** A temporary `@kickstart/core` shim is acceptable only as shrinking compile scaffolding for Step 1. It cannot become a second runtime boundary or preserve v1 semantics beyond what is strictly needed to keep the repo building while imports move to `@kickstart/harness`. Because the real risk is cross-package compile wiring across web, API, and MCP, Ralph should route Bender first and treat Fry as preserved-shell follow-through. Key files: `docs/v2-implementation-brief.md`, GitHub issue `#474`, `packages/core/package.json`, `packages/harness/src/index.ts`.
+
+- **2026-04-17T12:06:45.293Z — v2 rewrite start gate (#474):** Even when the v2 implementation brief is design-locked and Step 1 is technically dependency-free, `.squad/identity/now.md` is the active execution gate. If it says "no feature code until sprint planning completes," Ralph should route the planning ceremony instead of pushing the first implementation issue. Key files: `.squad/identity/now.md`, `docs/v2-implementation-brief.md`, `.squad/ceremonies.md`, GitHub issue `#474`.
+
 - **2026-04-17T03:30:17Z — MCP App IDE DP (#329) architecture review:** Approved with conditions. Key finding: PoC adds \`runtime/\` modules inside \`packages/mcp-server\` that parallel the existing \`packages/web/api/\` LLM client + session store. If both the MCP App runtime and the Agents SDK migration (#330) proceed, we risk a third forked LLM runtime. Implementation issue must define which client is canonical before code lands. Bundle size validation of vite-plugin-singlefile output with full React + Fluent 2 + A2UI is required before Slice 1 ships. Decision file: \`.squad/decisions/inbox/leela-dp-reviews-apr17.md\`
 
-- **2026-04-17T03:30:17Z — Agents SDK DP (#330) closeout:** Both Leela architecture and Zapp security reviews complete. Verified all five acceptance criteria satisfied. Created follow-on issues: #445 (Bender — backend SDK adapter) and #446 (Fry — chat/workspace UI adaptation), both v1.0.0, #446 depends on #445. Closed #330 as completed.
+## 2026-04-17 DP Reviews
 
-- **2026-04-16T06:00:45.448Z — User directive: vendor adaptive-ui instead of depending:** When a user says "do not depend on X, vendor it instead," the right action is surgical extraction of the minimal surface + create a tracked issue. Issue #342 removes `@sabbour/adaptive-ui-core` + `@sabbour/adaptive-ui-azure-pack` from web app by extracting icon registry + two SVGs into native code. Router: Fry. Scope: hotfix, no design proposal needed (pure refactor). Decision file: `.squad/decisions/inbox/leela-vendor-diagram-hotfix.md`
-- **2026-04-15T22:27:37.636Z — Priority lane tracking on GitHub:** Encode sprint priority directly on GitHub issues using existing labels (`priority:p1`, `priority:p2`) plus cross-link comments. Each issue gets a pinned comment listing its related issues in the same lane. This makes priority visible on the issue page without requiring users to check local squad notes. Decision file: `.squad/decisions/inbox/leela-priority-tracking-github.md`
-- **2026-04-15T09:46:31.308Z — Issue #265 smallest ship:** Treat `FileEditor` payloads as workspace data, not chat bubble content. The no-mock v1 is frontend-first: transform incoming `FileEditor` A2UI into compact file cards, mirror those files into `VirtualFileSystem`, auto-open the sidebar/viewer, and override generate-phase progress title client-side. Key paths: `packages/web/src/utils/chat-a2ui.ts`, `packages/web/src/App.tsx`, `packages/web/src/components/FileManager/`, `packages/web/api/src/lib/session-store.ts`.
-- **2026-04-15T09:46:31.308Z — Issue #265 sequencing stays tight:** GitHub OAuth now being available and Azure deployment staying in scope does not widen #265. The file-manager slice remains a parallel generate/review UX track that should land before or alongside handoff/deploy work, not after it.
+**DP #329 (MCP App IDE Surface) — APPROVED WITH CONDITIONS**
+- Resource registration via `registerAppResource` + `registerAppTool` canonical
+- Single-file bundle with `vite-plugin-singlefile` required; CSP headers mandatory
+- `event.source === window.parent` guard required
+- Bundle size validation (vite-plugin-singlefile with full React + Fluent 2 + A2UI) before Slice 1 ships
 
-## Round 5: Design Review Cycle
+**DP #330 (Agents SDK Migration) — APPROVED + CLOSED**
+- Option B (hybrid route planner + manager agent) adopted
+- Server-authored route state replaces model-emitted booleans
+- Implementation: #445 (Bender backend), #446 (Fry UI)
 
-**2026-04-14**
-- Reviewed and approved DP #188 (expanded demo scenarios)
-- Approved Fry's implementation readiness for issue #188
+## 2026-04-17 PR #447 Code Review + Approval
 
-## 2026-04-17 Design Proposal Reviews (Round 6)
+- Found duplicate-message bug in SDK streaming loop (blocking). Bender fixed in commit a3899e5.
+- Applied `leela:approved`. 1511 tests passing, 0 unresolved threads.
 
-**DP #329 (MCP App IDE Surface) — Architecture Review**
-- **Verdict:** APPROVED WITH CONDITIONS
-- **Conditions:**
-  1. Resource registration approach canonical per MCP Apps Quickstart §2
-  2. Single-file bundle with CSP headers required (`script-src 'unsafe-inline'`, `style-src 'unsafe-inline'`, `connect-src 'none'`)
-  3. postMessage validation via `event.source === window.parent` guard
-  4. **Blocking risk:** Runtime duplication. PoC adds `runtime/conversation.ts`, `runtime/openai-client.ts`, `runtime/session-store.ts` inside `packages/mcp-server` that parallel `packages/web/api/src/lib/openai-client.ts` + `session-store.ts`. Combined with Agents SDK migration (#330), could fork LLM runtime 3 ways. Implementation issue must define canonical client before code lands.
-  5. Bundle size validation required: `vite-plugin-singlefile` output measured with full React + Fluent 2 + A2UI before Slice 1 ships.
+## 2026-04-17 v2 Sprint Planning + #474 DP Review
 
-**DP #330 (OpenAI Agents SDK Migration) — Architecture Review & Closeout**
-- **Verdict:** APPROVED + SESSION CLOSE
-- **Architecture decisions adopted:**
-  1. **Option B (hybrid route planner + manager agent)** — not Option A (loop-only) or Option C (full handoff rewrite)
-  2. SDK handles run/tool/session/streaming/tracing; product code owns route policy, generation sequencing, A2UI output
-  3. `phaseComplete`/`filesComplete` flags retired; server-authored route state replaces model-emitted booleans
-  4. Generate step orchestration stays custom; workspace-first (#326/#327/#328) is enforced constraint
-  5. Implementation sequence locked: Gate approval → arch spike + Azure compat → backend (#445, Bender) → UI (#446, Fry) → cleanup
-- **Follow-on issues created:** #445 (Backend SDK adapter, Bender), #446 (Chat/workspace UI, Fry)
-- **Design Proposal closed:** All 5 acceptance criteria verified; conditions integrated into implementation roadmap.
+- HOLD_FOR_PLANNING gate honored; sprint planning run first.
+- Sprint plan: #474 → #475 → #476 blocking chain. Step 4+ frozen until #476.
+- #474 DP: APPROVE_WITH_CONDITIONS. Seam-cutting pass approach confirmed.
+- v2 architecture DP (#473): APPROVED. Guardrail enforcement semantics must be pinned before Step 11 (`error` SSE with `guardrail_block`). UserAction resume authz must be a done criterion in Step 5.
 
-## 2026-04-15 PR Review & Merge Sprint
+## 2026-05-28 — DP Review #476 v2 Step 3: Registry + loaders
 
-**Round 1 — File Manager Sidebar Merge**
-- Reviewed and merged PR #252 (feat: file manager sidebar with tree view and file viewer, closes #201)
-- Architecture: FileManagerSidebar + FileViewer components in `packages/web/src/components/FileManager/`
-- Follows existing patterns: Griffel, Fluent UI, barrel exports, VirtualFS context consumption
-- Noted non-blocking issue: highlight.js language registrations duplicated between ChatMarkdown and FileViewer — candidate for shared `hljs-setup.ts` module
-- Layout.tsx extended with additive optional props (`fileManagerSidebar`, `fileViewer`, `showFileSidebar`, `showFileViewer`)
-- Key files: `FileManagerSidebar.tsx`, `FileViewer.tsx`, `index.ts` barrel, Layout.tsx, App.tsx
-- Outcome: Squash-merged, CI green
+**Verdict:** APPROVE_WITH_CONDITIONS  
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/476#issuecomment-4268074355  
+**Decision record:** `.squad/decisions/inbox/leela-476-dp-review.md`
 
-**Round 2 — Bug Fix Reviews & Merges**
-- Reviewed and merged PR #247 (3 TypeScript fixes: missing module, null type, wrong variable)
-  - Outcome: Merged, CI green
-- Reviewed and merged PR #248 (E2E test fix: added exact:true to getByRole)
-  - Outcome: Merged (already merged by CI automation), CI green
+Key findings:
+- Registry lifecycle (`register → enable → seal`) and sigil resolution (`.`/`:`) are sound. ✅
+- Circular dependency detection and collision rules correctly specified. ✅
+- Catalog skeleton scope (typed data assembly only, no UI runtime) is correct. ✅
+- C1 (BLOCKER): Custom frontmatter mini-parser can't handle arrays; must use `yaml` npm package. All agent/skill frontmatter uses arrays.
+- C2 (BLOCKER): Registry read accessor surface underspecified; only `getAgent` + `components` listed. Step 5+6 need `getSkillsForAgent`, `getToolsForAgent`, `getUserAction`, `getGuardrailsByStage` — must be locked in Step 3.
+- C3 (REQUIRED): UserAction wire transliteration (`azure:login` → `azure__login`) unspecified. `UserActionContribution` must carry both `.name` and `.wireName`.
+- M1/M2 (minor): `enable()` dep enforcement and `enable()` after `seal()` behavior unspecified in DP text.
 
-**Summary:** 3 PRs merged, 5 issues closed (includes #201 via #252), CI maintained at green
-## 2026-04-14 Round 2: DP Review + Team Leadership
+## 2026-05-28 — DP Review #475 v2 Step 2: Harness types
 
-- **Reviewed DPs #186 & #187**: Approved both with guidance. #186 requires security hardening (immutable pinning, prompt-injection checks) before Phase 1.
-- **Approved PR #213**: Choice components fix. Clean, additive change.
-- **Team status**: Zapp flagged #186 security concerns; Fry delivered hash-based nav; Bender merged SWA deployment automation.
-- **Next:** Address #186 security gate before starting Phase 1.
+**Verdict:** APPROVE_WITH_CONDITIONS  
+**GitHub comment:** https://github.com/sabbour/kickstart/issues/475#issuecomment-4268063788  
+**Decision record:** `.squad/decisions/inbox/leela-475-dp-review.md`
 
-## 2026-04-15 E2E Demo Sprint Planning
+Key findings:
+- Primitive coverage complete (all 12 type files match brief). ✅
+- AgentOutput Zod contract correct. ✅
+- A2UI schemas must be discriminated unions with `version: 'v0.9'` literal — not v1 all-optional transcription. (C1)
+- `SessionCtx` forward refs (`AppIntent`, `Artifact`, `A2UICatalog`, `Turn`, `PendingUserAction`, `AzureCredential`) must be resolved. (C2)
+- `ComponentContribution.renderer` typed as `unknown` in harness — React-aware narrowing deferred to pack-core. (C3)
+- `package.json` missing `zod` and `@openai/agents` as runtime dependencies. (C4)
+- `chat-a2ui.ts` port must drop all v1 phase-model code; PR needs explicit keep/drop inventory. (C5)
 
-- **Sprint plan built** for making Kickstart demo-ready with no faking/mocking
-- ~~**Scope trade decision:** Demo ends at PR creation~~ → **REVERSED v3:** Full E2E including Azure auth + deployment per Ahmed directive
-- **PR #297 ships immediately** (Option A) — closes #271, #269. Makes Review terminal with ZIP download. Safety net while real auth lands.
-- **GitHub OAuth App exists** — #274 no longer has external blockers. Registration risk removed.
-- **Azure auth/deployment IN SCOPE** — MSAL device-code auth, ARM provisioning for AKS Automatic. Needs new issue creation.
-- **Critical path:** PR #297 (merge now) → #298 (surface fix) → #275 (progressive flow, design for 6 phases) + #274 (GitHub OAuth, unblocked) → Azure MSAL + AKS deploy → full 6-phase E2E
-- **Conditional phase activation:** Handoff/Deploy re-enable when auth tokens present. 4-phase flow stays default for unauthenticated users.
-- **#274 patterns inform Azure auth** — GitHub OAuth device flow establishes the auth UX; Azure MSAL follows same structure.
-- **Deferred:** #272 (live pricing) and #277 (token tracker) — both self-described as non-blockers
-- **Coding agent candidates:** #296 (subtitle sweep) and #299 (debug placement) — mechanical, well-scoped
-- **Zapp mandatory** on #274 AND Azure auth — both are security boundary crossings
-- **4 parallel tracks** after #298: Wizard Flow (#275), GitHub (#274), Azure (new), Polish (#300/#265/#273/#296/#299)
-- **#300** (arch diagram prompt depth) — prompt-only fix, lands before #273 (ELK engine). Bender owns.
-- **Try-AKS reference:** `/mnt/c/Users/asabbour/Git/adaptive-ui`
-- **Key files:** Sprint plan at `.squad/decisions/inbox/leela-e2e-sprint-plan.md`
+## 2026-05-28 — DP Reviews #475 + #476
 
-## 2026-04-15 Sprint Planning Ceremony (Overdue)
+**#475 (Harness Types) — APPROVE_WITH_CONDITIONS:**
+1. A2UI Zod schemas must be discriminated unions with `version: z.literal("v0.9")` — not all-optional.
+2. `ComponentContribution.renderer` typed as `unknown` in harness; React-aware type deferred to pack-core.
+3. `SessionCtx` forward refs (`AppIntent`, `Artifact`, `A2UICatalog`, `Turn`, `PendingUserAction`, `AzureCredential`) must be stubbed with `// TODO(Step 3)` before merge.
+4. `zod` + `@openai/agents` must be `dependencies`, not `devDependencies`, in `@kickstart/harness`.
+5. `chat-a2ui.ts` port must drop all v1 phase-model code — explicit keep/drop inventory required in PR.
+All five conditions are blocking. Step 3 gated on standalone compile.
 
-- **Ceremony run** for v0.6.1 — full open backlog assessment (15 issues, 1 PR)
-- **Board drift identified:** 12/15 issues had no milestone, all had stale `go:needs-research`, no priority labels on 11/15, #271/#269 open despite ready fix
-- **Fixes applied:** All demo-critical → v0.6.1, created v0.7.0 for deferred, cleared stale labels on in-flight work
-- **Burn now (4):** PR #297, #298, #299, #274 — do not interrupt
-- **Burn next (5):** #300, #296, #275, #265, #266 — fire as Wave 1 when active lanes land
-- **Blocked (2):** #301 (Azure, waits for #274), #273 (ELK, waits for #300)
-- **Close (2):** #271, #269 — closed by PR #297
-- **Defer (3):** #272, #277 → v0.7.0; #46 stays v0.6.0 (multi-week epic)
-- **Fry is the bottleneck** — almost every issue has frontend surface. Mitigation: @copilot handles #296, #299 is quick, #273 is back-loaded.
-- **Ralph's next wave:** Monitor BURN NOW completion → fire #300/#296/#275/#265/#266 in parallel
-- **Key file:** `.squad/decisions/inbox/leela-sprint-planning-v061.md`
+**#476 (Registry + Loaders) — APPROVE_WITH_CONDITIONS:**
+- C1 (BLOCKER): Drop custom mini-parser; use `yaml` npm package — mini-parser doesn't support arrays needed for `tools:`, `handoffs:`, `appliesTo:`, `keywords:`.
+- C2 (BLOCKER): Full registry read accessor surface required in Step 3 (6 methods/properties defined — see decisions.md).
+- C3 (BLOCKER): `UserActionContribution` must carry both `.name` (canonical, `:` sigil) and `.wireName` (transliterated, `__`); loader-agent.ts produces both.
+C1–C3 block Step 4 (pack-core), Step 5 (Runner), and Step 6 (skill resolver).
 
-## 2026-04-15 Architecture Diagram Depth Decision
+## Wave 3 — 2026-04-17 #474 Step 1 + A2UI #351 Decisions Filed
 
+- `leela-v2-rewrite-start-gate.md`: Do not start #474 implementation until sprint planning ceremony completes; HOLD gate honored.
+- `leela-dp-474-step1.md`: Step 1 seam APPROVE_WITH_CONDITIONS — shim must be shrinking only, no new exports or runtime behavior; Bender owns implementation, Fry handles web-shell fallout. Exit contract: v1 files deleted, v1 flags gone, `packages/harness` canonical.
+- `leela-351-component-expansion.md`: A2UI catalog expanded 28→33 components; Alert, Table, Link added; SummaryCard + DecisionCard new React components; `KNOWN_COMPONENT_TYPES` 46→48; ProgressSteps/CodeBlock/SteppedCarousel/Questionnaire deferred.
 - **Issue #300**: Architecture diagram at DESIGN step is under-informed — shows only user-selected services as flat nodes, omits AKS infrastructure known from §7/§9 defaults (ACR, Gateway API, Key Vault, Workload Identity, CI/CD).
 - **Root cause**: System prompt line 125 says only "ArchitectureDiagram showing the app and connected services". Example 3 (line 282) reinforces the flat pattern. Component catalog gives 2-node example.
 - **Decision**: Three-tier model — Tier 1 (always: AKS subgraph, ACR, Key Vault, Gateway), Tier 2 (conditional: DB, cache, queue, AI), Tier 3 (annotations: CI/CD, Workload Identity, replicas). Use `diagram` prop with Mermaid subgraphs, not `nodes/edges`.

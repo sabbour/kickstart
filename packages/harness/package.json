@@ -1,0 +1,69 @@
+{
+  "name": "@kickstart/harness",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./runtime/catalog": {
+      "import": "./dist/runtime/catalog.js",
+      "types": "./dist/runtime/catalog.d.ts"
+    },
+    "./runtime/loader-agent": {
+      "import": "./dist/runtime/loader-agent.js",
+      "types": "./dist/runtime/loader-agent.d.ts"
+    },
+    "./runtime/loader-skill": {
+      "import": "./dist/runtime/loader-skill.js",
+      "types": "./dist/runtime/loader-skill.d.ts"
+    },
+    "./runtime/frontmatter": {
+      "import": "./dist/runtime/frontmatter.js",
+      "types": "./dist/runtime/frontmatter.d.ts"
+    },
+    "./runtime/registry": {
+      "import": "./dist/runtime/registry.js",
+      "types": "./dist/runtime/registry.d.ts"
+    },
+    "./runtime/session": {
+      "import": "./dist/runtime/session.js",
+      "types": "./dist/runtime/session.d.ts"
+    },
+    "./runtime/sse": {
+      "import": "./dist/runtime/sse.js",
+      "types": "./dist/runtime/sse.d.ts"
+    },
+    "./runtime/runner": {
+      "import": "./dist/runtime/runner.js",
+      "types": "./dist/runtime/runner.d.ts"
+    },
+    "./runtime/resume": {
+      "import": "./dist/runtime/resume.js",
+      "types": "./dist/runtime/resume.d.ts"
+    },
+    "./mcp/server": {
+      "import": "./dist/mcp/server.js",
+      "types": "./dist/mcp/server.d.ts"
+    },
+    "./mcp/client": {
+      "import": "./dist/mcp/client.js",
+      "types": "./dist/mcp/client.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+  },
+  "devDependencies": {
+    "typescript": "*"
+  },
+  "dependencies": {
+    "@openai/agents": "0.8.3",
+    "zod": "^4.1.12",
+    "yaml": "^2.8.1"
+  }
+}

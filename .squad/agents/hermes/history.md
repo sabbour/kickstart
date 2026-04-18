@@ -48,3 +48,54 @@ QA engineer and test infrastructure owner. Expertise in Playwright E2E testing, 
 - (2026-04-17) **`systemPrompt` call sites — 4, not 3:** When auditing call sites for `buildSystemPrompt()` (or any system-prompt builder), count them from `git grep` output before writing the DP. The actual count in this repo was **4** call sites (`agents-runner.ts`, `action.ts`, `chat-action.ts`, and one more). Stating an incorrect count in a DP causes a blocking condition from Leela.
 - (2026-04-17) **`agents-runner.ts` descope pattern:** When a backend file is being migrated or replaced (e.g., `agents-runner.ts` under the Agents SDK migration), explicitly note in the DP that it is a descope target and will not need the new feature wired in. Leela's condition was specifically that the DP must account for this call site even if only to document that it's intentionally excluded.
 - (2026-04-17) **DP approval-with-conditions blocking merge gate:** Both Leela and Zapp `approved-with-conditions` verdicts on a DP are blocking — implementation must address all listed conditions before opening the first implementation PR. Do not open PRs against a conditionally-approved DP without confirming condition closure.
+
+## 2026-04-17T12:06:45Z — Connector Execution Model ADR
+
+- **Connector execution research completed:** AzureARMConnector always proxies through `/api/arm-proxy` (CORS constraint). GitHubConnector splits: reads direct, writes proxied for token security.
+- **Known technical debt flagged:** `createPullRequest()` calls `api.github.com` directly — inconsistency to be addressed.
+- **Standing rule established:** Any new connector methods that write data MUST use the server proxy pattern.
+- **Decision filed:** `hermes-connector-execution-adr.md` merged to decisions.md.
+
+---
+
+## 2026-04-17 — #474 Step-1 Triage: `squad/474-step1-nuke-v1`
+
+**Working as:** Hermes (Tester + Observability)
+**Branch:** `squad/474-step1-nuke-v1`
+**Commit:** `2105148`
+
+### Baseline
+- Tests before triage: **373 passing, 12 failing** across 6 files (36 total)
+- Tests after fixes: **407 passing, 0 failing** across 37 files
+
+### Failure Categorization
+
+| # | Test(s) | Root Cause | Category | Fix |
+|---|---------|-----------|----------|-----|
+| 5 | `action.test.ts` — advance/skip/submit phase flow | Harness stub phase order wrong: Discover→**Assess**→Design (v2-rewrite has no Assess; order is Discover→**Design**) | **Step-1 regression** | Fixed: corrected Phase enum + PHASE_DEFINITIONS |
+| 3 | `action-endpoint.test.ts` — same phase flow | Same root cause as above | **Step-1 regression** | Fixed (same fix) |
+| 1 | `kickstart.test.ts` — system prompt non-empty | `buildSystemPrompt` stub returned `''` | **Step-1 regression** | Fixed: returns non-empty stub string |
+| 1 | `generate-manifests.test.ts` — DS011/DS012/DS013 present | `DEPLOYMENT_SAFEGUARDS` was `[]` in stub | **Step-1 regression** | Fixed: added DS001–DS013 data constants |
+| 1 | `session-store.test.ts` — setup generation hydration | `SETUP_GENERATION_STEP_ORDER` was `[]`; validation always failed | **Step-1 regression** | Fixed: populated with 5 real step IDs |
+| 2 | `cost-estimate.test.ts` — live pricing cache | `PricingConnector` stub missing `fetchRetailPrices`/`lookupVmPrice`; fallback to 'estimated' | **Step-1 regression** | Fixed: added methods with retry (mirrors v2-rewrite `maxRetries` config) |
+
+### Pre-existing failures
+None — all 12 failures were newly introduced by Step 1 stub gaps.
+
+### Intentionally deleted tests
+None identified — the test files exist but tested against the stub; no test files were deleted.
+
+### New smoke tests added
+**`packages/harness/src/__tests__/harness-exports.test.ts`** — 34 tests covering:
+- Module load (no undefined named exports)
+- Phase enum correctness (v2 order, no Assess, Handoff present)
+- PHASE_DEFINITIONS flow (Discover→Design→…→Deploy)
+- getPhaseDefinition real lookup
+- SETUP_GENERATION_STEP_ORDER completeness
+- DEPLOYMENT_SAFEGUARDS (DS011–DS013 present, required fields)
+- All runtime function stubs (return correct shapes)
+- All class stubs (instantiate, expected API surface)
+
+### Key decisions
+- `getPhaseDefinition` now delegates to `PHASE_DEFINITIONS` (was returning empty stub)
+- `PricingConnector` constructor accepts `{ retry: { maxRetries } }` to mirror call-site config; retry loop matches v2-rewrite BaseConnector behaviour so `fetchMock.toHaveBeenCalledTimes(3)` assertion holds

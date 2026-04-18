@@ -13,7 +13,7 @@ import { useSessions } from './hooks/useSessions';
 import { useNavigation } from './hooks/useNavigation';
 import type { NavState } from './hooks/useNavigation';
 import { useStreaming } from './hooks/useStreaming';
-import { useMockStreaming } from './hooks/useMockStreaming';
+// TODO(Step 5): useMockStreaming removed — mock mode deleted in Step 1
 import { useAPIConnectorRegistry } from './contexts/APIConnectorContext';
 import { useArtifacts } from './contexts/ArtifactContext';
 import { ConversationSessionProvider } from './contexts/ConversationSessionContext';
@@ -21,7 +21,8 @@ import { useTheme } from './contexts/ThemeContext';
 import { useDebug } from './contexts/DebugContext';
 import { useVirtualFS } from './contexts/VirtualFSContext';
 import { healthCheck } from './services/api-client';
-import { isMockMode, isPlaygroundMode } from './services/mock-streaming';
+// TODO(Step 5): mock-streaming removed — mock mode deleted in Step 1
+// isMockMode and isPlaygroundMode permanently return false
 import { VirtualFileSystem } from './services/virtual-fs';
 import {
   applyStepwiseSetupEvent,
@@ -39,8 +40,8 @@ import { summarizeTokenUsage } from './utils/chat-usage';
 import type { AppMode, ChatMessage, A2uiPayloadItem, ConversationPhaseId, SetupGenerationEvent } from './types';
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
-const mockEnabled = isMockMode();
-const playgroundEnabled = isPlaygroundMode();
+const mockEnabled = false; // TODO(Step 5): mock mode deleted in Step 1
+const playgroundEnabled = false; // TODO(Step 5): playground auth stub deleted in Step 1
 
 let msgSeq = 0;
 function msgId(role: string) {
@@ -80,7 +81,19 @@ export function App() {
   const a2ui = useA2UI({ actionHandler });
   const sessions = useSessions();
   const streaming = useStreaming();
-  const mockStreaming = useMockStreaming();
+  // TODO(Step 5): mockStreaming removed — use real streaming only
+  const mockStreaming: {
+    isStreaming: boolean;
+    streamText: string;
+    send: (text: string, sessionId: string | undefined, callbacks: {
+      onChunk?: (t: string) => void;
+      onA2UI?: (payload: A2uiPayloadItem[]) => void;
+      onSetupEvent?: (event: SetupGenerationEvent) => void;
+      onPhase?: (phase: string) => void;
+      onComplete?: (fullText: string, model?: string) => void;
+      onError?: (error: string) => void;
+    }) => void;
+  } = { isStreaming: false, streamText: '', send: () => {} };
   const progressiveQueue = useProgressiveQueue();
 
   // Single VFS instance for the app lifetime
@@ -484,7 +497,7 @@ export function App() {
     // Use mock streaming when ?mock is active, real streaming otherwise
     if (mockEnabled) {
       mockStreaming.send(text, sessionId, {
-        onDelta: () => {},
+        onChunk: () => {},
         onA2UI: handleIncomingA2UI,
         onSetupEvent: handleIncomingSetupEvent,
         onPhase: (phase) => setConversationPhase(phase),
@@ -552,7 +565,7 @@ export function App() {
       const backendSessionId = activeSession?.backendSessionId;
       
       streaming.send(text, backendSessionId, {
-        onDelta: () => {},
+        onChunk: () => {},
         onA2UI: handleIncomingA2UI,
         onSetupEvent: handleIncomingSetupEvent,
         onPhase: (phase) => setConversationPhase(phase),

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { handleAction } from "../tools/action.js";
-import type { SessionState } from "@kickstart/core";
-import { Phase, getPhaseDefinition } from "@kickstart/core";
+import type { SessionState } from "@kickstart/harness";
+import { Phase, getPhaseDefinition } from "@kickstart/harness";
 
 /** Create a minimal session at a given phase for action testing. */
 function createSessionAtPhase(sessionId: string, phase: Phase): SessionState {

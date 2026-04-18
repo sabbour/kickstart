@@ -10,7 +10,7 @@ import {
   generateKubernetesManifests,
   generateGitHubActionsWorkflow,
   DEPLOYMENT_SAFEGUARDS,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 import type {
   SessionState,
   AppDefinition,
@@ -24,7 +24,7 @@ import type {
   CardComponent,
   TextComponent,
   RowComponent,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 import { createA2UIResource } from "../a2ui.js";
 import type { A2UICapability } from "../a2ui.js";
 

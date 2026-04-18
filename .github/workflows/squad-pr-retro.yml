@@ -6,77 +6,27 @@ name: Squad · PR Retro
 on:
   pull_request:
     types: [closed]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: 'PR number to backfill retro entry for'
-        required: true
-        type: string
 
 permissions:
   contents: write
   pull-requests: write
 
-concurrency:
-  group: squad-pr-retro-log-${{ github.event.pull_request.number || inputs.pr_number }}
-  cancel-in-progress: false
-
 jobs:
   retro:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.pull_request.labels.*.name, 'retro-log') }}
     steps:
-      - name: Generate squad app token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: 3414032
-          private-key: ${{ secrets.SQUAD_SCRIBE_APP_PRIVATE_KEY }}
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compute metrics
         id: metrics
         uses: actions/github-script@v7
         with:
           script: |
-            let pr;
-            if (context.eventName === 'workflow_dispatch') {
-              const prNumberInput = context.payload.inputs.pr_number;
-              const prNumber = parseInt(prNumberInput, 10);
-              if (Number.isNaN(prNumber)) {
-                throw new Error(`Invalid workflow_dispatch input "pr_number": "${prNumberInput}". Expected a numeric pull request number.`);
-              }
-              const { data } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: prNumber,
-              });
-              pr = data;
-              pr.merged = pr.merged_at != null;
-            } else {
-              pr = context.payload.pull_request;
-            }
-            if (pr.state === 'open') {
-              throw new Error(
-                `PR #${pr.number} is not closed yet (state: ${pr.state}). Retro metrics can only be generated for closed or merged pull requests.`
-              );
-            }
-
-            // Skip metadata/bot PRs — only log "work" PRs
-            const SKIP_PREFIXES = ['scribe:', 'chore(deps):', 'chore(deps-dev):', 'chore(retro-log):'];
-            const isMetadata = SKIP_PREFIXES.some(p => (pr.title ?? '').startsWith(p));
-            if (isMetadata) {
-              core.setOutput('skip', 'true');
-              core.warning(`Skipping metadata PR #${pr.number}: "${pr.title}"`);
-              return;
-            }
-            core.setOutput('skip', 'false');
-
+            const pr = context.payload.pull_request;
             const title = (pr.title || '').replace(/"/g, "'");
             const author = pr.user?.login ?? 'unknown';
             const changed = (pr.additions ?? 0) + (pr.deletions ?? 0);
@@ -126,90 +76,43 @@ jobs:
               : 'closed';
 
             const date = closedAt.toISOString().slice(0, 10);
-            const prUrl = pr.html_url;
-            const line = `| ${date} | [#${pr.number}](${prUrl}) | ${title} | ${size} | ${implMin}m | ${reviewMin}m | ${cycles} | ${outcome} | @${author} |`;
+            const line = `- ${date} | #${pr.number} "${title}" | ${size} | impl=${implMin}m | review=${reviewMin}m | cycles=${cycles} | ${outcome} | @${author}`;
 
             core.setOutput('line', line);
             core.setOutput('pr', String(pr.number));
-            core.setOutput('base_ref', 'main');
 
       - name: Append to retro log (as Scribe)
-        if: steps.metrics.outputs.skip != 'true'
         env:
           LINE: ${{ steps.metrics.outputs.line }}
-          PR_NUM: ${{ steps.metrics.outputs.pr }}
         run: |
           set -e
-          MARKER="<!-- entries below this line, newest at top -->"
+          mkdir -p .squad
+          touch .squad/retro-log.md
+          # Insert the new line directly after the entries marker
+          awk -v line="$LINE" '
+            /^<!-- entries below this line, newest at top -->$/ {
+              print
+              print ""
+              print line
+              next
+            }
+            { print }
+          ' .squad/retro-log.md > .squad/retro-log.md.new
+          mv .squad/retro-log.md.new .squad/retro-log.md
 
-          git config user.name "sabbour-squad-scribe[bot]"
-          git config user.email "sabbour-squad-scribe[bot]@users.noreply.github.com"
+          git config user.name "squad-scribe[bot]"
+          git config user.email "scribe@squad.local"
+          git add .squad/retro-log.md
+          if git diff --cached --quiet; then
+            echo "No retro-log changes to commit (duplicate event?)"
+            exit 0
+          fi
+          git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]
 
-          MAX_RETRIES=3
-          for attempt in $(seq 1 $MAX_RETRIES); do
-            git fetch origin main
-            git checkout main
-            git reset --hard origin/main
-
-            # Idempotency: skip if already logged (handles retries and duplicate events)
-            if grep -qF "#${PR_NUM}" .squad/retro-log.md 2>/dev/null; then
-              echo "Entry for #${PR_NUM} already in retro-log — skipping"
-              exit 0
-            fi
-
-            # Fail clearly if marker is missing (misconfigured file)
-            if ! grep -qF "${MARKER}" .squad/retro-log.md; then
-              echo "ERROR: marker '${MARKER}' not found in .squad/retro-log.md"
-              exit 1
-            fi
-
-            awk -v line="$LINE" \
-              'BEGIN{inserted=0} /^\|[-| ]+\|$/ && !inserted { print; print line; inserted=1; next } { print }' \
-              .squad/retro-log.md > .squad/retro-log.md.new
-            mv .squad/retro-log.md.new .squad/retro-log.md
-
-            git add .squad/retro-log.md
-            if git diff --cached --quiet; then
-              echo "No changes after insert — skipping"
-              exit 0
-            fi
-            git commit -m "chore(retro-log): #${PR_NUM} [scribe]"
-
-            # Rebase on origin/main — merge=union in .gitattributes resolves
-            # concurrent retro entries automatically (no manual conflict handling needed)
-            if ! git pull --rebase origin main; then
-              git rebase --abort
-              echo "Rebase failed on attempt ${attempt}, retrying from scratch..."
-              sleep $((attempt * 2))
-              continue
-            fi
-
-            # Push — retry only on non-fast-forward; fail fast on auth/permission errors
-            # set +e to prevent set -e from exiting before we can inspect the result
-            set +e
-            git push origin HEAD:main > /tmp/push_out 2>&1
-            PUSH_EXIT=$?
-            set -e
-            PUSH_OUT=$(cat /tmp/push_out)
-            echo "$PUSH_OUT"
-            if [ $PUSH_EXIT -eq 0 ]; then
-              echo "Push succeeded on attempt ${attempt}"
-              exit 0
-            fi
-            if echo "$PUSH_OUT" | grep -qE "non-fast-forward|rejected"; then
-              echo "Non-fast-forward on attempt ${attempt}, retrying..."
-              sleep $((attempt * 2))
-              continue
-            fi
-            echo "Push failed with non-retryable error — aborting"
-            exit 1
-          done
-
-          echo "ERROR: Failed to push after ${MAX_RETRIES} attempts"
-          exit 1
+Working as Scribe — see .squad/agents/scribe/charter.md"
+          git push
 
       - name: Mirror line as PR comment
-        if: steps.metrics.outputs.skip != 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -218,16 +121,15 @@ jobs:
               '**Working as Scribe** · see `.squad/agents/scribe/charter.md`',
               '',
               '### Retro entry',
-              '',
-              '| Date | PR | Title | Size | Impl | Review | Cycles | Outcome | Author |',
-              '|------|-----|-------|------|------|--------|--------|---------|--------|',
+              '```',
               line,
+              '```',
               '',
               'Appended to `.squad/retro-log.md`. Used by the daily and weekly pulse.',
             ].join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: parseInt('${{ steps.metrics.outputs.pr }}', 10),
+              issue_number: context.payload.pull_request.number,
               body,
             });

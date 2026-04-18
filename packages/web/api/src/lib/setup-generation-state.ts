@@ -1,10 +1,10 @@
-import { SETUP_GENERATION_STEP_ORDER } from "@kickstart/core";
+import { SETUP_GENERATION_STEP_ORDER } from "@kickstart/harness";
 import type {
   SetupGenerationRunState,
   SetupGenerationSnapshot,
   SetupGenerationStepId,
   SetupGenerationStepState,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 
 export function isValidSetupGenerationSnapshot(
   value: unknown,

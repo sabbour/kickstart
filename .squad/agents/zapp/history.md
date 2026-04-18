@@ -13,6 +13,7 @@
 - 2026-04-10: `/api/converse` currently exposes full system prompts to clients on new sessions; treat system prompts as sensitive control-plane data.
 - 2026-04-10: Security hardening backlog now tracked in Security milestone issues #81-#88 with severity and OWASP mapping.
 - 2026-04-10: DP #30 (IntegrationKit lifecycle/dependency/auth extension) approved with conditions requiring transactional lifecycle rollback, cycle detection on re-registration, explicit auth schema validation, and documented trusted-kit boundary.
+- 2026-04-17T12:06:45.293Z: For delete-first migrations like #474 Step 1, a temporary package-boundary compatibility seam is acceptable only as compile-time scaffolding; it must stay behavior-free, preserve existing auth/secret trust boundaries, and be removed once imports are rewired.
 
 ## Round 5: Multi-Round Security Reviews
 
@@ -104,3 +105,43 @@ All 4 critical security conditions from issue #445 acceptance criteria:
 - Integration with DP #329 + #330 security review validated
 
 **Consequence:** Unblocks merge when Leela approval also present (verified as received).
+
+## 2026-04-17T12:06:45Z — #474 DP Review + v2 Security Architecture Review
+
+- **#474 DP review:** APPROVE_WITH_CONDITIONS. Standard seam-cutting conditions; playground stubs must be gated behind `KICKSTART_PLAYGROUND`.
+- **v2 security architecture review (#473):** APPROVED WITH CONDITIONS. 10 conditions total.
+  - 5 Critical (before Step 5): SSRF/fetch_webpage URL denylist, path traversal/write_file workspace prefix, resume handler OID ownership, resume resultSchema validation, playground stub fail-closed gate.
+  - 3 High (before Step 7/12): ARM path injection Zod regex, MCP auth documented, MCP UserAction architectural separation confirmed.
+  - 6 Medium: secrets detection, PII detection, A2UI guardrail scope, token budget ceiling, CSP audit, CSRF.
+- **MCP UserAction resolution:** UserActions are NOT MCP tools. MCP client detects `user_action_required` and POSTs directly to `/api/converse/resume`. Residual conditions #3 and #4 (OID ownership + resultSchema) cover MCP-originated resume calls equally.
+- **Decision filed:** `zapp-v2-security-review.md` merged to decisions.md.
+
+## Wave 3 — 2026-04-17 Security Reviews Filed
+
+### #474 Step 1 Shim Security (APPROVE_WITH_CONDITIONS)
+- Seam is compile-only and time-bounded; no new exports/fallback logic.
+- Delete v1 helpers fail-closed — no silent fallback to demo, mock, or legacy paths.
+- All v1 feature flags removed entirely.
+- Secret/auth trust boundaries must not move client-side during preservation work.
+- Step 1 merge requires proof: deleted imports gone, preserved packages did not gain broader runtime access.
+
+### Kickstart App Hotspot Hardening
+- Resolve parent target origin before messaging; reject messages unless `event.source === window.parent` and `event.origin` matches trusted parent.
+- Replace schema-driven `innerHTML` rendering with explicit DOM construction + URL allowlisting.
+- Dynamic renderer dispatch validated with allowlisted own-property check before invocation.
+- Decision filed as `zapp-kickstart-app-hotspot-hardening.md`.
+
+### #475 Harness Types (APPROVE_WITH_CONDITIONS)
+- `AgentOutput` must reject unknown fields; `intent` is closed enum.
+- A2UI union enforces one-and-only-one operation key; hybrid messages fail outright.
+- `SessionCtx` narrowed/redacted; credential access capability-scoped.
+- CI/static checks enforce compile-only boundary; dynamic code-loading primitives rejected.
+- Catalog validation remains a mandatory second gate at runtime.
+
+### #476 Registry + Loaders (APPROVE_WITH_CONDITIONS)
+- Pack-owned names only; namespace squatting prevented by name validation at index time.
+- Dependency-scoped reference resolution; only canonical `:` names valid in frontmatter.
+- Frontmatter parser: safe YAML only, no custom tags/functions, bounded aliases/size.
+- Loader path confinement: `realpath` canonicalization, symlink escape rejected.
+- Registry sealed after `seal()` — exported views frozen; concurrent lifecycle misuse fails closed.
+- Cycle detection: bounded iterative DFS or Kahn algorithm.

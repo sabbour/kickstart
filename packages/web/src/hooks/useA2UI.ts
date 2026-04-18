@@ -1,11 +1,23 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { MessageProcessor, Catalog } from '../vendor/a2ui/web_core/index';
-import { kickstartCatalog } from '../catalog/kickstart-catalog';
+import { MessageProcessor } from '../vendor/a2ui/web_core/index';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
 import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
 import type { A2uiClientAction } from '../vendor/a2ui/web_core/schema/client-to-server';
 import type { A2uiMsg } from '../types';
 import type { ActionHandler } from './useActionDispatch';
+import {
+  clientRegistry,
+  KICKSTART_CATALOG_ID,
+  validateAndSanitizeComponents,
+} from '../contexts/A2UIRegistryContext';
+
+// Registry-driven catalog — built from the sealed clientRegistry.
+// clientRegistry.seal() must have been called in main.tsx before React mounts.
+// Calling buildCatalog() here (module-level) is safe: this module is only
+// evaluated after React starts mounting, which is after seal().
+function getKickstartCatalog() {
+  return clientRegistry.isSealed ? clientRegistry.buildCatalog() : null;
+}
 
 export interface A2UIOptions {
   /** Handler invoked when any A2UI component fires an action event. */
@@ -31,8 +43,10 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   handlerRef.current = options.actionHandler;
 
   if (!processorRef.current) {
+    const catalog = getKickstartCatalog();
+    const catalogs = catalog ? [catalog] : [];
     const proc = new MessageProcessor<ReactComponentImplementation>(
-      [kickstartCatalog as Catalog<ReactComponentImplementation>],
+      catalogs,
       (action: A2uiClientAction) => {
         if (handlerRef.current) {
           handlerRef.current(action);
@@ -86,12 +100,29 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
 
   const processMessages = useCallback((msgs: A2uiMsg[]): string[] => {
     const surfaceIds: string[] = [];
-    for (const msg of msgs) {
-      if (msg.createSurface) {
-        surfaceIds.push(msg.createSurface.surfaceId);
+
+    // Pre-render validation (Zapp Crit1 / Phase B):
+    // Validate and sanitize component props before they reach the A2UI processor.
+    const safeMessages = msgs.map(msg => {
+      if (msg.updateComponents) {
+        const rawComponents = msg.updateComponents.components as Array<Record<string, unknown>>;
+        const validated = clientRegistry.isSealed
+          ? validateAndSanitizeComponents(rawComponents, clientRegistry)
+          : rawComponents;
+        return { ...msg, updateComponents: { ...msg.updateComponents, components: validated } };
       }
-    }
-    processor.processMessages(msgs as any);
+      if (msg.createSurface) {
+        // Force all surfaces to use our catalog ID
+        surfaceIds.push(msg.createSurface.surfaceId);
+        return {
+          ...msg,
+          createSurface: { ...msg.createSurface, catalogId: KICKSTART_CATALOG_ID },
+        };
+      }
+      return msg;
+    });
+
+    processor.processMessages(safeMessages as any);
     return surfaceIds;
   }, [processor]);
 

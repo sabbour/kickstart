@@ -753,3 +753,25 @@ Addressed Copilot review on PR #78 (data→context terminology fix). PR merged s
 - **Decision:** ToolContext.fileSystem is optional because web-only contexts don't have real filesystems.
 - **Test count:** 41 new tests (574 total), all passing. Build clean.
 - **Key files:** packages/core/src/filesystem/types.ts, in-memory-provider.ts, cloud-shell-provider.ts, registry.ts, tools/fs-*.ts
+
+---
+
+## ARCHIVED 2026-04-17 (Scribe summarization — bender history exceeded 15 KB)
+
+### Round 5: Multi-Round DP Cycle (#186) + Implementation (2026-04-14)
+Updated DP #186 through 3 rounds addressing Zapp security concerns. Implemented public Copilot skills: 10 files, 60 tests, PR #227. Key: immutable pinning, prompt-injection checks, zero-network runtime loader, policy scanner.
+
+### 2026-04-14 Round 2: Infrastructure + Bug Fixes
+PR #213 (missing choice components fix). SWA automation (continuous deployment + version-SHA footer, PR #177). Project board auto-assignment workflow.
+
+### 2026-04-15 Learnings (Archived)
+Unified narrative prompts, auto-continue via filesComplete, artifact summary injection, WSL file-edit loss on branch switch, Azure Functions v4 startup file loading, `bicep-node` must stay external in ESM bundle.
+
+### 2026-04-15 Backend Model Routing
+`converse-model-router.ts`: only trusted server-owned `Generate` turns use `AZURE_OPENAI_CODEX_DEPLOYMENT`; all other phases stay on chat deployment. `usage-tracking.ts` must follow router pricing group. Client rehydration must not escalate backend model choice.
+
+### 2026-04-16 FSM Removal Completion (PR #385)
+Deleted `machine.ts`, `phases.ts`, FSM test suite. Replaced with `ConversationState.currentPhase` + linear `advancePhase()` using `PHASE_DEFINITIONS.nextPhase`. ~40% state boilerplate reduction. Pattern: position-based phase status from order index.
+
+### 2026-04-16 Sprint Retro — Security + Generation Sprint
+Merged: #369 (serialize-javascript CVSS 8.1 fix), #373 (26 CodeQL alerts), #375 (hono/follow-redirects), #371 (crypto.randomUUID), auth handler fix. Learnings: `BaseConnector.isAuthenticated()` returns true for `auth: { kind: 'none' }`; all `useA2UI()` calls must supply an actionHandler.

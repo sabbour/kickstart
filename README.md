@@ -10,26 +10,23 @@ Kickstart helps developers go from "I have an app" to "it's running on Azure" th
 
 ## Features
 
-- **AI-guided landing page** — Track cards, framework pills, and an ✨ inspiration button that generates app ideas via AI
-- **A2UI component system** — 16 custom components + Fluent UI 2 styled vendor catalog, rendered from structured JSON returned by the LLM
-- **Component playground** — Interactive sidebar-navigated demo surface (https://kickstart.aks.azure.sabbour.me/?playground) for exploring A2UI components, scenarios, and questionnaire flows
-- **Fat A2UI components** — Azure and GitHub login cards, resource pickers, and action buttons with real API integration, in-memory token storage, and operation allowlisting
-- **LLM function calling** — Tool system enables the LLM to directly query Azure resources, GitHub repos, and web content
-- **ServiceConnector & ServicePack patterns** — Declarative auth requirements, kit lifecycle hooks, and dependency validation for seamless Azure/GitHub integration
-- **CORS proxy security** — Private IP filtering, redirect validation, and hostname allowlisting for safe cross-origin API calls
-- **Action system** — Unified button action pipeline with `/api/action` endpoint for component-driven interactions
-- **Azure Functions API** — Streaming conversation proxy, code generation (Codex), CORS proxies for ARM/GitHub/Pricing APIs
+- **Harness + packs architecture** — domain-agnostic runtime (`@kickstart/harness`) + domain packs (`pack-core`, `pack-azure`, `pack-aks-automatic`, `pack-github`)
+- **A2UI component system** — Fluent UI 2 styled components rendered from structured JSON emitted by agents via `core.emit_ui`
+- **Component playground** — Interactive demo surface for exploring A2UI components, scenarios, and questionnaire flows
+- **Azure and GitHub integration** — Login cards, resource pickers, and action buttons with real API integration via UserAction pause/resume
+- **`@openai/agents` SDK** — Agents call tools; UserActions pause the runner for browser-side interactions (MSAL popup, GitHub OAuth, etc.)
+- **Guardrails engine** — Cross-cutting checks at input, tool-call, and output stages contributed by packs
 - **MCP server** — IDE integration for VS Code Copilot and Claude Code via `@kickstart/mcp-server`
-- **Monorepo** — `packages/core` (engine), `packages/web` (React 19 + Vite 6), `packages/mcp-server` (MCP tools)
+- **Monorepo** — `packages/harness` (runtime), `packages/pack-*` (domain packs), `packages/web` (React 19 + Vite 6), `packages/mcp-server`
 
-## Two Surfaces, One Engine
+## Two Surfaces, One Harness
 
 | Surface | How it works | LLM |
 |---------|-------------|-----|
 | **Web Portal** | Azure Static Web Apps with a Copilot-style chat panel | Azure OpenAI (hosted) |
 | **IDE (MCP)** | MCP server for VS Code and Claude Code | User's own LLM |
 
-Both surfaces share `@kickstart/core` — the conversation engine, A2UI component catalog, prompt system, and code generators.
+Both surfaces use `@kickstart/harness` — the pack registry, Runner, SSE adapter, and session management.
 
 ## Quick Start
 

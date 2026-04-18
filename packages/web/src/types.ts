@@ -1,101 +1,19 @@
-// Shared TypeScript types for the Kickstart chat application
+// Web-client view-model types.
+//
+// These are *frontend* types used by React components, hooks, and utils.
+// They are deliberately decoupled from the harness-side runtime types —
+// the harness transmits JSON payloads that the web client adapts into
+// view models declared here.
 
-/** A logged action dispatch event for debug visibility. */
-export interface ActionDebugEvent {
-  /** Timestamp (ms) when the action was dispatched. */
-  timestamp: number;
-  /** A2UI action name (e.g. "pick-runtime", "navigate:plan"). */
-  actionName: string;
-  /** Routing category determined by useActionDispatch. */
-  category: string;
-  /** The event.context payload sent back to the LLM. */
-  context: Record<string, unknown>;
-  /** The natural-language message synthesised from the action. */
-  outboundMessage: string;
-}
+// ---------------------------------------------------------------------------
+// App shell
+// ---------------------------------------------------------------------------
 
-export interface DebugMetadata {
-  /** Model name used for this response (e.g., "gpt-4o"). */
-  model?: string;
-  /** Raw LLM response text before rendering. */
-  rawResponse?: string;
-  /** Full JSON envelope content before message extraction. */
-  rawContent?: string;
-  /** Complete structured envelope: text + all A2UI messages received for this turn. */
-  fullEnvelope?: {
-    message?: string;
-    a2ui?: A2uiPayloadItem[];
-    model?: string;
-    phase?: string;
-    usage?: TokenUsageSummary;
-  };
-  /** System prompt used for this LLM call (truncated at 8 KB). */
-  systemPrompt?: string;
-}
+export type AppMode = 'landing' | 'chat' | 'playground';
 
-export interface SetupStepStartEvent {
-  type: 'step_start';
-  stepId: string;
-  label: string;
-  sequence: number;
-}
-
-export interface SetupFileGeneratedEvent {
-  type: 'file_generated';
-  stepId: string;
-  path: string;
-  language: string;
-  content?: string;
-  byteLength: number;
-  sha256: string;
-}
-
-export interface SetupStepCompleteEvent {
-  type: 'step_complete';
-  stepId: string;
-  filesCount: number;
-  totalBytes: number;
-}
-
-export interface SetupStepErrorEvent {
-  type: 'step_error';
-  stepId: string;
-  code: 'codex_timeout' | 'codex_error' | 'validation_failed' | 'quota_exceeded' | 'connection_interrupted' | string;
-  message: string;
-  recoverable: boolean;
-}
-
-export type SetupGenerationEvent =
-  | SetupStepStartEvent
-  | SetupFileGeneratedEvent
-  | SetupStepCompleteEvent
-  | SetupStepErrorEvent;
-
-export type UsageCostStatus = 'estimated' | 'unavailable';
-
-export interface TokenUsageSnapshot {
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  recordedAt: string;
-  estimatedCostUsd?: number;
-  costStatus: UsageCostStatus;
-}
-
-export interface SessionUsageTotals {
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  turnCount: number;
-  estimatedCostUsd?: number;
-  costStatus: UsageCostStatus;
-}
-
-export interface TokenUsageSummary {
-  turn: TokenUsageSnapshot;
-  session: SessionUsageTotals;
-}
+// ---------------------------------------------------------------------------
+// Conversation phases
+// ---------------------------------------------------------------------------
 
 export type ConversationPhaseId =
   | 'discover'
@@ -105,98 +23,211 @@ export type ConversationPhaseId =
   | 'handoff'
   | 'deploy';
 
-export interface ConversationPhaseStep {
-  id: string;
-  label: string;
-  status: 'pending' | 'active' | 'complete';
+// ---------------------------------------------------------------------------
+// A2UI view-model types
+//
+// The harness emits A2UI v0.9 messages plus occasional inline ConversationPhase
+// components. The renderer treats anything with a `version: 'v0.9'` envelope or
+// a `type: 'ConversationPhase'` descriptor as an A2UI payload item.
+// ---------------------------------------------------------------------------
+
+export interface A2uiComponent {
+  id?: string;
+  component?: string;
+  type?: string;
+  [key: string]: unknown;
 }
 
-export interface ConversationPhasePayload {
-  type: 'ConversationPhase';
-  id: string;
-  phases: ConversationPhaseStep[];
-  currentPhase: string;
+export interface A2uiCreateSurfaceMsg {
+  version: 'v0.9';
+  createSurface: {
+    surfaceId: string;
+    catalogId: string;
+    theme?: unknown;
+    sendDataModel?: boolean;
+  };
+  updateComponents?: undefined;
+  updateDataModel?: undefined;
+  deleteSurface?: undefined;
 }
+
+export interface A2uiUpdateComponentsMsg {
+  version: 'v0.9';
+  createSurface?: undefined;
+  updateComponents: {
+    surfaceId: string;
+    components: A2uiComponent[];
+  };
+  updateDataModel?: undefined;
+  deleteSurface?: undefined;
+}
+
+export interface A2uiUpdateDataModelMsg {
+  version: 'v0.9';
+  createSurface?: undefined;
+  updateComponents?: undefined;
+  updateDataModel: {
+    surfaceId: string;
+    path?: string;
+    value?: unknown;
+  };
+  deleteSurface?: undefined;
+}
+
+export interface A2uiDeleteSurfaceMsg {
+  version: 'v0.9';
+  createSurface?: undefined;
+  updateComponents?: undefined;
+  updateDataModel?: undefined;
+  deleteSurface: {
+    surfaceId: string;
+  };
+}
+
+export type A2uiMsg =
+  | A2uiCreateSurfaceMsg
+  | A2uiUpdateComponentsMsg
+  | A2uiUpdateDataModelMsg
+  | A2uiDeleteSurfaceMsg;
+
+/**
+ * A raw payload item as persisted or streamed from the server. Either an A2UI
+ * v0.9 message envelope or a standalone ConversationPhase descriptor (legacy
+ * v1-compat shape still emitted for phase tracking).
+ */
+export type A2uiPayloadItem =
+  | A2uiMsg
+  | {
+      type: 'ConversationPhase';
+      id?: string;
+      currentPhase?: string;
+      phases?: Array<{ id: string; label: string; status: string }>;
+    };
+
+// ---------------------------------------------------------------------------
+// Stepwise setup events (v1-compat, may still arrive during migration)
+// ---------------------------------------------------------------------------
+
+export type SetupGenerationEvent =
+  | {
+      type: 'step_start';
+      stepId: string;
+      label: string;
+      sequence: number;
+    }
+  | {
+      type: 'file_generated';
+      stepId: string;
+      path: string;
+      language?: string;
+      byteLength?: number;
+      sha256: string;
+      content?: string;
+    }
+  | {
+      type: 'step_complete';
+      stepId: string;
+      filesCount: number;
+      totalBytes: number;
+    }
+  | {
+      type: 'step_error';
+      stepId: string;
+      code: string;
+      message: string;
+      recoverable: boolean;
+    };
+
+// ---------------------------------------------------------------------------
+// Token usage tracking
+// ---------------------------------------------------------------------------
+
+export type CostStatus = 'estimated' | 'unavailable';
+
+export interface TurnUsage {
+  model?: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  recordedAt?: string;
+  estimatedCostUsd?: number;
+  costStatus: CostStatus;
+}
+
+export interface SessionUsageTotals {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  turnCount: number;
+  estimatedCostUsd?: number;
+  costStatus: CostStatus;
+}
+
+export interface TokenUsageSummary {
+  turn: TurnUsage;
+  session: SessionUsageTotals;
+}
+
+// ---------------------------------------------------------------------------
+// Debug
+// ---------------------------------------------------------------------------
+
+export interface DebugMetadata {
+  model?: string;
+  systemPrompt?: string;
+  rawResponse?: string;
+  rawContent?: string;
+  fullEnvelope?: {
+    message?: string;
+    model?: string;
+    a2ui?: A2uiPayloadItem[];
+    usage?: TokenUsageSummary;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export interface ActionDebugEvent {
+  actionName: string;
+  category: string;
+  context: Record<string, unknown>;
+  outboundMessage: string;
+  timestamp: number;
+}
+
+// ---------------------------------------------------------------------------
+// Chat message view model
+// ---------------------------------------------------------------------------
+
+export type ChatRole = 'user' | 'assistant';
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: ChatRole;
   text: string;
-  surfaceIds?: string[];
-  phase?: string;
   model?: string;
-  timestamp: number;
-  isStreaming?: boolean;
-  /** When true, this message was auto-generated by the auto-continue middleware (not typed by the user). */
-  isAutoContinue?: boolean;
-  /** Debug metadata captured when debug mode is active. */
-  debugInfo?: DebugMetadata;
-  /** Raw A2UI messages that produced the surfaces for this message (used to rehydrate on reload). */
+  phase?: ConversationPhaseId | string | null;
+  timestamp?: number;
   a2uiMessages?: A2uiPayloadItem[];
-  /** Persisted stepwise setup stream metadata for workspace/progress rehydration. */
   setupEvents?: SetupGenerationEvent[];
-  /** Token usage captured for this assistant turn. */
-  usage?: TokenUsageSnapshot;
+  surfaceIds?: string[];
+  isAutoContinue?: boolean;
+  debugInfo?: DebugMetadata;
+  /** Per-turn usage. The session-wide summary is derived via summarizeTokenUsage. */
+  usage?: TurnUsage;
 }
+
+// ---------------------------------------------------------------------------
+// Session (frontend persistence model — keyed off localStorage)
+// ---------------------------------------------------------------------------
 
 export interface Session {
   id: string;
   title: string;
   messages: ChatMessage[];
+  currentPhase?: ConversationPhaseId | null;
   createdAt: number;
   updatedAt: number;
+  /** Server-side conversation session id. Set after the first /api/converse response. */
   backendSessionId?: string;
 }
-
-export type AppMode = 'landing' | 'chat';
-
-export interface DemoResponse {
-  text: string;
-  a2uiMessages: A2uiMsg[];
-  phase: string;
-  model?: string;
-  typingDelay?: number;
-}
-
-export interface A2uiMsg {
-  version: 'v0.9';
-  createSurface?: {
-    surfaceId: string;
-    catalogId: string;
-  };
-  updateComponents?: {
-    surfaceId: string;
-    components: A2uiComponent[];
-  };
-  deleteSurface?: {
-    surfaceId: string;
-  };
-  updateDataModel?: {
-    surfaceId: string;
-    path: string;
-    value: unknown;
-  };
-}
-
-export interface A2uiComponent {
-  id: string;
-  component: string;
-  [key: string]: unknown;
-}
-
-export type A2uiPayloadItem = A2uiMsg | ConversationPhasePayload;
-
-export interface StreamEvent {
-  error?: string;
-  delta?: string;
-  content?: string;
-  a2ui?: A2uiPayloadItem[];
-  phase?: string;
-  model?: string;
-  sessionId?: string;
-  usage?: TokenUsageSummary;
-  /** A single stepwise setup event emitted during file generation. */
-  setup_event?: SetupGenerationEvent;
-}
-
-

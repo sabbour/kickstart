@@ -1,9 +1,7 @@
 name: Squad · Weekly Pulse
 
-# Every Monday at 17:00 Pacific, Scribe opens a fresh issue summarising
+# Every Monday at 17:00 Pacific, Scribe opens a fresh Discussion summarising
 # the prior 7 days. Cron UTC: 00:00 Tuesday UTC = Monday 17:00 PDT.
-# Discussions were considered but issues are easier to triage and convert
-# into follow-up `process` issues, so the artifact is an issue.
 
 on:
   schedule:
@@ -13,6 +11,7 @@ on:
 permissions:
   contents: read
   issues: write
+  discussions: write
 
 jobs:
   weekly:
@@ -37,16 +36,10 @@ jobs:
               return m && new Date(m[1]).getTime() >= weekStart.getTime();
             });
 
-            // Compute aggregates from the structured outcome column only,
-            // so PR titles containing words like "merged" or "closed" do not
-            // get double-counted.
-            const outcomes = weekLines
-              .map(l => l.match(/\| (merged|closed|merged-with-rework) \| @/))
-              .filter(Boolean)
-              .map(m => m[1]);
-            const merged = outcomes.filter(o => o === 'merged' || o === 'merged-with-rework').length;
-            const closed = outcomes.filter(o => o === 'closed').length;
-            const rework = outcomes.filter(o => o === 'merged-with-rework').length;
+            // Compute aggregates
+            const merged = weekLines.filter(l => /merged/.test(l)).length;
+            const closed = weekLines.filter(l => /\| closed \|/.test(l)).length;
+            const rework = weekLines.filter(l => /merged-with-rework/.test(l)).length;
 
             const reviewTimes = weekLines
               .map(l => l.match(/review=(\d+)m/))
@@ -89,7 +82,7 @@ jobs:
             core.setOutput('body', body);
             core.setOutput('title', `Weekly Pulse · ${new Date().toISOString().slice(0, 10)}`);
 
-      - name: Open weekly pulse issue
+      - name: Open weekly pulse as issue (fallback if Discussions unavailable)
         uses: actions/github-script@v7
         env:
           TITLE: ${{ steps.build.outputs.title }}

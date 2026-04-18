@@ -16,7 +16,7 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import type { AzureARMConnector } from "@kickstart/core";
+import type { AzureARMConnector } from "@kickstart/harness";
 import { useAPIConnector } from "../../contexts/APIConnectorContext";
 import {
   getGitHubSession,
@@ -30,11 +30,10 @@ import {
   signOutAzure,
   type AzureAuthSessionState,
 } from "../../services/azure-auth";
-import {
-  createAzureStubSession,
-  createGitHubStubSession,
-  shouldUsePlaygroundAuthStub,
-} from "../../services/playground-auth-stub";
+// TODO(Step 7/9): playground-auth-stub removed in Step 1 — stubs always return false/undefined
+const createAzureStubSession = (_connected: boolean): AzureAuthSessionState => ({ authenticated: false, configured: false, subscriptions: [] });
+const createGitHubStubSession = (_connected: boolean): GitHubSessionState => ({ authenticated: false, configured: false, owners: [] });
+const shouldUsePlaygroundAuthStub = (): false => false;
 
 const AuthCardApi = {
   name: "AuthCard",

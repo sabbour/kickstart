@@ -5,7 +5,7 @@
  * Defines the message format between the sandboxed iframe and the MCP server.
  */
 
-import type { SessionState } from "@kickstart/core";
+import type { SessionState } from "@kickstart/harness";
 import { handleKickstart } from "../tools/kickstart.js";
 import { handleConverse } from "../tools/converse.js";
 import { handleAction } from "../tools/action.js";

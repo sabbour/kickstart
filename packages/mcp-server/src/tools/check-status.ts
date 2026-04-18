@@ -7,7 +7,7 @@
 import type {
   SessionState,
   GenerationProgressComponent,
-} from "@kickstart/core";
+} from "@kickstart/harness";
 import { createA2UIResource } from "../a2ui.js";
 
 /**

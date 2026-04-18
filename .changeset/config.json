@@ -6,7 +6,7 @@
   ],
   "commit": false,
   "fixed": [],
-  "linked": [["@kickstart/core", "@kickstart/mcp-server", "@kickstart/web"]],
+  "linked": [["@kickstart/harness", "@kickstart/mcp-server", "@kickstart/web"]],
   "access": "restricted",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",

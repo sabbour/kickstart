@@ -2,8 +2,6 @@ name: CI
 
 on:
   pull_request:
-    branches:
-      - main
 
 permissions:
   contents: read
@@ -40,17 +38,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Build core
-        run: npm run build -w @kickstart/core
+      - name: Build all workspaces
+        run: npm run build
 
       - name: TypeScript check (web)
         run: cd packages/web && npx tsc --noEmit
-
-      - name: Build API
-        run: cd packages/web/api && npm run build
-
-      - name: Build web app (Vite)
-        run: cd packages/web && npx vite build
 
       - name: Unit tests
         run: npx vitest run
@@ -87,11 +79,8 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build core
-        run: npm run build -w @kickstart/core
-
-      - name: Build web app (Vite)
-        run: cd packages/web && npx vite build
+      - name: Build all workspaces
+        run: npm run build
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
