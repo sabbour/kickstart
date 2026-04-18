@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   SetupGenerationEvent,
   TokenUsageSummary,
+  TurnUsage,
 } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
 import { normalizeConversationPhase } from '../utils/chat-a2ui';
@@ -90,7 +91,7 @@ const REVEAL_FRAMES = 80;
 export interface SdkNonStreamingFetchParams {
   sessionId: string | undefined;
   message: string;
-  clientMessages: Array<{ role: 'user' | 'assistant'; content: string; phase?: string; usage?: TokenUsageSummary }> | undefined;
+  clientMessages: Array<{ role: 'user' | 'assistant'; content: string; phase?: string; usage?: TurnUsage }> | undefined;
   signal: AbortSignal;
   debugMode: boolean;
 }

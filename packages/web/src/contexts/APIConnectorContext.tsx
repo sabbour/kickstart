@@ -64,8 +64,8 @@ export function APIConnectorProvider({
   useEffect(() => {
     for (const name of registry.names()) {
       const connector = registry.get(name);
-      if (connector && connector.name !== 'github' && !connector.isAuthenticated()) {
-        connector.authenticate().catch(() => {
+      if (connector && connector.name !== 'github' && !(connector.isAuthenticated?.() ?? false)) {
+        connector.authenticate?.().catch(() => {
           // Intentionally silent — stub connectors warn inside authenticate()
         });
       }

@@ -82,7 +82,18 @@ export function App() {
   const sessions = useSessions();
   const streaming = useStreaming();
   // TODO(Step 5): mockStreaming removed — use real streaming only
-  const mockStreaming = { isStreaming: false, streamText: '', send: () => {} } as const;
+  const mockStreaming: {
+    isStreaming: boolean;
+    streamText: string;
+    send: (text: string, sessionId: string | undefined, callbacks: {
+      onChunk?: (t: string) => void;
+      onA2UI?: (payload: A2uiPayloadItem[]) => void;
+      onSetupEvent?: (event: SetupGenerationEvent) => void;
+      onPhase?: (phase: string) => void;
+      onComplete?: (fullText: string, model?: string) => void;
+      onError?: (error: string) => void;
+    }) => void;
+  } = { isStreaming: false, streamText: '', send: () => {} };
   const progressiveQueue = useProgressiveQueue();
 
   // Single VFS instance for the app lifetime
