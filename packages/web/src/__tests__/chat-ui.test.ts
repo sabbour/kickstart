@@ -1,9 +1,51 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { ChatMessage as ChatMessageView } from '../components/Chat/ChatMessage';
-import { ChatShell } from '../components/Chat/ChatShell';
-import { DebugPanel } from '../components/Chat/DebugPanel';
+
+// Fluent v9 components + icons go through internal context hooks that resolve
+// `react` via commonjs and trip the "Cannot read properties of null" /
+// "Invalid hook call" SSR errors under vitest's node env. Mock the surfaces
+// used by the chat regression tests with passthrough HTML stubs; the
+// assertions only care about surrounding markup and data-testids.
+vi.mock('@fluentui/react-components', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@fluentui/react-components');
+  const passthrough = (tag: string) =>
+    ({ children, ...rest }: { children?: React.ReactNode } & Record<string, unknown>) =>
+      React.createElement(tag, rest as Record<string, unknown>, children);
+  const stubs: Record<string, unknown> = { ...actual };
+  // Override components/hooks that exercise Fluent context internals.
+  // Fluent components are React.forwardRef (object) or functions — stub both
+  // when the export name starts with a capital letter.
+  for (const key of Object.keys(actual)) {
+    const val = actual[key];
+    if (/^[A-Z]/.test(key) && (typeof val === 'function' || typeof val === 'object')) {
+      stubs[key] = passthrough('div');
+    }
+  }
+  stubs.makeStyles = (styles: Record<string, unknown>) => () =>
+    Object.fromEntries(Object.keys(styles).map((k) => [k, k])) as Record<string, string>;
+  stubs.tokens = new Proxy({}, { get: () => '' });
+  return stubs;
+});
+
+vi.mock('@fluentui/react-icons', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@fluentui/react-icons');
+  const iconStub = () => React.createElement('span', { 'data-icon': true });
+  const stubs: Record<string, unknown> = {};
+  for (const key of Object.keys(actual)) {
+    const val = actual[key];
+    if (/^[A-Z]/.test(key) && (typeof val === 'function' || typeof val === 'object')) {
+      stubs[key] = iconStub;
+    } else {
+      stubs[key] = val;
+    }
+  }
+  return stubs;
+});
+
+const { ChatMessage: ChatMessageView } = await import('../components/Chat/ChatMessage');
+const { ChatShell } = await import('../components/Chat/ChatShell');
+const { DebugPanel } = await import('../components/Chat/DebugPanel');
 import type { ChatMessage, TokenUsageSummary } from '../types';
 import { GENERATION_PROGRESS_TITLE, getLatestConversationPhase, rebuildChatSessionState } from '../utils/chat-a2ui';
 import { summarizeTokenUsage } from '../utils/chat-usage';
