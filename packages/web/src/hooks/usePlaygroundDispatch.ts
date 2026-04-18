@@ -12,7 +12,7 @@ import type { PlaygroundScenario, ComponentContribution } from '@kickstart/harne
 export interface PlaygroundRegistryView {
   readonly playgroundScenarios: PlaygroundScenario[];
   readonly components: ComponentContribution[];
-  readonly playgroundStubs: ReadonlyMap<string, PlaygroundStub>;
+  readonly playgroundStubs: Readonly<Record<string, PlaygroundStub>>;
 }
 
 export interface UsePlaygroundDispatchResult {
@@ -35,13 +35,13 @@ export function usePlaygroundDispatch(
   const dispatch = useCallback(
     (actionName: string, payload: unknown): void => {
       const stubs = registry.playgroundStubs;
-      const stub = stubs.get(actionName);
+      const stub = stubs[actionName];
 
       // Leela C2: this guard is REQUIRED — the DP pseudocode was missing it
       if (!stub) {
         const detail = IS_PROD
           ? 'Action not found'
-          : `No playground stub registered for action: ${actionName}. Registered: ${[...stubs.keys()].join(', ')}`;
+          : `No playground stub registered for action: ${actionName}. Registered: ${Object.keys(stubs).join(', ')}`;
         setErrorMessage(detail);
         return;
       }

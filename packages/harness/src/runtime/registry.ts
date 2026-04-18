@@ -45,7 +45,7 @@ export class PackRegistry {
   private readonly playgroundScenariosById = new Map<string, PlaygroundScenario>();
   private activePackNames: string[] | null = null;
   private sealed = false;
-  private _sealedPlaygroundStubs: ReadonlyMap<string, PlaygroundStub> | null = null;
+  private _sealedPlaygroundStubs: Readonly<Record<string, PlaygroundStub>> | null = null;
 
   register(pack: Pack): void {
     if (this.sealed) {
@@ -125,17 +125,17 @@ export class PackRegistry {
   seal(): void {
     this.sealed = true;
     // Snapshot and freeze playground stubs at seal time — post-seal mutations blocked.
-    const stubs = new Map<string, PlaygroundStub>();
+    const stubs: Record<string, PlaygroundStub> = {};
     for (const registeredPack of this.packs.values()) {
       if (!this.isPackActive(registeredPack.pack.name) || !registeredPack.pack.playgroundStubs) continue;
       for (const [key, stub] of Object.entries(registeredPack.pack.playgroundStubs)) {
-        if (stubs.has(key)) {
+        if (Object.prototype.hasOwnProperty.call(stubs, key)) {
           throw new Error(`Duplicate playground stub key across packs: "${key}"`);
         }
-        stubs.set(key, stub);
+        stubs[key] = stub;
       }
     }
-    this._sealedPlaygroundStubs = stubs;
+    this._sealedPlaygroundStubs = Object.freeze(stubs);
   }
 
   getAgent(name: string): AgentContribution {
@@ -196,17 +196,17 @@ export class PackRegistry {
     return [...this.playgroundScenariosById.values()].filter((scenario) => this.isPackActive(this.packNameFromScenario(scenario.id)));
   }
 
-  get playgroundStubs(): ReadonlyMap<string, PlaygroundStub> {
+  get playgroundStubs(): Readonly<Record<string, PlaygroundStub>> {
     if (this._sealedPlaygroundStubs) return this._sealedPlaygroundStubs;
     // Pre-seal: compute on demand (dev/test only), collision detection included.
-    const stubs = new Map<string, PlaygroundStub>();
+    const stubs: Record<string, PlaygroundStub> = {};
     for (const registeredPack of this.packs.values()) {
       if (!this.isPackActive(registeredPack.pack.name) || !registeredPack.pack.playgroundStubs) continue;
       for (const [key, stub] of Object.entries(registeredPack.pack.playgroundStubs)) {
-        if (stubs.has(key)) {
+        if (Object.prototype.hasOwnProperty.call(stubs, key)) {
           throw new Error(`Duplicate playground stub key across packs: "${key}"`);
         }
-        stubs.set(key, stub);
+        stubs[key] = stub;
       }
     }
     return stubs;
@@ -233,10 +233,19 @@ export class PackRegistry {
     scope: { tools: Map<string, ToolContribution>; userActions: Map<string, UserActionContribution> },
   ): AgentContribution[] {
     const loaded: AgentContribution[] = [];
-    if (!pack.agentsDir) return loaded;
-    const baseDir = directoryURLToPath(pack.agentsDir);
-    for (const entry of collectMarkdownFiles(baseDir, '.agent.md')) {
-      loaded.push(loadAgentFile(pack, entry, scope));
+    if (pack.agentsDir) {
+      const baseDir = directoryURLToPath(pack.agentsDir);
+      for (const entry of collectMarkdownFiles(baseDir, '.agent.md')) {
+        loaded.push(loadAgentFile(pack, entry, scope));
+      }
+    }
+    // Inline agents (pack.agents): resolve against the dependency scope so that
+    // any reference to a tool or user action outside the declared dependsOn
+    // graph fails at register() time (same rigor as file-backed agents).
+    if (pack.agents) {
+      for (const agent of pack.agents) {
+        loaded.push(this.normalizeInlineAgent(pack, agent, scope));
+      }
     }
     return loaded;
   }
@@ -253,12 +262,14 @@ export class PackRegistry {
     const inlineSkills: Skill[] = [];
     if (pack.skills) {
       for (const raw of pack.skills) {
-        // Fix 2: enforce pack-name prefix — fail-closed, no auto-correction
-        if (!raw.id.startsWith(`${pack.name}/`)) {
-          throw new Error(`Inline skill id "${raw.id}" must be namespaced under "${pack.name}/"`);
-        }
-        // Fix 1: zod validation — same rigor as file-backed skills
+        // Zod validation — same rigor as file-backed skills.
         const parsed = inlineSkillSchema.parse(raw);
+        // Namespace the skill id under the owning pack. Already-namespaced ids
+        // must match the pack name; bare ids are auto-prefixed by
+        // normalizeInlineSkill. Cross-pack leakage is rejected fail-closed.
+        if (parsed.id.includes('/') && !parsed.id.startsWith(`${pack.name}/`)) {
+          throw new Error(`Inline skill id "${parsed.id}" must be namespaced under "${pack.name}/"`);
+        }
         const normalized = this.normalizeInlineSkill(pack, parsed as Skill);
         // Validate glob patterns at registration (Zapp: prevent injection)
         for (const pattern of normalized.appliesTo ?? []) {
