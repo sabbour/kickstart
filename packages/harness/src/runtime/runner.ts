@@ -196,7 +196,7 @@ function wrapUserAction(
       const isPlayground = process.env.KICKSTART_PLAYGROUND === 'true';
       if (isPlayground) {
         const stubs = registry.playgroundStubs;
-        const stub = stubs.get(contrib.name) ?? stubs.get(contrib.wireName);
+        const stub = stubs[contrib.name] ?? stubs[contrib.wireName];
         if (stub) {
           // Invoke the stub in playground mode
           try {

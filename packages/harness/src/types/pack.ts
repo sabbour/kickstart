@@ -1,3 +1,4 @@
+import type { AgentContribution } from './agent.js';
 import type { ComponentContribution } from './component.js';
 import type { GuardrailContribution } from './guardrail.js';
 import type { PlaygroundScenario } from './playground.js';
@@ -12,6 +13,7 @@ export interface Pack {
   version: string;
   dependsOn?: string[];
   agentsDir?: URL;
+  agents?: AgentContribution[];   // inline agent registrations (no .md file required)
   skillsDir?: URL;
   skills?: Skill[];          // inline skill registrations (no .md file required)
   tools?: ToolContribution[];
