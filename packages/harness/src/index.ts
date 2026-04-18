@@ -2,13 +2,14 @@
 // This file temporarily satisfies legacy @kickstart/core imports during the v2 migration.
 
 // ── Phase (was an enum in v1) ────────────────────────────────────────────────
-// Order matches the current harness contract: Discover → Assess → Design → Generate → Review → Deploy
+// Canonical order per docs/v2-implementation-brief.md §2:
+// Discover → Design → Generate → Review → Handoff → Deploy
 export const Phase = {
   Discover: 'discover',
-  Assess: 'assess',
   Design: 'design',
   Generate: 'generate',
   Review: 'review',
+  Handoff: 'handoff',
   Deploy: 'deploy',
 } as const;
 export type Phase = (typeof Phase)[keyof typeof Phase];
@@ -221,11 +222,11 @@ export const defaultRegistry: {
 export const PHASE_DEFINITIONS: Array<{
   id: Phase; label: string; description: string; nextPhase?: Phase;
 }> = [
-  { id: Phase.Discover, label: 'Discover', description: 'What are you building?', nextPhase: Phase.Assess },
-  { id: Phase.Assess, label: 'Assess', description: 'Assess requirements and handoff context.', nextPhase: Phase.Design },
+  { id: Phase.Discover, label: 'Discover', description: 'What are you building?', nextPhase: Phase.Design },
   { id: Phase.Design, label: 'Design', description: 'Here is the recommended architecture.', nextPhase: Phase.Generate },
   { id: Phase.Generate, label: 'Generate', description: 'Generating your deployment files.', nextPhase: Phase.Review },
-  { id: Phase.Review, label: 'Review', description: 'Review and validate your artifacts.', nextPhase: Phase.Deploy },
+  { id: Phase.Review, label: 'Review', description: 'Review and validate your artifacts.', nextPhase: Phase.Handoff },
+  { id: Phase.Handoff, label: 'Handoff', description: 'Hand off to the target platform.', nextPhase: Phase.Deploy },
   { id: Phase.Deploy, label: 'Deploy', description: 'Deploy to AKS.' },
 ];
 
