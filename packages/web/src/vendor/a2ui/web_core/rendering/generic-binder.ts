@@ -66,15 +66,24 @@ function getFieldBehavior(
 ): BehaviorNode {
   let current: z.ZodTypeAny = type;
 
-  // Unwrap optionals/nullables/defaults
+  // Unwrap optionals/nullables/defaults. In Zod v4, some wrapped schemas don't
+  // expose `.unwrap()` as a direct method, so fall back to the internal
+  // `_def.innerType` / `def.innerType` pointer to stay robust across Zod
+  // minor releases.
   while (
     current instanceof z.ZodOptional ||
     current instanceof z.ZodNullable ||
     current instanceof z.ZodDefault
   ) {
-    current = (
-      current as z.ZodOptional<z.ZodTypeAny> | z.ZodNullable<z.ZodTypeAny> | z.ZodDefault<z.ZodTypeAny>
-    ).unwrap() as z.ZodTypeAny;
+    const wrapper = current as z.ZodOptional<z.ZodTypeAny> | z.ZodNullable<z.ZodTypeAny> | z.ZodDefault<z.ZodTypeAny>;
+    const next =
+      typeof (wrapper as unknown as { unwrap?: () => z.ZodTypeAny }).unwrap === 'function'
+        ? (wrapper as unknown as { unwrap: () => z.ZodTypeAny }).unwrap()
+        : ((wrapper as unknown as { _def?: { innerType?: z.ZodTypeAny }; def?: { innerType?: z.ZodTypeAny } })._def
+            ?.innerType
+            ?? (wrapper as unknown as { def?: { innerType?: z.ZodTypeAny } }).def?.innerType);
+    if (!next) break;
+    current = next as z.ZodTypeAny;
   }
 
   if (propertyName === 'checks') {
