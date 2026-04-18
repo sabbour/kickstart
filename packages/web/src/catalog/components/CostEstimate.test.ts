@@ -3,8 +3,47 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { ComponentContext } from '../../vendor/a2ui/web_core/index';
 import { ConversationSessionProvider } from '../../contexts/ConversationSessionContext';
-import { CostEstimateView } from './CostEstimate';
 import type { CostEstimateInput } from '../../utils/cost-estimate';
+
+// Fluent v9 components pull in a chain of internal context hooks
+// (useTextDirection, useFluent, useCardBase_unstable, etc.) that resolve
+// `react` via commonjs and trip the "Cannot read properties of null"
+// dispatcher error when rendered from node with renderToStaticMarkup.
+// For this markup-only contract test we stub out just the surface used by
+// CostEstimate with pass-through <div>s and a no-op makeStyles.
+vi.mock('@fluentui/react-components', async () => {
+  const actual = await vi.importActual<typeof import('@fluentui/react-components')>(
+    '@fluentui/react-components',
+  );
+  const passthrough = (tag: string) =>
+    ({ children, ...rest }: { children?: React.ReactNode } & Record<string, unknown>) =>
+      React.createElement(tag, rest as Record<string, unknown>, children);
+  return {
+    ...actual,
+    makeStyles: (styles: Record<string, unknown>) => () =>
+      Object.fromEntries(Object.keys(styles).map((k) => [k, k])) as Record<string, string>,
+    tokens: new Proxy({}, { get: () => '' }) as unknown as typeof actual.tokens,
+    Badge: passthrough('span'),
+    Body2: passthrough('p'),
+    Button: passthrough('button'),
+    Caption1: passthrough('span'),
+    Card: passthrough('section'),
+    Label: passthrough('label'),
+    MessageBar: passthrough('div'),
+    MessageBarBody: passthrough('div'),
+    Select: passthrough('select'),
+    Slider: passthrough('input'),
+    Spinner: passthrough('span'),
+    Subtitle1: passthrough('h3'),
+  };
+});
+
+vi.mock('@fluentui/react-icons', () => ({
+  MoneyRegular: () => React.createElement('span', { 'data-icon': 'money' }),
+}));
+
+// Import after mocks so CostEstimate.tsx binds to the stubs.
+const { CostEstimateView } = await import('./CostEstimate');
 
 const componentContext = {
   dispatchAction: vi.fn(),
