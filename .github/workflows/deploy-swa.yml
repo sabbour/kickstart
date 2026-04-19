@@ -44,12 +44,6 @@ jobs:
       - name: Build web app (Vite)
         run: cd packages/web && npx vite build
 
-      - name: Prepare API dist for SWA
-        run: |
-          cp packages/web/api/host.json packages/web/api/dist/host.json
-          echo '{"name":"kickstart-api","version":"1.0.0","type":"module","main":"functions/*.js","dependencies":{"@azure/functions":"^4.6.0","bicep-node":"^0.0.9"}}' > packages/web/api/dist/package.json
-          cd packages/web/api/dist && npm install --omit=dev --no-package-lock
-
       - name: Deploy to Azure Static Web Apps
         id: swa_deploy
         uses: Azure/static-web-apps-deploy@v1
@@ -58,10 +52,11 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "packages/web/dist"
-          api_location: "packages/web/api/dist"
+          api_location: "packages/web/api"
           output_location: ""
           skip_app_build: true
           skip_api_build: false
+          api_build_command: "echo 'API already built'"
 
       - name: Resolve production smoke target
         id: production_url
