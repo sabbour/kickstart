@@ -1,0 +1,21 @@
+// Azure Functions v4 entry point — imports all function registrations.
+import "./functions/action.js";
+import "./functions/arm-proxy.js";
+import "./functions/azure-deployments.js";
+import "./functions/azure-target.js";
+import "./functions/converse.js";
+import "./functions/cost-estimate.js";
+import "./functions/deploy-cost-gate.js";
+import "./functions/generate.js";
+import "./functions/github-auth.js";
+import "./functions/github-oauth.js";
+import "./functions/github-proxy.js";
+import "./functions/github-pulls.js";
+import "./functions/github-repos.js";
+import "./functions/health.js";
+import "./functions/inspirations.js";
+import "./functions/packs.js";
+import "./functions/playground.js";
+import "./functions/pricing-proxy.js";
+import "./functions/resume.js";
+import "./functions/widget-inspirations.js";

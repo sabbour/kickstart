@@ -15,10 +15,12 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HARNESS_SRC = resolve(__dirname, "../../harness/src");
 
-const entryPoints = readdirSync("src/functions")
+const functionEntryPoints = readdirSync("src/functions")
   .filter((f) => f.endsWith(".ts"))
   .filter((f) => !f.endsWith(".test.ts") && !f.endsWith(".spec.ts"))
   .map((f) => join("src/functions", f));
+
+const entryPoints = ["src/register-all.ts", ...functionEntryPoints];
 
 // esbuild's `alias` option does not handle subpath exports like
 // `@kickstart/harness/runtime/sse`. A resolver plugin rewrites both the
@@ -38,7 +40,7 @@ const harnessResolver = {
 await esbuild.build({
   entryPoints,
   bundle: true,
-  outdir: "dist/functions",
+  outdir: "dist",
   format: "esm",
   platform: "node",
   target: "node20",
@@ -47,4 +49,6 @@ await esbuild.build({
   plugins: [harnessResolver],
 });
 
-console.log(`✅ Bundled ${entryPoints.length} function(s) to dist/functions/`);
+console.log(
+  `✅ Bundled ${functionEntryPoints.length} function(s) plus register-all.js`,
+);
