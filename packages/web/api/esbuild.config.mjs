@@ -8,17 +8,18 @@
  */
 
 import * as esbuild from "esbuild";
-import { readdirSync } from "node:fs";
+import { readdirSync, writeFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HARNESS_SRC = resolve(__dirname, "../../harness/src");
 
-const entryPoints = readdirSync("src/functions")
+const functionFiles = readdirSync("src/functions")
   .filter((f) => f.endsWith(".ts"))
-  .filter((f) => !f.endsWith(".test.ts") && !f.endsWith(".spec.ts"))
-  .map((f) => join("src/functions", f));
+  .filter((f) => !f.endsWith(".test.ts") && !f.endsWith(".spec.ts"));
+
+const entryPoints = functionFiles.map((f) => join("src/functions", f));
 
 // esbuild's `alias` option does not handle subpath exports like
 // `@kickstart/harness/runtime/sse`. A resolver plugin rewrites both the
@@ -48,3 +49,15 @@ await esbuild.build({
 });
 
 console.log(`✅ Bundled ${entryPoints.length} function(s) to dist/functions/`);
+
+// Emit a single entry file that imports every function bundle for its
+// side-effect `app.http()` registrations. Azure Functions v4 loads the
+// path declared in package.json "main" and expects that module to register
+// every function. A glob (e.g. `dist/functions/*.js`) is silently ignored
+// by the runtime, which is why we must materialise an explicit index.js.
+const imports = functionFiles
+  .map((f) => `import "./functions/${f.replace(/\.ts$/, ".js")}";`)
+  .join("\n");
+writeFileSync("dist/index.js", `${imports}\n`);
+
+console.log(`✅ Wrote dist/index.js with ${functionFiles.length} registration import(s)`);
