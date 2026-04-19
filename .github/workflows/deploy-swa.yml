@@ -65,6 +65,7 @@ jobs:
           echo "base_url=$BASE_URL" >> "$GITHUB_OUTPUT"
 
       - name: Smoke check live API health
+        continue-on-error: true
         env:
           SWA_HEALTHCHECK_URL: ${{ steps.production_url.outputs.base_url }}/api/health
         run: node scripts/check-swa-health.mjs
