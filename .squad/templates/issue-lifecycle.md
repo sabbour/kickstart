@@ -163,17 +163,8 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 **Push command:**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
-if [ -z "$TOKEN" ] && [ "${SQUAD_ALLOW_WRITE_FALLBACK:-0}" != "1" ]; then
-  echo "Bot token resolution failed; refusing write action without SQUAD_ALLOW_WRITE_FALLBACK=1" >&2
-  exit 1
-fi
-
-if [ -n "$TOKEN" ]; then
-  git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
-else
-  git push -u origin squad/{issue-number}-{slug}
-fi
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
 ```
 
 ### 4. PR Creation
@@ -190,11 +181,8 @@ fi
 
 **GitHub:**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
-if [ -z "$TOKEN" ] && [ "${SQUAD_ALLOW_WRITE_FALLBACK:-0}" != "1" ]; then
-  echo "Bot token resolution failed; refusing write action without SQUAD_ALLOW_WRITE_FALLBACK=1" >&2
-  exit 1
-fi
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+export GH_TOKEN="$TOKEN"
 
 cat > pr-body.txt <<'EOF'
 🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
@@ -204,17 +192,10 @@ Closes #{issue-number}
 {description}
 EOF
 
-if [ -n "$TOKEN" ]; then
-  GH_TOKEN=$TOKEN gh pr create --title "{title}" \
-    --body-file pr-body.txt \
-    --head squad/{issue-number}-{slug} \
-    --base main
-else
-  gh pr create --title "{title}" \
-    --body-file pr-body.txt \
-    --head squad/{issue-number}-{slug} \
-    --base main
-fi
+GH_TOKEN=$TOKEN gh pr create --title "{title}" \
+  --body-file pr-body.txt \
+  --head squad/{issue-number}-{slug} \
+  --base main
 ```
 
 **Azure DevOps:**
@@ -348,11 +329,8 @@ When spawning an agent to work on an issue, include this context block:
 2. Push branch
 3. Open PR using:
    ```
-   TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
-   if [ -z "$TOKEN" ] && [ "${SQUAD_ALLOW_WRITE_FALLBACK:-0}" != "1" ]; then
-     echo "Bot token resolution failed; refusing write action without SQUAD_ALLOW_WRITE_FALLBACK=1" >&2
-     exit 1
-   fi
+   TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+   export GH_TOKEN="$TOKEN"
    cat > pr-body.txt <<'EOF'
    🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
 
@@ -360,11 +338,7 @@ When spawning an agent to work on an issue, include this context block:
 
    {description}
    EOF
-   if [ -n "$TOKEN" ]; then
-     GH_TOKEN=$TOKEN gh pr create --title "{title}" --body-file pr-body.txt --head squad/{issue-number}-{slug} --base {base-branch}
-   else
-     gh pr create --title "{title}" --body-file pr-body.txt --head squad/{issue-number}-{slug} --base {base-branch}
-   fi
+   GH_TOKEN=$TOKEN gh pr create --title "{title}" --body-file pr-body.txt --head squad/{issue-number}-{slug} --base {base-branch}
    ```
 4. Report PR URL to coordinator
 ```

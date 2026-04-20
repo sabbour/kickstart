@@ -6,13 +6,25 @@
 
 Kickstart uses a structured issue → Design Proposal → PR → review → merge lifecycle. Design discussion happens on the **issue** (via a Design Proposal comment), not on the PR. PRs are for code review only.
 
+## Write identity
+
+For agent-authored GitHub writes, resolve the role app token first and reuse it for every write:
+
+```bash
+TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG")
+export GH_TOKEN="$TOKEN"
+```
+
+Normal agent writes in this repo do **not** use ambient `gh` auth.
+
 ## Steps
 
 ### 1. Pick up an issue
 
+Do not auto-assign a human via the agent app token. If a human assignee is intentionally needed for visibility, do that as a separate explicit human-owned step outside the agent-authored write path.
+
 ```bash
-gh issue edit <N> --add-assignee "$(gh api user -q .login)"
-gh issue edit <N> --milestone "<milestone-name>"
+GH_TOKEN=$TOKEN gh issue edit <N> --milestone "<milestone-name>"
 ```
 
 Move the project board status to **In progress**.
@@ -48,26 +60,12 @@ git worktree add .worktrees/<slug-or-issue-number> \
 cd .worktrees/<slug-or-issue-number>
 ```
 
-Rules:
-
-- Worktree path lives under `.worktrees/` (gitignored). Name it after the issue or a short slug.
-- Branch off `origin/main`, not the local `main`.
-- Never run `git checkout -b` in the top-level working tree.
-- One worktree per in-flight PR. Reuse, don't duplicate.
-- When the PR merges or closes, run from any other checkout:
-  ```bash
-  git worktree remove .worktrees/<name>
-  git worktree prune
-  ```
-
-All subsequent commands in this skill run from inside the worktree.
-
 ### 4. Open a draft PR
 
 Always draft, never ready on first push.
 
 ```bash
-gh pr create --draft \
+GH_TOKEN=$TOKEN gh pr create --draft \
   --title "<title>" \
   --body "Closes #<issue-number>
 
@@ -95,11 +93,11 @@ gh pr create --draft \
 
 ### 5. Keep the branch current
 
-Rebase, never merge.
+Rebase, never merge. Push with the app token, not ambient auth.
 
 ```bash
 git fetch origin && git rebase origin/main
-git push --force-with-lease
+git push https://x-access-token:${TOKEN}@github.com/<owner>/<repo>.git squad/<issue-number>-<slug> --force-with-lease
 ```
 
 ### 6. Mark ready for review
@@ -110,7 +108,7 @@ Only after:
 - Docs and changeset are in place.
 
 ```bash
-gh pr ready <N>
+GH_TOKEN=$TOKEN gh pr ready <N>
 ```
 
 ### 7. Review gates

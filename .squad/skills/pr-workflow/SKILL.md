@@ -18,29 +18,18 @@
 
 ---
 
-## GitHub Account Selection
+## GitHub Write Identity
 
-Before running any `gh` commands, ensure you are authenticated with the correct GitHub account.
+For agent-authored GitHub writes in this repo, do **not** rely on ambient `gh` auth. Resolve the explicit app token once per shell and reuse it for every write command:
 
-1. **Determine the repo owner** from the git remote:
-   ```bash
-   REPO_OWNER=$(gh repo view --json owner -q .owner.login)
-   ```
+```bash
+TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG")
+export GH_TOKEN="$TOKEN"
+```
 
-2. **Check if this is a personal (non-EMU) repo.** EMU accounts typically have an `_` suffix (e.g., `user_microsoft`). If the repo owner is a personal account, switch `gh` to the personal account:
-   ```bash
-   # List authenticated accounts
-   gh auth status
-   # If the active account is an EMU account and the repo owner is personal, switch:
-   gh auth switch  # interactive — pick the matching account
-   ```
-
-3. **Verify** the active account matches the repo context:
-   ```bash
-   gh api user -q .login
-   ```
-
-> **Rule of thumb:** if `REPO_OWNER` does NOT contain `_` (i.e., it's not an EMU slug), use your personal GitHub account. Otherwise, use the EMU account.
+- `TEAM_ROOT` and `ROLE_SLUG` come from the coordinator prompt.
+- `--required` fails closed and prints the reason when the role/app mapping is missing or broken.
+- Read-only `gh` commands can still use normal auth, but issue/PR comments, edits, GraphQL mutations, pushes, and PR creation must use `GH_TOKEN=$TOKEN` or token-authenticated HTTPS.
 
 ---
 
@@ -48,19 +37,16 @@ Before running any `gh` commands, ensure you are authenticated with the correct 
 
 ### Picking Up an Issue
 
-1. **Assign to the current user** so the human owner has visibility:
-   ```bash
-   gh issue edit <N> --add-assignee "$(gh api user -q .login)"
-   ```
+1. **Do not auto-assign a human via the agent app token.** If a human assignee is intentionally needed for visibility, do that as a separate explicit human-owned step outside the agent-authored write path.
 
 2. **Post major findings as comments** on the issue as work progresses:
    ```bash
-   gh issue comment <N> --body "🔍 Finding: ..."
+   GH_TOKEN=$TOKEN gh issue comment <N> --body "🔍 Finding: ..."
    ```
 
 3. **Set the milestone** on the issue to tie it to the current sprint/release:
    ```bash
-   gh issue edit <N> --milestone "<milestone-name>"
+   GH_TOKEN=$TOKEN gh issue edit <N> --milestone "<milestone-name>"
    ```
 
 4. **Update project board fields** (Priority, Size, Estimate, Status).
@@ -71,7 +57,7 @@ Before running any `gh` commands, ensure you are authenticated with the correct 
    ```bash
    REPO_OWNER=$(gh repo view --json owner -q .owner.login)
    PROJECT_NUM=$(grep -oP 'projects/\K[0-9]+' .squad/team.md)
-   gh api graphql -f query='
+   GH_TOKEN=$TOKEN gh api graphql -f query='
      query {
        user(login: "'"$REPO_OWNER"'") {
          projectV2(number: '"$PROJECT_NUM"') {
@@ -90,7 +76,7 @@ Before running any `gh` commands, ensure you are authenticated with the correct 
 
    Then update a field on an item:
    ```bash
-   gh api graphql -f query='
+   GH_TOKEN=$TOKEN gh api graphql -f query='
      mutation {
        updateProjectV2ItemFieldValue(input: {
          projectId: "<PROJECT_ID>"
@@ -144,7 +130,7 @@ Before running any `gh` commands, ensure you are authenticated with the correct 
 
 1. **Always open as draft** — never open a ready PR directly:
    ```bash
-   gh pr create --draft \
+   GH_TOKEN=$TOKEN gh pr create --draft \
      --title "<title>" \
      --body "Closes #<issue-number>
 
@@ -163,7 +149,7 @@ Before running any `gh` commands, ensure you are authenticated with the correct 
 
 2. **Post findings as PR comments** as work progresses:
    ```bash
-   gh pr comment <N> --body "📝 Progress: ..."
+   GH_TOKEN=$TOKEN gh pr comment <N> --body "📝 Progress: ..."
    ```
 
 ### Keeping the Branch Current
@@ -173,14 +159,14 @@ When the branch is behind `main`, **always rebase** — never merge:
 git fetch origin
 git rebase origin/main
 # Resolve any conflicts
-git push --force-with-lease
+git push https://x-access-token:${TOKEN}@github.com/sabbour/kickstart.git squad/<issue-number>-<slug> --force-with-lease
 ```
 
 ### Marking Ready for Review
 
 Only after work is complete AND CI passes:
 ```bash
-gh pr ready <N>
+GH_TOKEN=$TOKEN gh pr ready <N>
 ```
 
 ### Review Gates
@@ -195,11 +181,11 @@ Zapp's review is a **pre-merge gate** for foundational patterns. Do not merge wi
 **How approvals work (label-based):**
 - **Leela** approves by adding the `leela:approved` label:
   ```bash
-  gh pr edit {number} --add-label "leela:approved" --repo sabbour/kickstart
+  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "leela:approved" --repo sabbour/kickstart
   ```
 - **Zapp** approves by adding the `zapp:approved` label:
   ```bash
-  gh pr edit {number} --add-label "zapp:approved" --repo sabbour/kickstart
+  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "zapp:approved" --repo sabbour/kickstart
   ```
 
 No GitHub formal PR review approval is required — squad agents share a single GitHub account with the repo owner, making self-approval impossible. The `squad/review-gate` status check (`.github/workflows/squad-review-gate.yml`) normally turns green when both labels are present. For explicitly low-risk PRs labeled `squad:chore-auto`, the gate accepts `leela:approved` alone unless the PR looks security-sensitive (`security`, `GHSA`, `CVE`, `vulnerability`) or touches sensitive paths (`.github/workflows/**`, auth, guardrail, security code), in which case `zapp:approved` is still required. `Squad Auto Merge` clears approval labels on every `synchronize` so new commits always need fresh approval labels.
@@ -209,7 +195,7 @@ No GitHub formal PR review approval is required — squad agents share a single 
 Use the REST API (not comment mentions):
 ```bash
 REPO_NWO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-gh api "repos/${REPO_NWO}/pulls/<N>/requested_reviewers" \
+GH_TOKEN=$TOKEN gh api "repos/${REPO_NWO}/pulls/<N>/requested_reviewers" \
   --method POST \
   -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
 ```
@@ -221,13 +207,13 @@ When a PR has review comments or formal review threads, the full feedback loop i
 1. **Read ALL feedback** — check both formal review threads AND top-level comments:
    ```bash
    # Formal review threads (these must all be resolved before merge)
-   gh pr view <N> --json reviewThreads --jq '.reviewThreads[] | {id: .id, isResolved: .isResolved, path: .path, body: (.comments[0].body // ""), line: .line}'
+   GH_TOKEN=$TOKEN gh pr view <N> --json reviewThreads --jq '.reviewThreads[] | {id: .id, isResolved: .isResolved, path: .path, body: (.comments[0].body // ""), line: .line}'
    
    # Top-level PR comments (Copilot often posts here)
-   gh pr view <N> --json comments --jq '.comments[] | {id: .id, author: .author.login, body: .body}'
+   GH_TOKEN=$TOKEN gh pr view <N> --json comments --jq '.comments[] | {id: .id, author: .author.login, body: .body}'
    
    # Formal review decisions
-   gh pr view <N> --json reviews --jq '.reviews[] | {author: .author.login, state: .state, body: .body}'
+   GH_TOKEN=$TOKEN gh pr view <N> --json reviews --jq '.reviews[] | {author: .author.login, state: .state, body: .body}'
    ```
 
 2. **For each piece of feedback, decide:**
@@ -237,18 +223,18 @@ When a PR has review comments or formal review threads, the full feedback loop i
 3. **After fixing (or deciding not to fix), ALWAYS reply to the specific comment:**
    ```bash
    # Reply to a review thread comment (get comment ID from reviewThreads query above)
-   gh api "repos/sabbour/kickstart/pulls/<PR>/comments/<comment_id>/replies" \
+   GH_TOKEN=$TOKEN gh api "repos/sabbour/kickstart/pulls/<PR>/comments/<comment_id>/replies" \
      --method POST \
      -f body="Addressed in <commit_sha>: <what you changed and why, 1-2 sentences>. Resolving thread."
    
    # OR for a top-level PR comment, reply inline:
-   gh pr comment <N> --body "Re: <quote the feedback briefly> — <what you did to address it, or why not>."
+   GH_TOKEN=$TOKEN gh pr comment <N> --body "Re: <quote the feedback briefly> — <what you did to address it, or why not>."
    ```
 
 4. **Resolve the thread after replying:**
    ```bash
    # Get thread node ID
-   THREAD_ID=$(gh api graphql -f query='{
+   THREAD_ID=$(GH_TOKEN=$TOKEN gh api graphql -f query='{
      repository(owner: "sabbour", name: "kickstart") {
        pullRequest(number: <N>) {
          reviewThreads(first: 50) {
@@ -259,12 +245,12 @@ When a PR has review comments or formal review threads, the full feedback loop i
    }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | .id')
    
    # Resolve it
-   gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<THREAD_ID>"}) { thread { isResolved } } }'
+   GH_TOKEN=$TOKEN gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<THREAD_ID>"}) { thread { isResolved } } }'
    ```
 
 5. **Verify all threads are resolved before attempting merge:**
    ```bash
-   UNRESOLVED=$(gh pr view <N> --json reviewThreads --jq '[.reviewThreads[] | select(.isResolved == false)] | length')
+   UNRESOLVED=$(GH_TOKEN=$TOKEN gh pr view <N> --json reviewThreads --jq '[.reviewThreads[] | select(.isResolved == false)] | length')
    # Must be 0 before proceeding
    ```
 
@@ -281,7 +267,7 @@ All CI checks must pass, including Playwright E2E tests. If checks fail:
 
 ### Merge Gate
 
-**Rule:** Never call `gh pr merge` without first verifying ALL of the following:
+**Rule:** Never call `GH_TOKEN=$TOKEN gh pr merge` without first verifying ALL of the following:
 
 1. **Squad label gate** — verify the PR satisfies one of the allowed approval paths on the current head:
     - standard path: `leela:approved` + `zapp:approved`
@@ -289,8 +275,8 @@ All CI checks must pass, including Playwright E2E tests. If checks fail:
     - low-risk sensitive path: `squad:chore-auto` + `leela:approved` + `zapp:approved` when the PR text looks security-sensitive or it touches `.github/workflows/**`, auth, guardrail, or security code
 
     ```bash
-    PR_JSON=$(gh pr view {number} --json number,title,body,headRefName,labels)
-    FILES_JSON=$(gh api repos/sabbour/kickstart/pulls/{number}/files --paginate)
+    PR_JSON=$(GH_TOKEN=$TOKEN gh pr view {number} --json number,title,body,headRefName,labels)
+    FILES_JSON=$(GH_TOKEN=$TOKEN gh api repos/sabbour/kickstart/pulls/{number}/files --paginate)
     jq -n --argjson pr "$PR_JSON" --argjson files "$FILES_JSON" '
       ($pr.labels | map(.name)) as $labels
       | ([ $pr.title, $pr.body, $pr.headRefName ] + $labels | map(select(. != null)) | join(" ")) as $signals
@@ -304,7 +290,7 @@ All CI checks must pass, including Playwright E2E tests. If checks fail:
 
 2. **Conversation resolution** — all review threads resolved:
    ```bash
-   gh pr view {number} --json reviewThreads --jq '[.reviewThreads[] | select(.isResolved == false)] | length'
+   GH_TOKEN=$TOKEN gh pr view {number} --json reviewThreads --jq '[.reviewThreads[] | select(.isResolved == false)] | length'
    ```
    Must return `0`.
 
@@ -318,7 +304,7 @@ If either check fails — STOP. Do not merge. Comment on the PR requesting the m
 
 Once merge gate checks pass, all reviews are addressed, threads resolved, and CI is green:
 ```bash
-gh pr merge <N> --squash --delete-branch
+GH_TOKEN=$TOKEN gh pr merge <N> --squash --delete-branch
 ```
 
 Qualifying GitHub PRs can now skip the manual merge command: the `Squad Auto Merge` workflow arms squash auto-merge when trusted merge signals are green (`CI Gate` from workflow `CI` plus `squad/review-gate` from `Squad Review Gate`), the PR is neither XL (>1000 changed lines) nor titled `refactor`, and one of these approval paths is satisfied on the current head:
@@ -376,7 +362,7 @@ Example: `squad/42-fix-login-validation`
 ## Quick Reference Checklist
 
 ```
-□ Assign issue to current user (gh api user -q .login)
+□ Assign issue to current user (GH_TOKEN=$TOKEN gh api user -q .login)
 □ Set milestone
 □ Update board → In progress
 □ Issue has exactly one `estimate:*` label
@@ -385,17 +371,17 @@ Example: `squad/42-fix-login-validation`
 □ Zapp approves DP (security)
 □ Create branch: squad/{N}-{slug}
 □ Implement (design already approved)
-□ Open draft PR: gh pr create --draft
+□ Open draft PR: GH_TOKEN=$TOKEN gh pr create --draft
 □ Post progress comments on PR
 □ Rebase if behind main (never merge)
 □ All CI green
-□ gh pr ready
+□ GH_TOKEN=$TOKEN gh pr ready
 □ Request @copilot review via API
 □ Leela reviews code quality
 □ Zapp reviews security
 □ Address all review comments
 □ Resolve all threads
 □ Update board → In review
-□ gh pr merge --squash --delete-branch
+□ GH_TOKEN=$TOKEN gh pr merge --squash --delete-branch
 □ Update board → Done
 ```

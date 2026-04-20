@@ -132,55 +132,31 @@ Agents MUST use their GitHub App token for these calls so the comment appears as
 
 ```bash
 # Resolve bot token (see GIT IDENTITY in spawn prompt)
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
-if [ -z "$TOKEN" ] && [ "${SQUAD_ALLOW_WRITE_FALLBACK:-0}" != "1" ]; then
-  echo "Bot token resolution failed; refusing write action without SQUAD_ALLOW_WRITE_FALLBACK=1" >&2
-  exit 1
-fi
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+export GH_TOKEN="$TOKEN"
 
 # Post start comment on the issue
-if [ -n "$TOKEN" ]; then
-  GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
-    --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
+GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
+  --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
 ⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 🌿 Branch: \`squad/{issue-number}-{slug}\`"
-else
-  gh issue comment {number} --repo {owner}/{repo} \
-    --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
-⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-🌿 Branch: \`squad/{issue-number}-{slug}\`"
-fi
 
 # Move issue to "In Progress" on the project board
 # Use the GitHub Projects GraphQL API to update the status field
-if [ -n "$TOKEN" ]; then
-  GH_TOKEN=$TOKEN gh api graphql -f query='
-    mutation {
-      updateProjectV2ItemFieldValue(
-        input: {
-          projectId: "{project-node-id}"
-          itemId: "{item-node-id}"
-          fieldId: "{status-field-id}"
-          value: { singleSelectOptionId: "{in-progress-option-id}" }
-        }
-      ) { projectV2Item { id } }
-    }'
-else
-  gh api graphql -f query='
-    mutation {
-      updateProjectV2ItemFieldValue(
-        input: {
-          projectId: "{project-node-id}"
-          itemId: "{item-node-id}"
-          fieldId: "{status-field-id}"
-          value: { singleSelectOptionId: "{in-progress-option-id}" }
-        }
-      ) { projectV2Item { id } }
-    }'
-fi
+GH_TOKEN=$TOKEN gh api graphql -f query='
+  mutation {
+    updateProjectV2ItemFieldValue(
+      input: {
+        projectId: "{project-node-id}"
+        itemId: "{item-node-id}"
+        fieldId: "{status-field-id}"
+        value: { singleSelectOptionId: "{in-progress-option-id}" }
+      }
+    ) { projectV2Item { id } }
+  }'
 ```
 
-> **Write-auth escape hatch:** Write actions fail closed by default. Set `SQUAD_ALLOW_WRITE_FALLBACK=1` only when you intentionally want to use ambient `gh`/`git` auth and can audit that choice.
+> **Fail-closed rule:** Normal agent-authored writes must resolve an explicit app token first. Do not use ambient `gh`/`git` auth in this workflow.
 
 > **Board IDs:** The coordinator resolves project/item/field/option IDs before spawning and passes them in the ISSUE CONTEXT block. See spawn prompt additions below.
 
@@ -220,17 +196,8 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 **Push command:**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
-if [ -z "$TOKEN" ] && [ "${SQUAD_ALLOW_WRITE_FALLBACK:-0}" != "1" ]; then
-  echo "Bot token resolution failed; refusing write action without SQUAD_ALLOW_WRITE_FALLBACK=1" >&2
-  exit 1
-fi
-
-if [ -n "$TOKEN" ]; then
-  git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
-else
-  git push -u origin squad/{issue-number}-{slug}
-fi
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
 ```
 
 ### 4. PR Creation
@@ -247,11 +214,8 @@ fi
 
 **GitHub:**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
-if [ -z "$TOKEN" ] && [ "${SQUAD_ALLOW_WRITE_FALLBACK:-0}" != "1" ]; then
-  echo "Bot token resolution failed; refusing write action without SQUAD_ALLOW_WRITE_FALLBACK=1" >&2
-  exit 1
-fi
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+export GH_TOKEN="$TOKEN"
 
 cat > pr-body.txt <<'EOF'
 🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
@@ -261,17 +225,10 @@ Closes #{issue-number}
 {description}
 EOF
 
-if [ -n "$TOKEN" ]; then
-  GH_TOKEN=$TOKEN gh pr create --title "{title}" \
-    --body-file pr-body.txt \
-    --head squad/{issue-number}-{slug} \
-    --base main
-else
-  gh pr create --title "{title}" \
-    --body-file pr-body.txt \
-    --head squad/{issue-number}-{slug} \
-    --base main
-fi
+GH_TOKEN=$TOKEN gh pr create --title "{title}" \
+  --body-file pr-body.txt \
+  --head squad/{issue-number}-{slug} \
+  --base main
 ```
 
 **Azure DevOps:**
@@ -328,40 +285,23 @@ Working as {member} ({role})
 **Feedback acknowledgment (GitHub — using bot identity):**
 
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
-if [ -z "$TOKEN" ] && [ "${SQUAD_ALLOW_WRITE_FALLBACK:-0}" != "1" ]; then
-  echo "Bot token resolution failed; refusing write action without SQUAD_ALLOW_WRITE_FALLBACK=1" >&2
-  exit 1
-fi
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+export GH_TOKEN="$TOKEN"
 
 # Before making changes
-if [ -n "$TOKEN" ]; then
-  GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
-    --body "🔧 **{AgentName}** ({Role}) is addressing review feedback.
+GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
+  --body "🔧 **{AgentName}** ({Role}) is addressing review feedback.
 ⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-else
-  gh pr comment {pr-number} --repo {owner}/{repo} \
-    --body "🔧 **{AgentName}** ({Role}) is addressing review feedback.
-⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-fi
 
 # After pushing changes
-if [ -n "$TOKEN" ]; then
-  GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
-    --body "✅ **{AgentName}** addressed the feedback.
+GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
+  --body "✅ **{AgentName}** addressed the feedback.
 ⏱️ Completed: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 **Changes:** {summary}
 Ready for re-review."
-else
-  gh pr comment {pr-number} --repo {owner}/{repo} \
-    --body "✅ **{AgentName}** addressed the feedback.
-⏱️ Completed: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-**Changes:** {summary}
-Ready for re-review."
-fi
 ```
 
-> Write actions fail closed by default. Use `SQUAD_ALLOW_WRITE_FALLBACK=1` only as an explicit, auditable escape hatch for ambient auth.
+> Agent-authored feedback/status writes must use the explicit app token path above; do not fall back to ambient auth.
 
 **Update workflow:**
 ```bash
@@ -454,44 +394,25 @@ When spawning an agent to work on an issue, include this context block:
 
 1. **Post a start comment on the issue** using your bot identity:
    ```bash
-   TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
-   if [ -z "$TOKEN" ] && [ "${SQUAD_ALLOW_WRITE_FALLBACK:-0}" != "1" ]; then
-     echo "Bot token resolution failed; refusing write action without SQUAD_ALLOW_WRITE_FALLBACK=1" >&2
-     exit 1
-   fi
-   if [ -n "$TOKEN" ]; then
-     GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
-       --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
+   TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+   export GH_TOKEN="$TOKEN"
+   GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
+     --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
    ⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
    🌿 Branch: \`squad/{issue-number}-{slug}\`"
-   else
-     gh issue comment {number} --repo {owner}/{repo} \
-       --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
-   ⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-   🌿 Branch: \`squad/{issue-number}-{slug}\`"
-   fi
    ```
 
 2. **Move the issue to "In Progress" on the project board:**
    ```bash
-   if [ -n "$TOKEN" ]; then
-     GH_TOKEN=$TOKEN gh api graphql -f query='
-       mutation { updateProjectV2ItemFieldValue(input: {
-         projectId: "{project-node-id}", itemId: "{item-node-id}",
-         fieldId: "{status-field-id}",
-         value: { singleSelectOptionId: "{in-progress-option-id}" }
-       }) { projectV2Item { id } } }'
-   else
-     gh api graphql -f query='
-       mutation { updateProjectV2ItemFieldValue(input: {
-         projectId: "{project-node-id}", itemId: "{item-node-id}",
-         fieldId: "{status-field-id}",
-         value: { singleSelectOptionId: "{in-progress-option-id}" }
-       }) { projectV2Item { id } } }'
-   fi
+   GH_TOKEN=$TOKEN gh api graphql -f query='
+     mutation { updateProjectV2ItemFieldValue(input: {
+       projectId: "{project-node-id}", itemId: "{item-node-id}",
+       fieldId: "{status-field-id}",
+       value: { singleSelectOptionId: "{in-progress-option-id}" }
+     }) { projectV2Item { id } } }'
    ```
 
-> Write actions fail closed by default. Use `SQUAD_ALLOW_WRITE_FALLBACK=1` only as an explicit, auditable escape hatch for ambient auth.
+> Agent-authored writes in this lifecycle are fail-closed and must use an explicit app token.
 
 ## FEEDBACK ACKNOWLEDGMENT PROTOCOL
 
@@ -524,11 +445,8 @@ This data feeds Sprint Retro velocity analysis and Sprint Planning estimation.
 2. Push branch
 3. Open PR using:
    ```
-   TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
-   if [ -z "$TOKEN" ] && [ "${SQUAD_ALLOW_WRITE_FALLBACK:-0}" != "1" ]; then
-     echo "Bot token resolution failed; refusing write action without SQUAD_ALLOW_WRITE_FALLBACK=1" >&2
-     exit 1
-   fi
+   TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+   export GH_TOKEN="$TOKEN"
    cat > pr-body.txt <<'EOF'
    🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
 
@@ -536,11 +454,7 @@ This data feeds Sprint Retro velocity analysis and Sprint Planning estimation.
 
    {description}
    EOF
-   if [ -n "$TOKEN" ]; then
-     GH_TOKEN=$TOKEN gh pr create --title "{title}" --body-file pr-body.txt --head squad/{issue-number}-{slug} --base {base-branch}
-   else
-     gh pr create --title "{title}" --body-file pr-body.txt --head squad/{issue-number}-{slug} --base {base-branch}
-   fi
+   GH_TOKEN=$TOKEN gh pr create --title "{title}" --body-file pr-body.txt --head squad/{issue-number}-{slug} --base {base-branch}
    ```
 4. Report PR URL and time spent to coordinator
 ```
