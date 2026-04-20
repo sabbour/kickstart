@@ -348,6 +348,10 @@
   cursor: not-allowed;
 }
 
+.chat-send-icon {
+  font-size: 16px;
+}
+
 /* --- Demo badge (in phase bar) --- */
 .demo-badge {
   display: inline-flex;
