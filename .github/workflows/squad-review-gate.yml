@@ -1,10 +1,11 @@
 name: Squad Review Gate
 on:
   pull_request:
-    types: [labeled, unlabeled, opened, synchronize, reopened]
+    types: [labeled, unlabeled, opened, synchronize, reopened, edited, ready_for_review]
 
 permissions:
   contents: read
+  pull-requests: read
   statuses: write
 
 jobs:
@@ -15,25 +16,72 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const labels = context.payload.pull_request.labels.map(l => l.name);
-            const leelaApproved = labels.includes('leela:approved');
-            const zappApproved = labels.includes('zapp:approved');
+            const LOW_RISK_LABEL = 'squad:chore-auto';
+            const SENSITIVE_PATH_PATTERNS = [
+              /^\.github\/workflows\//i,
+              /(^|[\/._-])(auth|guardrail|guardrails|security)([\/._-]|$)/i,
+            ];
+
+            function isSecurityPatch(pr, labels) {
+              const securitySignals = [
+                pr.title,
+                pr.body,
+                pr.head?.ref,
+                ...labels,
+              ].filter(Boolean).join(' ');
+              return /security|cve-\d{4}-\d+|ghsa-|vuln|vulnerability/i.test(securitySignals);
+            }
+
+            function isSensitivePath(filename) {
+              return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(filename));
+            }
+
+            async function listChangedFiles(prNumber) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                per_page: 100,
+              });
+              return files.map((file) => file.filename);
+            }
+
+            const pr = context.payload.pull_request;
+            const labels = new Set(pr.labels.map((label) => label.name));
+            const changedFiles = await listChangedFiles(pr.number);
+            const leelaApproved = labels.has('leela:approved');
+            const zappApproved = labels.has('zapp:approved');
+            const isLowRisk = labels.has(LOW_RISK_LABEL);
+            const touchesSensitivePaths = changedFiles.some(isSensitivePath);
+            const hasSecuritySignals = isSecurityPatch(pr, labels);
+
+            const requiresZapp = !isLowRisk || hasSecuritySignals || touchesSensitivePaths;
+            const requiredApprovals = ['leela:approved'];
+            if (requiresZapp) {
+              requiredApprovals.push('zapp:approved');
+            }
+
+            const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
+            const leelaStatus = leelaApproved ? '✅' : '⏳';
+            const zappStatus = zappApproved ? '✅' : (requiresZapp ? '⏳' : '➖');
 
             let state, description;
-            if (leelaApproved && zappApproved) {
+            if (missingApprovals.length === 0) {
               state = 'success';
-              description = 'Squad review gate: Leela ✅ Zapp ✅';
+              description = isLowRisk && !requiresZapp
+                ? 'Squad review gate: low-risk path Leela ✅'
+                : 'Squad review gate: Leela ✅ Zapp ✅';
             } else {
               state = 'pending';
-              const leelaStatus = leelaApproved ? '✅' : '⏳';
-              const zappStatus = zappApproved ? '✅' : '⏳';
-              description = `Squad review gate: Leela ${leelaStatus} Zapp ${zappStatus}`;
+              description = isLowRisk && !requiresZapp
+                ? `Squad review gate: low-risk path Leela ${leelaStatus}`
+                : `Squad review gate: Leela ${leelaStatus} Zapp ${zappStatus}`;
             }
 
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: context.payload.pull_request.head.sha,
+              sha: pr.head.sha,
               state,
               description,
               context: 'squad/review-gate'

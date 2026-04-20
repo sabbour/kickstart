@@ -24,9 +24,14 @@ jobs:
         with:
           script: |
             const AUTO_MERGE_MARKER = '<!-- squad-auto-merge -->';
+            const LOW_RISK_LABEL = 'squad:chore-auto';
             const XL_THRESHOLD = 1000;
             const APPROVAL_LABELS = ['leela:approved', 'zapp:approved'];
             const REVIEW_GATE_CONTEXT = 'squad/review-gate';
+            const SENSITIVE_PATH_PATTERNS = [
+              /^\.github\/workflows\//i,
+              /(^|[\/._-])(auth|guardrail|guardrails|security)([\/._-]|$)/i,
+            ];
             const TRUSTED_CI_WORKFLOW = '.github/workflows/ci.yml';
             const TRUSTED_REVIEW_WORKFLOW = '.github/workflows/squad-review-gate.yml';
 
@@ -64,6 +69,50 @@ jobs:
               return node?.status === 'COMPLETED' && node?.conclusion === 'SUCCESS';
             }
 
+            function isSecurityPatch(pr, labels) {
+              const securitySignals = [
+                pr.title,
+                pr.body,
+                pr.headRefName,
+                ...labels,
+              ].filter(Boolean).join(' ');
+              return /security|cve-\d{4}-\d+|ghsa-|vuln|vulnerability/i.test(securitySignals);
+            }
+
+            function isSensitivePath(filename) {
+              return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(filename));
+            }
+
+            function getZappRequirementReason(pr, labels, changedFiles) {
+              if (!labels.has(LOW_RISK_LABEL)) {
+                return 'standard review path';
+              }
+
+              if (isSecurityPatch(pr, labels)) {
+                return 'security-sensitive title/body/branch/label signal';
+              }
+
+              const sensitiveFiles = changedFiles.filter(isSensitivePath);
+              if (sensitiveFiles.length > 0) {
+                const preview = sensitiveFiles.slice(0, 3).map((file) => `\`${file}\``).join(', ');
+                return `sensitive paths touched (${preview}${sensitiveFiles.length > 3 ? ', …' : ''})`;
+              }
+
+              return null;
+            }
+
+            function getRequiredApprovals(pr, labels, changedFiles) {
+              if (!labels.has(LOW_RISK_LABEL)) {
+                return [...APPROVAL_LABELS];
+              }
+
+              const required = ['leela:approved'];
+              if (getZappRequirementReason(pr, labels, changedFiles)) {
+                required.push('zapp:approved');
+              }
+              return required;
+            }
+
             async function listComments(prNumber) {
               return github.paginate(github.rest.issues.listComments, {
                 owner: context.repo.owner,
@@ -71,6 +120,16 @@ jobs:
                 issue_number: prNumber,
                 per_page: 100,
               });
+            }
+
+            async function listChangedFiles(prNumber) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                per_page: 100,
+              });
+              return files.map((file) => file.filename);
             }
 
             async function upsertAuditComment(prNumber, body, createIfMissing = true) {
@@ -178,11 +237,13 @@ jobs:
                     id
                     number
                     title
+                    body
                     state
                     isDraft
                     mergeStateStatus
                     additions
                     deletions
+                    headRefName
                     headRefOid
                     autoMergeRequest {
                       enabledAt
@@ -206,7 +267,6 @@ jobs:
                                   conclusion
                                   startedAt
                                   completedAt
-                                  workflowName
                                 }
                               }
                             }
@@ -232,6 +292,8 @@ jobs:
             }
 
             const labels = new Set(pr.labels.nodes.map((label) => label.name));
+            const changedFiles = await listChangedFiles(pr.number);
+            const zappRequirementReason = getZappRequirementReason(pr, labels, changedFiles);
             const removedLabels = await clearApprovalLabels(pr, labels);
             if (removedLabels.length > 0) {
               await disableAutoMerge(
@@ -242,7 +304,7 @@ jobs:
                   '🤖 Auto-merge disarmed.',
                   '',
                   `- removed stale approval labels: ${removedLabels.join(', ')}`,
-                  '- new commits require fresh Leela + Zapp approval labels before re-arming',
+                  '- new commits require fresh approval labels before re-arming',
                 ].join('\n'),
               );
               core.info(`Cleared stale approval labels for PR #${pr.number}: ${removedLabels.join(', ')}`);
@@ -265,8 +327,10 @@ jobs:
               blockers.push('PR title is marked refactor');
             }
 
-            if (!(labels.has('leela:approved') && labels.has('zapp:approved'))) {
-              blockers.push('missing fresh approval labels');
+            const requiredApprovals = getRequiredApprovals(pr, labels, changedFiles);
+            const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
+            if (missingApprovals.length > 0) {
+              blockers.push(`missing fresh approval labels: ${missingApprovals.join(', ')}`);
             }
 
             if (pr.mergeStateStatus === 'DIRTY') {
@@ -297,10 +361,10 @@ jobs:
             }
 
             const rawCheckRuns = pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts?.nodes ?? [];
-            const checkRuns = [...dedupeBy(rawCheckRuns.filter((node) => node?.__typename === 'CheckRun'), (node) => `${node.workflowName ?? 'unknown'}:${node.name}`).values()];
-            const ciGate = checkRuns.find((node) => node.name === 'CI Gate' && node.workflowName === 'CI');
+            const checkRuns = [...dedupeBy(rawCheckRuns.filter((node) => node?.__typename === 'CheckRun'), (node) => node.name).values()];
+            const ciGate = checkRuns.find((node) => node.name === 'CI Gate');
             if (!isSuccessfulCheckRun(ciGate)) {
-              core.info(`PR #${pr.number} does not yet have a green CI Gate check from workflow CI.`);
+              core.info(`PR #${pr.number} does not yet have a green CI Gate check.`);
               return;
             }
 
@@ -357,7 +421,9 @@ jobs:
                 AUTO_MERGE_MARKER,
                 '🤖 Auto-merge armed.',
                 '',
-                '- fresh `leela:approved` + `zapp:approved` labels are present on the current head',
+                labels.has(LOW_RISK_LABEL)
+                  ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}`
+                  : '- fresh `leela:approved` + `zapp:approved` labels are present on the current head',
                 '- trusted merge signals are green: `CI Gate` from workflow `CI` and `squad/review-gate` from `Squad Review Gate`',
                 '- PR is not XL and title is not marked `refactor`',
                 '',

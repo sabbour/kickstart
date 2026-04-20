@@ -5,7 +5,8 @@
 # workflow lives alongside it and syncs labels that are NOT in the
 # upstream list (review gates, pulse/retro labels, release PRs, etc.).
 #
-# Same trigger and upsert pattern as sync-squad-labels.yml.
+# Same upsert pattern as sync-squad-labels.yml, but it also re-runs when this
+# workflow changes so new custom labels roll out on merge.
 
 name: Sync Squad Custom Labels
 
@@ -14,6 +15,7 @@ on:
     paths:
       - '.squad/team.md'
       - '.ai-team/team.md'
+      - '.github/workflows/sync-squad-custom-labels.yml'
   workflow_dispatch:
 
 permissions:
@@ -35,6 +37,7 @@ jobs:
               { name: 'pulse:daily',       color: 'BFD4F2', description: 'Daily pulse rolling issue' },
               { name: 'pulse:weekly',      color: '6B8EB5', description: 'Weekly pulse issue' },
               { name: 'release',           color: '0E8A16', description: 'Release PR opened by the cadence workflow' },
+              { name: 'squad:chore-auto',  color: 'BFDADC', description: 'Opt in low-risk PR for auto-merge when gates pass' },
               { name: 'leela:approved',    color: '0E8A16', description: 'Architecture review approved' },
               { name: 'leela:rejected',    color: 'D93F0B', description: 'Architecture review rejected' },
               { name: 'zapp:approved',     color: '0E8A16', description: 'Security review approved' },
