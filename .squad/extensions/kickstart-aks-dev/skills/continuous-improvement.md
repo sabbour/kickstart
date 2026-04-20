@@ -17,7 +17,7 @@ No squad member opens a retro by hand. No human types "run sprint planning." If 
 | Weekly team question | `.github/workflows/squad-weekly-pulse.yml` | live | Publishes the weekly pulse issue |
 | Velocity + quality SLO panel | `.github/workflows/squad-velocity-report.yml` | pending `#803` / PR `#836` | Becomes the source of truth for throughput, estimate accuracy, and quality SLOs |
 | Process experiment grading | `.github/workflows/squad-process-grader.yml` | pending `#805` | Posts the grade for each expired `process` experiment |
-| Safety brake on quality regressions | `.github/workflows/squad-review-gate.yml` | live now, quality brake pending `#806` / PR `#837` | The workflow exists today; #806 adds the quality-SLO fail-closed behavior |
+| Safety brake on quality regressions | `.github/workflows/squad-review-gate.yml` | live now, quality brake pending `#806` | The workflow exists today; #806 adds the quality-SLO fail-closed behavior |
 
 ## The loop
 
