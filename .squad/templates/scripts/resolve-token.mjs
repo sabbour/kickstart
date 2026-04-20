@@ -3,8 +3,11 @@
 // Standalone token resolution for agent identity.
 // Uses only Node.js built-in modules — no npm dependencies required.
 //
-// Usage: node .squad/scripts/resolve-token.mjs <role_slug>
-// Output: installation access token on stdout, or nothing on failure (exit 0).
+// Usage:
+//   node .squad/scripts/resolve-token.mjs <role_slug>
+//   node .squad/scripts/resolve-token.mjs --required <role_slug>
+// Output: installation access token on stdout. In default mode, failures print nothing and exit 0.
+// In --required mode, failures print a reason to stderr and exit 1.
 
 import { createSign } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
@@ -229,17 +232,23 @@ function clearTokenCache() {
  * @param {string} roleKey - Role key (e.g. 'lead', 'backend', 'shared')
  * @returns {Promise<string | null>}
  */
-async function resolveToken(projectRoot, roleKey) {
+async function resolveTokenWithDiagnostics(projectRoot, roleKey) {
+  const normalizedRoleKey = normalizeRoleKey(roleKey);
   try {
     const resolvedRoleKey = resolveRoleSlug(projectRoot, roleKey);
-    if (!resolvedRoleKey) return null;
+    if (!resolvedRoleKey) {
+      return {
+        token: null,
+        error: `No GitHub App mapping configured for role "${normalizedRoleKey ?? String(roleKey)}".`,
+      };
+    }
 
     // Check cache
     const cached = tokenCache.get(resolvedRoleKey);
     if (cached) {
       const remainingMs = cached.expiresAt.getTime() - Date.now();
       if (remainingMs > REFRESH_MARGIN_MS) {
-        return cached.token;
+        return { token: cached.token, error: null };
       }
       tokenCache.delete(resolvedRoleKey);
     }
@@ -250,29 +259,47 @@ async function resolveToken(projectRoot, roleKey) {
       const jwt = generateAppJWT(envCreds.appId, envCreds.pem);
       const { token, expiresAt } = await getInstallationToken(jwt, envCreds.installationId);
       tokenCache.set(resolvedRoleKey, { token, expiresAt });
-      return token;
+      return { token, error: null };
     }
 
     // Path 2: Filesystem (default)
     const reg = loadAppRegistration(projectRoot, resolvedRoleKey);
-    if (!reg) return null;
+    if (!reg) {
+      return {
+        token: null,
+        error: `No GitHub App registration found for role "${resolvedRoleKey}".`,
+      };
+    }
 
     const pemPath = join(projectRoot, '.squad', 'identity', 'keys', `${resolvedRoleKey}.pem`);
-    if (!existsSync(pemPath)) return null;
+    if (!existsSync(pemPath)) {
+      return {
+        token: null,
+        error: `No GitHub App private key found for role "${resolvedRoleKey}".`,
+      };
+    }
 
     const pem = readFileSync(pemPath, 'utf-8');
     const jwt = generateAppJWT(reg.appId, pem);
     const { token, expiresAt } = await getInstallationToken(jwt, reg.installationId);
 
     tokenCache.set(resolvedRoleKey, { token, expiresAt });
-    return token;
-  } catch {
-    // Graceful fallback — never throw; output nothing on failure
-    return null;
+    return { token, error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      token: null,
+      error: message || `Failed to resolve GitHub App token for role "${normalizedRoleKey ?? String(roleKey)}".`,
+    };
   }
 }
 
-export { clearTokenCache, resolveRoleSlug, resolveToken };
+async function resolveToken(projectRoot, roleKey) {
+  const { token } = await resolveTokenWithDiagnostics(projectRoot, roleKey);
+  return token;
+}
+
+export { clearTokenCache, resolveRoleSlug, resolveToken, resolveTokenWithDiagnostics };
 
 // ============================================================================
 // CLI entry point
@@ -283,7 +310,9 @@ const isCliInvocation =
   resolvePath(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isCliInvocation) {
-  const roleSlug = process.argv[2];
+  const args = process.argv.slice(2);
+  const required = args[0] === '--required';
+  const roleSlug = required ? args[1] : args[0];
   if (!roleSlug) {
     process.exit(0);
   }
@@ -298,8 +327,13 @@ if (isCliInvocation) {
     // Fallback to cwd if import.meta.url is unavailable
   }
 
-  const token = await resolveToken(projectRoot, roleSlug);
+  const { token, error } = await resolveTokenWithDiagnostics(projectRoot, roleSlug);
   if (token) {
     process.stdout.write(token);
+  } else if (required) {
+    if (error) {
+      process.stderr.write(`${error}\n`);
+    }
+    process.exit(1);
   }
 }
