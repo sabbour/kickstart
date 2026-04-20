@@ -11,6 +11,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: squad-retro-log
+  cancel-in-progress: false
+
 permissions:
   checks: read
   contents: write
@@ -25,6 +29,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref || github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compute metrics
@@ -179,8 +184,11 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           LINE: ${{ steps.metrics.outputs.line }}
+          TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
         run: |
           set -e
+          git fetch origin "$TARGET_BRANCH"
+          git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
           mkdir -p .squad
           touch .squad/retro-log.md
           # Insert the new line directly after the entries marker
@@ -203,7 +211,8 @@ jobs:
             exit 0
           fi
           git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
-          git push
+          git pull --rebase origin "$TARGET_BRANCH"
+          git push origin "HEAD:$TARGET_BRANCH"
 
       - name: Detect reverted PRs
         id: reverted
@@ -301,8 +310,11 @@ jobs:
         if: github.event_name == 'push'
         env:
           PRS_JSON: ${{ steps.reverted.outputs.prs }}
+          TARGET_BRANCH: ${{ github.ref_name }}
         run: |
           set -e
+          git fetch origin "$TARGET_BRANCH"
+          git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
           node <<'EOF'
           const fs = require('fs');
 
@@ -345,7 +357,8 @@ jobs:
             exit 0
           fi
           git commit -m "chore(retro-log): backfill reverted flags [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
-          git push
+          git pull --rebase origin "$TARGET_BRANCH"
+          git push origin "HEAD:$TARGET_BRANCH"
 
       - name: Mirror line as PR comment
         if: github.event_name == 'pull_request'
