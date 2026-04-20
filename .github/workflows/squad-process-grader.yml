@@ -1,0 +1,290 @@
+name: Squad · Process Grader
+
+# Every day, grade due process experiments against the latest velocity snapshot.
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Grade due process issues
+        id: grade
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const VELOCITY_PATH = '.squad/velocity.md';
+            const DECISIONS_DIR = '.squad/decisions/inbox';
+            const GRADE_LABELS = ['process:succeeded', 'process:no-effect', 'process:reverted'];
+            const TODAY = new Date().toISOString().slice(0, 10);
+
+            if (!fs.existsSync(VELOCITY_PATH)) {
+              core.setFailed('Missing .squad/velocity.md. Merge the velocity report workflow first.');
+              return;
+            }
+
+            const velocityText = fs.readFileSync(VELOCITY_PATH, 'utf8');
+            const latestSnapshot = velocityText.match(/## Snapshot · (\d{4}-\d{2}-\d{2})[\s\S]*?(?=\n## Snapshot · |$)/);
+            if (!latestSnapshot) {
+              core.setFailed('Unable to parse the latest velocity snapshot.');
+              return;
+            }
+
+            const snapshotDate = latestSnapshot[1];
+            const snapshotBody = latestSnapshot[0];
+            const medianThroughput = snapshotBody.match(/Median throughput: \*\*(\d+(?:\.\d+)?)\*\* size-points\/week/);
+            const qualityPanel = snapshotBody.match(/### Quality SLO panel\s*\n([\s\S]*?)(?:\n### |\n## |\n---|$)/);
+
+            const metrics = {};
+            if (medianThroughput) {
+              metrics['median throughput'] = { value: Number.parseFloat(medianThroughput[1]), unit: 'pts/wk' };
+            }
+            if (qualityPanel) {
+              for (const line of qualityPanel[1].split('\n')) {
+                const row = line.match(/^\| ([^|]+) \| ([^|]+) \|/);
+                if (!row) continue;
+                const signal = row[1].trim().toLowerCase();
+                const actual = row[2].trim();
+                const numeric = actual.match(/-?\d+(?:\.\d+)?/);
+                if (!numeric) continue;
+                metrics[signal] = {
+                  value: Number.parseFloat(numeric[0]),
+                  unit: actual.includes('%') ? '%' : '',
+                };
+              }
+            }
+
+            const normalizeSignal = (signal) => signal.trim().toLowerCase();
+            const parseField = (body, label) => {
+              const inline = body.match(new RegExp(`^${label}:\\s*(.+)$`, 'mi'));
+              if (inline) return inline[1].trim();
+              const section = body.match(new RegExp(`^###\\s+${label}\\s*$\\n+([\\s\\S]*?)(?=\\n###\\s+|$)`, 'mi'));
+              return section ? section[1].trim() : null;
+            };
+            const replaceField = (body, label, value) => {
+              if (new RegExp(`^${label}:\\s*.+$`, 'mi').test(body)) {
+                return body.replace(new RegExp(`^${label}:\\s*.+$`, 'mi'), `${label}: ${value}`);
+              }
+              if (new RegExp(`^###\\s+${label}\\s*$`, 'mi').test(body)) {
+                return body.replace(
+                  new RegExp(`(^###\\s+${label}\\s*$\\n+)([\\s\\S]*?)(?=\\n###\\s+|$)`, 'mi'),
+                  `$1${value}\n`
+                );
+              }
+              return body;
+            };
+            const parseTarget = (text) => {
+              const match = text.match(/^(<=|>=|<|>)\s*(-?\d+(?:\.\d+)?)\s*(%|pts\/wk)?$/i);
+              if (!match) return null;
+              return { op: match[1], value: Number.parseFloat(match[2]), unit: (match[3] || '').toLowerCase() };
+            };
+            const parseBaseline = (text) => {
+              const match = text.match(/(-?\d+(?:\.\d+)?)/);
+              if (!match) return null;
+              return Number.parseFloat(match[1]);
+            };
+            const compare = (actual, target) => {
+              if (target.op === '<') return actual < target.value;
+              if (target.op === '<=') return actual <= target.value;
+              if (target.op === '>') return actual > target.value;
+              if (target.op === '>=') return actual >= target.value;
+              return false;
+            };
+            const betterDirection = (target) => target.op.includes('<') ? 'lower' : 'higher';
+            const epsilonFor = (unit) => unit === '%' ? 0.5 : 1;
+            const addDays = (dateText, days) => {
+              const date = new Date(`${dateText}T00:00:00Z`);
+              date.setUTCDate(date.getUTCDate() + days);
+              return date.toISOString().slice(0, 10);
+            };
+
+            const processIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'process',
+              per_page: 100,
+            });
+
+            const candidates = processIssues.filter((issue) =>
+              !issue.pull_request &&
+              !issue.labels.some((label) => {
+                const name = typeof label === 'string' ? label : label.name;
+                return name === 'process:succeeded' || name === 'process:reverted';
+              })
+            );
+
+            fs.mkdirSync(DECISIONS_DIR, { recursive: true });
+
+            const graded = [];
+            for (const issue of candidates) {
+              const signalField = parseField(issue.body || '', 'Signal');
+              const targetField = parseField(issue.body || '', 'Target');
+              const baselineField = parseField(issue.body || '', 'Baseline');
+              const revisitDate = parseField(issue.body || '', 'Revisit date');
+              const hypothesis = parseField(issue.body || '', 'Hypothesis') || issue.title;
+
+              if (!signalField || !targetField || !baselineField || !revisitDate || revisitDate > TODAY) {
+                continue;
+              }
+
+              const signal = normalizeSignal(signalField);
+              const metric = metrics[signal];
+              const target = parseTarget(targetField);
+              const baseline = parseBaseline(baselineField);
+              if (!metric || !target || baseline == null) {
+                continue;
+              }
+
+              const actual = metric.value;
+              const targetMet = compare(actual, target);
+              const direction = betterDirection(target);
+              const epsilon = epsilonFor(metric.unit || target.unit);
+              const delta = actual - baseline;
+
+              let grade = 'process:no-effect';
+              let badge = '🟡';
+              let summary = 'No material change yet. Extend the experiment by 2 weeks.';
+
+              if (targetMet) {
+                grade = 'process:succeeded';
+                badge = '✅';
+                summary = 'Target met. The experiment succeeded.';
+              } else {
+                const gotWorse = direction === 'lower'
+                  ? actual > baseline + epsilon
+                  : actual < baseline - epsilon;
+                if (gotWorse) {
+                  grade = 'process:reverted';
+                  badge = '🔴';
+                  summary = 'Signal moved the wrong way. Open a revert follow-up.';
+                }
+              }
+
+              const marker = `<!-- squad-process-grader:${snapshotDate}:${issue.number} -->`;
+              const commentBody = [
+                marker,
+                `### ${badge} Process grade (${snapshotDate})`,
+                '',
+                `- Signal: **${signalField}**`,
+                `- Baseline: **${baselineField}**`,
+                `- Actual: **${actual}${metric.unit || ''}**`,
+                `- Target: **${targetField}**`,
+                '',
+                summary,
+              ].join('\n');
+
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                per_page: 100,
+              });
+              const existing = comments.find((comment) => comment.body?.includes(marker));
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body: commentBody,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: commentBody,
+                });
+              }
+
+              const currentLabels = issue.labels.map((label) => typeof label === 'string' ? label : label.name);
+              for (const label of GRADE_LABELS) {
+                if (label !== grade && currentLabels.includes(label)) {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    name: label,
+                  }).catch(() => {});
+                }
+              }
+              if (!currentLabels.includes(grade)) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: [grade],
+                });
+              }
+
+              let nextBody = issue.body || '';
+              if (grade === 'process:no-effect') {
+                const nextRevisit = addDays(revisitDate, 14);
+                nextBody = replaceField(nextBody, 'Revisit date', nextRevisit);
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: nextBody,
+                });
+              }
+
+              const decisionPath = path.join(DECISIONS_DIR, `process-grade-${issue.number}.md`);
+              const decisionBody = [
+                `# Process grade — #${issue.number}`,
+                '',
+                `**Date:** ${snapshotDate}`,
+                `**Issue:** #${issue.number}`,
+                '',
+                '## Hypothesis',
+                '',
+                hypothesis,
+                '',
+                '## Grade',
+                '',
+                `- Signal: ${signalField}`,
+                `- Baseline: ${baselineField}`,
+                `- Actual: ${actual}${metric.unit || ''}`,
+                `- Target: ${targetField}`,
+                `- Result: ${grade}`,
+                '',
+                summary,
+                '',
+                'Generated by `.github/workflows/squad-process-grader.yml` for Scribe to merge into `.squad/decisions.md`.',
+              ].join('\n');
+              fs.writeFileSync(decisionPath, decisionBody);
+
+              graded.push(`#${issue.number} → ${grade}`);
+            }
+
+            core.setOutput('graded', JSON.stringify(graded));
+            core.setOutput('has_changes', graded.length ? 'true' : 'false');
+
+      - name: Commit graded hypotheses (as Scribe)
+        if: steps.grade.outputs.has_changes == 'true'
+        run: |
+          set -e
+          git config user.name "squad-scribe[bot]"
+          git config user.email "scribe@squad.local"
+          git add -f .squad/decisions/inbox/process-grade-*.md
+          if git diff --cached --quiet; then
+            echo "No graded hypothesis files to commit."
+            exit 0
+          fi
+          git commit -m "chore(process-grader): grade process hypotheses [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
+          git push origin HEAD:${{ github.event.repository.default_branch }}

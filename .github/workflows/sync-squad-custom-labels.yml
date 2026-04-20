@@ -32,6 +32,9 @@ jobs:
           script: |
             const labels = [
               { name: 'process',           color: '5319E7', description: 'Process improvement tracked by the weekly pulse' },
+              { name: 'process:succeeded', color: '0E8A16', description: 'Process experiment met its target' },
+              { name: 'process:no-effect', color: 'FBCA04', description: 'Process experiment showed no material change yet' },
+              { name: 'process:reverted',  color: 'D93F0B', description: 'Process experiment regressed and should be reverted' },
               { name: 'pulse:daily',       color: 'BFD4F2', description: 'Daily pulse rolling issue' },
               { name: 'pulse:weekly',      color: '6B8EB5', description: 'Weekly pulse issue' },
               { name: 'release',           color: '0E8A16', description: 'Release PR opened by the cadence workflow' },

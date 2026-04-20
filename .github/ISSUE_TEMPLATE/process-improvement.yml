@@ -1,0 +1,87 @@
+name: Process Improvement
+description: Propose a measurable process experiment with an expiry and grading target.
+title: "[Process]: "
+labels: ["squad", "process"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Process Improvement Experiment
+        Process issues must be measurable and reversible. Fill in the hypothesis block so the grader workflow can evaluate the experiment on the revisit date.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Description
+      description: What recurring delivery or quality problem are you trying to change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Hypothesis
+      description: State the proposed process change as a testable hypothesis.
+      placeholder: "If we do X, then Y should improve because Z."
+    validations:
+      required: true
+
+  - type: input
+    id: signal
+    attributes:
+      label: Signal
+      description: Metric name from `.squad/velocity.md` to track.
+      placeholder: "Rework rate"
+    validations:
+      required: true
+
+  - type: input
+    id: baseline
+    attributes:
+      label: Baseline
+      description: Starting value before the experiment.
+      placeholder: "24.0%"
+    validations:
+      required: true
+
+  - type: input
+    id: target
+    attributes:
+      label: Target
+      description: Goal the experiment must hit.
+      placeholder: "<= 20%"
+    validations:
+      required: true
+
+  - type: input
+    id: revisit-date
+    attributes:
+      label: Revisit date
+      description: Date the experiment must be graded (YYYY-MM-DD).
+      placeholder: "2026-05-04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: What must happen for the experiment to be considered implemented?
+      placeholder: |
+        - [ ] Workflow or rule change lands
+        - [ ] Owners know how to follow it
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        Add the following block to the issue body so automation can parse it:
+
+        ```
+        Hypothesis: <copy from the field above>
+        Signal: <copy from the field above>
+        Baseline: <copy from the field above>
+        Target: <copy from the field above>
+        Revisit date: <copy from the field above>
+        ```
