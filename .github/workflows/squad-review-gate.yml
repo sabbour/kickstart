@@ -17,6 +17,10 @@ jobs:
         with:
           script: |
             const LOW_RISK_LABEL = 'squad:chore-auto';
+            const TRUSTED_RETRO_LABEL = 'retro-log';
+            const TRUSTED_RETRO_BRANCH_PREFIX = 'retro-log/pr-';
+            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'sabbour-squad-lead[bot]']);
+            const TRUSTED_RETRO_ONLY_PATHS = new Set(['.squad/retro-log.md']);
             const SENSITIVE_PATH_PATTERNS = [
               /^\.github\/workflows\//i,
               /(^|[\/._-])(auth|guardrail|guardrails|security)([\/._-]|$)/i,
@@ -36,6 +40,16 @@ jobs:
               return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(filename));
             }
 
+            function isTrustedRetroLogPr(pr, labels, changedFiles) {
+              return (
+                labels.has(TRUSTED_RETRO_LABEL) &&
+                TRUSTED_RETRO_AUTHORS.has(pr.user?.login ?? '') &&
+                (pr.head?.ref ?? '').startsWith(TRUSTED_RETRO_BRANCH_PREFIX) &&
+                changedFiles.length > 0 &&
+                changedFiles.every((filename) => TRUSTED_RETRO_ONLY_PATHS.has(filename))
+              );
+            }
+
             async function listChangedFiles(prNumber) {
               const files = await github.paginate(github.rest.pulls.listFiles, {
                 owner: context.repo.owner,
@@ -49,6 +63,18 @@ jobs:
             const pr = context.payload.pull_request;
             const labels = new Set(pr.labels.map((label) => label.name));
             const changedFiles = await listChangedFiles(pr.number);
+            const trustedRetroLogPr = isTrustedRetroLogPr(pr, labels, changedFiles);
+            if (trustedRetroLogPr) {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: pr.head.sha,
+                state: 'success',
+                description: 'Squad review gate: trusted retro-log PR',
+                context: 'squad/review-gate'
+              });
+              return;
+            }
             const leelaApproved = labels.has('leela:approved');
             const zappApproved = labels.has('zapp:approved');
             const isLowRisk = labels.has(LOW_RISK_LABEL);

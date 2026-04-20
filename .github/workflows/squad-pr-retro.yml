@@ -32,9 +32,61 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref || github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Classify trusted retro-log PR
+        id: trusted_retro_pr
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const TRUSTED_RETRO_LABEL = 'retro-log';
+            const TRUSTED_RETRO_BRANCH_PREFIX = 'retro-log/pr-';
+            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'sabbour-squad-lead[bot]']);
+            const TRUSTED_RETRO_ONLY_PATHS = new Set(['.squad/retro-log.md']);
+
+            const pr = context.payload.pull_request;
+            const labels = new Set((pr.labels ?? []).map((label) => label.name));
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+            const changedFiles = files.map((file) => file.filename);
+            const isTrustedRetroPr =
+              labels.has(TRUSTED_RETRO_LABEL) &&
+              TRUSTED_RETRO_AUTHORS.has(pr.user?.login ?? '') &&
+              (pr.head?.ref ?? '').startsWith(TRUSTED_RETRO_BRANCH_PREFIX) &&
+              changedFiles.length > 0 &&
+              changedFiles.every((filename) => TRUSTED_RETRO_ONLY_PATHS.has(filename));
+
+            core.setOutput('skip_pr_close', isTrustedRetroPr ? 'true' : 'false');
+
+      - name: Resolve retro branch state
+        id: retro_branch_state
+        uses: actions/github-script@v8
+        env:
+          TARGET_BRANCH: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref || github.ref_name }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const base = process.env.TARGET_BRANCH;
+            const branch = `retro-log/pr-${base}`;
+            const openPulls = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'open',
+              head: `${owner}:${branch}`,
+              base,
+              per_page: 20,
+            });
+
+            core.setOutput('branch', branch);
+            core.setOutput('has_open_pr', openPulls.length > 0 ? 'true' : 'false');
+
       - name: Compute metrics
         id: metrics
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.trusted_retro_pr.outputs.skip_pr_close != 'true'
         uses: actions/github-script@v8
         with:
           script: |
@@ -181,14 +233,22 @@ jobs:
             core.setOutput('pr', String(pr.number));
 
       - name: Append to retro log (as Scribe)
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.trusted_retro_pr.outputs.skip_pr_close != 'true'
+        id: append
         env:
           LINE: ${{ steps.metrics.outputs.line }}
           TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
+          RETRO_BRANCH: ${{ steps.retro_branch_state.outputs.branch }}
+          HAS_OPEN_RETRO_PR: ${{ steps.retro_branch_state.outputs.has_open_pr }}
         run: |
-          set -e
+          set -euo pipefail
           git fetch origin "$TARGET_BRANCH"
-          git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          if [ "$HAS_OPEN_RETRO_PR" = "true" ] && git ls-remote --exit-code --heads origin "$RETRO_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$RETRO_BRANCH"
+            git checkout -B "$RETRO_BRANCH" "origin/$RETRO_BRANCH"
+          else
+            git checkout -B "$RETRO_BRANCH" "origin/$TARGET_BRANCH"
+          fi
           mkdir -p .squad
           touch .squad/retro-log.md
           # Insert the new line directly after the entries marker
@@ -208,11 +268,80 @@ jobs:
           git add .squad/retro-log.md
           if git diff --cached --quiet; then
             echo "No retro-log changes to commit (duplicate event?)"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "branch=$RETRO_BRANCH" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
-          git pull --rebase origin "$TARGET_BRANCH"
-          git push origin "HEAD:$TARGET_BRANCH"
+          git push --force-with-lease origin "HEAD:$RETRO_BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "branch=$RETRO_BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert retro-log PR
+        id: retro_pr
+        if: github.event_name == 'pull_request' && steps.trusted_retro_pr.outputs.skip_pr_close != 'true' && steps.append.outputs.changed == 'true'
+        uses: actions/github-script@v8
+        env:
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ steps.append.outputs.branch }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const base = process.env.BASE_BRANCH;
+            const head = process.env.HEAD_BRANCH;
+            const sourcePr = context.payload.pull_request.number;
+            const title = `chore(retro-log): update ${base}`;
+            const body = [
+              '**Working as Scribe** · see `.squad/agents/scribe/charter.md`',
+              '',
+              '## Retro-log update',
+              `- source event: closed PR #${sourcePr}`,
+              `- target branch: \`${base}\``,
+              `- artifact: \`.squad/retro-log.md\``,
+              '',
+              'This PR exists because `main` is protected. The retro log now lands through the trusted `retro-log/pr-*` PR path instead of direct pushes.',
+              '',
+              '---',
+              '_Generated by `.github/workflows/squad-pr-retro.yml`._',
+            ].join('\n');
+            const existing = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'open',
+              head: `${owner}:${head}`,
+              base,
+              per_page: 20,
+            });
+            let pull = existing[0];
+            if (pull) {
+              pull = (await github.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: pull.number,
+                title,
+                body,
+                base,
+              })).data;
+            } else {
+              pull = (await github.rest.pulls.create({
+                owner,
+                repo,
+                title,
+                head,
+                base,
+                body,
+                draft: false,
+              })).data;
+            }
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: pull.number,
+              labels: ['retro-log'],
+            });
+            core.setOutput('number', String(pull.number));
+            core.setOutput('url', pull.html_url);
 
       - name: Detect reverted PRs
         id: reverted
@@ -308,13 +437,21 @@ jobs:
 
       - name: Backfill reverted flags (as Scribe)
         if: github.event_name == 'push'
+        id: backfill
         env:
           PRS_JSON: ${{ steps.reverted.outputs.prs }}
           TARGET_BRANCH: ${{ github.ref_name }}
+          RETRO_BRANCH: ${{ steps.retro_branch_state.outputs.branch }}
+          HAS_OPEN_RETRO_PR: ${{ steps.retro_branch_state.outputs.has_open_pr }}
         run: |
-          set -e
+          set -euo pipefail
           git fetch origin "$TARGET_BRANCH"
-          git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          if [ "$HAS_OPEN_RETRO_PR" = "true" ] && git ls-remote --exit-code --heads origin "$RETRO_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$RETRO_BRANCH"
+            git checkout -B "$RETRO_BRANCH" "origin/$RETRO_BRANCH"
+          else
+            git checkout -B "$RETRO_BRANCH" "origin/$TARGET_BRANCH"
+          fi
           node <<'EOF'
           const fs = require('fs');
 
@@ -354,14 +491,84 @@ jobs:
           git add .squad/retro-log.md
           if git diff --cached --quiet; then
             echo "No retro-log changes to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "branch=$RETRO_BRANCH" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "chore(retro-log): backfill reverted flags [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
-          git pull --rebase origin "$TARGET_BRANCH"
-          git push origin "HEAD:$TARGET_BRANCH"
+          git push --force-with-lease origin "HEAD:$RETRO_BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "branch=$RETRO_BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert retro-log backfill PR
+        id: backfill_pr
+        if: github.event_name == 'push' && steps.backfill.outputs.changed == 'true'
+        uses: actions/github-script@v8
+        env:
+          BASE_BRANCH: ${{ github.ref_name }}
+          HEAD_BRANCH: ${{ steps.backfill.outputs.branch }}
+          PRS_JSON: ${{ steps.reverted.outputs.prs }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const base = process.env.BASE_BRANCH;
+            const head = process.env.HEAD_BRANCH;
+            const revertedPrs = JSON.parse(process.env.PRS_JSON || '[]');
+            const title = `chore(retro-log): backfill reverted flags for ${base}`;
+            const body = [
+              '**Working as Scribe** · see `.squad/agents/scribe/charter.md`',
+              '',
+              '## Retro-log revert backfill',
+              `- source event: push to \`${base}\``,
+              `- reverted PRs: ${revertedPrs.length ? revertedPrs.map((pr) => `#${pr}`).join(', ') : 'none'}`,
+              `- artifact: \`.squad/retro-log.md\``,
+              '',
+              'This PR exists because `main` is protected. Revert backfills now land through the trusted `retro-log/pr-*` PR path instead of direct pushes.',
+              '',
+              '---',
+              '_Generated by `.github/workflows/squad-pr-retro.yml`._',
+            ].join('\n');
+            const existing = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'open',
+              head: `${owner}:${head}`,
+              base,
+              per_page: 20,
+            });
+            let pull = existing[0];
+            if (pull) {
+              pull = (await github.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: pull.number,
+                title,
+                body,
+                base,
+              })).data;
+            } else {
+              pull = (await github.rest.pulls.create({
+                owner,
+                repo,
+                title,
+                head,
+                base,
+                body,
+                draft: false,
+              })).data;
+            }
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: pull.number,
+              labels: ['retro-log'],
+            });
+            core.setOutput('number', String(pull.number));
+            core.setOutput('url', pull.html_url);
 
       - name: Mirror line as PR comment
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.trusted_retro_pr.outputs.skip_pr_close != 'true' && steps.append.outputs.changed == 'true'
         uses: actions/github-script@v8
         with:
           script: |
@@ -374,7 +581,8 @@ jobs:
               line,
               '```',
               '',
-              'Appended to `.squad/retro-log.md`. Used by the daily and weekly pulse.',
+              `Queued via retro-log PR #${{ steps.retro_pr.outputs.number }}: ${{ steps.retro_pr.outputs.url }}`,
+              'This update will land in `.squad/retro-log.md` after that PR merges.',
             ].join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,

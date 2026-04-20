@@ -25,6 +25,10 @@ jobs:
           script: |
             const AUTO_MERGE_MARKER = '<!-- squad-auto-merge -->';
             const LOW_RISK_LABEL = 'squad:chore-auto';
+            const TRUSTED_RETRO_LABEL = 'retro-log';
+            const TRUSTED_RETRO_BRANCH_PREFIX = 'retro-log/pr-';
+            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'sabbour-squad-lead[bot]']);
+            const TRUSTED_RETRO_ONLY_PATHS = new Set(['.squad/retro-log.md']);
             const XL_THRESHOLD = 1000;
             const APPROVAL_LABELS = ['leela:approved', 'zapp:approved'];
             const REVIEW_GATE_CONTEXT = 'squad/review-gate';
@@ -81,6 +85,16 @@ jobs:
 
             function isSensitivePath(filename) {
               return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(filename));
+            }
+
+            function isTrustedRetroLogPr(pr, labels, changedFiles) {
+              return (
+                labels.has(TRUSTED_RETRO_LABEL) &&
+                TRUSTED_RETRO_AUTHORS.has(pr.author?.login ?? '') &&
+                (pr.headRefName ?? '').startsWith(TRUSTED_RETRO_BRANCH_PREFIX) &&
+                changedFiles.length > 0 &&
+                changedFiles.every((filename) => TRUSTED_RETRO_ONLY_PATHS.has(filename))
+              );
             }
 
             function getZappRequirementReason(pr, labels, changedFiles) {
@@ -238,6 +252,9 @@ jobs:
                     number
                     title
                     body
+                    author {
+                      login
+                    }
                     state
                     isDraft
                     mergeStateStatus
@@ -293,6 +310,7 @@ jobs:
 
             const labels = new Set(pr.labels.nodes.map((label) => label.name));
             const changedFiles = await listChangedFiles(pr.number);
+            const trustedRetroLogPr = isTrustedRetroLogPr(pr, labels, changedFiles);
             const zappRequirementReason = getZappRequirementReason(pr, labels, changedFiles);
             const removedLabels = await clearApprovalLabels(pr, labels);
             if (removedLabels.length > 0) {
@@ -327,7 +345,7 @@ jobs:
               blockers.push('PR title is marked refactor');
             }
 
-            const requiredApprovals = getRequiredApprovals(pr, labels, changedFiles);
+            const requiredApprovals = trustedRetroLogPr ? [] : getRequiredApprovals(pr, labels, changedFiles);
             const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
             if (missingApprovals.length > 0) {
               blockers.push(`missing fresh approval labels: ${missingApprovals.join(', ')}`);
@@ -421,7 +439,9 @@ jobs:
                 AUTO_MERGE_MARKER,
                 '🤖 Auto-merge armed.',
                 '',
-                labels.has(LOW_RISK_LABEL)
+                trustedRetroLogPr
+                  ? '- trusted retro-log PR path is green (`retro-log` label + `retro-log/pr-*` branch + trusted bot author + `.squad/retro-log.md` only)'
+                  : labels.has(LOW_RISK_LABEL)
                   ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}`
                   : '- fresh `leela:approved` + `zapp:approved` labels are present on the current head',
                 '- trusted merge signals are green: `CI Gate` from workflow `CI` and `squad/review-gate` from `Squad Review Gate`',
