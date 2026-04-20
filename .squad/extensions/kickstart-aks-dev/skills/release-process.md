@@ -1,5 +1,7 @@
 # Release Process
 
+> ⚠️ **Deprecated pattern removed.** The `release/v*` versioned branch pattern (e.g. `release/v1.0.1`) is **retired**. Do not create `release/v*` branches. All releases go through the cadence workflow only: `release/cadence → main`. See [decisions.md — Release Process v1.0.1 Gap & Pattern Retirement] for full context.
+
 **When to use:** you are reviewing the daily release PR, publishing release notes, or troubleshooting the cadence workflow.
 
 ## Context
@@ -79,6 +81,7 @@ Open a Discussion under **Announcements** only when the release changes the top-
 - **Main = pre-prod SWA.** Every merge deploys. Tags mark versioned releases but do not cut a separate production deploy today.
 - **Infra + docs** deploy on push to main, path-scoped (`.github/workflows/deploy-infra.yml`, `.github/workflows/deploy-docs.yml`).
 - **Release early, release often.** Small, frequent releases over big batches.
+- **No `release/v*` branches.** The versioned branch pattern (`release/v1.0.x`, `release/v0.7.0`, etc.) is retired. The cadence workflow is the only valid release path. Creating a `release/v*` branch bypasses merge-back to `main` and strands the version bump commit.
 
 ## Failure modes
 
