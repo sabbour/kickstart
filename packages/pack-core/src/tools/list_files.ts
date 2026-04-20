@@ -8,12 +8,14 @@ import type { SessionCtx } from '@kickstart/harness';
 const listFilesSchema = z.object({
   directory: z
     .string()
+    .nullable()
     .optional()
     .describe(
       'Relative path to list (defaults to workspace root). Must stay within the workspace.',
     ),
   recursive: z
     .boolean()
+    .nullable()
     .optional()
     .describe('List files recursively. Defaults to false.'),
 });

@@ -77,7 +77,8 @@ hljs.registerLanguage('bash', bash);
 hljs.registerLanguage('dockerfile', dockerfile);
 hljs.registerLanguage('go', go);
 
-import { ensureMonacoLocal } from './monaco-local-setup';
+// monaco-local-setup is dynamically imported to keep ?worker shims and editor.api2
+// out of the initial bundle — only loaded when an editable FileEditor renders.
 
 // Lazy-load the Monaco Editor component (code-split by Vite automatically)
 const MonacoEditor = lazy(() =>
@@ -267,12 +268,14 @@ export const FileEditor = createReactComponent(FileEditorApi, ({ props }) => {
 
   const isReadOnly = props.readOnly !== false;
 
-  // Trigger Monaco CDN config eagerly when editable mode is requested
+  // Trigger Monaco CDN config when editable mode is requested.
+  // Dynamic import keeps monaco-local-setup (and its ?worker shims) out of the initial bundle.
   const [monacoReady, setMonacoReady] = useState(false);
   useEffect(() => {
     if (!isReadOnly) {
-      ensureMonacoLocal();
-      setMonacoReady(true);
+      import('./monaco-local-setup')
+        .then(({ ensureMonacoLocal }) => ensureMonacoLocal())
+        .then(() => setMonacoReady(true));
     }
   }, [isReadOnly]);
 

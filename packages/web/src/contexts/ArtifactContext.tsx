@@ -22,7 +22,6 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import JSZip from 'jszip';
 import type { Artifact, ArtifactStore } from '@kickstart/harness';
 
 interface ArtifactContextValue {
@@ -91,6 +90,7 @@ export function ArtifactProvider({
     const all = store.list();
     if (all.length === 0) return false;
 
+    const { default: JSZip } = await import('jszip');
     const zip = new JSZip();
     for (const artifact of all) {
       zip.file(artifact.path, artifact.content);

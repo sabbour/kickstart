@@ -8,7 +8,7 @@ import {
   DialogActions,
   Button,
 } from '@fluentui/react-components';
-import { Sparkle24Regular, Map16Regular } from '@fluentui/react-icons';
+import { Sparkle24Regular, Map16Regular, ArrowRight24Regular } from '@fluentui/react-icons';
 import type { Session } from '../types';
 import { apiFetch } from '../services/api-client';
 import { OnboardingTour, resetOnboardingTour } from './OnboardingTour';
@@ -250,7 +250,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
               title="Send"
               onClick={() => handleSubmit(inputValue)}
             >
-              <img src="assets/icons/commands/go.svg" width="16" height="16" alt="" />
+              <ArrowRight24Regular />
             </button>
           </div>
         </div>

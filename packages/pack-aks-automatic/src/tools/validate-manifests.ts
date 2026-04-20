@@ -18,6 +18,7 @@ const ValidateManifestsInputSchema = z.object({
     .describe('Kubernetes YAML manifest content to validate'),
   manifestName: z
     .string()
+    .nullable()
     .optional()
     .describe('Optional display name for the manifest (used in error messages)'),
 });

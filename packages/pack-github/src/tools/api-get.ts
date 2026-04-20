@@ -49,6 +49,7 @@ const ApiGetInputSchema = z.object({
     ),
   params: z
     .record(z.string(), z.string())
+    .nullable()
     .optional()
     .describe('Optional query string parameters'),
 });

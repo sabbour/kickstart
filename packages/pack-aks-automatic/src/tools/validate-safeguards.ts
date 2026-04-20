@@ -1,7 +1,7 @@
 import { tool } from '@openai/agents';
 import { z } from 'zod';
-import { createRequire } from 'node:module';
 import type { ToolContribution } from '@kickstart/harness';
+import safeguardsConfig from '../safeguards.json';
 
 // ── Load and freeze safeguards.json at module initialisation ──────────────────
 // Rules are frozen at startup and cannot be modified at runtime.
@@ -18,9 +18,7 @@ interface SafeguardsConfig {
 }
 
 function loadSafeguards(): readonly SafeguardRule[] {
-  const require = createRequire(import.meta.url);
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const raw = require('../safeguards.json') as SafeguardsConfig;
+  const raw = safeguardsConfig as SafeguardsConfig;
   return Object.freeze(raw.rules.map((r) => Object.freeze({ ...r })));
 }
 
@@ -35,6 +33,7 @@ const ValidateSafeguardsInputSchema = z.object({
     .describe('Kubernetes YAML manifest content to check against AKS safeguards'),
   manifestName: z
     .string()
+    .nullable()
     .optional()
     .describe('Optional display name for the manifest'),
 });

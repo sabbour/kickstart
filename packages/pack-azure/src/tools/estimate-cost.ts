@@ -20,7 +20,7 @@ const EstimateCostInputSchema = z.object({
     .min(1)
     .describe('List of resource line items to include in the estimate'),
   currencyCode: z.string().default('USD').describe('ISO 4217 currency code'),
-  region: z.string().optional().describe('Azure region for context, e.g. "eastus"'),
+  region: z.string().nullable().optional().describe('Azure region for context, e.g. "eastus"'),
 });
 
 const EstimateCostOutputSchema = z.object({
@@ -67,7 +67,7 @@ export const estimateCostTool: ToolContribution = {
         totalMonthlyUSD,
         breakdown,
         currencyCode: input.currencyCode ?? 'USD',
-        region: input.region,
+        region: input.region ?? undefined,
         disclaimer:
           'Estimates are based on retail list prices and do not reflect reserved instance discounts, ' +
           'EA/MCA negotiated rates, or actual usage patterns. Actual costs may differ.',
