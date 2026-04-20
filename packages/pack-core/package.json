@@ -1,6 +1,6 @@
 {
   "name": "@kickstart/pack-core",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Core pack — agents, skills, tools, and domain-neutral components for Kickstart v2",
   "type": "module",
   "main": "dist/index.js",
