@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-20 | #890 "docs(contributing): explain Squad and Copilot workflow in deployed page" | L | impl=0m | review=7m | cycles=1 | merged | @sabbour | first_review=4m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-20 | #887 "docs: handoff cleanup — v2 architecture, squad workflow, removed dead pages" | L | impl=0m | review=15m | cycles=1 | merged | @sabbour | first_review=n/a | ci=5m | reviewer=none | human_comments=1 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-20 | #840 "feat: Harden docs gate to block merge without docs/changeset" | M | impl=1m | review=16m | cycles=1 | merged | @sabbour | first_review=n/a | ci=5m | reviewer=none | human_comments=0 | issue=#810 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
