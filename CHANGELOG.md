@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## [1.0.2] - 2026-04-20
+
+### Fixed
+
+- **Workspace references blocker:** Use local workspace references (`file://` paths) instead of npm registry for internal packages (@kickstart/harness, all packs) — resolves SWA deployment failure during `npm install --production`.
+
+### Changed
+
+- **Documentation cleanup:** Removed "v2" branding from architecture and extending guides; documentation now reflects the current version.
+
+### Removed
+
+- **v2 implementation brief:** Deleted internal 1,171-line migration document. Implementation is complete and no longer user-facing.
+
 ## [1.0.1] - 2026-04-20
 
 ### Fixed
