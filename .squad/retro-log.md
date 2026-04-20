@@ -4,7 +4,7 @@ Append-only record of every merged or closed PR. One line per entry. Owned by Sc
 
 Format:
 ```
-- YYYY-MM-DD | #NNN "title" | size | impl=XXm | review=XXm | cycles=N | outcome | author
+- YYYY-MM-DD | #NNN "title" | size | impl=XXm | review=XXm | cycles=N | outcome | author | first_review=XXm | ci=XXm | reviewer=bot|human|none | human_comments=N
 ```
 
 Legend:
@@ -14,6 +14,10 @@ Legend:
 - **cycles** — number of review-then-push loops
 - **outcome** — `merged` / `closed` / `merged-with-rework`
 - **author** — GitHub login
+- **first_review** — time from PR open to the first submitted review (`n/a` when none)
+- **ci** — total completed check-run duration for the PR head SHA (`n/a` when unavailable)
+- **reviewer** — whether the first submitted reviewer was a `bot`, `human`, or `none`
+- **human_comments** — human-authored review + issue comment count (bot comments excluded)
 
 ---
 
