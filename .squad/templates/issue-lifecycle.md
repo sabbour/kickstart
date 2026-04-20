@@ -344,7 +344,7 @@ See `.squad/templates/ralph-reference.md` for Ralph's full lifecycle.
 If the project has no human reviewers configured:
 1. PR opens
 2. CI runs
-3. If CI passes, Ralph auto-merges
+3. If CI passes, Ralph (or the `Squad Auto Merge` workflow for dual-approved non-XL/non-`refactor` PRs) auto-merges
 4. Issue closes
 
 ### Human Review Required

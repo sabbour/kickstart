@@ -307,6 +307,8 @@ Once merge gate checks pass, all reviews are addressed, threads resolved, and CI
 gh pr merge <N> --squash --delete-branch
 ```
 
+Qualifying GitHub PRs can now skip the manual merge command: the `Squad Auto Merge` workflow arms squash auto-merge when `leela:approved` + `zapp:approved` are both present, all checks are green, and the PR is neither XL (>1000 changed lines) nor titled `refactor`.
+
 ---
 
 ## Board Status Updates
