@@ -201,7 +201,7 @@ Zapp's review is a **pre-merge gate** for foundational patterns. Do not merge wi
   gh pr edit {number} --add-label "zapp:approved" --repo sabbour/kickstart
   ```
 
-No GitHub formal PR review approval is required — squad agents share a single GitHub account with the repo owner, making self-approval impossible. The `squad/review-gate` status check (`.github/workflows/squad-review-gate.yml`) automatically turns green when both labels are present.
+No GitHub formal PR review approval is required — squad agents share a single GitHub account with the repo owner, making self-approval impossible. The `squad/review-gate` status check (`.github/workflows/squad-review-gate.yml`) automatically turns green when both labels are present, and `Squad Auto Merge` clears `leela:approved` / `zapp:approved` on every `synchronize` so new commits always need fresh approval labels.
 
 ### Requesting Copilot Review
 
@@ -307,7 +307,7 @@ Once merge gate checks pass, all reviews are addressed, threads resolved, and CI
 gh pr merge <N> --squash --delete-branch
 ```
 
-Qualifying GitHub PRs can now skip the manual merge command: the `Squad Auto Merge` workflow arms squash auto-merge when `leela:approved` + `zapp:approved` are both present, all checks are green, and the PR is neither XL (>1000 changed lines) nor titled `refactor`.
+Qualifying GitHub PRs can now skip the manual merge command: the `Squad Auto Merge` workflow arms squash auto-merge when fresh `leela:approved` + `zapp:approved` labels are present on the current head, trusted merge signals are green (`CI Gate` from workflow `CI` plus `squad/review-gate` from `Squad Review Gate`), and the PR is neither XL (>1000 changed lines) nor titled `refactor`.
 
 ---
 
