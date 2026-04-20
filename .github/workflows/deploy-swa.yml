@@ -44,6 +44,11 @@ jobs:
       - name: Build web app (Vite)
         run: cd packages/web && npx vite build
 
+      - name: Pre-build API to resolve workspace packages
+        run: |
+          cd packages/web/api
+          npm install --production
+
       - name: Deploy to Azure Static Web Apps
         id: swa_deploy
         uses: Azure/static-web-apps-deploy@v1
@@ -55,6 +60,7 @@ jobs:
           api_location: "packages/web/api"
           output_location: ""
           skip_app_build: true
+          skip_api_build: true
 
       - name: Resolve production smoke target
         id: production_url
