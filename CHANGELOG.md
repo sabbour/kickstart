@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## [1.0.1] - 2026-04-20
+
+### Fixed
+
+- Resolved bundled pack asset path collision causing chat endpoint 404 in production. Asset manifests now load correctly from pack-scoped directories.
+
 ## [1.0.0] - 2026-04-20
 
 ### Breaking changes

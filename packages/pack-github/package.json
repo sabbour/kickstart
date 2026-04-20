@@ -1,6 +1,6 @@
 {
   "name": "@kickstart/pack-github",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "GitHub pack — agents, skills, tools, user actions, and components for Kickstart v2",
   "type": "module",
   "main": "dist/index.js",

@@ -1,6 +1,6 @@
 {
   "name": "@kickstart/web",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Kickstart web frontend — Azure Portal-style UX for AI-guided AKS deployment",
