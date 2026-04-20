@@ -29,6 +29,11 @@ jobs:
             const log = fs.existsSync('.squad/retro-log.md')
               ? fs.readFileSync('.squad/retro-log.md', 'utf8')
               : '';
+            const gradedLabels = new Map([
+              ['process:succeeded', '✅ succeeded'],
+              ['process:no-effect', '🟡 no effect'],
+              ['process:reverted', '🔴 reverted'],
+            ]);
 
             const lines = log.split('\n').filter(l => /^- \d{4}-\d{2}-\d{2} \| #\d+/.test(l));
             const weekLines = lines.filter(l => {
@@ -56,6 +61,25 @@ jobs:
               if (m && sizes[m[1]] !== undefined) sizes[m[1]]++;
             });
 
+            const processIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              labels: 'process',
+              since: weekStart.toISOString(),
+              per_page: 100,
+            });
+            const gradedExperiments = processIssues
+              .filter((item) => !item.pull_request)
+              .map((item) => {
+                const label = item.labels
+                  .map((entry) => typeof entry === 'string' ? entry : entry.name)
+                  .find((name) => gradedLabels.has(name));
+                if (!label) return null;
+                return `- ${gradedLabels.get(label)} — #${item.number} "${item.title}"`;
+              })
+              .filter(Boolean);
+
             const body = [
               '**Working as Scribe** · see `.squad/agents/scribe/charter.md`',
               '',
@@ -69,6 +93,9 @@ jobs:
               '',
               '### PRs this week',
               weekLines.length ? weekLines.join('\n') : '_No closed PRs._',
+              '',
+              '### Process experiments graded this week',
+              gradedExperiments.length ? gradedExperiments.join('\n') : '_No graded process experiments this week._',
               '',
               '### Prompt for the team',
               '> Anything we should change?',

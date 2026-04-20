@@ -130,7 +130,7 @@ This protocol applies to all agents (squad members AND @copilot). It is enforced
 |-------|-------|
 | **Trigger** | auto |
 | **When** | after |
-| **Condition** | build failure, test failure, or reviewer rejection |
+| **Condition** | build failure, test failure, reviewer rejection, or any quality SLO in `.squad/velocity.md` turning 🔴 |
 | **Facilitator** | Leela |
 | **Participants** | all-involved, Nibbler for code quality analysis |
 | **Time budget** | focused |
@@ -138,9 +138,10 @@ This protocol applies to all agents (squad members AND @copilot). It is enforced
 
 **Agenda:**
 1. What happened? (facts only)
-2. Root cause analysis
-3. What should change? (concrete, testable)
-4. Open a `process` issue for each action item → daily pulse tracks them
+2. If an SLO tripped, inspect the latest `.squad/velocity.md` snapshot, name the breached metric, and compare it with the prior 4-week trend plus the relevant retro-log / pulse evidence
+3. Root cause analysis
+4. What should change? (concrete, testable)
+5. Open a `process` issue for each action item → daily pulse tracks them
 
 ---
 
