@@ -8,7 +8,24 @@ This project uses [@changesets/cli](https://github.com/changesets/changesets) fo
 
 ### Fixed
 
-- Resolved bundled pack asset path collision causing chat endpoint 404 in production. Asset manifests now load correctly from pack-scoped directories.
+- **NPM registry blocker:** Added `@kickstart/harness` to API package dependencies — harness now available at runtime for API lambda boot sequence.
+- **Asset path alignment:** Resolved bundled pack asset path collision causing chat endpoint 404 in production. Asset manifests now load correctly from pack-scoped directories.
+- **Review approval lane safety:** Preserve `squad/lane-safe-review` status check on review PRs; prevents false positive merge blocks.
+- **GitHub pack asset paths:** Align github pack asset paths with other packs for consistent bundled layout.
+- **Playground route restoration:** Restore deleted playground route; `/playground` now loads demo scenarios correctly.
+- **Reviewer aliasing closure:** Tighten reviewer identity aliasing to fail closed on missing mappings.
+
+### Added
+
+- **Pack initialization resilience:** `/api/converse` endpoint now handles pack initialization failures gracefully instead of rejecting requests; ensures chat flow survives incomplete pack registration.
+- **Docs merge gate hardening:** Enforce that every PR merge must include either documentation updates or a changeset entry. Tightens release audit trail.
+
+### Changed
+
+- **Contributing guide overhaul:** CONTRIBUTING.md now explains Squad team roles, Copilot CLI integration, DP ceremony, and v2 harness+packs architecture. Four separate sections added for Squad workflow, package structure, entry points, and handoff flow.
+- **Local setup documentation:** Update environment variable names to `KICKSTART_*` prefix and fix endpoint format in setup guide.
+- **Pack assets documentation:** Document the bundled pack-assets layout for bundle-time asset references and runtime mount paths.
+- **Asset layout alignment:** Update all docs references to match the new bundled asset path structure across pack manifests.
 
 ## [1.0.0] - 2026-04-20
 
