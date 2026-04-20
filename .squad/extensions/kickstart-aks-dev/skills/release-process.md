@@ -29,7 +29,7 @@ If no PR opened and you expected one, check `.github/workflows/squad-release-cad
 ### 2. Review the version bump
 
 Verify:
-- `npm run version` consumed all pending changesets from `.changeset/`.
+- `npm run changeset:version` consumed all pending changesets from `.changeset/`.
 - Every package bumped in lockstep.
 - `CHANGELOG.md` entries match the changeset bodies.
 
@@ -85,5 +85,5 @@ Open a Discussion under **Announcements** only when the release changes the top-
 - **Cadence workflow didn't run:** check `.github/workflows/squad-release-cadence.yml` run history. Dispatch manually via `workflow_dispatch` if a scheduled run was missed.
 - **Release PR already open and stale:** rebase it. The workflow is idempotent and won't open a duplicate.
 - **Changeset missed on a merged PR:** open a follow-up PR that adds a changeset describing the historical impact. The next cadence run picks it up.
-- **CHANGELOG drift:** regenerate with `npm run version`. Do not hand-edit.
+- **CHANGELOG drift:** regenerate with `npm run changeset:version`. Do not hand-edit.
 - **Tag pushed by mistake:** delete the tag locally and remotely (`git push --delete origin vX.Y.Z`), then re-tag the correct commit. Never force-update an existing tag that's already in a published release.

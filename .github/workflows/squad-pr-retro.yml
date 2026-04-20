@@ -6,14 +6,25 @@ name: Squad · PR Retro
 on:
   pull_request:
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to backfill retro entry for'
+        required: true
+        type: string
 
 permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: squad-pr-retro-log
+  cancel-in-progress: false
+
 jobs:
   retro:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.pull_request.labels.*.name, 'retro-log') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -21,12 +32,40 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Generate Squad lead token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.SQUAD_LEAD_APP_ID }}
+          private-key: ${{ secrets.SQUAD_LEAD_PRIVATE_KEY }}
+
       - name: Compute metrics
         id: metrics
         uses: actions/github-script@v8
         with:
           script: |
-            const pr = context.payload.pull_request;
+            let pr;
+            if (context.eventName === 'workflow_dispatch') {
+              const prNumberInput = context.payload.inputs.pr_number;
+              const prNumber = parseInt(prNumberInput, 10);
+              if (Number.isNaN(prNumber)) {
+                throw new Error(`Invalid workflow_dispatch input "pr_number": "${prNumberInput}". Expected a numeric pull request number.`);
+              }
+              const { data } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+              });
+              pr = data;
+              pr.merged = pr.merged_at != null;
+            } else {
+              pr = context.payload.pull_request;
+            }
+            if (pr.state === 'open') {
+              throw new Error(
+                `PR #${pr.number} is not closed yet (state: ${pr.state}). Retro metrics can only be generated for closed or merged pull requests.`
+              );
+            }
             const title = (pr.title || '').replace(/"/g, "'");
             const author = pr.user?.login ?? 'unknown';
             const changed = (pr.additions ?? 0) + (pr.deletions ?? 0);
@@ -80,12 +119,22 @@ jobs:
 
             core.setOutput('line', line);
             core.setOutput('pr', String(pr.number));
+            core.setOutput('base_ref', pr.base?.ref ?? context.payload.repository?.default_branch ?? 'main');
 
       - name: Append to retro log (as Scribe)
         env:
+          BASE_REF: ${{ steps.metrics.outputs.base_ref }}
           LINE: ${{ steps.metrics.outputs.line }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -e
+          git fetch origin "$BASE_REF"
+          if git show-ref --verify --quiet "refs/heads/$BASE_REF"; then
+            git checkout "$BASE_REF"
+            git reset --hard "origin/$BASE_REF"
+          else
+            git checkout -b "$BASE_REF" "origin/$BASE_REF"
+          fi
           mkdir -p .squad
           touch .squad/retro-log.md
           # Insert the new line directly after the entries marker
@@ -100,15 +149,54 @@ jobs:
           ' .squad/retro-log.md > .squad/retro-log.md.new
           mv .squad/retro-log.md.new .squad/retro-log.md
 
+          PR_NUM="${{ steps.metrics.outputs.pr }}"
+          SIDE_BRANCH="retro-log/pr-${PR_NUM}"
+
           git config user.name "squad-scribe[bot]"
           git config user.email "scribe@squad.local"
+          git checkout -B "${SIDE_BRANCH}"
           git add .squad/retro-log.md
           if git diff --cached --quiet; then
             echo "No retro-log changes to commit (duplicate event?)"
             exit 0
           fi
-          git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
-          git push
+          git commit -m "chore(retro-log): #${PR_NUM} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
+          git push --force-with-lease "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "${SIDE_BRANCH}"
+
+          PR_COUNT="$(gh pr list \
+            --state open \
+            --base "$BASE_REF" \
+            --head "${SIDE_BRANCH}" \
+            --json number \
+            --jq 'length')"
+
+          if [ "$PR_COUNT" -gt 1 ]; then
+            echo "Multiple open PRs found for ${SIDE_BRANCH} (expected 0 or 1): found ${PR_COUNT}"
+            exit 1
+          fi
+
+          PR_URL="$(gh pr list \
+            --state open \
+            --base "$BASE_REF" \
+            --head "${SIDE_BRANCH}" \
+            --json url \
+            --jq '.[0].url')"
+
+          if [ -n "$PR_URL" ]; then
+            echo "Reusing existing PR: ${PR_URL}"
+          else
+            PR_URL="$(gh pr create \
+              --title "chore(retro-log): #${PR_NUM} [scribe]" \
+              --body "Automated retro log entry for #${PR_NUM}. Opened by \`.github/workflows/squad-pr-retro.yml\`." \
+              --base "$BASE_REF" \
+              --head "${SIDE_BRANCH}" \
+              --label "retro-log" \
+              --label "leela:approved" \
+              --label "zapp:approved")"
+            echo "Created PR: ${PR_URL}"
+          fi
+
+          gh pr merge "$PR_URL" --squash --auto --delete-branch
 
       - name: Mirror line as PR comment
         uses: actions/github-script@v8
@@ -128,6 +216,6 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
+              issue_number: parseInt('${{ steps.metrics.outputs.pr }}', 10),
               body,
             });
