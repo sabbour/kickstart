@@ -9,6 +9,7 @@ Ceremonies are structured team interactions that the Squad coordinator triggers 
 | Design Proposal | auto | before work | Leela | assigned agent | ✅ Blocks implementation until DP posted |
 | Design Review | auto | before code | Leela | Zapp, Nibbler, all-relevant | ✅ Blocks code until approved |
 | PR Review Gate | auto | before merge | Nibbler | Leela (architecture), Zapp (security), Hermes (tests) | ✅ Blocks merge until all feedback addressed |
+| Docs Sweep | auto | monthly | Scribe | all-relevant | ❌ Freshness audit, not blocking |
 | Retrospective | auto | after failure | Leela | Nibbler, all-involved | ❌ Diagnostic, not blocking |
 
 ## Automated workflows (not coordinator ceremonies)
@@ -141,6 +142,31 @@ This protocol applies to all agents (squad members AND @copilot). It is enforced
 2. Root cause analysis
 3. What should change? (concrete, testable)
 4. Open a `process` issue for each action item → daily pulse tracks them
+
+---
+
+## Docs Sweep
+
+| Field | Value |
+|-------|-------|
+| **Trigger** | auto |
+| **When** | monthly |
+| **Condition** | first docs hygiene pass of the month, or manual trigger when docs drift is suspected |
+| **Facilitator** | Scribe |
+| **Participants** | all-relevant |
+| **Time budget** | focused |
+| **Enabled** | ✅ yes |
+
+**Goal:** Catch silent docs rot before it lands in charters, skills, the brief, or docs-site pages.
+
+**Checklist:**
+1. Broken links across repo docs and docs-site
+2. Brief freshness: compare `Last updated:` in `docs-site/docs/architecture/v2-implementation-brief.md` against recent `packages/` churn
+3. Pack-page completeness: each active pack page still lists current agents, skills, tools, user actions, components, guardrails, and dependencies
+4. Charter relevance: role boundaries and owned artifacts still match current workflows
+5. Skill accuracy: workflow-facing skills still match the real repo layout and ceremony gates
+
+**Output:** Scribe records findings in the current pulse issue or opens focused `process` issues when drift needs follow-up work.
 
 ---
 
