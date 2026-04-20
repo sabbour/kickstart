@@ -35,7 +35,6 @@ jobs:
 
             const hasChangeset = paths.some(p => p.startsWith('.changeset/') && p.endsWith('.md') && !p.endsWith('README.md'));
             const hasDocsSite = paths.some(p => p.startsWith('docs-site/docs/'));
-            const hasBriefUpdate = paths.some(p => p === 'docs/v2-implementation-brief.md');
             const hasApiRef = paths.some(p => p === 'docs/api-reference.md');
 
             // User-facing signal: touches packages/** src but is not test/config only
@@ -49,7 +48,6 @@ jobs:
 
             core.setOutput('hasChangeset', String(hasChangeset));
             core.setOutput('hasDocsSite', String(hasDocsSite));
-            core.setOutput('hasBriefUpdate', String(hasBriefUpdate));
             core.setOutput('hasApiRef', String(hasApiRef));
             core.setOutput('userFacing', String(userFacing));
 
@@ -58,7 +56,6 @@ jobs:
         env:
           HAS_CHANGESET: ${{ steps.changed.outputs.hasChangeset }}
           HAS_DOCS_SITE: ${{ steps.changed.outputs.hasDocsSite }}
-          HAS_BRIEF: ${{ steps.changed.outputs.hasBriefUpdate }}
           HAS_API: ${{ steps.changed.outputs.hasApiRef }}
           USER_FACING: ${{ steps.changed.outputs.userFacing }}
         with:
@@ -86,7 +83,6 @@ jobs:
               '',
               changesetLine,
               docLine(process.env.HAS_DOCS_SITE, 'docs-site/docs/', 'if user-facing behavior or UI changed'),
-              docLine(process.env.HAS_BRIEF, 'docs/v2-implementation-brief.md', 'if this is an architectural change'),
               docLine(process.env.HAS_API, 'docs/api-reference.md', 'if the API surface changed'),
               '',
             ];
