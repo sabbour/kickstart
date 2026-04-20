@@ -143,7 +143,7 @@ test.describe.skip('Playground', () => {
     });
   });
 
-  test.describe('Fat component slices', () => {
+  test.describe('Smart component slices', () => {
     test('AzureLoginCard signs in with the playground auth flow', async ({ page }) => {
       await openScenario(page, 'AzureLoginCard', 'Components');
 

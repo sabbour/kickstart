@@ -121,11 +121,11 @@ Updates just the data of an existing component (without replacing it):
 }
 ```
 
-## Fat Components
+## Smart Components
 
-Starting in v0.3.0, Kickstart includes **fat components** — self-managing implementations of common workflows with built-in authentication, validation, and security controls. Contributed by the `pack-azure` and `pack-github` packs.
+Starting in v0.3.0, Kickstart includes **smart components** — self-managing implementations of common workflows with built-in authentication, validation, and security controls. Contributed by the `pack-azure` and `pack-github` packs.
 
-### Azure Fat Components
+### Azure Smart Components
 
 | Component | Purpose | Auth | Security |
 |-----------|---------|------|----------|
@@ -133,7 +133,7 @@ Starting in v0.3.0, Kickstart includes **fat components** — self-managing impl
 | **AzureResourcePicker** | Browse subscriptions and list resources | AzureARMConnector | Rate-limit handling; stub fallback |
 | **AzureResourceForm** | Collect deployment parameters and estimate cost | AzureARMConnector | Input validation; cost preview before submit |
 
-### GitHub Fat Components
+### GitHub Smart Components
 
 | Component | Purpose | Auth | Security |
 |-----------|---------|------|----------|
@@ -148,7 +148,7 @@ Starting in v0.3.0, Kickstart includes **fat components** — self-managing impl
 - **Typed confirmation** — DELETE and merge operations require developer confirmation
 - **Protected-branch blocking** — Cannot push to `main`/`master`/`production`
 
-See [Extending the A2UI Component System](../components/extending-a2ui.md) for how to build your own fat component.
+See [Extending the A2UI Component System](../components/extending-a2ui.md) for how to build your own smart component.
 
 ## Custom Kickstart Catalog
 

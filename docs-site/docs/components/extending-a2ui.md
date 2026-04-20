@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # Extending the A2UI Component System
 
-> How to add new components, register them across the stack, teach the LLM to use them, and build playground scenarios — including fat components with built-in authentication, validation, and state management.
+> How to add new components, register them across the stack, teach the LLM to use them, and build playground scenarios — including smart components with built-in authentication, validation, and state management.
 
 This guide walks through the full lifecycle of extending Kickstart's A2UI component system — from defining a React component to seeing it rendered by the LLM in production.
 
@@ -305,11 +305,11 @@ All components must meet WCAG 2.1 AA:
 - Roving `tabIndex` for keyboard navigation in groups
 - `aria-live` regions for dynamic content updates
 
-## Fat Components
+## Smart Components
 
-### What Is a Fat Component?
+### What Is a Smart Component?
 
-From the LLM's perspective, fat components look identical to any other component — same JSON structure, same catalog entry. The **fat distinction is purely a frontend implementation pattern**: the component manages its own async flows (authentication, API calls, multi-step wizards) internally.
+From the LLM's perspective, smart components look identical to any other component — same JSON structure, same catalog entry. The **smart distinction is purely a frontend implementation pattern**: the component manages its own async flows (authentication, API calls, multi-step wizards) internally.
 
 **LLM output — identical pattern for both:**
 
@@ -320,15 +320,15 @@ From the LLM's perspective, fat components look identical to any other component
 
 The difference: `Text` displays its props; `GitHubLoginCard` manages the full OAuth flow internally.
 
-### When to Build a Fat Component
+### When to Build a Smart Component
 
-Build a fat component when the component needs to:
+Build a smart component when the component needs to:
 - Manage its own data fetching or polling
 - Handle authentication flows (OAuth device code, MSAL)
 - Orchestrate multi-step async processes
 - Handle errors gracefully without LLM intervention
 
-### Fat Component Pattern
+### Smart Component Pattern
 
 ```typescript
 import { useState, useEffect } from 'react';
@@ -361,7 +361,7 @@ export const MyFatComponent = createReactComponent(api, ({ props }) => {
 
 For full control over context bindings, use `createBinderlessComponent()` instead of `createReactComponent()`.
 
-### Built-in Fat Components
+### Built-in Smart Components
 
 **Azure Components:**
 | Component | Purpose | Handles Internally |
@@ -378,9 +378,9 @@ For full control over context bindings, use `createBinderlessComponent()` instea
 | `GitHubAction` | Execute allowlisted operations | Operation validation, confirmations for DELETE |
 | `GitHubCommit` | Create pull request | Branch validation, protected-branch guards |
 
-### Security for Fat Components
+### Security for Smart Components
 
-Fat components integrating with external services must implement:
+Smart components integrating with external services must implement:
 - **In-memory token storage** — never `localStorage` for sensitive tokens
 - **Operation allowlisting** — validate allowed operations before execution
 - **Typed confirmation** — require explicit user confirmation for destructive operations
