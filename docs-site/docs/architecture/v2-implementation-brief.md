@@ -7,7 +7,6 @@ sidebar_position: 6
 **Last updated:** 2026-04-20
 
 **Audience:** the implementing agent.
-**Last updated:** 2026-04-20
 **Status:** ✅ All 13 steps merged into `v2-rewrite`. Implementation complete.
 **Scope:** greenfield rewrite on `main`. v1 does not need to keep working. Delete aggressively. No user state to preserve.
 

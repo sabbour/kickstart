@@ -161,7 +161,7 @@ This protocol applies to all agents (squad members AND @copilot). It is enforced
 
 **Checklist:**
 1. Broken links across repo docs and docs-site
-2. Brief freshness: compare `Last updated:` in `docs/v2-implementation-brief.md` against recent `packages/` churn
+2. Brief freshness: compare `Last updated:` in `docs-site/docs/architecture/v2-implementation-brief.md` against recent `packages/` churn
 3. Pack-page completeness: each active pack page still lists current agents, skills, tools, user actions, components, guardrails, and dependencies
 4. Charter relevance: role boundaries and owned artifacts still match current workflows
 5. Skill accuracy: workflow-facing skills still match the real repo layout and ceremony gates
