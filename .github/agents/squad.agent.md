@@ -341,7 +341,7 @@ prompt: |
   {% endif %}
 
   {only if identity configured:}
-  GIT IDENTITY: Commit as `{app_slug}[bot]`. Resolve the token with `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")` and, if present, push with `git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git BRANCH`; otherwise fall back to default auth with `git push origin BRANCH`. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
+  GIT IDENTITY: Commit as `{app_slug}[bot]`. Resolve the token with `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")`. For write actions, fail closed unless either the bot token resolved or `SQUAD_ALLOW_WRITE_FALLBACK=1` is explicitly set as an auditable escape hatch. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
   {end identity block}
 
   TASK: {specific task description}
@@ -701,16 +701,16 @@ Each entry records: agent routed, why chosen, mode (background/sync), files auth
 When spawning an agent that may do git operations (commit, push, PR), resolve the identity context:
 
 1. **Check identity config:** Does `.squad/identity/config.json` exist?
-   - **No** → omit the identity block entirely. Agents use default auth.
+   - **No** → omit the identity block entirely. Agents use default auth because no bot identity is configured.
    - **Yes** → read the config to get the tier and app registrations.
 
 2. **Resolve the role slug:** Map the agent's role to an identity role slug using `resolveRoleSlug()` semantics:
-   - Lead/Architect → `lead`
-   - Backend/Core Dev → `backend` (falls back to `lead` if no backend app)
-   - Frontend → `frontend` (falls back to `lead`)
-   - Tester → `tester` (falls back to `lead`)
+   - Lead/Architect/Zapp/Nibbler/Ralph → `lead` via explicit alias mapping
+   - Backend/Core Dev/Bender → `backend` via explicit alias mapping
+   - Frontend/Fry → `frontend` via explicit alias mapping
+   - Tester/Hermes → `tester` via explicit alias mapping
    - For `shared` tier: all agents use the single shared app
-   - For `per-role` tier: try role-specific app first, fall back to `lead`
+   - For `per-role` tier: only the explicit mapped app is valid; if no app is configured for that mapped role, token resolution must fail closed
 
 3. **Get the app slug:** From the identity config, look up the app registration for the resolved role slug. The `appSlug` is the GitHub App's URL slug (e.g., `sabbour-squad-lead`).
 
@@ -718,7 +718,7 @@ When spawning an agent that may do git operations (commit, push, PR), resolve th
 
 5. **Include the identity block** in the spawn prompt with the resolved values.
 
-**If any step fails, omit the identity block silently.** Identity is always graceful — never block a spawn because identity resolution failed.
+**If config exists but role/app resolution fails for a write-capable agent, stop and fix the mapping.** Do not silently drop into ambient auth; the only escape hatch is an explicit `SQUAD_ALLOW_WRITE_FALLBACK=1` decision.
 
 ### Pre-Spawn: Worktree Setup
 
@@ -845,11 +845,18 @@ prompt: |
   ```bash
   TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
   ```
-  `resolve-token.mjs` applies the configured role-to-app mapping and falls back to the lead app when a role-specific registration is unavailable. If token resolution fails, fall back to default git auth — do NOT block on identity.
+  `resolve-token.mjs` only uses explicit config keys or explicit alias mappings; it does **not** guess another app. If token resolution fails, write actions must stop unless `SQUAD_ALLOW_WRITE_FALLBACK=1` is explicitly set.
   
   **Git commit identity:**
   - `git -c user.name="{app_slug}[bot]" -c user.email="{app_slug}[bot]@users.noreply.github.com" commit ...`
   
+  **Guard write actions first:**
+  ```bash
+  if [ -z "$TOKEN" ] && [ "${SQUAD_ALLOW_WRITE_FALLBACK:-0}" != "1" ]; then
+    echo "Bot token resolution failed; refusing write action without SQUAD_ALLOW_WRITE_FALLBACK=1" >&2
+    exit 1
+  fi
+  ```
   **Push:** `if [ -n "$TOKEN" ]; then git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git {branch}; else git push origin {branch}; fi`
   **PR create:** `if [ -n "$TOKEN" ]; then GH_TOKEN=$TOKEN gh pr create ...; else gh pr create ...; fi`
   **PR body must include:** `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`

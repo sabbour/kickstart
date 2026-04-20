@@ -76,7 +76,7 @@ function normalizeRoleKey(roleKey) {
 
 /**
  * Resolve a requested role to the configured identity role slug.
- * Uses per-role identity config when available and falls back to lead.
+ * Uses only explicit config keys or explicit alias mappings.
  * @param {string} projectRoot
  * @param {string} roleKey
  * @returns {string | null}
@@ -86,10 +86,8 @@ function resolveRoleSlug(projectRoot, roleKey) {
   const normalized = normalizeRoleKey(roleKey);
   if (!config?.apps || !normalized) return normalized;
 
-  const appKeys = Object.keys(config.apps);
   if (config.tier === 'shared') {
-    if (config.apps.shared) return 'shared';
-    return appKeys[0] ?? null;
+    return config.apps.shared ? 'shared' : null;
   }
 
   if (config.apps[normalized]) {
@@ -105,11 +103,7 @@ function resolveRoleSlug(projectRoot, roleKey) {
     }
   }
 
-  if (config.apps.lead) {
-    return 'lead';
-  }
-
-  return appKeys[0] ?? null;
+  return null;
 }
 
 // ============================================================================
