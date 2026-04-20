@@ -1,5 +1,18 @@
 # Decision: DP Reviews — April 17, 2026
 
+## Hypothesis log (process experiments)
+
+This section is reserved for summarized grades from `.github/workflows/squad-process-grader.yml` once `#805` lands.
+
+**Planned entry format:**
+
+| Date | Issue | Signal | Baseline → current | Grade | Follow-up |
+|------|-------|--------|--------------------|-------|-----------|
+
+**Ownership:** Scribe appends graded experiment summaries here after the workflow posts the result on the underlying `process` issue. No manual backfill unless the workflow was broken and a corrective PR documents it.
+
+---
+
 **Date:** 2026-04-17T03:30:17Z
 **Author:** Leela (Lead)
 **Status:** Proposed
