@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@azure/functions": "^4.6.0",
+    "@kickstart/harness": "*",
     "bicep-node": "^0.0.9",
     "vite": "^8.0.9"
   },

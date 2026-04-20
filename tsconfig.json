@@ -15,7 +15,15 @@
     "outDir": "dist",
     "rootDir": "src",
     "isolatedModules": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "baseUrl": ".",
+    "paths": {
+      "@kickstart/harness": ["packages/harness/src/index.ts"],
+      "@kickstart/harness/runtime/session": ["packages/harness/src/runtime/session.ts"],
+      "@kickstart/harness/runtime/runner": ["packages/harness/src/runtime/runner.ts"],
+      "@kickstart/harness/runtime/sse": ["packages/harness/src/runtime/sse.ts"],
+      "@kickstart/harness/*": ["packages/harness/src/*"]
+    }
   },
   "exclude": ["node_modules", "dist"]
 }

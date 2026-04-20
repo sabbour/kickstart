@@ -5,6 +5,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@kickstart/harness": resolve(__dirname, "packages/harness/src/index.ts"),
+      "@kickstart/harness/runtime/session": resolve(__dirname, "packages/harness/src/runtime/session.ts"),
+      "@kickstart/harness/runtime/runner": resolve(__dirname, "packages/harness/src/runtime/runner.ts"),
+      "@kickstart/harness/runtime/sse": resolve(__dirname, "packages/harness/src/runtime/sse.ts"),
       "@kickstart/core": resolve(__dirname, "packages/harness/src/index.ts"),
     },
   },
