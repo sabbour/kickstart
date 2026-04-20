@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # Contributing with Squad
 
-Kickstart is maintained by **Squad** — a coordinated team of AI agents supervised by a human lead. When you open an issue or want to contribute, it gets routed to the right agent based on work type. This guide explains how to work within the Squad framework and interact with our AI team.
+Kickstart is maintained using **Squad** — a team of AI agents coordinated by a human lead. Squad automates much of the development workflow: issue triage, design reviews, PR reviews, and queue monitoring. This guide explains how to contribute through the **GitHub Copilot CLI** and what Squad handles automatically.
 
 ## The Squad Team
 
@@ -21,28 +21,97 @@ Kickstart is maintained by **Squad** — a coordinated team of AI agents supervi
 
 ---
 
-## How Issues Get Routed to Squad
+## Using Squad via GitHub Copilot CLI
 
-**The workflow:**
+The recommended way to work on Kickstart is through the **GitHub Copilot CLI**. Here's what happens at each stage:
 
-1. You open an issue (or the Lead opens one)
-2. Lead **triages** it: assigns a `squad:{member}` label
-3. That agent **picks it up** in their next session
-4. Agent completes the work, following the gates below
+### 1. Ralph Loop — Automatic Issue Pickup
 
-**Example labels:**
-- `squad:leela` → Leela handles this
-- `squad:fry` → Fry handles this  
-- `squad:copilot` → Copilot auto-routes based on capability
-- `squad` (no member suffix) → Waiting for Lead triage
+**What it does:**
+- Ralph monitors the project board for untriaged issues (labeled `squad`)
+- Automatically triages them using routing rules in `.squad/routing.md`
+- Assigns a `squad:{member}` label based on work type
+- Posts triage comments with reasoning
+
+**When Ralph runs:**
+- **Automatically** via GitHub Actions heartbeat workflow (triggered on PR close, issue label changes)
+- **Conversationally** when you ask the Copilot CLI: "Ralph, go" or "Ralph, status"
+- **Persistently** via local polling: `npx @bradygaster/squad-cli watch --interval N` (checks every N minutes)
+
+**In conversation** (e.g., with Copilot CLI or agent-based interaction):
+```
+You: Ralph, go
+Ralph: 🔄 Scanning for untriaged issues...
+[Ralph runs triage loop while work exists]
+
+You: Ralph, status
+Ralph: 📋 Found 3 untriaged issues...
+
+You: Ralph, idle
+Ralph: ⏸️ Pausing. Use `npx @bradygaster/squad-cli watch --interval 10` for persistent polling.
+```
+
+For continuous monitoring without conversation:
+```bash
+# Polls GitHub every 10 minutes (default)
+npx @bradygaster/squad-cli watch
+
+# Custom interval
+npx @bradygaster/squad-cli watch --interval 5
+```
+
+**What you don't need to do:** Manually triage issues or assign labels. Ralph does this automatically.
+
+### 2. Automatic Design Review Gates
+
+When a squad member picks up an issue labeled `squad:{name}` and posts a Design Proposal comment:
+- **Leela** (Lead) automatically reviews for architecture alignment
+- **Zapp** reviews for security concerns if relevant
+- Design Review happens in parallel — no human coordination needed
+
+**What you need to do:** Post the Design Proposal comment (template provided below).  
+**What Squad handles:** Review assignment, feedback, approval decisions.
+
+### 3. Automatic PR Review Gates
+
+When you open a PR from your worktree:
+- **CI** automatically runs lint, tests, and builds
+- **Nibbler** reviews for code quality
+- **Leela** reviews for architecture
+- **Zapp** reviews for security if touching sensitive paths
+- All reviews use label-based approval gates (see Step 6 below for exact labels)
+
+**What you need to do:** Address feedback with required comment replies.  
+**What Squad handles:** Review assignment, parallel review, merge blocking until gates pass.
+
+### 4. Worktree Pattern — Standardized by Squad
+
+Squad enforces a standardized worktree pattern (rather than manual `git checkout -b` in the top-level checkout):
+
+**What you do:**
+```bash
+# Create a worktree for your issue
+git worktree add .worktrees/123-my-feature -b squad/123-my-feature origin/main
+cd .worktrees/123-my-feature
+```
+
+**What Squad standardizes:** Requires all work to use isolated worktrees, preventing dirty diffs, merge conflicts in the main checkout, and accidental commits to the wrong branch.
 
 ---
 
-## Working with @copilot
+## Working with Copilot CLI
 
-**@copilot is a coding agent** — it can handle issues labeled `squad:copilot` if they fit one of these categories:
+The **GitHub Copilot CLI** is your interface to Squad. It:
+- Manages workflow bookkeeping
+- Enforces ceremony gates (DP, PR review)
+- Integrates with Ralph for queue monitoring
+- Handles repetitive task coordination
 
-### 🟢 Good fit (auto-routed to @copilot)
+### When @copilot auto-handles an issue
+
+Issues labeled `squad:copilot` get picked up by the coding agent if they fit one of these categories:
+
+**🟢 Good fit (auto-routed)**
 - Bug fixes with clear reproduction steps
 - Test coverage (adding missing tests, fixing flaky tests)
 - Lint/format fixes and code style cleanup
@@ -51,12 +120,12 @@ Kickstart is maintained by **Squad** — a coordinated team of AI agents supervi
 - Documentation fixes and updates
 - Changeset additions
 
-### 🟡 Needs review (routed to @copilot, but a squad member must review the PR before merge)
+**🟡 Needs review (routed to @copilot, but a squad member must review the PR)**
 - Medium features with clear specs and acceptance criteria
 - Refactoring with existing test coverage
 - New API endpoints following established patterns
 
-### 🔴 Not suitable for @copilot (routed to a human squad member instead)
+**🔴 Not suitable for @copilot (routed to a human squad member)**
 - Architecture decisions and system design
 - Pack boundary changes
 - SSE event taxonomy or A2UI contract changes
@@ -65,29 +134,71 @@ Kickstart is maintained by **Squad** — a coordinated team of AI agents supervi
 - Performance-critical paths needing benchmarking
 - Ambiguous requirements needing discussion
 
-**If your issue has `squad:copilot`, @copilot will pick it up and follow the same gates as human agents** — see below for Design Proposal and PR Review gates.
-
 See [`.squad/team.md`](https://github.com/sabbour/kickstart/blob/main/.squad/team.md) for the complete capability matrix and [`.squad/routing.md`](https://github.com/sabbour/kickstart/blob/main/.squad/routing.md) for the full routing table.
 
 ---
 
-## Issue Workflow Overview
+## Issue Workflow — What You Do vs What Squad Handles
 
 ```
-Issue Created → Triaged (squad:{member} label)
-→ Design Proposal (comment) → Design Review (approved)
-→ Create Worktree → Implementation → Tests Pass
-→ Open PR → PR Review (gates) → Merge → Cleanup
+Untriaged Issue (squad label)
+  ↓
+Ralph auto-triages → assigns squad:{member} label
+  ↓
+You (assigned agent) pick up the issue
+  ↓
+You create worktree (one-time setup)
+  ↓
+You write Design Proposal comment (DP gate)
+  ↓
+Leela + Squad review automatically (no manual coordination)
+  ↓
+You implement in worktree + commit + push
+  ↓
+You open PR
+  ↓
+CI + Nibbler + Leela + Zapp review automatically (label-based gates)
+  ↓
+You address feedback with reply comments (required)
+  ↓
+Merge when all gates pass (automatic via CI)
+  ↓
+You delete worktree (cleanup)
 ```
+
+**What You Do:**
+- Write code
+- Post Design Proposal and PR comments
+- Reply to review feedback
+- Test locally before pushing
+- Manage your worktree lifecycle
+
+**What Ralph + Squad Handle:**
+- Triage and issue assignment
+- Design review assignment and approval
+- PR review assignment and approval
+- Merge eligibility checking
+- Continuous queue monitoring (Ralph)
+- Ceremony gate enforcement (via CI labels)
 
 ---
 
 ## Step 1: Design Proposal (DP) — Before Any Code
 
 **When:** Any implementation issue (except docs-only)  
-**Gate:** ✅ **Blocks code** until DP is posted and approved
+**Gate:** ✅ **Blocks code** until DP is posted and approved by Squad
 
-When you pick up an issue labeled with your name, **post a Design Proposal comment** on the issue before writing code.
+### What You Do
+
+Post a comment on the issue with the Design Proposal template below. Include your proposed approach, affected packs, security considerations, and test strategy.
+
+### What Squad Handles Automatically
+
+After you post the DP:
+1. **Leela** is notified and reviews for architecture alignment with the [v2 implementation brief](./architecture/v2-implementation-brief.md)
+2. **Zapp** reviews for security concerns if applicable
+3. Once both approve (via comments), you can start implementation
+4. No manual ceremony coordination needed — it happens in parallel
 
 ### Design Proposal Template
 
@@ -142,7 +253,7 @@ When you pick up an issue labeled with your name, **post a Design Proposal comme
 
 ## Step 2: Create a Worktree
 
-**Critical:** Never use `git checkout -b` in the top-level checkout.
+**Critical:** Never use `git checkout -b` in the top-level checkout. Squad enforces isolated worktrees to prevent dirty diffs and branch conflicts.
 
 ```bash
 # List existing worktrees
@@ -159,10 +270,7 @@ git worktree add .worktrees/123-my-feature \
 cd .worktrees/123-my-feature
 ```
 
-**Branch naming convention:**
-```
-squad/{issue-number}-{kebab-case-slug}
-```
+**Branch naming convention:** `squad/{issue-number}-{kebab-case-slug}`
 
 Examples:
 - `squad/456-fix-empty-tool-result`
@@ -172,6 +280,7 @@ Examples:
 - Avoids dirty diffs and merge conflicts in the main checkout
 - Allows multiple features to work in parallel
 - Prevents accidental commits to the wrong branch
+- Matches the Squad workflow model
 
 ---
 
@@ -235,11 +344,11 @@ git push origin squad/123-my-feature
 
 ---
 
-## Step 6: PR Review Gates
+## Step 6: PR Review Gates — What Squad Handles
 
-Your PR must pass **three gates before merge**:
+Your PR automatically goes through **three gates**:
 
-### Gate 1: CI Status Checks
+### Gate 1: CI Status Checks (Automatic)
 
 ```
 ✅ Lint, build, unit tests
@@ -247,11 +356,16 @@ Your PR must pass **three gates before merge**:
 ✅ Docs gate (if you changed code)
 ```
 
-**If CI fails:** Fix locally, push again. CI re-runs automatically.
+Squad's CI pipeline runs automatically. **If CI fails:** Fix locally, push again. CI re-runs automatically.
 
-### Gate 2: Code Review (Label-based)
+### Gate 2: Code Review (Automatic Assignment + Your Response)
 
-When reviewers comment on your PR, **you must address every comment:**
+**Squad assigns reviewers automatically:**
+- **Leela** — Architecture alignment
+- **Zapp** — Security (if touching auth, secrets, validation)
+- **Nibbler** — Code quality, readability, patterns (may review but does not block merge)
+
+**What you must do:** Address every comment with a required response format:
 
 1. **Read** the comment
 2. **Fix** the code
@@ -260,21 +374,20 @@ When reviewers comment on your PR, **you must address every comment:**
 5. **Push** the fix
 6. **Request re-review**
 
-**Reviewers:**
-- **Leela** — Architecture alignment
-- **Zapp** — Security (if touching auth, secrets, validation)
-- **Nibbler** — Code quality, readability, patterns
-
-### Gate 3: All Approval Labels
+### Gate 3: Approval Labels (Enforced by Squad)
 
 The PR cannot merge until:
-- ✅ `leela:approved` label
-- ✅ `zapp:approved` label (if security-sensitive paths affected)
-- ✅ `nibbler:approved` label (code quality)
+- ✅ `leela:approved` label (always required)
+- ✅ `zapp:approved` label (required if code touches security-sensitive paths: auth, secrets, CORS, validation)
 - ✅ All review threads resolved
 - ✅ CI passing
 
-**Docs-only PRs:** Need only `leela:approved` + `zapp:approved` labels.
+**Label enforcement is automated by `.github/workflows/squad-review-gate.yml` and `.github/workflows/squad-auto-merge.yml`.**
+
+**Docs-only PRs:** Need only `leela:approved` label.
+
+**What Squad handles:** Checking label presence, blocking merge until all gates pass, CI integration.  
+**What you handle:** Addressing feedback comments with required replies.
 
 ---
 
@@ -282,13 +395,16 @@ The PR cannot merge until:
 
 Once all gates pass:
 
-1. **Merge** via GitHub
+1. **Merge** via GitHub (automatic merge may be enabled via CI)
 2. **Delete the worktree:**
    ```bash
    cd /path/to/repo  # Go back to main checkout
    git worktree remove .worktrees/123-my-feature
    git worktree prune
    ```
+
+**What Squad handles:** Merge eligibility verification, preventing manual merge without all gates passing.  
+**What you handle:** Cleanup of your worktree once merged.
 
 ---
 
@@ -463,3 +579,9 @@ File a separate issue; don't bundle it with your PR.
 - Changeset if user-facing
 - Reply to all review comments
 - Resolve all comment threads before merge
+
+---
+
+## Maintaining Copilot Skills
+
+Kickstart maintains a suite of Copilot CLI skills under `.copilot/skills/`. For a quick reference on existing skills, their use cases, and authoring conventions, see [`.copilot/skills/README.md`](./.copilot/skills/README.md).

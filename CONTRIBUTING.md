@@ -122,140 +122,94 @@ The canonical documentation lives in **`docs-site/docs/`** and is published to [
 
 ## Squad Workflow — Maintaining with AI Agents
 
-Kickstart uses **Squad** — a team of AI agents (Leela, Fry, Bender, Hermes, Zapp, Nibbler, Scribe) coordinated by a human or automated lead. If you're contributing to Kickstart or maintaining it, you'll interact with these conventions.
+Kickstart uses **Squad** — a team of AI agents coordinated by a human lead. The canonical guide for contributing is in **[docs-site/docs/contributing.md](https://sabbour.github.io/kickstart/docs/contributing/)**, which explains:
+
+- **Ralph loop** for automatic issue triage and queue monitoring
+- **Design Proposal gates** enforced by Squad
+- **PR review gates** with automatic reviewer assignment
+- **Worktree workflow** for isolated feature branches
+- **Squad vs. manual** — what you do vs. what's automated
+
+This file contains setup instructions only. For workflow details, see the canonical guide above.
 
 ### Team Structure & Issue Routing
 
-**See:** `.squad/team.md` (team roster and routing rules)
-
-The Squad consists of:
-- **Leela** (Lead) — Architecture, design proposals, scope decisions
-- **Fry** (Frontend) — React, A2UI, web client
-- **Bender** (Backend) — Harness, packs, API, infrastructure
-- **Hermes** (Testing) — Test strategy, performance, observability
-- **Zapp** (Security) — Security review, threat modeling, guardrail design
-- **Nibbler** (Code Quality) — PR reviews, readability, bug patterns
-- **Scribe** (Docs & Product) — Public docs, release notes, DX review
-
-Issues labeled `squad` are triaged by the Lead, who assigns the appropriate team member with a `squad:{member}` label. Each member has a **charter** describing their domain and responsibilities.
-
-**Coding Agent (@copilot)** can auto-handle bugs, tests, docs, and small isolated features (see `.squad/team.md` for the capability matrix). For complex work, a squad member takes it.
+See `.squad/team.md` and the [canonical contributing guide](https://sabbour.github.io/kickstart/docs/contributing/) for full details.
 
 ### Picking Up a Feature or Bug
 
-1. **Find an unstarted issue** on the [project board](https://github.com/users/sabbour/projects/3) with a `squad:{member}` label
-2. **No label yet?** The issue has the base `squad` label. It's untriaged — Leela will assign it when available
-3. **If labeled with your name:** That's your work. Read the issue body and acceptance criteria
-4. **Design Proposal gate:** Before implementing, you (or the assigned agent) post a **Design Proposal** comment on the issue explaining the approach, affected packs, test strategy, and docs plan. Leela reviews it before you code
-5. **Worktree workflow:** Create a feature branch in a **dedicated worktree**, not in the top-level checkout:
-   ```bash
-   git fetch origin
-   git worktree list                    # check what's in flight
-   git worktree add .worktrees/123-my-feature \
-     -b squad/123-my-feature origin/main
-   cd .worktrees/123-my-feature
-   ```
-   Every issue gets its own worktree to avoid dirty diffs and branch conflicts.
-6. **Commit with issue reference:** `git commit -m "feat: add auth flow (#123)"`
-7. **Changeset:** If user-facing, add a changeset: `npx changeset`
-8. **PR creation:** Open PR from your branch to `main`. Mention issue in description: `Closes #123`
-9. **PR review gates:**
-   - **Nibbler** reviews for code quality, readability, bugs
-   - **Leela** reviews for architecture alignment
-   - **Zapp** reviews if security-sensitive (auth, secrets, CORS, validation)
-   - **CI must pass** before merge
-10. **Address feedback:** If reviewers request changes, post an acknowledgment comment, fix the code, push, and request re-review
-11. **Merge & cleanup:** Once approved, the PR merges. Delete your worktree:
-    ```bash
-    git worktree remove .worktrees/123-my-feature
-    git worktree prune
-    ```
+**Canonical workflow steps:** See [Contributing with Squad](https://sabbour.github.io/kickstart/docs/contributing/).
+
+Quick reference:
+1. Wait for Ralph or Leela to assign a `squad:{member}` label (automatic triage via Ralph heartbeat)
+2. Create a worktree: `git worktree add .worktrees/{issue}-{slug} -b squad/{issue}-{slug} origin/main`
+3. Post a Design Proposal comment (DP gate blocks code)
+4. Implement → Commit → Push → Open PR
+5. Address review feedback (required comment replies)
+6. Merge when all gates pass
+7. Delete worktree: `git worktree remove .worktrees/{issue}-{slug}`
+
+**For full step-by-step instructions with examples, templates, and rationale, see the [canonical guide](https://sabbour.github.io/kickstart/docs/contributing/).**
 
 ### Key Conventions for Safe Contribution
 
-**Branches:**
-- Always use `.worktrees/{issue-number}-{slug}` — never `git checkout -b` in the top-level directory
-- Branch naming: `squad/123-my-feature-slug`
+See the [canonical guide](https://sabbour.github.io/kickstart/docs/contributing/) for detailed explanations. Quick reference:
 
-**Commits:**
-- Reference issue number: `Closes #123` in PR description
-- Use conventional commit format: `type(scope): description (#issue)`
-- Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`
+**Branches:** Always `.worktrees/{issue-slug}` with `squad/{issue}-{slug}` branch naming — never `git checkout -b` in top-level.
 
-**Changesets** (every user-facing change):
-- Run `npx changeset` after implementing a feature or fix
-- Skip changesets for: docs-only PRs, CI/workflow changes, dev tool changes
-- See [RELEASING.md](RELEASING.md) for versioning rules
+**Commits:** Conventional format `type(scope): description (#issue)` with issue reference in PR body.
 
-**Docs & DX:**
-- Public docs live in `docs-site/docs/`, not `docs/`
-- Update architecture briefs if you change harness primitives (tools, agents, components, etc.)
-- If adding an extension point, document it in `docs-site/docs/extending/`
+**Changesets:** `npx changeset` for all user-facing changes. Skip for docs-only, CI, workflows.
 
-**PR Workflow:**
-- Design Proposal posts before code (required by ceremony gate)
-- Aim for focused PRs (one issue per PR — split large features into sub-issues)
-- Code must pass `npm run lint` and `npm test` locally before pushing
-- CI must pass: linting, unit tests, E2E tests
-- If flagged as 🟡 **needs review**, note it in the PR body and wait for squad member approval
+**Docs:** Public docs in `docs-site/docs/` only. Update architecture briefs for harness changes.
 
-**Code Review Protocol:**
-- Reviewers will comment on the PR; address all comments
-- Reply to each comment with what you did: e.g., "Addressed in {commit-sha}: {description}"
-- After pushing fixes, request re-review
-- Never merge your own PR
+**PR workflow:** DP gate before code. Focused PRs. Local lint + test before push. Reply to all review comments with required protocol.
+
+**Code review:** Reply to comments: `Addressed in {sha}: {description}`. Resolve thread. Request re-review. Never merge your own.
 
 ### Example: Contributing a Bug Fix
 
+See the [canonical guide](https://sabbour.github.io/kickstart/docs/contributing/) for complete examples with all steps.
+
+Quick example:
 ```bash
-# 1. Find an issue labeled squad/bender (backend bug)
-# Issue: #456 — "ConvocationRunner fails on empty tool result"
-
+# 1. Ralph auto-triages issue #456 → assigns squad/bender label
 # 2. Create worktree
-git worktree add .worktrees/456-runner-empty-tool \
-  -b squad/456-runner-empty-tool origin/main
-cd .worktrees/456-runner-empty-tool
+git worktree add .worktrees/456-runner-fix -b squad/456-runner-fix origin/main
+cd .worktrees/456-runner-fix
 
-# 3. Reproduce and fix
-npm test packages/harness               # Find the failing test
-# ... edit packages/harness/src/runner.ts to handle empty tool result ...
-npm test                               # Verify all tests pass
+# 3. Fix the bug locally
+npm test packages/harness
+# ... edit and test ...
 
-# 4. Commit
+# 4. Commit and push
 git commit -m "fix(harness): handle empty tool result in Runner (#456)"
+git push origin squad/456-runner-fix
 
-# 5. Push
-git push origin squad/456-runner-empty-tool
-
-# 6. Create PR
-# Go to GitHub, create PR with title "fix: handle empty tool result in Runner"
-# In description: "Closes #456"
-
-# 7. Address any feedback from reviewers
-
-# 8. Once approved and merged
-git worktree remove .worktrees/456-runner-empty-tool
-git worktree prune
+# 5. Open PR → DP (if needed) → Review → Merge → Cleanup
 ```
 
 ### When to Ask for Help
 
-- **Not sure which squad member owns this?** → Check `.squad/routing.md`
-- **Unclear acceptance criteria?** → Comment on the issue; Leela will clarify
-- **Blocked on a decision?** → Comment on the issue with your question; don't spin
-- **Architecture question?** → Ask in the issue or reach out to Leela
-- **Security concern?** → Mention Zapp (`@zapp`) for a security review
+See the [canonical guide FAQ](https://sabbour.github.io/kickstart/docs/contributing/#troubleshooting--common-questions) for common questions and troubleshooting.
 
-### Squad Documentation
+Quick reference:
+- **Unclear acceptance criteria?** → Comment on issue; Leela will clarify
+- **Blocked on decision?** → Comment on issue
+- **Unsure about architecture?** → Mention Leela
+- **Security concern?** → Mention Zapp
+- **Not sure who owns this?** → Check `.squad/routing.md`
 
-**Canonical Squad reference:**
-- `.squad/team.md` — Team roster, routing rules, @copilot capability matrix
-- `.squad/routing.md` — Decision tree for routing work to the right person
-- `.squad/issue-lifecycle.md` — Detailed issue → branch → PR → merge workflow with command examples
-- `.squad/ceremonies.md` — Design Proposal, Design Review, PR Review gates
-- `.squad/decisions.md` — Team decisions, RFCs, architecture notes
+---
 
-These are living documents. If you find workflows unclear or outdated, file an issue or note it in Scribe's decision inbox.
+## Squad Ceremony Gates
+
+The workflow is enforced by ceremony gates. See `.squad/ceremonies.md` for complete details on:
+- **Design Proposal gate** — blocks code until DP approved
+- **Design Review gate** — blocks code until all reviewers approve
+- **PR Review gate** — blocks merge until all labels present and threads resolved
+
+See also: [Contributing with Squad](https://sabbour.github.io/kickstart/docs/contributing/)
 
 ## Infrastructure
 

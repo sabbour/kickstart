@@ -1,0 +1,24 @@
+import type { ComponentApi } from '../../catalog/types';
+export declare const TextApi: ComponentApi;
+export declare const ImageApi: ComponentApi;
+export declare const IconApi: ComponentApi;
+export declare const VideoApi: ComponentApi;
+export declare const AudioPlayerApi: ComponentApi;
+export declare const RowApi: ComponentApi;
+export declare const ColumnApi: ComponentApi;
+export declare const ListApi: ComponentApi;
+export declare const CardApi: ComponentApi;
+export declare const TabsApi: ComponentApi;
+export declare const ModalApi: ComponentApi;
+export declare const DividerApi: ComponentApi;
+export declare const ButtonApi: ComponentApi;
+export declare const TextFieldApi: ComponentApi;
+export declare const CheckBoxApi: ComponentApi;
+export declare const ChoicePickerApi: ComponentApi;
+export declare const SliderApi: ComponentApi;
+export declare const DateTimeInputApi: ComponentApi;
+export declare const TableApi: ComponentApi;
+export declare const AlertApi: ComponentApi;
+export declare const LinkApi: ComponentApi;
+export declare const BASIC_COMPONENTS: ComponentApi[];
+//# sourceMappingURL=basic_components.d.ts.map

@@ -44,6 +44,8 @@ When recommending node pool sizes for AKS Automatic, prefer ...
 | `keywords` | ✅ | Terms that boost this skill's score against conversation turns |
 | `priority` | optional | Ordering within budget (default: 50) |
 
+> **Using GitHub Copilot CLI?** The Copilot skill **[add-agent-skill](https://github.com/sabbour/kickstart/blob/main/.copilot/skills/add-agent-skill/)** scaffolds new `SKILL.md` files with frontmatter and guides you through authoring the skill content and registering it with an agent.
+
 ## Where Skills Live
 
 | Pack | Skills directory |
