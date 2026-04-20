@@ -120,7 +120,7 @@ GH_TOKEN=$TOKEN gh pr ready <N>
 | Zapp | Security, auth, secrets, tool schemas, guardrails |
 | Hermes | Test coverage across the layers the PR touches |
 
-Both Leela and Zapp must approve. The `.github/workflows/squad-review-gate.yml` workflow enforces this as a required status check, and `Squad Auto Merge` clears those approval labels on every `synchronize` so fresh approval is always tied to the current head commit.
+Both Leela and Zapp must approve. The `.github/workflows/squad-review-gate.yml` workflow enforces this as a required status check, and `Squad Auto Merge` clears approval labels on `synchronize` unless the PR is already in the opposite reviewer's rejection loop. Today that means a `zapp:rejected` fix cycle preserves `leela:approved`, and a `leela:rejected` fix cycle preserves `zapp:approved`.
 
 ### 8. Address review comments
 

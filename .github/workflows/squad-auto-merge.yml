@@ -89,6 +89,16 @@ jobs:
               return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(filename));
             }
 
+            function getPreservedApprovalLabels(labels) {
+              const hasLeelaRejection = labels.has('leela:rejected');
+              const hasZappRejection = labels.has('zapp:rejected');
+              if (hasLeelaRejection === hasZappRejection) {
+                return [];
+              }
+
+              return hasZappRejection ? ['leela:approved'] : ['zapp:approved'];
+            }
+
             function isTrustedRetroLogPr(pr, labels, changedFiles) {
               return (
                 labels.has(TRUSTED_RETRO_LABEL) &&
@@ -205,11 +215,16 @@ jobs:
 
             async function clearApprovalLabels(pr, labels) {
               if (context.eventName !== 'pull_request_target' || context.payload.action !== 'synchronize') {
-                return [];
+                return { removed: [], preserved: [] };
               }
 
+              const preserved = getPreservedApprovalLabels(labels);
+              const labelsToClear = APPROVAL_LABELS.filter((label) => !preserved.includes(label));
               const removed = [];
               for (const label of APPROVAL_LABELS) {
+                if (!labelsToClear.includes(label)) {
+                  continue;
+                }
                 if (!labels.has(label)) {
                   continue;
                 }
@@ -228,7 +243,7 @@ jobs:
                   }
                 }
               }
-              return removed;
+              return { removed, preserved };
             }
 
             async function getTrustedWorkflowRuns(headSha, prNumber) {
@@ -322,8 +337,11 @@ jobs:
             const trustedRetroLogPr = isTrustedRetroLogPr(pr, labels, changedFiles);
             const dependabotPr = isDependabotPr(pr);
             const zappRequirementReason = getZappRequirementReason(pr, labels, changedFiles);
-            const removedLabels = await clearApprovalLabels(pr, labels);
-            if (removedLabels.length > 0) {
+            const clearedApprovals = await clearApprovalLabels(pr, labels);
+            if (clearedApprovals.removed.length > 0) {
+              const preservedLabelsSummary = clearedApprovals.preserved
+                .map((label) => `\`${label}\``)
+                .join(', ');
               await disableAutoMerge(
                 pr,
                 'new commits require fresh approvals',
@@ -331,11 +349,13 @@ jobs:
                   AUTO_MERGE_MARKER,
                   '🤖 Auto-merge disarmed.',
                   '',
-                  `- removed stale approval labels: ${removedLabels.join(', ')}`,
-                  '- new commits require fresh approval labels before re-arming',
+                  `- removed stale approval labels: ${clearedApprovals.removed.join(', ')}`,
+                  clearedApprovals.preserved.length > 0
+                    ? `- preserved ${preservedLabelsSummary} because the opposite reviewer is already in a rejection loop`
+                    : '- new commits require fresh approval labels before re-arming',
                 ].join('\n'),
               );
-              core.info(`Cleared stale approval labels for PR #${pr.number}: ${removedLabels.join(', ')}`);
+              core.info(`Cleared stale approval labels for PR #${pr.number}: ${clearedApprovals.removed.join(', ')}`);
               return;
             }
 
