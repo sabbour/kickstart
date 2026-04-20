@@ -8,7 +8,9 @@ on:
     types: [closed]
 
 permissions:
+  checks: read
   contents: write
+  issues: write
   pull-requests: write
 
 jobs:
@@ -34,6 +36,11 @@ jobs:
               changed <= 50 ? 'S' :
               changed <= 250 ? 'M' :
               changed <= 1000 ? 'L' : 'XL';
+            const isBotUser = (user) => {
+              const login = user?.login ?? '';
+              return user?.type === 'Bot' || /\[bot\]$/i.test(login);
+            };
+            const formatMinutes = (value) => Number.isFinite(value) ? `${value}m` : 'n/a';
 
             // Implementation window = created_at - first commit
             const commits = await github.rest.pulls.listCommits({
@@ -70,13 +77,56 @@ jobs:
             });
             const requestedChanges = reviews.filter(r => r.state === 'CHANGES_REQUESTED').length;
             const cycles = Math.max(1, requestedChanges + (pr.merged ? 0 : 0));
+            const submittedReviews = reviews
+              .filter((review) => review.submitted_at)
+              .sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime());
+            const firstReview = submittedReviews[0];
+            const firstReviewMin = firstReview?.submitted_at
+              ? Math.max(0, Math.round((new Date(firstReview.submitted_at) - new Date(pr.created_at)) / 60000))
+              : null;
+            const reviewerType = firstReview
+              ? (isBotUser(firstReview.user) ? 'bot' : 'human')
+              : 'none';
+
+            const reviewComments = await github.paginate(github.rest.pulls.listReviewComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+            const issueComments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            const humanCommentsCount =
+              reviews.filter((review) => review.body?.trim() && !isBotUser(review.user)).length +
+              reviewComments.filter((comment) => comment.body?.trim() && !isBotUser(comment.user)).length +
+              issueComments.filter((comment) => comment.body?.trim() && !isBotUser(comment.user)).length;
+
+            const checkRuns = await github.paginate(github.rest.checks.listForRef, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: pr.head.sha,
+              per_page: 100,
+            });
+            const ciDurationMin = checkRuns
+              .filter((run) => run.started_at && run.completed_at)
+              .reduce((sum, run) => {
+                const duration = new Date(run.completed_at).getTime() - new Date(run.started_at).getTime();
+                return sum + Math.max(0, duration);
+              }, 0);
+            const ciDurationRounded = ciDurationMin > 0
+              ? Math.round(ciDurationMin / 60000)
+              : null;
 
             const outcome = pr.merged
               ? (requestedChanges > 0 ? 'merged-with-rework' : 'merged')
               : 'closed';
 
             const date = closedAt.toISOString().slice(0, 10);
-            const line = `- ${date} | #${pr.number} "${title}" | ${size} | impl=${implMin}m | review=${reviewMin}m | cycles=${cycles} | ${outcome} | @${author}`;
+            const line = `- ${date} | #${pr.number} "${title}" | ${size} | impl=${implMin}m | review=${reviewMin}m | cycles=${cycles} | ${outcome} | @${author} | first_review=${formatMinutes(firstReviewMin)} | ci=${formatMinutes(ciDurationRounded)} | reviewer=${reviewerType} | human_comments=${humanCommentsCount}`;
 
             core.setOutput('line', line);
             core.setOutput('pr', String(pr.number));
