@@ -4,7 +4,7 @@ Local development setup for the Kickstart monorepo.
 
 ## Prerequisites
 
-- **Node.js 20+** — [Download](https://nodejs.org/)
+- **Node.js 22+** — [Download](https://nodejs.org/)
 - **Azure Static Web Apps CLI** — install globally:
   ```bash
   npm install -g @azure/static-web-apps-cli

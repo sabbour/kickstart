@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "defaultModel": "claude-opus-4.7",
+  "defaultModel": "gpt-5.4",
   "agentModelOverrides": {
     "zapp": "gpt-5.3-codex"
   },

@@ -41,9 +41,14 @@ await esbuild.build({
   outdir: "dist/functions",
   format: "esm",
   platform: "node",
-  target: "node20",
+  target: "node22",
   external: ["@azure/functions", "bicep-node"],
-  sourcemap: true,
+  banner: {
+    js: "import { createRequire as __kickstartCreateRequire } from 'node:module'; const require = __kickstartCreateRequire(import.meta.url);",
+  },
+  // Source maps bloat the SWA upload and aren't used by the Functions host.
+  // Enable locally by setting KICKSTART_API_SOURCEMAP=1.
+  sourcemap: process.env.KICKSTART_API_SOURCEMAP === "1",
   plugins: [harnessResolver],
 });
 
