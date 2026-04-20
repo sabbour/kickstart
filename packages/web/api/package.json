@@ -1,6 +1,6 @@
 {
   "name": "@kickstart/api",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Azure Functions API for Kickstart web surface — LLM proxy",
   "type": "module",

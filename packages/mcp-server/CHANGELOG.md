@@ -1,5 +1,24 @@
 # @kickstart/mcp-server
 
+## 1.0.0
+
+### Major Changes
+
+- Kickstart v1.0.0 makes the harness plus packs architecture the supported product baseline and retires the remaining v1 compatibility surface.
+
+### Patch Changes
+
+- [#790](https://github.com/sabbour/kickstart/pull/790) [`380a226`](https://github.com/sabbour/kickstart/commit/380a226c694dabe05948dfcf99fe1821e2a974b7) Thanks [@sabbour](https://github.com/sabbour)! - MCP server now registers the core/azure/aks/github packs at boot through a sealed `PackRegistry` singleton that mirrors `packages/web/api/src/startup/packs.ts`, honouring the `KICKSTART_PACKS` env var. Each pack now exports a `./server-manifest` subpath so server-only runtimes (MCP + Azure Functions) can load it without pulling in React.
+
+- [#789](https://github.com/sabbour/kickstart/pull/789) [`5c1138d`](https://github.com/sabbour/kickstart/commit/5c1138d9c3315cd4968a5776a63e49d3a1b9c89c) Thanks [@sabbour](https://github.com/sabbour)! - Remove v1 compatibility stubs: delete `packages/core/` redirect package, drop unused v1 shims (`ConversationSkillsContext`, `registerKit`, `azureKit`, `githubKit`, `resolveConversationSkills`) from the harness barrel, delete `packages/web/api/src/lib/response-processor.ts` and `converse-model-router.ts`, and drop the legacy harness-exports test. Changeset `linked` group now targets `@kickstart/harness` instead of `@kickstart/core`.
+
+- Updated dependencies [[`380a226`](https://github.com/sabbour/kickstart/commit/380a226c694dabe05948dfcf99fe1821e2a974b7), [`1909bfa`](https://github.com/sabbour/kickstart/commit/1909bfab0c533236a83ac21e564ecdcde7d7660a), [`5c1138d`](https://github.com/sabbour/kickstart/commit/5c1138d9c3315cd4968a5776a63e49d3a1b9c89c)]:
+  - @kickstart/pack-core@1.0.0
+  - @kickstart/pack-azure@1.0.0
+  - @kickstart/pack-aks-automatic@1.0.0
+  - @kickstart/pack-github@1.0.0
+  - @kickstart/harness@1.0.0
+
 ## 0.7.0
 
 ### Minor Changes

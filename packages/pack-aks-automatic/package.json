@@ -1,7 +1,7 @@
 {
   "name": "@kickstart/pack-aks-automatic",
-  "version": "0.1.0",
-  "description": "AKS Automatic pack \u2014 agents, skills, tools, user actions, and components for Kickstart v2",
+  "version": "1.0.0",
+  "description": "AKS Automatic pack — agents, skills, tools, user actions, and components for Kickstart v2",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
