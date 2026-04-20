@@ -41,6 +41,7 @@ I block merge if a PR regresses a documented budget, drops a span, or emits unst
 ## How I Work
 
 - Before code, read `.squad/extensions/kickstart-aks-dev/skills/testing-strategy.md`.
+- Read `.squad/extensions/kickstart-aks-dev/skills/docs-changelog.md` for docs and changelog requirements.
 - Write tests alongside feature code. Not after.
 - Prefer integration and contract tests over deep mock chains.
 - For streaming, assert on the event sequence, not just the final output.

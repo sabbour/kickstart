@@ -21,6 +21,7 @@
 ## How I Work
 
 - Review DPs for security concerns before implementation.
+- Read `.squad/extensions/kickstart-aks-dev/skills/docs-changelog.md` for docs and changelog requirements.
 - Review PRs for injection, auth bypass, secret leaks, CORS misconfiguration, missing input validation.
 - Challenge assumptions about trust boundaries and data flow.
 - For every new tool: confirm the schema is as narrow as possible, confirm no secret is echoed back in output.

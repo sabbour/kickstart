@@ -20,6 +20,7 @@
 ## How I Work
 
 - Before code, read `.squad/extensions/kickstart-aks-dev/skills/pr-workflow.md` and `pack-authoring.md`.
+- Read `.squad/extensions/kickstart-aks-dev/skills/docs-changelog.md` for docs and changelog requirements.
 - Post a DP on the issue before writing code. Wait for Leela + Zapp approval.
 - Design APIs and tool schemas contract-first. Tool schemas are the security surface, so Zapp signs off on any widening.
 - Keep the harness domain-free. Domain logic lives in packs. If you find yourself adding Azure knowledge to the harness, stop.

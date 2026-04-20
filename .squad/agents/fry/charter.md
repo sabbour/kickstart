@@ -20,6 +20,7 @@
 ## How I Work
 
 - Before code, read `.squad/extensions/kickstart-aks-dev/skills/pr-workflow.md`, `a2ui-components.md`, and `pack-authoring.md`.
+- Read `.squad/extensions/kickstart-aks-dev/skills/docs-changelog.md` for docs and changelog requirements.
 - Post a DP on the issue before writing code. Wait for Leela + Zapp approval.
 - Start with the user journey. Components are the last step, not the first.
 - Use Fluent UI v9 primitives only. No custom CSS class systems, no inline styles, no emoji in UI.
