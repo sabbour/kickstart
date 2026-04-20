@@ -21,6 +21,7 @@ These run via GitHub Actions on schedule or events. Documented here for referenc
 | Per-PR Micro-Retro | PR closed | `.github/workflows/squad-pr-retro.yml` | Scribe | `.squad/retro-log.md` + PR comment |
 | Daily Pulse | cron `0 0 * * *` (17:00 PT) | `.github/workflows/squad-daily-pulse.yml` | Scribe | rolling issue `📊 Daily Pulse (rolling)` |
 | Weekly Pulse | cron `0 0 * * 2` (Mon 17:00 PT) | `.github/workflows/squad-weekly-pulse.yml` | Scribe | new issue `Weekly Pulse · YYYY-MM-DD` |
+| Weekly Velocity Report | cron `0 0 * * 1` (Sun 17:00 PT) | `.github/workflows/squad-velocity-report.yml` | Scribe | `.squad/velocity.md` |
 | Monthly Docs Sweep | cron `0 0 2 * *` (~1st day 17:00 PT) | `.github/workflows/squad-monthly-docs-sweep.yml` | Scribe | rolling issue `📚 Docs Sweep (rolling)` |
 | Release Cadence | cron `0 0 * * *` (17:00 PT) | `.github/workflows/squad-release-cadence.yml` | Leela + Scribe | draft PR on `release/cadence` branch |
 
