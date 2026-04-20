@@ -120,96 +120,21 @@ The canonical documentation lives in **`docs-site/docs/`** and is published to [
 - Run the site locally: `cd docs-site && npm install && npm start`
 - New pages are auto-added to the sidebar based on directory structure and `sidebar_position` frontmatter
 
-## Squad Workflow — Maintaining with AI Agents
+## Contributing with Squad
 
-Kickstart uses **Squad** — a team of AI agents coordinated by a human lead. The canonical guide for contributing is in **[docs-site/docs/contributing.md](https://sabbour.github.io/kickstart/docs/contributing/)**, which explains:
+Kickstart uses **Squad** — a team of AI agents coordinated by a human lead.
 
-- **Ralph loop** for automatic issue triage and queue monitoring
-- **Design Proposal gates** enforced by Squad
-- **PR review gates** with automatic reviewer assignment
-- **Worktree workflow** for isolated feature branches
-- **Squad vs. manual** — what you do vs. what's automated
+**For the complete workflow guide, ceremonies, troubleshooting, and examples, see [Contributing with Squad](https://sabbour.github.io/kickstart/docs/contributing/).**
 
-This file contains setup instructions only. For workflow details, see the canonical guide above.
+Quick local references:
+- **Team roster & issue routing:** `.squad/team.md`
+- **Ceremony gates (DP, Review, PR gates):** `.squad/ceremonies.md`
+- **Decisions log:** `.squad/decisions/`
+- **Agent charters:** `.squad/agents/{member}/charter.md`
 
-### Team Structure & Issue Routing
+### Maintaining Skills
 
-See `.squad/team.md` and the [canonical contributing guide](https://sabbour.github.io/kickstart/docs/contributing/) for full details.
-
-### Picking Up a Feature or Bug
-
-**Canonical workflow steps:** See [Contributing with Squad](https://sabbour.github.io/kickstart/docs/contributing/).
-
-Quick reference:
-1. Wait for Ralph or Leela to assign a `squad:{member}` label (automatic triage via Ralph heartbeat)
-2. Create a worktree: `git worktree add .worktrees/{issue}-{slug} -b squad/{issue}-{slug} origin/main`
-3. Post a Design Proposal comment (DP gate blocks code)
-4. Implement → Commit → Push → Open PR
-5. Address review feedback (required comment replies)
-6. Merge when all gates pass
-7. Delete worktree: `git worktree remove .worktrees/{issue}-{slug}`
-
-**For full step-by-step instructions with examples, templates, and rationale, see the [canonical guide](https://sabbour.github.io/kickstart/docs/contributing/).**
-
-### Key Conventions for Safe Contribution
-
-See the [canonical guide](https://sabbour.github.io/kickstart/docs/contributing/) for detailed explanations. Quick reference:
-
-**Branches:** Always `.worktrees/{issue-slug}` with `squad/{issue}-{slug}` branch naming — never `git checkout -b` in top-level.
-
-**Commits:** Conventional format `type(scope): description (#issue)` with issue reference in PR body.
-
-**Changesets:** `npx changeset` for all user-facing changes. Skip for docs-only, CI, workflows.
-
-**Docs:** Public docs in `docs-site/docs/` only. Update architecture briefs for harness changes.
-
-**PR workflow:** DP gate before code. Focused PRs. Local lint + test before push. Reply to all review comments with required protocol.
-
-**Code review:** Reply to comments: `Addressed in {sha}: {description}`. Resolve thread. Request re-review. Never merge your own.
-
-### Example: Contributing a Bug Fix
-
-See the [canonical guide](https://sabbour.github.io/kickstart/docs/contributing/) for complete examples with all steps.
-
-Quick example:
-```bash
-# 1. Ralph auto-triages issue #456 → assigns squad/bender label
-# 2. Create worktree
-git worktree add .worktrees/456-runner-fix -b squad/456-runner-fix origin/main
-cd .worktrees/456-runner-fix
-
-# 3. Fix the bug locally
-npm test packages/harness
-# ... edit and test ...
-
-# 4. Commit and push
-git commit -m "fix(harness): handle empty tool result in Runner (#456)"
-git push origin squad/456-runner-fix
-
-# 5. Open PR → DP (if needed) → Review → Merge → Cleanup
-```
-
-### When to Ask for Help
-
-See the [canonical guide FAQ](https://sabbour.github.io/kickstart/docs/contributing/#troubleshooting--common-questions) for common questions and troubleshooting.
-
-Quick reference:
-- **Unclear acceptance criteria?** → Comment on issue; Leela will clarify
-- **Blocked on decision?** → Comment on issue
-- **Unsure about architecture?** → Mention Leela
-- **Security concern?** → Mention Zapp
-- **Not sure who owns this?** → Check `.squad/routing.md`
-
----
-
-## Squad Ceremony Gates
-
-The workflow is enforced by ceremony gates. See `.squad/ceremonies.md` for complete details on:
-- **Design Proposal gate** — blocks code until DP approved
-- **Design Review gate** — blocks code until all reviewers approve
-- **PR Review gate** — blocks merge until all labels present and threads resolved
-
-See also: [Contributing with Squad](https://sabbour.github.io/kickstart/docs/contributing/)
+Skills are authored as `.copilot/skills/{skill}/SKILL.md` files (agentskills.io format). See `.copilot/skills/README.md` for guidance on skill structure, patterns, and maintenance.
 
 ## Infrastructure
 

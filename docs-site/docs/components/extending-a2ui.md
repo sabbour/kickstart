@@ -8,7 +8,7 @@ sidebar_position: 2
 
 This guide walks through the full lifecycle of extending Kickstart's A2UI component system — from defining a React component to seeing it rendered by the LLM in production.
 
-> **Using GitHub Copilot CLI?** The Copilot skills **[create-a2ui-component](https://github.com/sabbour/kickstart/blob/main/.copilot/skills/create-a2ui-component/)** and **[create-smart-component](https://github.com/sabbour/kickstart/blob/main/.copilot/skills/create-smart-component/)** automate the 4-layer stack and guide you through each step. Use them to scaffold new components and stateful smart components with built-in validation, auth, and state management.
+> **Using GitHub Copilot CLI?** The Copilot skills **[create-a2ui-component](https://github.com/sabbour/kickstart/blob/main/.copilot/skills/create-a2ui-component/SKILL.md)** and **[create-smart-component](https://github.com/sabbour/kickstart/blob/main/.copilot/skills/create-smart-component/SKILL.md)** automate the 4-layer stack and guide you through each step. Use them to scaffold new components and stateful smart components with built-in validation, auth, and state management.
 
 ## The 4-Layer Stack
 

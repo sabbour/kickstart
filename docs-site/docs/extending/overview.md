@@ -39,7 +39,7 @@ packages/
 - **Browser popup / credential flow?** → Author a **UserAction**. The harness handles pause/resume automatically.
 - **New AI persona?** → Author an `.agent.md` file. Declare its allowed tools and handoff targets in frontmatter.
 - **Domain knowledge injection?** → Author a `SKILL.md` file with an `appliesTo` glob targeting the relevant agents.
-- **New integration domain** (e.g., a new cloud provider)? → Create a new pack that contributes agents + skills + tools + user actions together. Use the Copilot skill **[create-new-pack](https://github.com/sabbour/kickstart/blob/main/.copilot/skills/create-new-pack/)** to scaffold the pack structure and wiring.
+- **New integration domain** (e.g., a new cloud provider)? → Create a new pack that contributes agents + skills + tools + user actions together. Use the Copilot skill **[create-new-pack](https://github.com/sabbour/kickstart/blob/main/.copilot/skills/create-new-pack/SKILL.md)** to scaffold the pack structure and wiring.
 - **New HTTP surface?** → [API Endpoints](./api-endpoints.md) covers the Azure Functions v4 pattern with SSE streaming.
 - **IDE integration?** → [MCP Tools](./mcp-tools.md) covers MCP tool authoring for VS Code Copilot and Claude Code.
 
