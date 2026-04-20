@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Packs
 
-A **Pack** is the unit of extensibility in Kickstart v2. It bundles agents, skills, tools, user actions, components, and guardrails into a single deployable unit. The harness is domain-agnostic; packs carry all product knowledge.
+A **Pack** is the unit of extensibility in Kickstart. It bundles agents, skills, tools, user actions, components, and guardrails into a single deployable unit. The harness is domain-agnostic; packs carry all product knowledge.
 
 ## Pack Interface
 

@@ -132,7 +132,7 @@ When you pick up an issue labeled with your name, **post a Design Proposal comme
 ```
 
 **Review process:**
-- Leela reviews for architecture alignment with the [v2 implementation brief](./architecture/v2-implementation-brief.md)
+- Leela reviews for architecture alignment with the current architecture
 - Zapp reviews for security concerns (if applicable)
 - Once approved, you can start implementation
 
@@ -397,7 +397,7 @@ The canonical documentation lives in **`docs-site/docs/`** and is published to [
 ### Editing docs
 
 - Docs are Markdown in `docs-site/docs/`
-- Architecture brief: `docs-site/docs/architecture/v2-implementation-brief.md`
+- Architecture overview: `docs-site/docs/architecture/overview.md`
 - Run the site locally: `cd docs-site && npm install && npm start`
 - New pages are auto-added to the sidebar based on `sidebar_position` frontmatter
 
@@ -411,7 +411,7 @@ The canonical documentation lives in **`docs-site/docs/`** and is published to [
 | `.squad/routing.md` | Work routing: who handles what type |
 | `.squad/ceremonies.md` | Design Proposal and PR Review gates |
 | `.squad/decisions.md` | Architecture decisions and RFCs |
-| `docs-site/docs/architecture/v2-implementation-brief.md` | System design that all DPs reference |
+| `docs-site/docs/architecture/overview.md` | System architecture reference |
 | `.github/workflows/squad-review-gate.yml` | CI enforcing label-based approval |
 | `CONTRIBUTING.md` | (Local repo) Setup and development commands |
 

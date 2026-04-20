@@ -60,6 +60,9 @@ Ready for QA handoff.
 - **Histories updated:** leela, fry, bender, zapp, hermes
 - **History summarization:** fry (29,842 bytes), leela (21,435 bytes), bender (17,814 bytes) — all exceed 15 KB; summarization in progress
 
-## 2026-04-17 Wave 3 — Inbox merge
+## 2026-04-20 — Docs cleanup: v2 implementation brief removed
 
-Merged 11 new decision files from worktree inboxes (mcp-apps-concept-smoke, docs-rewrite, leela-351, zapp-kickstart-app-security, 474-step1-nuke-v1 ×5, 475-harness-types-review, 476-security-review). decisions.md: 116,926 → 128,677 bytes. Updated histories: bender, leela, zapp, fry. All history files below 15 KB — no summarization needed.
+Deleted `docs-site/docs/architecture/v2-implementation-brief.md` (1,171 lines, internal migration plan). Cleaned `v2` branding from 4 remaining docs files. Build validated with `onBrokenLinks: 'throw'` active.
+
+**Learning:** When removing a large internal-facing doc that other files link to, scan all docs for references before deleting. `onBrokenLinks: 'throw'` will catch them at build time, but fixing references first is cleaner.
+
