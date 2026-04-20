@@ -2337,3 +2337,74 @@ Startup-only registry model is directionally sound and `seal()` is the right con
 ## Security consequence
 
 With conditions above, Step 3 remains acceptable as design foundation for Step 4. Without them, the registry becomes a trust-boundary weak point.
+
+---
+
+# Decision: Release Process — v1.0.1 Gap & Pattern Retirement
+
+**Date:** 2026-04-20T12:42:36-07:00  
+**Author:** Leela (Lead)  
+**Trigger:** Post-release audit of v1.0.1 (published 2026-04-20T16:46:55Z)  
+**Status:** DECISION: ACCEPTED
+
+---
+
+## Finding
+
+v1.0.1 was prepared via the `release` skill, which created a `release/v1.0.1` branch and applied a version-bump commit (`0df05df`, "chore(release): prepare v1.0.1 with asset path fix"). However, the `v1.0.1` git tag was applied to the **pre-bump commit** (`0dddcbb`, "chore: rename Fat components to Smart components") — a commit that IS on `main`. No PR was opened to merge `release/v1.0.1` → `main`.
+
+Result:
+- `main` is still at package.json `1.0.0`
+- The version-bump commit (1.0.1) and the "asset path fix" content it carries live only on the unmerged `release/v1.0.1` branch
+- The deploy-swa workflow **did** run on the `v1.0.1` tag push (at `2026-04-20T16:33:36Z`, result: success), but it deployed the pre-bump commit — not the asset path fix
+
+---
+
+## Issue
+
+The `release/v1.0.1` branch has one commit not on `main`:
+
+```
+0df05df  chore(release): prepare v1.0.1 with asset path fix
+         — bumps package.json to 1.0.1
+         — adds .github/scripts/squad-visible-trail.cjs + workflow
+         — adds agent inbox entries (bender/fry follow-up items)
+```
+
+This commit is stranded. `main` never received the version bump or the asset path fix. Any user loading the deployed SWA sees code from commit `0dddcbb`, not the release-prep content.
+
+---
+
+## Root Cause
+
+Two competing release workflows are in use:
+
+| Path | Branch name | Tag origin | PR back to main? |
+|------|-------------|------------|-----------------|
+| `squad-release-cadence.yml` (designed process) | `release/cadence` | Created by `squad-release.yml` on `main` push | Yes — the cadence workflow opens `release/cadence → main` PR |
+| `release` skill (used for v1.0.1) | `release/v1.0.x` | Created manually on the release branch | **No** — skill has no merge-back step |
+
+The `squad-release-cadence.yml` design is correct: it merges version-bump changes into `main` first, then the `squad-release.yml` tags from `main`. The `release` skill short-circuits this by operating on a standalone `release/v*` branch, tagging at the wrong point, and leaving no path back to `main`.
+
+This is a **process regression** — the versioned branch pattern (also used for v0.7.0 and earlier) predates the cadence workflow. The cadence workflow was never fully adopted; the old pattern persisted.
+
+---
+
+## Decision
+
+**Retire the `release/v*` versioned branch pattern entirely.** All future releases go through `release/cadence → main` only. The `squad-release.yml` on `main` push creates the tag. The `release` skill is updated to redirect to the cadence workflow or be retired in favor of the cadence automation.
+
+The cadence workflow already covers release management correctly. Running two competing release paths is the root cause of this gap. One canonical process is cleaner, more auditable, and eliminates merge conflicts and stranded commits.
+
+---
+
+## Action Items
+
+| Item | Owner | Priority | Status |
+|------|-------|----------|--------|
+| Open PR `release/v1.0.1 → main`, merge it | Leela / sabbour | **Immediate** | — |
+| Remove `release` skill or update it to use cadence workflow | Leela (workflow update) + Scribe (docs) | High | ✅ Done — skill updated to redirect to cadence workflow; `release/v*` pattern explicitly retired in skill docs |
+| Add deprecation note to release skill docs: `release/v*` branches are retired | Scribe | High | ✅ Done — deprecation warning added to `.squad/extensions/kickstart-aks-dev/skills/release-process.md` |
+| Audit v0.7.0 and earlier for same gap (stranded version bumps) | Hermes | Medium | — |
+
+---
