@@ -23,7 +23,7 @@ jobs:
             const appliedLabel = context.payload.label.name;
 
             // Namespaces with mutual exclusivity rules
-            const EXCLUSIVE_PREFIXES = ['go:', 'release:', 'type:', 'priority:'];
+            const EXCLUSIVE_PREFIXES = ['go:', 'release:', 'type:', 'priority:', 'estimate:'];
 
             // Skip if not a managed namespace label
             if (!EXCLUSIVE_PREFIXES.some(p => appliedLabel.startsWith(p))) {
@@ -175,6 +175,32 @@ jobs:
                   repo: context.repo.repo,
                   issue_number: issue.number,
                   body: `🏷️ Priority updated → \`${appliedLabel}\``
+                });
+              }
+            }
+
+            // Handle estimate: namespace (mutual exclusivity)
+            if (appliedLabel.startsWith('estimate:')) {
+              const otherEstimateLabels = allLabels.filter(l =>
+                l.startsWith('estimate:') && l !== appliedLabel
+              );
+
+              if (otherEstimateLabels.length > 0) {
+                for (const label of otherEstimateLabels) {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    name: label
+                  });
+                  core.info(`Removed conflicting label: ${label}`);
+                }
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `🏷️ Estimate updated → \`${appliedLabel}\``
                 });
               }
             }

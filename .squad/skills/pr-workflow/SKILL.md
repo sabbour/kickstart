@@ -118,16 +118,17 @@ Before running any `gh` commands, ensure you are authenticated with the correct 
 ### DP Lifecycle
 
 1. **Issue is triaged** — Ahmed or Leela writes the problem statement and acceptance criteria in the issue body.
-2. **Agent picks up issue** — posts a **Design Proposal (DP)** as a structured comment on the issue BEFORE writing any code.
+2. **Agent picks up issue** — confirms the issue has exactly one `estimate:S`, `estimate:M`, `estimate:L`, or `estimate:XL` label, then posts a **Design Proposal (DP)** as a structured comment on the issue BEFORE writing any code.
 3. **DP structure:**
    - Problem statement (reference to issue body)
+   - `Estimate: <S/M/L/XL>` (required; must match the issue label. Calibration: S≈2h/1 point, M≈8h/3 points, L≈24h/8 points, XL≈80h/20 points)
    - Proposed approach
    - Files to modify / create
    - Patterns and dependencies
    - API contracts (if applicable)
    - Security considerations
    - Alternatives considered
-4. **Leela reviews DP** for architecture quality (comment on issue).
+4. **Leela reviews DP** for architecture quality (comment on issue). A DP missing `Estimate:` or mismatching the issue's `estimate:*` label is rejected.
 5. **Zapp reviews DP** for security concerns (comment on issue).
 6. **Both approve** → agent proceeds to implementation.
 7. **Draft PR opened** — code review only; design is already approved on the issue.
@@ -378,7 +379,8 @@ Example: `squad/42-fix-login-validation`
 □ Assign issue to current user (gh api user -q .login)
 □ Set milestone
 □ Update board → In progress
-□ Post Design Proposal (DP) comment on issue
+□ Issue has exactly one `estimate:*` label
+□ Post Design Proposal (DP) comment on issue with `Estimate: <S/M/L/XL>`
 □ Leela approves DP (architecture)
 □ Zapp approves DP (security)
 □ Create branch: squad/{N}-{slug}

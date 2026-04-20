@@ -42,8 +42,18 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 
 **Gate:** No implementation code may be written until the DP is posted as a comment on the issue.
 
+**Estimate calibration:** every implementation issue carries exactly one estimate label and the DP must repeat that estimate in the proposal.
+
+| Label | Time band | Velocity points |
+|-------|-----------|-----------------|
+| `estimate:S` | ~2 hours | 1 |
+| `estimate:M` | ~8 hours | 3 |
+| `estimate:L` | ~24 hours | 8 |
+| `estimate:XL` | ~80 hours | 20 |
+
 **DP structure** (the implementing agent posts a comment with):
 - Problem statement (cite the issue body)
+- `Estimate: <S/M/L/XL>` (required; must match the issue's `estimate:*` label)
 - Proposed approach with a reference to the relevant brief section
 - Pack boundaries affected
 - Primitive surface changes: tools, user actions, components, guardrails
@@ -55,6 +65,7 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 **Rules:**
 - The issue body (problem + acceptance criteria) is written by the product owner or Lead. The DP (approach) is written by the implementing agent.
 - Each PR maps to one issue. Split bundles.
+- Leela rejects a DP that is missing the `Estimate:` field or does not match the issue's `estimate:*` label.
 
 **Agenda:**
 1. Assigned agent drafts a Design Proposal comment on the issue
