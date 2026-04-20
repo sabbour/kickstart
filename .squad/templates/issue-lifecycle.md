@@ -393,7 +393,7 @@ See `.squad/templates/ralph-reference.md` for Ralph's full lifecycle.
 If the project has no human reviewers configured:
 1. PR opens
 2. CI runs
-3. If CI passes, Ralph (or the `Squad Auto Merge` workflow for dual-approved non-XL/non-`refactor` PRs) auto-merges
+3. If CI passes, Ralph (or the `Squad Auto Merge` workflow for qualifying non-XL/non-`refactor` PRs, including opt-in `squad:chore-auto` PRs) auto-merges
 4. Issue closes
 
 ### Human Review Required
@@ -402,7 +402,7 @@ If the project requires human approval:
 1. PR opens
 2. Human reviewer is notified (GitHub/ADO notifications)
 3. Reviewer approves or requests changes
-4. If approved + CI passes, Ralph merges
+4. If approved + CI passes, Ralph merges (or the `Squad Auto Merge` workflow arms squash auto-merge for dual-approved PRs and opt-in `squad:chore-auto` low-risk PRs that satisfy the review gate)
 5. If changes requested, agent addresses feedback
 
 ### Squad Member Review

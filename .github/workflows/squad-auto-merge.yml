@@ -24,6 +24,7 @@ jobs:
         with:
           script: |
             const AUTO_MERGE_MARKER = '<!-- squad-auto-merge -->';
+            const LOW_RISK_LABEL = 'squad:chore-auto';
             const XL_THRESHOLD = 1000;
             const APPROVAL_LABELS = ['leela:approved', 'zapp:approved'];
             const REVIEW_GATE_CONTEXT = 'squad/review-gate';
@@ -62,6 +63,28 @@ jobs:
 
             function isSuccessfulCheckRun(node) {
               return node?.status === 'COMPLETED' && node?.conclusion === 'SUCCESS';
+            }
+
+            function isSecurityPatch(pr, labels) {
+              const securitySignals = [
+                pr.title,
+                pr.body,
+                pr.headRefName,
+                ...labels,
+              ].filter(Boolean).join(' ');
+              return /security|cve-\d{4}-\d+|ghsa-|vuln|vulnerability/i.test(securitySignals);
+            }
+
+            function getRequiredApprovals(pr, labels) {
+              if (!labels.has(LOW_RISK_LABEL)) {
+                return [...APPROVAL_LABELS];
+              }
+
+              const required = ['leela:approved'];
+              if (isSecurityPatch(pr, labels)) {
+                required.push('zapp:approved');
+              }
+              return required;
             }
 
             async function listComments(prNumber) {
@@ -178,11 +201,13 @@ jobs:
                     id
                     number
                     title
+                    body
                     state
                     isDraft
                     mergeStateStatus
                     additions
                     deletions
+                    headRefName
                     headRefOid
                     autoMergeRequest {
                       enabledAt
@@ -242,7 +267,7 @@ jobs:
                   '🤖 Auto-merge disarmed.',
                   '',
                   `- removed stale approval labels: ${removedLabels.join(', ')}`,
-                  '- new commits require fresh Leela + Zapp approval labels before re-arming',
+                  '- new commits require fresh approval labels before re-arming',
                 ].join('\n'),
               );
               core.info(`Cleared stale approval labels for PR #${pr.number}: ${removedLabels.join(', ')}`);
@@ -265,8 +290,10 @@ jobs:
               blockers.push('PR title is marked refactor');
             }
 
-            if (!(labels.has('leela:approved') && labels.has('zapp:approved'))) {
-              blockers.push('missing fresh approval labels');
+            const requiredApprovals = getRequiredApprovals(pr, labels);
+            const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
+            if (missingApprovals.length > 0) {
+              blockers.push(`missing fresh approval labels: ${missingApprovals.join(', ')}`);
             }
 
             if (pr.mergeStateStatus === 'DIRTY') {
@@ -357,7 +384,9 @@ jobs:
                 AUTO_MERGE_MARKER,
                 '🤖 Auto-merge armed.',
                 '',
-                '- fresh `leela:approved` + `zapp:approved` labels are present on the current head',
+                labels.has(LOW_RISK_LABEL)
+                  ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head`
+                  : '- fresh `leela:approved` + `zapp:approved` labels are present on the current head',
                 '- trusted merge signals are green: `CI Gate` from workflow `CI` and `squad/review-gate` from `Squad Review Gate`',
                 '- PR is not XL and title is not marked `refactor`',
                 '',

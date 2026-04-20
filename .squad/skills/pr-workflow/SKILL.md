@@ -201,7 +201,7 @@ Zapp's review is a **pre-merge gate** for foundational patterns. Do not merge wi
   gh pr edit {number} --add-label "zapp:approved" --repo sabbour/kickstart
   ```
 
-No GitHub formal PR review approval is required — squad agents share a single GitHub account with the repo owner, making self-approval impossible. The `squad/review-gate` status check (`.github/workflows/squad-review-gate.yml`) automatically turns green when both labels are present, and `Squad Auto Merge` clears `leela:approved` / `zapp:approved` on every `synchronize` so new commits always need fresh approval labels.
+No GitHub formal PR review approval is required — squad agents share a single GitHub account with the repo owner, making self-approval impossible. The `squad/review-gate` status check (`.github/workflows/squad-review-gate.yml`) normally turns green when both labels are present. For explicitly low-risk PRs labeled `squad:chore-auto`, the gate accepts `leela:approved` alone unless the PR looks security-sensitive (`security`, `GHSA`, `CVE`, `vulnerability`), in which case `zapp:approved` is still required. `Squad Auto Merge` clears approval labels on every `synchronize` so new commits always need fresh approval labels.
 
 ### Requesting Copilot Review
 
@@ -269,7 +269,7 @@ When a PR has review comments or formal review threads, the full feedback loop i
 
 **NEVER silently fix code and move on.** A reply is required for every piece of feedback, even if the fix is trivial. This is not optional.
 
-**Why this matters:** `require_conversation_resolution: true` is enforced in branch protection. Unresolved threads block the `squad/review-gate` status check. Even if both `leela:approved` and `zapp:approved` labels are present, GitHub will not allow merge while threads are open.
+**Why this matters:** `require_conversation_resolution: true` is enforced in branch protection. Unresolved threads block the `squad/review-gate` status check. Even if the required label set for the PR is present (`leela:approved` + `zapp:approved`, or the low-risk `squad:chore-auto` path), GitHub will not allow merge while threads are open.
 
 ### CI Requirements
 
@@ -282,9 +282,18 @@ All CI checks must pass, including Playwright E2E tests. If checks fail:
 
 **Rule:** Never call `gh pr merge` without first verifying ALL of the following:
 
-1. **Squad label gate** — both approval labels must be present:
+1. **Squad label gate** — verify the PR satisfies one of the allowed approval paths on the current head:
+   - standard path: `leela:approved` + `zapp:approved`
+   - low-risk path: `squad:chore-auto` + `leela:approved`
+   - low-risk security path: `squad:chore-auto` + `leela:approved` + `zapp:approved`
+
    ```bash
-   gh pr view {number} --json labels --jq '[.labels[].name] | contains(["leela:approved", "zapp:approved"])'
+   gh pr view {number} --json title,body,headRefName,labels --jq '
+     (.labels | map(.name)) as $labels
+     | ([.title, .body, .headRefName] + $labels | join(" ")) as $signals
+     | ($signals | test("security|cve-[0-9]{4}-[0-9]+|ghsa-|vuln|vulnerability"; "i")) as $security
+     | (($labels | index("squad:chore-auto")) and ($labels | index("leela:approved")) and ((($security | not) or ($labels | index("zapp:approved"))))) or ($labels | contains(["leela:approved", "zapp:approved"]))
+   '
    ```
    Must return `true`.
 
@@ -294,7 +303,7 @@ All CI checks must pass, including Playwright E2E tests. If checks fail:
    ```
    Must return `0`.
 
-If either check fails — STOP. Do not merge. Comment on the PR requesting review from Leela or Zapp.
+If either check fails — STOP. Do not merge. Comment on the PR requesting the missing approval path from Leela or Zapp.
 
 **NEVER use `--admin` flag.** Branch protection exists to enforce review. Bypassing it with `--admin` defeats the entire gate. If protection blocks a merge, that is correct behavior — request review, do not force.
 
@@ -307,7 +316,11 @@ Once merge gate checks pass, all reviews are addressed, threads resolved, and CI
 gh pr merge <N> --squash --delete-branch
 ```
 
-Qualifying GitHub PRs can now skip the manual merge command: the `Squad Auto Merge` workflow arms squash auto-merge when fresh `leela:approved` + `zapp:approved` labels are present on the current head, trusted merge signals are green (`CI Gate` from workflow `CI` plus `squad/review-gate` from `Squad Review Gate`), and the PR is neither XL (>1000 changed lines) nor titled `refactor`.
+Qualifying GitHub PRs can now skip the manual merge command: the `Squad Auto Merge` workflow arms squash auto-merge when trusted merge signals are green (`CI Gate` from workflow `CI` plus `squad/review-gate` from `Squad Review Gate`), the PR is neither XL (>1000 changed lines) nor titled `refactor`, and one of these approval paths is satisfied on the current head:
+
+- standard path: fresh `leela:approved` + `zapp:approved`
+- low-risk path: opt-in `squad:chore-auto` + fresh `leela:approved`
+- low-risk security path: opt-in `squad:chore-auto` + fresh `leela:approved` + `zapp:approved`
 
 ---
 
