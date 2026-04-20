@@ -50,12 +50,13 @@ function parseEnabledPacks(raw: string | undefined): PackId[] {
  */
 export function getRegistry(): PackRegistry {
   if (!_registry) {
-    _registry = new PackRegistry();
+    const registry = new PackRegistry();
     const enabled = parseEnabledPacks(process.env.KICKSTART_PACKS);
     for (const id of enabled) {
-      _registry.register(PACK_BY_ID[id]);
+      registry.register(PACK_BY_ID[id]);
     }
-    _registry.seal();
+    registry.seal();
+    _registry = registry;
   }
   return _registry;
 }

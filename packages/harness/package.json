@@ -25,6 +25,10 @@
       "import": "./dist/runtime/frontmatter.js",
       "types": "./dist/runtime/frontmatter.d.ts"
     },
+    "./runtime/asset-url": {
+      "import": "./dist/runtime/asset-url.js",
+      "types": "./dist/runtime/asset-url.d.ts"
+    },
     "./runtime/registry": {
       "import": "./dist/runtime/registry.js",
       "types": "./dist/runtime/registry.d.ts"

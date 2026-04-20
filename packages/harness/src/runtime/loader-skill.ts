@@ -6,6 +6,7 @@ import type { Pack } from '../types/pack.js';
 import type { Skill } from '../types/skill.js';
 
 const skillFrontmatterSchema = z.object({
+  id: z.string().min(1).optional(),
   name: z.string().min(1),
   description: z.string().min(1),
   version: z.string().min(1),
@@ -42,6 +43,22 @@ function validateSkillName(name: string): string {
   return name;
 }
 
+function normalizeSkillId(pack: Pack, rawId: string | undefined, fallbackName: string): string {
+  if (!rawId) {
+    return `${pack.name}/${validateSkillName(fallbackName)}`;
+  }
+  if (rawId.includes('..') || rawId.includes('\\')) {
+    throw new Error(`Skill id contains an invalid path-like segment: ${rawId}`);
+  }
+  if (rawId.startsWith(`${pack.name}/`)) {
+    return rawId;
+  }
+  if (rawId.startsWith(`${pack.name}.`)) {
+    return `${pack.name}/${rawId.slice(pack.name.length + 1)}`;
+  }
+  throw new Error(`Skill id must be namespaced under ${pack.name}: ${rawId}`);
+}
+
 export function loadSkillFile(pack: Pack, filePath: string): Skill {
   const baseDir = pack.skillsDir ? fileURLToPath(pack.skillsDir) : undefined;
   if (!baseDir) {
@@ -53,7 +70,7 @@ export function loadSkillFile(pack: Pack, filePath: string): Skill {
   const validatedName = validateSkillName(parsed.name);
 
   return Object.freeze({
-    id: `${pack.name}/${validatedName}`,
+    id: normalizeSkillId(pack, parsed.id, validatedName),
     name: validatedName,
     description: parsed.description,
     version: parsed.version,
