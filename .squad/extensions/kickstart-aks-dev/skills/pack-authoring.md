@@ -6,7 +6,7 @@
 
 Kickstart v2 is a harness plus packs. The harness never contains domain knowledge. Packs are the only place where domain logic, prompts, and Azure/GitHub/AKS specifics live. This skill defines the rules for authoring them.
 
-See [`docs/v2-implementation-brief.md`](../../../../docs/v2-implementation-brief.md) for full architecture.
+See [`docs-site/docs/architecture/v2-implementation-brief.md`](../../../../docs-site/docs/architecture/v2-implementation-brief.md) for full architecture.
 
 ## Primitives and their files
 

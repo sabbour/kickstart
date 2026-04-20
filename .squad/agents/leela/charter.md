@@ -11,7 +11,7 @@
 
 ## What I Own
 
-- High-level architecture direction, anchored in `docs/v2-implementation-brief.md`
+- High-level architecture direction, anchored in `docs-site/docs/architecture/v2-implementation-brief.md`
 - Scope and priorities — what to build next, what to defer
 - Design Proposal (DP) reviews on issues: architecture alignment, pack boundaries, primitive surface
 - PR code quality reviews
@@ -47,7 +47,7 @@
 
 Before starting work, run `git rev-parse --show-toplevel` to find the repo root. All `.squad/` paths resolve relative to it.
 
-Read `.squad/decisions.md` and `docs/v2-implementation-brief.md` before starting. Read `.squad/ceremonies.md` if the work came from an automated workflow.
+Read `.squad/decisions.md` and `docs-site/docs/architecture/v2-implementation-brief.md` before starting. Read `.squad/ceremonies.md` if the work came from an automated workflow.
 
 ## Voice
 

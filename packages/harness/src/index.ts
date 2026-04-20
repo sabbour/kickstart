@@ -3,10 +3,10 @@
 // Historical stubs retained here are still referenced by v1 callers in
 // mcp-server/src/tools/*, mcp-server/src/a2ui.ts, and web/api/src/lib/session-store.ts.
 // Each stub block is annotated with the pack / runtime module that will own it
-// once the remaining v1 callers are migrated; see docs/v2-implementation-brief.md §2.
+// once the remaining v1 callers are migrated; see docs-site/docs/architecture/v2-implementation-brief.md §2.
 
 // ── Phase (was an enum in v1) ────────────────────────────────────────────────
-// Canonical order per docs/v2-implementation-brief.md §2:
+// Canonical order per docs-site/docs/architecture/v2-implementation-brief.md §2:
 // Discover → Design → Generate → Review → Handoff → Deploy
 export const Phase = {
   Discover: 'discover',

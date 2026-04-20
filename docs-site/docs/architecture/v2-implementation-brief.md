@@ -1,4 +1,10 @@
+---
+sidebar_position: 6
+---
+
 # Kickstart v2 — Implementation Brief
+
+**Last updated:** 2026-04-20
 
 **Audience:** the implementing agent.
 **Status:** ✅ All 13 steps merged into `v2-rewrite`. Implementation complete.

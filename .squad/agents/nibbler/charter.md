@@ -55,7 +55,7 @@
 
 ### Architecture Alignment
 - Does the change respect pack boundaries?
-- Is the change consistent with `docs/v2-implementation-brief.md`?
+- Is the change consistent with `docs-site/docs/architecture/v2-implementation-brief.md`?
 - Does it introduce new dependencies without justification?
 
 ## Boundaries

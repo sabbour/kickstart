@@ -2,7 +2,7 @@
 
 Kickstart-specific rules that override or extend the squad defaults. Every agent must read this before starting work.
 
-> **North star:** the v2 design lives in [`docs/v2-implementation-brief.md`](../../../../docs/v2-implementation-brief.md). All new code, agents, and tooling must align with the harness + packs architecture described there. If a brief section and an older convention disagree, the brief wins. Flag the conflict in a decision note.
+> **North star:** the v2 design lives in [`docs-site/docs/architecture/v2-implementation-brief.md`](../../../../docs-site/docs/architecture/v2-implementation-brief.md). All new code, agents, and tooling must align with the harness + packs architecture described there. If a brief section and an older convention disagree, the brief wins. Flag the conflict in a decision note.
 
 ---
 
@@ -27,8 +27,8 @@ Kickstart-specific rules that override or extend the squad defaults. Every agent
 ## Documentation (mandatory, not optional)
 
 - Every user-facing change updates [`docs-site/docs/`](../../../../docs-site/docs/) in the same PR. No "docs will follow" PRs.
-- Every architectural change updates or cites a section of `docs/v2-implementation-brief.md`. If the brief is wrong, update the brief in the same PR.
-- Public API changes (HTTP endpoints, SSE event shapes, tool schemas) update [`docs/api-reference.md`](../../../../docs/api-reference.md).
+- Every architectural change updates or cites a section of `docs-site/docs/architecture/v2-implementation-brief.md`. If the brief is wrong, update the brief in the same PR.
+- Public API changes (HTTP endpoints, SSE event shapes, tool schemas) update [`docs-site/docs/extending/api-endpoints.md`](../../../../docs-site/docs/extending/api-endpoints.md).
 - Pack additions get a short page in `docs-site/docs/extending/` describing the pack's agents, skills, tools, user actions, and components.
 - See the `docs-changelog` skill for the exact checklist.
 
