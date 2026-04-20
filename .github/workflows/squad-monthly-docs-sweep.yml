@@ -1,0 +1,203 @@
+name: Squad · Monthly Docs Sweep
+
+# Scribe refreshes a single rolling docs-sweep issue on the first Pacific
+# evening of the month. Cron is UTC: 00:00 on the 2nd ~= 17:00 PDT / 16:00 PST
+# on the 1st.
+
+on:
+  schedule:
+    - cron: '0 0 2 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  docs-sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Build docs sweep body
+        id: build
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { execSync } = require('child_process');
+
+            const canonicalDocsRoot = 'docs-site/docs';
+            const briefPath = `${canonicalDocsRoot}/architecture/v2-implementation-brief.md`;
+            const legacyDocsRedirect = 'docs/README.md';
+
+            function walk(dir) {
+              if (!fs.existsSync(dir)) return [];
+              return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+                const fullPath = path.join(dir, entry.name);
+                return entry.isDirectory() ? walk(fullPath) : [fullPath];
+              });
+            }
+
+            function unique(values) {
+              return [...new Set(values)];
+            }
+
+            function normalizeLinkTarget(rawTarget) {
+              let target = rawTarget.trim();
+              if (!target) return null;
+              if (target.startsWith('<') && target.endsWith('>')) target = target.slice(1, -1);
+              if (/^(https?:|mailto:|tel:|javascript:)/i.test(target) || target.startsWith('#')) return null;
+              if (/^\{.+\}$/.test(target)) return null;
+              return target.split('#')[0].split('?')[0];
+            }
+
+            function resolveCandidates(fromFile, target) {
+              const basePath = target.startsWith('/')
+                ? target.replace(/^\/+/, '')
+                : path.normalize(path.join(path.dirname(fromFile), target));
+              return [
+                basePath,
+                `${basePath}.md`,
+                path.join(basePath, 'README.md'),
+                path.join(basePath, 'index.md'),
+              ];
+            }
+
+            function collectBrokenLinks(files) {
+              const broken = [];
+              const linkPattern = /\[[^\]]+\]\(([^)]+)\)/g;
+
+              for (const file of files) {
+                const content = fs.readFileSync(file, 'utf8');
+                for (const match of content.matchAll(linkPattern)) {
+                  const target = normalizeLinkTarget(match[1]);
+                  if (!target) continue;
+                  const candidates = resolveCandidates(file, target);
+                  if (!candidates.some(candidate => fs.existsSync(candidate))) {
+                    broken.push(`- \`${file}\` → \`${match[1]}\``);
+                  }
+                }
+              }
+
+              return unique(broken).sort();
+            }
+
+            const docsFiles = walk(canonicalDocsRoot)
+              .filter(file => file.endsWith('.md'))
+              .sort();
+            const docsSections = unique(
+              docsFiles.map(file => path.relative(canonicalDocsRoot, file).split(path.sep)[0].replace(/\.md$/, ''))
+            ).sort();
+            const packDirs = fs.existsSync('packages')
+              ? fs.readdirSync('packages', { withFileTypes: true })
+                  .filter(entry => entry.isDirectory() && entry.name.startsWith('pack-'))
+                  .map(entry => entry.name)
+                  .sort()
+              : [];
+            const charterFiles = walk('.squad/agents')
+              .filter(file => file.endsWith('charter.md'))
+              .sort();
+            const docsSkills = walk('.squad/skills')
+              .filter(file => /docs|changelog|release|external-comms/i.test(file))
+              .map(file => file.replace(/\\/g, '/'))
+              .sort();
+            const brokenLinks = collectBrokenLinks([...docsFiles, legacyDocsRedirect].filter(file => fs.existsSync(file)));
+
+            const brief = fs.existsSync(briefPath)
+              ? fs.readFileSync(briefPath, 'utf8')
+              : '';
+            const lastUpdatedMatch = brief.match(/^\*\*Last updated:\*\*\s+([0-9]{4}-[0-9]{2}-[0-9]{2})$/m);
+            const lastUpdated = lastUpdatedMatch?.[1] || null;
+            const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+            const weeksSinceBriefUpdate = lastUpdated
+              ? Math.floor((Date.now() - new Date(`${lastUpdated}T00:00:00Z`).getTime()) / MS_PER_WEEK)
+              : null;
+            const packagesChurn = lastUpdated
+              ? parseInt(
+                  execSync(`git rev-list --count --since='${lastUpdated}T00:00:00Z' HEAD -- packages`, { encoding: 'utf8' }).trim() || '0',
+                  10,
+                )
+              : 0;
+            const briefFreshness = lastUpdated
+              ? `**${weeksSinceBriefUpdate} week(s)** since brief update (${lastUpdated}) · **${packagesChurn}** commit(s) touching \`packages/\` since then`
+              : `Missing \`Last updated:\` field in \`${briefPath}\``;
+
+            const brokenLinkSummary = brokenLinks.length
+              ? brokenLinks.slice(0, 20).join('\n')
+              : '_None detected._';
+            const moreBrokenLinks = brokenLinks.length > 20
+              ? `\n- _${brokenLinks.length - 20} more omitted from this issue body._`
+              : '';
+
+            const body = [
+              '**Working as Scribe** · see `.squad/agents/scribe/charter.md`',
+              '',
+              `_Rolling docs sweep — last updated ${new Date().toISOString()}_`,
+              '',
+              '## Canonical docs surface',
+              `- Canonical docs root: \`${canonicalDocsRoot}/\` (${docsFiles.length} markdown file(s))`,
+              `- Canonical brief path: \`${briefPath}\``,
+              `- Legacy redirect map: ${fs.existsSync(legacyDocsRedirect) ? `\`${legacyDocsRedirect}\`` : `missing \`${legacyDocsRedirect}\``}`,
+              `- Current docs sections: ${docsSections.map(section => `\`${section}\``).join(', ') || '_None detected._'}`,
+              '',
+              '## Automated checks',
+              `- Broken relative markdown links: **${brokenLinks.length}**`,
+              brokenLinkSummary + moreBrokenLinks,
+              `- Brief freshness: ${briefFreshness}`,
+              `- Active pack packages to cross-check in docs: ${packDirs.map(pack => `\`${pack}\``).join(', ') || '_None detected._'}`,
+              `- Agent charters to spot-check: **${charterFiles.length}**`,
+              `- Docs-facing skills to spot-check: ${docsSkills.slice(0, 6).map(skill => `\`${skill}\``).join(', ') || '_None detected._'}`,
+              '',
+              '## Manual sweep checklist',
+              `- [ ] Pack-page completeness still matches active packs (${packDirs.join(', ') || 'none'})`,
+              `- [ ] Charter relevance still matches current workflows across ${charterFiles.length} charter(s)`,
+              `- [ ] Skill accuracy still matches the canonical docs surface and repo layout`,
+              '- [ ] Open focused `process` issues for any drift that needs follow-up work',
+              '',
+              '## Notes',
+              '- This is the monthly docs-sweep artifact. Weekly Pulse remains the weekly summary artifact and should not be duplicated here.',
+              '- Target the canonical docs tree at `docs-site/docs/` when opening any follow-up docs work.',
+              '',
+              '---',
+              '_Generated by `.github/workflows/squad-monthly-docs-sweep.yml`._',
+            ].join('\n');
+
+            core.setOutput('body', body);
+
+      - name: Upsert rolling docs-sweep issue
+        uses: actions/github-script@v8
+        env:
+          BODY: ${{ steps.build.outputs.body }}
+        with:
+          script: |
+            const title = '📚 Docs Sweep (rolling)';
+            const body = process.env.BODY;
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'squad:scribe,docs:sweep',
+              per_page: 20,
+            });
+            const match = existing.find(issue => !issue.pull_request && issue.title === title);
+
+            if (match) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['squad:scribe', 'docs:sweep', 'type:docs'],
+              });
+            }
