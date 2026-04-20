@@ -20,13 +20,13 @@ jobs:
   cadence:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'npm'
@@ -54,7 +54,7 @@ jobs:
       - name: Abort if release PR already open
         if: steps.check.outputs.pending == 'true'
         id: existing
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const prs = await github.paginate(github.rest.pulls.list, {
@@ -85,7 +85,7 @@ jobs:
 
       - name: Open release PR (as Leela, with Scribe curating notes)
         if: steps.existing.outputs.exists == 'false'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const body = [

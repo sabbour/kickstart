@@ -8,6 +8,7 @@ const ValidateBicepInputSchema = z.object({
   bicep: z.string().min(1).describe('Bicep template source code to validate'),
   templateName: z
     .string()
+    .nullable()
     .optional()
     .describe('Optional display name for the template (used in error messages)'),
 });

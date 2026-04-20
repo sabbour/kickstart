@@ -21,10 +21,12 @@ const WhatIfInputSchema = z.object({
     .describe('ARM or Bicep-compiled JSON template object to evaluate'),
   parameters: z
     .record(z.string(), z.unknown())
+    .nullable()
     .optional()
     .describe('Optional ARM template parameters object'),
   deploymentName: z
     .string()
+    .nullable()
     .optional()
     .describe('Optional deployment name for tracking'),
 });

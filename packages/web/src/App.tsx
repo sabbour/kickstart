@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef, useSyncExternalStore, lazy, Suspense } from 'react';
 import { FluentProvider, webLightTheme, webDarkTheme } from '@fluentui/react-components';
 import { Layout } from './components/Layout';
 import { Landing } from './components/Landing';
 import { ChatShell } from './components/Chat/ChatShell';
 import { SessionsSidebar } from './components/Sidebar/SessionsSidebar';
 import { FileManagerSidebar, FileViewer } from './components/FileManager';
-import { Playground } from './pages/Playground';
+const Playground = lazy(() => import('./pages/Playground').then((m) => ({ default: m.Playground })));
 import { useA2UI } from './hooks/useA2UI';
 import { useActionDispatch } from './hooks/useActionDispatch';
 import { useProgressiveQueue } from './hooks/useProgressiveQueue';
@@ -885,7 +885,7 @@ export function App() {
             showSessionsToggle={false}
             hasFiles={false}
           >
-            <Playground />
+            <Suspense fallback={null}><Playground /></Suspense>
           </Layout>
         </ConversationSessionProvider>
       </FluentProvider>

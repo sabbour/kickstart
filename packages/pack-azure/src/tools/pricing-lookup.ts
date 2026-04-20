@@ -15,10 +15,12 @@ const PricingLookupInputSchema = z.object({
     .describe('Service name, e.g. "Virtual Machines", "Azure Kubernetes Service", "Azure SQL Database"'),
   skuName: z
     .string()
+    .nullable()
     .optional()
     .describe('Optional SKU name filter, e.g. "D2s v3", "Standard_LRS"'),
   armRegionName: z
     .string()
+    .nullable()
     .optional()
     .describe('ARM region name, e.g. "eastus", "westeurope". Omit for global pricing.'),
   currencyCode: z
