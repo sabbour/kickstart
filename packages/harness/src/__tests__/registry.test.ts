@@ -53,7 +53,7 @@ describe('registry + loaders', () => {
 name: core.triage
 description: Triage
 model:
-  envVar: AZURE_OPENAI_CHAT_DEPLOYMENT
+  envVar: KICKSTART_CHAT_MODEL
 tools:
   - core.emit_ui
   - core:confirm
@@ -153,7 +153,7 @@ Nope.
 name: core.bad
 description: Missing tools
 model:
-  envVar: AZURE_OPENAI_CHAT_DEPLOYMENT
+  envVar: KICKSTART_CHAT_MODEL
 unknown: true
 ---
 

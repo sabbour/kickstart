@@ -59,6 +59,22 @@ export interface CodexCompletionResult {
 }
 
 // ---------------------------------------------------------------------------
+// Security helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate that a deployment name contains only safe characters before it is
+ * interpolated into a URL path.  Throws if the name contains anything outside
+ * the set [a-zA-Z0-9._-].
+ */
+export function sanitizeDeploymentName(name: string): string {
+  if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
+    throw new Error(`Invalid deployment name: ${name}`);
+  }
+  return name;
+}
+
+// ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
@@ -142,7 +158,7 @@ export async function chatCompletion(
   options: ChatCompletionOptions = {},
 ): Promise<ChatCompletionResult> {
   const { endpoint, chatDeployment, apiKey } = getConfig();
-  const deployment = options.deployment || chatDeployment;
+  const deployment = sanitizeDeploymentName(options.deployment || chatDeployment);
   if (!deployment) {
     throw new Error("No chat deployment configured. Set KICKSTART_CHAT_MODEL.");
   }
@@ -262,7 +278,7 @@ export async function* chatCompletionStream(
   options: ChatCompletionOptions = {},
 ): AsyncGenerator<string> {
   const { endpoint, chatDeployment, apiKey } = getConfig();
-  const deployment = options.deployment || chatDeployment;
+  const deployment = sanitizeDeploymentName(options.deployment || chatDeployment);
   if (!deployment) {
     throw new Error("No chat deployment configured. Set KICKSTART_CHAT_MODEL.");
   }
@@ -331,7 +347,7 @@ export async function codexCompletion(
   options: CodexCompletionOptions = {},
 ): Promise<CodexCompletionResult> {
   const { endpoint, codexDeployment, apiKey } = getConfig();
-  const deployment = options.deployment || codexDeployment;
+  const deployment = sanitizeDeploymentName(options.deployment || codexDeployment);
   if (!deployment) {
     throw new Error("No codex deployment configured. Set KICKSTART_CODEX_MODEL.");
   }
@@ -402,7 +418,7 @@ export async function* codexCompletionStream(
   options: CodexCompletionOptions = {},
 ): AsyncGenerator<string> {
   const { endpoint, codexDeployment, apiKey } = getConfig();
-  const deployment = options.deployment || codexDeployment;
+  const deployment = sanitizeDeploymentName(options.deployment || codexDeployment);
   if (!deployment) {
     throw new Error("No codex deployment configured. Set KICKSTART_CODEX_MODEL.");
   }
