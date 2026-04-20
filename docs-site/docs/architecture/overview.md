@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Architecture Overview
 
-Kickstart v2 is a **harness + packs** system. The harness is domain-agnostic; packs carry all product knowledge.
+Kickstart is a **harness + packs** system. The harness is domain-agnostic; packs carry all product knowledge.
 
 ## Monorepo Structure
 
