@@ -195,9 +195,10 @@ vi.mock('../services/api-client', () => ({
 // TODO(Step 5): mock-streaming removed in Step 1 — mock removed
 
 let App: typeof import('../App').App;
+let getInitialAppMode: typeof import('../App').getInitialAppMode;
 
 beforeAll(async () => {
-  ({ App } = await import('../App'));
+  ({ App, getInitialAppMode } = await import('../App'));
 });
 
 describe('App file surface composition', () => {
@@ -214,5 +215,11 @@ describe('App file surface composition', () => {
     expect(markup).toContain('data-testid="file-viewer"');
     expect(markup).not.toContain('data-testid="legacy-file-editor"');
     expect(markup).not.toContain('data-testid="legacy-file-tree-panel"');
+  });
+
+  it('routes ?playground launches into playground mode', () => {
+    expect(getInitialAppMode('?playground')).toBe('playground');
+    expect(getInitialAppMode('?foo=bar&playground')).toBe('playground');
+    expect(getInitialAppMode('')).toBe('landing');
   });
 });
