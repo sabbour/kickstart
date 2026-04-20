@@ -32,9 +32,7 @@ jobs:
             const log = fs.existsSync('.squad/retro-log.md')
               ? fs.readFileSync('.squad/retro-log.md', 'utf8')
               : '';
-            const briefPath = fs.existsSync('docs-site/docs/architecture/v2-implementation-brief.md')
-              ? 'docs-site/docs/architecture/v2-implementation-brief.md'
-              : 'docs/v2-implementation-brief.md';
+            const briefPath = 'docs-site/docs/architecture/v2-implementation-brief.md';
             const brief = fs.existsSync(briefPath)
               ? fs.readFileSync(briefPath, 'utf8')
               : '';
@@ -49,7 +47,7 @@ jobs:
               : 0;
             const briefFreshness = lastUpdated
               ? `**${weeksSinceBriefUpdate} week(s)** since brief update (${lastUpdated}) · **${packagesChurn}** commit(s) touching \`packages/\` since then`
-              : 'Missing `Last updated:` field in `docs-site/docs/architecture/v2-implementation-brief.md`';
+              : `Missing \`Last updated:\` field in \`${briefPath}\``;
 
             const lines = log.split('\n').filter(l => /^- \d{4}-\d{2}-\d{2} \| #\d+/.test(l));
             const weekLines = lines.filter(l => {
