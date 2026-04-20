@@ -14,6 +14,7 @@ on:
     paths:
       - '.squad/team.md'
       - '.ai-team/team.md'
+      - '.github/workflows/sync-squad-custom-labels.yml'
   workflow_dispatch:
 
 permissions:
