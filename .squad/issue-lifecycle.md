@@ -307,6 +307,7 @@ Ready for re-review."
 ```bash
 # Make changes
 # ⚠️ NEVER use `git add .` or `git add -A` — only stage files you intentionally changed
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
 git add -- {specific files you modified}
 git commit -m "fix: address review feedback"
 git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
@@ -315,6 +316,7 @@ git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{is
 **Re-request review (GitHub):**
 ```bash
 TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+export GH_TOKEN="$TOKEN"
 GH_TOKEN=$TOKEN gh pr ready {pr-number}
 ```
 
@@ -327,12 +329,14 @@ GH_TOKEN=$TOKEN gh pr ready {pr-number}
 **GitHub (merge commit):**
 ```bash
 TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+export GH_TOKEN="$TOKEN"
 GH_TOKEN=$TOKEN gh pr merge {pr-number} --merge --delete-branch
 ```
 
 **GitHub (squash):**
 ```bash
 TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+export GH_TOKEN="$TOKEN"
 GH_TOKEN=$TOKEN gh pr merge {pr-number} --squash --delete-branch
 ```
 

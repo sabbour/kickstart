@@ -31,6 +31,7 @@ All open v2 issues should carry milestone **v2**.
 
 ## Learnings
 
+- (2026-04-20T02:48:20.359-07:00) Lifecycle template parity matters for auth hardening: fixing `.squad/issue-lifecycle.md` is insufficient if `.squad/templates/issue-lifecycle.md` still teaches ambient push, PR-ready, or merge commands. Wave-1 GitHub write guidance must stay fail-closed in both live docs and generators.
 - (2026-04-20T02:48:20.359-07:00) GitHub write hardening wave 1: `sabbour/kickstart` agent-authored writes now document a fail-closed path via `resolve-token.mjs --required`, `GH_TOKEN`, and token-authenticated pushes. Coordinator, lifecycle, and workflow docs should not suggest ambient `gh`, PAT, or account-switching fallbacks for bot writes.
 - (2026-04-17T12:06:45.293Z) Sprint planning always required before backlog pickup when `.squad/identity/now.md` gate is active. Shortest v2 slice is harness spine, not pack work: `#474 → #475 → #476` must land before pack-core batch.
 - (2026-04-17T03:30:17Z) DP #329: runtime duplication is the blocking risk — PoC adds `runtime/` inside `packages/mcp-server` that parallels `packages/web/api/` LLM client + session store. Third fork risk with SDK migration. Implementation issue must define canonical client before code lands.
