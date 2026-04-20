@@ -27,7 +27,7 @@ jobs:
             const LOW_RISK_LABEL = 'squad:chore-auto';
             const TRUSTED_RETRO_LABEL = 'retro-log';
             const TRUSTED_RETRO_BRANCH_PREFIX = 'retro-log/pr-';
-            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'sabbour-squad-lead[bot]']);
+            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'app/github-actions', 'sabbour-squad-lead[bot]']);
             const TRUSTED_RETRO_ONLY_PATHS = new Set(['.squad/retro-log.md']);
             const XL_THRESHOLD = 1000;
             const APPROVAL_LABELS = ['leela:approved', 'zapp:approved'];

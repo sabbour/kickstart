@@ -21,7 +21,7 @@ jobs:
           script: |
             const TRUSTED_RETRO_LABEL = 'retro-log';
             const TRUSTED_RETRO_BRANCH_PREFIX = 'retro-log/pr-';
-            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'sabbour-squad-lead[bot]']);
+            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'app/github-actions', 'sabbour-squad-lead[bot]']);
             const TRUSTED_RETRO_ONLY_PATHS = new Set(['.squad/retro-log.md']);
 
             async function listChangedFiles(prNumber) {
