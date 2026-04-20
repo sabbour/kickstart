@@ -76,8 +76,8 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install rolldown native binding
-        run: npm install --save-optional @rolldown/binding-linux-x64-gnu
+      - name: Install optional native bindings
+        run: npm install --save-optional @rolldown/binding-linux-x64-gnu lightningcss && npm rebuild
 
       - name: Lint
         run: npm run lint
@@ -146,8 +146,8 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install rolldown native binding
-        run: npm install --save-optional @rolldown/binding-linux-x64-gnu
+      - name: Install optional native bindings
+        run: npm install --save-optional @rolldown/binding-linux-x64-gnu lightningcss && npm rebuild
 
       - name: Build all workspaces
         run: npm run build
