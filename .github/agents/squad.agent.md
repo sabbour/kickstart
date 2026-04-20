@@ -705,12 +705,15 @@ When spawning an agent that may do git operations (commit, push, PR), resolve th
    - **Yes** → read the config to get the tier and app registrations.
 
 2. **Resolve the role slug:** Map the agent's role to an identity role slug using `resolveRoleSlug()` semantics:
-   - Lead/Architect/Zapp/Nibbler/Ralph → `lead` via explicit alias mapping
+   - Lead/Architect/Coordinator/Squad → `lead` via explicit alias mapping
+   - Zapp → `zapp` via explicit alias mapping
+   - Nibbler → `nibbler` via explicit alias mapping
+   - Ralph → `ralph` via explicit alias mapping
    - Backend/Core Dev/Bender → `backend` via explicit alias mapping
    - Frontend/Fry → `frontend` via explicit alias mapping
    - Tester/Hermes → `tester` via explicit alias mapping
    - For `shared` tier: all agents use the single shared app
-   - For `per-role` tier: only the explicit mapped app is valid; if no app is configured for that mapped role, token resolution must fail closed
+   - For `per-role` tier: only the explicit mapped app is valid; if no app is configured for that mapped role, token resolution must fail closed instead of collapsing to another bot identity
 
 3. **Get the app slug:** From the identity config, look up the app registration for the resolved role slug. The `appSlug` is the GitHub App's URL slug (e.g., `sabbour-squad-lead`).
 

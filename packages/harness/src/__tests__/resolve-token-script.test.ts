@@ -3,7 +3,11 @@ import { promisify } from 'node:util';
 
 import { describe, expect, it } from 'vitest';
 
-import { resolveToken, resolveTokenWithDiagnostics } from '../../../../.squad/scripts/resolve-token.mjs';
+import {
+  resolveRoleSlug,
+  resolveToken,
+  resolveTokenWithDiagnostics,
+} from '../../../../.squad/scripts/resolve-token.mjs';
 
 const execFileAsync = promisify(execFile);
 const scriptPath = new URL('../../../../.squad/scripts/resolve-token.mjs', import.meta.url);
@@ -28,5 +32,24 @@ describe('resolve-token script', () => {
       code: 1,
       stderr: expect.stringContaining('No GitHub App mapping configured for role "totally-unknown-role".'),
     });
+  });
+});
+
+describe('resolve-token role mapping', () => {
+  it('keeps reviewer personas distinct from lead when per-role apps are missing', async () => {
+    expect(resolveRoleSlug(projectRoot, 'lead')).toBe('lead');
+    expect(resolveRoleSlug(projectRoot, 'zapp')).toBeNull();
+    expect(resolveRoleSlug(projectRoot, 'nibbler')).toBeNull();
+    expect(resolveRoleSlug(projectRoot, 'ralph')).toBeNull();
+
+    await expect(resolveToken(projectRoot, 'zapp')).resolves.toBeNull();
+    await expect(resolveToken(projectRoot, 'nibbler')).resolves.toBeNull();
+    await expect(resolveToken(projectRoot, 'ralph')).resolves.toBeNull();
+  });
+
+  it('still resolves the shipped worker roles', () => {
+    expect(resolveRoleSlug(projectRoot, 'bender')).toBe('backend');
+    expect(resolveRoleSlug(projectRoot, 'fry')).toBe('frontend');
+    expect(resolveRoleSlug(projectRoot, 'hermes')).toBe('tester');
   });
 });
