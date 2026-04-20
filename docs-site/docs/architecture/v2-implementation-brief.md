@@ -1037,7 +1037,7 @@ export async function initPacks(): Promise<void> {
 Agent and skill source folders can vary by pack layout. Most packs keep them under `src/agents/` and `src/skills/`, while `pack-github` keeps them at the package root. Every server manifest therefore calls `resolveAssetURL(import.meta.url, sourceRelative, bundledRelative)` with two paths:
 
 - `sourceRelative` points at the authoring-time folder next to the pack source.
-- `bundledRelative` points at the copied bundle asset folder under `pack-assets/{pack}/{agents|skills}/`.
+- `bundledRelative` points at the copied bundle asset folder that matches the emitted manifest location.
 
 `resolveAssetURL()` checks the source-relative path first. If the markdown exists there, the runtime reads directly from source. If not, it falls back to the bundled path:
 
@@ -1051,26 +1051,30 @@ export function resolveAssetURL(metaUrl: string, sourceRelative: string, bundled
 }
 ```
 
-The API build copies every `.agent.md` and `SKILL.md` file into a pack-scoped bundle layout beside the emitted function bundle:
+The API build copies every `.agent.md` and `SKILL.md` file into pack-scoped bundle folders, but the current output is not fully uniform:
 
 ```text
-dist/functions/
+dist/
+  functions/
+    pack-assets/
+      core/
+        agents/
+        skills/
+      azure/
+        agents/
+        skills/
+      aks/
+        agents/
+        skills/
   pack-assets/
-    core/
-      agents/
-      skills/
-    azure/
-      agents/
-      skills/
-    aks/
-      agents/
-      skills/
     github/
       agents/
       skills/
 ```
 
-The `{pack}` segment is required. Different packs can reuse filenames like `SKILL.md` or `triage.agent.md`, so pack scoping prevents cross-pack collisions during the copy step while still giving every manifest a predictable fallback location in the bundled app.
+Core, Azure, and AKS server manifests resolve `./pack-assets/{pack}/...` from files emitted under `dist/functions/`, so their markdown lands under `dist/functions/pack-assets/...`. `pack-github` emits `dist/server-manifest.js`, resolves `../pack-assets/github/...`, and therefore reads from `dist/pack-assets/github/...` instead.
+
+The `{pack}` segment is still required. Different packs can reuse filenames like `SKILL.md` or `triage.agent.md`, so pack scoping prevents cross-pack collisions during the copy step even though the parent bundle directory differs today.
 
 ---
 
