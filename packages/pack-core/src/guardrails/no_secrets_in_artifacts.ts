@@ -1,4 +1,4 @@
-import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@kickstart/harness';
+import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@aks-kickstart/harness';
 
 /**
  * High-entropy string detection: Shannon entropy >= 4.5 bits/char on a

@@ -21,7 +21,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { Search20Regular, Star20Regular } from "@fluentui/react-icons";
-import type { GitHubRepo } from "@kickstart/harness";
+import type { GitHubRepo } from "@aks-kickstart/harness";
 import {
   createGitHubRepo,
   getGitHubSession,

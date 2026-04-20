@@ -1,5 +1,5 @@
 {
-  "name": "@kickstart/harness",
+  "name": "@aks-kickstart/harness",
   "version": "1.0.1",
   "type": "module",
   "main": "dist/index.js",

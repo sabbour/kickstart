@@ -1,4 +1,4 @@
-import type { GitHubRepo } from "@kickstart/harness";
+import type { GitHubRepo } from "@aks-kickstart/harness";
 import { apiFetch } from "./api-client";
 
 const AUTH_COMPLETE_EVENT = "kickstart:github-auth:complete";

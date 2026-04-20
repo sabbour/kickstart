@@ -3,7 +3,7 @@
  * @suite 6a — Agent frontmatter parse (pack-core)
  *
  * Verifies that each `.agent.md` file in `packages/pack-core/agents/` parses
- * correctly through `loader-agent.ts` (from #476 / @kickstart/harness).
+ * correctly through `loader-agent.ts` (from #476 / @aks-kickstart/harness).
  *
  * Tests are written as `it.todo()` scaffolding. When Fry delivers Phase B
  * (the three .agent.md files) and Bender delivers the agent loader (#476),
@@ -34,7 +34,7 @@ const AGENT_NAME_PATTERN = /^core\.[a-z][a-z0-9-]*$/;
 
 // ── When loader-agent.ts ships from #476, uncomment and fill in: ─────────────
 //
-// import { parseAgentFrontmatter } from '@kickstart/harness';
+// import { parseAgentFrontmatter } from '@aks-kickstart/harness';
 // OR: import { parseAgentFrontmatter } from '../../../src/loaders/loader-agent.js';
 //
 // type AgentFrontmatter = {

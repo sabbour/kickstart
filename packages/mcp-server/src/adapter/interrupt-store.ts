@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/mcp-server/adapter/interrupt-store
+ * @module @aks-kickstart/mcp-server/adapter/interrupt-store
  *
  * CAS (Compare-And-Swap) single-use interrupt state store.
  *

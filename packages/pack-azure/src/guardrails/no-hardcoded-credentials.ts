@@ -1,4 +1,4 @@
-import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@kickstart/harness';
+import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@aks-kickstart/harness';
 
 /**
  * Blocks tool calls that contain embedded credential patterns in their args.

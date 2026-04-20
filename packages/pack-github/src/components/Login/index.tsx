@@ -10,7 +10,7 @@ import {
   tokens,
   makeStyles,
 } from '@fluentui/react-components';
-import type { ComponentContribution } from '@kickstart/harness';
+import type { ComponentContribution } from '@aks-kickstart/harness';
 
 const LoginSchema = z.object({
   status: z.enum(['idle', 'loading', 'success', 'error']).default('idle'),

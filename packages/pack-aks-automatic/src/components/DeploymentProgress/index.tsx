@@ -9,7 +9,7 @@ import {
   tokens,
   makeStyles,
 } from '@fluentui/react-components';
-import type { ComponentContribution } from '@kickstart/harness';
+import type { ComponentContribution } from '@aks-kickstart/harness';
 
 const DeploymentProgressSchema = z.object({
   clusterName: z.string().describe('AKS cluster name'),

@@ -20,8 +20,8 @@ import {
   buildA2UIContent,
   buildInterruptContent,
   PackRegistry,
-} from '@kickstart/harness';
-import type { McpInterruptBlock } from '@kickstart/harness';
+} from '@aks-kickstart/harness';
+import type { McpInterruptBlock } from '@aks-kickstart/harness';
 import {
   registerInterrupt,
   claimInterrupt,

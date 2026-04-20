@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/mcp-server/tools/action
+ * @module @aks-kickstart/mcp-server/tools/action
  *
  * Tool handler: Process user actions from the A2UI interface.
  * Handles phase advancement, resource selection, and form submissions.
@@ -11,11 +11,11 @@ import {
   PHASE_DEFINITIONS,
   Phase,
   advancePhase,
-} from "@kickstart/harness";
+} from "@aks-kickstart/harness";
 import type {
   SessionState,
   PhaseItem,
-} from "@kickstart/harness";
+} from "@aks-kickstart/harness";
 import { createA2UIResource } from "../a2ui.js";
 
 type ActionType = "advance" | "skip" | "select" | "submit" | "reply" | "navigate" | "api";

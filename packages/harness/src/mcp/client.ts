@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/harness/mcp/client
+ * @module @aks-kickstart/harness/mcp/client
  *
  * Harness-side MCP client stub.
  *

@@ -24,7 +24,7 @@ import {
   Warning20Regular,
 } from '@fluentui/react-icons';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
-import type { GitHubConnector } from '@kickstart/harness';
+import type { GitHubConnector } from '@aks-kickstart/harness';
 
 // ── Security: operation allowlisting (per Zapp's conditions) ──
 

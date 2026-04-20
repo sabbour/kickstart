@@ -1,5 +1,5 @@
 import type { Cookie, HttpRequest } from "@azure/functions";
-import type { GitHubPullRequest, GitHubRepo } from "@kickstart/harness";
+import type { GitHubPullRequest, GitHubRepo } from "@aks-kickstart/harness";
 import {
   createCipheriv,
   createDecipheriv,

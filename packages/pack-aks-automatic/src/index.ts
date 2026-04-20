@@ -1,4 +1,4 @@
-import type { Pack, ComponentContribution } from '@kickstart/harness';
+import type { Pack, ComponentContribution } from '@aks-kickstart/harness';
 
 // Tools
 import { validateManifestsTool } from './tools/validate-manifests.js';

@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { writeFile, unlink, mkdtemp, rmdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { ToolContribution } from '@kickstart/harness';
+import type { ToolContribution } from '@aks-kickstart/harness';
 
 const execFileAsync = promisify(execFile);
 

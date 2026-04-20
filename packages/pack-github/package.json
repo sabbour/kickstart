@@ -1,5 +1,5 @@
 {
-  "name": "@kickstart/pack-github",
+  "name": "@aks-kickstart/pack-github",
   "version": "1.0.1",
   "description": "GitHub pack — agents, skills, tools, user actions, and components for Kickstart v2",
   "type": "module",
@@ -21,7 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@kickstart/harness": "*",
+    "@aks-kickstart/harness": "*",
     "@openai/agents": "^0.8.4",
     "zod": "^4.1.12"
   },

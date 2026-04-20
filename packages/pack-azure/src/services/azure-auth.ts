@@ -8,7 +8,7 @@
  * browser props, or environment variables at runtime.
  */
 
-import type { SessionCtx } from '@kickstart/harness';
+import type { SessionCtx } from '@aks-kickstart/harness';
 
 const ARM_AUDIENCE = 'https://management.azure.com';
 

@@ -1,4 +1,4 @@
-import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@kickstart/harness';
+import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@aks-kickstart/harness';
 
 /**
  * Blocks Azure tool calls with ARM paths that are not subscription-scoped.

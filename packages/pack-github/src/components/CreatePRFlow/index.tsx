@@ -11,7 +11,7 @@ import {
   tokens,
   makeStyles,
 } from '@fluentui/react-components';
-import type { ComponentContribution } from '@kickstart/harness';
+import type { ComponentContribution } from '@aks-kickstart/harness';
 
 const CreatePRFlowSchema = z.object({
   status: z.enum(['idle', 'pushing', 'creating_pr', 'done', 'error']).default('idle'),

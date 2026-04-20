@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
-import type { AppIntent } from '@kickstart/harness';
+import type { AppIntent } from '@aks-kickstart/harness';
 
 /**
  * Hash-based navigation for browser back/forward button support.

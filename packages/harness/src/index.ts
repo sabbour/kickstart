@@ -1,4 +1,4 @@
-// @kickstart/harness barrel — canonical harness surface for packs, runtime, and adapters.
+// @aks-kickstart/harness barrel — canonical harness surface for packs, runtime, and adapters.
 //
 // Historical stubs retained here are still referenced by v1 callers in
 // mcp-server/src/tools/*, mcp-server/src/a2ui.ts, and web/api/src/lib/session-store.ts.

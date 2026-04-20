@@ -4,8 +4,8 @@ import { resolve } from "path";
 export default defineConfig({
   resolve: {
     alias: {
-      "@kickstart/harness": resolve(__dirname, "packages/harness/src/index.ts"),
-      "@kickstart/core": resolve(__dirname, "packages/harness/src/index.ts"),
+      "@aks-kickstart/harness": resolve(__dirname, "packages/harness/src/index.ts"),
+      "@aks-kickstart/core": resolve(__dirname, "packages/harness/src/index.ts"),
     },
   },
   test: {

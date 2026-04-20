@@ -1,6 +1,6 @@
 import { tool } from '@openai/agents';
 import { z } from 'zod';
-import type { ToolContribution } from '@kickstart/harness';
+import type { ToolContribution } from '@aks-kickstart/harness';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 

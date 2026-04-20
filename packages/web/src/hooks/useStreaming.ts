@@ -9,7 +9,7 @@ import type {
 } from '../types';
 import { apiFetch, SessionExpiredError } from '../services/api-client';
 import { normalizeConversationPhase } from '../utils/chat-a2ui';
-import type { AppIntent } from '@kickstart/harness';
+import type { AppIntent } from '@aks-kickstart/harness';
 
 // ---------------------------------------------------------------------------
 // A2UI item type guard (validate before passing to renderer)

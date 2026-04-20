@@ -12,12 +12,12 @@
     "worktrees": true
   },
   "scripts": {
-    "build": "npm run clean --workspaces --if-present && npm run build -w @kickstart/harness && npm run build -w @kickstart/pack-core -w @kickstart/pack-azure -w @kickstart/pack-aks-automatic -w @kickstart/pack-github && npm run build -w @kickstart/mcp-server && npm run build -w @kickstart/web && npm run build -w @kickstart/api",
+    "build": "npm run clean --workspaces --if-present && npm run build -w @aks-kickstart/harness && npm run build -w @aks-kickstart/pack-core -w @aks-kickstart/pack-azure -w @aks-kickstart/pack-aks-automatic -w @aks-kickstart/pack-github && npm run build -w @aks-kickstart/mcp-server && npm run build -w @aks-kickstart/web && npm run build -w @aks-kickstart/api",
     "test": "npx vitest run",
     "lint": "eslint packages/*/src/**/*.ts packages/*/src/**/*.tsx",
-    "api:build": "npm run build -w @kickstart/harness && npm run build -w @kickstart/api",
+    "api:build": "npm run build -w @aks-kickstart/harness && npm run build -w @aks-kickstart/api",
     "clean": "npm run clean --workspaces --if-present",
-    "dev": "npm run build -w @kickstart/harness && npm run build -w @kickstart/api && concurrently -n vite,func,swa -c cyan,magenta,yellow \"npm run dev:vite\" \"npm run dev:func\" \"npm run dev:swa\"",
+    "dev": "npm run build -w @aks-kickstart/harness && npm run build -w @aks-kickstart/api && concurrently -n vite,func,swa -c cyan,magenta,yellow \"npm run dev:vite\" \"npm run dev:func\" \"npm run dev:swa\"",
     "dev:vite": "cd packages/web && npx vite --port 5173",
     "dev:func": "cd packages/web/api && func start --cors '*' --port 7071",
     "dev:swa": "node scripts/dev-swa.mjs",

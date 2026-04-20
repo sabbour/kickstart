@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { UserActionContribution } from '@kickstart/harness';
+import type { UserActionContribution } from '@aks-kickstart/harness';
 
 /**
  * azure:update-resource user action.

@@ -10,12 +10,12 @@
 import { app } from "@azure/functions";
 import type { HttpRequest, InvocationContext } from "@azure/functions";
 import { getRegistry } from "../startup/packs.js";
-import { sessionStore } from "@kickstart/harness/runtime/session";
-import { Runner } from "@kickstart/harness/runtime/runner";
-import { SSE_RESPONSE_HEADERS, formatSSEFrame } from "@kickstart/harness/runtime/sse";
-import { getOidFromPrincipalHeader } from "@kickstart/harness/runtime/resume";
+import { sessionStore } from "@aks-kickstart/harness/runtime/session";
+import { Runner } from "@aks-kickstart/harness/runtime/runner";
+import { SSE_RESPONSE_HEADERS, formatSSEFrame } from "@aks-kickstart/harness/runtime/sse";
+import { getOidFromPrincipalHeader } from "@aks-kickstart/harness/runtime/resume";
 import { z } from "zod";
-import type { SSEEventType } from "@kickstart/harness/runtime/sse";
+import type { SSEEventType } from "@aks-kickstart/harness/runtime/sse";
 
 interface ResumeRequest {
   sessionId: string;

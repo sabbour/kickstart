@@ -1,4 +1,4 @@
-import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@kickstart/harness';
+import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@aks-kickstart/harness';
 
 /**
  * Blocks Kubernetes manifests that reference container images with the

@@ -12,10 +12,10 @@
 import { app } from "@azure/functions";
 import type { HttpRequest, InvocationContext } from "@azure/functions";
 import { getRegistry } from "../startup/packs.js";
-import { getOrCreateSession } from "@kickstart/harness/runtime/session";
-import { Runner } from "@kickstart/harness/runtime/runner";
-import { SSE_RESPONSE_HEADERS, formatSSEFrame } from "@kickstart/harness/runtime/sse";
-import type { SSEEventType } from "@kickstart/harness/runtime/sse";
+import { getOrCreateSession } from "@aks-kickstart/harness/runtime/session";
+import { Runner } from "@aks-kickstart/harness/runtime/runner";
+import { SSE_RESPONSE_HEADERS, formatSSEFrame } from "@aks-kickstart/harness/runtime/sse";
+import type { SSEEventType } from "@aks-kickstart/harness/runtime/sse";
 
 interface ConverseRequest {
   sessionId?: string;

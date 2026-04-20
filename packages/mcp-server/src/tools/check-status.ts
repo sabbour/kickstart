@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/mcp-server/tools/check-status
+ * @module @aks-kickstart/mcp-server/tools/check-status
  *
  * Tool handler: Check deployment status for an active session.
  */
@@ -7,7 +7,7 @@
 import type {
   SessionState,
   GenerationProgressComponent,
-} from "@kickstart/harness";
+} from "@aks-kickstart/harness";
 import { createA2UIResource } from "../a2ui.js";
 
 /**

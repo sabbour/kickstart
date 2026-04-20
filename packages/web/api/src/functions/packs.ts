@@ -11,7 +11,7 @@ import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { getRegistry } from "../startup/packs.js";
-import type { ComponentContribution, PlaygroundScenario } from "@kickstart/harness";
+import type { ComponentContribution, PlaygroundScenario } from "@aks-kickstart/harness";
 
 interface ComponentDTO {
   name: string;

@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/lib/debug-mode
+ * @module @aks-kickstart/api/lib/debug-mode
  *
  * Detects whether a request has debug mode enabled and builds
  * debug metadata payloads for SSE events.

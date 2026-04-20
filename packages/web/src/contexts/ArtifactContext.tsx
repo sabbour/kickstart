@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/web/contexts/ArtifactContext
+ * @module @aks-kickstart/web/contexts/ArtifactContext
  *
  * React context for accessing the artifact store in the browser.
  * Exposes a reactive list of artifacts so components re-render when new files
@@ -22,7 +22,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import type { Artifact, ArtifactStore } from '@kickstart/harness';
+import type { Artifact, ArtifactStore } from '@aks-kickstart/harness';
 
 interface ArtifactContextValue {
   /** Current snapshot of all stored artifacts. Refreshes after every tool call. */
