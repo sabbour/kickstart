@@ -9,7 +9,7 @@
 
 import * as esbuild from "esbuild";
 import { copyFileSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import { join, resolve, dirname } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -20,16 +20,33 @@ const entryPoints = readdirSync("src/functions")
   .filter((f) => !f.endsWith(".test.ts") && !f.endsWith(".spec.ts"))
   .map((f) => join("src/functions", f));
 
-function copyMarkdownTree(sourceDir, targetDir) {
+const RUNTIME_ASSET_MATCHERS = [
+  (filePath) => filePath.endsWith(".agent.md"),
+  (filePath) => basename(filePath) === "SKILL.md",
+];
+
+function isRuntimeAsset(filePath) {
+  return RUNTIME_ASSET_MATCHERS.some((matcher) => matcher(filePath));
+}
+
+function copyMarkdownTree(sourceDir, targetDir, seenTargets) {
   for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
     const sourcePath = join(sourceDir, entry.name);
     const targetPath = join(targetDir, entry.name);
     if (entry.isDirectory()) {
       mkdirSync(targetPath, { recursive: true });
-      copyMarkdownTree(sourcePath, targetPath);
+      copyMarkdownTree(sourcePath, targetPath, seenTargets);
       continue;
     }
-    if (entry.isFile() && sourcePath.endsWith(".md")) {
+    if (entry.isFile() && isRuntimeAsset(sourcePath)) {
+      const targetKey = relative(__dirname, targetPath).replace(/\\/g, "/");
+      const previousSource = seenTargets.get(targetKey);
+      if (previousSource && previousSource !== sourcePath) {
+        throw new Error(
+          `Runtime asset collision for ${targetKey}: ${previousSource} conflicts with ${sourcePath}`,
+        );
+      }
+      seenTargets.set(targetKey, sourcePath);
       mkdirSync(dirname(targetPath), { recursive: true });
       copyFileSync(sourcePath, targetPath);
     }
@@ -84,10 +101,12 @@ const bundleAssetCopies = [
   ["../../pack-github/skills", "dist/skills"],
 ];
 
+const seenBundleTargets = new Map();
+
 for (const [sourceRelative, targetRelative] of bundleAssetCopies) {
   const sourceDir = resolve(__dirname, sourceRelative);
   if (!statSync(sourceDir).isDirectory()) {
     throw new Error(`Expected asset directory at ${sourceDir}`);
   }
-  copyMarkdownTree(sourceDir, resolve(__dirname, targetRelative));
+  copyMarkdownTree(sourceDir, resolve(__dirname, targetRelative), seenBundleTargets);
 }
