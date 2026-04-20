@@ -107,6 +107,143 @@ The canonical documentation lives in **`docs-site/docs/`** and is published to [
 - Run the site locally: `cd docs-site && npm install && npm start`
 - New pages are auto-added to the sidebar based on directory structure and `sidebar_position` frontmatter
 
+## Squad Workflow — Maintaining with AI Agents
+
+Kickstart uses **Squad** — a team of AI agents (Leela, Fry, Bender, Hermes, Zapp, Nibbler, Scribe) coordinated by a human or automated lead. If you're contributing to Kickstart or maintaining it, you'll interact with these conventions.
+
+### Team Structure & Issue Routing
+
+**See:** `.squad/team.md` (team roster and routing rules)
+
+The Squad consists of:
+- **Leela** (Lead) — Architecture, design proposals, scope decisions
+- **Fry** (Frontend) — React, A2UI, web client
+- **Bender** (Backend) — Harness, packs, API, infrastructure
+- **Hermes** (Testing) — Test strategy, performance, observability
+- **Zapp** (Security) — Security review, threat modeling, guardrail design
+- **Nibbler** (Code Quality) — PR reviews, readability, bug patterns
+- **Scribe** (Docs & Product) — Public docs, release notes, DX review
+
+Issues labeled `squad` are triaged by the Lead, who assigns the appropriate team member with a `squad:{member}` label. Each member has a **charter** describing their domain and responsibilities.
+
+**Coding Agent (@copilot)** can auto-handle bugs, tests, docs, and small isolated features (see `.squad/team.md` for the capability matrix). For complex work, a squad member takes it.
+
+### Picking Up a Feature or Bug
+
+1. **Find an unstarted issue** on the [project board](https://github.com/users/sabbour/projects/3) with a `squad:{member}` label
+2. **No label yet?** The issue has the base `squad` label. It's untriaged — Leela will assign it when available
+3. **If labeled with your name:** That's your work. Read the issue body and acceptance criteria
+4. **Design Proposal gate:** Before implementing, you (or the assigned agent) post a **Design Proposal** comment on the issue explaining the approach, affected packs, test strategy, and docs plan. Leela reviews it before you code
+5. **Worktree workflow:** Create a feature branch in a **dedicated worktree**, not in the top-level checkout:
+   ```bash
+   git fetch origin
+   git worktree list                    # check what's in flight
+   git worktree add .worktrees/123-my-feature \
+     -b squad/123-my-feature origin/main
+   cd .worktrees/123-my-feature
+   ```
+   Every issue gets its own worktree to avoid dirty diffs and branch conflicts.
+6. **Commit with issue reference:** `git commit -m "feat: add auth flow (#123)"`
+7. **Changeset:** If user-facing, add a changeset: `npx changeset`
+8. **PR creation:** Open PR from your branch to `main`. Mention issue in description: `Closes #123`
+9. **PR review gates:**
+   - **Nibbler** reviews for code quality, readability, bugs
+   - **Leela** reviews for architecture alignment
+   - **Zapp** reviews if security-sensitive (auth, secrets, CORS, validation)
+   - **CI must pass** before merge
+10. **Address feedback:** If reviewers request changes, post an acknowledgment comment, fix the code, push, and request re-review
+11. **Merge & cleanup:** Once approved, the PR merges. Delete your worktree:
+    ```bash
+    git worktree remove .worktrees/123-my-feature
+    git worktree prune
+    ```
+
+### Key Conventions for Safe Contribution
+
+**Branches:**
+- Always use `.worktrees/{issue-number}-{slug}` — never `git checkout -b` in the top-level directory
+- Branch naming: `squad/123-my-feature-slug`
+
+**Commits:**
+- Reference issue number: `Closes #123` in PR description
+- Use conventional commit format: `type(scope): description (#issue)`
+- Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`
+
+**Changesets** (every user-facing change):
+- Run `npx changeset` after implementing a feature or fix
+- Skip changesets for: docs-only PRs, CI/workflow changes, dev tool changes
+- See [RELEASING.md](RELEASING.md) for versioning rules
+
+**Docs & DX:**
+- Public docs live in `docs-site/docs/`, not `docs/`
+- Update architecture briefs if you change harness primitives (tools, agents, components, etc.)
+- If adding an extension point, document it in `docs-site/docs/extending/`
+
+**PR Workflow:**
+- Design Proposal posts before code (required by ceremony gate)
+- Aim for focused PRs (one issue per PR — split large features into sub-issues)
+- Code must pass `npm run lint` and `npm test` locally before pushing
+- CI must pass: linting, unit tests, E2E tests
+- If flagged as 🟡 **needs review**, note it in the PR body and wait for squad member approval
+
+**Code Review Protocol:**
+- Reviewers will comment on the PR; address all comments
+- Reply to each comment with what you did: e.g., "Addressed in {commit-sha}: {description}"
+- After pushing fixes, request re-review
+- Never merge your own PR
+
+### Example: Contributing a Bug Fix
+
+```bash
+# 1. Find an issue labeled squad/bender (backend bug)
+# Issue: #456 — "ConvocationRunner fails on empty tool result"
+
+# 2. Create worktree
+git worktree add .worktrees/456-runner-empty-tool \
+  -b squad/456-runner-empty-tool origin/main
+cd .worktrees/456-runner-empty-tool
+
+# 3. Reproduce and fix
+npm test packages/harness               # Find the failing test
+# ... edit packages/harness/src/runner.ts to handle empty tool result ...
+npm test                               # Verify all tests pass
+
+# 4. Commit
+git commit -m "fix(harness): handle empty tool result in Runner (#456)"
+
+# 5. Push
+git push origin squad/456-runner-empty-tool
+
+# 6. Create PR
+# Go to GitHub, create PR with title "fix: handle empty tool result in Runner"
+# In description: "Closes #456"
+
+# 7. Address any feedback from reviewers
+
+# 8. Once approved and merged
+git worktree remove .worktrees/456-runner-empty-tool
+git worktree prune
+```
+
+### When to Ask for Help
+
+- **Not sure which squad member owns this?** → Check `.squad/routing.md`
+- **Unclear acceptance criteria?** → Comment on the issue; Leela will clarify
+- **Blocked on a decision?** → Comment on the issue with your question; don't spin
+- **Architecture question?** → Ask in the issue or reach out to Leela
+- **Security concern?** → Mention Zapp (`@zapp`) for a security review
+
+### Squad Documentation
+
+**Canonical Squad reference:**
+- `.squad/team.md` — Team roster, routing rules, @copilot capability matrix
+- `.squad/routing.md` — Decision tree for routing work to the right person
+- `.squad/issue-lifecycle.md` — Detailed issue → branch → PR → merge workflow with command examples
+- `.squad/ceremonies.md` — Design Proposal, Design Review, PR Review gates
+- `.squad/decisions.md` — Team decisions, RFCs, architecture notes
+
+These are living documents. If you find workflows unclear or outdated, file an issue or note it in Scribe's decision inbox.
+
 ## Infrastructure
 
 Azure infrastructure lives in `infra/` and uses Bicep. See the [Deployment Guide](https://sabbour.github.io/kickstart/docs/getting-started/deployment) for full details.
