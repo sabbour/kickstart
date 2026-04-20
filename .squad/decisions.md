@@ -310,6 +310,11 @@ code — no fake data, no placeholder URLs, no pretend deployments.
 - **Ahmed Sabbour** — confirm "download project" is acceptable as #271 scope; confirm GitHub OAuth App registration goes into a follow-up issue.
 ---
 
+### 2026-04-20: `docs-site/docs/` is the canonical docs surface
+**By:** Scribe (Scribe)
+**What:** After #811, contributor guidance, release entry points, and docs automation should treat `docs-site/docs/` as the canonical docs tree and `docs-site/docs/architecture/v2-implementation-brief.md` as the canonical brief path. `docs/README.md` is the redirect map for removed legacy `docs/*` pages.
+**Why:** This keeps follow-up docs cleanup work from reintroducing dead `docs/*` paths or split-brain guidance between the docs site and top-level docs.
+
 # Decision: Issue #271 — Ship complete flow with real project delivery
 
 **Date:** 2026-04-15T08:39:29.427Z

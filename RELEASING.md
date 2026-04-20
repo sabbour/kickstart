@@ -2,6 +2,17 @@
 
 This project uses [Changesets](https://github.com/changesets/changesets) for versioning and changelog generation across the monorepo.
 
+## Documentation Entry Points
+
+Before cutting a release, make sure these entry points agree:
+
+- `README.md`
+- `CHANGELOG.md`
+- `docs-site/docs/`
+- `docs-site/docs/architecture/v2-implementation-brief.md`
+
+If you fix an old `docs/*` link during release prep, update the source link or `docs/README.md` redirect map instead of recreating legacy stubs.
+
 ## How It Works
 
 1. **Contributors add changesets** alongside their code changes
