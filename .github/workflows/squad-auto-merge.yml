@@ -456,7 +456,7 @@ jobs:
                 mutation EnableAutoMerge($pullRequestId: ID!) {
                   enablePullRequestAutoMerge(input: {
                     pullRequestId: $pullRequestId,
-                    mergeMethod: SQUASH
+                    mergeMethod: REBASE
                   }) {
                     pullRequest {
                       number
@@ -483,7 +483,7 @@ jobs:
                 '- trusted merge signals are green: `CI Gate` from workflow `CI` and `squad/review-gate` from `Squad Review Gate`',
                 '- PR is not XL and title is not marked `refactor`',
                 '',
-                'GitHub will squash-merge this PR automatically once the remaining branch protections are satisfied.',
+                'GitHub will rebase-merge this PR automatically once the remaining branch protections are satisfied.',
               ].join('\n'),
             );
 
