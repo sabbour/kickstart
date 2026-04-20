@@ -41,7 +41,7 @@ The container auto-installs dependencies, builds all packages, and starts the de
 
 ### Option 2: Local setup
 
-**Prerequisites:** Node.js 20+ (22 recommended), npm 10+
+**Prerequisites:** Node.js 22+, npm 10+
 
 ```bash
 # Install dependencies

@@ -14,7 +14,7 @@ The Codespace will automatically install dependencies, build the project, and st
 
 ### Prerequisites
 
-- **Node.js 20+** (22 recommended)
+- **Node.js 22+**
 - npm 10+
 
 ### Setup
