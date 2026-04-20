@@ -1,5 +1,16 @@
 # @kickstart/web
 
+## 1.0.1
+
+### Patch Changes
+
+- [#860](https://github.com/sabbour/kickstart/pull/860) [`8cc157a`](https://github.com/sabbour/kickstart/commit/8cc157a528a273c9e57cc23f941229808e6ccfb2) Thanks [@sabbour](https://github.com/sabbour)! - fix: use the Fluent go icon in the chat composer send button
+
+  - replace the composer go.svg image with the same Fluent ArrowRight icon used in the landing input
+  - inherit theme-aware icon color so the send button stays visible in dark mode
+
+- [#871](https://github.com/sabbour/kickstart/pull/871) [`0dddcbb`](https://github.com/sabbour/kickstart/commit/0dddcbbf1a7e8822fceb8531e595a71ce53847e3) Thanks [@sabbour-squad-frontend](https://github.com/apps/sabbour-squad-frontend)! - chore: Rename "Fat components" to "Smart components" throughout docs and tests
+
 ## 1.0.0
 
 ### Major Changes

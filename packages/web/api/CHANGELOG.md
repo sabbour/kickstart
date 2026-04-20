@@ -1,5 +1,11 @@
 # @kickstart/api
 
+## 1.0.1
+
+### Patch Changes
+
+- [#864](https://github.com/sabbour/kickstart/pull/864) [`67d23ab`](https://github.com/sabbour/kickstart/commit/67d23abe0e6333a82cffdf6e4b78989129290a2b) Thanks [@sabbour-squad-backend](https://github.com/apps/sabbour-squad-backend)! - Fix API pack registry startup so bundled agent and skill assets resolve correctly in the built Functions bundle.
+
 ## 1.0.0
 
 ### Major Changes
