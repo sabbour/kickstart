@@ -47,15 +47,42 @@ function parseEnabledPacks(raw: string | undefined): PackId[] {
  * list of pack ids: `core`, `azure`, `aks`, `github`). When unset or empty,
  * all four packs are enabled. `core` is always registered regardless of
  * configuration because every other pack depends on it.
+ *
+ * Throws if pack initialization fails (e.g., manifest imports fail or assets
+ * cannot be resolved). Caller must handle and recover gracefully.
  */
 export function getRegistry(): PackRegistry {
   if (!_registry) {
     const registry = new PackRegistry();
     const enabled = parseEnabledPacks(process.env.KICKSTART_PACKS);
+    console.log(`[packs] Initializing pack registry with ${enabled.length} pack(s): ${enabled.join(', ')}`);
+    
     for (const id of enabled) {
-      registry.register(PACK_BY_ID[id]);
+      try {
+        console.log(`[packs] Registering pack: ${id}`);
+        registry.register(PACK_BY_ID[id]);
+        console.log(`[packs] Successfully registered pack: ${id}`);
+      } catch (err) {
+        console.error(`[packs] Failed to register pack '${id}': ${err instanceof Error ? err.message : String(err)}`);
+        if (err instanceof Error && err.stack) {
+          console.error(`[packs] Stack trace: ${err.stack}`);
+        }
+        throw err;
+      }
     }
-    registry.seal();
+    
+    try {
+      console.log(`[packs] Sealing registry`);
+      registry.seal();
+      console.log(`[packs] Registry sealed successfully`);
+    } catch (err) {
+      console.error(`[packs] Failed to seal registry: ${err instanceof Error ? err.message : String(err)}`);
+      if (err instanceof Error && err.stack) {
+        console.error(`[packs] Stack trace: ${err.stack}`);
+      }
+      throw err;
+    }
+    
     _registry = registry;
   }
   return _registry;

@@ -29,6 +29,8 @@ jobs:
             const TRUSTED_RETRO_BRANCH_PREFIX = 'retro-log/pr-';
             const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'sabbour-squad-scribe[bot]']);
             const TRUSTED_RETRO_ONLY_PATHS = new Set(['.squad/retro-log.md']);
+            const DEPENDABOT_AUTHOR = 'dependabot[bot]';
+            const DEPENDABOT_BRANCH_PREFIX = 'dependabot/';
             const XL_THRESHOLD = 1000;
             const APPROVAL_LABELS = ['leela:approved', 'zapp:approved'];
             const REVIEW_GATE_CONTEXT = 'squad/review-gate';
@@ -94,6 +96,13 @@ jobs:
                 (pr.headRefName ?? '').startsWith(TRUSTED_RETRO_BRANCH_PREFIX) &&
                 changedFiles.length > 0 &&
                 changedFiles.every((filename) => TRUSTED_RETRO_ONLY_PATHS.has(filename))
+              );
+            }
+
+            function isDependabotPr(pr) {
+              return (
+                pr.author?.login === DEPENDABOT_AUTHOR &&
+                (pr.headRefName ?? '').startsWith(DEPENDABOT_BRANCH_PREFIX)
               );
             }
 
@@ -311,6 +320,7 @@ jobs:
             const labels = new Set(pr.labels.nodes.map((label) => label.name));
             const changedFiles = await listChangedFiles(pr.number);
             const trustedRetroLogPr = isTrustedRetroLogPr(pr, labels, changedFiles);
+            const dependabotPr = isDependabotPr(pr);
             const zappRequirementReason = getZappRequirementReason(pr, labels, changedFiles);
             const removedLabels = await clearApprovalLabels(pr, labels);
             if (removedLabels.length > 0) {
@@ -345,7 +355,11 @@ jobs:
               blockers.push('PR title is marked refactor');
             }
 
-            const requiredApprovals = trustedRetroLogPr ? [] : getRequiredApprovals(pr, labels, changedFiles);
+            const requiredApprovals = dependabotPr
+              ? []
+              : trustedRetroLogPr
+              ? []
+              : getRequiredApprovals(pr, labels, changedFiles);
             const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
             if (missingApprovals.length > 0) {
               blockers.push(`missing fresh approval labels: ${missingApprovals.join(', ')}`);
@@ -441,6 +455,8 @@ jobs:
                 '',
                 trustedRetroLogPr
                   ? '- trusted retro-log PR path is green (`retro-log` label + `retro-log/pr-*` branch + trusted bot author + `.squad/retro-log.md` only)'
+                  : dependabotPr
+                  ? '- Dependabot auto-merge: CI is green and `dependabot[bot]` author in `dependabot/*` branch'
                   : labels.has(LOW_RISK_LABEL)
                   ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}`
                   : '- fresh `leela:approved` + `zapp:approved` labels are present on the current head',
