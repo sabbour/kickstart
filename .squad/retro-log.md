@@ -1,10 +1,10 @@
 # Squad Retro Log
 
-Append-only record of every merged or closed PR. One line per entry. Owned by Scribe (via `.github/workflows/squad-pr-retro.yml`). Do not hand-edit.
+Workflow-owned record of every merged or closed PR. One line per entry. Rows are appended on PR close, and the workflow may later backfill `reverted=true` if a standard git revert lands on `main`. Do not hand-edit.
 
 Format:
 ```
-- YYYY-MM-DD | #NNN "title" | size | impl=XXm | review=XXm | cycles=N | outcome | author | first_review=XXm | ci=XXm | reviewer=bot|human|none | human_comments=N
+- YYYY-MM-DD | #NNN "title" | size | impl=XXm | review=XXm | cycles=N | outcome | author | first_review=XXm | ci=XXm | reviewer=bot|human|none | human_comments=N | issue=#NNN/none | estimate=S/M/L/XL/unknown | rejections_by_reviewer=nibbler:X,leela:Y,zapp:Z | reverted=true/false
 ```
 
 Legend:
@@ -18,6 +18,12 @@ Legend:
 - **ci** — total completed check-run duration for the PR head SHA (`n/a` when unavailable)
 - **reviewer** — whether the first submitted reviewer was a `bot`, `human`, or `none`
 - **human_comments** — human-authored review + issue comment count (bot comments excluded)
+- **issue** — linked in-repo issue from the PR closing keyword (`Closes #NNN`), else `none`
+- **estimate** — linked issue label `estimate:S|M|L|XL`, else `unknown`
+- **rejections_by_reviewer** — count of `*:rejected` label applications during the PR lifecycle
+- **reverted** — `true` once a later trusted `git revert` commit on `main` is associated back to the PR, else `false`
+
+Historical rows before each schema extension keep their older trailing columns.
 
 ---
 

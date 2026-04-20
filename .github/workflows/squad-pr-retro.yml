@@ -1,11 +1,19 @@
 name: Squad · PR Retro
 
-# Fires on every PR close. Scribe computes metrics, appends a line to
-# .squad/retro-log.md, and mirrors the line as a PR comment for visibility.
+# On PR close, Scribe computes metrics, appends a line to .squad/retro-log.md,
+# and mirrors the line as a PR comment for visibility. On pushes to main, the
+# same workflow backfills reverted=true for any logged PR later reverted by a
+# standard git revert commit.
 
 on:
   pull_request:
     types: [closed]
+  push:
+    branches: [main]
+
+concurrency:
+  group: squad-retro-log
+  cancel-in-progress: false
 
 permissions:
   checks: read
@@ -21,13 +29,17 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref || github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compute metrics
         id: metrics
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v8
         with:
           script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
             const pr = context.payload.pull_request;
             const title = (pr.title || '').replace(/"/g, "'");
             const author = pr.user?.login ?? 'unknown';
@@ -42,15 +54,40 @@ jobs:
             };
             const formatMinutes = (value) => Number.isFinite(value) ? `${value}m` : 'n/a';
 
+            const linkedIssueMatch = (pr.body ?? '').match(
+              /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)\b/i
+            );
+            const linkedIssueNumber = linkedIssueMatch
+              ? Number.parseInt(linkedIssueMatch[1], 10)
+              : null;
+            let estimate = 'unknown';
+            if (linkedIssueNumber) {
+              try {
+                const linkedIssue = await github.rest.issues.get({
+                  owner,
+                  repo,
+                  issue_number: linkedIssueNumber,
+                });
+                const estimateLabel = (linkedIssue.data.labels ?? [])
+                  .map((label) => typeof label === 'string' ? label : label.name)
+                  .find((label) => /^estimate:(S|M|L|XL)$/i.test(label ?? ''));
+                if (estimateLabel) {
+                  estimate = estimateLabel.split(':')[1].toUpperCase();
+                }
+              } catch (error) {
+                core.warning(`Unable to load linked issue #${linkedIssueNumber}: ${error.message}`);
+              }
+            }
+
             // Implementation window = created_at - first commit
-            const commits = await github.rest.pulls.listCommits({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner,
+              repo,
               pull_number: pr.number,
               per_page: 100,
             });
-            const firstCommitAt = commits.data.length
-              ? new Date(commits.data[0].commit.author.date)
+            const firstCommitAt = commits.length
+              ? new Date(commits[0].commit.author.date)
               : new Date(pr.created_at);
             const implMin = Math.max(0, Math.round(
               (new Date(pr.created_at) - firstCommitAt) / 60000
@@ -58,8 +95,8 @@ jobs:
 
             // Review window = merged_at (or closed_at) - ready_for_review event (fallback: created_at)
             const events = await github.paginate(github.rest.issues.listEvents, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               issue_number: pr.number,
               per_page: 100,
             });
@@ -68,10 +105,20 @@ jobs:
             const closedAt = new Date(pr.merged_at ?? pr.closed_at);
             const reviewMin = Math.max(0, Math.round((closedAt - readyAt) / 60000));
 
+            const rejections = { nibbler: 0, leela: 0, zapp: 0 };
+            for (const event of events) {
+              if (event.event !== 'labeled' || !event.label?.name) {
+                continue;
+              }
+              if (event.label.name === 'nibbler:rejected') rejections.nibbler += 1;
+              if (event.label.name === 'leela:rejected') rejections.leela += 1;
+              if (event.label.name === 'zapp:rejected') rejections.zapp += 1;
+            }
+
             // Review cycles = number of push-after-review events (approximation)
             const reviews = await github.paginate(github.rest.pulls.listReviews, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               pull_number: pr.number,
               per_page: 100,
             });
@@ -89,14 +136,14 @@ jobs:
               : 'none';
 
             const reviewComments = await github.paginate(github.rest.pulls.listReviewComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               pull_number: pr.number,
               per_page: 100,
             });
             const issueComments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               issue_number: pr.number,
               per_page: 100,
             });
@@ -106,8 +153,8 @@ jobs:
               issueComments.filter((comment) => comment.body?.trim() && !isBotUser(comment.user)).length;
 
             const checkRuns = await github.paginate(github.rest.checks.listForRef, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               ref: pr.head.sha,
               per_page: 100,
             });
@@ -125,17 +172,23 @@ jobs:
               ? (requestedChanges > 0 ? 'merged-with-rework' : 'merged')
               : 'closed';
 
+            const reverted = false;
+
             const date = closedAt.toISOString().slice(0, 10);
-            const line = `- ${date} | #${pr.number} "${title}" | ${size} | impl=${implMin}m | review=${reviewMin}m | cycles=${cycles} | ${outcome} | @${author} | first_review=${formatMinutes(firstReviewMin)} | ci=${formatMinutes(ciDurationRounded)} | reviewer=${reviewerType} | human_comments=${humanCommentsCount}`;
+            const line = `- ${date} | #${pr.number} "${title}" | ${size} | impl=${implMin}m | review=${reviewMin}m | cycles=${cycles} | ${outcome} | @${author} | first_review=${formatMinutes(firstReviewMin)} | ci=${formatMinutes(ciDurationRounded)} | reviewer=${reviewerType} | human_comments=${humanCommentsCount} | issue=${linkedIssueNumber ? `#${linkedIssueNumber}` : 'none'} | estimate=${estimate} | rejections_by_reviewer=nibbler:${rejections.nibbler},leela:${rejections.leela},zapp:${rejections.zapp} | reverted=${reverted}`;
 
             core.setOutput('line', line);
             core.setOutput('pr', String(pr.number));
 
       - name: Append to retro log (as Scribe)
+        if: github.event_name == 'pull_request'
         env:
           LINE: ${{ steps.metrics.outputs.line }}
+          TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
         run: |
           set -e
+          git fetch origin "$TARGET_BRANCH"
+          git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
           mkdir -p .squad
           touch .squad/retro-log.md
           # Insert the new line directly after the entries marker
@@ -158,9 +211,157 @@ jobs:
             exit 0
           fi
           git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
-          git push
+          git pull --rebase origin "$TARGET_BRANCH"
+          git push origin "HEAD:$TARGET_BRANCH"
+
+      - name: Detect reverted PRs
+        id: reverted
+        if: github.event_name == 'push'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { execFileSync } = require('child_process');
+            const fs = require('fs');
+            const path = require('path');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const revertedPrs = new Set();
+            const repoRoot = process.env.GITHUB_WORKSPACE || process.cwd();
+            const git = (cwd, args) => execFileSync('git', args, {
+              cwd,
+              encoding: 'utf8',
+              stdio: ['ignore', 'pipe', 'pipe'],
+            }).trim();
+            const getParents = (sha) => {
+              const line = git(repoRoot, ['rev-list', '--parents', '-n', '1', sha]);
+              const [, ...parents] = line.split(/\s+/);
+              return parents;
+            };
+            const getTrustedRevertedSha = (commitSha, message) => {
+              if (typeof commitSha !== 'string' || typeof message !== 'string') {
+                return null;
+              }
+              const match = message.match(/^Revert "[^\n]+"\n\nThis reverts commit ([0-9a-f]{40})\.(?:\n|$)/i);
+              if (!match) {
+                return null;
+              }
+              try {
+                git(repoRoot, ['cat-file', '-e', `${commitSha}^{commit}`]);
+                git(repoRoot, ['cat-file', '-e', `${match[1]}^{commit}`]);
+              } catch {
+                return null;
+              }
+              const revertParents = getParents(commitSha);
+              const revertedParents = getParents(match[1]);
+              if (revertParents.length !== 1 || revertedParents.length < 1) {
+                return null;
+              }
+              const scratch = path.join(repoRoot, `.revert-check-${commitSha.slice(0, 12)}`);
+              try {
+                if (fs.existsSync(scratch)) {
+                  git(repoRoot, ['worktree', 'remove', '--force', scratch]);
+                }
+                git(repoRoot, ['worktree', 'add', '--detach', scratch, revertParents[0]]);
+                const revertArgs = ['revert', '--no-commit'];
+                if (revertedParents.length > 1) {
+                  revertArgs.push('-m', '1');
+                }
+                revertArgs.push(match[1]);
+                git(scratch, revertArgs);
+                const simulatedTree = git(scratch, ['write-tree']);
+                const actualTree = git(repoRoot, ['rev-parse', `${commitSha}^{tree}`]);
+                return simulatedTree === actualTree ? match[1] : null;
+              } catch {
+                return null;
+              } finally {
+                if (fs.existsSync(scratch)) {
+                  try {
+                    git(scratch, ['revert', '--abort']);
+                  } catch {}
+                  try {
+                    git(repoRoot, ['worktree', 'remove', '--force', scratch]);
+                  } catch {}
+                }
+              }
+            };
+
+            for (const commit of context.payload.commits ?? []) {
+              const revertedSha = getTrustedRevertedSha(commit.id ?? commit.sha, commit.message);
+              if (!revertedSha) {
+                continue;
+              }
+                const pulls = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
+                  owner,
+                  repo,
+                  commit_sha: revertedSha,
+                  per_page: 100,
+                });
+                const revertedPr = pulls.find((pull) => pull.merged_at) ?? pulls[0];
+                if (revertedPr) {
+                  revertedPrs.add(revertedPr.number);
+                }
+            }
+
+            const numbers = [...revertedPrs].sort((a, b) => a - b);
+            core.info(numbers.length ? `Backfilling reverted PRs: ${numbers.join(', ')}` : 'No reverted PRs found in push payload.');
+            core.setOutput('prs', JSON.stringify(numbers));
+
+      - name: Backfill reverted flags (as Scribe)
+        if: github.event_name == 'push'
+        env:
+          PRS_JSON: ${{ steps.reverted.outputs.prs }}
+          TARGET_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -e
+          git fetch origin "$TARGET_BRANCH"
+          git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          node <<'EOF'
+          const fs = require('fs');
+
+          const prs = JSON.parse(process.env.PRS_JSON || '[]');
+          if (!prs.length) {
+            console.log('No reverted PRs to backfill.');
+            process.exit(0);
+          }
+
+          const path = '.squad/retro-log.md';
+          if (!fs.existsSync(path)) {
+            console.log('retro-log missing; nothing to update.');
+            process.exit(0);
+          }
+
+          let text = fs.readFileSync(path, 'utf8');
+          let changed = false;
+          for (const pr of prs) {
+            const pattern = new RegExp(`(^- .*\\| #${pr} "[^\\n]*?\\| reverted=)(false)(\\s*$)`, 'm');
+            if (!pattern.test(text)) {
+              continue;
+            }
+            text = text.replace(pattern, '$1true$3');
+            changed = true;
+          }
+
+          if (!changed) {
+            console.log('No retro-log lines required revert updates.');
+            process.exit(0);
+          }
+
+          fs.writeFileSync(path, text);
+          EOF
+
+          git config user.name "squad-scribe[bot]"
+          git config user.email "scribe@squad.local"
+          git add .squad/retro-log.md
+          if git diff --cached --quiet; then
+            echo "No retro-log changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(retro-log): backfill reverted flags [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
+          git pull --rebase origin "$TARGET_BRANCH"
+          git push origin "HEAD:$TARGET_BRANCH"
 
       - name: Mirror line as PR comment
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v8
         with:
           script: |
