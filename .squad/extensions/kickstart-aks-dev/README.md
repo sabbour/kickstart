@@ -1,6 +1,6 @@
 # Kickstart AKS Development Extension
 
-Codifies development workflows for **Kickstart** — an AI-guided AKS onboarding app built on the `@openai/agents` SDK. Two-layer architecture: `@kickstart/harness` (runtime glue) plus packs (`pack-core`, `pack-azure`, `pack-aks-automatic`, `pack-github`). Design north star: [`docs/v2-implementation-brief.md`](../../../docs/v2-implementation-brief.md).
+Codifies development workflows for **Kickstart** — an AI-guided AKS onboarding app built on the `@openai/agents` SDK. Two-layer architecture: `@kickstart/harness` (runtime glue) plus packs (`pack-core`, `pack-azure`, `pack-aks-automatic`, `pack-github`). Design north star: [`docs-site/docs/architecture/v2-implementation-brief.md`](../../../docs-site/docs/architecture/v2-implementation-brief.md).
 
 ## Install
 

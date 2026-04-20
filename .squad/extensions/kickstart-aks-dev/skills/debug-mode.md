@@ -66,7 +66,7 @@ When adding a new debug field (token counts, latency breakdowns, guardrail trace
 1. Add the field to the `debug` object in `debug-mode.ts`.
 2. Update the `DebugMetadata` type.
 3. Render it in `DebugPanel` with a "Not available" fallback.
-4. Document the field in `docs/api-reference.md`.
+4. Document the field in `docs-site/docs/extending/api-endpoints.md`.
 
 ### 6. SDK trace
 

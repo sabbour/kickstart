@@ -6,7 +6,7 @@
 
 Kickstart v2 streams UI through one mechanism: the `core.emit_ui` tool. Agents call it. The harness forwards the payload as an SSE `a2ui` event. The web client renders the payload against the registered component catalog. There is no envelope. There is no JSON parser. There is no FSM.
 
-See [`docs/v2-implementation-brief.md`](../../../../docs/v2-implementation-brief.md) sections on A2UI streaming and components.
+See [`docs-site/docs/architecture/v2-implementation-brief.md`](../../../../docs-site/docs/architecture/v2-implementation-brief.md) sections on A2UI streaming and components.
 
 ## The contract
 

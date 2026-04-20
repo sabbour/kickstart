@@ -56,7 +56,7 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 
 **Agenda:**
 1. Assigned agent drafts a Design Proposal comment on the issue
-2. Leela reviews for completeness — does it cover architecture alignment with `docs/v2-implementation-brief.md`?
+2. Leela reviews for completeness — does it cover architecture alignment with `docs-site/docs/architecture/v2-implementation-brief.md`?
 3. If incomplete, Leela requests revisions before proceeding to Design Review
 4. DP comment posted → triggers Design Review ceremony
 

@@ -22,7 +22,7 @@ Move the project board status to **In progress**.
 Before writing code, post a DP comment on the issue with:
 
 - Problem statement (reference the issue body)
-- Proposed approach (reference the relevant section of `docs/v2-implementation-brief.md`)
+- Proposed approach (reference the relevant section of `docs-site/docs/architecture/v2-implementation-brief.md`)
 - Files to modify or create
 - Pack boundaries affected (which pack owns which change)
 - Tool / user-action / component surface changes
@@ -83,8 +83,8 @@ gh pr create --draft \
 ## Docs and changeset
 - [ ] Changeset added (or marked internal-only with reason)
 - [ ] docs-site/docs/ updated (or N/A)
-- [ ] docs/v2-implementation-brief.md updated (or N/A)
-- [ ] docs/api-reference.md updated (or N/A)
+- [ ] docs-site/docs/architecture/v2-implementation-brief.md updated (or N/A)
+- [ ] docs-site/docs/extending/api-endpoints.md updated (or N/A)
 - [ ] Pack docs updated (or N/A)
 - [ ] Tests added or covered
 " \

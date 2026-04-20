@@ -1,6 +1,6 @@
 # Squad Team
 
-> Kickstart — AI-guided onboarding experience for deploying apps to AKS. v2 runs on `@openai/agents` SDK with a harness + packs architecture. See [`docs/v2-implementation-brief.md`](../docs/v2-implementation-brief.md).
+> Kickstart — AI-guided onboarding experience for deploying apps to AKS. v2 runs on `@openai/agents` SDK with a harness + packs architecture. See [`docs-site/docs/architecture/v2-implementation-brief.md`](../docs-site/docs/architecture/v2-implementation-brief.md).
 
 ## Coordinator
 

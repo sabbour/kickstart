@@ -21,7 +21,7 @@ If any answer is missing, the PR is not ready.
 | **User-facing** | new component, new pack, new SSE event, new env var, UX change | changeset + public docs update |
 | **Architectural** | new primitive, harness contract change, pack boundary shift | changeset + public docs update + brief update |
 | **Internal only** | refactor, test-only, dev tooling | no changeset required, but add a note to the PR body |
-| **Docs-only** | fixes to `docs-site/` or `docs/` | no changeset |
+| **Docs-only** | fixes to `docs-site/` (and the legacy `docs/README.md` redirect) | no changeset |
 
 ### 2. Public docs update (`docs-site/docs/`)
 
@@ -39,7 +39,7 @@ Rules:
 - Code samples must be copy-pasteable and reference the actual repo layout.
 - Use KaTeX for math. Do not use emoji in headings.
 
-### 3. Brief update (`docs/v2-implementation-brief.md`)
+### 3. Brief update (`docs-site/docs/architecture/v2-implementation-brief.md`)
 
 Update the brief when a PR changes any of:
 
@@ -70,7 +70,7 @@ Good changeset:
 Bad changeset:
 > Refactored `azure-kit.ts` to add a new streaming hook and wired it through `useStreaming.ts`.
 
-### 5. API reference (`docs/api-reference.md`)
+### 5. API reference (`docs-site/docs/extending/api-endpoints.md`)
 
 Update for any change to:
 - HTTP endpoint shape (path, request body, response body, status codes)
@@ -107,8 +107,8 @@ Paste into the PR description:
 ```md
 - [ ] Changeset added (or marked internal-only with reason)
 - [ ] `docs-site/docs/` updated (or N/A)
-- [ ] `docs/v2-implementation-brief.md` updated (or N/A)
-- [ ] `docs/api-reference.md` updated (or N/A)
+- [ ] `docs-site/docs/architecture/v2-implementation-brief.md` updated (or N/A)
+- [ ] `docs-site/docs/extending/api-endpoints.md` updated (or N/A)
 - [ ] Pack docs updated (or N/A)
 - [ ] Tests added or existing tests cover the change
 ```

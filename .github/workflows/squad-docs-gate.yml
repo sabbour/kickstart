@@ -35,7 +35,7 @@ jobs:
 
             const hasChangeset = paths.some(p => p.startsWith('.changeset/') && p.endsWith('.md') && !p.endsWith('README.md'));
             const hasDocsSite = paths.some(p => p.startsWith('docs-site/docs/'));
-            const hasApiRef = paths.some(p => p === 'docs/api-reference.md');
+            const hasApiDocs = paths.some(p => p === 'docs-site/docs/extending/api-endpoints.md');
 
             // User-facing signal: touches packages/** src but is not test/config only
             const userFacing = paths.some(p =>
@@ -48,7 +48,7 @@ jobs:
 
             core.setOutput('hasChangeset', String(hasChangeset));
             core.setOutput('hasDocsSite', String(hasDocsSite));
-            core.setOutput('hasApiRef', String(hasApiRef));
+            core.setOutput('hasApiDocs', String(hasApiDocs));
             core.setOutput('userFacing', String(userFacing));
 
       - name: Post or update sticky comment
@@ -56,7 +56,7 @@ jobs:
         env:
           HAS_CHANGESET: ${{ steps.changed.outputs.hasChangeset }}
           HAS_DOCS_SITE: ${{ steps.changed.outputs.hasDocsSite }}
-          HAS_API: ${{ steps.changed.outputs.hasApiRef }}
+          HAS_API: ${{ steps.changed.outputs.hasApiDocs }}
           USER_FACING: ${{ steps.changed.outputs.userFacing }}
         with:
           script: |
@@ -83,7 +83,7 @@ jobs:
               '',
               changesetLine,
               docLine(process.env.HAS_DOCS_SITE, 'docs-site/docs/', 'if user-facing behavior or UI changed'),
-              docLine(process.env.HAS_API, 'docs/api-reference.md', 'if the API surface changed'),
+              docLine(process.env.HAS_API, 'docs-site/docs/extending/api-endpoints.md', 'if the API surface changed'),
               '',
             ];
 
