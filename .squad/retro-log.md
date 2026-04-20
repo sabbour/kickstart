@@ -18,10 +18,10 @@ Legend:
 - **ci** — total completed check-run duration for the PR head SHA (`n/a` when unavailable)
 - **reviewer** — whether the first submitted reviewer was a `bot`, `human`, or `none`
 - **human_comments** — human-authored review + issue comment count (bot comments excluded)
-- **issue** — linked issue from the PR closing keyword, else `none`
+- **issue** — linked in-repo issue from the PR closing keyword (`Closes #NNN`), else `none`
 - **estimate** — linked issue label `estimate:S|M|L|XL`, else `unknown`
 - **rejections_by_reviewer** — count of `*:rejected` label applications during the PR lifecycle
-- **reverted** — `true` once a later `git revert` commit on `main` is associated back to the PR, else `false`
+- **reverted** — `true` once a later trusted `git revert` commit on `main` is associated back to the PR, else `false`
 
 Historical rows before each schema extension keep their older trailing columns.
 
