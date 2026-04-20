@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { ArrowRight24Regular } from '@fluentui/react-icons';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -57,7 +58,7 @@ export function ChatInput({ onSend, disabled, statusBar }: ChatInputProps) {
           aria-label="Send message"
           title="Send"
         >
-          <img src="assets/icons/commands/go.svg" width="16" height="16" alt="" />
+          <ArrowRight24Regular className="chat-send-icon" />
         </button>
       </div>
     </div>
