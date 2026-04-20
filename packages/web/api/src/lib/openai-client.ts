@@ -1,9 +1,10 @@
 /**
  * @module @kickstart/api/lib/openai-client
  *
- * Fetch-based Azure OpenAI client with dual-deployment support:
- * - Chat deployment (e.g. gpt-5.4-mini) — Chat Completions API for non-coding conversation
- * - Generate deployment (e.g. gpt-5.4) — coding/generate flows
+ * Fetch-based Azure OpenAI client with per-path deployment support:
+ * - Chat deployment (KICKSTART_CHAT_MODEL, e.g. gpt-5.4-mini) — Chat Completions API for non-coding conversation
+ * - Inspire deployment (KICKSTART_INSPIRE_MODEL, optional) — inspiration generation, falls back to KICKSTART_CHAT_MODEL
+ * - Generate deployment (KICKSTART_CODEX_MODEL, e.g. gpt-5.4) — coding/generate flows
  */
 
 // ---------------------------------------------------------------------------
@@ -58,6 +59,22 @@ export interface CodexCompletionResult {
 }
 
 // ---------------------------------------------------------------------------
+// Security helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate that a deployment name contains only safe characters before it is
+ * interpolated into a URL path.  Throws if the name contains anything outside
+ * the set [a-zA-Z0-9._-].
+ */
+export function sanitizeDeploymentName(name: string): string {
+  if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
+    throw new Error(`Invalid deployment name: ${name}`);
+  }
+  return name;
+}
+
+// ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
@@ -71,16 +88,13 @@ interface OpenAIConfig {
 function getConfig(): OpenAIConfig {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
-  const fallback = process.env.AZURE_OPENAI_DEPLOYMENT;
 
-  const chatDeployment =
-    process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ?? fallback;
-  const codexDeployment =
-    process.env.AZURE_OPENAI_CODEX_DEPLOYMENT ?? fallback;
+  const chatDeployment = process.env.KICKSTART_CHAT_MODEL;
+  const codexDeployment = process.env.KICKSTART_CODEX_MODEL;
 
   if (!endpoint || !apiKey || (!chatDeployment && !codexDeployment)) {
     throw new Error(
-      "Missing Azure OpenAI configuration. Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and at least one deployment (AZURE_OPENAI_CHAT_DEPLOYMENT, AZURE_OPENAI_CODEX_DEPLOYMENT, or AZURE_OPENAI_DEPLOYMENT as fallback).",
+      "Missing Azure OpenAI configuration. Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and at least one deployment (KICKSTART_CHAT_MODEL or KICKSTART_CODEX_MODEL).",
     );
   }
 
@@ -94,33 +108,24 @@ function getConfig(): OpenAIConfig {
 
 /** Return the non-coding chat deployment name (for UI model indicator). */
 export function getChatDeploymentName(): string {
-  return (
-    process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
-    process.env.AZURE_OPENAI_DEPLOYMENT ??
-    "unknown"
-  );
+  return process.env.KICKSTART_CHAT_MODEL ?? "unknown";
 }
 
 /**
  * Return the deployment name to use for inspiration generation.
- * Falls back: AZURE_OPENAI_INSPIRE_DEPLOYMENT → AZURE_OPENAI_CHAT_DEPLOYMENT → AZURE_OPENAI_DEPLOYMENT
+ * Falls back: KICKSTART_INSPIRE_MODEL → KICKSTART_CHAT_MODEL
  */
 export function getInspireDeploymentName(): string {
   return (
-    process.env.AZURE_OPENAI_INSPIRE_DEPLOYMENT ??
-    process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
-    process.env.AZURE_OPENAI_DEPLOYMENT ??
+    process.env.KICKSTART_INSPIRE_MODEL ??
+    process.env.KICKSTART_CHAT_MODEL ??
     ""
   );
 }
 
 /** Return the coding/generate deployment name used by the app router. */
 export function getGenerateDeploymentName(): string {
-  return (
-    process.env.AZURE_OPENAI_CODEX_DEPLOYMENT ??
-    process.env.AZURE_OPENAI_DEPLOYMENT ??
-    "unknown"
-  );
+  return process.env.KICKSTART_CODEX_MODEL ?? "unknown";
 }
 
 /** Legacy alias for callers that still use codex naming. */
@@ -133,9 +138,8 @@ export function isConfigured(): boolean {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
   const hasDeployment =
-    process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
-    process.env.AZURE_OPENAI_CODEX_DEPLOYMENT ??
-    process.env.AZURE_OPENAI_DEPLOYMENT;
+    process.env.KICKSTART_CHAT_MODEL ??
+    process.env.KICKSTART_CODEX_MODEL;
   return !!(endpoint && apiKey && hasDeployment);
 }
 
@@ -154,9 +158,9 @@ export async function chatCompletion(
   options: ChatCompletionOptions = {},
 ): Promise<ChatCompletionResult> {
   const { endpoint, chatDeployment, apiKey } = getConfig();
-  const deployment = options.deployment || chatDeployment;
+  const deployment = sanitizeDeploymentName(options.deployment || chatDeployment);
   if (!deployment) {
-    throw new Error("No chat deployment configured. Set AZURE_OPENAI_CHAT_DEPLOYMENT or AZURE_OPENAI_DEPLOYMENT.");
+    throw new Error("No chat deployment configured. Set KICKSTART_CHAT_MODEL.");
   }
 
   const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${CHAT_API_VERSION}`;
@@ -274,9 +278,9 @@ export async function* chatCompletionStream(
   options: ChatCompletionOptions = {},
 ): AsyncGenerator<string> {
   const { endpoint, chatDeployment, apiKey } = getConfig();
-  const deployment = options.deployment || chatDeployment;
+  const deployment = sanitizeDeploymentName(options.deployment || chatDeployment);
   if (!deployment) {
-    throw new Error("No chat deployment configured. Set AZURE_OPENAI_CHAT_DEPLOYMENT or AZURE_OPENAI_DEPLOYMENT.");
+    throw new Error("No chat deployment configured. Set KICKSTART_CHAT_MODEL.");
   }
 
   const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${CHAT_API_VERSION}`;
@@ -343,9 +347,9 @@ export async function codexCompletion(
   options: CodexCompletionOptions = {},
 ): Promise<CodexCompletionResult> {
   const { endpoint, codexDeployment, apiKey } = getConfig();
-  const deployment = options.deployment || codexDeployment;
+  const deployment = sanitizeDeploymentName(options.deployment || codexDeployment);
   if (!deployment) {
-    throw new Error("No codex deployment configured. Set AZURE_OPENAI_CODEX_DEPLOYMENT or AZURE_OPENAI_DEPLOYMENT.");
+    throw new Error("No codex deployment configured. Set KICKSTART_CODEX_MODEL.");
   }
 
   const url = `${endpoint}/openai/deployments/${deployment}/responses?api-version=${RESPONSES_API_VERSION}`;
@@ -414,9 +418,9 @@ export async function* codexCompletionStream(
   options: CodexCompletionOptions = {},
 ): AsyncGenerator<string> {
   const { endpoint, codexDeployment, apiKey } = getConfig();
-  const deployment = options.deployment || codexDeployment;
+  const deployment = sanitizeDeploymentName(options.deployment || codexDeployment);
   if (!deployment) {
-    throw new Error("No codex deployment configured. Set AZURE_OPENAI_CODEX_DEPLOYMENT or AZURE_OPENAI_DEPLOYMENT.");
+    throw new Error("No codex deployment configured. Set KICKSTART_CODEX_MODEL.");
   }
 
   const url = `${endpoint}/openai/deployments/${deployment}/responses?api-version=${RESPONSES_API_VERSION}`;

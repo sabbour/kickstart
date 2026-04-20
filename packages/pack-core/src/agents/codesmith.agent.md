@@ -2,7 +2,7 @@
 name: core.codesmith
 description: File generation agent. Reads the plan, generates all requested files, and writes them to the artifact store. Fetches external documentation when needed to ground implementations in current best practices.
 model:
-  envVar: KICKSTART_MODEL
+  envVar: KICKSTART_CODEX_MODEL
 tools:
   - core.fetch_webpage
   - core.read_file

@@ -8,9 +8,9 @@
  * Otherwise, returns a shuffled subset of hardcoded fallback ideas.
  *
  * Environment variables:
- *   AZURE_OPENAI_INSPIRE_DEPLOYMENT — Optional. Dedicated deployment for inspiration
+ *   KICKSTART_INSPIRE_MODEL — Optional. Dedicated deployment for inspiration
  *     generation (e.g., gpt-5.4-nano for fast/cheap calls). Falls back to
- *     AZURE_OPENAI_CHAT_DEPLOYMENT → AZURE_OPENAI_DEPLOYMENT if not set.
+ *     KICKSTART_CHAT_MODEL if not set.
  */
 
 import { app } from "@azure/functions";
@@ -147,7 +147,7 @@ function randomDomainHint(): string {
 function isOpenAIConfigured(): boolean {
   return !!(
     process.env.AZURE_OPENAI_ENDPOINT &&
-    (process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || process.env.AZURE_OPENAI_DEPLOYMENT) &&
+    (process.env.KICKSTART_CHAT_MODEL ?? process.env.KICKSTART_CODEX_MODEL) &&
     process.env.AZURE_OPENAI_API_KEY
   );
 }

@@ -4,7 +4,7 @@ description: >
   Guides the user through GitHub repository selection, CI/CD wiring, and
   pull-request creation for generated AKS deployment artifacts.
 model:
-  envVar: KICKSTART_MODEL
+  envVar: KICKSTART_CHAT_MODEL
 tools:
   - github.api_get
   - core.emit_ui

@@ -2,7 +2,7 @@
 name: core.triage
 description: Entry-point agent. Receives the user's initial request, clarifies requirements, drafts a structured plan, and routes to the codesmith for implementation or reviewer for feedback.
 model:
-  envVar: KICKSTART_MODEL
+  envVar: KICKSTART_CHAT_MODEL
 tools: []
 handoffs:
   - label: Generate files

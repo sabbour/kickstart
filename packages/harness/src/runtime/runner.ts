@@ -14,7 +14,7 @@
 import { randomUUID } from 'node:crypto';
 import { Agent, Runner as SDKRunner, tool, setDefaultModelProvider, OpenAIProvider } from '@openai/agents';
 import type { FunctionTool } from '@openai/agents';
-import type { AgentContribution, ModelRef } from '../types/agent.js';
+import type { AgentContribution } from '../types/agent.js';
 import type { ToolContribution } from '../types/tool.js';
 import type { UserActionContribution } from '../types/user-action.js';
 import type { PackRegistry } from './registry.js';
@@ -22,25 +22,8 @@ import type { Session } from './session.js';
 import type { SSEWriter } from './sse.js';
 import { AgentOutput } from '../types/agent-output.js';
 import { runGuardrails } from './guardrails.js';
+import { resolveModelName } from './model-resolution.js';
 import { z } from 'zod';
-
-// ---------------------------------------------------------------------------
-// Model resolution
-// ---------------------------------------------------------------------------
-
-function resolveModelName(ref: ModelRef): string {
-  if ('envVar' in ref) {
-    const value = process.env[ref.envVar];
-    if (!value) {
-      throw new Error(
-        `Agent model env var "${ref.envVar}" is not set. ` +
-        `Check AZURE_OPENAI_CHAT_DEPLOYMENT or the agent's modelRef config.`,
-      );
-    }
-    return value;
-  }
-  return ref.id;
-}
 
 // ---------------------------------------------------------------------------
 // Build model provider (Azure-aware)

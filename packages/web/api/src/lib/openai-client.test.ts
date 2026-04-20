@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { chatCompletionWithTools } from "./openai-client.js";
+import { chatCompletionWithTools, sanitizeDeploymentName } from "./openai-client.js";
 
 function createJsonResponse(payload: unknown): Response {
   return {
@@ -13,8 +13,8 @@ describe("chatCompletionWithTools", () => {
   beforeEach(() => {
     vi.stubEnv("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com");
     vi.stubEnv("AZURE_OPENAI_API_KEY", "test-key");
-    vi.stubEnv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-5.4-mini");
-    vi.stubEnv("AZURE_OPENAI_CODEX_DEPLOYMENT", "gpt-5.4");
+    vi.stubEnv("KICKSTART_CHAT_MODEL", "gpt-5.4-mini");
+    vi.stubEnv("KICKSTART_CODEX_MODEL", "gpt-5.4");
   });
 
   afterEach(() => {
@@ -107,8 +107,7 @@ describe("chatCompletionWithTools", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toContain("/deployments/gpt-5.4/chat/completions");
     expect(fetchMock.mock.calls[1]?.[0]).toContain("/deployments/gpt-5.4/chat/completions");
 
-    const secondRequestBody = JSON.parse(
-      String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"),
+    const secondRequestBody = JSON.parse(      String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"),
     ) as { messages?: Array<Record<string, unknown>> };
     expect(secondRequestBody.messages).toEqual([
       { role: "user", content: "Generate the next batch" },
@@ -132,5 +131,24 @@ describe("chatCompletionWithTools", () => {
         content: "{\"files\":[\"src/index.ts\"]}",
       },
     ]);
+  });
+});
+
+describe("sanitizeDeploymentName", () => {
+  it("allows valid deployment names", () => {
+    expect(sanitizeDeploymentName("gpt-5.4-mini")).toBe("gpt-5.4-mini");
+    expect(sanitizeDeploymentName("gpt_5")).toBe("gpt_5");
+    expect(sanitizeDeploymentName("my-deployment.v1")).toBe("my-deployment.v1");
+  });
+
+  it("throws on names containing path-traversal characters", () => {
+    expect(() => sanitizeDeploymentName("../evil")).toThrow("Invalid deployment name");
+    expect(() => sanitizeDeploymentName("dep/subpath")).toThrow("Invalid deployment name");
+    expect(() => sanitizeDeploymentName("dep?api-version=bad")).toThrow("Invalid deployment name");
+    expect(() => sanitizeDeploymentName("dep name")).toThrow("Invalid deployment name");
+  });
+
+  it("throws on empty string", () => {
+    expect(() => sanitizeDeploymentName("")).toThrow("Invalid deployment name");
   });
 });

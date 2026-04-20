@@ -2,7 +2,7 @@
 name: aks.architect
 description: AKS Automatic architecture agent. Guides users through cluster design, network topology, identity, and workload placement for AKS Automatic clusters.
 model:
-  envVar: KICKSTART_MODEL
+  envVar: KICKSTART_CHAT_MODEL
 tools:
   - aks.validate_manifests
   - aks.validate_safeguards

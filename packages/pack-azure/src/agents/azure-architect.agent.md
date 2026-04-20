@@ -2,7 +2,7 @@
 name: azure.architect
 description: Azure architecture agent. Guides users through resource design, cost estimation, and infrastructure-as-code authoring. Hands off to azure.ops for deployments.
 model:
-  envVar: KICKSTART_MODEL
+  envVar: KICKSTART_CHAT_MODEL
 tools:
   - azure.arm_get
   - azure.pricing_lookup

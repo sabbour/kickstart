@@ -2,7 +2,7 @@
 name: azure.ops
 description: Azure operations agent. Executes deployments, monitors status, and manages existing resources. Requires an active subscription context.
 model:
-  envVar: KICKSTART_MODEL
+  envVar: KICKSTART_CHAT_MODEL
 tools:
   - azure.arm_get
   - azure.what_if
