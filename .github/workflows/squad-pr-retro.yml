@@ -105,13 +105,13 @@ jobs:
               reviewComments.filter((comment) => comment.body?.trim() && !isBotUser(comment.user)).length +
               issueComments.filter((comment) => comment.body?.trim() && !isBotUser(comment.user)).length;
 
-            const checkRunsResponse = await github.rest.checks.listForRef({
+            const checkRuns = await github.paginate(github.rest.checks.listForRef, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               ref: pr.head.sha,
               per_page: 100,
             });
-            const ciDurationMin = checkRunsResponse.data.check_runs
+            const ciDurationMin = checkRuns
               .filter((run) => run.started_at && run.completed_at)
               .reduce((sum, run) => {
                 const duration = new Date(run.completed_at).getTime() - new Date(run.started_at).getTime();
