@@ -65,8 +65,8 @@ export const githubPackServer: Pack = {
 
   // pack-github keeps agents/skills at the package root (not under src/),
   // matching the live manifest in ./index.ts.
-  agentsDir: resolveAssetURL(import.meta.url, '../agents/', '../pack-assets/github/agents/'),
-  skillsDir: resolveAssetURL(import.meta.url, '../skills/', '../pack-assets/github/skills/'),
+  agentsDir: resolveAssetURL(import.meta.url, '../agents/', './pack-assets/github/agents/'),
+  skillsDir: resolveAssetURL(import.meta.url, '../skills/', './pack-assets/github/skills/'),
 
   tools: [apiGetTool],
 
