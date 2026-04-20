@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-20 | #885 "test: pin colon allowlist ids" | S | impl=0m | review=6m | cycles=1 | merged | @sabbour-squad-tester[bot] | first_review=n/a | ci=5m | reviewer=none | human_comments=0 | issue=#866 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-20 | #883 "docs: document pack-assets bundle layout" | S | impl=1m | review=0m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=n/a | ci=5m | reviewer=none | human_comments=0 | issue=#867 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-20 | #882 "fix: restore playground route" | S | impl=1m | review=3m | cycles=1 | merged | @sabbour-squad-tester[bot] | first_review=n/a | ci=5m | reviewer=none | human_comments=0 | issue=#870 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
