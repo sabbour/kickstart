@@ -21,6 +21,7 @@
 ## How I Work
 
 - Start every review by reading `.squad/decisions.md` for context on what was decided and why.
+- Read `.squad/extensions/kickstart-aks-dev/skills/docs-changelog.md` for docs and changelog requirements.
 - Read the PR diff (not just the files — the actual changes).
 - Check commit messages for clarity and conventional-commit format.
 - Look for what's NOT in the diff: missing tests, missing error handling, missing docs updates.
