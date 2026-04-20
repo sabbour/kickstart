@@ -156,7 +156,7 @@ GH_TOKEN=$TOKEN gh api graphql -f query='
   }'
 ```
 
-> **Fail-closed rule:** Normal agent-authored writes must resolve an explicit app token first. Do not use ambient `gh`/`git` auth in this workflow.
+> **Fail-closed rule:** Agent-authored writes must resolve an explicit app token first. If `resolve-token.mjs --required` fails, stop; do not fall back to ambient `gh` or `git` auth.
 
 > **Board IDs:** The coordinator resolves project/item/field/option IDs before spawning and passes them in the ISSUE CONTEXT block. See spawn prompt additions below.
 
@@ -307,14 +307,17 @@ Ready for re-review."
 ```bash
 # Make changes
 # ⚠️ NEVER use `git add .` or `git add -A` — only stage files you intentionally changed
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
 git add -- {specific files you modified}
 git commit -m "fix: address review feedback"
-git push
+git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
 ```
 
 **Re-request review (GitHub):**
 ```bash
-gh pr ready {pr-number}
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+export GH_TOKEN="$TOKEN"
+GH_TOKEN=$TOKEN gh pr ready {pr-number}
 ```
 
 ### 6. PR Merge
@@ -325,12 +328,16 @@ gh pr ready {pr-number}
 
 **GitHub (merge commit):**
 ```bash
-gh pr merge {pr-number} --merge --delete-branch
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+export GH_TOKEN="$TOKEN"
+GH_TOKEN=$TOKEN gh pr merge {pr-number} --merge --delete-branch
 ```
 
 **GitHub (squash):**
 ```bash
-gh pr merge {pr-number} --squash --delete-branch
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+export GH_TOKEN="$TOKEN"
+GH_TOKEN=$TOKEN gh pr merge {pr-number} --squash --delete-branch
 ```
 
 **Azure DevOps:**
