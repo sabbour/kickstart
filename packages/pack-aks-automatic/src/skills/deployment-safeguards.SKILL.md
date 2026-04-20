@@ -1,6 +1,6 @@
 ---
 name: deployment-safeguards
-description: Deployment safeguards are the built-in Azure Policy assignments enforced by AKS Automatic. Teaches each rule and severity and how to author manifests that satisfy them (single source of truth: safeguards.json).
+description: "Deployment safeguards are the built-in Azure Policy assignments enforced by AKS Automatic. Teaches each rule and severity and how to author manifests that satisfy them (single source of truth: safeguards.json)."
 version: 1.0.0
 author: kickstart-squad
 license: MIT

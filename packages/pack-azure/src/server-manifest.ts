@@ -14,6 +14,7 @@
 
 import { z } from 'zod';
 import type { Pack, ComponentContribution } from '@kickstart/harness';
+import { resolveAssetURL } from '@kickstart/harness/runtime/asset-url';
 
 // Tools (no JSX)
 import { armGetTool } from './tools/arm-get.js';
@@ -68,8 +69,8 @@ export const azurePackServer: Pack = {
   version: '0.1.0',
   dependsOn: ['core'],
 
-  agentsDir: new URL('./agents/', import.meta.url),
-  skillsDir: new URL('./skills/', import.meta.url),
+  agentsDir: resolveAssetURL(import.meta.url, './agents/', './pack-assets/azure/agents/'),
+  skillsDir: resolveAssetURL(import.meta.url, './skills/', './pack-assets/azure/skills/'),
 
   tools: [
     armGetTool,

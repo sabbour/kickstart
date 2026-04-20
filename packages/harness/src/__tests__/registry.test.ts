@@ -85,6 +85,68 @@ Hello world.
     expect(agent.modelInvocable).toBe(true);
   });
 
+  it('accepts model-invocable and userActions aliases in file-backed agents', () => {
+    const agentsDir = fileDir('pack-alias/agents');
+    const filePath = writeFixture('pack-alias/agents/github.publisher.agent.md', `---
+name: github.publisher
+description: Publisher
+model:
+  envVar: KICKSTART_MODEL
+tools:
+  - github.api_get
+userActions:
+  - github:login
+handoffs: []
+user-invocable: false
+model-invocable: true
+---
+
+Publish artifacts.
+`);
+
+    const pack: Pack = {
+      name: 'github',
+      version: '1.0.0',
+      agentsDir,
+    };
+
+    const agent = loadAgentFile(pack, filePath, {
+      tools: new Map([['github.api_get', makeTool('github.api_get')]]),
+      userActions: new Map([['github:login', makeUserAction('github:login')]]),
+    });
+
+    expect(agent.toolAllowlist).toEqual(['github.api_get', 'github:login']);
+    expect(agent.userInvocable).toBe(false);
+    expect(agent.modelInvocable).toBe(true);
+  });
+
+  it('rejects agents that declare both model-invocable variants', () => {
+    const agentsDir = fileDir('pack-conflict/agents');
+    const filePath = writeFixture('pack-conflict/agents/core.conflict.agent.md', `---
+name: core.conflict
+description: Conflict
+model:
+  envVar: KICKSTART_MODEL
+tools: []
+handoffs: []
+user-invocable: false
+model-invocable: true
+disable-model-invocation: false
+---
+
+Nope.
+`);
+
+    const pack: Pack = {
+      name: 'core',
+      version: '1.0.0',
+      agentsDir,
+    };
+
+    expect(() => loadAgentFile(pack, filePath, { tools: new Map(), userActions: new Map() }))
+      .toThrow(/cannot declare both/);
+  });
+
   it('rejects agent frontmatter with missing required fields or unknown keys', () => {
     const agentsDir = fileDir('pack-b/agents');
     const badFile = writeFixture('pack-b/agents/core.bad.agent.md', `---
@@ -159,6 +221,31 @@ Bad.
     expect(skill.id).toBe('aks/gateway-api-mandatory');
     expect(skill.appliesTo).toEqual(['aks.architect', 'core.codesmith']);
     expect(() => loadSkillFile(pack, badFile)).toThrow();
+  });
+
+  it('accepts dotted frontmatter skill ids and normalizes them to pack/id', () => {
+    const skillsDir = fileDir('pack-e/skills');
+    const filePath = writeFixture('pack-e/skills/arm-basics.SKILL.md', `---
+id: azure.arm-basics
+name: ARM Basics
+description: ARM only
+version: 1.0.0
+x-kickstart:
+  appliesTo:
+    - azure.*
+  keywords:
+    - arm
+  priority: 80
+---
+
+Use ARM.
+`);
+
+    const pack: Pack = { name: 'azure', version: '1.0.0', skillsDir };
+    const skill = loadSkillFile(pack, filePath);
+
+    expect(skill.id).toBe('azure/arm-basics');
+    expect(skill.name).toBe('ARM Basics');
   });
 
   it('rejects cross-pack namespace leakage during registration', () => {

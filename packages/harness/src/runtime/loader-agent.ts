@@ -24,10 +24,12 @@ const agentFrontmatterSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
   model: modelRefSchema,
-  tools: z.array(z.string().min(1)),
+  tools: z.array(z.string().min(1)).default([]),
+  userActions: z.array(z.string().min(1)).default([]).optional(),
   handoffs: z.array(handoffSchema).default([]),
   'user-invocable': z.boolean().default(false),
-  'disable-model-invocation': z.boolean().default(false),
+  'model-invocable': z.boolean().optional(),
+  'disable-model-invocation': z.boolean().optional(),
   'x-kickstart': z.object({
     mcpExposed: z.boolean().optional(),
   }).strict().optional(),
@@ -102,15 +104,22 @@ export function loadAgentFile(
   const parsed = agentFrontmatterSchema.parse(attributes);
   validatePathLikeName(parsed.name, 'Agent name');
   assertPackOwnedAgentName(pack, parsed.name);
+  if (parsed['model-invocable'] !== undefined && parsed['disable-model-invocation'] !== undefined) {
+    throw new Error(
+      `Agent ${parsed.name} cannot declare both "model-invocable" and "disable-model-invocation".`,
+    );
+  }
+  const modelInvocable = parsed['model-invocable'] ?? !parsed['disable-model-invocation'];
+  const allowlist = [...parsed.tools, ...(parsed.userActions ?? [])];
 
   return {
     name: parsed.name,
     description: parsed.description,
     model: parsed.model as ModelRef,
-    toolAllowlist: resolveToolAllowlist(pack, parsed.tools, scope),
+    toolAllowlist: resolveToolAllowlist(pack, allowlist, scope),
     handoffs: parsed.handoffs as Handoff[],
     userInvocable: parsed['user-invocable'],
-    modelInvocable: !parsed['disable-model-invocation'],
+    modelInvocable,
     instructionsBase: body,
     outputType: 'AgentOutput',
     ...(parsed['x-kickstart']?.mcpExposed !== undefined ? { mcpExposed: parsed['x-kickstart'].mcpExposed } : {}),

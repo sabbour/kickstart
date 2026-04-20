@@ -14,6 +14,7 @@
 
 import { z } from 'zod';
 import type { Pack, ComponentContribution } from '@kickstart/harness';
+import { resolveAssetURL } from '@kickstart/harness/runtime/asset-url';
 
 // Tools (no JSX)
 import { validateManifestsTool } from './tools/validate-manifests.js';
@@ -54,8 +55,8 @@ export const aksAutomaticPackServer: Pack = {
   version: '0.1.0',
   dependsOn: ['core', 'azure'],
 
-  agentsDir: new URL('./agents/', import.meta.url),
-  skillsDir: new URL('./skills/', import.meta.url),
+  agentsDir: resolveAssetURL(import.meta.url, './agents/', './pack-assets/aks/agents/'),
+  skillsDir: resolveAssetURL(import.meta.url, './skills/', './pack-assets/aks/skills/'),
 
   tools: [
     validateManifestsTool,

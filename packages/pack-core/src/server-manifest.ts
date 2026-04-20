@@ -17,6 +17,7 @@
 import { z } from 'zod';
 import type { Pack } from '@kickstart/harness';
 import type { ComponentContribution } from '@kickstart/harness';
+import { resolveAssetURL } from '@kickstart/harness/runtime/asset-url';
 import { BASIC_COMPONENTS } from './vendor/a2ui/web_core/basic_catalog/components/basic_components.js';
 
 // Tools (no JSX)
@@ -86,8 +87,8 @@ export const corePackServer: Pack = {
   name: 'core',
   version: '0.1.0',
 
-  agentsDir: new URL('./agents/', import.meta.url),
-  skillsDir: new URL('./skills/', import.meta.url),
+  agentsDir: resolveAssetURL(import.meta.url, './agents/', './pack-assets/core/agents/'),
+  skillsDir: resolveAssetURL(import.meta.url, './skills/', './pack-assets/core/skills/'),
 
   tools: [
     emitUiTool,

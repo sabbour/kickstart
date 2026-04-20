@@ -22,7 +22,7 @@ const entryPoints = readdirSync("src/functions")
 
 const RUNTIME_ASSET_MATCHERS = [
   (filePath) => filePath.endsWith(".agent.md"),
-  (filePath) => basename(filePath) === "SKILL.md",
+  (filePath) => filePath.endsWith("SKILL.md"),
 ];
 
 function isRuntimeAsset(filePath) {
@@ -91,14 +91,14 @@ console.log(`✅ Bundled ${entryPoints.length} function(s) to dist/functions/`);
 // After bundling, those URLs resolve relative to dist/, so copy the markdown
 // assets into the exact locations the bundle will read from.
 const bundleAssetCopies = [
-  ["../../pack-core/src/agents", "dist/functions/agents"],
-  ["../../pack-core/src/skills", "dist/functions/skills"],
-  ["../../pack-azure/src/agents", "dist/functions/agents"],
-  ["../../pack-azure/src/skills", "dist/functions/skills"],
-  ["../../pack-aks-automatic/src/agents", "dist/functions/agents"],
-  ["../../pack-aks-automatic/src/skills", "dist/functions/skills"],
-  ["../../pack-github/agents", "dist/agents"],
-  ["../../pack-github/skills", "dist/skills"],
+  ["../../pack-core/src/agents", "dist/functions/pack-assets/core/agents"],
+  ["../../pack-core/src/skills", "dist/functions/pack-assets/core/skills"],
+  ["../../pack-azure/src/agents", "dist/functions/pack-assets/azure/agents"],
+  ["../../pack-azure/src/skills", "dist/functions/pack-assets/azure/skills"],
+  ["../../pack-aks-automatic/src/agents", "dist/functions/pack-assets/aks/agents"],
+  ["../../pack-aks-automatic/src/skills", "dist/functions/pack-assets/aks/skills"],
+  ["../../pack-github/agents", "dist/pack-assets/github/agents"],
+  ["../../pack-github/skills", "dist/pack-assets/github/skills"],
 ];
 
 const seenBundleTargets = new Map();
