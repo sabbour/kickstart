@@ -1,7 +1,7 @@
 name: Squad · Docs & Changeset Gate
 
-# Soft gate: warn (but don't block) when a PR lacks a changeset or docs update.
-# Posts a sticky comment on the PR. Hermes reviews the comment during PR review.
+# Hard gate for user-facing package changes without docs or a changeset.
+# Still posts a sticky comment so reviewers can see why the gate passed or failed.
 
 on:
   pull_request:
@@ -32,14 +32,16 @@ jobs:
               per_page: 100,
             });
             const paths = files.map(f => f.filename);
+            const labels = context.payload.pull_request.labels.map(l => l.name);
 
             const hasChangeset = paths.some(p => p.startsWith('.changeset/') && p.endsWith('.md') && !p.endsWith('README.md'));
             const hasDocsSite = paths.some(p => p.startsWith('docs-site/docs/'));
             const hasApiDocs = paths.some(p => p === 'docs-site/docs/extending/api-endpoints.md');
+            const skipDocs = labels.includes('skip-docs');
 
-            // User-facing signal: touches packages/** src but is not test/config only
+            // User-facing signal: touches packages/*/src/ but is not test-only
             const userFacing = paths.some(p =>
-              /^packages\/(web|pack-|harness)\//.test(p) &&
+              /^packages\/[^/]+\/src\//.test(p) &&
               !p.includes('__tests__') &&
               !p.endsWith('.test.ts') &&
               !p.endsWith('.test.tsx') &&
@@ -49,6 +51,7 @@ jobs:
             core.setOutput('hasChangeset', String(hasChangeset));
             core.setOutput('hasDocsSite', String(hasDocsSite));
             core.setOutput('hasApiDocs', String(hasApiDocs));
+            core.setOutput('skipDocs', String(skipDocs));
             core.setOutput('userFacing', String(userFacing));
 
       - name: Post or update sticky comment
@@ -57,12 +60,16 @@ jobs:
           HAS_CHANGESET: ${{ steps.changed.outputs.hasChangeset }}
           HAS_DOCS_SITE: ${{ steps.changed.outputs.hasDocsSite }}
           HAS_API: ${{ steps.changed.outputs.hasApiDocs }}
+          SKIP_DOCS: ${{ steps.changed.outputs.skipDocs }}
           USER_FACING: ${{ steps.changed.outputs.userFacing }}
         with:
           script: |
             const marker = '<!-- squad-docs-gate -->';
             const userFacing = process.env.USER_FACING === 'true';
             const hasChangeset = process.env.HAS_CHANGESET === 'true';
+            const hasDocsSite = process.env.HAS_DOCS_SITE === 'true';
+            const skipDocs = process.env.SKIP_DOCS === 'true';
+            const needsDocsGate = userFacing && !hasChangeset && !hasDocsSite && !skipDocs;
 
             // ✅ = done, ⚠️ = likely needed, ℹ️ = optional suggestion
             const done = v => v === 'true';
@@ -87,15 +94,21 @@ jobs:
               '',
             ];
 
-            if (userFacing && !hasChangeset) {
-              lines.push('> ⚠️ This PR touches \`packages/\` source but has no changeset. If the change is user-visible, run \`npm run changeset\` before merging. Internal-only changes can skip this.');
+            if (skipDocs) {
+              lines.push('> ℹ️ `skip-docs` label present. Docs/changeset requirement explicitly bypassed for this PR.');
+            } else if (needsDocsGate) {
+              lines.push('> ❌ This PR touches `packages/*/src/` but has neither a changeset nor a `docs-site/docs/` update. Add one of them or apply `skip-docs` before merging.');
+            } else if (userFacing && !hasChangeset && hasDocsSite) {
+              lines.push('> ✅ User-facing package changes are covered by a `docs-site/docs/` update, so a changeset is optional for this gate.');
+            } else if (userFacing && !hasChangeset) {
+              lines.push('> ⚠️ This PR touches `packages/*/src/` but has no changeset. If the change is user-visible, run `npm run changeset` before merging. Internal-only changes can skip this.');
             } else if (!userFacing) {
               lines.push('_No user-facing source changed. Changeset and doc updates are not needed._');
             } else {
               lines.push('_Changeset present. Good._');
             }
 
-            lines.push('', '---', '_Soft gate — does not block merge. ✅ = done, ⚠️ = likely needed, ℹ️ = consider updating._');
+            lines.push('', '---', '_Hard gate for user-facing package changes without docs or changeset. ✅ = done, ⚠️ = likely needed, ℹ️ = optional or bypassed._');
 
             const body = lines.join('\n');
 
@@ -121,3 +134,27 @@ jobs:
                 body,
               });
             }
+
+      - name: Enforce docs or changeset for user-facing code
+        env:
+          HAS_CHANGESET: ${{ steps.changed.outputs.hasChangeset }}
+          HAS_DOCS_SITE: ${{ steps.changed.outputs.hasDocsSite }}
+          SKIP_DOCS: ${{ steps.changed.outputs.skipDocs }}
+          USER_FACING: ${{ steps.changed.outputs.userFacing }}
+        run: |
+          user_facing="${USER_FACING}"
+          has_changeset="${HAS_CHANGESET}"
+          has_docs_site="${HAS_DOCS_SITE}"
+          skip_docs="${SKIP_DOCS}"
+
+          if [[ "$skip_docs" == "true" ]]; then
+            echo "Docs gate bypassed via skip-docs label."
+            exit 0
+          fi
+
+          if [[ "$user_facing" == "true" && "$has_changeset" != "true" && "$has_docs_site" != "true" ]]; then
+            echo "User-facing package changes require a changeset or docs-site/docs update."
+            exit 1
+          fi
+
+          echo "Docs gate passed."

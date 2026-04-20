@@ -85,9 +85,36 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      - name: Detect docs-gate scope
+        id: docs_gate
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const paths = files.map(file => file.filename);
+            const labels = context.payload.pull_request.labels.map(label => label.name);
+
+            const userFacing = paths.some(path =>
+              /^packages\/[^/]+\/src\//.test(path) &&
+              !path.includes('__tests__') &&
+              !path.endsWith('.test.ts') &&
+              !path.endsWith('.test.tsx') &&
+              !path.includes('/e2e/')
+            );
+            const hasDocsSite = paths.some(path => path.startsWith('docs-site/docs/'));
+            const skipDocs = labels.includes('skip-docs');
+            const requireChangeset = userFacing && !hasDocsSite && !skipDocs;
+
+            core.setOutput('requireChangeset', String(requireChangeset));
+
       - name: Changeset status
+        if: steps.docs_gate.outputs.requireChangeset == 'true'
         run: npx changeset status
-        continue-on-error: true
 
   e2e:
     name: Playwright E2E Tests
