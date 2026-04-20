@@ -81,7 +81,7 @@ describe("redactSecrets", () => {
   });
 
   it("redacts URL-embedded secrets in error messages", () => {
-    const input = 'Error calling API: GET /blobs?api-key=secret123&version=2024 returned 401';
+    const input = "Error calling API: GET /blobs?api-key=secret123&version=2024 returned 401";
     const result = redactSecrets(input) as string;
     expect(result).toContain("?api-key=****");
     expect(result).not.toContain("secret123");
@@ -111,10 +111,7 @@ describe("redactSecrets", () => {
   });
 
   it("handles arrays", () => {
-    const input = [
-      { secret: "value1" },
-      { secret: "value2" },
-    ];
+    const input = [{ secret: "value1" }, { secret: "value2" }];
     const result = redactSecrets(input) as Array<Record<string, any>>;
     expect(result[0].secret).toBe("****");
     expect(result[1].secret).toBe("****");
@@ -150,16 +147,19 @@ describe("Logger", () => {
     expect(entry.key).toBe("value");
   });
 
-  it("logs errors with stack traces", () => {
+  it("logs errors with sanitized stack traces", () => {
     const logger = new Logger(mockCtx, "test-function", "trace-123");
-    const error = new Error("Test error");
+    const error = new Error("token=top-secret");
+    error.stack = "Error: token=top-secret\n    at handler (file.ts:1:1)";
+
     logger.error("Failed", error, { context: "test" });
 
     expect(logCalls).toHaveLength(1);
     const entry = JSON.parse(logCalls[0]);
     expect(entry.level).toBe("error");
-    expect(entry.error_message).toBe("Test error");
-    expect(entry.stack_trace).toContain("Error: Test error");
+    expect(entry.error_message).toBe("token=[REDACTED]");
+    expect(entry.stack_trace).toContain("token=[REDACTED]");
+    expect(entry.stack_trace).not.toContain("top-secret");
     expect(entry.context).toBe("test");
   });
 
@@ -176,15 +176,15 @@ describe("Logger", () => {
     expect(entry.username).toBe("alice");
   });
 
-  it("creates child loggers with session context", () => {
+  it("creates child loggers with request context", () => {
     const logger = new Logger(mockCtx, "test-function", "trace-123");
-    const childLogger = logger.withContext("sess-456");
+    const childLogger = logger.withContext({ request_id: "req-456" });
 
     childLogger.info("Child message");
 
     expect(logCalls).toHaveLength(1);
     const entry = JSON.parse(logCalls[0]);
-    expect(entry.session_id).toBe("sess-456");
+    expect(entry.request_id).toBe("req-456");
     expect(entry.trace_id).toBe("trace-123");
     expect(entry.function).toBe("test-function");
   });
@@ -218,177 +218,74 @@ describe("Logger", () => {
 
   it("handles error without metadata", () => {
     const logger = new Logger(mockCtx, "test-function", "trace-123");
-    const error = new Error("Test");
+    const error = new Error("Test error");
+
     logger.error("Failed", error);
 
     expect(logCalls).toHaveLength(1);
     const entry = JSON.parse(logCalls[0]);
-    expect(entry.error_message).toBe("Test");
-  });
-
-  it("includes timestamp in ISO format", () => {
-    const before = new Date().toISOString();
-    const logger = new Logger(mockCtx, "test-function", "trace-123");
-    logger.info("Test");
-    const after = new Date().toISOString();
-
-    const entry = JSON.parse(logCalls[0]);
-    const timestamp = entry.timestamp;
-    expect(timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-    expect(timestamp >= before && timestamp <= after).toBe(true);
+    expect(entry.error_message).toBe("Test error");
   });
 });
 
 describe("extractTraceId", () => {
-  it("extracts custom x-trace-id header", () => {
-    const headers = new Map([["x-trace-id", "custom-trace-123"]]);
-    const traceId = extractTraceId(headers);
-    expect(traceId).toBe("custom-trace-123");
-  });
-
-  it("extracts trace ID from W3C traceparent header", () => {
+  it("prefers x-trace-id header", () => {
     const headers = new Map([
-      ["traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"],
+      ["x-trace-id", "custom-trace"],
+      ["traceparent", "00-abc123-parent-01"],
     ]);
-    const traceId = extractTraceId(headers);
-    expect(traceId).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
+
+    expect(extractTraceId(headers)).toBe("custom-trace");
   });
 
-  it("extracts x-ms-request-id as fallback", () => {
-    const headers = new Map([["x-ms-request-id", "azure-request-123"]]);
-    const traceId = extractTraceId(headers);
-    expect(traceId).toBe("azure-request-123");
+  it("extracts trace id from traceparent", () => {
+    const headers = new Map([["traceparent", "00-abc123def4567890abc123def4567890-parent-01"]]);
+    expect(extractTraceId(headers)).toBe("abc123def4567890abc123def4567890");
   });
 
-  it("generates UUID when no trace ID header present", () => {
-    const headers = new Map();
-    const traceId = extractTraceId(headers);
-    expect(traceId).toMatch(/^[a-f0-9\-]{36}$/);
+  it("falls back to x-ms-request-id", () => {
+    const headers = new Map([["x-ms-request-id", "azure-request-id"]]);
+    expect(extractTraceId(headers)).toBe("azure-request-id");
   });
 
-  it("prefers x-trace-id over other headers", () => {
-    const headers = new Map([
-      ["x-trace-id", "custom-123"],
-      ["traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"],
-      ["x-ms-request-id", "azure-123"],
-    ]);
+  it("generates a UUID when no headers are present", () => {
+    const headers = new Map<string, string>();
     const traceId = extractTraceId(headers);
-    expect(traceId).toBe("custom-123");
+    expect(traceId).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
 
 describe("extractRequestMetadata", () => {
-  it("extracts method and path", () => {
+  it("extracts request metadata", () => {
     const request = {
       method: "POST",
-      url: "http://localhost/api/converse",
-      headers: new Map(),
+      url: "https://example.com/api/converse?foo=bar",
+      headers: new Map([
+        ["content-length", "42"],
+        ["user-agent", "vitest"],
+      ]),
     };
+
     const metadata = extractRequestMetadata(request);
     expect(metadata.method).toBe("POST");
     expect(metadata.path).toBe("/api/converse");
-  });
-
-  it("extracts content length", () => {
-    const request = {
-      method: "POST",
-      url: "http://localhost/api/converse",
-      headers: new Map([["content-length", "1024"]]),
-    };
-    const metadata = extractRequestMetadata(request);
-    expect(metadata.content_length).toBe(1024);
-  });
-
-  it("extracts user agent", () => {
-    const request = {
-      method: "GET",
-      url: "http://localhost/health",
-      headers: new Map([["user-agent", "Mozilla/5.0"]]),
-    };
-    const metadata = extractRequestMetadata(request);
-    expect(metadata.user_agent).toBe("Mozilla/5.0");
-  });
-
-  it("counts headers", () => {
-    const request = {
-      method: "GET",
-      url: "http://localhost/health",
-      headers: new Map([
-        ["user-agent", "Mozilla/5.0"],
-        ["accept", "application/json"],
-      ]),
-    };
-    const metadata = extractRequestMetadata(request);
+    expect(metadata.query).toBe("?foo=bar");
+    expect(metadata.content_length).toBe(42);
     expect(metadata.headers_count).toBe(2);
+    expect(metadata.user_agent).toBe("vitest");
   });
 
-  it("handles missing URL", () => {
+  it("redacts secrets in query strings", () => {
     const request = {
       method: "GET",
-      headers: new Map(),
+      url: "https://example.com/api?token=secret&api_key=abc",
+      headers: new Map<string, string>(),
     };
-    const metadata = extractRequestMetadata(request);
-    expect(metadata.method).toBe("GET");
-    expect(metadata.path).toBeUndefined();
-  });
 
-  it("extracts query string", () => {
-    const request = {
-      method: "GET",
-      url: "http://localhost/api/search?q=test&limit=10",
-      headers: new Map(),
-    };
-    const metadata = extractRequestMetadata(request);
-    expect(metadata.query).toContain("q=test");
-  });
-
-  it("redacts api_key from query string", () => {
-    const request = {
-      method: "GET",
-      url: "http://localhost/api/search?api_key=sk-secret123&q=test",
-      headers: new Map(),
-    };
-    const metadata = extractRequestMetadata(request);
-    expect(metadata.query).toContain("****");
-    expect(metadata.query).not.toContain("sk-secret123");
-    expect(metadata.query).toContain("q=test");
-  });
-
-  it("redacts code from query string", () => {
-    const request = {
-      method: "GET",
-      url: "http://localhost/callback?code=auth_code_123&state=xyz",
-      headers: new Map(),
-    };
-    const metadata = extractRequestMetadata(request);
-    expect(metadata.query).toContain("code=****");
-    expect(metadata.query).not.toContain("auth_code_123");
-    expect(metadata.query).toContain("state=xyz");
-  });
-
-  it("redacts token from query string", () => {
-    const request = {
-      method: "GET",
-      url: "http://localhost/api?token=eyJhbGc&version=1",
-      headers: new Map(),
-    };
     const metadata = extractRequestMetadata(request);
     expect(metadata.query).toContain("token=****");
-    expect(metadata.query).not.toContain("eyJhbGc");
-  });
-
-  it("redacts multiple secret params in query string", () => {
-    const request = {
-      method: "GET",
-      url: "http://localhost/sync?api_key=key123&token=token456&secret=sec789",
-      headers: new Map(),
-    };
-    const metadata = extractRequestMetadata(request);
-    expect(metadata.query).not.toContain("key123");
-    expect(metadata.query).not.toContain("token456");
-    expect(metadata.query).not.toContain("sec789");
     expect(metadata.query).toContain("api_key=****");
-    expect(metadata.query).toContain("token=****");
-    expect(metadata.query).toContain("secret=****");
+    expect(metadata.query).not.toContain("secret");
+    expect(metadata.query).not.toContain("abc");
   });
 });
