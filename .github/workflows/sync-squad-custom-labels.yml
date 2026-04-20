@@ -5,7 +5,8 @@
 # workflow lives alongside it and syncs labels that are NOT in the
 # upstream list (review gates, pulse/retro labels, release PRs, etc.).
 #
-# Same trigger and upsert pattern as sync-squad-labels.yml.
+# Same upsert pattern as sync-squad-labels.yml, but it also re-runs when this
+# workflow changes so new custom labels roll out on merge.
 
 name: Sync Squad Custom Labels
 
@@ -14,6 +15,7 @@ on:
     paths:
       - '.squad/team.md'
       - '.ai-team/team.md'
+      - '.github/workflows/sync-squad-custom-labels.yml'
   workflow_dispatch:
 
 permissions:

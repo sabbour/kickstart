@@ -28,6 +28,10 @@ jobs:
             const XL_THRESHOLD = 1000;
             const APPROVAL_LABELS = ['leela:approved', 'zapp:approved'];
             const REVIEW_GATE_CONTEXT = 'squad/review-gate';
+            const SENSITIVE_PATH_PATTERNS = [
+              /^\.github\/workflows\//i,
+              /(^|[\/._-])(auth|guardrail|guardrails|security)([\/._-]|$)/i,
+            ];
             const TRUSTED_CI_WORKFLOW = '.github/workflows/ci.yml';
             const TRUSTED_REVIEW_WORKFLOW = '.github/workflows/squad-review-gate.yml';
 
@@ -75,13 +79,35 @@ jobs:
               return /security|cve-\d{4}-\d+|ghsa-|vuln|vulnerability/i.test(securitySignals);
             }
 
-            function getRequiredApprovals(pr, labels) {
+            function isSensitivePath(filename) {
+              return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(filename));
+            }
+
+            function getZappRequirementReason(pr, labels, changedFiles) {
+              if (!labels.has(LOW_RISK_LABEL)) {
+                return 'standard review path';
+              }
+
+              if (isSecurityPatch(pr, labels)) {
+                return 'security-sensitive title/body/branch/label signal';
+              }
+
+              const sensitiveFiles = changedFiles.filter(isSensitivePath);
+              if (sensitiveFiles.length > 0) {
+                const preview = sensitiveFiles.slice(0, 3).map((file) => `\`${file}\``).join(', ');
+                return `sensitive paths touched (${preview}${sensitiveFiles.length > 3 ? ', …' : ''})`;
+              }
+
+              return null;
+            }
+
+            function getRequiredApprovals(pr, labels, changedFiles) {
               if (!labels.has(LOW_RISK_LABEL)) {
                 return [...APPROVAL_LABELS];
               }
 
               const required = ['leela:approved'];
-              if (isSecurityPatch(pr, labels)) {
+              if (getZappRequirementReason(pr, labels, changedFiles)) {
                 required.push('zapp:approved');
               }
               return required;
@@ -94,6 +120,16 @@ jobs:
                 issue_number: prNumber,
                 per_page: 100,
               });
+            }
+
+            async function listChangedFiles(prNumber) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                per_page: 100,
+              });
+              return files.map((file) => file.filename);
             }
 
             async function upsertAuditComment(prNumber, body, createIfMissing = true) {
@@ -257,6 +293,8 @@ jobs:
             }
 
             const labels = new Set(pr.labels.nodes.map((label) => label.name));
+            const changedFiles = await listChangedFiles(pr.number);
+            const zappRequirementReason = getZappRequirementReason(pr, labels, changedFiles);
             const removedLabels = await clearApprovalLabels(pr, labels);
             if (removedLabels.length > 0) {
               await disableAutoMerge(
@@ -290,7 +328,7 @@ jobs:
               blockers.push('PR title is marked refactor');
             }
 
-            const requiredApprovals = getRequiredApprovals(pr, labels);
+            const requiredApprovals = getRequiredApprovals(pr, labels, changedFiles);
             const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
             if (missingApprovals.length > 0) {
               blockers.push(`missing fresh approval labels: ${missingApprovals.join(', ')}`);
@@ -385,7 +423,7 @@ jobs:
                 '🤖 Auto-merge armed.',
                 '',
                 labels.has(LOW_RISK_LABEL)
-                  ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head`
+                  ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}`
                   : '- fresh `leela:approved` + `zapp:approved` labels are present on the current head',
                 '- trusted merge signals are green: `CI Gate` from workflow `CI` and `squad/review-gate` from `Squad Review Gate`',
                 '- PR is not XL and title is not marked `refactor`',

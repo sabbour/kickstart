@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
   statuses: write
 
 jobs:
@@ -15,20 +16,46 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
+            const LOW_RISK_LABEL = 'squad:chore-auto';
+            const SENSITIVE_PATH_PATTERNS = [
+              /^\.github\/workflows\//i,
+              /(^|[\/._-])(auth|guardrail|guardrails|security)([\/._-]|$)/i,
+            ];
+
+            function isSecurityPatch(pr, labels) {
+              const securitySignals = [
+                pr.title,
+                pr.body,
+                pr.head?.ref,
+                ...labels,
+              ].filter(Boolean).join(' ');
+              return /security|cve-\d{4}-\d+|ghsa-|vuln|vulnerability/i.test(securitySignals);
+            }
+
+            function isSensitivePath(filename) {
+              return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(filename));
+            }
+
+            async function listChangedFiles(prNumber) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                per_page: 100,
+              });
+              return files.map((file) => file.filename);
+            }
+
             const pr = context.payload.pull_request;
             const labels = new Set(pr.labels.map((label) => label.name));
+            const changedFiles = await listChangedFiles(pr.number);
             const leelaApproved = labels.has('leela:approved');
             const zappApproved = labels.has('zapp:approved');
-            const isLowRisk = labels.has('squad:chore-auto');
-            const securitySignals = [
-              pr.title,
-              pr.body,
-              pr.head?.ref,
-              ...labels,
-            ].filter(Boolean).join(' ');
-            const isSecurityPatch = /security|cve-\d{4}-\d+|ghsa-|vuln|vulnerability/i.test(securitySignals);
+            const isLowRisk = labels.has(LOW_RISK_LABEL);
+            const touchesSensitivePaths = changedFiles.some(isSensitivePath);
+            const hasSecuritySignals = isSecurityPatch(pr, labels);
 
-            const requiresZapp = !isLowRisk || isSecurityPatch;
+            const requiresZapp = !isLowRisk || hasSecuritySignals || touchesSensitivePaths;
             const requiredApprovals = ['leela:approved'];
             if (requiresZapp) {
               requiredApprovals.push('zapp:approved');
