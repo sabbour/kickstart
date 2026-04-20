@@ -21,6 +21,7 @@ These run via GitHub Actions on schedule or events. Documented here for referenc
 | Per-PR Micro-Retro | PR closed | `.github/workflows/squad-pr-retro.yml` | Scribe | `.squad/retro-log.md` + PR comment |
 | Daily Pulse | cron `0 0 * * *` (17:00 PT) | `.github/workflows/squad-daily-pulse.yml` | Scribe | rolling issue `📊 Daily Pulse (rolling)` |
 | Weekly Pulse | cron `0 0 * * 2` (Mon 17:00 PT) | `.github/workflows/squad-weekly-pulse.yml` | Scribe | new issue `Weekly Pulse · YYYY-MM-DD` |
+| Monthly Docs Sweep | cron `0 0 2 * *` (~1st day 17:00 PT) | `.github/workflows/squad-monthly-docs-sweep.yml` | Scribe | rolling issue `📚 Docs Sweep (rolling)` |
 | Release Cadence | cron `0 0 * * *` (17:00 PT) | `.github/workflows/squad-release-cadence.yml` | Leela + Scribe | draft PR on `release/cadence` branch |
 
 All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
@@ -166,7 +167,7 @@ This protocol applies to all agents (squad members AND @copilot). It is enforced
 4. Charter relevance: role boundaries and owned artifacts still match current workflows
 5. Skill accuracy: workflow-facing skills still match the real repo layout and ceremony gates
 
-**Output:** Scribe records findings in the current pulse issue or opens focused `process` issues when drift needs follow-up work.
+**Output:** Scribe records findings in the rolling `📚 Docs Sweep (rolling)` issue or opens focused `process` issues when drift needs follow-up work.
 
 ---
 
