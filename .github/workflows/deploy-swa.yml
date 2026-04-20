@@ -55,6 +55,7 @@ jobs:
           api_location: "packages/web/api"
           output_location: ""
           skip_app_build: true
+          skip_api_build: true
 
       - name: Resolve production smoke target
         id: production_url
