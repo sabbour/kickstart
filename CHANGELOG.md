@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## [1.0.2] - 2026-04-20
+
+### Fixed
+
+- **Package scope clarity:** Renamed package scope from `@kickstart` to `@aks-kickstart` to resolve npm registry resolution errors during Azure SWA deployment. Workspace packages are no longer confused with public npm packages.
+
 ## [1.0.1] - 2026-04-20
 
 ### Fixed

@@ -1,7 +1,7 @@
 {
   "name": "kickstart",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "AI-guided onboarding for deploying apps to AKS",
   "license": "MIT",
   "workspaces": [
