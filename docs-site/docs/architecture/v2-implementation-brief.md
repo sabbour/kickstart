@@ -1051,7 +1051,7 @@ export function resolveAssetURL(metaUrl: string, sourceRelative: string, bundled
 }
 ```
 
-The API build copies every `.agent.md` and `SKILL.md` file into pack-scoped bundle folders, but the current output is not fully uniform:
+The API build copies every `.agent.md` and `SKILL.md` file into pack-scoped bundle folders under `dist/functions/pack-assets/`, even when a pack's authoring-time markdown lives outside `src/`:
 
 ```text
 dist/
@@ -1066,15 +1066,14 @@ dist/
       aks/
         agents/
         skills/
-  pack-assets/
-    github/
-      agents/
-      skills/
+      github/
+        agents/
+        skills/
 ```
 
-Core, Azure, and AKS server manifests resolve `./pack-assets/{pack}/...` from files emitted under `dist/functions/`, so their markdown lands under `dist/functions/pack-assets/...`. `pack-github` emits `dist/server-manifest.js`, resolves `../pack-assets/github/...`, and therefore reads from `dist/pack-assets/github/...` instead.
+Core, Azure, AKS, and GitHub server manifests all resolve `./pack-assets/{pack}/...` from files emitted under `dist/functions/`, so their markdown lands under `dist/functions/pack-assets/...`. `pack-github` still reads source markdown from its package-root `agents/` and `skills/` folders during local development, but its bundled fallback now matches the same Functions-relative layout as every other pack.
 
-The `{pack}` segment is still required. Different packs can reuse filenames like `SKILL.md` or `triage.agent.md`, so pack scoping prevents cross-pack collisions during the copy step even though the parent bundle directory differs today.
+The `{pack}` segment is still required. Different packs can reuse filenames like `SKILL.md` or `triage.agent.md`, so pack scoping prevents cross-pack collisions during the copy step.
 
 ---
 
