@@ -107,9 +107,7 @@ jobs:
             echo "No retro-log changes to commit (duplicate event?)"
             exit 0
           fi
-          git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]
-
-Working as Scribe — see .squad/agents/scribe/charter.md"
+          git commit -m "chore(retro-log): #${{ steps.metrics.outputs.pr }} [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
           git push
 
       - name: Mirror line as PR comment

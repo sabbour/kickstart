@@ -26,11 +26,6 @@ export async function apiFetch(url: string, init?: RequestInit, debugMode?: bool
   const res = await fetch(url, { ...init, headers, redirect: 'manual' });
 
   if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
-    // Kick off the login redirect so every caller gets the same behavior.
-    // Guarded for non-browser environments (tests).
-    if (typeof window !== 'undefined' && window.location) {
-      window.location.href = '/.auth/login/aad?post_login_redirect_uri=/';
-    }
     throw new SessionExpiredError();
   }
 
