@@ -267,7 +267,6 @@ jobs:
                                   conclusion
                                   startedAt
                                   completedAt
-                                  workflowName
                                 }
                               }
                             }
@@ -362,10 +361,10 @@ jobs:
             }
 
             const rawCheckRuns = pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts?.nodes ?? [];
-            const checkRuns = [...dedupeBy(rawCheckRuns.filter((node) => node?.__typename === 'CheckRun'), (node) => `${node.workflowName ?? 'unknown'}:${node.name}`).values()];
-            const ciGate = checkRuns.find((node) => node.name === 'CI Gate' && node.workflowName === 'CI');
+            const checkRuns = [...dedupeBy(rawCheckRuns.filter((node) => node?.__typename === 'CheckRun'), (node) => node.name).values()];
+            const ciGate = checkRuns.find((node) => node.name === 'CI Gate');
             if (!isSuccessfulCheckRun(ciGate)) {
-              core.info(`PR #${pr.number} does not yet have a green CI Gate check from workflow CI.`);
+              core.info(`PR #${pr.number} does not yet have a green CI Gate check.`);
               return;
             }
 
