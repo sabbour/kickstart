@@ -16,11 +16,11 @@
     "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
   },
   "dependencies": {
-    "@kickstart/harness": "*",
-    "@kickstart/pack-core": "*",
-    "@kickstart/pack-azure": "*",
-    "@kickstart/pack-aks-automatic": "*",
-    "@kickstart/pack-github": "*",
+    "@kickstart/harness": "file:../harness",
+    "@kickstart/pack-core": "file:../pack-core",
+    "@kickstart/pack-azure": "file:../pack-azure",
+    "@kickstart/pack-aks-automatic": "file:../pack-aks-automatic",
+    "@kickstart/pack-github": "file:../pack-github",
     "@modelcontextprotocol/sdk": "^1.12.1"
   },
   "devDependencies": {
