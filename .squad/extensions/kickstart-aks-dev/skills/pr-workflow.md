@@ -19,9 +19,10 @@ Move the project board status to **In progress**.
 
 ### 2. Post a Design Proposal (DP)
 
-Before writing code, post a DP comment on the issue with:
+Before writing code, confirm the issue carries exactly one `estimate:S`, `estimate:M`, `estimate:L`, or `estimate:XL` label, then post a DP comment on the issue with:
 
 - Problem statement (reference the issue body)
+- `Estimate: <S/M/L/XL>` (required; must match the issue label. Calibration: S≈2h/1 point, M≈8h/3 points, L≈24h/8 points, XL≈80h/20 points)
 - Proposed approach (reference the relevant section of `docs-site/docs/architecture/v2-implementation-brief.md`)
 - Files to modify or create
 - Pack boundaries affected (which pack owns which change)
@@ -30,7 +31,7 @@ Before writing code, post a DP comment on the issue with:
 - Docs and changeset plan
 - Alternatives considered
 
-Wait for **Leela** (architecture) and **Zapp** (security) to approve the DP. Do not start coding before.
+Wait for **Leela** (architecture) and **Zapp** (security) to approve the DP. Do not start coding before. Leela rejects a DP that is missing `Estimate:` or does not match the issue's `estimate:*` label.
 
 ### 3. Create a worktree (required)
 

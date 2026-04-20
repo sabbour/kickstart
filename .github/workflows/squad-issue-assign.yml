@@ -28,6 +28,10 @@ jobs:
             const issueLabels = (issue.labels || []).map((entry) =>
               typeof entry === 'string' ? entry : entry.name
             );
+            const NON_IMPLEMENTATION_LABELS = ['pulse:daily', 'pulse:weekly', 'docs:sweep'];
+            const isImplementationIssue = !issueLabels.some((name) =>
+              NON_IMPLEMENTATION_LABELS.includes(name)
+            );
             const hasEstimate = issueLabels.some((name) => name?.startsWith('estimate:'));
 
             // Extract member name from label (e.g., "squad:ripley" → "ripley")
@@ -110,7 +114,8 @@ jobs:
               ].join('\n');
             }
 
-            if (!hasEstimate) {
+            // Scheduled pulse/docs-sweep artifacts are coordination issues, not implementation work.
+            if (isImplementationIssue && !hasEstimate) {
               comment += [
                 '',
                 `⚠️ **Estimate missing**`,
