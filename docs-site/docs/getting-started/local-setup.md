@@ -36,13 +36,18 @@ Create `packages/web/api/local.settings.json`:
   "Values": {
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "AzureWebJobsStorage": "",
-    "AZURE_OPENAI_ENDPOINT": "https://your-resource.openai.azure.com/",
+    "AZURE_OPENAI_ENDPOINT": "https://your-resource.cognitiveservices.azure.com/",
     "AZURE_OPENAI_API_KEY": "your-api-key",
-    "AZURE_OPENAI_CHAT_DEPLOYMENT": "gpt-5.4-mini",
-    "AZURE_OPENAI_CODEX_DEPLOYMENT": "gpt-5.4"
+    "KICKSTART_CHAT_MODEL": "gpt-5.4-mini",
+    "KICKSTART_CODEX_MODEL": "gpt-5.4",
+    "KICKSTART_INSPIRE_MODEL": "gpt-5.4-nano"
   }
 }
 ```
+
+:::note Endpoint format
+For **Azure AI Services** (multi-service) resources, the endpoint uses `.cognitiveservices.azure.com/`. For legacy single-service Azure OpenAI resources, use `.openai.azure.com/`. Check your resource in the Azure Portal under **Keys and Endpoint**.
+:::
 
 :::caution
 Never commit `local.settings.json` files to source control. The repo already ignores them.
