@@ -49,9 +49,10 @@ jobs:
               ? `**${weeksSinceBriefUpdate} week(s)** since brief update (${lastUpdated}) · **${packagesChurn}** commit(s) touching \`packages/\` since then`
               : `Missing \`Last updated:\` field in \`${briefPath}\``;
 
-            const lines = log.split('\n').filter(l => /^- \d{4}-\d{2}-\d{2} \| #\d+/.test(l));
+            const retroEntryPattern = /^(?:-\s*|\|\s*)(\d{4}-\d{2}-\d{2})\s*\|/;
+            const lines = log.split('\n').filter(l => retroEntryPattern.test(l));
             const weekLines = lines.filter(l => {
-              const m = l.match(/^- (\d{4}-\d{2}-\d{2})/);
+              const m = l.match(retroEntryPattern);
               return m && new Date(m[1]).getTime() >= weekStart.getTime();
             });
 
