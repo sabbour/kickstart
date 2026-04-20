@@ -1032,6 +1032,50 @@ export async function initPacks(): Promise<void> {
 
 `register` walks `agentsDir` and `skillsDir`, parses files, resolves tool references in agent frontmatter against registered tools/user-actions (sigil tells which), indexes by name. Throws on unresolved references, name collisions, or circular pack dependencies.
 
+### Bundled markdown asset layout
+
+Agent and skill source folders can vary by pack layout. Most packs keep them under `src/agents/` and `src/skills/`, while `pack-github` keeps them at the package root. Every server manifest therefore calls `resolveAssetURL(import.meta.url, sourceRelative, bundledRelative)` with two paths:
+
+- `sourceRelative` points at the authoring-time folder next to the pack source.
+- `bundledRelative` points at the copied bundle asset folder that matches the emitted manifest location.
+
+`resolveAssetURL()` checks the source-relative path first. If the markdown exists there, the runtime reads directly from source. If not, it falls back to the bundled path:
+
+```ts
+export function resolveAssetURL(metaUrl: string, sourceRelative: string, bundledRelative: string): URL {
+  const sourceUrl = new URL(sourceRelative, metaUrl);
+  if (existsSync(fileURLToPath(sourceUrl))) {
+    return sourceUrl;
+  }
+  return new URL(bundledRelative, metaUrl);
+}
+```
+
+The API build copies every `.agent.md` and `SKILL.md` file into pack-scoped bundle folders, but the current output is not fully uniform:
+
+```text
+dist/
+  functions/
+    pack-assets/
+      core/
+        agents/
+        skills/
+      azure/
+        agents/
+        skills/
+      aks/
+        agents/
+        skills/
+  pack-assets/
+    github/
+      agents/
+      skills/
+```
+
+Core, Azure, and AKS server manifests resolve `./pack-assets/{pack}/...` from files emitted under `dist/functions/`, so their markdown lands under `dist/functions/pack-assets/...`. `pack-github` emits `dist/server-manifest.js`, resolves `../pack-assets/github/...`, and therefore reads from `dist/pack-assets/github/...` instead.
+
+The `{pack}` segment is still required. Different packs can reuse filenames like `SKILL.md` or `triage.agent.md`, so pack scoping prevents cross-pack collisions during the copy step even though the parent bundle directory differs today.
+
 ---
 
 ## 12. Playground
