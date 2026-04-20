@@ -97,11 +97,13 @@ For the full release workflow — cutting releases, tagging, deploying — see *
 
 The canonical documentation lives in **`docs-site/docs/`** and is published to [sabbour.github.io/kickstart](https://sabbour.github.io/kickstart/). This is the single source of truth.
 
-**Do not edit files in `docs/`** — that directory contains redirect stubs only. All documentation updates go to `docs-site/docs/`.
+**Do not edit files in `docs/`** — that directory contains the redirect map only. All documentation updates go to `docs-site/docs/`.
 
 ### Editing docs
 
 - Docs are Markdown files in `docs-site/docs/`
+- The architecture brief lives at `docs-site/docs/architecture/v2-implementation-brief.md`
+- `docs/README.md` is the redirect map for removed legacy `docs/*` paths
 - Run the site locally: `cd docs-site && npm install && npm start`
 - New pages are auto-added to the sidebar based on directory structure and `sidebar_position` frontmatter
 
