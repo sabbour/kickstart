@@ -4,18 +4,11 @@ You are working on a project that uses **Squad**, an AI team framework. When pic
 
 ## Team Context
 
-Before starting work on any issue, PR, comment, or workflow-driven task:
+Before starting work on any issue:
 
 1. Read `.squad/team.md` for the team roster, member roles, and your capability profile.
 2. Read `.squad/routing.md` for work routing rules.
-3. **Adopt the named persona.** The persona is signalled in priority order:
-   1. An explicit instruction in the comment or issue body like `work as Scribe` or `Working as Leela (Lead)`.
-   2. A `squad:{member}` label on the issue or PR.
-   3. The `squad:{member}` label on the parent issue linked from a PR.
-
-   Once the persona is known, read `.squad/agents/{member}/charter.md` and work in that voice. Match their boundaries, model preferences, and style. Do not default to generic Copilot behaviour when a persona is specified.
-4. Read `.squad/ceremonies.md` if the task came from an automated workflow (daily pulse, weekly pulse, release cadence, PR retro) so you understand what artifact the workflow expects.
-5. If no persona is specified **and** the task clearly belongs to one (e.g. release notes → Scribe, architecture review → Leela, security review → Zapp), adopt that persona and state it in your first reply.
+3. If the issue has a `squad:{member}` label, read that member's charter at `.squad/agents/{member}/charter.md` to understand their domain expertise and coding style — work in their voice.
 
 ## Capability Self-Check
 
@@ -36,7 +29,7 @@ squad/{issue-number}-{kebab-case-slug}
 ```
 Example: `squad/42-fix-login-validation`
 
-## Worktrees are mandatory
+## Worktrees
 
 Never run `git checkout -b` in the top-level working tree. Every piece of issue work happens inside its own worktree under `.worktrees/`. This prevents agents from stomping on each other's uncommitted changes, branching off the wrong base, or producing mixed-diff PRs.
 
@@ -64,13 +57,15 @@ When opening a PR:
 
 ## PR Review Feedback — Required Loop
 
-When addressing any review comment (from Copilot, Leela, Zapp, or any reviewer):
+When addressing any review comment (from Copilot, Leela, Zapp, Nibbler, or any reviewer):
 1. Fix the code (or decide not to and explain why)
 2. Reply to the specific comment with what you did: "Addressed in {sha}: {description}"
 3. Resolve the thread via GitHub GraphQL API (resolveReviewThread mutation)
 4. Verify 0 unresolved threads before attempting merge
 
 Never silently fix and move on. A reply is required on every comment.
+
+The full protocol is defined in `.squad/ceremonies.md` under the **PR Review Gate** section.
 
 ## Decisions
 
