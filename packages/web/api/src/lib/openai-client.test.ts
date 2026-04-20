@@ -13,8 +13,8 @@ describe("chatCompletionWithTools", () => {
   beforeEach(() => {
     vi.stubEnv("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com");
     vi.stubEnv("AZURE_OPENAI_API_KEY", "test-key");
-    vi.stubEnv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-5.4-mini");
-    vi.stubEnv("AZURE_OPENAI_CODEX_DEPLOYMENT", "gpt-5.4");
+    vi.stubEnv("KICKSTART_CHAT_MODEL", "gpt-5.4-mini");
+    vi.stubEnv("KICKSTART_CODEX_MODEL", "gpt-5.4");
   });
 
   afterEach(() => {
