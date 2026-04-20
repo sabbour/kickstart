@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-20 | #897 "chore(release): merge v1.0.1 to main for deployment" | XL | impl=191m | review=49m | cycles=1 | merged | @sabbour | first_review=n/a | ci=4m | reviewer=none | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-20 | #898 "chore(release): remove deprecated v* branch pattern from skill & docs" | M | impl=0m | review=33m | cycles=1 | merged | @sabbour | first_review=n/a | ci=5m | reviewer=none | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-20 | #899 "fix(review-gate): preserve lane-safe approvals on synchronize" | S | impl=502m | review=29m | cycles=1 | merged | @sabbour | first_review=n/a | ci=5m | reviewer=none | human_comments=0 | issue=#875 | estimate=S | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
