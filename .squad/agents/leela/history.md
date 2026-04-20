@@ -31,6 +31,7 @@ All open v2 issues should carry milestone **v2**.
 
 ## Learnings
 
+- (2026-04-20T02:48:20.359-07:00) GitHub write hardening wave 1: `sabbour/kickstart` agent-authored writes now document a fail-closed path via `resolve-token.mjs --required`, `GH_TOKEN`, and token-authenticated pushes. Coordinator, lifecycle, and workflow docs should not suggest ambient `gh`, PAT, or account-switching fallbacks for bot writes.
 - (2026-04-17T12:06:45.293Z) Sprint planning always required before backlog pickup when `.squad/identity/now.md` gate is active. Shortest v2 slice is harness spine, not pack work: `#474 → #475 → #476` must land before pack-core batch.
 - (2026-04-17T03:30:17Z) DP #329: runtime duplication is the blocking risk — PoC adds `runtime/` inside `packages/mcp-server` that parallels `packages/web/api/` LLM client + session store. Third fork risk with SDK migration. Implementation issue must define canonical client before code lands.
 - (2026-04-17T03:30:17Z) DP #330 closeout: Option B (hybrid route planner + manager agent) adopted. `phaseComplete`/`filesComplete` flags retired. Implementation sequence locked: Gate → arch spike → backend (#445, Bender) → UI (#446, Fry) → cleanup. Follow-ons #445 and #446 created.
