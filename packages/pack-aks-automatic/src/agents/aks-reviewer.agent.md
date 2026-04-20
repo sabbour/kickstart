@@ -2,7 +2,7 @@
 name: aks.reviewer
 description: AKS manifest reviewer. Reviews manifests for deployment safeguards, Azure Policy compliance, workload identity wiring, and AKS Automatic anti-patterns before deployment.
 model:
-  envVar: KICKSTART_MODEL
+  envVar: KICKSTART_CHAT_MODEL
 tools:
   - aks.validate_manifests
   - aks.validate_safeguards

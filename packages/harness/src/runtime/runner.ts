@@ -30,12 +30,12 @@ import { z } from 'zod';
 
 function resolveModelName(ref: ModelRef): string {
   if ('envVar' in ref) {
-    const value = process.env[ref.envVar];
+    const value =
+      process.env[ref.envVar] ??
+      process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
+      process.env.AZURE_OPENAI_DEPLOYMENT;
     if (!value) {
-      throw new Error(
-        `Agent model env var "${ref.envVar}" is not set. ` +
-        `Check AZURE_OPENAI_CHAT_DEPLOYMENT or the agent's modelRef config.`,
-      );
+      throw new Error('Agent model is not configured. Contact your administrator.');
     }
     return value;
   }

@@ -2,7 +2,7 @@
 name: core.reviewer
 description: Review agent. Reads generated files, validates their correctness and quality, and provides a structured verdict with actionable feedback.
 model:
-  envVar: KICKSTART_MODEL
+  envVar: KICKSTART_CHAT_MODEL
 tools:
   - core.read_file
   - core.list_files

@@ -2,7 +2,7 @@
 name: aks.manifests_author
 description: AKS manifest authoring agent. Produces Kubernetes YAML manifests for AKS Automatic clusters — workloads, Gateway API routes, workload identity wiring, and ACR image references.
 model:
-  envVar: KICKSTART_MODEL
+  envVar: KICKSTART_CODEX_MODEL
 tools:
   - aks.validate_manifests
   - aks.validate_safeguards
