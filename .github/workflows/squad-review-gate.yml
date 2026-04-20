@@ -15,19 +15,75 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
+            const pr = context.payload.pull_request;
             const labels = context.payload.pull_request.labels.map(l => l.name);
             const leelaApproved = labels.includes('leela:approved');
             const zappApproved = labels.includes('zapp:approved');
+            const isVelocityProcess = labels.includes('process:velocity');
+            const isQualityProcess = labels.includes('process:quality');
+
+            let brakeState = 'pass';
+            let brakeReason = '';
+
+            if (isVelocityProcess && !isQualityProcess) {
+              let velocity = '';
+              try {
+                const response = await github.rest.repos.getContent({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  path: '.squad/velocity.md',
+                  ref: pr.base.ref,
+                });
+                if (!('content' in response.data) || response.data.type !== 'file') {
+                  throw new Error('velocity artifact is not a file');
+                }
+                velocity = Buffer.from(response.data.content, 'base64').toString('utf8');
+              } catch (error) {
+                brakeState = 'fail';
+                brakeReason = error.status === 404
+                  ? 'Safety brake: .squad/velocity.md missing'
+                  : 'Safety brake: unable to read velocity report';
+              }
+
+              if (brakeState !== 'fail') {
+                const panelMatch = velocity.match(
+                  /### Quality SLO panel\s*\n([\s\S]*?)(?:\n### |\n## |\n---|$)/
+                );
+                if (!panelMatch) {
+                  brakeState = 'fail';
+                  brakeReason = 'Safety brake: quality SLO panel missing';
+                } else {
+                  const redRows = panelMatch[1]
+                    .split('\n')
+                    .filter((line) => /^\|/.test(line))
+                    .filter((line) => line.includes('🔴'));
+                  if (redRows.length > 0) {
+                    brakeState = 'fail';
+                    brakeReason = 'Safety brake: quality SLO is red';
+                  }
+                }
+              }
+            }
 
             let state, description;
-            if (leelaApproved && zappApproved) {
+            if (brakeState === 'fail') {
+              state = 'failure';
+              description = brakeReason;
+            } else if (leelaApproved && zappApproved) {
               state = 'success';
-              description = 'Squad review gate: Leela ✅ Zapp ✅';
+              description = isQualityProcess
+                ? 'Squad review gate: Leela ✅ Zapp ✅ quality bypass'
+                : 'Squad review gate: Leela ✅ Zapp ✅';
             } else {
               state = 'pending';
               const leelaStatus = leelaApproved ? '✅' : '⏳';
               const zappStatus = zappApproved ? '✅' : '⏳';
-              description = `Squad review gate: Leela ${leelaStatus} Zapp ${zappStatus}`;
+              const brakeStatus = isQualityProcess
+                ? ' brake=bypass'
+                : isVelocityProcess
+                  ? ' brake=armed'
+                  : '';
+              description = `Squad review gate: Leela ${leelaStatus} Zapp ${zappStatus}${brakeStatus}`;
             }
 
             await github.rest.repos.createCommitStatus({

@@ -32,6 +32,8 @@ jobs:
           script: |
             const labels = [
               { name: 'process',           color: '5319E7', description: 'Process improvement tracked by the weekly pulse' },
+              { name: 'process:velocity',  color: '6B8EB5', description: 'Process change targeting delivery speed or throughput' },
+              { name: 'process:quality',   color: '0E8A16', description: 'Process change targeting quality or safety outcomes' },
               { name: 'pulse:daily',       color: 'BFD4F2', description: 'Daily pulse rolling issue' },
               { name: 'pulse:weekly',      color: '6B8EB5', description: 'Weekly pulse issue' },
               { name: 'release',           color: '0E8A16', description: 'Release PR opened by the cadence workflow' },
