@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 This project uses [@changesets/cli](https://github.com/changesets/changesets) for versioning.
 
+## [1.0.0] - 2026-04-20
+
+### Breaking changes
+
+- Kickstart now treats the harness plus packs runtime as the supported product baseline. Remaining v1 compatibility stubs, docs, and extension guidance are no longer part of the shipped surface.
+
+### Added
+
+- `@kickstart/harness` as the shared runtime for sessions, SSE streaming, pack registration, guardrails, and MCP integration.
+- First-party pack composition with `pack-core`, `pack-azure`, `pack-aks-automatic`, and `pack-github`.
+- A retained MCP surface that runs the same harness runtime as the web app.
+- A refreshed public docs set for pack authoring, API endpoints, deployment, and current repository structure.
+
+### Changed
+
+- Public and engineering docs now describe the harness plus packs architecture as the current product, not an in-progress rewrite.
+- Release prep guidance now assumes a curated `v1.0.0` release PR instead of informal v0.x milestone notes.
+- Canonical architecture guidance now points to the harness runtime, pack manifests, and current Azure Functions endpoints.
+
+### Fixed
+
+- Bundled API output now ships pack runtime assets into the dist layout expected at runtime, fixing `/api/converse` failures and `Unknown agent: core.triage` in deployed environments.
+- Server-safe pack manifests and startup registration are now aligned between the web API and MCP server boot paths.
+- The web client now includes the Fluent dark-mode send icon fix, session-expiry redirect handling, and Monaco/Vite 8 compatibility updates.
+- Removed stale references to retired v1 docs, JSON-envelope response handling, and legacy extension guidance across the repo docs and docs site.
+
+### Removed
+
+- Remaining v1 compatibility stubs and legacy docs surfaces that duplicated or contradicted the current docs site.
+
+### Security
+
+- Release documentation now reflects the current guardrail pipeline, browser-mediated user actions, and resume-token validation model instead of older optimistic descriptions.
+
 ## [0.7.0] - 2026-04-15
 
 ### Added
