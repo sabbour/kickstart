@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-20 | #889 "fix: align github pack asset paths with other packs" | S | impl=1m | review=52m | cycles=1 | merged | @sabbour | first_review=n/a | ci=5m | reviewer=none | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-20 | #880 "chore(deps): bump the non-breaking group with 4 updates" | L | impl=0m | review=403m | cycles=1 | merged | @dependabot[bot] | first_review=n/a | ci=5m | reviewer=none | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-20 | #892 "🚨 CRITICAL FIX: Deploy /api/converse 404 resilience fix" | M | impl=0m | review=16m | cycles=1 | merged | @sabbour | first_review=n/a | ci=5m | reviewer=none | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
