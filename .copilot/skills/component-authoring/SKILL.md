@@ -236,9 +236,9 @@ wins over the basic catalog at lookup time.
 
 ---
 
-### 7 — Fat component pattern
+### 7 — Smart component pattern
 
-**Fat components** bundle auth, API calls, validation, and security into a single
+**Smart components** bundle auth, API calls, validation, and security into a single
 self-managing unit. Use this pattern whenever a component must:
 
 - Authenticate a user (Azure MSAL, GitHub OAuth)
