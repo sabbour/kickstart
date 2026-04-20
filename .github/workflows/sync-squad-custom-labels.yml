@@ -1,0 +1,78 @@
+# Custom companion to sync-squad-labels.yml.
+#
+# The upstream sync-squad-labels.yml workflow is overwritten on every
+# `squad upgrade`, which would clobber any locally-added labels. This
+# workflow lives alongside it and syncs labels that are NOT in the
+# upstream list (review gates, pulse/retro labels, release PRs, etc.).
+#
+# Same trigger and upsert pattern as sync-squad-labels.yml.
+
+name: Sync Squad Custom Labels
+
+on:
+  push:
+    paths:
+      - '.squad/team.md'
+      - '.ai-team/team.md'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  sync-custom-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync custom squad labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: 'process',           color: '5319E7', description: 'Process improvement tracked by the weekly pulse' },
+              { name: 'pulse:daily',       color: 'BFD4F2', description: 'Daily pulse rolling issue' },
+              { name: 'pulse:weekly',      color: '6B8EB5', description: 'Weekly pulse issue' },
+              { name: 'release',           color: '0E8A16', description: 'Release PR opened by the cadence workflow' },
+              { name: 'leela:approved',    color: '0E8A16', description: 'Architecture review approved' },
+              { name: 'leela:rejected',    color: 'D93F0B', description: 'Architecture review rejected' },
+              { name: 'zapp:approved',     color: '0E8A16', description: 'Security review approved' },
+              { name: 'zapp:rejected',     color: 'D93F0B', description: 'Security review rejected' },
+              { name: 'nibbler:approved',  color: '0E8A16', description: 'Code quality review approved' },
+              { name: 'nibbler:rejected',  color: 'D93F0B', description: 'Code quality review rejected' },
+              { name: 'retro-log',         color: 'C5DEF5', description: 'Retrospective log entry' }
+            ];
+
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name
+                });
+                await github.rest.issues.updateLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  color: label.color,
+                  description: label.description
+                });
+                core.info(`Updated label: ${label.name}`);
+              } catch (err) {
+                if (err.status === 404) {
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label.name,
+                    color: label.color,
+                    description: label.description
+                  });
+                  core.info(`Created label: ${label.name}`);
+                } else {
+                  throw err;
+                }
+              }
+            }
+
+            core.info(`Custom label sync complete: ${labels.length} labels synced`);

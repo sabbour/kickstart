@@ -9,6 +9,7 @@ How to decide who handles what.
 | Frontend UX | Fry | Web client routes, A2UI rendering, component authoring, SSE client, playground |
 | Backend & runtime | Bender | Harness, non-UI packs, SDK tools, user actions, guardrails, SWA Functions API, Azure infra |
 | Code review | Leela | Review PRs, check architecture alignment, suggest improvements |
+| Code quality gate | Nibbler | PR correctness, readability, bug patterns, error handling, naming |
 | Testing | Hermes | Four test layers: unit, pack conformance, contract, Playwright E2E |
 | Performance & observability | Hermes | Perf budgets on DPs, p95 latency, first-chunk time, token ceilings, cold-start, resource sizing, tracing spans, structured logging |
 | Scope & priorities | Leela | What to build next, trade-offs, decisions |
