@@ -50,22 +50,23 @@ This is the single source of truth. No FSM state slice, no `phaseStatuses` map.
 
 ### Phase Advancement
 
-Phase transitions happen in `converse.ts` when the LLM returns `phaseComplete: true` in its JSON response envelope:
+Phase transitions happen in `converse.ts` when the LLM returns `intent: "advance"` in its structured `AgentOutput`:
 
 ```typescript
-// converse.ts — simplified
-if (llmResponse.phaseComplete) {
-  session.state.currentPhase = advancePhase(session.state.currentPhase);
-}
+// AgentOutput from @openai/agents SDK
+const AgentOutput = z.object({
+  message: z.string(),
+  intent: z.enum(['continue', 'advance', 'revise', 'auto-continue-files']).optional(),
+});
 ```
 
-`advancePhase()` looks up the current phase in `PHASE_DEFINITIONS` and returns `nextPhase`. There is no event system or transition guard — the LLM's signal is the only trigger.
+When `intent: "advance"` is present, `advancePhase()` looks up the current phase in `PHASE_DEFINITIONS` and returns `nextPhase`. There is no event system or transition guard — the LLM's signal is the only trigger.
 
 A2UI actions with `complete:` or `continue:` prefixes (handled in `packages/harness/src/runtime/runner.ts`) can trigger phase transitions from button clicks in the UI. After stripping the `complete:`/`continue:` prefix, if the resulting action name starts with `navigate:` or `nav:`, it is treated as a phase-navigation signal — for example, the full action name is `complete:navigate:design`.
 
 ### How the LLM Navigates Phases
 
-The system prompt includes the current phase identifier and the `description` from its `PhaseDefinition`. The LLM reads this context, determines when the phase goals are met, and signals `phaseComplete: true`. There are no TypeScript-enforced entry or exit conditions — the LLM decides.
+The agent's dynamic instructions include the current phase identifier and the `description` from its `PhaseDefinition`. The LLM reads this context, determines when the phase goals are met, and signals `intent: "advance"` in its `AgentOutput`. There are no TypeScript-enforced entry or exit conditions — the LLM decides.
 
 ### Skill Resolution
 
