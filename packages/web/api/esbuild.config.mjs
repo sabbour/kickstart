@@ -8,7 +8,7 @@
  */
 
 import * as esbuild from "esbuild";
-import { readdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +19,22 @@ const entryPoints = readdirSync("src/functions")
   .filter((f) => f.endsWith(".ts"))
   .filter((f) => !f.endsWith(".test.ts") && !f.endsWith(".spec.ts"))
   .map((f) => join("src/functions", f));
+
+function copyMarkdownTree(sourceDir, targetDir) {
+  for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
+    const sourcePath = join(sourceDir, entry.name);
+    const targetPath = join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      mkdirSync(targetPath, { recursive: true });
+      copyMarkdownTree(sourcePath, targetPath);
+      continue;
+    }
+    if (entry.isFile() && sourcePath.endsWith(".md")) {
+      mkdirSync(dirname(targetPath), { recursive: true });
+      copyFileSync(sourcePath, targetPath);
+    }
+  }
+}
 
 // esbuild's `alias` option does not handle subpath exports like
 // `@kickstart/harness/runtime/sse`. A resolver plugin rewrites both the
@@ -53,3 +69,25 @@ await esbuild.build({
 });
 
 console.log(`✅ Bundled ${entryPoints.length} function(s) to dist/functions/`);
+
+// Pack agent/skill markdown is loaded at runtime from agentsDir/skillsDir URLs.
+// After bundling, those URLs resolve relative to dist/, so copy the markdown
+// assets into the exact locations the bundle will read from.
+const bundleAssetCopies = [
+  ["../../pack-core/src/agents", "dist/functions/agents"],
+  ["../../pack-core/src/skills", "dist/functions/skills"],
+  ["../../pack-azure/src/agents", "dist/functions/agents"],
+  ["../../pack-azure/src/skills", "dist/functions/skills"],
+  ["../../pack-aks-automatic/src/agents", "dist/functions/agents"],
+  ["../../pack-aks-automatic/src/skills", "dist/functions/skills"],
+  ["../../pack-github/agents", "dist/agents"],
+  ["../../pack-github/skills", "dist/skills"],
+];
+
+for (const [sourceRelative, targetRelative] of bundleAssetCopies) {
+  const sourceDir = resolve(__dirname, sourceRelative);
+  if (!statSync(sourceDir).isDirectory()) {
+    throw new Error(`Expected asset directory at ${sourceDir}`);
+  }
+  copyMarkdownTree(sourceDir, resolve(__dirname, targetRelative));
+}
