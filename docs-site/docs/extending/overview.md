@@ -43,6 +43,8 @@ packages/
 - **New HTTP surface?** → [API Endpoints](./api-endpoints.md) covers the Azure Functions v4 pattern with SSE streaming.
 - **IDE integration?** → [MCP Tools](./mcp-tools.md) covers MCP tool authoring for VS Code Copilot and Claude Code.
 
+If you add `.agent.md` or `SKILL.md` files, the API bundle copies them into `pack-assets/{pack}/{agents|skills}/` so bundled Functions can still load them. See the [v2 implementation brief](../architecture/v2-implementation-brief.md#bundled-markdown-asset-layout).
+
 ## Design Principles
 
 **Packs are the unit of extensibility.** A pack is a sealed bundle registered at startup. The harness is domain-agnostic — it does not know about Azure, AKS, GitHub, or any product domain.
