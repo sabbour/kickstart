@@ -41,7 +41,11 @@ import type { AppMode, ChatMessage, A2uiPayloadItem, ConversationPhaseId, SetupG
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
 const mockEnabled = false; // TODO(Step 5): mock mode deleted in Step 1
-const playgroundEnabled = false; // TODO(Step 5): playground auth stub deleted in Step 1
+
+export function getInitialAppMode(locationSearch?: string): AppMode {
+  const search = locationSearch ?? (typeof window !== 'undefined' ? window.location.search : '');
+  return new URLSearchParams(search).has('playground') ? 'playground' : 'landing';
+}
 
 let msgSeq = 0;
 function msgId(role: string) {
@@ -53,7 +57,7 @@ export function App() {
   const { debugEnabled, logAction, clearActionLog } = useDebug();
   const fluentTheme = resolvedTheme === 'dark' ? webDarkTheme : webLightTheme;
 
-  const [mode, setMode] = useState<AppMode>(playgroundEnabled ? 'chat' : 'landing');
+  const [mode, setMode] = useState<AppMode>(() => getInitialAppMode());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(mockEnabled ? true : null);
   const [filePanelOpen, setFilePanelOpen] = useState(true);
@@ -874,7 +878,7 @@ export function App() {
   }, [fileSidebarOpen]);
 
   // Playground mode — standalone A2UI test harness
-  if (playgroundEnabled) {
+  if (mode === 'playground') {
     return (
       <FluentProvider theme={fluentTheme}>
         <ConversationSessionProvider value={sessionContextValue}>
