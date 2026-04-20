@@ -44,7 +44,8 @@ gh auth token --user corpalias_enterprise
 **Important:** do **not** use `gh auth token --user`, ambient `gh`, or personal-account token extraction for normal agent-authored writes in this repo. Squad agent writes must resolve the explicit app token instead:
 
 ```bash
-TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG")
+TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG") || exit 1
+[ -n "$TOKEN" ] || exit 1
 export GH_TOKEN="$TOKEN"
 git push https://x-access-token:${TOKEN}@github.com/$OWNER/$REPO.git "$BRANCH"
 GH_TOKEN=$TOKEN gh pr create ...

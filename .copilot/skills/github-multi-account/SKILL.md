@@ -24,10 +24,11 @@ Ask: "I see you have multiple GitHub accounts: {list them}. Which one is your pe
 
 This skill is for **human-owned** account switching convenience. Do **not** use it to choose identity for normal Squad agent-authored writes in this repo.
 
-Agent-authored writes here must stay fail-closed on the configured app identity:
+Agent-authored writes here must stay fail-closed on the configured app identity; stop the shell if token resolution fails:
 
 ```bash
-TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG")
+TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG") || exit 1
+[ -n "$TOKEN" ] || exit 1
 export GH_TOKEN="$TOKEN"
 ```
 

@@ -341,7 +341,7 @@ prompt: |
   {% endif %}
 
   {only if identity configured:}
-  GIT IDENTITY: Commit as `{app_slug}[bot]`. Resolve the token with `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")` and export `GH_TOKEN="$TOKEN"`. Agent-authored GitHub writes must use that app token; do not fall back to ambient `gh`/`git` auth. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
+  GIT IDENTITY: Commit as `{app_slug}[bot]`. Resolve the token with `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1`, verify `[ -n "$TOKEN" ] || exit 1`, and export `GH_TOKEN="$TOKEN"`. Agent-authored GitHub writes must use that app token; do not fall back to ambient `gh`/`git` auth. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
   {end identity block}
 
   TASK: {specific task description}
@@ -843,7 +843,8 @@ prompt: |
   
   **Resolve token at runtime (fail closed for writes):**
   ```bash
-  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}")
+  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+  [ -n "$TOKEN" ] || exit 1
   export GH_TOKEN="$TOKEN"
   ```
   `resolve-token.mjs` only uses explicit config keys or explicit alias mappings; it does **not** guess another app. `--required` prints a reason to stderr and exits non-zero when write auth is not explicitly configured.

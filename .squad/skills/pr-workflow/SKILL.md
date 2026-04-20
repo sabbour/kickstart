@@ -20,15 +20,16 @@
 
 ## GitHub Write Identity
 
-For agent-authored GitHub writes in this repo, do **not** rely on ambient `gh` auth. Resolve the explicit app token once per shell and reuse it for every write command:
+For agent-authored GitHub writes in this repo, do **not** rely on ambient `gh` auth. Resolve the explicit app token once per shell, stop immediately if resolution fails, and reuse it for every write command:
 
 ```bash
-TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG")
+TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG") || exit 1
+[ -n "$TOKEN" ] || exit 1
 export GH_TOKEN="$TOKEN"
 ```
 
 - `TEAM_ROOT` and `ROLE_SLUG` come from the coordinator prompt.
-- `--required` fails closed and prints the reason when the role/app mapping is missing or broken.
+- `--required` must be paired with `|| exit 1` (plus `[ -n "$TOKEN" ] || exit 1`) so the shell also fails closed when token resolution breaks.
 - Read-only `gh` commands can still use normal auth, but issue/PR comments, edits, GraphQL mutations, pushes, and PR creation must use `GH_TOKEN=$TOKEN` or token-authenticated HTTPS.
 
 ---
