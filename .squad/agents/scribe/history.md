@@ -63,3 +63,19 @@ Ready for QA handoff.
 ## 2026-04-17 Wave 3 — Inbox merge
 
 Merged 11 new decision files from worktree inboxes (mcp-apps-concept-smoke, docs-rewrite, leela-351, zapp-kickstart-app-security, 474-step1-nuke-v1 ×5, 475-harness-types-review, 476-security-review). decisions.md: 116,926 → 128,677 bytes. Updated histories: bender, leela, zapp, fry. All history files below 15 KB — no summarization needed.
+
+## 2026-04-20T10:10:21Z — Stale Deployed Contributing Docs Fix
+
+**Issue:** Deployed `docs-site/docs/contributing.md` mentioned Squad framework but didn't explain how developers actually interact with the AI team or the `squad:{member}` label system.
+
+**Fix:** Rewrote the guide to be actionable:
+- Team roster and role matrix
+- How `squad:{member}` labels route issues
+- @copilot capability matrix (🟢/🟡/🔴)
+- Complete workflow: DP gate → worktree → implementation → PR review gates
+- Local development setup and key files
+- Troubleshooting FAQs
+
+**PR:** [#890](https://github.com/sabbour/kickstart/pull/890) — docs(contributing): explain Squad and Copilot workflow
+
+**Output:** Deployed docs now match the real contribution process.
