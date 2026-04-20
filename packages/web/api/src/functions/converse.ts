@@ -60,7 +60,32 @@ async function converse(
     } catch { /* use default */ }
   }
 
-  const registry = getRegistry();
+  let registry;
+  try {
+    registry = getRegistry();
+  } catch (err) {
+    ctx.error(`Pack registry initialization failed: ${err instanceof Error ? err.message : String(err)}`);
+    if (err instanceof Error) {
+      ctx.error(`Stack: ${err.stack}`);
+    }
+    // Return SSE 200 with error event instead of 500, so client gets graceful message
+    const encoder = new TextEncoder();
+    const errorFrame = encoder.encode(
+      `event: error\ndata: ${JSON.stringify({
+        message: "Pack registry initialization failed. Please check server logs for details.",
+      })}\n\n`
+    );
+    return new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(errorFrame);
+        controller.close();
+      },
+    }), {
+      status: 200,
+      headers: { ...SSE_RESPONSE_HEADERS, "X-Pack-Init-Failed": "true" },
+    });
+  }
+
   let session;
   try {
     session = getOrCreateSession(body.sessionId, oid);
