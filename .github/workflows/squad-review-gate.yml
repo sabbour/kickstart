@@ -77,31 +77,33 @@ jobs:
             }
             const leelaApproved = labels.has('leela:approved');
             const zappApproved = labels.has('zapp:approved');
+            const nibblerApproved = labels.has('nibbler:approved');
             const isLowRisk = labels.has(LOW_RISK_LABEL);
             const touchesSensitivePaths = changedFiles.some(isSensitivePath);
             const hasSecuritySignals = isSecurityPatch(pr, labels);
 
             const requiresZapp = !isLowRisk || hasSecuritySignals || touchesSensitivePaths;
-            const requiredApprovals = ['leela:approved'];
+            const requiredApprovals = ['leela:approved', 'nibbler:approved'];
             if (requiresZapp) {
               requiredApprovals.push('zapp:approved');
             }
 
             const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
             const leelaStatus = leelaApproved ? '✅' : '⏳';
+            const nibblerStatus = nibblerApproved ? '✅' : '⏳';
             const zappStatus = zappApproved ? '✅' : (requiresZapp ? '⏳' : '➖');
 
             let state, description;
             if (missingApprovals.length === 0) {
               state = 'success';
               description = isLowRisk && !requiresZapp
-                ? 'Squad review gate: low-risk path Leela ✅'
-                : 'Squad review gate: Leela ✅ Zapp ✅';
+                ? 'Squad review gate: Leela ✅ Nibbler ✅'
+                : 'Squad review gate: Leela ✅ Nibbler ✅ Zapp ✅';
             } else {
               state = 'pending';
               description = isLowRisk && !requiresZapp
-                ? `Squad review gate: low-risk path Leela ${leelaStatus}`
-                : `Squad review gate: Leela ${leelaStatus} Zapp ${zappStatus}`;
+                ? `Squad review gate: Leela ${leelaStatus} Nibbler ${nibblerStatus}`
+                : `Squad review gate: Leela ${leelaStatus} Nibbler ${nibblerStatus} Zapp ${zappStatus}`;
             }
 
             await github.rest.repos.createCommitStatus({
