@@ -2,8 +2,8 @@
  * Model resolution — maps a ModelRef to a deployment name.
  *
  * Fallback chain is tier-aware:
- *   KICKSTART_CODEX_MODEL → AZURE_OPENAI_CODEX_DEPLOYMENT → AZURE_OPENAI_DEPLOYMENT
- *   KICKSTART_CHAT_MODEL  → AZURE_OPENAI_CHAT_DEPLOYMENT  → AZURE_OPENAI_DEPLOYMENT
+ *   KICKSTART_CODEX_MODEL → AZURE_OPENAI_CODEX_DEPLOYMENT
+ *   KICKSTART_CHAT_MODEL  → AZURE_OPENAI_CHAT_DEPLOYMENT
  *
  * Cross-tier fallback is intentionally blocked: a missing KICKSTART_CODEX_MODEL
  * will NOT silently route to AZURE_OPENAI_CHAT_DEPLOYMENT, preventing silent
@@ -26,18 +26,15 @@ export function resolveModelName(ref: ModelRef): string {
   const isCodexTier = ref.envVar === CODEX_TIER_VAR;
   const tierFallbackVar = isCodexTier ? 'AZURE_OPENAI_CODEX_DEPLOYMENT' : 'AZURE_OPENAI_CHAT_DEPLOYMENT';
   const tierFallback = process.env[tierFallbackVar];
-  const genericFallback = process.env.AZURE_OPENAI_DEPLOYMENT;
 
-  const resolved = tierFallback ?? genericFallback;
-  if (resolved) {
-    const usedVar = tierFallback ? tierFallbackVar : 'AZURE_OPENAI_DEPLOYMENT';
-    console.warn(`[harness] Model env var ${ref.envVar} not set — falling back to ${usedVar}`);
-    return resolved;
+  if (tierFallback) {
+    console.warn(`[harness] Model env var ${ref.envVar} not set — falling back to ${tierFallbackVar}`);
+    return tierFallback;
   }
 
   // Log full diagnostic server-side; keep user-facing message generic
   console.error(
-    `[harness] Model not configured. Checked: ${ref.envVar}, ${tierFallbackVar}, AZURE_OPENAI_DEPLOYMENT`,
+    `[harness] Model not configured. Checked: ${ref.envVar}, ${tierFallbackVar}`,
   );
   throw new Error('Agent model is not configured. Contact your administrator.');
 }

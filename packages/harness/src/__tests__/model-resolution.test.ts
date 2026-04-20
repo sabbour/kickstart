@@ -6,7 +6,6 @@
  * - KICKSTART_CHAT_MODEL unset, tier-correct fallback (AZURE_OPENAI_CHAT_DEPLOYMENT) set → uses it + warns
  * - KICKSTART_CODEX_MODEL unset, tier-correct fallback (AZURE_OPENAI_CODEX_DEPLOYMENT) set → uses it + warns
  * - KICKSTART_CODEX_MODEL unset, cross-tier fallback only (AZURE_OPENAI_CHAT_DEPLOYMENT) set → throws (tier mismatch)
- * - KICKSTART_CHAT_MODEL unset, tier fallback unset, AZURE_OPENAI_DEPLOYMENT set → uses generic + warns
  * - All unset → throws user-friendly error without raw env var names
  * - ref.id shortcut → returns id without touching env
  */
@@ -63,21 +62,13 @@ describe('resolveModelName', () => {
 
   it('does NOT fall back to AZURE_OPENAI_CHAT_DEPLOYMENT for codex tier (tier mismatch)', () => {
     vi.stubEnv('AZURE_OPENAI_CHAT_DEPLOYMENT', 'chat-only');
-    // AZURE_OPENAI_CODEX_DEPLOYMENT and AZURE_OPENAI_DEPLOYMENT are unset
+    // AZURE_OPENAI_CODEX_DEPLOYMENT is unset — tier mismatch must throw
     expect(() => resolveModelName({ envVar: 'KICKSTART_CODEX_MODEL' })).toThrow(
       'Agent model is not configured. Contact your administrator.',
     );
     expect(console.warn).not.toHaveBeenCalled();
   });
 
-  it('falls back to generic AZURE_OPENAI_DEPLOYMENT when tier-specific fallback unset, and logs a warning', () => {
-    vi.stubEnv('AZURE_OPENAI_DEPLOYMENT', 'generic-deployment');
-    const result = resolveModelName({ envVar: 'KICKSTART_CHAT_MODEL' });
-    expect(result).toBe('generic-deployment');
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining('AZURE_OPENAI_DEPLOYMENT'),
-    );
-  });
 
   it('throws user-friendly error when all env vars are unset', () => {
     expect(() => resolveModelName({ envVar: 'KICKSTART_CHAT_MODEL' })).toThrow(
