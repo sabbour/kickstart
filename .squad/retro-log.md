@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-20 | #907 "fix: use local workspace references instead of npm for internal packages" | M | impl=0m | review=26m | cycles=1 | merged | @sabbour | first_review=22m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-20 | #843 "feat: Shipping forecast workflow" | M | impl=2m | review=0m | cycles=1 | merged | @sabbour | first_review=1096m | ci=6m | reviewer=bot | human_comments=2 | issue=#804 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-20 | #903 "chore(release): wrap v1.0.1 release in PR for review gate" | S | impl=10m | review=10m | cycles=1 | merged | @sabbour | first_review=5m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
