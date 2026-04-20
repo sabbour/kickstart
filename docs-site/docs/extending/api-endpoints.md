@@ -84,12 +84,13 @@ app.http("functionName", {
 
 #### Deprecated (410 Gone)
 
-These routes are registered solely to return `410 Gone` to any client still calling them. Do not use them.
+⚠️ **Legacy v1 API endpoints** — Do not use. These routes return `410 Gone`.
 
-| Endpoint | Route | Replacement |
-|---|---|---|
-| `github-proxy-legacy` | `/api/github-proxy/{*path}` | Use `/api/github-auth`, `/api/github/repos`, `/api/github/pulls` |
-| `github-oauth-legacy` | `/api/github-oauth/{*path}` | Use `/api/github-auth/login` |
+**Migrated to current endpoints:**
+- `github-proxy-legacy` → use `/api/github-auth`, `/api/github/repos`, `/api/github/pulls`
+- `github-oauth-legacy` → use `/api/github-auth/login`
+
+See the current GitHub Integration section above for the canonical endpoints.
 
 ### SSE Streaming Pattern
 

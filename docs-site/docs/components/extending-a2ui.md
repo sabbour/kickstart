@@ -15,11 +15,11 @@ Every A2UI component touches four layers of the stack. Missing any one layer cau
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Layer 1: LLM System Prompt                                    │
-│  packages/core/src/prompts/component-catalog.ts                │
+│  packages/pack-core/src/catalog/component-catalog.ts           │
 │  → Teaches the LLM that the component exists + usage example   │
 ├─────────────────────────────────────────────────────────────────┤
 │  Layer 2: Backend Validator                                    │
-│  packages/core/src/services/a2ui-schema.ts                     │
+│  packages/pack-core/src/a2ui-schema.ts                         │
 │  → Zod schema validates LLM output; drops unknown components  │
 ├─────────────────────────────────────────────────────────────────┤
 │  Layer 3: Frontend Catalog                                     │
@@ -161,7 +161,7 @@ const kickstartComponents: ReactComponentImplementation[] = [
 
 ## Step 2: Add the Backend Validation Schema
 
-**File:** `packages/core/src/services/a2ui-schema.ts`
+**File:** `packages/pack-core/src/a2ui-schema.ts`
 
 ### Add to `KNOWN_COMPONENT_TYPES`
 
@@ -214,9 +214,9 @@ export const PAYLOAD_LIMITS = {
 
 ## Step 3: Teach the LLM to Use Your Component
 
-**File:** `packages/core/src/prompts/component-catalog.ts`
+**File:** `packages/pack-core/src/catalog/component-catalog.ts`
 
-Add a `ComponentCatalogEntry` to the `BASE_COMPONENT_CATALOG` array:
+Add a `ComponentCatalogEntry` to the catalog array:
 
 ```typescript
 {
@@ -335,7 +335,7 @@ import { useState, useEffect } from 'react';
 import { useAPIConnector } from '../../hooks/useAPIConnector';
 import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 
-export const MyFatComponent = createReactComponent(api, ({ props }) => {
+export const MySmartComponent = createReactComponent(api, ({ props }) => {
   const connector = useAPIConnector('github');
   const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [data, setData] = useState(null);
@@ -400,13 +400,13 @@ Smart components integrating with external services must implement:
   □ Import added
   □ Component added to kickstartComponents array
 
-□ Backend schema: packages/core/src/services/a2ui-schema.ts
+□ Backend schema: packages/pack-core/src/a2ui-schema.ts
   □ Type added to KNOWN_COMPONENT_TYPES (alphabetical)
   □ YourComponentPropsSchema defined with .strip()
   □ Schema added to COMPONENT_SCHEMA_REGISTRY (alphabetical)
 
-□ LLM catalog: packages/core/src/prompts/component-catalog.ts
-  □ ComponentCatalogEntry added to BASE_COMPONENT_CATALOG
+□ LLM catalog: packages/pack-core/src/catalog/component-catalog.ts
+  □ ComponentCatalogEntry added to catalog array
   □ JSON example is concise and shows key props
 
 □ Playground: packages/web/src/pages/playground-scenarios.ts

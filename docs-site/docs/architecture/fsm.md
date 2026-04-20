@@ -4,6 +4,10 @@ sidebar_position: 3
 
 # Phase System
 
+:::note Historical reference
+This page documents the **deprecated** finite state machine (FSM) that was removed in v2. It is kept for historical context. **Current phase definitions are in `packages/harness/src/index.ts`** — see [Conversation Phases](../extending/conversation-phases.md) for the current implementation.
+:::
+
 Kickstart's conversation engine uses a lightweight, LLM-driven phase system to guide users from project discovery through deployment.
 
 :::note Historical context
