@@ -33,8 +33,12 @@ jobs:
               : '';
             const today = new Date().toISOString().slice(0, 10);
             const yesterday = new Date(Date.now() - 24*60*60*1000).toISOString().slice(0, 10);
+            const retroEntryPattern = /^(?:-\s*|\|\s*)(\d{4}-\d{2}-\d{2})\s*\|/;
             const recentPrs = log.split('\n')
-              .filter(l => l.startsWith(`- ${today}`) || l.startsWith(`- ${yesterday}`))
+              .filter(l => {
+                const match = l.match(retroEntryPattern);
+                return match && (match[1] === today || match[1] === yesterday);
+              })
               .join('\n') || '_No PRs closed in the last 24h._';
 
             // Open PRs aging >3d
