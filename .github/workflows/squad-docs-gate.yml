@@ -64,30 +64,35 @@ jobs:
         with:
           script: |
             const marker = '<!-- squad-docs-gate -->';
-            const mark = v => v === 'true' ? '✅' : '⚠️';
             const userFacing = process.env.USER_FACING === 'true';
             const hasChangeset = process.env.HAS_CHANGESET === 'true';
+
+            // ✅ = done, ⚠️ = likely needed, ℹ️ = optional suggestion
+            const done = v => v === 'true';
+            const changesetIcon = done(process.env.HAS_CHANGESET) ? '✅'
+              : userFacing ? '⚠️' : 'ℹ️';
+            const infoOrDone = v => done(v) ? '✅' : 'ℹ️';
 
             const lines = [
               marker,
               '## Docs & changeset gate',
               '',
-              `- ${mark(process.env.HAS_CHANGESET)} changeset added (\`.changeset/*.md\`)`,
-              `- ${mark(process.env.HAS_DOCS_SITE)} \`docs-site/docs/\` updated`,
-              `- ${mark(process.env.HAS_BRIEF)} \`docs/v2-implementation-brief.md\` updated (if architectural)`,
-              `- ${mark(process.env.HAS_API)} \`docs/api-reference.md\` updated (if API surface changed)`,
+              `- ${changesetIcon} changeset added (\`.changeset/*.md\`)`,
+              `- ${infoOrDone(process.env.HAS_DOCS_SITE)} \`docs-site/docs/\` updated — if user-facing behavior or UI changed`,
+              `- ${infoOrDone(process.env.HAS_BRIEF)} \`docs/v2-implementation-brief.md\` updated — if architectural`,
+              `- ${infoOrDone(process.env.HAS_API)} \`docs/api-reference.md\` updated — if API surface changed`,
               '',
             ];
 
             if (userFacing && !hasChangeset) {
-              lines.push('> ⚠️ This PR touches `packages/` source but has no changeset. If the change is user-visible, run `npm run changeset` before merging. If it is internal-only, note that in the PR body.');
+              lines.push('> ⚠️ This PR touches \`packages/\` source but has no changeset. If the change is user-visible, run \`npm run changeset\` before merging. Internal-only changes can skip this.');
             } else if (!userFacing) {
-              lines.push('_Touches no user-facing source; changeset may be unnecessary._');
+              lines.push('_No user-facing source changed. Changeset and doc updates are not needed._');
             } else {
               lines.push('_Changeset present. Good._');
             }
 
-            lines.push('', '---', '_Soft gate. Does not block merge. Hermes reviews during PR review._');
+            lines.push('', '---', '_Soft gate — does not block merge. ✅ = done, ⚠️ = likely needed, ℹ️ = consider updating._');
 
             const body = lines.join('\n');
 
