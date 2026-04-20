@@ -31,47 +31,27 @@ Look for:
 - `Token scopes: ...` — what permissions are available
 - Multiple accounts will show separate entries
 
-### Extract a Specific Account's Token
+### Explicit boundary for agent-authored writes
 
-When you need to operate as a specific user (not the default):
+When you need to operate as a specific user (not the default), that can be acceptable for human-owned or explicitly personal workflows.
 
 ```bash
-# Get the personal account token (by username)
+# Human-owned example only
 gh auth token --user personaluser
-
-# Get the EMU account token
 gh auth token --user corpalias_enterprise
 ```
 
-**Use case:** Push to a personal fork while the default `gh` auth is the EMU account.
-
-### Push to Personal Repos from EMU Shell
-
-The most common scenario: your shell defaults to the EMU account, but you need to push to a personal GitHub repo.
+**Important:** do **not** use `gh auth token --user`, ambient `gh`, or personal-account token extraction for normal agent-authored writes in this repo. Squad agent writes must resolve the explicit app token instead:
 
 ```bash
-# 1. Extract the personal token
-$token = gh auth token --user personaluser
-
-# 2. Push using token-authenticated HTTPS
-git push https://personaluser:$token@github.com/personaluser/repo.git branch-name
+TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG") || exit 1
+[ -n "$TOKEN" ] || exit 1
+export GH_TOKEN="$TOKEN"
+git push https://x-access-token:${TOKEN}@github.com/$OWNER/$REPO.git "$BRANCH"
+GH_TOKEN=$TOKEN gh pr create ...
 ```
 
-**Why this works:** `gh auth token --user` reads from `gh`'s credential store without switching the active account. The token is used inline for a single operation and never persisted.
-
-### Create PRs on Personal Forks
-
-When the default `gh` context is EMU but you need to create a PR from a personal fork:
-
-```bash
-# Option 1: Use --repo flag (works if token has access)
-gh pr create --repo upstream/repo --head personaluser:branch --title "..." --body "..."
-
-# Option 2: Temporarily set GH_TOKEN for one command
-$env:GH_TOKEN = $(gh auth token --user personaluser)
-gh pr create --repo upstream/repo --head personaluser:branch --title "..."
-Remove-Item Env:\GH_TOKEN
-```
+Use personal/EMU account selection only for workflows that are intentionally human-authored or outside the Squad app-identity path.
 
 ### Config Directory Isolation (Advanced)
 

@@ -181,7 +181,7 @@ async function getInstallationToken(jwt, installationId) {
  * Resolve credentials from env vars: SQUAD_{ROLE}_APP_ID, _PRIVATE_KEY, _INSTALLATION_ID.
  * PEM may be base64-encoded; decoded automatically when it doesn't start with "-----BEGIN".
  * @param {string} roleKey
- * @returns {{ appId: number, pem: string, installationId: number } | null}
+ * @returns {{ credentials: { appId: number, pem: string, installationId: number } | null, error: string | null }}
  */
 function resolveEnvCredentials(roleKey) {
   const envKey = roleKey.toUpperCase();
@@ -189,17 +189,29 @@ function resolveEnvCredentials(roleKey) {
   const pemRaw = process.env[`SQUAD_${envKey}_PRIVATE_KEY`];
   const installIdStr = process.env[`SQUAD_${envKey}_INSTALLATION_ID`];
 
-  if (!appIdStr || !pemRaw || !installIdStr) return null;
+  const presentCount = [appIdStr, pemRaw, installIdStr].filter(Boolean).length;
+  if (presentCount === 0) return { credentials: null, error: null };
+  if (presentCount !== 3) {
+    return {
+      credentials: null,
+      error: `Incomplete environment credentials for role "${roleKey}". Expected SQUAD_${envKey}_APP_ID, SQUAD_${envKey}_PRIVATE_KEY, and SQUAD_${envKey}_INSTALLATION_ID.`,
+    };
+  }
 
   const appId = Number(appIdStr);
   const installationId = Number(installIdStr);
-  if (!Number.isFinite(appId) || !Number.isFinite(installationId)) return null;
+  if (!Number.isFinite(appId) || !Number.isFinite(installationId)) {
+    return {
+      credentials: null,
+      error: `Invalid environment credentials for role "${roleKey}". App and installation IDs must be numbers.`,
+    };
+  }
 
   const pem = pemRaw.trimStart().startsWith('-----BEGIN')
     ? pemRaw
     : Buffer.from(pemRaw, 'base64').toString('utf-8');
 
-  return { appId, pem, installationId };
+  return { credentials: { appId, pem, installationId }, error: null };
 }
 
 // ============================================================================
@@ -227,65 +239,103 @@ function clearTokenCache() {
  *
  * @param {string} projectRoot - Project root directory (parent of .squad/)
  * @param {string} roleKey - Role key (e.g. 'lead', 'backend', 'shared')
- * @returns {Promise<string | null>}
+ * @returns {Promise<{ token: string | null, resolvedRoleKey: string | null, error: string | null }>}
  */
-async function resolveToken(projectRoot, roleKey) {
+async function resolveTokenWithDiagnostics(projectRoot, roleKey) {
+  let resolvedRoleKey = null;
+
   try {
-    const resolvedRoleKey = resolveRoleSlug(projectRoot, roleKey);
-    if (!resolvedRoleKey) return null;
+    resolvedRoleKey = resolveRoleSlug(projectRoot, roleKey);
+    if (!resolvedRoleKey) {
+      return {
+        token: null,
+        resolvedRoleKey: null,
+        error: `No GitHub App mapping configured for role "${roleKey}".`,
+      };
+    }
 
     // Check cache
     const cached = tokenCache.get(resolvedRoleKey);
     if (cached) {
       const remainingMs = cached.expiresAt.getTime() - Date.now();
       if (remainingMs > REFRESH_MARGIN_MS) {
-        return cached.token;
+        return { token: cached.token, resolvedRoleKey, error: null };
       }
       tokenCache.delete(resolvedRoleKey);
     }
 
     // Path 1: Environment variables (CI/CD override)
-    const envCreds = resolveEnvCredentials(resolvedRoleKey);
-    if (envCreds) {
-      const jwt = generateAppJWT(envCreds.appId, envCreds.pem);
-      const { token, expiresAt } = await getInstallationToken(jwt, envCreds.installationId);
+    const envResult = resolveEnvCredentials(resolvedRoleKey);
+    if (envResult.error) {
+      return { token: null, resolvedRoleKey, error: envResult.error };
+    }
+    if (envResult.credentials) {
+      const jwt = generateAppJWT(envResult.credentials.appId, envResult.credentials.pem);
+      const { token, expiresAt } = await getInstallationToken(jwt, envResult.credentials.installationId);
       tokenCache.set(resolvedRoleKey, { token, expiresAt });
-      return token;
+      return { token, resolvedRoleKey, error: null };
     }
 
     // Path 2: Filesystem (default)
     const reg = loadAppRegistration(projectRoot, resolvedRoleKey);
-    if (!reg) return null;
+    if (!reg) {
+      return {
+        token: null,
+        resolvedRoleKey,
+        error: `No app registration found for role "${resolvedRoleKey}" in .squad/identity/apps/${resolvedRoleKey}.json.`,
+      };
+    }
 
     const pemPath = join(projectRoot, '.squad', 'identity', 'keys', `${resolvedRoleKey}.pem`);
-    if (!existsSync(pemPath)) return null;
+    if (!existsSync(pemPath)) {
+      return {
+        token: null,
+        resolvedRoleKey,
+        error: `No private key found for role "${resolvedRoleKey}" at .squad/identity/keys/${resolvedRoleKey}.pem.`,
+      };
+    }
 
     const pem = readFileSync(pemPath, 'utf-8');
     const jwt = generateAppJWT(reg.appId, pem);
     const { token, expiresAt } = await getInstallationToken(jwt, reg.installationId);
 
     tokenCache.set(resolvedRoleKey, { token, expiresAt });
-    return token;
-  } catch {
-    // Graceful fallback — never throw; output nothing on failure
-    return null;
+    return { token, resolvedRoleKey, error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { token: null, resolvedRoleKey, error: message };
   }
 }
 
-export { clearTokenCache, resolveRoleSlug, resolveToken };
+async function resolveToken(projectRoot, roleKey) {
+  const result = await resolveTokenWithDiagnostics(projectRoot, roleKey);
+  return result.token;
+}
+
+export { clearTokenCache, resolveRoleSlug, resolveToken, resolveTokenWithDiagnostics };
 
 // ============================================================================
 // CLI entry point
 // ============================================================================
+
+function parseCliArgs(argv) {
+  const args = argv.slice(2);
+  const required = args.includes('--required') || args.includes('--write');
+  const positional = args.filter(arg => !arg.startsWith('--'));
+  return {
+    required,
+    roleSlug: positional[0] ?? null,
+  };
+}
 
 const isCliInvocation =
   typeof process.argv[1] === 'string' &&
   resolvePath(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isCliInvocation) {
-  const roleSlug = process.argv[2];
+  const { roleSlug, required } = parseCliArgs(process.argv);
   if (!roleSlug) {
-    process.exit(0);
+    process.exit(required ? 1 : 0);
   }
 
   // Derive project root from script location (.squad/scripts/ → repo root).
@@ -298,8 +348,11 @@ if (isCliInvocation) {
     // Fallback to cwd if import.meta.url is unavailable
   }
 
-  const token = await resolveToken(projectRoot, roleSlug);
-  if (token) {
-    process.stdout.write(token);
+  const result = await resolveTokenWithDiagnostics(projectRoot, roleSlug);
+  if (result.token) {
+    process.stdout.write(result.token);
+  } else if (required) {
+    console.error(result.error ?? `Failed to resolve GitHub App token for role "${roleSlug}".`);
+    process.exit(1);
   }
 }

@@ -20,8 +20,19 @@ Look for multiple accounts. Note which usernames are listed.
 ### Step 2: Ask the user
 Ask: "I see you have multiple GitHub accounts: {list them}. Which one is your personal account and which is your work/EMU account?"
 
-### Step 3: Run the setup automatically
-Once the user confirms, do ALL of this for them:
+### Step 3: Important boundary before setup
+
+This skill is for **human-owned** account switching convenience. Do **not** use it to choose identity for normal Squad agent-authored writes in this repo.
+
+Agent-authored writes here must stay fail-closed on the configured app identity; stop the shell if token resolution fails:
+
+```bash
+TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG") || exit 1
+[ -n "$TOKEN" ] || exit 1
+export GH_TOKEN="$TOKEN"
+```
+
+Only if the user explicitly wants personal/work shell aliases for their own manual GitHub usage should you continue with the setup below.
 
 ```powershell
 # 1. Define the functions

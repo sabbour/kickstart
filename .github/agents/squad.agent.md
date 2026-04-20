@@ -341,7 +341,7 @@ prompt: |
   {% endif %}
 
   {only if identity configured:}
-  GIT IDENTITY: Commit as `{app_slug}[bot]`. Resolve the token with `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")`. For write actions, fail closed unless either the bot token resolved or `SQUAD_ALLOW_WRITE_FALLBACK=1` is explicitly set as an auditable escape hatch. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
+  GIT IDENTITY: Commit as `{app_slug}[bot]`. Resolve the token with `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1`, verify `[ -n "$TOKEN" ] || exit 1`, and export `GH_TOKEN="$TOKEN"`. Agent-authored GitHub writes must use that app token; do not fall back to ambient `gh`/`git` auth. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
   {end identity block}
 
   TASK: {specific task description}
@@ -718,7 +718,7 @@ When spawning an agent that may do git operations (commit, push, PR), resolve th
 
 5. **Include the identity block** in the spawn prompt with the resolved values.
 
-**If config exists but role/app resolution fails for a write-capable agent, stop and fix the mapping.** Do not silently drop into ambient auth; the only escape hatch is an explicit `SQUAD_ALLOW_WRITE_FALLBACK=1` decision.
+**If config exists but role/app resolution fails for a write-capable agent, stop and fix the mapping.** Do not silently drop into ambient auth for agent-authored writes.
 
 ### Pre-Spawn: Worktree Setup
 
@@ -841,25 +841,22 @@ prompt: |
   ## GIT IDENTITY — Bot Authentication
   This project uses GitHub App identity for git operations. When pushing code or creating PRs, authenticate as the bot.
   
-  **Resolve token at runtime:**
+  **Resolve token at runtime (fail closed for writes):**
   ```bash
-  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
+  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+  [ -n "$TOKEN" ] || exit 1
+  export GH_TOKEN="$TOKEN"
   ```
-  `resolve-token.mjs` only uses explicit config keys or explicit alias mappings; it does **not** guess another app. If token resolution fails, write actions must stop unless `SQUAD_ALLOW_WRITE_FALLBACK=1` is explicitly set.
+  `resolve-token.mjs` only uses explicit config keys or explicit alias mappings; it does **not** guess another app. `--required` prints a reason to stderr and exits non-zero when write auth is not explicitly configured.
   
   **Git commit identity:**
   - `git -c user.name="{app_slug}[bot]" -c user.email="{app_slug}[bot]@users.noreply.github.com" commit ...`
   
-  **Guard write actions first:**
-  ```bash
-  if [ -z "$TOKEN" ] && [ "${SQUAD_ALLOW_WRITE_FALLBACK:-0}" != "1" ]; then
-    echo "Bot token resolution failed; refusing write action without SQUAD_ALLOW_WRITE_FALLBACK=1" >&2
-    exit 1
-  fi
-  ```
-  **Push:** `if [ -n "$TOKEN" ]; then git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git {branch}; else git push origin {branch}; fi`
-  **PR create:** `if [ -n "$TOKEN" ]; then GH_TOKEN=$TOKEN gh pr create ...; else gh pr create ...; fi`
+  **Agent-authored writes must stay on app identity:**
+  - **Push:** `git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git {branch}`
+  - **PR create:** `GH_TOKEN=$TOKEN gh pr create ...`
   **PR body must include:** `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`
+  - **Do not use** ambient `gh` or `git` auth for normal agent-authored writes.
   
   **Never log or echo the token value.**
   {end identity block}
@@ -1189,7 +1186,7 @@ Ralph always appears in `team.md`: `| Ralph | Work Monitor | — | 🔄 Monitor 
 | "Ralph, idle" / "Take a break" / "Stop monitoring" | Fully deactivate (stop loop + idle-watch) |
 | "Ralph, scope: just issues" / "Ralph, skip CI" | Adjust what Ralph monitors this session |
 | References PR feedback or changes requested | Spawn agent to address PR review feedback |
-| "merge PR #N" / "merge it" (recent context) | Merge via `gh pr merge` |
+| "merge PR #N" / "merge it" (recent context) | Merge via `GH_TOKEN=$TOKEN gh pr merge` |
 
 These are intent signals, not exact strings — match meaning, not words.
 
@@ -1313,7 +1310,7 @@ Store `## Issue Source` in `team.md` with repository, connection date, and filte
 
 ### Issue → PR → Merge Lifecycle
 
-Agents create branch (`squad/{issue-number}-{slug}`), do work, commit referencing issue, push, and open PR via `gh pr create`. See `.squad/templates/issue-lifecycle.md` for the full spawn prompt ISSUE CONTEXT block, PR review handling, and merge commands.
+Agents create branch (`squad/{issue-number}-{slug}`), do work, commit referencing issue, push, and open PR via `GH_TOKEN=$TOKEN gh pr create`. See `.squad/templates/issue-lifecycle.md` for the full spawn prompt ISSUE CONTEXT block, PR review handling, and merge commands.
 
 After issue work completes, follow standard After Agent Work flow.
 
