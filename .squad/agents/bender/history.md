@@ -84,6 +84,7 @@ Key learnings: TypeScript `readonly RegExp[]` patterns, API surface minimization
 - (2026-04-16) All `useA2UI()` calls must supply an `actionHandler` (even a no-op) if the component may host surfaces that fire `continue:` or other actions. Omitting the handler silently swallows actions and can stall wizard flows.
 - (2026-04-17) `advancePhase()` must use `PHASE_DEFINITIONS.find()` + a safe fallback rather than `getPhaseDefinition()` which throws. Any function called on every LLM turn must be hardened against stale/hydrated strings from client rehydration. Use `isPhase()` type guard at API boundaries before trusting a string as a `Phase`.
 - (2026-04-17) `Phase` enum values are lowercase strings (`"discover"`, `"design"`, etc.) — not PascalCase. Type guards and tests must use the actual runtime values, not the enum key names.
+- (2026-04-20) Squad bot auth must resolve through `.squad/scripts/resolve-token.mjs`, not a compiled `packages/squad-sdk/dist/...` path. Worktrees may not contain built SDK artifacts, so prompts and lifecycle docs should call the checked-in script, which maps persona aliases (`Bender`/`Fry`/`Hermes`/`Leela`) to per-role apps and falls back to `lead` or default auth gracefully.
 
 ## 2026-04-17 Agents SDK Backend Adapter (#445, PR #447)
 

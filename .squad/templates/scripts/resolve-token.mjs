@@ -8,7 +8,7 @@
 
 import { createSign } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // ============================================================================
@@ -38,6 +38,78 @@ function loadAppRegistration(projectRoot, key) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Load the identity config from `.squad/identity/config.json`.
+ * @param {string} projectRoot
+ * @returns {{ tier?: string, apps?: Record<string, { roleSlug?: string }> } | null}
+ */
+function loadIdentityConfig(projectRoot) {
+  const configPath = join(projectRoot, '.squad', 'identity', 'config.json');
+  try {
+    const raw = readFileSync(configPath, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+const ROLE_ALIASES = {
+  lead: ['lead', 'leela', 'architect', 'architecture', 'coordinator', 'squad', 'zapp', 'nibbler', 'ralph'],
+  backend: ['backend', 'bender', 'core', 'core-dev', 'backend-dev'],
+  frontend: ['frontend', 'fry', 'ui', 'frontend-dev'],
+  tester: ['tester', 'hermes', 'qa', 'test', 'observability'],
+  scribe: ['scribe'],
+};
+
+/**
+ * Normalize a role-like string into a lowercase slug.
+ * @param {string} roleKey
+ * @returns {string | null}
+ */
+function normalizeRoleKey(roleKey) {
+  if (typeof roleKey !== 'string') return null;
+  const normalized = roleKey.trim().toLowerCase().replace(/[\s_]+/g, '-');
+  return normalized || null;
+}
+
+/**
+ * Resolve a requested role to the configured identity role slug.
+ * Uses per-role identity config when available and falls back to lead.
+ * @param {string} projectRoot
+ * @param {string} roleKey
+ * @returns {string | null}
+ */
+function resolveRoleSlug(projectRoot, roleKey) {
+  const config = loadIdentityConfig(projectRoot);
+  const normalized = normalizeRoleKey(roleKey);
+  if (!config?.apps || !normalized) return normalized;
+
+  const appKeys = Object.keys(config.apps);
+  if (config.tier === 'shared') {
+    if (config.apps.shared) return 'shared';
+    return appKeys[0] ?? null;
+  }
+
+  if (config.apps[normalized]) {
+    return normalized;
+  }
+
+  for (const [resolvedRole, aliases] of Object.entries(ROLE_ALIASES)) {
+    if (aliases.includes(normalized)) {
+      if (config.apps[resolvedRole]) {
+        return resolvedRole;
+      }
+      break;
+    }
+  }
+
+  if (config.apps.lead) {
+    return 'lead';
+  }
+
+  return appKeys[0] ?? null;
 }
 
 // ============================================================================
@@ -143,6 +215,10 @@ function resolveEnvCredentials(roleKey) {
 const tokenCache = new Map();
 const REFRESH_MARGIN_MS = 10 * 60 * 1000; // 10 minutes
 
+function clearTokenCache() {
+  tokenCache.clear();
+}
+
 // ============================================================================
 // High-level token resolution
 // ============================================================================
@@ -161,37 +237,40 @@ const REFRESH_MARGIN_MS = 10 * 60 * 1000; // 10 minutes
  */
 async function resolveToken(projectRoot, roleKey) {
   try {
+    const resolvedRoleKey = resolveRoleSlug(projectRoot, roleKey);
+    if (!resolvedRoleKey) return null;
+
     // Check cache
-    const cached = tokenCache.get(roleKey);
+    const cached = tokenCache.get(resolvedRoleKey);
     if (cached) {
       const remainingMs = cached.expiresAt.getTime() - Date.now();
       if (remainingMs > REFRESH_MARGIN_MS) {
         return cached.token;
       }
-      tokenCache.delete(roleKey);
+      tokenCache.delete(resolvedRoleKey);
     }
 
     // Path 1: Environment variables (CI/CD override)
-    const envCreds = resolveEnvCredentials(roleKey);
+    const envCreds = resolveEnvCredentials(resolvedRoleKey);
     if (envCreds) {
       const jwt = generateAppJWT(envCreds.appId, envCreds.pem);
       const { token, expiresAt } = await getInstallationToken(jwt, envCreds.installationId);
-      tokenCache.set(roleKey, { token, expiresAt });
+      tokenCache.set(resolvedRoleKey, { token, expiresAt });
       return token;
     }
 
     // Path 2: Filesystem (default)
-    const reg = loadAppRegistration(projectRoot, roleKey);
+    const reg = loadAppRegistration(projectRoot, resolvedRoleKey);
     if (!reg) return null;
 
-    const pemPath = join(projectRoot, '.squad', 'identity', 'keys', `${roleKey}.pem`);
+    const pemPath = join(projectRoot, '.squad', 'identity', 'keys', `${resolvedRoleKey}.pem`);
     if (!existsSync(pemPath)) return null;
 
     const pem = readFileSync(pemPath, 'utf-8');
     const jwt = generateAppJWT(reg.appId, pem);
     const { token, expiresAt } = await getInstallationToken(jwt, reg.installationId);
 
-    tokenCache.set(roleKey, { token, expiresAt });
+    tokenCache.set(resolvedRoleKey, { token, expiresAt });
     return token;
   } catch {
     // Graceful fallback — never throw; output nothing on failure
@@ -199,26 +278,34 @@ async function resolveToken(projectRoot, roleKey) {
   }
 }
 
+export { clearTokenCache, resolveRoleSlug, resolveToken };
+
 // ============================================================================
 // CLI entry point
 // ============================================================================
 
-const roleSlug = process.argv[2];
-if (!roleSlug) {
-  process.exit(0);
-}
+const isCliInvocation =
+  typeof process.argv[1] === 'string' &&
+  resolvePath(process.argv[1]) === fileURLToPath(import.meta.url);
 
-// Derive project root from script location (.squad/scripts/ → repo root).
-// Agents invoke this via absolute path so process.cwd() may be a worktree.
-let projectRoot = process.cwd();
-try {
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  projectRoot = join(scriptDir, '..', '..');
-} catch {
-  // Fallback to cwd if import.meta.url is unavailable
-}
+if (isCliInvocation) {
+  const roleSlug = process.argv[2];
+  if (!roleSlug) {
+    process.exit(0);
+  }
 
-const token = await resolveToken(projectRoot, roleSlug);
-if (token) {
-  process.stdout.write(token);
+  // Derive project root from script location (.squad/scripts/ → repo root).
+  // Agents invoke this via absolute path so process.cwd() may be a worktree.
+  let projectRoot = process.cwd();
+  try {
+    const scriptDir = dirname(fileURLToPath(import.meta.url));
+    projectRoot = join(scriptDir, '..', '..');
+  } catch {
+    // Fallback to cwd if import.meta.url is unavailable
+  }
+
+  const token = await resolveToken(projectRoot, roleSlug);
+  if (token) {
+    process.stdout.write(token);
+  }
 }

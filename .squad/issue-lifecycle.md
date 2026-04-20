@@ -132,27 +132,48 @@ Agents MUST use their GitHub App token for these calls so the comment appears as
 
 ```bash
 # Resolve bot token (see GIT IDENTITY in spawn prompt)
-TOKEN=$(node --input-type=module -e "import{pathToFileURL}from'node:url';const{resolveToken,clearTokenCache}=await import(pathToFileURL('{team_root}/packages/squad-sdk/dist/identity/tokens.js').href);clearTokenCache();const t=await resolveToken('{team_root}','{role_slug}');if(t)process.stdout.write(t);else process.exit(1)")
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
 
 # Post start comment on the issue
-GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
-  --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
+if [ -n "$TOKEN" ]; then
+  GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
+    --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
 ⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 🌿 Branch: \`squad/{issue-number}-{slug}\`"
+else
+  gh issue comment {number} --repo {owner}/{repo} \
+    --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
+⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+🌿 Branch: \`squad/{issue-number}-{slug}\`"
+fi
 
 # Move issue to "In Progress" on the project board
 # Use the GitHub Projects GraphQL API to update the status field
-GH_TOKEN=$TOKEN gh api graphql -f query='
-  mutation {
-    updateProjectV2ItemFieldValue(
-      input: {
-        projectId: "{project-node-id}"
-        itemId: "{item-node-id}"
-        fieldId: "{status-field-id}"
-        value: { singleSelectOptionId: "{in-progress-option-id}" }
-      }
-    ) { projectV2Item { id } }
-  }'
+if [ -n "$TOKEN" ]; then
+  GH_TOKEN=$TOKEN gh api graphql -f query='
+    mutation {
+      updateProjectV2ItemFieldValue(
+        input: {
+          projectId: "{project-node-id}"
+          itemId: "{item-node-id}"
+          fieldId: "{status-field-id}"
+          value: { singleSelectOptionId: "{in-progress-option-id}" }
+        }
+      ) { projectV2Item { id } }
+    }'
+else
+  gh api graphql -f query='
+    mutation {
+      updateProjectV2ItemFieldValue(
+        input: {
+          projectId: "{project-node-id}"
+          itemId: "{item-node-id}"
+          fieldId: "{status-field-id}"
+          value: { singleSelectOptionId: "{in-progress-option-id}" }
+        }
+      ) { projectV2Item { id } }
+    }'
+fi
 ```
 
 > **Fallback:** If bot token resolution fails, fall back to default `gh` auth. Do NOT block work because identity failed — post the comment with whatever auth is available.
@@ -270,19 +291,33 @@ Working as {member} ({role})
 **Feedback acknowledgment (GitHub — using bot identity):**
 
 ```bash
-TOKEN=$(node --input-type=module -e "import{pathToFileURL}from'node:url';const{resolveToken,clearTokenCache}=await import(pathToFileURL('{team_root}/packages/squad-sdk/dist/identity/tokens.js').href);clearTokenCache();const t=await resolveToken('{team_root}','{role_slug}');if(t)process.stdout.write(t);else process.exit(1)")
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
 
 # Before making changes
-GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
-  --body "🔧 **{AgentName}** ({Role}) is addressing review feedback.
+if [ -n "$TOKEN" ]; then
+  GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
+    --body "🔧 **{AgentName}** ({Role}) is addressing review feedback.
 ⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+else
+  gh pr comment {pr-number} --repo {owner}/{repo} \
+    --body "🔧 **{AgentName}** ({Role}) is addressing review feedback.
+⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+fi
 
 # After pushing changes
-GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
-  --body "✅ **{AgentName}** addressed the feedback.
+if [ -n "$TOKEN" ]; then
+  GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
+    --body "✅ **{AgentName}** addressed the feedback.
 ⏱️ Completed: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 **Changes:** {summary}
 Ready for re-review."
+else
+  gh pr comment {pr-number} --repo {owner}/{repo} \
+    --body "✅ **{AgentName}** addressed the feedback.
+⏱️ Completed: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+**Changes:** {summary}
+Ready for re-review."
+fi
 ```
 
 > Falls back to default `gh` auth if bot token fails. Never skip the comment.
@@ -378,21 +413,37 @@ When spawning an agent to work on an issue, include this context block:
 
 1. **Post a start comment on the issue** using your bot identity:
    ```bash
-   TOKEN=$(node --input-type=module -e "import{pathToFileURL}from'node:url';const{resolveToken,clearTokenCache}=await import(pathToFileURL('{team_root}/packages/squad-sdk/dist/identity/tokens.js').href);clearTokenCache();const t=await resolveToken('{team_root}','{role_slug}');if(t)process.stdout.write(t);else process.exit(1)")
-   GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
-     --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
+   TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
+   if [ -n "$TOKEN" ]; then
+     GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
+       --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
    ⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
    🌿 Branch: \`squad/{issue-number}-{slug}\`"
+   else
+     gh issue comment {number} --repo {owner}/{repo} \
+       --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
+   ⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+   🌿 Branch: \`squad/{issue-number}-{slug}\`"
+   fi
    ```
 
 2. **Move the issue to "In Progress" on the project board:**
    ```bash
-   GH_TOKEN=$TOKEN gh api graphql -f query='
-     mutation { updateProjectV2ItemFieldValue(input: {
-       projectId: "{project-node-id}", itemId: "{item-node-id}",
-       fieldId: "{status-field-id}",
-       value: { singleSelectOptionId: "{in-progress-option-id}" }
-     }) { projectV2Item { id } } }'
+   if [ -n "$TOKEN" ]; then
+     GH_TOKEN=$TOKEN gh api graphql -f query='
+       mutation { updateProjectV2ItemFieldValue(input: {
+         projectId: "{project-node-id}", itemId: "{item-node-id}",
+         fieldId: "{status-field-id}",
+         value: { singleSelectOptionId: "{in-progress-option-id}" }
+       }) { projectV2Item { id } } }'
+   else
+     gh api graphql -f query='
+       mutation { updateProjectV2ItemFieldValue(input: {
+         projectId: "{project-node-id}", itemId: "{item-node-id}",
+         fieldId: "{status-field-id}",
+         value: { singleSelectOptionId: "{in-progress-option-id}" }
+       }) { projectV2Item { id } } }'
+   fi
    ```
 
 > Falls back to default `gh` auth if bot token fails. Do NOT block work.

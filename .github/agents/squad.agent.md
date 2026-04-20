@@ -341,7 +341,7 @@ prompt: |
   {% endif %}
 
   {only if identity configured:}
-  GIT IDENTITY: Commit as `{app_slug}[bot]`. Push with token: `TOKEN=$(node --input-type=module -e "import{pathToFileURL}from'node:url';const{resolveToken,clearTokenCache}=await import(pathToFileURL('{team_root}/packages/squad-sdk/dist/identity/tokens.js').href);clearTokenCache();const t=await resolveToken('{team_root}','{role_slug}');if(t)process.stdout.write(t);else process.exit(1)"); git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git BRANCH`. PR body: `🤖 [{app_slug}](https://github.com/apps/{app_slug})`.
+  GIT IDENTITY: Commit as `{app_slug}[bot]`. Resolve the token with `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")` and, if present, push with `git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git BRANCH`; otherwise fall back to default auth with `git push origin BRANCH`. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
   {end identity block}
 
   TASK: {specific task description}
@@ -843,15 +843,15 @@ prompt: |
   
   **Resolve token at runtime:**
   ```bash
-  TOKEN=$(node --input-type=module -e "import{pathToFileURL}from'node:url';const{resolveToken,clearTokenCache}=await import(pathToFileURL('{team_root}/packages/squad-sdk/dist/identity/tokens.js').href);clearTokenCache();const t=await resolveToken('{team_root}','{role_slug}');if(t)process.stdout.write(t);else process.exit(1)")
+  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" "{role_slug}")
   ```
-  If token resolution fails (no identity configured), fall back to default git auth — do NOT block on identity.
+  `resolve-token.mjs` applies the configured role-to-app mapping and falls back to the lead app when a role-specific registration is unavailable. If token resolution fails, fall back to default git auth — do NOT block on identity.
   
   **Git commit identity:**
   - `git -c user.name="{app_slug}[bot]" -c user.email="{app_slug}[bot]@users.noreply.github.com" commit ...`
   
-  **Push:** `git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git {branch}`
-  **PR create:** `GH_TOKEN=$TOKEN gh pr create ...`
+  **Push:** `if [ -n "$TOKEN" ]; then git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git {branch}; else git push origin {branch}; fi`
+  **PR create:** `if [ -n "$TOKEN" ]; then GH_TOKEN=$TOKEN gh pr create ...; else gh pr create ...; fi`
   **PR body must include:** `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`
   
   **Never log or echo the token value.**
