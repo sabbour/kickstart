@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/lib/sanitize-tool-output
+ * @module @aks-kickstart/api/lib/sanitize-tool-output
  *
  * Sanitizes tool output before it is sent to the LLM context or streamed to
  * the client.  Guards against prompt-injection persistence and sensitive data

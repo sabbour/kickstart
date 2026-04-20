@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/functions/playground
+ * @module @aks-kickstart/api/functions/playground
  *
  * POST /api/playground — Dedicated endpoint for the A2UI Playground Create tab.
  *

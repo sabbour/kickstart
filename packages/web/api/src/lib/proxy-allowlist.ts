@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/lib/proxy-allowlist
+ * @module @aks-kickstart/api/lib/proxy-allowlist
  *
  * Host allowlist validation for CORS proxy endpoints.
  *

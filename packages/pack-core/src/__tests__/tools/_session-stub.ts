@@ -1,11 +1,11 @@
 /**
  * Minimal SessionCtx stub shared across Phase C tool tests.
  *
- * Replace with the real factory from @kickstart/harness once SessionCtx
+ * Replace with the real factory from @aks-kickstart/harness once SessionCtx
  * has a concrete constructor / builder in the runtime package.
  */
 
-import type { SessionCtx } from '@kickstart/harness';
+import type { SessionCtx } from '@aks-kickstart/harness';
 
 export function makeSessionCtx(
   overrides: Partial<SessionCtx> = {},

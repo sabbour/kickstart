@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Artifact } from '@kickstart/harness';
+import type { Artifact } from '@aks-kickstart/harness';
 
 interface ArtifactContextValue {
   artifacts: Artifact[];

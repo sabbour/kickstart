@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/functions/pricing-proxy
+ * @module @aks-kickstart/api/functions/pricing-proxy
  *
  * GET /api/pricing-proxy — CORS proxy for Azure Retail Prices API.
  *

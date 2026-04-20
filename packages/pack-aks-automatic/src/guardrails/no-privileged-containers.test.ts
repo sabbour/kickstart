@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { noPrivilegedContainersGuardrail } from './no-privileged-containers.js';
-import type { GuardrailInput } from '@kickstart/harness';
+import type { GuardrailInput } from '@aks-kickstart/harness';
 
 const BASE = `
 apiVersion: apps/v1

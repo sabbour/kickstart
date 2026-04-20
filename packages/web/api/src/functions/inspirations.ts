@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/functions/inspirations
+ * @module @aks-kickstart/api/functions/inspirations
  *
  * GET /api/inspirations — Returns carousel inspiration ideas for the landing page.
  * GET /api/inspirations?stream=true — Streams a single inspiration idea token-by-token.

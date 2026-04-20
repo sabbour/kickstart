@@ -1,12 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
 import type { A2uiClientAction } from '../vendor/a2ui/web_core/schema/client-to-server';
-import type { APIConnectorRegistry } from '@kickstart/harness';
+import type { APIConnectorRegistry } from '@aks-kickstart/harness';
 import {
   shouldAutoContinue,
   synthesizeContinuationPrompt,
   synthesizeNavigationPrompt,
   AUTO_CONTINUE_MAX_CONSECUTIVE,
-} from '@kickstart/harness';
+} from '@aks-kickstart/harness';
 import { sanitizeActionContext } from '../utils/sanitize-action-context';
 import type { UserActionReqPayload } from './useStreaming';
 import { clientRegistry } from '../contexts/A2UIRegistryContext';

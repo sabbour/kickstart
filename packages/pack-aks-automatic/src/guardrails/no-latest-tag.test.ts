@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { noLatestTagGuardrail } from './no-latest-tag.js';
-import type { GuardrailInput } from '@kickstart/harness';
+import type { GuardrailInput } from '@aks-kickstart/harness';
 
 const BASE_MANIFEST = `
 apiVersion: apps/v1

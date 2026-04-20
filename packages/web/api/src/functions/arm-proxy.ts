@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/functions/arm-proxy
+ * @module @aks-kickstart/api/functions/arm-proxy
  *
  * ANY /api/arm-proxy/{*path} — CORS proxy for Azure Resource Manager API.
  *

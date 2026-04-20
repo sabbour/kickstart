@@ -26,7 +26,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // ── Module stub — remove when pack-core ships ────────────────────────────────
-vi.mock('@kickstart/pack-core', () => {
+vi.mock('@aks-kickstart/pack-core', () => {
   // Minimal React stubs so the file loads without real component code
   return {
     Button: () => null,
@@ -51,7 +51,7 @@ vi.mock('@kickstart/pack-core', () => {
 //   ProgressSteps,
 //   FileEditor,
 //   Markdown,
-// } from '@kickstart/pack-core';
+// } from '@aks-kickstart/pack-core';
 
 // ── A2UI adapter context stub ─────────────────────────────────────────────────
 // Components expect a ComponentContext from the A2UI adapter.
@@ -98,7 +98,7 @@ describe('core/AuthCard', () => {
   it.todo('renders without throwing with status="authenticated"');
   it.todo('renders without throwing with status="error" and errorMessage prop');
   it.todo('produces a DOM element (container not empty)');
-  it.todo('does not import from @kickstart/pack-azure (domain-neutral requirement)');
+  it.todo('does not import from @aks-kickstart/pack-azure (domain-neutral requirement)');
 });
 
 // ── Additional rich component smoke tests ────────────────────────────────────
@@ -129,8 +129,8 @@ describe('core/FileEditor', () => {
 // ── Catalog coverage ──────────────────────────────────────────────────────────
 
 describe('component catalog coverage', () => {
-  it.todo('all 27 basic components are exported from @kickstart/pack-core');
-  it.todo('all 12 rich components are exported from @kickstart/pack-core');
+  it.todo('all 27 basic components are exported from @aks-kickstart/pack-core');
+  it.todo('all 12 rich components are exported from @aks-kickstart/pack-core');
   it.todo('no component export is undefined or null');
   it.todo('each exported component has a .schema property (Zod schema)');
   it.todo('each exported component is a function (React component)');

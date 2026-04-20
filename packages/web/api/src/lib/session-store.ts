@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/lib/session-store
+ * @module @aks-kickstart/api/lib/session-store
  *
  * In-memory session store with TTL cleanup.
  * Stores conversation state for the web surface API.
@@ -10,14 +10,14 @@ import {
   Phase,
   SETUP_GENERATION_STEP_ORDER,
   buildSystemPrompt,
-} from "@kickstart/harness";
+} from "@aks-kickstart/harness";
 import type {
   SessionState,
   ConversationMessage,
   CostEstimateProps,
   SetupGenerationRunState,
   SetupGenerationSnapshot,
-} from "@kickstart/harness";
+} from "@aks-kickstart/harness";
 import {
   cloneSetupGenerationRun,
   isValidSetupGenerationSnapshot,

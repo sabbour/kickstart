@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/mcp-server/a2ui
+ * @module @aks-kickstart/mcp-server/a2ui
  *
  * Helper to wrap A2UI component trees as MCP embedded resources
  * with the application/json+a2ui MIME type.
@@ -10,7 +10,7 @@
  * - No A2UI support → text-only responses
  */
 
-import type { A2UIDocument, Component, CardComponent, TextComponent, ColumnComponent } from "@kickstart/harness";
+import type { A2UIDocument, Component, CardComponent, TextComponent, ColumnComponent } from "@aks-kickstart/harness";
 
 /** MIME type for A2UI JSON payloads in MCP embedded resources. */
 export const A2UI_MIME_TYPE = "application/json+a2ui" as const;

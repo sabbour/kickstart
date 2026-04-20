@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/functions/generate
+ * @module @aks-kickstart/api/functions/generate
  *
  * POST /api/generate — Code generation endpoint powered by the configured
  * coding deployment

@@ -9,12 +9,12 @@
  * rejecting. Error-case tests check the returned string.
  *
  * @depends Phase C of #477 (emit_ui.ts must exist)
- * @depends #475 A2UIMessageSchema on @kickstart/harness
+ * @depends #475 A2UIMessageSchema on @aks-kickstart/harness
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RunContext } from '@openai/agents';
-import { A2UIMessageSchema, A2UI_VERSION } from '@kickstart/harness';
+import { A2UIMessageSchema, A2UI_VERSION } from '@aks-kickstart/harness';
 import { emitUiTool } from '../../tools/emit_ui.js';
 import { makeSessionCtx } from './_session-stub.js';
 

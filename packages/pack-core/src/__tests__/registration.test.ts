@@ -3,7 +3,7 @@
  * @suite 6c — Pack registration smoke test (pack-core)
  *
  * Verifies that `corePack` can be registered on a live `PackRegistry`
- * (from @kickstart/harness, shipped by #476) and that all contributions
+ * (from @aks-kickstart/harness, shipped by #476) and that all contributions
  * are enumerable after registration.
  *
  * This suite is the **blocking done-criterion** for #477 — no green test,
@@ -16,7 +16,7 @@
  * can be loaded without resolution errors. Remove both mocks once the
  * real packages ship.
  *
- * @depends #476 (PackRegistry on @kickstart/harness)
+ * @depends #476 (PackRegistry on @aks-kickstart/harness)
  * @depends #477 Phase H (corePack manifest fully wired)
  */
 
@@ -24,8 +24,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // ── Module stubs — remove when #476 and #477 ship ───────────────────────────
 
-vi.mock('@kickstart/harness', async (importOriginal) => {
-  const real = await importOriginal<typeof import('@kickstart/harness')>();
+vi.mock('@aks-kickstart/harness', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@aks-kickstart/harness')>();
   return {
     ...real,
     // PackRegistry will be added by #476; stub here until then
@@ -47,7 +47,7 @@ vi.mock('@kickstart/harness', async (importOriginal) => {
   };
 });
 
-vi.mock('@kickstart/pack-core', () => ({
+vi.mock('@aks-kickstart/pack-core', () => ({
   corePack: {
     name: 'core',
     version: '0.1.0',
@@ -65,8 +65,8 @@ vi.mock('@kickstart/pack-core', () => ({
 }));
 
 // When #476 and #477 ship, replace with real imports:
-// import { PackRegistry } from '@kickstart/harness';
-// import { corePack } from '@kickstart/pack-core';
+// import { PackRegistry } from '@aks-kickstart/harness';
+// import { corePack } from '@aks-kickstart/pack-core';
 
 // ── Registration smoke test ──────────────────────────────────────────────────
 
@@ -137,6 +137,6 @@ describe('corePack registration', () => {
 
   describe('standalone harness compile (no other packs)', () => {
     it.todo('a PackRegistry with only corePack registered compiles without errors');
-    it.todo('no imports from @kickstart/pack-azure, @kickstart/pack-aks, or @kickstart/pack-github exist in pack-core source');
+    it.todo('no imports from @aks-kickstart/pack-azure, @aks-kickstart/pack-aks, or @aks-kickstart/pack-github exist in pack-core source');
   });
 });

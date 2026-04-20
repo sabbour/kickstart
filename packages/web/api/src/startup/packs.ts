@@ -1,5 +1,5 @@
-import type { Pack } from '@kickstart/harness';
-import { PackRegistry } from '@kickstart/harness/runtime/registry';
+import type { Pack } from '@aks-kickstart/harness';
+import { PackRegistry } from '@aks-kickstart/harness/runtime/registry';
 import { Logger } from '../lib/logger.js';
 import { corePackServer } from '../../../../pack-core/src/server-manifest.js';
 import { azurePackServer } from '../../../../pack-azure/src/server-manifest.js';

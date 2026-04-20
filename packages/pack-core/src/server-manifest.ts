@@ -15,9 +15,9 @@
  */
 
 import { z } from 'zod';
-import type { Pack } from '@kickstart/harness';
-import type { ComponentContribution } from '@kickstart/harness';
-import { resolveAssetURL } from '@kickstart/harness/runtime/asset-url';
+import type { Pack } from '@aks-kickstart/harness';
+import type { ComponentContribution } from '@aks-kickstart/harness';
+import { resolveAssetURL } from '@aks-kickstart/harness/runtime/asset-url';
 import { BASIC_COMPONENTS } from './vendor/a2ui/web_core/basic_catalog/components/basic_components.js';
 
 // Tools (no JSX)

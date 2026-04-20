@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { MessageBar, MessageBarBody } from '@fluentui/react-components';
-import type { PlaygroundStub } from '@kickstart/harness';
-import type { PlaygroundScenario, ComponentContribution } from '@kickstart/harness';
+import type { PlaygroundStub } from '@aks-kickstart/harness';
+import type { PlaygroundScenario, ComponentContribution } from '@aks-kickstart/harness';
 
 /**
  * Browser-readable surface of PackRegistry.

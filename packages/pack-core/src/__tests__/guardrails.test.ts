@@ -13,7 +13,7 @@ import { tokenBudgetGuardrail } from '../guardrails/token_budget.js';
 import { noPiiInLogsGuardrail } from '../guardrails/no_pii_in_logs.js';
 import { noSecretsInArtifactsGuardrail } from '../guardrails/no_secrets_in_artifacts.js';
 import { noCredentialLeakGuardrail } from '../guardrails/no-credential-leak.js';
-import type { GuardrailInput } from '@kickstart/harness';
+import type { GuardrailInput } from '@aks-kickstart/harness';
 
 // ── token-budget ─────────────────────────────────────────────────────────────
 

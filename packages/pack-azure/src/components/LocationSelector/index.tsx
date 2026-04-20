@@ -1,7 +1,7 @@
 import React from 'react';
 import { z } from 'zod';
 import { Card, CardHeader, Text, tokens, makeStyles } from '@fluentui/react-components';
-import type { ComponentContribution } from '@kickstart/harness';
+import type { ComponentContribution } from '@aks-kickstart/harness';
 
 const LocationItemSchema = z.object({
   name: z.string().describe('ARM region name, e.g. "eastus"'),

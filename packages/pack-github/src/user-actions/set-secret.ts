@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { UserActionContribution } from '@kickstart/harness';
+import type { UserActionContribution } from '@aks-kickstart/harness';
 
 const SetSecretParametersSchema = z.object({
   owner: z.string().describe('Repository owner (org or user login)'),

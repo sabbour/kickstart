@@ -1,5 +1,5 @@
 {
-  "name": "@kickstart/api",
+  "name": "@aks-kickstart/api",
   "version": "1.0.0",
   "private": true,
   "description": "Azure Functions API for Kickstart web surface — LLM proxy",
@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@azure/functions": "^4.6.0",
-    "@kickstart/harness": "file:../../harness",
+    "@aks-kickstart/harness": "*",
     "bicep-node": "^0.0.9",
     "vite": "^8.0.9"
   },

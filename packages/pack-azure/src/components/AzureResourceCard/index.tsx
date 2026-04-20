@@ -1,7 +1,7 @@
 import React from 'react';
 import { z } from 'zod';
 import { Card, CardHeader, Badge, Text, tokens, makeStyles } from '@fluentui/react-components';
-import type { ComponentContribution } from '@kickstart/harness';
+import type { ComponentContribution } from '@aks-kickstart/harness';
 
 const AzureResourceCardSchema = z.object({
   resourceName: z.string().describe('Azure resource display name'),

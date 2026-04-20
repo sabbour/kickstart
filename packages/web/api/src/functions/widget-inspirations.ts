@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/functions/widget-inspirations
+ * @module @aks-kickstart/api/functions/widget-inspirations
  *
  * GET /api/inspirations/widgets — Returns widget inspiration ideas for the Playground.
  *

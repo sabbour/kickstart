@@ -14,8 +14,8 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { handleAction } from "../tools/action.js";
-import type { SessionState } from "@kickstart/harness";
-import { Phase } from "@kickstart/harness";
+import type { SessionState } from "@aks-kickstart/harness";
+import { Phase } from "@aks-kickstart/harness";
 
 // ── Helpers ─────────────────────────────────────────────────────────
 

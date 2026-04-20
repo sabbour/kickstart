@@ -7,7 +7,7 @@ import { VirtualFSProvider } from './contexts/VirtualFSContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { DebugProvider } from './contexts/DebugContext';
 import { A2UIRegistryProvider, clientRegistry } from './contexts/A2UIRegistryContext';
-import { InMemoryArtifactStore } from '@kickstart/harness';
+import { InMemoryArtifactStore } from '@aks-kickstart/harness';
 
 // ---------------------------------------------------------------------------
 // Phase A bootstrap ordering (DP Step 10)

@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/mcp-server/tools/generate-manifests
+ * @module @aks-kickstart/mcp-server/tools/generate-manifests
  *
  * Tool handler: Generate Kubernetes manifests from conversation state.
  * After generation, validates against deployment safeguards (D13) and
@@ -10,7 +10,7 @@ import {
   generateKubernetesManifests,
   generateGitHubActionsWorkflow,
   DEPLOYMENT_SAFEGUARDS,
-} from "@kickstart/harness";
+} from "@aks-kickstart/harness";
 import type {
   SessionState,
   AppDefinition,
@@ -24,7 +24,7 @@ import type {
   CardComponent,
   TextComponent,
   RowComponent,
-} from "@kickstart/harness";
+} from "@aks-kickstart/harness";
 import { createA2UIResource } from "../a2ui.js";
 import type { A2UICapability } from "../a2ui.js";
 

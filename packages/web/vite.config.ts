@@ -92,7 +92,7 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
     alias: {
       '@': resolve(__dirname, 'src'),
-      '@kickstart/harness': resolve(__dirname, '../harness/src/index.ts'),
+      '@aks-kickstart/harness': resolve(__dirname, '../harness/src/index.ts'),
       react: resolve(__dirname, 'node_modules/react'),
       'react-dom': resolve(__dirname, 'node_modules/react-dom'),
     },

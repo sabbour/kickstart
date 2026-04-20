@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/lib/content-safety
+ * @module @aks-kickstart/api/lib/content-safety
  *
  * Lightweight LLM-based content safety pre-flight check for user input.
  * Uses minimal tokens to keep the check fast and cheap.

@@ -1,4 +1,4 @@
-import type { Pack, ComponentContribution } from '@kickstart/harness';
+import type { Pack, ComponentContribution } from '@aks-kickstart/harness';
 
 // Tools
 import { armGetTool } from './tools/arm-get.js';
