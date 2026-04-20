@@ -25,6 +25,10 @@ jobs:
             const fs = require('fs');
             const issue = context.payload.issue;
             const label = context.payload.label.name;
+            const issueLabels = (issue.labels || []).map((entry) =>
+              typeof entry === 'string' ? entry : entry.name
+            );
+            const hasEstimate = issueLabels.some((name) => name?.startsWith('estimate:'));
 
             // Extract member name from label (e.g., "squad:ripley" → "ripley")
             const memberName = label.replace('squad:', '').toLowerCase();
@@ -104,6 +108,16 @@ jobs:
                 `> Otherwise, start a Copilot session and say:`,
                 `> \`${assignedMember.name}, work on issue #${issue.number}\``,
               ].join('\n');
+            }
+
+            if (!hasEstimate) {
+              comment += [
+                '',
+                `⚠️ **Estimate missing**`,
+                `Add exactly one of \`estimate:S\`, \`estimate:M\`, \`estimate:L\`, or \`estimate:XL\` before the Design Proposal is reviewed.`,
+                `Calibration: S≈2h (1 point), M≈8h (3 points), L≈24h (8 points), XL≈80h (20 points).`
+              ].join('\n');
+              core.warning(`Issue #${issue.number} is missing an estimate label`);
             }
 
             await github.rest.issues.createComment({
