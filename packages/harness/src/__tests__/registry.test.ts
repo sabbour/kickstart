@@ -85,7 +85,38 @@ Hello world.
     expect(agent.modelInvocable).toBe(true);
   });
 
-  it('accepts model-invocable and userActions aliases in file-backed agents', () => {
+  it('preserves colon-namespaced user action ids in agent allowlists', () => {
+    const agentsDir = fileDir('pack-user-action/agents');
+    const filePath = writeFixture('pack-user-action/agents/github.login.agent.md', `---
+name: github.login
+description: Login helper
+model:
+  envVar: KICKSTART_MODEL
+tools: []
+userActions:
+  - github:login
+handoffs: []
+user-invocable: false
+---
+
+Handle login.
+`);
+
+    const pack: Pack = {
+      name: 'github',
+      version: '1.0.0',
+      agentsDir,
+    };
+
+    const agent = loadAgentFile(pack, filePath, {
+      tools: new Map(),
+      userActions: new Map([['github:login', makeUserAction('github:login')]]),
+    });
+
+    expect(agent.toolAllowlist).toEqual(['github:login']);
+  });
+
+  it('accepts model-invocable aliases in file-backed agents', () => {
     const agentsDir = fileDir('pack-alias/agents');
     const filePath = writeFixture('pack-alias/agents/github.publisher.agent.md', `---
 name: github.publisher
