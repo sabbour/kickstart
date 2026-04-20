@@ -22,19 +22,19 @@
   },
   "dependencies": {
     "@kickstart/harness": "*",
-    "@openai/agents": "*",
+    "@openai/agents": "^0.8.4",
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "typescript": "*",
-    "vitest": "*",
     "@fluentui/react-components": "*",
-    "@fluentui/react-icons": "*"
+    "@fluentui/react-icons": "*",
+    "typescript": "*",
+    "vitest": "*"
   },
   "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
     "@fluentui/react-components": "^9.0.0",
-    "@fluentui/react-icons": "^2.0.0"
+    "@fluentui/react-icons": "^2.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
   }
 }
