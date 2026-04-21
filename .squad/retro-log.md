@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #925 "fix: Build and deploy pipeline reliability (fixes #919)" | S | impl=0m | review=8m | cycles=1 | merged | @sabbour | first_review=6m | ci=5m | reviewer=human | human_comments=4 | issue=#919 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-20 | #911 "fix: skip Oryx API build to use pre-resolved workspace packages" | S | impl=0m | review=3m | cycles=1 | merged | @sabbour | first_review=0m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-20 | #910 "release: v1.0.2" | S | impl=12m | review=4m | cycles=1 | merged | @sabbour | first_review=0m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
