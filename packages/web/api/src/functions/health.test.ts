@@ -42,11 +42,11 @@ vi.mock("../lib/logger.js", () => ({
 }));
 
 vi.mock("../lib/appinsights.js", () => ({
-  getAppInsightsClient: vi.fn(() => ({
-    trackEvent: vi.fn(),
-    trackException: vi.fn(),
-  })),
+  trackException: vi.fn(),
+  trackEvent: vi.fn(),
+  trackTrace: vi.fn(),
   flushAppInsights: vi.fn().mockResolvedValue(undefined),
+  initializeAppInsights: vi.fn(),
 }));
 
 vi.mock("../telemetry/sanitize-error.js", () => ({

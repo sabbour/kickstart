@@ -101,6 +101,14 @@ function makeRegistry(overrides: Partial<{
 let packsHandler: (request: unknown, context: unknown) => Promise<unknown>;
 
 beforeAll(async () => {
+    // Mock appinsights so the side-effectful module init doesn't touch OTel globals.
+    vi.doMock('../lib/appinsights.js', () => ({
+      trackException: vi.fn(),
+      trackEvent: vi.fn(),
+      trackTrace: vi.fn(),
+      flushAppInsights: vi.fn().mockResolvedValue(undefined),
+      initializeAppInsights: vi.fn(),
+    }));
   await import('./packs.js');
   const handler = registeredHandlers.get('packs');
   if (!handler) throw new Error('packs handler not registered');
@@ -221,8 +229,10 @@ describe('GET /api/packs — error path', () => {
 
     expect(res.status).toBe(500);
 
-    // Opaque error message only
-    expect(res.jsonBody.error).toBe('Registry initialization failed. See server logs.');
+    // Opaque error message per DP #1030 amendment 1 (Nibbler C4): stable label + requestId
+    expect(res.jsonBody.error).toBe('Pack registry unavailable');
+    expect(typeof res.jsonBody.requestId).toBe('string');
+    expect(res.jsonBody.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
 
     // Critically: none of the sensitive error content appears in the response
     const body = JSON.stringify(res.jsonBody);
