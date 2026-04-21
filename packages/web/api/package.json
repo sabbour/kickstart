@@ -12,8 +12,9 @@
     "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
   },
   "dependencies": {
-    "@azure/functions": "^4.6.0",
     "@aks-kickstart/harness": "*",
+    "@azure/functions": "^4.6.0",
+    "@azure/monitor-opentelemetry": "^1.16.0",
     "applicationinsights": "^3.14.0",
     "bicep-node": "^0.0.9",
     "vite": "^8.0.9"
