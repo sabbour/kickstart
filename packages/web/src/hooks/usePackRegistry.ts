@@ -26,9 +26,15 @@ interface PlaygroundScenarioDTO {
   group?: string;
 }
 
+interface PackLoadErrorDTO {
+  packId: string;
+  reason: string;
+}
+
 interface PacksDTO {
   components: ComponentDTO[];
   playgroundScenarios: PlaygroundScenarioDTO[];
+  loadErrors?: PackLoadErrorDTO[];
 }
 
 // ── DTO adapters ──────────────────────────────────────────────────────────────

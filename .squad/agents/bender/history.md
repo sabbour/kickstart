@@ -10,6 +10,7 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - `packages/core/src/kits/` — IntegrationKit framework
 
 ## Recent Work
+- 2026-04-21: **#1027 implementation complete** — PR #1029 opened. Fixed `a2ui-media-discipline/SKILL.md` manifest; hardened `getRegistry()` with per-pack quarantine; closed pre-existing raw error leak in `/api/packs`; added degraded health mode; 6/6 tests passing (all 5 Nibbler cases + Leela C1 core hard-stop). Awaiting PR Review Gate.
 - v2 #474 DP: seam-cutting pass required, APPROVE_WITH_CONDITIONS
 - Agents SDK adapter (#445): behind KICKSTART_AGENTS_SDK flag, 1511 tests
 - Security sprint: API hardening, rate limiting, CodeQL fixes

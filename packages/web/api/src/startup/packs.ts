@@ -9,6 +9,14 @@ import { randomUUID } from 'crypto';
 import { getCredentialConfig } from './credentials.js';
 
 let _registry: PackRegistry | null = null;
+let _loadErrors: PackLoadError[] = [];
+
+export type PackLoadErrorReason = 'schema_validation' | 'parse_error' | 'unknown';
+
+export interface PackLoadError {
+  packId: string;
+  reason: PackLoadErrorReason;
+}
 
 /**
  * Pack identifiers understood by `KICKSTART_PACKS`. The order here defines
@@ -38,6 +46,43 @@ function parseEnabledPacks(raw: string | undefined): PackId[] {
   return PACK_ORDER.filter((id): id is PackId => requested.has(id));
 }
 
+function classifyLoadError(err: unknown): PackLoadErrorReason {
+  if (
+    err !== null &&
+    typeof err === 'object' &&
+    'issues' in err &&
+    Array.isArray((err as Record<string, unknown>).issues)
+  ) {
+    return 'schema_validation';
+  }
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    if (msg.includes('frontmatter') || msg.includes('yaml') || msg.includes('parse')) {
+      return 'parse_error';
+    }
+  }
+  return 'unknown';
+}
+
+
+/**
+ * Returns the pack load errors collected during the last registry initialization.
+ * Returns an empty array when all packs loaded successfully.
+ * Resets automatically on the next successful `getRegistry()` call.
+ */
+export function getLoadErrors(): PackLoadError[] {
+  return [..._loadErrors];
+}
+
+/**
+ * Reset module state — exposed for testing only.
+ * @internal
+ */
+export function _resetRegistryState(): void {
+  _registry = null;
+  _loadErrors = [];
+}
+
 /**
  * Returns the sealed PackRegistry singleton.
  *
@@ -45,20 +90,21 @@ function parseEnabledPacks(raw: string | undefined): PackId[] {
  * call; subsequent calls return the same sealed instance (safe for Azure
  * Functions warm-start sharing).
  *
- * The enabled pack set is controlled by `KICKSTART_PACKS` (comma-separated
- * list of pack ids: `core`, `azure`, `aks`, `github`). When unset or empty,
- * all four packs are enabled. `core` is always registered regardless of
- * configuration because every other pack depends on it.
+ * Fail-soft: if a non-core pack fails to register (e.g. bad SKILL.md
+ * frontmatter), it is quarantined — its error is recorded in `loadErrors[]`
+ * and healthy packs continue to load. The registry seals and the API stays up.
  *
- * Validates credentials on first call before registering packs. Throws if
- * pack initialization fails (e.g., manifest imports fail, assets cannot be
- * resolved, or credentials are misconfigured). Caller must handle and
- * recover gracefully.
+ * Hard stop: if the `core` pack fails (it is a universal dependency for every
+ * agent and every other pack), the error is rethrown immediately and the
+ * registry is not set.
  *
- * Logs startup events to Azure Application Insights via structured JSON logging.
+ * Callers can inspect `getLoadErrors()` to surface degraded state to operators.
  */
 export function getRegistry(): PackRegistry {
   if (!_registry) {
+    // Reset load errors on each fresh initialization attempt.
+    _loadErrors = [];
+
     const startupTraceId = process.env.STARTUP_TRACE_ID || randomUUID();
     const mockCtx = {
       log: (msg: string) => {
@@ -118,7 +164,15 @@ export function getRegistry(): PackRegistry {
           error_code: 'MANIFEST_LOAD_FAILED',
           duration_ms: duration,
         });
-        throw err;
+
+        // Leela C1: core pack failure is always a hard stop.
+        // Every agent and every other pack depends on core.
+        if (id === 'core') {
+          throw err;
+        }
+
+        // Non-core packs: quarantine and continue.
+        _loadErrors.push({ packId: id, reason: classifyLoadError(err) });
       }
     }
 
@@ -133,7 +187,8 @@ export function getRegistry(): PackRegistry {
       const duration = Date.now() - sealStartTime;
       logger.info('Registry sealed successfully', {
         source: 'startup',
-        pack_count: enabled.length,
+        pack_count: enabled.length - _loadErrors.length,
+        load_errors: _loadErrors.length,
         duration_ms: duration,
       });
     } catch (err) {
@@ -148,3 +203,5 @@ export function getRegistry(): PackRegistry {
   }
   return _registry;
 }
+
+
