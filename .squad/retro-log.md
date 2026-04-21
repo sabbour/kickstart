@@ -29,6 +29,12 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #946 "feat(api): wire Azure Monitor OpenTelemetry auto-instrumentation (closes #940)" | L | impl=1m | review=0m | cycles=2 | merged-with-rework | @sabbour-squad-backend[bot] | first_review=13m | ci=5m | reviewer=bot | human_comments=0 | issue=#940 | estimate=M | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #945 "fix(playground): render live A2UI component previews in Components tab (#944)" | L | impl=0m | review=13m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=12m | ci=5m | reviewer=bot | human_comments=0 | issue=#944 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #935 "fix(web): Playground uses live /api/packs (#934)" | L | impl=0m | review=5m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=3m | ci=5m | reviewer=bot | human_comments=0 | issue=#934 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #891 "feat(api): Add Application Insights instrumentation for 404 diagnosis" | XL | impl=0m | review=221m | cycles=2 | merged-with-rework | @sabbour | first_review=286m | ci=5m | reviewer=bot | human_comments=3 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:1 | reverted=false
 
 - 2026-04-21 | #924 "fix: Add diagnostic error messages to API health check (#914)" | L | impl=0m | review=76m | cycles=1 | merged-with-rework | @sabbour | first_review=9m | ci=5m | reviewer=human | human_comments=6 | issue=#914 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
