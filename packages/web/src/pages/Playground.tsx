@@ -43,6 +43,7 @@ import {
 } from './playground-icons';
 import { getFluentIcon } from '../catalog/icons/fluent-icons';
 import { apiFetch } from '../services/api-client';
+import { FALLBACK_WIDGET_IDEAS } from '../lib/fallback-ideas';
 
 // ── Module-level stub registry ────────────────────────────────────────────────
 // TODO(Step 5): replace with server-provided registry
@@ -882,9 +883,16 @@ function PlaygroundInner() {
           const ideas = await res.json();
           if (Array.isArray(ideas) && ideas.length > 0) {
             setCreatePrompt(ideas[0].prompt);
+            setInspireLoading(false);
+            return;
           }
         }
-      } catch { /* ignore */ }
+      } catch { /* API call failed */ }
+      // Fallback to client-side ideas if API is unavailable
+      if (FALLBACK_WIDGET_IDEAS.length > 0) {
+        const randomIdx = Math.floor(Math.random() * FALLBACK_WIDGET_IDEAS.length);
+        setCreatePrompt(FALLBACK_WIDGET_IDEAS[randomIdx].prompt);
+      }
       setInspireLoading(false);
     } finally {
       inspireAbortRef.current = null;

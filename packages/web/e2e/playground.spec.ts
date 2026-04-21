@@ -13,12 +13,9 @@ async function openScenario(page: Page, label: string, tab: 'Ideas' | 'Component
   await page.getByRole('dialog').waitFor({ timeout: 5_000 });
 }
 
-// TODO(v2): Playground page fails to render with the helpers.ts auto-fixture
-// that 503s all `/api/**` calls after demo mode was removed in v2 Step 1.
-// The `.playground-page` selector never appears. Tests need to be updated to
-// intercept the specific API calls the v2 Playground requires, or provide a
-// test-mode bypass. Tracked in issue #772.
-test.describe.skip('Playground', () => {
+// TODO(v2): Playground tests re-enabled with mock for /api/inspirations/widgets (#913)
+// The helpers.ts fixture now mocks this endpoint with fallback ideas instead of 503ing.
+test.describe('Playground', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(PLAYGROUND_URL);
     await page.waitForSelector('.playground-page', { timeout: 15_000 });
