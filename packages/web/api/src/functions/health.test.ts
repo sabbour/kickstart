@@ -135,6 +135,53 @@ describe("GET /health (no deep param)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Degraded health check — non-core packs failed, registry still sealed
+// ---------------------------------------------------------------------------
+
+describe("GET /health (degraded — some packs failed)", () => {
+  it("returns HTTP 200 with status:degraded when loadErrors is non-empty", async () => {
+    mockGetLoadErrors.mockReturnValue([
+      { packId: "azure", reason: "schema_validation" },
+    ]);
+
+    const res = (await healthHandler(makeRequest(), makeContext())) as {
+      status: number;
+      jsonBody: Record<string, unknown>;
+    };
+
+    // HTTP 200 — not 503 (avoids Azure health probes taking down the SWA)
+    expect(res.status).toBe(200);
+    expect(res.jsonBody.status).toBe("degraded");
+    expect(res.jsonBody.registry).toBe("ready");
+
+    // loadErrors appears on the body with the sanitized shape
+    const loadErrors = res.jsonBody.loadErrors as Array<{ packId: string; reason: string }>;
+    expect(loadErrors).toHaveLength(1);
+    expect(loadErrors[0]).toEqual({ packId: "azure", reason: "schema_validation" });
+
+    // No raw error strings on an unauthenticated endpoint
+    const body = JSON.stringify(res.jsonBody);
+    expect(body).not.toContain("ZodError");
+    expect(body).not.toContain("/home/");
+    expect(body).not.toContain("wwwroot");
+  });
+
+  it("returns HTTP 200 with status:ok when loadErrors is empty", async () => {
+    mockGetLoadErrors.mockReturnValue([]);
+
+    const res = (await healthHandler(makeRequest(), makeContext())) as {
+      status: number;
+      jsonBody: Record<string, unknown>;
+    };
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody.status).toBe("ok");
+    // loadErrors should not be on the body in the healthy case
+    expect(res.jsonBody.loadErrors).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Deep health check — LLM probe
 // ---------------------------------------------------------------------------
 
