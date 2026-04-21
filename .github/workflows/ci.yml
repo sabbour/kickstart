@@ -110,7 +110,10 @@ jobs:
 
       - name: Changeset status
         if: steps.docs_gate.outputs.requireChangeset == 'true'
-        run: npx changeset status
+        run: |
+          # Create a local main branch for changesets to compare against
+          git fetch origin main:main --no-tags || git fetch origin main:main
+          npx changeset status
 
   e2e:
     name: Playwright E2E Tests
