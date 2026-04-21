@@ -77,31 +77,53 @@ jobs:
             }
             const leelaApproved = labels.has('leela:approved');
             const zappApproved = labels.has('zapp:approved');
+            const nibblerApproved = labels.has('nibbler:approved');
+            const docsApproved = labels.has('docs:approved');
+            const docsNotApplicable = labels.has('docs:not-applicable');
+            const leelaRejected = labels.has('leela:rejected');
+            const zappRejected = labels.has('zapp:rejected');
+            const nibblerRejected = labels.has('nibbler:rejected');
+            const docsRejected = labels.has('docs:rejected');
             const isLowRisk = labels.has(LOW_RISK_LABEL);
             const touchesSensitivePaths = changedFiles.some(isSensitivePath);
             const hasSecuritySignals = isSecurityPatch(pr, labels);
 
             const requiresZapp = !isLowRisk || hasSecuritySignals || touchesSensitivePaths;
-            const requiredApprovals = ['leela:approved'];
+            // Nibbler (code quality) is required on every path — per .squad/ceremonies.md
+            // the 4-way gate is the standard. Code review is cheap and Nibbler is fast,
+            // so low-risk PRs still get a code-quality pass.
+            const requiredApprovals = ['leela:approved', 'nibbler:approved'];
             if (requiresZapp) {
               requiredApprovals.push('zapp:approved');
             }
 
+            const hasDocsMarker = docsApproved || docsNotApplicable;
+            const rejectionLabels = [];
+            if (leelaRejected) rejectionLabels.push('leela:rejected');
+            if (zappRejected && requiresZapp) rejectionLabels.push('zapp:rejected');
+            if (nibblerRejected) rejectionLabels.push('nibbler:rejected');
+            if (docsRejected) rejectionLabels.push('docs:rejected');
+
             const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
             const leelaStatus = leelaApproved ? '✅' : '⏳';
             const zappStatus = zappApproved ? '✅' : (requiresZapp ? '⏳' : '➖');
+            const nibblerStatus = nibblerApproved ? '✅' : '⏳';
+            const docsStatus = docsApproved ? '✅' : docsNotApplicable ? '➖ N/A' : '⏳';
 
             let state, description;
-            if (missingApprovals.length === 0) {
+            if (rejectionLabels.length > 0) {
+              state = 'failure';
+              description = `Squad review gate: rejected — ${rejectionLabels.join(', ')}`;
+            } else if (missingApprovals.length === 0 && hasDocsMarker) {
               state = 'success';
               description = isLowRisk && !requiresZapp
-                ? 'Squad review gate: low-risk path Leela ✅'
-                : 'Squad review gate: Leela ✅ Zapp ✅';
+                ? `Squad review gate: low-risk path Leela ✅ Nibbler ✅ Docs ${docsStatus}`
+                : `Squad review gate: Leela ✅ Zapp ✅ Nibbler ✅ Docs ${docsStatus}`;
             } else {
               state = 'pending';
               description = isLowRisk && !requiresZapp
-                ? `Squad review gate: low-risk path Leela ${leelaStatus}`
-                : `Squad review gate: Leela ${leelaStatus} Zapp ${zappStatus}`;
+                ? `Squad review gate: low-risk path Leela ${leelaStatus} Nibbler ${nibblerStatus} Docs ${docsStatus}`
+                : `Squad review gate: Leela ${leelaStatus} Zapp ${zappStatus} Nibbler ${nibblerStatus} Docs ${docsStatus}`;
             }
 
             await github.rest.repos.createCommitStatus({

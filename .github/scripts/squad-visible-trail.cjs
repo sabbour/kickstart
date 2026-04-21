@@ -40,6 +40,46 @@ const REVIEW_LABELS = {
     reviewEvent: 'REQUEST_CHANGES',
     reviewState: 'CHANGES_REQUESTED',
   },
+  'nibbler:approved': {
+    reviewer: 'Nibbler',
+    domain: 'code quality',
+    outcome: 'approved',
+    emoji: '✅',
+    reviewEvent: 'APPROVE',
+    reviewState: 'APPROVED',
+  },
+  'nibbler:rejected': {
+    reviewer: 'Nibbler',
+    domain: 'code quality',
+    outcome: 'rejected',
+    emoji: '🛑',
+    reviewEvent: 'REQUEST_CHANGES',
+    reviewState: 'CHANGES_REQUESTED',
+  },
+  'docs:approved': {
+    reviewer: 'Docs',
+    domain: 'documentation',
+    outcome: 'approved',
+    emoji: '✅',
+    reviewEvent: 'APPROVE',
+    reviewState: 'APPROVED',
+  },
+  'docs:rejected': {
+    reviewer: 'Docs',
+    domain: 'documentation',
+    outcome: 'rejected',
+    emoji: '🛑',
+    reviewEvent: 'REQUEST_CHANGES',
+    reviewState: 'CHANGES_REQUESTED',
+  },
+  'docs:not-applicable': {
+    reviewer: 'Docs',
+    domain: 'documentation',
+    outcome: 'not applicable',
+    emoji: '➖',
+    reviewEvent: 'COMMENT',
+    reviewState: 'COMMENTED',
+  },
 };
 
 function getLabelName(label) {
@@ -192,7 +232,8 @@ function getZappRequirementReason(pr, labels, changedFiles) {
 }
 
 function getRequiredApprovals(pr, labels, changedFiles) {
-  const required = ['leela:approved'];
+  // Nibbler (code quality) is required on every path per the 4-way review gate.
+  const required = ['leela:approved', 'nibbler:approved'];
   const zappRequirementReason = getZappRequirementReason(pr, labels, changedFiles);
 
   if (!labels.has(LOW_RISK_LABEL) || zappRequirementReason) {
@@ -383,24 +424,33 @@ async function handlePullRequestEvent({ github, context, core }) {
   const changedFiles = await listChangedFiles({ github, context, prNumber: pr.number });
   const { required, zappRequirementReason } = getRequiredApprovals(pr, labels, changedFiles);
   const missingApprovals = required.filter((label) => !labels.has(label));
+  const hasDocsMarker = labels.has('docs:approved') || labels.has('docs:not-applicable');
+  const docsRejected = labels.has('docs:rejected');
   const descriptions = await getLabelDescriptions({
     github,
     context,
     labelNames: [...labels].filter(isManagedPrLabel).concat(changedLabel),
   });
   const activeManagedLabels = [...labels].filter(isManagedPrLabel).sort();
-  const hasRejection = labels.has('leela:rejected') || labels.has('zapp:rejected');
+  const hasRejection = labels.has('leela:rejected')
+    || labels.has('zapp:rejected')
+    || labels.has('nibbler:rejected')
+    || docsRejected;
   const zappOptional = labels.has(LOW_RISK_LABEL) && !zappRequirementReason;
 
   const gatePath = !labels.has(LOW_RISK_LABEL)
-    ? 'Standard path — both `leela:approved` and `zapp:approved` are required on the current head.'
+    ? 'Standard path — `leela:approved` + `zapp:approved` + `nibbler:approved` are required on the current head, plus one of `docs:approved` or `docs:not-applicable` for the docs gate.'
     : zappRequirementReason
-      ? `Low-risk label present, but ` + `\`zapp:approved\`` + ` is still required because ${zappRequirementReason}.`
-      : 'Low-risk path — `squad:chore-auto` + `leela:approved` are enough on the current head.';
+      ? `Low-risk label present, but \`zapp:approved\` is still required because ${zappRequirementReason}. Leela + Nibbler + Zapp + docs marker all required.`
+      : 'Low-risk path — `squad:chore-auto` + `leela:approved` + `nibbler:approved` + one of `docs:approved` / `docs:not-applicable` are enough on the current head.';
 
-  const gateSnapshot = missingApprovals.length === 0
+  const gateSnapshot = (missingApprovals.length === 0 && hasDocsMarker && !docsRejected)
     ? '✅ `squad/review-gate` should be green on the current head.'
-    : `⏳ Missing ${missingApprovals.map((label) => `\`${label}\``).join(' + ')} on the current head.`;
+    : docsRejected
+      ? '🛑 `docs:rejected` is present on the current head; the docs gate is failing.'
+      : !hasDocsMarker
+        ? `⏳ Missing docs marker (one of \`docs:approved\` or \`docs:not-applicable\`) on the current head${missingApprovals.length > 0 ? `, plus ${missingApprovals.map((label) => `\`${label}\``).join(' + ')}` : ''}.`
+        : `⏳ Missing ${missingApprovals.map((label) => `\`${label}\``).join(' + ')} on the current head.`;
 
   const mirrorNote = reviewMirror === 'created'
     ? '- Native PR review mirror created for this label event.'
@@ -424,6 +474,8 @@ async function handlePullRequestEvent({ github, context, core }) {
     '**Reviewer labels**',
     `- Leela: ${getReviewerStatus(labels, 'leela')}`,
     `- Zapp: ${getReviewerStatus(labels, 'zapp', zappOptional)}`,
+    `- Nibbler: ${getReviewerStatus(labels, 'nibbler')}`,
+    `- Docs: ${labels.has('docs:approved') ? '✅ approved via `docs:approved`' : labels.has('docs:not-applicable') ? '➖ not applicable via `docs:not-applicable`' : labels.has('docs:rejected') ? '🛑 changes requested via `docs:rejected`' : '⏳ awaiting `docs:approved` or `docs:not-applicable`'}`,
     '',
     buildSection('Active labels', activeManagedLabels, descriptions, 'No active squad review labels.'),
     hasRejection
