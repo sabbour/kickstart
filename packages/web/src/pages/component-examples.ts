@@ -6,6 +6,14 @@
  * array of an `updateComponents` message.  The first component MUST have
  * id="root" so the A2UI surface renders it as the tree root.
  *
+ * IMPORTANT — naming convention:
+ *   • Map KEYS use the pack-qualified id (`core/Text`) because they are matched
+ *     against `comp.name` from the `/api/packs` response.
+ *   • Descriptor `component` VALUES must be the bare renderer name (`Text`)
+ *     because `clientRegistry` keys renderers by `impl.name` (see main.tsx
+ *     and A2UIRegistryContext.tsx). Using `core/Text` here would miss the
+ *     registry and render `_ErrorComponent`. See #954.
+ *
  * Keep entries minimal — the goal is a recognisable thumbnail, not a full demo.
  * Components whose previews require complex setup (e.g. ArchitectureDiagram,
  * FileEditor) are intentionally omitted; ComponentCard falls back gracefully to
@@ -19,17 +27,17 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   // ── Basic components ──────────────────────────────────────────────────────
 
   'core/Text': [
-    { id: 'root', component: 'core/Text', text: 'Hello, world!' },
+    { id: 'root', component: 'Text', text: 'Hello, world!' },
   ],
 
   'core/Button': [
-    { id: 'root', component: 'core/Button', text: 'Click me' },
+    { id: 'root', component: 'Button', text: 'Click me' },
   ],
 
   'core/Image': [
     {
       id: 'root',
-      component: 'core/Image',
+      component: 'Image',
       url: '/assets/icons/fluent/sparkle.svg',
       description: 'Sparkle icon',
       variant: 'icon',
@@ -37,41 +45,41 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   ],
 
   'core/Icon': [
-    { id: 'root', component: 'core/Icon', name: '/assets/icons/fluent/sparkle.svg' },
+    { id: 'root', component: 'Icon', name: '/assets/icons/fluent/sparkle.svg' },
   ],
 
   'core/Link': [
-    { id: 'root', component: 'core/Link', text: 'Open link', url: '#' },
+    { id: 'root', component: 'Link', text: 'Open link', url: '#' },
   ],
 
   'core/Divider': [
-    { id: 'root', component: 'core/Divider' },
+    { id: 'root', component: 'Divider' },
   ],
 
   'core/Alert': [
-    { id: 'root', component: 'core/Alert', text: 'This is an alert message.', intent: 'info' },
+    { id: 'root', component: 'Alert', text: 'This is an alert message.', intent: 'info' },
   ],
 
   'core/TextField': [
-    { id: 'root', component: 'core/TextField', label: 'Name', placeholder: 'Enter your name' },
+    { id: 'root', component: 'TextField', label: 'Name', placeholder: 'Enter your name' },
   ],
 
   'core/CheckBox': [
-    { id: 'root', component: 'core/CheckBox', label: 'Enable feature', checked: false },
+    { id: 'root', component: 'CheckBox', label: 'Enable feature', checked: false },
   ],
 
   'core/Slider': [
-    { id: 'root', component: 'core/Slider', label: 'Volume', min: 0, max: 100, value: 40 },
+    { id: 'root', component: 'Slider', label: 'Volume', min: 0, max: 100, value: 40 },
   ],
 
   'core/DateTimeInput': [
-    { id: 'root', component: 'core/DateTimeInput', label: 'Scheduled date' },
+    { id: 'root', component: 'DateTimeInput', label: 'Scheduled date' },
   ],
 
   'core/ChoicePicker': [
     {
       id: 'root',
-      component: 'core/ChoicePicker',
+      component: 'ChoicePicker',
       label: 'Region',
       choices: [
         { label: 'East US', value: 'eastus' },
@@ -83,36 +91,36 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   'core/Row': [
     {
       id: 'root',
-      component: 'core/Row',
+      component: 'Row',
       children: ['c1', 'c2'],
     },
-    { id: 'c1', component: 'core/Text', text: 'Left' },
-    { id: 'c2', component: 'core/Text', text: 'Right' },
+    { id: 'c1', component: 'Text', text: 'Left' },
+    { id: 'c2', component: 'Text', text: 'Right' },
   ],
 
   'core/Column': [
     {
       id: 'root',
-      component: 'core/Column',
+      component: 'Column',
       children: ['c1', 'c2'],
     },
-    { id: 'c1', component: 'core/Text', text: 'First' },
-    { id: 'c2', component: 'core/Text', text: 'Second' },
+    { id: 'c1', component: 'Text', text: 'First' },
+    { id: 'c2', component: 'Text', text: 'Second' },
   ],
 
   'core/Card': [
     {
       id: 'root',
-      component: 'core/Card',
+      component: 'Card',
       children: ['c1'],
     },
-    { id: 'c1', component: 'core/Text', text: 'Card content' },
+    { id: 'c1', component: 'Text', text: 'Card content' },
   ],
 
   'core/List': [
     {
       id: 'root',
-      component: 'core/List',
+      component: 'List',
       items: ['Item one', 'Item two', 'Item three'],
     },
   ],
@@ -120,7 +128,7 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   'core/Table': [
     {
       id: 'root',
-      component: 'core/Table',
+      component: 'Table',
       columns: [{ label: 'Name', key: 'name' }, { label: 'Status', key: 'status' }],
       rows: [
         { name: 'Alice', status: 'Active' },
@@ -132,17 +140,17 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   // ── Fluent UI overrides ───────────────────────────────────────────────────
 
   'core/Badge': [
-    { id: 'root', component: 'core/Badge', text: 'New', color: 'brand' },
+    { id: 'root', component: 'Badge', text: 'New', color: 'brand' },
   ],
 
   'core/Toggle': [
-    { id: 'root', component: 'core/Toggle', label: 'Dark mode', checked: true },
+    { id: 'root', component: 'Toggle', label: 'Dark mode', checked: true },
   ],
 
   'core/ComboBox': [
     {
       id: 'root',
-      component: 'core/ComboBox',
+      component: 'ComboBox',
       label: 'Framework',
       options: ['React', 'Vue', 'Angular'],
     },
@@ -151,7 +159,7 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   'core/MultiSelect': [
     {
       id: 'root',
-      component: 'core/MultiSelect',
+      component: 'MultiSelect',
       label: 'Tags',
       options: ['production', 'staging', 'dev'],
     },
@@ -162,7 +170,7 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   'core/Markdown': [
     {
       id: 'root',
-      component: 'core/Markdown',
+      component: 'Markdown',
       content: '## Hello\nThis is **Markdown** rendered inline.',
     },
   ],
@@ -170,7 +178,7 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   'core/CodeBlock': [
     {
       id: 'root',
-      component: 'core/CodeBlock',
+      component: 'CodeBlock',
       language: 'typescript',
       code: 'const greet = (name: string) => `Hello, ${name}!`;',
     },
@@ -179,7 +187,7 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   'core/ProgressSteps': [
     {
       id: 'root',
-      component: 'core/ProgressSteps',
+      component: 'ProgressSteps',
       steps: [
         { label: 'Plan', status: 'completed' },
         { label: 'Build', status: 'current' },
@@ -191,7 +199,7 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   'core/DecisionCard': [
     {
       id: 'root',
-      component: 'core/DecisionCard',
+      component: 'DecisionCard',
       title: 'Deploy to production?',
       description: 'This will update the live environment.',
       options: [
@@ -204,7 +212,7 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   'core/SummaryCard': [
     {
       id: 'root',
-      component: 'core/SummaryCard',
+      component: 'SummaryCard',
       title: 'Deployment summary',
       items: [
         { label: 'Cluster', value: 'aks-prod' },
