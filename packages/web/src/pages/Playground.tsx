@@ -20,7 +20,7 @@ import {
 import {
   Dismiss24Regular, Sparkle24Regular,
   Add24Regular, Lightbulb24Regular, Grid24Regular, Icons24Regular,
-  Navigation24Regular, FolderOpen24Regular,
+  Navigation24Regular, FolderOpen24Regular, Copy24Regular,
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import type { ActionHandler } from '../hooks/useActionDispatch';
@@ -28,6 +28,7 @@ import { usePackRegistry } from '../hooks/usePackRegistry';
 import type { PlaygroundScenario, ComponentContribution } from '@aks-kickstart/harness';
 import { useDebug } from '../contexts/DebugContext';
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
+import { A2UIEnvelopePreview } from '../components/A2UI/A2UIEnvelopePreview';
 import { DebugPanel } from '../components/Chat/DebugPanel';
 import type { ChatMessage, DebugMetadata } from '../types';
 import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
@@ -510,6 +511,21 @@ const useStyles = makeStyles({
   detailTabs: {
     marginBottom: tokens.spacingVerticalM,
   },
+  jsonCopyRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: tokens.spacingVerticalXS,
+  },
+  compCardClickable: {
+    cursor: 'pointer',
+    ':hover': {
+      boxShadow: tokens.shadow8,
+    },
+    ':focus-visible': {
+      outline: `2px solid ${tokens.colorBrandStroke1}`,
+      outlineOffset: '2px',
+    },
+  },
   iconGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
@@ -777,38 +793,28 @@ GalleryCard.displayName = 'GalleryCard';
 // Renders a live A2UI preview thumbnail for a single component entry.
 // Uses COMPONENT_PREVIEWS for example props; falls back to metadata-only
 // for components that have no registered example (e.g. complex rich components).
+// Click opens the component detail dialog (preview + JSON view).
 interface ComponentCardProps {
   comp: ComponentContribution;
+  onCardClick: (comp: ComponentContribution) => void;
 }
 
-const ComponentCard = memo(({ comp }: ComponentCardProps) => {
+const ComponentCard = memo(({ comp, onCardClick }: ComponentCardProps) => {
   const classes = useStyles();
-  const compActionHandler = useCallback<ActionHandler>(() => {}, []);
-  const { surfaces, processMessages, processor } = useA2UI({ actionHandler: compActionHandler });
-
   const exampleComponents = COMPONENT_PREVIEWS[comp.name];
-
-  useEffect(() => {
-    if (!exampleComponents) return;
-    const surfaceId = `component-preview-${comp.name}`;
-    const msgs: unknown[] = [
-      { version: 'v0.9', createSurface: { surfaceId, catalogId: 'kickstart' } },
-      { version: 'v0.9', updateComponents: { surfaceId, components: exampleComponents } },
-    ];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const createdIds = processMessages(msgs as any);
-    return () => {
-      for (const id of createdIds) {
-        try { processor.model.deleteSurface(id); } catch { /* already gone */ }
-      }
-    };
-  // processMessages and processor are stable refs; only re-run when component name changes
-  }, [comp.name]);
-
-  const surfaceEntries = Array.from(surfaces.entries());
+  const surfaceId = `component-preview-${comp.name}`;
 
   return (
-    <Card appearance="outline" style={{ padding: tokens.spacingVerticalM, cursor: 'default' }}>
+    <Card
+      appearance="outline"
+      style={{ padding: tokens.spacingVerticalM }}
+      className={classes.compCardClickable}
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${comp.name} detail`}
+      onClick={() => onCardClick(comp)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(comp); } }}
+    >
       <Body1Strong style={{ fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200 }}>
         {comp.name.split('/')[1] ?? comp.name}
       </Body1Strong>
@@ -817,17 +823,16 @@ const ComponentCard = memo(({ comp }: ComponentCardProps) => {
       </Caption1>
       {exampleComponents && (
         <div className={classes.cardBody} style={{ marginTop: tokens.spacingVerticalS, pointerEvents: 'none' }}>
-          {surfaceEntries.length === 0 ? (
-            <div style={{ padding: '8px 0', color: tokens.colorNeutralForeground4, fontSize: tokens.fontSizeBase200 }}>
-              Loading…
-            </div>
-          ) : (
-            surfaceEntries.map(([id, surface]) => (
-              <div key={id} className="a2ui-component">
-                <A2UISurfaceWrapper surface={surface} />
+          {/* A2UIEnvelopePreview — same render pipeline as Chat */}
+          <A2UIEnvelopePreview
+            surfaceId={surfaceId}
+            components={exampleComponents}
+            loading={
+              <div style={{ padding: '8px 0', color: tokens.colorNeutralForeground4, fontSize: tokens.fontSizeBase200 }}>
+                Loading…
               </div>
-            ))
-          )}
+            }
+          />
         </div>
       )}
     </Card>
@@ -879,6 +884,11 @@ function PlaygroundInner() {
   const [inspireLoading, setInspireLoading] = useState(false);
   const inspireAbortRef = useRef<AbortController | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Component detail dialog state
+  const [selectedComponent, setSelectedComponent] = useState<ComponentContribution | null>(null);
+  const [componentDialogOpen, setComponentDialogOpen] = useState(false);
+  const [componentDetailTab, setComponentDetailTab] = useState<'preview' | 'json'>('preview');
+  const [jsonCopied, setJsonCopied] = useState(false);
 
   // Registry-driven data — fetched live from /api/packs
   const { registry, loading: registryLoading, error: registryError } = usePackRegistry();
@@ -1192,6 +1202,29 @@ function PlaygroundInner() {
     if (!selectedScenario) return '';
     return JSON.stringify(selectedScenario.a2ui, null, 2);
   }, [selectedScenario]);
+
+  // Component detail dialog handlers
+  const handleComponentCardClick = useCallback((comp: ComponentContribution) => {
+    setSelectedComponent(comp);
+    setComponentDetailTab('preview');
+    setJsonCopied(false);
+    setComponentDialogOpen(true);
+  }, []);
+
+  // Memoize the JSON for the selected component
+  const componentJson = useMemo(() => {
+    if (!selectedComponent) return '';
+    const descriptors = COMPONENT_PREVIEWS[selectedComponent.name];
+    return descriptors ? JSON.stringify(descriptors, null, 2) : '';
+  }, [selectedComponent]);
+
+  const handleCopyComponentJson = useCallback(() => {
+    if (!componentJson) return;
+    navigator.clipboard.writeText(componentJson).then(() => {
+      setJsonCopied(true);
+      setTimeout(() => setJsonCopied(false), 2000);
+    }).catch(() => { /* clipboard unavailable */ });
+  }, [componentJson]);
 
   const customSurfaceEntries = Array.from(customA2ui.surfaces.entries());
 
@@ -1625,9 +1658,21 @@ function PlaygroundInner() {
       {activeTab === 'gallery' && (
         <div id="panel-gallery" role="tabpanel" aria-labelledby="tab-gallery" className="playground-gallery-scroll">
           {registryError ? (
-            <MessageBar intent="error" style={{ margin: tokens.spacingHorizontalL }}>
-              <MessageBarBody>Failed to load registry: {registryError}</MessageBarBody>
-            </MessageBar>
+            registryError.includes('401') ? (
+              <div className={classes.emptyState}>
+                <div className={classes.emptyIcon}>
+                  <img src="/assets/icons/fluent/sparkle.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
+                </div>
+                <Body1Strong>Sign in to view scenarios</Body1Strong>
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
+                  The scenario registry requires authentication. See issue <a href="https://github.com/sabbour/kickstart/issues/955" target="_blank" rel="noopener noreferrer">#955</a>.
+                </Caption1>
+              </div>
+            ) : (
+              <MessageBar intent="error" style={{ margin: tokens.spacingHorizontalL }}>
+                <MessageBarBody>Failed to load registry: {registryError}</MessageBarBody>
+              </MessageBar>
+            )
           ) : filteredGalleryScenarios.length === 0 ? (
             <div className={classes.emptyState}>
               <div className={classes.emptyIcon}>
@@ -1661,9 +1706,21 @@ function PlaygroundInner() {
       {activeTab === 'components' && (
         <div id="panel-components" role="tabpanel" aria-labelledby="tab-components" className="playground-gallery-scroll">
           {registryError ? (
-            <MessageBar intent="error" style={{ margin: tokens.spacingHorizontalL }}>
-              <MessageBarBody>Failed to load registry: {registryError}</MessageBarBody>
-            </MessageBar>
+            registryError.includes('401') ? (
+              <div className={classes.emptyState}>
+                <div className={classes.emptyIcon}>
+                  <img src="/assets/icons/fluent/grid.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
+                </div>
+                <Body1Strong>Sign in to view components</Body1Strong>
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
+                  The component registry requires authentication. See issue <a href="https://github.com/sabbour/kickstart/issues/955" target="_blank" rel="noopener noreferrer">#955</a>.
+                </Caption1>
+              </div>
+            ) : (
+              <MessageBar intent="error" style={{ margin: tokens.spacingHorizontalL }}>
+                <MessageBarBody>Failed to load registry: {registryError}</MessageBarBody>
+              </MessageBar>
+            )
           ) : filteredComponents.length === 0 ? (
             <div className={classes.emptyState}>
               <div className={classes.emptyIcon}>
@@ -1683,7 +1740,7 @@ function PlaygroundInner() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: tokens.spacingVerticalM, padding: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalL}` }}>
                   {comps.map(comp => (
                     <GalleryCardErrorBoundary key={comp.name} label={comp.name}>
-                      <ComponentCard comp={comp} />
+                      <ComponentCard comp={comp} onCardClick={handleComponentCardClick} />
                     </GalleryCardErrorBoundary>
                   ))}
                 </div>
@@ -1834,6 +1891,86 @@ function PlaygroundInner() {
             </DialogContent>
             <DialogActions>
               <Button appearance="secondary" onClick={() => setDialogOpen(false)}>Close</Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+
+      {/* ---- Component Detail Dialog ---- */}
+      <Dialog open={componentDialogOpen} onOpenChange={(_e, data) => setComponentDialogOpen(data.open)}>
+        <DialogSurface className={classes.dialogSurface}>
+          <DialogBody>
+            <DialogTitle
+              action={
+                <Button
+                  appearance="subtle"
+                  aria-label="Dismiss"
+                  icon={<Dismiss24Regular />}
+                  onClick={() => setComponentDialogOpen(false)}
+                />
+              }
+            >
+              {selectedComponent?.name}
+            </DialogTitle>
+            <DialogContent>
+              <div className={classes.dialogContent}>
+                {/* Detail Tabs */}
+                <TabList
+                  selectedValue={componentDetailTab}
+                  onTabSelect={(_e, data) => setComponentDetailTab(data.value as 'preview' | 'json')}
+                  size="small"
+                  className={classes.detailTabs}
+                >
+                  <Tab value="preview">Preview</Tab>
+                  <Tab value="json">JSON</Tab>
+                </TabList>
+
+                {componentDetailTab === 'preview' ? (
+                  <div>
+                    {selectedComponent && COMPONENT_PREVIEWS[selectedComponent.name] ? (
+                      /* A2UIEnvelopePreview — same render engine as Chat */
+                      <A2UIEnvelopePreview
+                        surfaceId={`comp-detail-${selectedComponent.name}`}
+                        components={COMPONENT_PREVIEWS[selectedComponent.name]}
+                        loading={
+                          <div style={{ padding: tokens.spacingVerticalL, color: tokens.colorNeutralForeground4, fontSize: tokens.fontSizeBase200 }}>
+                            Loading preview…
+                          </div>
+                        }
+                      />
+                    ) : (
+                      <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                        No preview available for this component.
+                      </Caption1>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <div className={classes.jsonCopyRow}>
+                      <Button
+                        appearance="subtle"
+                        size="small"
+                        icon={<Copy24Regular />}
+                        onClick={handleCopyComponentJson}
+                        disabled={!componentJson}
+                        aria-label="Copy JSON to clipboard"
+                      >
+                        {jsonCopied ? 'Copied!' : 'Copy'}
+                      </Button>
+                    </div>
+                    {componentJson ? (
+                      <pre className={classes.jsonCodeBlock}>{componentJson}</pre>
+                    ) : (
+                      <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                        No JSON preview registered for this component.
+                      </Caption1>
+                    )}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => setComponentDialogOpen(false)}>Close</Button>
             </DialogActions>
           </DialogBody>
         </DialogSurface>

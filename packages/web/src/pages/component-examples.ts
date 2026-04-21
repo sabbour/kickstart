@@ -45,7 +45,7 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   ],
 
   'core/Icon': [
-    { id: 'root', component: 'Icon', name: '/assets/icons/fluent/sparkle.svg' },
+    { id: 'root', component: 'Icon', name: { path: '/assets/icons/fluent/sparkle.svg' } },
   ],
 
   'core/Link': [
@@ -57,15 +57,15 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   ],
 
   'core/Alert': [
-    { id: 'root', component: 'Alert', text: 'This is an alert message.', intent: 'info' },
+    { id: 'root', component: 'Alert', message: 'This is an alert message.', severity: 'info' },
   ],
 
   'core/TextField': [
-    { id: 'root', component: 'TextField', label: 'Name', placeholder: 'Enter your name' },
+    { id: 'root', component: 'TextField', label: 'Name' },
   ],
 
   'core/CheckBox': [
-    { id: 'root', component: 'CheckBox', label: 'Enable feature', checked: false },
+    { id: 'root', component: 'CheckBox', label: 'Enable feature', value: false },
   ],
 
   'core/Slider': [
@@ -73,7 +73,7 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   ],
 
   'core/DateTimeInput': [
-    { id: 'root', component: 'DateTimeInput', label: 'Scheduled date' },
+    { id: 'root', component: 'DateTimeInput', label: 'Scheduled date', value: '' },
   ],
 
   'core/ChoicePicker': [
@@ -81,10 +81,11 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
       id: 'root',
       component: 'ChoicePicker',
       label: 'Region',
-      choices: [
+      options: [
         { label: 'East US', value: 'eastus' },
         { label: 'West Europe', value: 'westeurope' },
       ],
+      value: [],
     },
   ],
 
@@ -121,18 +122,21 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
     {
       id: 'root',
       component: 'List',
-      items: ['Item one', 'Item two', 'Item three'],
+      children: ['li1', 'li2', 'li3'],
     },
+    { id: 'li1', component: 'Text', text: 'Item one' },
+    { id: 'li2', component: 'Text', text: 'Item two' },
+    { id: 'li3', component: 'Text', text: 'Item three' },
   ],
 
   'core/Table': [
     {
       id: 'root',
       component: 'Table',
-      columns: [{ label: 'Name', key: 'name' }, { label: 'Status', key: 'status' }],
+      columns: ['Name', 'Status'],
       rows: [
-        { name: 'Alice', status: 'Active' },
-        { name: 'Bob', status: 'Inactive' },
+        ['Alice', 'Active'],
+        ['Bob', 'Inactive'],
       ],
     },
   ],
@@ -152,7 +156,11 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
       id: 'root',
       component: 'ComboBox',
       label: 'Framework',
-      options: ['React', 'Vue', 'Angular'],
+      options: [
+        { text: 'React', value: 'react' },
+        { text: 'Vue', value: 'vue' },
+        { text: 'Angular', value: 'angular' },
+      ],
     },
   ],
 
@@ -161,7 +169,11 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
       id: 'root',
       component: 'MultiSelect',
       label: 'Tags',
-      options: ['production', 'staging', 'dev'],
+      options: [
+        { text: 'production', value: 'production' },
+        { text: 'staging', value: 'staging' },
+        { text: 'dev', value: 'dev' },
+      ],
     },
   ],
 
