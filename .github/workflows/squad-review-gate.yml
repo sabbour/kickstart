@@ -9,6 +9,39 @@ permissions:
   statuses: write
 
 jobs:
+  quality-slo-safety-brake:
+    # Blocks merge of velocity-oriented process PRs while any Quality SLO in
+    # .squad/velocity.md is 🔴. See issue #806 and the design proposal at
+    # https://github.com/sabbour/kickstart/issues/806#issuecomment-4288707735.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head (script + tests)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout base ref for velocity.md (prevents self-editing bypass)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          sparse-checkout: |
+            .squad/velocity.md
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+          path: base-ref
+      - name: Self-test the brake parser
+        # Cheap sanity check so a broken parser never silently lets PRs through.
+        run: node .squad/scripts/check-quality-slo-brake.mjs --self-test
+      - name: Evaluate Quality SLO safety brake
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          labels="$(printf '%s' "$PR_LABELS" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const a=JSON.parse(d||"[]");process.stdout.write(a.join(","))})')"
+          echo "Evaluating brake for labels: ${labels:-<none>}"
+          node .squad/scripts/check-quality-slo-brake.mjs \
+            --velocity-file=base-ref/.squad/velocity.md \
+            --labels="$labels"
+
   check-squad-approval:
     runs-on: ubuntu-latest
     steps:
