@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #1007 "docs: Scribe Round-4 decisions merge + identity update + retrospective" | XL | impl=93m | review=34m | cycles=1 | merged | @sabbour | first_review=20m | ci=23m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #1008 "chore: extend retros with slo trip triggers (#808)" | L | impl=1943m | review=20m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=10m | ci=7m | reviewer=bot | human_comments=0 | issue=#808 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #1009 "fix(web): coerce AKS composition outputs so the shared validator resolves them (#996)" | M | impl=1m | review=12m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=8m | ci=6m | reviewer=bot | human_comments=0 | issue=#996 | estimate=M | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
