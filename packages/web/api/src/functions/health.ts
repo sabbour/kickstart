@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { Logger, extractTraceId, extractRequestMetadata } from "../lib/logger.js";
-import { getAppInsightsClient, flushAppInsights } from "../lib/appinsights.js";
+import { trackException, trackEvent, flushAppInsights } from "../lib/appinsights.js";
 import { getRegistry, getLoadErrors } from "../startup/packs.js";
 import type { PackLoadError } from "../startup/packs.js";
 import { sanitizeError } from "../telemetry/sanitize-error.js";
@@ -137,7 +137,6 @@ app.http("health", {
     const requestId = randomUUID();
     const traceId = extractTraceId(req.headers);
     const logger = new Logger(ctx, "health", traceId).withContext({ request_id: requestId });
-    const appInsights = getAppInsightsClient();
 
     const requestMeta = extractRequestMetadata(req);
     logger.info("HTTP request received", requestMeta);
@@ -156,14 +155,11 @@ app.http("health", {
         load_errors: loadErrors.length,
         duration_ms: duration,
       });
-      appInsights.trackEvent({
-        name: "health-check-success",
-        properties: {
-          requestId,
-          registryInitDurationMs: String(duration),
-          degraded: String(degraded),
-          loadErrorCount: String(loadErrors.length),
-        },
+      trackEvent("health-check-success", {
+        requestId,
+        registryInitDurationMs: String(duration),
+        degraded: String(degraded),
+        loadErrorCount: String(loadErrors.length),
       });
 
       if (!deep) {
@@ -178,15 +174,12 @@ app.http("health", {
       const llm = await probeLlm();
       logger.info("LLM probe complete", { ok: llm.ok, latencyMs: llm.latencyMs });
 
-      appInsights.trackEvent({
-        name: "health-check-llm-probe",
-        properties: {
-          requestId,
-          llmOk: String(llm.ok),
-          llmLatencyMs: String(llm.latencyMs),
-          llmModel: llm.model,
-          ...(llm.errorCode !== undefined ? { llmErrorCode: String(llm.errorCode) } : {}),
-        },
+      trackEvent("health-check-llm-probe", {
+        requestId,
+        llmOk: String(llm.ok),
+        llmLatencyMs: String(llm.latencyMs),
+        llmModel: llm.model,
+        ...(llm.errorCode !== undefined ? { llmErrorCode: String(llm.errorCode) } : {}),
       });
 
       const httpStatus = llm.ok ? 200 : 503;
@@ -206,15 +199,12 @@ app.http("health", {
         duration_ms: duration,
         phase,
       });
-      appInsights.trackException({
-        exception: sanitizedError,
-        properties: { requestId, context: "health-check-pack-init", phase },
-      });
+      trackException(sanitizedError, { requestId, context: "health-check-pack-init", phase });
       await flushAppInsights();
 
       // Return only opaque category fields — never raw error messages, file
       // paths, or URLs. Full detail is captured server-side via logger.error
-      // and appInsights.trackException above.
+      // and trackException above.
       return {
         status: 503,
         jsonBody: { status: "error", phase, hint } satisfies HealthResponse,

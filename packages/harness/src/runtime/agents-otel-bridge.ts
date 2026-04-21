@@ -193,12 +193,27 @@ interface OtelRef {
  * OpenTelemetry spans for export via the Azure Monitor OTel distro.
  */
 export class OtelBridgeTraceProcessor implements TracingProcessor {
-  private readonly tracer: Tracer;
+  private readonly injectedTracer?: Tracer;
   private readonly byTraceId = new Map<string, OtelRef>();
   private readonly bySpanId = new Map<string, OtelRef>();
 
   constructor(tracer?: Tracer) {
-    this.tracer = tracer ?? otelTraceApi.getTracer(TRACER_NAME);
+    this.injectedTracer = tracer;
+  }
+
+  /**
+   * Lazy tracer lookup. `@opentelemetry/api.trace.getTracer()` returns a
+   * `ProxyTracer` that forwards to the currently-registered global
+   * TracerProvider on every call — re-resolving here is free and is the
+   * documented mechanism for surviving provider re-registration.
+   *
+   * Caching the tracer at construction time (the old behavior) silently
+   * broke if `useAzureMonitor()` ran after the Runner constructed this
+   * processor — the cached Tracer retained a handle to the torn-down
+   * provider and subsequent spans went nowhere. See issue #1030 / Nibbler B3.
+   */
+  private get tracer(): Tracer {
+    return this.injectedTracer ?? otelTraceApi.getTracer(TRACER_NAME);
   }
 
   async onTraceStart(trace: Trace): Promise<void> {

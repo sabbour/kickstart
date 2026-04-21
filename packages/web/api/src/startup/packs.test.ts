@@ -43,8 +43,11 @@ vi.mock('./credentials.js', () => ({
 }));
 
 vi.mock('../lib/appinsights.js', () => ({
-  getAppInsightsClient: vi.fn(() => ({ trackException: mockTrackException })),
+  trackException: mockTrackException,
+  trackTrace: vi.fn(),
+  trackEvent: vi.fn(),
   flushAppInsights: (...args: unknown[]) => mockFlushAppInsights(...args),
+  initializeAppInsights: vi.fn(),
 }));
 
 // Pack imports — each returns a minimal stub (name only; registry never reads further)
@@ -229,9 +232,16 @@ describe('packs startup — getRegistry() fail-soft', () => {
     const { getRegistry } = await import('./packs.js');
     expect(() => getRegistry()).toThrow('core pack bad manifest');
 
-    // trackException is called (fire-and-forget from sync getRegistry)
+    // trackException is called with (err, properties) — new pure-OTel signature
     expect(mockTrackException).toHaveBeenCalledWith(
-      expect.objectContaining({ exception: coreErr }),
+      coreErr,
+      expect.objectContaining({ packId: 'core', context: 'core-pack-registration-failed' }),
+    );
+    // flushAppInsights invoked (T7 call-order)
+    expect(mockFlushAppInsights).toHaveBeenCalled();
+    // Call ordering: trackException was invoked before flushAppInsights.
+    expect(mockTrackException.mock.invocationCallOrder[0]).toBeLessThan(
+      mockFlushAppInsights.mock.invocationCallOrder[0],
     );
   });
 
@@ -246,8 +256,10 @@ describe('packs startup — getRegistry() fail-soft', () => {
     expect(() => getRegistry()).toThrow('Seal failed: conflict');
 
     expect(mockTrackException).toHaveBeenCalledWith(
-      expect.objectContaining({ exception: sealErr }),
+      sealErr,
+      expect.objectContaining({ context: 'registry-seal-failed' }),
     );
+    expect(mockFlushAppInsights).toHaveBeenCalled();
   });
 
   // ── #1030 startup telemetry: telemetry failure does not mask original throw ─

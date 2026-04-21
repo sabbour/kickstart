@@ -2,15 +2,14 @@
  * esbuild config for @aks-kickstart/api
  *
  * Bundles each Azure Function entry point into a self-contained ESM file.
- * All npm dependencies (including @azure/functions and bicep-node) are inlined;
- * only Node.js built-ins stay external.  Making the bundles self-contained
- * avoids a deployment-time issue where npm workspace hoisting keeps those
- * packages in the repo root node_modules rather than packages/web/api/node_modules,
- * causing the Functions worker to fail to resolve them in Azure SWA.
+ * OTel / Azure Monitor packages stay external so every bundle in the worker
+ * process shares the same module identity + globalThis singletons (see
+ * issue #1030 — multiple bundled copies of @opentelemetry/api give every
+ * bundle its own registry and wipe each other's providers).
  */
 
 import * as esbuild from "esbuild";
-import { copyFileSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -77,18 +76,25 @@ await esbuild.build({
   format: "esm",
   platform: "node",
   target: "node22",
-  // @azure/functions-core is the only module that must stay external — it is a
-  // virtual module injected by the Azure Functions Node.js worker host at
-  // runtime and is never present in node_modules.  All other npm dependencies
-  // (including @azure/functions and bicep-node) are pure JavaScript and are
-  // bundled inline so that dist/functions/*.js files are self-contained.
+  metafile: true,
+  // @azure/functions-core is a virtual module injected by the Functions worker.
   //
-  // Background: npm workspace hoisting keeps these packages in the repo root
-  // node_modules rather than packages/web/api/node_modules, and the
-  // packages/web/api/.npmrc "workspaces=false" override is silently ignored in
-  // CI (npm warns "ignoring workspace config").  Bundling them removes the
-  // runtime dependency on node_modules entirely.
-  external: ["@azure/functions-core"],
+  // Every package below MUST stay external so the worker process sees a single
+  // module identity — they register against globalThis singletons (OTel trace
+  // provider, logs provider, meter provider) and multiple bundled copies give
+  // each bundle its own registry that silently wipes the others (issue #1030).
+  external: [
+    "@azure/functions-core",
+    "@azure/monitor-opentelemetry",
+    "@azure/monitor-opentelemetry-exporter",
+    "applicationinsights",
+    "@opentelemetry/api",
+    "@opentelemetry/api-logs",
+    "@opentelemetry/sdk-trace-base",
+    "@opentelemetry/sdk-logs",
+    "@opentelemetry/sdk-metrics",
+    "@opentelemetry/core",
+  ],
   banner: {
     js: "import { createRequire as __kickstartCreateRequire } from 'node:module'; const require = __kickstartCreateRequire(import.meta.url);",
   },
@@ -96,6 +102,11 @@ await esbuild.build({
   // Enable locally by setting KICKSTART_API_SOURCEMAP=1.
   sourcemap: process.env.KICKSTART_API_SOURCEMAP === "1",
   plugins: [harnessResolver],
+}).then(async (result) => {
+  // T1 binding test reads this metafile to assert externalization stuck.
+  const metaPath = resolve(__dirname, "dist/meta.json");
+  mkdirSync(dirname(metaPath), { recursive: true });
+  writeFileSync(metaPath, JSON.stringify(result.metafile, null, 2), "utf8");
 });
 
 console.log(`✅ Bundled ${entryPoints.length} function(s) to dist/functions/`);
