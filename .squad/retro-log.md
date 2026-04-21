@@ -29,6 +29,14 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #951 "fix(api): redact raw error details from unauthenticated /health 503 responses" | M | impl=0m | review=4m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=3m | ci=6m | reviewer=bot | human_comments=0 | issue=#927 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #950 "feat(api): add /health?deep=1 LLM canary check" | L | impl=1m | review=3m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=1m | ci=5m | reviewer=bot | human_comments=0 | issue=#941 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #948 "feat(infra): provision Application Insights + Log Analytics workspace (#942)" | M | impl=0m | review=8m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=3m | ci=5m | reviewer=bot | human_comments=0 | issue=#942 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #947 "fix(converse): fix double-encoded JSON responses and missing model name in SSE stream" | L | impl=1m | review=25m | cycles=1 | merged-with-rework | @sabbour-squad-backend[bot] | first_review=2m | ci=5m | reviewer=bot | human_comments=1 | issue=#937 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #946 "feat(api): wire Azure Monitor OpenTelemetry auto-instrumentation (closes #940)" | L | impl=1m | review=0m | cycles=2 | merged-with-rework | @sabbour-squad-backend[bot] | first_review=13m | ci=5m | reviewer=bot | human_comments=0 | issue=#940 | estimate=M | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #945 "fix(playground): render live A2UI component previews in Components tab (#944)" | L | impl=0m | review=13m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=12m | ci=5m | reviewer=bot | human_comments=0 | issue=#944 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
