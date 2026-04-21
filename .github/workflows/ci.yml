@@ -137,6 +137,8 @@ jobs:
 
       - name: Build all workspaces
         run: npm run build
+
+      - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
       - name: Playwright E2E tests
