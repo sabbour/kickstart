@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #1011 "feat: add quality SLO safety brake to squad review-gate (#806)" | L | impl=1m | review=30m | cycles=2 | merged-with-rework | @sabbour-squad-backend[bot] | first_review=0m | ci=6m | reviewer=bot | human_comments=1 | issue=#806 | estimate=unknown | rejections_by_reviewer=nibbler:1,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #1014 "feat(process): process grader workflow (close the learning loop) (#805)" | XL | impl=3m | review=16m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=3m | ci=5m | reviewer=bot | human_comments=1 | issue=#805 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #1013 "feat(security): harden insertSvgSafely against SVG XSS vectors" | L | impl=2m | review=13m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=5m | ci=6m | reviewer=bot | human_comments=1 | issue=#1006 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
