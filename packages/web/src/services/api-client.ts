@@ -47,15 +47,75 @@ export interface ConversationResponse {
   usage?: import('../types').TokenUsageSummary;
 }
 
-export async function healthCheck(): Promise<boolean> {
+export interface HealthCheckError {
+  phase: string;
+  message: string;
+  hint?: string;
+}
+
+export interface HealthCheckResult {
+  ok: boolean;
+  error?: HealthCheckError;
+}
+
+export async function healthCheck(): Promise<HealthCheckResult> {
   try {
     const res = await fetch('/api/health', {
       method: 'GET',
       signal: AbortSignal.timeout(5000),
     });
-    return res.ok;
-  } catch {
-    return false;
+
+    if (res.ok) {
+      return { ok: true };
+    }
+
+    // Server returned an error (e.g., 503) — extract diagnostics
+    try {
+      const body = await res.json() as {
+        status?: string;
+        phase?: string;
+        message?: string;
+        detail?: string;
+        hint?: string;
+      };
+
+      const error: HealthCheckError = {
+        phase: body.phase || 'api-error',
+        message: body.detail || body.message || 'API returned an error',
+        hint: body.hint,
+      };
+
+      console.error('[healthCheck] API error:', error);
+      return { ok: false, error };
+    } catch {
+      // Could not parse error response
+      return {
+        ok: false,
+        error: {
+          phase: 'api-error',
+          message: `API returned ${res.status} ${res.statusText}`,
+        },
+      };
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[healthCheck] Network or timeout error:', message);
+
+    // Distinguish between timeout and network errors
+    const isTimeout = err instanceof Error && 'name' in err && err.name === 'AbortError';
+
+    return {
+      ok: false,
+      error: {
+        phase: isTimeout ? 'api-timeout' : 'api-unreachable',
+        message: isTimeout
+          ? 'API health check timed out (5s)'
+          : 'API is not reachable. Check that Azure Functions are running.',
+        hint: isTimeout
+          ? 'The API may be slow or overloaded. Try again in a few moments.'
+          : 'Ensure the API server is running and accessible.',
+      },
+    };
   }
 }
 

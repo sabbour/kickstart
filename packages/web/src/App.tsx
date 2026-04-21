@@ -20,7 +20,7 @@ import { ConversationSessionProvider } from './contexts/ConversationSessionConte
 import { useTheme } from './contexts/ThemeContext';
 import { useDebug } from './contexts/DebugContext';
 import { useVirtualFS } from './contexts/VirtualFSContext';
-import { healthCheck } from './services/api-client';
+import { healthCheck, type HealthCheckResult } from './services/api-client';
 // TODO(Step 5): mock-streaming removed — mock mode deleted in Step 1
 // isMockMode and isPlaygroundMode permanently return false
 import { VirtualFileSystem } from './services/virtual-fs';
@@ -59,7 +59,7 @@ export function App() {
 
   const [mode, setMode] = useState<AppMode>(() => getInitialAppMode());
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isApiAvailable, setIsApiAvailable] = useState<boolean | null>(mockEnabled ? true : null);
+  const [healthCheckResult, setHealthCheckResult] = useState<HealthCheckResult | null>(mockEnabled ? { ok: true } : null);
   const [filePanelOpen, setFilePanelOpen] = useState(true);
   const [fileSidebarOpen, setFileSidebarOpen] = useState(true);
   const [viewerFile, setViewerFile] = useState<string | undefined>();
@@ -176,7 +176,7 @@ export function App() {
   // Check API availability on mount (skip in mock mode — already true)
   useEffect(() => {
     if (!mockEnabled) {
-      healthCheck().then(setIsApiAvailable);
+      healthCheck().then(setHealthCheckResult);
     }
   }, []);
 
@@ -473,11 +473,32 @@ export function App() {
     setMessages(prev => [...prev, userMsg]);
     sessions.addMessage(sessionId!, userMsg);
 
-    if (!isApiAvailable) {
+    if (!healthCheckResult?.ok) {
+      // Build specific error message based on health check phase
+      let errorText = '⚠️ The API is not available. ';
+      
+      if (healthCheckResult?.error) {
+        const { phase, message, hint } = healthCheckResult.error;
+        
+        if (phase === 'env-validation') {
+          errorText += 'Azure OpenAI credentials are not configured. ' + (hint || '');
+        } else if (phase === 'pack-import') {
+          errorText += 'Pack initialization failed. ' + (hint || '');
+        } else if (phase === 'api-timeout') {
+          errorText += 'API is responding slowly. ' + (hint || '');
+        } else if (phase === 'api-unreachable') {
+          errorText += (hint || 'Check that the API server is running.');
+        } else {
+          errorText += message + (hint ? ' ' + hint : '');
+        }
+      } else {
+        errorText += 'Please check that Azure OpenAI credentials are configured and the API is running.';
+      }
+      
       const errorMsg: ChatMessage = {
         id: msgId('error'),
         role: 'assistant',
-        text: '⚠️ The API is not available. Please check that Azure OpenAI credentials are configured and the API is running.',
+        text: errorText,
         timestamp: Date.now(),
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -645,7 +666,7 @@ export function App() {
     clearActionLog,
     debugEnabled,
     finalizeStepwiseAssistantTurn,
-    isApiAvailable,
+    healthCheckResult,
     mockStreaming,
     processIncomingA2UI,
     processIncomingSetupEvent,
