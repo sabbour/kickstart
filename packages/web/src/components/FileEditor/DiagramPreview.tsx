@@ -3,6 +3,7 @@ import {
   loadMermaid,
   prepareArchitectureDiagramSource,
   injectDiagramStyles,
+  sanitizeSvgMarkup,
 } from '../../catalog/components/architectureDiagramUtils';
 
 interface DiagramPreviewProps {
@@ -12,8 +13,9 @@ interface DiagramPreviewProps {
 let diagramPreviewCounter = 0;
 
 function insertSvgSafely(container: HTMLElement, svg: string): void {
+  const hardened = sanitizeSvgMarkup(svg);
   const template = document.createElement('template');
-  template.innerHTML = svg;
+  template.innerHTML = hardened;
   template.content.querySelectorAll('script').forEach((s) => s.remove());
   template.content.querySelectorAll('*').forEach((el) => {
     Array.from(el.attributes).forEach((attr) => {
