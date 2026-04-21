@@ -6,11 +6,13 @@ Ceremonies are structured team interactions that the Squad coordinator triggers 
 
 | Ceremony | Trigger | When | Facilitator | Participants | Gate? |
 |----------|---------|------|-------------|--------------|-------|
+| Sprint Planning | auto | weekly (Monday) | Leela | all active squad + Ahmed (PO) | ❌ Backlog shaping, not a hard gate |
 | Design Proposal | auto | before work | Leela | assigned agent | ✅ Blocks implementation until DP posted |
 | Design Review | auto | before code | Leela | Zapp, Nibbler, all-relevant | ✅ Blocks code until approved |
-| PR Review Gate | auto | before merge | Nibbler | Leela (architecture), Zapp (security), Hermes (tests) | ✅ Blocks merge until all feedback addressed |
+| PR Review Gate | auto | before merge | Nibbler | Leela (architecture), Zapp (security), Nibbler (code quality), Docs reviewer (Scribe interim — McManus not on roster) | ✅ Blocks merge until all four approval labels present + CI green |
 | Docs Sweep | auto | monthly | Scribe | all-relevant | ❌ Freshness audit, not blocking |
-| Retrospective | auto | after failure | Leela | Nibbler, all-involved | ❌ Diagnostic, not blocking |
+| Cadence Retrospective | auto | weekly | Leela | all squad + Scribe | ❌ Continuous improvement, not blocking |
+| Failure Retrospective | auto | after failure | Leela | Nibbler, all-involved | ❌ Diagnostic, not blocking |
 
 ## Automated workflows (not coordinator ceremonies)
 
@@ -26,6 +28,32 @@ These run via GitHub Actions on schedule or events. Documented here for referenc
 | Release Cadence | cron `0 0 * * *` (17:00 PT) | `.github/workflows/squad-release-cadence.yml` | Leela + Scribe | draft PR on `release/cadence` branch |
 
 All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
+
+---
+
+## Sprint Planning
+
+| Field | Value |
+|-------|-------|
+| **Trigger** | auto |
+| **When** | weekly (Monday) or when the backlog needs re-estimation |
+| **Condition** | start of a new sprint, or ≥5 open `squad` issues lack an `estimate:*` label |
+| **Facilitator** | Leela |
+| **Participants** | all active squad members + assigned human PO (Ahmed) |
+| **Time budget** | focused |
+| **Enabled** | ✅ yes |
+| **Gate?** | ❌ Not a hard gate — a missing estimate is caught downstream by the Design Proposal ceremony gate. |
+
+**Goal:** Shape the sprint backlog so every in-flight issue has an estimate, an owner, and a sprint goal before implementation work starts.
+
+**Agenda:**
+1. Pull open issues carrying the `squad` label that are unestimated (no `estimate:*` label).
+2. For each, assign one of `estimate:S` / `estimate:M` / `estimate:L` / `estimate:XL` per the velocity-points table in the Design Proposal ceremony below.
+3. Confirm or assign the `squad:{member}` label so each issue has a clear owner.
+4. Agree the sprint goal in one sentence.
+5. Capture outcomes in a new sprint note at `.squad/sprints/{YYYY-MM-DD}.md` — sprint goal, in-scope issue list with estimates and owners, explicit deferrals, known risks.
+
+**Output:** `.squad/sprints/{YYYY-MM-DD}.md`. The file is informational; the real gate remains the DP ceremony (which rejects any DP whose estimate is missing or mismatched).
 
 ---
 
@@ -60,13 +88,15 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 - Primitive surface changes: tools, user actions, components, guardrails
 - Security considerations: schema changes, trust boundaries, secrets
 - Test strategy
-- Docs and changeset plan
+- `Docs impact:` (**required**) — explicit list of affected doc pages/sections (e.g., `docs-site/docs/architecture/v2-implementation-brief.md`, a pack page, a charter, a skill file, `README.md`) **OR** an explicit `N/A` with one-sentence justification for why this change touches no user-facing behavior, APIs, pack surface, ceremonies, skills, or process. A missing or empty `Docs impact:` field is an automatic DP rejection.
+- Docs and changeset plan (how the docs impact above will actually be landed — in this PR, or tracked as a follow-up with an issue link)
 - Alternatives considered
 
 **Rules:**
 - The issue body (problem + acceptance criteria) is written by the product owner or Lead. The DP (approach) is written by the implementing agent.
 - Each PR maps to one issue. Split bundles.
 - Leela rejects a DP that is missing the `Estimate:` field or does not match the issue's `estimate:*` label.
+- Leela rejects a DP that is missing the `Docs impact:` field, or whose `Docs impact: N/A` claim is not justified.
 
 **Agenda:**
 1. Assigned agent drafts a Design Proposal comment on the issue
@@ -109,24 +139,29 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 | **When** | before merge |
 | **Condition** | PR opened by a squad agent |
 | **Facilitator** | Nibbler |
-| **Participants** | Leela (architecture), Zapp (security), Hermes (test coverage) |
+| **Participants** | Leela (architecture), Zapp (security), Nibbler (code quality), Docs reviewer — **Scribe (interim)** |
 | **Time budget** | focused |
 | **Enabled** | ✅ yes |
 
-**Gate:** PR may NOT be merged until all review threads are resolved and all reviewers have approved.
+**Gate:** PR may NOT be merged until all review threads are resolved and all four structured reviewers have approved.
+
+> **Docs reviewer role gap:** The Ahmed directive names McManus as the docs reviewer. McManus is not currently on the roster in `.squad/team.md`. Until a docs reviewer is cast, **Scribe** fills this role as interim docs reviewer and owns the `docs:*` labels. When McManus (or another docs reviewer) is added to the roster, update this section and the ceremony overview table to reassign the role.
 
 **Review dimensions:**
-1. **Nibbler** — code correctness, readability, bug patterns, error handling, naming
-2. **Leela** — architecture alignment, pack boundaries, API contract consistency
-3. **Zapp** — security surface, input validation, trust boundaries, secret handling
-4. **Hermes** — test coverage for new/changed code, edge cases, regression risk
+1. **Nibbler** — code correctness, readability, bug patterns, error handling, naming. Posted via `gh pr review` under the `lead` bot identity (same protocol as Leela and Zapp).
+2. **Leela** — architecture alignment, pack boundaries, API contract consistency. Posted via `gh pr review` under the `lead` bot identity.
+3. **Zapp** — security surface, input validation, trust boundaries, secret handling. Posted via `gh pr review` under the `lead` bot identity.
+4. **Docs reviewer (Scribe interim)** — verifies that every doc page/section listed in the DP's `Docs impact:` field is actually updated in this PR (or has an explicit, linked follow-up issue), that changesets are present where required, that no user-facing behavior ships without corresponding docs, and that a `Docs impact: N/A` claim genuinely holds. Posted via `gh pr review` under the appropriate bot identity.
 
-**Feedback labels:**
-- `nibbler:approved` / `nibbler:rejected` — code quality gate
+Hermes remains the owner of test-coverage analysis and contributes findings into the Nibbler and Leela review passes; Hermes is not a separate approval gate on the PR.
+
+**Feedback labels (all four are equal-weight approval gates):**
 - `leela:approved` / `leela:rejected` — architecture gate
 - `zapp:approved` / `zapp:rejected` — security gate
+- `nibbler:approved` / `nibbler:rejected` — code quality gate
+- `docs:approved` / `docs:rejected` / `docs:not-applicable` — docs gate. `docs:not-applicable` is a valid approval **only** when the DP's `Docs impact:` field was `N/A` with justification; it must be applied explicitly, never defaulted.
 
-**Merge criteria:** All three approval labels present + CI green. Any rejection blocks merge and triggers revision by a different agent (per Reviewer Rejection Protocol).
+**Merge criteria:** All four approval labels present (`leela:approved` + `zapp:approved` + `nibbler:approved` + (`docs:approved` OR `docs:not-applicable`)) + CI green. Any rejection blocks merge and triggers revision by a different agent (per Reviewer Rejection Protocol).
 
 **Feedback reply protocol (required for all reviewers and authors):**
 1. When addressing any review comment, the author MUST reply to the specific comment with: "Addressed in {sha}: {description}"
@@ -138,7 +173,38 @@ This protocol applies to all agents (squad members AND @copilot). It is enforced
 
 ---
 
-## Retrospective
+## Cadence Retrospective
+
+| Field | Value |
+|-------|-------|
+| **Trigger** | auto |
+| **When** | weekly |
+| **Condition** | end of each sprint week (distinct from the failure-triggered Failure Retrospective below) |
+| **Facilitator** | Leela |
+| **Participants** | all squad + Scribe |
+| **Time budget** | focused |
+| **Enabled** | ✅ yes |
+| **Gate?** | ❌ Not a hard gate — continuous-improvement ceremony. |
+
+**Goal:** Continuous improvement on a fixed cadence, independent of whether anything failed this week.
+
+**Inputs:**
+- `.squad/retro-log.md` (per-PR micro-retros from Scribe)
+- `.squad/velocity.md` (weekly velocity report)
+- Last week's closed issues and merged/closed PRs
+- Open `process` issues still in flight
+
+**Agenda:**
+1. **What went well** — velocity hit, green PRs, smooth reviews, shipped goals.
+2. **What didn't** — CI failures, rejected DPs, rework cycles, stuck PRs, gate skips.
+3. **Action items** — each concrete, testable, and filed as a new `process` issue (one per action).
+4. Scribe captures the summary.
+
+**Output:** a new GitHub issue titled `Weekly Retro · {YYYY-MM-DD}` containing the agenda summary, the linked inputs, and the list of filed `process` action-item issues.
+
+---
+
+## Failure Retrospective
 
 | Field | Value |
 |-------|-------|

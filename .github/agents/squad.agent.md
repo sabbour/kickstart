@@ -958,13 +958,25 @@ Ceremonies are structured team meetings where agents align before or after work.
 
 **On-demand reference:** Read `.squad/ceremonies.md` for the automation map, per-ceremony config, facilitator assignment, and persona mechanism.
 
-**Core logic (always loaded):**
-1. Before spawning a work batch, check `.squad/ceremonies.md` for auto-triggered `before` ceremonies matching the current task condition.
-2. After a batch completes, check for `after` ceremonies. Manual ceremonies run only when the user asks.
-3. Spawn the facilitator (sync) per the ceremony's entry in `.squad/ceremonies.md`. Facilitator spawns participants as sub-tasks.
-4. For `before`: include ceremony summary in work batch spawn prompts. Spawn Scribe (background) to record.
-5. **Ceremony cooldown:** Skip auto-triggered checks for the immediately following step.
-6. Show: `📋 {CeremonyName} completed — facilitated by {Lead}. Decisions: {count} | Action items: {count}.`
+**Core logic (always loaded — BLOCKING):**
+1. Before spawning any code-producing agent (fry, bender, hermes, copilot, or any agent about to write or modify product code), the coordinator **MUST** run the ceremony-check in `.squad/ceremonies.md` for auto-triggered `before` ceremonies whose condition matches the current task. This is a hard precondition, not a best-effort reminder.
+2. **Trigger condition (non-negotiable):** When a user request produces implementation work tied to a labeled GitHub issue, the **Design Proposal** ceremony MUST fire and complete (DP comment posted on the issue) AND the **Design Review** ceremony MUST fire and complete (leela + zapp + nibbler approval labels present on the issue or the DP comment) **before any code-producing agent is dispatched**. No exceptions for "small" changes.
+3. After a batch completes, check for `after` ceremonies (including the auto-triggered Failure Retrospective on build/test/review failure). Manual ceremonies run only when the user asks.
+4. Spawn the facilitator (sync) per the ceremony's entry in `.squad/ceremonies.md`. Facilitator spawns participants as sub-tasks.
+5. For `before`: include ceremony summary in work-batch spawn prompts. Spawn Scribe (background) to record.
+6. **Ceremony cooldown:** Skip auto-triggered checks for the immediately following step *only* when the same ceremony already completed for the same issue in this session. Cooldown never applies to a new issue.
+7. Show: `📋 {CeremonyName} completed — facilitated by {Lead}. Decisions: {count} | Action items: {count}.`
+
+**Pre-dispatch checkpoint (run this list in order, BEFORE spawning ANY code-producing agent):**
+- [ ] Is this work tied to a GitHub issue? (If no → stop and file one, or reclassify as non-product work.)
+- [ ] Does the issue have a Design Proposal comment posted by the implementing agent, including `Estimate:` and `Docs impact:` fields?
+- [ ] Does the DP have all three DP-stage approval labels: `leela:approved`, `zapp:approved`, `nibbler:approved` (or equivalent DP-approval labels like `leela:approved-dp` / `zapp:approved-dp`)?
+
+If **any** box is unchecked → the coordinator MUST run the matching ceremony first (Design Proposal, then Design Review) before any dispatch. Writing code before these boxes are checked is a governance violation.
+
+**❌ Anti-pattern (do not do this):** Dispatching `fry` or `bender` (or @copilot with a squad persona) straight to write code on an issue that has no DP comment posted, or whose DP has not yet collected `leela:approved` + `zapp:approved` + `nibbler:approved`. This has been observed in practice and is the exact failure mode this enforcement section exists to prevent.
+
+**✅ Correct pattern:** Issue labeled `squad:{member}` → Leela runs Design Proposal ceremony → implementing agent posts DP comment with all required fields → Design Review ceremony fires → leela/zapp/nibbler post approval labels → *only then* the coordinator dispatches the code-producing agent → PR opens → PR Review Gate runs the four-way review (leela + zapp + nibbler + docs) → all four approval labels + CI green → merge.
 
 ### Adding Team Members
 
