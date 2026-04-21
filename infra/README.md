@@ -201,7 +201,7 @@ If you already have an Application Insights resource and a Static Web App deploy
    az staticwebapp appsettings set \
      --name kickstart-web-dev \
      --resource-group rg-kickstart-dev \
-     --setting-names "APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=2ffebd56-...;IngestionEndpoint=..."
+     --setting-names "APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=..."
    ```
 
 3. **Wait for restart:**
