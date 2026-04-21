@@ -14,7 +14,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RunContext } from '@openai/agents';
-import { A2UIMessageSchema, A2UI_VERSION } from '@aks-kickstart/harness';
+import { A2UIMessageSchema, A2UIMessageEnvelopeSchema, A2UI_VERSION } from '@aks-kickstart/harness';
 import { emitUiTool } from '../../tools/emit_ui.js';
 import { makeSessionCtx } from './_session-stub.js';
 
@@ -220,6 +220,64 @@ describe('core.emit_ui', () => {
         },
       });
       expect(String(result)).toContain('updateComponents');
+    });
+  });
+
+  // ── #980 Explicit op discriminator — runtime path ────────────────────────
+  //
+  // Pins the discriminated-union branch selected by `op` when the LLM emits
+  // `op` verbatim (as opposed to the `withDiscriminator` preprocessor path,
+  // which synthesizes `op` from the sole payload key when omitted).
+  //
+  // We assert three things per op variant:
+  //   1. The raw envelope schema (pre-strip) parses and preserves `op`
+  //      equal to the input's `op` — this is the discriminator-branch pin.
+  //   2. The runtime `A2UIMessageSchema` (which strips `op` on output)
+  //      accepts the fixture and yields the payload key corresponding to `op`.
+  //   3. End-to-end through the tool invocation, the recorded emission carries
+  //      the payload key matching `op` (branch survived the full runtime path).
+  describe('explicit op discriminator — runtime path', () => {
+    const explicitFixtures = [
+      { op: 'createSurface' as const, fixture: validCreateSurface },
+      { op: 'updateComponents' as const, fixture: validUpdateComponents },
+      { op: 'updateDataModel' as const, fixture: validUpdateDataModel },
+      { op: 'deleteSurface' as const, fixture: validDeleteSurface },
+    ];
+
+    for (const { op, fixture } of explicitFixtures) {
+      it(`${op}: envelope schema selects the branch matching input.op verbatim`, () => {
+        expect(fixture.op).toBe(op);
+        const parsed = A2UIMessageEnvelopeSchema.parse(fixture);
+        expect(parsed.op).toBe(op);
+      });
+
+      it(`${op}: A2UIMessageSchema (runtime) routes to the op-named payload key`, () => {
+        const parsed = A2UIMessageSchema.parse(fixture) as Record<string, unknown>;
+        expect(parsed[op]).toBeDefined();
+        expect(parsed).not.toHaveProperty('op');
+      });
+
+      it(`${op}: tool invocation records an emission on the op-named payload key`, async () => {
+        await invoke(fixture);
+        expect(session.a2uiEmissions).toHaveLength(1);
+        const recorded = session.a2uiEmissions[0] as Record<string, unknown>;
+        expect(recorded[op]).toBeDefined();
+      });
+    }
+
+    it('negative control: mismatched op vs payload key fails validation', async () => {
+      const result = String(
+        await invoke({
+          version: A2UI_VERSION,
+          op: 'createSurface',
+          updateComponents: {
+            surfaceId: 'surface-001',
+            components: [{ id: 'root', component: 'Button', label: 'x' }],
+          },
+        }),
+      );
+      expect(result).toMatch(/An error occurred|invalid/i);
+      expect(session.a2uiEmissions).toHaveLength(0);
     });
   });
 
