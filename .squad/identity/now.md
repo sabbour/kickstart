@@ -1,35 +1,50 @@
 ---
-updated_at: 2026-04-16T05:51:43.085Z
-mode: process-reset-then-design
-focus_area: Sprint planning ceremony, then architecture design spikes (#330, #329)
-active_issues: [330, 329]
-blocked_issues: [332]
+updated_at: 2026-04-21T05:30:00Z
+mode: bug-shipping-then-feature-unblock
+focus_area: UI bug shipping velocity, schema conformance, bundle ceiling enforcement
+active_issues: [996, 987]
+blocked_issues: []
 ---
 
 # What We're Focused On
 
-**v0.7.0 shipped. The burndown is complete. Process reset starts NOW.**
+**Round 4 complete: 5 UI bugs shipped (#991/#980/#995/#997/#998). Now unblocking #996 + #987. Schema conformance CI gate in place. Bundle-ceiling enforcement proved.**
 
-The demo-sprint lanes (297, 298, 299, 274, 301, 265, 300, 331) are all done. #338 confirmed fixed. #332 remains blocked on live credentials (P2, v1.0.0 — no action until external deps clear).
+## Current Status
 
-## Immediate Priority Order
+### Just Shipped (April 21, round 4)
 
-1. **Merge PR #341** — DOMPurify 3.4.0 security bump. Fixes mXSS and prototype pollution. Safety-first.
-2. **Sprint planning ceremony** — scope post-v0.7.0 milestones, reassess board, calibrate estimates. Leela facilitates. This was committed to and is now overdue.
-3. **#330 — Agents SDK migration design** (P1, v1.0.0) — Leela writes the DP. Architecture spike, no code. Can proceed in parallel with ceremony since it doesn't consume implementation capacity.
-4. **#329 — MCP App IDE surface design** (important, v0.7.0) — Leela writes the DP after #330, or in parallel if bandwidth allows. Depends on #46 epic direction.
+- **#991** ✅ — Pack no-previews (fixed in #1001)
+- **#980** ✅ — Workflow revert (merged in round 3)
+- **#995** ✅ — Core tab tight rendering + preview coverage (PR #1003 merged; playground-layout-constants module is new SSoT for geometry)
+- **#997** ✅ — Workspace black void (PR #1004 merged; `min-height: 0` flex discipline applied)
+- **#998** ✅ — Chat broken, A2UI v0.9 schema strict-required (PR #1005 merged; parametrised conformance test now covers every pack-core tool)
 
-## What's NOT Happening
+### In Flight (high priority)
 
-- **No feature code** until sprint planning completes and the next sprint is scoped.
-- **#332** stays blocked — needs live Azure/GitHub credentials and cross-system auth.
-- **#46** stays as the parent epic — #329 is the active design slice.
+1. **#996** — AKS _ErrorComponent, inspiration prompts unreliable. Assigned: Bender. Depends on #998 conformance test passing (which it does). Root cause: allow-list drift between LLM system prompt and ClientComponentRegistry. [See #990 defense-in-depth test pattern]
 
-## Rationale
+2. **#987** — Playground E2E regression: previously-skipped #772 scenario suite. Assigned: Fry. Must use geometry-constants module + named-viewport patterns from #1003/#1004. Expectation: 3 new Playwright test groups, 12+ cases.
 
-Design spikes are process-compatible with a reset — they're architecture planning, exactly what a healthy process produces. The reset prevents premature code without proper DP gates. Writing DPs IS the gate.
+3. **Zapp follow-up — insertSvgSafely guardrail** (filed by Zapp during round 4 review). Future pack-core tools will use this utility for any SVG/XML content. Blocks future pack feature work; low priority until such feature is in scope.
 
-## Reference Projects
+### Next Sprint (Ralph round 3 scan in progress)
 
-- [adaptive-ui-try-aks](https://github.com/sabbour/adaptive-ui-try-aks) — Existing "Ship It" prototype (TypeScript/Vite, conversational AI guide for AKS deployment)
-- [portal-prototyper](https://github.com/azure-management-and-platforms/portal-prototyper) — Azure Portal UX framework (zero-dependency static HTML/CSS/JS)
+- Identify next 3–5 fixable issues from public board + internal tech debt.
+- Sprint planning ceremony deferred pending #996/#987 closure.
+
+## Key Learnings (Round 4 Retrospective)
+
+[See `.squad/retro-log.md` for detailed round-4 learnings — brief summary here]
+
+1. **Stale agent verdicts:** Leela reported CI "red" on PR #1000 post-rebase when it was actually green. **Lesson:** Always verify live CI state before acting on cached agent reports. Workaround: have each agent poll `gh run list` or equivalent for the specific PR before posting verdict.
+
+2. **Edit-but-not-commit hazard:** Bender's rebase (fc60b872 → 6b8f17e3) included test-import fixes in the working tree but not committed. Local tests passed (saw the edits), but CI failed (no edits in index). **Lesson:** Enforce "commit early and often" discipline during rebases. Flag stale `git status` output in code-review if working-tree is dirty.
+
+3. **Approval-label loss on synchronize:** Push to PR after rebase stripped all review labels (nibbler/leela/zapp). This is GitHub default behavior but broke the "auto-merge on label" contract. **Lesson:** Plan an explicit relabel pass into the PR merge ceremony. Current workaround: contributor manually re-requests review or Scribe force-adds labels via REST. Consider a bot pass that re-applies labels if the reviewer is still marked as a reviewer.
+
+4. **Worktree hygiene:** `.worktrees/` has accumulated stale checkouts (fry-987, bender-996, etc.). Each branch that landed was not cleaned up. **Lesson:** Add a "cleanup stale worktrees" step to the squad meeting cadence (e.g. weekly housekeeping task). Command: `git worktree list`, then `git worktree remove .worktrees/X` + `git worktree prune`.
+
+5. **Bundle-budget gate proved:** PR #1000's bundle-budget ceiling (`check-bundle-budget.mjs` post-build CI + waiver-by-PR-description) worked cleanly. This is now the approved pattern for any controlled performance overages. ✅ Proven shape.
+
+6. **Named-constant geometry SSoT:** Playground layout constants module (consumed by CSS + unit test + Playwright in #1003/#1004) prevents test-drift-no-op failures. This is now the approved pattern for any Playground or flex-layout regressions. ✅ Proven shape.
