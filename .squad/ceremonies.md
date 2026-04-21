@@ -6,12 +6,12 @@ Ceremonies are structured team interactions that the Squad coordinator triggers 
 
 | Ceremony | Trigger | When | Facilitator | Participants | Gate? |
 |----------|---------|------|-------------|--------------|-------|
-| Sprint Planning | auto | weekly (Monday) | Leela | all active squad + Ahmed (PO) | ❌ Backlog shaping, not a hard gate |
+| Sprint Planning | auto | every 6h (00:00 / 06:00 / 12:00 / 18:00 UTC — Ahmed may override) | Leela | all active squad + Ahmed (PO) | ❌ Backlog shaping, not a hard gate |
 | Design Proposal | auto | before work | Leela | assigned agent | ✅ Blocks implementation until DP posted |
 | Design Review | auto | before code | Leela | Zapp, Nibbler, all-relevant | ✅ Blocks code until approved |
 | PR Review Gate | auto | before merge | Nibbler | Leela (architecture), Zapp (security), Nibbler (code quality), Docs reviewer (Scribe interim — McManus not on roster) | ✅ Blocks merge until all four approval labels present + CI green |
 | Docs Sweep | auto | monthly | Scribe | all-relevant | ❌ Freshness audit, not blocking |
-| Cadence Retrospective | auto | weekly | Leela | all squad + Scribe | ❌ Continuous improvement, not blocking |
+| Cadence Retrospective | auto | end of each 6h sprint | Leela | all squad + Scribe | ❌ Continuous improvement, not blocking |
 | Failure Retrospective | auto | after failure | Leela | Nibbler, all-involved | ❌ Diagnostic, not blocking |
 
 ## Automated workflows (not coordinator ceremonies)
@@ -36,24 +36,25 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 | Field | Value |
 |-------|-------|
 | **Trigger** | auto |
-| **When** | weekly (Monday) or when the backlog needs re-estimation |
-| **Condition** | start of a new sprint, or ≥5 open `squad` issues lack an `estimate:*` label |
+| **When** | every 6 hours on a fixed UTC schedule — anchors at **00:00 / 06:00 / 12:00 / 18:00 UTC**. Ahmed (PO) may override the anchor times by amending this row; the coordinator uses whatever is written here. |
+| **Condition** | start of a new 6h sprint window, or ≥5 open `squad` issues lack an `estimate:*` label |
 | **Facilitator** | Leela |
 | **Participants** | all active squad members + assigned human PO (Ahmed) |
-| **Time budget** | focused |
+| **Time budget** | focused — must fit inside the 6h window it is planning |
 | **Enabled** | ✅ yes |
 | **Gate?** | ❌ Not a hard gate — a missing estimate is caught downstream by the Design Proposal ceremony gate. |
 
-**Goal:** Shape the sprint backlog so every in-flight issue has an estimate, an owner, and a sprint goal before implementation work starts.
+**Goal:** Shape the next 6h sprint backlog so every in-flight issue has an estimate, an owner, and a sprint goal before implementation work starts — and so the total in-scope work fits in 6 hours.
 
 **Agenda:**
 1. Pull open issues carrying the `squad` label that are unestimated (no `estimate:*` label).
 2. For each, assign one of `estimate:S` / `estimate:M` / `estimate:L` / `estimate:XL` per the velocity-points table in the Design Proposal ceremony below.
-3. Confirm or assign the `squad:{member}` label so each issue has a clear owner.
-4. Agree the sprint goal in one sentence.
-5. Capture outcomes in a new sprint note at `.squad/sprints/{YYYY-MM-DD}.md` — sprint goal, in-scope issue list with estimates and owners, explicit deferrals, known risks.
+3. **XL-split rule:** any issue that lands at `estimate:XL` (>3h) **does not enter a sprint**. Leela splits it into `S`/`M`/`L` children during triage and only the children are eligible for planning. An XL issue on the board at sprint-planning time is a blocker for that planning session.
+4. Confirm or assign the `squad:{member}` label so each issue has a clear owner.
+5. Agree the sprint goal in one sentence.
+6. Capture outcomes in a new sprint note at `.squad/sprints/{YYYY-MM-DDThh}Z.md` (timestamped to the 6h anchor, e.g. `2026-04-21T12Z.md` for the 12:00 UTC sprint) — sprint goal, in-scope issue list with estimates and owners, explicit deferrals, known risks.
 
-**Output:** `.squad/sprints/{YYYY-MM-DD}.md`. The file is informational; the real gate remains the DP ceremony (which rejects any DP whose estimate is missing or mismatched).
+**Output:** `.squad/sprints/{YYYY-MM-DDThh}Z.md`. The file is informational; the real gate remains the DP ceremony (which rejects any DP whose estimate is missing or mismatched).
 
 ---
 
@@ -71,14 +72,16 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 
 **Gate:** No implementation code may be written until the DP is posted as a comment on the issue.
 
-**Estimate calibration:** every implementation issue carries exactly one estimate label and the DP must repeat that estimate in the proposal.
+**Estimate calibration:** every implementation issue carries exactly one estimate label and the DP must repeat that estimate in the proposal. Bands are sized for the **6h sprint cadence** — a single sprint should absorb one L, several M's, or a cluster of S's.
 
-| Label | Time band | Velocity points |
-|-------|-----------|-----------------|
-| `estimate:S` | ~2 hours | 1 |
-| `estimate:M` | ~8 hours | 3 |
-| `estimate:L` | ~24 hours | 8 |
-| `estimate:XL` | ~80 hours | 20 |
+| Label | Time band | Velocity points | Fits in a 6h sprint? |
+|-------|-----------|-----------------|----------------------|
+| `estimate:S` | ~15 min | 1 | ✅ |
+| `estimate:M` | ~1 hour | 3 | ✅ |
+| `estimate:L` | ~3 hours | 8 | ✅ (at most one per sprint, leaves headroom) |
+| `estimate:XL` | >3 hours | 20 | ❌ — **must be split** into `S`/`M`/`L` children before Sprint Planning accepts it |
+
+**XL-split rule:** An `estimate:XL` label means "does not fit in a single 6h sprint." XL issues never enter sprint scope. Leela splits them during triage into smaller children that each carry their own `estimate:S/M/L` label. If a DP lands with `Estimate: XL`, Leela rejects the DP with a split plan instead.
 
 **DP structure** (the implementing agent posts a comment with):
 - Problem statement (cite the issue body)
@@ -178,29 +181,32 @@ This protocol applies to all agents (squad members AND @copilot). It is enforced
 | Field | Value |
 |-------|-------|
 | **Trigger** | auto |
-| **When** | weekly |
-| **Condition** | end of each sprint week (distinct from the failure-triggered Failure Retrospective below) |
+| **When** | end of each 6h sprint (at the next 6h anchor — i.e. immediately before the next Sprint Planning) |
+| **Condition** | a 6h sprint window just closed (distinct from the failure-triggered Failure Retrospective below) |
 | **Facilitator** | Leela |
 | **Participants** | all squad + Scribe |
-| **Time budget** | focused |
+| **Time budget** | focused — small; this runs four times a day and must stay lightweight |
 | **Enabled** | ✅ yes |
 | **Gate?** | ❌ Not a hard gate — continuous-improvement ceremony. |
 
-**Goal:** Continuous improvement on a fixed cadence, independent of whether anything failed this week.
+**Goal:** Continuous improvement on a fixed 6h cadence, independent of whether anything failed this sprint.
 
 **Inputs:**
-- `.squad/retro-log.md` (per-PR micro-retros from Scribe)
-- `.squad/velocity.md` (weekly velocity report)
-- Last week's closed issues and merged/closed PRs
-- Open `process` issues still in flight
+- The sprint goal file for the window that just closed: `.squad/sprints/{YYYY-MM-DDThh}Z.md`
+- Issues closed inside the 6h window
+- PRs merged inside the 6h window
+- Any `process` issues opened during the sprint
+- Recent entries in `.squad/retro-log.md` (per-PR micro-retros from Scribe)
+- `.squad/velocity.md` if fresh
 
 **Agenda:**
-1. **What went well** — velocity hit, green PRs, smooth reviews, shipped goals.
-2. **What didn't** — CI failures, rejected DPs, rework cycles, stuck PRs, gate skips.
-3. **Action items** — each concrete, testable, and filed as a new `process` issue (one per action).
-4. Scribe captures the summary.
+1. **Sprint goal status** — did we hit what the sprint note said? Carry-over list.
+2. **What went well** — velocity hit, green PRs, smooth reviews.
+3. **What didn't** — CI failures, rejected DPs, rework cycles, stuck PRs, gate skips.
+4. **Action items** — each concrete, testable, and filed as a new `process` issue (one per action).
+5. Scribe captures the summary.
 
-**Output:** a new GitHub issue titled `Weekly Retro · {YYYY-MM-DD}` containing the agenda summary, the linked inputs, and the list of filed `process` action-item issues.
+**Output:** **appended as a comment** to a rolling per-day issue titled `Cadence Retro · {YYYY-MM-DD}` (one issue per UTC day, up to four retro comments bucketed into it — one per 6h sprint). This prevents spamming four new issues every day. The comment contains the agenda summary, the closed 6h window (e.g. `Sprint 2026-04-21T12Z → 2026-04-21T18Z`), the linked inputs, and the list of filed `process` action-item issues. Scribe creates the daily rolling issue on the first retro of each UTC day.
 
 ---
 
