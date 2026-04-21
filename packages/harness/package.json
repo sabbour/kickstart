@@ -67,7 +67,8 @@
   },
   "dependencies": {
     "@openai/agents": "0.8.4",
-    "zod": "^4.1.12",
-    "yaml": "^2.8.1"
+    "@opentelemetry/api": "^1.9.1",
+    "yaml": "^2.8.1",
+    "zod": "^4.1.12"
   }
 }

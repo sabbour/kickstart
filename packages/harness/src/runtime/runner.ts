@@ -12,8 +12,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { Agent, Runner as SDKRunner, tool, setDefaultModelProvider, OpenAIProvider } from '@openai/agents';
+import { Agent, Runner as SDKRunner, tool, setDefaultModelProvider, OpenAIProvider, setTraceProcessors } from '@openai/agents';
 import type { FunctionTool } from '@openai/agents';
+import { OtelBridgeTraceProcessor } from './agents-otel-bridge.js';
 import type { AgentContribution } from '../types/agent.js';
 import type { ToolContribution } from '../types/tool.js';
 import type { UserActionContribution } from '../types/user-action.js';
@@ -72,9 +73,39 @@ export function buildModelProvider(): OpenAIProvider {
 
 // Lazily-initialised shared provider + SDK runner
 let _sdkRunner: SDKRunner | null = null;
+let _otelBridgeInstalled = false;
+
+/**
+ * Install the OpenTelemetry bridge as the sole `@openai/agents` trace
+ * processor. Replacing (rather than adding to) the default processors
+ * means:
+ *   - No outbound to OpenAI's traces dashboard (no OPENAI_API_KEY needed,
+ *     no unintended data egress to a third-party endpoint).
+ *   - Every AgentSpan / GenerationSpan / FunctionSpan / GuardrailSpan /
+ *     HandoffSpan is mirrored into an OTel span and flows through the
+ *     Azure Monitor OpenTelemetry distro already bootstrapped in the API
+ *     layer. Outbound HTTP deps captured by the undici OTel
+ *     instrumentation become children of the matching generation span,
+ *     giving full workflow → agent → generation → HTTPS request nesting
+ *     in Application Insights.
+ *
+ * Idempotent: guarded so repeated Runner instantiations do not clobber
+ * the processor list on every API invocation.
+ */
+function installOtelBridgeOnce(): void {
+  if (_otelBridgeInstalled) return;
+  try {
+    setTraceProcessors([new OtelBridgeTraceProcessor()]);
+    _otelBridgeInstalled = true;
+  } catch (err) {
+    // Never fail the runner because of telemetry wiring.
+    console.warn('[runner] Failed to install OTel trace bridge:', err);
+  }
+}
 
 function getSdkRunner(): SDKRunner {
   if (!_sdkRunner) {
+    installOtelBridgeOnce();
     const provider = buildModelProvider();
     setDefaultModelProvider(provider);
     _sdkRunner = new SDKRunner({ modelProvider: provider });
