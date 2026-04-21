@@ -1,5 +1,5 @@
 ---
-'@kickstart/api': patch
+'@aks-kickstart/api': patch
 ---
 
 Fix persistent HTTP 404 on `/api/health` after SWA deployment.
