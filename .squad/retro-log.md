@@ -29,6 +29,30 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #921 "fix: centralized Azure credentials validation at startup (#920)" | L | impl=0m | review=76m | cycles=1 | merged | @sabbour | first_review=4m | ci=5m | reviewer=human | human_comments=5 | issue=#920 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #929 "ci: Fix changeset status check in PR contexts" | S | impl=0m | review=28m | cycles=1 | merged | @sabbour | first_review=27m | ci=6m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #912 "refactor: rename @kickstart scope to @aks-kickstart" | XL | impl=67m | review=90m | cycles=1 | merged-with-rework | @sabbour | first_review=1m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #930 "fix(api): bundle @azure/functions + bicep-node to fix SWA health 404" | S | impl=0m | review=2m | cycles=1 | merged | @sabbour | first_review=1m | ci=5m | reviewer=bot | human_comments=0 | issue=#926 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #928 "fix(ci): replace file: workspace refs with published version 1.0.1" | M | impl=0m | review=24m | cycles=1 | closed | @sabbour | first_review=15m | ci=5m | reviewer=bot | human_comments=2 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #926 "fix: Playground component graceful API fallback and E2E test re-enablement (#913)" | M | impl=1m | review=33m | cycles=1 | merged | @sabbour | first_review=5m | ci=5m | reviewer=human | human_comments=6 | issue=#913 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #922 "feat: Add structured JSON logging to Azure Functions with Application Insights" | L | impl=0m | review=14m | cycles=1 | merged | @sabbour | first_review=6m | ci=5m | reviewer=human | human_comments=7 | issue=#915 | estimate=M | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #925 "fix: Build and deploy pipeline reliability (fixes #919)" | S | impl=0m | review=8m | cycles=1 | merged | @sabbour | first_review=6m | ci=5m | reviewer=human | human_comments=4 | issue=#919 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-20 | #911 "fix: skip Oryx API build to use pre-resolved workspace packages" | S | impl=0m | review=3m | cycles=1 | merged | @sabbour | first_review=0m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-20 | #910 "release: v1.0.2" | S | impl=12m | review=4m | cycles=1 | merged | @sabbour | first_review=0m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-20 | #908 "docs: remove v2 branding and implementation brief" | XL | impl=7m | review=14m | cycles=1 | merged | @sabbour | first_review=8m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-20 | #907 "fix: use local workspace references instead of npm for internal packages" | M | impl=0m | review=26m | cycles=1 | merged | @sabbour | first_review=22m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-20 | #843 "feat: Shipping forecast workflow" | M | impl=2m | review=0m | cycles=1 | merged | @sabbour | first_review=1096m | ci=6m | reviewer=bot | human_comments=2 | issue=#804 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-20 | #903 "chore(release): wrap v1.0.1 release in PR for review gate" | S | impl=10m | review=10m | cycles=1 | merged | @sabbour | first_review=5m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
