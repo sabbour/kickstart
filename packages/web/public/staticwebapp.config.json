@@ -48,6 +48,10 @@
       "allowedRoles": ["authenticated"]
     },
     {
+      "route": "/api/packs",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/*",
       "allowedRoles": ["authenticated"]
     }
