@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #928 "fix(ci): replace file: workspace refs with published version 1.0.1" | M | impl=0m | review=24m | cycles=1 | closed | @sabbour | first_review=15m | ci=5m | reviewer=bot | human_comments=2 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #926 "fix: Playground component graceful API fallback and E2E test re-enablement (#913)" | M | impl=1m | review=33m | cycles=1 | merged | @sabbour | first_review=5m | ci=5m | reviewer=human | human_comments=6 | issue=#913 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #922 "feat: Add structured JSON logging to Azure Functions with Application Insights" | L | impl=0m | review=14m | cycles=1 | merged | @sabbour | first_review=6m | ci=5m | reviewer=human | human_comments=7 | issue=#915 | estimate=M | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
