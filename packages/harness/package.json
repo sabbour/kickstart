@@ -37,6 +37,10 @@
       "import": "./dist/runtime/session.js",
       "types": "./dist/runtime/session.d.ts"
     },
+    "./runtime/redact": {
+      "import": "./dist/runtime/redact.js",
+      "types": "./dist/runtime/redact.d.ts"
+    },
     "./runtime/sse": {
       "import": "./dist/runtime/sse.js",
       "types": "./dist/runtime/sse.d.ts"
@@ -67,7 +71,8 @@
   },
   "dependencies": {
     "@openai/agents": "0.8.4",
-    "zod": "^4.1.12",
-    "yaml": "^2.8.1"
+    "@opentelemetry/api": "^1.9.1",
+    "yaml": "^2.8.1",
+    "zod": "^4.1.12"
   }
 }

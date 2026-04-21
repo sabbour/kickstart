@@ -4,6 +4,7 @@ import { resolve } from "path";
 export default defineConfig({
   resolve: {
     alias: {
+      "@aks-kickstart/harness/runtime/redact": resolve(__dirname, "packages/harness/src/runtime/redact.ts"),
       "@aks-kickstart/harness": resolve(__dirname, "packages/harness/src/index.ts"),
       "@aks-kickstart/core": resolve(__dirname, "packages/harness/src/index.ts"),
     },
