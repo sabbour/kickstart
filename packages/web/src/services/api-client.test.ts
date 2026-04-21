@@ -23,8 +23,8 @@ describe('healthCheck', () => {
           status: 'error',
           phase: 'env-validation',
           message: 'Pack registry initialization failed',
-          detail: 'AZURE_OPENAI_KEY is not set',
-          hint: 'Ensure AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT environment variables are set',
+          detail: 'AZURE_OPENAI_API_KEY is not set',
+          hint: 'Ensure AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT environment variables are set',
         }),
         { status: 503 }
       )
@@ -35,8 +35,8 @@ describe('healthCheck', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toEqual({
       phase: 'env-validation',
-      message: 'AZURE_OPENAI_KEY is not set',
-      hint: 'Ensure AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT environment variables are set',
+      message: 'AZURE_OPENAI_API_KEY is not set',
+      hint: 'Ensure AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT environment variables are set',
     });
   });
 

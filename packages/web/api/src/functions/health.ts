@@ -19,7 +19,7 @@ function diagnoseProblem(err: unknown): { phase: string; hint: string } {
   if (msg.includes('AZURE_OPENAI') || msg.includes('environment variable')) {
     return {
       phase: 'env-validation',
-      hint: 'Ensure AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT environment variables are set',
+      hint: 'Ensure AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT environment variables are set',
     };
   }
   if (msg.includes('cannot find module') || msg.includes('ERR_MODULE_NOT_FOUND')) {
