@@ -44,6 +44,15 @@ import { getFluentIcon } from '../catalog/icons/fluent-icons';
 import { apiFetch } from '../services/api-client';
 import { FALLBACK_WIDGET_IDEAS } from '../lib/fallback-ideas';
 import { COMPONENT_PREVIEWS } from './component-examples';
+import {
+  COMPONENT_GRID_MIN_COL_PX,
+  COMPONENT_GRID_MAX_CARD_PX,
+  COMPONENT_GRID_GAP_PX,
+  COMPONENT_COMPACT_MIN_COL_PX,
+  COMPONENT_COMPACT_MAX_CARD_PX,
+  COMPONENT_CARD_PREVIEW_MIN_HEIGHT_PX,
+  COMPONENT_CARD_COMPACT_MIN_HEIGHT_PX,
+} from './playground-layout-constants';
 
 
 // ── LLM → A2UI component normalizer ─────────────────────────────────────
@@ -492,28 +501,35 @@ const useStyles = makeStyles({
       outlineOffset: '2px',
     },
   },
-  // Tight grid: 4–5 cards/row at standard viewports, never breaks narrower widths.
+  // Component grid: 4–5 cards/row at standard viewports (1280/1440/1920).
+  // Geometry comes from playground-layout-constants.ts so Playwright asserts
+  // against the same source of truth. See #995 (restores #986's intent).
   componentGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-    gap: tokens.spacingVerticalM,
+    gridTemplateColumns: `repeat(auto-fill, minmax(${COMPONENT_GRID_MIN_COL_PX}px, 1fr))`,
+    gap: `${COMPONENT_GRID_GAP_PX}px`,
     padding: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalL}`,
     '& > *': {
-      maxWidth: '320px',
+      maxWidth: `${COMPONENT_GRID_MAX_CARD_PX}px`,
     },
   },
   // Compact grid for pack sections where every component lacks a preview.
   componentCompactGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    gridTemplateColumns: `repeat(auto-fill, minmax(${COMPONENT_COMPACT_MIN_COL_PX}px, 1fr))`,
     gap: tokens.spacingVerticalS,
     padding: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalL}`,
     '& > *': {
-      maxWidth: '280px',
+      maxWidth: `${COMPONENT_COMPACT_MAX_CARD_PX}px`,
     },
   },
+  compCardPreview: {
+    minHeight: `${COMPONENT_CARD_PREVIEW_MIN_HEIGHT_PX}px`,
+    display: 'flex',
+    flexDirection: 'column' as const,
+  },
   compCardCompact: {
-    minHeight: '88px',
+    minHeight: `${COMPONENT_CARD_COMPACT_MIN_HEIGHT_PX}px`,
   },
   emptyPreviewLabel: {
     marginTop: tokens.spacingVerticalXS,
@@ -749,12 +765,14 @@ const ComponentCard = memo(({ comp, onCardClick, compact = false }: ComponentCar
     <Card
       appearance="outline"
       style={{ padding: tokens.spacingVerticalM }}
-      className={`${classes.compCardClickable}${isCompact ? ` ${classes.compCardCompact}` : ''}`}
+      className={`${classes.compCardClickable} ${isCompact ? classes.compCardCompact : classes.compCardPreview}`}
       role="button"
       tabIndex={0}
       aria-label={`Open ${comp.name} detail`}
       onClick={() => onCardClick(comp)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(comp); } }}
+      data-component-card={comp.name}
+      data-component-has-preview={hasPreview ? 'true' : 'false'}
     >
       <Body1Strong style={{ fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200 }}>
         {comp.name.split('/')[1] ?? comp.name}
@@ -763,7 +781,11 @@ const ComponentCard = memo(({ comp, onCardClick, compact = false }: ComponentCar
         {comp.name}
       </Caption1>
       {hasPreview ? (
-        <div className={classes.cardBody} style={{ marginTop: tokens.spacingVerticalS, pointerEvents: 'none' }}>
+        <div
+          className={classes.cardBody}
+          style={{ marginTop: tokens.spacingVerticalS, pointerEvents: 'none', flex: 1 }}
+          data-testid="component-card-preview"
+        >
           {/* A2UIEnvelopePreview — same render pipeline as Chat */}
           <A2UIEnvelopePreview
             surfaceId={surfaceId}

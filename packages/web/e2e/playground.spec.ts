@@ -1,5 +1,11 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './helpers';
+import {
+  COMPONENT_GRID_MIN_COL_PX,
+  COMPONENT_GRID_MAX_CARD_PX,
+  COMPONENT_GRID_GAP_PX,
+  COMPONENT_CARD_PREVIEW_MIN_HEIGHT_PX,
+} from '../src/pages/playground-layout-constants';
 
 const PLAYGROUND_URL = '/?playground';
 
@@ -179,6 +185,65 @@ test.describe.skip('Playground', () => {
       for (const group of ['Layout', 'Content', 'Inputs', 'Custom Controls']) {
         await expect(page.getByText(group, { exact: true }).first()).toBeVisible();
       }
+    });
+  });
+
+  // ---- Components tab: Core density + preview quality (regression #995) ----
+  // Geometry expectations are imported from playground-layout-constants.ts so
+  // the CSS and the assertions share a single source of truth (Nibbler DP ask).
+  test.describe('Components tab Core density + preview quality (#995)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.getByRole('tab', { name: 'Components' }).click();
+    });
+
+    test('Core section preview cards render with adequate preview min-height', async ({ page }) => {
+      const corePreviewCards = page.locator(
+        '[data-component-card^="core/"][data-component-has-preview="true"]',
+      );
+      await expect(corePreviewCards.first()).toBeVisible({ timeout: 10_000 });
+      const count = await corePreviewCards.count();
+      expect(count).toBeGreaterThan(0);
+
+      const firstBox = await corePreviewCards.first().boundingBox();
+      expect(firstBox).not.toBeNull();
+      expect(firstBox!.height).toBeGreaterThanOrEqual(
+        COMPONENT_CARD_PREVIEW_MIN_HEIGHT_PX,
+      );
+      // Card width must never fall below the grid-declared min column width
+      // and must never exceed the card hard-cap.
+      expect(firstBox!.width).toBeGreaterThanOrEqual(COMPONENT_GRID_MIN_COL_PX - 1);
+      expect(firstBox!.width).toBeLessThanOrEqual(COMPONENT_GRID_MAX_CARD_PX + 1);
+
+      const previewBody = corePreviewCards
+        .first()
+        .locator('[data-testid="component-card-preview"]');
+      await expect(previewBody).toBeVisible();
+      const previewBox = await previewBody.boundingBox();
+      expect(previewBox).not.toBeNull();
+      // Preview must actually take visible space — not a zero-sized stub.
+      expect(previewBox!.width).toBeGreaterThan(0);
+      expect(previewBox!.height).toBeGreaterThan(0);
+    });
+
+    test('Core section grid uses the declared gap (no tight rendering)', async ({ page }) => {
+      const coreCards = page.locator('[data-component-card^="core/"]');
+      await expect(coreCards.first()).toBeVisible({ timeout: 10_000 });
+      const grid = coreCards.first().locator('xpath=..');
+      const computedGap = await grid.evaluate(
+        (el) => getComputedStyle(el as HTMLElement).rowGap,
+      );
+      const gapPx = parseFloat(computedGap);
+      expect(gapPx).toBeGreaterThanOrEqual(COMPONENT_GRID_GAP_PX);
+    });
+
+    test('Core section shows no "No preview" placeholder for shipped basic components', async ({ page }) => {
+      // Any core card with has-preview="false" is a regression — all core
+      // basic renderers ship with an example in COMPONENT_PREVIEWS.
+      const missing = page.locator(
+        '[data-component-card^="core/"][data-component-has-preview="false"]',
+      );
+      await page.locator('[data-component-card^="core/"]').first().waitFor({ timeout: 10_000 });
+      await expect(missing).toHaveCount(0);
     });
   });
 

@@ -147,6 +147,52 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
     },
   ],
 
+  'core/Tabs': [
+    {
+      id: 'root',
+      component: 'Tabs',
+      tabs: [
+        { label: 'Overview', children: ['tab-overview'] },
+        { label: 'Details', children: ['tab-details'] },
+      ],
+    },
+    { id: 'tab-overview', component: 'Text', text: 'Overview content' },
+    { id: 'tab-details', component: 'Text', text: 'Details content' },
+  ],
+
+  'core/Modal': [
+    { id: 'root', component: 'Modal', trigger: 'modal-trigger', content: 'modal-content' },
+    { id: 'modal-trigger', component: 'Button', child: 'modal-trigger-label' },
+    { id: 'modal-trigger-label', component: 'Text', text: 'Open modal' },
+    { id: 'modal-content', component: 'Text', text: 'Modal body content' },
+  ],
+
+  'core/Accordion': [
+    {
+      id: 'root',
+      component: 'Accordion',
+      items: [
+        { title: 'Section one', children: ['acc-1'] },
+        { title: 'Section two', children: ['acc-2'] },
+      ],
+    },
+    { id: 'acc-1', component: 'Text', text: 'First section body' },
+    { id: 'acc-2', component: 'Text', text: 'Second section body' },
+  ],
+
+  'core/Video': [
+    { id: 'root', component: 'Video', url: 'https://www.w3schools.com/html/mov_bbb.mp4' },
+  ],
+
+  'core/AudioPlayer': [
+    {
+      id: 'root',
+      component: 'AudioPlayer',
+      url: 'https://www.w3schools.com/html/horse.mp3',
+      description: 'Audio preview',
+    },
+  ],
+
   // ── Fluent UI overrides ───────────────────────────────────────────────────
 
   'core/Badge': [
