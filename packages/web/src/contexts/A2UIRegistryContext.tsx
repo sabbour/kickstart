@@ -223,6 +223,44 @@ export function isPropsTooLarge(props: unknown): boolean {
 }
 
 /**
+ * Strip fields whose value is `null` or `undefined`.
+ *
+ * Per-component Zod schemas can otherwise reject unknown-but-null keys and
+ * the component would be replaced with `_ErrorComponent`. See #984.
+ *
+ * NOTE: empty strings are preserved. Some components (e.g. DateTimeInput)
+ * require a string `value` and initialize it to `""` — dropping `""` here
+ * would wrongly strip that field.
+ */
+export function dropEmptyPropValues(
+  props: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(props)) {
+    if (v === null || v === undefined) continue;
+    result[k] = v;
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// A2UI v0.9 clean break (#984 / PR #989)
+// ---------------------------------------------------------------------------
+//
+// Spec: https://a2ui.org/specification/v0.9-a2ui/
+//
+// There is NO back-compat shim. Envelopes that still use legacy dialect
+// fields (`label` / `onClick` / `onChange` / `items` / `placeholder` /
+// `value` / `disabled` at the top level of a component) are rejected by the
+// per-component Zod schemas below. The offending component is replaced with
+// `_ErrorComponent` and a `[A2UIRegistry]` `console.error` names the
+// component + the non-spec key(s) so the prompt / producer is fixed rather
+// than silently translated.
+//
+// If we ever need a temporary translation layer again, add it explicitly at
+// the network boundary — do NOT re-introduce it into the renderer pipeline.
+
+/**
  * Sanitize raw component props:
  * 1. Strip dangerous keys
  * 2. Validate URL-bearing props
@@ -261,8 +299,10 @@ export function validateAndSanitizeComponents(
       return { id, component: '_ErrorComponent' };
     }
 
-    // Dangerous-key strip + URL validation
-    const sanitized = sanitizeComponentProps(rawProps as Record<string, unknown>);
+    // Dangerous-key strip + URL validation + drop empty defaults
+    const sanitized = dropEmptyPropValues(
+      sanitizeComponentProps(rawProps as Record<string, unknown>),
+    );
 
     // Unknown component → error renderer (Zapp Phase B, point 5)
     if (typeof componentName !== 'string') {
@@ -276,15 +316,27 @@ export function validateAndSanitizeComponents(
       return { id, component: '_ErrorComponent' };
     }
 
-    // Schema parse (Zapp Crit1 / Phase B) — strips unknown keys, validates types
+    // Schema parse (Zapp Crit1 / Phase B) — strict schemas reject unknown keys,
+    // typed schemas reject bad values. Any failure → _ErrorComponent + a
+    // descriptive console.error naming the non-spec property (clean-break
+    // policy, #984 / PR #989).
     const schema = impl.schema;
     if (schema && typeof schema.safeParse === 'function') {
       const result = schema.safeParse(sanitized);
       if (!result.success) {
-        console.error(
-          `[A2UIRegistry] Component "${componentName}" failed prop validation:`,
-          result.error,
-        );
+        const unknownKeys = result.error.issues
+          .filter((iss) => iss.code === 'unrecognized_keys')
+          .flatMap((iss) => (iss as { keys?: string[] }).keys ?? []);
+        if (unknownKeys.length > 0) {
+          console.error(
+            `[A2UIRegistry] Non-spec property ${unknownKeys.map((k) => `"${k}"`).join(', ')} on component "${id}" (${componentName}) — envelope must follow A2UI v0.9 shape. Rejecting.`,
+          );
+        } else {
+          console.error(
+            `[A2UIRegistry] Component "${componentName}" (id="${id}") failed v0.9 prop validation:`,
+            result.error,
+          );
+        }
         return { id, component: '_ErrorComponent' };
       }
       return { id, component: componentName, ...result.data };

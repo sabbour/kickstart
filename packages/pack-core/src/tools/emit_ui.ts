@@ -9,26 +9,67 @@ import type { ToolContribution, SessionCtx } from '@aks-kickstart/harness';
 // Scalar values that can appear in data-model and component property fields.
 const A2UIScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
-// Lightweight component schema — enforces `component` + `id` (both required by
-// the A2UI renderer) and the most common optional rendering props.
+// Lightweight component schema — v0.9 adjacency-list shape.
+// See https://a2ui.org/specification/v0.9-a2ui/ and
+// https://a2ui.org/concepts/components/.
+//
 // The runtime re-validates against the full harness A2UIMessageSchema in
 // execute(), so this schema only needs to be strict enough for the OpenAI API
-// to accept it without a 400.
+// to accept it without a 400 AND to keep the LLM on-spec.
 //
-// IMPORTANT: use `component` (not `type`) — the browser renderer destructures
-// `{ id, component, ...props }` from each entry. `id` must be unique within
-// the surface (e.g. "root" for the top-level component).
-// Use bare component names — no pack prefix (e.g. "Button", not "core/Button").
+// IMPORTANT:
+// - Use `component` (not `type`) and `id` for every entry.
+// - Container hierarchy is expressed via `child` (single ID) or
+//   `children` (array of IDs) — NEVER `items`.
+// - A Button's label is a CHILD Text component referenced via `child`.
+//   There is no top-level `label`.
+// - Interactions go through `action: { event: { name, payload? } }`.
+//   There is no `onClick` / `onChange` string shorthand.
 const A2UIComponentSchema = z.object({
-  id: z.string().describe('Unique component ID within this surface, e.g. "root"'),
-  component: z.string().describe('Bare component name, e.g. "Button", "Row", "Text" — no pack prefix'),
-  label: z.string().nullable().optional(),
-  placeholder: z.string().nullable().optional(),
-  value: A2UIScalar.nullable().optional(),
-  disabled: z.boolean().nullable().optional(),
-  items: z.array(z.object({ label: z.string(), value: z.string() })).nullable().optional(),
-  onClick: z.string().nullable().optional(),
-  onChange: z.string().nullable().optional(),
+  id: z.string().describe('Unique component ID within this surface, e.g. "root".'),
+  component: z
+    .string()
+    .describe('Bare component name, e.g. "Button", "Row", "Text" — no pack prefix.'),
+  // --- Hierarchy (v0.9 adjacency list) ---
+  child: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'Single child component ID. Use on single-slot containers like Card or ' +
+        'a Button (the Button\'s visible label is a Text child referenced here). ' +
+        'Must reference another component emitted in the same updateComponents call.',
+    ),
+  children: z
+    .array(z.string())
+    .nullable()
+    .optional()
+    .describe(
+      'Ordered array of child component IDs. Use on multi-slot containers like ' +
+        'Row, Column, and List. Each ID must reference another component in the same call.',
+    ),
+  // --- Leaf content ---
+  text: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Literal text content for a Text component.'),
+  // --- Interactions ---
+  action: z
+    .object({
+      event: z.object({
+        name: z.string().describe('Event name dispatched when the component is activated.'),
+        payload: z
+          .record(z.string(), A2UIScalar)
+          .optional()
+          .describe('Optional flat payload (string/number/boolean/null values) delivered with the event.'),
+      }),
+    })
+    .optional()
+    .describe(
+      'Interaction descriptor for clickable / editable components. ' +
+        'Use `action: { event: { name: "..." } }` — never a bare onClick string.',
+    ),
 });
 
 // Full discriminated union for the A2UI v0.9 envelope.
@@ -91,13 +132,27 @@ export const emitUiTool: ToolContribution = {
   tool: tool({
     name: 'core.emit_ui',
     description:
-      'Validates and emits an A2UI v0.9 message. ' +
-      'The message is validated against the A2UI schema and then recorded on the session context ' +
+      'Validates and emits an A2UI v0.9 message (spec: https://a2ui.org/specification/v0.9-a2ui/). ' +
+      'The message is validated against the A2UI schema and recorded on the session context ' +
       'so the runner can stream it to the browser as an "a2ui" SSE event. ' +
-      'Use this any time you want to create, update, or remove a UI surface. ' +
-      'IMPORTANT: In createSurface messages, always set catalogId to "kickstart". ' +
-      'In updateComponents messages, use bare component names (e.g. "Button", not "core/Button") ' +
-      'and give every component a unique string id (e.g. "root" for the top-level component).',
+      'IMPORTANT rules (v0.9):\n' +
+      '- In createSurface messages, always set catalogId to "kickstart".\n' +
+      '- In updateComponents, emit a FLAT adjacency list of components. Every entry has ' +
+      '`id` (unique within surface) and `component` (bare name, e.g. "Button", "Row", "Text").\n' +
+      '- Hierarchy is EXPLICIT: containers declare `child` (single ID) or `children` (array of IDs). ' +
+      'Components are never nested by emit order.\n' +
+      '- A Button\'s visible label is a Text CHILD referenced via `child` — there is NO top-level `label` prop.\n' +
+      '- Interactions use `action: { event: { name, payload? } }`. Do NOT emit `onClick` / `onChange` / `items` / ' +
+      '`placeholder` / `value` / `disabled` as top-level fields — they are not part of v0.9 and will be ignored.\n' +
+      'Spec-compliant example:\n' +
+      '{"version":"v0.9","updateComponents":{"surfaceId":"main","components":[' +
+      '{"id":"root","component":"Column","children":["greeting","buttons"]},' +
+      '{"id":"greeting","component":"Text","text":"Hello"},' +
+      '{"id":"buttons","component":"Row","children":["cancel-btn","ok-btn"]},' +
+      '{"id":"cancel-btn","component":"Button","child":"cancel-text","action":{"event":{"name":"cancel"}}},' +
+      '{"id":"cancel-text","component":"Text","text":"Cancel"},' +
+      '{"id":"ok-btn","component":"Button","child":"ok-text","action":{"event":{"name":"ok"}}},' +
+      '{"id":"ok-text","component":"Text","text":"OK"}]}}',
     parameters: EmitUiInputSchema,
     execute: async (input, runCtx): Promise<string> => {
       const session = runCtx?.context as SessionCtx | undefined;

@@ -106,6 +106,11 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
     const safeMessages = msgs.map(msg => {
       if (msg.updateComponents) {
         const rawComponents = msg.updateComponents.components as Array<Record<string, unknown>>;
+        // Clean-break validation (no back-compat shim): any component whose
+        // raw envelope violates the v0.9 spec (e.g. legacy `label` / `onClick`
+        // / `items` / `placeholder` / `value` / `disabled` / `onChange` keys
+        // the catalog schema no longer accepts) is rejected here and replaced
+        // with `_ErrorComponent` by `validateAndSanitizeComponents`. See #984.
         const validated = clientRegistry.isSealed
           ? validateAndSanitizeComponents(rawComponents, clientRegistry)
           : rawComponents;

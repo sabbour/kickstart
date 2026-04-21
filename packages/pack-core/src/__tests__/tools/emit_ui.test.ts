@@ -169,6 +169,60 @@ describe('core.emit_ui', () => {
     });
   });
 
+  // ── #984 A2UI v0.9 spec alignment ────────────────────────────────────────
+
+  describe('#984 — A2UI v0.9 adjacency-list schema', () => {
+    it('accepts the canonical v0.9 spec envelope (Column → Text + Row → Buttons with Text children + action)', async () => {
+      const result = await invoke({
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'main',
+          components: [
+            { id: 'root', component: 'Column', children: ['greeting', 'buttons'] },
+            { id: 'greeting', component: 'Text', text: 'Hello' },
+            { id: 'buttons', component: 'Row', children: ['cancel-btn', 'ok-btn'] },
+            { id: 'cancel-btn', component: 'Button', child: 'cancel-text',
+              action: { event: { name: 'cancel' } } },
+            { id: 'cancel-text', component: 'Text', text: 'Cancel' },
+            { id: 'ok-btn', component: 'Button', child: 'ok-text',
+              action: { event: { name: 'ok', payload: { confirmed: true } } } },
+            { id: 'ok-text', component: 'Text', text: 'OK' },
+          ],
+        },
+      });
+      expect(String(result)).toContain('updateComponents');
+      expect(session.a2uiEmissions).toHaveLength(1);
+
+      const emitted = session.a2uiEmissions[0] as {
+        updateComponents: { components: Array<Record<string, unknown>> };
+      };
+      const comps = emitted.updateComponents.components;
+      expect(comps[0].children).toEqual(['greeting', 'buttons']);
+      expect(comps[1].text).toBe('Hello');
+      expect(comps[3].child).toBe('cancel-text');
+      const okAction = comps[5].action as { event: { name: string; payload?: unknown } };
+      expect(okAction.event.name).toBe('ok');
+      expect(okAction.event.payload).toEqual({ confirmed: true });
+    });
+
+    it('accepts a minimal Text + Button pair (no non-spec fields)', async () => {
+      const result = await invoke({
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 's',
+          components: [
+            { id: 'btn', component: 'Button', child: 'lbl',
+              action: { event: { name: 'go' } } },
+            { id: 'lbl', component: 'Text', text: 'Go' },
+          ],
+        },
+      });
+      expect(String(result)).toContain('updateComponents');
+    });
+  });
+
   // ── Metadata ──────────────────────────────────────────────────────────────
 
   describe('ToolContribution shape', () => {

@@ -3,25 +3,29 @@ import {createReactComponent} from '../../vendor/a2ui/react/adapter';
 import {z} from 'zod';
 import {
   ComponentIdSchema,
-  DynamicStringSchema,
   ActionSchema,
   CheckableSchema,
 } from '../../vendor/a2ui/web_core/schema/common-types';
 import {Button as FluentButton, makeStyles, tokens} from '@fluentui/react-components';
 
-// Flexible ButtonApi: accepts `label` as shorthand (avoids needing a separate Text child)
+// v0.9 Button: the visible label is a `child` Text component. There is no
+// top-level `label` / `onClick` / `onChange` — interactions flow through
+// `action: { event: { name, payload? } }`. Any legacy prop is rejected by the
+// strict schema and the component falls back to _ErrorComponent with a
+// "non-spec property" error. See #984 + https://a2ui.org/specification/v0.9-a2ui/.
 const FlexibleButtonApi = {
   name: 'Button' as const,
-  schema: z.object({
-    accessibility: z.any().optional(),
-    weight: z.number().optional(),
-    child: ComponentIdSchema.optional(),
-    label: DynamicStringSchema.optional(),
-    variant: z.string().default('default').optional(),
-    action: ActionSchema.optional(),
-    checks: CheckableSchema.shape.checks,
-    isValid: z.boolean().optional(),
-  }),
+  schema: z
+    .object({
+      accessibility: z.any().optional(),
+      weight: z.number().optional(),
+      child: ComponentIdSchema.optional(),
+      variant: z.string().optional(),
+      action: ActionSchema.optional(),
+      checks: CheckableSchema.shape.checks,
+      isValid: z.boolean().optional(),
+    })
+    .strict(),
 };
 
 const useStyles = makeStyles({
@@ -51,7 +55,7 @@ export const Button = createReactComponent(FlexibleButtonApi, ({props, buildChil
       onClick={props.action}
       disabled={props.isValid === false}
     >
-      {props.child ? buildChild(props.child) : (props.label ?? null)}
+      {props.child ? buildChild(props.child) : null}
     </FluentButton>
   );
 });
