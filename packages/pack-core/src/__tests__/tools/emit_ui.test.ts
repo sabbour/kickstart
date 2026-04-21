@@ -35,7 +35,7 @@ const validUpdateComponents = {
   op: 'updateComponents' as const,
   updateComponents: {
     surfaceId: 'surface-001',
-    components: [{ type: 'Button', label: 'Click me' }],
+    components: [{ id: 'root', component: 'Button', label: 'Click me' }],
   },
 };
 

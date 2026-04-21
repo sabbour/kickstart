@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { makeStyles, tokens, Text } from '@fluentui/react-components';
-import { KNOWN_COMPONENT_TYPES } from '@aks-kickstart/harness';
+import { clientRegistry } from '../../contexts/A2UIRegistryContext';
 import type { A2uiPayloadItem, A2uiMsg, A2uiComponent } from '../../types';
 
 const KICKSTART_CATALOG_ID = 'kickstart';
@@ -147,7 +147,7 @@ function groupBySurface(messages: A2uiMsg[]): Map<string, SurfaceOps> {
 }
 
 function ComponentBadge({ componentType, styles }: { componentType: string; styles: ReturnType<typeof useStyles> }) {
-  const isKnown = KNOWN_COMPONENT_TYPES.includes(componentType);
+  const isKnown = clientRegistry.isSealed && clientRegistry.getNames().includes(componentType);
   return (
     <span className={`${styles.badge} ${isKnown ? styles.badgeOk : styles.badgeWarn}`}>
       {isKnown ? '✅ resolved' : '⚠️ unknown type'}
