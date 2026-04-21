@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #1000 "feat: render pack components via the engine" | XL | impl=1m | review=63m | cycles=3 | merged-with-rework | @sabbour | first_review=9m | ci=6m | reviewer=bot | human_comments=0 | issue=#991 | estimate=L | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #1004 "fix(web): Workspace flex layout (min-height:0) closes black-void (#997)" | M | impl=0m | review=15m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=11m | ci=6m | reviewer=bot | human_comments=1 | issue=#997 | estimate=S | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #1001 "test(pack-core): add emit_ui explicit-op fixture" | M | impl=0m | review=16m | cycles=1 | merged | @sabbour | first_review=6m | ci=6m | reviewer=bot | human_comments=0 | issue=#980 | estimate=S | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
