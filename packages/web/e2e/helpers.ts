@@ -1,5 +1,4 @@
 import { test as base, type Page } from '@playwright/test';
-import { FALLBACK_WIDGET_IDEAS } from '../src/lib/fallback-ideas';
 
 /**
  * Shared test fixture that mocks MSAL and forces demo mode
@@ -28,24 +27,10 @@ export const test = base.extend<{ mockAuth: void }>({
       }),
     );
 
-    // Mock /api/inspirations/widgets endpoint with fallback ideas
-    await page.route('**/api/inspirations/widgets*', route =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(FALLBACK_WIDGET_IDEAS),
-      }),
+    // Force demo mode — no backend in E2E tests
+    await page.route('**/api/**', route =>
+      route.fulfill({ status: 503, contentType: 'text/plain', body: 'No backend' }),
     );
-
-    // Mock other API calls with 503 for demo mode (playground doesn't need them)
-    await page.route('**/api/**', route => {
-      // Skip if already handled by specific routes (like inspirations/widgets)
-      const url = route.request().url();
-      if (url.includes('/api/inspirations/widgets')) {
-        return; // Already handled above
-      }
-      route.fulfill({ status: 503, contentType: 'text/plain', body: 'No backend' });
-    });
 
     // Block auth redirects — prevents navigating away from the app when the
     // playground auth stub is not active (e.g. in non-playground test routes).
