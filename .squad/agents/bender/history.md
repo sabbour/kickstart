@@ -223,3 +223,24 @@ All 6 security conditions from DP #329 + DP #330 security reviews integrated as 
 - (2026-04-17T12:06:45.293Z) Step-2 `Pack` should stay dir-based for agents/skills (`agentsDir`/`skillsDir`) while inline arrays remain only for contributions without a file-authoring model. Mixing both surfaces creates ambiguous registry contracts for later steps.
 
 - (2026-04-20T09:33:44.947-07:00) When rebasing workflow-only docs-gate branches, preserve the canonical docs-site API-doc path from main while carrying forward any explicit bypass label logic (`skip-docs`) and companion label sync entries. That keeps the gate aligned with the consolidated docs surface instead of silently reviving legacy doc paths during conflict resolution.
+
+## 2026-04-20: AppInsights Bicep Provisioning (#942, PR #948)
+
+**Sponsor Issue:** #942 — Provision Application Insights in Bicep + wire connection string  
+**PR:** #948 — squad/942-appinsights-bicep  
+**Status:** ✅ PR open, ready for review
+
+**Implementation Scope:**
+- Added `Microsoft.OperationalInsights/workspaces` (PerGB2018, 30-day retention) and `Microsoft.Insights/components` (workspace-based, kind `web`) to `infra/main.bicep`
+- Wired `APPLICATIONINSIGHTS_CONNECTION_STRING` into `baseAppSettings` from `appInsights.properties.ConnectionString` — no Key Vault indirection (ingestion-only credential)
+- Removed the conditional `if` guard on the `appSettings` resource — always deployed now
+- Added `appInsightsConnectionString` (`@secure()`) + `appInsightsInstrumentationKey` outputs
+- Updated `parameters.dev.json` with dev workspace/component names
+- Updated `infra/README.md`: architecture diagram, contents table, app settings table
+- Added changeset `appinsights-bicep-942.md` (patch for `@aks-kickstart/api`)
+
+**Key Learnings:**
+- (2026-04-20) Workspace-based AppInsights is the only type Azure creates post-2021; `Microsoft.Insights/components` with `WorkspaceResourceId` pointing to a `Microsoft.OperationalInsights/workspaces` is the required pattern. Classic (non-workspace) components are deprecated.
+- (2026-04-20) AppInsights `ConnectionString` is not a secret in the Key Vault sense — it provides ingestion-write access only, no read access to telemetry data. Safe to place directly in SWA `appsettings` without KV indirection. Mark Bicep output `@secure()` only to suppress ARM deployment state logging (prevents connection string appearing in `az deployment` JSON output).
+- (2026-04-20) When adding a setting always available from a sibling Bicep resource, remove any conditional `if` guard on the dependent `appSettings` resource — the guard becomes misleading and risks deploying with a missing required env var.
+- (2026-04-20) `az bicep build` compiles to `infra/main.json` in the same directory; add `infra/main.json` to `.gitignore` if not present (ARM JSON is a build artifact, not source).
