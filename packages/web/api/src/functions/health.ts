@@ -19,8 +19,6 @@ export interface LlmCheckResult {
 interface HealthResponse {
   status: "ok" | "error";
   phase?: string;
-  message?: string;
-  detail?: string;
   hint?: string;
   registry?: "ready";
   llm?: LlmCheckResult;
@@ -203,15 +201,12 @@ app.http("health", {
         properties: { requestId, context: "health-check-pack-init", phase },
       });
 
+      // Return only opaque category fields — never raw error messages, file
+      // paths, or URLs. Full detail is captured server-side via logger.error
+      // and appInsights.trackException above.
       return {
         status: 503,
-        jsonBody: {
-          status: "error",
-          phase,
-          message: "Pack registry initialization failed",
-          detail: sanitizedError.message,
-          hint,
-        } as HealthResponse,
+        jsonBody: { status: "error", phase, hint } as HealthResponse,
       };
     }
   },
