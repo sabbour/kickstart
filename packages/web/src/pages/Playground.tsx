@@ -1,5 +1,5 @@
 /**
- * Playground — A2UI Gallery (sidebar layout).
+ * Playground — Create / Components / Icons / Workspace (sidebar layout).
  *
  * Access via ?playground URL parameter.
  * Left sidebar navigation: Create | Components | Icons | Workspace
@@ -176,9 +176,8 @@ function normalizePlaygroundComponents(raw: any[]): any[] {
 }
 
 // Registry-derived groupings — populated from registry at render time.
-// Scenarios are grouped by pack name (prefix of scenario.id, e.g. "core" for "core/discover-flow").
 // Components are grouped by pack name (prefix of component.name, e.g. "core" for "core/Button").
-// Both lists are empty until pack-core lands (Step 4) and registry is wired in (Step 5).
+// The list is empty until pack-core lands (Step 4) and registry is wired in (Step 5).
 
 function packNameFromId(id: string): string {
   return id.split('/')[0] ?? id;
@@ -701,11 +700,11 @@ const useStyles = makeStyles({
   },
 });
 
-// ---- GalleryCardErrorBoundary ----
-// Isolates crashes in individual gallery cards so one broken card
-// doesn't bring down the whole gallery.
+// ---- ComponentCardErrorBoundary ----
+// Isolates crashes in individual component cards so one broken card
+// doesn't bring down the whole grid.
 interface ErrorBoundaryState { hasError: boolean; message: string }
-class GalleryCardErrorBoundary extends React.Component<
+class ComponentCardErrorBoundary extends React.Component<
   React.PropsWithChildren<{ label?: string }>,
   ErrorBoundaryState
 > {
@@ -1593,9 +1592,9 @@ function PlaygroundInner() {
                   )}
                   <div className={allEmpty ? classes.componentCompactGrid : classes.componentGrid}>
                     {comps.map(comp => (
-                      <GalleryCardErrorBoundary key={comp.name} label={comp.name}>
+                      <ComponentCardErrorBoundary key={comp.name} label={comp.name}>
                         <ComponentCard comp={comp} onCardClick={handleComponentCardClick} compact={allEmpty} />
-                      </GalleryCardErrorBoundary>
+                      </ComponentCardErrorBoundary>
                     ))}
                   </div>
                 </div>
