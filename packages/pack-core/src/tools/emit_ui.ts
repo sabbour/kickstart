@@ -6,85 +6,267 @@ import type { ToolContribution, SessionCtx } from '@aks-kickstart/harness';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
-// Scalar values that can appear in data-model and component property fields.
+// Scalar values for data-model and action payload fields.
 const A2UIScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
-// Lightweight component schema — v0.9 adjacency-list shape.
-// See https://a2ui.org/specification/v0.9-a2ui/ and
-// https://a2ui.org/concepts/components/.
+// Dynamic string: a literal string or a data-binding reference `{ path: "..." }`.
+// Subset of the full DynamicStringSchema accepted by the client catalog.
+const A2UIDynamicString = z.union([
+  z.string(),
+  z.object({ path: z.string().describe('JSON Pointer path into the data model.') }),
+]);
+
+// Dynamic boolean: a literal boolean or a data-binding reference.
+const A2UIDynamicBoolean = z.union([
+  z.boolean(),
+  z.object({ path: z.string().describe('JSON Pointer path into the data model.') }),
+]);
+
+// Dynamic number: a literal number or a data-binding reference.
+const A2UIDynamicNumber = z.union([
+  z.number(),
+  z.object({ path: z.string().describe('JSON Pointer path into the data model.') }),
+]);
+
+// Action schema for interactive components.
+// Uses a flat event envelope; `payload` is nullable so null is stripped by
+// stripNulls() before runtime validation (satisfies OpenAI strict-mode required).
+const A2UIActionSchema = z.object({
+  event: z.object({
+    name: z.string().describe('Event name dispatched when the component is activated.'),
+    payload: z
+      .record(z.string(), A2UIScalar)
+      .nullable()
+      .describe(
+        'Flat payload (string/number/boolean/null values) delivered with the event, ' +
+          'or null when no payload is needed.',
+      ),
+  }),
+}).describe(
+  'Interaction descriptor. Use `action: { event: { name: "..." } }` — never a bare onClick string.',
+);
+
+// ── Per-component discriminated union ─────────────────────────────────────────
 //
-// The runtime re-validates against the full harness A2UIMessageSchema in
-// execute(), so this schema only needs to be strict enough for the OpenAI API
-// to accept it without a 400 AND to keep the LLM on-spec.
+// Each variant is keyed on `component` (the A2UI v0.9 discriminator) and
+// declares ONLY the fields applicable to that component type. This prevents
+// the LLM from emitting non-spec fields (e.g. `child` on Text, `text` on
+// Button) that cause the client registry to reject the component as
+// _ErrorComponent (#1017).
 //
-// IMPORTANT:
-// - Use `component` (not `type`) and `id` for every entry.
-// - Container hierarchy is expressed via `child` (single ID) or
-//   `children` (array of IDs) — NEVER `items`.
-// - A Button's label is a CHILD Text component referenced via `child`.
-//   There is no top-level `label`.
-// - Interactions go through `action: { event: { name, payload? } }`.
-//   There is no `onClick` / `onChange` string shorthand.
-// NOTE on `.nullable()` vs `.nullable().optional()` (#998):
-// OpenAI's strict function-tool schema validator requires EVERY key in
-// `properties` to appear in `required`. The zod converter used by
-// @openai/agents maps `.optional()` to "not in required"; mapping
-// `.nullable()` alone produces "required, may be null" — which is the
-// strict-mode contract. Optional-nullable fields nested inside a
-// `z.discriminatedUnion` are not re-rewritten by the SDK's strict-mode
-// transform, which is what caused the 400 in #998. Use `.nullable()`
-// (NOT `.nullable().optional()`) for every field inside emit_ui's
-// union branches. The runtime path strips nulls before validating
-// against the harness A2UIMessageSchema (see `stripNulls` below).
-const A2UIComponentSchema = z.object({
-  id: z.string().describe('Unique component ID within this surface, e.g. "root".'),
-  component: z
-    .string()
-    .describe('Bare component name, e.g. "Button", "Row", "Text" — no pack prefix.'),
-  // --- Hierarchy (v0.9 adjacency list) ---
-  child: z
-    .string()
-    .nullable()
-    .describe(
-      'Single child component ID, or null. Use on single-slot containers like ' +
-        'Card or a Button (the Button\'s visible label is a Text child referenced here). ' +
-        'Must reference another component emitted in the same updateComponents call. ' +
-        'Set to null when the component has no single child.',
+// OpenAI strict-mode requires every key in `properties` to appear in
+// `required`. All fields in each variant are therefore included in `required`
+// (no `.optional()`). Fields that the LLM may not always populate are typed
+// as `.nullable()` and stripped by stripNulls() before runtime validation.
+//
+// This schema is a SUBSET of the client-side component catalog schemas
+// (packages/web/src/vendor/a2ui/web_core/basic_catalog/components/basic_components.ts
+//  + packages/web/src/catalog/fluent-components/).
+// Required fields per Ahmed's directive (MUST be emitted when the component
+// is used, never null):
+//   Text      → text
+//   Image     → url
+//   Button    → child + action
+//   TextField → label
+//   CheckBox  → label + value
+const A2UIComponentSchema = z.discriminatedUnion('component', [
+  // ── Leaf / content components ──────────────────────────────────────────────
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Text'),
+    text: A2UIDynamicString.describe('Text content to display. Required for Text components.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Image'),
+    url: A2UIDynamicString.describe('URL of the image. Required for Image components.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Icon'),
+    name: z.string().describe('Icon name from the catalog (e.g. "add", "delete", "search").'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Video'),
+    url: A2UIDynamicString.describe('URL of the video. Required for Video components.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('AudioPlayer'),
+    url: A2UIDynamicString.describe('URL of the audio. Required for AudioPlayer components.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Link'),
+    text: A2UIDynamicString.describe('Visible link text.'),
+    url: A2UIDynamicString.describe('URL the link navigates to.'),
+  }).strict(),
+  // ── Layout / container components ─────────────────────────────────────────
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Row'),
+    children: z.array(z.string()).describe(
+      'Ordered array of child component IDs. Use for horizontal layouts.',
     ),
-  children: z
-    .array(z.string())
-    .nullable()
-    .describe(
-      'Ordered array of child component IDs, or null. Use on multi-slot containers ' +
-        'like Row, Column, and List. Each ID must reference another component in the ' +
-        'same call. Set to null when the component has no children.',
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Column'),
+    children: z.array(z.string()).describe(
+      'Ordered array of child component IDs. Use for vertical layouts.',
     ),
-  // --- Leaf content ---
-  text: z
-    .string()
-    .nullable()
-    .describe('Literal text content for a Text component, or null if not applicable.'),
-  // --- Interactions ---
-  action: z
-    .object({
-      event: z.object({
-        name: z.string().describe('Event name dispatched when the component is activated.'),
-        payload: z
-          .record(z.string(), A2UIScalar)
-          .nullable()
-          .describe(
-            'Flat payload (string/number/boolean/null values) delivered with the event, ' +
-              'or null when no payload is needed.',
-          ),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('List'),
+    children: z.array(z.string()).describe('Ordered array of child component IDs.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Card'),
+    child: z.string().describe(
+      'ID of the single child component inside the card. ' +
+        'Wrap multiple elements in a Column or Row first.',
+    ),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Tabs'),
+    tabs: z.array(
+      z.object({
+        title: A2UIDynamicString.describe('Tab title.'),
+        child: z.string().describe('ID of the child component shown in this tab.'),
       }),
-    })
-    .nullable()
-    .describe(
-      'Interaction descriptor for clickable / editable components, or null. ' +
-        'Use `action: { event: { name: "..." } }` — never a bare onClick string. ' +
-        'Set to null on non-interactive components.',
+    ).min(1).describe('Array of tab definitions; each tab has a title and a child component ID.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Modal'),
+    trigger: z.string().describe('ID of the component that opens the modal.'),
+    content: z.string().describe('ID of the component displayed inside the modal.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Divider'),
+  }).strict(),
+  // ── Interactive components ─────────────────────────────────────────────────
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Button'),
+    child: z.string().describe(
+      'ID of the Text (or Icon) child component that provides the button label. ' +
+        'Required — a Button without a label child is invalid.',
     ),
-});
+    action: A2UIActionSchema.describe('Required interaction descriptor for Button.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('TextField'),
+    label: A2UIDynamicString.describe('Text label for the input field. Required.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('CheckBox'),
+    label: A2UIDynamicString.describe('Label displayed next to the checkbox. Required.'),
+    value: A2UIDynamicBoolean.describe('Current checked state of the checkbox. Required.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('ChoicePicker'),
+    options: z.array(
+      z.object({
+        label: A2UIDynamicString.describe('Option label text.'),
+        value: z.string().describe('Stable value for this option.'),
+      }),
+    ).describe('List of available options.'),
+    value: z.union([
+      z.array(z.string()),
+      z.object({ path: z.string() }),
+    ]).describe('Currently selected value(s) — array of strings or a data-binding path.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Slider'),
+    max: z.number().describe('Maximum value of the slider.'),
+    value: A2UIDynamicNumber.describe('Current value of the slider.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('DateTimeInput'),
+    value: A2UIDynamicString.describe('Selected date/time in ISO 8601 format, or a data-binding path.'),
+  }).strict(),
+  // ── Data display ──────────────────────────────────────────────────────────
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Table'),
+    columns: z.array(A2UIDynamicString).min(1).describe('Column headers.'),
+    rows: z.array(z.array(A2UIDynamicString)).describe(
+      'Table rows; each row is an array of cell values matching the columns order.',
+    ),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Alert'),
+    message: A2UIDynamicString.describe('Alert message text.'),
+    action: A2UIActionSchema.nullable().describe(
+      'Optional action on the alert (e.g. dismiss button), or null.',
+    ),
+  }).strict(),
+  // ── Fluent-catalog-only components ────────────────────────────────────────
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Badge'),
+    text: A2UIDynamicString.describe('Badge label text.'),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('ComboBox'),
+    options: z.array(
+      z.object({
+        text: A2UIDynamicString.describe('Option display text.'),
+        value: A2UIDynamicString.describe('Option value.'),
+      }),
+    ).describe('List of available options.'),
+    action: A2UIActionSchema.nullable().describe(
+      'Action dispatched when a selection is made, or null.',
+    ),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('MultiSelect'),
+    options: z.array(
+      z.object({
+        text: A2UIDynamicString.describe('Option display text.'),
+        value: A2UIDynamicString.describe('Option value.'),
+      }),
+    ).describe('List of available options.'),
+    action: A2UIActionSchema.nullable().describe(
+      'Action dispatched when a selection changes, or null.',
+    ),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Toggle'),
+    label: A2UIDynamicString.nullable().describe('Label for the toggle, or null.'),
+    checked: A2UIDynamicBoolean.nullable().describe(
+      'Current toggle state bound to the data model, or null.',
+    ),
+    action: A2UIActionSchema.nullable().describe(
+      'Action dispatched when the toggle changes, or null.',
+    ),
+  }).strict(),
+  z.object({
+    id: z.string().describe('Unique component ID within this surface.'),
+    component: z.literal('Accordion'),
+    items: z.array(
+      z.object({
+        title: A2UIDynamicString.describe('Accordion section title.'),
+        children: z.array(z.string()).describe('Child component IDs for this section.'),
+      }),
+    ).describe('Accordion sections, each with a title and child IDs.'),
+  }).strict(),
+]);
 
 // Full discriminated union for the A2UI v0.9 envelope.
 //
@@ -184,20 +366,25 @@ export const emitUiTool: ToolContribution = {
       'IMPORTANT rules (v0.9):\n' +
       '- In createSurface messages, always set catalogId to "kickstart".\n' +
       '- In updateComponents, emit a FLAT adjacency list of components. Every entry has ' +
-      '`id` (unique within surface) and `component` (bare name, e.g. "Button", "Row", "Text").\n' +
-      '- Hierarchy is EXPLICIT: containers declare `child` (single ID) or `children` (array of IDs). ' +
+      '`id` (unique within surface) and `component` (component type, e.g. "Button", "Row", "Text").\n' +
+      '- Hierarchy is EXPLICIT: containers (Row, Column, Card) declare `child`/`children` IDs. ' +
       'Components are never nested by emit order.\n' +
-      '- A Button\'s visible label is a Text CHILD referenced via `child` — there is NO top-level `label` prop.\n' +
-      '- Interactions use `action: { event: { name, payload? } }`. Do NOT emit `onClick` / `onChange` / `items` / ' +
-      '`placeholder` / `value` / `disabled` as top-level fields — they are not part of v0.9 and will be ignored.\n' +
+      '- EACH COMPONENT ONLY CARRIES ITS OWN FIELDS. Do NOT add extra fields (e.g. do NOT add ' +
+      '`child` or `action` to a Text; do NOT add `text` to a Button). The schema is a discriminated ' +
+      'union — each `component` type accepts only its own properties.\n' +
+      '- A Button\'s visible label is a Text CHILD referenced via `child`. Button.action is required.\n' +
+      '- Interactions use `action: { event: { name: "...", payload: null } }`. ' +
+      'Do NOT emit `onClick` / `onChange` / `items` / `placeholder` / `disabled`.\n' +
+      '- Text.text is required. Image.url is required. Button.child and Button.action are required. ' +
+      'TextField.label is required. CheckBox.label and CheckBox.value are required.\n' +
       'Spec-compliant example:\n' +
-      '{"version":"v0.9","updateComponents":{"surfaceId":"main","components":[' +
+      '{"version":"v0.9","op":"updateComponents","updateComponents":{"surfaceId":"main","components":[' +
       '{"id":"root","component":"Column","children":["greeting","buttons"]},' +
       '{"id":"greeting","component":"Text","text":"Hello"},' +
       '{"id":"buttons","component":"Row","children":["cancel-btn","ok-btn"]},' +
-      '{"id":"cancel-btn","component":"Button","child":"cancel-text","action":{"event":{"name":"cancel"}}},' +
+      '{"id":"cancel-btn","component":"Button","child":"cancel-text","action":{"event":{"name":"cancel","payload":null}}},' +
       '{"id":"cancel-text","component":"Text","text":"Cancel"},' +
-      '{"id":"ok-btn","component":"Button","child":"ok-text","action":{"event":{"name":"ok"}}},' +
+      '{"id":"ok-btn","component":"Button","child":"ok-text","action":{"event":{"name":"ok","payload":null}}},' +
       '{"id":"ok-text","component":"Text","text":"OK"}]}}',
     parameters: EmitUiInputSchema,
     execute: async (input, runCtx): Promise<string> => {
