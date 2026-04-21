@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { Logger, extractTraceId, extractRequestMetadata } from "../lib/logger.js";
-import { getAppInsightsClient } from "../lib/appinsights.js";
+import { getAppInsightsClient, isAppInsightsConfigured } from "../lib/appinsights.js";
 import { getRegistry } from "../startup/packs.js";
 import { sanitizeError } from "../telemetry/sanitize-error.js";
 import { getChatDeploymentName } from "../lib/openai-client.js";
@@ -22,6 +22,7 @@ interface HealthResponse {
   hint?: string;
   registry?: "ready";
   llm?: LlmCheckResult;
+  appinsights?: "configured" | "not_configured";
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +159,11 @@ app.http("health", {
       if (!deep) {
         return {
           status: 200,
-          jsonBody: { status: "ok", registry: "ready" } as HealthResponse,
+          jsonBody: {
+            status: "ok",
+            registry: "ready",
+            appinsights: isAppInsightsConfigured() ? "configured" : "not_configured",
+          } as HealthResponse,
         };
       }
 
@@ -185,6 +190,7 @@ app.http("health", {
           status: llm.ok ? "ok" : "error",
           registry: "ready" as const,
           llm,
+          appinsights: isAppInsightsConfigured() ? "configured" : "not_configured",
         } as HealthResponse,
       };
     } catch (err) {

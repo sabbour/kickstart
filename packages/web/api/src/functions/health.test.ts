@@ -44,6 +44,7 @@ vi.mock("../lib/appinsights.js", () => ({
     trackEvent: vi.fn(),
     trackException: vi.fn(),
   })),
+  isAppInsightsConfigured: vi.fn(() => false),
 }));
 
 vi.mock("../telemetry/sanitize-error.js", () => ({

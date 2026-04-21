@@ -5,6 +5,20 @@ import { sanitizeError, sanitizeText } from "../telemetry/sanitize-error.js";
 let client: appInsights.TelemetryClient | null = null;
 let azureMonitorStarted = false;
 
+/** Returns the first 20 characters of the InstrumentationKey for safe logging. */
+function keyPrefix(connString: string): string {
+  const match = connString.match(/InstrumentationKey=([^;]{1,20})/i);
+  return match ? match[1] : connString.substring(0, 20);
+}
+
+/**
+ * Returns whether AppInsights telemetry is configured (connection string present).
+ * Use this in health checks and startup logs to confirm config state.
+ */
+export function isAppInsightsConfigured(): boolean {
+  return !!process.env.APPLICATIONINSIGHTS_CONNECTION_STRING;
+}
+
 /**
  * Initialize the Azure Monitor OpenTelemetry distro for auto-collection of:
  *   - outbound HTTP dependencies (including global `fetch`/undici, which the
@@ -28,6 +42,7 @@ function startAzureMonitor(connString: string): void {
       azureMonitorExporterOptions: { connectionString: connString },
     });
     azureMonitorStarted = true;
+    console.log(`[AppInsights] OTel distro started (key prefix: ${keyPrefix(connString)}...)`);
   } catch (err) {
     const sanitized = sanitizeError(err);
     console.error(`[AppInsights] Failed to start Azure Monitor OpenTelemetry: ${sanitized.message}`);
@@ -85,7 +100,7 @@ export function initializeAppInsights(): appInsights.TelemetryClient {
 
     appInsights.start();
     client = appInsights.defaultClient;
-
+    console.log(`[AppInsights] ✓ Classic SDK started (key prefix: ${keyPrefix(connString)}...)`);
     client.addTelemetryProcessor((envelope) => {
       const baseData = envelope.data?.baseData as {
         message?: string;

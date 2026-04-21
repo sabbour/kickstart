@@ -80,4 +80,17 @@ describe("appinsights module — Azure Monitor OTel distro wiring", () => {
     // startAzureMonitor guards on azureMonitorStarted flag, so no additional calls
     expect(useAzureMonitorMock).toHaveBeenCalledTimes(1);
   });
+
+  it("isAppInsightsConfigured returns true when connection string is set", async () => {
+    process.env.APPLICATIONINSIGHTS_CONNECTION_STRING =
+      "InstrumentationKey=00000000-0000-0000-0000-000000000003;IngestionEndpoint=https://example.in.applicationinsights.azure.com/";
+    const mod = await import("./appinsights.js");
+    expect(mod.isAppInsightsConfigured()).toBe(true);
+  });
+
+  it("isAppInsightsConfigured returns false when connection string is absent", async () => {
+    delete process.env.APPLICATIONINSIGHTS_CONNECTION_STRING;
+    const mod = await import("./appinsights.js");
+    expect(mod.isAppInsightsConfigured()).toBe(false);
+  });
 });
