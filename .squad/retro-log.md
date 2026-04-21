@@ -27,6 +27,38 @@ Historical rows before each schema extension keep their older trailing columns.
 
 ---
 
+## Round 4 Retrospective (2026-04-21)
+
+**Shipped:** 5 UI bugs (#991, #980, #995, #997, #998)  
+**PRs merged:** #1000 (pack client guardrails + bundle ceiling), #1001 (pack previews), #1003 (playground layout constants), #1004 (workspace flex), #1005 (schema conformance)  
+**Gate cycle:** 4-way review (Leela, Zapp, Nibbler, Docs) all PRs; avg 2-3 cycles per PR
+
+### Key Learnings
+
+1. **Stale agent verdicts must be verified live.** Leela reported PR #1000 CI as "red" post-rebase, but CI was actually green. The agent cached a stale state and didn't re-poll GitHub Actions. **Action:** Each reviewer agent should validate live `gh run list` output before posting verdict. Avoid time-of-check-to-time-of-use gaps on CI state.
+
+2. **Edit-but-not-commit creates silent test passes.** During Bender's rebase of #1000, test-import fixes were applied in the working tree but not committed. Local `npm test` passed (saw the edits), but the PR CI failed (index was stale). **Action:** Enforce "commit early, commit often" during rebases. Code review should flag `git status` with dirty working tree.
+
+3. **Approval labels strip on PR synchronize.** GitHub clears review labels when a new commit is pushed to a PR. After Bender's rebase (fc60b872 → 6b8f17e3), nibbler/leela/zapp labels vanished. The "auto-merge on label" contract broke. **Action:** Plan an explicit relabel pass into the PR merge ceremony. Current workaround: contributor re-requests reviews, or Scribe force-adds via REST API.
+
+4. **Worktree hygiene is overdue.** `.worktrees/` directory accumulated stale branches (fry-987, bender-996, etc.). Cleanup was not automated. **Action:** Add weekly squad housekeeping: `git worktree list`, then `git worktree remove .worktrees/X && git worktree prune` for all closed PRs.
+
+5. **Bundle-budget ceiling gate proved.** PR #1000's `check-bundle-budget.mjs` (post-build CI + waiver-by-PR-description line) successfully gated JS payload growth. This is the approved pattern for any future "controlled performance overage" sign-off. ✅ Pattern locked in.
+
+6. **Named-constant geometry SSoT prevents test drift.** PRs #1003 and #1004 used `playground-layout-constants.ts` (consumed by CSS, unit test, Playwright) as the single source of truth. This eliminates the test-drift-no-op failure mode. ✅ Pattern locked in for all Playground and flex-layout regressions.
+
+7. **Parametrised tool conformance test is durable.** The `tool-strict-required-conformance.test.ts` walker (parametrised across all pack-core tools) prevents silent schema regressions like #998 from ever landing. This is now the mandatory check for any tool schema change. ✅ Conformance testing locked in.
+
+### Implications for Next Rounds
+
+- **Agent state validation:** Require live polling before verdicts; consider adding `--live` flag or automated re-check on stale reports.
+- **Rebase discipline:** Stress-test commit workflow during rebases; treat working-tree-dirty as a red flag in reviews.
+- **Label persistence:** Add relabel bot or explicit relabel step in the ceremony so 4-way approvals survive rebases.
+- **Worktree cleanup:** Weekly cadence (or automatically on PR merge close).
+- **Bundle + geometry as standard gates:** Future PRs touching performance or Playground layout should default to these patterns.
+
+---
+
 <!-- entries below this line, newest at top -->
 
 - 2026-04-21 | #990 "fix(web): vary Create-tab inspirations and constrain to core components" | L | impl=1m | review=10m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=26m | ci=5m | reviewer=bot | human_comments=5 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false

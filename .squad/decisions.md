@@ -2404,3 +2404,482 @@ Add opt-in deep-check mode via `?deep=1` query parameter on the existing `/healt
 
 ---
 
+---
+
+# Bender — PR #1000 Revision (2026-04-21)
+
+**Author:** Bender (Backend Dev)
+**Status:** Proposed — awaiting Scribe merge into `.squad/decisions.md`
+**PR:** #1000 (`squad/991-pack-render-engine`)
+**Context:** Rejected by Zapp + Nibbler. Fry locked out per Reviewer Rejection Protocol. Bender authored revision.
+
+## Decisions recorded
+
+### 1. Pack `./client` subpath resolution in TypeScript
+
+Monorepo pack packages expose a `./client` export (`./dist/client.js`) that is not present without a full pack build. `packages/web` has vite + vitest aliases for those subpaths pointing at `src/client.ts`, but tsc (which runs against source, not dist) fell through to the package export and raised TS2307 × 12.
+
+**Canonical fix:** mirror the vite aliases into `packages/web/tsconfig.json`'s `compilerOptions.paths`. Adding new pack client subpaths in the future requires the same three-place update: pack `package.json` exports, `packages/web/vite.config.ts` alias, and `packages/web/tsconfig.json` paths. This is the accepted cost until/unless we introduce a codegen step.
+
+### 2. Cross-version Zod casts in web ↔ pack boundary
+
+`@aks-kickstart/pack-*` and `@aks-kickstart/harness` pin `zod@4.1.12`. `@aks-kickstart/web` still pins `zod@3.25.76`. The two packages ship structurally distinct `ZodTypeAny` aliases, so direct casts across the boundary (e.g. `propertySchema as z.ZodTypeAny` in `adaptPackComponent.ts`) are rejected by tsc.
+
+**Canonical pattern:** widen through `unknown` at the boundary (`as unknown as z.ZodTypeAny`) and add an inline comment explaining the version skew. Runtime contract — `.safeParse(...)` for prop validation — is identical across zod 3 and 4, so the cast is safe.
+
+**Follow-up candidate:** a zod-major-alignment sweep. Upgrading web to zod 4 or downgrading packs to zod 3 would let us drop the casts. Out of scope for PR #1000.
+
+### 3. Pack client security guardrail — vitest over workflow
+
+Zapp required a same-PR CI check that hard-fails on `dangerouslySetInnerHTML`, `eval(`, or `new Function(` in pack client code. His condition accepted "new workflow OR pre-commit OR test."
+
+**Chosen implementation:** vitest test at `packages/web/src/__tests__/pack-client-guardrails.test.ts`. Runs under the existing `Unit tests` CI job. Walks every file reachable from each pack's `./client` export (`src/client.ts` + `src/components/`) and fails on any literal hit.
+
+**Why test over workflow:** the squad per-role App tokens (backend, frontend) lack the `workflows` GitHub App permission, so pushes that touch `.github/workflows/**` are remote-rejected. A vitest test accomplishes the same gate without touching workflow files.
+
+**Implication for future security gates requested by Zapp:** prefer vitest/script-based enforcement over new workflows whenever possible. Reserve workflow edits for Leela's token or manual merges.
+
+### 4. Bundle-budget regression lock — postbuild script
+
+Nibbler flagged that PR #1000 pushed the main `index.js` chunk +14 KB gzip, above the prior ≤+10 KB advisory. Signed off provided a CI gate locks the bundle at the new size.
+
+**Canonical pattern:** `packages/web/scripts/check-bundle-budget.mjs` wired as `postbuild` in `packages/web/package.json`. Measures gzipped size of the main entry (`index-*.js`) and the Playground route chunk (`Playground-*.js`). Runs on every `npm run build`, including the existing e2e CI job's monorepo build.
+
+**Scope decision:** only the chunks that contain pack renderer code are budgeted. Vendor workers (monaco `ts.worker` ≈ 1.4 MB gz, mermaid chunks) are deliberately excluded — they're pre-existing and unaffected by pack wiring. Budgeting them here would create permanent red noise without meaningful signal.
+
+**Ceilings (gzipped bytes):**
+- main entry (`index-*.js`): 260 000 (current 228 642)
+- Playground route (`Playground-*.js`): 60 000 (current 39 613)
+
+Raising a ceiling requires an explicit edit to `check-bundle-budget.mjs` + a `bundle-budget-waiver:` line in the PR description. This is the sanctioned escape hatch.
+
+## Verification record
+
+- `npm run lint` → 0 errors, 61 pre-existing warnings
+- `CI=1 npx vitest run --reporter=dot` → 933 passed, 159 todo, 0 failing (88 files)
+- `cd packages/web && npx tsc --noEmit` → clean (no TS2307 / TS2352)
+- `npm run build -w @aks-kickstart/api` → 20 functions bundled
+- `npm run build -w @aks-kickstart/web` → build + postbuild bundle-budget pass
+
+## Out-of-scope guardrails honoured
+
+Per Reviewer Rejection Protocol: no modifications to Fry's renderer wiring, pack `client.ts` exports, preview fixtures, or approval labels. Deltas strictly match the Zapp + Nibbler findings.
+
+
+---
+
+# Strict-mode conformance for pack-core tool schemas (#998)
+
+**Date:** 2026-04-21
+**Author:** Bender (Backend Dev)
+**Status:** Proposed
+**PR:** #1005 (squad/998-chat-emit-ui-required)
+
+## Decision
+
+Every field declared inside a `z.discriminatedUnion` branch in a pack-core tool's input schema MUST be declared with `.nullable()` (required-but-nullable) rather than `.nullable().optional()` / `.optional()`. Runtime paths are expected to strip `null` before delegating to the canonical harness validators.
+
+Pack-core tools MUST also pass the parametrised conformance test `tool-strict-required-conformance.test.ts`, which asserts that every `{ type: "object", properties }` node in every tool's generated JSON schema lists every property key in `required`.
+
+## Rationale
+
+OpenAI's Responses API enforces strict-mode function schemas: every key in `properties` must appear in `required`. The `@openai/agents` zod-to-JSON-Schema converter maps `.optional()` to "not in required", and the SDK's strict-mode transform does not re-rewrite optional fields nested inside a `z.discriminatedUnion`. The #989 A2UI v0.9 realignment introduced `z.discriminatedUnion` on `core.emit_ui`, which silently broke the contract — `sendDataModel` (and siblings) were emitted without being listed in `required`, producing a 400 on every chat turn.
+
+No existing unit / e2e / Playwright test walked the generated schema for this invariant. The conformance test closes that hole, is parametrised across every pack-core tool, and makes the same class of regression impossible to merge.
+
+## Consequences
+
+- Future pack-core tool authors must not use `.optional()` on fields nested inside a discriminated union. Use `.nullable()` plus a null-stripping step in `execute()` before delegating to any `.strict()` runtime schema that rejects null.
+- Tests that call the harness `A2UIMessageSchema` / `A2UIMessageEnvelopeSchema` directly with tool-shaped fixtures must strip nulls first (see `stripNulls` helper in `emit_ui.test.ts`).
+- The conformance test runs automatically in the pack-core suite; new tools inherit the invariant by being added to the `tools` parametrisation array.
+- Harness runtime schemas (`CreateSurfaceMessagePayload`, etc.) remain `.optional()` — the null-strip step in emit_ui is the adapter between the strict-mode LLM contract and the canonical runtime contract. This keeps the harness wire format untouched.
+
+
+---
+
+# Decision: Playground layout constants are the single source of truth for component-tab geometry (#995)
+
+**Date:** 2026-04-21
+**Author:** Fry (Frontend)
+**Related:** #995 (Core tab tight rendering + preview regression), #986 (incomplete predecessor), #772 (Playground Playwright suite currently skipped).
+
+## Decision
+
+All component-grid geometry on the Playground Components tab — min column width, card max-width cap, row gap, preview card min-height, compact card min-height — now lives in a single module:
+
+```
+packages/web/src/pages/playground-layout-constants.ts
+```
+
+The CSS (`Playground.tsx` `useStyles`), the unit regression suite (`playground-core-tab-rendering.test.ts`), and the Playwright spec (`playground.spec.ts`) all import named constants from this module. There are **no hard-coded pixel thresholds** in the tests.
+
+## Rationale
+
+- #986 regressed partly because the Core tab density was asserted only in prose in the PR body and checked visually. Any future design-token change could drift the layout without tripping CI.
+- Nibbler's DP approval on #995 was explicitly conditioned on "DOM assertion thresholds must be named constants imported from the same CSS module, not hard-coded in the spec."
+- Having one module lets a future reviewer flip one number and have both the CSS and the regression assertions move in lockstep, which prevents the test-drift-no-op failure mode.
+
+## Scope rule (for future frontend contributions)
+
+When touching Playground component-grid geometry:
+
+1. Change the constant in `playground-layout-constants.ts` — never hard-code a px value in `Playground.tsx` `useStyles` or in a spec.
+2. If you need a new dimension, add a new named constant and export it from this module.
+3. Playwright / unit tests that assert against layout must import the same constant. Snapshot-style "approximate" tests still pass `boundingBox()` through the named constant, optionally with a tolerance.
+
+## Non-scope
+
+- This decision does **not** mandate layout-constants modules for every page. It only applies to the Playground Components tab, which has had two regressions in quick succession (#986 → #995) and therefore warrants the guardrail.
+- Fluent design tokens (`tokens.spacingVerticalL` etc.) are still the preferred unit where a token applies cleanly. The layout-constants module is for numeric thresholds (card widths, min-heights) that need to be asserted against in tests.
+
+## Status
+
+Proposed. Scribe: please fold into `.squad/decisions.md` under the frontend section when you next merge the inbox.
+
+
+---
+
+# Playground Workspace black-void fix — flex min-height:0 discipline
+
+**Date:** 2026-04-21
+**Author:** Fry (Frontend Dev)
+**Issue:** #997
+**PR:** #1004
+**Status:** Proposed
+
+## Decision
+
+In the Playground Workspace flex chain, every column-flex container that wraps a scrollable/fill-height child (Monaco-like editors, highlighted code viewers, any `flex: 1` pane) must set `min-height: 0` explicitly. Do **not** rely on `overflow: hidden` alone to contain content — `min-height: auto` (the default) will still blow out / collapse the chain.
+
+Where this applies today: `#panel-workspace`, `PlaygroundWorkspace.body`, `PlaygroundWorkspace.viewerWrapper`, `FileViewer.rootFill`.
+
+Prefer `flex: 1` + `min-height: 0` over `height: 100%` for column-flex children. Mixing both (as `#panel-workspace` did) creates conflicting constraints; drop the `height: 100%`.
+
+## Rationale
+
+The "black void" bug was the default `min-height: auto` on every column-flex ancestor of the code-viewer: each child's flex-basis resolved to its content min-size instead of shrinking to fill the parent, so the editor pane collapsed and the page-body (dark) background leaked through below. This is the canonical Monaco-in-flex pitfall — cheap to avoid, costly to debug.
+
+## Consequences
+
+- New Workspace-like surfaces (editors, diagram panes, file-trees wrapped in column-flex) should start with the `min-height: 0` + `flex: 1` pair baked in.
+- When porting these components into pack-core in the future, carry the `min-height: 0` with the base style — don't rely on host containers to supply it.
+- Playwright layout regressions should use **explicit geometry** assertions with named constants (e.g. `MAX_EDITOR_BOTTOM_SLACK_PX`) rather than background-colour proxies. See `packages/web/e2e/workspace-layout.spec.ts` as the reference pattern.
+
+
+---
+
+# Leela — PR Review Round 4 (2026-04-21T05:20Z)
+
+**Date:** 2026-04-21T05:20:00-07:00  
+**Requested by:** Asabbour (via delegation)  
+**Context:** Requested review of 4 open PRs: prioritize #1005 (HIGH), then #1000, #1003, #1004  
+**Review gate:** Per squad ceremony, all PRs require 4-way gate (leela + zapp + nibbler + docs) + green CI
+
+---
+
+## PR #1005 (HIGH) — core_emit_ui strict-required schema fix
+
+**Issue:** #998 (Chat broken)  
+**Author:** Bender (Backend Dev)  
+**Title:** fix: core_emit_ui schema — sendDataModel required + pack-core conformance test
+
+### Summary
+Chat was 100% broken since #989 (A2UI v0.9 realignment). Root cause: OpenAI strict-mode function schemas require every key in `properties` to appear in `required`, but Zod's `.optional()` was not being rewritten inside discriminated unions. The `sendDataModel` field was marked optional in the `createSurface` branch, triggering a 400 "Invalid schema" rejection from the Azure OpenAI API on every turn.
+
+### Changes
+- `packages/pack-core/src/tools/emit_ui.ts` — all optional fields in discriminated-union branches now `.nullable()` (required-but-nullable): `sendDataModel`, `updateDataModel.path`, `updateDataModel.value`, component-level `child`/`children`/`text`/`action`/`action.event.payload`
+- Runtime `execute()` strips `null` values before validating against harness `A2UIMessageSchema`
+- `packages/pack-core/src/tools/list_files.ts` — same bug class swept per DP ask
+- **New parametrised conformance test** (`tool-strict-required-conformance.test.ts`): walks every pack-core tool's JSON schema, asserts strict-required invariant across all object nodes (including nested anyOf/oneOf/allOf/items branches), regression-pinned to the `createSurface.sendDataModel` failure
+
+### CI & Tests
+- **All 16 CI checks passing** (green, no failures)
+- `npm test`: 940 passed | 159 todo | 0 failing
+- `npm run lint`: 0 errors
+- `npm run build -w @aks-kickstart/api`: ✅ Bundled 20 functions
+
+### Architecture alignment
+- ✅ Bugfix on internal tool schema; no infra/wire-format changes
+- ✅ Rollback: single git revert
+- ✅ Conformance test prevents future regression across all tools
+
+### Verdict
+**✅ APPROVED** — This is a hot fix for a breaking regression. High severity, surgical fix, excellent conformance test to prevent recurrence. No post-review work.
+
+**Applied label:** `leela:approved`
+
+---
+
+## PR #1003 — Core tab rendering density fix
+
+**Issue:** #995  
+**Author:** Fry (Frontend Dev)  
+**Title:** fix(web): core components tab density + preview rendering (#995)
+
+### Summary
+Grid density regression in #986 produced 6+ cards/row at 1920px (target 4–5 per DP). Additionally, 5 core basic component previews were missing (`Video`, `AudioPlayer`, `Tabs`, `Modal`, `Accordion`), causing the Core tab to show mixed "No preview" placeholders.
+
+### Changes
+- Named-constant geometry module (`playground-layout-constants.ts`) extracted from CSS so CSS + unit tests + Playwright specs all consume the same values
+- Grid `minmax` 260→300, card max-width cap 320→380, gap → `spacingVerticalL` (20px). Achieves 4 cards/row at 1280px, 4–5 at 1440/1920
+- New `compCardPreview` style with `min-height` for vertical room in previews
+- Previews added for all 5 missing core basic components (Core tab now 100% preview coverage)
+- Unit-test regression: every core basic component must have registered preview + geometry assertions
+- Playwright: card width bounds, preview min-height, row-gap, zero missing-preview cards (assertions .skip'd until #772 lifts, auto-activate when ready)
+
+### CI & Tests
+- **All 10 CI checks passing**
+- `npm test`: 904 passed | 3 skipped | 159 todo. Pre-existing unrelated failure in `pack-core/.../basic-components.test.tsx` (missing @testing-library/react dep, identical on origin/main)
+- New targeted suite: 34/34 green
+
+### Architecture alignment
+- ✅ Named-constant geometry prevents drift across media
+- ✅ Zero post-review work
+
+### Verdict
+**✅ APPROVED** — Clean density fix with solid regression guards. Pre-existing test failure is unrelated (separate issue #772 context). No post-review work.
+
+**Applied label:** `leela:approved`
+
+---
+
+## PR #1004 — Workspace layout fix (black void)
+
+**Issue:** #997  
+**Author:** Fry (Frontend Dev)  
+**Title:** fix(web): Workspace flex layout (min-height:0) closes black-void (#997)
+
+### Summary
+Playground Workspace's flex chain (panel-workspace → PlaygroundWorkspace.body → viewerWrapper → FileViewer.rootFill) had column-flex children without `min-height: 0`. The default `min-height: auto` on a flex item resolves to content min-size, so the editor pane collapsed, showing the page-body dark background below as a "black void".
+
+### Changes
+- Layout-only fix (no runtime/logic changes)
+- `Playground.tsx`: add `minHeight: 0` to `panel-workspace`; drop redundant `height: '100%'`
+- `PlaygroundWorkspace.tsx`: add `minHeight: 0` to `.body` and `.viewerWrapper` (+ `minWidth: 0` for symmetry)
+- `FileViewer.tsx`: add `minHeight: 0` to `rootFill`
+- Playwright regression test (`workspace-layout.spec.ts`): asserts viewer bottom is within bounds of viewport.height, code-wrapper height stays above MIN_EDITOR_BOTTOM_SLACK_PX, tests both sidebar visible + collapsed states
+
+### CI & Tests
+- **All 10 CI checks passing**
+- `npm test`: 335/335 vitest tests pass
+- `npx playwright test workspace-layout.spec.ts --list`: ✅ 2 tests discovered, parses clean
+
+### Architecture alignment
+- ✅ Geometry guards via named constants (matches DP discipline)
+- ✅ Zero post-review work
+
+### Verdict
+**✅ APPROVED** — Surgical layout fix with solid geometry regression guards. No post-review work.
+
+**Applied label:** `leela:approved`
+
+---
+
+## PR #1000 — Pack rendering engine (BLOCKED)
+
+**Issue:** #991  
+**Author:** Fry (Frontend Dev), revised by Bender per feedback  
+**Title:** feat: render pack components via the engine
+
+### Summary
+Wires `pack-azure`, `pack-aks-automatic`, and `pack-github` React renderers into the web client's `ClientComponentRegistry` via the A2UI engine. Packs become first-class in the component system. Hardcoded `COMPONENT_PREVIEWS` map is deleted in favor of pack-contributed preview fixtures. DP #991 review (Zapp + Nibbler) set 3 PR-time conditions.
+
+### Architecture Review
+Substantive quality is **excellent**:
+- ✅ Pack boundaries clean: each pack ships `./client` and `./server-manifest` subpaths
+- ✅ No import-time side effects; explicit `registerClient(target)` registration
+- ✅ Pack previews are static build-time fixtures (validated against Zod schema in test gate)
+- ✅ Hardcoded map deleted; consolidated with pack-contributed previews
+- ✅ Docs: packs-and-skills.md updated with "Server / client entrypoints" section + registerClient example
+- ✅ **component-previews.test.ts render-time guard:** validateAndSanitizeComponents + zero _ErrorComponent assertion
+- ✅ Bundle impact quantified: +14 KB gzip (slightly above Nibbler's ≤+10 KB advisory, but acceptable — three pack renderers + schemas + fixtures)
+- ✅ Rollback: single git revert (atomic change)
+
+### BLOCKING ISSUES
+
+**1. CI is red (Nibbler blocking condition)**
+
+TS2307 (12×) + TS2352 (1×) errors from `packages/web/tsc --noEmit`:
+```
+error TS2307: Cannot find module '@aks-kickstart/pack-azure/client'
+error TS2352: Conversion of type 'ZodType<unknown, ..>' to type 'ZodTypeAny' may be a mistake
+```
+
+Root cause: `./client` subpath `package.json` exports point at `./dist/client.js` / `./dist/client.d.ts`, but `.d.ts` files don't exist when CI runs tsc --noEmit before build. Vite/Vitest aliases work locally (source-to-source), but tsc uses package `exports.types` directly.
+
+**Fix required:** Add TS path mapping in `packages/web/tsconfig.json`:
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "@aks-kickstart/pack-*/client": ["../pack-*/src/client.ts"]
+    }
+  }
+}
+```
+
+For the Zod TS2352: cast `contribution.propertySchema as unknown as z.ZodTypeAny` in `adaptPackComponent.ts:29`.
+
+**2. Zapp's CI grep condition missing (Zapp blocking condition #2)**
+
+Hard-fail CI if `dangerouslySetInnerHTML` / `eval` / `new Function` appear in `packages/pack-*/src/**/client/**`. PR description admits: *"not yet added; happy to add in follow-up"*. Per DP review, this is **non-deferrable** — must land in same PR as hard-fail, not follow-up (Reviewer Rejection Protocol precedent on #1000).
+
+**Fix required:** Add a CI step in `.github/workflows/ci.yml` (or vitest guard) that hard-fails if forbidden sinks detected. Zapp's comment has suggested bash implementation. Pre-existing `ArchitectureDiagram` usage (insertSvgSafely sanitizer) should get an allow-list comment directive referencing the sanitizer.
+
+### Reviewer Rejection Protocol
+
+Per squad ceremony, **original author (Fry) is locked out**. A different squad member must:
+1. Address TS path mapping issue (✅ clear)
+2. Add CI grep rule (✅ clear, Zapp's spec provided)
+3. Push fixes
+4. Re-run CI (verify green)
+5. Tag Zapp + Nibbler for re-review
+
+### Verdict
+**🔴 BLOCKED — Request Changes applied**
+
+Substantive code is excellent; blocking issues are mechanical + well-defined. Not a technical rejection, but ceremony enforcement: gates are locked until CI passes + grep rule lands.
+
+**Status:** Awaiting squad member (not Fry) to fix CI + grep, re-push, mark for re-review.
+
+---
+
+## Summary Table
+
+| PR | Title | Issue | Status | CI | Labels | Post-Review Work |
+|---|---|---|---|---|---|---|
+| **#1005** | core_emit_ui strict-required | #998 | ✅ APPROVED | ✅ 16/16 | leela:approved | None — ready to merge |
+| **#1003** | Core tab density | #995 | ✅ APPROVED | ✅ 10/10 | leela:approved | None — ready to merge |
+| **#1004** | Workspace flex layout | #997 | ✅ APPROVED | ✅ 10/10 | leela:approved | None — ready to merge |
+| **#1000** | Pack rendering engine | #991 | 🔴 BLOCKED | ❌ TS errors | request-changes | (1) TS path mapping, (2) CI grep rule, (3) re-review by Zapp+Nibbler |
+
+---
+
+## Key Learnings & Decisions
+
+### Reviewer Rejection Protocol in action
+PR #1000 demonstrates the ceremony: when DP review sets hard PR-time gates (Nibbler's CI check, Zapp's grep rule), they are non-negotiable. Deferring to follow-up is explicitly rejected in the DP review. The locked-out-author rule (original author cannot fix) enforces accountability + team review.
+
+### Chat regression prevention
+The parametrised conformance test in #1005 is a structural fix — it bakes the invariant into every tool in the codebase. New tools automatically inherit the guarantee. This is how we prevent silent regressions on function-schema contracts.
+
+### Density regression + geometry constants
+#1003 + #1004 both extract named constants (playground-layout-constants.ts, workspace-layout.spec.ts) and drive CSS + tests + Playwright from the same values. This prevents the drift that caused the original regression.
+
+---
+
+## Gate Status
+
+**PRs awaiting final merge:**
+- ✅ #1005 (leela:approved, awaiting zapp + nibbler + docs + CI)
+- ✅ #1003 (leela:approved, awaiting zapp + nibbler + docs)
+- ✅ #1004 (leela:approved, awaiting zapp + nibbler + docs)
+
+**PR awaiting fix:**
+- 🔴 #1000 (awaiting CI path fix + grep rule from squad member, then re-review)
+
+---
+
+🤖 **Created by:** Leela (Lead)  
+**Ceremony:** PR Review Round 4  
+**Decision closure:** This decision is logged for squad visibility and archived in `.squad/decisions/` after Scribe merge.
+
+
+---
+
+# Nibbler — Round 4 review decisions
+
+**Date:** 2026-04-21
+**Author:** Nibbler (Code Reviewer, Lead-tier)
+**Scope:** PRs #1005, #1000 (re-approval), #1003, #1004
+
+## Decisions
+
+### 1. PR #1005 — APPROVED
+`core_emit_ui` strict-mode schema regression (#998) fix. Parametrised conformance test walks every pack-core tool at every nesting depth (`anyOf`/`oneOf`/`allOf`/`items`/`additionalProperties`); explicit regression assertion pinned to `createSurface.sendDataModel`; runtime contract preserved via `stripNulls` before `A2UIMessageSchema.parse`; sibling sweep for `list_files.ts` included. CI green (940 tests). Formal review + `nibbler:approved` label.
+
+### 2. PR #1000 — APPROVED (re-approval after revise)
+All three round-3 blockers resolved:
+- **TS2307 + TS2352**: path aliases aligned across `packages/web/tsconfig.json` + `vite.config.ts` + `vitest.config.ts`; Zod cast narrowed with explicit `as unknown as z.ZodTypeAny` + comment documenting the zod@3/zod@4 bridge.
+- **Concrete bundle-budget gate**: `packages/web/scripts/check-bundle-budget.mjs` wired via `postbuild`. Correctly scoped to `index-*.js` + `Playground-*.js` only — vendor workers (monaco `ts.worker`, mermaid lazy chunks) explicitly excluded. Ceilings sit with sane headroom above current measurements. Waiver via PR description `bundle-budget-waiver:` line.
+- **Pack-authoring docs**: server/client subpath contract + `registerClient` pattern documented in `docs-site/docs/guides/packs-and-skills.md`.
+
+Single-revert rollback confirmed. Full CI green. `nibbler:approved` label re-applied (was stripped on synchronize).
+
+### 3. PR #1003 — APPROVED
+#995 Core-tab density + preview coverage. Named-constant geometry module (`playground-layout-constants.ts`) is the single source of truth consumed by CSS (`Playground.tsx`), unit test (`playground-core-tab-rendering.test.ts`), and Playwright (`playground.spec.ts`). Stable data-attribute selectors on cards. Preview-coverage matrix parametrised across all shipped core basic renderers. `nibbler:approved` label.
+
+### 4. PR #1004 — APPROVED
+#997 workspace black void. `min-height: 0` chain complete across all four column-flex links. Explicit geometry assertions use named constants (`MAX_EDITOR_BOTTOM_SLACK_PX`, `MIN_CODE_WRAPPER_HEIGHT_PX`) — no magic numbers, no background-color proxy. Two viewport states. Formal review + `nibbler:approved` label.
+
+## Conventions carried forward
+
+- **Bundle-overage pattern**: concrete ceiling + CI gate + waiver-by-PR-description line is the approved shape for any future "controlled performance overage" sign-off.
+- **Self-authored PRs**: GitHub blocks formal `gh pr review --approve` when the authenticated identity matches the PR author. For PRs authored by `sabbour`, only the `nibbler:approved` label path is available. The `check-squad-approval` workflow reads the label, so this is a non-blocking operational limitation — future Nibbler runs should expect the GraphQL "cannot approve own PR" error and fall through to the label path without retrying.
+- **Named-constant geometry ask is now proven**: for any layout regression where CSS, unit, and E2E all assert geometry, the single-source-of-truth module pattern (`*-layout-constants.ts` imported by all three) is the approved shape. Applied cleanly in #1003 and #1004.
+- **CI-green precheck before approve** remains mandatory after round-3 learning: never approve on PR-body test counts alone; always verify the checks panel.
+
+## Consequences
+
+- Four PRs cleared on the first round-4 pass — continues to validate the DP-stage gate reducing PR-stage rework.
+- Bundle-budget script is now the baseline — future pack additions that breach the ceiling must either raise the number in the script (requiring deliberate edit + waiver note) or split into lazy chunks.
+
+
+---
+
+# Zapp — Round 4 PR batch decision (2026-04-21)
+
+**Author:** Zapp (Security, Lead-tier)
+**Scope:** PRs #1005, #1000, #1003, #1004
+**Verdicts:** All ✅ approve + `zapp:approved` applied.
+
+## Decisions
+
+### D-zapp-1005-1 — `.nullable()` (not `.nullable().optional()`) is the required default for every field inside any Zod `discriminatedUnion` branch that feeds an OpenAI strict-mode function tool
+
+**Context:** PR #1005 fixes the #998 400 by flipping `sendDataModel` and its siblings from `.nullable().optional()` to `.nullable()`. Root cause is that `@openai/agents`' strict-mode transform does NOT re-rewrite optional fields nested inside a `z.discriminatedUnion`, so OpenAI's strict validator rejects the tool.
+
+**Decision:** For every Zod schema attached to a `ToolContribution` under `packages/pack-*/src/tools/**`, fields inside any `z.discriminatedUnion` branch that semantically mean "unset" MUST use `.nullable()` and NEVER `.nullable().optional()` or bare `.optional()`. Runtime paths that need to drop the sentinel MUST use an explicit `stripNulls` before validating against the harness runtime schema. Enforcement: the parametrised `tool-strict-required-conformance.test.ts` walker is the durable CI gate.
+
+**Scope:** All pack-core and future pack tool schemas. Applies retroactively — if future audits find any other `.optional()`-under-discriminated-union in a tool schema, it's a bug.
+
+### D-zapp-1000-1 — Vitest-based guardrail tests are accepted as hard-fail equivalents to GitHub Actions workflow grep rules
+
+**Context:** PR #1000's DP condition (b) was "CI grep rule hard-fails on `dangerouslySetInnerHTML` / `eval` / `new Function` in pack client code." The phrasing was "workflow OR pre-commit OR test." Backend App lacks `workflows:write`, so Bender implemented the gate as `packages/web/src/__tests__/pack-client-guardrails.test.ts`.
+
+**Decision:** Security guardrails implemented as vitest tests are accepted as meeting DP conditions that demand "CI hard-fail," provided all of the following hold:
+1. The test is picked up by the repo's standard vitest glob without further config.
+2. CI runs `npx vitest run` (or equivalent) in a job whose failure blocks merge.
+3. The failure mode is a hard `expect(...).toEqual([])` / `toThrow` / similar — not a warning, not a `console.warn`, not a `.skip`.
+4. The scan/check scope is explicit and documented in test comments.
+
+Future DP reviews from Zapp will continue to write "workflow OR pre-commit OR test" as equivalent options.
+
+### D-zapp-1000-2 — Bundle-budget gates must protect against chunk-split evasion
+
+**Context:** PR #1000's `packages/web/scripts/check-bundle-budget.mjs` fails when a budgeted chunk prefix matches zero files. This prevents a future PR from splitting new code into a brand-new chunk name to bypass the ceiling.
+
+**Decision:** Any future per-chunk bundle-budget gate MUST (a) fail when `matches.length === 0` for any budgeted prefix, and (b) require an explicit source-file edit (not just a PR description toggle) to raise a ceiling. `check-bundle-budget.mjs` is the reference implementation.
+
+### D-zapp-1003-1 — CSP is the gate for third-party URL literals in developer-authored fixtures
+
+**Context:** PR #1003 adds hard-coded `https://www.w3schools.com/...` URLs in preview fixtures (Video, AudioPlayer). Production CSP in `packages/web/public/staticwebapp.config.json` is `default-src 'self'` with no `media-src` override, so cross-origin media loads are blocked.
+
+**Decision:** Developer-authored fixture URLs to third-party domains are ACCEPTABLE provided:
+1. The URL is a compile-time constant in repo source (not fetched, not attacker-controlled).
+2. Production CSP for that resource type is NOT widened in the same PR (no new `media-src`, `img-src`, `connect-src`, `script-src` third-party entries).
+
+When CSP blocks such a fixture, the resulting broken-media / broken-image state is a functional issue for the owning agent (Fry here), not a Zapp merge gate. Future reviews: when fixture diff adds any URL literal (`src=`, `href=`, API URL), the reviewer MUST check the prod CSP for that resource type before raising a security flag.
+
+### Follow-up — not gating any of the approved PRs
+
+**F-zapp-round4-1 — `ArchitectureDiagram.insertSvgSafely` sanitizer gaps:** The pre-existing SVG sanitizer in `packages/pack-aks-automatic/src/components/ArchitectureDiagram/index.tsx` strips `<script>` and `on*` attrs but does NOT strip `javascript:` hrefs on anchors, external `<use href="…">` references, `<foreignObject>` embedded HTML, or `xlink:href`. This was called out in round 3 as a follow-up. First client-mount landed with PR #1000. Action: file a dedicated hardening issue to extend the sanitizer — not a #1000 blocker.
+
+**F-zapp-round4-2 — Bundle media fixtures locally:** Recommend moving the 2 third-party media URLs (PR #1003) to local bundled assets under `packages/web/public/` or `data:` URIs so the previews actually render in production.
+
+**F-zapp-round4-3 — Auto-inclusion test for new packs:** When `PACKS` constant in `pack-client-guardrails.test.ts` doesn't cover a newly added pack, the guardrail silently doesn't scan it. Add a meta-assertion: `PACKS` must equal every `packages/pack-*` dir present in the repo. Small follow-up, not a #1000 blocker.
+
+## Learnings referenced
+
+See `.squad/agents/zapp/history.md` — "Learnings (Round 4)" section for: CSP as gate for fixture URLs, vitest-as-workflow-substitute, chunk-split evasion in bundle budgets, conformance walker generalization.
+
