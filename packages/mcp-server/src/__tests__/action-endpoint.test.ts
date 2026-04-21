@@ -21,8 +21,8 @@ import type {
   ServerToAppMessage,
   ActionMessage,
 } from "../app/protocol.js";
-import type { SessionState } from "@kickstart/harness";
-import { Phase } from "@kickstart/harness";
+import type { SessionState } from "@aks-kickstart/harness";
+import { Phase } from "@aks-kickstart/harness";
 
 // ── Helpers ─────────────────────────────────────────────────────────
 

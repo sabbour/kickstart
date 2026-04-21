@@ -20,14 +20,14 @@
  * doesn't exist — remove it once the real implementation ships.
  *
  * @depends Phase C of #477 (tools implementation)
- * @depends #475 (A2UIMessageSchema on @kickstart/harness)
+ * @depends #475 (A2UIMessageSchema on @aks-kickstart/harness)
  * @depends #476 (SessionCtx type / ToolContext)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Module stub — remove when pack-core ships ────────────────────────────────
-vi.mock('@kickstart/pack-core', () => ({
+vi.mock('@aks-kickstart/pack-core', () => ({
   emitUiTool: { name: 'core.emit_ui', parameters: null, execute: vi.fn() },
   writeFileTool: { name: 'core.write_file', parameters: null, execute: vi.fn() },
   readFileTool: { name: 'core.read_file', parameters: null, execute: vi.fn() },
@@ -44,7 +44,7 @@ vi.mock('@kickstart/pack-core', () => ({
 //   listFilesTool,
 //   validateArtifactsTool,
 //   fetchWebpageTool,
-// } from '@kickstart/pack-core';
+// } from '@aks-kickstart/pack-core';
 
 // ── Minimal SessionCtx stub used across tool tests ───────────────────────────
 function makeSessionCtx() {

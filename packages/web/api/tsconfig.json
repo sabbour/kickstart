@@ -6,12 +6,12 @@
     "composite": true,
     "types": ["node"],
     "paths": {
-      "@kickstart/harness": ["../../harness/src/index.ts"],
-      "@kickstart/harness/runtime/registry": ["../../harness/src/runtime/registry.ts"],
-      "@kickstart/harness/runtime/session": ["../../harness/src/runtime/session.ts"],
-      "@kickstart/harness/runtime/sse": ["../../harness/src/runtime/sse.ts"],
-      "@kickstart/harness/runtime/runner": ["../../harness/src/runtime/runner.ts"],
-      "@kickstart/harness/runtime/resume": ["../../harness/src/runtime/resume.ts"]
+      "@aks-kickstart/harness": ["../../harness/src/index.ts"],
+      "@aks-kickstart/harness/runtime/registry": ["../../harness/src/runtime/registry.ts"],
+      "@aks-kickstart/harness/runtime/session": ["../../harness/src/runtime/session.ts"],
+      "@aks-kickstart/harness/runtime/sse": ["../../harness/src/runtime/sse.ts"],
+      "@aks-kickstart/harness/runtime/runner": ["../../harness/src/runtime/runner.ts"],
+      "@aks-kickstart/harness/runtime/resume": ["../../harness/src/runtime/resume.ts"]
     }
   },
   "references": [

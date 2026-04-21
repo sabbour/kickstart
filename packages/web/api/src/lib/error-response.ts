@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/lib/error-response
+ * @module @aks-kickstart/api/lib/error-response
  *
  * Shared error handling utilities for API functions.
  * Logs full error details server-side and returns a generic message to clients.

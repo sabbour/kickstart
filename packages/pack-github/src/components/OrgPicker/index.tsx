@@ -9,7 +9,7 @@ import {
   makeStyles,
   Badge,
 } from '@fluentui/react-components';
-import type { ComponentContribution } from '@kickstart/harness';
+import type { ComponentContribution } from '@aks-kickstart/harness';
 
 const OwnerSchema = z.object({
   login: z.string(),

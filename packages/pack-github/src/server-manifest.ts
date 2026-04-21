@@ -13,8 +13,8 @@
  */
 
 import { z } from 'zod';
-import type { Pack, ComponentContribution } from '@kickstart/harness';
-import { resolveAssetURL } from '@kickstart/harness/runtime/asset-url';
+import type { Pack, ComponentContribution } from '@aks-kickstart/harness';
+import { resolveAssetURL } from '@aks-kickstart/harness/runtime/asset-url';
 
 // Tools (no JSX)
 import { apiGetTool } from './tools/api-get.js';

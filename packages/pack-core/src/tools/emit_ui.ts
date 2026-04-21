@@ -1,8 +1,8 @@
 import { tool } from '@openai/agents';
 import { z } from 'zod';
-import { A2UIMessageSchema } from '@kickstart/harness';
-import type { A2UIMessageV09 } from '@kickstart/harness';
-import type { ToolContribution, SessionCtx } from '@kickstart/harness';
+import { A2UIMessageSchema } from '@aks-kickstart/harness';
+import type { A2UIMessageV09 } from '@aks-kickstart/harness';
+import type { ToolContribution, SessionCtx } from '@aks-kickstart/harness';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 

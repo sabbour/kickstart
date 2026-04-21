@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/mcp-server/tools/kickstart
+ * @module @aks-kickstart/mcp-server/tools/kickstart
  *
  * Tool handler: Start a new Kickstart conversation.
  * Returns A2UI ConversationPhase component + intro text.
@@ -13,12 +13,12 @@ import {
   getPhaseDefinition,
   buildSystemPrompt,
   DEPLOYMENT_SAFEGUARDS,
-} from "@kickstart/harness";
+} from "@aks-kickstart/harness";
 import type {
   SessionState,
   ConversationPhaseComponent,
   PhaseItem,
-} from "@kickstart/harness";
+} from "@aks-kickstart/harness";
 import { createA2UIResource } from "../a2ui.js";
 import type { A2UICapability } from "../a2ui.js";
 

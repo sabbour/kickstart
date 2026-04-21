@@ -26,7 +26,7 @@ import {
 import { useA2UI } from '../hooks/useA2UI';
 import type { ActionHandler } from '../hooks/useActionDispatch';
 import type { PlaygroundRegistryView } from '../hooks/usePlaygroundDispatch';
-import type { PlaygroundScenario, ComponentContribution } from '@kickstart/harness';
+import type { PlaygroundScenario, ComponentContribution } from '@aks-kickstart/harness';
 import { useDebug } from '../contexts/DebugContext';
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
 import { DebugPanel } from '../components/Chat/DebugPanel';

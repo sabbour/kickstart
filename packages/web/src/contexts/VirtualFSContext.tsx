@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/web/contexts/VirtualFSContext
+ * @module @aks-kickstart/web/contexts/VirtualFSContext
  *
  * React context for the IndexedDB-backed VirtualFS.
  *

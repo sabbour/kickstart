@@ -1,4 +1,4 @@
-import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@kickstart/harness';
+import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@aks-kickstart/harness';
 
 /** Maximum total tokens allowed in a session before blocking new turns. */
 const TOKEN_BUDGET_LIMIT = 128_000;

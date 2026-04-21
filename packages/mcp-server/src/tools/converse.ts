@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/mcp-server/tools/converse
+ * @module @aks-kickstart/mcp-server/tools/converse
  *
  * Tool handler: Multi-turn conversation within an existing Kickstart session.
  * Processes user messages through the phase machine, composes the
@@ -11,12 +11,12 @@ import {
   getPhaseDefinition,
   buildSystemPrompt,
   Phase,
-} from "@kickstart/harness";
+} from "@aks-kickstart/harness";
 import type {
   SessionState,
   ConversationPhaseComponent,
   PhaseItem,
-} from "@kickstart/harness";
+} from "@aks-kickstart/harness";
 import { getSessionPhase, setSessionPhase } from "./kickstart.js";
 import { createA2UIResource } from "../a2ui.js";
 import type { A2UICapability } from "../a2ui.js";

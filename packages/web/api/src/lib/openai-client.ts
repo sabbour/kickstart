@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/lib/openai-client
+ * @module @aks-kickstart/api/lib/openai-client
  *
  * Fetch-based Azure OpenAI client with per-path deployment support:
  * - Chat deployment (KICKSTART_CHAT_MODEL, e.g. gpt-5.4-mini) — Chat Completions API for non-coding conversation
@@ -11,7 +11,7 @@
 // Shared types
 // ---------------------------------------------------------------------------
 
-import type { OpenAIToolDefinition, ToolCall } from "@kickstart/harness";
+import type { OpenAIToolDefinition, ToolCall } from "@aks-kickstart/harness";
 import { sanitizeToolOutput } from "./sanitize-tool-output.js";
 import { normalizeChatUsage, sumChatUsage } from "./usage-tracking.js";
 import type { ChatUsage } from "./usage-tracking.js";

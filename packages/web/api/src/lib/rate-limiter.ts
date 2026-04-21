@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/lib/rate-limiter
+ * @module @aks-kickstart/api/lib/rate-limiter
  *
  * In-memory sliding-window rate limiter for API endpoints.
  *

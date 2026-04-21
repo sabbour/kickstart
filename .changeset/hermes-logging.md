@@ -1,5 +1,5 @@
 ---
-'@kickstart/api': minor
+'@aks-kickstart/api': minor
 ---
 
 Add structured JSON logging to Azure Functions using Application Insights. Introduces:

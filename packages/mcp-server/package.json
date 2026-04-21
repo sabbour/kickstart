@@ -1,5 +1,5 @@
 {
-  "name": "@kickstart/mcp-server",
+  "name": "@aks-kickstart/mcp-server",
   "version": "1.0.1",
   "description": "MCP server for AKS Kickstart — exposes conversation tools and A2UI responses",
   "type": "module",
@@ -16,11 +16,11 @@
     "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
   },
   "dependencies": {
-    "@kickstart/harness": "file:../harness",
-    "@kickstart/pack-core": "file:../pack-core",
-    "@kickstart/pack-azure": "file:../pack-azure",
-    "@kickstart/pack-aks-automatic": "file:../pack-aks-automatic",
-    "@kickstart/pack-github": "file:../pack-github",
+    "@aks-kickstart/harness": "*",
+    "@aks-kickstart/pack-core": "*",
+    "@aks-kickstart/pack-azure": "*",
+    "@aks-kickstart/pack-aks-automatic": "*",
+    "@aks-kickstart/pack-github": "*",
     "@modelcontextprotocol/sdk": "^1.12.1"
   },
   "devDependencies": {

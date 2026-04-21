@@ -1,10 +1,10 @@
 /**
- * @module @kickstart/harness/mcp/server
+ * @module @aks-kickstart/harness/mcp/server
  *
  * Harness-side MCP server utilities.
  *
  * Provides the manifest-building and client-detection primitives that the
- * @kickstart/mcp-server thin adapter uses. All filtering policy lives here so
+ * @aks-kickstart/mcp-server thin adapter uses. All filtering policy lives here so
  * it can be unit-tested without spinning up the full MCP transport layer.
  */
 

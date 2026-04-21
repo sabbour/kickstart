@@ -1,4 +1,4 @@
-import type { Pack, ComponentContribution } from '@kickstart/harness';
+import type { Pack, ComponentContribution } from '@aks-kickstart/harness';
 import type { ReactComponentImplementation } from './vendor/a2ui/react/adapter.js';
 
 // Tools

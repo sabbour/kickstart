@@ -14,7 +14,7 @@ type IsDynamic<T> = DataBinding extends NonNullable<T> ? true : false;
 /**
  * Maps a raw Zod-inferred prop type to its resolved runtime equivalent.
  *
- * The generic binder in `@kickstart/web` resolves dynamic values (paths,
+ * The generic binder in `@aks-kickstart/web` resolves dynamic values (paths,
  * function calls) before handing props to React components, so at runtime:
  *   - `Action` objects become callable `() => void` functions
  *   - `ChildList` becomes the rendered subtree (typed as `any` here)

@@ -7,7 +7,7 @@
  * Tool is invoked via FunctionTool.invoke(runCtx, jsonInput).
  *
  * @depends Phase C of #477 (search_components.ts must exist)
- * @depends ComponentContribution shape from @kickstart/harness
+ * @depends ComponentContribution shape from @aks-kickstart/harness
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

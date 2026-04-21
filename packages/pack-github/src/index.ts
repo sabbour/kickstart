@@ -1,4 +1,4 @@
-import type { Pack, ComponentContribution } from '@kickstart/harness';
+import type { Pack, ComponentContribution } from '@aks-kickstart/harness';
 
 // Tool
 import { apiGetTool } from './tools/api-get.js';

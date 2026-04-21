@@ -1,7 +1,7 @@
 import React from 'react';
 import { z } from 'zod';
 import { Card, CardHeader, Text, tokens, makeStyles, Divider } from '@fluentui/react-components';
-import type { ComponentContribution } from '@kickstart/harness';
+import type { ComponentContribution } from '@aks-kickstart/harness';
 
 const CostLineItemSchema = z.object({
   name: z.string(),

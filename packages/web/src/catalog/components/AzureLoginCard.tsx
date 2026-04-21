@@ -17,7 +17,7 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
-import type { AzureARMConnector, AzureSubscription } from '@kickstart/harness';
+import type { AzureARMConnector, AzureSubscription } from '@aks-kickstart/harness';
 import type { AzureAuthSessionState } from '../../services/azure-auth';
 // TODO(Step 7): playground-auth-stub removed in Step 1 — stubs always return false/undefined
 const createAzureStubSession = (_connected: boolean): AzureAuthSessionState => ({ authenticated: false, configured: false, subscriptions: [] });

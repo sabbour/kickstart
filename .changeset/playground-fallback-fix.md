@@ -1,5 +1,5 @@
 ---
-'@kickstart/web': patch
+'@aks-kickstart/web': patch
 ---
 
 Fix: Playground component graceful API fallback and E2E test re-enablement (#913)

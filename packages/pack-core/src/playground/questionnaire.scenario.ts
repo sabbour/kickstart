@@ -1,5 +1,5 @@
-import type { PlaygroundScenario } from '@kickstart/harness';
-import { A2UI_VERSION } from '@kickstart/harness';
+import type { PlaygroundScenario } from '@aks-kickstart/harness';
+import { A2UI_VERSION } from '@aks-kickstart/harness';
 
 /**
  * Playground scenario: core.questionnaire

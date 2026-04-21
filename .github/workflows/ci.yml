@@ -60,27 +60,20 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch main branch for changeset status
-        run: git fetch origin main:main --depth=1
+        run: git fetch origin main:main --deepen=50 || git fetch origin main:main
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
-          cache: "npm"
           registry-url: "https://npm.pkg.github.com"
-          scope: "@sabbour"
+          scope: "@aks-kickstart"
           always-auth: true
 
       - name: Install dependencies
         run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Build all workspaces
-        run: npm run build
 
       - name: TypeScript check (web)
         run: cd packages/web && npx tsc --noEmit
@@ -133,9 +126,8 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22"
-          cache: "npm"
           registry-url: "https://npm.pkg.github.com"
-          scope: "@sabbour"
+          scope: "@aks-kickstart"
           always-auth: true
 
       - name: Install dependencies

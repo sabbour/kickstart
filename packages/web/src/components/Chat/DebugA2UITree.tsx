@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { makeStyles, tokens, Text } from '@fluentui/react-components';
-import { KNOWN_COMPONENT_TYPES } from '@kickstart/harness';
+import { KNOWN_COMPONENT_TYPES } from '@aks-kickstart/harness';
 import type { A2uiPayloadItem, A2uiMsg, A2uiComponent } from '../../types';
 
 const KICKSTART_CATALOG_ID = 'kickstart';

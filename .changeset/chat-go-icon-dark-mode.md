@@ -1,5 +1,5 @@
 ---
-"@kickstart/web": patch
+"@aks-kickstart/web": patch
 ---
 
 fix: use the Fluent go icon in the chat composer send button

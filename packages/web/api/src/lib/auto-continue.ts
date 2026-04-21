@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/lib/auto-continue
+ * @module @aks-kickstart/api/lib/auto-continue
  *
  * Middleware that detects when an LLM response was truncated (finish_reason:
  * "length") and automatically sends continuation requests until the response

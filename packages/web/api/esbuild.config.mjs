@@ -1,5 +1,5 @@
 /**
- * esbuild config for @kickstart/api
+ * esbuild config for @aks-kickstart/api
  *
  * Bundles each Azure Function entry point into a self-contained ESM file.
  * All npm dependencies (including @azure/functions and bicep-node) are inlined;
@@ -56,15 +56,15 @@ function copyMarkdownTree(sourceDir, targetDir, seenTargets) {
 }
 
 // esbuild's `alias` option does not handle subpath exports like
-// `@kickstart/harness/runtime/sse`. A resolver plugin rewrites both the
+// `@aks-kickstart/harness/runtime/sse`. A resolver plugin rewrites both the
 // root specifier and any subpath to the corresponding `.ts` source file.
 const harnessResolver = {
   name: "kickstart-harness-resolver",
   setup(build) {
     build.onResolve({ filter: /^@kickstart\/harness(\/.*)?$/ }, (args) => {
-      const sub = args.path === "@kickstart/harness"
+      const sub = args.path === "@aks-kickstart/harness"
         ? "index"
-        : args.path.slice("@kickstart/harness/".length);
+        : args.path.slice("@aks-kickstart/harness/".length);
       return { path: resolve(HARNESS_SRC, `${sub}.ts`) };
     });
   },

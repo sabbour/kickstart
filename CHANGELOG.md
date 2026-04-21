@@ -9,6 +9,7 @@ This project uses [@changesets/cli](https://github.com/changesets/changesets) fo
 ### Fixed
 
 - **Workspace references blocker:** Use local workspace references (`file://` paths) instead of npm registry for internal packages (@kickstart/harness, all packs) — resolves SWA deployment failure during `npm install --production`.
+- **API health check diagnostics:** Enhanced health endpoint to return structured diagnostic error information instead of generic message. Root cause detection identifies: missing environment variables (`env-validation`), module import failures (`pack-import`), registry sealing failures (`registry-seal`), and general initialization failures (`pack-registry-init`). Frontend now displays specific actionable error messages (e.g., "Azure OpenAI credentials not configured") instead of generic "API not available" message. Includes helpful hints for each failure type and console logging for browser diagnostics.
 
 ### Changed
 

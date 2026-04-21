@@ -1,8 +1,8 @@
 import { tool } from '@openai/agents';
 import { z } from 'zod';
 import * as dnsPromises from 'node:dns/promises';
-import type { ToolContribution } from '@kickstart/harness';
-import type { SessionCtx } from '@kickstart/harness';
+import type { ToolContribution } from '@aks-kickstart/harness';
+import type { SessionCtx } from '@aks-kickstart/harness';
 
 // ── SSRF guard ────────────────────────────────────────────────────────────────
 

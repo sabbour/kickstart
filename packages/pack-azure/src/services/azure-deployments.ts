@@ -6,7 +6,7 @@
  * operations only (the deploy write itself lives in user-actions/deploy.ts).
  */
 
-import type { SessionCtx } from '@kickstart/harness';
+import type { SessionCtx } from '@aks-kickstart/harness';
 import { getAzureToken, armAuthHeaders, armBaseUrl, pollArmLro } from './azure-auth.js';
 
 const ARM_DEPLOYMENTS_API = '2021-04-01';

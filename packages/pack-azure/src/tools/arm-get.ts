@@ -1,7 +1,7 @@
 import { tool } from '@openai/agents';
 import { z } from 'zod';
-import type { ToolContribution } from '@kickstart/harness';
-import type { SessionCtx } from '@kickstart/harness';
+import type { ToolContribution } from '@aks-kickstart/harness';
+import type { SessionCtx } from '@aks-kickstart/harness';
 
 // ── ARM path security (Zapp C1) ───────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { z } from 'zod';
 import { Card, CardHeader, Badge, Text, Spinner, tokens, makeStyles } from '@fluentui/react-components';
-import type { ComponentContribution } from '@kickstart/harness';
+import type { ComponentContribution } from '@aks-kickstart/harness';
 
 const DeploymentStatusSchema = z.object({
   deploymentName: z.string().describe('ARM deployment name'),

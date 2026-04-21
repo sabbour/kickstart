@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/api/functions/action
+ * @module @aks-kickstart/api/functions/action
  *
  * POST /api/action — A2UI action processing endpoint.
  *
@@ -23,9 +23,9 @@ import {
   processResponse,
   isPhase,
   Phase,
-} from "@kickstart/harness";
-import type { PhaseItem } from "@kickstart/harness";
-import type { A2UIMessage } from "@kickstart/harness";
+} from "@aks-kickstart/harness";
+import type { PhaseItem } from "@aks-kickstart/harness";
+import type { A2UIMessage } from "@aks-kickstart/harness";
 import {
   getSession,
   getPrincipalId,

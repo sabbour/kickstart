@@ -1,5 +1,5 @@
 /**
- * @module @kickstart/mcp-server/adapter/session-mutex
+ * @module @aks-kickstart/mcp-server/adapter/session-mutex
  *
  * Per-session serialisation mutex.
  *
