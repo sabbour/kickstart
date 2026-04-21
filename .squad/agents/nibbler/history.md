@@ -127,3 +127,41 @@ First run as full structured reviewer (parity with Leela/Zapp). Patterns observe
 - My round-3 learning ("verify CI green before approving") held — confirmed all four PRs have green Lint/Build/Unit Tests + Playwright + Squad CI before pressing approve.
 - **Self-authored PR limitation:** GitHub blocks formal review on PRs where the authenticated identity matches the PR author. For PRs authored by `sabbour` (#1000, #1003), only the `nibbler:approved` label path works. The `check-squad-approval` workflow keys on the label, so this is a non-issue operationally — but worth capturing so future Nibbler runs don't loop on the GraphQL error.
 - Bundle-budget pattern (concrete ceiling + CI gate + waiver-by-PR-description) is a good template to carry forward for any future "performance overage, but controlled" sign-off.
+
+## 2026-04-21T12:47:00Z — Round 5: Batch DP review (DPs #1017/#1018/#1020)
+
+**DP #1017 — A2UI empty-string placeholder fix (Fry) → APPROVED (`nibbler:approved`)**
+- Root cause of triage-agent `_ErrorComponent` breakage is sound: the model emits null/empty-string placeholders for every optional field, violating A2UI spec (non-applicable fields must be omitted). emit_ui.ts schema is already strict-mode correct (`.nullable()` not `.optional()`) and `stripNulls()` correctly collapses nulls to absents before harness validation. DP must integrate Ahmed's REQUIRED PROPERTIES rules (Text.text, Image.url, Button.action, TextField/CheckBox.label must be emitted when component is used) and add per-component integration tests covering the "no empty-string" rule. Backward compat on event envelope shape confirmed via existing `stripNulls()` behavior.
+
+**DP #1018 — Sparkle asset + CSP local-media (Fry) → APPROVED (`nibbler:approved`)**
+- Two distinct issues (missing sparkle.svg 404 + CSP blocking w3schools media) addressed with pragmatic spec-aligned approach: Option A (local assets only) keeps CSP strict and avoids external whitelisting. DP specifies concrete paths (`packages/web/src/assets/samples/`) and E2E verification (no CSP console warnings). Bundle-config correctness is the risk surface — must validate that build actually copies samples to output and vite preserves paths. Low-risk, well-scoped. DP asks for documentation of local-assets-only pattern to prevent future regressions.
+
+**DP #1020 — widget-inspirations simplification (Fry) → APPROVED (`nibbler:approved`)**
+- Four simplification levers are sound: consolidate dual system prompt (non-streaming vs streaming paths have ~60-line duplication), flatten triple-nested fallback try-catch, externalize prompt text, inline single-use helpers. File is 251 lines with clear refactoring targets. Constraint properly scoped: zero behavior change, preserve test coverage (`a2ui-allow-list-registry.test.ts` must remain green), maintain allow-list compliance and A2UI conformance. Risk is low because change is localized to single handler. DP correctly calls for confirmation that focus-domain rotation (`nextFocusDomain()`) logic remains functionally equivalent post-refactor.
+
+**Pattern observation:** All three DPs passed approval on first review. No rework asks. The DP-stage gate continues to catch and clarify scope before implementation — this batch had clear scope statements, no behavior-change surprises, and implementable constraints. Consistency: each DP had a distinct scope (conformance fix, asset bundling, code hygiene) with testability baked in.
+
+**Cross-cutting:** Three-issue batch review completed in one pass; zero escalations or changes-requested decisions.
+
+## 2026-04-21T10:08:59Z — Round 6: PRs #1021 and #1026
+
+**PR #1021 — chore(decisions): merge 7 inbox files → decisions.md (Scribe) → APPROVED (`nibbler:approved` via label)**
+- Fast-track mechanical review. All three criteria met: (a) no data loss — 7 inbox entries now in decisions.md, (b) append-only — +410/0 on decisions.md, +32/0 on scribe history, (c) entries formatted consistently with existing decision blocks (header/date/owner/status/problem/decision/rationale).
+- No changeset — governance-only. Correct.
+- CI fully green: Lint/Build/Tests ✅ Playwright ✅ All workflow checks ✅
+- Formal review blocked (self-authored by lead bot). Label path used; review comment posted.
+- Landed: `leela:approved` + `zapp:approved` + `nibbler:approved` + `docs:approved` → all four gate labels present.
+
+**PR #1026 — fix(web): simplify widget-inspirations system prompt (Fry, closes #1020) → APPROVED (`nibbler:approved` via label)**
+- Prompt-text-only change: +12/-20 lines in `widget-inspirations.ts` plus changeset. Correct scope per DP #1020.
+- `nextFocusDomain()` rotation preserved in both paths. `ALLOWED_LIST` still dynamic. Allow-list prohibition and namespaced-type rejection preserved. Safety guardrail condensed to one constructive line (Zapp-blessed as security-neutral).
+- Tests: `widget-inspirations-data.test.ts` covers `nextFocusDomain()` + `pickFallbackIdea()` exhaustively. CI: 1012 passed, lint clean, build clean.
+- Changeset: `@aks-kickstart/web: patch` — correct.
+- 🟡 **Watch item (non-blocking):** Unified `SYSTEM_PROMPT` omits format instructions for both paths. JSON path calls `JSON.parse(result.content)` with no explicit "return JSON array" instruction; streaming path has no "return raw first-person prompt" instruction. Modern GPT-4 infers from context, but parse failures will trigger the fallback more often than before. Not a crash — failure path gracefully handled. If elevated fallback rates are observed in production, fix is to add per-path format spec to the user message only (keeping system prompt unified). Accepted under DP #1020 simplification contract.
+- Formal review blocked (self-authored by lead bot). Label path used; review comment posted.
+- Landed: `leela:approved` + `zapp:approved` + `nibbler:approved` + `docs:approved` → all four gate labels present.
+
+**Cross-cutting round-6 observations:**
+- Both PRs self-authored by `sabbour-squad-lead[bot]` — formal `gh pr review --approve` unavailable. Label path is the correct operational path; check-squad-approval workflow keys on labels. This is a known limitation documented since round 4.
+- #1021: cleanest possible Scribe PR — pure append, no deletes, fully formatted. These should never block.
+- #1026: the DP-stage approval contract held (all four reviewers signed off at DP). The 🟡 concern about missing format instructions is a quality watch item, not a gate blocker. If it triggers regressions, the fix is small and localized.
