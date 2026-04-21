@@ -80,6 +80,25 @@ export function registerClient(target: PackClientRegisterTarget): void {
 export type PackPreview = Array<Record<string, unknown>>;
 
 /**
+ * Curated scenario composition (Playground Ideas tab — #987).
+ *
+ * Each scenario is a full A2UI v0.9 adjacency list (2–4 pack components plus
+ * any supporting core primitives). The first descriptor MUST have `id: 'root'`.
+ * Unlike `previews` (one component in isolation), scenarios demonstrate a
+ * realistic user workflow end-to-end.
+ *
+ * Scenarios are static, build-time-trusted fixtures — same trust bucket as
+ * `previews`. No runtime LLM synthesis, no user-supplied envelopes.
+ */
+export interface PackScenario {
+  /** Kebab-case ID, unique within the pack. */
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly components: ReadonlyArray<Readonly<Record<string, unknown>>>;
+}
+
+/**
  * Sample envelopes for Playground previews. Keys are pack-qualified component
  * names (e.g. `'azure/AzureResourceCard'`). Each value is a flat descriptor array
  * suitable for `updateComponents`.
@@ -189,3 +208,98 @@ export const previews: Readonly<Record<string, PackPreview>> = Object.freeze({
     },
   ],
 });
+
+/**
+ * Curated scenarios for the Playground Ideas tab (#987).
+ *
+ * Each entry mixes 2–4 components (pack + core primitives) into a realistic
+ * user workflow. Consumed by `packages/web/src/catalog/component-scenarios.ts`
+ * and rendered via the same engine used for Components tab previews.
+ */
+export const scenarios: readonly PackScenario[] = Object.freeze([
+  {
+    id: 'pick-region',
+    title: 'Pick an Azure region',
+    description: 'Region picker with a primary action button.',
+    components: [
+      { id: 'root', component: 'Column', children: ['heading', 'selector', 'continue'] },
+      { id: 'heading', component: 'Text', text: 'Choose a deployment region' },
+      {
+        id: 'selector',
+        component: 'azure/LocationSelector',
+        status: 'loaded',
+        selectedLocation: 'eastus',
+        groupByGeography: true,
+        locations: [
+          { name: 'eastus', displayName: 'East US', regionalDisplayName: '(US) East US', geographyGroup: 'US' },
+          { name: 'westeurope', displayName: 'West Europe', regionalDisplayName: '(Europe) West Europe', geographyGroup: 'Europe' },
+          { name: 'southeastasia', displayName: 'Southeast Asia', regionalDisplayName: '(Asia Pacific) Southeast Asia', geographyGroup: 'Asia Pacific' },
+        ],
+      },
+      { id: 'continue', component: 'Button', child: 'continue-label' },
+      { id: 'continue-label', component: 'Text', text: 'Continue' },
+    ],
+  },
+  {
+    id: 'scope-deployment',
+    title: 'Scope a deployment',
+    description: 'Pick the subscription and resource group before deploying.',
+    components: [
+      { id: 'root', component: 'Column', children: ['subs', 'rgs', 'continue'] },
+      {
+        id: 'subs',
+        component: 'azure/SubscriptionSelector',
+        status: 'loaded',
+        subscriptions: [
+          { subscriptionId: '00000000-0000-0000-0000-000000000000', displayName: 'Kickstart Prod', state: 'Enabled' },
+          { subscriptionId: '11111111-1111-1111-1111-111111111111', displayName: 'Kickstart Dev', state: 'Enabled' },
+        ],
+        selectedSubscriptionId: '00000000-0000-0000-0000-000000000000',
+      },
+      {
+        id: 'rgs',
+        component: 'azure/ResourceGroupSelector',
+        status: 'loaded',
+        subscriptionId: '00000000-0000-0000-0000-000000000000',
+        resourceGroups: [
+          { name: 'rg-kickstart-prod', location: 'eastus', provisioningState: 'Succeeded' },
+          { name: 'rg-kickstart-dev', location: 'westeurope', provisioningState: 'Succeeded' },
+        ],
+        selectedResourceGroup: 'rg-kickstart-prod',
+      },
+      { id: 'continue', component: 'Button', child: 'continue-label' },
+      { id: 'continue-label', component: 'Text', text: 'Continue' },
+    ],
+  },
+  {
+    id: 'review-cost-before-deploy',
+    title: 'Review cost before deploying',
+    description: 'Show the monthly cost breakdown next to the deploy action.',
+    components: [
+      { id: 'root', component: 'Card', children: ['wrap'] },
+      { id: 'wrap', component: 'Column', children: ['cost', 'action'] },
+      {
+        id: 'cost',
+        component: 'azure/CostEstimate',
+        totalMonthlyUSD: 248.75,
+        currencyCode: 'USD',
+        region: 'eastus',
+        breakdown: [
+          { name: 'AKS cluster', monthlyUSD: 146.0, unitPrice: 0.2, quantity: 730, unitOfMeasure: 'hours' },
+          { name: 'Container Registry (Standard)', monthlyUSD: 20.0, unitPrice: 20.0, quantity: 1, unitOfMeasure: 'month' },
+          { name: 'Log Analytics (5 GB)', monthlyUSD: 12.5, unitPrice: 2.5, quantity: 5, unitOfMeasure: 'GB' },
+        ],
+        disclaimer: 'Estimated — actuals may vary by workload.',
+      },
+      {
+        id: 'action',
+        component: 'azure/AzureAction',
+        title: 'Deploy to Azure',
+        description: 'Deploy main.bicep to rg-kickstart-prod',
+        status: 'pending',
+        resourcePath: '/subscriptions/0.../resourceGroups/rg-kickstart-prod',
+        destructive: false,
+      },
+    ],
+  },
+]);
