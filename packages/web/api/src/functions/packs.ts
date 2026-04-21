@@ -15,7 +15,7 @@ import { getRegistry, getLoadErrors } from "../startup/packs.js";
 import type { PackLoadError } from "../startup/packs.js";
 import type { ComponentContribution, PlaygroundScenario } from "@aks-kickstart/harness";
 import { Logger, extractTraceId } from "../lib/logger.js";
-import { getAppInsightsClient, flushAppInsights } from "../lib/appinsights.js";
+import { trackException, flushAppInsights } from "../lib/appinsights.js";
 import { sanitizeError } from "../telemetry/sanitize-error.js";
 import { randomUUID } from "node:crypto";
 
@@ -107,14 +107,14 @@ async function packs(
     logger.error('Registry initialization failed', sanitizedError, {
       error_code: 'REGISTRY_INIT_FAILED',
     });
-    getAppInsightsClient().trackException({
-      exception: sanitizedError,
-      properties: { requestId, context: 'packs-registry-init-failed' },
-    });
+    trackException(sanitizedError, { requestId, context: 'packs-registry-init-failed' });
     await flushAppInsights();
+    // Nibbler C4: opaque error body with requestId correlation. Never leak
+    // err.message to the wire — Zod errors and stack frames carry internal
+    // paths + schema shape.
     return {
       status: 500,
-      jsonBody: { error: 'Registry initialization failed. See server logs.' },
+      jsonBody: { error: 'Pack registry unavailable', requestId },
     };
   }
 }

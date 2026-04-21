@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto";
 import { app } from "@azure/functions";
 import type { HttpRequest, InvocationContext } from "@azure/functions";
 import { Logger, extractTraceId, extractRequestMetadata } from "../lib/logger.js";
-import { getAppInsightsClient, flushAppInsights } from "../lib/appinsights.js";
+import { trackException, trackEvent, flushAppInsights } from "../lib/appinsights.js";
 import { getRegistry } from "../startup/packs.js";
 import { getOrCreateSession } from "@aks-kickstart/harness/runtime/session";
 import { Runner } from "@aks-kickstart/harness/runtime/runner";
@@ -35,7 +35,6 @@ async function converse(
   const requestId = randomUUID();
   const traceId = extractTraceId(request.headers);
   const logger = new Logger(ctx, "converse", traceId).withContext({ request_id: requestId });
-  const appInsights = getAppInsightsClient();
 
   const requestMeta = extractRequestMetadata(request);
   logger.info("HTTP request received", requestMeta);
@@ -46,7 +45,7 @@ async function converse(
   } catch (err) {
     const sanitizedError = sanitizeError(err);
     logger.error("Failed to parse JSON body", sanitizedError);
-    appInsights.trackEvent({ name: "converse-parse-error", properties: { requestId } });
+    trackEvent("converse-parse-error", { requestId });
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -55,10 +54,7 @@ async function converse(
 
   if (!body.message || typeof body.message !== "string") {
     logger.warn("Invalid request: message field missing or not a string");
-    appInsights.trackEvent({
-      name: "converse-validation-error",
-      properties: { requestId, reason: "missing-message" },
-    });
+    trackEvent("converse-validation-error", { requestId, reason: "missing-message" });
     return new Response(JSON.stringify({ error: "'message' field is required" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -92,17 +88,11 @@ async function converse(
     registry = getRegistry();
     const registryDuration = Date.now() - registryStartTime;
     logger.info("Pack registry initialized", { duration_ms: registryDuration });
-    appInsights.trackEvent({
-      name: "pack-registry-initialized",
-      properties: { requestId, durationMs: String(registryDuration) },
-    });
+    trackEvent("pack-registry-initialized", { requestId, durationMs: String(registryDuration) });
   } catch (err) {
     const sanitizedError = sanitizeError(err);
     logger.error("Pack registry initialization failed", sanitizedError);
-    appInsights.trackException({
-      exception: sanitizedError,
-      properties: { requestId, context: "pack-registry-init" },
-    });
+    trackException(sanitizedError, { requestId, context: "pack-registry-init" });
     await flushAppInsights();
 
     const encoder = new TextEncoder();
@@ -133,16 +123,13 @@ async function converse(
   } catch (err) {
     if (err instanceof Error && err.message === "SESSION_OID_MISMATCH") {
       logger.warn("Session ownership mismatch");
-      appInsights.trackEvent({ name: "session-oid-mismatch", properties: { requestId } });
+      trackEvent("session-oid-mismatch", { requestId });
       return new Response("Forbidden", { status: 403 });
     }
 
     const sanitizedError = sanitizeError(err);
     logger.error("Failed to resolve session", sanitizedError);
-    appInsights.trackException({
-      exception: sanitizedError,
-      properties: { requestId, context: "session-resolution" },
-    });
+    trackException(sanitizedError, { requestId, context: "session-resolution" });
     await flushAppInsights();
     throw err;
   }
@@ -184,23 +171,17 @@ async function converse(
           event_count: eventCount,
           error_count: errorCount,
         });
-        appInsights.trackEvent({
-          name: "converse-success",
-          properties: {
+        trackEvent("converse-success", {
             requestId,
             durationMs: String(runDuration),
             eventCount: String(eventCount),
             errorCount: String(errorCount),
-          },
-        });
+          });
       } catch (err) {
         errorCount++;
         const sanitizedError = sanitizeError(err);
         requestLogger.error("Runner execution failed", sanitizedError);
-        appInsights.trackException({
-          exception: sanitizedError,
-          properties: { requestId, context: "runner-execution" },
-        });
+        trackException(sanitizedError, { requestId, context: "runner-execution" });
         await flushAppInsights();
         try {
           write("error", { message: sanitizedError.message });
@@ -217,7 +198,7 @@ async function converse(
     },
     cancel() {
       requestLogger.info("Client disconnected during request");
-      appInsights.trackEvent({ name: "converse-client-disconnect", properties: { requestId } });
+      trackEvent("converse-client-disconnect", { requestId });
       abortController.abort("client-disconnect");
     },
   });

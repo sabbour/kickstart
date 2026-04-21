@@ -1,7 +1,7 @@
 import type { Pack } from '@aks-kickstart/harness';
 import { PackRegistry } from '@aks-kickstart/harness/runtime/registry';
 import { Logger } from '../lib/logger.js';
-import { getAppInsightsClient, flushAppInsights } from '../lib/appinsights.js';
+import { trackException, flushAppInsights } from '../lib/appinsights.js';
 import { corePackServer } from '../../../../pack-core/src/server-manifest.js';
 import { azurePackServer } from '../../../../pack-azure/src/server-manifest.js';
 import { aksAutomaticPackServer } from '../../../../pack-aks-automatic/src/server-manifest.js';
@@ -170,14 +170,10 @@ export function getRegistry(): PackRegistry {
         // Every agent and every other pack depends on core.
         if (id === 'core') {
           // Emit telemetry before rethrowing — non-masking: telemetry failure
-          // must never prevent the original error from propagating.
-          // Fire-and-forget: getRegistry() is sync; the calling handler's own
-          // catch block also calls trackException + flushAppInsights() with await.
+          // must never prevent the original error from propagating. Flush is
+          // awaited via the caller's catch block (see handler-level catches).
           try {
-            getAppInsightsClient().trackException({
-              exception: err instanceof Error ? err : new Error(String(err)),
-              properties: { packId: id, context: 'core-pack-registration-failed' },
-            });
+            trackException(err, { packId: id, context: 'core-pack-registration-failed' });
             void flushAppInsights();
           } catch { /* telemetry errors do not mask the original throw */ }
           throw err;
@@ -209,10 +205,7 @@ export function getRegistry(): PackRegistry {
         error_code: 'REGISTRY_SEAL_FAILED',
       });
       try {
-        getAppInsightsClient().trackException({
-          exception: err instanceof Error ? err : new Error(String(err)),
-          properties: { context: 'registry-seal-failed' },
-        });
+        trackException(err, { context: 'registry-seal-failed' });
         void flushAppInsights();
       } catch { /* telemetry errors do not mask the original throw */ }
       throw err;
