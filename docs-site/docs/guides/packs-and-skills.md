@@ -194,7 +194,32 @@ export function registerPackComponents(registry: ClientComponentRegistry) {
 }
 ```
 
-Each pack's `previews: Record<ComponentName, A2UIEnvelope>` export provides Playground preview fixtures. Fixtures are validated against the component's `propertySchema` via `component-previews.test.ts`.
+Each pack's `previews: Record<ComponentName, A2UIEnvelope>` export provides Playground preview fixtures for the **Components** tab. Fixtures are validated against the component's `propertySchema` via `component-previews.test.ts`.
+
+### Scenarios (Ideas tab)
+
+Packs can also contribute `scenarios: readonly PackScenario[]` — **curated scenario compositions** shown in the Playground's **Ideas** tab. Each scenario is a full A2UI v0.9 adjacency list that mixes 2–4 components (pack-contributed + `core/*` primitives) into a realistic end-to-end workflow:
+
+```ts
+// packages/pack-azure/src/client.ts
+export const scenarios: readonly PackScenario[] = Object.freeze([
+  {
+    id: 'pick-region',
+    title: 'Pick an Azure region',
+    description: 'Region picker with a primary action button.',
+    components: [
+      { id: 'root', component: 'Column', children: ['heading', 'selector', 'continue'] },
+      { id: 'heading', component: 'Text', text: 'Choose a deployment region' },
+      { id: 'selector', component: 'azure/LocationSelector', /* …props… */ },
+      { id: 'continue', component: 'Button', child: 'continue-label' },
+      { id: 'continue-label', component: 'Text', text: 'Continue' },
+    ],
+  },
+  // …
+]);
+```
+
+Scenarios are **static, build-time-trusted fixtures** — no runtime LLM synthesis, no user-supplied envelopes — so they inherit the same trust boundary as `previews`. They are aggregated in `packages/web/src/catalog/component-scenarios.ts` and validated against each component's `propertySchema` plus a registry-resolution + sanitizer guard (`component-scenarios.test.ts`), guaranteeing the Ideas tab renders deterministically from fixture input with zero `_ErrorComponent` placeholders.
 
 
 ## Skills
