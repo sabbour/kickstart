@@ -821,7 +821,7 @@ const ComponentCard = memo(({ comp, onCardClick }: ComponentCardProps) => {
       <Caption1 style={{ color: tokens.colorNeutralForeground3, fontFamily: tokens.fontFamilyMonospace }}>
         {comp.name}
       </Caption1>
-      {exampleComponents && (
+      {exampleComponents ? (
         <div className={classes.cardBody} style={{ marginTop: tokens.spacingVerticalS, pointerEvents: 'none' }}>
           {/* A2UIEnvelopePreview — same render pipeline as Chat */}
           <A2UIEnvelopePreview
@@ -833,6 +833,18 @@ const ComponentCard = memo(({ comp, onCardClick }: ComponentCardProps) => {
               </div>
             }
           />
+        </div>
+      ) : (
+        <div
+          style={{
+            marginTop: tokens.spacingVerticalS,
+            padding: `${tokens.spacingVerticalS} 0`,
+            color: tokens.colorNeutralForeground4,
+            fontSize: tokens.fontSizeBase200,
+            fontStyle: 'italic',
+          }}
+        >
+          No preview available
         </div>
       )}
     </Card>
