@@ -96,9 +96,28 @@ Posted DP to https://github.com/sabbour/kickstart/issues/477#issuecomment-426812
 
 ### Covered
 
-## Archived History Note
+## 2026-04-21 — #1018: sparkle.svg 404 + CSP external media fix (PR #1022)
 
-For comprehensive work history prior to 2026-04-20, see git log and .squad/orchestration-log/. Recent sessions tracked above.
+Working as **Fry (Frontend Dev)**.
+
+**Root causes:**
+1. `sparkle.svg` was registered in `playground-icons.ts` and used in `core-previews.ts` (Image + Icon previews) but never committed to `packages/web/public/assets/icons/fluent/`. Build copies `public/` verbatim so the missing file caused a 404.
+2. `core-previews.ts` Video + AudioPlayer example envelopes referenced `https://www.w3schools.com/html/mov_bbb.mp4` / `https://www.w3schools.com/html/horse.mp3`. No explicit `media-src` in CSP → falls back to `default-src 'self'` → blocked.
+
+**Fix:**
+- `sparkle.svg` — extracted Sparkle24Regular path data from `@fluentui/react-icons` (already a dep), committed SVG to `packages/web/public/assets/icons/fluent/sparkle.svg` following the exact same format used by all other Fluent SVGs in that directory.
+- `sample.mp4` + `sample.mp3` — generated minimal valid binary stubs (Node.js, no ffmpeg) committed to `packages/web/public/assets/samples/`. Same origin, no external dependency.
+- Updated `core-previews.ts` to reference `/assets/samples/sample.mp4` and `/assets/samples/sample.mp3`.
+- CSP unchanged.
+- New SKILL.md: `packages/pack-core/src/skills/a2ui-media-discipline/SKILL.md`.
+
+**Learnings:**
+- **Asset bundling pattern:** Vite copies `packages/web/public/` verbatim into `dist/`. Any static asset referenced by a URL path (not a `import`) must live in `public/`, not `src/assets/`. The fluent icon SVGs in `public/assets/icons/fluent/` follow this pattern.
+- **Fluent SVG vendor pattern:** SVGs are sourced from `@fluentui/react-icons` path data (in `lib-cjs/atoms/svg/<name>.js`) and committed as standalone `.svg` files — they're not imported as React components in the icon catalog, they're served as static assets.
+- **CSP boundary:** `default-src 'self'` is the fallback for `media-src`. Any component example with an external `url` prop will be silently broken in production. The safe default is always a local `/assets/` path.
+- **Local media pattern:** Minimal valid MP3/MP4 stubs can be generated programmatically in Node.js without ffmpeg (ID3v2 header + MPEG frame for MP3; ftyp + mvhd moov box for MP4). Size ~2KB total — negligible bundle impact.
+
+
 
 
 ## 2026-04-17 — #477 pack-core Phases D–H (commits 92ba022, 833b44d, be1c2da)
