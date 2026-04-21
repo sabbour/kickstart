@@ -56,6 +56,7 @@ import {
 } from '@opentelemetry/api';
 import type { TracingProcessor } from '@openai/agents';
 import type { Trace, Span, SpanData } from '@openai/agents';
+import { sanitizeText } from './redact.js';
 
 const TRACER_NAME = '@openai/agents';
 
@@ -94,7 +95,7 @@ function deriveOtelSpanName(data: SpanData): string {
   }
 }
 
-function applySpanAttributes(otelSpan: OtelSpan, sdkSpan: Span): void {
+function applySpanAttributes(otelSpan: OtelSpan, sdkSpan: Span<SpanData>): void {
   const data = sdkSpan.spanData;
   otelSpan.setAttribute('openai.agents.span_id', sdkSpan.spanId);
   otelSpan.setAttribute('openai.agents.trace_id', sdkSpan.traceId);
@@ -118,11 +119,21 @@ function applySpanAttributes(otelSpan: OtelSpan, sdkSpan: Span): void {
     case 'function':
       otelSpan.setAttribute('openai.agents.tool_name', data.name);
       if (recordContent) {
+        // Even in opt-in mode, run tool I/O through the shared redaction
+        // rules — tool args/results can carry Bearer tokens, api-keys,
+        // connection strings, etc. Sanitize BEFORE the length clamp so a
+        // redacted marker always lands inside the 8 KB window.
         if (typeof data.input === 'string') {
-          otelSpan.setAttribute('openai.agents.tool_input', data.input.slice(0, 8192));
+          otelSpan.setAttribute(
+            'openai.agents.tool_input',
+            sanitizeText(data.input).slice(0, 8192),
+          );
         }
         if (typeof data.output === 'string') {
-          otelSpan.setAttribute('openai.agents.tool_output', data.output.slice(0, 8192));
+          otelSpan.setAttribute(
+            'openai.agents.tool_output',
+            sanitizeText(data.output).slice(0, 8192),
+          );
         }
       }
       break;
@@ -164,8 +175,11 @@ function applySpanAttributes(otelSpan: OtelSpan, sdkSpan: Span): void {
   }
 
   if (sdkSpan.error) {
-    otelSpan.setStatus({ code: SpanStatusCode.ERROR, message: sdkSpan.error.message });
-    otelSpan.recordException({ name: 'AgentSpanError', message: sdkSpan.error.message });
+    // Error messages from tools / the SDK can echo user input or upstream
+    // HTTP payloads. Redact before emitting to Application Insights.
+    const safeMsg = sanitizeText(sdkSpan.error.message);
+    otelSpan.setStatus({ code: SpanStatusCode.ERROR, message: safeMsg });
+    otelSpan.recordException({ name: 'AgentSpanError', message: safeMsg });
   }
 }
 
@@ -206,7 +220,7 @@ export class OtelBridgeTraceProcessor implements TracingProcessor {
     this.byTraceId.delete(trace.traceId);
   }
 
-  async onSpanStart(span: Span): Promise<void> {
+  async onSpanStart(span: Span<SpanData>): Promise<void> {
     const parentRef = span.parentId
       ? this.bySpanId.get(span.parentId)
       : this.byTraceId.get(span.traceId);
@@ -224,7 +238,7 @@ export class OtelBridgeTraceProcessor implements TracingProcessor {
     this.bySpanId.set(span.spanId, { span: otelSpan, kind: 'span' });
   }
 
-  async onSpanEnd(span: Span): Promise<void> {
+  async onSpanEnd(span: Span<SpanData>): Promise<void> {
     const ref = this.bySpanId.get(span.spanId);
     if (!ref) return;
     applySpanAttributes(ref.span, span);

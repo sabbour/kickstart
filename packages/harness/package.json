@@ -37,6 +37,10 @@
       "import": "./dist/runtime/session.js",
       "types": "./dist/runtime/session.d.ts"
     },
+    "./runtime/redact": {
+      "import": "./dist/runtime/redact.js",
+      "types": "./dist/runtime/redact.d.ts"
+    },
     "./runtime/sse": {
       "import": "./dist/runtime/sse.js",
       "types": "./dist/runtime/sse.d.ts"

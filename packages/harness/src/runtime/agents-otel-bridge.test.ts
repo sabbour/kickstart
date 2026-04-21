@@ -109,7 +109,7 @@ describe('OtelBridgeTraceProcessor', () => {
     for (const s of spans) expect(s.ended).toBe(true);
   });
 
-  it('records tool input/output only when KICKSTART_OTEL_RECORD_CONTENT=true', async () => {
+  it('records tool input/output only when KICKSTART_OTEL_RECORD_CONTENT=true, and sanitizes first', async () => {
     process.env.KICKSTART_OTEL_RECORD_CONTENT = 'true';
     const { tracer, spans } = makeTracerSpy();
     const bridge = new OtelBridgeTraceProcessor(tracer);
@@ -118,17 +118,27 @@ describe('OtelBridgeTraceProcessor', () => {
     const funcSpan = makeSpan({
       traceId: 't1',
       spanId: 's1',
-      spanData: { type: 'function', name: 'core.emit_ui', input: 'hello', output: 'world' },
+      spanData: {
+        type: 'function',
+        name: 'core.emit_ui',
+        input: 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig plus api_key=sk-abcd1234',
+        output: 'AccountKey=REDACTME+ABC==',
+      },
     });
     await bridge.onSpanStart(funcSpan as unknown as Parameters<typeof bridge.onSpanStart>[0]);
     await bridge.onSpanEnd(funcSpan as unknown as Parameters<typeof bridge.onSpanEnd>[0]);
 
     const s = spans.find((sp) => sp.name === 'tool.core.emit_ui');
-    expect(s?.attributes['openai.agents.tool_input']).toBe('hello');
-    expect(s?.attributes['openai.agents.tool_output']).toBe('world');
+    const inp = String(s?.attributes['openai.agents.tool_input']);
+    const out = String(s?.attributes['openai.agents.tool_output']);
+    expect(inp).toContain('[REDACTED]');
+    expect(inp).not.toContain('sk-abcd1234');
+    expect(inp).not.toMatch(/eyJhbGciOiJIUzI1NiJ9\.payload\.sig/);
+    expect(out).toContain('[REDACTED]');
+    expect(out).not.toContain('REDACTME+ABC==');
   });
 
-  it('marks SDK span errors on the mirrored OTel span', async () => {
+  it('sanitizes SDK span error messages before emitting them on the OTel span', async () => {
     const { tracer, spans } = makeTracerSpy();
     const bridge = new OtelBridgeTraceProcessor(tracer);
 
@@ -137,7 +147,9 @@ describe('OtelBridgeTraceProcessor', () => {
       traceId: 't1',
       spanId: 's1',
       spanData: { type: 'generation', model: 'gpt-4o' },
-      error: { message: 'upstream 404' },
+      error: {
+        message: 'upstream 404 from https://x.openai.azure.com/path?api-key=sk-leak1234',
+      },
     });
     await bridge.onSpanStart(badSpan as unknown as Parameters<typeof bridge.onSpanStart>[0]);
     await bridge.onSpanEnd(badSpan as unknown as Parameters<typeof bridge.onSpanEnd>[0]);
@@ -145,7 +157,14 @@ describe('OtelBridgeTraceProcessor', () => {
     const gen = spans.find((s) => s.name === 'generation.gpt-4o');
     expect(gen).toBeDefined();
     // @ts-expect-error — test spy accessor
-    expect(gen.setStatus).toHaveBeenCalledWith({ code: 2, message: 'upstream 404' });
+    const statusCall = gen.setStatus.mock.calls[0][0];
+    expect(statusCall.code).toBe(2);
+    expect(statusCall.message).toContain('[REDACTED]');
+    expect(statusCall.message).not.toContain('sk-leak1234');
+    // @ts-expect-error — test spy accessor
+    const excCall = gen.recordException.mock.calls[0][0];
+    expect(excCall.message).toContain('[REDACTED]');
+    expect(excCall.message).not.toContain('sk-leak1234');
   });
 
   it('shutdown force-ends any remaining open spans without throwing', async () => {
