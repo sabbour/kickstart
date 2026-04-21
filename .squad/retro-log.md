@@ -59,6 +59,43 @@ Historical rows before each schema extension keep their older trailing columns.
 
 ---
 
+## Round 5–6 Retrospective (Overnight Sprint, 2026-04-21)
+
+**Scope:** Continuous delivery sprint, 2 rounds of 4-way reviews  
+**Shipped:** 19 issues / 26 PRs merged in ~8h  
+**Outcomes:** 5 UI bugs landed + 4 process/security improvements  
+**Gate cycle:** 4-way review (Leela, Zapp, Nibbler, Docs); avg 2–3 cycles per PR
+
+### Key Learnings
+
+1. **Trio-agent confusion on diff delta.** The `trio-1014-relabel` agent mistook "full PR diff" for "delta since last approval" and refused to relabel, claiming the change was "out of scope." Coordinator had to manually apply `leela:approved` label. **Root cause:** agent logic assumed `gh pr diff` returns delta vs approval-time state; actually returns entire PR scope vs main. **Action:** Teach all diff-comparison agents: (a) PR diff vs main is the WHOLE scope, never a delta; (b) for relabel tasks, explicitly fetch the diff at the time of PREVIOUS approval (via commit SHA) and compare against the current head, not against main.
+
+2. **Bootstrap problem on workflow PRs.** PR #1011 originally failed CI because the base checkout (sparse-checkout of base.sha) tried to execute a script that was new to the PR. The script couldn't run until the head checkout was available, but the anti-tamper sparse-checkout job blocked it. **Solution pattern:** Split into two independent checkouts: (a) full checkout from head SHA (for dynamic scripts), (b) sparse checkout from base SHA (for anti-tamper static checks). Run (b) first (fast-fail if base is compromised), then (a) for script execution.
+
+3. **`nibbler:rejected` label requires explicit deletion on re-review.** PR #1011 had `nibbler:rejected` label from an earlier review. When Nibbler re-approved, the label workflow added `nibbler:approved` but left the `rejected` label live, causing confusion about the actual state. **Action:** Teach all reviewers (agents and humans): when flipping a verdict (rejected → approved, or vice versa), EXPLICITLY DELETE the opposing label with `gh pr edit --remove-label nibbler:rejected` (or equivalent). Don't rely on "last label wins" semantics.
+
+4. **Approval-label stripping is inconsistent (open question).** In round 4, we documented that approval labels strip on PR synchronize (GitHub default). In round 5, Leela's force-push on #1011 allegedly preserved all labels, contradicting the earlier pattern. **Status:** Open question — may be GitHub behavior variance, GitHub Actions race condition, or coordinator sequence issue. Recommend: next agent force-push should log `gh pr view <PR> --json labels` before and after to capture the actual label state. Don't assume; verify.
+
+5. **User-authored PRs (e.g., PR #999) are in a separate lane.** PR #999 is Asabbour's user-authored identity fix, currently in flight. Coordinator and squad agents must NOT touch this PR without explicit direction from Asabbour. Unlike squad-authored PRs (which expect automated relabel + approve flows), user PRs have external ownership. **Action:** Add a check to the coordinator: if `author != (squad app)` and `issue != (squad workflow generated)`, flag as "user-owned, do not touch" and ping Asabbour before any automated action.
+
+### Patterns Locked In (Carry Forward)
+
+- ✅ **Bundle-budget ceiling gate** — CI hard-fail + waiver-by-PR-description is the approved shape
+- ✅ **Named-constant geometry SSoT** — CSS + unit test + Playwright all import same constants module
+- ✅ **Parametrised tool-conformance test** — covers all pack-core tools at every nesting depth, prevents schema regressions
+- ✅ **Vitest guardrail tests as workflow equivalent** — CI hard-fail vitest tests accepted for security/conformance gates
+- ✅ **Label deletion on verdict flip** — explicit `--remove-label` when changing approved → rejected or vice versa
+
+### Implications for Next Rounds
+
+- **Diff-comparison agents:** Validate diff scope vs approval-time state, not just vs main
+- **Bootstrap on workflow PRs:** Plan two-checkout strategy (full head + sparse base)
+- **Label management:** Make explicit deletion a standard step in the relabel ceremony
+- **Force-push verification:** Log label state before/after to catch GitHub behavior variance
+- **User-owned PR detection:** Add pre-check in coordinator to block automated actions on non-squad PRs
+
+---
+
 <!-- entries below this line, newest at top -->
 
 - 2026-04-21 | #1011 "feat: add quality SLO safety brake to squad review-gate (#806)" | L | impl=1m | review=30m | cycles=2 | merged-with-rework | @sabbour-squad-backend[bot] | first_review=0m | ci=6m | reviewer=bot | human_comments=1 | issue=#806 | estimate=unknown | rejections_by_reviewer=nibbler:1,leela:0,zapp:0 | reverted=false
