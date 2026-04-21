@@ -374,6 +374,9 @@ export function useStreaming() {
     let lastModel: string | undefined;
     let lastSessionId: string | undefined;
     let lastUsage: TokenUsageSummary | undefined;
+    let lastAgentName: string | undefined;
+    let lastSkillsExecuted: string[] | undefined;
+    let lastToolsExecuted: Array<{ name: string; status: 'ok' | 'error' }> | undefined;
     const debugA2uiMessages: A2uiPayloadItem[] = [];
 
     // Build client messages for potential session rehydration
@@ -529,6 +532,23 @@ export function useStreaming() {
                   callbacks.onIntent?.({ summary: parsed.intent });
                 }
                 if (parsed.model) lastModel = parsed.model as string;
+                if (typeof parsed.agentName === 'string') {
+                  lastAgentName = parsed.agentName;
+                }
+                if (Array.isArray(parsed.skillsExecuted)) {
+                  lastSkillsExecuted = (parsed.skillsExecuted as unknown[]).filter(
+                    (s): s is string => typeof s === 'string',
+                  );
+                }
+                if (Array.isArray(parsed.toolsExecuted)) {
+                  lastToolsExecuted = (parsed.toolsExecuted as unknown[]).filter(
+                    (t): t is { name: string; status: 'ok' | 'error' } =>
+                      typeof t === 'object' && t !== null &&
+                      typeof (t as Record<string, unknown>).name === 'string' &&
+                      ((t as Record<string, unknown>).status === 'ok' ||
+                        (t as Record<string, unknown>).status === 'error'),
+                  );
+                }
                 break;
               }
 
@@ -591,11 +611,17 @@ export function useStreaming() {
         ? {
             model: lastModel,
             rawResponse: accumulated,
+            agentName: lastAgentName,
+            skillsExecuted: lastSkillsExecuted,
+            toolsExecuted: lastToolsExecuted,
             fullEnvelope: {
               message: accumulated,
               a2ui: debugA2uiMessages.length > 0 ? debugA2uiMessages : undefined,
               model: lastModel,
               usage: lastUsage,
+              agentName: lastAgentName,
+              skillsExecuted: lastSkillsExecuted,
+              toolsExecuted: lastToolsExecuted,
             },
           }
         : undefined;

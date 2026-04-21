@@ -172,11 +172,23 @@ export interface TokenUsageSummary {
 // Debug
 // ---------------------------------------------------------------------------
 
+/** Per-turn tool execution record surfaced on the SSE `end` event (#958). */
+export interface DebugToolExecution {
+  name: string;
+  status: 'ok' | 'error';
+}
+
 export interface DebugMetadata {
   model?: string;
   systemPrompt?: string;
   rawResponse?: string;
   rawContent?: string;
+  /** Agent that owned this turn (e.g. `core.triage`). Populated from SSE `end` event. */
+  agentName?: string;
+  /** Skill IDs matched/executed during this turn. Populated from SSE `end` event. */
+  skillsExecuted?: string[];
+  /** Tool invocations attempted during this turn. Populated from SSE `end` event. */
+  toolsExecuted?: DebugToolExecution[];
   fullEnvelope?: {
     message?: string;
     model?: string;

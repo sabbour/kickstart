@@ -135,6 +135,39 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground4,
     fontStyle: 'italic',
   },
+  list: {
+    listStyleType: 'none',
+    paddingLeft: '0',
+    marginTop: '0',
+    marginBottom: '0',
+  },
+  listItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    paddingTop: tokens.spacingVerticalXXS,
+    paddingBottom: tokens.spacingVerticalXXS,
+    fontFamily: tokens.fontFamilyMonospace,
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground1,
+  },
+  statusDot: {
+    display: 'inline-block',
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    flexShrink: 0,
+  },
+  statusOk: {
+    backgroundColor: tokens.colorPaletteGreenForeground1,
+  },
+  statusError: {
+    backgroundColor: tokens.colorPaletteRedForeground1,
+  },
+  statusLabel: {
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase100,
+  },
 });
 
 /** Simple JSON syntax highlighting via inline styles. */
@@ -261,6 +294,53 @@ export function DebugPanel({ debugInfo, a2uiMessages }: DebugPanelProps) {
               <Text font="monospace" size={200}>{debugInfo.model}</Text>
             ) : (
               <Text className={styles.notAvailable} size={200}>Not available</Text>
+            )}
+          </div>
+
+          {/* Agent */}
+          <div className={styles.section}>
+            <Text className={styles.sectionLabel}>Agent</Text>
+            {debugInfo?.agentName ? (
+              <Text font="monospace" size={200}>{debugInfo.agentName}</Text>
+            ) : (
+              <Text className={styles.notAvailable} size={200}>—</Text>
+            )}
+          </div>
+
+          {/* Skills */}
+          <div className={styles.section}>
+            <Text className={styles.sectionLabel}>Skills</Text>
+            {debugInfo?.skillsExecuted && debugInfo.skillsExecuted.length > 0 ? (
+              <ul className={styles.list}>
+                {debugInfo.skillsExecuted.map((skillId) => (
+                  <li key={skillId} className={styles.listItem}>
+                    <span>{skillId}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Text className={styles.notAvailable} size={200}>—</Text>
+            )}
+          </div>
+
+          {/* Tools */}
+          <div className={styles.section}>
+            <Text className={styles.sectionLabel}>Tools</Text>
+            {debugInfo?.toolsExecuted && debugInfo.toolsExecuted.length > 0 ? (
+              <ul className={styles.list}>
+                {debugInfo.toolsExecuted.map((tool, idx) => (
+                  <li key={`${tool.name}-${idx}`} className={styles.listItem}>
+                    <span
+                      className={`${styles.statusDot} ${tool.status === 'ok' ? styles.statusOk : styles.statusError}`}
+                      aria-hidden="true"
+                    />
+                    <span>{tool.name}</span>
+                    <span className={styles.statusLabel}>{tool.status}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Text className={styles.notAvailable} size={200}>—</Text>
             )}
           </div>
 
