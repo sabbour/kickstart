@@ -7,6 +7,11 @@
  *  3. Error sanitization — no raw strings or file paths in loadErrors
  *  4. getLoadErrors() resets when registry rebuilds
  *  5. registry.seal() failure propagates as hard stop
+ *
+ * Plus startup telemetry tests (#1030):
+ *  6. core pack failure emits trackException before rethrowing (non-masking)
+ *  7. seal failure emits trackException before rethrowing (non-masking)
+ *  8. telemetry failure in startup does not mask original throw
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -14,9 +19,11 @@ import { ZodError, ZodIssueCode } from 'zod';
 
 // ── Hoist mock variables so vi.mock factories can reference them ─────────────
 
-const { mockRegister, mockSeal } = vi.hoisted(() => ({
+const { mockRegister, mockSeal, mockTrackException, mockFlushAppInsights } = vi.hoisted(() => ({
   mockRegister: vi.fn(),
   mockSeal: vi.fn(),
+  mockTrackException: vi.fn(),
+  mockFlushAppInsights: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
@@ -33,6 +40,11 @@ vi.mock('@aks-kickstart/harness/runtime/registry', () => ({
 
 vi.mock('./credentials.js', () => ({
   getCredentialConfig: vi.fn(() => ({ provider: 'azure-openai' })),
+}));
+
+vi.mock('../lib/appinsights.js', () => ({
+  getAppInsightsClient: vi.fn(() => ({ trackException: mockTrackException })),
+  flushAppInsights: (...args: unknown[]) => mockFlushAppInsights(...args),
 }));
 
 // Pack imports — each returns a minimal stub (name only; registry never reads further)
@@ -69,6 +81,8 @@ describe('packs startup — getRegistry() fail-soft', () => {
   beforeEach(async () => {
     mockRegister.mockReset();
     mockSeal.mockReset();
+    mockTrackException.mockReset();
+    mockFlushAppInsights.mockReset().mockResolvedValue(undefined);
     // Re-import to reset module-scope state (_registry, _loadErrors)
     vi.resetModules();
   });
@@ -202,5 +216,51 @@ describe('packs startup — getRegistry() fail-soft', () => {
     // Registry was never sealed — _registry stays null; loadErrors stays empty
     // (the error was rethrown before it could be quarantined)
     expect(getLoadErrors()).toEqual([]);
+  });
+
+  // ── #1030 startup telemetry: core pack failure emits trackException ────────
+
+  it('emits trackException when core pack fails, without masking the original throw', async () => {
+    const coreErr = new Error('core pack bad manifest');
+    mockRegister.mockImplementation((pack: { name: string }) => {
+      if (pack.name === 'core') throw coreErr;
+    });
+
+    const { getRegistry } = await import('./packs.js');
+    expect(() => getRegistry()).toThrow('core pack bad manifest');
+
+    // trackException is called (fire-and-forget from sync getRegistry)
+    expect(mockTrackException).toHaveBeenCalledWith(
+      expect.objectContaining({ exception: coreErr }),
+    );
+  });
+
+  // ── #1030 startup telemetry: seal failure emits trackException ────────────
+
+  it('emits trackException when seal fails, without masking the original throw', async () => {
+    mockRegister.mockReturnValue(undefined);
+    const sealErr = new Error('Seal failed: conflict');
+    mockSeal.mockImplementation(() => { throw sealErr; });
+
+    const { getRegistry } = await import('./packs.js');
+    expect(() => getRegistry()).toThrow('Seal failed: conflict');
+
+    expect(mockTrackException).toHaveBeenCalledWith(
+      expect.objectContaining({ exception: sealErr }),
+    );
+  });
+
+  // ── #1030 startup telemetry: telemetry failure does not mask original throw ─
+
+  it('telemetry failure in startup does not mask the original throw', async () => {
+    const coreErr = new Error('core pack bad');
+    mockRegister.mockImplementation((pack: { name: string }) => {
+      if (pack.name === 'core') throw coreErr;
+    });
+    mockTrackException.mockImplementation(() => { throw new Error('AppInsights unavailable'); });
+
+    const { getRegistry } = await import('./packs.js');
+    // Original error must still propagate despite telemetry failure
+    expect(() => getRegistry()).toThrow('core pack bad');
   });
 });

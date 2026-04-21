@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto";
 import { app } from "@azure/functions";
 import type { HttpRequest, InvocationContext } from "@azure/functions";
 import { Logger, extractTraceId, extractRequestMetadata } from "../lib/logger.js";
-import { getAppInsightsClient } from "../lib/appinsights.js";
+import { getAppInsightsClient, flushAppInsights } from "../lib/appinsights.js";
 import { getRegistry } from "../startup/packs.js";
 import { getOrCreateSession } from "@aks-kickstart/harness/runtime/session";
 import { Runner } from "@aks-kickstart/harness/runtime/runner";
@@ -103,6 +103,7 @@ async function converse(
       exception: sanitizedError,
       properties: { requestId, context: "pack-registry-init" },
     });
+    await flushAppInsights();
 
     const encoder = new TextEncoder();
     const errorFrame = encoder.encode(
@@ -142,6 +143,7 @@ async function converse(
       exception: sanitizedError,
       properties: { requestId, context: "session-resolution" },
     });
+    await flushAppInsights();
     throw err;
   }
 
@@ -199,6 +201,7 @@ async function converse(
           exception: sanitizedError,
           properties: { requestId, context: "runner-execution" },
         });
+        await flushAppInsights();
         try {
           write("error", { message: sanitizedError.message });
         } catch {
