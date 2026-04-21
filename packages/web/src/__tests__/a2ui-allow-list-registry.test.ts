@@ -15,6 +15,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
   ClientComponentRegistry,
 } from "../contexts/A2UIRegistryContext";
@@ -42,6 +43,9 @@ import {
   SteppedCarousel,
   SummaryCard,
 } from "../catalog/components/index";
+import { azureClientComponents } from "@aks-kickstart/pack-azure/client";
+import { aksClientComponents } from "@aks-kickstart/pack-aks-automatic/client";
+import { githubClientComponents } from "@aks-kickstart/pack-github/client";
 import { ALLOWED_A2UI_COMPONENTS } from "../../api/src/lib/widget-inspirations-data";
 
 // ---------------------------------------------------------------------------
@@ -80,6 +84,21 @@ function buildBootstrapRegistry(): ClientComponentRegistry {
     SummaryCard,
   ];
   for (const impl of richComponents) registry.register(impl);
+  // Pack components — mirrors registerPackComponents() in main.tsx. Stub
+  // renderers since the registry only checks by name; adapter details are
+  // covered by the component-previews.test.ts render-time guard.
+  for (const contribution of [
+    ...azureClientComponents,
+    ...aksClientComponents,
+    ...githubClientComponents,
+  ]) {
+    registry.register({
+      name: contribution.name,
+      schema: z.object({}),
+      render: () => null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+  }
   registry.seal();
   return registry;
 }

@@ -1,28 +1,14 @@
 /**
- * Component preview examples for the Playground Components tab.
+ * Core pack preview fixtures. Keys are pack-qualified component names
+ * (e.g. `core/Text`); descriptor `component` values are the bare renderer
+ * names registered in `ClientComponentRegistry` (see A2UIRegistryContext
+ * and main.tsx). Consumed via the aggregator in `./component-previews.ts`.
  *
- * Maps a fully-qualified component name (e.g. "core/Text") to a flat array of
- * A2UI component descriptors that can be passed directly as the `components`
- * array of an `updateComponents` message.  The first component MUST have
- * id="root" so the A2UI surface renders it as the tree root.
- *
- * IMPORTANT — naming convention:
- *   • Map KEYS use the pack-qualified id (`core/Text`) because they are matched
- *     against `comp.name` from the `/api/packs` response.
- *   • Descriptor `component` VALUES must be the bare renderer name (`Text`)
- *     because `clientRegistry` keys renderers by `impl.name` (see main.tsx
- *     and A2UIRegistryContext.tsx). Using `core/Text` here would miss the
- *     registry and render `_ErrorComponent`. See #954.
- *
- * Keep entries minimal — the goal is a recognisable thumbnail, not a full demo.
- * Components whose previews require complex setup (e.g. ArchitectureDiagram,
- * FileEditor) are intentionally omitted; ComponentCard falls back gracefully to
- * a "No preview available" placeholder.
+ * Pack-contributed previews for azure/*, aks/*, and github/* live in
+ * each pack's ./client subpath export (@aks-kickstart/pack-NAME/client).
  *
  * SCHEMA INVARIANT: descriptor props must match the component's Zod schema
- * exactly (required fields present, no unknown keys in .strict() schemas).
- * The validateAndSanitizeComponents render-time guard test (component-examples.test.ts)
- * catches drift — run `CI=1 npm test` to verify before adding new entries.
+ * exactly. `__tests__/component-previews.test.ts` is the render-time guard.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- component props are untyped by design

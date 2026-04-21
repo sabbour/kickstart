@@ -43,7 +43,7 @@ import {
 import { getFluentIcon } from '../catalog/icons/fluent-icons';
 import { apiFetch } from '../services/api-client';
 import { FALLBACK_WIDGET_IDEAS } from '../lib/fallback-ideas';
-import { COMPONENT_PREVIEWS } from './component-examples';
+import { COMPONENT_PREVIEWS } from '../catalog/component-previews';
 import {
   COMPONENT_GRID_MIN_COL_PX,
   COMPONENT_GRID_MAX_CARD_PX,
