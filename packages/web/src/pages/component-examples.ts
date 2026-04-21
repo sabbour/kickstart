@@ -17,7 +17,12 @@
  * Keep entries minimal — the goal is a recognisable thumbnail, not a full demo.
  * Components whose previews require complex setup (e.g. ArchitectureDiagram,
  * FileEditor) are intentionally omitted; ComponentCard falls back gracefully to
- * a "no preview" placeholder.
+ * a "No preview available" placeholder.
+ *
+ * SCHEMA INVARIANT: descriptor props must match the component's Zod schema
+ * exactly (required fields present, no unknown keys in .strict() schemas).
+ * The validateAndSanitizeComponents render-time guard test (component-examples.test.ts)
+ * catches drift — run `CI=1 npm test` to verify before adding new entries.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- component props are untyped by design
@@ -201,9 +206,9 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
       id: 'root',
       component: 'ProgressSteps',
       steps: [
-        { label: 'Plan', status: 'completed' },
-        { label: 'Build', status: 'current' },
-        { label: 'Deploy', status: 'upcoming' },
+        { id: 's1', label: 'Plan', status: 'complete' },
+        { id: 's2', label: 'Build', status: 'active' },
+        { id: 's3', label: 'Deploy', status: 'pending' },
       ],
     },
   ],
@@ -212,12 +217,10 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
     {
       id: 'root',
       component: 'DecisionCard',
-      title: 'Deploy to production?',
-      description: 'This will update the live environment.',
-      options: [
-        { label: 'Deploy', value: 'deploy' },
-        { label: 'Cancel', value: 'cancel' },
-      ],
+      title: 'Which tier?',
+      recommendation: 'Standard',
+      rationale: 'Balances cost and performance for most workloads.',
+      badge: 'recommended',
     },
   ],
 
@@ -231,6 +234,82 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
         { label: 'Region', value: 'East US' },
         { label: 'Nodes', value: '3' },
       ],
+    },
+  ],
+
+  // ── Rich auth / form / progress components ────────────────────────────────
+
+  'core/AuthCard': [
+    { id: 'root', component: 'AuthCard', provider: 'azure' },
+  ],
+
+  'core/FormGroup': [
+    {
+      id: 'root',
+      component: 'FormGroup',
+      title: 'Cluster configuration',
+      step: 1,
+      child: 'c1',
+    },
+    { id: 'c1', component: 'TextField', label: 'Cluster name' },
+  ],
+
+  'core/GenerationProgress': [
+    {
+      id: 'root',
+      component: 'GenerationProgress',
+      title: 'Deploying resources',
+      overallStatus: 'running',
+      steps: [
+        { id: 's1', label: 'Generating Bicep', status: 'complete' },
+        { id: 's2', label: 'Validating template', status: 'complete' },
+        { id: 's3', label: 'Provisioning cluster', status: 'running' },
+        { id: 's4', label: 'Configuring node pools', status: 'pending' },
+      ],
+    },
+  ],
+
+  'core/RadioGroup': [
+    {
+      id: 'root',
+      component: 'RadioGroup',
+      options: [
+        { id: 'free', label: 'Free', description: 'Dev/test only', recommended: false },
+        { id: 'standard', label: 'Standard', description: 'Production workloads', recommended: true },
+        { id: 'premium', label: 'Premium', description: 'Mission critical', recommended: false },
+      ],
+      value: 'standard',
+      action: { event: { name: 'tier-selected' } },
+    },
+  ],
+
+  'core/SteppedCarousel': [
+    {
+      id: 'root',
+      component: 'SteppedCarousel',
+      activeStep: 0,
+      steps: [
+        { title: 'Choose region', child: 'step1' },
+        { title: 'Pick node size', child: 'step2' },
+        { title: 'Review', child: 'step3' },
+      ],
+    },
+    { id: 'step1', component: 'Text', text: 'Select the Azure region for your cluster.' },
+    { id: 'step2', component: 'Text', text: 'Choose a VM size for your system node pool.' },
+    { id: 'step3', component: 'Text', text: 'Review your configuration before creating.' },
+  ],
+
+  'core/CostEstimate': [
+    {
+      id: 'root',
+      component: 'CostEstimate',
+      title: 'Monthly estimate',
+      items: [
+        { name: 'AKS cluster (Standard_D2s_v3 × 3)', sku: 'Standard', monthlyCost: 219 },
+        { name: 'Container Registry (Basic)', monthlyCost: 5 },
+        { name: 'Load Balancer', monthlyCost: 18 },
+      ],
+      currency: 'USD',
     },
   ],
 };
