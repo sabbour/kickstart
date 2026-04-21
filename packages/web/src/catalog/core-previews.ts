@@ -167,14 +167,14 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   ],
 
   'core/Video': [
-    { id: 'root', component: 'Video', url: 'https://www.w3schools.com/html/mov_bbb.mp4' },
+    { id: 'root', component: 'Video', url: '/assets/samples/sample.mp4' },
   ],
 
   'core/AudioPlayer': [
     {
       id: 'root',
       component: 'AudioPlayer',
-      url: 'https://www.w3schools.com/html/horse.mp3',
+      url: '/assets/samples/sample.mp3',
       description: 'Audio preview',
     },
   ],
