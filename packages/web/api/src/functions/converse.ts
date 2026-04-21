@@ -11,6 +11,7 @@
 
 import { app } from "@azure/functions";
 import type { HttpRequest, InvocationContext } from "@azure/functions";
+import { Logger, extractTraceId, extractRequestMetadata } from "../lib/logger.js";
 import { getRegistry } from "../startup/packs.js";
 import { getOrCreateSession } from "@kickstart/harness/runtime/session";
 import { Runner } from "@kickstart/harness/runtime/runner";
@@ -27,12 +28,18 @@ async function converse(
   request: HttpRequest,
   ctx: InvocationContext,
 ): Promise<Response> {
-  ctx.log("v2 converse handler");
+  const startTime = Date.now();
+  const traceId = extractTraceId(request.headers);
+  const logger = new Logger(ctx, "converse", traceId);
+
+  const requestMeta = extractRequestMetadata(request);
+  logger.info("HTTP request received", requestMeta);
 
   let body: ConverseRequest;
   try {
     body = await request.json() as ConverseRequest;
-  } catch {
+  } catch (err) {
+    logger.error("Failed to parse JSON body", err as Error);
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -40,6 +47,7 @@ async function converse(
   }
 
   if (!body.message || typeof body.message !== "string") {
+    logger.warn("Invalid request: message field missing or not a string");
     return new Response(JSON.stringify({ error: "'message' field is required" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -57,18 +65,17 @@ async function converse(
         (c) => c.typ === "http://schemas.microsoft.com/identity/claims/objectidentifier" || c.typ === "oid"
       );
       oid = oidClaim?.val ?? principal.userId ?? "anonymous";
-    } catch { /* use default */ }
+      logger.info("Principal extracted from SWA header", { oid_found: oid !== "anonymous" });
+    } catch (err) {
+      logger.warn("Failed to parse SWA principal header", err as Error);
+    }
   }
 
   let registry;
   try {
     registry = getRegistry();
   } catch (err) {
-    ctx.error(`Pack registry initialization failed: ${err instanceof Error ? err.message : String(err)}`);
-    if (err instanceof Error) {
-      ctx.error(`Stack: ${err.stack}`);
-    }
-    // Return SSE 200 with error event instead of 500, so client gets graceful message
+    logger.error("Pack registry initialization failed", err as Error);
     const encoder = new TextEncoder();
     const errorFrame = encoder.encode(
       `event: error\ndata: ${JSON.stringify({
@@ -87,14 +94,21 @@ async function converse(
   }
 
   let session;
+  let sessionId: string;
   try {
     session = getOrCreateSession(body.sessionId, oid);
+    sessionId = session.id;
+    const action = body.sessionId ? "resumed" : "created";
+    logger.info("Session resolved", { session_id: sessionId, action });
   } catch (err) {
+    logger.error("Failed to resolve session", err as Error, { session_id: body.sessionId });
     if (err instanceof Error && err.message === 'SESSION_OID_MISMATCH') {
       return new Response('Forbidden', { status: 403 });
     }
     throw err;
   }
+
+  const childLogger = logger.withContext(sessionId);
   const runner = new Runner(registry);
 
   // B2: AbortController to signal runner when client disconnects
@@ -102,17 +116,33 @@ async function converse(
 
   // Build SSE ReadableStream
   const encoder = new TextEncoder();
+  let eventCount = 0;
+  let errorCount = 0;
+  let firstChunkTime: number | null = null;
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const write = (event: SSEEventType, data: unknown) => {
         try {
+          if (firstChunkTime === null) {
+            firstChunkTime = Date.now() - startTime;
+            childLogger.debug("First SSE chunk emitted", { first_chunk_ms: firstChunkTime });
+          }
+          eventCount++;
+          if (event === "error") {
+            errorCount++;
+          }
           controller.enqueue(encoder.encode(formatSSEFrame(event, data)));
         } catch { /* client disconnected */ }
       };
 
       try {
+        childLogger.info("Starting runner", { message_length: body.message.length });
         await runner.run(session, body.message, write, abortController.signal);
+        childLogger.info("Runner completed successfully", { event_count: eventCount, error_count: errorCount });
       } catch (err) {
+        errorCount++;
+        childLogger.error("Runner execution failed", err as Error);
         try {
           write("error", { message: err instanceof Error ? err.message : String(err) });
         } catch { /* ignore */ }
@@ -122,8 +152,18 @@ async function converse(
     },
     cancel() {
       // B2: client disconnected — abort the runner
+      childLogger.info("Client disconnected during request");
       abortController.abort('client-disconnect');
     },
+  });
+
+  const responseTime = Date.now() - startTime;
+  childLogger.info("HTTP response sent", {
+    status_code: 200,
+    duration_ms: responseTime,
+    event_count: eventCount,
+    first_chunk_ms: firstChunkTime,
+    error_count: errorCount,
   });
 
   return new Response(stream, {
@@ -138,4 +178,3 @@ app.http("converse", {
   route: "converse",
   handler: converse,
 });
-

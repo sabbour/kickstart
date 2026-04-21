@@ -1,9 +1,11 @@
 import type { Pack } from '@kickstart/harness';
 import { PackRegistry } from '@kickstart/harness/runtime/registry';
+import { Logger } from '../lib/logger.js';
 import { corePackServer } from '../../../../pack-core/src/server-manifest.js';
 import { azurePackServer } from '../../../../pack-azure/src/server-manifest.js';
 import { aksAutomaticPackServer } from '../../../../pack-aks-automatic/src/server-manifest.js';
 import { githubPackServer } from '../../../../pack-github/src/server-manifest.js';
+import { randomUUID } from 'crypto';
 
 let _registry: PackRegistry | null = null;
 
@@ -50,36 +52,84 @@ function parseEnabledPacks(raw: string | undefined): PackId[] {
  *
  * Throws if pack initialization fails (e.g., manifest imports fail or assets
  * cannot be resolved). Caller must handle and recover gracefully.
+ *
+ * Logs startup events to Azure Application Insights via structured JSON logging.
  */
 export function getRegistry(): PackRegistry {
   if (!_registry) {
+    // Create a startup logger (trace ID for startup events)
+    const startupTraceId = process.env.STARTUP_TRACE_ID || randomUUID();
+    
+    // Create a mock InvocationContext for startup logging
+    // In a real Azure Functions environment, this would be the global context
+    const mockCtx = {
+      log: (msg: string) => {
+        // In production, this routes to Application Insights via the Azure Functions runtime
+        if (process.env.NODE_ENV !== 'test') {
+          console.log(msg);
+        }
+      },
+    };
+    
+    const logger = new Logger(mockCtx as any, 'pack-registry-startup', startupTraceId);
+    
     const registry = new PackRegistry();
     const enabled = parseEnabledPacks(process.env.KICKSTART_PACKS);
-    console.log(`[packs] Initializing pack registry with ${enabled.length} pack(s): ${enabled.join(', ')}`);
+    
+    logger.info("Pack registry initialization started", {
+      source: "startup",
+      enabled_packs: enabled,
+      pack_count: enabled.length,
+    });
     
     for (const id of enabled) {
+      const packStartTime = Date.now();
       try {
-        console.log(`[packs] Registering pack: ${id}`);
+        logger.info("Registering pack", {
+          source: "startup",
+          pack_id: id,
+        });
+        
         registry.register(PACK_BY_ID[id]);
-        console.log(`[packs] Successfully registered pack: ${id}`);
+        
+        const duration = Date.now() - packStartTime;
+        logger.info("Pack registered successfully", {
+          source: "startup",
+          pack_id: id,
+          status: "success",
+          duration_ms: duration,
+        });
       } catch (err) {
-        console.error(`[packs] Failed to register pack '${id}': ${err instanceof Error ? err.message : String(err)}`);
-        if (err instanceof Error && err.stack) {
-          console.error(`[packs] Stack trace: ${err.stack}`);
-        }
+        const duration = Date.now() - packStartTime;
+        logger.error("Pack registration failed", err as Error, {
+          source: "startup",
+          pack_id: id,
+          error_code: "MANIFEST_LOAD_FAILED",
+          duration_ms: duration,
+        });
         throw err;
       }
     }
     
     try {
-      console.log(`[packs] Sealing registry`);
+      const sealStartTime = Date.now();
+      logger.info("Sealing registry", {
+        source: "startup",
+      });
+      
       registry.seal();
-      console.log(`[packs] Registry sealed successfully`);
+      
+      const duration = Date.now() - sealStartTime;
+      logger.info("Registry sealed successfully", {
+        source: "startup",
+        pack_count: enabled.length,
+        duration_ms: duration,
+      });
     } catch (err) {
-      console.error(`[packs] Failed to seal registry: ${err instanceof Error ? err.message : String(err)}`);
-      if (err instanceof Error && err.stack) {
-        console.error(`[packs] Stack trace: ${err.stack}`);
-      }
+      logger.error("Failed to seal registry", err as Error, {
+        source: "startup",
+        error_code: "REGISTRY_SEAL_FAILED",
+      });
       throw err;
     }
     
