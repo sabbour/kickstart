@@ -282,6 +282,34 @@ function wrapUserAction(
 }
 
 // ---------------------------------------------------------------------------
+// Output text resolution — exported for unit-testing (#937)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract the prose display text from a structured AgentOutput finalOutput.
+ *
+ * When the SDK runs with an `outputType`, the model emits JSON-encoded tokens
+ * as the raw stream text (fullText).  The SDK also parses the final JSON and
+ * exposes it via `result.finalOutput`.  This helper pulls `finalOutput.message`
+ * so callers send clean prose to the client instead of the raw JSON token stream.
+ *
+ * Falls back to `fullText` when finalOutput is null, not an object, or has no
+ * string `message` field (e.g. interrupted runs, plain-text agents without
+ * structured output).
+ */
+export function resolveOutputText(finalOutput: unknown, fullText: string): string {
+  if (
+    finalOutput !== null &&
+    typeof finalOutput === 'object' &&
+    'message' in finalOutput &&
+    typeof (finalOutput as { message?: unknown }).message === 'string'
+  ) {
+    return (finalOutput as { message: string }).message;
+  }
+  return fullText;
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 
@@ -444,7 +472,7 @@ export class Runner {
       // Extract intent and prose message from structured final output.
       // AgentOutput forces the model to emit JSON tokens as the raw stream text, so
       // fullText is the JSON-encoded object (e.g. '{"message":"...","intent":"continue"}').
-      // Replacing outputText with finalOutput.message surfaces clean prose to the client
+      // resolveOutputText() pulls finalOutput.message so clean prose reaches the client
       // and prevents the double-encoded JSON from reaching useStreaming.ts (#937).
       let intent: string | undefined;
       let outputText = fullText;
@@ -457,11 +485,8 @@ export class Runner {
               session.intent = { summary: intent };
             }
           }
-          if ('message' in finalOutput && typeof (finalOutput as { message?: unknown }).message === 'string') {
-            // Overwrite outputText with the parsed prose — not the raw JSON token stream.
-            outputText = (finalOutput as { message: string }).message;
-          }
         }
+        outputText = resolveOutputText(finalOutput, fullText);
       } catch { /* finalOutput not available when interrupted */ }
 
       // ── Output guardrail hook (runs BEFORE any chunk is sent to the client) ─

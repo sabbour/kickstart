@@ -160,6 +160,132 @@ export async function _performSdkNonStreamingFetch(
   };
 }
 
+// ---------------------------------------------------------------------------
+// SSE stream processor — exported for unit-testing (#943)
+// ---------------------------------------------------------------------------
+
+export interface SSEStreamResult {
+  accumulated: string;
+  model: string | undefined;
+  sessionId: string | undefined;
+  intent: string | undefined;
+}
+
+/**
+ * Process a raw SSE `ReadableStream<Uint8Array>` body produced by /api/converse,
+ * firing lightweight callbacks for each recognised event type and returning the
+ * final accumulated text, resolved model name, session ID, and intent.
+ *
+ * Exported so it can be exercised without a React rendering context.
+ * The `user_action_req` case is signalled via the optional `onUserActionReq`
+ * callback; on receipt the function returns immediately (stream is paused).
+ *
+ * Follows the same injection/export pattern as `_performSdkNonStreamingFetch`.
+ */
+export async function _processSSEStream(
+  body: ReadableStream<Uint8Array>,
+  callbacks: {
+    onChunk?: (text: string) => void;
+    onIntent?: (intent: { summary: string }) => void;
+    onPhase?: (phase: string) => void;
+    onError?: (msg: string) => void;
+    onUserActionReq?: () => void;
+  },
+  signal?: AbortSignal,
+): Promise<SSEStreamResult> {
+  const state: SSEStreamResult = {
+    accumulated: '',
+    model: undefined,
+    sessionId: undefined,
+    intent: undefined,
+  };
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let currentEventType = '';
+
+  try {
+    while (true) {
+      if (signal?.aborted) break;
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          currentEventType = line.slice(7).trim();
+          continue;
+        }
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+
+        try {
+          const parsed: Record<string, unknown> = JSON.parse(data);
+
+          switch (currentEventType) {
+            case 'start':
+              if (typeof parsed.sessionId === 'string') state.sessionId = parsed.sessionId;
+              break;
+
+            case 'chunk': {
+              const delta = typeof parsed.delta === 'string' ? parsed.delta : '';
+              state.accumulated += delta;
+              callbacks.onChunk?.(state.accumulated);
+              break;
+            }
+
+            case 'phase':
+              if (typeof parsed.agent === 'string') callbacks.onPhase?.(parsed.agent);
+              break;
+
+            case 'end':
+              if (typeof parsed.sessionId === 'string') state.sessionId = parsed.sessionId;
+              if (typeof parsed.intent === 'string') {
+                state.intent = parsed.intent;
+                callbacks.onIntent?.({ summary: parsed.intent });
+              }
+              if (parsed.model) state.model = String(parsed.model);
+              break;
+
+            case 'error': {
+              const msg = typeof parsed.message === 'string' ? parsed.message : 'Unknown error from server';
+              callbacks.onError?.(msg);
+              await reader.cancel();
+              return state;
+            }
+
+            case 'user_action_req':
+              callbacks.onUserActionReq?.();
+              await reader.cancel();
+              return state;
+
+            default:
+              // v1 / generic fallback compat
+              if (typeof parsed.delta === 'string') {
+                state.accumulated += parsed.delta;
+                callbacks.onChunk?.(state.accumulated);
+              }
+              if (parsed.model) state.model = String(parsed.model);
+              if (typeof parsed.sessionId === 'string') state.sessionId = parsed.sessionId;
+              break;
+          }
+
+          currentEventType = '';
+        } catch { /* skip malformed JSON */ }
+      }
+    }
+  } finally {
+    try { reader.releaseLock(); } catch { /* already released */ }
+  }
+
+  return state;
+}
+
 export function useStreaming() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState('');

@@ -10,7 +10,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpenAIProvider } from '@openai/agents';
-import { buildAzureBaseUrl, buildModelProvider } from '../../src/runtime/runner.js';
+import { buildAzureBaseUrl, buildModelProvider, resolveOutputText } from '../../src/runtime/runner.js';
 
 describe('buildAzureBaseUrl', () => {
   it('appends /openai/v1 when endpoint has no trailing slash', () => {
@@ -75,5 +75,43 @@ describe('buildModelProvider', () => {
     expect(console.log).toHaveBeenCalledWith(
       '[runner] Building model provider: Standard OpenAI (or dev/test fallback)',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveOutputText — prose extraction (#937)
+// ---------------------------------------------------------------------------
+
+describe('resolveOutputText', () => {
+  it('returns finalOutput.message when the SDK finalOutput is a parsed AgentOutput object', () => {
+    const finalOutput = { message: 'Great idea — I can help with that.', intent: 'continue' };
+    const fullText = '{"message":"Great idea — I can help with that.","intent":"continue"}';
+    expect(resolveOutputText(finalOutput, fullText)).toBe('Great idea — I can help with that.');
+  });
+
+  it('falls back to fullText when finalOutput is null (interrupted run)', () => {
+    expect(resolveOutputText(null, 'raw-stream-text')).toBe('raw-stream-text');
+  });
+
+  it('falls back to fullText when finalOutput is undefined', () => {
+    expect(resolveOutputText(undefined, 'fallback')).toBe('fallback');
+  });
+
+  it('falls back to fullText when finalOutput.message is not a string', () => {
+    expect(resolveOutputText({ message: 42 }, 'fallback')).toBe('fallback');
+  });
+
+  it('falls back to fullText when finalOutput has no message field (plain-text agent)', () => {
+    // An agent without AgentOutput structured output produces a non-object finalOutput
+    expect(resolveOutputText({ intent: 'continue' }, 'plain text')).toBe('plain text');
+  });
+
+  it('does NOT return raw JSON string when finalOutput.message is the clean prose (regression guard for #937)', () => {
+    const jsonTokenStream = '{"message":"Hello there","intent":"continue"}';
+    const finalOutput = { message: 'Hello there', intent: 'continue' };
+    const result = resolveOutputText(finalOutput, jsonTokenStream);
+    // Must be clean prose, not the JSON-encoded token stream
+    expect(result).toBe('Hello there');
+    expect(result).not.toContain('{');
   });
 });
