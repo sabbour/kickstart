@@ -341,7 +341,7 @@ prompt: |
   {% endif %}
 
   {only if identity configured:}
-  GIT IDENTITY: Commit as `{app_slug}[bot]`. Resolve the token with `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1`, verify `[ -n "$TOKEN" ] || exit 1`, and export `GH_TOKEN="$TOKEN"`. Agent-authored GitHub writes must use that app token; do not fall back to ambient `gh`/`git` auth. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
+  GIT IDENTITY: Commit as `{app_slug}[bot]`. Session-export token at start: `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1`; `[ -n "$TOKEN" ] || exit 1`; `export GH_TOKEN="$TOKEN"` — covers all `gh` write commands (review, comment, merge, edit, issue). Push: `git push`. PR: `GH_TOKEN=$TOKEN gh pr create ...`. Body: `🤖 [{app_slug}](https://github.com/apps/{app_slug})`.
   {end identity block}
 
   TASK: {specific task description}
@@ -855,15 +855,23 @@ prompt: |
   **Git commit identity:**
   - `git -c user.name="{app_slug}[bot]" -c user.email="{app_slug}[bot]@users.noreply.github.com" commit ...`
   
-  **Agent-authored writes must stay on app identity:**
-  - **Push:** `git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git {branch}`
-  - **PR create:** `GH_TOKEN=$TOKEN gh pr create ...`
-  **PR body must include:** `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`
-  - **Do not use** ambient `gh` or `git` auth for normal agent-authored writes.
-  
+  **Session-level token export — one-time at session start (covers all gh write commands):**
+  ```bash
+  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+  [ -n "$TOKEN" ] || exit 1
+  export GH_TOKEN="$TOKEN"
+  ```
+  Once exported, `GH_TOKEN` is available to all subsequent `gh` commands in this shell session:
+  - `gh pr create ...`
+  - `gh pr review ...`
+  - `gh pr comment ...`
+  - `gh pr merge ...`
+  - `gh pr edit ...`
+  - `gh issue comment ...`
+
+  **Git push:** `git push` (uses `GH_TOKEN` environment variable for auth)
   **Never log or echo the token value.**
   {end identity block}
-  
   **Requested by:** {current user name}
   
   INPUT ARTIFACTS: {list exact file paths to review/modify}
