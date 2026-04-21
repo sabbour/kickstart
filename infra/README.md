@@ -168,3 +168,52 @@ The script will:
 | Future | `kickstart.aks.azure.com` |
 
 Custom domains are configured via Bicep (`customDomainHostname` parameter). Requires a CNAME record pointing to the SWA default hostname before deployment.
+
+## Bring-your-own AppInsights (skip full bicep deploy)
+
+If you already have an Application Insights resource and a Static Web App deployed (possibly in a different subscription than `parameters.dev.json`), you can wire in your AppInsights without running the full Bicep template.
+
+### Scenario
+
+- You've pre-created an AppInsights resource elsewhere (e.g., in a different subscription or resource group).
+- Your SWA is already deployed (e.g., `kickstart-web-dev` in `rg-kickstart-dev`).
+- You want to skip the Bicep deployment and directly set the AppInsights connection string on the SWA.
+
+### Steps
+
+1. **Find your AppInsights connection string:**
+   - Open [Azure Portal](https://portal.azure.com)
+   - Navigate to your Application Insights resource
+   - Click **Overview**
+   - Copy the **Connection String** (appears in the properties panel on the right)
+
+2. **Set the app setting on your SWA:**
+
+   ```bash
+   az staticwebapp appsettings set \
+     --name <swa-name> \
+     --resource-group <rg> \
+     --setting-names "APPLICATIONINSIGHTS_CONNECTION_STRING=<paste-from-ai-portal>"
+   ```
+
+   Example:
+   ```bash
+   az staticwebapp appsettings set \
+     --name kickstart-web-dev \
+     --resource-group rg-kickstart-dev \
+     --setting-names "APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=..."
+   ```
+
+3. **Wait for restart:**
+   - The SWA's managed Functions backend will restart automatically (~30–60 seconds).
+   - Once restarted, telemetry will begin flowing from the application to AppInsights.
+
+### Important Notes
+
+- **App setting name is case-sensitive:** Must be exactly `APPLICATIONINSIGHTS_CONNECTION_STRING`. Other names (e.g., `APPINSIGHTS_INSTRUMENTATION_KEY`) will not auto-bind to the telemetry SDK.
+- **Connection string format:** Use the full connection string from the AppInsights **Overview** page, not just the instrumentation key.
+- **Subscription mismatch:** The `parameters.dev.json` file hardcodes resource names (`swaName: kickstart-web-dev`, `rg: rg-kickstart-dev`) and assumes AppInsights is in the same subscription. If your resources exist in a different subscription, running `az deployment group create` will fail or create duplicates. **Use this app-setting approach instead of re-running Bicep.**
+
+### Verifying Telemetry
+
+See `docs-site/docs/operations/observability.md` for verification steps and troubleshooting.
