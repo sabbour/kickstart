@@ -2,9 +2,11 @@
  * esbuild config for @kickstart/api
  *
  * Bundles each Azure Function entry point into a self-contained ESM file.
- * @kickstart/harness is inlined (not published to npm), while @azure/functions,
- * bicep-node, and Node.js built-ins stay external (resolved from node_modules
- * at runtime).
+ * All npm dependencies (including @azure/functions and bicep-node) are inlined;
+ * only Node.js built-ins stay external.  Making the bundles self-contained
+ * avoids a deployment-time issue where npm workspace hoisting keeps those
+ * packages in the repo root node_modules rather than packages/web/api/node_modules,
+ * causing the Functions worker to fail to resolve them in Azure SWA.
  */
 
 import * as esbuild from "esbuild";
@@ -75,7 +77,18 @@ await esbuild.build({
   format: "esm",
   platform: "node",
   target: "node22",
-  external: ["@azure/functions", "bicep-node"],
+  // @azure/functions-core is the only module that must stay external — it is a
+  // virtual module injected by the Azure Functions Node.js worker host at
+  // runtime and is never present in node_modules.  All other npm dependencies
+  // (including @azure/functions and bicep-node) are pure JavaScript and are
+  // bundled inline so that dist/functions/*.js files are self-contained.
+  //
+  // Background: npm workspace hoisting keeps these packages in the repo root
+  // node_modules rather than packages/web/api/node_modules, and the
+  // packages/web/api/.npmrc "workspaces=false" override is silently ignored in
+  // CI (npm warns "ignoring workspace config").  Bundling them removes the
+  // runtime dependency on node_modules entirely.
+  external: ["@azure/functions-core"],
   banner: {
     js: "import { createRequire as __kickstartCreateRequire } from 'node:module'; const require = __kickstartCreateRequire(import.meta.url);",
   },
