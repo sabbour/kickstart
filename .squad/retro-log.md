@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #982 "fix(emit_ui): use `component`+`id` fields and require catalogId='kickstart'" | S | impl=1m | review=24m | cycles=1 | merged | @sabbour | first_review=7m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #976 "docs: AppInsights SWA wiring + observability runbook" | L | impl=0m | review=100m | cycles=1 | merged-with-rework | @sabbour | first_review=4m | ci=5m | reviewer=bot | human_comments=1 | issue=#964 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #971 "chore(squad): merge stale decisions inbox + archive decisions.md" | L | impl=0m | review=113m | cycles=1 | merged | @sabbour | first_review=113m | ci=5m | reviewer=bot | human_comments=0 | issue=#794 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
