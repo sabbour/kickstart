@@ -411,6 +411,7 @@ export function PlaygroundWorkspace() {
             streamingFiles={streamingFiles}
             vfs={stubVfs}
             onDismiss={() => setSelectedPath(undefined)}
+            fillContainer
           />
         </div>
       </div>

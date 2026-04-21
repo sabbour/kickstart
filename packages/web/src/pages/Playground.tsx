@@ -21,6 +21,7 @@ import {
   Dismiss24Regular, Sparkle24Regular,
   Add24Regular, Lightbulb24Regular, Grid24Regular, Icons24Regular,
   Navigation24Regular, FolderOpen24Regular, Copy24Regular,
+  ArrowRight24Regular,
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import type { ActionHandler } from '../hooks/useActionDispatch';
@@ -425,39 +426,46 @@ const useStyles = makeStyles({
   },
   createInputRow: {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     width: '100%',
     maxWidth: '600px',
     position: 'relative',
-    borderRadius: tokens.borderRadiusMedium,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    // Match main chat composer: large radius, stroke-1, spacing-s/m padding.
+    borderRadius: tokens.borderRadiusLarge,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
     backgroundColor: tokens.colorNeutralBackground1,
-    transition: 'border-color 0.15s ease',
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
     ':focus-within': {
       borderTopColor: tokens.colorBrandStroke1,
       borderRightColor: tokens.colorBrandStroke1,
       borderBottomColor: tokens.colorBrandStroke1,
       borderLeftColor: tokens.colorBrandStroke1,
+      boxShadow: `0 0 0 1px ${tokens.colorBrandStroke1}`,
     },
   },
   createInput: {
     flex: 1,
-    minHeight: '44px',
-    maxHeight: '200px',
+    minHeight: '24px',
+    maxHeight: '160px',
     border: 'none',
     outline: 'none',
     backgroundColor: 'transparent',
-    fontSize: tokens.fontSizeBase400,
+    // Match chat-textarea: 300 font size + 1.5 line-height.
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
     fontFamily: tokens.fontFamilyBase,
     color: tokens.colorNeutralForeground1,
-    paddingLeft: tokens.spacingHorizontalM,
+    paddingLeft: 0,
     paddingRight: '80px',
-    paddingTop: '11px',
-    paddingBottom: '11px',
+    paddingTop: tokens.spacingVerticalXS,
+    paddingBottom: tokens.spacingVerticalXS,
     boxSizing: 'border-box' as const,
-    lineHeight: '1.43',
     '::placeholder': {
-      color: tokens.colorNeutralForeground3,
+      color: tokens.colorNeutralForegroundDisabled,
     },
   },
   createSubtext: {
@@ -525,6 +533,43 @@ const useStyles = makeStyles({
       outline: `2px solid ${tokens.colorBrandStroke1}`,
       outlineOffset: '2px',
     },
+  },
+  // Tight grid: 4–5 cards/row at standard viewports, never breaks narrower widths.
+  componentGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    gap: tokens.spacingVerticalM,
+    padding: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalL}`,
+    '& > *': {
+      maxWidth: '320px',
+    },
+  },
+  // Compact grid for pack sections where every component lacks a preview.
+  componentCompactGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    gap: tokens.spacingVerticalS,
+    padding: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalL}`,
+    '& > *': {
+      maxWidth: '280px',
+    },
+  },
+  compCardCompact: {
+    minHeight: '88px',
+  },
+  emptyPreviewLabel: {
+    marginTop: tokens.spacingVerticalXS,
+    color: tokens.colorNeutralForeground4,
+    fontSize: tokens.fontSizeBase100,
+    fontStyle: 'italic',
+  },
+  compPackBanner: {
+    margin: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalM}`,
+    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground2,
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
   },
   iconGrid: {
     display: 'grid',
@@ -797,18 +842,21 @@ GalleryCard.displayName = 'GalleryCard';
 interface ComponentCardProps {
   comp: ComponentContribution;
   onCardClick: (comp: ComponentContribution) => void;
+  compact?: boolean;
 }
 
-const ComponentCard = memo(({ comp, onCardClick }: ComponentCardProps) => {
+const ComponentCard = memo(({ comp, onCardClick, compact = false }: ComponentCardProps) => {
   const classes = useStyles();
   const exampleComponents = COMPONENT_PREVIEWS[comp.name];
   const surfaceId = `component-preview-${comp.name}`;
+  const hasPreview = !!exampleComponents;
+  const isCompact = compact || !hasPreview;
 
   return (
     <Card
       appearance="outline"
       style={{ padding: tokens.spacingVerticalM }}
-      className={classes.compCardClickable}
+      className={`${classes.compCardClickable}${isCompact ? ` ${classes.compCardCompact}` : ''}`}
       role="button"
       tabIndex={0}
       aria-label={`Open ${comp.name} detail`}
@@ -821,7 +869,7 @@ const ComponentCard = memo(({ comp, onCardClick }: ComponentCardProps) => {
       <Caption1 style={{ color: tokens.colorNeutralForeground3, fontFamily: tokens.fontFamilyMonospace }}>
         {comp.name}
       </Caption1>
-      {exampleComponents ? (
+      {hasPreview ? (
         <div className={classes.cardBody} style={{ marginTop: tokens.spacingVerticalS, pointerEvents: 'none' }}>
           {/* A2UIEnvelopePreview — same render pipeline as Chat */}
           <A2UIEnvelopePreview
@@ -835,17 +883,7 @@ const ComponentCard = memo(({ comp, onCardClick }: ComponentCardProps) => {
           />
         </div>
       ) : (
-        <div
-          style={{
-            marginTop: tokens.spacingVerticalS,
-            padding: `${tokens.spacingVerticalS} 0`,
-            color: tokens.colorNeutralForeground4,
-            fontSize: tokens.fontSizeBase200,
-            fontStyle: 'italic',
-          }}
-        >
-          No preview available
-        </div>
+        <div className={classes.emptyPreviewLabel}>No preview</div>
       )}
     </Card>
   );
@@ -1425,7 +1463,7 @@ function PlaygroundInner() {
                 disabled={!createPrompt.trim() || createLoading}
                 style={{ position: 'absolute', right: '8px' }}
               >
-                <img src="assets/icons/commands/go.svg" width="16" height="16" alt="" />
+                <ArrowRight24Regular style={{ width: '16px', height: '16px' }} />
               </button>
             </div>
             <div className={classes.createSubtext}>
@@ -1640,7 +1678,7 @@ function PlaygroundInner() {
                 disabled={!createPrompt.trim() || createLoading}
                 style={{ position: 'absolute', right: '8px' }}
               >
-                <img src="assets/icons/commands/go.svg" width="16" height="16" alt="" />
+                <ArrowRight24Regular style={{ width: '16px', height: '16px' }} />
               </button>
             </div>
             <div className={classes.createChatFooter}>
@@ -1746,18 +1784,26 @@ function PlaygroundInner() {
               )}
             </div>
           ) : (
-            Array.from(groupByPack(filteredComponents, c => c.name).entries()).map(([pack, comps]) => (
-              <div key={pack}>
-                <Subtitle2 className={classes.groupHeader}>{pack}</Subtitle2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: tokens.spacingVerticalM, padding: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalL}` }}>
-                  {comps.map(comp => (
-                    <GalleryCardErrorBoundary key={comp.name} label={comp.name}>
-                      <ComponentCard comp={comp} onCardClick={handleComponentCardClick} />
-                    </GalleryCardErrorBoundary>
-                  ))}
+            Array.from(groupByPack(filteredComponents, c => c.name).entries()).map(([pack, comps]) => {
+              const allEmpty = comps.every(c => !COMPONENT_PREVIEWS[c.name]);
+              return (
+                <div key={pack}>
+                  <Subtitle2 className={classes.groupHeader}>{pack}</Subtitle2>
+                  {allEmpty && (
+                    <div className={classes.compPackBanner}>
+                      Previews unavailable for pack-only components — showing compact cards.
+                    </div>
+                  )}
+                  <div className={allEmpty ? classes.componentCompactGrid : classes.componentGrid}>
+                    {comps.map(comp => (
+                      <GalleryCardErrorBoundary key={comp.name} label={comp.name}>
+                        <ComponentCard comp={comp} onCardClick={handleComponentCardClick} compact={allEmpty} />
+                      </GalleryCardErrorBoundary>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
