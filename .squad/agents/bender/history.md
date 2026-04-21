@@ -73,3 +73,22 @@ For detailed work history prior to 2026-04-20, see git log and .squad/orchestrat
 **Non-blocking:** DP #996 (AKS _ErrorComponent, estimate:M) assigned to Bender but depends on #1000 merging first. Nibbler notes: reuse `validateAndSanitizeComponents` from #1000 (don't author a parallel validator); pin LLM reliability tests or move off CI. Start implementation after #1000 merges.
 
 **Summary:** Bender has two concurrent tracks: (a) DP #998 (chat fix, HIGH priority) and (b) bender-1000-revise (fix PR #1000). Track (a) is unblocked. Track (b) is in-flight. DP #996 waits for #1000 merge.
+
+## 2026-04-21 Issue #998 — `core_emit_ui` strict-mode 400 regression
+
+**PR:** #1005 — squad/998-chat-emit-ui-required
+**Status:** ✅ PR open
+
+**Scope:** Chat completely broken (400 on every turn) because `core.emit_ui`'s `createSurface` branch declared `sendDataModel` with `.nullable().optional()`. OpenAI strict-mode required every property in `properties` to appear in `required`; zod's `.optional()` maps to "not in required", and the @openai/agents strict-mode transform does not recurse into `z.discriminatedUnion` branches. Regression landed via #989's A2UI v0.9 realignment.
+
+**Fix:**
+- `emit_ui.ts` — every union-branch field (`sendDataModel`, `updateDataModel.path`/`value`, component `child`/`children`/`text`/`action`/`action.event.payload`) changed from `.nullable().optional()` to `.nullable()` (required-but-nullable). emit_ui strips nulls recursively before delegating to the harness `A2UIMessageSchema`.
+- `list_files.ts` — same sweep, per Zapp's DP ask.
+- Parametrised conformance test `tool-strict-required-conformance.test.ts` walks every pack-core tool's JSON schema and asserts `required ⊇ keys(properties)` on every object node; includes an explicit #998 regression assertion. Verified to fail when the bug is re-introduced.
+
+**Tests:** 940 passed | 159 todo | 3 skipped (85 files). Lint clean. API build succeeds.
+
+**Key learnings:**
+- (2026-04-21) `@openai/agents` zod-to-JSON-Schema strict-mode transform **does not recurse into `z.discriminatedUnion` branches**. Any `.optional()` nested inside a union branch will land in the generated schema as "not in required" and fail OpenAI's strict-mode validator. Use `.nullable()` (required-but-nullable) instead, and strip nulls at the runtime boundary before delegating to canonical validators.
+- (2026-04-21) For tool-schema invariants (strict-mode `required` completeness, presence of `type` keys, `additionalProperties: false` discipline), **walk the generated JSON schema in a parametrised conformance test** — don't rely on case-specific invocation tests. Invocation tests exercise one path; a schema walk catches every branch.
+- (2026-04-21) When the tool input schema becomes stricter than the runtime harness schema (tool requires null, harness rejects null), a single-file `stripNulls(value)` adapter in `execute()` is the cleanest bridge — keeps the harness wire format untouched and avoids cascading schema changes across packages.
