@@ -20,6 +20,7 @@ export default defineConfig({
       "packages/*/src/**/*.test.ts",
       "packages/*/src/**/*.test.tsx",
       "packages/web/api/src/**/*.test.ts",
+      ".squad/scripts/**/*.test.mjs",
     ],
     exclude: ["dist/**", "node_modules/**", "**/*.spec.ts", "**/e2e/**"],
   },

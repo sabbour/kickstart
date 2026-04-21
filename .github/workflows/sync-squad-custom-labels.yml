@@ -53,7 +53,10 @@ jobs:
               { name: 'docs:approved',     color: '0E8A16', description: 'Docs review approved — user-facing docs updated or in-PR changeset landed' },
               { name: 'docs:rejected',     color: 'D93F0B', description: 'Docs review rejected — required documentation is missing or stale' },
               { name: 'docs:not-applicable', color: 'BFD4F2', description: 'Docs gate satisfied without docs changes — DP explicitly declared Docs impact: N/A' },
-              { name: 'retro-log',         color: 'C5DEF5', description: 'Retrospective log entry' }
+              { name: 'retro-log',         color: 'C5DEF5', description: 'Retrospective log entry' },
+              { name: 'process:succeeded', color: '0E8A16', description: 'Process experiment hit its target signal' },
+              { name: 'process:no-effect', color: 'FBCA04', description: 'Process experiment inside noise band — extended' },
+              { name: 'process:reverted',  color: 'D93F0B', description: 'Process experiment regressed signal — revert recommended' }
             ];
 
             for (const label of labels) {

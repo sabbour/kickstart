@@ -1,0 +1,87 @@
+name: Process improvement experiment
+description: Propose a process/workflow change with a measurable hypothesis graded automatically against .squad/velocity.md.
+title: "[Process]: "
+labels: ["process"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Process experiment
+
+        Use this template to propose a process/workflow change that should be graded against a
+        measurable velocity signal. The `squad-process-grader` workflow runs daily; on the
+        `Revisit:` date it compares the signal in `.squad/velocity.md` to the baseline/target
+        below and posts a grade (`process:succeeded` / `process:no-effect` / `process:reverted`).
+
+        **The YAML block at the end of this body is required** — the grader parses it as
+        frontmatter. Leave the fences intact and edit only the values.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / hypothesis
+      description: What process pain are you trying to improve and what change do you hypothesize will move the signal?
+      placeholder: "Rework rate is high; tightening DR gate criteria should reduce it."
+    validations:
+      required: true
+
+  - type: textarea
+    id: change
+    attributes:
+      label: Change being trialled
+      description: Exactly what is being changed (workflow, charter, ceremony, etc.) and where.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: signal
+    attributes:
+      label: Signal
+      description: Which `.squad/velocity.md` row will grade this experiment? Must match the key exactly in the YAML block below.
+      options:
+        - rework_rate
+        - zapp_rejected_rate
+        - revert_rate
+        - median_throughput
+        - lead_time_p50_S
+        - lead_time_p50_M
+        - lead_time_p50_L
+        - lead_time_p50_XL
+        - lead_time_p90_S
+        - lead_time_p90_M
+        - lead_time_p90_L
+        - lead_time_p90_XL
+        - estimate_accuracy_S
+        - estimate_accuracy_M
+        - estimate_accuracy_L
+        - estimate_accuracy_XL
+    validations:
+      required: true
+
+  - type: textarea
+    id: hypothesis-block
+    attributes:
+      label: Hypothesis frontmatter (required, do not remove the `---` fences)
+      description: |
+        The grader parses this YAML verbatim. Signal must match the dropdown key.
+        Baseline is a number (percent signals in %, durations in minutes, throughput in size-points/week).
+        Target uses operators `<=`, `>=`, `<`, `>`, or `=`. Revisit is an ISO date (YYYY-MM-DD).
+      value: |
+        ---
+        Signal: rework_rate
+        Baseline: 28.0
+        BaselineDate: 2026-03-09
+        Target: "<=20.0"
+        Revisit: 2026-05-04
+        ---
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / supporting data
+      description: Links to retro rows, prior pulses, or any context that justifies the baseline/target.
+    validations:
+      required: false
