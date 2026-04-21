@@ -79,6 +79,12 @@ const useStyles = makeStyles({
     ...shorthands.borderLeft(tokens.strokeWidthThin, 'solid', tokens.colorNeutralStroke2),
     overflow: 'hidden',
   },
+  rootFill: {
+    width: '100%',
+    minWidth: '0',
+    maxWidth: 'none',
+    flex: 1,
+  },
   header: {
     display: 'flex',
     alignItems: 'center',
@@ -226,6 +232,13 @@ export interface FileViewerProps {
   onDeleteFile?: (path: string) => void;
   /** Called to close the viewer. */
   onDismiss: () => void;
+  /**
+   * If true, fill the entire available width of the parent container
+   * instead of using the default 45%/55% chat-side-panel sizing.
+   * Use this when FileViewer is the sole content of its container
+   * (e.g. the Playground Workspace tab).
+   */
+  fillContainer?: boolean;
 }
 
 export function FileViewer({
@@ -234,6 +247,7 @@ export function FileViewer({
   vfs,
   onDeleteFile,
   onDismiss,
+  fillContainer = false,
 }: FileViewerProps) {
   const styles = useStyles();
   const [copied, setCopied] = useState(false);
@@ -292,7 +306,7 @@ export function FileViewer({
 
   if (!filePath) {
     return (
-      <div className={styles.root} data-testid="file-viewer">
+      <div className={mergeClasses(styles.root, fillContainer && styles.rootFill)} data-testid="file-viewer">
         <div className={styles.empty}>
           <Text size={200}>Select a file to view</Text>
         </div>
@@ -301,7 +315,7 @@ export function FileViewer({
   }
 
   return (
-    <div className={styles.root} data-testid="file-viewer">
+    <div className={mergeClasses(styles.root, fillContainer && styles.rootFill)} data-testid="file-viewer">
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <Text className={styles.fileName} size={300} title={filePath}>
