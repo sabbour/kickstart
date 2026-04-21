@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #990 "fix(web): vary Create-tab inspirations and constrain to core components" | L | impl=1m | review=10m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=26m | ci=5m | reviewer=bot | human_comments=5 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #989 "fix(web): align A2UI schema and renderer with v0.9 spec" | L | impl=1m | review=55m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=34m | ci=5m | reviewer=bot | human_comments=2 | issue=#984 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #986 "fix(web/playground): tighten grid, fix Workspace void, unify Create chat composer" | M | impl=1m | review=42m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=37m | ci=6m | reviewer=bot | human_comments=2 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
