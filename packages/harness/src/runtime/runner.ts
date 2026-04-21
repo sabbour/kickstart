@@ -29,15 +29,34 @@ import { z } from 'zod';
 // Build model provider (Azure-aware)
 // ---------------------------------------------------------------------------
 
-function buildModelProvider(): OpenAIProvider {
+/**
+ * Build the Azure OpenAI baseURL for use with the OpenAI-compatible SDK.
+ *
+ * Uses the new Azure OpenAI v1 endpoint shape:
+ *   https://{resource}.openai.azure.com/openai/v1
+ *
+ * The SDK will then append `/chat/completions`, producing the correct
+ * `/openai/v1/chat/completions` path. The previous shape (`/openai`) resolved
+ * to `/openai/chat/completions`, which does not exist on Azure OpenAI and
+ * returned HTTP 404 "Resource not found" for every /api/converse call (see #932).
+ *
+ * Azure OpenAI only serves chat completions under two shapes:
+ *   - legacy: /openai/deployments/{name}/chat/completions?api-version=...
+ *   - v1:     /openai/v1/chat/completions
+ * We target v1 because it matches the OpenAI-compatible surface the SDK uses.
+ */
+export function buildAzureBaseUrl(endpoint: string): string {
+  const trimmed = endpoint.replace(/\/$/, '');
+  return `${trimmed}/openai/v1`;
+}
+
+export function buildModelProvider(): OpenAIProvider {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
 
   if (endpoint && apiKey) {
-    // Azure OpenAI — use Chat Completions API via baseURL
-    const azureBaseUrl = endpoint.endsWith('/')
-      ? `${endpoint}openai`
-      : `${endpoint}/openai`;
+    // Azure OpenAI — use the v1 OpenAI-compatible surface (see #932).
+    const azureBaseUrl = buildAzureBaseUrl(endpoint);
     console.log('[runner] Building model provider: Azure OpenAI');
     return new OpenAIProvider({
       apiKey,
