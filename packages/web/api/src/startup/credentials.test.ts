@@ -59,6 +59,34 @@ describe('credentials', () => {
     });
   });
 
+  describe('Endpoint URL validation', () => {
+    it('should throw if AZURE_OPENAI_ENDPOINT is not a valid URL', () => {
+      process.env.AZURE_OPENAI_ENDPOINT = 'not-a-valid-url';
+      process.env.AZURE_OPENAI_API_KEY = 'test-key';
+      process.env.KICKSTART_CHAT_MODEL = 'gpt-5.4-mini';
+
+      expect(() => loadAndValidateCredentials()).toThrow(/not a valid URL/);
+    });
+
+    it('should accept valid HTTPS endpoints', () => {
+      process.env.AZURE_OPENAI_ENDPOINT = 'https://my-resource.openai.azure.com';
+      process.env.AZURE_OPENAI_API_KEY = 'test-key';
+      process.env.KICKSTART_CHAT_MODEL = 'gpt-5.4-mini';
+
+      const config = loadAndValidateCredentials();
+      expect(config.provider).toBe('azure-openai');
+    });
+
+    it('should accept endpoints with trailing slashes', () => {
+      process.env.AZURE_OPENAI_ENDPOINT = 'https://my-resource.openai.azure.com/';
+      process.env.AZURE_OPENAI_API_KEY = 'test-key';
+      process.env.KICKSTART_CHAT_MODEL = 'gpt-5.4-mini';
+
+      const config = loadAndValidateCredentials();
+      expect(config.provider).toBe('azure-openai');
+    });
+  });
+
   describe('Azure OpenAI with codex only', () => {
     it('should accept KICKSTART_CODEX_MODEL without KICKSTART_CHAT_MODEL', () => {
       process.env.AZURE_OPENAI_ENDPOINT = 'https://test.openai.azure.com/';

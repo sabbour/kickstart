@@ -6,6 +6,10 @@
  * 
  * Called once at application startup (in getRegistry) to fail fast if
  * credentials are misconfigured.
+ * 
+ * **Note on secret rotation:** The credential config is cached as a singleton
+ * in the application process. After rotating secrets (API keys, client secrets),
+ * you must restart the process for new credentials to be loaded.
  */
 
 export interface AzureOpenAICredentials {
@@ -30,7 +34,8 @@ export interface CredentialConfig {
 /**
  * Load and validate Azure OpenAI credentials.
  * Returns null if not configured (allows fallback to standard OpenAI).
- * Logs validation steps.
+ * Logs validation steps with presence/absence indicators.
+ * Validates endpoint URL format and throws on invalid URLs.
  */
 function loadAzureOpenAICredentials(): AzureOpenAICredentials | null {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();
@@ -42,6 +47,14 @@ function loadAzureOpenAICredentials(): AzureOpenAICredentials | null {
 
   if (endpoint) {
     console.log('[startup:credentials] ✓ AZURE_OPENAI_ENDPOINT configured');
+    // Validate endpoint is a valid URL
+    try {
+      new URL(endpoint);
+    } catch {
+      const error = new Error(`AZURE_OPENAI_ENDPOINT is not a valid URL: ${endpoint}`);
+      console.error(`[startup:credentials] ✗ ${error.message}`);
+      throw error;
+    }
   } else {
     console.log('[startup:credentials] ✗ AZURE_OPENAI_ENDPOINT not set');
   }
@@ -53,13 +66,13 @@ function loadAzureOpenAICredentials(): AzureOpenAICredentials | null {
   }
 
   if (chatDeployment) {
-    console.log(`[startup:credentials] ✓ KICKSTART_CHAT_MODEL="${chatDeployment}"`);
+    console.log('[startup:credentials] ✓ KICKSTART_CHAT_MODEL configured');
   } else {
     console.log('[startup:credentials] ℹ KICKSTART_CHAT_MODEL not set (optional if KICKSTART_CODEX_MODEL set)');
   }
 
   if (codexDeployment) {
-    console.log(`[startup:credentials] ✓ KICKSTART_CODEX_MODEL="${codexDeployment}"`);
+    console.log('[startup:credentials] ✓ KICKSTART_CODEX_MODEL configured');
   } else {
     console.log('[startup:credentials] ℹ KICKSTART_CODEX_MODEL not set (optional if KICKSTART_CHAT_MODEL set)');
   }
@@ -179,6 +192,9 @@ export function loadAndValidateCredentials(): CredentialConfig {
 
 /**
  * Cache the loaded config singleton for the lifetime of the process.
+ * 
+ * **IMPORTANT:** After rotating secrets, the process must be restarted to pick up
+ * new values. The cached config is not refreshed during the process lifetime.
  */
 let _config: CredentialConfig | null = null;
 let _loadError: Error | null = null;
@@ -186,6 +202,9 @@ let _loadError: Error | null = null;
 /**
  * Get the cached credential config, loading and validating on first call.
  * Throws if validation failed on a previous call.
+ * 
+ * **Note on secret rotation:** Credentials are validated once at startup and cached.
+ * Process restart required after rotating secrets (API keys, client secrets, etc).
  */
 export function getCredentialConfig(): CredentialConfig {
   if (_loadError) {
