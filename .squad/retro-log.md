@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #929 "ci: Fix changeset status check in PR contexts" | S | impl=0m | review=28m | cycles=1 | merged | @sabbour | first_review=27m | ci=6m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #912 "refactor: rename @kickstart scope to @aks-kickstart" | XL | impl=67m | review=90m | cycles=1 | merged-with-rework | @sabbour | first_review=1m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #930 "fix(api): bundle @azure/functions + bicep-node to fix SWA health 404" | S | impl=0m | review=2m | cycles=1 | merged | @sabbour | first_review=1m | ci=5m | reviewer=bot | human_comments=0 | issue=#926 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
