@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 // Hoisted mock setup (vi.mock factories run before variable declarations)
 // ---------------------------------------------------------------------------
 
-const { registeredHandlers, registerHttpHandler, mockGetRegistry } = vi.hoisted(() => {
+const { registeredHandlers, registerHttpHandler, mockGetRegistry, mockGetLoadErrors } = vi.hoisted(() => {
   const registeredHandlers = new Map<
     string,
     (request: unknown, context: unknown) => Promise<unknown>
@@ -18,7 +18,8 @@ const { registeredHandlers, registerHttpHandler, mockGetRegistry } = vi.hoisted(
     },
   );
   const mockGetRegistry = vi.fn();
-  return { registeredHandlers, registerHttpHandler, mockGetRegistry };
+  const mockGetLoadErrors = vi.fn(() => []);
+  return { registeredHandlers, registerHttpHandler, mockGetRegistry, mockGetLoadErrors };
 });
 
 vi.mock("@azure/functions", () => ({
@@ -27,6 +28,7 @@ vi.mock("@azure/functions", () => ({
 
 vi.mock("../startup/packs.js", () => ({
   getRegistry: mockGetRegistry,
+  getLoadErrors: mockGetLoadErrors,
 }));
 
 vi.mock("../lib/logger.js", () => ({
@@ -90,6 +92,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   mockGetRegistry.mockReturnValue({});
+  mockGetLoadErrors.mockReturnValue([]);
   resetLlmCache?.();
 
   vi.stubEnv("AZURE_OPENAI_ENDPOINT", "https://aoai.example.com");

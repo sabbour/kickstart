@@ -216,7 +216,7 @@ app.http("health", {
       // and appInsights.trackException above.
       return {
         status: 503,
-        jsonBody: { status: "error", phase, hint } as HealthResponse,
+        jsonBody: { status: "error", phase, hint } satisfies HealthResponse,
       };
     }
   },
