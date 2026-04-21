@@ -98,172 +98,58 @@ Key findings:
 - `SessionCtx` forward refs (`AppIntent`, `Artifact`, `A2UICatalog`, `Turn`, `PendingUserAction`, `AzureCredential`) must be resolved. (C2)
 - `ComponentContribution.renderer` typed as `unknown` in harness — React-aware narrowing deferred to pack-core. (C3)
 - `package.json` missing `zod` and `@openai/agents` as runtime dependencies. (C4)
-- `chat-a2ui.ts` port must drop all v1 phase-model code; PR needs explicit keep/drop inventory. (C5)
 
-## 2026-05-28 — DP Reviews #475 + #476
+## Archived History Note
 
-**#475 (Harness Types) — APPROVE_WITH_CONDITIONS:**
-1. A2UI Zod schemas must be discriminated unions with `version: z.literal("v0.9")` — not all-optional.
-2. `ComponentContribution.renderer` typed as `unknown` in harness; React-aware type deferred to pack-core.
-3. `SessionCtx` forward refs (`AppIntent`, `Artifact`, `A2UICatalog`, `Turn`, `PendingUserAction`, `AzureCredential`) must be stubbed with `// TODO(Step 3)` before merge.
-4. `zod` + `@openai/agents` must be `dependencies`, not `devDependencies`, in `@kickstart/harness`.
-5. `chat-a2ui.ts` port must drop all v1 phase-model code — explicit keep/drop inventory required in PR.
-All five conditions are blocking. Step 3 gated on standalone compile.
+For comprehensive work history prior to 2026-04-20, see git log and .squad/orchestration-log/. Recent sessions tracked above.
 
-**#476 (Registry + Loaders) — APPROVE_WITH_CONDITIONS:**
-- C1 (BLOCKER): Drop custom mini-parser; use `yaml` npm package — mini-parser doesn't support arrays needed for `tools:`, `handoffs:`, `appliesTo:`, `keywords:`.
-- C2 (BLOCKER): Full registry read accessor surface required in Step 3 (6 methods/properties defined — see decisions.md).
-- C3 (BLOCKER): `UserActionContribution` must carry both `.name` (canonical, `:` sigil) and `.wireName` (transliterated, `__`); loader-agent.ts produces both.
-C1–C3 block Step 4 (pack-core), Step 5 (Runner), and Step 6 (skill resolver).
+### Work queue unblocked
 
-## Wave 3 — 2026-04-17 #474 Step 1 + A2UI #351 Decisions Filed
+**Immediate (no dependencies):**
+- **#998** (Bender) — Chat regression fix (S)
+- **#995** (Fry) — Core tab rendering (M)
+- **#997** (Fry) — Workspace layout (S)
+- **#1001** (automated) — Merge ready
 
-- `leela-v2-rewrite-start-gate.md`: Do not start #474 implementation until sprint planning ceremony completes; HOLD gate honored.
-- `leela-dp-474-step1.md`: Step 1 seam APPROVE_WITH_CONDITIONS — shim must be shrinking only, no new exports or runtime behavior; Bender owns implementation, Fry handles web-shell fallout. Exit contract: v1 files deleted, v1 flags gone, `packages/harness` canonical.
-- `leela-351-component-expansion.md`: A2UI catalog expanded 28→33 components; Alert, Table, Link added; SummaryCard + DecisionCard new React components; `KNOWN_COMPONENT_TYPES` 46→48; ProgressSteps/CodeBlock/SteppedCarousel/Questionnaire deferred.
-- **Issue #300**: Architecture diagram at DESIGN step is under-informed — shows only user-selected services as flat nodes, omits AKS infrastructure known from §7/§9 defaults (ACR, Gateway API, Key Vault, Workload Identity, CI/CD).
-- **Root cause**: System prompt line 125 says only "ArchitectureDiagram showing the app and connected services". Example 3 (line 282) reinforces the flat pattern. Component catalog gives 2-node example.
-- **Decision**: Three-tier model — Tier 1 (always: AKS subgraph, ACR, Key Vault, Gateway), Tier 2 (conditional: DB, cache, queue, AI), Tier 3 (annotations: CI/CD, Workload Identity, replicas). Use `diagram` prop with Mermaid subgraphs, not `nodes/edges`.
-- **Key insight**: ArchitectureDiagram.tsx already supports subgraphs via raw Mermaid `diagram` prop — this is purely a prompt-layer fix.
-- **Files affected**: `system-prompt.ts` (§2 STEP 2 + Example 3), `component-catalog.ts` (ArchitectureDiagram entry), `demo-scenarios.ts` (ARCHITECTURE scenario)
-- **Assigned to**: Bender (implementation), Fry (rendering verification)
-- **Decision file**: `.squad/decisions/inbox/leela-architecture-diagram-depth.md`
+**Blocked on #991 merge:**
+- **#987** (Fry) — Ideas tab restoration (M)
+
+**Blocked on #998 resolution:**
+- **#996** (Bender) — AKS inspiration prompt audit (M) [loose dependency; can start earlier if needed]
+
+**Waiting on gate closure:**
+- **#1000** — Pack rendering engine (Zapp + Nibbler approvals required)
 
 ---
 
-### 2026-04-15T22:27:37Z: Priority Tracking Session
-**Outcome:** Priority labels and cross-links added to GitHub issues #333, #328, #327, #326, #331, #332. Decision recorded in decisions.md for future priority tracking workflow.
+**Decision closure:** Appended to `.squad/decisions/inbox/leela-round3-2026-04-21.md`
 
-- **2026-04-16T05:51:43.085Z — Post-v0.7.0 triage and priority lane decision:** Burndown complete, all demo-sprint lanes shipped. Decided: (1) merge PR #341 security bump immediately, (2) run sprint planning ceremony before any feature code, (3) proceed with #330 Agents SDK design spike (P1) in parallel since DPs are process-compatible with a reset, (4) #329 MCP App IDE design follows, (5) #332 stays blocked. Key insight: design spikes produce the DP gates the process requires — blocking them on the ceremony is circular. Updated now.md, session plan, and wrote decision to inbox. Decision file: `.squad/decisions/inbox/leela-post-v070-priority-lane.md`
+## 2026-04-21 — Round 3 Ceremony Closure + Post-Gate Decisions
 
----
+**Five DPs Approved (2026-04-21T04:30Z):**
+- #998 (chat regression, Bender, S, HIGH) → APPROVED + READY FOR IMPLEMENTATION
+- #995 (Core rendering, Fry, M) → APPROVED + READY FOR IMPLEMENTATION
+- #996 (AKS brittleness, Bender, M) → APPROVED but depends on #1000
+- #997 (workspace black void, Fry, S) → APPROVED + READY FOR IMPLEMENTATION
+- #987 (Ideas tab, Fry, M) → APPROVED but depends on #991 merge
 
-## 2026-04-16 PR #383 Documentation Rewrite — Complete
+**Two PRs Under Review:**
+- **PR #1000** (pack rendering, #991) → **REJECTED** by Zapp + Nibbler. Red CI (TS2307/TS2352) + missing CI grep rule. Fry locked out; bender-1000-revise assigned to add CI step + allow-list comment.
+- **PR #1001** (emit_ui fixture, #980) → ✅ **MERGED.** All gates green. Shipped explicit-op discriminator coverage.
 
-**Engineering Docs Rewrite (7 files)**
-- **Status:** Ready for merge; all review comments addressed
-- **Files updated:**
-  1. docs/ARCHITECTURE.md — Comprehensive system architecture with VSCode type hints
-  2. docs/PHASES.md — Phase definitions (updated post-FSM removal)
-  3. docs/CONVERSATION-ENGINE.md — Engine internals with advancePhase() pattern
-  4. docs/AUTHENTICATION.md — Auth security model (no localStorage secrets)
-  5. docs/PERSISTENCE.md — virtual-fs.ts (client-side IndexedDB) + server backup
-  6. docs/INTEGRATION.md — Kit pattern + lifecycle management
-  7. docs/TESTING.md — Snapshot + E2E test patterns
+**Process Milestone:**
+- PR #993 (ceremony enforcement) merged (commit c90f5da). Mechanical 4-way gate + docs gate now active on all future PRs.
+- All future PRs require: `leela:approved` + `zapp:approved` + `nibbler:approved` + (`docs:approved` ∨ `docs:not-applicable`) + green CI.
+- No override path; gate is blocking at merge time.
 
-**Code Health Documentation**
-- **virtual-fs.ts:** Client-side VirtualFileSystem (IndexedDB). NO server-side TTL. Affects data durability understanding.
-- **Splice vs push:** Clarified immutable array operations using splice(0,1) for safe mutation-free operations in reducer examples.
-- **Resolver ordering:** System walks scoped → base → global. Made dependency resolution chain explicit.
-- **IntegrationKit:** Interface defined in @kickstart/core, published via catalog plugin system.
+**In-flight Dispatches:**
+- bender-998 (chat fix, HIGH) — unblocked, implementation ready
+- bender-1000-revise (pack rendering fix) — Reviewer Rejection Protocol applies; Fry locked out
+- fry-995 (density bugs) — ready, unblocked
+- fry-997 (black void) — ready, unblocked
 
-**Accuracy Fixes (2026-04-16T17:44:57Z)**
-- Corrected factual errors from Copilot PR review (12 comments total)
-- All review feedback incorporated; PR ready for merge
-
-**Quality Gates**
-- npm run build ✅
-- All internal doc links validated ✅
-- Code examples executable ✅
-- Copilot review completed ✅
-
----
-
-## 2026-04-16 Sprint Retro — Security + Generation Sprint
-
-**PRs merged this sprint (Leela-owned or cross-cutting):**
-- #341 DOMPurify 3.4.0 (XSS/prototype pollution fix)
-- #354 Enable STEPWISE_GENERATION_V1 flag — now default in prod via infra/main.bicep
-- #356 DeploymentProgress → GenerationProgress rename (18 files)
-- #358 LLM combined catalog guidance in system-prompt.ts
-- #368 CI permissions (explicit permissions blocks in all workflows)
-- #372 next-card phantom cleanup + DeploymentProgress orphan text removal
-
-**Issues created / triaged:**
-- Overnight backlog audit: 11 items triaged. New: #349 (FileEditor A2UI coupling), #350 (DeploymentProgress wording), #351 (custom components audit) — all Leela spikes.
-- Confirmed #329 (MCP App IDE) and #330 (Agents SDK) spikes adequate — no follow-up issues needed.
-
-**Architecture decisions made:**
-- Component rename discipline formalized (all 8 surfaces must be updated together)
-- Sanitization standard: regex approach for Node.js packages, DOMPurify for browser-only
-- Stepwise generation is now production default
-- Prompt-catalog contract tests (#374) guard phantom references automatically going forward
-
-**Next:** Address architecture spikes #349, #350, #351; review DPs for #329 and #330.
-
-## 2026-04-17 DP #330 Architecture Review
-
-**Review Date:** 2026-04-17T01:53:59Z  
-**Issue:** #330 — spike: design OpenAI Agents SDK migration for less-rigid chat flow  
-**DP:** Hybrid route planner + manager agent architecture
-
-**Decision:** ✅ APPROVED
-
-**Architecture Alignment Verified:**
-1. FSM removal (#400/#412) — merged; DP's route planner fills control plane
-2. Workspace-first generation (#326/#327/#328) — treated as constraints
-3. Custom/SDK boundary — SDK handles loop/retry/session/streaming/tracing
-4. Agents-as-tools — pragmatic starting position (handoffs deferred)
-5. Server-authored route state — replaces model-authored flags
-
-**Checkpoints Requested:**
-1. Validate `RunResult`/`StreamedRunResult` → typed SSE adaptation without losing A2UI
-2. Validate session hydration cold-start round-trip from existing session store
-
-**Consequence:** Implementation unblocked pending Zapp's security review (approved with conditions).
-
-## 2026-04-17 Review Gate Fix — Label-Based Merge Gate
-
-- **Problem:** Branch protection required 1 approving review, but squad agents push PRs as the repo owner. Authors cannot self-approve → every squad PR blocked permanently.
-- **Solution:** Replaced required-approval gate with label-based `squad/review-gate` status check.
-- **Workflow:** `.github/workflows/squad-review-gate.yml` — triggers on PR label/unlabel/open/sync/reopen events.
-- **Labels:** `leela:approved` (blue, #0075ca) and `zapp:approved` (yellow, #e4e669).
-- **Gate logic:** Status = `success` when both labels present; `pending` otherwise. Context: `squad/review-gate`.
-- **Branch protection:** Removed `required_approving_review_count`, added `squad/review-gate` to required status checks. `required_conversation_resolution` kept enabled.
-- **SKILL updated:** `.squad/skills/pr-workflow/SKILL.md` — new Merge Gate section with label verification commands.
-- **PR:** #427
-- **Status:** ✅ Archived to decisions.md (2026-04-17T01:57:58Z)
-
-## 2026-04-17 Comment Acknowledgment + Thread Resolution — Process Fix
-
-- **Problem:** Agents were fixing code from PR review feedback but never replying to the specific comment or resolving the review thread. This left reviewers blind and blocked merge when `require_conversation_resolution: true` is enforced.
-- **Fix:** Updated three files to make the full feedback loop mandatory:
-  1. `.squad/skills/pr-workflow/SKILL.md` — replaced "Handling Review Feedback" section with 5-step loop (read → decide → reply → resolve → verify)
-  2. `.github/copilot-instructions.md` — added "PR Review Feedback — Required Loop" section
-  3. `.squad/decisions/inbox/leela-comment-resolution-process.md` — decision record
-- **Learnings:** Comment-acknowledgment and thread-resolution are now documented as non-optional steps in every agent's PR workflow. Silently fixing code is a process violation.
-
-## 2026-04-17 Round 3: PR #447 Code Review + Final Approvals
-
-**Sponsor Issue:** #445 — Backend SDK adapter for OpenAI Agents SDK migration
-
-**PR Review Cycle:**
-- **Initial finding:** Duplicate-message bug in conversation streaming. Consecutive identical assistant messages were not deduplicated, causing AI artifact expansion and UX degradation.
-- **Blocking status:** High-priority. Required fix before merge.
-- **Resolution:** Bender pushed fix to streaming loop (commit a3899e5) with unit tests. Verified in subsequent review cycles.
-
-**Review Verdict:** ✅ **APPROVED** (applied `leela:approved` label)
-- All 1 blocking finding resolved
-- 1511 tests passing  
-- 0 unresolved comment threads
-- Security gate also clear (Zapp approved with conditions)
-
-**Implementation Quality:** Clean, focused fix. Demonstrates no-lockout directive — Bender handled all feedback cycles autonomously. No scope creep or pre-existing issues addressed.
-
-## 2026-04-17 v2-Rewrite Merge Strategy Assessment & 1.0.0 Release
-
-**Assessment Date:** 2026-04-17T20:00:55.651Z  
-**Status:** GO VERDICT
-
-Completed merge strategy assessment for v2-rewrite → main merge. All 13 v2 implementation steps reviewed. DP approvals finalized:
-
-- ✅ DP #483 (pack-aks-automatic) — APPROVE_WITH_CONDITIONS
-- ✅ DP #484 (pack-github) — APPROVE_WITH_CONDITIONS  
-- ✅ DP #485 (web A2UI renderer) — APPROVE_WITH_CONDITIONS (Leela); BLOCKED pending Zapp security re-review
-- ✅ DP #486 (guardrails engine) — APPROVE_WITH_CONDITIONS
-- ✅ DP #487 (MCP adapter) — APPROVE_WITH_CONDITIONS
-- ✅ PR #550 (Step 5 Runner + SSE) — APPROVE_WITH_CONDITIONS
-
-**Merge Strategy:** --no-ff merge approved. 6 file conflicts identified with clear resolution paths documented. Bender executing merge with conflict resolution steps.
-
-**Version:** Bumped to 1.0.0. This is the 1.0.0 release milestone.
+**Key DP-Time Security Decisions:**
+1. Structural invariant test for strict-mode schema compliance (Object.keys(properties) ⊆ required)
+2. Ideas-tab curated-only model; future user-supplied inspirations will reopen threat
+3. Composition-reliability harness constraints: fail-loud, ≤2 retries, redacted logs
+4. DP-time conditions enforce at PR time non-negotiable (Reviewer Rejection Protocol on #1000 sets precedent)

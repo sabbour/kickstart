@@ -98,64 +98,11 @@ Working as Fry (Frontend Dev) on branch `squad/474-step1-nuke-v1`.
 Posted DP to https://github.com/sabbour/kickstart/issues/477#issuecomment-4268128132
 
 ### Covered
-- Delivery order: Phase A (scaffold) → B (agents+skills, parallel) → C (tools, after #475) → D (27 basic components, parallel batches) → E (12 rich, audited) → F (guardrails) → G (playground scenarios) → H (wire manifest)
-- Full file manifest: 3 agent.md, 5 SKILL.md, 6 tools, 27 basic + 12 rich components, 3 guardrails, 2 playground scenarios, index.ts
-- Registry contract: corePack: Pack shape, which #476 APIs are consumed at startup vs runtime
-- emit_ui contract: Zod-discriminated A2UI message union from #475, records to session.a2uiEmissions, no SSE in pack-core
-- Porting strategy: basic = mechanical path-rewrite; rich = audit 21 candidates, keep 12 domain-neutral, defer Azure/AKS/GitHub to later packs
-- Test plan for Hermes: frontmatter parse, tool Zod rejection, registration smoke, 4-component render smoke, guardrail verdicts
-- 5 risks flagged with mitigations (manifest-only-in-playground, v1 bleeding, A2UI union stability, PR size, FileEditor/Monaco)
-- 3 open questions for Bender (agent loader mode, SessionCtx.a2uiEmissions location, AuthCard split)
 
-### Awaiting
-Leela + Zapp approval before implementation starts.
+## Archived History Note
 
-## Wave 3 — 2026-04-17 Playground Decision Filed
+For comprehensive work history prior to 2026-04-20, see git log and .squad/orchestration-log/. Recent sessions tracked above.
 
-- `fry-playground-component-grouping.md`: GitHub Components + Azure Components moved from `GALLERY_GROUPS` to `COMPONENT_GROUPS` in `Playground.tsx` — they are catalog components, not gallery scenarios. Playground stub connector guard removed; `AzureARMConnector` + `GitHubConnector` always registered unconditionally.
-## 2026-04-17 — #477 pack-core Phases A+B (commit c950d61)
-
-Working as **Fry (Frontend Dev)**.
-
-**Phase A — 3 agent files** (`packages/pack-core/src/agents/`):
-- `orchestrator.agent.md` (`core.orchestrator`) — main orchestrator; collects requirements, drafts deployment plan, hands off to architect for review or implementer for code gen. Skills: `generate-plan`, `validate-artifacts`. No tools.
-- `architect.agent.md` (`core.architect`) — architecture advisor; reviews plans against Azure WAF (Reliability, Security, Cost, OE, Performance). Skills: `architecture-review`. Tools: `fetch_webpage`.
-- `implementer.agent.md` (`core.implementer`) — code generator; produces Bicep, Kubernetes manifests, Dockerfile, GitHub Actions workflow. Skills: `generate-files`. Tools: `read_file`, `write_file`, `validate_artifacts`.
-
-**Phase B — 5 skill files** (`packages/pack-core/src/skills/`):
-- `generate-plan/SKILL.md` — orchestrator-only; required plan sections, quality criteria, ambiguity handling. Priority 80.
-- `validate-artifacts/SKILL.md` — orchestrator + implementer; Bicep, Kubernetes, and GitHub Actions validation rules. Priority 70.
-- `architecture-review/SKILL.md` — architect-only; WAF five-pillar checklist with AKS-specific items. Priority 75.
-- `generate-files/SKILL.md` — implementer-only; file inventory, Bicep/YAML/workflow code standards, pinned SHA requirement. Priority 85.
-- `aks-best-practices/SKILL.md` — all agents (`*`); cross-cutting AKS cluster, workload, security, OpEx, and cost guidance with reference links. Priority 60.
-
-**Hermes test scaffold cherry-picked** from `12579cd` (branch `squad/477-pack-core-test-scaffold`). Tests are `it.todo()` scaffolding; Hermes will activate them in a follow-up pass once the #476 loader and Phase C tools ship.
-
-**Blockers noted for Phase C:**
-- `validate_artifacts` tool not yet implemented (Phase C) — referenced in frontmatter but no runtime code yet.
-- `#476` registry/loader (`parseAgentFrontmatter`, `PackRegistry`) not yet merged into v2-rewrite — harness types are still stubs.
-- Hermes' agent tests expect `core.triage`/`core.codesmith`/`core.reviewer` naming; Phases A+B use `core.orchestrator`/`core.architect`/`core.implementer` per task spec. Will need reconciliation once the loader ships.
-
-## 2026-04-17 — #477 pack-core Phase C (commit bc7f3fd)
-
-Working as **Fry (Frontend Dev)**.
-
-**Naming gap fix:** Updated Hermes' `agents.test.ts` to match DP-approved names (`core.orchestrator`, `core.architect`, `core.implementer`) instead of the Hermes-scaffold placeholders (`core.triage`, `core.codesmith`, `core.reviewer`).
-
-**Agent/skill frontmatter corrected** to match actual `loader-agent.ts` / `loader-skill.ts` schemas:
-- Agent: added required `model: { envVar: KICKSTART_MODEL }`, changed `handoffs` from string array to object array `{ label, agent }`, qualified tool names as `core.*`.
-- Skills: added required `version: 0.1.0`, moved `appliesTo`/`keywords`/`priority` under `x-kickstart:` namespace.
-
-**Phase C — 6 tool files** (`packages/pack-core/src/tools/`):
-- `fetch_webpage.ts` — SSRF guard (non-HTTPS and private IPs rejected), 32k char truncation, 15s timeout.
-- `read_file.ts` — workspace-root confinement, null-byte guard, UTF-8 read.
-- `write_file.ts` — confinement, mkdirSync recursive, records artifact on SessionCtx.
-- `validate_artifacts.ts` — stub returning `valid: true`; TODO marker for real linter (Phase D follow-up).
-- `emit_ui.ts` — validates via `A2UIMessageSchema` from `@kickstart/harness`, calls `session.recordA2UIEmission`.
-- `search_components.ts` — factory `createSearchComponentsTool(registry: ComponentRegistry)` using a structural interface (avoids depending on unexported `PackRegistry` type).
-- `tools/index.ts` barrel.
-
-**Blocker noted:** `PackRegistry` is not yet exported from `@kickstart/harness` index — raised as Phase D pre-condition.
 
 ## 2026-04-17 — #477 pack-core Phases D–H (commits 92ba022, 833b44d, be1c2da)
 
@@ -191,3 +138,18 @@ Ported 11 domain-neutral rich components from `packages/web/src/catalog/componen
 - `validate_artifacts` tool is still a stub returning `{valid: true}`.
 - `search_components` tool retained (also exported) alongside new `list_files`.
 - Guardrail `token-budget` and tool `list_files` reference extension fields not in base `SessionCtx` — using safe `as unknown` casts with TODO comments.
+
+## 2026-04-21 — Round 3: Design Reviews + Work Assignments
+
+**Status Update:** DP reviews for #995, #997, #987 all approved. PR #1000 blocked on red CI (TS2307/TS2352). PR #1001 merged.
+
+**Work Assignments (in-flight):**
+- **#995** — Core components tab rendering (estimate:M). DP `leela:approved`. Ready for implementation.
+- **#997** — Workspace black void (estimate:S). DP `leela:approved`. Ready for implementation.
+- **#987** — Ideas tab restoration (estimate:M). DP `leela:approved` but blocked pending #991 merge. Cannot start until PR #1000 is fixed & merged.
+
+**⚠️ Critical Note — PR #1000 Rejection:**
+- **PR #1000** (pack rendering engine, #991) was REJECTED by Zapp+Nibbler for missing CI grep rule on `dangerouslySetInnerHTML`/`eval`/`new Function` in pack client code. DP #991 set this as a "same-PR hard-fail" condition. Fry is **LOCKED OUT** from revising this PR per the Reviewer Rejection Protocol.
+- **Action:** Bender (or bender-1000-revise agent) will add the missing CI grep step + allow-list comment. Fry can resume #987, #995, #997 work in parallel.
+
+**Other issues remain yours:** #987 (blocked), #995, #997 are assigned and ready to pick up once #1000 is fixed.
