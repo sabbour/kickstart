@@ -61,6 +61,28 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #1011 "feat: add quality SLO safety brake to squad review-gate (#806)" | L | impl=1m | review=30m | cycles=2 | merged-with-rework | @sabbour-squad-backend[bot] | first_review=0m | ci=6m | reviewer=bot | human_comments=1 | issue=#806 | estimate=unknown | rejections_by_reviewer=nibbler:1,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1014 "feat(process): process grader workflow (close the learning loop) (#805)" | XL | impl=3m | review=16m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=3m | ci=5m | reviewer=bot | human_comments=1 | issue=#805 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1013 "feat(security): harden insertSvgSafely against SVG XSS vectors" | L | impl=2m | review=13m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=5m | ci=6m | reviewer=bot | human_comments=1 | issue=#1006 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1012 "fix(workflows): pass retro metrics via env to avoid JS template injection" | S | impl=1m | review=16m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=1m | ci=7m | reviewer=bot | human_comments=1 | issue=#792 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1007 "docs: Scribe Round-4 decisions merge + identity update + retrospective" | XL | impl=93m | review=34m | cycles=1 | merged | @sabbour | first_review=20m | ci=23m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1008 "chore: extend retros with slo trip triggers (#808)" | L | impl=1943m | review=20m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=10m | ci=7m | reviewer=bot | human_comments=0 | issue=#808 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1009 "fix(web): coerce AKS composition outputs so the shared validator resolves them (#996)" | M | impl=1m | review=12m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=8m | ci=6m | reviewer=bot | human_comments=0 | issue=#996 | estimate=M | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1000 "feat: render pack components via the engine" | XL | impl=1m | review=63m | cycles=3 | merged-with-rework | @sabbour | first_review=9m | ci=6m | reviewer=bot | human_comments=0 | issue=#991 | estimate=L | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1004 "fix(web): Workspace flex layout (min-height:0) closes black-void (#997)" | M | impl=0m | review=15m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=11m | ci=6m | reviewer=bot | human_comments=1 | issue=#997 | estimate=S | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1001 "test(pack-core): add emit_ui explicit-op fixture" | M | impl=0m | review=16m | cycles=1 | merged | @sabbour | first_review=6m | ci=6m | reviewer=bot | human_comments=0 | issue=#980 | estimate=S | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #993 "process: add Sprint Planning + Cadence Retro ceremonies, elevate Nibbler to full reviewer, add docs gate, tighten coordinator ceremony enforcement" | XL | impl=1m | review=39m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=48m | ci=6m | reviewer=human | human_comments=2 | issue=#992 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #990 "fix(web): vary Create-tab inspirations and constrain to core components" | L | impl=1m | review=10m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=26m | ci=5m | reviewer=bot | human_comments=5 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #989 "fix(web): align A2UI schema and renderer with v0.9 spec" | L | impl=1m | review=55m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=34m | ci=5m | reviewer=bot | human_comments=2 | issue=#984 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
