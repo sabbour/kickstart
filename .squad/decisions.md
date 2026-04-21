@@ -2408,3 +2408,256 @@ The cadence workflow already covers release management correctly. Running two co
 | Audit v0.7.0 and earlier for same gap (stranded version bumps) | Hermes | Medium | — |
 
 ---
+
+---
+title: Low-risk dual-approved PRs may arm squash auto-merge
+date: 2026-04-20
+author: Bender
+---
+
+## Context
+
+PRs that already had both squad approval labels and green CI were still waiting on a manual merge step, even for small low-risk changes. Retro analysis called out the extra idle time on PRs like #771.
+
+## Decision
+
+Add a `Squad Auto Merge` workflow that arms GitHub squash auto-merge when a PR is:
+
+- open and non-draft
+- carrying fresh `leela:approved` and `zapp:approved` labels on the current head commit
+- green on the trusted merge signals for that head: `CI Gate` from workflow `CI` and `squad/review-gate` from workflow `Squad Review Gate`
+- not XL (`additions + deletions > 1000`)
+- not titled `refactor`
+
+On every `synchronize`, the workflow clears both approval labels so new commits must be re-approved before auto-merge can arm again. The workflow leaves XL and `refactor` PRs for explicit human merge, and posts an audit comment when it arms or disarms auto-merge.
+
+## Why
+
+This removes dead wait time without weakening the review gate. The exclusions keep large or intentionally broad changes on a human-controlled merge path.
+
+---
+
+---
+title: Monthly docs sweep writes to a rolling Scribe issue
+date: 2026-04-20
+author: Bender
+---
+
+## Context
+
+#831 adds the deferred monthly Docs Sweep automation now that #811 and #813 have landed. The repo already has a weekly pulse issue and a rolling daily pulse issue, so the remaining question is where the monthly docs audit should live.
+
+## Decision
+
+Publish the monthly docs sweep to a dedicated rolling Scribe issue titled `📚 Docs Sweep (rolling)` and label it with `squad:scribe` plus `docs:sweep`.
+
+The workflow targets the canonical docs surface at `docs-site/docs/` and the canonical brief path `docs-site/docs/architecture/v2-implementation-brief.md`. The issue body carries automated docs-health signals and the standing manual checklist; any real drift discovered during the sweep should become focused `process` issues instead of more pulse artifacts.
+
+## Why
+
+This keeps the docs audit persistent and easy to update without creating another weekly-style issue stream. It also cleanly separates docs hygiene from Weekly Pulse, which stays the team’s time-boxed summary artifact.
+
+---
+
+---
+title: Low-risk PRs get an opt-in auto-merge gate
+date: 2026-04-20
+author: Copilot
+---
+
+## Context
+
+`Squad Auto Merge` already covered dual-approved PRs, but low-risk chore/config changes still needed the same full approval path and manual merge step. Retro data for issue #784 showed those PRs spend disproportionate time waiting after CI.
+
+## Decision
+
+Add an explicit `squad:chore-auto` label and treat it as a low-risk auto-merge opt-in:
+
+- the review gate turns green with fresh `leela:approved` alone for `squad:chore-auto` PRs
+- if the PR title/body/branch/labels look security-sensitive (`security`, `GHSA`, `CVE`, `vulnerability`) or it touches sensitive paths (`.github/workflows/**`, auth, guardrail, security code), `zapp:approved` is still required
+- the custom label sync also triggers when `.github/workflows/sync-squad-custom-labels.yml` changes so new low-risk labels are created as part of the rollout merge
+- `Squad Auto Merge` reuses the same trusted CI/review-gate checks, XL exclusion, `refactor` exclusion, stale-label clearing, and audit-comment trail
+
+## Why
+
+This keeps the fast path explicit and narrow while preserving the stronger security gate for workflow/auth/guardrail/security changes, even when the PR text looks harmless. Triggering the custom label sync on its own workflow file also makes the rollout self-hosting instead of depending on a later team-file edit or manual dispatch.
+
+---
+
+# Decision: preserve canonical docs gate paths during PR #840 conflict resolution
+
+**Date:** 2026-04-20T09:33:44.947-07:00  
+**Author:** Bender (Backend Dev)  
+**Status:** Implemented
+
+## Context
+
+Rebasing `squad/810-harden-docs-gate` onto `origin/main` produced conflicts in the docs gate and custom label workflows. Main had already moved API-doc references to the consolidated `docs-site/docs/extending/api-endpoints.md` path and added the rolling `docs:sweep` label, while the PR introduced the explicit `skip-docs` bypass label and hard-gate behavior.
+
+## Decision
+
+Keep the main-branch canonical docs path and existing `docs:sweep` custom label, then layer the PR's `skip-docs` bypass logic on top. Do not restore the legacy `docs/api-reference.md` path or drop the new bypass label during conflict resolution.
+
+## Why
+
+This is the narrowest resolution that preserves both shipped docs consolidation work and the PR's intended gate hardening. It keeps the docs handoff lane aligned with the current docs surface while avoiding scope creep into unrelated workflow behavior.
+
+---
+
+# Decision: Retro workflow uses repo-tracked scribe app id
+
+**Date:** 2026-04-20T01:56:21.267-07:00  
+**Author:** Bender (Backend Dev)  
+**Status:** Proposed
+
+## Context
+
+`Squad · PR Retro` moved onto `actions/create-github-app-token@v1`, but the repo secrets available in production only include the scribe app private key material, not a matching `SQUAD_SCRIBE_APP_ID` secret. The workflow therefore failed at startup with `Input required and not supplied: app-id`, blocking retro PR updates and leaving PR #862 stuck.
+
+## Decision
+
+Use the scribe app's numeric id directly from the repo's recorded identity data in `.squad/identity/config.json` and keep the secret dependency only for the private key (`SQUAD_SCRIBE_APP_PRIVATE_KEY`).
+
+## Why
+
+- The scribe app identity is already tracked in-repo as stable configuration (`3414032` for `sabbour-squad-scribe`).
+- GitHub Actions needs a concrete `app-id`; missing-secret indirection adds a failure mode without adding protection.
+- The private key remains secret, so the security boundary does not widen.
+
+## Consequences
+
+- `squad-pr-retro.yml` no longer depends on a missing `SQUAD_SCRIBE_APP_ID` secret.
+- Retro-log commits and PR updates attribute to `sabbour-squad-scribe[bot]` through the same app token path.
+- Future ceremony workflow changes should verify the actual secret shape in repo settings before assuming both app id and private key are secret-backed.
+
+---
+
+# Decision — Application Insights auto-instrumentation via Azure Monitor OpenTelemetry distro
+
+**Date:** 2026-04-20
+**Author:** Bender (Backend Dev)
+**Scope:** `packages/web/api/` (API layer)
+**Related issues:** #940 (closes), #942 (stays open — infra-side)
+
+## Decision
+Adopt `@azure/monitor-opentelemetry` alongside the existing classic `applicationinsights@^3.14.0` SDK.
+
+- **OTel distro owns auto-collection** — outbound HTTP (undici/`fetch`, the class of calls the classic SDK misses), incoming HTTP requests, exceptions, console-log bridge.
+- **Classic SDK retains only custom `trackEvent`/`trackException`/`trackTrace` call sites.** Its auto-collection (`setAutoCollectRequests/Dependencies/Exceptions`) is **explicitly disabled** to prevent double-counting.
+- **Eager init at module load** of `packages/web/api/src/lib/appinsights.ts` via a side-effect block, so OTel instruments the global `fetch` before any handler issues a request.
+
+## Why
+The classic `applicationinsights` SDK's auto-collection relies on `diagnostic-channel` to patch Node's `http`/`https` modules. It does **not** patch `undici` or global `fetch` (Node 18+ runtime default). The `@openai/agents` SDK issues its outbound calls through global `fetch`, so every call to Azure OpenAI was invisible to our dependency telemetry — this was the root cause of the 2-day debug on PR #933 (Leela's audit trail).
+
+`@azure/monitor-opentelemetry` uses the official OpenTelemetry Node auto-instrumentations, which include `@opentelemetry/instrumentation-undici` — closing the gap.
+
+## Consequences
+- **Bundle size:** +~300–400 KB per bundled function after minification. Acceptable (well under SWA caps).
+- **Cold start:** +50–150 ms one-time for OTel SDK bootstrap. Negligible vs existing pack-registry-seal cost.
+- **No portal double-counting:** classic auto-collection is disabled; OTel is the sole auto-telemetry source.
+- **Rollback path:** unset `APPLICATIONINSIGHTS_CONNECTION_STRING` → both SDKs become no-ops.
+- **Infra dependency (#942):** code is ready; lighting up the portal view requires the Bicep resource to be provisioned.
+
+## What this closes
+- **#940** — yes. Auto-instrumentation surfaces resolved URL, status, and duration for every LLM call without any runner-side code change.
+
+## What it does NOT close
+- **#942** — Bicep-side provisioning is Fry/Nibbler's lane; leaving open.
+- **#941** — `/health` end-to-end LLM ping. Separate concern.
+- **#943** — Model name in SSE stream. Separate concern.
+
+## Alternatives rejected
+- *Enable auto-collection on the existing classic SDK* — does not solve the problem; classic does not instrument `undici`/`fetch`.
+- *Migrate fully off the classic SDK* — touches every `trackEvent`/`trackException` call site; larger blast radius with no marginal observability benefit. Viable future cleanup.
+
+---
+
+# Decision: Chat Surface Bugs — #937 & #943
+
+**Date:** 2026-04-20  
+**Author:** Bender (Backend Dev)
+
+## Context
+
+Two related bugs observed in the same debug screenshot affected the main chat surface.
+
+## Decision 1 — Double-encoded JSON (#937)
+
+When `AgentOutput` is used as the SDK's `outputType`, the model emits structured JSON tokens (`{"message":"...","intent":"continue"}`) as the raw text stream. The runner was forwarding those JSON tokens as `chunk` deltas, so `useStreaming.ts` accumulated the JSON string into `accumulated` → `fullEnvelope.message` showed double-encoded JSON.
+
+**Resolution:** After `result.finalOutput` resolves, overwrite `outputText` with `finalOutput.message` (the already-parsed prose string). The existing `outputText !== fullText` flush path sends the clean prose as a single chunk, preserving the guardrail redaction path.
+
+**Implication for future pack authoring:** The `message` field in `AgentOutput` is the display text. Do not stream raw JSON schema fields to the client — the runner handles message extraction.
+
+## Decision 2 — Model name in SSE stream (#943)
+
+The runner resolved `modelName` but never included it in any SSE event. The frontend `useStreaming` read `parsed.model` only in the `default:` fallback case, never in the typed `case 'end':`.
+
+**Resolution:** 
+1. `runner.ts`: add `model: modelName` to `sseWrite('end', ...)`.
+2. `useStreaming.ts`: add `if (parsed.model) lastModel = parsed.model as string;` inside `case 'end':`.
+
+**Contract:** The `end` SSE event now carries `{ sessionId, intent?, model }`. Any new consumer of the stream should read model from `end` — not rely on the `default:` fallback.
+
+---
+
+# Decision: /health deep-check endpoint design
+
+**Date:** 2026-04-20  
+**Author:** Bender (backend)  
+**Issue:** #941  
+**Status:** PROPOSED
+
+---
+
+## Context
+
+`/health` previously only checked the pack registry. If Azure OpenAI returned a 4xx error (as happened for ~2 days in #933), the endpoint still reported green — a false-positive that masked the real outage.
+
+## Decision
+
+Add opt-in deep-check mode via `?deep=1` query parameter on the existing `/health` endpoint rather than a separate `/health/llm` endpoint.
+
+**Rationale for query param over new endpoint:**
+- One fewer route to document, version, and secure
+- Existing load-balancer/uptime probes using `/health` with no params are unaffected
+- Synthetic monitors / alert rules that want real LLM validation add `?deep=1` explicitly
+
+**LLM probe spec:**
+- Chat Completions API, chat deployment only (`KICKSTART_CHAT_MODEL`)
+- Single `"hi"` user message, `max_completion_tokens: 1` — minimal cost/latency
+- 8-second `AbortController` timeout
+- Response: `{ llm: { ok, latencyMs, model, errorCode? } }`
+- Error redaction: only HTTP `response.status` surfaced as `errorCode` (never raw body)
+
+**Cache:**
+- 30-second module-level TTL, success-only
+- Cache misses (failures) always execute a live probe so monitoring gets real signal
+- Cache hits return `{ cached: true }` in the response
+
+## Consequences
+
+- Operators should update synthetic monitors to use `/health?deep=1` to get real LLM signal
+- `/health` (no param) remains a fast, cheap registry probe suitable for load-balancer health checks
+- If AOAI is down, `GET /health?deep=1` returns HTTP 503, giving alert rules a concrete signal
+
+---
+
+# Role-specific GitHub App identity uses the checked-in resolver script
+
+**Date:** 2026-04-20  
+**Author:** Bender (Backend Dev)  
+**Status:** Proposed
+
+**Decision:** Squad agent prompts and lifecycle docs should resolve GitHub App tokens via `.squad/scripts/resolve-token.mjs`. The resolver owns explicit role-to-app mapping, supports explicit persona aliases, and write actions fail closed unless `SQUAD_ALLOW_WRITE_FALLBACK=1` is intentionally set as an escape hatch.
+
+**Rationale:** The repository ships the checked-in resolver script and identity config in `.squad/identity/`, but worktrees do not reliably contain a built `packages/squad-sdk/dist/identity/tokens.js` artifact. Calling the checked-in script removes that drift, and refusing silent ambient-auth fallback keeps commits, pushes, issue comments, and PR creation aligned to the spawned agent's intended bot identity.
+
+**Consequences:**
+- New bot personas must be registered in `.squad/identity/config.json`/`.squad/identity/apps/` and, when needed, added to the resolver alias map.
+- Unmapped roles now resolve to no token instead of guessing another app identity.
+- Ambient `git`/`gh` writes require explicit `SQUAD_ALLOW_WRITE_FALLBACK=1`; the default is fail-closed.
+- PR bodies should continue to include `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
+
+---
+
