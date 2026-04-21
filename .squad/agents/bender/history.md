@@ -244,3 +244,15 @@ All 6 security conditions from DP #329 + DP #330 security reviews integrated as 
 - (2026-04-20) AppInsights `ConnectionString` is not a secret in the Key Vault sense — it provides ingestion-write access only, no read access to telemetry data. Safe to place directly in SWA `appsettings` without KV indirection. Mark Bicep output `@secure()` only to suppress ARM deployment state logging (prevents connection string appearing in `az deployment` JSON output).
 - (2026-04-20) When adding a setting always available from a sibling Bicep resource, remove any conditional `if` guard on the dependent `appSettings` resource — the guard becomes misleading and risks deploying with a missing required env var.
 - (2026-04-20) `az bicep build` compiles to `infra/main.json` in the same directory; add `infra/main.json` to `.gitignore` if not present (ARM JSON is a build artifact, not source).
+
+## 2026-04-20 Issue #941 — /health LLM deep-check canary
+
+**PR:** squad/941-health-llm  
+**Status:** In progress
+
+**Scope:** Added `?deep=1` opt-in mode to `/health` that fires a minimal 1-token AOAI probe and reports `{ llm: { ok, latencyMs, model, errorCode? } }`. 30-second success cache prevents AOAI spam on repeated probes. Default shallow path unchanged.
+
+**Key Learnings:**
+- (2026-04-20) In Vitest, `vi.mock` factory closures are hoisted before variable declarations; any variable referenced inside a factory must be declared via `vi.hoisted()` — plain `const` in module scope hits the temporal dead zone.
+- (2026-04-20) When mocking a class constructor in Vitest, use `class { ... }` syntax in the factory instead of `vi.fn().mockReturnValue(...)` or `vi.fn().mockImplementation(() => ...)` with an arrow function — arrow functions cannot be constructors and `mockReturnValue` is rejected when called with `new`.
+- (2026-04-20) For timeout tests against `AbortController`-based fetch calls, simulate the abort by rejecting immediately with `err.name = "AbortError"` rather than wiring a real abort listener — wiring a listener requires the actual timeout to fire (8 s), which exceeds the default Vitest test timeout (5 s).
