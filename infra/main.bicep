@@ -50,6 +50,13 @@ param openAiApiKey string = ''
 param entraClientSecret string = ''
 
 
+@description('Name of the Log Analytics workspace (must be globally unique)')
+param logAnalyticsWorkspaceName string = 'law-kickstart'
+
+@description('Name of the Application Insights component (must be globally unique)')
+param appInsightsName string = 'ai-kickstart'
+
+
 // ── Key Vault ───────────────────────────────────────────────────
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
@@ -82,6 +89,38 @@ resource secretEntraClientSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' 
   properties: {
     value: entraClientSecret
     contentType: 'text/plain'
+  }
+}
+
+// ── Log Analytics Workspace ─────────────────────────────────────
+
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+  name: logAnalyticsWorkspaceName
+  location: location
+  properties: {
+    sku: {
+      name: 'PerGB2018'
+    }
+    retentionInDays: 30
+    features: {
+      enableLogAccessUsingOnlyResourcePermissions: true
+    }
+    publicNetworkAccessForIngestion: 'Enabled'
+    publicNetworkAccessForQuery: 'Enabled'
+  }
+}
+
+// ── Application Insights ────────────────────────────────────────
+
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: appInsightsName
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logAnalyticsWorkspace.id
+    publicNetworkAccessForIngestion: 'Enabled'
+    publicNetworkAccessForQuery: 'Enabled'
   }
 }
 
@@ -134,6 +173,7 @@ var baseAppSettings = {
   AZURE_OPENAI_CHAT_DEPLOYMENT: openAiChatDeployment
   AZURE_OPENAI_CODEX_DEPLOYMENT: openAiCodexDeployment
   AZURE_OPENAI_INSPIRE_DEPLOYMENT: openAiInspireDeployment
+  APPLICATIONINSIGHTS_CONNECTION_STRING: appInsights.properties.ConnectionString
 }
 
 var clientSecretSetting = !empty(entraClientSecret)
@@ -144,7 +184,7 @@ var apiKeySetting = !empty(openAiApiKey)
   ? { AZURE_OPENAI_API_KEY: '@Microsoft.KeyVault(SecretUri=${keyVault.properties.vaultUri}secrets/openai-api-key)' }
   : {}
 
-resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = if (!empty(entraClientId) || !empty(openAiApiKey)) {
+resource appSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
   parent: staticWebApp
   name: 'appsettings'
   properties: union(baseAppSettings, clientSecretSetting, apiKeySetting)
@@ -177,3 +217,13 @@ output keyVaultName string = keyVault.name
 
 @description('Key Vault URI')
 output keyVaultUri string = keyVault.properties.vaultUri
+
+@description('Application Insights name')
+output appInsightsName string = appInsights.name
+
+@description('Application Insights connection string (contains the ingestion endpoint and instrumentation key)')
+@secure()
+output appInsightsConnectionString string = appInsights.properties.ConnectionString
+
+@description('Application Insights instrumentation key')
+output appInsightsInstrumentationKey string = appInsights.properties.InstrumentationKey

@@ -34,6 +34,12 @@
     },
     "keyVaultName": {
       "value": "kv-kickstart-dev"
+    },
+    "logAnalyticsWorkspaceName": {
+      "value": "law-kickstart-dev"
+    },
+    "appInsightsName": {
+      "value": "ai-kickstart-dev"
     }
   }
 }

@@ -6,7 +6,7 @@ Infrastructure-as-code for the AKS Kickstart platform.
 
 | File | Purpose |
 |------|---------|
-| `main.bicep` | Azure Static Web App, Key Vault for secrets, managed identity, RBAC, custom domain |
+| `main.bicep` | Azure Static Web App, Key Vault for secrets, managed identity, RBAC, Log Analytics workspace, Application Insights, custom domain |
 | `parameters.dev.json` | Dev environment parameters (includes Entra client ID, custom domain, Key Vault name) |
 | `setup-entra.sh` | Entra ID app registration script |
 
@@ -21,6 +21,19 @@ Infrastructure-as-code for the AKS Kickstart platform.
         │                              ▲
         │  @Microsoft.KeyVault(...)    │
         └──────────────────────────────┘
+
+┌─────────────────────┐       ┌──────────────────────────┐
+│  Application        │◀──────│  Log Analytics           │
+│  Insights           │       │  Workspace               │
+│  (workspace-based)  │       │  (PerGB2018, 30-day)     │
+└─────────────────────┘       └──────────────────────────┘
+        │
+        │  ConnectionString → APPLICATIONINSIGHTS_CONNECTION_STRING
+        ▼
+┌─────────────────────┐
+│  SWA Functions API  │
+│  (appinsights.ts)   │
+└─────────────────────┘
 ```
 
 **Secret flow:** Secrets are stored in Azure Key Vault and referenced by SWA app settings using `@Microsoft.KeyVault(SecretUri=...)`. The SWA's system-assigned managed identity is granted the `Key Vault Secrets User` RBAC role, so no API keys or passwords are stored in SWA configuration or ARM state.
@@ -66,6 +79,7 @@ The SWA auth config in `staticwebapp.config.json` references these app settings 
 | `AZURE_OPENAI_API_KEY` | Key Vault reference (`@Microsoft.KeyVault(SecretUri=...)`) |
 | `AZURE_OPENAI_ENDPOINT` | Bicep parameter — not a secret |
 | `AZURE_OPENAI_*_DEPLOYMENT` | Bicep parameters — not secrets |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Auto-wired from the provisioned Application Insights resource (`appInsights.properties.ConnectionString`) — not stored in Key Vault |
 
 ### Secret Management
 
