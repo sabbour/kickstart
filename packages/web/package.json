@@ -7,9 +7,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "postbuild": "node scripts/check-bundle-budget.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@aks-kickstart/harness": "*",
+    "@aks-kickstart/pack-aks-automatic": "*",
+    "@aks-kickstart/pack-azure": "*",
+    "@aks-kickstart/pack-github": "*",
     "@fluentui/react-components": "^9.73.7",
     "@fluentui/react-icons": "^2.0.324",
     "@mermaid-js/layout-elk": "0.2.1",
