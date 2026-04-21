@@ -46,9 +46,11 @@ npm run dev
 
 This starts **Vite** (port 5173) and **SWA CLI** (port 4280) in parallel using `concurrently`. The SWA CLI proxies to Vite for the frontend and serves Azure Functions for the API.
 
-## Configure Azure OpenAI Credentials
+## Configure Environment Variables
 
-The API needs Azure OpenAI credentials to power the conversation engine. Edit `packages/web/api/local.settings.json`:
+The API needs Azure OpenAI credentials and optional authentication configuration. See [Environment Variables](docs-site/docs/getting-started/environment-variables.md) for a complete reference.
+
+Create `packages/web/api/local.settings.json`:
 
 ```json
 {
@@ -58,17 +60,18 @@ The API needs Azure OpenAI credentials to power the conversation engine. Edit `p
     "AzureWebJobsStorage": "",
     "AZURE_OPENAI_ENDPOINT": "https://<your-resource>.openai.azure.com",
     "AZURE_OPENAI_API_KEY": "<your-api-key>",
-    "AZURE_OPENAI_CHAT_DEPLOYMENT": "gpt-5.4-mini",
-    "AZURE_OPENAI_CODEX_DEPLOYMENT": "gpt-5.4",
-    "AZURE_CLIENT_ID": "e71a23c6-aeb4-459a-88fc-07ff96fc9b92",
-    "AZURE_TENANT_ID": "d91aa5af-8c1e-442c-b77c-0b92988b387b",
-    "AZURE_CLIENT_SECRET": "<your-client-secret>",
-    "STEPWISE_GENERATION_V1": "true"
+    "KICKSTART_CHAT_MODEL": "gpt-5.4-mini",
+    "KICKSTART_CODEX_MODEL": "gpt-5.4",
+    "AZURE_CLIENT_ID": "your-app-id",
+    "AZURE_TENANT_ID": "your-tenant-id",
+    "AZURE_CLIENT_SECRET": "<your-client-secret>"
   }
 }
 ```
 
 > **Note:** `local.settings.json` is gitignored — it will never be committed. Each developer needs their own copy.
+
+For a complete list of all environment variables, defaults, and fallback chains, see [Getting Started → Environment Variables](docs-site/docs/getting-started/environment-variables.md).
 
 ### Stepwise Generation Feature Flag
 
