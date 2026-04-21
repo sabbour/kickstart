@@ -169,6 +169,9 @@ export interface SSEStreamResult {
   model: string | undefined;
   sessionId: string | undefined;
   intent: string | undefined;
+  agentName: string | undefined;
+  skillsExecuted: string[] | undefined;
+  toolsExecuted: Array<{ name: string; status: 'ok' | 'error' }> | undefined;
 }
 
 /**
@@ -198,6 +201,9 @@ export async function _processSSEStream(
     model: undefined,
     sessionId: undefined,
     intent: undefined,
+    agentName: undefined,
+    skillsExecuted: undefined,
+    toolsExecuted: undefined,
   };
 
   const reader = body.getReader();
@@ -250,6 +256,18 @@ export async function _processSSEStream(
                 callbacks.onIntent?.({ summary: parsed.intent });
               }
               if (parsed.model) state.model = String(parsed.model);
+              if (typeof parsed.agentName === 'string') state.agentName = parsed.agentName;
+              if (Array.isArray(parsed.skillsExecuted)) {
+                state.skillsExecuted = (parsed.skillsExecuted as unknown[]).filter((s): s is string => typeof s === 'string');
+              }
+              if (Array.isArray(parsed.toolsExecuted)) {
+                state.toolsExecuted = (parsed.toolsExecuted as unknown[]).filter(
+                  (t): t is { name: string; status: 'ok' | 'error' } =>
+                    typeof t === 'object' && t !== null &&
+                    typeof (t as Record<string, unknown>).name === 'string' &&
+                    ((t as Record<string, unknown>).status === 'ok' || (t as Record<string, unknown>).status === 'error'),
+                );
+              }
               break;
 
             case 'error': {

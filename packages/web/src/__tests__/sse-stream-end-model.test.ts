@@ -162,3 +162,82 @@ describe('_processSSEStream — error and phase events', () => {
     expect(onPhase).toHaveBeenCalledWith('design-agent');
   });
 });
+
+// ---------------------------------------------------------------------------
+// #958 — end event carries agentName, skillsExecuted, toolsExecuted
+// ---------------------------------------------------------------------------
+
+describe('_processSSEStream — debug fields in end event (#958)', () => {
+  it('returns agentName, skillsExecuted, and toolsExecuted from the end event', async () => {
+    const stream = makeSSEStream([
+      sseFrame('start', { sessionId: 'sess-1' }),
+      sseFrame('chunk', { delta: 'Sure!' }),
+      sseFrame('end', {
+        sessionId: 'sess-1',
+        model: 'gpt-5.4-mini',
+        agentName: 'core.triage',
+        skillsExecuted: ['core/github-import'],
+        toolsExecuted: [{ name: 'core.emit_ui', status: 'ok' }],
+      }),
+    ]);
+
+    const result = await _processSSEStream(stream, {});
+
+    expect(result.agentName).toBe('core.triage');
+    expect(result.skillsExecuted).toEqual(['core/github-import']);
+    expect(result.toolsExecuted).toEqual([{ name: 'core.emit_ui', status: 'ok' }]);
+  });
+
+  it('returns undefined for debug fields when the end event omits them (backward compat)', async () => {
+    const stream = makeSSEStream([
+      sseFrame('end', { sessionId: 's', model: 'gpt-5.4-mini' }),
+    ]);
+
+    const result = await _processSSEStream(stream, {});
+
+    expect(result.agentName).toBeUndefined();
+    expect(result.skillsExecuted).toBeUndefined();
+    expect(result.toolsExecuted).toBeUndefined();
+  });
+
+  it('filters malformed toolsExecuted entries (type safety)', async () => {
+    const stream = makeSSEStream([
+      sseFrame('end', {
+        model: 'gpt-5.4-mini',
+        agentName: 'core.triage',
+        toolsExecuted: [
+          { name: 'core.emit_ui', status: 'ok' },
+          { name: 42, status: 'ok' },       // malformed — name not a string
+          { name: 'core.read_file' },        // malformed — missing status
+          null,                              // malformed — not an object
+        ],
+      }),
+    ]);
+
+    const result = await _processSSEStream(stream, {});
+
+    // Only the valid entry passes the type guard
+    expect(result.toolsExecuted).toEqual([{ name: 'core.emit_ui', status: 'ok' }]);
+  });
+
+  it('reports multiple tool calls including errors', async () => {
+    const stream = makeSSEStream([
+      sseFrame('end', {
+        model: 'gpt-5.4-mini',
+        agentName: 'core.codesmith',
+        skillsExecuted: [],
+        toolsExecuted: [
+          { name: 'core.fetch_webpage', status: 'ok' },
+          { name: 'core.write_file', status: 'error' },
+        ],
+      }),
+    ]);
+
+    const result = await _processSSEStream(stream, {});
+
+    expect(result.agentName).toBe('core.codesmith');
+    expect(result.skillsExecuted).toEqual([]);
+    expect(result.toolsExecuted).toHaveLength(2);
+    expect(result.toolsExecuted?.[1]).toEqual({ name: 'core.write_file', status: 'error' });
+  });
+});

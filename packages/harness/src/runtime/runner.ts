@@ -415,6 +415,11 @@ export class Runner {
     // Buffer all text chunks — output guardrails must pass before any chunk is sent to the client.
     const chunkBuffer: string[] = [];
 
+    // Debug telemetry — track tool calls and matched skills for the `end` event.
+    const toolsExecuted: Array<{ name: string; status: 'ok' | 'error' }> = [];
+    const pendingToolNames = new Map<string, number>(); // toolName → index in toolsExecuted
+    const skillsExecuted = skills.map((s) => s.id);
+
     try {
       const sdkRunner = getSdkRunner();
       const result = await sdkRunner.run(agent, guardedMessage, {
@@ -444,9 +449,14 @@ export class Runner {
           if (name === 'tool_called') {
             const toolName = (item as { rawItem?: { name?: string } }).rawItem?.name ?? 'unknown';
             sseWrite('tool_start', { toolName });
+            // Record a pending entry; will be updated to 'ok' on tool_output.
+            const idx = toolsExecuted.push({ name: toolName, status: 'ok' }) - 1;
+            pendingToolNames.set(toolName, idx);
           } else if (name === 'tool_output') {
             const toolName = (item as { rawItem?: { name?: string } }).rawItem?.name ?? 'unknown';
             sseWrite('tool_done', { toolName });
+            // Mark the matching pending entry as ok (already defaulted to 'ok').
+            pendingToolNames.delete(toolName);
           } else if (name === 'handoff_occurred') {
             const newAgentName = (item as { agent?: { name?: string } }).agent?.name;
             if (newAgentName) {
@@ -529,6 +539,9 @@ export class Runner {
         sessionId: session.sessionId,
         intent,
         model: modelName,
+        agentName,
+        skillsExecuted,
+        toolsExecuted,
       });
     } catch (err: unknown) {
       // AbortError: may be a UserAction interrupt OR a guardrail halt
