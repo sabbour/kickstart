@@ -9,14 +9,17 @@
  * direct phase routing.
  */
 
+import { randomUUID } from "node:crypto";
 import { app } from "@azure/functions";
 import type { HttpRequest, InvocationContext } from "@azure/functions";
 import { Logger, extractTraceId, extractRequestMetadata } from "../lib/logger.js";
+import { getAppInsightsClient } from "../lib/appinsights.js";
 import { getRegistry } from "../startup/packs.js";
 import { getOrCreateSession } from "@aks-kickstart/harness/runtime/session";
 import { Runner } from "@aks-kickstart/harness/runtime/runner";
 import { SSE_RESPONSE_HEADERS, formatSSEFrame } from "@aks-kickstart/harness/runtime/sse";
 import type { SSEEventType } from "@aks-kickstart/harness/runtime/sse";
+import { sanitizeError } from "../telemetry/sanitize-error.js";
 
 interface ConverseRequest {
   sessionId?: string;
@@ -29,8 +32,10 @@ async function converse(
   ctx: InvocationContext,
 ): Promise<Response> {
   const startTime = Date.now();
+  const requestId = randomUUID();
   const traceId = extractTraceId(request.headers);
-  const logger = new Logger(ctx, "converse", traceId);
+  const logger = new Logger(ctx, "converse", traceId).withContext({ request_id: requestId });
+  const appInsights = getAppInsightsClient();
 
   const requestMeta = extractRequestMetadata(request);
   logger.info("HTTP request received", requestMeta);
@@ -39,7 +44,9 @@ async function converse(
   try {
     body = await request.json() as ConverseRequest;
   } catch (err) {
-    logger.error("Failed to parse JSON body", err as Error);
+    const sanitizedError = sanitizeError(err);
+    logger.error("Failed to parse JSON body", sanitizedError);
+    appInsights.trackEvent({ name: "converse-parse-error", properties: { requestId } });
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -48,73 +55,99 @@ async function converse(
 
   if (!body.message || typeof body.message !== "string") {
     logger.warn("Invalid request: message field missing or not a string");
+    appInsights.trackEvent({
+      name: "converse-validation-error",
+      properties: { requestId, reason: "missing-message" },
+    });
     return new Response(JSON.stringify({ error: "'message' field is required" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
   }
 
-  // Extract OID from Azure SWA principal header (may be undefined in dev/anon mode)
   const principalHeader = request.headers.get("x-ms-client-principal");
   let oid = "anonymous";
   if (principalHeader) {
     try {
       const decoded = Buffer.from(principalHeader, "base64").toString("utf-8");
-      const principal = JSON.parse(decoded) as { userId?: string; claims?: Array<{ typ: string; val: string }> };
+      const principal = JSON.parse(decoded) as {
+        userId?: string;
+        claims?: Array<{ typ: string; val: string }>;
+      };
       const oidClaim = principal.claims?.find(
-        (c) => c.typ === "http://schemas.microsoft.com/identity/claims/objectidentifier" || c.typ === "oid"
+        (claim) => claim.typ === "http://schemas.microsoft.com/identity/claims/objectidentifier" || claim.typ === "oid",
       );
       oid = oidClaim?.val ?? principal.userId ?? "anonymous";
       logger.info("Principal extracted from SWA header", { oid_found: oid !== "anonymous" });
     } catch (err) {
-      logger.warn("Failed to parse SWA principal header", err as Error);
+      logger.warn("Failed to parse SWA principal header", {
+        error: sanitizeError(err).message,
+      });
     }
   }
 
   let registry;
   try {
+    const registryStartTime = Date.now();
     registry = getRegistry();
+    const registryDuration = Date.now() - registryStartTime;
+    logger.info("Pack registry initialized", { duration_ms: registryDuration });
+    appInsights.trackEvent({
+      name: "pack-registry-initialized",
+      properties: { requestId, durationMs: String(registryDuration) },
+    });
   } catch (err) {
-    logger.error("Pack registry initialization failed", err as Error);
+    const sanitizedError = sanitizeError(err);
+    logger.error("Pack registry initialization failed", sanitizedError);
+    appInsights.trackException({
+      exception: sanitizedError,
+      properties: { requestId, context: "pack-registry-init" },
+    });
+
     const encoder = new TextEncoder();
     const errorFrame = encoder.encode(
       `event: error\ndata: ${JSON.stringify({
         message: "Pack registry initialization failed. Please check server logs for details.",
-      })}\n\n`
+      })}\n\n`,
     );
-    return new Response(new ReadableStream({
-      start(controller) {
-        controller.enqueue(errorFrame);
-        controller.close();
+
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(errorFrame);
+          controller.close();
+        },
+      }),
+      {
+        status: 200,
+        headers: { ...SSE_RESPONSE_HEADERS, "X-Pack-Init-Failed": "true" },
       },
-    }), {
-      status: 200,
-      headers: { ...SSE_RESPONSE_HEADERS, "X-Pack-Init-Failed": "true" },
-    });
+    );
   }
 
   let session;
-  let sessionId: string;
   try {
     session = getOrCreateSession(body.sessionId, oid);
-    sessionId = session.id;
-    const action = body.sessionId ? "resumed" : "created";
-    logger.info("Session resolved", { session_id: sessionId, action });
+    logger.info("Session resolved", { action: body.sessionId ? "resumed" : "created" });
   } catch (err) {
-    logger.error("Failed to resolve session", err as Error, { session_id: body.sessionId });
-    if (err instanceof Error && err.message === 'SESSION_OID_MISMATCH') {
-      return new Response('Forbidden', { status: 403 });
+    if (err instanceof Error && err.message === "SESSION_OID_MISMATCH") {
+      logger.warn("Session ownership mismatch");
+      appInsights.trackEvent({ name: "session-oid-mismatch", properties: { requestId } });
+      return new Response("Forbidden", { status: 403 });
     }
+
+    const sanitizedError = sanitizeError(err);
+    logger.error("Failed to resolve session", sanitizedError);
+    appInsights.trackException({
+      exception: sanitizedError,
+      properties: { requestId, context: "session-resolution" },
+    });
     throw err;
   }
 
-  const childLogger = logger.withContext(sessionId);
+  const requestLogger = logger.withContext({ request_id: requestId });
   const runner = new Runner(registry);
-
-  // B2: AbortController to signal runner when client disconnects
   const abortController = new AbortController();
-
-  // Build SSE ReadableStream
   const encoder = new TextEncoder();
   let eventCount = 0;
   let errorCount = 0;
@@ -126,41 +159,69 @@ async function converse(
         try {
           if (firstChunkTime === null) {
             firstChunkTime = Date.now() - startTime;
-            childLogger.debug("First SSE chunk emitted", { first_chunk_ms: firstChunkTime });
+            requestLogger.debug("First SSE chunk emitted", { first_chunk_ms: firstChunkTime });
           }
           eventCount++;
           if (event === "error") {
             errorCount++;
           }
           controller.enqueue(encoder.encode(formatSSEFrame(event, data)));
-        } catch { /* client disconnected */ }
+        } catch {
+          // client disconnected
+        }
       };
 
       try {
-        childLogger.info("Starting runner", { message_length: body.message.length });
+        requestLogger.info("Starting runner", { message_length: body.message.length });
+        const runStartTime = Date.now();
         await runner.run(session, body.message, write, abortController.signal);
-        childLogger.info("Runner completed successfully", { event_count: eventCount, error_count: errorCount });
+        const runDuration = Date.now() - runStartTime;
+
+        requestLogger.info("Runner completed successfully", {
+          duration_ms: runDuration,
+          event_count: eventCount,
+          error_count: errorCount,
+        });
+        appInsights.trackEvent({
+          name: "converse-success",
+          properties: {
+            requestId,
+            durationMs: String(runDuration),
+            eventCount: String(eventCount),
+            errorCount: String(errorCount),
+          },
+        });
       } catch (err) {
         errorCount++;
-        childLogger.error("Runner execution failed", err as Error);
+        const sanitizedError = sanitizeError(err);
+        requestLogger.error("Runner execution failed", sanitizedError);
+        appInsights.trackException({
+          exception: sanitizedError,
+          properties: { requestId, context: "runner-execution" },
+        });
         try {
-          write("error", { message: err instanceof Error ? err.message : String(err) });
-        } catch { /* ignore */ }
+          write("error", { message: sanitizedError.message });
+        } catch {
+          // ignore write failure on disconnect
+        }
       } finally {
-        try { controller.close(); } catch { /* already closed */ }
+        try {
+          controller.close();
+        } catch {
+          // already closed
+        }
       }
     },
     cancel() {
-      // B2: client disconnected — abort the runner
-      childLogger.info("Client disconnected during request");
-      abortController.abort('client-disconnect');
+      requestLogger.info("Client disconnected during request");
+      appInsights.trackEvent({ name: "converse-client-disconnect", properties: { requestId } });
+      abortController.abort("client-disconnect");
     },
   });
 
-  const responseTime = Date.now() - startTime;
-  childLogger.info("HTTP response sent", {
+  requestLogger.info("HTTP response sent", {
     status_code: 200,
-    duration_ms: responseTime,
+    duration_ms: Date.now() - startTime,
     event_count: eventCount,
     first_chunk_ms: firstChunkTime,
     error_count: errorCount,

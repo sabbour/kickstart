@@ -34,7 +34,6 @@ function parseEnabledPacks(raw: string | undefined): PackId[] {
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
   );
-  // `core` is always registered — everything else depends on it.
   requested.add('core');
   return PACK_ORDER.filter((id): id is PackId => requested.has(id));
 }
@@ -60,14 +59,9 @@ function parseEnabledPacks(raw: string | undefined): PackId[] {
  */
 export function getRegistry(): PackRegistry {
   if (!_registry) {
-    // Create a startup logger (trace ID for startup events)
     const startupTraceId = process.env.STARTUP_TRACE_ID || randomUUID();
-
-    // Create a mock InvocationContext for startup logging
-    // In a real Azure Functions environment, this would be the global context
     const mockCtx = {
       log: (msg: string) => {
-        // In production, this routes to Application Insights via the Azure Functions runtime
         if (process.env.NODE_ENV !== 'test') {
           console.log(msg);
         }
@@ -76,7 +70,6 @@ export function getRegistry(): PackRegistry {
 
     const logger = new Logger(mockCtx as any, 'pack-registry-startup', startupTraceId);
 
-    // Validate credentials FIRST (fail fast if misconfigured)
     try {
       const credentialConfig = getCredentialConfig();
       logger.info('Credentials validated', {
@@ -94,8 +87,8 @@ export function getRegistry(): PackRegistry {
     const registry = new PackRegistry();
     const enabled = parseEnabledPacks(process.env.KICKSTART_PACKS);
 
-    logger.info("Pack registry initialization started", {
-      source: "startup",
+    logger.info('Pack registry initialization started', {
+      source: 'startup',
       enabled_packs: enabled,
       pack_count: enabled.length,
     });
@@ -103,26 +96,26 @@ export function getRegistry(): PackRegistry {
     for (const id of enabled) {
       const packStartTime = Date.now();
       try {
-        logger.info("Registering pack", {
-          source: "startup",
+        logger.info('Registering pack', {
+          source: 'startup',
           pack_id: id,
         });
 
         registry.register(PACK_BY_ID[id]);
 
         const duration = Date.now() - packStartTime;
-        logger.info("Pack registered successfully", {
-          source: "startup",
+        logger.info('Pack registered successfully', {
+          source: 'startup',
           pack_id: id,
-          status: "success",
+          status: 'success',
           duration_ms: duration,
         });
       } catch (err) {
         const duration = Date.now() - packStartTime;
-        logger.error("Pack registration failed", err as Error, {
-          source: "startup",
+        logger.error('Pack registration failed', err as Error, {
+          source: 'startup',
           pack_id: id,
-          error_code: "MANIFEST_LOAD_FAILED",
+          error_code: 'MANIFEST_LOAD_FAILED',
           duration_ms: duration,
         });
         throw err;
@@ -131,22 +124,22 @@ export function getRegistry(): PackRegistry {
 
     try {
       const sealStartTime = Date.now();
-      logger.info("Sealing registry", {
-        source: "startup",
+      logger.info('Sealing registry', {
+        source: 'startup',
       });
 
       registry.seal();
 
       const duration = Date.now() - sealStartTime;
-      logger.info("Registry sealed successfully", {
-        source: "startup",
+      logger.info('Registry sealed successfully', {
+        source: 'startup',
         pack_count: enabled.length,
         duration_ms: duration,
       });
     } catch (err) {
-      logger.error("Failed to seal registry", err as Error, {
-        source: "startup",
-        error_code: "REGISTRY_SEAL_FAILED",
+      logger.error('Failed to seal registry', err as Error, {
+        source: 'startup',
+        error_code: 'REGISTRY_SEAL_FAILED',
       });
       throw err;
     }
