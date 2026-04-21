@@ -1,12 +1,12 @@
 /* ----------------------------------------------------------------
-   Playground — A2UI Gallery (sidebar layout)
+   Playground (sidebar layout)
    Renders inside Layout → .app-shell → .app-layout → .chat-main
    all of which have overflow: hidden. We must fill the space and
    manage our own scroll containers.
 
    Component styling is handled by Fluent UI v9 (makeStyles + tokens).
-   This file retains layout-only rules: flex containers, scroll areas,
-   masonry grid, responsive breakpoints.
+   This file retains layout-only rules: flex containers and scroll
+   areas for the Create / Components / Icons / Workspace views.
    ---------------------------------------------------------------- */
 
 /* Fill the entire .chat-main area */
@@ -19,38 +19,12 @@
   font-family: var(--fontFamilyBase);
 }
 
-/* ---- Gallery View: Masonry Grid ---- */
+/* ---- Components / Icons scroll container ---- */
 .playground-gallery-scroll {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 24px;
-}
-
-.playground-gallery {
-  column-count: 1;
-  column-gap: 20px;
-  max-width: 1600px;
-  margin: 0 auto;
-}
-
-/* Responsive column breakpoints */
-@media (min-width: 640px) {
-  .playground-gallery {
-    column-count: 2;
-  }
-}
-
-@media (min-width: 1024px) {
-  .playground-gallery {
-    column-count: 3;
-  }
-}
-
-@media (min-width: 1440px) {
-  .playground-gallery {
-    column-count: 4;
-  }
 }
 
 /* ---- Create View: JSON Editor ---- */
@@ -67,13 +41,4 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-/* ---- Widget Card Animations ---- */
-.playground-widget-card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.playground-widget-card:hover {
-  transform: translateY(-2px);
 }

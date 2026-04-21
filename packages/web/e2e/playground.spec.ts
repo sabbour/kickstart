@@ -3,9 +3,9 @@ import { test, expect } from './helpers';
 
 const PLAYGROUND_URL = '/?playground';
 
-async function openScenario(page: Page, label: string, tab: 'Ideas' | 'Components' = 'Ideas') {
+async function openScenario(page: Page, label: string, tab: 'Components' = 'Components') {
   await page.getByRole('tab', { name: tab }).click();
-  const searchBox = page.getByPlaceholder('Filter scenarios...');
+  const searchBox = page.getByPlaceholder('Filter components...');
   await searchBox.fill(label);
   const card = page.getByRole('button', { name: label }).first();
   await card.waitFor({ timeout: 10_000 });
@@ -27,15 +27,15 @@ test.describe.skip('Playground', () => {
   // ---- Tab Navigation ----
 
   test.describe('Tab navigation', () => {
-    test('all six tabs are visible', async ({ page }) => {
-      for (const tab of ['Create', 'Ideas', 'Components', 'Icons', 'Widgets', 'Workspace']) {
+    test('all five tabs are visible', async ({ page }) => {
+      for (const tab of ['Create', 'Components', 'Icons', 'Widgets', 'Workspace']) {
         await expect(page.getByRole('tab', { name: tab })).toBeVisible();
       }
     });
 
-    test('Ideas tab is active by default', async ({ page }) => {
-      await expect(page.getByRole('tab', { name: 'Ideas' })).toHaveAttribute('aria-selected', 'true');
-      await expect(page.locator('.playground-gallery')).toBeVisible();
+    test('Create tab is active by default', async ({ page }) => {
+      await expect(page.getByRole('tab', { name: 'Create' })).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByText('What component would you like to imagine?')).toBeVisible();
     });
 
     test('switching to Create tab shows the prompt hero', async ({ page }) => {
@@ -44,7 +44,7 @@ test.describe.skip('Playground', () => {
       await expect(page.getByText('What component would you like to imagine?')).toBeVisible();
     });
 
-    test('switching to Components tab shows the gallery grid', async ({ page }) => {
+    test('switching to Components tab shows the component grid', async ({ page }) => {
       await page.getByRole('tab', { name: 'Components' }).click();
       await expect(page.getByRole('tab', { name: 'Components' })).toHaveAttribute('aria-selected', 'true');
       await expect(page.locator('.playground-gallery-scroll')).toBeVisible();
@@ -66,26 +66,29 @@ test.describe.skip('Playground', () => {
     });
   });
 
-  // ---- Gallery Tab ----
+  // ---- Components Tab (cards + interaction) ----
 
-  test.describe('Gallery tab', () => {
-    test('masonry grid renders with multiple scenario cards', async ({ page }) => {
-      const gallery = page.locator('.playground-gallery');
-      await expect(gallery).toBeVisible();
+  test.describe('Components tab cards', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.getByRole('tab', { name: 'Components' }).click();
+    });
 
-      const cards = page.locator('.playground-gallery > div');
+    test('grid renders with multiple component cards', async ({ page }) => {
+      const grid = page.locator('.playground-gallery-scroll');
+      await expect(grid).toBeVisible();
+
+      const cards = page.locator('.playground-gallery-scroll [role="button"]');
       const count = await cards.count();
       expect(count).toBeGreaterThan(5);
     });
 
     test('cards contain A2UI component content after render', async ({ page }) => {
-      // Wait for first card's A2UI surface to render (async via useEffect)
-      const firstCard = page.locator('.playground-gallery > div').first();
+      const firstCard = page.locator('.playground-gallery-scroll [role="button"]').first();
       await expect(firstCard.locator('.a2ui-component')).toBeVisible({ timeout: 10_000 });
     });
 
-    test('clicking a gallery card opens a preview dialog', async ({ page }) => {
-      const firstCard = page.locator('.playground-gallery > div').first();
+    test('clicking a component card opens a preview dialog', async ({ page }) => {
+      const firstCard = page.locator('.playground-gallery-scroll [role="button"]').first();
       await firstCard.waitFor({ timeout: 5000 });
       await firstCard.click();
 
@@ -93,7 +96,7 @@ test.describe.skip('Playground', () => {
     });
 
     test('dialog has Preview and JSON tabs', async ({ page }) => {
-      await page.locator('.playground-gallery > div').first().click();
+      await page.locator('.playground-gallery-scroll [role="button"]').first().click();
       await page.getByRole('dialog').waitFor({ timeout: 5000 });
 
       await expect(page.getByRole('tab', { name: 'Preview' })).toBeVisible();
@@ -101,39 +104,38 @@ test.describe.skip('Playground', () => {
     });
 
     test('dialog JSON tab shows valid JSON', async ({ page }) => {
-      await page.locator('.playground-gallery > div').first().click();
+      await page.locator('.playground-gallery-scroll [role="button"]').first().click();
       await page.getByRole('dialog').waitFor({ timeout: 5000 });
 
       await page.getByRole('tab', { name: 'JSON', exact: true }).click();
-      // The JSON code block renders A2UI message JSON — check it contains "version"
       await expect(page.getByRole('dialog').getByText(/version/)).toBeVisible({ timeout: 3000 });
     });
 
     test('dialog can be closed with the Close button', async ({ page }) => {
-      await page.locator('.playground-gallery > div').first().click();
+      await page.locator('.playground-gallery-scroll [role="button"]').first().click();
       await page.getByRole('dialog').waitFor({ timeout: 5000 });
 
       await page.getByRole('button', { name: 'Close' }).click();
       await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 3000 });
     });
 
-    test('search filter reduces visible gallery cards', async ({ page }) => {
-      const cards = page.locator('.playground-gallery > div');
+    test('search filter reduces visible component cards', async ({ page }) => {
+      const cards = page.locator('.playground-gallery-scroll [role="button"]');
       const initialCount = await cards.count();
       expect(initialCount).toBeGreaterThan(0);
 
-      await page.getByPlaceholder('Filter scenarios...').fill('zzznothing');
+      await page.getByPlaceholder('Filter components...').fill('zzznothing');
 
       await expect(async () => {
         expect(await cards.count()).toBeLessThan(initialCount);
       }).toPass({ timeout: 3000 });
     });
 
-    test('clearing search filter restores all gallery cards', async ({ page }) => {
-      const cards = page.locator('.playground-gallery > div');
+    test('clearing search filter restores all component cards', async ({ page }) => {
+      const cards = page.locator('.playground-gallery-scroll [role="button"]');
       const initialCount = await cards.count();
 
-      const searchBox = page.getByPlaceholder('Filter scenarios...');
+      const searchBox = page.getByPlaceholder('Filter components...');
       await searchBox.fill('zzznothing');
       await searchBox.clear();
 
@@ -166,9 +168,9 @@ test.describe.skip('Playground', () => {
 
   });
 
-  // ---- Components Tab ----
+  // ---- Components Tab (group headers) ----
 
-  test.describe('Components tab', () => {
+  test.describe('Components tab groups', () => {
     test.beforeEach(async ({ page }) => {
       await page.getByRole('tab', { name: 'Components' }).click();
     });
@@ -177,32 +179,6 @@ test.describe.skip('Playground', () => {
       for (const group of ['Layout', 'Content', 'Inputs', 'Custom Controls']) {
         await expect(page.getByText(group, { exact: true }).first()).toBeVisible();
       }
-    });
-
-    test('component cards render inside groups', async ({ page }) => {
-      const cards = page.locator('.playground-gallery > div');
-      await expect(cards.first()).toBeVisible({ timeout: 5000 });
-      const count = await cards.count();
-      expect(count).toBeGreaterThan(0);
-    });
-
-    test('clicking a component card opens a dialog', async ({ page }) => {
-      const firstCard = page.locator('.playground-gallery > div').first();
-      await firstCard.waitFor({ timeout: 5000 });
-      await firstCard.click();
-      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
-      await page.getByRole('button', { name: 'Close' }).click();
-    });
-
-    test('search filter works on component scenarios', async ({ page }) => {
-      const cards = page.locator('.playground-gallery > div');
-      const initialCount = await cards.count();
-
-      await page.getByPlaceholder('Filter scenarios...').fill('zzznothing');
-
-      await expect(async () => {
-        expect(await cards.count()).toBeLessThan(initialCount);
-      }).toPass({ timeout: 3000 });
     });
   });
 
@@ -428,12 +404,6 @@ test.describe.skip('Playground', () => {
   test.describe('Accessibility', () => {
     // --- ARIA roles on tab panels ---
 
-    test('Ideas tab panel has role="tabpanel" and aria-labelledby="tab-gallery"', async ({ page }) => {
-      const panel = page.locator('#panel-gallery');
-      await expect(panel).toHaveAttribute('role', 'tabpanel');
-      await expect(panel).toHaveAttribute('aria-labelledby', 'tab-gallery');
-    });
-
     test('Components tab panel has correct ARIA attributes', async ({ page }) => {
       await page.getByRole('tab', { name: 'Components' }).click();
       const panel = page.locator('#panel-components');
@@ -462,97 +432,94 @@ test.describe.skip('Playground', () => {
       await expect(panel).toHaveAttribute('aria-labelledby', 'tab-create');
     });
 
-    // --- Tab IDs (aria-controls wiring) ---
+    // --- Component card ARIA (requires Components tab active) ---
 
-    test('Ideas tab has id="tab-gallery" and aria-controls="panel-gallery"', async ({ page }) => {
-      const tab = page.getByRole('tab', { name: 'Ideas' });
-      await expect(tab).toHaveAttribute('id', 'tab-gallery');
-      await expect(tab).toHaveAttribute('aria-controls', 'panel-gallery');
-    });
+    test.describe('Component card keyboard & ARIA', () => {
+      test.beforeEach(async ({ page }) => {
+        await page.getByRole('tab', { name: 'Components' }).click();
+      });
 
-    // --- Gallery card ARIA ---
+      test('component cards have role="button" and aria-label', async ({ page }) => {
+        const firstCard = page.locator('.playground-gallery-scroll [role="button"]').first();
+        await expect(firstCard).toBeVisible({ timeout: 5000 });
+        await expect(firstCard).toHaveAttribute('role', 'button');
+        const label = await firstCard.getAttribute('aria-label');
+        expect(label).toBeTruthy();
+      });
 
-    test('gallery cards have role="button" and aria-label', async ({ page }) => {
-      const firstCard = page.locator('.playground-gallery [role="button"]').first();
-      await expect(firstCard).toBeVisible({ timeout: 5000 });
-      await expect(firstCard).toHaveAttribute('role', 'button');
-      const label = await firstCard.getAttribute('aria-label');
-      expect(label).toBeTruthy();
-    });
+      test('Enter key on focused component card opens dialog', async ({ page }) => {
+        const firstCard = page.locator('.playground-gallery-scroll [role="button"]').first();
+        await firstCard.waitFor({ timeout: 5000 });
+        await firstCard.focus();
+        await page.keyboard.press('Enter');
+        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
+      });
 
-    test('Enter key on focused gallery card opens dialog', async ({ page }) => {
-      const firstCard = page.locator('.playground-gallery [role="button"]').first();
-      await firstCard.waitFor({ timeout: 5000 });
-      await firstCard.focus();
-      await page.keyboard.press('Enter');
-      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
-    });
+      test('Space key on focused component card opens dialog', async ({ page }) => {
+        const firstCard = page.locator('.playground-gallery-scroll [role="button"]').first();
+        await firstCard.waitFor({ timeout: 5000 });
+        await firstCard.focus();
+        await page.keyboard.press(' ');
+        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
+      });
 
-    test('Space key on focused gallery card opens dialog', async ({ page }) => {
-      const firstCard = page.locator('.playground-gallery [role="button"]').first();
-      await firstCard.waitFor({ timeout: 5000 });
-      await firstCard.focus();
-      await page.keyboard.press(' ');
-      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
-    });
+      test('Escape closes open dialog', async ({ page }) => {
+        await page.locator('.playground-gallery-scroll [role="button"]').first().click();
+        await page.getByRole('dialog').waitFor({ timeout: 5000 });
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 3000 });
+      });
 
-    test('Escape closes open dialog', async ({ page }) => {
-      await page.locator('.playground-gallery [role="button"]').first().click();
-      await page.getByRole('dialog').waitFor({ timeout: 5000 });
-      await page.keyboard.press('Escape');
-      await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 3000 });
-    });
+      // --- Arrow key card navigation ---
 
-    // --- Arrow key gallery navigation ---
+      test('ArrowRight moves focus to next component card', async ({ page }) => {
+        const cards = page.locator('.playground-gallery-scroll [role="button"]');
+        await cards.first().waitFor({ timeout: 5000 });
+        await cards.first().focus();
+        await page.keyboard.press('ArrowRight');
+        await expect(cards.nth(1)).toBeFocused();
+      });
 
-    test('ArrowRight moves focus to next gallery card', async ({ page }) => {
-      const cards = page.locator('.playground-gallery [role="button"]');
-      await cards.first().waitFor({ timeout: 5000 });
-      await cards.first().focus();
-      await page.keyboard.press('ArrowRight');
-      await expect(cards.nth(1)).toBeFocused();
-    });
+      test('ArrowLeft moves focus to previous component card', async ({ page }) => {
+        const cards = page.locator('.playground-gallery-scroll [role="button"]');
+        await cards.first().waitFor({ timeout: 5000 });
+        await cards.nth(1).focus();
+        await page.keyboard.press('ArrowLeft');
+        await expect(cards.first()).toBeFocused();
+      });
 
-    test('ArrowLeft moves focus to previous gallery card', async ({ page }) => {
-      const cards = page.locator('.playground-gallery [role="button"]');
-      await cards.first().waitFor({ timeout: 5000 });
-      // Focus second card then go back
-      await cards.nth(1).focus();
-      await page.keyboard.press('ArrowLeft');
-      await expect(cards.first()).toBeFocused();
-    });
+      test('ArrowDown moves focus to next component card', async ({ page }) => {
+        const cards = page.locator('.playground-gallery-scroll [role="button"]');
+        await cards.first().waitFor({ timeout: 5000 });
+        await cards.first().focus();
+        await page.keyboard.press('ArrowDown');
+        await expect(cards.nth(1)).toBeFocused();
+      });
 
-    test('ArrowDown moves focus to next gallery card', async ({ page }) => {
-      const cards = page.locator('.playground-gallery [role="button"]');
-      await cards.first().waitFor({ timeout: 5000 });
-      await cards.first().focus();
-      await page.keyboard.press('ArrowDown');
-      await expect(cards.nth(1)).toBeFocused();
-    });
-
-    test('ArrowRight does not go past last gallery card', async ({ page }) => {
-      const cards = page.locator('.playground-gallery [role="button"]');
-      await cards.first().waitFor({ timeout: 5000 });
-      const count = await cards.count();
-      await cards.last().focus();
-      await page.keyboard.press('ArrowRight');
-      // Focus stays on last card
-      await expect(cards.nth(count - 1)).toBeFocused();
+      test('ArrowRight does not go past last component card', async ({ page }) => {
+        const cards = page.locator('.playground-gallery-scroll [role="button"]');
+        await cards.first().waitFor({ timeout: 5000 });
+        const count = await cards.count();
+        await cards.last().focus();
+        await page.keyboard.press('ArrowRight');
+        await expect(cards.nth(count - 1)).toBeFocused();
+      });
     });
 
     // --- Keyboard shortcuts ---
 
-    test('Ctrl+K focuses gallery search input', async ({ page }) => {
-      // Focus a reliable non-input target — clicking body is flaky in headless CI
-      await page.getByRole('tab', { name: 'Ideas' }).focus();
+    test('Ctrl+K focuses component search input', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Components' }).click();
+      await page.getByRole('tab', { name: 'Components' }).focus();
       await page.keyboard.press('Control+k');
-      await expect(page.getByPlaceholder('Filter scenarios...')).toBeFocused();
+      await expect(page.getByPlaceholder('Filter components...')).toBeFocused();
     });
 
-    test('/ key focuses gallery search input', async ({ page }) => {
-      await page.getByRole('tab', { name: 'Ideas' }).focus();
+    test('/ key focuses component search input', async ({ page }) => {
+      await page.getByRole('tab', { name: 'Components' }).click();
+      await page.getByRole('tab', { name: 'Components' }).focus();
       await page.keyboard.press('/');
-      await expect(page.getByPlaceholder('Filter scenarios...')).toBeFocused();
+      await expect(page.getByPlaceholder('Filter components...')).toBeFocused();
     });
 
     test('Ctrl+K focuses icons search when Icons tab is active', async ({ page }) => {
@@ -639,7 +606,8 @@ test.describe.skip('Playground', () => {
     // --- Dialog accessibility ---
 
     test('dialog dismiss button has aria-label', async ({ page }) => {
-      await page.locator('.playground-gallery [role="button"]').first().click();
+      await page.getByRole('tab', { name: 'Components' }).click();
+      await page.locator('.playground-gallery-scroll [role="button"]').first().click();
       await page.getByRole('dialog').waitFor({ timeout: 5000 });
       await expect(page.getByRole('button', { name: 'Dismiss' })).toBeVisible();
     });

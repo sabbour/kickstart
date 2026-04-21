@@ -1,8 +1,8 @@
 /**
- * Playground — A2UI Gallery (sidebar layout).
+ * Playground — Create / Components / Icons / Workspace (sidebar layout).
  *
  * Access via ?playground URL parameter.
- * Left sidebar navigation: Create | Ideas | Components | Icons
+ * Left sidebar navigation: Create | Components | Icons | Workspace
  *
  * Registry is fetched live from /api/packs (Step 5).
  */
@@ -19,21 +19,19 @@ import {
 } from '@fluentui/react-components';
 import {
   Dismiss24Regular, Sparkle24Regular,
-  Add24Regular, Lightbulb24Regular, Grid24Regular, Icons24Regular,
+  Add24Regular, Grid24Regular, Icons24Regular,
   Navigation24Regular, FolderOpen24Regular, Copy24Regular,
   ArrowRight24Regular,
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import type { ActionHandler } from '../hooks/useActionDispatch';
 import { usePackRegistry } from '../hooks/usePackRegistry';
-import type { PlaygroundScenario, ComponentContribution } from '@aks-kickstart/harness';
+import type { ComponentContribution } from '@aks-kickstart/harness';
 import { useDebug } from '../contexts/DebugContext';
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
 import { A2UIEnvelopePreview } from '../components/A2UI/A2UIEnvelopePreview';
 import { DebugPanel } from '../components/Chat/DebugPanel';
 import type { ChatMessage, DebugMetadata } from '../types';
-import type { SurfaceModel } from '../vendor/a2ui/web_core/index';
-import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
 import { PlaygroundWorkspace } from './PlaygroundWorkspace';
 import {
   AZURE_ICON_CATEGORIES,
@@ -178,9 +176,8 @@ function normalizePlaygroundComponents(raw: any[]): any[] {
 }
 
 // Registry-derived groupings — populated from registry at render time.
-// Scenarios are grouped by pack name (prefix of scenario.id, e.g. "core" for "core/discover-flow").
 // Components are grouped by pack name (prefix of component.name, e.g. "core" for "core/Button").
-// Both lists are empty until pack-core lands (Step 4) and registry is wired in (Step 5).
+// The list is empty until pack-core lands (Step 4) and registry is wired in (Step 5).
 
 function packNameFromId(id: string): string {
   return id.split('/')[0] ?? id;
@@ -316,45 +313,6 @@ const useStyles = makeStyles({
     [`@media (max-width: ${SIDEBAR_COLLAPSED_BP})`]: {
       display: 'inline-flex',
     },
-  },
-  galleryCard: {
-    backgroundColor: tokens.colorNeutralBackground1,
-    borderRadius: tokens.borderRadiusXLarge,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    boxShadow: tokens.shadow4,
-    cursor: 'pointer',
-    transition: 'box-shadow 0.2s ease, transform 0.15s ease',
-    breakInside: 'avoid' as const,
-    marginBottom: tokens.spacingVerticalM,
-    overflow: 'hidden',
-    ':hover': {
-      boxShadow: tokens.shadow16,
-      transform: 'translateY(-3px)',
-    },
-    ':focus-visible': {
-      outline: `2px solid ${tokens.colorBrandStroke1}`,
-      outlineOffset: '2px',
-      boxShadow: tokens.shadow16,
-    },
-  },
-  cardLabel: {
-    display: 'block',
-    paddingTop: tokens.spacingVerticalS,
-    paddingLeft: tokens.spacingHorizontalM,
-    paddingRight: tokens.spacingHorizontalM,
-    color: tokens.colorNeutralForeground3,
-    fontSize: tokens.fontSizeBase200,
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
-    fontWeight: tokens.fontWeightSemibold,
-  },
-  cardDescription: {
-    display: 'block',
-    paddingLeft: tokens.spacingHorizontalM,
-    paddingRight: tokens.spacingHorizontalM,
-    paddingTop: tokens.spacingVerticalXS,
-    color: tokens.colorNeutralForeground4,
-    fontSize: tokens.fontSizeBase200,
   },
   catalogBadge: {
     display: 'inline-block',
@@ -742,11 +700,11 @@ const useStyles = makeStyles({
   },
 });
 
-// ---- GalleryCardErrorBoundary ----
-// Isolates crashes in individual gallery cards so one broken card
-// doesn't bring down the whole gallery.
+// ---- ComponentCardErrorBoundary ----
+// Isolates crashes in individual component cards so one broken card
+// doesn't bring down the whole grid.
 interface ErrorBoundaryState { hasError: boolean; message: string }
-class GalleryCardErrorBoundary extends React.Component<
+class ComponentCardErrorBoundary extends React.Component<
   React.PropsWithChildren<{ label?: string }>,
   ErrorBoundaryState
 > {
@@ -768,71 +726,6 @@ class GalleryCardErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
-
-// ---- GalleryCard Component ----
-interface GalleryCardProps {
-  scenario: PlaygroundScenario;
-  onCardClick: (scenario: PlaygroundScenario, surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>) => void;
-}
-
-const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
-  const classes = useStyles();
-  // Gallery cards are display-only previews — provide a stable no-op handler so
-  // that auth actions like continue:azure-auth-complete are gracefully absorbed
-  // instead of triggering "[A2UI] action (no handler)" console warnings.
-  const galleryActionHandler = useCallback<ActionHandler>(() => {}, []);
-  const { surfaces, processMessages, processor } = useA2UI({ actionHandler: galleryActionHandler });
-
-  // Process scenario messages in useEffect.
-  // Cleanup deletes surfaces so React 19 Strict Mode double-fire doesn't crash.
-  useEffect(() => {
-    const createdIds = scenario.a2ui.length > 0
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? processMessages(scenario.a2ui as any)
-      : [];
-    return () => {
-      for (const id of createdIds) {
-        try { processor.model.deleteSurface(id); } catch { /* already gone */ }
-      }
-    };
-    // processMessages and processor are stable (useCallback / ref-based)
-  }, [scenario]);
-
-  const surfaceEntries = Array.from(surfaces.entries());
-
-  return (
-    <div
-      className={classes.galleryCard}
-      role="button"
-      tabIndex={0}
-      aria-label={scenario.title}
-      onClick={() => onCardClick(scenario, surfaces)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(scenario, surfaces); } }}
-    >
-      <Caption1 className={classes.cardLabel}>
-        {scenario.title}
-      </Caption1>
-      {scenario.description && (
-        <Caption1 className={classes.cardDescription}>{scenario.description}</Caption1>
-      )}
-      <div className={classes.cardBody}>
-        {surfaceEntries.length === 0 ? (
-          <div style={{ padding: '12px 0', color: tokens.colorNeutralForeground4, fontSize: tokens.fontSizeBase200 }}>
-            Loading…
-          </div>
-        ) : (
-          surfaceEntries.map(([id, surface]) => (
-            <div key={id} className="a2ui-component">
-              <A2UISurfaceWrapper surface={surface} />
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-});
-
-GalleryCard.displayName = 'GalleryCard';
 
 // ---- ComponentCard Component ----
 // Renders a live A2UI preview thumbnail for a single component entry.
@@ -905,7 +798,7 @@ const ICON_SECTIONS = [
 function PlaygroundInner() {
   const classes = useStyles();
   const { debugEnabled, toggleDebug } = useDebug();
-  const [activeTab, setActiveTab] = useState<'create' | 'gallery' | 'components' | 'icons' | 'workspace'>('gallery');
+  const [activeTab, setActiveTab] = useState<'create' | 'components' | 'icons' | 'workspace'>('create');
   const [filterQuery, setFilterQuery] = useState('');
   const [iconFilter, setIconFilter] = useState('');
   const [iconSection, setIconSection] = useState<string>('Azure Services');
@@ -913,10 +806,6 @@ function PlaygroundInner() {
   const [jsonError, setJsonError] = useState('');
   const [createPrompt, setCreatePrompt] = useState('');
   const [showAdvancedJson, setShowAdvancedJson] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedScenario, setSelectedScenario] = useState<PlaygroundScenario | null>(null);
-  const [selectedSurfaces, setSelectedSurfaces] = useState<Map<string, SurfaceModel<ReactComponentImplementation>>>(new Map());
-  const [detailTab, setDetailTab] = useState<'preview' | 'json'>('preview');
   const customCounter = useRef(0);
   // No-op handler: neither the JSON editor nor the Create tab widget previews
   // have an LLM conversation to advance — absorb all component actions silently.
@@ -928,7 +817,6 @@ function PlaygroundInner() {
   const createEndRef = useRef<HTMLDivElement>(null);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const iconSearchRef = useRef<HTMLDivElement>(null);
-  const galleryRef = useRef<HTMLDivElement>(null);
   const createInputRef = useRef<HTMLTextAreaElement>(null);
   const [createMessages, setCreateMessages] = useState<ChatMessage[]>([]);
   const [inspireLoading, setInspireLoading] = useState(false);
@@ -1021,17 +909,6 @@ function PlaygroundInner() {
     }
   }, [debugEnabled]);
 
-  // Registry-driven filtered scenarios (Phase A)
-  const filteredGalleryScenarios = useMemo(() => {
-    const scenarios = registry.playgroundScenarios;
-    if (!filterQuery.trim()) return scenarios;
-    const query = filterQuery.toLowerCase();
-    return scenarios.filter(s =>
-      s.title.toLowerCase().includes(query) ||
-      (s.description ?? '').toLowerCase().includes(query),
-    );
-  }, [filterQuery, registry]);
-
   // Registry-driven filtered components (Phase C)
   const filteredComponents = useMemo((): ComponentContribution[] => {
     const comps = registry.components;
@@ -1058,14 +935,6 @@ function PlaygroundInner() {
     () => filteredIconCategories.reduce((sum, cat) => sum + cat.icons.length, 0),
     [filteredIconCategories],
   );
-
-  // Handle card click → open detail dialog
-  const handleCardClick = useCallback((scenario: PlaygroundScenario, surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>) => {
-    setSelectedScenario(scenario);
-    setSelectedSurfaces(surfaces);
-    setDetailTab('preview');
-    setDialogOpen(true);
-  }, []);
 
   // Handle custom JSON render
   const handleJsonRender = useCallback(() => {
@@ -1129,7 +998,7 @@ function PlaygroundInner() {
       const isEditing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
       if (isEditing) return;
       if (e.key === '/' || (e.key === 'k' && (e.ctrlKey || e.metaKey))) {
-        if (activeTab === 'gallery' || activeTab === 'components') {
+        if (activeTab === 'components') {
           e.preventDefault();
           searchBoxRef.current?.querySelector<HTMLInputElement>('input')?.focus();
         } else if (activeTab === 'icons') {
@@ -1233,31 +1102,10 @@ function PlaygroundInner() {
     createSessionIdRef.current = undefined;
   }, [customA2ui, createA2ui]);
 
-  // Arrow key navigation within the gallery grid
-  const handleGalleryKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
-    const cards = galleryRef.current?.querySelectorAll<HTMLElement>('[role="button"]');
-    if (!cards || cards.length === 0) return;
-    const arr = Array.from(cards);
-    const idx = arr.indexOf(document.activeElement as HTMLElement);
-    if (idx === -1) return;
-    e.preventDefault();
-    const next = e.key === 'ArrowRight' || e.key === 'ArrowDown'
-      ? Math.min(idx + 1, arr.length - 1)
-      : Math.max(idx - 1, 0);
-    arr[next]?.focus();
-  }, []);
-
   // Handle copy icon path
   const handleCopyIcon = useCallback((icon: IconEntry) => {
     navigator.clipboard.writeText(icon.path);
   }, []);
-
-  // Memoize the JSON for the selected scenario
-  const scenarioJson = useMemo(() => {
-    if (!selectedScenario) return '';
-    return JSON.stringify(selectedScenario.a2ui, null, 2);
-  }, [selectedScenario]);
 
   // Component detail dialog handlers
   const handleComponentCardClick = useCallback((comp: ComponentContribution) => {
@@ -1287,7 +1135,6 @@ function PlaygroundInner() {
   // Determine counter for topbar
   const getCounter = () => {
     switch (activeTab) {
-      case 'gallery': return filteredGalleryScenarios.length;
       case 'components': return filteredComponents.length;
       case 'icons': return filteredIconCount;
       case 'create': return customSurfaceEntries.length;
@@ -1298,14 +1145,12 @@ function PlaygroundInner() {
   // Tab label map for topbar heading
   const TAB_LABELS: Record<string, string> = {
     create: 'Create',
-    gallery: 'Ideas',
     components: 'Components',
     icons: 'Icons',
     workspace: 'Workspace',
   };
   const TAB_DESCRIPTIONS: Record<string, string> = {
     create: 'Build A2UI components with AI',
-    gallery: 'Browse pre-built registry scenarios',
     components: 'A2UI component reference',
     icons: 'Fluent icon browser',
     workspace: 'Test the full file manager, editor, and diagram experience.',
@@ -1346,7 +1191,6 @@ function PlaygroundInner() {
               size="medium"
             >
               <Tab id="tab-create" value="create" aria-controls="panel-create" icon={<Add24Regular />}>Create</Tab>
-              <Tab id="tab-gallery" value="gallery" aria-controls="panel-gallery" icon={<Lightbulb24Regular />}>Ideas</Tab>
               <Tab id="tab-components" value="components" aria-controls="panel-components" icon={<Grid24Regular />}>Components</Tab>
               <Tab id="tab-icons" value="icons" aria-controls="panel-icons" icon={<Icons24Regular />}>Icons</Tab>
               <Tab id="tab-workspace" value="workspace" aria-controls="panel-workspace" icon={<FolderOpen24Regular />}>Workspace</Tab>
@@ -1402,10 +1246,10 @@ function PlaygroundInner() {
                 size="small"
               />
             </div>
-            {(activeTab === 'gallery' || activeTab === 'components') && (
+            {activeTab === 'components' && (
               <div className={classes.topbarCenter} ref={searchBoxRef}>
                 <SearchBox
-                  placeholder="Filter scenarios..."
+                  placeholder="Filter components..."
                   value={filterQuery}
                   onChange={(_e, data) => setFilterQuery(data.value)}
                   size="small"
@@ -1710,54 +1554,6 @@ function PlaygroundInner() {
         </div>
       )}
 
-      {/* ---- Tab 2: Gallery (Scenarios grouped by pack name — Phase A) ---- */}
-      {activeTab === 'gallery' && (
-        <div id="panel-gallery" role="tabpanel" aria-labelledby="tab-gallery" className="playground-gallery-scroll">
-          {registryError ? (
-            registryError.includes('401') ? (
-              <div className={classes.emptyState}>
-                <div className={classes.emptyIcon}>
-                  <img src="/assets/icons/fluent/sparkle.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
-                </div>
-                <Body1Strong>Sign in to view scenarios</Body1Strong>
-                <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
-                  The scenario registry requires authentication. See issue <a href="https://github.com/sabbour/kickstart/issues/955" target="_blank" rel="noopener noreferrer">#955</a>.
-                </Caption1>
-              </div>
-            ) : (
-              <MessageBar intent="error" style={{ margin: tokens.spacingHorizontalL }}>
-                <MessageBarBody>Failed to load registry: {registryError}</MessageBarBody>
-              </MessageBar>
-            )
-          ) : filteredGalleryScenarios.length === 0 ? (
-            <div className={classes.emptyState}>
-              <div className={classes.emptyIcon}>
-                <img src="/assets/icons/fluent/lightbulb.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
-              </div>
-              <Body1Strong>{registryLoading ? 'Loading scenarios…' : 'No scenarios registered'}</Body1Strong>
-              {!registryLoading && (
-                <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
-                  Scenarios come from registered packs.
-                </Caption1>
-              )}
-            </div>
-          ) : (
-            Array.from(groupByPack(filteredGalleryScenarios, s => s.id).entries()).map(([pack, scenarios]) => (
-              <div key={pack}>
-                <Subtitle2 className={classes.groupHeader}>{pack}</Subtitle2>
-                <div className="playground-gallery" ref={galleryRef} onKeyDown={handleGalleryKeyDown}>
-                  {scenarios.map(scenario => (
-                    <GalleryCardErrorBoundary key={scenario.id} label={scenario.title}>
-                      <GalleryCard scenario={scenario} onCardClick={handleCardClick} />
-                    </GalleryCardErrorBoundary>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
       {/* ---- Tab 3: Components (grouped by pack name — Phase C) ---- */}
       {activeTab === 'components' && (
         <div id="panel-components" role="tabpanel" aria-labelledby="tab-components" className="playground-gallery-scroll">
@@ -1802,9 +1598,9 @@ function PlaygroundInner() {
                   )}
                   <div className={allEmpty ? classes.componentCompactGrid : classes.componentGrid}>
                     {comps.map(comp => (
-                      <GalleryCardErrorBoundary key={comp.name} label={comp.name}>
+                      <ComponentCardErrorBoundary key={comp.name} label={comp.name}>
                         <ComponentCard comp={comp} onCardClick={handleComponentCardClick} compact={allEmpty} />
-                      </GalleryCardErrorBoundary>
+                      </ComponentCardErrorBoundary>
                     ))}
                   </div>
                 </div>
@@ -1900,65 +1696,6 @@ function PlaygroundInner() {
           <PlaygroundWorkspace />
         </div>
       )}
-
-      {/* ---- Detail Dialog ---- */}
-      <Dialog open={dialogOpen} onOpenChange={(_e, data) => setDialogOpen(data.open)}>
-        <DialogSurface className={classes.dialogSurface}>
-          <DialogBody>
-            <DialogTitle
-              action={
-                <Button
-                  appearance="subtle"
-                  aria-label="Dismiss"
-                  icon={<Dismiss24Regular />}
-                  onClick={() => setDialogOpen(false)}
-                />
-              }
-            >
-              {selectedScenario?.title}
-            </DialogTitle>
-            <DialogContent>
-              <div className={classes.dialogContent}>
-                {selectedScenario?.description && (
-                  <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-                    {selectedScenario.description}
-                  </Caption1>
-                )}
-
-                {/* Detail Tabs */}
-                <TabList
-                  selectedValue={detailTab}
-                  onTabSelect={(_e, data) => setDetailTab(data.value as 'preview' | 'json')}
-                  size="small"
-                  className={classes.detailTabs}
-                >
-                  <Tab value="preview">Preview</Tab>
-                  <Tab value="json">JSON</Tab>
-                </TabList>
-
-                {detailTab === 'preview' ? (
-                  <div>
-                    {selectedScenario && Array.from(selectedSurfaces.entries()).map(([id, surface]) => (
-                      <div key={id} style={{ marginBottom: tokens.spacingVerticalM }}>
-                        <div className="a2ui-component">
-                          <A2UISurfaceWrapper surface={surface} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className={classes.jsonCodeBlock}>
-                    {scenarioJson}
-                  </div>
-                )}
-              </div>
-            </DialogContent>
-            <DialogActions>
-              <Button appearance="secondary" onClick={() => setDialogOpen(false)}>Close</Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
 
       {/* ---- Component Detail Dialog ---- */}
       <Dialog open={componentDialogOpen} onOpenChange={(_e, data) => setComponentDialogOpen(data.open)}>
