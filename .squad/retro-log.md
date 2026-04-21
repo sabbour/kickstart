@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #1013 "feat(security): harden insertSvgSafely against SVG XSS vectors" | L | impl=2m | review=13m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=5m | ci=6m | reviewer=bot | human_comments=1 | issue=#1006 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #1012 "fix(workflows): pass retro metrics via env to avoid JS template injection" | S | impl=1m | review=16m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=1m | ci=7m | reviewer=bot | human_comments=1 | issue=#792 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #1007 "docs: Scribe Round-4 decisions merge + identity update + retrospective" | XL | impl=93m | review=34m | cycles=1 | merged | @sabbour | first_review=20m | ci=23m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
