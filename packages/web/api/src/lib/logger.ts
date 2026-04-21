@@ -27,7 +27,17 @@ export interface LogEntry {
 
 /**
  * Redacts sensitive information from objects before logging.
- * Masks tokens, API keys, passwords, and PII.
+ * Masks tokens, API keys, passwords, PII, and URL-embedded secrets.
+ *
+ * Patterns covered:
+ * - JWT Bearer tokens
+ * - API keys (api_key, apiKey, x-api-key, api-key, etc.)
+ * - Query string secrets (?api_key=, ?code=, ?token=, etc.)
+ * - Authorization headers
+ * - Passwords and credentials
+ * - Azure IDs (subscription, tenant, client)
+ * - Connection strings
+ * - URL-embedded secrets in error messages
  */
 export function redactSecrets(obj: unknown): unknown {
   if (obj === null || obj === undefined) {
@@ -35,33 +45,35 @@ export function redactSecrets(obj: unknown): unknown {
   }
 
   if (typeof obj === "string") {
-    // Redact common secret patterns
-    const patterns = [
-      // JWT tokens (usually eyJ... base64)
-      { regex: /Bearer\s+([a-zA-Z0-9\-_.]+)/g, replacement: "Bearer ****" },
-      // API keys (long alphanumeric sequences)
-      { regex: /(["\']api[_-]?key["\']\s*:\s*["\'])([^"\']+)(["\'])/gi, replacement: '$1****$3' },
-      // Azure subscription IDs (replace middle part)
-      { regex: /(["\']subscription[_-]?id["\']\s*:\s*["\'])([a-f0-9\-]{36})(["\'])/gi, 
-        replacement: (match, p1, p2, p3) => {
-          const masked = p2.substring(0, 8) + "xxxx" + p2.substring(p2.length - 8);
-          return p1 + masked + p3;
-        }
-      },
-      // Connection strings
-      { regex: /(connection[_-]?string["\']?\s*[:=]\s*["\'])([^"\']+)(["\'])/gi, 
-        replacement: '$1****$3' 
-      },
-      // Passwords
-      { regex: /(["\']password["\']\s*:\s*["\'])([^"\']+)(["\'])/gi, replacement: '$1****$3' },
-    ];
-
+    // Redact common secret patterns in strings
     let result = obj;
-    for (const { regex, replacement } of patterns) {
-      if (typeof replacement === "string") {
-        result = result.replace(regex, replacement);
-      }
-    }
+
+    // JWT tokens (usually eyJ... base64, preceded by Bearer)
+    result = result.replace(/Bearer\s+([a-zA-Z0-9\-_.]+)/g, "Bearer ****");
+
+    // Query string secrets: ?api_key=xxx, ?code=xxx, ?token=xxx, ?secret=xxx, etc.
+    result = result.replace(/[?&](api[_-]?key|code|token|secret|password|auth|credential)=([^&\s"']+)/gi, 
+      (match, param) => `?${param}=****`);
+
+    // URL-embedded secrets in error messages (e.g. Azure SDK errors with ?api-key=)
+    result = result.replace(/\?api-key=([^&\s"']+)/gi, "?api-key=****");
+    result = result.replace(/\?subscription[_-]?id=([^&\s"']+)/gi, "?subscription_id=****");
+
+    // Bearer token in URL
+    result = result.replace(/[?&]authorization=([^&\s"']+)/gi, "&authorization=****");
+
+    // API keys in JSON
+    result = result.replace(/(["\']api[_-]?key["\']\s*:\s*["\'])([^"\']+)(["\'])/gi, '$1****$3');
+
+    // Connection strings
+    result = result.replace(/(connection[_-]?string["\']?\s*[:=]\s*["\'])([^"\']+)(["\'])/gi, '$1****$3');
+
+    // Passwords
+    result = result.replace(/(["\']password["\']\s*:\s*["\'])([^"\']+)(["\'])/gi, '$1****$3');
+
+    // Authorization headers
+    result = result.replace(/(["\']authorization["\']\s*:\s*["\'])([^"\']+)(["\'])/gi, '$1****$3');
+
     return result;
   }
 
@@ -80,12 +92,15 @@ export function redactSecrets(obj: unknown): unknown {
         lowerKey === "password" ||
         lowerKey === "apikey" ||
         lowerKey === "api_key" ||
+        lowerKey === "authorization" ||
         lowerKey === "credential" ||
         lowerKey === "credentials" ||
+        lowerKey === "auth" ||
         lowerKey.endsWith("_token") ||
         lowerKey.endsWith("_secret") ||
         lowerKey.endsWith("_password") ||
         lowerKey.endsWith("_key") ||
+        lowerKey.endsWith("-key") ||
         lowerKey.endsWith("token") ||
         lowerKey.endsWith("secret")
       ) {
@@ -93,9 +108,14 @@ export function redactSecrets(obj: unknown): unknown {
         continue;
       }
 
-      // Redact OID (object ID) if it looks like a GUID
+      // Redact GUID-like IDs (OID, user_id, tenant_id, client_id, subscription_id, etc.)
       if (
-        (key === "oid" || key === "user_id" || key === "sub" || key === "subscription_id") &&
+        (key === "oid" || 
+         key === "user_id" || 
+         key === "sub" || 
+         key === "subscription_id" ||
+         key === "tenant_id" ||
+         key === "client_id") &&
         typeof value === "string" &&
         /^[a-f0-9\-]{36}$/.test(value)
       ) {
@@ -110,6 +130,7 @@ export function redactSecrets(obj: unknown): unknown {
 
   return obj;
 }
+
 
 /**
  * Azure Functions logger with structured JSON output and automatic redaction.
@@ -232,6 +253,7 @@ export function extractTraceId(headers: Map<string, string>): string {
  * Extract metadata from an HTTP request for logging.
  *
  * Returns: method, path, content_length, headers_count, user_agent
+ * Query string is redacted to prevent leaking secrets.
  * (Does not include sensitive headers like Authorization)
  */
 export function extractRequestMetadata(request: {
@@ -243,10 +265,13 @@ export function extractRequestMetadata(request: {
   const url = request.url ? new URL(request.url, "http://localhost") : null;
   const contentLength = request.headers.get("content-length");
 
+  // Redact query string to prevent leaking secrets like ?api_key=, ?code=, ?token=
+  const query = url?.search ? (redactSecrets(url.search) as string) : undefined;
+
   return {
     method: request.method,
     path: url?.pathname,
-    query: url?.search,
+    query,
     content_length: contentLength ? parseInt(contentLength, 10) : undefined,
     headers_count: request.headers.size,
     user_agent: request.headers.get("user-agent"),

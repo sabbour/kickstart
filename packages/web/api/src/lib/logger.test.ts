@@ -31,11 +31,67 @@ describe("redactSecrets", () => {
     expect(result.oid.startsWith("a1b2c3d4")).toBe(true);
   });
 
-  it("redacts subscription IDs", () => {
-    const input = { "subscription_id": "12345678-90ab-cdef-1234-567890abcdef" };
+  it("redacts query string secrets (?api_key=, ?code=, ?token=)", () => {
+    const input = "http://localhost/api/converse?api_key=sk-1234567890abcdef&code=auth123&token=eyJ";
+    const result = redactSecrets(input) as string;
+    expect(result).not.toContain("sk-1234567890");
+    expect(result).not.toContain("auth123");
+    expect(result).not.toContain("eyJ");
+    expect(result).toContain("?api_key=****");
+    expect(result).toContain("?code=****");
+    expect(result).toContain("?token=****");
+  });
+
+  it("redacts authorization in query strings", () => {
+    const input = "?authorization=Bearer%20eyJhbGc";
+    const result = redactSecrets(input) as string;
+    expect(result).toContain("authorization=****");
+    expect(result).not.toContain("eyJhbGc");
+  });
+
+  it("redacts azure api-key in URL", () => {
+    const input = "https://api.azure.com/resource?api-key=abcd1234&version=1";
+    const result = redactSecrets(input) as string;
+    expect(result).toContain("?api-key=****");
+    expect(result).not.toContain("abcd1234");
+  });
+
+  it("redacts authorization header key in objects", () => {
+    const input = { authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" };
     const result = redactSecrets(input) as Record<string, any>;
-    expect(result.subscription_id).toContain("xxxx");
-    expect(result.subscription_id).not.toContain("90ab-cdef");
+    expect(result.authorization).toBe("****");
+  });
+
+  it("redacts x-api-key header with hyphen", () => {
+    const input = { "x-api-key": "sk-1234567890" };
+    const result = redactSecrets(input) as Record<string, any>;
+    expect(result["x-api-key"]).toBe("****");
+  });
+
+  it("redacts tenant_id and client_id GUIDs", () => {
+    const input = {
+      tenant_id: "a1b2c3d4-e5f6-47f8-a9f0-b1c2d3e4f5a6",
+      client_id: "f5a6b7c8-d9e0-41f2-a3b4-c5d6e7f8a9b0",
+    };
+    const result = redactSecrets(input) as Record<string, any>;
+    expect(result.tenant_id).toContain("xxxx");
+    expect(result.tenant_id.startsWith("a1b2c3d4")).toBe(true);
+    expect(result.client_id).toContain("xxxx");
+    expect(result.client_id.startsWith("f5a6b7c8")).toBe(true);
+  });
+
+  it("redacts URL-embedded secrets in error messages", () => {
+    const input = 'Error calling API: GET /blobs?api-key=secret123&version=2024 returned 401';
+    const result = redactSecrets(input) as string;
+    expect(result).toContain("?api-key=****");
+    expect(result).not.toContain("secret123");
+  });
+
+  it("redacts subscription_id in URL", () => {
+    const input = "/subscriptions?subscription_id=12345678-90ab-cdef-1234-567890abcdef";
+    const result = redactSecrets(input) as string;
+    expect(result).toContain("subscription_id=****");
+    expect(result).not.toContain("90ab-cdef");
   });
 
   it("handles nested objects", () => {
@@ -284,5 +340,55 @@ describe("extractRequestMetadata", () => {
     };
     const metadata = extractRequestMetadata(request);
     expect(metadata.query).toContain("q=test");
+  });
+
+  it("redacts api_key from query string", () => {
+    const request = {
+      method: "GET",
+      url: "http://localhost/api/search?api_key=sk-secret123&q=test",
+      headers: new Map(),
+    };
+    const metadata = extractRequestMetadata(request);
+    expect(metadata.query).toContain("****");
+    expect(metadata.query).not.toContain("sk-secret123");
+    expect(metadata.query).toContain("q=test");
+  });
+
+  it("redacts code from query string", () => {
+    const request = {
+      method: "GET",
+      url: "http://localhost/callback?code=auth_code_123&state=xyz",
+      headers: new Map(),
+    };
+    const metadata = extractRequestMetadata(request);
+    expect(metadata.query).toContain("code=****");
+    expect(metadata.query).not.toContain("auth_code_123");
+    expect(metadata.query).toContain("state=xyz");
+  });
+
+  it("redacts token from query string", () => {
+    const request = {
+      method: "GET",
+      url: "http://localhost/api?token=eyJhbGc&version=1",
+      headers: new Map(),
+    };
+    const metadata = extractRequestMetadata(request);
+    expect(metadata.query).toContain("token=****");
+    expect(metadata.query).not.toContain("eyJhbGc");
+  });
+
+  it("redacts multiple secret params in query string", () => {
+    const request = {
+      method: "GET",
+      url: "http://localhost/sync?api_key=key123&token=token456&secret=sec789",
+      headers: new Map(),
+    };
+    const metadata = extractRequestMetadata(request);
+    expect(metadata.query).not.toContain("key123");
+    expect(metadata.query).not.toContain("token456");
+    expect(metadata.query).not.toContain("sec789");
+    expect(metadata.query).toContain("api_key=****");
+    expect(metadata.query).toContain("token=****");
+    expect(metadata.query).toContain("secret=****");
   });
 });
