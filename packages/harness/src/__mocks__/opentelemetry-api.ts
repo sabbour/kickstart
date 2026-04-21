@@ -38,7 +38,39 @@ export const trace = {
   getSpan: (_ctx: unknown) => undefined,
   wrapSpanContext: (ctx: unknown) => ctx,
   deleteSpan: (ctx: unknown) => ctx,
+  getTracerProvider: () => ({
+    getTracer: () => noopTracer,
+    getDelegate: () => ({ forceFlush: async () => undefined }),
+    forceFlush: async () => undefined,
+  }),
+  disable: () => undefined,
 };
+
+export const logs = {
+  getLogger: () => ({ emit: () => undefined }),
+  getLoggerProvider: () => ({
+    getLogger: () => ({ emit: () => undefined }),
+    forceFlush: async () => undefined,
+  }),
+};
+
+export const metrics = {
+  getMeter: () => ({}),
+  getMeterProvider: () => ({
+    getMeter: () => ({}),
+    forceFlush: async () => undefined,
+  }),
+};
+
+export const diag = {
+  setLogger: () => undefined,
+  debug: () => undefined,
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+};
+
+export const DiagLogLevel = { NONE: 0, ERROR: 30, WARN: 50, INFO: 60, DEBUG: 70, VERBOSE: 80, ALL: 9999 } as const;
 
 export const context = {
   active: () => ({}),
