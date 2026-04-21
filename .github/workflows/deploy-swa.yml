@@ -36,18 +36,19 @@ jobs:
           node-version: "22"
           cache: "npm"
 
-      - name: Install dependencies and build
-        run: |
-          npm ci
-          npm run build
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build web app (Vite)
-        run: cd packages/web && npx vite build
+      - name: Build all workspaces
+        run: npm run build
 
-      - name: Pre-build API to resolve workspace packages
+      - name: Resolve API workspace dependencies
         run: |
           cd packages/web/api
-          npm install --production
+          npm install --production --no-save
+
+      - name: Verify API dist
+        run: test -f packages/web/api/dist/functions/health.js || (echo "❌ API bundle not found at packages/web/api/dist/functions/" && exit 1)
 
       - name: Deploy to Azure Static Web Apps
         id: swa_deploy
@@ -62,13 +63,20 @@ jobs:
           skip_app_build: true
           skip_api_build: true
 
-      - name: Resolve production smoke target
+      - name: Resolve smoke test target
         id: production_url
         run: |
-          BASE_URL="$(node -e "const params = require('./infra/parameters.dev.json'); const host = params.parameters.customDomainHostname?.value; if (!host) { throw new Error('infra/parameters.dev.json is missing parameters.customDomainHostname.value'); } process.stdout.write('https://' + host);")"
-          echo "base_url=$BASE_URL" >> "$GITHUB_OUTPUT"
+          # SWA action sets static_web_app_url; use it instead of parameter file
+          DEPLOYMENT_URL="${{ steps.swa_deploy.outputs.static_web_app_url }}"
+          if [ -z "$DEPLOYMENT_URL" ]; then
+            echo "⚠️ SWA deployment URL not available, skipping smoke test"
+            echo "base_url=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "base_url=${DEPLOYMENT_URL}" >> "$GITHUB_OUTPUT"
 
       - name: Smoke check live API health
+        if: steps.production_url.outputs.base_url != ''
         continue-on-error: true
         env:
           SWA_HEALTHCHECK_URL: ${{ steps.production_url.outputs.base_url }}/api/health
