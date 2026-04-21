@@ -7,6 +7,9 @@ export default defineConfig({
       "@aks-kickstart/harness/runtime/redact": resolve(__dirname, "packages/harness/src/runtime/redact.ts"),
       "@aks-kickstart/harness": resolve(__dirname, "packages/harness/src/index.ts"),
       "@aks-kickstart/core": resolve(__dirname, "packages/harness/src/index.ts"),
+      // Stub out @opentelemetry/api so harness unit tests don't need the full
+      // OpenTelemetry install. The otel bridge is tested in integration only.
+      "@opentelemetry/api": resolve(__dirname, "packages/harness/src/__mocks__/opentelemetry-api.ts"),
     },
   },
   test: {

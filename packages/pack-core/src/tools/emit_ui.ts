@@ -6,17 +6,75 @@ import type { ToolContribution, SessionCtx } from '@aks-kickstart/harness';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
-// The tool accepts any object — we validate it as an A2UI message envelope using
-// A2UIMessageSchema from the harness. Using z.unknown() here because the model
-// passes a raw JSON value; Zod validates the shape in execute().
+// Scalar values that can appear in data-model and component property fields.
+const A2UIScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+
+// Lightweight component schema — enforces `type` (required by A2UI) and the
+// most common optional rendering props. The runtime re-validates against the
+// full harness A2UIMessageSchema in execute(), so this schema only needs to be
+// strict enough for the OpenAI API to accept it without a 400.
+const A2UIComponentSchema = z.object({
+  type: z.string().describe('Component type name from the A2UI catalog'),
+  label: z.string().nullable().optional(),
+  placeholder: z.string().nullable().optional(),
+  value: A2UIScalar.nullable().optional(),
+  disabled: z.boolean().nullable().optional(),
+  items: z.array(z.object({ label: z.string(), value: z.string() })).nullable().optional(),
+  onClick: z.string().nullable().optional(),
+  onChange: z.string().nullable().optional(),
+});
+
+// Full discriminated union for the A2UI v0.9 envelope.
+//
+// z.unknown() was previously used here, but the OpenAI Responses API rejects
+// tool schemas where any property in `properties` is missing a `type` key
+// (HTTP 400: "schema must have a 'type' key"). z.discriminatedUnion produces
+// a `oneOf` with all branches carrying `type: "object"`, which satisfies the
+// validator. The `op` discriminator is required by the schema; the runtime
+// A2UIMessageSchema.parse() in execute() still accepts envelopes with or
+// without `op` via the `withDiscriminator` preprocessor.
+const A2UIMessageInputSchema = z.discriminatedUnion('op', [
+  z.object({
+    version: z.literal('v0.9'),
+    op: z.literal('createSurface'),
+    createSurface: z.object({
+      surfaceId: z.string(),
+      catalogId: z.string(),
+      sendDataModel: z.boolean().nullable().optional(),
+    }),
+  }),
+  z.object({
+    version: z.literal('v0.9'),
+    op: z.literal('updateComponents'),
+    updateComponents: z.object({
+      surfaceId: z.string(),
+      components: z.array(A2UIComponentSchema).min(1),
+    }),
+  }),
+  z.object({
+    version: z.literal('v0.9'),
+    op: z.literal('updateDataModel'),
+    updateDataModel: z.object({
+      surfaceId: z.string(),
+      path: z.string().nullable().optional(),
+      value: A2UIScalar.nullable().optional(),
+    }),
+  }),
+  z.object({
+    version: z.literal('v0.9'),
+    op: z.literal('deleteSurface'),
+    deleteSurface: z.object({
+      surfaceId: z.string(),
+    }),
+  }),
+]).describe(
+  'A valid A2UI v0.9 message envelope. Must have "version": "v0.9" and "op" set to one of: ' +
+  '"createSurface", "updateComponents", "updateDataModel", "deleteSurface". ' +
+  'Include the matching payload object (e.g. "createSurface": { "surfaceId": "...", "catalogId": "..." }).',
+);
+
 const EmitUiInputSchema = z.object({
-  message: z
-    .unknown()
-    .describe(
-      'A valid A2UI v0.9 message envelope. Must have a "version" field equal to "v0.9" ' +
-      'and one of the following "op" values: "createSurface", "updateComponents", ' +
-      '"updateDataModel", "deleteSurface". See the A2UI schema for the full payload shape.',
-    ),
+  message: A2UIMessageInputSchema,
 });
 
 // ── Tool ──────────────────────────────────────────────────────────────────────
@@ -34,6 +92,9 @@ export const emitUiTool: ToolContribution = {
     execute: async (input, runCtx): Promise<string> => {
       const session = runCtx?.context as SessionCtx | undefined;
 
+      // Re-validate through the full harness A2UIMessageSchema which applies
+      // the withDiscriminator preprocessor and strips the 'op' discriminator
+      // field. This is the canonical runtime validation path.
       let parsed: A2UIMessageV09;
       try {
         parsed = A2UIMessageSchema.parse(input.message) as A2UIMessageV09;

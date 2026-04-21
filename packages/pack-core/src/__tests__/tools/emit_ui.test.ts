@@ -19,14 +19,20 @@ import { emitUiTool } from '../../tools/emit_ui.js';
 import { makeSessionCtx } from './_session-stub.js';
 
 // ── Valid message fixtures ─────────────────────────────────────────────────
+// All fixtures include the `op` discriminator field, which is required by the
+// updated EmitUiInputSchema (discriminated union). The runtime A2UIMessageSchema
+// still handles messages with or without `op` via withDiscriminator, but the
+// tool's JSON schema (sent to the OpenAI API) requires `op` to be present.
 
 const validCreateSurface = {
   version: A2UI_VERSION,
+  op: 'createSurface' as const,
   createSurface: { surfaceId: 'surface-001', catalogId: 'test-catalog' },
 };
 
 const validUpdateComponents = {
   version: A2UI_VERSION,
+  op: 'updateComponents' as const,
   updateComponents: {
     surfaceId: 'surface-001',
     components: [{ type: 'Button', label: 'Click me' }],
@@ -35,11 +41,13 @@ const validUpdateComponents = {
 
 const validUpdateDataModel = {
   version: A2UI_VERSION,
+  op: 'updateDataModel' as const,
   updateDataModel: { surfaceId: 'surface-001', path: 'app.name', value: 'Kickstart' },
 };
 
 const validDeleteSurface = {
   version: A2UI_VERSION,
+  op: 'deleteSurface' as const,
   deleteSurface: { surfaceId: 'surface-001' },
 };
 
