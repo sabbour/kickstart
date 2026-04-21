@@ -116,11 +116,17 @@ GH_TOKEN=$TOKEN gh pr ready <N>
 
 | Reviewer | Checks |
 |----------|--------|
-| Leela | Architecture alignment, scope, code quality, docs |
+| Leela | Architecture alignment, scope, code quality, DP match |
 | Zapp | Security, auth, secrets, tool schemas, guardrails |
-| Hermes | Test coverage across the layers the PR touches |
+| Nibbler | Code quality, maintainability, test coverage depth |
+| Docs reviewer | User-facing docs updated (or DP declared `Docs impact: N/A`) |
+| Hermes | Test coverage across the layers the PR touches (separate from Nibbler's code-quality pass) |
 
-Both Leela and Zapp must approve. The `.github/workflows/squad-review-gate.yml` workflow enforces this as a required status check, and `Squad Auto Merge` clears approval labels on `synchronize` unless the PR is already in the opposite reviewer's rejection loop. Today that means a `zapp:rejected` fix cycle preserves `leela:approved`, and a `leela:rejected` fix cycle preserves `zapp:approved`.
+Leela, Zapp, and Nibbler must all approve. The docs gate is satisfied by **one of** `docs:approved` or `docs:not-applicable`; `docs:rejected` fails the gate. The `.github/workflows/squad-review-gate.yml` workflow enforces this as a required status check and `.github/workflows/squad-auto-merge.yml` arms auto-merge once all four dimensions are satisfied.
+
+`Squad Auto Merge` clears the three approval labels (`leela:approved`, `zapp:approved`, `nibbler:approved`) on every `synchronize`. If exactly one reviewer is in a rejection loop, the other two approvals are preserved across the synchronize — so a `zapp:rejected` fix cycle preserves `leela:approved` + `nibbler:approved`, a `leela:rejected` fix cycle preserves `zapp:approved` + `nibbler:approved`, and a `nibbler:rejected` fix cycle preserves `leela:approved` + `zapp:approved`. Docs labels persist across synchronize (they describe the PR content, not a per-commit signoff).
+
+For `squad:chore-auto` low-risk PRs, Nibbler still gates (code-quality review is cheap) and the docs marker is still required. Zapp becomes optional unless the PR is security-sensitive or touches `.github/workflows/**`, auth, guardrail, or security code.
 
 ### 8. Address review comments
 

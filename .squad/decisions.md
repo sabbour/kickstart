@@ -1,849 +1,198 @@
-# Observability & AppInsights SWA Wiring — April 21, 2026
+### 2026-04-21T02:59:40Z: User directive — Docs updates are a gated ceremony obligation
+**By:** Ahmed (via Copilot)
+**What:** Every PR that changes user-facing behavior, APIs, pack surface, ceremonies, skills, or process MUST land with synchronized doc updates. This is enforced at two points: (1) Design Proposal ceremony — the DP must name the doc pages/sections affected and the update plan, (2) PR Review Gate — a new `docs:approved` / `docs:rejected` label (owned by McManus or designated docs reviewer) blocks merge when docs are missing or stale. No PR that touches public-facing behavior merges without explicit docs sign-off. "Docs N/A" is a valid verdict for purely internal changes but must be explicit — not default.
+**Why:** User observed doc updates were not being enforced as part of ceremonies or gates — PRs have been landing without accompanying doc changes.
 
-**Date:** 2026-04-21T00:17:00Z  
-**Author:** Ahmed (Engineering), documented by Scribe  
-**Status:** Documented  
-**Related PR:** #976
-
-## Summary
-
-AppInsights connection-string plumbing on `kickstart-web-dev` (Static Web App) in `rg-kickstart-dev` (CloudNative subscription) was provisioned via `az staticwebapp appsettings set` on 2026-04-21. Deployment bypassed Bicep (`infra/main.bicep`) entirely due to pre-existing resources in a different subscription than `infra/parameters.dev.json` expects.
-
-### Key Facts
-
-- **SWA:** `kickstart-web-dev`
-- **Resource Group:** `rg-kickstart-dev`
-- **Subscription:** `CloudNative` (`4498459e-01d5-4a3f-b07e-8f1f36598c16`)
-- **Provisioning method:** `az staticwebapp appsettings set --setting-names "APPLICATIONINSIGHTS_CONNECTION_STRING=..."`
-- **App setting:** Must be exactly `APPLICATIONINSIGHTS_CONNECTION_STRING` (case-sensitive)
-- **SWA restart:** Automatic on app-setting change (~30–60 seconds); telemetry auto-flows after restart
-- **Code-side wiring:** Already initialized in `packages/web/api/src/startup/*` via `@azure/monitor-opentelemetry` + `applicationinsights`
-
-### Known Divergence: Subscription & Parameters Mismatch
-
-`infra/parameters.dev.json` hardcodes:
-- `swaName: "kickstart-web-dev"`, `rg: "rg-kickstart-dev"`, AppInsights `ai-kickstart-dev`
-- Assumes resources are in the subscription specified in CLI context when Bicep runs
-
-**Actual state:** Resources pre-exist in `CloudNative` subscription (`4498459e-01d5-4a3f-b07e-8f1f36598c16`), which may differ from the subscription `parameters.dev.json` was designed for.
-
-### Impact & Mitigation
-
-**Future Bicep deployments via `az deployment group create`:**
-- Will conflict (resource exists) if run against the same RG, OR
-- Will create duplicates if run in a different subscription/RG
-
-**Mitigation:** Use `az staticwebapp appsettings set` for manual AppInsights wiring (documented in PR #976). Do not re-run Bicep unless:
-1. A new Bicep template is created with parameters for `CloudNative` subscription, OR
-2. Existing resources are destroyed and Bicep provisions from scratch, OR
-3. Parameter overrides are passed to `az deployment group create` to match actual subscription/RG
-
-### Documentation
-
-**PR #976** documents:
-1. `infra/README.md` → New section "Bring-your-own AppInsights (skip full bicep deploy)"
-2. `docs-site/docs/operations/observability.md` → Complete observability runbook (setup, verification, KQL, troubleshooting)
 
 ---
 
-# Decision: DP Reviews — April 17, 2026
+### 2026-04-21T02:59:40Z: User directive — Nibbler as full structured reviewer
+**By:** Ahmed (via Copilot)
+**What:** Nibbler MUST be engaged in the same structured way as Leela and Zapp for every PR review. That means: (1) dedicated review pass per PR, (2) `nibbler:approved` / `nibbler:rejected` label outcome, (3) merge is blocked until the `nibbler:approved` label is present alongside `leela:approved` and `zapp:approved`, (4) review posted via `gh pr review` under the lead bot identity like the other two, (5) Nibbler's review dimension is code correctness + readability + bug patterns + error handling + naming (per ceremonies.md).
+**Why:** User observed Nibbler was being run ad-hoc rather than as a structured gate equal to Leela and Zapp. Correcting the review-gate asymmetry.
 
-## Hypothesis log (process experiments)
-
-This section is reserved for summarized grades from `.github/workflows/squad-process-grader.yml` once `#805` lands.
-
-**Planned entry format:**
-
-| Date | Issue | Signal | Baseline → current | Grade | Follow-up |
-|------|-------|--------|--------------------|-------|-----------|
-
-**Ownership:** Scribe appends graded experiment summaries here after the workflow posts the result on the underlying `process` issue. No manual backfill unless the workflow was broken and a corrective PR documents it.
 
 ---
 
-**Date:** 2026-04-17T03:30:17Z
-**Author:** Leela (Lead)
-**Status:** Proposed
+### 2026-04-21T02:59:40Z: Process — Ceremony enforcement tightened (Sprint Planning + Cadence Retro added, Nibbler elevated, Docs gate added, coordinator obligation hardened)
+**By:** Leela (Lead)
+**What:**
+1. Added **Sprint Planning** ceremony to `.squad/ceremonies.md` — weekly (Monday), facilitated by Leela, participants are all active squad + Ahmed (PO). Duties: estimate unestimated `squad` issues, confirm assignees, set sprint goal, capture in `.squad/sprints/{YYYY-MM-DD}.md`. Not a hard gate — missing estimates are still caught by the DP ceremony.
+2. Added **Cadence Retrospective** ceremony — weekly, facilitated by Leela, participants all squad + Scribe. Pulls from `.squad/retro-log.md`, `.squad/velocity.md`, last week's closed issues/PRs. Output: a new issue `Weekly Retro · {YYYY-MM-DD}`. Renamed the existing failure-triggered retro to **Failure Retrospective** to disambiguate.
+3. **Elevated Nibbler to full structured reviewer** (per Ahmed directive). The PR Review Gate is now a four-way gate: Leela (architecture) + Zapp (security) + Nibbler (code quality) + Docs reviewer (Scribe interim). Nibbler posts reviews via `gh pr review` under the `lead` bot identity, same protocol as Leela and Zapp. Updated `.squad/agents/nibbler/charter.md` with the review-parity protocol. Merge criteria now reads: `all four approval labels present + CI green`.
+4. **Added a Docs Gate** (per Ahmed directive). Design Proposal ceremony now requires a `Docs impact:` field (explicit doc pages/sections affected, or `N/A` with justification) — a missing field auto-rejects the DP. PR Review Gate gained a fourth review dimension: **Docs Reviewer** (Scribe interim — McManus is not on the roster; noted as a role gap to fill). Labels `docs:approved` / `docs:rejected` / `docs:not-applicable` added to merge criteria.
+5. **Tightened coordinator ceremony enforcement** in `.github/agents/squad.agent.md` → Ceremonies section. The ceremony-check is now explicitly BLOCKING with a pre-dispatch checkpoint list: [ ] issue tied? [ ] DP posted? [ ] DP has leela+zapp+nibbler approval labels? If any box is unchecked the coordinator MUST run the ceremony first. Added a negative-pattern example (dispatching fry/bender straight to code without DP) and the correct positive pattern end-to-end.
+6. Filed tracking issue (linked from the PR) and landed everything in one PR on branch `squad/process-ceremony-enforcement-2026-04-21`.
+
+**Why:** Ahmed audited the ceremony setup and identified four gaps: (a) no Sprint Planning ceremony on the books, (b) only one retro (failure-triggered), (c) Nibbler was being run ad-hoc rather than as a structured gate equal to Leela and Zapp, (d) doc updates were not enforced by any ceremony despite repeated observation that PRs were shipping without docs, and (e) the coordinator had been skipping the ceremony-check in practice. These changes close each gap, and the tracking issue will verify the fix holds by watching the next three implementation PRs land through the full four-way gate.
+
+**Role gap noted:** Docs reviewer is currently filled by Scribe as interim because McManus is not in `.squad/team.md`. Casting a dedicated docs reviewer is a follow-up.
+
 
 ---
 
-## DP #329 — MCP App IDE Surface (A2UI + ext-apps)
+# Leela — Architecture review batch — 2026-04-21
 
-**Verdict:** APPROVED WITH CONDITIONS
+Reviewed four PRs as one batch because #989 is the v0.9 foundation the others build on.
 
-### Architecture decisions recorded
+## Verdicts
 
-1. **Resource registration approach is canonical.** `ui://kickstart/wizard.html` via `registerAppResource` + `registerAppTool` with `RESOURCE_MIME_TYPE` from `@modelcontextprotocol/ext-apps/server` is the correct pattern per MCP Apps Quickstart §2. No bespoke protocol. This is the standard for all future MCP App registrations in this repo.
+| PR | Title | Verdict | Label | Notes |
+|----|-------|---------|-------|-------|
+| #989 | A2UI v0.9 clean break | **APPROVED** | `leela:approved` applied | Foundation PR. Spec-compliant tool schema, loud-fail renderer, no back-compat shim. Pack boundaries intact. |
+| #986 | Playground grid / Workspace / Create polish | **APPROVED** | `leela:approved` applied | Presentation-only in `packages/web`. Backward-compatible `fillContainer` prop. Data-driven grid mode. |
+| #988 | Remove Ideas tab | **COMMENT-ONLY (draft)** | — | Scope and sequencing correct. Harness `PlaygroundScenario` contract preserved. Reopen for approval when flipped to ready-for-review. |
+| #990 | Create-tab inspirations variety | **COMMENT-ONLY (draft)** | — | Fix at producer layer is right. Pairs cleanly with #989. Flagged: duplicated fallback list client/server — follow-up to server-own the list. Reopen for approval when flipped to ready-for-review. |
 
-2. **Single-file bundle (vite-plugin-singlefile) is required for MCP App surfaces.** `script-src 'unsafe-inline'` + `style-src 'unsafe-inline'` in the CSP meta tag is unavoidable with this bundling strategy. `connect-src 'none'` is mandatory — all communication must go through `postMessage`.
+## Key architectural decisions (affirmed)
 
-3. **`event.source === window.parent` guard is required.** Under the null-origin sandbox (`allow-scripts` only, no `allow-same-origin`), `event.source` validation is the primary incoming-message check. `"*"` as targetOrigin is acceptable in the null-origin context. If any host grants `allow-same-origin`, we must switch to explicit origin checking.
+1. **v0.9 adjacency-list as canonical envelope shape**, not a dialect-translating layer. Producers (LLM + packs + scenarios) emit spec shape or are rejected loudly with a named-property `_ErrorComponent` fallback. Zero silent translation in the renderer.
+2. **Layered defense for A2UI correctness:** producer-side allow-list/ban-list in the LLM system prompt (#990) + renderer-side per-component strict validation with spec-compliant error messages (#989). Each PR owns exactly one boundary.
+3. **Remove-now / reintroduce-later** is the correct sequencing for half-working UI tabs (#988) — preserving harness contracts while deleting dead consumers keeps pack-API surface stable for future reintroduction.
+4. **Presentation changes stay in `packages/web`** and must be backward-compatible to every existing consumer (opt-in props, default false) — #986 is the model.
 
-4. **Runtime duplication is a blocking risk.** The PoC adds `runtime/conversation.ts`, `runtime/openai-client.ts`, `runtime/session-store.ts` inside `packages/mcp-server`. These parallel the existing `packages/web/api/src/lib/openai-client.ts` and `session-store.ts`. Combined with the Agents SDK migration (#330), we could have three LLM runtime forks. The implementation issue must define the canonical client before any code lands.
+## Follow-ups to file as process issues (non-blocking)
 
-5. **Bundle size validation is a Slice 1 ship requirement.** `vite-plugin-singlefile` output must be measured with full React + Fluent 2 + A2UI before the PR merges. Any known host size limits must be documented.
+- [ ] Collapse `FALLBACK_IDEAS` duplication: server-own the list, client fetches from `/api/inspirations/widgets` with a thin hardcoded lifeboat.
+- [ ] Align `packages/pack-core/src/components/basic/Button.tsx` schema with the Fluent override (drop legacy `label`) or mark as internal-only — closes the last place legacy dialect could leak in.
+- [ ] Skill `a2ui-output-discipline` should call out the distinction between top-level adjacency-list keys (NOT allowed: `label`, `onClick`, etc.) and per-component native props (allowed: `ChoicePicker.label`, `Toggle.label`, `Questionnaire.label`, …) so later agents don't over-correct.
+- [ ] Cross-link #987 from `usePackRegistry` adapter comment + the harness `PlaygroundScenario` type so nobody mistakes the preserved contract for dead code.
 
-### Conditions on implementation issue
-- Define canonical LLM client / session infrastructure (no third fork)
-- Bundle size validation added to acceptance criteria
-- A2UI surface disabled (or host serialization documented) while tool call is in flight
-- Error state defined and rendered when `tools/call` fails
-- S7 text-only fallback covered by tests
+## Rejections
 
----
+None. All four PRs are on-direction.
 
-## DP #330 — OpenAI Agents SDK Migration
-
-**Verdict:** APPROVED (architecture, 2026-04-17T01:53Z) + CLOSED OUT this session
-
-### Closeout decisions recorded
-
-1. **Option B (hybrid route planner + manager agent) is the adopted migration shape.** Not a loop-only swap (Option A — rejected) and not a full handoff-first rewrite (Option C — deferred). The SDK handles run/tool/session/streaming/tracing; product code handles route policy, generation sequencing, and A2UI output.
-
-2. **`phaseComplete`/`filesComplete` model flags are retired.** Server-authored route state replaces them. Model-emitted booleans are no longer the main control plane. This is a hard contract change — backends must emit explicit route metadata.
-
-3. **Generate step orchestration stays custom.** The SDK does not get to invent artifact routing. Workspace-first generation (#326/#327/#328) is a constraint, not an option.
-
-4. **Implementation sequence is locked.** Gate (DP #330) → arch spike + Azure compat → backend runtime (#445, Bender) → chat/workspace UI (#446, Fry) → cleanup. UI work cannot start until backend contract is stable.
-
-5. **Follow-on issues created:**
-   - **#445** — Backend SDK adapter (Bender), v1.0.0. Includes all Zapp security conditions as acceptance criteria.
-   - **#446** — Chat/workspace UI adaptation (Fry), v1.0.0. Depends on #445.
 
 ---
 
-# Zapp Decision — DP #329 MCP App IDE Surface Security Review
+# Nibbler review batch — 2026-04-21
 
-**Date:** 2026-04-17
+**Author:** Nibbler (Code Quality Reviewer, lead role)
+**Scope:** Structured code-quality review of 4 open PRs under the new parity-reviewer directive (approval is a hard merge gate alongside Leela and Zapp).
+
+## Verdicts
+
+| PR  | Title                                                           | Verdict                   | Label applied       |
+|-----|-----------------------------------------------------------------|---------------------------|---------------------|
+| 989 | `fix(web): align A2UI schema and renderer with v0.9 spec`       | ✅ Approved                | `nibbler:approved`  |
+| 986 | `fix(web/playground): tighten grid, fix Workspace void, unify Create chat composer` | ✅ Approved | `nibbler:approved`  |
+| 988 | `chore(web): remove Playground Ideas tab` (DRAFT)               | 💬 Comment-only (draft)   | none                |
+| 990 | `fix(web): vary Create-tab inspirations and constrain to core components` (DRAFT) | 💬 Comment-only (draft) | none                |
+
+## Justifications
+
+### #989 — A2UI v0.9 clean break → APPROVED
+Loud-rejection policy is correctly implemented:
+- Zod `unrecognized_keys` issue code is the hook for `[A2UIRegistry] Non-spec property "<key>" on component "<id>" (<name>) — envelope must follow A2UI v0.9 shape. Rejecting.`; the fallback `console.error` path is preserved for typed-shape failures.
+- Three test classes all present: canonical v0.9 envelope acceptance, lone-container survival for all of `Row`/`Column`/`List`, and explicit legacy-dialect rejection with message-shape assertions.
+- No residual translation shim. `Button.tsx` drops the `DynamicStringSchema` import and the `props.label ?? null` fallback cleanly. `emit_ui.ts` tool schema is v0.9-only. Renderer contract and LLM-boundary contract are aligned.
+- `dropEmptyPropValues` correctly preserves `""` (documented for `DateTimeInput`) and drops `null`/`undefined` only.
+- Approve → Leela and Zapp had already approved; all three squad labels now present and CI (lint/build/unit) green.
+
+### #986 — Playground polish → APPROVED
+Targeted visual polish, fully behaviour-preserving for non-Playground consumers:
+- `FileViewer.fillContainer` is opt-in (`= false`), only `PlaygroundWorkspace` consumes it → no blast radius into the chat-side-panel layout.
+- `mergeClasses(styles.root, fillContainer && styles.rootFill)` correctly handles the falsy branch; override applied in both populated and empty-state render paths.
+- Grid math: `repeat(auto-fill, minmax(260px, 1fr))` + `maxWidth: 320px` yields the claimed 4–5 cards/row without breaking narrow viewports.
+- `allEmpty` predicate correctly OR-ed with per-card `!hasPreview` so the compact treatment propagates correctly. `ArrowRight24Regular` replaces the `go.svg` `<img>` in both render sites.
+- Flagged 🟡 concern on zero new tests for grid-compacting logic / `fillContainer` branch, but Playwright E2E + unit CI are green; accepted as a visual-polish PR.
+
+### #988 — Remove Ideas tab (DRAFT) → COMMENT-ONLY
+Clean deletion; no approval label until it exits draft. Surfaced items to address before un-drafting:
+1. Stale file-level JSDoc still says "Playground — A2UI Gallery".
+2. Stale comment on `groupByPack` helper references deleted "scenarios" concept.
+3. `GalleryCardErrorBoundary` class name is now a misnomer (still used by `ComponentCard`) — rename suggested.
+4. Suggested a grep of any CSS/E2E references to `playground-gallery-scroll` / `playground-gallery` selectors before marking ready.
+No architectural concerns; pure subtraction with imports, state, handlers, and type unions all removed consistently.
+
+### #990 — Create-tab inspirations variety (DRAFT) → COMMENT-ONLY
+Root-cause fix at both content and prompt layers. Three items raised for before un-drafting:
+1. **Blocking when out of draft:** verify that every component name in the system-prompt allow-list (`DecisionCard`, `SummaryCard`, `AuthCard`, `CodeBlock`, `FormGroup`, `Questionnaire`, `RadioGroup`) is actually registered in the client catalog — otherwise the allow-list silently reintroduces the `_ErrorComponent` bug this PR is fixing.
+2. Duplicated fallback arrays in `packages/web/api/src/functions/widget-inspirations.ts` and `packages/web/src/lib/fallback-ideas.ts` with only a "keep in sync" doc-comment; recommend centralising to a shared module or pinning with a pairwise equality unit test.
+3. No tests for `pickFallbackIdea` (no immediate repeats) or `nextFocusDomain` (cycles through all 8 before repeating).
+Process-local counters on Azure Functions workers are acceptable for best-effort variety. Approved prompt-engineering tactics (allow-list + DO-NOT list + trailing anchor sentence).
+
+## Merge-readiness snapshot (at review time)
+
+- **#989** — all three squad labels present (leela+zapp were pre-existing, nibbler added now); Playwright E2E still in progress. Ready to merge once E2E lands green.
+- **#986** — all three squad labels present; CI fully green including Playwright E2E. Ready to merge.
+- **#988** — draft; will require removing draft status + addressing the 4 comment items before a re-review.
+- **#990** — draft; will require item 1 (allow-list verification) minimum before approval when un-drafted.
+
+## Cross-reference to Leela / Zapp
+
+- #989: deferred nothing — stayed in code-quality lane.
+- #986: deferred nothing.
+- #988: explicitly deferred default-tab flip to Leela; noted no security surface for Zapp.
+- #990: explicitly deferred shared-module placement across api↔web boundary to Leela; flagged prompt-injection check on focus-domain interpolation for Zapp (hardcoded array, low risk but worth a second look).
+
+
+---
+
+# Decision: Zapp Security Review Batch — 2026-04-21
+
+**Date:** 2026-04-21T02:59:40-07:00
 **Author:** Zapp (Security Architect)
-**Issue:** #329
-**Status:** APPROVE WITH CONDITIONS
+**Status:** Final
 
-## Decision
+## Verdicts
 
-DP #329 is approved to proceed **only with mandatory implementation-time controls**. The architecture is directionally sound, but its current trust model is too dependent on host behavior and must be hardened with explicit server-side authorization, message validation, and payload safety limits.
+| PR | Title | Verdict | Label |
+|----|-------|---------|-------|
+| #989 | A2UI v0.9 clean break (schema + renderer) | ✅ Approve | `zapp:approved` |
+| #986 | Playground polish (grid, Workspace fill, Create composer) | ✅ Approve | `zapp:approved` |
+| #988 | Remove Playground Ideas tab (DRAFT) | 🟡 Comment (no blockers) | — |
+| #990 | Create-tab inspirations variety (DRAFT) | 🟡 Comment (no blockers) | — |
 
-## Findings by Severity
+## #989 — A2UI v0.9 clean break
 
-1. **🔴 High — MCP tool exposure from iframe runtime**
-   - The app runtime uses `app.callServerTool()` and the server exposes multiple tools; without server-side allowlisting for app-originated calls, a compromised iframe can attempt broader tool access.
+**Approve.** Security posture **improves**:
 
-2. **🟠 Major — postMessage trust model under host variance**
-   - `"*"` target origin in null-origin sandbox can be acceptable, but only with strict message/source/session validation. If any host enables `allow-same-origin`, explicit `event.origin` allowlisting becomes mandatory.
+- Tool schema (`core.emit_ui`) narrowed from 7 loose optionals to the v0.9 adjacency-list set. `action.event.payload` constrained to `record<string, scalar>` — blocks nested-payload smuggling.
+- Clean-break rejection (`_ErrorComponent` + named `console.error`) replaces silent legacy translation. Fail-loud at the trust boundary is the correct posture.
+- `Button` schema is `.strict()`; legacy `onClick: <string>` can no longer reach the renderer. Closes a confused-deputy path.
+- Double validation preserved: `sanitizeComponentProps` (dangerous-key strip + URL validation) runs before `dropEmptyPropValues` and the per-component Zod parse.
+- Regression test (`a2ui-hierarchy.test.ts`) locks in the legacy-dialect rejection contract.
 
-3. **🟠 Major — CSP missing in PoC; must be required in production**
-   - Security posture relies on sandbox + renderer discipline. CSP must be baked into shipped app as defense-in-depth, not optional documentation.
+**Standing reminders (non-blocking):**
+- Future interactive leaves should default to `.strict()` like Button.
+- `action.event.name` must remain an opaque allowlisted key in the dispatcher.
+- Do not surface `unknownKeys` console text in DOM without escaping.
 
-4. **🟠 Major — A2UI payload parsing lacks strict bounds**
-   - Unbounded payload/component processing can enable UI tampering or render-path DoS.
+## #986 — Playground polish
 
-5. **🟡 Minor — Session ownership/replay protections not explicit**
-   - Session-bound authz checks and replay-resistant message semantics should be explicitly required.
+**Approve.** No security impact:
+- No new user-input path, no URL param parsing, no `dangerouslySetInnerHTML`.
+- Preview rendering unchanged (still `A2UIEnvelopePreview`, static `COMPONENT_PREVIEWS`).
+- Icon swap removes a local SVG asset — CSP `script-src 'self'` unaffected.
+- `fillContainer` prop is a pure boolean with a safe default.
 
-6. **🟢 Low — Credential handling generally sound**
-   - API keys stay server-side; retain strict no-token-in-iframe invariant and redaction guarantees.
+## #988 — Remove Ideas tab (draft, comment)
 
-## Required Security Conditions (Implementation Acceptance Criteria)
+**No blockers.** Deletion reduces surface (removes DOM-serialized JSON viewer of pack-contributed scenarios).
 
-1. Server-enforced allowlist of app-callable MCP tools with default-deny behavior.
-2. Mode-aware message verification:
-   - null-origin sandbox: strict source + schema + nonce/session binding.
-   - same-origin sandbox: strict origin allowlist + source validation.
-3. Mandatory restrictive CSP in bundled app, verified in CI.
-4. Strict A2UI validation: schema checks, payload size limits, component count/depth limits, fail-closed fallback.
-5. Per-session principal/channel ownership checks and replay/audit protections on every app tool call.
-6. Security compatibility matrix across VS Code, Claude Code, and ChatGPT hosts.
+**Follow-up:** `/api/packs` still carries `playgroundScenarios` with no consumer; recommend a post-merge issue to either stop shipping or document the contract so it doesn't silently become a new client surface.
 
-## Outcome
+## #990 — Create-tab inspirations variety (draft, comment)
 
-Security gate for the **design proposal** is conditionally clear. Final implementation PR(s) must demonstrate all conditions with tests/evidence before receiving Zapp implementation sign-off.
+**No blockers.**
+- `${focus}` interpolation is hardcoded constants — no request data enters the system prompt.
+- Prompt allow-list is defense-in-depth; enforcement lives in `validateAndSanitizeComponents` (strengthened by #989).
+- `Math.random()` selection is acceptable (not a security primitive).
+- Process-local mutable counters leak nothing sensitive; acceptable today, flag if tenant/user-scoped state ever lands here.
+- Safety clause (weapons/violence/etc.) retained in both system prompts.
+
+**Low-severity recommendation:** add a drift-guard vitest asserting the client `FALLBACK_WIDGET_IDEAS` and server `FALLBACK_IDEAS` stay in sync so guardrail text can't split across surfaces.
+
+## Cross-cutting takeaways for future reviews
+
+1. Schema narrowing + fail-loud rejection is the canonical posture for any LLM-facing tool.
+2. Treat prompt allow-lists as rails, not gates. Always confirm the runtime validator.
+3. CSS-only PRs still warrant a CSP/asset-surface check.
+4. Deletion PRs should trigger a scan for orphaned server payloads that could silently become new surfaces.
 
 ---
 
-### 2026-04-17: Review gate via labels, not GitHub reviews
-**By:** Ahmed Sabbour (via Leela)
-**What:** Squad PRs use leela:approved + zapp:approved labels as the merge gate, enforced by squad/review-gate status check (squad-review-gate.yml). Required GitHub review approvals removed — authors cannot approve their own PRs.
-**Why:** The 1-required-approval branch protection permanently blocked squad agent PRs because agents push as the same GitHub user who owns the repo.
-
-### 2026-04-15: Removed paths-ignore from CI workflow
-**By:** Bender (Backend Dev)
-**What:** Removed paths-ignore from .github/workflows/ci.yml so all PRs trigger CI checks, preventing merge deadlocks on docs-only PRs.
-**Why:** The protect-main ruleset requires 'Lint, Build & Unit Tests' and 'Playwright E2E Tests', but paths-ignore excluded docs files. Docs-only PRs could never merge.
-
-# Decision: Keep non-runtime files and `bicep-node` out of SWA function startup
-
-**Date:** 2026-04-15T16:06:15Z  
-**Author:** Bender (Backend Dev)  
-**Status:** Implemented
-
-## Context
-
-The live Static Web App was returning 404 for anonymous API routes like `/api/health` and `/api/github-auth/callback` even though the latest `deploy-swa.yml` run succeeded and the frontend auth layer was still active.
-
-The deploy log for commit `d936a67` showed the API build bundling **18 function entrypoints**. One of those files was `packages/web/api/src/functions/converse.test.ts`, and importing the built `dist/functions/converse.test.js` outside Vitest immediately threw `Vitest mocker was not initialized in this environment`. The same startup sweep also failed when `bicep-node` was inlined into `azure-deployments.js`, throwing `Dynamic require of "os" is not supported`.
-
-## Decision
-
-1. **Exclude test/spec files from API entrypoints** — `packages/web/api/esbuild.config.mjs` must not bundle `*.test.ts` or `*.spec.ts` from `src/functions/`.
-2. **Keep `bicep-node` external** — the API bundle must leave `bicep-node` in `node_modules` instead of inlining it into the ESM function entrypoints.
-
-## Why
-
-Azure Functions v4 loads every file matched by the `package.json` `main` glob at startup. Any bundled file that throws during import prevents handler registration for the whole managed API, which shows up at the edge as repo-correct routes returning 404.
-
-## Evidence
-
-- Latest SWA deploy log: `✅ Bundled 18 function(s) to dist/functions/`
-- `git ls-tree origin/main packages/web/api/src/functions` included `converse.test.ts`
-- Reproduced crash by importing the built test bundle:
-  - `Vitest mocker was not initialized in this environment. vi.queueMock() is forbidden.`
-- Reproduced crash by importing the bundled Azure deployment entrypoint before externalizing `bicep-node`:
-  - `Dynamic require of "os" is not supported`
-
-## Consequences
-
-- Managed Functions startup now only imports real runtime entrypoints.
-- Azure deployment routes can still use `bicep-node`, but only through the runtime dependency in `node_modules`.
-- Future API tests can stay near the functions code, but the build must continue filtering non-runtime files out of the startup glob.
----
-
-# Decision: Secure ELK ArchitectureDiagram contract
-
-**Date:** 2026-04-15T15:20:24Z
-**Author:** Fry (Frontend Dev)
-**Status:** Implemented
-
-## Context
-
-Issue #273 needed the real try-aks architecture diagram path: ELK layout, Azure/Kubernetes icons, nested group boundaries, and multiline subtitles. The existing renderer already had safe Mermaid handling, so the key trade-off was how to add the richer visuals without weakening the security posture or shipping fake icon heuristics.
-
-## Decision
-
-1. **`diagram` is the v1 contract.** `ArchitectureDiagram` should prefer raw Mermaid text with nested subgraphs, while `nodes`/`edges` remain a legacy fallback for simple graphs.
-2. **Renderer posture stays strict.** Keep `securityLevel: 'antiscript'`, preserve `sanitizeDiagramInput()`, and expand `%%icon:name%%` placeholders only after render with a strict allowlist.
-3. **Registry-backed icons or plain text — never fake guesses.** Use the shared adaptive-ui icon registry for supported keys; if a shared icon is missing, render the label without an icon instead of mapping to a local keyword-based placeholder.
-
-## Consequences
-
-- Prompt, schema, catalog, and demo updates should emit `diagram`, `title`, and `description` so the model and demos use the grouped architecture path consistently.
-- Reusable renderer helpers live in `packages/web/src/catalog/components/architectureDiagramUtils.ts`.
-- Web-only type shims in `packages/web/src/types/` are acceptable when source-published packages expose more TypeScript surface area than the renderer actually needs.
-
-# Hermes Decision — Issue #326 Revision 4 QA Gate
-
-- **Date:** 2026-04-15
-- **Issue:** #326
-- **Revision Reviewed:** 4 (`#4255575488`)
-- **Decision:** APPROVE
-
-## Context
-Revision 4 was reviewed specifically against the previously blocked QA concerns: batch validation semantics, mandatory-step failure handling, deterministic rehydration, and the accessibility/regression contract for workspace-only live file streaming.
-
-## QA Decision
-Revision 4 makes validation all-or-nothing per step, keeps mandatory-step failures from silently advancing, persists explicit per-step run outcomes for deterministic resume behavior, and keeps accessibility plus regression requirements explicit on the FileManager-first stream.
-
-## Outcome
-QA gate is clear for implementation issues #327 and #328 from the testing side.
----
-
-# Decision: Issue #271 — Real flow termination with project download
-
-**Date:** 2026-04-15T08:39:29.427Z
-**Author:** Leela (Lead)
-**Issue:** #271 — Deployment flow is blocked
-**Status:** Proposed
-**Supersedes:** `leela-271-deployment-flow.md` (demo-only stopgap)
-
-## Problem
-
-The onboarding flow enters HANDOFF (Step 5) and DEPLOY (Step 6) phases
-that have no working backend. Users see fake "repo created" cards, "Deploy
-now" buttons, and sign-in prompts that lead nowhere. The flow is a dead end.
-
-**Corrected root cause:** The issue claims AuthCard is unregistered. That is
-wrong — AuthCard is fully registered in the React catalog, component-catalog,
-and a2ui-schema. The real problem is the flow reaches phases that pretend
-work is happening when there is no backend to execute it.
-
-## What Actually Exists (Infrastructure Audit)
-
-| Capability | Status | Evidence |
-|------------|--------|----------|
-| Phase engine (state machine) | ✅ Real | `engine/machine.ts` — `transition()` handles ADVANCE, SKIP, PHASE_COMPLETE |
-| LLM conversation | ✅ Real | `/api/converse` → Azure OpenAI, phase-aware prompt injection |
-| File generation | ✅ Real | LLM generates files → VirtualFS (IndexedDB) + VirtualFileSystem (memory) |
-| ZIP export | ✅ Real | `VirtualFS.exportZip()` via JSZip, buttons in FileTreePanel + FileManagerSidebar |
-| SWA AAD auth | ✅ Real | `/.auth/me`, `/.auth/login/aad` — fully functional |
-| AuthCard component | ✅ Real | Renders, handles sign-in/sign-out, falls back to stub mode gracefully |
-| DeploymentProgress component | ✅ Real | Renders step tracker with status icons |
-| GitHub connector | ⚠️ Scaffolded | `createRepo()`, `listUserRepos()` exist but no token provider is wired |
-| GitHub OAuth proxy | ⚠️ Scaffolded | `/api/github-oauth` Azure Function exists, proxies device flow to github.com |
-| GitHub OAuth App | ❌ Missing | No `GITHUB_CLIENT_ID` in any config, env, or secret reference |
-| GitHub file push | ❌ Missing | `GitHubConnector` has no `pushTree()`/`createCommit()` method |
-| Azure ARM connector | ⚠️ Scaffolded | Real ARM methods exist but no MSAL token provider is wired |
-| Azure deployment | ❌ Missing | No resource provisioning logic anywhere |
-
-## Options Evaluated
-
-### Option A: Wire GitHub OAuth + create repo + push files
-- Wire `/api/github-oauth` to GitHubLoginCard (real device codes)
-- Add `setTokenProvider()` in web layer after token acquisition
-- Add `pushTree()` to GitHubConnector (GitHub Trees/Blobs API)
-- Make HANDOFF real, remove DEPLOY
-
-**Verdict: BLOCKED.** No GitHub OAuth App is registered — no `GITHUB_CLIENT_ID`
-exists in any config or secret. The device flow proxy exists but has no app to
-authenticate against. This is infrastructure work (register OAuth App, store
-secrets in SWA, configure scopes) that must happen before code changes.
-
-### Option B: End at REVIEW with real project download
-- Make REVIEW the terminal phase in the engine (`nextPhase: null`)
-- System prompt ends with "Your project is ready — download your files"
-- LLM shows completion summary with download CTA
-- Users get their actual LLM-generated files as a ZIP
-- Remove HANDOFF + DEPLOY from prompt and demo scenarios
-
-**Verdict: SHIP THIS.** Every piece is real and working. No fake data, no stubs.
-The user walks away with actual deployment artifacts generated by the LLM.
-
-### Option C: Full Azure deployment
-**Verdict: WAY TOO BIG.** ARM provisioning = resource groups, ACR, AKS, networking,
-OIDC federation. Not an issue-271 fix.
-
-## Decision: Ship Option B, file follow-up for Option A
-
-### What #271 delivers (real, functioning)
-
-The onboarding flow completes at REVIEW with a **"Your Project Is Ready"**
-experience. The user downloads their generated files as a ZIP. Every step in
-the flow (discover → design → generate → review → download) is backed by real
-code — no fake data, no placeholder URLs, no pretend deployments.
-
-### Changes required (5 files, ordered)
-
-| # | File | Change | Why |
-|---|------|--------|-----|
-| 1 | `packages/core/src/engine/phases.ts` | Set Review `nextPhase: null` (was `Phase.Handoff`). | Engine formally ends at REVIEW. Machine sets `isComplete: true`. |
-| 2 | `packages/core/src/prompts/system-prompt.ts` | **Remove** STEP 5 (HANDOFF) and STEP 6 (DEPLOY). **Rewrite** STEP 4 (REVIEW) as terminal: after approval, show "Your Project Is Ready" Card with Markdown summary of generated files + a primary Button labeled "Download project" with action `{"event":{"name":"download-project"}}`. **Remove** Example 6 (handoff). **Update** Example 5: replace "Approve and continue to handoff" with completion summary + download CTA. **Add guardrail** in section 2: "The flow ends at REVIEW. Do not enter handoff or deploy phases — they are not yet implemented. After the user approves the review, show a session-complete summary and direct them to download their project files." |
-| 3 | `packages/web/src/services/demo-scenarios.ts` | **Replace** `HANDOFF` const with a `SESSION_COMPLETE` response: success Badge, file-count summary, "Download project" Button (action: `download-project`), Accordion with next-steps (clone, customize, deploy later). **Remove** `DEPLOY_PROGRESS` const. **Update** `scenarioFlow` array: end at `SESSION_COMPLETE` (drop DEPLOY_PROGRESS). **Update** SCENARIOS keyword routing: remove deploy/handoff matchers, add `complete\|done\|finish\|download` → SESSION_COMPLETE. **Update** CONFIGURE_FORM: ProgressSteps "Deploy" label → "Review". |
-| 4 | `packages/web/src/App.tsx` | Wire the `download-project` A2UI action event to the existing `handleDownloadZip` callback. When the chat receives a button click with event name `download-project`, call `handleDownloadZip()`. |
-| 5 | `packages/core/src/engine/types.ts` | No code change needed — `Phase.Handoff` and `Phase.Deploy` enum values stay (they may be referenced in tests/playground). Add a TSDoc comment: `/** @deprecated Not yet implemented — flow ends at Review. */` to Handoff and Deploy. |
-
-### Follow-up issue (file after #271 ships)
-
-**Title:** "feat: Wire real GitHub OAuth handoff — device flow + repo creation + file push"
-**Scope:**
-1. Register a GitHub OAuth App, store `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` in SWA app settings
-2. Wire `GitHubLoginCard` to call `/api/github-oauth/login/device/code` for real device codes
-3. Add `setTokenProvider()` integration: after token exchange, inject token into GitHubConnector
-4. Add `pushTree(owner, repo, files)` to `GitHubConnector` using GitHub Git Trees/Blobs API
-5. Re-enable HANDOFF phase in system prompt with real capabilities
-6. Consider: should HANDOFF become a second terminal phase (Review OR Handoff), or always flow through?
-**Blocked by:** GitHub OAuth App registration (infra/ops task for Ahmed)
-
-### Defer (do NOT touch in #271)
-
-- **AuthCard / GitHubLoginCard** — work correctly, keep for future OAuth.
-- **DeploymentProgress** — works correctly, reusable for future deploy phase.
-- **a2ui-schema.ts / component-catalog.ts** — no changes needed.
-- **playground-scenarios.ts** — separate component showcase, not user-facing flow.
-- **Phase enum values** (Handoff, Deploy) — keep in enum, mark deprecated.
-
-## Acceptance Bar
-
-1. **End-to-end flow works:** Discover → Design → Generate → Review → "Your Project Is Ready" → Download ZIP.
-2. **ZIP contains real files:** Generated by the LLM (not placeholder content). In demo mode, contains the demo file set.
-3. **No dead ends:** Every screen has an action the user can take.
-4. **No fake data:** No "github.example.com", no "7 resources provisioned", no "Created repo" badges for repos that don't exist.
-5. **Engine state:** After review approval, `isComplete === true`.
-6. **Tests pass:** `npm run build && npm test` green.
-
-## Risks
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| `download-project` event not caught by existing action handler | Medium | Medium — button click does nothing | Wire explicitly in App.tsx; fall back to opening FileTreePanel if VFS is empty |
-| LLM still tries to enter handoff despite guardrail | Low | Low — user sees unrendered phase | Engine `nextPhase: null` prevents machine from advancing past review regardless of LLM output |
-| Demo scenarios reference removed constants | Low | High — build break | Search for all HANDOFF/DEPLOY_PROGRESS references before removing |
-
-## Needs Sign-Off
-
-- **Ahmed Sabbour** — confirm "download project" is acceptable as #271 scope; confirm GitHub OAuth App registration goes into a follow-up issue.
----
-
-### 2026-04-20: `docs-site/docs/` is the canonical docs surface
-**By:** Scribe (Scribe)
-**What:** After #811, contributor guidance, release entry points, and docs automation should treat `docs-site/docs/` as the canonical docs tree and `docs-site/docs/architecture/v2-implementation-brief.md` as the canonical brief path. `docs/README.md` is the redirect map for removed legacy `docs/*` pages.
-**Why:** This keeps follow-up docs cleanup work from reintroducing dead `docs/*` paths or split-brain guidance between the docs site and top-level docs.
-
-# Decision: Issue #271 — Ship complete flow with real project delivery
-
-**Date:** 2026-04-15T08:39:29.427Z
-**Author:** Leela (Lead)
-**Issue:** #271 — Deployment flow is blocked
-**Status:** Proposed
-**Supersedes:** `leela-271-deployment-flow.md` (v1), `leela-271-deployment-flow-v2.md` (v2)
-
----
-
-## 1. Why v1 and v2 Were Insufficient
-
-v1 proposed removing fake screens. v2 proposed ending at Review with ZIP
-download. Both are defensible but fall short of "fully functional, ship-ready."
-They treat #271 as damage control. This v3 treats it as a product release.
-
-## 2. Functional Scope #271 Must Deliver
-
-**A complete, working Kickstart flow where every step produces real output
-and the user walks away with a real deliverable.**
-
-```
-DISCOVER → DESIGN → GENERATE → REVIEW → PROJECT DELIVERY
-```
-
-| Step | What Happens | Real? |
-|------|-------------|-------|
-| DISCOVER | LLM asks about app type, runtime, existing code | ✅ Real (Azure OpenAI) |
-| DESIGN | LLM proposes architecture, cost estimate | ✅ Real (Pricing API for costs) |
-| GENERATE | LLM generates Dockerfile, manifests, CI/CD, app code | ✅ Real (stored in VirtualFS/IndexedDB) |
-| REVIEW | Architecture recap, cost recap, best-practice audit | ✅ Real |
-| PROJECT DELIVERY | User downloads ZIP of generated files | ✅ Real (JSZip exportZip()) |
-
-**What gets removed:** HANDOFF (Step 5) and DEPLOY (Step 6) — the two phases
-with zero working backend.
-
-**Why this is not a stopgap:** This is the product. A guided project generator
-that gives you deployment-ready files. The same model as `create-react-app`,
-`yo`, Spring Initializr. The flow is complete, every step is backed by real
-infrastructure, and the user gets a real deliverable.
-
-## 3. What Exists vs. What's Missing
-
-### Already built and working
-
-| Capability | Location | Status |
-|------------|----------|--------|
-| Phase state machine | `core/engine/machine.ts` | ✅ `transition()` handles ADVANCE, sets `isComplete` when `nextPhase === null` |
-| LLM conversation backend | `web/api/functions/converse.ts` | ✅ Azure OpenAI with phase-aware prompt |
-| File generation + storage | `web/services/virtual-fs.ts` | ✅ VirtualFS (IndexedDB) + VirtualFileSystem (memory) |
-| ZIP export | `VirtualFS.exportZip()` + JSZip | ✅ Used by FileTreePanel + FileManagerSidebar |
-| Download handler | `App.tsx:386-398` (`handleDownloadZip`) | ✅ Creates blob URL, triggers download |
-| Action dispatch system | `hooks/useActionDispatch.ts` | ✅ Prefix-based routing: reply, navigate, auto-continue, api |
-| A2UI component catalog (28 components) | `core/prompts/component-catalog.ts` | ✅ All registered, including AuthCard + DeploymentProgress |
-| Phase indicator UI | `converse.ts:237-248` | ✅ Shows all phases with status |
-| Demo scenario engine | `web/services/demo-scenarios.ts` | ✅ Keyword matching + sequential flow |
-
-### Missing (must build in #271)
-
-| Gap | What to Build | Effort |
-|-----|--------------|--------|
-| Review is not terminal | Set `Review.nextPhase = null` in `phases.ts` | 1 line |
-| System prompt goes past Review | Remove STEP 5/6, add completion CTA to STEP 4 | Medium (prompt editing) |
-| No `client:` action prefix | Add `client:` category to `useActionDispatch.ts` for client-side actions (download, open panel) | ~15 lines |
-| App.tsx not wired for client actions | Add `onClientAction` callback to useActionDispatch options | ~10 lines |
-| Demo scenarios show fake handoff/deploy | Replace HANDOFF + DEPLOY_PROGRESS with SESSION_COMPLETE | Medium |
-| Tests assert 6-phase chain | Update to 4-phase chain (Discover→Design→Generate→Review) | 3 test files |
-| Review example button says "continue to handoff" | Change to "Download your project" with `client:download-project` action | 1 change in prompt |
-
-### Not in #271 (follow-up issues)
-
-| Feature | Blocker | Follow-Up |
-|---------|---------|-----------|
-| GitHub OAuth handoff | No `GITHUB_CLIENT_ID` registered anywhere. `/api/github-oauth` proxy exists but has no OAuth App to authenticate against. GitHubConnector has `createRepo()` but no `pushTree()` for multi-file commits. | New issue: register OAuth App (infra), implement pushTree, wire device flow |
-| Azure ARM deployment | No MSAL token provider wired. AzureARMConnector methods exist but return stubs. No resource provisioning logic. | Future milestone |
-
-## 4. Implementation Sequence
-
-### Bender (backend + engine): Changes 1-3
-
-**Change 1: `packages/core/src/engine/phases.ts`**
-- Line 80: Change `nextPhase: Phase.Handoff` → `nextPhase: null`
-- This makes Review the terminal phase. When the engine ADVANCEs from Review,
-  `machine.ts:49-53` sets `isComplete = true`.
-- Keep Handoff and Deploy phase definitions in the array (tests/playground
-  reference them, and they'll be re-enabled when infra is ready).
-
-**Change 2: `packages/core/src/prompts/system-prompt.ts`**
-- Remove STEP 5 (HANDOFF, ~lines 147-150) and STEP 6 (DEPLOY, ~lines 152-156).
-- Rewrite STEP 4 (REVIEW) as the terminal step. After the user approves:
-  - Show "Your Project Is Ready" Card with:
-    - Success Badge
-    - Markdown summary of generated files
-    - Primary Button: "Download project" with action
-      `{"event":{"name":"client:download-project","context":{"label":"Download project"}}}`
-    - Accordion with next steps: "Run locally", "Push to GitHub manually", "Deploy later"
-  - Set `phaseComplete: true` so the engine marks the conversation complete.
-- Add guardrail in section 2 (conversation flow): "The flow ends at REVIEW.
-  After the user approves, show a project-complete summary with a download
-  action. Do not enter handoff or deploy phases."
-- Remove Example 6 (handoff repo picker, ~line 290-291).
-- Update Example 5 (review): Replace "Approve and continue to handoff" button
-  with completion summary + download CTA using `client:download-project`.
-- In section 2a (ARCHITECT MINDSET, line 167): soften "MUST include a GitHub
-  Actions workflow" to "SHOULD include a CI/CD workflow" since we're not
-  pushing to GitHub yet.
-
-**Change 3: `packages/core/src/engine/types.ts`**
-- Add TSDoc deprecation markers to Handoff and Deploy enum members:
-  ```typescript
-  /** @deprecated Not yet implemented — flow currently ends at Review. */
-  Handoff = "handoff",
-  /** @deprecated Not yet implemented — flow currently ends at Review. */
-  Deploy = "deploy",
-  ```
-
-### Fry (frontend): Changes 4-6
-
-**Change 4: `packages/web/src/hooks/useActionDispatch.ts`**
-- Add `client:` prefix to PREFIX_MAP (line 26-31):
-  ```typescript
-  'client:': 'client',
-  ```
-- Add `'client'` to ActionCategory type (line 23).
-- Add `onClientAction` to ActionDispatchOptions (line 115-135):
-  ```typescript
-  /** Callback for client-side actions (download, open panel, etc.). */
-  onClientAction?: (operation: string, context: Record<string, unknown>) => void;
-  ```
-- Add case in switch (after line 325):
-  ```typescript
-  case 'client': {
-    consecutiveRef.current = 0;
-    setConsecutiveAutoContinueCount(0);
-    const operation = action.name.replace(/^client:/, '');
-    const safeContext = sanitizeActionContext(action.context);
-    logDebug(operation);
-    optionsRef.current.onClientAction?.(operation, safeContext);
-    break;
-  }
-  ```
-
-**Change 5: `packages/web/src/App.tsx`**
-- Wire `onClientAction` in the `useActionDispatch` call (~line 53-58):
-  ```typescript
-  onClientAction: (operation) => {
-    if (operation === 'download-project') {
-      handleDownloadZip();
-    }
-  },
-  ```
-- This connects the LLM's "Download project" button directly to the existing
-  `handleDownloadZip()` (line 386-398) which calls `vfs.exportZip()`.
-
-**Change 6: `packages/web/src/services/demo-scenarios.ts`**
-- Replace `HANDOFF` const (line 225-264) with `SESSION_COMPLETE`:
-  ```typescript
-  const SESSION_COMPLETE: DemoResponse = {
-    text: "Your project is ready! All files have been generated...",
-    phase: 'review',
-    model: 'gpt-5.3-chat',
-    typingDelay: 1400,
-    a2uiMessages: surface('complete-surface', [
-      // Success card with Badge, file summary, download button, next-steps accordion
-    ]),
-  };
-  ```
-- Remove `DEPLOY_PROGRESS` const (line 266-312).
-- Update `scenarioFlow` (line 442): Replace `HANDOFF, DEPLOY_PROGRESS` with
-  `SESSION_COMPLETE`. Final array:
-  `[ARCHITECTURE, DESIGN_DETAIL, CONFIGURE_FORM, CODE_PREVIEW, FILE_GENERATION, REVIEW_EXPANDED, SESSION_COMPLETE]`
-- Update SCENARIOS keyword routing (line 404-413):
-  - Remove: `{ match: /deploy|ship|launch|go live/i, response: DEPLOY_PROGRESS }`
-  - Remove: `{ match: /handoff|github|repo|push|codespace/i, response: HANDOFF }`
-  - Add: `{ match: /complete|done|finish|download|ready/i, response: SESSION_COMPLETE }`
-- Update CONFIGURE_FORM ProgressSteps (line 325): "Deploy" → "Review".
-
-### Bender or Fry: Change 7
-
-**Change 7: Update tests (3 files)**
-
-a) `packages/core/src/__tests__/machine.test.ts`
-- Lines 41-56: Update ADVANCE chain test. After Review ADVANCE, expect
-  `isComplete === true` (not transition to Handoff).
-- Lines 150-176: Update full journey test. Chain is now 4 phases:
-  Discover → Design → Generate → Review → isComplete.
-
-b) `packages/core/src/__tests__/phases.test.ts`
-- Lines 52-63: Update phase chain test. Review should have
-  `nextPhase === null`. Handoff/Deploy still exist in definitions but are
-  no longer in the active chain.
-- Line 60: "last phase (Deploy) has nextPhase = null" → update assertion
-  to also verify Review has nextPhase = null.
-
-c) `packages/mcp-server/src/__tests__/action.test.ts`
-- Lines 156-171: Update full journey test. Advance through 4 phases
-  (Discover → Design → Generate → Review), verify isComplete after Review.
-
-## 5. Risks and Blockers
-
-| # | Risk | Likelihood | Impact | Mitigation |
-|---|------|-----------|--------|------------|
-| R1 | LLM ignores guardrail and tries to enter Handoff despite prompt changes | Low | Low | Engine enforces: Review.nextPhase=null means machine cannot advance past Review regardless of LLM output. Defense in depth. |
-| R2 | `client:download-project` action not fired because Button schema doesn't support `client:` prefix | Low | High | Verify A2UI action schema accepts any string for event name (it does — ActionSchema uses z.string()). Test E2E. |
-| R3 | VirtualFS empty when user clicks download (no files generated in demo mode) | Medium | Medium | Check `vfs.list().length > 0` before triggering download. If empty, show toast/message "No files to download." |
-| R4 | Existing test suites fail after phase chain change | Certain | Low | Changes 7a-7c update all affected tests. No E2E tests walk past Review (confirmed by audit). |
-| R5 | Playground scenarios (`playground-scenarios.ts`) reference Deploy | Low | None | Playground is a component showcase, not the user flow. Deploy references there are fine — they demo the DeploymentProgress component. |
-| R6 | `phaseComplete: true` from LLM after Review triggers unexpected UI behavior | Low | Medium | Verify client handles `isComplete` gracefully. Phase indicator should show "Complete" state. |
-
-**Hard blocker: None.** All infrastructure exists. This is a wiring + prompt task.
-
-## 6. Acceptance Bar
-
-1. **Complete flow E2E**: Discover → Design → Generate → Review → "Your Project Is Ready" → click "Download project" → ZIP downloads with generated files.
-2. **Demo mode works**: Sequential scenario flow reaches SESSION_COMPLETE, download button fires.
-3. **No dead ends**: Every screen has an actionable next step.
-4. **No fake data**: Zero instances of "github.example.com", "7 resources provisioned", "my-awesome-app" fake repo URLs, or "Deploy now" buttons.
-5. **Engine state correct**: After Review approval, `engineState.isComplete === true`.
-6. **All tests green**: `npm run build && npm test` pass, including updated phase chain tests.
-7. **Guardrail holds**: LLM prompt explicitly prevents entering Handoff/Deploy; engine enforces mechanically via `nextPhase: null`.
----
-
-# Decision: Stop the flow before handoff/deploy — Issue #271
-
-**Date:** 2026-04-15T08:39:29.427Z
-**Author:** Leela (Lead)
-**Issue:** #271 — Deployment flow is blocked
-**Status:** Proposed
-
-## Problem
-
-The onboarding flow enters HANDOFF (STEP 5) and DEPLOY (STEP 6) phases
-that have **no backend implementation**. Users see fake "repo created" cards,
-"Deploy now" buttons, and AuthCard sign-in prompts that lead nowhere.
-This is a dead end — the demo cannot proceed past file generation.
-
-The issue text claims AuthCard is unregistered. **That is wrong.** AuthCard
-exists in the React catalog, component-catalog, and a2ui-schema. It renders
-fine. The problem is the flow reaches phases that pretend real work is
-happening when it is not.
-
-## Root Causes
-
-1. **System prompt instructs LLM to enter unimplemented phases.**
-   STEP 5 (HANDOFF) and STEP 6 (DEPLOY) describe GitHub repo creation
-   and Azure deployment flows backed by no real service.
-2. **Demo scenarios include HANDOFF and DEPLOY_PROGRESS responses.**
-   Fake repo URLs, fake "7 resources provisioned" progress, and "Deploy now"
-   buttons that fire events no handler catches.
-3. **Review example ends with "Approve and continue to handoff"**
-   leading directly into the dead end.
-4. **CONFIGURE_FORM ProgressSteps** includes a "Deploy" step label
-   that implies deployment exists.
-
-## Decision: End the flow at REVIEW
-
-### Ship now (3 changes)
-
-| # | File | Change |
-|---|------|--------|
-| 1 | `packages/core/src/prompts/system-prompt.ts` | Remove STEP 5 (HANDOFF) and STEP 6 (DEPLOY) from the conversation flow. Make REVIEW the terminal step. Replace the "Approve and continue to handoff" button in Example 5 with a "Session complete" summary. Remove Example 6 (handoff). Add an explicit guardrail: the LLM must NOT enter handoff or deploy phases. |
-| 2 | `packages/web/src/services/demo-scenarios.ts` | Replace HANDOFF with a "Session Complete" summary (no fake repo/deployment). Remove DEPLOY_PROGRESS. Update `scenarioFlow` to end at REVIEW_EXPANDED. Remove keyword routing for deploy/handoff to fake screens. Remove the "Deploy" step from CONFIGURE_FORM ProgressSteps. |
-| 3 | `packages/web/src/services/demo-scenarios.ts` | In CONFIGURE_FORM, change ProgressSteps "Deploy" to "Review" so the step tracker does not promise deployment. |
-
-### Defer (do NOT touch)
-
-- **AuthCard component** — works correctly, keep for future Azure auth.
-- **DeploymentProgress component** — works correctly, keep for future use.
-- **a2ui-schema.ts / component-catalog.ts** — no changes needed.
-- **playground-scenarios.ts** — separate concern; many deploy references,
-  but it's a component playground, not the user-facing onboarding flow.
-
-## Acceptance Bar
-
-1. Walk through the demo flow end-to-end. After REVIEW, the user sees a
-   "session complete" summary with next steps (not handoff/deploy).
-2. No "Deploy now", "Open in Codespaces", or fake repo cards appear.
-3. The LLM never enters handoff/deploy phases (verified by prompt guardrail).
-4. All existing tests pass (`npm run build && npm test`).
-
-## Consequences
-
-- Users can complete the demo without hitting a dead end.
-- Deployment/handoff features can be re-added when backend support exists
-  (AuthCard, DeploymentProgress, and schema entries remain intact).
-- The system prompt shrinks slightly, reducing token spend per request.
-
-## Needs Sign-Off
-
-- **Ahmed Sabbour** — product scope confirmation (ending at review is acceptable).
----
-
-# Decision: E2E Demo Sprint Plan — No Faking, No Mocking
-
-**Date:** 2026-04-15T09:34:03.404Z
-**Updated:** 2026-04-15T09:34:03.404Z
-**Author:** Leela (Lead)
-**Status:** Active (v3 — scope expanded per Ahmed directive)
-**Scope:** Sprint plan for making Kickstart end-to-end demo ready with real integrations
-
----
-
-## Goal
-
-A user walks through Kickstart from "describe your app" through file generation, GitHub repo creation, and Azure deployment — **zero fakes, zero mocks, zero dead ends.** Full pipeline, all real.
-
-## Scope (Revised)
-
-~~**v1 scope trade:** Demo ended at PR creation. Azure bits deferred.~~
-
-**v3 scope (current):** Full E2E including Azure auth and deployment. Ahmed's directive: "include the Azure bits too." The GitHub OAuth App now exists — #274 is unblocked. No more external blockers.
-
-**Demo flow target:**
-```
-DISCOVER → DESIGN → GENERATE → REVIEW → HANDOFF (GitHub) → DEPLOY (Azure)
-```
-
-Every phase backed by real infrastructure. Handoff/Deploy re-enabled conditionally (only when auth tokens are present).
-
----
-
-## What Already Shipped / Ships Now
-
-### PR #297 — Ship Immediately (Option A)
-
-| Closes | What it does |
-|--------|-------------|
-| **#271** | Makes Review terminal (`nextPhase = null`), adds `client:download-project` action routing, wires ZIP download. No more dead-end screens. |
-| **#269** | Prompt guardrail: LLM cannot hallucinate "repo created" cards. Engine prevents reaching Handoff/Deploy. |
-
-**Action:** Merge PR #297 now. It's the safety net — users get a clean flow even before GitHub/Azure integration lands. Handoff/Deploy phases are deprecated but retained in code, ready for conditional re-enablement.
-
----
-
-## Priority Tiers
-
-### TIER 1 — Foundation (blocks everything else)
-
-| # | Issue | Type | Why it's first |
-|---|-------|------|----------------|
-| 1 | **PR #297** | Fix (critical) | Merge now. Stops the dead-end flow. Closes #271, #269. Foundation for everything below. |
-| 2 | **#298** — Chat surface ownership + phase bar regression | Bug (critical) | Surfaces mutate earlier turns, phase bar doesn't render. Every other issue touches chat rendering. |
-
-### TIER 2 — Demo Spine (the real flow)
-
-| # | Issue | Type | Depends on | Why this order |
-|---|-------|------|------------|----------------|
-| 3 | **#275** — Progressive conversation flow | Feature (critical) | #298 | The wizard skeleton. One-step-at-a-time pacing, phase state tracking. Must work for both current 4-phase flow AND future 6-phase flow when Handoff/Deploy re-activate. |
-| 4 | **#274** — GitHub OAuth + real repo flow | Feature (high) | #298 | **UNBLOCKED — OAuth App exists.** Real sign-in, org selection, repo creation, file commit, PR. Re-enables Handoff phase conditionally. Needs Zapp security review. |
-| 5 | **NEW** — Azure MSAL auth + AKS deployment flow | Feature (high) | #274 | Azure device-code/browser auth via MSAL. ARM API calls for AKS Automatic provisioning. Re-enables Deploy phase conditionally. **Needs issue creation.** Needs Zapp security review. |
-
-**The #269/#271/#274 cluster is now resolved:** #269 and #271 closed by PR #297. #274 stands alone as real GitHub integration (unblocked).
-
-### TIER 3 — Demo Polish (parallel track)
-
-| # | Issue | Type | Depends on | Notes |
-|---|-------|------|------------|-------|
-| 6 | **#265** — File manager experience | Feature | #298 | Wire generated files into FileManagerSidebar, compact file list in chat. |
-| 7 | **#300** — Architecture diagram prompt-layer depth | Feature | none | Prompt-only fix: AKS subgraphs, ACR, Key Vault, Gateway. Quick win, ships before #273. |
-| 8 | **#273** — Architecture diagram (ELK + icons) | Feature | none | ELK layout engine, Azure icons, zoom. Benefits from #300 landing first. |
-| 9 | **#299** — Debug action-event placement | Bug | none | Move debug output to separate panel. Quick fix. |
-| 10 | **#296** — Subtitle 1 title sweep | Bug | none | Typography normalization across 11 components. Quick fix. |
-
-### TIER 4 — Deferred (after E2E works)
-
-| # | Issue | Type | Why defer |
-|---|-------|------|-----------|
-| 11 | **#272** — Live Azure pricing | Feature | "Not a demo blocker" per issue. Estimated pricing acceptable for demo. |
-| 12 | **#277** — Session token/cost tracker | Feature | "Not a blocker" per issue. Nice-to-have for cost demos. |
-
----
-
-## Dependency Graph
-
-```
-PR #297 (merge now) ─── closes #271, #269
-  │
-#298 (surface ownership)
-  ├── #275 (progressive flow) ──────────────────┐
-  ├── #274 (GitHub OAuth — UNBLOCKED) ──────────┤── re-enable Handoff
-  ├── #265 (file manager)                       │
-  │                                             ├── NEW: Azure MSAL + AKS deploy
-  │                                             │        ── re-enable Deploy
-  #300 (arch diagram prompt) ── lands before ── #273 (arch diagram ELK)
-  #299 (debug placement) ──────(independent)
-  #296 (subtitle sweep) ───────(independent)
-```
-
-## Parallel Tracks
-
-After #297 merges and #298 lands:
-
-- **Track A (Wizard Flow):** #275 — Bender (prompt/backend) + Fry (frontend). Must design phase state to support conditional 4-phase or 6-phase flow.
-- **Track B (GitHub):** #274 — Bender (OAuth service, device flow, pushTree, GitHubConnector) + Fry (A2UI components: GitHubLoginCard, AccountSelector, RepoForm, CommitCard, PRCard) + Zapp (security review). Re-enables Handoff phase.
-- **Track C (Azure):** NEW — Bender (MSAL auth, ARM provisioning API, AKS Automatic resource creation) + Fry (AuthCard for Azure, DeploymentProgress with real status) + Zapp (security review). Re-enables Deploy phase.
-- **Track D (Polish):** #300, #265, #273, #296, #299 — interleaved with Tracks A–C.
-
-Tracks B and C can run in parallel once #298 and #275 are stable. Track C depends on Track B patterns (auth flow established by GitHub OAuth informs Azure auth structure).
-
----
-
-## Execution Plan — Squad Assignment
-
-### Phase 0: Ship Now
-
-| Item | Assignee | Work |
-|------|----------|------|
-| **Merge PR #297** | **Leela** (approve) | Merge Option A. Review terminal, download action, prompt guardrails. Closes #271, #269. |
-
-### Phase 1: Foundation (Day 1)
-
-| Issue | Assignee | Work |
-|-------|----------|------|
-| **#298** | **Fry** | Fix surface ownership in useA2UI/useStreaming, restore phase bar rendering, turn-scoped surface IDs |
-| **#300** | **Bender** | Prompt-layer depth fix: system-prompt.ts, component-catalog.ts, demo-scenarios.ts. Ref: `/mnt/c/Users/asabbour/Git/adaptive-ui` |
-| **#296** | **@copilot** (Fry reviews) | Subtitle 1 sweep — 11 files, mechanical. |
-| **#299** | **@copilot** (Fry reviews) | Debug panel extraction — small, well-scoped. |
-
-### Phase 2: Core Flow (Day 1–2, starts when #298 merges)
-
-| Issue | Assignee | Work |
-|-------|----------|------|
-| **#275** | **Bender** (prompt + backend phase state) + **Fry** (frontend phase UI) | Progressive flow with phase state machine that supports conditional 4→6 phase expansion. Design phase transitions so Handoff/Deploy activate when auth tokens are present. |
-| **#274** | **Bender** (OAuth device flow, GitHub API service, GitHubConnector.pushTree) + **Fry** (GitHubLoginCard, AccountSelector, RepoForm, CommitCard, PRCard) | Full GitHub OAuth integration. Wire real device codes. Create repos, commit files, open PRs. Re-enable Handoff phase conditionally. Ref: `/mnt/c/Users/asabbour/Git/adaptive-ui`. **Zapp must review before merge.** |
-| **#265** | **Fry** | Wire VirtualFS → FileManagerSidebar, compact file cards in chat, progress card rename |
-
-### Phase 3: Azure Integration (Day 2–3, starts when #274 patterns are established)
-
-| Issue | Assignee | Work |
-|-------|----------|------|
-| **NEW: Azure auth + deploy** | **Bender** (MSAL device-code auth, ARM REST API for AKS Automatic, deployment status polling) + **Fry** (AuthCard Azure rendering, DeploymentProgress real status) | Azure MSAL auth flow. AKS Automatic cluster + ACR provisioning via ARM. Re-enable Deploy phase conditionally. Follow auth patterns from #274. **Zapp must review before merge.** |
-| **#273** | **Fry** (continued) | Finish ELK diagram. #300 should be merged by now. Ref: `/mnt/c/Users/asabbour/Git/adaptive-ui` |
-
-### Phase 4: Convergence + Ship (Day 3–4)
-
-| Task | Assignee |
-|------|----------|
-| E2E test: full 6-phase flow (Discover → Deploy) | **Hermes** |
-| Security review: #274 OAuth + Azure MSAL + ARM calls | **Zapp** |
-| Conditional flow test: 4-phase (no auth) vs 6-phase (auth present) | **Hermes** |
-| Final architecture review | **Leela** |
-| Release cut | **Bender** |
-
----
-
-## Key Decisions
-
-1. **PR #297 ships now** — immediate safety net, closes #271 and #269.
-2. **Full E2E through Azure deployment is IN SCOPE** — scope trade reversed per Ahmed directive.
-3. **GitHub OAuth App exists** — #274 has no external blockers. Remove registration risk.
-4. **Azure auth/deploy needs a new issue** — Leela or Ahmed should create it, scoped to: MSAL auth, ARM provisioning, Deploy phase re-enablement.
-5. **Handoff/Deploy re-enabled conditionally** — phases activate only when auth tokens are present. 4-phase flow remains the default for unauthenticated users.
-6. **#275 must design for 6 phases** — progressive flow should account for the full pipeline, not just 4 phases.
-7. **#274 patterns inform Azure auth** — GitHub OAuth device flow establishes the auth UX pattern; Azure MSAL follows the same structure.
-8. **#272 and #277 remain deferred** — not demo blockers.
-9. **#296 and #299 are coding agent candidates** — mechanical, well-scoped, Fry reviews.
-10. **Zapp mandatory on #274 AND Azure auth** — both are security boundary crossings.
-11. **Try-AKS reference:** `/mnt/c/Users/asabbour/Git/adaptive-ui` for #273, #274, #275, #300, and Azure auth reference.
-
----
-
-## Issue Hygiene — Action Items
-
-| Action | Owner |
-|--------|-------|
-| Merge PR #297 | Ahmed / Leela |
-| Create issue: "Azure MSAL auth + AKS Automatic deployment flow" | Leela (recommend) |
-| Update #274 description: remove "blocked by OAuth App registration" note | Leela |
 
 ---
 
