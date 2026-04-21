@@ -9,12 +9,19 @@ import type { ToolContribution, SessionCtx } from '@aks-kickstart/harness';
 // Scalar values that can appear in data-model and component property fields.
 const A2UIScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
-// Lightweight component schema — enforces `type` (required by A2UI) and the
-// most common optional rendering props. The runtime re-validates against the
-// full harness A2UIMessageSchema in execute(), so this schema only needs to be
-// strict enough for the OpenAI API to accept it without a 400.
+// Lightweight component schema — enforces `component` + `id` (both required by
+// the A2UI renderer) and the most common optional rendering props.
+// The runtime re-validates against the full harness A2UIMessageSchema in
+// execute(), so this schema only needs to be strict enough for the OpenAI API
+// to accept it without a 400.
+//
+// IMPORTANT: use `component` (not `type`) — the browser renderer destructures
+// `{ id, component, ...props }` from each entry. `id` must be unique within
+// the surface (e.g. "root" for the top-level component).
+// Use bare component names — no pack prefix (e.g. "Button", not "core/Button").
 const A2UIComponentSchema = z.object({
-  type: z.string().describe('Component type name from the A2UI catalog'),
+  id: z.string().describe('Unique component ID within this surface, e.g. "root"'),
+  component: z.string().describe('Bare component name, e.g. "Button", "Row", "Text" — no pack prefix'),
   label: z.string().nullable().optional(),
   placeholder: z.string().nullable().optional(),
   value: A2UIScalar.nullable().optional(),
@@ -39,7 +46,7 @@ const A2UIMessageInputSchema = z.discriminatedUnion('op', [
     op: z.literal('createSurface'),
     createSurface: z.object({
       surfaceId: z.string(),
-      catalogId: z.string(),
+      catalogId: z.string().describe('Must always be "kickstart"'),
       sendDataModel: z.boolean().nullable().optional(),
     }),
   }),
@@ -87,7 +94,10 @@ export const emitUiTool: ToolContribution = {
       'Validates and emits an A2UI v0.9 message. ' +
       'The message is validated against the A2UI schema and then recorded on the session context ' +
       'so the runner can stream it to the browser as an "a2ui" SSE event. ' +
-      'Use this any time you want to create, update, or remove a UI surface.',
+      'Use this any time you want to create, update, or remove a UI surface. ' +
+      'IMPORTANT: In createSurface messages, always set catalogId to "kickstart". ' +
+      'In updateComponents messages, use bare component names (e.g. "Button", not "core/Button") ' +
+      'and give every component a unique string id (e.g. "root" for the top-level component).',
     parameters: EmitUiInputSchema,
     execute: async (input, runCtx): Promise<string> => {
       const session = runCtx?.context as SessionCtx | undefined;
