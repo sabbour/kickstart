@@ -189,7 +189,7 @@ vi.mock('../contexts/VirtualFSContext', () => ({
 }));
 
 vi.mock('../services/api-client', () => ({
-  healthCheck: () => Promise.resolve(true),
+  healthCheck: () => Promise.resolve({ ok: true }),
 }));
 
 // TODO(Step 5): mock-streaming removed in Step 1 — mock removed

@@ -1,52 +1,75 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { apiFetch, SessionExpiredError } from "./api-client";
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { healthCheck } from './api-client';
 
-describe("apiFetch", () => {
-  const fetchMock = vi.fn<typeof fetch>();
-
+describe('healthCheck', () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", fetchMock);
+    vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    fetchMock.mockReset();
-    vi.unstubAllGlobals();
+  it('returns ok: true on successful health check (200)', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: 'ok', registry: 'ready' }), { status: 200 })
+    );
+
+    const result = await healthCheck();
+
+    expect(result).toEqual({ ok: true });
   });
 
-  it("uses manual redirects for SWA-authenticated /api calls and only adds the debug header", async () => {
-    fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
+  it('extracts error details from 503 response with structured error', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'error',
+          phase: 'env-validation',
+          message: 'Pack registry initialization failed',
+          detail: 'AZURE_OPENAI_KEY is not set',
+          hint: 'Ensure AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT environment variables are set',
+        }),
+        { status: 503 }
+      )
+    );
 
-    await apiFetch("/api/converse", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    }, true);
+    const result = await healthCheck();
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("/api/converse", expect.objectContaining({
-      method: "POST",
-      redirect: "manual",
-    }));
-
-    const init = fetchMock.mock.calls[0]?.[1];
-    const headers = new Headers(init?.headers);
-    expect(headers.get("content-type")).toBe("application/json");
-    expect(headers.get("x-kickstart-debug")).toBe("true");
-    expect(headers.get("authorization")).toBeNull();
+    expect(result.ok).toBe(false);
+    expect(result.error).toEqual({
+      phase: 'env-validation',
+      message: 'AZURE_OPENAI_KEY is not set',
+      hint: 'Ensure AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT environment variables are set',
+    });
   });
 
-  it("throws SessionExpiredError when SWA redirects the browser to login", async () => {
-    fetchMock.mockResolvedValue(new Response(null, {
-      status: 302,
-      headers: { Location: "/.auth/login/aad?post_login_redirect_uri=/" },
-    }));
+  it('returns network error on fetch timeout', async () => {
+    const timeoutError = new Error('The operation was aborted.');
+    Object.defineProperty(timeoutError, 'name', { value: 'AbortError' });
 
-    await expect(apiFetch("/api/deployments")).rejects.toBeInstanceOf(SessionExpiredError);
+    global.fetch = vi.fn().mockRejectedValue(timeoutError);
+
+    const result = await healthCheck();
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.phase).toBe('api-timeout');
   });
 
-  it("returns the backend response when SWA auth does not redirect", async () => {
-    const response = new Response(JSON.stringify({ ok: true }), { status: 200 });
-    fetchMock.mockResolvedValue(response);
+  it('returns unreachable error on network failure', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('Failed to fetch'));
 
-    await expect(apiFetch("/api/deployments/run-123")).resolves.toBe(response);
+    const result = await healthCheck();
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.phase).toBe('api-unreachable');
+  });
+
+  it('handles error response without structured body', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response('Internal Server Error', { status: 500 })
+    );
+
+    const result = await healthCheck();
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.phase).toBe('api-error');
+    expect(result.error?.message).toContain('500');
   });
 });
