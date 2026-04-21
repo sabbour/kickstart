@@ -43,6 +43,7 @@ import {
 import { getFluentIcon } from '../catalog/icons/fluent-icons';
 import { apiFetch } from '../services/api-client';
 import { FALLBACK_WIDGET_IDEAS } from '../lib/fallback-ideas';
+import { COMPONENT_PREVIEWS } from './component-examples';
 
 
 // ── LLM → A2UI component normalizer ─────────────────────────────────────
@@ -771,6 +772,69 @@ const GalleryCard = memo(({ scenario, onCardClick }: GalleryCardProps) => {
 });
 
 GalleryCard.displayName = 'GalleryCard';
+
+// ---- ComponentCard Component ----
+// Renders a live A2UI preview thumbnail for a single component entry.
+// Uses COMPONENT_PREVIEWS for example props; falls back to metadata-only
+// for components that have no registered example (e.g. complex rich components).
+interface ComponentCardProps {
+  comp: ComponentContribution;
+}
+
+const ComponentCard = memo(({ comp }: ComponentCardProps) => {
+  const classes = useStyles();
+  const compActionHandler = useCallback<ActionHandler>(() => {}, []);
+  const { surfaces, processMessages, processor } = useA2UI({ actionHandler: compActionHandler });
+
+  const exampleComponents = COMPONENT_PREVIEWS[comp.name];
+
+  useEffect(() => {
+    if (!exampleComponents) return;
+    const surfaceId = `component-preview-${comp.name}`;
+    const msgs: unknown[] = [
+      { version: 'v0.9', createSurface: { surfaceId, catalogId: 'kickstart' } },
+      { version: 'v0.9', updateComponents: { surfaceId, components: exampleComponents } },
+    ];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const createdIds = processMessages(msgs as any);
+    return () => {
+      for (const id of createdIds) {
+        try { processor.model.deleteSurface(id); } catch { /* already gone */ }
+      }
+    };
+  // processMessages and processor are stable refs; only re-run when component name changes
+  }, [comp.name]);
+
+  const surfaceEntries = Array.from(surfaces.entries());
+
+  return (
+    <Card appearance="outline" style={{ padding: tokens.spacingVerticalM, cursor: 'default' }}>
+      <Body1Strong style={{ fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200 }}>
+        {comp.name.split('/')[1] ?? comp.name}
+      </Body1Strong>
+      <Caption1 style={{ color: tokens.colorNeutralForeground3, fontFamily: tokens.fontFamilyMonospace }}>
+        {comp.name}
+      </Caption1>
+      {exampleComponents && (
+        <div className={classes.cardBody} style={{ marginTop: tokens.spacingVerticalS, pointerEvents: 'none' }}>
+          {surfaceEntries.length === 0 ? (
+            <div style={{ padding: '8px 0', color: tokens.colorNeutralForeground4, fontSize: tokens.fontSizeBase200 }}>
+              Loading…
+            </div>
+          ) : (
+            surfaceEntries.map(([id, surface]) => (
+              <div key={id} className="a2ui-component">
+                <A2UISurfaceWrapper surface={surface} />
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </Card>
+  );
+});
+
+ComponentCard.displayName = 'ComponentCard';
 
 // Icon sections for the Icons tab (Azure, UI, Fluent 2, Fluent React)
 // Icon category sections for the Icons tab
@@ -1618,14 +1682,9 @@ function PlaygroundInner() {
                 <Subtitle2 className={classes.groupHeader}>{pack}</Subtitle2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: tokens.spacingVerticalM, padding: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalL}` }}>
                   {comps.map(comp => (
-                    <Card key={comp.name} appearance="outline" style={{ padding: tokens.spacingVerticalM }}>
-                      <Body1Strong style={{ fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200 }}>
-                        {comp.name.split('/')[1] ?? comp.name}
-                      </Body1Strong>
-                      <Caption1 style={{ color: tokens.colorNeutralForeground3, fontFamily: tokens.fontFamilyMonospace }}>
-                        {comp.name}
-                      </Caption1>
-                    </Card>
+                    <GalleryCardErrorBoundary key={comp.name} label={comp.name}>
+                      <ComponentCard comp={comp} />
+                    </GalleryCardErrorBoundary>
                   ))}
                 </div>
               </div>
