@@ -236,3 +236,109 @@ describe("GET /health?deep=1", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Information-disclosure redaction (#927, #894)
+// ---------------------------------------------------------------------------
+
+describe("503 response redaction — no raw error details in unauthenticated responses", () => {
+  const ALLOWED_KEYS = new Set(["status", "phase", "hint"]);
+
+  function assert503Shape(
+    body: Record<string, unknown>,
+    rawMessage: string,
+  ): void {
+    // Only allow known safe fields
+    for (const key of Object.keys(body)) {
+      expect(ALLOWED_KEYS.has(key), `Unexpected key in 503 body: ${key}`).toBe(true);
+    }
+    // Raw error text must never appear in the serialised response
+    const serialised = JSON.stringify(body);
+    expect(serialised).not.toContain(rawMessage);
+    // detail and message fields must be absent
+    expect(body.detail).toBeUndefined();
+    expect(body.message).toBeUndefined();
+  }
+
+  it("redacts filesystem paths from ERR_MODULE_NOT_FOUND errors", async () => {
+    const rawMsg =
+      "ERR_MODULE_NOT_FOUND: cannot find module '/home/user/kickstart/packages/pack-azure/dist/index.js'";
+    mockGetRegistry.mockImplementation(() => {
+      const err = new Error(rawMsg);
+      (err as NodeJS.ErrnoException).code = "ERR_MODULE_NOT_FOUND";
+      throw err;
+    });
+
+    const res = (await healthHandler(makeRequest(), makeContext())) as {
+      status: number;
+      jsonBody: Record<string, unknown>;
+    };
+
+    expect(res.status).toBe(503);
+    assert503Shape(res.jsonBody, "/home/user/kickstart");
+    expect(res.jsonBody.phase).toBe("pack-import");
+  });
+
+  it("redacts endpoint URLs from Invalid URL errors", async () => {
+    const rawMsg =
+      "Invalid URL: https://abc-xyz-invalid-region.openai.azure.com/openai/deployments/gpt-4o";
+    mockGetRegistry.mockImplementation(() => {
+      throw new TypeError(rawMsg);
+    });
+
+    const res = (await healthHandler(makeRequest(), makeContext())) as {
+      status: number;
+      jsonBody: Record<string, unknown>;
+    };
+
+    expect(res.status).toBe(503);
+    assert503Shape(res.jsonBody, "abc-xyz-invalid-region.openai.azure.com");
+  });
+
+  it("redacts env-var names from AZURE_OPENAI misconfiguration errors", async () => {
+    const rawMsg = "Missing required environment variable AZURE_OPENAI_API_KEY";
+    mockGetRegistry.mockImplementation(() => {
+      throw new Error(rawMsg);
+    });
+
+    const res = (await healthHandler(makeRequest(), makeContext())) as {
+      status: number;
+      jsonBody: Record<string, unknown>;
+    };
+
+    expect(res.status).toBe(503);
+    // phase is allowed to say "env-validation" (opaque category, no raw msg)
+    expect(res.jsonBody.phase).toBe("env-validation");
+    assert503Shape(res.jsonBody, rawMsg);
+  });
+
+  it("redacts pack-registry seal errors", async () => {
+    const rawMsg = "Seal failed: duplicate pack id 'azure' registered at /opt/app/packs/azure.js";
+    mockGetRegistry.mockImplementation(() => {
+      throw new Error(rawMsg);
+    });
+
+    const res = (await healthHandler(makeRequest(), makeContext())) as {
+      status: number;
+      jsonBody: Record<string, unknown>;
+    };
+
+    expect(res.status).toBe(503);
+    assert503Shape(res.jsonBody, "/opt/app/packs/azure.js");
+    expect(res.jsonBody.phase).toBe("registry-seal");
+  });
+
+  it("503 body has exactly status, phase, and hint — nothing else", async () => {
+    mockGetRegistry.mockImplementation(() => {
+      throw new Error("unexpected failure");
+    });
+
+    const res = (await healthHandler(makeRequest(), makeContext())) as {
+      status: number;
+      jsonBody: Record<string, unknown>;
+    };
+
+    expect(res.status).toBe(503);
+    expect(Object.keys(res.jsonBody).sort()).toEqual(["hint", "phase", "status"]);
+  });
+});
+
