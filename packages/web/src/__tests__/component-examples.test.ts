@@ -1,16 +1,21 @@
 /**
- * Regression test for #954.
+ * Regression tests for #954 and #967/#968 (playground renderer unification).
  *
  * Asserts every COMPONENT_PREVIEWS entry uses descriptor `component` values
  * that resolve through a registry seeded with the actual fluentOverrides +
  * rich components. Catches drift between `impl.name` (bare, e.g. "Text") and
  * the example map (which keys by pack-qualified id, e.g. "core/Text").
+ *
+ * Also guards the validateAndSanitizeComponents path — ensures that when the
+ * real sanitizer runs over the preview descriptors, NO descriptor is replaced
+ * with _ErrorComponent. This is the same code path that fires in A2UIEnvelopePreview
+ * at render time.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { z } from 'zod';
 import { COMPONENT_PREVIEWS } from '../pages/component-examples';
-import { ClientComponentRegistry } from '../contexts/A2UIRegistryContext';
+import { ClientComponentRegistry, validateAndSanitizeComponents } from '../contexts/A2UIRegistryContext';
 import { fluentOverrides } from '../catalog/fluent-components/index';
 
 // Mirrors the rich-component list registered in main.tsx. We register stub
@@ -81,5 +86,26 @@ describe('COMPONENT_PREVIEWS', () => {
         }
       }
     }
+  });
+
+  it('validateAndSanitizeComponents produces NO _ErrorComponent for any COMPONENT_PREVIEWS entry (render-time guard)', () => {
+    // This is the exact code path that fires inside A2UIEnvelopePreview / useA2UI.
+    // If any descriptor would render as _ErrorComponent in the browser, this test fails.
+    const errorEntries: Array<{ key: string; id: unknown; component: unknown }> = [];
+    for (const [key, descriptors] of Object.entries(COMPONENT_PREVIEWS)) {
+      const sanitized = validateAndSanitizeComponents(
+        descriptors as Array<Record<string, unknown>>,
+        registry,
+      );
+      for (const d of sanitized) {
+        if (d.component === '_ErrorComponent') {
+          errorEntries.push({ key, id: d.id, component: d.component });
+        }
+      }
+    }
+    expect(
+      errorEntries,
+      'Some COMPONENT_PREVIEWS descriptors resolved to _ErrorComponent — check registry names vs descriptor values',
+    ).toEqual([]);
   });
 });
