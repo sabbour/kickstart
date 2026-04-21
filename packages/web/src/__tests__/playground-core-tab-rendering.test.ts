@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { COMPONENT_PREVIEWS } from '../pages/component-examples';
+import { COMPONENT_PREVIEWS } from '../catalog/component-previews';
 import {
   COMPONENT_GRID_MIN_COL_PX,
   COMPONENT_GRID_MAX_CARD_PX,
