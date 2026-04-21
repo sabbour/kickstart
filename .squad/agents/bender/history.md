@@ -18,6 +18,7 @@ Backend engineer owning MCP server, API layer, and database design. Expertise in
 - **Error response pattern:** Use safeErrorResponse() utility for generic client messages; log details server-side
 
 ## Recent Work
+- 2026-04-21: **Bug intake — 2 issues assigned** (#998: Chat broken, schema validation regression from #989, priority:high; #996: AKS _ErrorComponent, inspiration prompts unreliable). Both unassigned, go:needs-research. **Action:** Verify #998 schema conformance; audit test suite for A2UI 0.9 spec coverage.
 - v2 #474 DP drafted and posted; APPROVE_WITH_CONDITIONS from Leela + Zapp
 - Agents SDK adapter (#445, PR #447): SDK behind `KICKSTART_AGENTS_SDK=true`, all Zapp conditions met, 1511 tests, merged
 - FSM removal (#385): replaced with linear `advancePhase()` pattern

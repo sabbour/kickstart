@@ -18,6 +18,7 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 - **Accessibility:** WCAG 2.1 AA — aria-label on all A2UI components, roving tabIndex for RadioGroup, live regions on dynamic content
 
 ## Recent Work
+- 2026-04-21: **Bug intake — 2 issues assigned** (#995: Core components tab tight rendering + preview quality; #997: Workspace page black void). Both unassigned, go:needs-research tags.
 - v2 #474 frontend cut line analysis: seam-cutting pass approach confirmed for Step 1
 - v0.6.x: 406 fallback in useStreaming.ts for SDK path; K8s icon catalog expansion; A2UI debug visualization; system-prompt context var injection fix
 - v0.5.x: SSE parser fixes, action context enrichment, hash-based routing, ArchitectureDiagram diagram-first contract, theme system
