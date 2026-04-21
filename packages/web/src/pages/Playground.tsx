@@ -1692,7 +1692,7 @@ function PlaygroundInner() {
 
       {/* ---- Tab 5: Workspace ---- */}
       {activeTab === 'workspace' && (
-        <div id="panel-workspace" role="tabpanel" aria-labelledby="tab-workspace" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
+        <div id="panel-workspace" role="tabpanel" aria-labelledby="tab-workspace" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <PlaygroundWorkspace />
         </div>
       )}

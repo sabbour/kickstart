@@ -84,6 +84,7 @@ const useStyles = makeStyles({
     minWidth: '0',
     maxWidth: 'none',
     flex: 1,
+    minHeight: 0,
   },
   header: {
     display: 'flex',
