@@ -4,8 +4,7 @@
  * Access via ?playground URL parameter.
  * Left sidebar navigation: Create | Ideas | Components | Icons
  *
- * Step 4a: Gallery and Components tabs are now registry-driven.
- * TODO(Step 5): replace stubRegistry with server-provided PackRegistry.
+ * Registry is fetched live from /api/packs (Step 5).
  */
 
 import React, { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react';
@@ -25,7 +24,7 @@ import {
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import type { ActionHandler } from '../hooks/useActionDispatch';
-import type { PlaygroundRegistryView } from '../hooks/usePlaygroundDispatch';
+import { usePackRegistry } from '../hooks/usePackRegistry';
 import type { PlaygroundScenario, ComponentContribution } from '@aks-kickstart/harness';
 import { useDebug } from '../contexts/DebugContext';
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
@@ -45,13 +44,6 @@ import { getFluentIcon } from '../catalog/icons/fluent-icons';
 import { apiFetch } from '../services/api-client';
 import { FALLBACK_WIDGET_IDEAS } from '../lib/fallback-ideas';
 
-// ── Module-level stub registry ────────────────────────────────────────────────
-// TODO(Step 5): replace with server-provided registry
-const stubRegistry: PlaygroundRegistryView = {
-  playgroundScenarios: [],
-  components: [],
-  playgroundStubs: {},
-};
 
 // ── LLM → A2UI component normalizer ─────────────────────────────────────
 // The LLM may output components in two formats:
@@ -824,8 +816,8 @@ function PlaygroundInner() {
   const inspireAbortRef = useRef<AbortController | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Registry-driven data (read at render time)
-  const registry = stubRegistry; // TODO(Step 5): replace with server-provided registry
+  // Registry-driven data — fetched live from /api/packs
+  const { registry, loading: registryLoading, error: registryError } = usePackRegistry();
 
   // Abort in-flight inspiration stream on unmount
   useEffect(() => {
@@ -1568,15 +1560,21 @@ function PlaygroundInner() {
       {/* ---- Tab 2: Gallery (Scenarios grouped by pack name — Phase A) ---- */}
       {activeTab === 'gallery' && (
         <div id="panel-gallery" role="tabpanel" aria-labelledby="tab-gallery" className="playground-gallery-scroll">
-          {filteredGalleryScenarios.length === 0 ? (
+          {registryError ? (
+            <MessageBar intent="error" style={{ margin: tokens.spacingHorizontalL }}>
+              <MessageBarBody>Failed to load registry: {registryError}</MessageBarBody>
+            </MessageBar>
+          ) : filteredGalleryScenarios.length === 0 ? (
             <div className={classes.emptyState}>
               <div className={classes.emptyIcon}>
                 <img src="/assets/icons/fluent/lightbulb.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
               </div>
-              <Body1Strong>No scenarios registered</Body1Strong>
-              <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
-                Scenarios come from registered packs. This will populate once pack-core lands (Step 4).
-              </Caption1>
+              <Body1Strong>{registryLoading ? 'Loading scenarios…' : 'No scenarios registered'}</Body1Strong>
+              {!registryLoading && (
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
+                  Scenarios come from registered packs.
+                </Caption1>
+              )}
             </div>
           ) : (
             Array.from(groupByPack(filteredGalleryScenarios, s => s.id).entries()).map(([pack, scenarios]) => (
@@ -1598,15 +1596,21 @@ function PlaygroundInner() {
       {/* ---- Tab 3: Components (grouped by pack name — Phase C) ---- */}
       {activeTab === 'components' && (
         <div id="panel-components" role="tabpanel" aria-labelledby="tab-components" className="playground-gallery-scroll">
-          {filteredComponents.length === 0 ? (
+          {registryError ? (
+            <MessageBar intent="error" style={{ margin: tokens.spacingHorizontalL }}>
+              <MessageBarBody>Failed to load registry: {registryError}</MessageBarBody>
+            </MessageBar>
+          ) : filteredComponents.length === 0 ? (
             <div className={classes.emptyState}>
               <div className={classes.emptyIcon}>
                 <img src="/assets/icons/fluent/grid.svg" alt="" width="32" height="32" style={{ opacity: 0.4 }} />
               </div>
-              <Body1Strong>No components registered</Body1Strong>
-              <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
-                Components come from registered packs. This will populate once pack-core lands (Step 4).
-              </Caption1>
+              <Body1Strong>{registryLoading ? 'Loading components…' : 'No components registered'}</Body1Strong>
+              {!registryLoading && (
+                <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
+                  Components come from registered packs.
+                </Caption1>
+              )}
             </div>
           ) : (
             Array.from(groupByPack(filteredComponents, c => c.name).entries()).map(([pack, comps]) => (
