@@ -71,7 +71,7 @@ jobs:
           always-auth: true
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -131,7 +131,7 @@ jobs:
           always-auth: true
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
