@@ -59,6 +59,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch main branch for changeset status
+        run: git fetch origin main:main --depth=1
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
