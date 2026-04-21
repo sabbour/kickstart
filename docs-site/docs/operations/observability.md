@@ -160,3 +160,15 @@ traces
 - **Sampling:** By default, AppInsights ingests all telemetry. For high-volume deployments, configure adaptive sampling in the SDK.
 - **Retention:** Default retention is 30 days (configurable in AppInsights → **Usage and estimated costs** → **Data retention**).
 - **Costs:** Ingestion is charged per GB. Monitor your data volume in AppInsights → **Usage and estimated costs**.
+
+## API package telemetry contract
+
+The API Functions worker owns a strict telemetry init + redaction contract. See [`packages/web/api/OBSERVABILITY.md`](https://github.com/sabbour/kickstart/blob/main/packages/web/api/OBSERVABILITY.md) for:
+
+- Single-init guarantee (`useAzureMonitor` called exactly once; enforced by ESLint + an in-process flag)
+- Bundling invariant — `@azure/monitor-opentelemetry`, `@opentelemetry/api`, and `@opentelemetry/api-logs` **must** remain external at build time (guarded by `scripts/verify-api-externals.mjs`)
+- Redaction pipeline — `RedactingSpanExporter` (Proxy-wrapped) + `RedactingLogRecordProcessor`
+- Flush-before-respond rule on every 5xx path
+- `host.json` sampling lock (`excludedTypes: "Request;Exception"`)
+
+If telemetry disappears from Application Insights, check that contract first.
