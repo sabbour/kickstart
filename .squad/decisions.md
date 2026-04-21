@@ -2883,3 +2883,169 @@ When CSP blocks such a fixture, the resulting broken-media / broken-image state 
 
 See `.squad/agents/zapp/history.md` — "Learnings (Round 4)" section for: CSP as gate for fixture URLs, vitest-as-workflow-substitute, chunk-split evasion in bundle budgets, conformance walker generalization.
 
+---
+
+# Decision: Wire the 4-way review gate into CI (squad-review-gate + squad-auto-merge + visible trail)
+
+**Author:** Leela (Lead)
+**Date:** 2026-04-21
+**Status:** Decided (pending PR #993 merge)
+**Relates to:** PR #993, tracking issue #992, decision `leela-ceremony-enforcement-2026-04-21.md` (which declared the 4-way gate in `.squad/ceremonies.md` but did not wire it into CI)
+
+## Context
+
+The earlier ceremony-enforcement PR (#993 pre-recalibration) declared in `.squad/ceremonies.md` that the PR Review Gate is now four-way (Leela + Zapp + Nibbler + Docs). Ahmed's audit caught that the **enforcement was documentation-only** — `.github/workflows/squad-review-gate.yml`, `.github/workflows/squad-auto-merge.yml`, and `.github/scripts/squad-visible-trail.cjs` still only knew about Leela + Zapp. The status check would turn green without Nibbler, without a docs marker, and would not fail on `nibbler:rejected` or `docs:rejected`.
+
+This decision captures the wiring changes folded into PR #993 before it goes ready-for-review.
+
+## Decision
+
+### 1. `squad/review-gate` status check requires 4 dimensions
+
+- `leela:approved` — required on every path
+- `nibbler:approved` — required on every path (including `squad:chore-auto`)
+- `zapp:approved` — required on the standard path; required on the low-risk path only if the PR is security-sensitive or touches sensitive paths
+- Exactly one of `docs:approved` or `docs:not-applicable` — required on every non-trusted path
+- Any of `leela:rejected`, `zapp:rejected` (when Zapp is in-scope), `nibbler:rejected`, `docs:rejected` fails the gate immediately (state: `failure`, not `pending`).
+
+### 2. `squad-auto-merge` clears 3 approval labels on `synchronize`
+
+`APPROVAL_LABELS = ['leela:approved', 'zapp:approved', 'nibbler:approved']`. All three are cleared on every synchronize. **Migration impact:** in-flight PRs on other branches will need a fresh `nibbler:approved` label after this PR lands — the auto-merge workflow will clear any pre-existing `nibbler:approved` on the next push. The PR description calls this out.
+
+### 3. Three-way rejection-preservation matrix
+
+Old behaviour: if exactly one of (Leela, Zapp) was rejecting, the OTHER reviewer's approval was preserved across synchronize to avoid re-asking an uninvolved reviewer to re-approve. Extended to three reviewers: if exactly one of (Leela, Zapp, Nibbler) is rejecting, the other two approvals are preserved. If zero or two-or-more are rejecting, no preservation — all approvals clear.
+
+Docs markers (`docs:approved`, `docs:not-applicable`) are **not** cleared on synchronize. They describe the PR's content (did docs land, or was it declared N/A in the DP) rather than a reviewer's per-commit signoff. Clearing them on every push would create churn for no gain.
+
+### 4. Low-risk path decision — Nibbler stays required
+
+`squad:chore-auto` PRs still require `nibbler:approved`. Rationale:
+
+- Code-quality review is **cheap and fast** — Nibbler typically needs seconds to read a chore PR and approve.
+- Many historical `squad:chore-auto` regressions (dead code, missing types, stale imports) would have been caught by a code-quality pass even though security and architecture were genuinely N/A.
+- The policy is simpler with one exception (Zapp) than two — operators don't need to remember a per-reviewer matrix.
+- If a specific chore truly shouldn't need Nibbler, Leela can apply `nibbler:approved` directly as part of the triage signoff; we do not carve out a "no Nibbler" path.
+
+If this turns out to be friction in practice we will revisit, but the default is "Nibbler reviews every PR."
+
+### 5. Docs gate on low-risk path
+
+Low-risk path also requires a docs marker. `docs:not-applicable` is specifically designed as the cheap escape valve for chores that genuinely don't touch user-facing behaviour — the DP must have declared `Docs impact: N/A` with justification for `docs:not-applicable` to apply. A chore PR with `docs:not-applicable` + `leela:approved` + `nibbler:approved` (and `zapp:approved` if sensitive) is 30 seconds of reviewer time total.
+
+### 6. Labels synced via `sync-squad-custom-labels.yml`
+
+Added `docs:approved` (`0E8A16`), `docs:rejected` (`D93F0B`), `docs:not-applicable` (`BFD4F2`). Reused the existing colour scheme so the new labels blend with `leela:*` / `zapp:*` / `nibbler:*`. Also updated the stale `estimate:*` descriptions (they were still referencing 2h/8h/24h/80h from the weekly cadence — now reflect the 6h-sprint bands from the sibling decision `leela-6h-sprint-calibration-2026-04-21.md`).
+
+### 7. Visible trail comment now renders 4 reviewers
+
+`.github/scripts/squad-visible-trail.cjs` now reports Leela, Zapp, Nibbler, and Docs statuses on the sticky PR comment, and the gate-path summary string names all four. Docs is handled as a tri-state (`docs:approved` / `docs:not-applicable` / `docs:rejected`) rather than a binary approved/rejected because "not applicable" is a legitimate green state, not an absence.
+
+## Alternatives considered and rejected
+
+- **Nibbler optional on `squad:chore-auto`.** Rejected — see (4). Cost is near-zero, value is real.
+- **Docs marker cleared on synchronize.** Rejected. Docs state is a PR-content property, not a per-commit reviewer signoff; clearing it would force the docs reviewer to re-apply the marker after every push with no new information.
+- **Separate docs status check context.** Rejected. Keeping docs inside `squad/review-gate` means one status check, one branch-protection entry, one workflow to keep in sync.
+- **Flip gate to `failure` only when explicit `*:rejected` is present, otherwise `pending`.** Adopted. Distinguishes "waiting for a reviewer" (benign) from "actively rejected" (needs fix), which drives different agent behaviour downstream.
+
+## Action items
+
+- [ ] After PR #993 merges, run the `Sync Squad Custom Labels` workflow once to create the three new `docs:*` labels in the repo
+- [ ] Amend branch-protection required checks if the `squad/review-gate` context needs re-registering (it should re-post under the same name, so likely a no-op)
+- [ ] Any in-flight PRs on long-running branches will lose `nibbler:approved` on their next push and need a fresh Nibbler pass — expected and correct
+
+
+---
+
+# Decision: Recalibrate Sprint Planning + Cadence Retro for 6-hour sprint cadence
+
+**Author:** Leela (Lead)
+**Date:** 2026-04-21
+**Status:** Decided (pending PR #993 merge)
+**Supersedes:** the weekly-sprint language shipped earlier the same day on branch `squad/process-ceremony-enforcement-2026-04-21`
+**Relates to:** Ahmed directive `copilot-directive-6h-sprints-2026-04-21.md`, tracking issue #992, PR #993
+
+## Context
+
+PR #993 originally defined Sprint Planning as "weekly (Monday)" and Cadence Retrospective as "weekly," with estimate bands sized for a week of work (2h / 8h / 24h / 80h). Ahmed clarified post-merge of the ceremony text that the squad's actual cadence is **6-hour sprints on a fixed UTC schedule**, not weekly. This decision captures the recalibration made before #993 is flipped ready-for-review.
+
+## Decision
+
+### Sprint Planning cadence
+Runs **every 6 hours** on fixed UTC anchors: **00:00 / 06:00 / 12:00 / 18:00 UTC**. Ahmed (PO) may override by editing the anchor row in `.squad/ceremonies.md` directly — coordinator consumes whatever is written there, no separate config flag.
+
+### Sprint goal file
+Timestamped per 6h anchor: `.squad/sprints/{YYYY-MM-DDThh}Z.md` (e.g. `.squad/sprints/2026-04-21T12Z.md` for the 12:00 UTC sprint that runs until 18:00 UTC).
+
+### Estimate bands (sized for a single 6h sprint)
+
+| Label | Time band | Points | Fits in a 6h sprint? |
+|-------|-----------|--------|----------------------|
+| `estimate:S` | ~15 min | 1 | ✅ |
+| `estimate:M` | ~1 hour | 3 | ✅ |
+| `estimate:L` | ~3 hours | 8 | ✅ (at most one per sprint) |
+| `estimate:XL` | >3 hours | 20 | ❌ |
+
+### XL-split rule
+`estimate:XL` means "does not fit in a 6h sprint." XL issues **never enter sprint scope**. Leela splits them during triage into `S` / `M` / `L` children, each with their own estimate label. DPs landing with `Estimate: XL` are rejected with a split plan.
+
+### Cadence Retrospective
+Runs **end of each 6h sprint** (at the next anchor, immediately before the next Sprint Planning). Output is appended as a **comment** to a rolling daily issue `Cadence Retro · {YYYY-MM-DD}` — up to 4 comments per UTC day, one per closed sprint. Scribe creates the rolling daily issue on the first retro of each UTC day. This avoids 4 new retro issues every day.
+
+### Deferred (not in PR #993)
+The existing weekly/daily cron workflows — `squad-weekly-pulse.yml`, `squad-velocity-report.yml`, `squad-daily-pulse.yml` — are independent reports, **not** Sprint Planning inputs. They are **not** retimed in PR #993. Tracked as an acceptance item on #992: decide whether `squad-weekly-pulse.yml` should become `squad-sprint-pulse.yml` at 6h cadence.
+
+## Rationale
+
+- **Anchor times**: aligning to `00 / 06 / 12 / 18 UTC` gives predictable globally-readable timestamps, keeps all four sprints in a single UTC day, and makes the daily retro-bucketing issue clean. Any other choice (e.g. anchoring to local PT) would break the "four clean sprints per UTC day" invariant used by the retro rollup.
+- **Estimate bands** chosen so that: S = a trivial change anyone can finish without context-switching cost; M = a single focused task; L = the sprint's hero item with headroom left; XL = physical impossibility for the cadence, which forces the split instead of pretending it fits.
+- **XL-split over "XL spans multiple sprints"**: the alternative (let XL span sprints) destroys the "one PR = one issue = one sprint of scope" invariant and makes velocity tracking meaningless. Forcing the split during triage is cheap because Leela is already reading each new `squad` issue; the split happens at the same moment the estimate is applied.
+- **Retro as daily-bucketed comments, not per-sprint issues**: four new `Retro` issues per day is noise, not signal. A single rolling daily issue preserves auditability, cuts notification volume by 4×, and groups an entire UTC-day's sprints in one place for trend-reading.
+
+## Action items (picked up after merge)
+
+- [ ] Flip PR #993 ready-for-review once Ahmed has reviewed the recalibration
+- [ ] Follow-up on #992: decide fate of `squad-weekly-pulse.yml` (rename to `squad-sprint-pulse.yml` at 6h cadence, or leave as weekly summary alongside the 6h retros)
+- [ ] First 6h Sprint Planning ceremony at the next UTC anchor after merge — confirms the new file path `.squad/sprints/{YYYY-MM-DDThh}Z.md` works end-to-end
+- [ ] First Cadence Retro at the following anchor — confirms the rolling daily issue pattern works
+
+
+---
+
+# Nibbler — Round 4 review decisions
+
+**Date:** 2026-04-21
+**Author:** Nibbler (Code Reviewer, Lead-tier)
+**Scope:** PRs #1005, #1000 (re-approval), #1003, #1004
+
+## Decisions
+
+### 1. PR #1005 — APPROVED
+`core_emit_ui` strict-mode schema regression (#998) fix. Parametrised conformance test walks every pack-core tool at every nesting depth (`anyOf`/`oneOf`/`allOf`/`items`/`additionalProperties`); explicit regression assertion pinned to `createSurface.sendDataModel`; runtime contract preserved via `stripNulls` before `A2UIMessageSchema.parse`; sibling sweep for `list_files.ts` included. CI green (940 tests). Formal review + `nibbler:approved` label.
+
+### 2. PR #1000 — APPROVED (re-approval after revise)
+All three round-3 blockers resolved:
+- **TS2307 + TS2352**: path aliases aligned across `packages/web/tsconfig.json` + `vite.config.ts` + `vitest.config.ts`; Zod cast narrowed with explicit `as unknown as z.ZodTypeAny` + comment documenting the zod@3/zod@4 bridge.
+- **Concrete bundle-budget gate**: `packages/web/scripts/check-bundle-budget.mjs` wired via `postbuild`. Correctly scoped to `index-*.js` + `Playground-*.js` only — vendor workers (monaco `ts.worker`, mermaid lazy chunks) explicitly excluded. Ceilings sit with sane headroom above current measurements. Waiver via PR description `bundle-budget-waiver:` line.
+- **Pack-authoring docs**: server/client subpath contract + `registerClient` pattern documented in `docs-site/docs/guides/packs-and-skills.md`.
+
+Single-revert rollback confirmed. Full CI green. `nibbler:approved` label re-applied (was stripped on synchronize).
+
+### 3. PR #1003 — APPROVED
+#995 Core-tab density + preview coverage. Named-constant geometry module (`playground-layout-constants.ts`) is the single source of truth consumed by CSS (`Playground.tsx`), unit test (`playground-core-tab-rendering.test.ts`), and Playwright (`playground.spec.ts`). Stable data-attribute selectors on cards. Preview-coverage matrix parametrised across all shipped core basic renderers. `nibbler:approved` label.
+
+### 4. PR #1004 — APPROVED
+#997 workspace black void. `min-height: 0` chain complete across all four column-flex links. Explicit geometry assertions use named constants (`MAX_EDITOR_BOTTOM_SLACK_PX`, `MIN_CODE_WRAPPER_HEIGHT_PX`) — no magic numbers, no background-color proxy. Two viewport states. Formal review + `nibbler:approved` label.
+
+## Conventions carried forward
+
+- **Bundle-overage pattern**: concrete ceiling + CI gate + waiver-by-PR-description line is the approved shape for any future "controlled performance overage" sign-off.
+- **Self-authored PRs**: GitHub blocks formal `gh pr review --approve` when the authenticated identity matches the PR author. For PRs authored by `sabbour`, only the `nibbler:approved` label path is available. The `check-squad-approval` workflow reads the label, so this is a non-blocking operational limitation — future Nibbler runs should expect the GraphQL "cannot approve own PR" error and fall through to the label path without retrying.
+- **Named-constant geometry ask is now proven**: for any layout regression where CSS, unit, and E2E all assert geometry, the single-source-of-truth module pattern (`*-layout-constants.ts` imported by all three) is the approved shape. Applied cleanly in #1003 and #1004.
+- **CI-green precheck before approve** remains mandatory after round-3 learning: never approve on PR-body test counts alone; always verify the checks panel.
+
+## Consequences
+
+- Four PRs cleared on the first round-4 pass — continues to validate the DP-stage gate reducing PR-stage rework.
+- Bundle-budget script is now the baseline — future pack additions that breach the ceiling must either raise the number in the script (requiring deliberate edit + waiver note) or split into lazy chunks.
+

@@ -1,37 +1,44 @@
 ---
-updated_at: 2026-04-21T05:30:00Z
-mode: bug-shipping-then-feature-unblock
-focus_area: UI bug shipping velocity, schema conformance, bundle ceiling enforcement
-active_issues: [996, 987]
+updated_at: 2026-04-21T13:45:00Z
+mode: board-idle-after-sprint
+focus_area: Overnight sprint 5+6 shipped, board idle, standing by for next direction
+active_issues: []
 blocked_issues: []
 ---
 
 # What We're Focused On
 
-**Round 4 complete: 5 UI bugs shipped (#991/#980/#995/#997/#998). Now unblocking #996 + #987. Schema conformance CI gate in place. Bundle-ceiling enforcement proved.**
+**Overnight sprint complete: 19 issues / 26 PRs shipped in ~8h. Board IDLE. Ralph standing by.**
+
+## Sprint 5 + 6 Summary (2026-04-21, overnight run)
+
+**Shipped:**
+- 19 issues closed
+- 26 PRs merged
+- 5 UI bugs (#991, #980, #995, #997, #998) + 4 process/security design PRs
+- ~8 hours continuous delivery cycle
+
+**Key PRs merged (sprint 5+6):**
+- #1009 — #996 AKS _ErrorComponent fix (Bender)
+- #1010 — #987 Playground E2E reintroduction (Fry)
+- #1008 — #808 retro extension for SLO triggers
+- #1011 — #806 quality SLO safety brake (process/governance)
+- #1012 — #792 retro metrics via env (workflow hardening)
+- #1013 — #1006 insertSvgSafely hardening (security)
+- #1014 — #805 process grader workflow (learning loop)
+
+**Process improvements shipped:**
+- ✅ Bundle-budget ceiling gate (proven pattern)
+- ✅ Named-constant geometry SSoT (proven pattern)
+- ✅ Parametrised tool-conformance test (proven pattern)
+- ✅ Trio-agent improvement (diff-delta education needed)
+- ✅ Label deletion protocol (on re-review flip verdicts)
 
 ## Current Status
 
-### Just Shipped (April 21, round 4)
-
-- **#991** ✅ — Pack no-previews (fixed in #1001)
-- **#980** ✅ — Workflow revert (merged in round 3)
-- **#995** ✅ — Core tab tight rendering + preview coverage (PR #1003 merged; playground-layout-constants module is new SSoT for geometry)
-- **#997** ✅ — Workspace black void (PR #1004 merged; `min-height: 0` flex discipline applied)
-- **#998** ✅ — Chat broken, A2UI v0.9 schema strict-required (PR #1005 merged; parametrised conformance test now covers every pack-core tool)
-
-### In Flight (high priority)
-
-1. **#996** — AKS _ErrorComponent, inspiration prompts unreliable. Assigned: Bender. Depends on #998 conformance test passing (which it does). Root cause: allow-list drift between LLM system prompt and ClientComponentRegistry. [See #990 defense-in-depth test pattern]
-
-2. **#987** — Playground E2E regression: previously-skipped #772 scenario suite. Assigned: Fry. Must use geometry-constants module + named-viewport patterns from #1003/#1004. Expectation: 3 new Playwright test groups, 12+ cases.
-
-3. **Zapp follow-up — insertSvgSafely guardrail** (filed by Zapp during round 4 review). Future pack-core tools will use this utility for any SVG/XML content. Blocks future pack feature work; low priority until such feature is in scope.
-
-### Next Sprint (Ralph round 3 scan in progress)
-
-- Identify next 3–5 fixable issues from public board + internal tech debt.
-- Sprint planning ceremony deferred pending #996/#987 closure.
+**Board:** IDLE  
+**Sprint Planning:** Deferred; Ralph standing by for next scope-out  
+**Waiting On:** Asabbour (still asleep); team capacity reset
 
 ## Key Learnings (Round 4 Retrospective)
 
