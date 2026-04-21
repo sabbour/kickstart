@@ -9,15 +9,13 @@ const listFilesSchema = z.object({
   directory: z
     .string()
     .nullable()
-    .optional()
     .describe(
-      'Relative path to list (defaults to workspace root). Must stay within the workspace.',
+      'Relative path to list (null/empty defaults to workspace root). Must stay within the workspace.',
     ),
   recursive: z
     .boolean()
     .nullable()
-    .optional()
-    .describe('List files recursively. Defaults to false.'),
+    .describe('List files recursively. Null or false = non-recursive.'),
 });
 
 const MAX_FILES = 500;

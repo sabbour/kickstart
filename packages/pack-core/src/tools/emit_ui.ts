@@ -25,6 +25,17 @@ const A2UIScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 //   There is no top-level `label`.
 // - Interactions go through `action: { event: { name, payload? } }`.
 //   There is no `onClick` / `onChange` string shorthand.
+// NOTE on `.nullable()` vs `.nullable().optional()` (#998):
+// OpenAI's strict function-tool schema validator requires EVERY key in
+// `properties` to appear in `required`. The zod converter used by
+// @openai/agents maps `.optional()` to "not in required"; mapping
+// `.nullable()` alone produces "required, may be null" — which is the
+// strict-mode contract. Optional-nullable fields nested inside a
+// `z.discriminatedUnion` are not re-rewritten by the SDK's strict-mode
+// transform, which is what caused the 400 in #998. Use `.nullable()`
+// (NOT `.nullable().optional()`) for every field inside emit_ui's
+// union branches. The runtime path strips nulls before validating
+// against the harness A2UIMessageSchema (see `stripNulls` below).
 const A2UIComponentSchema = z.object({
   id: z.string().describe('Unique component ID within this surface, e.g. "root".'),
   component: z
@@ -34,26 +45,25 @@ const A2UIComponentSchema = z.object({
   child: z
     .string()
     .nullable()
-    .optional()
     .describe(
-      'Single child component ID. Use on single-slot containers like Card or ' +
-        'a Button (the Button\'s visible label is a Text child referenced here). ' +
-        'Must reference another component emitted in the same updateComponents call.',
+      'Single child component ID, or null. Use on single-slot containers like ' +
+        'Card or a Button (the Button\'s visible label is a Text child referenced here). ' +
+        'Must reference another component emitted in the same updateComponents call. ' +
+        'Set to null when the component has no single child.',
     ),
   children: z
     .array(z.string())
     .nullable()
-    .optional()
     .describe(
-      'Ordered array of child component IDs. Use on multi-slot containers like ' +
-        'Row, Column, and List. Each ID must reference another component in the same call.',
+      'Ordered array of child component IDs, or null. Use on multi-slot containers ' +
+        'like Row, Column, and List. Each ID must reference another component in the ' +
+        'same call. Set to null when the component has no children.',
     ),
   // --- Leaf content ---
   text: z
     .string()
     .nullable()
-    .optional()
-    .describe('Literal text content for a Text component.'),
+    .describe('Literal text content for a Text component, or null if not applicable.'),
   // --- Interactions ---
   action: z
     .object({
@@ -61,14 +71,18 @@ const A2UIComponentSchema = z.object({
         name: z.string().describe('Event name dispatched when the component is activated.'),
         payload: z
           .record(z.string(), A2UIScalar)
-          .optional()
-          .describe('Optional flat payload (string/number/boolean/null values) delivered with the event.'),
+          .nullable()
+          .describe(
+            'Flat payload (string/number/boolean/null values) delivered with the event, ' +
+              'or null when no payload is needed.',
+          ),
       }),
     })
-    .optional()
+    .nullable()
     .describe(
-      'Interaction descriptor for clickable / editable components. ' +
-        'Use `action: { event: { name: "..." } }` — never a bare onClick string.',
+      'Interaction descriptor for clickable / editable components, or null. ' +
+        'Use `action: { event: { name: "..." } }` — never a bare onClick string. ' +
+        'Set to null on non-interactive components.',
     ),
 });
 
@@ -88,7 +102,13 @@ const A2UIMessageInputSchema = z.discriminatedUnion('op', [
     createSurface: z.object({
       surfaceId: z.string(),
       catalogId: z.string().describe('Must always be "kickstart"'),
-      sendDataModel: z.boolean().nullable().optional(),
+      sendDataModel: z
+        .boolean()
+        .nullable()
+        .describe(
+          'Whether the surface expects server-pushed data-model updates. ' +
+            'Set to null when not applicable.',
+        ),
     }),
   }),
   z.object({
@@ -104,8 +124,13 @@ const A2UIMessageInputSchema = z.discriminatedUnion('op', [
     op: z.literal('updateDataModel'),
     updateDataModel: z.object({
       surfaceId: z.string(),
-      path: z.string().nullable().optional(),
-      value: A2UIScalar.nullable().optional(),
+      path: z
+        .string()
+        .nullable()
+        .describe('JSON-pointer-like path to the data-model field being updated, or null for root.'),
+      value: A2UIScalar
+        .nullable()
+        .describe('New scalar value to set at `path`. May be null.'),
     }),
   }),
   z.object({
@@ -126,6 +151,27 @@ const EmitUiInputSchema = z.object({
 });
 
 // ── Tool ──────────────────────────────────────────────────────────────────────
+
+// Recursively drop properties whose value is `null`. LLMs under strict-mode
+// tool schemas must include every property declared in `properties` — even
+// fields that semantically mean "unset" (e.g. `sendDataModel`, `action`,
+// `children`) — and they signal "unset" with `null`. The harness
+// A2UIMessageSchema treats those fields as `.optional()` (undefined = absent),
+// so we collapse `null` → absent here before runtime validation.
+function stripNulls<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((v) => stripNulls(v)) as unknown as T;
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v === null) continue;
+      out[k] = stripNulls(v);
+    }
+    return out as T;
+  }
+  return value;
+}
 
 export const emitUiTool: ToolContribution = {
   name: 'core.emit_ui',
@@ -162,7 +208,8 @@ export const emitUiTool: ToolContribution = {
       // field. This is the canonical runtime validation path.
       let parsed: A2UIMessageV09;
       try {
-        parsed = A2UIMessageSchema.parse(input.message) as A2UIMessageV09;
+        const cleaned = stripNulls(input.message);
+        parsed = A2UIMessageSchema.parse(cleaned) as A2UIMessageV09;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         throw new Error(`emit_ui: invalid A2UI message — ${msg}`, { cause: err });
