@@ -66,3 +66,35 @@ Deleted `docs-site/docs/architecture/v2-implementation-brief.md` (1,171 lines, i
 
 **Learning:** When removing a large internal-facing doc that other files link to, scan all docs for references before deleting. `onBrokenLinks: 'throw'` will catch them at build time, but fixing references first is cleaner.
 
+
+## 2026-04-21T08:40Z — Scribe Session: Decisions Merge + Session Log
+
+**Inbox merged:** 7 files, spanning 08:16–08:40Z and 15:40–15:50Z
+- copilot-directive-2026-04-21-emit-spec.md
+- copilot-directive-2026-04-21-spec-alignment.md
+- copilot-directive-2026-04-21-required-props.md
+- leela-a2ui-strict-omit.md (major: A2UI discriminated-union decision #1017)
+- leela-playground-csp-strict.md (CSP strictness + local media, issue #1018)
+- leela-playground-issue-1019-csp.md (CSP + sparkle.svg 404, issue #1019)
+- leela-playground-inspiration-simplify.md (prompt refactor scope, issue #1020)
+
+**decisions.md:** 3,051 → 3,700+ lines. No archival needed (all entries within 1 day).
+
+**Root cause summary:**
+- **#1017:** flat nullable tool schema forces LLM to emit all fields; client rejects non-spec fields with `.strict()`. Fix: per-component discriminated-union schema in emit_ui.ts, matching A2UI v0.9 spec.
+- **#1018–#1019:** CSP violations (w3schools demo URLs) + sparkle.svg 404. Fix: source small local sample media; commit to `/assets/samples/`; update Playground Seed to use local URLs.
+- **#1020:** inspiration prompt generator (widget-inspirations.ts) is overly complex; consolidate system prompt, flatten fallback logic, move prompt text to constant.
+
+**Team rules captured:**
+1. A2UI tool schemas must be per-component discriminated unions (not flat merged), matching spec.
+2. REQUIRED properties must always be emitted (even with dynamic values via `{"path": "..."}`).
+3. Non-spec fields must be OMITTED (not zeroed).
+4. External media URLs forbidden in A2UI components; all samples must be locally hosted under `/assets/samples/`.
+
+**DPs posted & awaiting review:**
+- #1017 (Bender/Fry/Hermes implementation; Leela/Zapp/Nibbler review)
+- #1018/#1019 (Fry implementation; Zapp/Nibbler/Leela review)
+- #1020 (Fry implementation; Zapp/Nibbler/Leela review)
+
+**Session log file:** 2026-04-21T08-40Z-decisions-merge.md (session artifact)
+

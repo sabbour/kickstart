@@ -3049,3 +3049,413 @@ Single-revert rollback confirmed. Full CI green. `nibbler:approved` label re-app
 - Four PRs cleared on the first round-4 pass — continues to validate the DP-stage gate reducing PR-stage rework.
 - Bundle-budget script is now the baseline — future pack additions that breach the ceiling must either raise the number in the script (requiring deliberate edit + waiver note) or split into lazy chunks.
 
+
+---
+
+# A2UI Schema Alignment — Tool-Side Fix (Discriminated Union)
+
+**Date:** 2026-04-21T08:16:14Z (amended 2026-04-21T15:50Z with concrete tool schema evidence)  
+**Directive:** "Align to the spec" + "When emitting A2UI, follow the spec — it's not about empty values, it's about non-spec fields"  
+**Scope:** emit_ui.ts tool schema + a2ui-output-discipline SKILL + tests  
+**Owner:** Leela (Lead) + Bender (Backend Dev) + Fry (Frontend Dev) + Hermes (Tester)  
+**Status:** IN DESIGN REVIEW (issue #1017, DP amended with concrete evidence)
+
+## Problem (Root Cause Identified)
+
+The `core.triage` agent is non-functional — every component rendered as `_ErrorComponent`.
+
+**Concrete evidence from trace:**
+
+1. **Tool schema overspecifies** (`packages/pack-core/src/tools/emit_ui.ts:39–87`)
+   - `A2UIComponentSchema` declares `child`, `children`, `text`, `action` as `.nullable()` (required, may be null)
+   - Comment lines 28–38: done to satisfy OpenAI strict-mode function-calling
+   - OpenAI strict-mode interprets `.nullable()` as "required field, null is valid" → forces LLM to emit every field on every component
+
+2. **Empty strings slip through** (`emit_ui.ts:155–174`)
+   - `stripNulls()` removes null values before validation
+   - But when LLM emits `""` (empty string) instead of `null` → empty strings NOT stripped
+   - Empty string passes to client validator
+
+3. **Client rejects with `.strict()`** (web package)
+   - Client schemas use `.strict()`: `Button.tsx:28`, `basic_components.ts:55`
+   - Unknown key (e.g., `child: ""` on Text) → validation fails → `_ErrorComponent` at `A2UIRegistryContext.tsx:396–418`
+
+4. **Architectural misalignment with A2UI v0.9 spec**
+   - Tool uses single flat `A2UIComponentSchema` with all possible fields merged
+   - A2UI v0.9 defines **per-component shapes** in `basic_catalog.json`:
+     - Text → `{id, component, text}` only
+     - Button → `{id, component, child, action}` only
+     - Row/Column/List → `{id, component, children}` only
+     - Card → `{id, component, child}` only
+   - Tool schema is fundamentally non-spec
+
+**Real root cause:** The tool schema forces every field to be optional-or-null. The LLM emits empty strings under stress. The client correctly rejects them. The fix is **tool-side schema alignment to spec**.
+
+## Decision: Per-Component Discriminated Union Schema (Primary Fix)
+
+The PRIMARY fix is **tool-side schema refactor**. Prompt guidance is secondary.
+
+### 1. Refactor Tool Schema (Bender owns — SDK/tool code)
+
+**File:** `packages/pack-core/src/tools/emit_ui.ts`
+
+Replace flat `A2UIComponentSchema` with **discriminated union per component type**, matching A2UI v0.9 `basic_catalog.json`:
+
+```typescript
+// Each component type: ONLY the properties that apply
+
+const TextComponentSchema = z.object({
+  id: z.string(),
+  component: z.literal('Text'),
+  text: z.string(),
+}).strict();
+
+const ButtonComponentSchema = z.object({
+  id: z.string(),
+  component: z.literal('Button'),
+  child: z.string(),
+  action: ActionSchema,
+}).strict();
+
+const RowComponentSchema = z.object({
+  id: z.string(),
+  component: z.literal('Row'),
+  children: z.array(z.string()),
+}).strict();
+
+// ... Column, List, Card
+
+// Discriminated union: LLM learns to pick the right shape per component
+const A2UIComponentSchema = z.discriminatedUnion('component', [
+  TextComponentSchema, ButtonComponentSchema, RowComponentSchema, /* ... */
+]);
+```
+
+**Verification:**
+- Test that OpenAI strict-mode accepts discriminated unions of `.strict()` shapes
+- Run existing `emit_ui.test.ts` to confirm tool JSON schema accepted
+- Remove `padComponent()` helper (no longer needed — tests shouldn't fill unused fields)
+
+### 2. Harden or Remove stripNulls() (Bender)
+
+With per-component strict shapes:
+- No nulls should be emitted (schema forbids unused fields)
+- No empty strings should be emitted (LLM learns correct shape)
+
+**Option A (recommended):** Remove `stripNulls()` entirely (cleaner)  
+**Option B:** Keep as defense-in-depth, strip both null and empty string on known-optional fields
+
+Bender decides during implementation.
+
+### 3. Strengthen Prompt Guidance (Fry)
+
+**File:** `packages/pack-core/src/skills/a2ui-output-discipline/SKILL.md`
+
+Add explicit **Component Shape Cheat Sheet** with per-component required properties:
+
+```markdown
+### Component Shape Cheat Sheet
+
+Per A2UI v0.9, each component has a REQUIRED shape. The emit_ui tool enforces these strictly.
+
+| Component | Required Properties |
+|-----------|----------------------|
+| Text | id, component, text |
+| Button | id, component, child, action |
+| Row | id, component, children |
+| Column | id, component, children |
+| List | id, component, children |
+| Card | id, component, child |
+
+Emit ONLY these properties. No extras. The tool schema rejects unknown properties.
+
+Common mistakes:
+- Text with `child` → REJECTED
+- Button with `text` → REJECTED
+- Row with `text` → REJECTED
+```
+
+Also cross-reference from `packages/pack-core/src/agents/triage.agent.md`:
+> Emit A2UI surfaces per a2ui-output-discipline. The emit_ui tool validates strictly — emit only the properties listed for each component type.
+
+### 4. Test Updates (Hermes)
+
+**File:** `packages/pack-core/src/tools/emit_ui.test.ts`
+
+- Remove `padComponent()` helper
+- Add test cases verifying per-component strict validation:
+  - Text with extra `child` → fails
+  - Button without `text` → succeeds
+  - Row with `text` → fails
+
+**File:** `packages/web/src/__tests__/a2ui-registry.test.ts`
+
+- Add snapshot test of corrected triage envelope (all components render, no `_ErrorComponent`)
+
+## Pack Boundaries
+
+- **emit_ui tool** (pack-core): schema refactor to discriminated union
+- **a2ui-output-discipline SKILL** (pack-core): prompt guidance
+- **triage agent** (pack-core): cross-reference to SKILL
+- **A2UI registry** (pack-web): NO CHANGES — already correct
+- **Tests** (pack-core + pack-web): validation + snapshot tests
+
+No boundary violations. No web-package changes.
+
+## Rationale: Root-Cause Fix
+
+1. **Tool schema is the root cause** — it forces every field onto every component
+2. **Fix is tool-side alignment** — per-component discriminated union matching v0.9 spec
+3. **Prompt guidance reinforces** — secondary defense, what the tool already enforces
+4. **Client validator is already correct** — no changes needed
+
+This aligns with Ahmed's directives:
+- "Align to the spec" — tool schema now matches v0.9 per-component shapes
+- "When emitting A2UI, follow the spec — it's not about empty values, it's about non-spec fields" — tool schema eliminates the ability to emit non-spec fields
+
+## Team Rule Locked In
+
+**A2UI tool schemas must be per-component discriminated unions, matching A2UI v0.9 spec.** No flat merged schemas. No fields that don't apply to a component type.
+
+## Next Steps
+
+1. **Design Review:** Zapp + Nibbler RE-REVIEW (tool schema approach is primary, not prose-only)
+2. **Implementation:** Bender (emit_ui.ts) → Fry (SKILL guidance) → Hermes (tests)
+3. **Verification:** triage agent emits spec-compliant envelopes; surfaces render cleanly
+
+**Related issue:** #1017  
+**Assigned to:** Bender (primary), Fry (secondary), Hermes (tests), Leela (design lead)  
+**Cross-ref:** "Align to the spec" + "non-spec fields" directives from Ahmed
+
+---
+
+## User directive — A2UI spec alignment (non-spec field omission)
+
+**Date:** 2026-04-21T08:26:00-07:00  
+**By:** Ahmed Sabbour (via Copilot)  
+**Status:** Team rule
+
+When emitting A2UI envelopes (core_emit_ui or any successor tool), agents MUST emit only the properties defined by the A2UI v0.9 catalog for each specific component type. The problem is not empty string values — it is the presence of non-spec properties (e.g. `child` on Text, `text` on Button). Fields that are not part of a component's spec shape must be OMITTED, not zeroed.
+
+---
+
+## User directive — A2UI validator strictness is correct
+
+**Date:** 2026-04-21T08:21:00-07:00  
+**By:** Ahmed Sabbour (via Copilot)  
+**Status:** Team rule
+
+On the A2UI strict-validator debate (issue #1017), the fix must align to the A2UI v0.9 spec. Do NOT soften the validator. The validator's strict rejection of non-spec properties is correct per spec; the emitter (triage agent + a2ui-output-discipline skill) is what must change.
+
+---
+
+## User directive — A2UI v0.9 REQUIRED PROPERTIES
+
+**Date:** 2026-04-21T08:28:00-07:00  
+**By:** Ahmed Sabbour (via Copilot)  
+**Status:** Team rule
+
+A2UI v0.9 REQUIRED PROPERTIES rule: agents MUST include all required properties for every component per the v0.9 schema, even inside templates or when bound to data. Examples: Text.text required, Image.url required, Button.action required, TextField/CheckBox.label required. Dynamic values use `{"path": "..."}`. Canonical JSON schemas live at https://github.com/google/A2UI/tree/6a82313a83fde09f25a10ce07fec48530988cf96/specification/v0_9/json
+
+---
+
+# Playground CSP Must Stay Strict (Local Assets Only)
+
+**Date:** 2026-04-21T15:40Z  
+**Directive Source:** Ahmed (via team message, aligns with "align to spec" directive)  
+**Scope:** packages/web CSP + sample media + a2ui-media-discipline documentation  
+**Owner:** Leela (Lead) + Fry (Frontend Dev)  
+**Status:** IN DESIGN REVIEW (issue #1018)
+
+## Problem
+
+Three console errors surface in the Playground (https://kickstart.aks.azure.sabbour.me):
+
+1. **404 on sparkle.svg asset** — A Fluent icon is referenced but missing from the deployment bundle
+2. **CSP blocks external video** — w3schools demo video URL violates `default-src 'self'` (no explicit `media-src`)
+3. **CSP blocks external audio** — w3schools demo audio URL violates `default-src 'self'` (same root cause)
+
+**Root causes:**
+- Asset 404: sparkle.svg is referenced in the UI but not present in built assets (either vendored library not copied or authored asset missing)
+- CSP violations: w3schools demo URLs in A2UI media components violate strict CSP that has no explicit `media-src` fallback
+
+## Decision: CSP-Strict (Local Assets Only)
+
+**CSP must remain as strict as possible.** Do NOT broaden CSP to allow external media hosts. Instead, eliminate external URLs by using locally-hosted sample media.
+
+### Approach
+
+#### 1. Resolve sparkle.svg 404
+
+- Investigate whether sparkle.svg is part of a vendored Fluent library or should be authored locally
+- If vendored: ensure the build process copies it correctly
+- If authored: commit the asset to the source tree
+- Verify it loads without error in the deployed Playground
+
+#### 2. Replace External Media URLs with Local Samples
+
+- Do NOT add `media-src` directive to CSP
+- Do NOT whitelist w3schools, CDNs, or external hosts
+- Source or author small royalty-free sample files (e.g., `sample.mp4`, `sample.mp3`)
+- Commit samples to `packages/web/src/assets/samples/`
+- Update A2UI example envelopes to reference `/assets/samples/sample.mp4` and `/assets/samples/sample.mp3` instead of external URLs
+- Verify build bundles these samples
+
+#### 3. Document Local-Assets-Only Pattern
+
+Create or update `packages/pack-core/src/skills/a2ui-media-discipline/SKILL.md` (new skill) to document:
+
+```markdown
+### Media Sample URLs
+
+A2UI media components (`Video`, `Audio`, `Media`) must reference **locally-hosted sample media only**, never external URLs.
+
+**Why:** External URLs violate strict CSP (`default-src 'self'`). Kickstart CSP is intentionally strict per "align to spec" directive.
+
+**Local samples:** `/assets/samples/sample.mp4`, `/assets/samples/sample.mp3`
+
+**Never use external URLs.** Always use local assets.
+```
+
+#### 4. Keep CSP Strict
+
+- Keep `default-src 'self'` unchanged
+- Do NOT add `media-src` directive
+- Do NOT whitelist external hosts
+- CSP remains strict per "align to spec" directive and security best practices
+
+## Rationale
+
+**Security first:** CSP should be as tight as possible. External URLs are a liability. By hosting sample media locally, we eliminate the CSP violation and simplify configuration.
+
+**Spec alignment:** Per Ahmed's directive "align to the spec," strict security posture aligns with lean, focused interfaces. No unnecessary external dependencies for demo content.
+
+**Debuggability:** Developers can reason about what domains are allowed by reading CSP — no magic whitelist exceptions.
+
+## Pack Impact
+
+- **packages/web:** Add sparkle.svg (if missing); add sample media; no CSP config changes
+- **pack-core:** Document local-assets-only rule in a2ui-media-discipline skill
+- **Build:** Ensure samples are bundled with static assets
+
+## Team Rule
+
+**External media URLs are not allowed in A2UI media components.** All sample media must be hosted locally under `/assets/samples/`. This is a security & spec-alignment rule and applies to all future media examples and documentation.
+
+## Next Steps
+
+1. **Design Review:** Fry + Zapp + Nibbler approval (issue #1018)
+2. **Implementation (Fry):** Resolve 404, commit samples, update examples, coordinate CSP verification
+3. **Verification:** Playground renders without CSP console errors; sample media plays
+
+**Related issue:** #1018  
+**Assigned to:** Fry (implementation), Leela (design lead)  
+**Cross-ref:** Aligns with Ahmed directive "Align to the spec" (strict, lean, focused)
+
+---
+
+# Playground CSP Remains Strict — Sample Media Must Be Locally Hosted (Issue #1019)
+
+**Author:** Leela (Lead)  
+**Date:** 2026-04-21T08:28:00-07:00  
+**Relates to:** Issue #1019, Ahmed directive `copilot-directive-2026-04-21-spec-alignment.md`  
+**Status:** Decided (awaiting DP review approvals before dispatch)
+
+## Context
+
+Playground (kickstart.aks.azure.sabbour.me/playground) has two distinct console errors:
+1. Missing static asset: `sparkle.svg` (404)
+2. CSP blocks external sample media from w3schools (strict `default-src 'self'` policy)
+
+Ahmed's "align to spec" directive (2026-04-21) governs the fix: do NOT soften CSP or validators. Keep strict.
+
+## Decision
+
+### Playground CSP Remains `default-src 'self'` — No External Media Allowances
+
+- CSP `default-src 'self'` is a **security control** and must remain strict
+- **Do NOT** add `media-src 'https://w3schools.com'` or similar external allowances
+- A2UI sample envelopes (Playground Seed flow) must reference **locally-hosted** demo media
+- Optional hardening: explicitly set `media-src 'self'` in CSP header for clarity (no behavior change)
+
+### Sample Media Strategy
+
+- Add small royalty-free sample media files (`sample.mp4`, `sample.mp3`) to `packages/web/src/assets/media/`
+- Update A2UI Playground Seed to reference local URLs (e.g., `/assets/media/sample.mp4`) instead of external URLs
+- Asset pipeline must ship these files in the deployed bundle
+
+### Sparkle.svg Asset Fix
+
+- Locate source file in `packages/web/src/assets/` or equivalent
+- If missing: source small royalty-free SVG sparkle icon
+- Confirm build pipeline copies static assets correctly
+
+## Rationale
+
+CSP strictness is a deliberate security posture. Fixtures and examples must align to CSP constraints, not vice versa. Keeping the policy strict is "align to spec" — the A2UI spec expects strict output validation and CSP enforcement.
+
+## Implementation Gate
+
+⚠️ Code work blocked until:
+- ✅ DP posted on #1019
+- ⏳ Design Review approvals from Zapp (security) + Nibbler (code quality) + Leela (architecture)
+
+No implementation dispatch before all three approvals.
+
+---
+
+# Simplify Playground Inspiration Prompt Generation
+
+**Issue:** #1020
+**Date filed:** 2026-04-21
+**Stage:** DP approval gate (awaiting Leela, Zapp, Nibbler sign-off)
+
+## Scope
+
+Refactor the Playground "Create" tab inspiration prompt generator to reduce complexity, eliminate duplicated system prompts, flatten nested error handling, and improve token efficiency.
+
+**Files in scope:**
+- `packages/web/api/src/functions/widget-inspirations.ts` (main implementation, 250 lines)
+- `packages/web/api/src/lib/widget-inspirations-data.ts` (data & helpers, shared with tests)
+- `packages/web/src/lib/fallback-ideas.ts` (client mirror — must remain in sync)
+- Tests: `a2ui-allow-list-registry.test.ts`, `fallback-ideas-sync.test.ts`
+
+## Constraints (Non-negotiable)
+
+1. **No behavior change** — Output shape, allow-list constraints, focus-domain variety, and fallback rotation remain identical
+2. **Preserve test coverage** — Existing tests must pass; add snapshot test if none exists for prompt shape
+3. **CSP aligned** — No new external calls or Azure dependencies; existing model selection logic unchanged
+4. **Spec aligned** — Emitted inspirations remain A2UI-compliant (same component type constraints, same prompt structure)
+5. **No Landing-page impact** — The separate inspirations endpoint (`/api/inspirations`) is out of scope; focus on Playground only
+
+## Simplification Levers Identified
+
+1. **Consolidate system prompt** — Extract a single template, parameterize by mode (streaming vs. non-streaming), reuse in both paths
+2. **Flatten fallback logic** — Merge nested try-catch blocks; introduce a `streamOrFallback()` helper that decides once whether to call OpenAI
+3. **Externalize prompt text** — Move system prompt to a constant or prompt file; simplifies token auditing
+4. **Inline single-use helpers** — Fold `generateWidgetIdeas()` and `generateWidgetPromptStream()` if they add no reusable value
+
+## Estimate
+
+**M** — 1–2 days (refactor + test validation)
+
+## Approval Gate
+
+- [ ] Leela (architecture)
+- [ ] Zapp (security — low signal, prompt-only)
+- [ ] Nibbler (code quality — medium signal, fallback refactoring)
+
+**After approvals:** Dispatch to Fry for implementation.
+
+## Routing
+
+- **Implementer:** Fry (squad:fry)
+- **Security review:** Zapp (squad:zapp, low)
+- **Code review:** Nibbler (squad:nibbler, medium)
+
+## Notes
+
+- Ahmed's request was to simplify; this DP scopes the work, cites specific levers, and sets clear constraints
+- The inspiration prompt generators for Playground and Landing page are separate codepaths; this task focuses on Playground only
+- Focus-domain rotation behavior (FOCUS_DOMAINS array, nextFocusDomain() cursor) must be preserved; this is a "nice to have" for variety but non-critical to the simplification
+
