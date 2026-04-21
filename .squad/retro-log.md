@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #965 "fix(api): add local.settings.json.template with APPLICATIONINSIGHTS_CONNECTION_STRING placeholder" | S | impl=2m | review=32m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=29m | ci=6m | reviewer=bot | human_comments=0 | issue=#964 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #969 "fix(pack-core): core.emit_ui schema — replace z.unknown() with typed discriminated union (#966)" | L | impl=1m | review=0m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=15m | ci=6m | reviewer=bot | human_comments=0 | issue=#966 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #962 "feat(web): Debug panel — surface agentName, skillsExecuted, toolsExecuted (#959)" | M | impl=13m | review=8m | cycles=1 | merged | @sabbour | first_review=7m | ci=6m | reviewer=bot | human_comments=0 | issue=#959 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
