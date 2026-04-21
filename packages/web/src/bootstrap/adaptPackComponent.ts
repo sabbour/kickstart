@@ -26,7 +26,12 @@ export function adaptPackComponent(
   const Renderer = contribution.renderer as PackRenderer;
   const api = {
     name: contribution.name,
-    schema: contribution.propertySchema as z.ZodTypeAny,
+    // Packs bundle zod@4 while web still depends on zod@3; the runtime
+    // contract (`.safeParse(...)` for prop validation) is identical across
+    // versions, so a widening cast through `unknown` is the correct bridge
+    // until the monorepo unifies on a single zod major. See decision note
+    // bender-1000-revise-2026-04-21.
+    schema: contribution.propertySchema as unknown as z.ZodTypeAny,
   };
   return createReactComponent(api, ({ props }) =>
     React.createElement(Renderer, { props: props as Record<string, unknown> }),
