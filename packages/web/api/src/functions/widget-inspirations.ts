@@ -31,6 +31,16 @@ import {
 
 const ALLOWED_LIST = ALLOWED_A2UI_COMPONENTS.join(", ");
 
+/** Unified system prompt shared by both JSON and streaming generation paths. */
+const SYSTEM_PROMPT = (focus: string) =>
+  `You generate a single creative component idea for an AKS developer tool using only A2UI core components: ${ALLOWED_LIST}.
+
+Do not invent namespaced types (e.g., "aks/PodTable", "Chart", "Container") or suggest workarounds like "use a Table instead of a Chart" — just use the allowed components as-is.
+
+Focus on: ${focus}.
+
+Generate realistic ideas with sample data (pod names, metrics, namespaces) and clear interactions. Keep ideas constructive and appropriate for a professional audience.`;
+
 /** Check whether Azure OpenAI env vars are configured. */
 function isOpenAIConfigured(): boolean {
   return !!(
@@ -50,19 +60,7 @@ async function generateWidgetIdeas(): Promise<WidgetIdea[]> {
     [
       {
         role: "system",
-        content: `You generate a single creative component idea for a developer tool that helps deploy and operate apps on Azure Kubernetes Service (AKS). The component is rendered with the **A2UI core catalog** and you MUST restrict yourself to its components. Valid component type names (exact spelling): ${ALLOWED_LIST}.
-
-DO NOT invent or reference namespaced component types (e.g. "aks/PodTable", "azure/CostEstimate", "github/RepoPicker", "FactSet", "Chart", "ColumnSet", "Container", "ActionSet", "TextBlock", "ProgressBar", "Input.*"). If you need a chart, describe a Table or Markdown summary instead. If you need a key-value panel, use a DecisionCard or a Column of Row + Text pairs.
-
-Your idea MUST focus on the following area this round: ${focus}.
-
-The prompt you generate should be detailed enough to produce a COMPLETE working component in a single AI response. Specify:
-- Which A2UI component types to use (from the allowed list above only)
-- What realistic sample data to show (pod names, namespaces, metrics, timestamps, repo names)
-- What interactions to include (Buttons, Toggles, ChoicePickers, TextFields)
-- How to lay out the component (Row for side-by-side, Column for stacking)
-
-Return ONLY a JSON array with exactly 1 object containing "title" (short catchy name, max 8 words), "subtitle" (one-line description, max 15 words), and "prompt" (a detailed first-person description starting with "I want to build a component that..." specifying the component types, sample data, layout, and interactions). End the prompt with the literal sentence "Use only core A2UI components." No emoji. No markdown. Raw JSON only. All generated ideas must be appropriate for a professional tech audience. Never generate ideas related to weapons, violence, illegal activities, adult content, gambling, or anything harmful or offensive. Keep ideas constructive, inclusive, and suitable for a workplace demo.`,
+        content: SYSTEM_PROMPT(focus),
       },
       {
         role: "user",
@@ -89,13 +87,7 @@ async function* generateWidgetPromptStream(): AsyncGenerator<string> {
     [
       {
         role: "system",
-        content: `You generate a single detailed component idea for a developer tool that helps deploy and operate apps on Azure Kubernetes Service (AKS). The component is rendered with the **A2UI core catalog** and you MUST restrict yourself to its components. Valid component type names (exact spelling): ${ALLOWED_LIST}.
-
-DO NOT invent or reference namespaced component types (e.g. "aks/PodTable", "azure/CostEstimate", "github/RepoPicker", "FactSet", "Chart", "ColumnSet", "Container", "ActionSet", "TextBlock", "ProgressBar", "Input.*"). If you need a chart, describe a Table or Markdown summary instead. If you need a key-value panel, use a DecisionCard or a Column of Row + Text pairs.
-
-Your idea MUST focus on the following area this round: ${focus}.
-
-Return ONLY a single first-person prompt starting with "I want to build a component that..." which is detailed enough to produce a complete working A2UI component in one shot. Specify which component types to use (from the allowed list above only), what sample data to show, what interactions to include, and how to lay things out. End the prompt with the literal sentence "Use only core A2UI components." Aim for 60-120 words. No JSON. No markdown. No title. Just the prompt sentence(s). All generated ideas must be appropriate for a professional tech audience. Never generate ideas related to weapons, violence, illegal activities, adult content, gambling, or anything harmful or offensive. Keep ideas constructive, inclusive, and suitable for a workplace demo.`,
+        content: SYSTEM_PROMPT(focus),
       },
       {
         role: "user",
