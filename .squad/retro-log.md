@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #978 "test(harness): runner a2ui drain-forward regression guard (#977)" | M | impl=1m | review=2m | cycles=1 | closed | @sabbour-squad-backend[bot] | first_review=n/a | ci=2m | reviewer=none | human_comments=0 | issue=#977 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #977 "fix(web): render A2UI envelopes in chat messages" | S | impl=1m | review=7m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=2m | ci=5m | reviewer=bot | human_comments=0 | issue=#977 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #974 "fix(api): ensure local AppInsights telemetry actually flows" | S | impl=1m | review=1m | cycles=1 | closed | @sabbour-squad-backend[bot] | first_review=n/a | ci=1m | reviewer=none | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
