@@ -1,8 +1,21 @@
 import React from 'react';
+import {z} from 'zod';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
-import {ListApi} from '../../vendor/a2ui/web_core/basic_catalog/index';
+import {ChildListSchema} from '../../vendor/a2ui/web_core/schema/common-types';
 import {makeStyles, tokens} from '@fluentui/react-components';
 import {ChildList} from './ChildList';
+
+// Flexible ListApi: children optional, non-strict (see Row.tsx + #984).
+const FlexibleListApi = {
+  name: 'List' as const,
+  schema: z.object({
+    accessibility: z.any().optional(),
+    weight: z.number().optional(),
+    children: ChildListSchema.optional(),
+    direction: z.string().optional(),
+    align: z.string().optional(),
+  }),
+};
 
 const useStyles = makeStyles({
   horizontal: {
@@ -35,7 +48,7 @@ const mapAlign = (a?: string) => {
   }
 };
 
-export const List = createReactComponent(ListApi, ({props, buildChild, context}) => {
+export const List = createReactComponent(FlexibleListApi, ({props, buildChild, context}) => {
   const classes = useStyles();
   const isHorizontal = props.direction === 'horizontal';
 

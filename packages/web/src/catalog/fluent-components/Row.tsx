@@ -1,8 +1,23 @@
 import React from 'react';
+import {z} from 'zod';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
-import {RowApi} from '../../vendor/a2ui/web_core/basic_catalog/index';
+import {ChildListSchema} from '../../vendor/a2ui/web_core/schema/common-types';
 import {makeStyles, tokens} from '@fluentui/react-components';
 import {ChildList} from './ChildList';
+
+// Flexible RowApi: children optional, non-strict. A Row emitted without
+// children should render as an empty flex box rather than failing schema
+// validation and falling back to _ErrorComponent (see #984).
+const FlexibleRowApi = {
+  name: 'Row' as const,
+  schema: z.object({
+    accessibility: z.any().optional(),
+    weight: z.number().optional(),
+    children: ChildListSchema.optional(),
+    justify: z.string().optional(),
+    align: z.string().optional(),
+  }),
+};
 
 const useStyles = makeStyles({
   root: {
@@ -39,7 +54,7 @@ const mapAlign = (a?: string) => {
   }
 };
 
-export const Row = createReactComponent(RowApi, ({props, buildChild, context}) => {
+export const Row = createReactComponent(FlexibleRowApi, ({props, buildChild, context}) => {
   const classes = useStyles();
 
   return (

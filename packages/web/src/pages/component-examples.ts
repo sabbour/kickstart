@@ -36,7 +36,8 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   ],
 
   'core/Button': [
-    { id: 'root', component: 'Button', text: 'Click me' },
+    { id: 'root', component: 'Button', child: 'btn-label' },
+    { id: 'btn-label', component: 'Text', text: 'Click me' },
   ],
 
   'core/Image': [
