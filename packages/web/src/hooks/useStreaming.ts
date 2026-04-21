@@ -384,6 +384,7 @@ export function useStreaming() {
                 if (parsed.intent && typeof parsed.intent === 'string') {
                   callbacks.onIntent?.({ summary: parsed.intent });
                 }
+                if (parsed.model) lastModel = parsed.model as string;
                 break;
               }
 

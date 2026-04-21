@@ -441,15 +441,25 @@ export class Runner {
         sseWrite('a2ui', msg);
       }
 
-      // Extract intent from final output if structured
+      // Extract intent and prose message from structured final output.
+      // AgentOutput forces the model to emit JSON tokens as the raw stream text, so
+      // fullText is the JSON-encoded object (e.g. '{"message":"...","intent":"continue"}').
+      // Replacing outputText with finalOutput.message surfaces clean prose to the client
+      // and prevents the double-encoded JSON from reaching useStreaming.ts (#937).
       let intent: string | undefined;
       let outputText = fullText;
       try {
         const finalOutput = await result.finalOutput;
-        if (finalOutput && typeof finalOutput === 'object' && 'intent' in finalOutput) {
-          intent = (finalOutput as { intent?: string }).intent;
-          if (intent) {
-            session.intent = { summary: intent };
+        if (finalOutput && typeof finalOutput === 'object') {
+          if ('intent' in finalOutput) {
+            intent = (finalOutput as { intent?: string }).intent;
+            if (intent) {
+              session.intent = { summary: intent };
+            }
+          }
+          if ('message' in finalOutput && typeof (finalOutput as { message?: unknown }).message === 'string') {
+            // Overwrite outputText with the parsed prose — not the raw JSON token stream.
+            outputText = (finalOutput as { message: string }).message;
           }
         }
       } catch { /* finalOutput not available when interrupted */ }
@@ -493,6 +503,7 @@ export class Runner {
       sseWrite('end', {
         sessionId: session.sessionId,
         intent,
+        model: modelName,
       });
     } catch (err: unknown) {
       // AbortError: may be a UserAction interrupt OR a guardrail halt
