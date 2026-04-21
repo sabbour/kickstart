@@ -21,6 +21,7 @@ These run via GitHub Actions on schedule or events. Documented here for referenc
 | Daily Pulse | cron `0 0 * * *` (17:00 PT) | `.github/workflows/squad-daily-pulse.yml` | Scribe | rolling issue `📊 Daily Pulse (rolling)` |
 | Weekly Pulse | cron `0 0 * * 2` (Mon 17:00 PT) | `.github/workflows/squad-weekly-pulse.yml` | Scribe | new issue `Weekly Pulse · YYYY-MM-DD` |
 | Release Cadence | cron `0 0 * * *` (17:00 PT) | `.github/workflows/squad-release-cadence.yml` | Leela + Scribe | draft PR on `release/cadence` branch |
+| Process Grader | cron `0 8 * * *` (08:00 UTC) | `.github/workflows/squad-process-grader.yml` | Scribe | grade comment + outcome label on due `process` issues, Scribe inbox entry |
 
 All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 
@@ -142,6 +143,44 @@ This protocol applies to all agents (squad members AND @copilot). It is enforced
 3. Root cause analysis
 4. What should change? (concrete, testable)
 5. Open a `process` issue for each action item → daily pulse tracks them
+
+---
+
+## Process Grader
+
+| Field | Value |
+|-------|-------|
+| **Trigger** | auto |
+| **When** | scheduled (independent of coordinator ceremonies) |
+| **Schedule** | cron `0 8 * * *` (daily 08:00 UTC) + `workflow_dispatch` |
+| **Workflow** | `.github/workflows/squad-process-grader.yml` |
+| **Facilitator** | Scribe |
+| **Participants** | none (automation); evidence drawn from `.squad/velocity.md` |
+| **Enabled** | ✅ yes |
+
+**Purpose:** close the loop on `process` experiments created by the [Retrospective](#retrospective) ceremony. Each `process` issue carries a hypothesis frontmatter (`Signal`, `Baseline`, `Target`, `Revisit`). Once the `Revisit:` date is reached, the grader compares the latest `.squad/velocity.md` snapshot against the hypothesis and assigns a verdict.
+
+**Outcomes (exactly one label applied per grading):**
+- `process:succeeded` — signal hit the target (and moved beyond the noise band in the improving direction).
+- `process:no-effect` — signal stayed within the noise band, or sample size was too small to conclude.
+- `process:reverted` — signal moved in the wrong direction beyond the noise band, i.e. the experiment made things worse.
+
+Any prior outcome label on the issue is cleared before the new one is applied so the three outcomes remain mutually exclusive.
+
+**Revisit window:**
+- On `process:succeeded` or `process:reverted` → terminal. The issue keeps its outcome label; no re-grading unless a human re-opens the experiment by resetting `Revisit:` and clearing the outcome label.
+- On `process:no-effect` → the grader extends `Revisit:` by 14 days in-place (editing the issue body) up to a maximum of 2 extensions, giving the experiment time to accumulate more PRs. After the 2nd extension the next `no-effect` verdict is terminal.
+
+**Rate-limit safeguards:**
+- **Pre-flight abort:** if the REST API `core.remaining` budget is `< 200` at the start of the run, the grader logs a warning and exits without grading anything. This leaves headroom for interactive squad work the same morning.
+- **Per-run cap:** at most **25 issues** are graded per run (`MAX_ISSUES_PER_RUN = 25`). Candidates are ordered oldest-`Revisit:` first; any overflow is deferred to the next scheduled run and logged via `core.notice`.
+- **Concurrency guard:** workflow uses `concurrency: squad-process-grader` with `cancel-in-progress: false` so overlapping manual dispatches serialize rather than double-grade.
+
+**Artifacts per graded issue:**
+1. A grade comment on the issue summarising signal / baseline / target / observed / verdict.
+2. The corresponding `process:{outcome}` label.
+3. A Scribe inbox entry under `.squad/decisions/inbox/process-grader-{issue}-{date}.md` so the next decisions-merge run folds the result into `.squad/decisions.md`.
+4. On `no-effect` extensions, an edited issue body with the new `Revisit:` date.
 
 ---
 
