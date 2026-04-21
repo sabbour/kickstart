@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { Logger, extractTraceId, extractRequestMetadata } from "../lib/logger.js";
-import { getAppInsightsClient } from "../lib/appinsights.js";
+import { getAppInsightsClient, flushAppInsights } from "../lib/appinsights.js";
 import { getRegistry, getLoadErrors } from "../startup/packs.js";
 import type { PackLoadError } from "../startup/packs.js";
 import { sanitizeError } from "../telemetry/sanitize-error.js";
@@ -210,6 +210,7 @@ app.http("health", {
         exception: sanitizedError,
         properties: { requestId, context: "health-check-pack-init", phase },
       });
+      await flushAppInsights();
 
       // Return only opaque category fields — never raw error messages, file
       // paths, or URLs. Full detail is captured server-side via logger.error

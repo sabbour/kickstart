@@ -15,6 +15,8 @@ import { getRegistry, getLoadErrors } from "../startup/packs.js";
 import type { PackLoadError } from "../startup/packs.js";
 import type { ComponentContribution, PlaygroundScenario } from "@aks-kickstart/harness";
 import { Logger, extractTraceId } from "../lib/logger.js";
+import { getAppInsightsClient, flushAppInsights } from "../lib/appinsights.js";
+import { sanitizeError } from "../telemetry/sanitize-error.js";
 import { randomUUID } from "node:crypto";
 
 interface ComponentDTO {
@@ -101,10 +103,15 @@ async function packs(
       },
     };
   } catch (err) {
-    // Log full error server-side (telemetry only — never in the response body).
-    logger.error('Registry initialization failed', err instanceof Error ? err : new Error(String(err)), {
+    const sanitizedError = sanitizeError(err);
+    logger.error('Registry initialization failed', sanitizedError, {
       error_code: 'REGISTRY_INIT_FAILED',
     });
+    getAppInsightsClient().trackException({
+      exception: sanitizedError,
+      properties: { requestId, context: 'packs-registry-init-failed' },
+    });
+    await flushAppInsights();
     return {
       status: 500,
       jsonBody: { error: 'Registry initialization failed. See server logs.' },
