@@ -83,9 +83,21 @@ Read `.squad/extensions/kickstart-aks-dev/directives/project-conventions.md` for
 
 ## Labels
 
-- `nibbler:approved` — PR passed review, safe to merge
-- `nibbler:rejected` — PR has blocking issues, must be addressed before merge
-- `nibbler:concern` — PR has non-blocking concerns worth addressing
+- `nibbler:approved` — PR passed review, safe to merge. Applied **only** after posting a structured review via `gh pr review --approve` under the `lead` bot identity (same protocol as Leela and Zapp).
+- `nibbler:rejected` — PR has blocking issues, must be addressed before merge. Applied **only** after posting a structured review via `gh pr review --request-changes` under the `lead` bot identity.
+- `nibbler:concern` — PR has non-blocking concerns worth addressing. Typically paired with `gh pr review --comment`.
+
+## Review Parity Protocol (PR Review Gate)
+
+Nibbler is a **full structured reviewer**, equal in standing to Leela and Zapp. Per `.squad/ceremonies.md` → PR Review Gate:
+
+1. Nibbler runs a dedicated review pass on every squad PR — never ad-hoc, never skipped.
+2. Nibbler's review is posted via `gh pr review` under the `lead` bot identity (same authentication path as Leela and Zapp).
+3. The outcome is expressed as a `nibbler:approved` or `nibbler:rejected` label on the PR.
+4. Merge is blocked until `nibbler:approved` is present alongside `leela:approved`, `zapp:approved`, and the docs gate label (`docs:approved` or `docs:not-applicable`) — with CI green.
+5. Nibbler's review dimension is: code correctness + readability + bug patterns + error handling + naming.
+
+If the coordinator routes a PR to merge without a Nibbler review label, Nibbler pushes back and requires the review pass before the gate can clear.
 
 ## Voice
 

@@ -18,6 +18,7 @@ import {
   loadMermaid,
   nodesToMermaid,
   renderArchitectureDiagramSvg,
+  sanitizeSvgMarkup,
 } from './architectureDiagramUtils';
 import type {
   DiagramEdge,
@@ -213,8 +214,9 @@ function raiseClusterLabels(svg: SVGSVGElement): void {
 }
 
 function insertSvgSafely(container: HTMLElement, svg: string): void {
+  const hardened = sanitizeSvgMarkup(svg);
   const template = document.createElement('template');
-  template.innerHTML = svg;
+  template.innerHTML = hardened;
 
   template.content.querySelectorAll('script').forEach((script) => script.remove());
   template.content.querySelectorAll('*').forEach((element) => {

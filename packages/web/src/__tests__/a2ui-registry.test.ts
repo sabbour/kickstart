@@ -183,6 +183,116 @@ describe('validateAndSanitizeComponents — pre-render validation', () => {
 });
 
 // ---------------------------------------------------------------------------
+// validateAndSanitizeComponents — coercion for AKS composition output (#996)
+//
+// The AKS pack emits pack-qualified names (`aks/AksClusterCard`), but the
+// composition-tool chain sometimes drops the prefix or uses `type` as an
+// alias for `component`. Coercion rewrites these into the canonical form so
+// the same `validateAndSanitizeComponents` trust boundary resolves them
+// instead of falling back to `_ErrorComponent`. See DP on issue #996 and PR
+// #1000 for the shared validator.
+// ---------------------------------------------------------------------------
+
+describe('validateAndSanitizeComponents — AKS composition coercion (#996)', () => {
+  let reg: ClientComponentRegistry;
+
+  beforeEach(() => {
+    reg = new ClientComponentRegistry();
+    reg.register(makeImpl('aks/AksClusterCard', z.object({ clusterName: z.string() })));
+    reg.register(makeImpl('aks/DeploymentProgress', z.object({ clusterName: z.string() })));
+    reg.register(makeImpl('azure/CostEstimate', z.object({ total: z.number() })));
+    // A bare name that collides with a pack suffix — ambiguity guard must
+    // NOT coerce when two packs share the same last segment.
+    reg.register(makeImpl('azure/AksClusterCard', z.object({ clusterName: z.string() })));
+    reg.register(makeImpl('Button', z.object({ label: z.string() })));
+    reg.seal();
+  });
+
+  it('rewrites a unique bare pack name to its pack-qualified form', () => {
+    const result = validateAndSanitizeComponents(
+      [{ id: 'c1', component: 'DeploymentProgress', clusterName: 'aks-kickstart-prod' }],
+      reg,
+    );
+    expect(result[0].component).toBe('aks/DeploymentProgress');
+    expect((result[0] as any).clusterName).toBe('aks-kickstart-prod');
+  });
+
+  it('does NOT coerce an ambiguous bare name (suffix shared across packs)', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // `AksClusterCard` is the suffix of BOTH aks/AksClusterCard and
+    // azure/AksClusterCard — the coercion must decline to guess, and the
+    // validator must reject the bare name as unknown.
+    const result = validateAndSanitizeComponents(
+      [{ id: 'c1', component: 'AksClusterCard', clusterName: 'x' }],
+      reg,
+    );
+    expect(result[0].component).toBe('_ErrorComponent');
+    errorSpy.mockRestore();
+  });
+
+  it('accepts `type` as a legacy alias for `component`', () => {
+    const result = validateAndSanitizeComponents(
+      [{ id: 'c1', type: 'aks/DeploymentProgress', clusterName: 'aks-kickstart-prod' }],
+      reg,
+    );
+    expect(result[0].component).toBe('aks/DeploymentProgress');
+  });
+
+  it('prefers explicit `component` over `type` when both are present', () => {
+    const result = validateAndSanitizeComponents(
+      [{ id: 'c1', component: 'Button', type: 'aks/DeploymentProgress', label: 'OK' }],
+      reg,
+    );
+    expect(result[0].component).toBe('Button');
+  });
+
+  it('leaves already-qualified names untouched', () => {
+    const result = validateAndSanitizeComponents(
+      [{ id: 'c1', component: 'aks/AksClusterCard', clusterName: 'aks-kickstart-prod' }],
+      reg,
+    );
+    expect(result[0].component).toBe('aks/AksClusterCard');
+  });
+
+  it('does not coerce a bare name when the bare form is itself registered (core wins)', () => {
+    // `Button` is registered as a bare name → it must NOT be rewritten to
+    // any pack/Button variant even if one existed. Core bare names win.
+    const result = validateAndSanitizeComponents(
+      [{ id: 'c1', component: 'Button', label: 'OK' }],
+      reg,
+    );
+    expect(result[0].component).toBe('Button');
+  });
+
+  it('produces NO _ErrorComponent for a realistic AKS composition envelope', () => {
+    // This is the regression guard from the #996 DP: the AKS "Secrets &
+    // Identity Posture Review" inspiration chain historically emitted
+    // envelopes with a mix of bare pack names and `type` aliases. All of
+    // them must now resolve through the shared validator.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const envelope = [
+      { id: 'cluster', component: 'AksClusterCard', clusterName: 'aks-prod' },
+      { id: 'progress', component: 'DeploymentProgress', clusterName: 'aks-prod' },
+      { id: 'cost', type: 'azure/CostEstimate', total: 42 },
+    ];
+    // `AksClusterCard` collides (aks + azure) so we disambiguate explicitly
+    // for this envelope — the point is that the other two resolve cleanly.
+    envelope[0].component = 'aks/AksClusterCard';
+    const result = validateAndSanitizeComponents(envelope, reg);
+    expect(result.map((c) => c.component)).toEqual([
+      'aks/AksClusterCard',
+      'aks/DeploymentProgress',
+      'azure/CostEstimate',
+    ]);
+    expect(
+      result.filter((c) => c.component === '_ErrorComponent'),
+      'AKS composition envelope must not produce _ErrorComponent entries',
+    ).toEqual([]);
+    errorSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // stripDangerousKeys
 // ---------------------------------------------------------------------------
 

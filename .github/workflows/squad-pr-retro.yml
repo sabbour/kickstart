@@ -582,10 +582,16 @@ jobs:
       - name: Mirror line as PR comment
         if: github.event_name == 'pull_request' && steps.trusted_retro_pr.outputs.skip_pr_close != 'true' && steps.append.outputs.changed == 'true'
         uses: actions/github-script@v8
+        env:
+          RETRO_LINE: ${{ steps.metrics.outputs.line }}
+          RETRO_PR_NUMBER: ${{ steps.retro_pr.outputs.number }}
+          RETRO_PR_URL: ${{ steps.retro_pr.outputs.url }}
         with:
           github-token: ${{ steps.squad_scribe_token.outputs.token }}
           script: |
-            const line = `${{ steps.metrics.outputs.line }}`;
+            const line = process.env.RETRO_LINE ?? '';
+            const retroPrNumber = process.env.RETRO_PR_NUMBER ?? '';
+            const retroPrUrl = process.env.RETRO_PR_URL ?? '';
             const body = [
               '**Working as Scribe** · see `.squad/agents/scribe/charter.md`',
               '',
@@ -594,7 +600,7 @@ jobs:
               line,
               '```',
               '',
-              `Queued via retro-log PR #${{ steps.retro_pr.outputs.number }}: ${{ steps.retro_pr.outputs.url }}`,
+              `Queued via retro-log PR #${retroPrNumber}: ${retroPrUrl}`,
               'This update will land in `.squad/retro-log.md` after that PR merges.',
             ].join('\n');
             await github.rest.issues.createComment({

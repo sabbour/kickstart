@@ -39,10 +39,10 @@ jobs:
               { name: 'pulse:daily',       color: 'BFD4F2', description: 'Daily pulse rolling issue' },
               { name: 'pulse:weekly',      color: '6B8EB5', description: 'Weekly pulse issue' },
               { name: 'release',           color: '0E8A16', description: 'Release PR opened by the cadence workflow' },
-              { name: 'estimate:S',        color: '0E8A16', description: 'Small issue (~2h, 1 point)' },
-              { name: 'estimate:M',        color: '1D76DB', description: 'Medium issue (~8h, 3 points)' },
-              { name: 'estimate:L',        color: 'FBCA04', description: 'Large issue (~24h, 8 points)' },
-              { name: 'estimate:XL',       color: 'D93F0B', description: 'Extra-large issue (~80h, 20 points)' },
+              { name: 'estimate:S',        color: '0E8A16', description: 'Small issue (~15 min, 1 point) — fits in a 6h sprint' },
+              { name: 'estimate:M',        color: '1D76DB', description: 'Medium issue (~1 hour, 3 points) — fits in a 6h sprint' },
+              { name: 'estimate:L',        color: 'FBCA04', description: 'Large issue (~3 hours, 8 points) — at most one per 6h sprint' },
+              { name: 'estimate:XL',       color: 'D93F0B', description: 'Extra-large issue (>3 hours, 20 points) — does NOT enter a sprint; must be split during triage' },
               { name: 'squad:chore-auto',  color: 'BFDADC', description: 'Opt in low-risk PR for auto-merge when gates pass' },
               { name: 'leela:approved',    color: '0E8A16', description: 'Architecture review approved' },
               { name: 'leela:rejected',    color: 'D93F0B', description: 'Architecture review rejected' },
@@ -50,7 +50,13 @@ jobs:
               { name: 'zapp:rejected',     color: 'D93F0B', description: 'Security review rejected' },
               { name: 'nibbler:approved',  color: '0E8A16', description: 'Code quality review approved' },
               { name: 'nibbler:rejected',  color: 'D93F0B', description: 'Code quality review rejected' },
-              { name: 'retro-log',         color: 'C5DEF5', description: 'Retrospective log entry' }
+              { name: 'docs:approved',     color: '0E8A16', description: 'Docs review approved — user-facing docs updated or in-PR changeset landed' },
+              { name: 'docs:rejected',     color: 'D93F0B', description: 'Docs review rejected — required documentation is missing or stale' },
+              { name: 'docs:not-applicable', color: 'BFD4F2', description: 'Docs gate satisfied without docs changes — DP explicitly declared Docs impact: N/A' },
+              { name: 'retro-log',         color: 'C5DEF5', description: 'Retrospective log entry' },
+              { name: 'process:succeeded', color: '0E8A16', description: 'Process experiment hit its target signal' },
+              { name: 'process:no-effect', color: 'FBCA04', description: 'Process experiment inside noise band — extended' },
+              { name: 'process:reverted',  color: 'D93F0B', description: 'Process experiment regressed signal — revert recommended' }
             ];
 
             for (const label of labels) {

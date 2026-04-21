@@ -93,6 +93,9 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src'),
       '@aks-kickstart/harness': resolve(__dirname, '../harness/src/index.ts'),
+      '@aks-kickstart/pack-azure/client': resolve(__dirname, '../pack-azure/src/client.ts'),
+      '@aks-kickstart/pack-aks-automatic/client': resolve(__dirname, '../pack-aks-automatic/src/client.ts'),
+      '@aks-kickstart/pack-github/client': resolve(__dirname, '../pack-github/src/client.ts'),
       react: resolve(__dirname, 'node_modules/react'),
       'react-dom': resolve(__dirname, 'node_modules/react-dom'),
     },

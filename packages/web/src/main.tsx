@@ -78,6 +78,13 @@ for (const impl of richComponents) {
   clientRegistry.register(impl);
 }
 
+// Step 1c: Pack-contributed renderers (azure/*, aks/*, github/*) from each
+// pack's ./client subpath. Registers them under their pack-qualified names
+// (e.g. "azure/AzureResourceCard") so the LLM can emit pack components in chat
+// and Playground can render them via the same A2UI pipeline as core/*.
+import { registerPackComponents } from './bootstrap/registerPackComponents';
+registerPackComponents(clientRegistry);
+
 // Step 2: Seal — ReadonlyMap, no further registrations accepted
 clientRegistry.seal();
 

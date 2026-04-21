@@ -169,6 +169,59 @@ KICKSTART_PACKS=core,azure,github,aks-automatic
 
 If `KICKSTART_PACKS` is not set, all discovered packs are loaded.
 
+### Server / client entrypoints
+
+Each pack is shipped with **two subpath exports** to keep React renderers out of the server bundle:
+
+| Subpath                           | What it exports                                                                 | Consumed by                          |
+| --------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------ |
+| `@aks-kickstart/pack-<name>`      | Default `Pack` object (tools, skills, agents, guardrails, user actions)         | Harness registry (Node)              |
+| `@aks-kickstart/pack-<name>/server` (also `/server-manifest`) | React-free manifest: Zod schemas, tool handlers, guardrails    | Azure Functions / MCP server         |
+| `@aks-kickstart/pack-<name>/client` | `registerClient(target)`, `clientComponents`, `previews` fixtures           | Web client bootstrap (`packages/web`) |
+
+The `./client` subpath is marked `sideEffects: false` so unused renderers tree-shake per route. `registerClient(target)` is an **explicit** registration — there are no import-time side effects — which matches the security contract for `core/*` renderers.
+
+```ts
+// packages/web/src/bootstrap/registerPackComponents.ts
+import { registerClient as registerAzure } from '@aks-kickstart/pack-azure/client';
+
+export function registerPackComponents(registry: ClientComponentRegistry) {
+  const target = {
+    register: (c: ComponentContribution) => registry.register(adaptPackComponent(c)),
+  };
+  registerAzure(target);
+  // …registerAks, registerGithub
+}
+```
+
+Each pack's `previews: Record<ComponentName, A2UIEnvelope>` export provides Playground preview fixtures for the **Components** tab. Fixtures are validated against the component's `propertySchema` via `component-previews.test.ts`.
+
+### Scenarios (Ideas tab)
+
+Packs can also contribute `scenarios: readonly PackScenario[]` — **curated scenario compositions** shown in the Playground's **Ideas** tab. Each scenario is a full A2UI v0.9 adjacency list that mixes 2–4 components (pack-contributed + `core/*` primitives) into a realistic end-to-end workflow:
+
+```ts
+// packages/pack-azure/src/client.ts
+export const scenarios: readonly PackScenario[] = Object.freeze([
+  {
+    id: 'pick-region',
+    title: 'Pick an Azure region',
+    description: 'Region picker with a primary action button.',
+    components: [
+      { id: 'root', component: 'Column', children: ['heading', 'selector', 'continue'] },
+      { id: 'heading', component: 'Text', text: 'Choose a deployment region' },
+      { id: 'selector', component: 'azure/LocationSelector', /* …props… */ },
+      { id: 'continue', component: 'Button', child: 'continue-label' },
+      { id: 'continue-label', component: 'Text', text: 'Continue' },
+    ],
+  },
+  // …
+]);
+```
+
+Scenarios are **static, build-time-trusted fixtures** — no runtime LLM synthesis, no user-supplied envelopes — so they inherit the same trust boundary as `previews`. They are aggregated in `packages/web/src/catalog/component-scenarios.ts` and validated against each component's `propertySchema` plus a registry-resolution + sanitizer guard (`component-scenarios.test.ts`), guaranteeing the Ideas tab renders deterministically from fixture input with zero `_ErrorComponent` placeholders.
+
+
 ## Skills
 
 A **skill** is a set of rules or knowledge that an agent can apply. Skills are not executable — they guide agent reasoning.

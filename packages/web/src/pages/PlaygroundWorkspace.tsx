@@ -58,10 +58,13 @@ const useStyles = makeStyles({
   body: {
     display: 'flex',
     flex: 1,
+    minHeight: 0,
     overflow: 'hidden',
   },
   viewerWrapper: {
     flex: 1,
+    minHeight: 0,
+    minWidth: 0,
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',

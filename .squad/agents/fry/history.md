@@ -1,30 +1,27 @@
 # Fry — Frontend Dev
 
 ## About Me
-Frontend engineer owning web surface and A2UI catalog components. Expertise in React, Fluent UI v9, CSS/Griffel, and streaming UX patterns. Shipped full Vite+React stack migration, Playground interface, dark mode, accessibility audit, and 20+ fat A2UI components.
+Frontend engineer owning web surface and A2UI catalog components. Expertise in React, Fluent UI v9, CSS/Griffel, and streaming UX patterns.
 
 ## Key Files
 - `packages/web/src/` — React app, Fluent components, catalog, streaming hooks
-- `packages/web/src/catalog/fluent-components/` — Fluent UI overrides and custom components
-- `packages/web/src/pages/` — Landing, Chat, Playground, Create pages
-- `packages/web/css/` — Design tokens, theme system, layout classes
-- `packages/web/src/components/` — FileEditor, FileTreePanel, DebugPanel, Widgets
-
-## Patterns
-- **Fat A2UI components:** Use createReactComponent factory + useState for auth/API state, useAPIConnector hook, context.dispatchAction for actions
-- **Streaming UI:** useProgressiveQueue hook for 150ms stagger reveal, progressive bubble state + ref tracking for stale closures
-- **Theme system:** ThemeContext with three-state mode (light/dark/system), resolvedTheme pattern for rendering, useSyncExternalStore for matchMedia
-- **Validation safeguards:** DS001-DS020 validators with auto-fix capability, badge/severity display in UI, RegexError handling
-- **Accessibility:** WCAG 2.1 AA — aria-label on all A2UI components, roving tabIndex for RadioGroup, live regions on dynamic content
+- `packages/web/src/pages/` — Chat, Playground, Create pages
+- `packages/web/css/` — Design tokens, theme system
 
 ## Recent Work
+- v2 #474: frontend cut line analysis, seam-cutting approach confirmed
+- v0.6: SSE parser fixes, K8s icon expansion, A2UI debug visualization
+- Shipped: 406 fallback in useStreaming, Playwright test suite
 - 2026-04-21: **Bug intake — 2 issues assigned** (#995: Core components tab tight rendering + preview quality; #997: Workspace page black void). Both unassigned, go:needs-research tags.
 - v2 #474 frontend cut line analysis: seam-cutting pass approach confirmed for Step 1
 - v0.6.x: 406 fallback in useStreaming.ts for SDK path; K8s icon catalog expansion; A2UI debug visualization; system-prompt context var injection fix
 - v0.5.x: SSE parser fixes, action context enrichment, hash-based routing, ArchitectureDiagram diagram-first contract, theme system
 
-## Active Sprint: v2 (harness + packs)
+## Active Sprint: v2
+Sprint 1: #474 (Nuke v1) → #475 → #476. Fry's role: seam-cutting (preserve shell, delete fixtures, replace in-place).
 
+## 2026-04-21 Status
+Participating in four-way review gate. Ceremony enforcement tightened with pre-dispatch blocking checkpoint.
 Sprint 1 locked: #474 (Nuke v1) → #475 (Harness types) → #476 (Registry + loaders). Fry's role in #474 is seam-cutting: remove mock/demo surfaces first, then hard-delete after introducing temporary replacement exports.
 
 **#474 cut line:**
@@ -153,3 +150,45 @@ Ported 11 domain-neutral rich components from `packages/web/src/catalog/componen
 - **Action:** Bender (or bender-1000-revise agent) will add the missing CI grep step + allow-list comment. Fry can resume #987, #995, #997 work in parallel.
 
 **Other issues remain yours:** #987 (blocked), #995, #997 are assigned and ready to pick up once #1000 is fixed.
+
+## 2026-04-21 — #997 Workspace black void fix (PR #1004)
+
+Working as **Fry (Frontend Dev)**.
+
+**Root cause:** Classic flex `min-height: 0` pitfall in the Playground Workspace chain (`#panel-workspace` → `PlaygroundWorkspace.body` → `.viewerWrapper` → `FileViewer.rootFill`). Column-flex children defaulted to `min-height: auto` (= content min-size), so the editor pane collapsed and the page-body dark background leaked through below the editor as a "black void".
+
+**Fix (layout-only, 3 files):**
+- `Playground.tsx` — `#panel-workspace` inline style: add `minHeight: 0`, drop redundant `height: '100%'` (conflicted with `flex: 1`).
+- `PlaygroundWorkspace.tsx` — `.body` and `.viewerWrapper` styles: add `minHeight: 0` (+ `minWidth: 0` on wrapper).
+- `FileViewer.tsx` — `rootFill` style: add `minHeight: 0`.
+
+**Test:** `packages/web/e2e/workspace-layout.spec.ts` — explicit geometry assertions with named constants (`MAX_EDITOR_BOTTOM_SLACK_PX`, `MIN_CODE_WRAPPER_HEIGHT_PX`), two viewport states. `describe.skip` consistent with existing `playground.spec.ts` (#772 E2E blocker).
+
+**Checks:** lint clean, 335/335 vitest pass, Playwright spec parses (`--list` confirms 2 tests).
+
+**Changeset:** `.changeset/workspace-black-void-997.md` — patch bump `@aks-kickstart/web`.
+
+PR: https://github.com/sabbour/kickstart/pull/1004
+
+## 2026-04-21 — #995: Core components tab density + preview regressions → PR #1003
+
+**Context.** Asabbour reported #986 either regressed or landed incomplete: Core tab still rendered tight (6+ cards/row at 1920px) and mixed real previews with `No preview` placeholders. DP approved by Leela/Zapp/Nibbler with an explicit ask from Nibbler to use named-constant geometry in the test assertions.
+
+**Root cause.**
+1. `minmax(260px, 1fr)` + 320px card cap produced 6–7 cards/row at 1920px — looked "tight" and left asymmetric gutters between the 1fr track and the capped card.
+2. `COMPONENT_PREVIEWS` missed Core basic components Video / AudioPlayer / Tabs / Modal / Accordion, so those cards fell back to the "No preview" placeholder. That is the "lack of previews" half of the user complaint — Core-only because those renderers happen to cluster in pack-core basic.
+
+**Fix.**
+- `packages/web/src/pages/playground-layout-constants.ts` (new) — single source of truth for grid geometry (min col px, max card px, gap, preview/compact min-heights).
+- `Playground.tsx` grid styles rewired to consume the constants. `componentGrid` now `minmax(300, 1fr)` with 380px cap + 20px gap; new `compCardPreview` class applies preview min-height.
+- `ComponentCard` emits `data-component-card` / `data-component-has-preview` / `data-testid="component-card-preview"` so tests can target without brittle class selectors.
+- `component-examples.ts` gains Video, AudioPlayer, Tabs, Modal, Accordion previews.
+- New unit suite `playground-core-tab-rendering.test.ts` — asserts (a) every listed core basic renderer has a preview, (b) density math yields 4–5 cards/row at 1280/1920, (c) preview min-height exceeds compact min-height. All thresholds imported, never hard-coded.
+- `playground.spec.ts` — added "Components tab Core density + preview quality (#995)" describe with card bounding-box / computed row-gap / missing-preview count assertions using the same named constants. Sits inside the suite-wide `describe.skip` for #772 — specs activate automatically when #772 lifts.
+
+**Validation.**
+- `npm run lint`: 0 errors, 59 pre-existing warnings (unchanged from #986 baseline).
+- `CI=1 npm test`: 904 passed / 3 skipped / 159 todo. One unrelated pre-existing failure in `pack-core/.../basic-components.test.tsx` (missing `@testing-library/react`, identical on origin/main — out of scope).
+- Targeted suite (my new test + `component-examples.test.ts`): 34/34 green.
+
+**PR #1003.** Changeset: web/patch. Rollback: single revert.

@@ -3,25 +3,8 @@
 ## About Me
 Lead engineer and architect. Owns roadmap prioritization, design reviews, technical decisions, and team coordination. Expert in process governance, architecture patterns, and escalation handling. Responsibility: ensure all work follows DP gate, security approval, and quality standards before shipping.
 
-## Key Files
-- `.squad/team.md` — team roster and capability profiles
-- `.squad/ceremonies.md` — ceremony definitions and triggers
-- `.squad/decisions.md` — canonical architecture decisions (last 5 kept here, older archived)
-- `docs/architecture.md` — architecture overview and patterns guide
-- `.squad/routing.md` — issue assignment and team boundaries
 
-## Patterns
-- **DP 3-step gate:** Issue → Design Proposal (on issue, not PR) → Leela + Zapp review → code implementation
-- **PR discipline:** One PR per issue, design already approved, code review secondary
-- **No-lockout directive:** Original author handles all post-review feedback
-- **Wave structure:** Wave 1 (foundations), Wave 2 (integration), Wave 3 (E2E), Wave 4 (release)
-- **Process directives:** Always stored in .squad/decisions/inbox/ for Scribe merge; not versioned inline
-
-## Recent Work
-- v2 sprint planning + #474 DP review: #474 → #475 → #476 blocking chain; APPROVE_WITH_CONDITIONS on #474
-- DP #329 (MCP App IDE) APPROVED WITH CONDITIONS; DP #330 (Agents SDK) APPROVED + closed out
-- PR #383 engineering docs rewrite (7 files); label-based review gate; comment-resolution process fix
-- v0.6.1 deployment prep: vendor diagram assets, CI hardening, stepwise generation default
+## Status (Summarized 2026-04-21)
 
 ## Active Sprint: v2 (harness + packs)
 
@@ -29,68 +12,50 @@ Sprint 1 blocking chain: **#474 → #475 → #476**. No Step 4+ work before #476
 After #476: pack-core batch (#542, #503–#506, #478) → runner/SSE (#479, #480) → domain packs (#482–#488).
 All open v2 issues should carry milestone **v2**.
 
-## Learnings
 
-- (2025-04-20T18:05:00Z) PR #891 rebase pattern: keep main's structured logger/bundling changes, then layer telemetry on the handlers only. For security, centralize secret scrubbing in `packages/web/api/src/telemetry/sanitize-error.ts`, prefer per-request UUID correlation over hashing long-lived IDs, and let logger + App Insights share the same sanitizer so logs and exception telemetry stay aligned.
-- (2026-04-17T12:06:45.293Z) Sprint planning always required before backlog pickup when `.squad/identity/now.md` gate is active. Shortest v2 slice is harness spine, not pack work: `#474 → #475 → #476` must land before pack-core batch.
-- (2026-04-17T03:30:17Z) DP #329: runtime duplication is the blocking risk — PoC adds `runtime/` inside `packages/mcp-server` that parallels `packages/web/api/` LLM client + session store. Third fork risk with SDK migration. Implementation issue must define canonical client before code lands.
-- (2026-04-17T03:30:17Z) DP #330 closeout: Option B (hybrid route planner + manager agent) adopted. `phaseComplete`/`filesComplete` flags retired. Implementation sequence locked: Gate → arch spike → backend (#445, Bender) → UI (#446, Fry) → cleanup. Follow-ons #445 and #446 created.
-- (2026-04-17T01:53:59Z) Review gate must be label-based, not GitHub approval-required, because repo owners cannot self-approve. `leela:approved` + `zapp:approved` labels drive `squad/review-gate` status check.
-- (2026-04-17) Comment acknowledgment and thread resolution are non-optional — silently fixing code is a process violation. Reply to specific comment with SHA + description; resolve thread via GraphQL; verify 0 unresolved before merge.
-- (2026-04-16T05:51:43.085Z) Design spikes producing DPs are process-compatible with sprint planning reset — blocking them on ceremony is circular. Spikes (DPs) run in parallel with ceremony.
-- (2026-04-15T09:46:31.308Z) Issue #265 smallest ship: treat FileEditor payloads as workspace data, not chat bubble content. Paths: `chat-a2ui.ts`, `App.tsx`, `FileManager/`, `session-store.ts`.
-- **2026-04-17T12:06:45.293Z — DP #474 Step 1 review:** A temporary `@kickstart/core` shim is acceptable only as shrinking compile scaffolding for Step 1. It cannot become a second runtime boundary or preserve v1 semantics beyond what is strictly needed to keep the repo building while imports move to `@kickstart/harness`. Because the real risk is cross-package compile wiring across web, API, and MCP, Ralph should route Bender first and treat Fry as preserved-shell follow-through. Key files: `docs/v2-implementation-brief.md`, GitHub issue `#474`, `packages/core/package.json`, `packages/harness/src/index.ts`.
+## Key Process Learnings (rolled)
 
-- **2026-04-17T12:06:45.293Z — v2 rewrite start gate (#474):** Even when the v2 implementation brief is design-locked and Step 1 is technically dependency-free, `.squad/identity/now.md` is the active execution gate. If it says "no feature code until sprint planning completes," Ralph should route the planning ceremony instead of pushing the first implementation issue. Key files: `.squad/identity/now.md`, `docs/v2-implementation-brief.md`, `.squad/ceremonies.md`, GitHub issue `#474`.
+- DP 3-step gate required before code: Issue → DP comment → Leela/Zapp approval → code
+- Sprint planning gates feature work; ceremony gaps erode when not in coordinator logic
+- Four-way review gate (Leela/Zapp/Nibbler/Docs) now enforced; all four labels required for merge
+- PR comment resolution is non-optional; reply + resolve thread before merge
+- v2 blocking chain: #474 → #475 → #476 (Step 1-3 gates); Step 4+ frozen until complete
 
-- **2026-04-17T03:30:17Z — MCP App IDE DP (#329) architecture review:** Approved with conditions. Key finding: PoC adds \`runtime/\` modules inside \`packages/mcp-server\` that parallel the existing \`packages/web/api/\` LLM client + session store. If both the MCP App runtime and the Agents SDK migration (#330) proceed, we risk a third forked LLM runtime. Implementation issue must define which client is canonical before code lands. Bundle size validation of vite-plugin-singlefile output with full React + Fluent 2 + A2UI is required before Slice 1 ships. Decision file: \`.squad/decisions/inbox/leela-dp-reviews-apr17.md\`
+## Recent Activity
 
-## 2026-04-17 DP Reviews
+- v2 sprint planning + #474 DP review: #474 → #475 → #476 blocking chain; APPROVE_WITH_CONDITIONS on #474
+- DP #329 (MCP App IDE) APPROVED WITH CONDITIONS; DP #330 (Agents SDK) APPROVED + closed out
+- PR #383 engineering docs rewrite (7 files); label-based review gate; comment-resolution process fix
+- v0.6.1 deployment prep: vendor diagram assets, CI hardening, stepwise generation default
 
-**DP #329 (MCP App IDE Surface) — APPROVED WITH CONDITIONS**
-- Resource registration via `registerAppResource` + `registerAppTool` canonical
-- Single-file bundle with `vite-plugin-singlefile` required; CSP headers mandatory
-- `event.source === window.parent` guard required
-- Bundle size validation (vite-plugin-singlefile with full React + Fluent 2 + A2UI) before Slice 1 ships
 
-**DP #330 (Agents SDK Migration) — APPROVED + CLOSED**
-- Option B (hybrid route planner + manager agent) adopted
-- Server-authored route state replaces model-emitted booleans
-- Implementation: #445 (Bender backend), #446 (Fry UI)
+## 2026-04-21 — Four-way Review Gate + Ceremony Enforcement
 
-## 2026-04-17 PR #447 Code Review + Approval
+Four-way PR Review Gate now live (Leela/Zapp/Nibbler/Docs). Merge blocked until all four approval labels present. Ceremony enforcement tightened with pre-dispatch blocking checkpoint. Docs gate added to DP + PR Review.
 
-- Found duplicate-message bug in SDK streaming loop (blocking). Bender fixed in commit a3899e5.
-- Applied `leela:approved`. 1511 tests passing, 0 unresolved threads.
+## 2026-04-21 — 6h Sprint Cadence Calibration (PR #993 pre-review amend)
 
-## 2026-04-17 v2 Sprint Planning + #474 DP Review
+Ahmed corrected post-merge that the squad runs **6-hour sprints**, not weekly. Recalibrated the just-shipped Sprint Planning + Cadence Retrospective ceremonies in PR #993 before flipping ready-for-review.
 
-- HOLD_FOR_PLANNING gate honored; sprint planning run first.
-- Sprint plan: #474 → #475 → #476 blocking chain. Step 4+ frozen until #476.
-- #474 DP: APPROVE_WITH_CONDITIONS. Seam-cutting pass approach confirmed.
-- v2 architecture DP (#473): APPROVED. Guardrail enforcement semantics must be pinned before Step 11 (`error` SSE with `guardrail_block`). UserAction resume authz must be a done criterion in Step 5.
+Anchor times set to **00:00 / 06:00 / 12:00 / 18:00 UTC** (Ahmed may override by editing the ceremony row directly). Sprint notes are timestamped per anchor: `.squad/sprints/{YYYY-MM-DDThh}Z.md` (e.g. `2026-04-21T12Z.md`).
 
-## 2026-05-28 — DP Review #476 v2 Step 3: Registry + loaders
+**Estimate band recalibration (for 6h sprint):**
+- `estimate:S` ~15 min (1 pt)
+- `estimate:M` ~1 hour (3 pt)
+- `estimate:L` ~3 hours (8 pt) — at most one per sprint
+- `estimate:XL` >3 hours (20 pt) — **does not enter a sprint**
 
-**Verdict:** APPROVE_WITH_CONDITIONS  
-**GitHub comment:** https://github.com/sabbour/kickstart/issues/476#issuecomment-4268074355  
-**Decision record:** `.squad/decisions/inbox/leela-476-dp-review.md`
+**XL-split rule (rationale):** the old weekly bands (2h / 8h / 24h / 80h) encoded "XL = big epic, stretches across sprints." In a 6h cadence, an XL by definition cannot fit, so the only honest way to preserve the "one PR maps to one issue, one sprint completes its scope" invariant is to refuse XL into planning and split it during triage. Keeps velocity math consistent and prevents a single item from eating an entire sprint plus silent carry-over.
 
-Key findings:
-- Registry lifecycle (`register → enable → seal`) and sigil resolution (`.`/`:`) are sound. ✅
-- Circular dependency detection and collision rules correctly specified. ✅
-- Catalog skeleton scope (typed data assembly only, no UI runtime) is correct. ✅
-- C1 (BLOCKER): Custom frontmatter mini-parser can't handle arrays; must use `yaml` npm package. All agent/skill frontmatter uses arrays.
-- C2 (BLOCKER): Registry read accessor surface underspecified; only `getAgent` + `components` listed. Step 5+6 need `getSkillsForAgent`, `getToolsForAgent`, `getUserAction`, `getGuardrailsByStage` — must be locked in Step 3.
-- C3 (REQUIRED): UserAction wire transliteration (`azure:login` → `azure__login`) unspecified. `UserActionContribution` must carry both `.name` and `.wireName`.
-- M1/M2 (minor): `enable()` dep enforcement and `enable()` after `seal()` behavior unspecified in DP text.
+**Cadence Retro output change:** instead of a new `Weekly Retro` issue, retros are appended as comments to a **rolling daily issue** `Cadence Retro · {YYYY-MM-DD}` (up to 4 comments/day, one per closed 6h sprint). Avoids 4 issues/day of noise while keeping an auditable record.
 
-## 2026-05-28 — DP Review #475 v2 Step 2: Harness types
+**Coordinator enforcement (`.github/agents/squad.agent.md`):** no text changes needed — the file never hardcoded "weekly," only referenced `.squad/ceremonies.md` as the source of truth. The pre-dispatch checkpoint is cadence-agnostic and still correct.
 
-**Verdict:** APPROVE_WITH_CONDITIONS  
-**GitHub comment:** https://github.com/sabbour/kickstart/issues/475#issuecomment-4268063788  
-**Decision record:** `.squad/decisions/inbox/leela-475-dp-review.md`
+**Deferred:** did NOT retime `squad-weekly-pulse.yml` / `squad-velocity-report.yml` / `squad-daily-pulse.yml` crons — they're independent reporting workflows, not Sprint Planning inputs. Flagged in PR description as a follow-up for #992 (possible rename to `squad-sprint-pulse.yml` at 6h cadence).
 
+### 2026-04-21 — PR #988 architecture re-review (post-nit push)
+- **Outcome:** APPROVED (`leela:approved` applied).
+- **Rationale:** Commit dd1e6c6 is strictly the requested nit sweep — JSDoc refresh, stale helper comment, `GalleryCardErrorBoundary`→`ComponentCardErrorBoundary` rename (def + both call sites), orphan CSS (`.playground-gallery` + breakpoints + `.playground-widget-card`) removed; `.playground-gallery-scroll` correctly retained. No layout/registry/behaviour drift.
 Key findings:
 - Primitive coverage complete (all 12 type files match brief). ✅
 - AgentOutput Zod contract correct. ✅

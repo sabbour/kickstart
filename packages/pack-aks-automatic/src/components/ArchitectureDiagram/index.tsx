@@ -18,6 +18,7 @@ import {
   loadMermaid,
   nodesToMermaid,
   renderArchitectureDiagramSvg,
+  sanitizeSvgMarkup,
 } from './architectureDiagramUtils.js';
 import {
   ARCHITECTURE_DIAGRAM_EMPTY_STATE_ICON_URL,
@@ -210,8 +211,9 @@ function raiseClusterLabels(svg: SVGSVGElement): void {
 }
 
 function insertSvgSafely(container: HTMLElement, svg: string): void {
+  const hardened = sanitizeSvgMarkup(svg);
   const template = document.createElement('template');
-  template.innerHTML = svg;
+  template.innerHTML = hardened;
   template.content.querySelectorAll('script').forEach((s) => s.remove());
   template.content.querySelectorAll('*').forEach((el) => {
     Array.from(el.attributes).forEach((attr) => {

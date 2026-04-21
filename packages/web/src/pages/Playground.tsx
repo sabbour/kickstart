@@ -21,7 +21,7 @@ import {
   Dismiss24Regular, Sparkle24Regular,
   Add24Regular, Grid24Regular, Icons24Regular,
   Navigation24Regular, FolderOpen24Regular, Copy24Regular,
-  ArrowRight24Regular,
+  ArrowRight24Regular, Lightbulb24Regular,
 } from '@fluentui/react-icons';
 import { useA2UI } from '../hooks/useA2UI';
 import type { ActionHandler } from '../hooks/useActionDispatch';
@@ -43,7 +43,21 @@ import {
 import { getFluentIcon } from '../catalog/icons/fluent-icons';
 import { apiFetch } from '../services/api-client';
 import { FALLBACK_WIDGET_IDEAS } from '../lib/fallback-ideas';
-import { COMPONENT_PREVIEWS } from './component-examples';
+import { COMPONENT_PREVIEWS } from '../catalog/component-previews';
+import {
+  SCENARIOS,
+  groupScenariosByPack,
+  type AggregatedScenario,
+} from '../catalog/component-scenarios';
+import {
+  COMPONENT_GRID_MIN_COL_PX,
+  COMPONENT_GRID_MAX_CARD_PX,
+  COMPONENT_GRID_GAP_PX,
+  COMPONENT_COMPACT_MIN_COL_PX,
+  COMPONENT_COMPACT_MAX_CARD_PX,
+  COMPONENT_CARD_PREVIEW_MIN_HEIGHT_PX,
+  COMPONENT_CARD_COMPACT_MIN_HEIGHT_PX,
+} from './playground-layout-constants';
 
 
 // ── LLM → A2UI component normalizer ─────────────────────────────────────
@@ -492,28 +506,35 @@ const useStyles = makeStyles({
       outlineOffset: '2px',
     },
   },
-  // Tight grid: 4–5 cards/row at standard viewports, never breaks narrower widths.
+  // Component grid: 4–5 cards/row at standard viewports (1280/1440/1920).
+  // Geometry comes from playground-layout-constants.ts so Playwright asserts
+  // against the same source of truth. See #995 (restores #986's intent).
   componentGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-    gap: tokens.spacingVerticalM,
+    gridTemplateColumns: `repeat(auto-fill, minmax(${COMPONENT_GRID_MIN_COL_PX}px, 1fr))`,
+    gap: `${COMPONENT_GRID_GAP_PX}px`,
     padding: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalL}`,
     '& > *': {
-      maxWidth: '320px',
+      maxWidth: `${COMPONENT_GRID_MAX_CARD_PX}px`,
     },
   },
   // Compact grid for pack sections where every component lacks a preview.
   componentCompactGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    gridTemplateColumns: `repeat(auto-fill, minmax(${COMPONENT_COMPACT_MIN_COL_PX}px, 1fr))`,
     gap: tokens.spacingVerticalS,
     padding: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalL}`,
     '& > *': {
-      maxWidth: '280px',
+      maxWidth: `${COMPONENT_COMPACT_MAX_CARD_PX}px`,
     },
   },
+  compCardPreview: {
+    minHeight: `${COMPONENT_CARD_PREVIEW_MIN_HEIGHT_PX}px`,
+    display: 'flex',
+    flexDirection: 'column' as const,
+  },
   compCardCompact: {
-    minHeight: '88px',
+    minHeight: `${COMPONENT_CARD_COMPACT_MIN_HEIGHT_PX}px`,
   },
   emptyPreviewLabel: {
     marginTop: tokens.spacingVerticalXS,
@@ -749,12 +770,14 @@ const ComponentCard = memo(({ comp, onCardClick, compact = false }: ComponentCar
     <Card
       appearance="outline"
       style={{ padding: tokens.spacingVerticalM }}
-      className={`${classes.compCardClickable}${isCompact ? ` ${classes.compCardCompact}` : ''}`}
+      className={`${classes.compCardClickable} ${isCompact ? classes.compCardCompact : classes.compCardPreview}`}
       role="button"
       tabIndex={0}
       aria-label={`Open ${comp.name} detail`}
       onClick={() => onCardClick(comp)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(comp); } }}
+      data-component-card={comp.name}
+      data-component-has-preview={hasPreview ? 'true' : 'false'}
     >
       <Body1Strong style={{ fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200 }}>
         {comp.name.split('/')[1] ?? comp.name}
@@ -763,7 +786,11 @@ const ComponentCard = memo(({ comp, onCardClick, compact = false }: ComponentCar
         {comp.name}
       </Caption1>
       {hasPreview ? (
-        <div className={classes.cardBody} style={{ marginTop: tokens.spacingVerticalS, pointerEvents: 'none' }}>
+        <div
+          className={classes.cardBody}
+          style={{ marginTop: tokens.spacingVerticalS, pointerEvents: 'none', flex: 1 }}
+          data-testid="component-card-preview"
+        >
           {/* A2UIEnvelopePreview — same render pipeline as Chat */}
           <A2UIEnvelopePreview
             surfaceId={surfaceId}
@@ -784,6 +811,59 @@ const ComponentCard = memo(({ comp, onCardClick, compact = false }: ComponentCar
 
 ComponentCard.displayName = 'ComponentCard';
 
+// ---- ScenarioCard Component (Ideas tab — #987) ----
+// Renders a live A2UI preview thumbnail for a curated scenario composition
+// (2–4 pack + core components). Click opens the scenario detail dialog
+// (preview + JSON view) — same interaction pattern as ComponentCard.
+interface ScenarioCardProps {
+  scenario: AggregatedScenario;
+  onCardClick: (scenario: AggregatedScenario) => void;
+}
+
+const ScenarioCard = memo(({ scenario, onCardClick }: ScenarioCardProps) => {
+  const classes = useStyles();
+  const surfaceId = `scenario-preview-${scenario.key}`;
+
+  return (
+    <Card
+      appearance="outline"
+      style={{ padding: tokens.spacingVerticalM }}
+      className={`${classes.compCardClickable} ${classes.compCardPreview}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${scenario.title} scenario detail`}
+      onClick={() => onCardClick(scenario)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCardClick(scenario); } }}
+      data-scenario-card={scenario.key}
+    >
+      <Body1Strong style={{ fontSize: tokens.fontSizeBase300 }}>
+        {scenario.title}
+      </Body1Strong>
+      <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+        {scenario.description}
+      </Caption1>
+      <div
+        className={classes.cardBody}
+        style={{ marginTop: tokens.spacingVerticalS, pointerEvents: 'none', flex: 1 }}
+        data-testid="scenario-card-preview"
+      >
+        {/* A2UIEnvelopePreview — same render engine as Components tab */}
+        <A2UIEnvelopePreview
+          surfaceId={surfaceId}
+          components={scenario.components as Array<Record<string, any>>}
+          loading={
+            <div style={{ padding: '8px 0', color: tokens.colorNeutralForeground4, fontSize: tokens.fontSizeBase200 }}>
+              Loading…
+            </div>
+          }
+        />
+      </div>
+    </Card>
+  );
+});
+
+ScenarioCard.displayName = 'ScenarioCard';
+
 // Icon sections for the Icons tab (Azure, UI, Fluent 2, Fluent React)
 // Icon category sections for the Icons tab
 const ICON_SECTIONS = [
@@ -798,7 +878,7 @@ const ICON_SECTIONS = [
 function PlaygroundInner() {
   const classes = useStyles();
   const { debugEnabled, toggleDebug } = useDebug();
-  const [activeTab, setActiveTab] = useState<'create' | 'components' | 'icons' | 'workspace'>('create');
+  const [activeTab, setActiveTab] = useState<'create' | 'ideas' | 'components' | 'icons' | 'workspace'>('create');
   const [filterQuery, setFilterQuery] = useState('');
   const [iconFilter, setIconFilter] = useState('');
   const [iconSection, setIconSection] = useState<string>('Azure Services');
@@ -828,6 +908,11 @@ function PlaygroundInner() {
   const [componentDialogOpen, setComponentDialogOpen] = useState(false);
   const [componentDetailTab, setComponentDetailTab] = useState<'preview' | 'json'>('preview');
   const [jsonCopied, setJsonCopied] = useState(false);
+  // Ideas tab (scenario detail dialog) state (#987)
+  const [selectedScenario, setSelectedScenario] = useState<AggregatedScenario | null>(null);
+  const [scenarioDialogOpen, setScenarioDialogOpen] = useState(false);
+  const [scenarioDetailTab, setScenarioDetailTab] = useState<'preview' | 'json'>('preview');
+  const [scenarioJsonCopied, setScenarioJsonCopied] = useState(false);
 
   // Registry-driven data — fetched live from /api/packs
   const { registry, loading: registryLoading, error: registryError } = usePackRegistry();
@@ -1130,6 +1215,26 @@ function PlaygroundInner() {
     }).catch(() => { /* clipboard unavailable */ });
   }, [componentJson]);
 
+  // Ideas tab (#987) — scenario dialog handlers + memoized JSON
+  const scenariosByPack = useMemo(() => groupScenariosByPack(SCENARIOS), []);
+  const handleScenarioCardClick = useCallback((scenario: AggregatedScenario) => {
+    setSelectedScenario(scenario);
+    setScenarioDetailTab('preview');
+    setScenarioJsonCopied(false);
+    setScenarioDialogOpen(true);
+  }, []);
+  const scenarioJson = useMemo(() => {
+    if (!selectedScenario) return '';
+    return JSON.stringify(selectedScenario.components, null, 2);
+  }, [selectedScenario]);
+  const handleCopyScenarioJson = useCallback(() => {
+    if (!scenarioJson) return;
+    navigator.clipboard.writeText(scenarioJson).then(() => {
+      setScenarioJsonCopied(true);
+      setTimeout(() => setScenarioJsonCopied(false), 2000);
+    }).catch(() => { /* clipboard unavailable */ });
+  }, [scenarioJson]);
+
   const customSurfaceEntries = Array.from(customA2ui.surfaces.entries());
 
   // Determine counter for topbar
@@ -1138,6 +1243,7 @@ function PlaygroundInner() {
       case 'components': return filteredComponents.length;
       case 'icons': return filteredIconCount;
       case 'create': return customSurfaceEntries.length;
+      case 'ideas': return SCENARIOS.length;
       default: return 0;
     }
   };
@@ -1145,12 +1251,14 @@ function PlaygroundInner() {
   // Tab label map for topbar heading
   const TAB_LABELS: Record<string, string> = {
     create: 'Create',
+    ideas: 'Ideas',
     components: 'Components',
     icons: 'Icons',
     workspace: 'Workspace',
   };
   const TAB_DESCRIPTIONS: Record<string, string> = {
     create: 'Build A2UI components with AI',
+    ideas: 'Curated scenario compositions from every pack',
     components: 'A2UI component reference',
     icons: 'Fluent icon browser',
     workspace: 'Test the full file manager, editor, and diagram experience.',
@@ -1191,6 +1299,7 @@ function PlaygroundInner() {
               size="medium"
             >
               <Tab id="tab-create" value="create" aria-controls="panel-create" icon={<Add24Regular />}>Create</Tab>
+              <Tab id="tab-ideas" value="ideas" aria-controls="panel-ideas" icon={<Lightbulb24Regular />}>Ideas</Tab>
               <Tab id="tab-components" value="components" aria-controls="panel-components" icon={<Grid24Regular />}>Components</Tab>
               <Tab id="tab-icons" value="icons" aria-controls="panel-icons" icon={<Icons24Regular />}>Icons</Tab>
               <Tab id="tab-workspace" value="workspace" aria-controls="panel-workspace" icon={<FolderOpen24Regular />}>Workspace</Tab>
@@ -1554,6 +1663,24 @@ function PlaygroundInner() {
         </div>
       )}
 
+      {/* ---- Tab 2: Ideas (curated scenario compositions — #987) ---- */}
+      {activeTab === 'ideas' && (
+        <div id="panel-ideas" role="tabpanel" aria-labelledby="tab-ideas" className="playground-gallery-scroll" data-testid="playground-ideas-panel">
+          {Array.from(scenariosByPack.entries()).map(([pack, packScenarios]) => (
+            <div key={pack}>
+              <Subtitle2 className={classes.groupHeader}>{pack}</Subtitle2>
+              <div className={classes.componentGrid}>
+                {packScenarios.map((scenario) => (
+                  <ComponentCardErrorBoundary key={scenario.key} label={scenario.key}>
+                    <ScenarioCard scenario={scenario} onCardClick={handleScenarioCardClick} />
+                  </ComponentCardErrorBoundary>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ---- Tab 3: Components (grouped by pack name — Phase C) ---- */}
       {activeTab === 'components' && (
         <div id="panel-components" role="tabpanel" aria-labelledby="tab-components" className="playground-gallery-scroll">
@@ -1692,7 +1819,7 @@ function PlaygroundInner() {
 
       {/* ---- Tab 5: Workspace ---- */}
       {activeTab === 'workspace' && (
-        <div id="panel-workspace" role="tabpanel" aria-labelledby="tab-workspace" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
+        <div id="panel-workspace" role="tabpanel" aria-labelledby="tab-workspace" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <PlaygroundWorkspace />
         </div>
       )}
@@ -1772,6 +1899,89 @@ function PlaygroundInner() {
             </DialogContent>
             <DialogActions>
               <Button appearance="secondary" onClick={() => setComponentDialogOpen(false)}>Close</Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+
+      {/* ---- Scenario Detail Dialog (Ideas tab — #987) ---- */}
+      <Dialog open={scenarioDialogOpen} onOpenChange={(_e, data) => setScenarioDialogOpen(data.open)}>
+        <DialogSurface className={classes.dialogSurface}>
+          <DialogBody>
+            <DialogTitle
+              action={
+                <Button
+                  appearance="subtle"
+                  aria-label="Dismiss"
+                  icon={<Dismiss24Regular />}
+                  onClick={() => setScenarioDialogOpen(false)}
+                />
+              }
+            >
+              {selectedScenario?.title}
+            </DialogTitle>
+            <DialogContent>
+              <div className={classes.dialogContent}>
+                {selectedScenario && (
+                  <Caption1 style={{ display: 'block', marginBottom: tokens.spacingVerticalS, color: tokens.colorNeutralForeground3 }}>
+                    {selectedScenario.pack} · {selectedScenario.description}
+                  </Caption1>
+                )}
+                <TabList
+                  selectedValue={scenarioDetailTab}
+                  onTabSelect={(_e, data) => setScenarioDetailTab(data.value as 'preview' | 'json')}
+                  size="small"
+                  className={classes.detailTabs}
+                >
+                  <Tab value="preview">Preview</Tab>
+                  <Tab value="json">JSON</Tab>
+                </TabList>
+
+                {scenarioDetailTab === 'preview' ? (
+                  <div>
+                    {selectedScenario ? (
+                      <A2UIEnvelopePreview
+                        surfaceId={`scenario-detail-${selectedScenario.key}`}
+                        components={selectedScenario.components as Array<Record<string, any>>}
+                        loading={
+                          <div style={{ padding: tokens.spacingVerticalL, color: tokens.colorNeutralForeground4, fontSize: tokens.fontSizeBase200 }}>
+                            Loading preview…
+                          </div>
+                        }
+                      />
+                    ) : (
+                      <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                        No scenario selected.
+                      </Caption1>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <div className={classes.jsonCopyRow}>
+                      <Button
+                        appearance="subtle"
+                        size="small"
+                        icon={<Copy24Regular />}
+                        onClick={handleCopyScenarioJson}
+                        disabled={!scenarioJson}
+                        aria-label="Copy scenario JSON to clipboard"
+                      >
+                        {scenarioJsonCopied ? 'Copied!' : 'Copy'}
+                      </Button>
+                    </div>
+                    {scenarioJson ? (
+                      <pre className={classes.jsonCodeBlock}>{scenarioJson}</pre>
+                    ) : (
+                      <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                        No JSON available for this scenario.
+                      </Caption1>
+                    )}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => setScenarioDialogOpen(false)}>Close</Button>
             </DialogActions>
           </DialogBody>
         </DialogSurface>

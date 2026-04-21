@@ -9,7 +9,6 @@ Ceremonies are structured team interactions that the Squad coordinator triggers 
 | Design Proposal | auto | before work | Leela | assigned agent | ✅ Blocks implementation until DP posted |
 | Design Review | auto | before code | Leela | Zapp, Nibbler, all-relevant | ✅ Blocks code until approved |
 | PR Review Gate | auto | before merge | Nibbler | Leela (architecture), Zapp (security), Hermes (tests) | ✅ Blocks merge until all feedback addressed |
-| Docs Sweep | auto | monthly | Scribe | all-relevant | ❌ Freshness audit, not blocking |
 | Retrospective | auto | after failure | Leela | Nibbler, all-involved | ❌ Diagnostic, not blocking |
 
 ## Automated workflows (not coordinator ceremonies)
@@ -21,9 +20,8 @@ These run via GitHub Actions on schedule or events. Documented here for referenc
 | Per-PR Micro-Retro | PR closed | `.github/workflows/squad-pr-retro.yml` | Scribe | `.squad/retro-log.md` + PR comment |
 | Daily Pulse | cron `0 0 * * *` (17:00 PT) | `.github/workflows/squad-daily-pulse.yml` | Scribe | rolling issue `📊 Daily Pulse (rolling)` |
 | Weekly Pulse | cron `0 0 * * 2` (Mon 17:00 PT) | `.github/workflows/squad-weekly-pulse.yml` | Scribe | new issue `Weekly Pulse · YYYY-MM-DD` |
-| Weekly Velocity Report | cron `0 0 * * 1` (Sun 17:00 PT) | `.github/workflows/squad-velocity-report.yml` | Scribe | `.squad/velocity.md` |
-| Monthly Docs Sweep | cron `0 0 2 * *` (~1st day 17:00 PT) | `.github/workflows/squad-monthly-docs-sweep.yml` | Scribe | rolling issue `📚 Docs Sweep (rolling)` |
 | Release Cadence | cron `0 0 * * *` (17:00 PT) | `.github/workflows/squad-release-cadence.yml` | Leela + Scribe | draft PR on `release/cadence` branch |
+| Process Grader | cron `0 8 * * *` (08:00 UTC) | `.github/workflows/squad-process-grader.yml` | Scribe | grade comment + outcome label on due `process` issues, Scribe inbox entry |
 
 All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 
@@ -43,18 +41,8 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 
 **Gate:** No implementation code may be written until the DP is posted as a comment on the issue.
 
-**Estimate calibration:** every implementation issue carries exactly one estimate label and the DP must repeat that estimate in the proposal.
-
-| Label | Time band | Velocity points |
-|-------|-----------|-----------------|
-| `estimate:S` | ~2 hours | 1 |
-| `estimate:M` | ~8 hours | 3 |
-| `estimate:L` | ~24 hours | 8 |
-| `estimate:XL` | ~80 hours | 20 |
-
 **DP structure** (the implementing agent posts a comment with):
 - Problem statement (cite the issue body)
-- `Estimate: <S/M/L/XL>` (required; must match the issue's `estimate:*` label)
 - Proposed approach with a reference to the relevant brief section
 - Pack boundaries affected
 - Primitive surface changes: tools, user actions, components, guardrails
@@ -66,11 +54,10 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 **Rules:**
 - The issue body (problem + acceptance criteria) is written by the product owner or Lead. The DP (approach) is written by the implementing agent.
 - Each PR maps to one issue. Split bundles.
-- Leela rejects a DP that is missing the `Estimate:` field or does not match the issue's `estimate:*` label.
 
 **Agenda:**
 1. Assigned agent drafts a Design Proposal comment on the issue
-2. Leela reviews for completeness — does it cover architecture alignment with `docs-site/docs/architecture/v2-implementation-brief.md`?
+2. Leela reviews for completeness — does it cover architecture alignment with `docs/v2-implementation-brief.md`?
 3. If incomplete, Leela requests revisions before proceeding to Design Review
 4. DP comment posted → triggers Design Review ceremony
 
@@ -144,7 +131,7 @@ This protocol applies to all agents (squad members AND @copilot). It is enforced
 |-------|-------|
 | **Trigger** | auto |
 | **When** | after |
-| **Condition** | build failure, test failure, or reviewer rejection |
+| **Condition** | build failure, test failure, reviewer rejection, or any quality SLO in `.squad/velocity.md` turning 🔴 |
 | **Facilitator** | Leela |
 | **Participants** | all-involved, Nibbler for code quality analysis |
 | **Time budget** | focused |
@@ -152,34 +139,48 @@ This protocol applies to all agents (squad members AND @copilot). It is enforced
 
 **Agenda:**
 1. What happened? (facts only)
-2. Root cause analysis
-3. What should change? (concrete, testable)
-4. Open a `process` issue for each action item → daily pulse tracks them
+2. If an SLO tripped, inspect the latest `.squad/velocity.md` snapshot, name the breached metric, and compare it with the prior 4-week trend plus the relevant retro-log / pulse evidence
+3. Root cause analysis
+4. What should change? (concrete, testable)
+5. Open a `process` issue for each action item → daily pulse tracks them
 
 ---
 
-## Docs Sweep
+## Process Grader
 
 | Field | Value |
 |-------|-------|
 | **Trigger** | auto |
-| **When** | monthly |
-| **Condition** | first docs hygiene pass of the month, or manual trigger when docs drift is suspected |
+| **When** | scheduled (independent of coordinator ceremonies) |
+| **Schedule** | cron `0 8 * * *` (daily 08:00 UTC) + `workflow_dispatch` |
+| **Workflow** | `.github/workflows/squad-process-grader.yml` |
 | **Facilitator** | Scribe |
-| **Participants** | all-relevant |
-| **Time budget** | focused |
+| **Participants** | none (automation); evidence drawn from `.squad/velocity.md` |
 | **Enabled** | ✅ yes |
 
-**Goal:** Catch silent docs rot before it lands in charters, skills, the brief, or docs-site pages.
+**Purpose:** close the loop on `process` experiments created by the [Retrospective](#retrospective) ceremony. Each `process` issue carries a hypothesis frontmatter (`Signal`, `Baseline`, `Target`, `Revisit`). Once the `Revisit:` date is reached, the grader compares the latest `.squad/velocity.md` snapshot against the hypothesis and assigns a verdict.
 
-**Checklist:**
-1. Broken links across repo docs and docs-site
-2. Brief freshness: compare `Last updated:` in `docs-site/docs/architecture/v2-implementation-brief.md` against recent `packages/` churn
-3. Pack-page completeness: each active pack page still lists current agents, skills, tools, user actions, components, guardrails, and dependencies
-4. Charter relevance: role boundaries and owned artifacts still match current workflows
-5. Skill accuracy: workflow-facing skills still match the real repo layout and ceremony gates
+**Outcomes (exactly one label applied per grading):**
+- `process:succeeded` — signal hit the target (and moved beyond the noise band in the improving direction).
+- `process:no-effect` — signal stayed within the noise band, or sample size was too small to conclude.
+- `process:reverted` — signal moved in the wrong direction beyond the noise band, i.e. the experiment made things worse.
 
-**Output:** Scribe records findings in the rolling `📚 Docs Sweep (rolling)` issue or opens focused `process` issues when drift needs follow-up work.
+Any prior outcome label on the issue is cleared before the new one is applied so the three outcomes remain mutually exclusive.
+
+**Revisit window:**
+- On `process:succeeded` or `process:reverted` → terminal. The issue keeps its outcome label; no re-grading unless a human re-opens the experiment by resetting `Revisit:` and clearing the outcome label.
+- On `process:no-effect` → the grader extends `Revisit:` by 14 days in-place (editing the issue body) up to a maximum of 2 extensions, giving the experiment time to accumulate more PRs. After the 2nd extension the next `no-effect` verdict is terminal.
+
+**Rate-limit safeguards:**
+- **Pre-flight abort:** if the REST API `core.remaining` budget is `< 200` at the start of the run, the grader logs a warning and exits without grading anything. This leaves headroom for interactive squad work the same morning.
+- **Per-run cap:** at most **25 issues** are graded per run (`MAX_ISSUES_PER_RUN = 25`). Candidates are ordered oldest-`Revisit:` first; any overflow is deferred to the next scheduled run and logged via `core.notice`.
+- **Concurrency guard:** workflow uses `concurrency: squad-process-grader` with `cancel-in-progress: false` so overlapping manual dispatches serialize rather than double-grade.
+
+**Artifacts per graded issue:**
+1. A grade comment on the issue summarising signal / baseline / target / observed / verdict.
+2. The corresponding `process:{outcome}` label.
+3. A Scribe inbox entry under `.squad/decisions/inbox/process-grader-{issue}-{date}.md` so the next decisions-merge run folds the result into `.squad/decisions.md`.
+4. On `no-effect` extensions, an edited issue body with the new `Revisit:` date.
 
 ---
 

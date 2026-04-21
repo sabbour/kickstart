@@ -32,7 +32,10 @@ jobs:
             const DEPENDABOT_AUTHOR = 'dependabot[bot]';
             const DEPENDABOT_BRANCH_PREFIX = 'dependabot/';
             const XL_THRESHOLD = 1000;
-            const APPROVAL_LABELS = ['leela:approved', 'zapp:approved'];
+            const APPROVAL_LABELS = ['leela:approved', 'zapp:approved', 'nibbler:approved'];
+            const DOCS_APPROVED_LABEL = 'docs:approved';
+            const DOCS_NA_LABEL = 'docs:not-applicable';
+            const DOCS_REJECTED_LABEL = 'docs:rejected';
             const REVIEW_GATE_CONTEXT = 'squad/review-gate';
             const SENSITIVE_PATH_PATTERNS = [
               /^\.github\/workflows\//i,
@@ -90,13 +93,29 @@ jobs:
             }
 
             function getPreservedApprovalLabels(labels) {
+              // Three-way preservation matrix: on synchronize, each reviewer's own
+              // approval is cleared, but if exactly one reviewer is in a rejection
+              // loop, the OTHER reviewers' approvals are preserved so the fix cycle
+              // only reopens the rejecting reviewer's review, not all of them.
               const hasLeelaRejection = labels.has('leela:rejected');
               const hasZappRejection = labels.has('zapp:rejected');
-              if (hasLeelaRejection === hasZappRejection) {
+              const hasNibblerRejection = labels.has('nibbler:rejected');
+              const rejectionCount = [hasLeelaRejection, hasZappRejection, hasNibblerRejection]
+                .filter(Boolean).length;
+
+              if (rejectionCount !== 1) {
+                // Zero or multiple rejections → preserve nothing; all approvals clear.
                 return [];
               }
 
-              return hasZappRejection ? ['leela:approved'] : ['zapp:approved'];
+              if (hasLeelaRejection) {
+                return ['zapp:approved', 'nibbler:approved'];
+              }
+              if (hasZappRejection) {
+                return ['leela:approved', 'nibbler:approved'];
+              }
+              // hasNibblerRejection
+              return ['leela:approved', 'zapp:approved'];
             }
 
             function isTrustedRetroLogPr(pr, labels, changedFiles) {
@@ -139,11 +158,24 @@ jobs:
                 return [...APPROVAL_LABELS];
               }
 
-              const required = ['leela:approved'];
+              // Low-risk path: Leela + Nibbler always; Zapp only if sensitive.
+              // Nibbler (code quality) stays required — see decision
+              // .squad/decisions/inbox/leela-4way-gate-wiring-2026-04-21.md.
+              const required = ['leela:approved', 'nibbler:approved'];
               if (getZappRequirementReason(pr, labels, changedFiles)) {
                 required.push('zapp:approved');
               }
               return required;
+            }
+
+            function getDocsBlocker(labels) {
+              if (labels.has(DOCS_REJECTED_LABEL)) {
+                return `docs reviewer rejected (\`${DOCS_REJECTED_LABEL}\`)`;
+              }
+              if (!labels.has(DOCS_APPROVED_LABEL) && !labels.has(DOCS_NA_LABEL)) {
+                return `missing docs marker (one of \`${DOCS_APPROVED_LABEL}\` or \`${DOCS_NA_LABEL}\` is required)`;
+              }
+              return null;
             }
 
             async function listComments(prNumber) {
@@ -385,6 +417,15 @@ jobs:
               blockers.push(`missing fresh approval labels: ${missingApprovals.join(', ')}`);
             }
 
+            // Docs gate: every non-trusted PR must carry either docs:approved or
+            // docs:not-applicable on the current head, and docs:rejected always blocks.
+            if (!dependabotPr && !trustedRetroLogPr) {
+              const docsBlocker = getDocsBlocker(labels);
+              if (docsBlocker) {
+                blockers.push(docsBlocker);
+              }
+            }
+
             if (pr.mergeStateStatus === 'DIRTY') {
               blockers.push('PR has merge conflicts');
             }
@@ -478,8 +519,8 @@ jobs:
                   : dependabotPr
                   ? '- Dependabot auto-merge: CI is green and `dependabot[bot]` author in `dependabot/*` branch'
                   : labels.has(LOW_RISK_LABEL)
-                  ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}`
-                  : '- fresh `leela:approved` + `zapp:approved` labels are present on the current head',
+                  ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : DOCS_NA_LABEL}\` for the docs gate`
+                  : `- fresh \`leela:approved\` + \`zapp:approved\` + \`nibbler:approved\` labels are present on the current head, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : DOCS_NA_LABEL}\` for the docs gate`,
                 '- trusted merge signals are green: `CI Gate` from workflow `CI` and `squad/review-gate` from `Squad Review Gate`',
                 '- PR is not XL and title is not marked `refactor`',
                 '',
