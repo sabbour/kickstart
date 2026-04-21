@@ -1,18 +1,24 @@
 /**
- * Fallback widget inspiration ideas for Playground
+ * @module @aks-kickstart/api/lib/widget-inspirations-data
  *
- * These are client-side fallback ideas used when the API is unavailable.
- * Prompts intentionally instruct the LLM to use only core A2UI components
- * (Column, Row, Text, Table, Badge, Button, ProgressSteps, DecisionCard,
- * ChoicePicker, TextField, Toggle, Markdown, …) so responses can render
- * without pack-specific client renderers.
+ * Canonical, server-owned data and helpers for Create-tab inspirations.
  *
- * The server owns the canonical list at
- * `packages/web/api/src/lib/widget-inspirations-data.ts` (exported as
- * `FALLBACK_IDEAS`). This client mirror MUST stay byte-for-byte equal —
- * the sync test at
- * `packages/web/api/src/lib/fallback-ideas-sync.test.ts`
- * enforces equality in CI.
+ * - `ALLOWED_A2UI_COMPONENTS` — allow-list of component type names the LLM
+ *   may propose. Every entry MUST correspond to a component registered in
+ *   the client `ClientComponentRegistry` (see
+ *   `packages/web/src/contexts/A2UIRegistryContext.tsx`). Drift causes the
+ *   chat to render `_ErrorComponent` for any LLM-proposed component that
+ *   lacks a renderer. A vitest guard in
+ *   `packages/web/src/__tests__/a2ui-allow-list-registry.test.ts`
+ *   enforces this invariant at CI time.
+ *
+ * - `FALLBACK_IDEAS` — canonical client-agnostic fallback list used when
+ *   Azure OpenAI is unavailable. The client mirror at
+ *   `packages/web/src/lib/fallback-ideas.ts` is pinned to this array via
+ *   the sync test in `fallback-ideas-sync.test.ts`. Server owns.
+ *
+ * - `pickFallbackIdea()` / `nextFocusDomain()` — process-local rotation
+ *   helpers; exported for unit testing.
  */
 
 export interface WidgetIdea {
@@ -21,7 +27,48 @@ export interface WidgetIdea {
   prompt: string;
 }
 
-export const FALLBACK_WIDGET_IDEAS: WidgetIdea[] = [
+// ---------------------------------------------------------------------------
+// Allow-list of A2UI component type names the LLM may reference.
+//
+// Any entry here MUST be registered in the client registry. See module
+// header. If you add or remove an entry, update the registry (and its
+// registrations in `packages/web/src/main.tsx`) to match.
+// ---------------------------------------------------------------------------
+
+export const ALLOWED_A2UI_COMPONENTS: readonly string[] = [
+  "Column",
+  "Row",
+  "Text",
+  "TextField",
+  "CheckBox",
+  "Toggle",
+  "ChoicePicker",
+  "Button",
+  "Image",
+  "Icon",
+  "Badge",
+  "Card",
+  "Divider",
+  "Link",
+  "List",
+  "Table",
+  "Tabs",
+  "Markdown",
+  "ProgressSteps",
+  "DecisionCard",
+  "SummaryCard",
+  "AuthCard",
+  "CodeBlock",
+  "FormGroup",
+  "Questionnaire",
+  "RadioGroup",
+] as const;
+
+// ---------------------------------------------------------------------------
+// Fallback ideas (AKS/Kubernetes operational widgets)
+// ---------------------------------------------------------------------------
+
+export const FALLBACK_IDEAS: WidgetIdea[] = [
   {
     title: "Deployment Rollout Tracker",
     subtitle: "Live pod rollout progress with revision history",
@@ -83,3 +130,60 @@ export const FALLBACK_WIDGET_IDEAS: WidgetIdea[] = [
       'I want to build a secret rotation planner. Use a Column root with a Text heading "Secrets nearing rotation SLA". Add a Row with a ChoicePicker for namespace and a Toggle labelled "Show system secrets". Add a Table with columns Name, Namespace, Type, Age (days), SLA, Status and 6 rows covering mixed states. Add a Row of Badges for overall status (On-track, At-risk, Overdue) with counts. End with a Row of Buttons: "Rotate Selected", "Export Inventory", "Open Runbook". Only use core A2UI components.',
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Focus-domain rotation
+//
+// Each invocation advances a process-local cursor so successive LLM calls
+// emphasise a different area, avoiding convergence on the same
+// "namespace operations" text. Process-local — persistence across
+// restarts is unnecessary for a best-effort variety hint.
+// ---------------------------------------------------------------------------
+
+export const FOCUS_DOMAINS: readonly string[] = [
+  "Kubernetes deployment and rollout (revisions, pods, safeguards)",
+  "CI/CD and GitHub Actions (workflow runs, image builds, scans)",
+  "Azure cost and capacity (spend breakdown, quota, forecasts)",
+  "AKS cluster health (nodes, upgrades, networking)",
+  "GitOps and configuration drift (Flux/Argo, Helm releases)",
+  "Observability and events (pod logs, metrics, alerts, SLOs)",
+  "Secrets and identity (rotation, managed identity, RBAC)",
+  "Developer self-service (scaling panels, namespace quotas)",
+];
+
+let focusCursor = Math.floor(Math.random() * FOCUS_DOMAINS.length);
+
+export function nextFocusDomain(): string {
+  const domain = FOCUS_DOMAINS[focusCursor % FOCUS_DOMAINS.length];
+  focusCursor = (focusCursor + 1) % FOCUS_DOMAINS.length;
+  return domain;
+}
+
+/** Test-only: deterministically reset the focus cursor. */
+export function _resetFocusCursorForTests(value = 0): void {
+  focusCursor = value;
+}
+
+// ---------------------------------------------------------------------------
+// Fallback rotation
+//
+// Tracks the last fallback index served so consecutive requests that miss
+// OpenAI get a different idea. Process-local; see FOCUS_DOMAINS note above.
+// ---------------------------------------------------------------------------
+
+let lastFallbackIdx = -1;
+
+export function pickFallbackIdea(): WidgetIdea {
+  if (FALLBACK_IDEAS.length <= 1) return FALLBACK_IDEAS[0];
+  let idx = Math.floor(Math.random() * FALLBACK_IDEAS.length);
+  if (idx === lastFallbackIdx) {
+    idx = (idx + 1) % FALLBACK_IDEAS.length;
+  }
+  lastFallbackIdx = idx;
+  return FALLBACK_IDEAS[idx];
+}
+
+/** Test-only: deterministically reset the last-served index. */
+export function _resetLastFallbackIdxForTests(value = -1): void {
+  lastFallbackIdx = value;
+}
