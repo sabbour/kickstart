@@ -75,11 +75,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install native bindings
-        run: npm install --no-save --legacy-peer-deps @rolldown/binding-linux-x64-gnu @rollup/rollup-linux-x64-gnu lightningcss-linux-x64-gnu
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: TypeScript check (web)
         run: cd packages/web && npx tsc --noEmit
 
@@ -137,11 +132,6 @@ jobs:
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install native bindings
-        run: npm install --no-save --legacy-peer-deps @rolldown/binding-linux-x64-gnu @rollup/rollup-linux-x64-gnu lightningcss-linux-x64-gnu
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
