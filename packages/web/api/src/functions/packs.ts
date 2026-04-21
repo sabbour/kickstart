@@ -2,6 +2,7 @@
  * GET /api/packs — returns a safe client DTO with component catalog and UserAction manifests.
  *
  * Never exposes: agent instructions, skill bodies, tool implementations, file paths, or credentials.
+ * Error bodies are always opaque — full error detail goes to server-side telemetry only.
  *
  * Leela C5: playgroundScenarios are included in the response so Playground.tsx can list them
  * without a direct registry import.
@@ -10,8 +11,11 @@
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { getRegistry } from "../startup/packs.js";
+import { getRegistry, getLoadErrors } from "../startup/packs.js";
+import type { PackLoadError } from "../startup/packs.js";
 import type { ComponentContribution, PlaygroundScenario } from "@aks-kickstart/harness";
+import { Logger, extractTraceId } from "../lib/logger.js";
+import { randomUUID } from "node:crypto";
 
 interface ComponentDTO {
   name: string;
@@ -37,12 +41,17 @@ interface PacksResponse {
   components: ComponentDTO[];
   userActions: UserActionDTO[];
   playgroundScenarios: PlaygroundScenarioDTO[];
+  loadErrors: PackLoadError[];
 }
 
 async function packs(
-  _request: HttpRequest,
-  _ctx: InvocationContext,
+  request: HttpRequest,
+  ctx: InvocationContext,
 ): Promise<HttpResponseInit> {
+  const requestId = randomUUID();
+  const traceId = extractTraceId(request.headers);
+  const logger = new Logger(ctx, "packs", traceId).withContext({ request_id: requestId });
+
   try {
     const registry = getRegistry();
 
@@ -80,6 +89,7 @@ async function packs(
       components,
       userActions: userActionDTOs,
       playgroundScenarios: scenarioDTOs,
+      loadErrors: getLoadErrors(),
     };
 
     return {
@@ -91,9 +101,13 @@ async function packs(
       },
     };
   } catch (err) {
+    // Log full error server-side (telemetry only — never in the response body).
+    logger.error('Registry initialization failed', err instanceof Error ? err : new Error(String(err)), {
+      error_code: 'REGISTRY_INIT_FAILED',
+    });
     return {
       status: 500,
-      jsonBody: { error: err instanceof Error ? err.message : String(err) },
+      jsonBody: { error: 'Registry initialization failed. See server logs.' },
     };
   }
 }
@@ -104,3 +118,4 @@ app.http("packs", {
   route: "packs",
   handler: packs,
 });
+

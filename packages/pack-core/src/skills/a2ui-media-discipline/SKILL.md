@@ -1,9 +1,18 @@
 ---
 name: a2ui-media-discipline
 description: Rules for referencing media assets (video, audio, images) in A2UI component examples. Enforces local-only media URLs to maintain strict CSP compliance.
-domain: a2ui, assets, csp
-confidence: high
-source: earned
+version: 1.0.0
+x-kickstart:
+  appliesTo:
+    - "core.*"
+  keywords:
+    - a2ui
+    - media
+    - csp
+    - video
+    - audio
+    - image
+  priority: 80
 ---
 
 ## Context

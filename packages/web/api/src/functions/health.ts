@@ -3,7 +3,8 @@ import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { Logger, extractTraceId, extractRequestMetadata } from "../lib/logger.js";
 import { getAppInsightsClient } from "../lib/appinsights.js";
-import { getRegistry } from "../startup/packs.js";
+import { getRegistry, getLoadErrors } from "../startup/packs.js";
+import type { PackLoadError } from "../startup/packs.js";
 import { sanitizeError } from "../telemetry/sanitize-error.js";
 import { getChatDeploymentName } from "../lib/openai-client.js";
 
@@ -16,11 +17,13 @@ export interface LlmCheckResult {
   cached?: true;
 }
 
+// Leela C2: status union includes "degraded" for partial pack load.
 interface HealthResponse {
-  status: "ok" | "error";
+  status: "ok" | "degraded" | "error";
   phase?: string;
   hint?: string;
   registry?: "ready";
+  loadErrors?: PackLoadError[];
   llm?: LlmCheckResult;
 }
 
@@ -144,22 +147,30 @@ app.http("health", {
     try {
       logger.info("Validating pack registry...");
       getRegistry();
+      const loadErrors = getLoadErrors();
       const duration = Date.now() - startTime;
+      const degraded = loadErrors.length > 0;
 
       logger.info("Pack registry validated", {
-        status: "ok",
+        status: degraded ? "degraded" : "ok",
+        load_errors: loadErrors.length,
         duration_ms: duration,
       });
       appInsights.trackEvent({
         name: "health-check-success",
-        properties: { requestId, registryInitDurationMs: String(duration) },
+        properties: {
+          requestId,
+          registryInitDurationMs: String(duration),
+          degraded: String(degraded),
+          loadErrorCount: String(loadErrors.length),
+        },
       });
 
       if (!deep) {
-        return {
-          status: 200,
-          jsonBody: { status: "ok", registry: "ready" } as HealthResponse,
-        };
+        const body: HealthResponse = degraded
+          ? { status: "degraded", registry: "ready", loadErrors }
+          : { status: "ok", registry: "ready" };
+        return { status: 200, jsonBody: body };
       }
 
       // Deep mode: fire a minimal LLM canary probe.
@@ -179,14 +190,13 @@ app.http("health", {
       });
 
       const httpStatus = llm.ok ? 200 : 503;
-      return {
-        status: httpStatus,
-        jsonBody: {
-          status: llm.ok ? "ok" : "error",
-          registry: "ready" as const,
-          llm,
-        } as HealthResponse,
+      const deepBody: HealthResponse = {
+        status: degraded ? "degraded" : (llm.ok ? "ok" : "error"),
+        registry: "ready",
+        llm,
+        ...(degraded ? { loadErrors } : {}),
       };
+      return { status: httpStatus, jsonBody: deepBody };
     } catch (err) {
       const duration = Date.now() - startTime;
       const sanitizedError = sanitizeError(err);
