@@ -39,11 +39,11 @@ export function redactSecrets(obj: unknown): unknown {
     let result = sanitizeText(obj);
 
     result = result.replace(/Bearer\s+([a-zA-Z0-9\-_.]+)/g, "Bearer ****");
-    result = result.replace(/[?&](api[_-]?key|code|token|secret|password|auth|credential)=([^&\s"']+)/gi,
-      (_match, param) => `?${param}=****`);
+    result = result.replace(/([?&])(api[_-]?key|code|token|secret|password|auth|credential)=([^&\s"']+)/gi,
+      (_match, delimiter, param) => `${delimiter}${param}=****`);
     result = result.replace(/\?api-key=([^&\s"']+)/gi, "?api-key=****");
     result = result.replace(/\?subscription[_-]?id=([^&\s"']+)/gi, "?subscription_id=****");
-    result = result.replace(/[?&]authorization=([^&\s"']+)/gi, "&authorization=****");
+    result = result.replace(/([?&])authorization=([^&\s"']+)/gi, "$1authorization=****");
     result = result.replace(/(["\']api[_-]?key["\']\s*:\s*["\'])([^"\']+)(["\'])/gi, '$1****$3');
     result = result.replace(/(connection[_-]?string["\']?\s*[:=]\s*["\'])([^"\']+)(["\'])/gi, '$1****$3');
     result = result.replace(/(["\']password["\']\s*:\s*["\'])([^"\']+)(["\'])/gi, '$1****$3');

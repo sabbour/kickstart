@@ -31,6 +31,7 @@ All open v2 issues should carry milestone **v2**.
 
 ## Learnings
 
+- (2025-04-20T18:05:00Z) PR #891 rebase pattern: keep main's structured logger/bundling changes, then layer telemetry on the handlers only. For security, centralize secret scrubbing in `packages/web/api/src/telemetry/sanitize-error.ts`, prefer per-request UUID correlation over hashing long-lived IDs, and let logger + App Insights share the same sanitizer so logs and exception telemetry stay aligned.
 - (2026-04-17T12:06:45.293Z) Sprint planning always required before backlog pickup when `.squad/identity/now.md` gate is active. Shortest v2 slice is harness spine, not pack work: `#474 → #475 → #476` must land before pack-core batch.
 - (2026-04-17T03:30:17Z) DP #329: runtime duplication is the blocking risk — PoC adds `runtime/` inside `packages/mcp-server` that parallels `packages/web/api/` LLM client + session store. Third fork risk with SDK migration. Implementation issue must define canonical client before code lands.
 - (2026-04-17T03:30:17Z) DP #330 closeout: Option B (hybrid route planner + manager agent) adopted. `phaseComplete`/`filesComplete` flags retired. Implementation sequence locked: Gate → arch spike → backend (#445, Bender) → UI (#446, Fry) → cleanup. Follow-ons #445 and #446 created.
