@@ -98,6 +98,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #1039 "Fix: emit_ui tool schema strict-mode compliance (#1032)" | L | impl=1m | review=9m | cycles=1 | merged | @sabbour | first_review=2m | ci=7m | reviewer=bot | human_comments=0 | issue=#1032 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #1034 "fix(observability): pure-OTel AppInsights pipeline + redaction (#1030)" | XL | impl=3m | review=16m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=6m | ci=7m | reviewer=bot | human_comments=0 | issue=#1030 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #1033 "fix(observability): repair AppInsights telemetry pipeline (closes #1030)" | L | impl=1m | review=4m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=1m | ci=7m | reviewer=bot | human_comments=0 | issue=#1030 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
