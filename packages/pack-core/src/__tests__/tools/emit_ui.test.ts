@@ -18,6 +18,39 @@ import { A2UIMessageSchema, A2UIMessageEnvelopeSchema, A2UI_VERSION } from '@aks
 import { emitUiTool } from '../../tools/emit_ui.js';
 import { makeSessionCtx } from './_session-stub.js';
 
+// Fixtures include `null` for fields that the tool's strict-mode JSON schema
+// now requires (e.g. `sendDataModel`, component `child`/`children`/`text`/
+// `action`). Those nulls are stripped by emit_ui before runtime validation
+// against the harness schema. For tests that call the harness schema directly
+// (bypassing the tool), strip nulls with this helper.
+function stripNulls<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(stripNulls) as unknown as T;
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v === null) continue;
+      out[k] = stripNulls(v);
+    }
+    return out as T;
+  }
+  return value;
+}
+
+// Pads a partial component spec with nulls for every strict-mode-required
+// sibling field so the fixture passes the tool's input schema. Mirrors
+// how the LLM emits under strict-mode (explicit nulls for unused slots).
+function padComponent(
+  c: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    child: null,
+    children: null,
+    text: null,
+    action: null,
+    ...c,
+  };
+}
+
 // ── Valid message fixtures ─────────────────────────────────────────────────
 // All fixtures include the `op` discriminator field, which is required by the
 // updated EmitUiInputSchema (discriminated union). The runtime A2UIMessageSchema
@@ -27,7 +60,7 @@ import { makeSessionCtx } from './_session-stub.js';
 const validCreateSurface = {
   version: A2UI_VERSION,
   op: 'createSurface' as const,
-  createSurface: { surfaceId: 'surface-001', catalogId: 'test-catalog' },
+  createSurface: { surfaceId: 'surface-001', catalogId: 'test-catalog', sendDataModel: null },
 };
 
 const validUpdateComponents = {
@@ -35,7 +68,9 @@ const validUpdateComponents = {
   op: 'updateComponents' as const,
   updateComponents: {
     surfaceId: 'surface-001',
-    components: [{ id: 'root', component: 'Button', label: 'Click me' }],
+    components: [
+      padComponent({ id: 'root', component: 'Button' }),
+    ],
   },
 };
 
@@ -100,7 +135,7 @@ describe('core.emit_ui', () => {
 
     it('the recorded emission equals the A2UIMessageSchema-parsed output', async () => {
       await invoke(validCreateSurface);
-      const expected = A2UIMessageSchema.parse(validCreateSurface);
+      const expected = A2UIMessageSchema.parse(stripNulls(validCreateSurface));
       expect(session.a2uiEmissions[0]).toEqual(expected);
     });
   });
@@ -179,15 +214,15 @@ describe('core.emit_ui', () => {
         updateComponents: {
           surfaceId: 'main',
           components: [
-            { id: 'root', component: 'Column', children: ['greeting', 'buttons'] },
-            { id: 'greeting', component: 'Text', text: 'Hello' },
-            { id: 'buttons', component: 'Row', children: ['cancel-btn', 'ok-btn'] },
-            { id: 'cancel-btn', component: 'Button', child: 'cancel-text',
-              action: { event: { name: 'cancel' } } },
-            { id: 'cancel-text', component: 'Text', text: 'Cancel' },
-            { id: 'ok-btn', component: 'Button', child: 'ok-text',
-              action: { event: { name: 'ok', payload: { confirmed: true } } } },
-            { id: 'ok-text', component: 'Text', text: 'OK' },
+            padComponent({ id: 'root', component: 'Column', children: ['greeting', 'buttons'] }),
+            padComponent({ id: 'greeting', component: 'Text', text: 'Hello' }),
+            padComponent({ id: 'buttons', component: 'Row', children: ['cancel-btn', 'ok-btn'] }),
+            padComponent({ id: 'cancel-btn', component: 'Button', child: 'cancel-text',
+              action: { event: { name: 'cancel', payload: null } } }),
+            padComponent({ id: 'cancel-text', component: 'Text', text: 'Cancel' }),
+            padComponent({ id: 'ok-btn', component: 'Button', child: 'ok-text',
+              action: { event: { name: 'ok', payload: { confirmed: true } } } }),
+            padComponent({ id: 'ok-text', component: 'Text', text: 'OK' }),
           ],
         },
       });
@@ -213,9 +248,9 @@ describe('core.emit_ui', () => {
         updateComponents: {
           surfaceId: 's',
           components: [
-            { id: 'btn', component: 'Button', child: 'lbl',
-              action: { event: { name: 'go' } } },
-            { id: 'lbl', component: 'Text', text: 'Go' },
+            padComponent({ id: 'btn', component: 'Button', child: 'lbl',
+              action: { event: { name: 'go', payload: null } } }),
+            padComponent({ id: 'lbl', component: 'Text', text: 'Go' }),
           ],
         },
       });
@@ -247,12 +282,12 @@ describe('core.emit_ui', () => {
     for (const { op, fixture } of explicitFixtures) {
       it(`${op}: envelope schema selects the branch matching input.op verbatim`, () => {
         expect(fixture.op).toBe(op);
-        const parsed = A2UIMessageEnvelopeSchema.parse(fixture);
+        const parsed = A2UIMessageEnvelopeSchema.parse(stripNulls(fixture));
         expect(parsed.op).toBe(op);
       });
 
       it(`${op}: A2UIMessageSchema (runtime) routes to the op-named payload key`, () => {
-        const parsed = A2UIMessageSchema.parse(fixture) as Record<string, unknown>;
+        const parsed = A2UIMessageSchema.parse(stripNulls(fixture)) as Record<string, unknown>;
         expect(parsed[op]).toBeDefined();
         expect(parsed).not.toHaveProperty('op');
       });
