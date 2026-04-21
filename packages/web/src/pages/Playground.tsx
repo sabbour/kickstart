@@ -933,6 +933,7 @@ function PlaygroundInner() {
   const [createMessages, setCreateMessages] = useState<ChatMessage[]>([]);
   const [inspireLoading, setInspireLoading] = useState(false);
   const inspireAbortRef = useRef<AbortController | null>(null);
+  const lastInspireIdxRef = useRef<number>(-1);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Component detail dialog state
   const [selectedComponent, setSelectedComponent] = useState<ComponentContribution | null>(null);
@@ -1004,10 +1005,15 @@ function PlaygroundInner() {
           }
         }
       } catch { /* API call failed */ }
-      // Fallback to client-side ideas if API is unavailable
+      // Fallback to client-side ideas if API is unavailable — pick an index
+      // that differs from the previous one so consecutive clicks vary.
       if (FALLBACK_WIDGET_IDEAS.length > 0) {
-        const randomIdx = Math.floor(Math.random() * FALLBACK_WIDGET_IDEAS.length);
-        setCreatePrompt(FALLBACK_WIDGET_IDEAS[randomIdx].prompt);
+        let idx = Math.floor(Math.random() * FALLBACK_WIDGET_IDEAS.length);
+        if (FALLBACK_WIDGET_IDEAS.length > 1 && idx === lastInspireIdxRef.current) {
+          idx = (idx + 1) % FALLBACK_WIDGET_IDEAS.length;
+        }
+        lastInspireIdxRef.current = idx;
+        setCreatePrompt(FALLBACK_WIDGET_IDEAS[idx].prompt);
       }
       setInspireLoading(false);
     } finally {
