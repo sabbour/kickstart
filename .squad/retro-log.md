@@ -29,6 +29,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-21 | #950 "feat(api): add /health?deep=1 LLM canary check" | L | impl=1m | review=3m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=1m | ci=5m | reviewer=bot | human_comments=0 | issue=#941 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #948 "feat(infra): provision Application Insights + Log Analytics workspace (#942)" | M | impl=0m | review=8m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=3m | ci=5m | reviewer=bot | human_comments=0 | issue=#942 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #947 "fix(converse): fix double-encoded JSON responses and missing model name in SSE stream" | L | impl=1m | review=25m | cycles=1 | merged-with-rework | @sabbour-squad-backend[bot] | first_review=2m | ci=5m | reviewer=bot | human_comments=1 | issue=#937 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
