@@ -33,7 +33,7 @@ emit for internal state transitions that have no user-visible effect.
   "child":    "<id>",            // optional — single-slot containers (Card, Button)
   "children": ["<id>", "<id>"],  // optional — multi-slot containers (Row, Column, List)
   "text":     "<literal>",       // optional — only on Text components
-  "action":   { "event": { "name": "<event>", "payload": { /* optional */ } } }
+  "action":   { "event": { "name": "<event>", "payload": { "confirmed": true, "id": null, "value": null, "action": null, "target": null } } }
 }
 ```
 

@@ -31,15 +31,41 @@ const A2UIDynamicNumber = z.union([
 // Action schema for interactive components.
 // Uses a flat event envelope; `payload` is nullable so null is stripped by
 // stripNulls() before runtime validation (satisfies OpenAI strict-mode required).
+//
+// #1032 — The `payload` field WAS `z.record(z.string(), A2UIScalar).nullable()`.
+// OpenAI strict mode rejects records because the converter
+// (@openai/agents-core/dist/utils/zodJsonSchemaCompat.mjs:237-242 / buildRecordSchema)
+// emits `{ type: 'object', additionalProperties: <scalar> }` with NO `properties`
+// key, which violates OpenAI's rule that every object node must declare
+// `properties` (and `additionalProperties: false`). The fix narrows `payload`
+// to a closed object with a fixed key set. Unused keys MUST be set to null
+// and are stripped by `stripNulls()` before `A2UIMessageSchema.parse()`.
+//
+// Closed key set:
+//   - `confirmed` — evidence-backed (see
+//     packages/pack-core/src/__tests__/tools/emit_ui.test.ts, existing
+//     confirm-dialog fixture).
+//   - `id`, `value`, `action`, `target` — forward-looking interaction keys.
+//     Intentional narrowing per DP Amendment #1 / Nibbler N2: not present in
+//     current repo usage. Adding new keys requires a code change + test update.
+//     If this list ever needs to grow past ~8 entries, switch to
+//     Alternative 2 (JSON-string payload parsed in execute()).
 const A2UIActionSchema = z.object({
   event: z.object({
     name: z.string().describe('Event name dispatched when the component is activated.'),
     payload: z
-      .record(z.string(), A2UIScalar)
+      .object({
+        confirmed: z.boolean().nullable(),
+        id: z.string().nullable(),
+        value: A2UIScalar.nullable(),
+        action: z.string().nullable(),
+        target: z.string().nullable(),
+      })
       .nullable()
       .describe(
-        'Flat payload (string/number/boolean/null values) delivered with the event, ' +
-          'or null when no payload is needed.',
+        'Event payload with a closed key set (confirmed, id, value, action, target). ' +
+          'Unused keys MUST be set to null. Unknown keys are stripped by OpenAI strict ' +
+          'mode + zod. See .changeset for the narrowing contract.',
       ),
   }),
 }).describe(

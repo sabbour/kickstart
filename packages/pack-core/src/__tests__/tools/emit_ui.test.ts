@@ -211,7 +211,9 @@ describe('core.emit_ui', () => {
               action: { event: { name: 'cancel', payload: null } } },
             { id: 'cancel-text', component: 'Text', text: 'Cancel' },
             { id: 'ok-btn', component: 'Button', child: 'ok-text',
-              action: { event: { name: 'ok', payload: { confirmed: true } } } },
+              action: { event: { name: 'ok', payload: {
+                confirmed: true, id: null, value: null, action: null, target: null,
+              } } } },
             { id: 'ok-text', component: 'Text', text: 'OK' },
           ],
         },
@@ -245,6 +247,52 @@ describe('core.emit_ui', () => {
         },
       });
       expect(String(result)).toContain('updateComponents');
+    });
+
+    // T2.5 (#1032 / DP Amendment #1, Nibbler N5) — closed-object payload:
+    // unknown keys sent by the LLM must be silently stripped by zod BEFORE
+    // the harness sees the message. OpenAI strict mode advertises
+    // `additionalProperties: false`, but zod's default strip behaviour is
+    // what enforces the contract at runtime. This locks in the stripping
+    // semantic so a future `.passthrough()` or schema widening can't
+    // regress it without a test failure.
+    it('emit_ui: strips unknown payload keys (additionalProperties: false contract)', async () => {
+      const result = await invoke({
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 's',
+          components: [
+            { id: 'btn', component: 'Button', child: 'lbl',
+              action: { event: { name: 'ok', payload: {
+                confirmed: true,
+                id: null, value: null, action: null, target: null,
+                // Unknown key — must be stripped, must NOT end up on the
+                // recorded emission or the harness message.
+                unknownKey: 'dropped',
+              } as unknown as {
+                confirmed: boolean | null;
+                id: string | null;
+                value: unknown;
+                action: string | null;
+                target: string | null;
+              } } } },
+            { id: 'lbl', component: 'Text', text: 'OK' },
+          ],
+        },
+      });
+      expect(String(result)).toContain('updateComponents');
+      expect(session.a2uiEmissions).toHaveLength(1);
+
+      const emitted = session.a2uiEmissions[0] as {
+        updateComponents: { components: Array<Record<string, unknown>> };
+      };
+      const btn = emitted.updateComponents.components[0] as {
+        action: { event: { name: string; payload: Record<string, unknown> } };
+      };
+      // stripNulls removes the null siblings, leaving only `confirmed`.
+      expect(btn.action.event.payload).toEqual({ confirmed: true });
+      expect(btn.action.event.payload).not.toHaveProperty('unknownKey');
     });
   });
 
@@ -391,7 +439,9 @@ describe('core.emit_ui', () => {
           surfaceId: 's',
           components: [
             { id: 'btn', component: 'Button', child: 'lbl',
-              action: { event: { name: 'submit', payload: { value: 'yes' } } } },
+              action: { event: { name: 'submit', payload: {
+                confirmed: null, id: null, value: 'yes', action: null, target: null,
+              } } } },
             { id: 'lbl', component: 'Text', text: 'Submit' },
           ],
         },
