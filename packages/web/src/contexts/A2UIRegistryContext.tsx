@@ -278,7 +278,82 @@ export function sanitizeComponentProps(
 }
 
 /**
+ * Build a map from the bare suffix of a pack-qualified component name
+ * (e.g. `AksClusterCard` from `aks/AksClusterCard`) to its fully qualified
+ * form. Suffixes that collide across packs are omitted so the coercion
+ * stays unambiguous (ambiguous names fall through to the unknown-component
+ * path in `validateAndSanitizeComponents`).
+ *
+ * Used by `coerceComponentForRegistry` so AKS composition tool output that
+ * emits bare names (common LLM drift — see #996) still resolves through the
+ * existing trust boundary instead of silently rendering `_ErrorComponent`.
+ */
+function buildBareNameIndex(registry: ClientComponentRegistry): Map<string, string> {
+  const index = new Map<string, string>();
+  const ambiguous = new Set<string>();
+  for (const name of registry.getNames()) {
+    const slash = name.indexOf('/');
+    if (slash < 0) continue;
+    const suffix = name.slice(slash + 1);
+    if (!suffix) continue;
+    if (ambiguous.has(suffix)) continue;
+    if (index.has(suffix)) {
+      index.delete(suffix);
+      ambiguous.add(suffix);
+      continue;
+    }
+    if (registry.getImpl(suffix)) continue;
+    index.set(suffix, name);
+  }
+  return index;
+}
+
+/**
+ * Normalise well-known, LLM-emission quirks into the canonical A2UI shape
+ * that `validateAndSanitizeComponents` already accepts. Coercion is
+ * **narrow** by design — any failure to normalise leaves the envelope
+ * untouched so the validator (the real trust boundary) still rejects
+ * malformed payloads.
+ *
+ * Handles:
+ *   1. `type` as a legacy alias for `component` (common MCP/tool drift).
+ *   2. Bare pack-component names (e.g. `AksClusterCard`) rewritten to their
+ *      unique pack-qualified registry entry (e.g. `aks/AksClusterCard`).
+ *
+ * See #996 DP (Nibbler: "reuse `validateAndSanitizeComponents`, don't fork
+ * it"). This helper is pre-processing for that validator, **not** a parallel
+ * validator.
+ */
+export function coerceComponentForRegistry(
+  comp: Record<string, unknown>,
+  bareNameIndex: Map<string, string>,
+): Record<string, unknown> {
+  let changed = false;
+  const next: Record<string, unknown> = { ...comp };
+
+  // (1) `type` → `component` (only when `component` is absent).
+  if (typeof next.component !== 'string' && typeof next.type === 'string') {
+    next.component = next.type;
+    delete next.type;
+    changed = true;
+  }
+
+  // (2) Bare → pack-qualified name.
+  if (typeof next.component === 'string' && next.component.indexOf('/') < 0) {
+    const qualified = bareNameIndex.get(next.component);
+    if (qualified) {
+      next.component = qualified;
+      changed = true;
+    }
+  }
+
+  return changed ? next : comp;
+}
+
+/**
  * Validate and sanitize an updateComponents payload.
+ * - Bare pack names + `type` aliases are coerced to their canonical form
+ *   before validation (see `coerceComponentForRegistry`, #996).
  * - Unknown component names → replaced with _ErrorComponent type
  * - Props parsed through the registered Zod schema (strips unknown keys)
  * - Dangerous keys stripped, URL props validated
@@ -288,7 +363,9 @@ export function validateAndSanitizeComponents(
   components: Array<Record<string, unknown>>,
   registry: ClientComponentRegistry,
 ): Array<Record<string, unknown>> {
-  return components.map(comp => {
+  const bareNameIndex = buildBareNameIndex(registry);
+  return components.map(rawComp => {
+    const comp = coerceComponentForRegistry(rawComp, bareNameIndex);
     const { id, component: componentName, ...rawProps } = comp;
 
     // Size guard
