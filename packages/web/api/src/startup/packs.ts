@@ -6,6 +6,7 @@ import { azurePackServer } from '../../../../pack-azure/src/server-manifest.js';
 import { aksAutomaticPackServer } from '../../../../pack-aks-automatic/src/server-manifest.js';
 import { githubPackServer } from '../../../../pack-github/src/server-manifest.js';
 import { randomUUID } from 'crypto';
+import { getCredentialConfig } from './credentials.js';
 
 let _registry: PackRegistry | null = null;
 
@@ -50,8 +51,10 @@ function parseEnabledPacks(raw: string | undefined): PackId[] {
  * all four packs are enabled. `core` is always registered regardless of
  * configuration because every other pack depends on it.
  *
- * Throws if pack initialization fails (e.g., manifest imports fail or assets
- * cannot be resolved). Caller must handle and recover gracefully.
+ * Validates credentials on first call before registering packs. Throws if
+ * pack initialization fails (e.g., manifest imports fail, assets cannot be
+ * resolved, or credentials are misconfigured). Caller must handle and
+ * recover gracefully.
  *
  * Logs startup events to Azure Application Insights via structured JSON logging.
  */
@@ -59,7 +62,7 @@ export function getRegistry(): PackRegistry {
   if (!_registry) {
     // Create a startup logger (trace ID for startup events)
     const startupTraceId = process.env.STARTUP_TRACE_ID || randomUUID();
-    
+
     // Create a mock InvocationContext for startup logging
     // In a real Azure Functions environment, this would be the global context
     const mockCtx = {
@@ -70,18 +73,33 @@ export function getRegistry(): PackRegistry {
         }
       },
     };
-    
+
     const logger = new Logger(mockCtx as any, 'pack-registry-startup', startupTraceId);
-    
+
+    // Validate credentials FIRST (fail fast if misconfigured)
+    try {
+      const credentialConfig = getCredentialConfig();
+      logger.info('Credentials validated', {
+        source: 'startup',
+        llm_provider: credentialConfig.provider,
+      });
+    } catch (err) {
+      logger.error('Credential validation failed', err as Error, {
+        source: 'startup',
+        error_code: 'CREDENTIAL_VALIDATION_FAILED',
+      });
+      throw err;
+    }
+
     const registry = new PackRegistry();
     const enabled = parseEnabledPacks(process.env.KICKSTART_PACKS);
-    
+
     logger.info("Pack registry initialization started", {
       source: "startup",
       enabled_packs: enabled,
       pack_count: enabled.length,
     });
-    
+
     for (const id of enabled) {
       const packStartTime = Date.now();
       try {
@@ -89,9 +107,9 @@ export function getRegistry(): PackRegistry {
           source: "startup",
           pack_id: id,
         });
-        
+
         registry.register(PACK_BY_ID[id]);
-        
+
         const duration = Date.now() - packStartTime;
         logger.info("Pack registered successfully", {
           source: "startup",
@@ -110,15 +128,15 @@ export function getRegistry(): PackRegistry {
         throw err;
       }
     }
-    
+
     try {
       const sealStartTime = Date.now();
       logger.info("Sealing registry", {
         source: "startup",
       });
-      
+
       registry.seal();
-      
+
       const duration = Date.now() - sealStartTime;
       logger.info("Registry sealed successfully", {
         source: "startup",
@@ -132,7 +150,7 @@ export function getRegistry(): PackRegistry {
       });
       throw err;
     }
-    
+
     _registry = registry;
   }
   return _registry;

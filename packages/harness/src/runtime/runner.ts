@@ -38,6 +38,7 @@ function buildModelProvider(): OpenAIProvider {
     const azureBaseUrl = endpoint.endsWith('/')
       ? `${endpoint}openai`
       : `${endpoint}/openai`;
+    console.log('[runner] Building model provider: Azure OpenAI');
     return new OpenAIProvider({
       apiKey,
       baseURL: azureBaseUrl,
@@ -46,6 +47,7 @@ function buildModelProvider(): OpenAIProvider {
   }
 
   // Standard OpenAI (dev/test) — reads OPENAI_API_KEY from env automatically
+  console.log('[runner] Building model provider: Standard OpenAI (or dev/test fallback)');
   return new OpenAIProvider({ useResponses: false });
 }
 
