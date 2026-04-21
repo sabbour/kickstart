@@ -498,6 +498,14 @@ export function useStreaming() {
                 break;
               }
 
+              case 'a2ui': {
+                if (isRawA2uiItem(parsed)) {
+                  if (debugMode) debugA2uiMessages.push(parsed as A2uiPayloadItem);
+                  callbacks.onA2UI([parsed as A2uiPayloadItem]);
+                }
+                break;
+              }
+
               case 'tool_start':
               case 'tool_done':
                 // Tool lifecycle — no UI callback needed for v2 core; future steps may add one
