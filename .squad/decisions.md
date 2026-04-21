@@ -1,3 +1,51 @@
+# Observability & AppInsights SWA Wiring — April 21, 2026
+
+**Date:** 2026-04-21T00:17:00Z  
+**Author:** Ahmed (Engineering), documented by Scribe  
+**Status:** Documented  
+**Related PR:** #976
+
+## Summary
+
+AppInsights connection-string plumbing on `kickstart-web-dev` (Static Web App) in `rg-kickstart-dev` (CloudNative subscription) was provisioned via `az staticwebapp appsettings set` on 2026-04-21. Deployment bypassed Bicep (`infra/main.bicep`) entirely due to pre-existing resources in a different subscription than `infra/parameters.dev.json` expects.
+
+### Key Facts
+
+- **SWA:** `kickstart-web-dev`
+- **Resource Group:** `rg-kickstart-dev`
+- **Subscription:** `CloudNative` (`4498459e-01d5-4a3f-b07e-8f1f36598c16`)
+- **Provisioning method:** `az staticwebapp appsettings set --setting-names "APPLICATIONINSIGHTS_CONNECTION_STRING=..."`
+- **App setting:** Must be exactly `APPLICATIONINSIGHTS_CONNECTION_STRING` (case-sensitive)
+- **SWA restart:** Automatic on app-setting change (~30–60 seconds); telemetry auto-flows after restart
+- **Code-side wiring:** Already initialized in `packages/web/api/src/startup/*` via `@azure/monitor-opentelemetry` + `applicationinsights`
+
+### Known Divergence: Subscription & Parameters Mismatch
+
+`infra/parameters.dev.json` hardcodes:
+- `swaName: "kickstart-web-dev"`, `rg: "rg-kickstart-dev"`, AppInsights `ai-kickstart-dev`
+- Assumes resources are in the subscription specified in CLI context when Bicep runs
+
+**Actual state:** Resources pre-exist in `CloudNative` subscription (`4498459e-01d5-4a3f-b07e-8f1f36598c16`), which may differ from the subscription `parameters.dev.json` was designed for.
+
+### Impact & Mitigation
+
+**Future Bicep deployments via `az deployment group create`:**
+- Will conflict (resource exists) if run against the same RG, OR
+- Will create duplicates if run in a different subscription/RG
+
+**Mitigation:** Use `az staticwebapp appsettings set` for manual AppInsights wiring (documented in PR #976). Do not re-run Bicep unless:
+1. A new Bicep template is created with parameters for `CloudNative` subscription, OR
+2. Existing resources are destroyed and Bicep provisions from scratch, OR
+3. Parameter overrides are passed to `az deployment group create` to match actual subscription/RG
+
+### Documentation
+
+**PR #976** documents:
+1. `infra/README.md` → New section "Bring-your-own AppInsights (skip full bicep deploy)"
+2. `docs-site/docs/operations/observability.md` → Complete observability runbook (setup, verification, KQL, troubleshooting)
+
+---
+
 # Decision: DP Reviews — April 17, 2026
 
 ## Hypothesis log (process experiments)
