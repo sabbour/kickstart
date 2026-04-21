@@ -556,6 +556,16 @@ export class Runner {
       sseWrite('error', {
         message: err instanceof Error ? err.message : String(err),
       });
+      // Emit `end` even on hard failure so the Debug panel can surface
+      // agentName and model. skillsExecuted/toolsExecuted may be partial.
+      sseWrite('end', {
+        sessionId: session.sessionId,
+        intent: undefined,
+        model: modelName,
+        agentName,
+        skillsExecuted,
+        toolsExecuted,
+      });
     }
   }
 
