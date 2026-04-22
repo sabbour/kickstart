@@ -15,7 +15,7 @@ import { getRegistry, getLoadErrors } from "../startup/packs.js";
 import type { PackLoadError } from "../startup/packs.js";
 import type { ComponentContribution, PlaygroundScenario } from "@aks-kickstart/harness";
 import { Logger, extractTraceId } from "../lib/logger.js";
-import { trackException, flushAppInsights } from "../lib/appinsights.js";
+import { trackException, flushAppInsights, initializeAppInsights } from "../lib/appinsights.js";
 import { sanitizeError } from "../telemetry/sanitize-error.js";
 import { randomUUID } from "node:crypto";
 
@@ -50,6 +50,7 @@ async function packs(
   request: HttpRequest,
   ctx: InvocationContext,
 ): Promise<HttpResponseInit> {
+  try { initializeAppInsights(); } catch { /* init failure must not kill the request path */ }
   const requestId = randomUUID();
   const traceId = extractTraceId(request.headers);
   const logger = new Logger(ctx, "packs", traceId).withContext({ request_id: requestId });

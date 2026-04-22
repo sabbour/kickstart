@@ -10,6 +10,7 @@
  */
 
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import * as appinsightsModule from '../lib/appinsights.js';
 
 // ---------------------------------------------------------------------------
 // Hoisted mock setup
@@ -62,6 +63,14 @@ vi.mock('zod-to-json-schema', () => ({
   zodToJsonSchema: vi.fn(() => ({ type: 'object' })),
 }));
 
+vi.mock('../lib/appinsights.js', () => ({
+  trackException: vi.fn(),
+  trackEvent: vi.fn(),
+  trackTrace: vi.fn(),
+  flushAppInsights: vi.fn().mockResolvedValue(undefined),
+  initializeAppInsights: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -101,14 +110,6 @@ function makeRegistry(overrides: Partial<{
 let packsHandler: (request: unknown, context: unknown) => Promise<unknown>;
 
 beforeAll(async () => {
-    // Mock appinsights so the side-effectful module init doesn't touch OTel globals.
-    vi.doMock('../lib/appinsights.js', () => ({
-      trackException: vi.fn(),
-      trackEvent: vi.fn(),
-      trackTrace: vi.fn(),
-      flushAppInsights: vi.fn().mockResolvedValue(undefined),
-      initializeAppInsights: vi.fn(),
-    }));
   await import('./packs.js');
   const handler = registeredHandlers.get('packs');
   if (!handler) throw new Error('packs handler not registered');
@@ -255,5 +256,18 @@ describe('GET /api/packs — error path', () => {
     expect(res.status).toBe(500);
     expect(typeof res.jsonBody.error).toBe('string');
     expect(res.jsonBody.error).not.toContain('string-throw');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// N3 — Nibbler: initializeAppInsights is called inside the handler
+// ---------------------------------------------------------------------------
+
+describe('N3 — initializeAppInsights called inside packs handler', () => {
+  it('calls initializeAppInsights as the first statement of each handler invocation', async () => {
+    const spy = vi.spyOn(appinsightsModule, 'initializeAppInsights');
+    await packsHandler(makeRequest(), makeContext());
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

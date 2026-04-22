@@ -15,6 +15,27 @@
 - (2026-04-21) When diagnosing a deployed SWA, check the GitHub Actions deploy-swa.yml run logs — the health probe runs against the freshly-deployed URL and shows the actual HTTP response body. Comparing the LAST SUCCESSFUL deploy SHA vs the FAILING deploy SHA (via `git diff --name-only`) is the fastest path to finding the regression commit.
 - (2026-04-21) Decision filed: `.squad/decisions/inbox/bender-registry-failsoft.md` — quarantine invalid skill manifests at `loadSkills()` time; collect errors into `loadErrors[]`; don't let one bad skill 503 the whole API.
 
+### 2026-04-21 — Issue #1041 Implementation: Revert OTel Externalization (PR #1051)
+
+**Task:** Implement approved DP — revert PR #1030's OTel externalization to fix 4-hour production 404 on all `/api/*` routes.
+
+**Root cause (confirmed):** `@aks-kickstart/harness: "*"` in `dependencies` (not devDependencies) causes SWA server-side npm install (even with `skip_api_build: true`) to fail resolving the private workspace package → wipes `node_modules/` → OTel externals throw `ERR_MODULE_NOT_FOUND` at worker start → no `app.http()` calls register → all routes 404.
+
+**`skip_api_build: true` only disables client-side Oryx.** Azure SWA performs its own server-side dependency resolution using the uploaded `package.json`. This is the deploy-model hazard that made externalization unsafe.
+
+**globalThis singleton is safe for bundled inline:** `@opentelemetry/api` uses `globalThis[Symbol.for('opentelemetry.js.api.1')]` for provider registry. Multiple bundled copies in the same worker process write/read the same slot — no wipeout. The externalization premise was incorrect.
+
+**Key learnings:**
+- (2026-04-21) `skip_api_build: true` in `swa-cli.config.json` does NOT prevent SWA from running server-side `npm install`. Any package in `dependencies` that can't resolve from the public registry causes a broken `node_modules/` → OTel external crashes worker → 404 on all routes.
+- (2026-04-21) **Never put private workspace packages (`@aks-kickstart/*`) in `dependencies` of a package deployed to SWA.** They must be `devDependencies` only.
+- (2026-04-21) `esbuild platform: "node"` auto-externalizes all Node.js built-ins (crypto, fs, path, buffer, etc., both bare and `node:` prefixed). When writing a "verify only @azure/functions-core is external" guard, you MUST allow node builtins using a known-builtins set (see `isNodeBuiltin()` in `verify-api-externals.mjs`).
+- (2026-04-21) esbuild writes input paths in `meta.json` as relative paths (e.g., `../../../../../node_modules/@opentelemetry/api/...`). To extract npm package names, find `node_modules/` index in the string and parse from there — don't assume absolute paths.
+- (2026-04-21) `vi.doMock` in `beforeAll` is NOT hoisted. If the test file has a top-level `import * as mod from '...'`, it resolves before `beforeAll` runs, so `vi.spyOn` on the real module won't catch calls from code that got the lazy mock. Use top-level `vi.mock` (hoisted) so all importers see the same mock instance.
+- (2026-04-21) vitest aliases must cover all subpath exports a test file imports transitively. When adding a new test file that imports a module with subpath exports (e.g., `@aks-kickstart/harness/runtime/session`), check `vitest.config.ts` resolve.alias and add missing entries.
+- (2026-04-21) Reversals of design decisions need all three test categories inverted: E2E guard scripts (T1), unit tests for the changed module (T2/T12), and handler-level integration tests (N3). Write them atomically with the code change.
+
+**PR:** #1051
+
 ### 2026-04-21 — Observability pipeline investigation (expanded) → Issues #1028, #1030
 
 **Task:** Diagnose why startup/registry errors aren't reaching Application Insights (separate from #1027), then expanded to explain why NO telemetry at all reaches AppInsights.

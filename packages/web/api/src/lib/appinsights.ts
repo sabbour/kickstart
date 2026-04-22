@@ -17,10 +17,11 @@
  *   RedactingSpanExporter rewrites attributes again before export;
  *   RedactingLogRecordProcessor sanitizes log bodies. HTTP instrumentation
  *   hooks strip query strings before the redactor runs.
- * - **Bundled safely.** Both `@azure/monitor-opentelemetry` and the OTel API
- *   packages are marked external in `esbuild.config.mjs` and materialized
- *   into `packages/web/api/node_modules/` via the postbuild script so every
- *   function bundle shares the same module identity and `globalThis` singletons.
+ * - **Bundled inline with globalThis singleton.** `@azure/monitor-opentelemetry`
+ *   and all OTel packages are bundled into each function by esbuild. Multiple
+ *   bundled copies in the same worker process share the same OTel state via
+ *   `globalThis[Symbol.for('opentelemetry.js.api.1')]` — a process-global
+ *   slot set by @opentelemetry/api itself. No external runtime deps needed.
  * - **Flush is awaitable.** `flushAppInsights()` inlines the three
  *   `forceFlush()` calls that `applicationinsights.flushAzureMonitor` does
  *   internally (trace delegate → logger → meter). Nothing is re-exported
@@ -49,10 +50,12 @@ const TRACER_NAME = "@aks-kickstart/api";
 const LOGGER_NAME = "@aks-kickstart/api";
 
 /**
- * globalThis-keyed init flag. Even with `@azure/monitor-opentelemetry`
- * externalized in esbuild, `initializeAppInsights()` can be invoked from
- * multiple handler bundles within the same worker process — we only want
- * one `useAzureMonitor()` call per process.
+ * globalThis-keyed init flag. `@opentelemetry/api` stores its provider
+ * registry on `globalThis[Symbol.for('opentelemetry.js.api.1')]`, so multiple
+ * bundled copies of the package in the same worker process all read/write the
+ * same slot. The STARTED flag below uses the same mechanism: even with
+ * OTel packages bundled inline per-function, `initializeAppInsights()` is
+ * called only once per worker process.
  */
 const STARTED = Symbol.for("kickstart.azmon.started");
 
@@ -258,13 +261,4 @@ export async function flushAppInsights(): Promise<void> {
   }
 }
 
-/**
- * Module-load side effect: start the distro ASAP so that instrumentation
- * is installed before any request handler issues a fetch.
- *
- * The globalThis-keyed guard makes this safe to run from every bundle that
- * imports this module; only the first call actually calls useAzureMonitor.
- */
-{
-  initializeAppInsights();
-}
+

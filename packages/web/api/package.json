@@ -7,7 +7,6 @@
   "main": "dist/functions/*.js",
   "scripts": {
     "build": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true})\" && node esbuild.config.mjs && node scripts/verify-api-externals.mjs",
-    "postbuild": "node scripts/materialize-api-externals.mjs",
     "build:tsc": "tsc",
     "start": "func start",
     "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
@@ -16,11 +15,6 @@
     "@aks-kickstart/harness": "*",
     "@azure/functions": "^4.6.0",
     "@azure/monitor-opentelemetry": "^1.16.0",
-    "@azure/monitor-opentelemetry-exporter": "^1.0.0-beta.39",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/api-logs": "^0.208.0",
-    "@opentelemetry/sdk-trace-base": "^2.7.0",
-    "@opentelemetry/sdk-logs": "^0.208.0",
     "applicationinsights": "^3.14.0",
     "bicep-node": "^0.0.9",
     "vite": "^8.0.9"
