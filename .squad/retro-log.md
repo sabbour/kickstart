@@ -98,6 +98,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-22 | #1064 "fix(obs): sanitize AgentSpanError stack trace before OTel export (#1040)" | M | impl=1m | review=313m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=2m | ci=8m | reviewer=human | human_comments=1 | issue=#1040 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-22 | #1065 "fix(telemetry): plug PII double-export bypass; extend redactor to links + resource" | XL | impl=0m | review=16m | cycles=1 | merged | @sabbour | first_review=0m | ci=8m | reviewer=bot | human_comments=0 | issue=#1035 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-22 | #1063 "chore: remove dead applicationinsights dep (#1037) + real tracer in T9 test (#1038)" | M | impl=0m | review=6m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=0m | ci=9m | reviewer=bot | human_comments=0 | issue=#1037 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
