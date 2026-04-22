@@ -35,16 +35,20 @@ import { join, relative, resolve as resolvePath, sep } from 'node:path';
 
 // --- Pattern set --------------------------------------------------------------
 
-// Nibbler gap 7 recommends `{20,}` to survive format drift; Zapp C1 anchors at
-// the current 36-char installation-token length. `{36,}` satisfies both: it
-// anchors at the current minimum and still matches longer future formats.
+// Nibbler PR #1091 review: tighten to EXACT {36} (not {36,}).
+// GitHub installation / PAT / OAuth tokens are exactly 36 random chars after
+// the prefix; `{36,}` allows longer pasted material to slip past in edge
+// formats. If GitHub ever publishes a different length, bump this constant
+// in a tracked PR so the change is governed.
+const TOKEN_BODY = '[A-Za-z0-9]{36}';
+
 const TOKEN_PATTERNS = [
-  { kind: 'ghs', re: /ghs_[A-Za-z0-9]{36,}/g },
-  { kind: 'ghp', re: /ghp_[A-Za-z0-9]{36,}/g },
-  { kind: 'gho', re: /gho_[A-Za-z0-9]{36,}/g },
-  { kind: 'ghu', re: /ghu_[A-Za-z0-9]{36,}/g },
-  { kind: 'ghr', re: /ghr_[A-Za-z0-9]{36,}/g },
-  { kind: 'ghe', re: /ghe_[A-Za-z0-9]{36,}/g },
+  { kind: 'ghs', re: new RegExp(`ghs_${TOKEN_BODY}`, 'g') },
+  { kind: 'ghp', re: new RegExp(`ghp_${TOKEN_BODY}`, 'g') },
+  { kind: 'gho', re: new RegExp(`gho_${TOKEN_BODY}`, 'g') },
+  { kind: 'ghu', re: new RegExp(`ghu_${TOKEN_BODY}`, 'g') },
+  { kind: 'ghr', re: new RegExp(`ghr_${TOKEN_BODY}`, 'g') },
+  { kind: 'ghe', re: new RegExp(`ghe_${TOKEN_BODY}`, 'g') },
   { kind: 'github_pat', re: /github_pat_[A-Za-z0-9_]{80,}/g },
 ];
 
@@ -164,9 +168,13 @@ function runStaged({ json, quiet }) {
 
   let stagedPaths = [];
   try {
-    stagedPaths = execFileSync('git', ['diff', '--cached', '--name-only'], {
-      encoding: 'utf-8',
-    })
+    // Filter to Added/Modified/Renamed/Copied — deletions (`D`) of a forbidden
+    // path are the REMEDIATION, not a violation.
+    stagedPaths = execFileSync(
+      'git',
+      ['diff', '--cached', '--name-only', '--diff-filter=AMRC'],
+      { encoding: 'utf-8' },
+    )
       .split('\n')
       .map((s) => s.trim())
       .filter(Boolean);
@@ -211,6 +219,10 @@ function runStaged({ json, quiet }) {
   process.exit(1);
 }
 
+// Nibbler RF1 (PR #1091 review): tracked forbidden paths are a HARD FAILURE.
+// The previous "skip as legacy" behaviour silenced the scanner at exactly
+// the surface that matters most. The only way to make the scanner "clean"
+// is to untrack the file — that is the correct incentive.
 function runTree({ json, quiet }) {
   let tracked;
   try {
@@ -224,14 +236,10 @@ function runTree({ json, quiet }) {
   }
 
   const findings = [];
-  // Identity paths that are already tracked are legacy state requiring key
-  // rotation (see .squad/identity/README.md). They're handled by a separate
-  // remediation — skip them in the tree content scan so this gate doesn't
-  // block every PR. The --staged surface still refuses any NEW add of these
-  // paths, which is what actually matters going forward.
-  const scanPaths = tracked.filter((p) => !isForbiddenPath(p));
+  const trackedForbidden = tracked.filter(isForbiddenPath);
 
-  for (const path of scanPaths) {
+  for (const path of tracked) {
+    if (isForbiddenPath(path)) continue; // reported separately as hard fail
     if (!existsSync(path)) continue;
     let st;
     try {
@@ -252,21 +260,38 @@ function runTree({ json, quiet }) {
     if (fileFindings.length > 0) findings.push(...fileFindings);
   }
 
-  if (findings.length === 0) {
-    if (!quiet) process.stderr.write(`scrub-secrets: tree clean (${scanPaths.length} files scanned, ${tracked.length - scanPaths.length} identity paths skipped as legacy)\n`);
+  if (findings.length === 0 && trackedForbidden.length === 0) {
+    if (!quiet) process.stderr.write(`scrub-secrets: tree clean (${tracked.length} files)\n`);
     return;
   }
 
   if (json) {
     process.stderr.write(
-      JSON.stringify({ surface: 'tree', findings }, null, 2) + '\n',
+      JSON.stringify(
+        { surface: 'tree', findings, trackedForbidden },
+        null,
+        2,
+      ) + '\n',
     );
   } else {
-    process.stderr.write(
-      `scrub-secrets: BLOCKED — ${findings.length} secret match(es) in tracked tree:\n`,
-    );
-    for (const f of findings) {
-      process.stderr.write(`    ${f.source}:${f.line}:${f.column}  kind=${f.kind}\n`);
+    if (findings.length > 0) {
+      process.stderr.write(
+        `scrub-secrets: BLOCKED — ${findings.length} secret match(es) in tracked tree:\n`,
+      );
+      for (const f of findings) {
+        process.stderr.write(`    ${f.source}:${f.line}:${f.column}  kind=${f.kind}\n`);
+      }
+    }
+    if (trackedForbidden.length > 0) {
+      process.stderr.write(
+        `scrub-secrets: BLOCKED — forbidden path(s) currently tracked in HEAD:\n` +
+          trackedForbidden.map((p) => `    ${p}`).join('\n') +
+          '\n' +
+          `  These paths must never be tracked. Run:\n` +
+          `    git rm --cached ${trackedForbidden.join(' ')}\n` +
+          `  If the file contained live key material, rotate the App private key BEFORE\n` +
+          `  force-removing the blob from history — see .squad/identity/README.md.\n`,
+      );
     }
   }
   process.exit(1);

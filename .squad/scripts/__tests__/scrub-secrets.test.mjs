@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   scanText,
   scrubText,
@@ -7,6 +11,9 @@ import {
   HEADER_PATTERNS,
   PEM_PATTERN,
 } from '../scrub-secrets.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const FIXTURE_ROOT = join(__dirname, '..', '..', 'runtime', 'test-fixtures');
 
 // These fixtures are synthetic — 36 arbitrary characters, never real tokens.
 const FAKE_GHS = 'ghs_' + 'A'.repeat(36);
@@ -100,5 +107,40 @@ describe('scrub-secrets / forbidden paths (Zapp C9)', () => {
     expect(isForbiddenPath('.squad/agents/fry/charter.md')).toBe(false);
     expect(isForbiddenPath('README.md')).toBe(false);
     expect(isForbiddenPath('.squad/identity/README.md')).toBe(false);
+  });
+});
+
+describe('scrub-secrets --tree / tracked forbidden paths are hard failures (Nibbler PR #1091 RF1)', () => {
+  it('fails loudly if a matching path is tracked in HEAD', () => {
+    mkdirSync(FIXTURE_ROOT, { recursive: true });
+    const root = mkdtempSync(join(FIXTURE_ROOT, 'scrub-'));
+    try {
+      execFileSync('git', ['init', '-q', root]);
+      execFileSync('git', ['-C', root, 'config', 'user.email', 'test@example.com']);
+      execFileSync('git', ['-C', root, 'config', 'user.name', 'test']);
+      mkdirSync(join(root, '.squad', 'identity', 'keys'), { recursive: true });
+      writeFileSync(join(root, '.squad', 'identity', 'keys', 'fake.pem'), 'placeholder\n');
+      writeFileSync(join(root, 'README.md'), '# test\n');
+      execFileSync('git', ['-C', root, 'add', '-A']);
+      execFileSync('git', ['-C', root, 'commit', '-q', '-m', 'init']);
+      const scriptPath = join(__dirname, '..', 'scrub-secrets.mjs');
+      let threw = false;
+      let stderr = '';
+      try {
+        execFileSync('node', [scriptPath, '--tree'], {
+          cwd: root,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch (err) {
+        threw = true;
+        stderr = (err.stderr ?? Buffer.from('')).toString();
+        expect(err.status).toBe(1);
+      }
+      expect(threw).toBe(true);
+      expect(stderr).toMatch(/forbidden path/i);
+      expect(stderr).toContain('.squad/identity/keys/fake.pem');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

@@ -341,7 +341,15 @@ prompt: |
   {% endif %}
 
   {only if identity configured:}
-  GIT IDENTITY: Commit as `{app_slug}[bot]`. Resolve the token with `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1`, verify `[ -n "$TOKEN" ] || exit 1`, and export `GH_TOKEN="$TOKEN"`. Agent-authored GitHub writes must use that app token; do not fall back to ambient `gh`/`git` auth. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
+  GIT IDENTITY: Commit as `{app_slug}[bot]`. Before any write:
+  ```bash
+  unset GH_TOKEN GITHUB_TOKEN
+  export GH_CONFIG_DIR="{team_root}/.squad/runtime/gh-config/{ceremony_id}"
+  mkdir -p "$GH_CONFIG_DIR"
+  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+  [ -n "$TOKEN" ] || exit 1
+  ```
+  Use the token **inline** on each write: `GH_TOKEN="$TOKEN" gh <command>`. **Never `export GH_TOKEN`** — the token persists in env and bleeds into `set -x` / tool-capture. After any write, run `.squad/scripts/post-flight-check.mjs` synchronously against the write actor. Agent-authored GitHub writes must use this app token; do not fall back to ambient `gh`/`git` auth. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
   {end identity block}
 
   TASK: {specific task description}
@@ -1012,7 +1020,7 @@ prompt: |
   4. SESSION LOG: Write .squad/log/{timestamp}-{topic}.md. Brief. Use ISO 8601 UTC timestamp.
   5. CROSS-AGENT: Append team updates to affected agents' history.md.
   6. HISTORY SUMMARIZATION [HARD GATE]: If any history.md >= 15360 bytes (15KB), summarize now.
-  7. GIT COMMIT: Stage only the exact `.squad/` files Scribe wrote in this session. Use `git status --porcelain` filtered to allowed paths (decisions.md, decisions-archive.md, agents/{name}/history.md, agents/{name}/history-archive.md, log/*, orchestration-log/*). Stage each file individually with `git add -- <path>`. Handle renames by extracting destination path (`-replace '^.* -> ',''`). **Before committing, run `node .squad/scripts/scrub-secrets.mjs --staged`** — if it exits non-zero, HALT the commit, do NOT auto-retry on the same files (Nibbler gap 9: self-review loop guard), and flag for Leela remediation. Commit with -F (write msg to temp file). Skip if nothing staged. ⚠️ NEVER use `git add .squad/` or broad globs.
+  7. GIT COMMIT: Stage only the exact `.squad/` files Scribe wrote in this session. Use `git status --porcelain` filtered to allowed paths (decisions.md, decisions-archive.md, agents/{name}/history.md, agents/{name}/history-archive.md, log/*, orchestration-log/*). Stage each file individually with `git add -- <path>`. Handle renames by extracting destination path (`-replace '^.* -> ',''`). **Before committing, run `node .squad/scripts/scribe-escalation-guard.mjs check --role scribe --paths <files>` — if it exits non-zero, HALT (Nibbler gap 9: self-review loop guard; auto-retry blocked for 24h). Then run `node .squad/scripts/scrub-secrets.mjs --staged` — if it exits non-zero, run `node .squad/scripts/scribe-escalation-guard.mjs record --role scribe --paths <files> --reason "<short>"` and HALT, do NOT auto-retry on the same files, flag for Leela remediation.** Commit with -F (write msg to temp file). Skip if nothing staged. ⚠️ NEVER use `git add .squad/` or broad globs.
   8. HEALTH REPORT: Log decisions.md before/after size, inbox count processed, history files summarized.
 
   Never speak to user. ⚠️ End with plain text summary after all tool calls.

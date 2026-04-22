@@ -121,22 +121,50 @@ async function getActor(kind, args, token) {
       return { login: match.actor?.login, type: match.actor?.type };
     }
     case 'pr-create': {
-      const r = await ghFetch('GET', `/repos/${owner}/${repo}/pulls/${pr}`, token);
-      if (!r.ok) return { error: `pr fetch failed: ${r.status}` };
-      return { login: r.data?.user?.login, type: r.data?.user?.type };
+      // Nibbler PR #1091 C3: verify BOTH the PR record user AND the head
+      // commit author — a bot-authored commit that was then opened as a PR
+      // under ambient human auth is the exact #1086 regression, and checking
+      // only one field misses it.
+      const prRes = await ghFetch('GET', `/repos/${owner}/${repo}/pulls/${pr}`, token);
+      if (!prRes.ok) return { error: `pr fetch failed: ${prRes.status}` };
+      const prUser = { login: prRes.data?.user?.login, type: prRes.data?.user?.type };
+      const headSha = prRes.data?.head?.sha;
+      if (!headSha) return { ...prUser, headActor: null };
+      const commitRes = await ghFetch('GET', `/repos/${owner}/${repo}/commits/${headSha}`, token);
+      const headActor = commitRes.ok
+        ? { login: commitRes.data?.author?.login, type: commitRes.data?.author?.type }
+        : null;
+      return { ...prUser, headActor };
     }
     case 'issue-edit': {
+      // Nibbler PR #1091 C4: filter the timeline to edit-shaped events only.
+      // slice(-1) picks the most recent event of ANY kind and attributes the
+      // edit to a bystander actor.
       const r = await ghFetch('GET', `/repos/${owner}/${repo}/issues/${issue}/timeline?per_page=100`, token);
       if (!r.ok) return { error: `timeline fetch failed: ${r.status}` };
-      const last = (r.data || []).slice(-1)[0];
-      if (!last) return { error: 'empty timeline' };
+      const editEvents = (r.data || []).filter((e) =>
+        e.event === 'renamed' || e.event === 'edited' || e.event === 'demilestoned' || e.event === 'milestoned' || e.event === 'locked' || e.event === 'unlocked',
+      );
+      const last = editEvents.slice(-1)[0];
+      if (!last) {
+        // Fall back to the issue record itself.
+        const issueRes = await ghFetch('GET', `/repos/${owner}/${repo}/issues/${issue}`, token);
+        if (!issueRes.ok) return { error: `issue fetch failed: ${issueRes.status}` };
+        return { login: issueRes.data?.user?.login, type: issueRes.data?.user?.type };
+      }
       return { login: last.actor?.login, type: last.actor?.type };
     }
     case 'commit': {
       const r = await ghFetch('GET', `/repos/${owner}/${repo}/commits/${sha}`, token);
       if (!r.ok) return { error: `commit fetch failed: ${r.status}` };
-      // Prefer the GitHub "author" (login+type) over the raw git author.
-      return { login: r.data?.author?.login, type: r.data?.author?.type };
+      // Zapp PR #1091 N2: explicit "unattributable" path when the commit
+      // email can't be resolved to a GitHub user.
+      if (!r.data?.author) {
+        return {
+          error: `commit ${sha.slice(0, 8)} has no GitHub-resolved author (author.login === null). Commit email may not match any GitHub user.`,
+        };
+      }
+      return { login: r.data.author.login, type: r.data.author.type };
     }
     default:
       return { error: `unknown kind: ${kind}` };
@@ -204,8 +232,15 @@ async function main() {
 
   const loginOk = actor.login === args.expectedLogin;
   const typeOk = actor.type === 'Bot';
+  // For pr-create, ALSO require the head commit to be authored by the same bot.
+  // This closes the regression where a bot commit is opened as a PR under
+  // ambient human auth (#1086 / #1087).
+  const headActorOk =
+    args.kind !== 'pr-create' ||
+    !actor.headActor ||
+    (actor.headActor.login === args.expectedLogin && actor.headActor.type === 'Bot');
 
-  if (loginOk && typeOk) {
+  if (loginOk && typeOk && headActorOk) {
     const msg = `post-flight-check: OK  kind=${args.kind} login=${actor.login} type=Bot\n`;
     if (args.json) {
       process.stdout.write(JSON.stringify({ ok: true, kind: args.kind, login: actor.login, type: actor.type }) + '\n');
@@ -223,7 +258,12 @@ async function main() {
     expectedLogin: args.expectedLogin,
     actualLogin: actor.login ?? null,
     actualType: actor.type ?? null,
-    reason: !typeOk ? 'user.type !== "Bot"' : 'login mismatch',
+    reason: !typeOk
+      ? 'user.type !== "Bot"'
+      : !loginOk
+        ? 'login mismatch'
+        : 'head commit actor mismatch',
+    headActor: actor.headActor ?? null,
     revoke,
   };
   if (args.json) {

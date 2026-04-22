@@ -99,13 +99,22 @@ a log file, or `events.jsonl`:
 ## Known legacy state (pre-#1087)
 
 At the time of this runbook's introduction, `.squad/identity/keys/*.pem` and
-`.squad/identity/apps/*.json` are already tracked in `HEAD` despite being
+`.squad/identity/apps/*.json` were already tracked in `HEAD` despite being
 listed in `.gitignore` (gitignore does not untrack already-committed files).
-The tree-scan surface skips these paths to avoid blocking every PR; the
-staged surface still refuses any **new** add of these paths. Migrating out
-of this legacy state requires coordinated key rotation on the GitHub App
-side and is tracked as a follow-up — do not `git rm --cached` these files
-in a routine PR without rotating the underlying app keys first.
+
+**Round 2 of PR #1091 resolves the tree side of this legacy state:**
+
+- The 4 `.pem` files and 4 `.json` files are now `git rm --cached`'d in this
+  PR so the tree-scan surface no longer has to special-case them.
+- `runTree()` now hard-fails on any tracked forbidden path (no more
+  silent skip), which is why the `git rm --cached` is required in the same
+  commit as the CI gate.
+- The keys remain in git **history** (since v0.5.5, commit `c222ac78`). An
+  actual key rotation on the GitHub App side is a separate P1 tracked in a
+  follow-up issue — linked from this PR's description.
+- Until that rotation lands, the leaked material in history must be treated
+  as compromised. New App private keys will be provisioned and installed
+  locally via this runbook's `Adding a new role` flow.
 
 ## Known incidents
 
