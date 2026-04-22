@@ -52,8 +52,7 @@ workspace under one trace id.
   `config({ jitless: true })` as the first import in `main.tsx`, and
   `vite.config.ts` aliases `zod/v4` to the root `node_modules/zod/v4`
   install so the mutation targets the exact `globalConfig` singleton the
-  bundled v4 code reads. `registerPackComponents` is also dynamic-imported
-  from `main.tsx` as an orthogonal boot-chunk hygiene win. No
+  bundled v4 code reads. No
   `'unsafe-eval'`, no schema edits, no pack/harness dependency changes.
 
 ### Kill switch

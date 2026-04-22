@@ -106,41 +106,30 @@ for (const impl of richComponents) {
 // pack's ./client subpath. Registers them under their pack-qualified names
 // (e.g. "azure/AzureResourceCard") so the LLM can emit pack components in chat
 // and Playground can render them via the same A2UI pipeline as core/*.
-//
-// IMPORTANT — `@aks-kickstart/pack-*` declare `zod@^4.1.12` whereas
-// `packages/web` is pinned to `zod@^3` (via `"zod": "^3.25.76"`). Eagerly
-// importing the pack client modules at boot would drag Zod v4's module graph
-// into the first chunk; Zod v4's `allowsEval` probe (`new Function("")`) then
-// trips `script-src 'self'` without `'unsafe-eval'`. We dynamic-import the
-// bootstrap module so pack renderers (and their v4 Zod) land in a separate
-// async chunk loaded alongside React mount — no boot-time eval under CSP, no
-// library swap, no schema changes. See issue #1042.
-void (async () => {
-  const { registerPackComponents } = await import('./bootstrap/registerPackComponents');
-  registerPackComponents(clientRegistry);
+import { registerPackComponents } from './bootstrap/registerPackComponents';
+registerPackComponents(clientRegistry);
 
-  // Step 2: Seal — ReadonlyMap, no further registrations accepted
-  clientRegistry.seal();
+// Step 2: Seal — ReadonlyMap, no further registrations accepted
+clientRegistry.seal();
 
-  // Session-scoped artifact store — one per page load, no singleton fallback.
-  const sessionArtifactStore = new InMemoryArtifactStore();
+// Session-scoped artifact store — one per page load, no singleton fallback.
+const sessionArtifactStore = new InMemoryArtifactStore();
 
-  // Step 3: Mount React (only after seal)
-  ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-      <ThemeProvider>
-        <DebugProvider>
-          <A2UIRegistryProvider>
-            <APIConnectorProvider>
-              <ArtifactProvider store={sessionArtifactStore}>
-                <VirtualFSProvider>
-                  <App />
-                </VirtualFSProvider>
-              </ArtifactProvider>
-            </APIConnectorProvider>
-          </A2UIRegistryProvider>
-        </DebugProvider>
-      </ThemeProvider>
-    </React.StrictMode>
-  );
-})();
+// Step 3: Mount React (only after seal)
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ThemeProvider>
+      <DebugProvider>
+        <A2UIRegistryProvider>
+          <APIConnectorProvider>
+            <ArtifactProvider store={sessionArtifactStore}>
+              <VirtualFSProvider>
+                <App />
+              </VirtualFSProvider>
+            </ArtifactProvider>
+          </APIConnectorProvider>
+        </A2UIRegistryProvider>
+      </DebugProvider>
+    </ThemeProvider>
+  </React.StrictMode>
+);
