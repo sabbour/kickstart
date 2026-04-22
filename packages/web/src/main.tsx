@@ -8,6 +8,20 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { DebugProvider } from './contexts/DebugContext';
 import { A2UIRegistryProvider, clientRegistry } from './contexts/A2UIRegistryContext';
 import { InMemoryArtifactStore } from '@aks-kickstart/harness';
+import { fetchBrowserTelemetryConfig, initBrowserTelemetry } from './lib/browser-appinsights';
+
+// Browser telemetry bootstrap (issue #1042 / DP-D revision 2). Flag-gated,
+// disabled by default; any init failure is swallowed so telemetry can never
+// break app boot. Runs before React mounts so the first /api/converse fetch
+// is already instrumented.
+void (async () => {
+  try {
+    const config = await fetchBrowserTelemetryConfig();
+    initBrowserTelemetry(config);
+  } catch {
+    // Silent — telemetry is non-critical.
+  }
+})();
 
 // ---------------------------------------------------------------------------
 // Phase A bootstrap ordering (DP Step 10)
