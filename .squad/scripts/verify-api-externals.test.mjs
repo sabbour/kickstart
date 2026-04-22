@@ -21,10 +21,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 const META = resolve(here, "../../packages/web/api/dist/meta.json");
 
 const OTEL_PACKAGES = [
-  "@azure/monitor-opentelemetry",
   "@azure/monitor-opentelemetry-exporter",
   "@opentelemetry/api",
   "@opentelemetry/api-logs",
+  "@opentelemetry/sdk-node",
 ];
 
 describe("T1 — bundle-everything (issue #1041, revert #1030)", () => {

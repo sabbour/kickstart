@@ -2,30 +2,39 @@
  * Application Insights / Azure Monitor OpenTelemetry wiring for the API
  * Functions worker.
  *
- * ## Design contract (DP #1030, amendments 1–3)
+ * ## Design contract (DP #1030, amendments 1–3; DP #1035 security fix)
  *
- * - **Single-init.** `useAzureMonitor()` is the only OTel bootstrap in this
- *   process. `applicationinsights`'s classic SDK is never imported from API
- *   code (enforced via ESLint `no-restricted-imports`). That kills the
- *   "double useAzureMonitor() wipes the OTel global registry" defect.
+ * - **Single trace path (DP #1035).** The ONLY trace export path is:
+ *   `OTel global TracerProvider → BatchSpanProcessor(RedactingSpanExporter(AzureMonitorTraceExporter))`.
+ *   `useAzureMonitor()` is NOT used — it always registers its own internal
+ *   `BatchSpanProcessor(AzureMonitorTraceExporter)` alongside any user-supplied
+ *   `spanProcessors`, creating a double-export (raw PII leak).  Option A of
+ *   DP-A was validated and found infeasible: the distro's TraceHandler creates
+ *   its internal exporter unconditionally, falling back to the
+ *   APPLICATIONINSIGHTS_CONNECTION_STRING env var even when
+ *   `azureMonitorExporterOptions` is omitted.  Option B (NodeSDK direct) is
+ *   therefore implemented here.
  * - **Pure OTel manual telemetry.** `trackException` / `trackTrace` /
  *   `trackEvent` emit through `@opentelemetry/api` / `@opentelemetry/api-logs`
  *   so they inherit the same pipeline (RedactingSpanExporter,
  *   RedactingLogRecordProcessor, instrumentation hooks) as auto-collected
  *   telemetry.
  * - **Redaction is defense-in-depth.** Helpers pre-sanitize at the boundary;
- *   RedactingSpanExporter rewrites attributes again before export;
- *   RedactingLogRecordProcessor sanitizes log bodies. HTTP instrumentation
- *   hooks strip query strings before the redactor runs.
- * - **Bundled inline with globalThis singleton.** `@azure/monitor-opentelemetry`
- *   and all OTel packages are bundled into each function by esbuild. Multiple
- *   bundled copies in the same worker process share the same OTel state via
- *   `globalThis[Symbol.for('opentelemetry.js.api.1')]` — a process-global
- *   slot set by @opentelemetry/api itself. No external runtime deps needed.
+ *   RedactingSpanExporter rewrites span attributes, events, links, and resource
+ *   attributes before export; RedactingLogRecordProcessor sanitizes log bodies.
+ *   HTTP instrumentation hooks strip query strings before the redactor runs.
+ * - **Bundled inline with globalThis singleton.** All OTel packages are bundled
+ *   into each function by esbuild. Multiple bundled copies in the same worker
+ *   process share the same OTel state via
+ *   `globalThis[Symbol.for('opentelemetry.js.api.1')]`.
  * - **Flush is awaitable.** `flushAppInsights()` inlines the three
- *   `forceFlush()` calls that `applicationinsights.flushAzureMonitor` does
- *   internally (trace delegate → logger → meter). Nothing is re-exported
- *   from `applicationinsights`.
+ *   `forceFlush()` calls (trace delegate → logger → meter). Nothing is
+ *   re-exported from `applicationinsights` or `@azure/monitor-opentelemetry`.
+ *
+ * ## CI guard
+ * `ci.yml` contains a grep step that fails if `azureMonitorExporterOptions`
+ * appears alongside `spanProcessors` in this file. Do not re-introduce the
+ * pattern — it creates an unredacted duplicate export path.
  */
 
 import {
@@ -37,11 +46,18 @@ import {
   type TracerProvider,
 } from "@opentelemetry/api";
 import { logs, SeverityNumber } from "@opentelemetry/api-logs";
-import { useAzureMonitor } from "@azure/monitor-opentelemetry";
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ClientRequest } from "node:http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { AzureMonitorTraceExporter } from "@azure/monitor-opentelemetry-exporter";
+import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import {
+  AzureMonitorTraceExporter,
+  AzureMonitorLogExporter,
+  AzureMonitorMetricExporter,
+} from "@azure/monitor-opentelemetry-exporter";
 import { RedactingSpanExporter } from "./redacting-span-exporter.js";
 import { RedactingLogRecordProcessor } from "./redacting-log-processor.js";
 import { sanitizeError, sanitizeText } from "../telemetry/sanitize-error.js";
@@ -105,9 +121,19 @@ function buildHttpHooks() {
 }
 
 /**
- * Initialize the Azure Monitor OpenTelemetry distro exactly once per worker
- * process. Safe to call from any number of bundles / handlers — subsequent
- * calls are a cheap no-op.
+ * Initialize the OpenTelemetry SDK exactly once per worker process, wiring
+ * Azure Monitor exporters through the redacting pipeline.
+ *
+ * **Trace pipeline (single path):** NodeSDK registers exactly one
+ * BatchSpanProcessor wrapping RedactingSpanExporter(AzureMonitorTraceExporter).
+ * No raw AzureMonitorTraceExporter is registered outside this wrapper.
+ *
+ * **Log pipeline:** RedactingLogRecordProcessor runs before
+ * BatchLogRecordProcessor(AzureMonitorLogExporter), ensuring logs are scrubbed
+ * before they leave the SDK.
+ *
+ * **Metric pipeline:** PeriodicExportingMetricReader(AzureMonitorMetricExporter)
+ * provides standard metric export to App Insights.
  *
  * Telemetry-init failures MUST NOT propagate: the API continues to serve
  * requests; manual `trackX` helpers fall back to no-op tracer/logger.
@@ -125,23 +151,34 @@ export function initializeAppInsights(): void {
   }
 
   try {
-    const redactingExporter = new RedactingSpanExporter(
-      new AzureMonitorTraceExporter({ connectionString }),
-    );
+    // Trace: single redacting path only. RedactingSpanExporter wraps the raw
+    // exporter so NO unredacted span data reaches App Insights.
+    const traceExporter = new AzureMonitorTraceExporter({ connectionString });
+    const redactingSpanExporter = new RedactingSpanExporter(traceExporter);
+    const spanProcessor = new BatchSpanProcessor(redactingSpanExporter);
 
-    useAzureMonitor({
-      azureMonitorExporterOptions: { connectionString },
-      spanProcessors: [new BatchSpanProcessor(redactingExporter)],
-      logRecordProcessors: [new RedactingLogRecordProcessor()],
-      instrumentationOptions: {
-        http: {
+    // Logs: redacting processor runs before the batch processor.
+    const logExporter = new AzureMonitorLogExporter({ connectionString });
+    const batchLogProcessor = new BatchLogRecordProcessor(logExporter);
+
+    // Metrics: standard periodic export.
+    const metricExporter = new AzureMonitorMetricExporter({ connectionString });
+    const metricReader = new PeriodicExportingMetricReader({ exporter: metricExporter });
+
+    const sdk = new NodeSDK({
+      spanProcessors: [spanProcessor],
+      logRecordProcessors: [new RedactingLogRecordProcessor(), batchLogProcessor],
+      metricReaders: [metricReader],
+      instrumentations: [
+        new HttpInstrumentation({
           enabled: true,
           ...buildHttpHooks(),
           // Do NOT set headersToSpanAttributes — defaults do not capture
           // auth/cookie/key headers and we want to keep it that way.
-        },
-      },
+        }),
+      ],
     });
+    sdk.start();
 
     markStarted();
   } catch (err) {
@@ -262,3 +299,14 @@ export async function flushAppInsights(): Promise<void> {
 }
 
 
+
+/**
+ * Module-load side effect: initialize telemetry ASAP so instrumentation is
+ * active before any request handler issues a fetch or logs a record.
+ *
+ * The globalThis-keyed guard makes this safe to run from every bundle that
+ * imports this module; only the first call actually starts the NodeSDK.
+ */
+{
+  initializeAppInsights();
+}

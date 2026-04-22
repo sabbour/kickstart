@@ -31,9 +31,10 @@ function isNodeBuiltin(path) {
 }
 
 const MUST_BE_INLINED = [
-  "@azure/monitor-opentelemetry",
+  "@azure/monitor-opentelemetry-exporter",
   "@opentelemetry/api",
   "@opentelemetry/api-logs",
+  "@opentelemetry/sdk-node",
 ];
 
 function fail(msg) {
