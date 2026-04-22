@@ -13,7 +13,8 @@
 
 import { randomUUID } from 'node:crypto';
 import { Agent, Runner as SDKRunner, tool, setDefaultModelProvider, OpenAIProvider, setTraceProcessors } from '@openai/agents';
-import type { FunctionTool } from '@openai/agents';
+import type { FunctionTool, AgentInputItem } from '@openai/agents';
+import type { Turn } from '../types/session.js';
 import { OtelBridgeTraceProcessor } from './agents-otel-bridge.js';
 import type { AgentContribution } from '../types/agent.js';
 import type { ToolContribution } from '../types/tool.js';
@@ -310,6 +311,64 @@ export function resolveOutputText(finalOutput: unknown, fullText: string): strin
 }
 
 // ---------------------------------------------------------------------------
+// Conversation history threading (#1062 Layer 0)
+// ---------------------------------------------------------------------------
+
+/**
+ * Feature flag: when true, the Runner threads `session.recentTurns` into the
+ * SDK on every turn instead of sending only the current `guardedMessage`.
+ *
+ * Default: OFF in first merge. Flipped to ON in a follow-up after preview
+ * validation (see DP v3 rollout plan on #1062).
+ *
+ * Env values "1" or "true" (case-insensitive) enable the feature.
+ */
+export function isHistoryEnabled(): boolean {
+  const raw = process.env.HARNESS_SESSION_HISTORY_ENABLED;
+  if (!raw) return false;
+  const v = raw.trim().toLowerCase();
+  return v === '1' || v === 'true';
+}
+
+/**
+ * Convert a bounded list of `session.recentTurns` into the SDK's
+ * `AgentInputItem[]` shape expected by `Runner.run()`.
+ *
+ * **Role filter (Z1):** Only `user` and `assistant` turns are replayed. Any
+ * `system`/`tool` turns in `recentTurns` are dropped — the SDK re-injects
+ * system instructions from the `Agent` on every call, and we never record
+ * raw tool-call/tool-result items in `recentTurns` today (runner only records
+ * `role: 'user' | 'assistant'` Turn rows). Dropping them keeps the replay
+ * shape clean and avoids leaking tool outputs that predate the current
+ * guardrail policy.
+ *
+ * **Empty-content guard:** Turns with no string content are dropped — an
+ * empty assistant message is not a useful replay item and the SDK requires
+ * a non-empty string for user items and at least one content block for
+ * assistant items.
+ *
+ * Exported for unit-testing (Z1, regression guard for #1062).
+ */
+export function toAgentInputItems(turns: readonly Turn[]): AgentInputItem[] {
+  const items: AgentInputItem[] = [];
+  for (const turn of turns) {
+    const text = typeof turn.content === 'string' ? turn.content : '';
+    if (!text) continue;
+    if (turn.role === 'user') {
+      items.push({ role: 'user', content: text } as AgentInputItem);
+    } else if (turn.role === 'assistant') {
+      items.push({
+        role: 'assistant',
+        status: 'completed',
+        content: [{ type: 'output_text', text }],
+      } as AgentInputItem);
+    }
+    // system / tool turns intentionally dropped — see doc-comment.
+  }
+  return items;
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 
@@ -323,7 +382,10 @@ export class Runner {
     signal?: AbortSignal,
   ): Promise<void> {
     sseWrite('start', { sessionId: session.sessionId });
-    session.recordTurn({ role: 'user', content: userMessage });
+    // NOTE(#1062 Z2): the user turn is recorded AFTER input guardrails run so
+    // sanitized text lands in `recentTurns` (guardrail-on-capture). Recording
+    // the raw userMessage here would persist pre-guardrail PII/credentials and
+    // replay them on every subsequent turn when history threading is enabled.
 
     const agentName = session.activeAgent;
     let agentContrib: AgentContribution;
@@ -356,6 +418,10 @@ export class Runner {
       sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
       return;
     }
+
+    // Record the SANITIZED user turn (Z2: guardrail-on-capture). The 50-turn
+    // sliding window in Session.recordTurn keeps recentTurns bounded.
+    session.recordTurn({ role: 'user', content: guardedMessage });
 
     // ── Tool guardrail setup ────────────────────────────────────────────────
     const toolGuardrails = this.registry.getGuardrailsByStage('tool');
@@ -422,7 +488,21 @@ export class Runner {
 
     try {
       const sdkRunner = getSdkRunner();
-      const result = await sdkRunner.run(agent, guardedMessage, {
+
+      // #1062 Layer 0: thread conversation history across turns when the
+      // feature flag is on. `session.recentTurns` already contains the
+      // sanitized current user turn (appended after input guardrails above);
+      // passing the whole history as `AgentInputItem[]` gives the model full
+      // context of the conversation instead of the single current message.
+      //
+      // Flag OFF path is byte-identical to pre-#1062 behavior: pass the bare
+      // `guardedMessage` string — the SDK treats that as a one-shot user item
+      // with no history.
+      const runInput: string | AgentInputItem[] = isHistoryEnabled()
+        ? toAgentInputItems(session.recentTurns)
+        : guardedMessage;
+
+      const result = await sdkRunner.run(agent, runInput, {
         stream: true,
         context: session,
         signal: abortCtrl.signal,
