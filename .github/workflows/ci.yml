@@ -125,6 +125,25 @@ jobs:
           fi
           echo "✅ Smoke gate integrity verified"
 
+      - name: Guard against useAzureMonitor double-init regression
+        run: |
+          # Protects the single-init invariant from DP #1030 / DP #1035.
+          # The real regression pattern is *multiple* useAzureMonitor() call-sites
+          # in appinsights.ts — a second call wipes the OTel global registry and
+          # re-wires the exporter pipeline, bypassing RedactingSpanExporter.
+          # Count call-sites (literal `useAzureMonitor(`). Expect exactly one.
+          APP_INSIGHTS=packages/web/api/src/lib/appinsights.ts
+          if [ ! -f "$APP_INSIGHTS" ]; then
+            echo "::error file=$APP_INSIGHTS::Guard failed: expected file not found."
+            exit 1
+          fi
+          count=$(grep -cE '\buseAzureMonitor[[:space:]]*\(' "$APP_INSIGHTS" || true)
+          if [ "$count" != "1" ]; then
+            echo "::error file=$APP_INSIGHTS::Regression: expected exactly 1 reference to useAzureMonitor( in appinsights.ts, found $count. Multiple call-sites re-initialize the OTel global TracerProvider and break the single-path redaction pipeline (DP #1030 / DP #1035). Zero references means the documented invariant anchor was removed."
+            exit 1
+          fi
+          echo "✅ appinsights.ts useAzureMonitor single-init invariant verified (count=1)"
+
       - name: Changeset status
         if: steps.docs_gate.outputs.requireChangeset == 'true'
         run: |
