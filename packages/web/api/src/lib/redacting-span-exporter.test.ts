@@ -1,46 +1,23 @@
 /**
  * T9 — SpanProcessor redaction (DP #1030 amendments 2+3).
  *
- * We do NOT construct a real BasicTracerProvider here because the root
- * `vitest.config.ts` aliases `@opentelemetry/api` to a minimal harness stub
- * (the real OTel API isn't needed for most unit tests). Instead we feed the
- * exporter hand-built ReadableSpan objects whose shape exercises the two
- * hazards the redactor has to survive:
- *   1. Prototype methods (`spanContext()`) — must not be lost by `{...span}`.
- *   2. Getter-backed fields (`duration`, `ended`) on a class prototype —
- *      must not be lost by `{...span}`.
+ * Uses a real BasicTracerProvider from @opentelemetry/sdk-trace-base so that
+ * the SpanImpl prototype chain (spanContext() method, duration/ended getters)
+ * matches production exactly. This guarantees future SDK changes to the real
+ * prototype are caught here rather than by the hand-rolled FakeSpanImpl that
+ * previously drifted from the SDK.
  *
- * If redactSpan ever regresses to an object-spread clone, tests (1) and (2)
- * will surface TypeError / undefined access the way production would.
+ * The root vitest.config.ts aliases @opentelemetry/api to a harness stub, but
+ * BasicTracerProvider only needs context.active() (→ returns {}) and diag
+ * (→ no-op logging) from that stub — both are present. Span construction and
+ * the prototype chain come entirely from sdk-trace-base and are unaffected.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import type { SpanExporter, ExportResult } from "@opentelemetry/sdk-trace-base";
 import { RedactingSpanExporter, redactSpan } from "./redacting-span-exporter.js";
-
-// Minimal SpanImpl-style class with prototype methods + getters, mirroring
-// the real @opentelemetry/sdk-trace-base SpanImpl surface that tripped us up.
-class FakeSpanImpl {
-  name = "unit-under-test";
-  kind = 0;
-  startTime: [number, number] = [0, 0];
-  endTime: [number, number] = [0, 0];
-  status = { code: 0 };
-  attributes: Record<string, unknown> = {};
-  links: unknown[] = [];
-  events: { name: string; attributes: Record<string, unknown>; time: [number, number] }[] = [];
-  resource = { attributes: {}, merge() { return this; } };
-  instrumentationScope = { name: "test" };
-  droppedAttributesCount = 0;
-  droppedEventsCount = 0;
-  droppedLinksCount = 0;
-  _ctx = { traceId: "a".repeat(32), spanId: "b".repeat(16), traceFlags: 1 };
-
-  spanContext() { return this._ctx; }
-  get duration(): [number, number] { return [0, 0]; }
-  get ended(): boolean { return true; }
-}
 
 class CapturingExporter implements SpanExporter {
   captured: ReadableSpan[] = [];
@@ -53,27 +30,38 @@ class CapturingExporter implements SpanExporter {
 }
 
 describe("RedactingSpanExporter (T9)", () => {
+  let tracerProvider: BasicTracerProvider;
+
+  beforeEach(() => {
+    tracerProvider = new BasicTracerProvider();
+  });
+
+  afterEach(async () => {
+    await tracerProvider.shutdown();
+  });
+
   it("scrubs URLs, attributes, and exception events while preserving prototype methods + getters", async () => {
     const sink = new CapturingExporter();
     const exporter = new RedactingSpanExporter(sink);
 
-    const span = new FakeSpanImpl() as unknown as ReadableSpan;
-    (span as FakeSpanImpl).attributes = {
-      "http.url": "https://example.com/api/health?code=SECRET&api-key=abc",
-      "note": "contains APPLICATIONINSIGHTS_CONNECTION_STRING=Endpoint=https://example.in.applicationinsights.azure.com/;InstrumentationKey=00000000-0000-0000-0000-000000000001 should disappear",
-    };
-    (span as FakeSpanImpl).events = [{
-      name: "exception",
-      time: [0, 0],
-      attributes: {
-        "exception.type": "Error",
-        "exception.message": "bearer eyJhbGciOi.abc.def should vanish",
-        "exception.stacktrace": "Error: bearer eyJhbGciOi.abc.def\n  at fn (/secret/path.ts:1:1)",
-      },
-    }];
+    const tracer = tracerProvider.getTracer("test");
+    const span = tracer.startSpan("unit-under-test");
+    span.setAttribute("http.url", "https://example.com/api/health?code=SECRET&api-key=abc");
+    span.setAttribute(
+      "note",
+      "contains APPLICATIONINSIGHTS_CONNECTION_STRING=Endpoint=https://example.in.applicationinsights.azure.com/;InstrumentationKey=00000000-0000-0000-0000-000000000001 should disappear",
+    );
+    span.addEvent("exception", {
+      "exception.type": "Error",
+      "exception.message": "bearer eyJhbGciOi.abc.def should vanish",
+      "exception.stacktrace": "Error: bearer eyJhbGciOi.abc.def\n  at fn (/secret/path.ts:1:1)",
+    });
+    span.end();
+
+    const readableSpan = span as unknown as ReadableSpan;
 
     await new Promise<void>((resolve) =>
-      exporter.export([span], () => resolve()),
+      exporter.export([readableSpan], () => resolve()),
     );
 
     expect(sink.captured).toHaveLength(1);
@@ -81,7 +69,7 @@ describe("RedactingSpanExporter (T9)", () => {
 
     // (1) Prototype method preservation — TypeError if object-spread was used.
     expect(typeof exported.spanContext).toBe("function");
-    expect(exported.spanContext().traceId).toBe("a".repeat(32));
+    expect(exported.spanContext().traceId).toMatch(/^[0-9a-f]{32}$/);
 
     // (2) Getter-backed fields survive Proxy wrap.
     expect(exported.ended).toBe(true);
@@ -115,12 +103,15 @@ describe("RedactingSpanExporter (T9)", () => {
   });
 
   it("redactSpan returns a Proxy view, not a mutated input reference", () => {
-    const span = new FakeSpanImpl() as unknown as ReadableSpan;
-    (span as FakeSpanImpl).attributes = { "http.url": "https://x/?code=S" };
-    const out = redactSpan(span);
-    expect(out).not.toBe(span);
+    const tracer = tracerProvider.getTracer("test");
+    const span = tracer.startSpan("unit-under-test");
+    span.setAttribute("http.url", "https://x/?code=S");
+    span.end();
+    const readableSpan = span as unknown as ReadableSpan;
+    const out = redactSpan(readableSpan);
+    expect(out).not.toBe(readableSpan);
     expect((out.attributes["http.url"] as string)).toContain("?<redacted>");
     // Original input attributes must remain untouched.
-    expect(((span as FakeSpanImpl).attributes["http.url"] as string)).toContain("code=S");
+    expect((readableSpan.attributes["http.url"] as string)).toContain("code=S");
   });
 });
