@@ -56,7 +56,9 @@ function loadIdentityConfig(projectRoot) {
 }
 
 const ROLE_ALIASES = {
-  lead: ['lead', 'leela', 'zapp', 'nibbler', 'architect', 'architecture', 'coordinator', 'squad'],
+  lead: ['lead', 'leela', 'architect', 'architecture', 'coordinator', 'squad'],
+  zapp: ['zapp'],
+  nibbler: ['lead'],
   ralph: ['ralph'],
   backend: ['backend', 'bender', 'core', 'core-dev', 'backend-dev'],
   frontend: ['frontend', 'fry', 'ui', 'frontend-dev'],
