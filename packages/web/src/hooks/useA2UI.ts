@@ -32,6 +32,61 @@ export interface A2UIHandle {
   reset: () => void;
 }
 
+/**
+ * Filter an incoming A2UI message batch before handing it to the processor.
+ *
+ * Layer 3 of #1062 (#1060): if a `createSurface` targets a surface that is
+ * already present on the canvas, drop that create message (no-op) — any
+ * subsequent `updateComponents` for the same surface still lands normally so
+ * the agent can update an existing surface without a duplicate-header remount.
+ *
+ * Pure and exported so it can be exercised without a React rendering context.
+ *
+ * @returns Filtered batch + the list of surfaceIds referenced by createSurface
+ *          messages (including those that were dropped as duplicates). Callers
+ *          use the returned IDs to list the rendered surfaces without
+ *          special-casing "already existed".
+ */
+export function _filterMessagesForProcessor(
+  msgs: A2uiMsg[],
+  hasSurface: (id: string) => boolean,
+  validateComponents: (raw: Array<Record<string, unknown>>) => unknown,
+  catalogId: string,
+): { safeMessages: A2uiMsg[]; surfaceIds: string[] } {
+  const surfaceIds: string[] = [];
+  const safeMessages: A2uiMsg[] = [];
+  for (const msg of msgs) {
+    if (msg.updateComponents) {
+      const rawComponents = msg.updateComponents.components as Array<Record<string, unknown>>;
+      const validated = validateComponents(rawComponents);
+      safeMessages.push({
+        ...msg,
+        updateComponents: { ...msg.updateComponents, components: validated as any },
+      });
+      continue;
+    }
+    if (msg.createSurface) {
+      const targetId = msg.createSurface.surfaceId;
+      if (hasSurface(targetId)) {
+        // eslint-disable-next-line no-console
+        console.debug(
+          `[useA2UI] createSurface dropped: surface "${targetId}" already exists (treating as update / no-op).`,
+        );
+        surfaceIds.push(targetId);
+        continue;
+      }
+      surfaceIds.push(targetId);
+      safeMessages.push({
+        ...msg,
+        createSurface: { ...msg.createSurface, catalogId },
+      });
+      continue;
+    }
+    safeMessages.push(msg);
+  }
+  return { safeMessages, surfaceIds };
+}
+
 export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   const processorRef = useRef<MessageProcessor<ReactComponentImplementation> | null>(null);
   const subscriptionsRef = useRef<Array<{ unsubscribe(): void }>>([]);
@@ -99,33 +154,22 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   const processor = processorRef.current;
 
   const processMessages = useCallback((msgs: A2uiMsg[]): string[] => {
-    const surfaceIds: string[] = [];
-
     // Pre-render validation (Zapp Crit1 / Phase B):
     // Validate and sanitize component props before they reach the A2UI processor.
-    const safeMessages = msgs.map(msg => {
-      if (msg.updateComponents) {
-        const rawComponents = msg.updateComponents.components as Array<Record<string, unknown>>;
+    const { safeMessages, surfaceIds } = _filterMessagesForProcessor(
+      msgs,
+      (id) => Boolean(processor.model.getSurface(id)),
+      (rawComponents) =>
         // Clean-break validation (no back-compat shim): any component whose
         // raw envelope violates the v0.9 spec (e.g. legacy `label` / `onClick`
         // / `items` / `placeholder` / `value` / `disabled` / `onChange` keys
         // the catalog schema no longer accepts) is rejected here and replaced
         // with `_ErrorComponent` by `validateAndSanitizeComponents`. See #984.
-        const validated = clientRegistry.isSealed
+        clientRegistry.isSealed
           ? validateAndSanitizeComponents(rawComponents, clientRegistry)
-          : rawComponents;
-        return { ...msg, updateComponents: { ...msg.updateComponents, components: validated } };
-      }
-      if (msg.createSurface) {
-        // Force all surfaces to use our catalog ID
-        surfaceIds.push(msg.createSurface.surfaceId);
-        return {
-          ...msg,
-          createSurface: { ...msg.createSurface, catalogId: KICKSTART_CATALOG_ID },
-        };
-      }
-      return msg;
-    });
+          : rawComponents,
+      KICKSTART_CATALOG_ID,
+    );
 
     processor.processMessages(safeMessages as any);
     return surfaceIds;

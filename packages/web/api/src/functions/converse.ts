@@ -25,6 +25,46 @@ interface ConverseRequest {
   sessionId?: string;
   message: string;
   clientMessageId?: string;
+  /**
+   * Structured A2UI event metadata (Layer 1 of #1062). Present when the user
+   * message originated from an A2UI component action (e.g. a Button click).
+   * The event name + payload are injected into the agent-facing prompt so the
+   * triage agent can branch-on-event without parsing free-form bubble text.
+   */
+  event?: {
+    name: string;
+    payload?: Record<string, unknown>;
+  };
+}
+
+/**
+ * Compose the agent-facing input string from the human-readable message and an
+ * optional structured A2UI event. The user bubble always shows `body.message`
+ * (the button label); the agent additionally sees a compact, deterministic
+ * event marker it can branch on.
+ *
+ * Kept intentionally tiny and pure so Bender's Layer 0 Runner changes don't
+ * need to know about the wire shape.
+ */
+function composeAgentInput(
+  message: string,
+  event: ConverseRequest["event"] | undefined,
+): string {
+  if (!event || typeof event.name !== "string" || event.name.length === 0) {
+    return message;
+  }
+  const payload = event.payload && typeof event.payload === "object"
+    ? event.payload
+    : {};
+  let payloadStr: string;
+  try {
+    payloadStr = JSON.stringify(payload);
+  } catch {
+    payloadStr = "{}";
+  }
+  // Compact single-line marker — triage.agent.md has an explicit
+  // branch-on-event rule that matches this exact prefix.
+  return `${message}\n\n[A2UI event] name=${event.name} payload=${payloadStr}`;
 }
 
 async function converse(
@@ -162,9 +202,14 @@ async function converse(
       };
 
       try {
-        requestLogger.info("Starting runner", { message_length: body.message.length });
+        const agentInput = composeAgentInput(body.message, body.event);
+        requestLogger.info("Starting runner", {
+          message_length: body.message.length,
+          agent_input_length: agentInput.length,
+          has_event: Boolean(body.event?.name),
+        });
         const runStartTime = Date.now();
-        await runner.run(session, body.message, write, abortController.signal);
+        await runner.run(session, agentInput, write, abortController.signal);
         const runDuration = Date.now() - runStartTime;
 
         requestLogger.info("Runner completed successfully", {
