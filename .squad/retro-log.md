@@ -98,6 +98,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-22 | #1051 "fix(api): revert #1030 externalization to unblock SWA prod deploy (#1041)" | L | impl=7m | review=33m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=30m | ci=6m | reviewer=bot | human_comments=0 | issue=#1041 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-22 | #1046 "fix: ship OTel externals in Functions deploy (#1041 hotfix)" | M | impl=1m | review=28m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=4m | ci=7m | reviewer=human | human_comments=1 | issue=#1041 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #1039 "Fix: emit_ui tool schema strict-mode compliance (#1032)" | L | impl=1m | review=9m | cycles=1 | merged | @sabbour | first_review=2m | ci=7m | reviewer=bot | human_comments=0 | issue=#1032 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
