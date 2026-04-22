@@ -99,6 +99,7 @@ jobs:
       - name: Smoke check live API packs registry
         env:
           SWA_HEALTHCHECK_URL: ${{ steps.production_url.outputs.base_url }}/api/packs
+          SWA_HEALTHCHECK_REQUIRE_JSON_OK: "false"
         run: node scripts/check-swa-health.mjs
 
   preview:
@@ -168,5 +169,6 @@ jobs:
           SWA_HEALTHCHECK_URL: ${{ steps.preview_url.outputs.base_url }}/api/packs
           SWA_HEALTHCHECK_ATTEMPTS: "4"
           SWA_HEALTHCHECK_DELAY_MS: "10000"
+          SWA_HEALTHCHECK_REQUIRE_JSON_OK: "false"
         run: node scripts/check-swa-health.mjs
 

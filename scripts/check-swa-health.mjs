@@ -2,6 +2,9 @@ const url = process.env.SWA_HEALTHCHECK_URL;
 const attempts = Number.parseInt(process.env.SWA_HEALTHCHECK_ATTEMPTS ?? '8', 10);
 const delayMs = Number.parseInt(process.env.SWA_HEALTHCHECK_DELAY_MS ?? '15000', 10);
 const timeoutMs = Number.parseInt(process.env.SWA_HEALTHCHECK_TIMEOUT_MS ?? '10000', 10);
+// When false, any 2xx response is treated as success (use for endpoints that return valid JSON
+// but not the {"status":"ok"} envelope — e.g. /api/packs). Default: true (requires status=ok).
+const requireJsonOk = (process.env.SWA_HEALTHCHECK_REQUIRE_JSON_OK ?? 'true') !== 'false';
 
 if (!url) {
   throw new Error('SWA_HEALTHCHECK_URL is required');
@@ -41,7 +44,7 @@ for (let attempt = 1; attempt <= attempts; attempt += 1) {
       body = null;
     }
 
-    if (response.ok && body?.status === 'ok') {
+    if (response.ok && (requireJsonOk ? body?.status === 'ok' : true)) {
       console.log(`✅ Health check passed with ${response.status} and body ${bodyText}`);
       process.exit(0);
     }
