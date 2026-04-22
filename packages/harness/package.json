@@ -49,6 +49,10 @@
       "import": "./dist/runtime/runner.js",
       "types": "./dist/runtime/runner.d.ts"
     },
+    "./runtime/guardrails": {
+      "import": "./dist/runtime/guardrails.js",
+      "types": "./dist/runtime/guardrails.d.ts"
+    },
     "./runtime/resume": {
       "import": "./dist/runtime/resume.js",
       "types": "./dist/runtime/resume.d.ts"

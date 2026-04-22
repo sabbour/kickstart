@@ -348,13 +348,25 @@ export function isHistoryEnabled(): boolean {
  * a non-empty string for user items and at least one content block for
  * assistant items.
  *
- * Exported for unit-testing (Z1, regression guard for #1062).
+ * **Trust marker (#1074 M3):** Turns with `trust === 'client-hydrated'` are
+ * wrapped in an explicit, delimited untrusted-context block so the LLM (and
+ * any auditor reading a trace) can tell client-replayed context from
+ * server-authored context. Delimiters are plain ASCII markers — no templating
+ * engine, no user-controlled strings in the marker itself.
+ *
+ * Exported for unit-testing (Z1, regression guard for #1062; #1074 M3).
  */
+const UNTRUSTED_BEGIN = '[BEGIN UNTRUSTED CONTEXT — client-hydrated, unverified]';
+const UNTRUSTED_END = '[END UNTRUSTED CONTEXT]';
+
 export function toAgentInputItems(turns: readonly Turn[]): AgentInputItem[] {
   const items: AgentInputItem[] = [];
   for (const turn of turns) {
-    const text = typeof turn.content === 'string' ? turn.content : '';
-    if (!text) continue;
+    const rawText = typeof turn.content === 'string' ? turn.content : '';
+    if (!rawText) continue;
+    const text = turn.trust === 'client-hydrated'
+      ? `${UNTRUSTED_BEGIN}\n${rawText}\n${UNTRUSTED_END}`
+      : rawText;
     if (turn.role === 'user') {
       items.push({ role: 'user', content: text } as AgentInputItem);
     } else if (turn.role === 'assistant') {
