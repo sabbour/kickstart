@@ -5113,3 +5113,32 @@ Tracks B and C can run in parallel once #298 and #275 are stable. Track C depend
 | Merge PR #297 | Ahmed / Leela |
 | Create issue: "Azure MSAL auth + AKS Automatic deployment flow" | Leela (recommend) |
 | Update #274 description: remove "blocked by OAuth App registration" note | Leela |
+
+---
+
+# Archived: SWA Production 404 Forensic Report & PR #1046 Outcome
+
+**Date:** 2026-04-21  
+**Author:** Bender  
+**Status:** Archived (read-only incident investigation, no DP)  
+**Related:** PR #1046 (failed; PR #1048 succeeded as remediation)
+
+## Root Cause Summary
+
+Production API returns 404 empty body on all routes. Root cause: `@aks-kickstart/harness: "*"` is listed in `dependencies` (not `devDependencies`) of `packages/web/api/package.json`. Azure SWA managed Functions service runs server-side `npm install` during post-upload processing, even when `skip_api_build: true` is set in the deploy action. This server-side npm install attempts to resolve the private workspace-only package from the public npm registry, fails, and overwrites the carefully-copied OTel externals. Static ESM imports in dist/functions/*.js throw `ERR_MODULE_NOT_FOUND` → worker crashes → zero routes registered → 404 empty body on every endpoint.
+
+## Evidence
+
+- CI run 24755110357 (PR #1046) confirmed externals were in zip pre-upload.
+- ~30-second "Polling on deployment" window shows Azure SWA service post-processing.
+- Health check attempt 1 immediately returned HTTP 404 with empty body.
+- HTTP response headers (`request-context`, `x-ms-middleware-request-id`) confirm request reached Functions HOST but worker crashed before registering any routes.
+- Historical commits from previous branches (swa-pkg-fix/68e5f875, swa-clean-deps/887913e3, swa-clean-deps/42e60e88) had identified this exact mechanism but were never merged.
+- PR #1034 (17b2fbd9) reintroduced `@aks-kickstart/harness: "*"` in dependencies, breaking the deploy.
+
+## Action Taken
+
+- Issue #1049 filed for SWA deploy hard gate (merge-blocking health check).
+- PR #1048 merged as remediation: move workspace and inlined deps to devDependencies.
+- Production fixed on 2026-04-22.
+
