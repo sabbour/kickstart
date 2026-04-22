@@ -6,7 +6,7 @@
 >
 > **Owner:** Nibbler (v2 author, per Reviewer Rejection Protocol — Leela locked out on v1 rejection)
 >
-> **Estimate:** L · **Gates pending:** `nibbler:approved` (Ahmed reviewing in Nibbler's stead), `human:approved-implementation` (Ahmed final sign-off)
+> **Estimate:** L · **Gates pending:** `nibbler:approved` (since `nibbler` is aliased to `lead` per PRs #1048 and #1053, Leela applies this label on Nibbler's behalf), `human:approved-implementation` (Ahmed final sign-off)
 >
 > **Already have:** `leela:approved-with-conditions`, `zapp:approved-with-conditions`
 >
@@ -90,6 +90,53 @@ Option B is viable **only** if we use the MCP SDK's native sampling-tools contra
 - fail-closed capability contracts with machine-readable error codes;
 - no silent fallback to an Azure/OpenAI provider path in the MCP binary; and
 - SWA Playground non-regression covered by invariant tests plus the existing Playwright CI gate.
+
+### 2.1 Runtime flow
+
+```mermaid
+sequenceDiagram
+    participant Host as VS Code / Copilot<br/>(LLM Provider + MCP Client)
+    participant MCP as Kickstart MCP Server<br/>(packages/mcp-server)
+    participant Runner as Harness Runner<br/>(packages/harness)
+    participant Packs as Pack Registry + Tools<br/>(pack-core / pack-azure / …)
+
+    Note over Host,Packs: No AOAI key · No Playground path · stdio transport
+
+    Host->>MCP: initialize (clientInfo, capabilities.sampling)
+    MCP-->>Host: initialized (connectionId assigned, capability snapshot stored)
+
+    Host->>MCP: converse(message, sessionId)
+    MCP->>Runner: runner.run(session, msg, sseWrite, providerOverride)
+    Runner->>Packs: resolve agent + mcpExposed=true tools
+
+    loop Each reasoning turn
+        Runner->>MCP: SamplingModelProvider.getResponse(ModelRequest)
+        MCP->>Host: sampling/createMessage(messages, tools, modelPreferences)
+        Host-->>MCP: CreateMessageResult (text | tool_use blocks)
+        MCP-->>Runner: ModelResponse (FunctionCallItem | text)
+        opt tool_use present
+            Runner->>Packs: execute tool → result
+            Packs-->>Runner: tool result (fed back as tool_result next turn)
+        end
+    end
+
+    opt A2UI emitted during run
+        Packs-->>Runner: core.emit_ui(component)
+        Runner-->>MCP: sseWrite('a2ui', msg)
+        MCP-->>Host: resource (application/json+a2ui, audience: user)
+    end
+
+    opt UserAction interrupt
+        Runner-->>MCP: sseWrite('user_action_req')
+        MCP-->>Host: interrupt JSON block (actionId, resultSchema)
+        Host->>MCP: resume(sessionId, actionId, result)
+        MCP->>Runner: runner.resume(session, result, sseWrite)
+    end
+
+    MCP-->>Host: content[] — text + A2UI resources
+```
+
+_The diagram shows the complete Option B runtime path. The VS Code host owns the LLM; the MCP server owns agent orchestration and tool execution via the shared harness. There is no outbound Azure/OpenAI call from the MCP binary — inference flows through `sampling/createMessage` to the host. A2UI components are emitted as embedded resources. UserAction interrupts surface as structured JSON blocks and are resumed via the `resume` tool._
 
 ## 3. Architecture — MCP-server adapter + scoped provider
 
