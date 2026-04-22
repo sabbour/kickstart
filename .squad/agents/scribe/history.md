@@ -98,3 +98,45 @@ Deleted `docs-site/docs/architecture/v2-implementation-brief.md` (1,171 lines, i
 
 **Session log file:** 2026-04-21T08-40Z-decisions-merge.md (session artifact)
 
+
+## Session: PR #1071 docs gate (2026-04-22 11:25 UTC-7)
+
+**Lead:** Ahmed  
+**Task:** Docs gate for PR #1071 (harness history threading) + routine Scribe duties
+
+### Docs Gate Decision
+
+**PR:** #1071 "feat(harness): thread conversation history across turns"  
+**Author:** Bender  
+**Status:** ✅ Merged
+
+**Assessment:**
+- PR adds `HARNESS_SESSION_HISTORY_ENABLED` feature flag (default OFF)
+- No user-facing behavior changes in this release (flag is OFF)
+- Changeset already documents the feature for changelog
+- PR body documents flag behavior comprehensively
+- No README/developer docs updates needed (internal infrastructure flag)
+
+**Gate decision:** `docs:not-applicable` — feature flag is internal, defaults OFF, changeset provides adequate documentation. No user sees behavior change until separate follow-up flag-flip PR.
+
+**Validation:**
+- ✅ `leela:approved`, `zapp:approved`, `nibbler:approved` present
+- ✅ CI green (all checks SUCCESS)
+- ✅ `squad/review-gate` settled as SUCCESS before merge
+- ✅ Merged via `gh pr merge 1071 --squash --delete-branch` at 18:12 UTC
+
+### Routine Duties
+
+**Decision inbox merge:**
+- Merged 23 decision inbox entries (.squad/decisions/inbox/*.md) into .squad/decisions.md
+- Entries spanning: Bender (#1062 L0), Fry (#1049/#1050), Leela (code reviews), Zapp (security reviews), Nibbler (coverage reviews), observations
+- Inbox cleared
+- Committed as 0ab1f67c
+
+### Summary
+
+- Docs gate applied: `docs:not-applicable`
+- PR #1071 merged (squash)
+- Decision inbox cleared and merged to rolling decisions
+- 1 commit to session branch
+

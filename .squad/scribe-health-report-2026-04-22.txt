@@ -1,0 +1,129 @@
+# Scribe Health Report — 2026-04-22T02:40:00-07:00
+
+## Artifacts Processed
+
+### Decision Management
+| Task | Status | Details |
+|------|--------|---------|
+| decisions.md overflow gate | ✅ TRIGGERED | 274,520 bytes >= 20,480-byte threshold |
+| Archive to decisions-archive.md | ✅ COMPLETE | SWA forensic report archived (5 entries now in archive) |
+| Inbox merge | ✅ COMPLETE | 3 files merged (fry-dp-1049, fry-1049, fry-1050) in chronological order |
+| decisions.md rebuild | ✅ COMPLETE | Fresh file from inbox; 3 active decisions now live |
+
+### History Summarization
+| Agent | Size Before | Size After | Gate | Status |
+|-------|-------------|-----------|------|--------|
+| bender | 48,150 | 2,909 | ⚠️ 15360 | ✅ SUMMARIZED |
+| fry | 22,322 | 3,165 | ⚠️ 15360 | ✅ SUMMARIZED |
+| hermes | 11,251 | 11,251 | ✅ OK | — |
+| leela | 20,947 | 4,102 | ⚠️ 15360 | ✅ SUMMARIZED |
+| nibbler | 25,178 | 3,957 | ⚠️ 15360 | ✅ SUMMARIZED |
+| ralph | 225 | 225 | ✅ OK | — |
+| scribe | 5,455 | 5,455 | ✅ OK | — |
+| zapp | 20,159 | 5,357 | ⚠️ 15360 | ✅ SUMMARIZED |
+
+**Gate status:** All histories now compliant (< 15,360 bytes) ✅
+
+### Operational Logs
+| Log | Action | Lines Added | Status |
+|-----|--------|-------------|--------|
+| orchestration-log.md | Append bender-19 + merge actions | 2 entries (17 lines) | ✅ COMPLETE |
+| session-log.md | Create + append curation session | 1 entry (18 lines) | ✅ COMPLETE |
+
+### Git Commit
+| File | Changes | Status |
+|------|---------|--------|
+| .squad/ (8 files) | Modified + new | ✅ STAGED & COMMITTED |
+| Commit hash | d9cf041e | `feat(scribe): merge decision inbox + archive + history...` |
+| Tree integrity | ✅ Clean | No orphans; all decisions reconciled |
+
+---
+
+## Shipping Manifest — What Shipped
+
+| Issue | PR | Commit | Status | Notes |
+|-------|----|----|--------|-------|
+| #1050 | #1058 | e1b6e012 | ✅ CLOSED | emit_ui strict-mode fix (6 .describe() calls deleted); merged 2026-04-22T09:39:57Z |
+| Canary | #1058 | c394f2c7 | ✅ MERGED | `/api/converse` dropped from prod deploy per Ahmed directive (ops: skip converse testing) |
+| #1049 | DP v2 | — | 📋 READY | SWA smoke gate + PR preview; approved by Zapp + Nibbler; awaiting Fry implementation |
+
+---
+
+## Decision Trail — What Was Decided
+
+### Decisions Now Active (in decisions.md)
+
+1. **fry-dp-1049** — SWA hard deploy gate + PR preview re-enable
+   - 4-part workflow fix: silent-skip → hard-fail, enable PR preview job, add regression guard to CI, branch protection
+   - Estimate: S (workflow-only)
+   - Validation paths: 4 explicit test scenarios documented
+
+2. **fry-1049-impl** — Workflow push via lead token (`workflows:write` permission)
+   - Pattern: Use lead token for git push if frontend token lacks `workflows:write`
+   - Scope: Workaround for GitHub App permission limits
+   - Precedent: Applied on PR #1058
+
+3. **fry-1050-impl** — emit_ui strict-mode fix
+   - Deleted container-level `.describe()` calls (1 root + 5 reuse sites)
+   - Migrated guidance to `event.name` leaf field
+   - Regression guard: walker test asserts no `$ref+sibling` violations
+   - Shipped: e1b6e012 ✅
+
+---
+
+## Integrity Checks
+
+| Check | Result | Evidence |
+|-------|--------|----------|
+| Archive gate triggered | ✅ CORRECT | decisions.md was 274,520 bytes |
+| Archive non-destructive | ✅ CORRECT | 5 entries now in archive; no data loss |
+| Summarization completed | ✅ CORRECT | 5 histories rolled; all < 15360 bytes |
+| Chronological order | ✅ CORRECT | Inbox merged by date (fry-dp-1049 → fry-1049 → fry-1050) |
+| No orphaned decisions | ✅ CORRECT | All 3 inbox files merged into active decisions.md |
+| Git staging clean | ✅ CORRECT | Only .squad/ files touched; co-author trailer included |
+
+---
+
+## Process Compliance
+
+| Ceremony | Requirement | Status |
+|----------|-------------|--------|
+| DP approval (fry-dp-1049) | Zapp + Nibbler approval | ✅ APPROVED (v2 gated feedback integrated) |
+| Session log | Required artifact | ✅ CREATED |
+| Orchestration log | Required artifact | ✅ UPDATED |
+| Cross-agent history | Required update | ✅ UPDATED (all 5 exceeding agents rolled) |
+| Git commit | Required for .squad/ changes | ✅ COMMITTED (d9cf041e) |
+
+---
+
+## Anomalies & Follow-Ups
+
+| Item | Category | Action |
+|------|----------|--------|
+| Converse canary deferred | Infra | Resolved per Ahmed directive; logging note added to decisions |
+| Frontend token workflows:write | Ops limitation | Documented workaround; bender-19 applied on PR #1058; escalate for token refresh if frequent |
+| 5 agent histories exceeded gate simultaneously | Process | No anomaly — all peaked on same cycle (2026-04-21 work volume). Summarization complete; monitor weekly. |
+
+---
+
+## Release Status
+
+| Component | Version | Status | Last Update |
+|-----------|---------|--------|-------------|
+| kickstart | v0.9.x | SHIPPING | #1058 merged (emit_ui strict-mode) |
+| converse canary | — | DEFERRED | Dropped from prod per ops; live testing pending DNS/auth fix |
+| SWA smoke gate | PENDING | DP approved; awaiting implementation | fry-dp-1049 DP v2 |
+| DP queue | — | ACTIVE | Round 3 batch (5 approved DPs) under implementation dispatch |
+
+---
+
+## Summary
+
+✅ **Scribe curation complete.** All decision-management and history-gate artifacts processed. Decision inbox merged (3 files), archive triggered and executed (SWA forensic report), 5 agent histories summarized (rolled to < 15360 bytes). Session and orchestration logs appended. Git changes committed cleanly (d9cf041e).
+
+**No blocking anomalies.** All gates passed. Ready for next cycle.
+
+---
+
+**Scribe → Coordinator:** Artifacts ready. Decision trail curated. Cross-agent histories updated. Process gates all green. 🟢
+

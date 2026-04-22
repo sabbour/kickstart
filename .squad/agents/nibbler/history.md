@@ -60,3 +60,127 @@ All PRs now subject to 4-way approval (Leela + Zapp + Nibbler + Docs). No overri
 - #1000 revision: Awaiting red-CI fix + grep guard addition (bender-1000-revise)
 - Follow-up vendor-schema-drift audit on pack-core (triggered by #998)
 
+---
+
+## Observability DP Batch Review — 2026-04-22T03:08:00-07:00
+
+**Requested by:** Ahmed
+**Batch:** 4 DPs covering 6 observability issues (#1035, #1036, #1037, #1038, #1040, #1042)
+
+### Verdicts
+
+| DP | Issues | Verdict | Label Applied |
+|----|--------|---------|---------------|
+| DP-A | #1035 + #1036 | ✅ APPROVED | nibbler:approved-dp |
+| DP-B | #1040 | ✅ APPROVED | nibbler:approved-dp |
+| DP-C | #1037 + #1038 | ✅ APPROVED | nibbler:approved-dp |
+| DP-D | #1042 | 🔴 REQUESTED CHANGES | nibbler:requested-changes-dp |
+
+### Key Findings
+
+**DP-A (#1035):** Approved with 🟡 note — test item 2 must assert processor._exporter IS a RedactingSpanExporter, not just that there is exactly one BatchSpanProcessor. Two conditions together are almost sufficient but leave an adversarial gap.
+
+**DP-B (#1040):** Approved with 🟡 push — happy path unit test is solid but defensive fallback paths are not covered: (1) plain-object error (not instanceof Error), (2) Error with undefined .stack. Hermes should add these before PR merges.
+
+**DP-C (#1037):** Clean approval. No concerns. Best warm-up DP in the batch — land first.
+
+**DP-D (#1042):** Requested changes. Five blockers documented:
+1. No E2E test infra decision (Playwright required)
+2. No runtime feature flag spec or kill-switch path
+3. No canary rollout plan
+4. No bundle size budget (recommended ≤100 KB gzipped delta)
+5. Zapp not yet formally requested on issue
+
+### Sequencing Recommendation
+
+**Land DP-C first** (trivial, cleans up dead dep + upgrades test fixture — unblocks DP-A which touches the same test file). Then **DP-A and DP-B can land in parallel** (different files, no conflicts). DP-D remains blocked on DP-A + DP-B merge AND on resolution of the five blockers above.
+
+### Learnings
+- Browser telemetry DPs require E2E test infra decision (Playwright), feature flag + runtime kill switch, and canary rollout plan as minimum DP content — not just open questions.
+- For P1 security fixes touching OTel pipeline, test plan must assert inner exporter type (not just processor count) to close adversarial gap.
+
+
+---
+
+## Learnings — Conversation Loop Systems Audit (2026-04-22T10:26-07:00)
+
+**Context:** Full systems audit across prompts, skills, agents, memory/turns, user actions, tools, and handover in response to #1060 / #1061 / #1062. Audit delivered as issue **#1069**; cross-links posted on the three symptom issues + #1067 (out-of-scope flag).
+
+### Architectural root causes discovered
+
+1. **Loader-parses-but-runtime-ignores pattern.** Two high-impact frontmatter fields (`handoffs`, skill bodies) are parsed cleanly by loaders and validated by tests but never consumed by the SDK-facing Runner:
+   - `runner.ts:406-412` builds `new Agent({...})` **without** `handoffs:` — dead SDK contract.
+   - `runner.ts:390-401` ships skill `id + description` only; the body loaded into `skillContrib.instructions` never reaches the LLM.
+   Review pattern to add: **"every frontmatter field with a loader must have at least one runtime read site"** — candidate CI invariant / future Nibbler grep guard.
+
+2. **Stateless runner masquerading as stateful conversation.** `runner.ts:425` — `sdkRunner.run(agent, guardedMessage, ...)` passes only the current string. Server session `recordTurn` is write-only (no call sites read `recentTurns`). Client sends `messages` array; `converse.ts:24-62` silently discards. This is the enabling condition behind the #1062 triage loop.
+
+3. **Event-as-text round-trip.** A2UI `action.event.payload` (v0.9 spec) is dropped by the vendor resolver (`data-context.ts:283-296` reads `.context` only). Button click reaches server as the raw event name `choose_build`. Agent can't distinguish intent-confirmation from ambiguous free text.
+
+### Review-pattern takeaway — "audit-edges discipline"
+
+On wide-scope audits, explicit §7 "deliberately NOT audited" section prevents scope creep and protects against later "why didn't you catch X" post-mortems. Recording the edges is a Nibbler responsibility whenever the review lens is architectural rather than per-PR.
+
+### Honesty flag recorded
+
+D1 and D2 both describe unreachable configuration paths. Suggests a prior refactor landed a loader-without-consumer regression with no DP catching it. Proposed follow-up #10 on #1069 asks Ralph for a retrospective on whether the multi-turn contract was ever DP'd.
+
+---
+
+## DP Review — #1062 v2 (Triage loop, Leela DP) — 2026-04-22T10:36:52-07:00
+
+**Requested by:** Ahmed
+**Scope:** DP-stage review on #1062 applying Architecture Alignment + Test Coverage lenses, informed by my own just-filed systems audit #1069.
+
+### Verdict: 🟡 `nibbler:requested-changes-dp`
+
+Architectural direction is correct (Layer 0 = SDK `Session` adapter via Option A maps 1:1 to D1 in my audit). L estimate is honest, two-agent ownership split (bender Layer 0, fry Layers 1–3) is clean, no sub-DP split needed.
+
+### Gaps flagged
+
+1. **Scope vs #1069 — explicit deferral of D2 (handoffs dead wiring) and D5 (inert skills).** DP mentions handoff lower-priority but doesn't name a follow-up; D5 not mentioned at all. Risk: architectural debt gets lost.
+2. **Test strategy — automated multi-turn regression guard missing.** Item 7 is "E2E manual" on a P0 architectural regression — wrong bar. Required either harness-level test asserting turn-2 SDK input contains turn-1 items, OR Playwright test asserting `choose_build` button count ≤1 across two turns. CI trigger on `harness/runtime/**` + `triage.agent.md`.
+3. **Rollout / migration — no feature flag on a hot-path change.** Every `/api/converse` modified. Asked for `HARNESS_SESSION_HISTORY_ENABLED` flag OR explicit rollout+monitoring plan OR explicit "no schema migration needed because sessions are in-memory/TTL-bounded" note.
+4. **Governance — #1069 not linked from DP `Related:` header; retrospective follow-up #10 not acknowledged.**
+
+### Comment URL
+https://github.com/sabbour/kickstart/issues/1062#issuecomment-4298661705
+
+### Label applied
+`nibbler:requested-changes-dp`
+
+### Notes for future reviews
+- My own audit fed directly into this review — confirms the charter pattern of reading recent `history.md` entries before starting. When an agent has a prior audit in-flight, that audit IS the review lens.
+- The DP author (Leela) already referenced hypothesis (f) as confirmed by #1069, but did not link #1069 in the DP header. Future DPs building on audits should link the upstream audit in `Related:`.
+
+---
+
+## DP Re-Review — #1062 v3 (Triage loop, Leela) — 2026-04-22T10:36:52-07:00
+
+**Requested by:** Ahmed
+**Scope:** Re-review after DP v3 edits addressing my 4 gaps from comment 4298661705.
+
+### Verdict: ✅ `nibbler:approved` (DP-stage)
+
+All four gaps genuinely closed on re-inspection of the edited DP body (2026-04-22 v3) + Leela's diff-summary "ping nibbler" comment.
+
+| Gap | Closure |
+|---|---|
+| 1. Scope vs #1069 (D2/D5/D12 deferrals) | New "Deferred to follow-ups" table naming D2, D5, D12 + proposed follow-up issues. |
+| 2. Automated multi-turn regression guard | Test item 8 = harness-level integration test with CI trigger on `packages/harness/src/runtime/**` and `triage.agent.md`. P0 guard in place. |
+| 3. Feature flag + rollout | `HARNESS_SESSION_HISTORY_ENABLED`, default on, Azure SWA app-settings kill switch, 24h monitoring, flag-removal follow-up. Schema-migration-not-needed stated with session.ts evidence. |
+| 4. #1069 link + retrospective ack | `Related:` includes #1069; retrospective paragraph acks #1069 §5 follow-up #10 (DP "conversation statefulness" gate). |
+
+Zapp Z1/Z2/Z3 folded into Layer 0 implementation requirements — stronger than a review note because Bender now picks them up day one.
+
+### Comment URL
+https://github.com/sabbour/kickstart/issues/1062#issuecomment-4298702279
+
+### Labels applied
+`nibbler:approved` (added). `nibbler:requested-changes-dp` was already removed by Leela pre-ping.
+
+### PR-time re-review focus (noted for follow-through)
+- `HarnessSessionAdapter.getItems()` role filter (Z1 test must be adversarial, include a tool-call turn)
+- Feature flag default + env-var read site fail-safe
+- CI trigger path actually fires on the multi-turn regression test
+- Guardrail-on-capture code comment (Z2) survives future refactors

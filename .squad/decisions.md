@@ -1498,3 +1498,51 @@ Hermes owns T9-equivalent test coverage for this exporter.
 2. An `/api/config` proxy path must also be implemented as a rotation escape hatch
 3. CI secret-scanner exceptions must be documented for the build artifact
 4. Browser sampling default: 10%
+
+---
+
+## 🛡️ Zapp — PR #1072 Re-Review (Approved)
+
+**Author:** Zapp (Security Architect)  
+**Date:** 2026-04-22  
+**Subject:** PR #1072 (A2UI event payload bridge, #1062 triage-loop fix) — re-review after revision `72d768b5`
+
+### Outcome
+
+**APPROVED.** Label `zapp:approved` applied on PR #1072.
+
+### What Changed Since First Review
+
+Bender pushed `72d768b5` addressing every concern raised (H1, M1, M2) plus 10 new rejection-path tests. L1 deferred to issue #1079 per directive.
+
+### Verification Against Findings
+
+| ID  | Concern                                                | Fix                                                                                                                                            | Status |
+| --- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| H1a | `event.name` allowed newlines → prompt injection       | `coerceEvent()` enforces `EVENT_NAME_RE = /^[a-zA-Z0-9_:\-]{1,64}$/`; 400 on violation; test feeds injection payload                      | ✅     |
+| H1b | Unbounded `event.payload` → token-exhaustion / cost    | `PAYLOAD_MAX_BYTES = 2 * 1024` enforced; test with `'x'.repeat(2049)` trips cap                                                             | ✅     |
+| H1c | `event.payload` shape not guarded                      | `typeof x !== 'object' \|\| Array.isArray(x)` check; array + non-object tested                                                              | ✅     |
+| M1  | `body.message` unbounded                               | 8 KB cap returning **413** (Payload Too Large); boundary test at 8 KB passes                                                                 | ✅     |
+| M2  | Skill doc missing security notes                       | `a2ui-event-payload-bridge.md` adds Security notes section naming residual spoofing vector via `message`                                    | ✅     |
+| L1  | Deferred (rate-limit on converse)                      | Filed as #1079 — out of scope for this PR                                                                                                    | ✅     |
+
+### Gate Ordering
+
+Code path verifies: `body.message` check → `coerceEvent()` validation → `composeAgentInput()` (marker built from sanitised input) → `runner.run()`. No path exists where malformed event reaches triage prompt.
+
+### Test Coverage
+
+10 new tests in `converse.test.ts` exercise attack vectors:
+- Newline injection, space in name, name overflow, valid names (positive)
+- Payload overflow, valid payload, array payload, non-object event
+- Message length boundaries (8 KB + 1 rejected, 8 KB accepted)
+
+### Design Honesty
+
+Skill doc is explicit: `[A2UI event]` marker is **not an authenticated channel** — users can still craft matching strings into `message` field. Named as UX shortcut, not security boundary.
+
+### Decision
+
+- Ship #1072 when CI is green ✅ (done 2026-04-22 18:27 UTC)
+- Keep #1079 visible on security backlog; Zapp owns after Layer 0 lands
+
