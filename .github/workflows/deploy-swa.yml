@@ -180,7 +180,10 @@ jobs:
       - name: Smoke check preview /api/converse canary (#1050 strict-mode guard)
         env:
           CONVERSE_URL: ${{ steps.preview_url.outputs.base_url }}/api/converse
-          CONVERSE_ATTEMPTS: "4"
-          CONVERSE_DELAY_MS: "10000"
-        run: node scripts/check-converse-canary.mjs
+          CONVERSE_ATTEMPTS: "8"
+          CONVERSE_DELAY_MS: "15000"
+        run: |
+          echo "Warming up preview URL (fresh SWA deploys need ~60s for DNS/TLS)..."
+          sleep 45
+          node scripts/check-converse-canary.mjs
 
