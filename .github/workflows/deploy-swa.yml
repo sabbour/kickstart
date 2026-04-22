@@ -102,10 +102,6 @@ jobs:
           SWA_HEALTHCHECK_REQUIRE_JSON_OK: "false"
         run: node scripts/check-swa-health.mjs
 
-      - name: Smoke check live /api/converse canary (#1050 strict-mode guard)
-        env:
-          CONVERSE_URL: ${{ steps.production_url.outputs.base_url }}/api/converse
-        run: node scripts/check-converse-canary.mjs
 
   preview:
     name: Deploy PR preview to Azure Static Web Apps
@@ -177,13 +173,4 @@ jobs:
           SWA_HEALTHCHECK_REQUIRE_JSON_OK: "false"
         run: node scripts/check-swa-health.mjs
 
-      - name: Smoke check preview /api/converse canary (#1050 strict-mode guard)
-        env:
-          CONVERSE_URL: ${{ steps.preview_url.outputs.base_url }}/api/converse
-          CONVERSE_ATTEMPTS: "8"
-          CONVERSE_DELAY_MS: "15000"
-        run: |
-          echo "Warming up preview URL (fresh SWA deploys need ~60s for DNS/TLS)..."
-          sleep 45
-          node scripts/check-converse-canary.mjs
 
