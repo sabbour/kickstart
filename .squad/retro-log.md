@@ -98,6 +98,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-22 | #1086 "feat(harness): core.read_skill pull-based skill loading (D5) — closes #1070" | XL | impl=1m | review=39m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=5m | ci=16m | reviewer=bot | human_comments=1 | issue=#1070 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-22 | #1085 "feat(harness): cold-session hydration from client messages (D3) — closes #1074" | XL | impl=1m | review=27m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=6m | ci=32m | reviewer=human | human_comments=2 | issue=#1074 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-22 | #1084 "fix(pack-core): emit_ui idempotent by surfaceId + live-surface cap (D11) — closes #1075" | L | impl=1m | review=11m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=9m | ci=9m | reviewer=bot | human_comments=0 | issue=#1075 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
