@@ -53,6 +53,15 @@ export class Session implements SessionCtx {
   pendingUserAction: PendingUserAction | null = null;
   workspaceRoot: string;
   currentPhase: Phase;
+  /**
+   * Per-turn record of skill ids pulled via `core.read_skill`. Reset at the
+   * top of every `Runner.run` turn (try/finally). Also used by the `end`
+   * SSE event to populate `skillsExecuted` (D12 — count only what actually
+   * reached the model).
+   */
+  skillsPulled?: Set<string>;
+  skillsPulledBytes?: number;
+  skillsPulledTokens?: number;
   /** Leela BLOCK-1: real first-class field; no type-cast side-channel needed. */
   lastActiveAt: number = Date.now();
 

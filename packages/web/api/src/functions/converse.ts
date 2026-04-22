@@ -27,6 +27,7 @@ import {
 } from "@aks-kickstart/harness/runtime/session";
 import type { ClientHydrationMessage } from "@aks-kickstart/harness/runtime/session";
 import { Runner } from "@aks-kickstart/harness/runtime/runner";
+import { createReadSkillTool } from "../../../../pack-core/src/tools/read_skill.js";
 import { SSE_RESPONSE_HEADERS, formatSSEFrame } from "@aks-kickstart/harness/runtime/sse";
 import type { SSEEventType } from "@aks-kickstart/harness/runtime/sse";
 import { runGuardrails } from "@aks-kickstart/harness/runtime/guardrails";
@@ -495,7 +496,7 @@ async function converse(
   }
 
   const requestLogger = logger.withContext({ request_id: requestId });
-  const runner = new Runner(registry);
+  const runner = new Runner(registry, { readSkillToolFactory: createReadSkillTool });
   const abortController = new AbortController();
   const encoder = new TextEncoder();
   let eventCount = 0;

@@ -6,3 +6,5 @@ export { listFilesTool } from './list_files.js';
 export { validateArtifactsTool } from './validate_artifacts.js';
 export { createSearchComponentsTool } from './search_components.js';
 export type { ComponentRegistry } from './search_components.js';
+export { createReadSkillTool, parseByteCapEnv, DEFAULT_MAX_BYTES_PER_TURN, MIN_MAX_BYTES_PER_TURN, MAX_MAX_BYTES_PER_TURN } from './read_skill.js';
+export type { SkillRegistry, SkillTrackingCtx, ReadSkillOptions, ReadSkillOutput } from './read_skill.js';

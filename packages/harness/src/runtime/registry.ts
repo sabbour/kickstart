@@ -194,6 +194,27 @@ export class PackRegistry {
     return this.activeSkills().filter((skill) => matchesSkill(agentName, skill));
   }
 
+  /**
+   * Id+description projection of skills available to an agent. Used by the
+   * `core.read_skill` tool to enforce the fail-closed allowlist without
+   * exposing full SKILL.md bodies.
+   */
+  listSkillsForAgent(agentName: string): ReadonlyArray<{ id: string; description: string }> {
+    return this.getSkillsForAgent(agentName).map((s) => ({ id: s.id, description: s.description }));
+  }
+
+  /**
+   * Full skill record (including `instructions` body) for a given id, or
+   * `undefined` if the id is unknown or the skill's pack is inactive. Used
+   * by the `core.read_skill` tool after the allowlist check passes.
+   */
+  getSkill(id: string): Skill | undefined {
+    const skill = this.skillsById.get(id);
+    if (!skill) return undefined;
+    if (!this.isPackActive(this.packNameFromSkill(skill.id))) return undefined;
+    return skill;
+  }
+
   listSkills(agentName?: string): Skill[] {
     const all = this.activeSkills();
     if (!agentName) return all;

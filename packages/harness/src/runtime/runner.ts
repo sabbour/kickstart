@@ -29,6 +29,38 @@ import { resolveModelName } from './model-resolution.js';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
+// Universal tool factories (D5 / #1070 — core.read_skill)
+// ---------------------------------------------------------------------------
+
+/**
+ * Factory contract for harness-provided universal tools that must be bound
+ * per turn (they close over current agentName + session + registry). The
+ * pack-core `createReadSkillTool` implements this shape. Injecting the
+ * factory rather than importing it directly preserves the harness → pack-core
+ * no-dependency rule (pack-core imports harness types already).
+ */
+export interface ReadSkillToolFactoryInput {
+  registry: {
+    listSkillsForAgent(agentName: string): ReadonlyArray<{ id: string; description: string }>;
+    getSkill(id: string): import('../types/skill.js').Skill | undefined;
+  };
+  agentName: string;
+  session: Session;
+}
+export type ReadSkillToolFactory = (input: ReadSkillToolFactoryInput) => ToolContribution;
+
+export interface RunnerOptions {
+  /**
+   * Optional factory for the `core.read_skill` tool (#1070). When provided,
+   * the runner registers the tool universally on every agent as a harness
+   * primitive, bypassing pack `toolAllowlist`. Application wiring passes
+   * `createReadSkillTool` from `@aks-kickstart/pack-core`. Tests that don't
+   * care about skill pulls omit this — the tool is simply not registered.
+   */
+  readSkillToolFactory?: ReadSkillToolFactory;
+}
+
+// ---------------------------------------------------------------------------
 // Build model provider (Azure-aware)
 // ---------------------------------------------------------------------------
 
@@ -414,7 +446,11 @@ export function resolveMaxTurns(): number {
 // ---------------------------------------------------------------------------
 
 export class Runner {
-  constructor(private readonly registry: PackRegistry) {}
+  private readonly readSkillToolFactory?: ReadSkillToolFactory;
+
+  constructor(private readonly registry: PackRegistry, opts: RunnerOptions = {}) {
+    this.readSkillToolFactory = opts.readSkillToolFactory;
+  }
 
   /**
    * Build an SDK `Agent` instance for the given agent id, recursively
@@ -479,10 +515,39 @@ export class Runner {
       );
     });
 
+    // ── #1070 D5 — register `core.read_skill` universally ───────────────────
+    // Harness-provided universal tool. DELIBERATELY bypasses pack
+    // `toolAllowlist` (policy exception): the tool's own fail-closed
+    // `matchesSkill`-based allowlist is the access control, and adding it
+    // to every pack's allowlist would be redundant churn for a harness
+    // primitive. When `readSkillToolFactory` is not supplied (some tests),
+    // the tool is simply not registered — byte-identical to pre-#1070.
+    if (this.readSkillToolFactory) {
+      const readSkillContrib = this.readSkillToolFactory({
+        registry: {
+          listSkillsForAgent: (name) => this.registry.listSkillsForAgent(name),
+          getSkill: (id) => this.registry.getSkill(id),
+        },
+        agentName,
+        session: ctx.session,
+      });
+      tools.push(
+        wrapTool(
+          readSkillContrib,
+          ctx.toolGuardrails,
+          agentName,
+          ctx.sseWrite,
+          ctx.abortCtrl,
+          ctx.isHalted,
+          ctx.setHalted,
+        ) as FunctionTool,
+      );
+    }
+
     // Build dynamic instructions: base + skills stub + catalog hint
     const skills = this.registry.getSkillsForAgent(agentName);
     const skillsBlock = skills.length > 0
-      ? `\n\n## Available Skills\n${skills.map((s) => `- **${s.id}**: ${s.description}`).join('\n')}`
+      ? `\n\n## Available Skills (call core.read_skill(id) to load the full body)\n${skills.map((s) => `- **${s.id}**: ${s.description}`).join('\n')}`
       : '';
 
     const components = this.registry.components;
@@ -538,6 +603,17 @@ export class Runner {
       return;
     }
 
+    // ── #1070 D5 — per-turn skill-pull counters (Zapp M1 HARD REQUIREMENT) ──
+    // Reset at turn entry and in a try/finally at the bottom so counters
+    // never leak across turns on thrown errors, abort, or guardrail halt.
+    // Sourced by the `end` event (D12) and read by `core.read_skill` to
+    // enforce the per-turn byte cap.
+    session.skillsPulled = new Set<string>();
+    session.skillsPulledBytes = 0;
+    session.skillsPulledTokens = 0;
+
+    try {
+
     const abortCtrl = new AbortController();
     // B2: forward external client-disconnect signal into the runner's abort controller
     if (signal) {
@@ -574,6 +650,10 @@ export class Runner {
     // Build tools list + agent tree (with recursively-resolved handoffs).
     // Per-turn cache: MUST be a fresh Map so closures bind to this turn's
     // session / sseWrite / abortCtrl (Nibbler N1/N2, #1073).
+    //
+    // #1070 D5: `buildAgentInstance` also wires `core.read_skill` into every
+    // agent it constructs (scoped via `agentName`/`session` captured in the
+    // tool factory) so handoff targets get the same pull-based skill access.
     const agentBuildCache = new Map<string, Agent<any, any>>();
     const buildCtx = {
       session,
@@ -585,17 +665,18 @@ export class Runner {
     };
     const agent = this.buildAgentInstance(agentName, agentBuildCache, buildCtx);
     const modelName = resolveModelName(agentContrib.model);
-    // Skills executed telemetry — resolved from the root agent only (its
-    // sub-agent skills are reported independently if/when that agent runs).
-    const skillsExecuted = this.registry.getSkillsForAgent(agentName).map((s) => s.id);
 
     let fullText = '';
     // Buffer all text chunks — output guardrails must pass before any chunk is sent to the client.
     const chunkBuffer: string[] = [];
 
-    // Debug telemetry — track tool calls and matched skills for the `end` event.
+    // Debug telemetry — track tool calls for the `end` event.
     const toolsExecuted: Array<{ name: string; status: 'ok' | 'error' }> = [];
     const pendingToolNames = new Map<string, number>(); // toolName → index in toolsExecuted
+    // #1070 D12 — skillsExecuted is now sourced from session.skillsPulled
+    // (ids the model actually pulled via core.read_skill), not the naive
+    // registry catalog. Empty if the model never called the tool this turn.
+    const getSkillsExecuted = (): string[] => Array.from(session.skillsPulled ?? []);
 
     try {
       const sdkRunner = getSdkRunner();
@@ -734,7 +815,9 @@ export class Runner {
         intent,
         model: modelName,
         agentName,
-        skillsExecuted,
+        skillsExecuted: getSkillsExecuted(),
+        skillsPulledBytes: session.skillsPulledBytes ?? 0,
+        skillsPulledTokens: session.skillsPulledTokens ?? 0,
         toolsExecuted,
       });
     } catch (err: unknown) {
@@ -757,9 +840,21 @@ export class Runner {
         intent: undefined,
         model: modelName,
         agentName,
-        skillsExecuted,
+        skillsExecuted: getSkillsExecuted(),
+        skillsPulledBytes: session.skillsPulledBytes ?? 0,
+        skillsPulledTokens: session.skillsPulledTokens ?? 0,
         toolsExecuted,
       });
+    }
+    } finally {
+      // Zapp M1 — unconditional per-turn reset. Guarantees counters do not
+      // bleed across turns regardless of exit path (success, AbortError,
+      // guardrail halt, unexpected throw, early return via `return` inside
+      // the SDK loop — all are covered because the SDK stream is awaited
+      // inside the inner try above).
+      session.skillsPulled = new Set<string>();
+      session.skillsPulledBytes = 0;
+      session.skillsPulledTokens = 0;
     }
   }
 
