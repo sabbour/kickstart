@@ -3459,3 +3459,501 @@ Refactor the Playground "Create" tab inspiration prompt generator to reduce comp
 - The inspiration prompt generators for Playground and Landing page are separate codepaths; this task focuses on Playground only
 - Focus-domain rotation behavior (FOCUS_DOMAINS array, nextFocusDomain() cursor) must be preserved; this is a "nice to have" for variety but non-critical to the simplification
 
+
+---
+
+## 2026-04-21: Electron Design Proposal Filed as Tracking Issue
+
+**Issue:** [sabbour/kickstart#1043](https://github.com/sabbour/kickstart/issues/1043)
+
+**Date:** 2026-04-21
+
+**Status:** WIP rev 5–6, exploration phase
+
+### Summary
+
+The Electron Design Proposal (115KB, 18 revisions) has been filed as a public tracking issue to become a durable team artifact. The full DP is split across two GitHub comments to comply with the 65KB limit.
+
+### Labels Applied
+
+- `squad` — internal team work
+- `squad:leela` — owned by Leela (Lead)
+- `design-proposal` — design artifact, not implementation issue
+- `wip` — work in progress, not yet finalized
+
+### Revision Stamped
+
+Issue filed at rev 5–6 (post-brainstorm, pre-implementation). Future DP updates should be posted as new comments on the issue to maintain the artifact lineage.
+
+### Next Steps
+
+1. **Squad feedback:** Review DP and flag any concerns before Phase 0 spike
+2. **Phase 0 spike:** Rate-limit validation, GitHub Models OAuth integration, architecture proof-of-concept
+3. **Phase 1 planning:** BYOK auth paths, telemetry consent UX, sign/notarize pipeline
+
+### References
+
+- Full DP: https://github.com/sabbour/kickstart/issues/1043
+- Part 1 comment: Sections 1–12 (Problem Statement through Recommendation)
+- Part 2 comment: Sections 13–20 (revisions 3–6, SDK interop analysis, dual-runtime strategies, source validation)
+- Decisions comment: Link to `.squad/decisions.md` reference sections
+
+---
+
+## 2026-04-21: Wire the 4-way review gate into CI
+
+**Author:** Leela (Lead)
+**Date:** 2026-04-21
+**Status:** Decided (pending PR #993 merge)
+**Relates to:** PR #993, tracking issue #992, decision `leela-ceremony-enforcement-2026-04-21.md` (which declared the 4-way gate in `.squad/ceremonies.md` but did not wire it into CI)
+
+### Context
+
+The earlier ceremony-enforcement PR (#993 pre-recalibration) declared in `.squad/ceremonies.md` that the PR Review Gate is now four-way (Leela + Zapp + Nibbler + Docs). Ahmed's audit caught that the **enforcement was documentation-only** — `.github/workflows/squad-review-gate.yml`, `.github/workflows/squad-auto-merge.yml`, and `.github/scripts/squad-visible-trail.cjs` still only knew about Leela + Zapp. The status check would turn green without Nibbler, without a docs marker, and would not fail on `nibbler:rejected` or `docs:rejected`.
+
+This decision captures the wiring changes folded into PR #993 before it goes ready-for-review.
+
+### Decision
+
+#### 1. `squad/review-gate` status check requires 4 dimensions
+
+- `leela:approved` — required on every path
+- `nibbler:approved` — required on every path (including `squad:chore-auto`)
+- `zapp:approved` — required on the standard path; required on the low-risk path only if the PR is security-sensitive or touches sensitive paths
+- Exactly one of `docs:approved` or `docs:not-applicable` — required on every non-trusted path
+- Any of `leela:rejected`, `zapp:rejected` (when Zapp is in-scope), `nibbler:rejected`, `docs:rejected` fails the gate immediately (state: `failure`, not `pending`).
+
+#### 2. `squad-auto-merge` clears 3 approval labels on `synchronize`
+
+`APPROVAL_LABELS = ['leela:approved', 'zapp:approved', 'nibbler:approved']`. All three are cleared on every synchronize. **Migration impact:** in-flight PRs on other branches will need a fresh `nibbler:approved` label after this PR lands — the auto-merge workflow will clear any pre-existing `nibbler:approved` on the next push. The PR description calls this out.
+
+#### 3. Three-way rejection-preservation matrix
+
+Old behaviour: if exactly one of (Leela, Zapp) was rejecting, the OTHER reviewer's approval was preserved across synchronize to avoid re-asking an uninvolved reviewer to re-approve. Extended to three reviewers: if exactly one of (Leela, Zapp, Nibbler) is rejecting, the other two approvals are preserved. If zero or two-or-more are rejecting, no preservation — all approvals clear.
+
+Docs markers (`docs:approved`, `docs:not-applicable`) are **not** cleared on synchronize. They describe the PR's content (did docs land, or was it declared N/A in the DP) rather than a reviewer's per-commit signoff. Clearing them on every push would create churn for no gain.
+
+#### 4. Low-risk path decision — Nibbler stays required
+
+`squad:chore-auto` PRs still require `nibbler:approved`. Rationale:
+
+- Code-quality review is **cheap and fast** — Nibbler typically needs seconds to read a chore PR and approve.
+- Many historical `squad:chore-auto` regressions (dead code, missing types, stale imports) would have been caught by a code-quality pass even though security and architecture were genuinely N/A.
+- The policy is simpler with one exception (Zapp) than two — operators don't need to remember a per-reviewer matrix.
+- If a specific chore truly shouldn't need Nibbler, Leela can apply `nibbler:approved` directly as part of the triage signoff; we do not carve out a "no Nibbler" path.
+
+If this turns out to be friction in practice we will revisit, but the default is "Nibbler reviews every PR."
+
+#### 5. Docs gate on low-risk path
+
+Low-risk path also requires a docs marker. `docs:not-applicable` is specifically designed as the cheap escape valve for chores that genuinely don't touch user-facing behaviour — the DP must have declared `Docs impact: N/A` with justification for `docs:not-applicable` to apply. A chore PR with `docs:not-applicable` + `leela:approved` + `nibbler:approved` (and `zapp:approved` if sensitive) is 30 seconds of reviewer time total.
+
+#### 6. Labels synced via `sync-squad-custom-labels.yml`
+
+Added `docs:approved` (`0E8A16`), `docs:rejected` (`D93F0B`), `docs:not-applicable` (`BFD4F2`). Reused the existing colour scheme so the new labels blend with `leela:*` / `zapp:*` / `nibbler:*`. Also updated the stale `estimate:*` descriptions (they were still referencing 2h/8h/24h/80h from the weekly cadence — now reflect the 6h-sprint bands from the sibling decision `leela-6h-sprint-calibration-2026-04-21.md`).
+
+#### 7. Visible trail comment now renders 4 reviewers
+
+`.github/scripts/squad-visible-trail.cjs` now reports Leela, Zapp, Nibbler, and Docs statuses on the sticky PR comment, and the gate-path summary string names all four. Docs is handled as a tri-state (`docs:approved` / `docs:not-applicable` / `docs:rejected`) rather than a binary approved/rejected because "not applicable" is a legitimate green state, not an absence.
+
+### Alternatives considered and rejected
+
+- **Nibbler optional on `squad:chore-auto`.** Rejected — see (4). Cost is near-zero, value is real.
+- **Docs marker cleared on synchronize.** Rejected. Docs state is a PR-content property, not a per-commit reviewer signoff; clearing it would force the docs reviewer to re-apply the marker after every push with no new information.
+- **Separate docs status check context.** Rejected. Keeping docs inside `squad/review-gate` means one status check, one branch-protection entry, one workflow to keep in sync.
+- **Flip gate to `failure` only when explicit `*:rejected` is present, otherwise `pending`.** Adopted. Distinguishes "waiting for a reviewer" (benign) from "actively rejected" (needs fix), which drives different agent behaviour downstream.
+
+### Action items
+
+- [ ] After PR #993 merges, run the `Sync Squad Custom Labels` workflow once to create the three new `docs:*` labels in the repo
+- [ ] Amend branch-protection required checks if the `squad/review-gate` context needs re-registering (it should re-post under the same name, so likely a no-op)
+- [ ] Any in-flight PRs on long-running branches will lose `nibbler:approved` on their next push and need a fresh Nibbler pass — expected and correct
+
+---
+
+## 2026-04-21: Recalibrate Sprint Planning + Cadence Retro for 6-hour sprint cadence
+
+**Author:** Leela (Lead)
+**Date:** 2026-04-21
+**Status:** Decided (pending PR #993 merge)
+**Supersedes:** the weekly-sprint language shipped earlier the same day on branch `squad/process-ceremony-enforcement-2026-04-21`
+**Relates to:** Ahmed directive `copilot-directive-6h-sprints-2026-04-21.md`, tracking issue #992, PR #993
+
+### Context
+
+PR #993 originally defined Sprint Planning as "weekly (Monday)" and Cadence Retrospective as "weekly," with estimate bands sized for a week of work (2h / 8h / 24h / 80h). Ahmed clarified post-merge of the ceremony text that the squad's actual cadence is **6-hour sprints on a fixed UTC schedule**, not weekly. This decision captures the recalibration made before #993 is flipped ready-for-review.
+
+### Decision
+
+#### Sprint Planning cadence
+
+Runs **every 6 hours** on fixed UTC anchors: **00:00 / 06:00 / 12:00 / 18:00 UTC**. Ahmed (PO) may override by editing the anchor row in `.squad/ceremonies.md` directly — coordinator consumes whatever is written there, no separate config flag.
+
+#### Sprint goal file
+
+Timestamped per 6h anchor: `.squad/sprints/{YYYY-MM-DDThh}Z.md` (e.g. `.squad/sprints/2026-04-21T12Z.md` for the 12:00 UTC sprint that runs until 18:00 UTC).
+
+#### Estimate bands (sized for a single 6h sprint)
+
+| Label | Time band | Points | Fits in a 6h sprint? |
+|-------|-----------|--------|----------------------|
+| `estimate:S` | ~15 min | 1 | ✅ |
+| `estimate:M` | ~1 hour | 3 | ✅ |
+| `estimate:L` | ~3 hours | 8 | ✅ (at most one per sprint) |
+| `estimate:XL` | >3 hours | 20 | ❌ |
+
+#### XL-split rule
+
+`estimate:XL` means "does not fit in a 6h sprint." XL issues **never enter sprint scope**. Leela splits them during triage into `S` / `M` / `L` children, each with their own estimate label. DPs landing with `Estimate: XL` are rejected with a split plan.
+
+#### Cadence Retrospective
+
+Runs **end of each 6h sprint** (at the next anchor, immediately before the next Sprint Planning). Output is appended as a **comment** to a rolling daily issue `Cadence Retro · {YYYY-MM-DD}` — up to 4 comments per UTC day, one per closed sprint. Scribe creates the rolling daily issue on the first retro of each UTC day. This avoids 4 new retro issues every day.
+
+#### Deferred (not in PR #993)
+
+The existing weekly/daily cron workflows — `squad-weekly-pulse.yml`, `squad-velocity-report.yml`, `squad-daily-pulse.yml` — are independent reports, **not** Sprint Planning inputs. They are **not** retimed in PR #993. Tracked as an acceptance item on #992: decide whether `squad-weekly-pulse.yml` should become `squad-sprint-pulse.yml` at 6h cadence.
+
+### Rationale
+
+- **Anchor times**: aligning to `00 / 06 / 12 / 18 UTC` gives predictable globally-readable timestamps, keeps all four sprints in a single UTC day, and makes the daily retro-bucketing issue clean. Any other choice (e.g. anchoring to local PT) would break the "four clean sprints per UTC day" invariant used by the retro rollup.
+- **Estimate bands** chosen so that: S = a trivial change anyone can finish without context-switching cost; M = a single focused task; L = the sprint's hero item with headroom left; XL = physical impossibility for the cadence, which forces the split instead of pretending it fits.
+- **XL-split over "XL spans multiple sprints"**: the alternative (let XL span sprints) destroys the "one PR = one issue = one sprint of scope" invariant and makes velocity tracking meaningless. Forcing the split during triage is cheap because Leela is already reading each new `squad` issue; the split happens at the same moment the estimate is applied.
+- **Retro as daily-bucketed comments, not per-sprint issues**: four new `Retro` issues per day is noise, not signal. A single rolling daily issue preserves auditability, cuts notification volume by 4×, and groups an entire UTC-day's sprints in one place for trend-reading.
+
+### Action items (picked up after merge)
+
+- [ ] Flip PR #993 ready-for-review once Ahmed has reviewed the recalibration
+- [ ] Follow-up on #992: decide fate of `squad-weekly-pulse.yml` (rename to `squad-sprint-pulse.yml` at 6h cadence, or leave as weekly summary alongside the 6h retros)
+- [ ] First 6h Sprint Planning ceremony at the next UTC anchor after merge — confirms the new file path `.squad/sprints/{YYYY-MM-DDThh}Z.md` works end-to-end
+- [ ] First Cadence Retro at the following anchor — confirms the rolling daily issue pattern works
+
+---
+
+## 2026-04-21: Electron DP Committed to Repo
+
+**Date:** 2026-04-21  
+**Decision Maker:** Leela (Lead)  
+**Status:** Approved
+
+### Context
+
+The Electron Desktop design proposal (rev 6, ~1772 lines) was previously maintained in session state. Ahmed Sabbour requested it be recorded as a markdown file in the repository instead of as a GitHub issue (prior issue filing was cancelled).
+
+### Decision
+
+The Electron DP has been committed to the repository at `docs/design/electron-desktop-dp.md` and tracked in draft PR #1045.
+
+**Branch:** `squad/electron-desktop-dp`  
+**File Path:** `docs/design/electron-desktop-dp.md`  
+**PR:** https://github.com/sabbour/kickstart/pull/1045  
+**Status:** WIP (rev 6) — Round 5 (Option 3 shim re-evaluation) pending
+
+### Implementation Notes
+
+- **File location:** `docs/design/` serves as the canonical design proposal directory
+- **README added:** `docs/design/README.md` created as an index with links to all DPs
+- **WIP banner:** Added at top of DP to signal that this is work-in-progress
+- **Future revisions:** Land as follow-up commits to the same branch, or as a new PR if the branch is merged before further work
+- **Co-authors:** Leela (Lead), Ahmed Sabbour (brainstorm partner)
+
+### Why This Decision
+
+- **Durability:** In-repo markdown survives session state cleanup and provides a canonical source of truth
+- **Collaboration:** Changes flow through PR review, allowing for team feedback and decision tracking
+- **Discoverability:** Committed files are indexed and searchable by all team members
+- **Iteration:** Revisions can be tracked through git history without losing prior context
+
+### Next Steps
+
+- Merge PR #1045 when DP round 5 (Option 3 shim verdict) is complete
+- Update PR status from draft to ready for review at that time
+- Archive session state reference in favor of the committed file
+
+---
+
+## 2026-04-21T17:30:00Z: Leela — Code-Quality Re-Review — MCP Apps Option B DP v2
+
+**Date:** 2026-04-21T17:30:00-07:00
+**Reviewed:** nibbler-mcp-apps-option-b-dp-v2.md (1238 lines)
+**Reviewer status:** Locked out from revising v1; reviewing v2 by explicit coordinator dispatch
+**Verdict:** leela:approved-with-conditions
+
+### Summary
+
+v2 is a materially different and substantially stronger document than the v1 it supersedes. The core architecture — scoped `providerOverride` bypassing `_sdkRunner`, native MCP sampling tools instead of parser-first, fail-closed capability gate on both `converse` and `resume` — is sound, accurately grounded in real code, and addresses every block and concern from the v1 rejection. The citation discipline is excellent across 20+ repo and SDK anchors, with one notable exception: the docs-site paths in the header and §30 are stale and must be corrected before implementation handoff.
+
+### Citation Spot-Checks
+
+| # | Citation | Claim | Verdict |
+|---|---|---|---|
+| 1 | `packages/harness/src/runtime/runner.ts:54-72` | `buildModelProvider()` constructs default OpenAIProvider | ✅ Lines 54–72 contain exactly this function |
+| 2 | `packages/harness/src/runtime/runner.ts:75-113` | `_sdkRunner` singleton, `installOtelBridgeOnce()`, `getSdkRunner()` | ✅ Module-scope `_sdkRunner` at 75, OTel at 95–104, `getSdkRunner()` at 106–113 |
+| 3 | `packages/harness/src/runtime/runner.ts:316-317` | Runner constructor stores only `registry` | ✅ `export class Runner { constructor(private readonly registry: PackRegistry) {} }` |
+| 4 | `packages/harness/src/runtime/runner.ts:423-425` | `getSdkRunner()` then `sdkRunner.run(...)` | ✅ Lines 423–429; `getSdkRunner()` at 424, `sdkRunner.run()` starts at 425 |
+| 5 | `packages/mcp-server/src/index.ts:100-109` | `oninitialized` sets `connectionId`, derives `isVsCode`, no capability snapshot | ✅ Exact match |
+| 6 | `packages/mcp-server/src/index.ts:119-219` | `converse` tool handler range | ✅ Handler opens at 119, core logic ends ~219, outer close at 221 (off-by-2 at tail, non-material) |
+| 7 | `packages/mcp-server/src/index.ts:245-256` | Resume 404 error uses `JSON.stringify` text content pattern | ✅ Lines 244–258, exact pattern |
+| 8 | `node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.d.ts:137-150` | Three `createMessage()` overloads including tools-enabled | ✅ Base at 140, WithTools at 145, union at 150 |
+| 9 | `node_modules/@modelcontextprotocol/sdk/dist/esm/spec.types.d.ts:300-312` | `ClientCapabilities.sampling.tools` definition | ✅ `sampling?: { context?: object; tools?: object }` at 302–312 |
+| 10 | `node_modules/@openai/agents-core/dist/model.d.ts:418-434` | `Model` interface: `getResponse`, `getStreamedResponse` | ✅ Exact match |
+| 11 | `node_modules/@openai/agents-core/dist/types/protocol.d.ts:375-389` | `FunctionCallItem` with `callId`, `name`, `arguments` | ✅ Zod schema matches |
+| 12 | `packages/harness/package.json:72-76` | `@openai/agents` pinned at `0.8.4` | ✅ Line 73: `"@openai/agents": "0.8.4"` |
+| 13 | `packages/mcp-server/package.json:11-27` | Scripts present, `@openai/agents` absent | ✅ No `@openai/agents` in deps |
+| 14 | `.github/workflows/ci.yml:141-148` | Playwright E2E gate | ✅ Build at 141, browser install at 144, test at 147 |
+| 15 | `.github/workflows/sync-squad-custom-labels.yml:35-59` | Current label list lacks `human:approved-implementation` etc. | ✅ Labels at 35–59, missing cited labels confirmed |
+| 16 | `docs-site/docs/architecture/overview.md` (line 30: "does not exist in this repo") | v2 claims this file is absent | ❌ **File exists** — `docs-site/docs/architecture/overview.md` is present in the repo |
+| 17 | `docs-site/docs/architecture/packs-and-skills.md` (line 10, 30: "correct architecture page") | v2's corrected path | ❌ **Wrong path** — actual file is `docs-site/docs/guides/packs-and-skills.md` |
+| 18 | `docs-site/docs/guides/mcp-tools.md` (line 9: docs impact field) | Existing guide to update | ❌ **Wrong path** — actual file is `docs-site/docs/extending/mcp-tools.md` |
+
+**Score: 15/18 accurate.** All repo source and SDK citations verified. Three docs-site paths are stale.
+
+### Findings
+
+#### 🔴 Block
+
+None.
+
+#### 🟡 Concern
+
+**C1 — Three stale docs-site paths undercut the "we fixed stale refs" claim.**
+
+v2 line 30 says: *"Fixes stale doc paths from v1 (`docs-site/docs/architecture/overview.md` does not exist in this repo; the correct architecture page in scope is `docs-site/docs/architecture/packs-and-skills.md`)."*
+
+Reality:
+- `docs-site/docs/architecture/overview.md` **does** exist.
+- `docs-site/docs/architecture/packs-and-skills.md` **does not** exist; the actual path is `docs-site/docs/guides/packs-and-skills.md`.
+- `docs-site/docs/guides/mcp-tools.md` (Docs impact field, line 9) **does not** exist; the actual path is `docs-site/docs/extending/mcp-tools.md`.
+
+Risk: implementers follow the DP's docs impact field, create or edit wrong paths, and the docs-site build breaks or the real files go stale. This is the same class of error the DP claims to fix from v1.
+
+**C2 — `function_call_result` structured-output mapping in §3.4 sketch.**
+
+Lines 335–346 of the sketch handle non-string `FunctionCallResultItem.output` with `[resultItem.output]` passed directly into `ToolResultContent.content`. The OpenAI SDK's structured output variants (`input_text`, `input_image`, `input_file` discriminant types at `protocol.d.ts:532-552`) do not share type names with MCP's `ContentBlock` types (`text`, `image`, etc.). In P0, tool outputs are overwhelmingly strings, so practical risk is low. But the sketch presents this as a complete mapping when it is not — a type mismatch on structured output would surface at runtime, not compile time.
+
+The test plan (§11.1 item 5: "function_call_result input item with structured output block → user tool_result") would catch this during implementation, which reduces the risk. Flagging it so the implementer knows the sketch line 341 needs real type translation, not a passthrough.
+
+**C3 — Minor line-number drift in converse/resume handler cites.**
+
+v2 cites `packages/mcp-server/src/index.ts:119-219` for `converse` (actual close: 221) and `229-296` for `resume` (actual close: 299). The off-by-2/3 doesn't invalidate any claims, but it weakens the "every code claim cites current files/lines" statement in Appendix A nit resolution. Non-blocking.
+
+#### 🟢 Nit
+
+**N1 — OTel bridge continuity in override path.**
+
+§3.5.2 specifies what the `providerOverride` path must not do (no `_sdkRunner` mutation, no `setDefaultModelProvider`). It does not specify that `installOtelBridgeOnce()` must still be called. Since the proposed refactor is `getSdkRunner(providerOverride?)`, the OTel call would naturally stay in scope. But given the DP's thoroughness everywhere else, mentioning OTel continuity explicitly would remove ambiguity.
+
+**N2 — Inconsistent `createMessage` cite ranges.**
+
+v2 uses both `137-150` (§3.2, §4.1, §13.1) and `142-150` (§3.4 notes) for the same SDK location. The no-tools overload starts at 137; the tools overload starts at 142. Both are defensible, but picking one range consistently would be cleaner.
+
+### Required Conditions (if approved-with-conditions)
+
+1. **Fix the three stale docs-site paths** before this DP is used for implementation routing:
+   - Line 9: `docs-site/docs/guides/mcp-tools.md` → `docs-site/docs/extending/mcp-tools.md`
+   - Line 10: `docs-site/docs/architecture/packs-and-skills.md` → `docs-site/docs/guides/packs-and-skills.md`
+   - Line 30: Remove the false claim that `docs-site/docs/architecture/overview.md` does not exist; correct the "fixed" path to `docs-site/docs/guides/packs-and-skills.md`
+
+   These are mechanical fixes. They do not require re-review.
+
+### Lockout Compliance Statement
+
+I confirm this review contains no rewrites, alternative architectures, or advisory suggestions that would constitute contribution to the revision.
+
+### Sign-off
+
+Verdict label: `leela:approved-with-conditions`
+
+---
+
+## 2026-04-21: KickstartRunner Shim (Option 3) — Verdict Flipped
+
+**Author:** Leela (Lead)
+**Date:** 2026-04-21
+**Status:** PROPOSED
+**Supersedes:** leela-dual-runtime-strategies.md (rev 5 recommendation of Option 1)
+**DP Reference:** electron-dp.md §18.10
+
+### Context
+
+Rev 5 rejected Option 3 (KickstartRunner shim) citing 6 leaky abstraction surfaces and
+"premature abstraction" — the shim only paying off with a speculative third runtime.
+
+Rev 6 source-code validation corrected two major claims:
+1. `customAgents[]` provides native handoff support (eliminates leak #1 and #5)
+2. Both Zod and JSON Schema are supported for tool params (eliminates leak #2)
+
+Additionally, Ahmed's requirement IS dual-runtime (SWA + Electron), not speculative. The MCP
+Apps Option B DP also proposes a third execution path (`SamplingModelProvider`).
+
+### Decision
+
+**Option 3 — KickstartRunner shim with `AgentBackend` interface — is now RECOMMENDED.**
+
+Architecture: shared `Runner.run()` handles guardrails, SSE dispatch, A2UI drain, output
+processing. `AgentBackend.execute()` is the only SDK-specific code (~200 lines for OpenAI,
+~300 lines for Copilot). Total: ~700 lines vs ~1,160 for Option 1.
+
+### Key facts that changed the verdict
+
+| Rev 5 argument | Rev 7 status |
+|----------------|-------------|
+| 6 leaky abstractions | 4 eliminated → 2 remain |
+| Premature (needs 3rd runtime) | Dual-runtime IS the requirement |
+| L effort (~1,470 lines) | M- effort (~700 lines) |
+| Handoffs leak through | Native `customAgents` — no leakage |
+| Structured output leaks | `resolveOutputText()` fallback handles it |
+
+### Remaining risks
+
+1. **Structured output (LOW):** `resolveOutputText()` already falls back to raw text. Intent
+   extraction degrades slightly on Copilot backend — acceptable for P1.
+2. **A2UI drain timing (LOW):** Copilot SDK events may fire less frequently. Drain on every
+   `AgentEvent` — worst case ~100-200ms additional latency. Spike validates.
+
+### Spike gates (2 days)
+
+1. Structured output via system prompt — JSON parse + retry success rate
+2. `assistant.message_delta` as A2UI drain trigger — event frequency + latency
+
+### Implementation: ~2 weeks (M effort)
+
+1. Spike: 2 days
+2. Extract `AgentBackend` interface + `OpenAIBackend`: 2 days
+3. Implement `CopilotBackend`: 3 days
+4. Integration tests + Electron wiring: 3 days
+
+— Leela
+
+---
+
+## 2026-04-21T17:12:00Z: Structured Review — DP v2: MCP Apps for VS Code — Option B (Nibbler)
+
+**Date:** 2026-04-21T17:12:00-07:00  
+**Author:** Nibbler (Code Reviewer & Watchdog)  
+**Supersedes:** Earlier leela-mcp-apps-option-b-dp.md (v1)  
+**Revised by:** Nibbler (per Reviewer Rejection Protocol; Leela locked out)  
+**Estimate:** L (real scope: harness isolation refactor + MCP-server adapter + host-capability gates + integration coverage)
+
+### Docs impact
+
+- `docs-site/docs/guides/mcp-tools.md` — VS Code host-managed sampling setup, capability requirements, and approval flow
+- `docs-site/docs/architecture/packs-and-skills.md` — provider-isolation diagram and SWA non-regression contract
+- `docs-site/docs/getting-started/vs-code-mcp-apps.md` — new end-user quick start for VS Code MCP Apps
+
+### Changes from v1
+
+- Replaces the rejected parser-first core with the SDK-native tools path: `server.createMessage({ messages, tools, toolChoice, ... })` and `tool_use` / `tool_result` blocks.
+- Replaces the incorrect harness story with the real runner lifecycle: module-scope `_sdkRunner`, `getSdkRunner()`, and `Runner.run()` calling that singleton (`packages/harness/src/runtime/runner.ts:75-113, 316-317, 423-425`).
+- Picks a scoped-provider design that does **not** mutate shared SWA runner state.
+- Removes JSON parsing as the primary mechanism; any text-parsing fallback is explicitly deferred to P2 and opt-in.
+- Adds a fail-closed capability contract for both `converse` and `resume`, with machine-readable error codes and no silent Option A route.
+- Tightens data-egress language: sampling forwards prompt/tool context to the host path, but not secrets or unrelated internal-only payloads.
+- Separates sampling-consent UX from destructive-action confirmation UX and forbids bundling them.
+- Validates `KICKSTART_MODEL_HINTS` with hard bounds and redaction-safe telemetry.
+- Strengthens the SWA non-regression contract to address the harness singleton hazard directly.
+- Expands the file-touch map with the missing package dependency, scripts, fixtures, type-only shim, changeset entry, and workflow/label changes.
+- Replaces parser-edge-case tests with native-tools translation tests, mock-host integration tests, and invariant tests that prove the MCP server never routes to a non-sampling provider.
+- Wires the human gate as an issue-label gate, not prose.
+- Closes open question #4: the `createMessage` API exists in the pinned SDK (`node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.d.ts:137-150`).
+- Fixes stale doc paths from v1 (`docs-site/docs/architecture/overview.md` does not exist in this repo; the correct architecture page in scope is `docs-site/docs/architecture/packs-and-skills.md`).
+
+### TL;DR
+
+Option B is viable **only** if we use the MCP SDK's native sampling-tools contract that is already present in the checked-in SDK, and **only** if the MCP server gets a scoped model-provider path that bypasses the harness singleton used by SWA. The happy path is:
+
+1. `packages/mcp-server/src/index.ts` snapshots host capabilities after initialize (`packages/mcp-server/src/index.ts:100-109`).
+2. The MCP-server path builds a scoped `SamplingModelProvider` and passes it through a new runner-facing override rather than touching `_sdkRunner` (`packages/harness/src/runtime/runner.ts:75-113, 423-425`).
+3. The adapter translates `ModelRequest` → `CreateMessageRequestParamsWithTools`, and `CreateMessageResultWithTools` → `ModelResponse` with native `FunctionCallItem`s.
+4. If the host lacks `sampling` or lacks `sampling.tools`, both `converse` and `resume` return a structured capability error. There is no silent Azure/OpenAI fallback in the MCP binary.
+5. SWA keeps its existing provider path and remains covered by the repo's Playwright gate in `.github/workflows/ci.yml:141-148`.
+
+This revision resolves my 3 blocks, my 6 concerns, my 3 nits, and all 7 of Zapp's binding conditions.
+
+---
+
+## 2026-04-21: Nibbler — Round 4 review decisions
+
+**Date:** 2026-04-21
+**Author:** Nibbler (Code Reviewer, Lead-tier)
+**Scope:** PRs #1005, #1000 (re-approval), #1003, #1004
+
+### Decisions
+
+#### 1. PR #1005 — APPROVED
+
+`core_emit_ui` strict-mode schema regression (#998) fix. Parametrised conformance test walks every pack-core tool at every nesting depth (`anyOf`/`oneOf`/`allOf`/`items`/`additionalProperties`); explicit regression assertion pinned to `createSurface.sendDataModel`; runtime contract preserved via `stripNulls` before `A2UIMessageSchema.parse`; sibling sweep for `list_files.ts` included. CI green (940 tests). Formal review + `nibbler:approved` label.
+
+#### 2. PR #1000 — APPROVED (re-approval after revise)
+
+All three round-3 blockers resolved:
+- **TS2307 + TS2352**: path aliases aligned across `packages/web/tsconfig.json` + `vite.config.ts` + `vitest.config.ts`; Zod cast narrowed with explicit `as unknown as z.ZodTypeAny` + comment documenting the zod@3/zod@4 bridge.
+- **Concrete bundle-budget gate**: `packages/web/scripts/check-bundle-budget.mjs` wired via `postbuild`. Correctly scoped to `index-*.js` + `Playground-*.js` only — vendor workers (monaco `ts.worker`, mermaid lazy chunks) explicitly excluded. Ceilings sit with sane headroom above current measurements. Waiver via PR description `bundle-budget-waiver:` line.
+- **Pack-authoring docs**: server/client subpath contract + `registerClient` pattern documented in `docs-site/docs/guides/packs-and-skills.md`.
+
+Single-revert rollback confirmed. Full CI green. `nibbler:approved` label re-applied (was stripped on synchronize).
+
+#### 3. PR #1003 — APPROVED
+
+#995 Core-tab density + preview coverage. Named-constant geometry module (`playground-layout-constants.ts`) is the single source of truth consumed by CSS (`Playground.tsx`), unit test (`playground-core-tab-rendering.test.ts`), and Playwright (`playground.spec.ts`). Stable data-attribute selectors on cards. Preview-coverage matrix parametrised across all shipped core basic renderers. `nibbler:approved` label.
+
+#### 4. PR #1004 — APPROVED
+
+#997 workspace black void. `min-height: 0` chain complete across all four column-flex links. Explicit geometry assertions use named constants (`MAX_EDITOR_BOTTOM_SLACK_PX`, `MIN_CODE_WRAPPER_HEIGHT_PX`) — no magic numbers, no background-color proxy. Two viewport states. Formal review + `nibbler:approved` label.
+
+### Conventions carried forward
+
+- **Bundle-overage pattern**: concrete ceiling + CI gate + waiver-by-PR-description line is the approved shape for any future "controlled performance overage" sign-off.
+- **Self-authored PRs**: GitHub blocks formal `gh pr review --approve` when the authenticated identity matches the PR author. For PRs authored by `sabbour`, only the `nibbler:approved` label path is available. The `check-squad-approval` workflow reads the label, so this is a non-blocking operational limitation — future Nibbler runs should expect the GraphQL "cannot approve own PR" error and fall through to the label path without retrying.
+- **Named-constant geometry ask is now proven**: for any layout regression where CSS, unit, and E2E all assert geometry, the single-source-of-truth module pattern (`*-layout-constants.ts` imported by all three) is the approved shape. Applied cleanly in #1003 and #1004.
+- **CI-green precheck before approve** remains mandatory after round-3 learning: never approve on PR-body test counts alone; always verify the checks panel.
+
+### Consequences
+
+- Four PRs cleared on the first round-4 pass — continues to validate the DP-stage gate reducing PR-stage rework.
+- Bundle-budget script is now the baseline — future pack additions that breach the ceiling must either raise the number in the script (requiring deliberate edit + waiver note) or split into lazy chunks.
+
+---
+
+## 2026-04-21: Local-only media assets for A2UI component examples
+
+**Date:** 2026-04-21  
+**Author:** Fry (Frontend Dev)  
+**Issue:** #1018  
+**PR:** #1022
+
+### Decision
+
+All A2UI component example envelopes that include a media `url` prop (Video, AudioPlayer, Image, Icon, Media) **must** reference locally-hosted assets served from the same origin. External URLs are prohibited.
+
+### Context
+
+Kickstart enforces `default-src 'self'` as its base CSP with no explicit `media-src` directive. Any external media URL in an A2UI component example will produce a CSP violation and a broken Playground preview in production. The w3schools demo URLs (`mov_bbb.mp4`, `horse.mp3`) that shipped in `core-previews.ts` triggered this in #1018.
+
+### Constraints
+
+- CSP must remain strict: `default-src 'self'`, no `media-src` whitelist additions. Per Ahmed's "align to spec" directive.
+- Sample media must be committed to the repo and bundled (not fetched at runtime from external sources).
+
+### Rationale
+
+Broader CSP (`media-src https://...`) was explicitly rejected: it widens the attack surface and contradicts the spec alignment directive. Local assets are auditable, cacheable, and always available regardless of external service availability.
+
+### Canonical sample paths
+
+| Asset | Path |
+|---|---|
+| Video | `/assets/samples/sample.mp4` |
+| Audio | `/assets/samples/sample.mp3` |
+| Icons | `/assets/icons/fluent/<name>.svg` |
+
+Source files: `packages/web/public/assets/samples/`, `packages/web/public/assets/icons/fluent/`
+
+### Scope
+
+Applies to: all A2UI example envelopes, component previews in `core-previews.ts`, sample prompts, SKILL.md examples, and any new A2UI component documentation that includes a media `url` prop.
+
+### Documentation
+
+`packages/pack-core/src/skills/a2ui-media-discipline/SKILL.md` — full pattern, examples, anti-patterns.
+
