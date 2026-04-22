@@ -98,6 +98,28 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-22 | #1086 "feat(harness): core.read_skill pull-based skill loading (D5) — closes #1070" | XL | impl=1m | review=39m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=5m | ci=16m | reviewer=bot | human_comments=1 | issue=#1070 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1085 "feat(harness): cold-session hydration from client messages (D3) — closes #1074" | XL | impl=1m | review=27m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=6m | ci=32m | reviewer=human | human_comments=2 | issue=#1074 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1084 "fix(pack-core): emit_ui idempotent by surfaceId + live-surface cap (D11) — closes #1075" | L | impl=1m | review=11m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=9m | ci=9m | reviewer=bot | human_comments=0 | issue=#1075 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1083 "feat(harness): wire handoffs frontmatter to SDK (D2) — closes #1073" | L | impl=1m | review=9m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=5m | ci=9m | reviewer=bot | human_comments=0 | issue=#1073 | estimate=M | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1072 "feat: structured event payload, triage branch-on-event, createSurface guard (#1062 Layers 1-3)" | XL | impl=1m | review=18m | cycles=1 | merged-with-rework | @sabbour | first_review=3m | ci=9m | reviewer=bot | human_comments=2 | issue=#1062 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1071 "feat(harness): thread conversation history across turns (#1062 Layer 0)" | L | impl=1m | review=9m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=6m | ci=8m | reviewer=bot | human_comments=0 | issue=#1062 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1068 "ci(guard): forbid useAzureMonitor double-export regression (#1066)" | S | impl=0m | review=122m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=0m | ci=6m | reviewer=bot | human_comments=0 | issue=#1066 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1064 "fix(obs): sanitize AgentSpanError stack trace before OTel export (#1040)" | M | impl=1m | review=313m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=2m | ci=8m | reviewer=human | human_comments=1 | issue=#1040 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1065 "fix(telemetry): plug PII double-export bypass; extend redactor to links + resource" | XL | impl=0m | review=16m | cycles=1 | merged | @sabbour | first_review=0m | ci=8m | reviewer=bot | human_comments=0 | issue=#1035 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1063 "chore: remove dead applicationinsights dep (#1037) + real tracer in T9 test (#1038)" | M | impl=0m | review=6m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=0m | ci=9m | reviewer=bot | human_comments=0 | issue=#1037 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1058 "fix(pack-core): emit_ui strict-mode schema violation" | M | impl=1m | review=53m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=3m | ci=9m | reviewer=bot | human_comments=0 | issue=#1050 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-22 | #1056 "fix(ops): SWA smoke test hard gate + re-enable PR preview environments (closes #1049)" | M | impl=1m | review=26m | cycles=1 | merged-with-rework | @sabbour-squad-frontend[bot] | first_review=4m | ci=9m | reviewer=bot | human_comments=0 | issue=#1049 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-22 | #1053 "fix(identity): alias zapp to lead role" | S | impl=0m | review=31m | cycles=1 | merged | @sabbour-squad-tester[bot] | first_review=6m | ci=7m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
