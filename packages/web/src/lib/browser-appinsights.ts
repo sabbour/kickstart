@@ -147,6 +147,28 @@ export function markBrowserTelemetryReady(): void {
         configurable: true,
         writable: true,
       });
+      // Always expose a flush hook — a no-op resolving promise when init
+      // did not succeed. Tests (and any production caller) can call it
+      // unconditionally without having to branch on init success. The real
+      // `provider.forceFlush` overwrites this from inside
+      // `initBrowserTelemetry` once the provider is up.
+      //
+      // Why this matters (Leela round 2): previously the E2E barrier
+      // AND-ed on `__kickstartTelemetryReady && __kickstartFlushTelemetry`.
+      // When the Azure Monitor exporter constructor throws (silent init
+      // failure on a fake connection string in CI), the ready signal
+      // still fires but the flush hook is never defined — every scenario
+      // timed out on the barrier. Separating the two signals keeps
+      // barrier = "bootstrap attempted" and flush = "spans are flowing",
+      // and guarantees the former is always available.
+      const w = window as Window & { __kickstartFlushTelemetry?: () => Promise<void> };
+      if (typeof w.__kickstartFlushTelemetry !== "function") {
+        Object.defineProperty(window, "__kickstartFlushTelemetry", {
+          value: () => Promise.resolve(),
+          configurable: true,
+          writable: true,
+        });
+      }
     } catch {
       // Ignore — harmless if window is frozen.
     }

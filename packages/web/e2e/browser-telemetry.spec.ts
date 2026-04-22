@@ -55,13 +55,20 @@ async function enableBrowserTelemetry(page: Page) {
  * this, `page.goto('/')` resolves and the test fetch fires before the async
  * init has registered FetchInstrumentation — the traceparent/ingestion
  * assertions in scenarios 1 and 2 would always race-miss.
+ *
+ * Important (Leela round 2): we wait ONLY on `__kickstartTelemetryReady` — the
+ * "bootstrap attempted" sentinel that `main.tsx` fires from its `finally`
+ * block whether init succeeded or not. We do NOT AND on
+ * `__kickstartFlushTelemetry`: when init fails silently (e.g. Azure Monitor
+ * exporter constructor throws on a fake connection string), the flush hook
+ * is still exposed as a no-op by `markBrowserTelemetryReady`, but waiting
+ * on its presence before was redundant with the ready sentinel and risked
+ * masking init failures as timeouts.
  */
 async function waitForTelemetryReady(page: Page): Promise<void> {
   await page.waitForFunction(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    () => typeof (window as any).__kickstartTelemetryReady !== 'undefined'
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      && typeof (window as any).__kickstartFlushTelemetry === 'function',
+    () => typeof (window as any).__kickstartTelemetryReady !== 'undefined',
     null,
     { timeout: 10_000 },
   );
