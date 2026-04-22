@@ -48,5 +48,12 @@ dp-46-body.md
 .squad/identity/keys/
 .squad/identity/apps/
 .squad/identity/config.json
+
+# Squad: per-ceremony gh CLI config (isolates auth from human hosts.yml — #1087)
+.squad/runtime/
+
+# Squad: local session artifacts (may contain captured agent output — #1087 C/R5)
+events.jsonl
+.copilot/session-state/
 .squad-*-token
 .squad-*-token.json
