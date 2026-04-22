@@ -121,19 +121,38 @@ async function getActor(kind, args, token) {
       return { login: match.actor?.login, type: match.actor?.type };
     }
     case 'pr-create': {
-      // Nibbler PR #1091 C3: verify BOTH the PR record user AND the head
-      // commit author — a bot-authored commit that was then opened as a PR
-      // under ambient human auth is the exact #1086 regression, and checking
-      // only one field misses it.
+      // Nibbler PR #1091 round-2: verify BOTH the PR record user AND the
+      // head commit author. A null headActor is a FAIL (not a pass) —
+      // commits whose email doesn't resolve to a GitHub user cannot be
+      // attributed to the bot, and the #1086/#1087 incident pattern is
+      // exactly: bot-shaped git author, ambient-auth PR creation, commit
+      // author.login === null on the GitHub side.
       const prRes = await ghFetch('GET', `/repos/${owner}/${repo}/pulls/${pr}`, token);
       if (!prRes.ok) return { error: `pr fetch failed: ${prRes.status}` };
       const prUser = { login: prRes.data?.user?.login, type: prRes.data?.user?.type };
       const headSha = prRes.data?.head?.sha;
-      if (!headSha) return { ...prUser, headActor: null };
+      if (!headSha) {
+        return { ...prUser, headActor: null, headActorError: 'pr has no head.sha' };
+      }
       const commitRes = await ghFetch('GET', `/repos/${owner}/${repo}/commits/${headSha}`, token);
-      const headActor = commitRes.ok
-        ? { login: commitRes.data?.author?.login, type: commitRes.data?.author?.type }
-        : null;
+      if (!commitRes.ok) {
+        return {
+          ...prUser,
+          headActor: null,
+          headActorError: `head commit fetch failed: ${commitRes.status}`,
+        };
+      }
+      if (!commitRes.data?.author) {
+        return {
+          ...prUser,
+          headActor: null,
+          headActorError: `head commit ${headSha.slice(0, 8)} has null author (commit email does not resolve to a GitHub user)`,
+        };
+      }
+      const headActor = {
+        login: commitRes.data.author.login,
+        type: commitRes.data.author.type,
+      };
       return { ...prUser, headActor };
     }
     case 'issue-edit': {
@@ -232,13 +251,23 @@ async function main() {
 
   const loginOk = actor.login === args.expectedLogin;
   const typeOk = actor.type === 'Bot';
-  // For pr-create, ALSO require the head commit to be authored by the same bot.
-  // This closes the regression where a bot commit is opened as a PR under
-  // ambient human auth (#1086 / #1087).
-  const headActorOk =
-    args.kind !== 'pr-create' ||
-    !actor.headActor ||
-    (actor.headActor.login === args.expectedLogin && actor.headActor.type === 'Bot');
+  // Nibbler PR #1091 round-2: for pr-create, null headActor is a HARD FAIL.
+  // The prior `!actor.headActor ||` clause silently passed when the head
+  // commit couldn't be attributed — which is exactly the #1086 regression.
+  let headActorOk = true;
+  let headActorReason = null;
+  if (args.kind === 'pr-create') {
+    if (!actor.headActor) {
+      headActorOk = false;
+      headActorReason = actor.headActorError || 'head commit actor unresolved';
+    } else if (
+      actor.headActor.login !== args.expectedLogin ||
+      actor.headActor.type !== 'Bot'
+    ) {
+      headActorOk = false;
+      headActorReason = `head commit actor ${actor.headActor.login}/${actor.headActor.type} != ${args.expectedLogin}/Bot`;
+    }
+  }
 
   if (loginOk && typeOk && headActorOk) {
     const msg = `post-flight-check: OK  kind=${args.kind} login=${actor.login} type=Bot\n`;
@@ -262,7 +291,7 @@ async function main() {
       ? 'user.type !== "Bot"'
       : !loginOk
         ? 'login mismatch'
-        : 'head commit actor mismatch',
+        : headActorReason || 'head commit actor mismatch',
     headActor: actor.headActor ?? null,
     revoke,
   };

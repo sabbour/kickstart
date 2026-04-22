@@ -66,13 +66,27 @@ function appendEntry(entry) {
 function parseArgs(argv) {
   const [, , cmd, ...rest] = argv;
   const out = { cmd, role: null, paths: [], reason: '' };
+  const FLAGS = new Set(['--role', '--reason', '--paths']);
+
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
-    if (a === '--role') { out.role = rest[++i]; }
-    else if (a === '--reason') { out.reason = rest[++i]; }
-    else if (a === '--paths') {
-      out.paths = rest.slice(i + 1).filter((x) => !x.startsWith('--'));
-      i = rest.length;
+    if (a === '--role') {
+      out.role = rest[++i];
+    } else if (a === '--reason') {
+      out.reason = rest[++i];
+    } else if (a === '--paths') {
+      // Nibbler PR #1091 round-2: `--paths` must terminate when it hits the
+      // next flag, not slurp to end-of-args. The prior implementation
+      // silently absorbed `--reason "<text>"` into the paths list, which
+      // made the JSONL cooldown state length-mismatch with every subsequent
+      // `check` invocation and effectively disabled the 24h guard.
+      i++;
+      while (i < rest.length && !FLAGS.has(rest[i])) {
+        out.paths.push(rest[i]);
+        i++;
+      }
+      // Step back one so the outer for-loop's i++ re-examines the flag.
+      i--;
     }
   }
   return out;

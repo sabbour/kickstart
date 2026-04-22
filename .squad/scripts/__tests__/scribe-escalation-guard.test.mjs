@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { existsSync, unlinkSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { pathsMatch, COOLDOWN_MS } from '../scribe-escalation-guard.mjs';
+import { pathsMatch, COOLDOWN_MS, parseArgs } from '../scribe-escalation-guard.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(__dirname, '..', 'scribe-escalation-guard.mjs');
@@ -70,5 +70,73 @@ describe('scribe-escalation-guard (Nibbler gap 9 mechanical guard)', () => {
   it('pathsMatch is order-independent', () => {
     expect(pathsMatch(['a', 'b'], ['b', 'a'])).toBe(true);
     expect(pathsMatch(['a'], ['a', 'b'])).toBe(false);
+  });
+
+  // Nibbler PR #1091 round-2 empirical-probe regression:
+  // The original parseArgs slurped everything after `--paths` to end-of-args
+  // without respecting subsequent flags, so `--reason "<short>"` got absorbed
+  // into the paths list and the whole JSONL state became length-mismatched.
+  describe('parseArgs — --paths must terminate at next flag', () => {
+    it('unit: --reason after --paths is NOT absorbed into paths', () => {
+      const args = parseArgs([
+        'node', 'scribe-escalation-guard.mjs', 'record',
+        '--role', 'scribe',
+        '--paths', 'a.md', 'b.md',
+        '--reason', 'scrub-secrets --staged blocked',
+      ]);
+      expect(args.cmd).toBe('record');
+      expect(args.role).toBe('scribe');
+      expect(args.paths).toEqual(['a.md', 'b.md']);
+      expect(args.reason).toBe('scrub-secrets --staged blocked');
+    });
+
+    it('unit: handles --paths with any flag ordering', () => {
+      const args = parseArgs([
+        'node', 'x.mjs', 'record',
+        '--paths', 'a.md', '--reason', 'x', '--role', 'scribe',
+      ]);
+      expect(args.paths).toEqual(['a.md']);
+      expect(args.reason).toBe('x');
+      expect(args.role).toBe('scribe');
+    });
+
+    it('unit: --role before --paths still works (regression of existing case)', () => {
+      const args = parseArgs([
+        'node', 'x.mjs', 'check',
+        '--role', 'scribe', '--paths', 'a.md', 'b.md',
+      ]);
+      expect(args.paths).toEqual(['a.md', 'b.md']);
+      expect(args.role).toBe('scribe');
+    });
+
+    // Integration: full record -> check cycle via CLI using the exact
+    // invocation pattern in squad.agent.md:1023 (record … --reason "<text>").
+    // Before the fix, the second `check` would (wrongly) exit 0 because the
+    // stored paths had `--reason` and the reason string appended.
+    it('integration: record --paths … --reason … then check blocks within 24h', () => {
+      const rec = run([
+        'record',
+        '--role', 'scribe',
+        '--paths', 'charter.md', 'history.md',
+        '--reason', 'scrub-secrets --staged blocked: ghs match',
+      ]);
+      expect(rec.code).toBe(0);
+
+      // The recorded JSONL entry must have exactly the two paths, not four.
+      const raw = readFileSync(STATE, 'utf-8').trim().split('\n');
+      expect(raw.length).toBe(1);
+      const entry = JSON.parse(raw[0]);
+      expect(entry.paths).toEqual(['charter.md', 'history.md']);
+      expect(entry.reason).toBe('scrub-secrets --staged blocked: ghs match');
+
+      // Check against the exact same paths — MUST block.
+      const chk = run([
+        'check',
+        '--role', 'scribe',
+        '--paths', 'charter.md', 'history.md',
+      ]);
+      expect(chk.code).toBe(1);
+      expect(chk.stderr).toMatch(/BLOCKED/);
+    });
   });
 });
