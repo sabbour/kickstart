@@ -52,7 +52,12 @@ const A2UIDynamicNumber = z.union([
 //     Alternative 2 (JSON-string payload parsed in execute()).
 const A2UIActionSchema = z.object({
   event: z.object({
-    name: z.string().describe('Event name dispatched when the component is activated.'),
+    // Guidance moved here from the removed container-level .describe() to avoid
+    // $ref+description sibling violations in OpenAI strict-mode JSON Schema.
+    name: z.string().describe(
+      'Structured event name emitted when the component is activated. ' +
+        'Use `action: { event: { name: "..." } }` — never a bare onClick string.',
+    ),
     payload: z
       .object({
         confirmed: z.boolean().nullable(),
@@ -68,9 +73,7 @@ const A2UIActionSchema = z.object({
           'mode + zod. See .changeset for the narrowing contract.',
       ),
   }),
-}).describe(
-  'Interaction descriptor. Use `action: { event: { name: "..." } }` — never a bare onClick string.',
-);
+});
 
 // ── Per-component discriminated union ─────────────────────────────────────────
 //
@@ -184,7 +187,7 @@ const A2UIComponentSchema = z.discriminatedUnion('component', [
       'ID of the Text (or Icon) child component that provides the button label. ' +
         'Required — a Button without a label child is invalid.',
     ),
-    action: A2UIActionSchema.describe('Required interaction descriptor for Button.'),
+    action: A2UIActionSchema,
   }).strict(),
   z.object({
     id: z.string().describe('Unique component ID within this surface.'),
@@ -235,9 +238,7 @@ const A2UIComponentSchema = z.discriminatedUnion('component', [
     id: z.string().describe('Unique component ID within this surface.'),
     component: z.literal('Alert'),
     message: A2UIDynamicString.describe('Alert message text.'),
-    action: A2UIActionSchema.nullable().describe(
-      'Optional action on the alert (e.g. dismiss button), or null.',
-    ),
+    action: A2UIActionSchema.nullable(),
   }).strict(),
   // ── Fluent-catalog-only components ────────────────────────────────────────
   z.object({
@@ -254,9 +255,7 @@ const A2UIComponentSchema = z.discriminatedUnion('component', [
         value: A2UIDynamicString.describe('Option value.'),
       }),
     ).describe('List of available options.'),
-    action: A2UIActionSchema.nullable().describe(
-      'Action dispatched when a selection is made, or null.',
-    ),
+    action: A2UIActionSchema.nullable(),
   }).strict(),
   z.object({
     id: z.string().describe('Unique component ID within this surface.'),
@@ -267,9 +266,7 @@ const A2UIComponentSchema = z.discriminatedUnion('component', [
         value: A2UIDynamicString.describe('Option value.'),
       }),
     ).describe('List of available options.'),
-    action: A2UIActionSchema.nullable().describe(
-      'Action dispatched when a selection changes, or null.',
-    ),
+    action: A2UIActionSchema.nullable(),
   }).strict(),
   z.object({
     id: z.string().describe('Unique component ID within this surface.'),
@@ -278,9 +275,7 @@ const A2UIComponentSchema = z.discriminatedUnion('component', [
     checked: A2UIDynamicBoolean.nullable().describe(
       'Current toggle state bound to the data model, or null.',
     ),
-    action: A2UIActionSchema.nullable().describe(
-      'Action dispatched when the toggle changes, or null.',
-    ),
+    action: A2UIActionSchema.nullable(),
   }).strict(),
   z.object({
     id: z.string().describe('Unique component ID within this surface.'),

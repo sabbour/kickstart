@@ -102,6 +102,7 @@ jobs:
           SWA_HEALTHCHECK_REQUIRE_JSON_OK: "false"
         run: node scripts/check-swa-health.mjs
 
+
   preview:
     name: Deploy PR preview to Azure Static Web Apps
     if: >-
@@ -171,4 +172,5 @@ jobs:
           SWA_HEALTHCHECK_DELAY_MS: "10000"
           SWA_HEALTHCHECK_REQUIRE_JSON_OK: "false"
         run: node scripts/check-swa-health.mjs
+
 
