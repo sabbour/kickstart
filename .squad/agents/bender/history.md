@@ -2,6 +2,42 @@
 
 ## Team Updates
 
+### 2026-04-21 — Issue #1041 Implementation: Revert OTel Externalization (PR #1051)
+
+**Task:** Implement approved DP (leela:approved-dp ✅, zapp:approved-dp ✅, nibbler:approved-dp ✅) to revert PR #1030's OTel externalization and unblock SWA production deploy.
+
+**What changed:**
+- `esbuild.config.mjs`: Restored `external: ["@azure/functions-core"]` only. Removed `@azure/monitor-opentelemetry`, `@azure/monitor-opentelemetry-exporter`, `applicationinsights`, `@opentelemetry/*` from external list.
+- `appinsights.ts`: Removed module-load IIFE `{ initializeAppInsights(); }`. Updated globalThis singleton comment to reflect bundled-inline behavior.
+- `health.ts`, `packs.ts`, `converse.ts`: Added `try { initializeAppInsights(); } catch { ... }` as first statement of each handler body (Zapp C1).
+- `package.json`: Removed `postbuild` hook; removed `@azure/monitor-opentelemetry-exporter`, `@opentelemetry/api`, `@opentelemetry/api-logs`, `@opentelemetry/sdk-trace-base`, `@opentelemetry/sdk-logs` from `dependencies` (bundled at build time, not needed at runtime).
+- `scripts/materialize-api-externals.mjs`: Deleted.
+- `scripts/verify-api-externals.mjs`: Rewritten — now asserts only `@azure/functions-core` is external and OTel packages ARE in meta.json inputs.
+- `.squad/scripts/verify-api-externals.test.mjs`: T1 inverted — both sub-cases now assert bundled-inline (Nibbler N1).
+- `appinsights.test.ts`: T2 rewritten (no IIFE → module import doesn't call useAzureMonitor); T12 rewritten (explicit call triggers, not import) (Nibbler N2).
+- `health.test.ts`, `packs.test.ts`: Added N3 `vi.spyOn(appinsightsModule, 'initializeAppInsights')` assertion. Moved `packs.test.ts` from `vi.doMock` to top-level `vi.mock` to make spy work correctly.
+- `converse.test.ts`: **Created** — minimal N3 handler test. Added vitest aliases for `harness/runtime/session`, `runner`, `sse` to `vitest.config.ts`.
+- `OBSERVABILITY.md`: Updated bundling section (externalize→inline, globalThis singleton explanation). Updated troubleshooting section.
+- `.changeset/1041-revert-1030-externalization.md`: Patch-level changeset created.
+
+**Evidence generated (E1–E8 all passed):**
+- E1: Build produces 20 bundles, verify-api-externals passes.
+- E2: meta.json confirms `["@azure/functions-core"]` only external npm pkg; 39 OTel packages inlined.
+- E3: health.js:2, packs.js:2, converse.js:3 — useAzureMonitor in every handler bundle.
+- E4: appinsights.ts ends with flushAppInsights closing brace, no IIFE.
+- E5: initializeAppInsights() is first statement in all 3 handlers.
+- E6: 99/100 test files pass (1 pre-existing failure: @testing-library/react not installed, unrelated).
+- E7: Lint: 0 errors, 64 pre-existing warnings.
+- E8: materialize-api-externals.mjs: No such file or directory.
+
+**PR:** #1051 — `squad/1041-revert-1030-externalization`
+
+**Surprises:**
+- The verify-api-externals.mjs script needed a Node.js builtins allowlist (Node 22 `platform: "node"` marks bare builtins like `crypto`, `fs`, `buffer` etc. as external automatically — these are not OTel packages and must be allowed).
+- The packs.test.ts N3 spy failed because `vi.doMock` in `beforeAll` doesn't produce a hoisted mock — the top-level `import * as appinsightsModule` got the real module, not the mock. Fixed by moving to top-level `vi.mock` (matching health.test.ts pattern).
+- converse.test.ts required new vitest.config.ts aliases for `@aks-kickstart/harness/runtime/session`, `runner`, and `sse` subpath exports (only `registry` and `redact` were aliased before).
+- meta.json input paths are relative (`../../../../../node_modules/@opentelemetry/api/...`), not absolute — the evidence script needed `indexOf('node_modules/')` extraction, not `split('/').slice(0,2)`.
+
 ### 2026-04-22 — DP #1041 (OTel Revert) Implementation Dispatched
 
 **Milestone:** Production 404 incident root-cause diagnosed and approved for fix. All three DP-stage approvals passed (Zapp security ✅, Nibbler test-plan ✅, Leela architectural ✅).
@@ -336,3 +372,69 @@ Landed the full approved DP + Amendments 1/2/3 for issue #1030 on top of PR #103
 - Committed `0eb44a7f`, pushed via lead token, replied to Leela's review comment.
 
 **Lesson reinforced:** walkDeps skips `peerDependencies` by design — peer deps must be in `TOP[]` explicitly. `@opentelemetry/api` already was, but CI wasn't asserting it. Always assert CI guards for every entry in TOP[].
+
+---
+
+## 2026-04-21/22 — Incident #1041 Production 404: Root Cause & Fix (PR #1051, #1052)
+
+**Sessions:** bender-16 (hotfix), bender-17 (guard inversion)
+**PRs:** #1051 (merged 05:26 UTC), #1052 (merged 05:40 UTC)
+**Incident duration:** 12.5 hours (17:00 2026-04-21 → 05:40 2026-04-22 UTC)
+
+### Root Cause
+
+Azure SWA managed Functions platform runs server-side `npm install` during ~30-second post-upload processing window (regardless of `skip_api_build: true` flag). When PR #1030/#1034 added `@aks-kickstart/harness: "*"` to API `dependencies` (not devDependencies), the server-side install attempted to resolve this workspace-only package from public npm, failed, and **silently overwrote the materialized OTel packages** in `node_modules/`. Static ESM top-level imports in bundled function code then threw `ERR_MODULE_NOT_FOUND` on worker startup → worker crashed before registering routes → 404 empty body.
+
+**Historical note:** Ahmed's unmerged `swa-pkg-fix/68e5f875` (2026-04-18) identified this exact mechanism. Never merged before PR #1034 reintroduced the issue.
+
+### Fix: Revert OTel Externalization (PR #1051)
+
+**Merged 05:26 UTC**
+- Revert #1030 OTel externalization strategy
+- Delete `materialize-api-externals.mjs` (no longer needed)
+- Remove esbuild `external` declarations for OTel packages → bundled inline
+- Move workspace deps from `dependencies` to `devDependencies` in `packages/web/api/package.json`
+- OTel initialization stays in `appinsights.ts` but is now bundled inline at build time
+
+**Evidence gates (8 passed):**
+- API bundles correctly inline OTel packages
+- `health.js` contains `useAzureMonitor()` initialization
+- No external declarations in esbuild output
+- `materialize-api-externals.mjs` deleted
+- Zero workspace dependencies in runtime `dependencies`
+
+**Review:** leela-21/zapp-15/nibbler-19 all approved
+
+### Hotfix: Guard Inversion (PR #1052)
+
+**Merged 05:40 UTC**
+- PR #1051 reverted externalization but did NOT update CI regression guard
+- `.github/workflows/deploy-swa.yml` guard was asserting OLD contract (OTel externals exist)
+- This caused all deploys to fail (run 24761816786)
+- **Fix:** Invert guard to assert NEW contract: OTel NOT externalized + `useAzureMonitor()` IS present in bundled code
+
+**Rule learned:** When build contracts change (external → inline or vice versa), the CI regression guard MUST be updated atomically. Deleting guards is not allowed; invert them to match the new contract.
+
+### Production Verification
+
+Deploy run 24762235453 succeeded 05:40 UTC. Smoke check passed:
+- `/api/health` → 200 ✅
+- `/api/packs` → 200 ✅
+
+### Key Learning: SWA Server-Side npm install
+
+**Never again:** Attempt to fix SWA deployment via `.funcignore` + materialization scripts + CI verification steps. The only safe pattern is **bundling everything inline**. Assume Azure SWA platform WILL run server-side `npm install` using your API's `package.json`, regardless of CI flags. If dependencies are listed in `package.json`, they MUST either:
+1. Be bundled inline (esbuild `external: []`)
+2. Be published to public npm (with explicit version pinning)
+
+Workspace-only packages in `dependencies` are a deployment hazard. Move them to `devDependencies` or delete them.
+
+### Incident Scorecard
+
+- ✅ Root Cause Identified
+- ✅ Fix Validated (8 gates, smoke check)
+- ✅ Production Restored (05:40 UTC)
+- ✅ Regression Guard Updated
+- ✅ Follow-up Issues Queued (#1049, #1040, #1050)
+- ✅ Decision Documented
+

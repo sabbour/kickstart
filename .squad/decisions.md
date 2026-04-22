@@ -4281,3 +4281,252 @@ Applies to: all A2UI example envelopes, component previews in `core-previews.ts`
 
 `packages/pack-core/src/skills/a2ui-media-discipline/SKILL.md` — full pattern, examples, anti-patterns.
 
+
+---
+
+# Decision: Azure/static-web-apps-deploy@v1 Packaging Architecture — Confirmed Behaviors
+
+**Date:** 2026-04-21
+**Author:** Leela (post-mortem, PR #1046 triage)
+**Status:** Proposed — based on empirical evidence from run 24755110357
+
+---
+
+## Context
+
+Two consecutive hotfix PRs (#1041, #1046) failed to resolve the `/api/health` 404 issue.
+Both PRs operated under the assumption that node_modules were being STRIPPED from the API
+deploy zip. Investigation of run 24755110357 yields new evidence that changes this model.
+
+---
+
+## Confirmed Behaviors (Evidence-Based)
+
+### 1. StaticSitesClient includes `node_modules/` in the API zip when `skip_api_build: true`
+
+**Evidence:** API zip timing (5.52 seconds) vs app zip timing (0.87 seconds) at the same
+Docker I/O throughput (27MB app / 0.87s ≈ 31 MB/s). At 31 MB/s, 5.52 seconds = ~171MB of
+content. API without node_modules is ~29MB (expected ~0.94s zip time). API with materialized
+node_modules (223MB total, ~143MB after `.funcignore` exclusions) = ~172MB. 5.52s matches.
+
+**Implication:** The DP Amendment #1 Option B theory (`.funcignore` needed to prevent
+node_modules stripping) was solving a problem that may not exist. The packages likely DO ship.
+
+### 2. `.funcignore` appears to be respected for selective exclusions
+
+The specific exclusions in `.funcignore` (`node_modules/@types/`, etc.) are present in the
+`packages/web/api/node_modules/` directory. The timing difference between expected and actual
+zip size (~51MB of exclusions vs ~3MB from `.funcignore`) suggests some additional StaticSites-
+Client-level exclusion may also apply, but `node_modules/` as a whole is NOT excluded.
+
+### 3. The Azure SWA platform performs ~30 seconds of server-side processing post-upload
+
+Between "Finished Upload" and "Status: Succeeded", the platform takes ~30 seconds. During
+this window, the platform may reinstall or verify dependencies. If it runs any variant of
+`npm install` using `packages/web/api/package.json`, it WILL fail because:
+- `"@aks-kickstart/harness": "*"` is a workspace-only package, not published to npm
+- This would silently replace our materialized node_modules with a broken install
+
+---
+
+## Architectural Recommendation
+
+**DO NOT attempt to fix the OTel deployment problem by materializing packages into
+`packages/web/api/node_modules/` alone.** The deploy pipeline has an unresolved ambiguity:
+packages ship in the zip but the runtime still 404s. Two candidate root causes:
+
+**Root Cause Candidate A** (server-side reinstall): Azure SWA platform reinstalls node_modules
+post-upload using the API's `package.json` → fails on `@aks-kickstart/harness` → broken
+node_modules → MODULE_NOT_FOUND → 404.
+
+**Root Cause Candidate B** (ESM worker startup): Packages ARE in the runtime, but the Azure
+Functions v4 ESM worker fails to load function modules due to static ESM imports from OTel
+packages (`@azure/monitor-opentelemetry`, `@opentelemetry/sdk-trace-base`) triggering a
+module-level failure before the functions register.
+
+## Required Bifurcation Test
+
+Before any further fix attempts, deploy a minimal probe function:
+```javascript
+// packages/web/api/src/functions/ping.ts
+import { app } from "@azure/functions";
+app.http("ping", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  handler: async () => ({ status: 200, body: "pong" }),
+});
+```
+
+- **If `/api/ping` → 200**: Deployment infrastructure works; OTel imports are the cause (B)
+- **If `/api/ping` → 404**: Deployment infrastructure is broken; server-side reinstall or routing (A)
+
+## Long-term Fix Direction
+
+If Root Cause A: Remove `@aks-kickstart/harness` from the API's runtime `dependencies`
+(it's a build-time/type-only dep) OR use `npm pack`-based deployment that bypasses the SWA
+platform's `npm install`.
+
+If Root Cause B: Move OTel initialization out of static module scope into a lazy/async
+factory, OR bundle OTel packages directly (removing the `external` declaration in esbuild),
+OR use dynamic `import()` with error handling instead of static top-level imports.
+
+**Never do again:** `.funcignore` alone is not a reliable mechanism for controlling what the
+Azure SWA platform deploys at RUNTIME — it only influences what StaticSitesClient packages
+at CI time.
+
+---
+
+# Decision: API bundle budget gap identified in PR #1051 review
+
+**Date:** 2026-04-21  
+**Author:** Leela  
+**Context:** Architecture review of PR #1051 (hotfix revert OTel externalization, issue #1041)
+
+## Observation
+
+`check-bundle-budget.mjs` covers only frontend assets (main entry, playground route). There is no automated budget check for API function bundles under `packages/web/api/dist/functions/`.
+
+With OTel packages now bundled inline (post-#1041 revert), the 3 bundles that import `appinsights.ts` (health, packs, converse) are meaningfully larger than before. No size data surfaced in CI output.
+
+## Decision
+
+This is a pre-existing gap, not introduced by #1041. The P0 hotfix is approved without this being resolved.
+
+**Action item:** Open a follow-up issue to extend `check-bundle-budget.mjs` (or a new script) to report API function bundle sizes in CI and enforce a per-bundle cap (suggested: 5MB warn / 10MB hard fail). Assign to Bender.
+
+## Rationale
+
+OTel inlining is the correct architecture for SWA deploy safety. The gap in budget reporting is a CI hygiene issue, not a correctness issue. Tracking it as a decision ensures it doesn't get lost.
+
+---
+
+# Decision: Invert OTel regression guard in deploy-swa.yml
+
+**Date:** 2026-04-22
+**Author:** Bender
+**Status:** Implemented (PR #1052)
+**Refs:** #1041, #1051
+
+## Context
+
+PR #1030 added a "Verify OTel externals present" guard step to `.github/workflows/deploy-swa.yml` asserting that OTel packages were materialized into `packages/web/api/node_modules/`. PR #1051 reverted this by bundling OTel inline via esbuild and deleting `materialize-api-externals.mjs`, but the workflow guard was not updated, causing all deploys to fail (run 24761816786).
+
+## Decision
+
+Regression guards tied to a specific contract must be inverted (not deleted) when the contract changes. The new guard:
+1. Asserts `node_modules/@azure/monitor-opentelemetry` does NOT exist (materialization removed).
+2. Asserts `useAzureMonitor` IS present in `health.js` (bundled inline by esbuild).
+
+This preserves the regression-guard intent while matching the new contract.
+
+## Rule
+
+**When a build contract changes (external → inline or vice versa), the CI regression guard for that contract must be updated atomically in the same PR or an immediate follow-up hotfix.** The guard must assert the NEW contract, not be deleted.
+
+---
+
+# Post-#1041 Issue Triage & Filing — 2026-04-21
+
+## Context
+Ahmed requested three follow-up priorities after the #1041 production 404 revert lands. Leela reviewed and filed all three issues.
+
+## Decisions & Filings
+
+### P0: SWA Deploy Hard Gate (#1049)
+- **Status:** FILED & LABELED
+- **Rationale:** The SWA deployment workflow's smoke check was silent. A failing health check did not fail the job, so broken code shipped to prod undetected. #1030/#1034 incident could have been caught pre-merge if this gate were enforced.
+- **Labels:** `squad`, `priority:critical`, `area/ops`
+- **Scope:** Promote smoke health check to a merge-blocking gate on main, add same gate to PR previews, re-enable prod environment in workflow settings.
+- **Routing:** Ralph will triage into squad queue per routing.yml rules.
+
+### P1: AgentSpanError Stack Trace (#1040)
+- **Status:** REVIEWED & REAFFIRMED (existing issue covers scope)
+- **Finding:** Issue #1040 (filed by leela-13) already describes the exact problem: `recordException()` called with minimal object instead of Error instance, so OTel bridge cannot extract `exception.stacktrace`.
+- **Action Taken:** Commented on #1040 reaffirming P1 priority and adding Ahmed's screenshot observation as validation.
+- **Gate:** Enters implementation queue after #1041 ships.
+- **Routing:** Already labeled `squad` with assignment pending (charter indicates Fry or Bender ownership).
+
+### P2: A2UI emit_ui Schema Error (#1050)
+- **Status:** FILED & LABELED
+- **Symptom:** `$ref cannot have keywords {description}` on action variant (anyOf[22], anyOf[0]) blocks local core_emit_ui calls.
+- **Root Cause Hypothesis:** Discriminated union variant where `action` subschema uses `.describe()` on a referenced member; OpenAI strict mode rejects $ref+sibling keywords.
+- **Labels:** `squad`, `priority:critical`, `area/backend`
+- **Scope:** Locate and fix the `.describe()` placement; verify emit_ui schema emits valid JSON-Schema.
+- **Routing:** Ralph will triage; Bender or Fry will implement per assignment.
+
+## Note on Labeling
+Labels are applied via `gh api -X POST /repos/sabbour/kickstart/issues/{n}/labels` because `gh issue create --label` does NOT work on this repo (silent no-op). API call is required to attach labels post-creation.
+
+## Follow-Up
+All three issues are in squad queue. Coordinator will assign per routing.yml and charter rules.
+
+---
+
+# User Directive: Nibbler and Zapp are Lead Roles
+
+**Date:** 2026-04-21/2026-04-22
+**Source:** Ahmed Sabbour (via Copilot)
+**Status:** Documented for implementation follow-up
+
+## Nibbler as Lead Role (2026-04-21T21:28:01Z)
+
+**What:** Clarification of Nibbler's role classification as a Lead.
+
+**Implications for identity resolution and approval gates:**
+- `.squad/scripts/resolve-token.mjs` currently has `nibbler: ['nibbler']` alias — no `nibbler` app exists, so writes fail closed. Under per-role tier, a Lead-role agent should resolve to the `lead` app (`sabbour-squad-lead`). Alias should be updated to `nibbler: ['lead']` so Nibbler can author git writes as `sabbour-squad-lead[bot]`.
+- `team.md` lists Nibbler as "Code Reviewer & Watchdog" — consider adding "Lead" to the role string so future role→token resolution and routing treat Nibbler with Lead authority.
+- Does NOT change DP-stage approval gate on #1044: `nibbler:approved` remains a separate label (authorship-separate-from-approval still applies).
+
+## Zapp as Lead Role (2026-04-21T22:38 PT)
+
+**What:** "zapp is also a lead, should be the same treatment as nibbler." Zapp's token resolution must route through the `lead` app (`sabbour-squad-lead`), not fail closed.
+
+**Implementation:**
+- Change `resolve-token.mjs` line `zapp: ['zapp']` → `zapp: ['lead']` in a follow-up PR after #1048.
+- Update `.squad/team.md` if it labels Zapp's tier.
+
+**Why:** No standalone `zapp.pem` exists; per-role tier requires explicit alias to an app that is provisioned. Matches the Nibbler decision from earlier in the session.
+
+---
+
+# DP: MCP Apps for VS Code — Option B (Host-Managed Sampling) [v2.1]
+
+**Date:** 2026-04-21T17:38:00-07:00
+**Author:** Nibbler (Code Reviewer & Watchdog)
+**Supersedes:** Earlier `leela-mcp-apps-option-b-dp.md` (v1) and §2 of `leela-mcp-apps-vscode-design.md`
+**Revised by:** Nibbler (per Reviewer Rejection Protocol; Leela locked out; v2.1 patches per Leela + Zapp conditions on 2026-04-21T17:38-07:00)
+**Estimate:** L (real scope: harness isolation refactor + MCP-server adapter + host-capability gates + integration coverage)
+**Docs impact:**
+- `docs-site/docs/extending/mcp-tools.md` — VS Code host-managed sampling setup, capability requirements, and approval flow
+- `docs-site/docs/guides/packs-and-skills.md` — provider-isolation diagram and SWA non-regression contract
+- `docs-site/docs/getting-started/vs-code-mcp-apps.md` — new "VS Code Quick Start" page (zero-BYOK flow)
+
+---
+
+## Changes from v1
+
+- Replaces the rejected parser-first core with the SDK-native tools path: `server.createMessage({ messages, tools, toolChoice, ... })` and `tool_use` / `tool_result` blocks (`node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.d.ts:137-155`).
+- Replaces the incorrect harness story with the real runner lifecycle: module-scope `_sdkRunner`, `getSdkRunner()`, and `Runner.run()` calling that singleton (`packages/harness/src/runtime/runner.ts:75-113, 316-317, 423-425`).
+- Picks a scoped-provider design that does **not** mutate shared SWA runner state or call `setDefaultModelProvider()` from the MCP-server path.
+- Adds a fail-closed capability contract for both `converse` and `resume`, with machine-readable error codes and no silent Option A route (`packages/mcp-server/src/index.ts:119-221, 229-299`).
+- Corrects docs-site paths to match the real tree (`docs-site/docs/extending/mcp-tools.md`, `docs-site/docs/guides/packs-and-skills.md`).
+
+## v2.1 Patch Notes
+
+- **Patch 1 — docs paths:** corrected the header docs targets and the v1-delta note so the document points at the real docs tree only.
+- **Patch 2 — `tool_use` validation:** added explicit pre-execution allowlist + schema-validation requirements in §3 and §4, with fail-closed structured errors and merge-blocker tests in §11.
+- **Patch 3 — label gate:** expanded §10/§12 with `.github/workflows/squad-implementation-gate.yml`, read-only permissions, self-approval prevention, and the `squad-issue-assign.yml` status-check contract.
+- **Patch 4 — scoped-provider invariants:** marked `_sdkRunner` isolation, `setDefaultModelProvider()` exclusion, and concurrent-runner leakage tests as P0 merge blockers.
+- **Patch 5 — structured outputs:** annotated the string-first tool-result mapping in the sketch, added the §11 catch-net, and tracked the non-string translation gap in §13 as a known-unknown.
+- **Nits:** reconciled `converse`/`resume` cite ranges to `packages/mcp-server/src/index.ts:119-221` and `229-299`; normalized `createMessage()` cites to `137-155`; required `installOtelBridgeOnce()` continuity; bounded/redacted any residual parse-fallback diagnostics; and added the CSP/origin regression test.
+
+## Summary
+
+The MCP server drives agent runs via the host's LLM using MCP `sampling/createMessage` —
+no API keys ship with the server. A `SamplingModelProvider` adapter translates between the
+`@openai/agents` SDK's `Model` interface and the MCP sampling protocol. The installed MCP
+SDK (`@modelcontextprotocol/sdk@1.29.0`) already supports **native tool-calling in
+sampling** — `tools`, `toolChoice`, `ToolUseContent`, and `ToolResultContent` are in the
+spec and typed — so the JSON-mode-prompting workaround from the deep-dive is **not needed
+for P0**. The adapter is a clean protocol translation, not a fragile text-parsing shim.
+

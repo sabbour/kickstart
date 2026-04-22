@@ -219,3 +219,50 @@ Security architect owning threat modeling, approval gates, and compliance for Ki
 **Directive:** Ceremony enforcement tightened; coordinator will enforce blocking checkpoint before dispatch.
 
 **Review posted:** `gh pr review 990 --approve`.
+
+---
+
+## 2026-04-21/22 — Incident #1041 Production 404: Security Review (zapp-14, zapp-15)
+
+**Sessions:** zapp-14 (PR #1051 review), zapp-15 (PR #1052 expedited review, role directive)
+**PRs approved:** #1051, #1052
+**Directives:** Lead-tier role classification
+
+### PR #1051 Security Review (zapp-14)
+
+**Reviewed:** OTel externalization revert
+**Concerns addressed:**
+- No introduction of new attack surface via bundling
+- Bundling inline keeps OTel initialization under local control (not dependent on server-side install)
+- CSP (`script-src 'self'`) alignment maintained
+- No third-party registry dependencies in runtime path
+
+**Approval:** `zapp:approved` on #1051 (2026-04-21)
+
+### PR #1052 Expedited Review (zapp-15)
+
+**Reviewed:** Workflow guard inversion (hotfix)
+**Context:** PR #1051 regression guard needed inversion; expedited review gate applied
+**Gate status:** All four reviewers approved (Leela, Zapp, Nibbler, Docs)
+
+**Approval:** `zapp:approved` on #1052 (2026-04-22 05:35 UTC)
+
+### User Directive: Zapp is a Lead-tier Role (2026-04-21T22:38 PT)
+
+**From:** Ahmed Sabbour
+**Directive:** "zapp is also a lead, should be the same treatment as nibbler."
+
+**Implications:**
+- Token resolution: Zapp's identity must route through `lead` app (`sabbour-squad-lead`), not fail closed
+- Alias update required: `.squad/scripts/resolve-token.mjs` line `zapp: ['zapp']` → `zapp: ['lead']`
+- Rationale: No standalone `zapp.pem` exists; per-role tier requires explicit alias to provisioned app
+- Matches Nibbler lead-role directive from earlier session
+
+**Implementation:** Follow-up PR after #1048 (pending coordinator assignment)
+
+### Incident Assessment
+
+- No security surface regression introduced by revert
+- Bundling actually reduces attack surface (server-side install hazard removed)
+- Incident root cause confirmed non-security (architectural deploy hazard, not code flaw)
+

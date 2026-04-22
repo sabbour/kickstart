@@ -240,3 +240,82 @@ The externalization rationale ("multiple bundled copies wipe each other's OTel p
 6. **SWA server-side `npm install` is a platform-level mutation point outside our control.** `skip_api_build: true` only disables client-side Oryx — the SWA service still runs `npm install --production` during the ~30s post-upload window. This can overwrite any `node_modules/` materialized client-side. Before #1030, bundles were self-contained and indifferent to `node_modules/` state (the server-side install was harmless). After #1030, bundles critically depend on `node_modules/`, turning the latent hazard into the production outage. Documented by Ahmed on unmerged `swa-pkg-fix` branch (`68e5f875`). Confirmed empirically by Bender-15: `request-context` header on 404s proves HOST up, WORKER crashed. Bundling is the only strategy that makes function bundles immune to this deploy-infra mutation.
 
 7. **DP addendum posted** to #1041 incorporating Bender-15's deploy-infra findings. Adds: server-side `npm install` as pre-existing hazard in §2, bundling-as-immunization in §4, `node_modules/` mutation risk in §5, and metafile-based external verification in §9.
+
+---
+
+## 2026-04-21/22 — Incident #1041 Production 404: Post-Mortem & Triage (leela-19, leela-20)
+
+**Sessions:** leela-19 (forensic analysis + DP), leela-20 (issue filing)
+**PRs reviewed:** #1051, #1052
+**Issues filed:** #1049 (P0), #1050 (P2), #1040 reaffirmed (P1)
+
+### Post-Mortem Analysis (leela-19)
+
+After bender-15's initial forensic investigation, Leela conducted architectural post-mortem:
+
+**Finding 1: Azure SWA Deploy Architecture Clarification**
+- `skip_api_build: true` disables **client-side Oryx build** only
+- Azure SWA **service** performs **server-side** dependency resolution post-upload using the API's `package.json`
+- This is platform-level behavior outside the deploy action control
+- The ~30-second "Polling" window is where this server-side processing occurs
+
+**Finding 2: Root Cause Confirmed**
+- Server-side `npm install` triggers when `package.json` contains unresolvable packages
+- `@aks-kickstart/harness: "*"` is workspace-only, not published → registry fetch fails
+- Server-side install failure overwrites materialized node_modules silently
+- Static ESM imports in bundled code fail → worker crash → 404
+
+**Finding 3: Bundle-Everything is the Only Safe Strategy**
+- Post-mortem document: `.squad/decisions/inbox/leela-swa-node-modules-deploy-architecture.md`
+- Recommendation: Revert OTel externalization, bundle inline
+- Do NOT use `.funcignore` as a safety mechanism — it only controls client-side zipping, not runtime state
+
+**Finding 4: API Bundle Budget Gap**
+- `check-bundle-budget.mjs` covers frontend only
+- No automated budget check for API function bundles under `packages/web/api/dist/functions/`
+- OTel bundling increased bundle sizes meaningfully
+- Decision: This is a pre-existing gap, not introduced by the fix; open follow-up issue for budget reporting
+
+### Review & Approval (leela-20)
+
+- **PR #1051 (Revert OTel):** Approved
+  - Fix aligns with architectural recommendation
+  - Evidence gates sufficient (8 passed)
+  - Smoke check ready
+
+- **PR #1052 (Guard Inversion):** Reviewed & approved
+  - Guard inversion maintains regression-guard intent while matching new contract
+  - Atomicity rule established: never delete regression guards, always invert
+
+### Issue Triage & Filing (leela-20)
+
+Post-incident, filed three priority follow-ups per Ahmed's request:
+
+**#1049 (P0 — SWA Deploy Hard Gate):**
+- Problem: Smoke check was silent. Broken code shipped to prod because health check did NOT fail the workflow.
+- Fix: Promote smoke health check to merge-blocking gate on main, add to PR previews.
+- Rationale: This incident could have been caught pre-merge with a hard gate.
+
+**#1050 (P2 — A2UI emit_ui Schema Error):**
+- Problem: `$ref cannot have keywords {description}` in discriminated union variant blocks local core_emit_ui calls.
+- Root Cause Hypothesis: OpenAI strict mode rejects $ref with sibling keywords.
+
+**#1040 (P1 — AgentSpanError Stack Trace):**
+- Reaffirmed existing issue (leela-13).
+- Problem: OTel bridge cannot extract `exception.stacktrace` when `recordException()` called with minimal object.
+- Priority: P1, implements after #1041 ships.
+
+All three labeled `squad` and routed to Ralph per squad routing rules.
+
+### Key Learning: Platform-Level Mutation Points
+
+Build contracts must account for platform-level behaviors outside CI control. Azure SWA's server-side `npm install` is a **latent deployment hazard** — it's harmless when bundles are self-contained and indifferent to `node_modules/` state (pre-#1030), but becomes a **critical failure mode** once bundles depend on `node_modules/` runtime state (#1030+). Documented by Ahmed unmerged; empirically confirmed by Bender-15. **Bundling is the immunization strategy.**
+
+### Incident Scorecard (Architectural Review)
+
+- ✅ Root cause validated (post-mortem architecture analysis)
+- ✅ Bundle-everywhere strategy confirmed as correct
+- ✅ Pre-existing gaps identified (bundle budget reporting)
+- ✅ Follow-ups prioritized and filed
+- ✅ Platform behavior documented for future reference
+

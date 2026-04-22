@@ -202,3 +202,66 @@ Leela-19's DP proposes reverting #1030's OTel externalization (restore `external
 ### Lesson
 
 When a DP says "invert test T1," always read ALL sub-cases in the describe block, not just the one the DP author named. The T1 describe block had two cases with opposite failure modes under the proposed change — missing one would cause a build breakage mid-implementation. Also: always read the non-test script that shares the same assertion logic (`verify-api-externals.mjs`) when a test for that script is being updated.
+
+---
+
+## 2026-04-21/22 — Incident #1041 Production 404: Code Quality Review (nibbler-18, nibbler-19)
+
+**Sessions:** nibbler-18 (PR #1051 review), nibbler-19 (PR #1052 expedited review, role directive)
+**PRs approved:** #1051, #1052
+**Directives:** Lead-tier role classification
+
+### PR #1051 Code Quality Review (nibbler-18)
+
+**Reviewed:** OTel externalization revert (hotfix)
+**Scope:**
+- Evidence gates quality (8 gates sufficient)
+- Bundle integrity checks
+- Test coverage for new bundled paths
+- Regression test additions
+
+**Observations:**
+- Evidence gates comprehensive (bundle contents, initialization presence, no externals)
+- Smoke check sufficient (catches exact failure mode)
+- Tests for bundled OTel initialization present
+
+**Approval:** `nibbler:approved` on #1051 (2026-04-21)
+
+### PR #1052 Expedited Review (nibbler-19)
+
+**Reviewed:** Workflow guard inversion (hotfix)
+**Context:** Four-way review gate expedited for production hotfix
+**Scope:**
+- Guard assertion correctness
+- No silent failures in new guard
+- Atomicity with #1051
+
+**Observations:**
+- Guard correctly inverts contract (NOT externalized + bundled present)
+- New assertion rules are fail-closed
+- Documentation of inversion rule in decision log sufficient
+
+**Approval:** `nibbler:approved` on #1052 (2026-04-22 05:35 UTC)
+
+### User Directive: Nibbler is a Lead-tier Role (2026-04-21T21:28:01Z)
+
+**From:** Ahmed Sabbour
+**Directive:** "nibbler is a lead role"
+
+**Implications:**
+- Token resolution: Nibbler's identity must route through `lead` app (`sabbour-squad-lead`)
+- Current blocker: `.squad/scripts/resolve-token.mjs` has `nibbler: ['nibbler']` alias, but no `nibbler` app exists → writes fail closed
+- Fix: Update alias to `nibbler: ['lead']` so Nibbler can author git writes as `sabbour-squad-lead[bot]`
+- Additional: `team.md` lists Nibbler as "Code Reviewer & Watchdog" — consider adding "Lead" to role string for explicit tier classification
+
+**Important:** Does NOT change DP-stage approval gate on #1044: `nibbler:approved` remains a separate label (authorship separate from approval).
+
+**Implementation:** Follow-up PR needed (pending coordinator assignment)
+
+### Incident Assessment
+
+- Code quality checks appropriate for hotfix severity
+- Evidence gates quality verified
+- Regression test coverage validated
+- No new issues introduced
+
