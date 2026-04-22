@@ -106,6 +106,8 @@ Nothing else belongs at the top level. In particular, **do not emit**:
 - Call `createSurface` exactly once per logical UI panel.
 - Assign a stable, descriptive `surfaceId` (e.g., `plan-review`, `file-list`, `progress-tracker`).
 - Do not create a new surface for every response turn — reuse existing surfaces via `updateComponents`.
+- **Invariant (harness-enforced, #1075):** one `createSurface` per `surfaceId` per session. A duplicate `createSurface` is rejected with a tool error — to rerender the same surface, use `updateComponents`. `updateComponents` / `updateDataModel` / `deleteSurface` on a `surfaceId` that was never created (or was already deleted) are also rejected.
+- `surfaceId` must be 1–128 characters. The harness additionally caps the number of live surfaces per session (default 1000, tunable via `KICKSTART_MAX_LIVE_SURFACES`) — release unused surfaces with `deleteSurface`.
 
 ### Updating components
 - Use `updateComponents` to modify individual component properties in-place.

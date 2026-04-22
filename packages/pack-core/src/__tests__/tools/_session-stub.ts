@@ -16,6 +16,8 @@ export function makeSessionCtx(
     intent: null,
     artifacts: new Map(),
     a2uiEmissions: [],
+    liveSurfaceIds: new Set<string>(),
+    maxLiveSurfaces: 1000,
     negotiatedCatalog: {
       id: 'test-catalog',
       components: ['Button', 'Text', 'CodeBlock', 'AuthCard', 'ProgressSteps'],
@@ -26,6 +28,15 @@ export function makeSessionCtx(
     pendingUserAction: null,
     recordA2UIEmission(msg) {
       this.a2uiEmissions.push(msg);
+      const m = msg as unknown as {
+        createSurface?: { surfaceId?: string };
+        deleteSurface?: { surfaceId?: string };
+      };
+      if (m.createSurface && typeof m.createSurface.surfaceId === 'string') {
+        this.liveSurfaceIds.add(m.createSurface.surfaceId);
+      } else if (m.deleteSurface && typeof m.deleteSurface.surfaceId === 'string') {
+        this.liveSurfaceIds.delete(m.deleteSurface.surfaceId);
+      }
     },
     recordArtifact(artifact) {
       this.artifacts.set(artifact.path, artifact);

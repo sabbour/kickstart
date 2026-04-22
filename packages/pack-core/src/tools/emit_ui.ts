@@ -298,12 +298,24 @@ const A2UIComponentSchema = z.discriminatedUnion('component', [
 // validator. The `op` discriminator is required by the schema; the runtime
 // A2UIMessageSchema.parse() in execute() still accepts envelopes with or
 // without `op` via the `withDiscriminator` preprocessor.
+// Bounded surface id — D11 / Zapp M1 (#1075). Replaces the four raw
+// `z.string()` sites below. Length-only (1–128); no charset regex — see L1
+// deferral in Leela DP v2.
+//
+// NOTE: no `.describe()` here. The schema is reused across four branches of
+// the discriminated union; the zod→JSON-Schema converter emits later uses as
+// `$ref` and a sibling `description` on a `$ref` node violates the
+// OpenAI strict-mode $ref-sibling guard enforced by
+// emit_ui-schema.test.ts (#1050). The min/max constraints are self-
+// documenting; a description can be attached at each call site if needed.
+const SurfaceIdSchema = z.string().min(1).max(128);
+
 const A2UIMessageInputSchema = z.discriminatedUnion('op', [
   z.object({
     version: z.literal('v0.9'),
     op: z.literal('createSurface'),
     createSurface: z.object({
-      surfaceId: z.string(),
+      surfaceId: SurfaceIdSchema,
       catalogId: z.string().describe('Must always be "kickstart"'),
       sendDataModel: z
         .boolean()
@@ -318,7 +330,7 @@ const A2UIMessageInputSchema = z.discriminatedUnion('op', [
     version: z.literal('v0.9'),
     op: z.literal('updateComponents'),
     updateComponents: z.object({
-      surfaceId: z.string(),
+      surfaceId: SurfaceIdSchema,
       components: z.array(A2UIComponentSchema).min(1),
     }),
   }),
@@ -326,7 +338,7 @@ const A2UIMessageInputSchema = z.discriminatedUnion('op', [
     version: z.literal('v0.9'),
     op: z.literal('updateDataModel'),
     updateDataModel: z.object({
-      surfaceId: z.string(),
+      surfaceId: SurfaceIdSchema,
       path: z
         .string()
         .nullable()
@@ -340,7 +352,7 @@ const A2UIMessageInputSchema = z.discriminatedUnion('op', [
     version: z.literal('v0.9'),
     op: z.literal('deleteSurface'),
     deleteSurface: z.object({
-      surfaceId: z.string(),
+      surfaceId: SurfaceIdSchema,
     }),
   }),
 ]).describe(
@@ -424,6 +436,52 @@ export const emitUiTool: ToolContribution = {
       }
 
       if (session) {
+        // ── D11 / Zapp M1 (#1075) — surface lifecycle invariants ───────────
+        // Ordering of checks, authoritative per Leela DP v2:
+        //   1. Schema parse (already done above; also length-bounds surfaceId)
+        //   2. Dedupe:  createSurface on already-live id → reject
+        //   3. Cap:     createSurface when liveSurfaceIds is full → reject
+        //   4. Exists:  update*/delete on unknown id → reject
+        //   5. recordA2UIEmission() mutates the set
+        // Dedupe is intentionally checked before the cap: a duplicate is a
+        // correctness bug and should surface even when the session is also
+        // full. `parsed` has the `op` discriminator stripped by
+        // A2UIMessageSchema — identify the op via the payload key instead.
+        const parsedRec = parsed as unknown as {
+          createSurface?: { surfaceId: string };
+          updateComponents?: { surfaceId: string };
+          updateDataModel?: { surfaceId: string };
+          deleteSurface?: { surfaceId: string };
+        };
+
+        if (parsedRec.createSurface) {
+          const surfaceId = parsedRec.createSurface.surfaceId;
+          if (session.liveSurfaceIds.has(surfaceId)) {
+            throw new Error(
+              `emit_ui: surface '${surfaceId}' already exists — use updateComponents to modify it`,
+            );
+          }
+          if (session.liveSurfaceIds.size >= session.maxLiveSurfaces) {
+            throw new Error(
+              `emit_ui: session surface cap reached (${session.maxLiveSurfaces}) — ` +
+                `delete unused surfaces with op:'deleteSurface' before creating new ones`,
+            );
+          }
+        } else {
+          const targeted =
+            parsedRec.updateComponents ??
+            parsedRec.updateDataModel ??
+            parsedRec.deleteSurface;
+          if (targeted) {
+            const surfaceId = targeted.surfaceId;
+            if (!session.liveSurfaceIds.has(surfaceId)) {
+              throw new Error(
+                `emit_ui: surface '${surfaceId}' does not exist — call createSurface first`,
+              );
+            }
+          }
+        }
+
         session.recordA2UIEmission(parsed);
       }
 
