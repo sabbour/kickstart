@@ -98,6 +98,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-22 | #1063 "chore: remove dead applicationinsights dep (#1037) + real tracer in T9 test (#1038)" | M | impl=0m | review=6m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=0m | ci=9m | reviewer=bot | human_comments=0 | issue=#1037 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-22 | #1058 "fix(pack-core): emit_ui strict-mode schema violation" | M | impl=1m | review=53m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=3m | ci=9m | reviewer=bot | human_comments=0 | issue=#1050 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-22 | #1056 "fix(ops): SWA smoke test hard gate + re-enable PR preview environments (closes #1049)" | M | impl=1m | review=26m | cycles=1 | merged-with-rework | @sabbour-squad-frontend[bot] | first_review=4m | ci=9m | reviewer=bot | human_comments=0 | issue=#1049 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
