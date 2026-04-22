@@ -194,3 +194,56 @@ Estimate upgraded to **L**. Two-agent PR: Bender (Layer 0, harness), Fry (Layers
 2. **When triaging audits, group related defects into one issue only if they share a file and fix approach.** D2+D7+D14 all live in `runner.ts:406–473` and are fixed by the same `handoffs:` constructor change, so one issue. D3 + F4 are the same thing (the audit double-counted), so one issue. Don't split further than the implementing agent will open PRs.
 3. **Priority the blockers first, polish second, governance in parallel.** All P1 are implementation, all P2 are polish/governance. Keeps the sprint readable.
 4. **Cite the defect ID AND the follow-up number in each new issue title.** Future backlink searches work better with both.
+
+---
+
+## 2026-04-22 — MCP Apps DP v2.1 refresh + mermaid diagram (PR #1047)
+
+### Task
+
+Re-sweep MCP-relevant surfaces against DP v2.1 and add a mermaid runtime diagram.
+
+### Sweep findings
+
+- **`packages/mcp-server` already exists** as a v2 thin adapter (McpServer + harness Runner). The DP correctly frames the `SamplingModelProvider` / capability gate as unbuilt future work.
+- **Line references in the DP still accurate**: `index.ts:100-109` (oninitialized hook), `runner.ts:316-317` (Runner constructor), `runner.ts:423-425` (getSdkRunner call), `runner.ts:54-72` (buildModelProvider), `runner.ts:95-104` (installOtelBridgeOnce).
+- **Old v1 artifacts present but dormant**: `src/tools/` and `src/app/protocol.ts` contain the pre-harness phase-machine implementation. They are referenced only by `protocol.ts` (not the entry point). Not DP scope.
+- **nibbler/zapp → lead alias consolidation** (PRs #1048, #1053): DP §2 gates note was stale; updated to reflect that `nibbler:approved` is now applied by Leela as the lead alias.
+
+### Drift classification
+
+- 1 metadata/annotation update (nibbler alias)
+- 0 structural drift items (architecture still correct)
+- 1 additive (mermaid diagram §2.1)
+
+### Learnings
+
+1. **When a DP lands next to a partially-built package, sweep the entry point first** — `index.ts` tells you what's done vs. still proposed faster than reading tests.
+2. **Vestigial v1 code in `src/tools/` won't be caught by the DP's file-touch map** — future cleanup should note these are orphaned and safe to remove independently.
+3. **Squad alias consolidations need DP annotation passes** — any DP referencing a named agent as a gate must be updated when that agent is aliased.
+
+## 2026-04-22 — Electron DP rev 8: reconciliation + mermaid diagram
+
+**Task:** Re-survey Kickstart repo against Electron Desktop DP rev 7. Reconcile claims with actual code, add mermaid architecture diagram.
+
+### Scope
+
+Re-read `runner.ts`, `agents-otel-bridge.ts`, `converse.ts`, all 20 function handlers, 3 agent files, `emit_ui.ts`, `appinsights.ts`, `logger.ts`, frontend auth services, `infra/main.bicep`, and `package.json` workspace layout. Compared every claim in the DP against the source.
+
+### Drift findings
+
+- **2 minor fixes:** `agents-otel-bridge.ts` line count 262→277 (Nibbler B3 fix added 15 lines); `Runner.run()` method start line 316→319 (316 is class decl).
+- **2 substantive reconciliation notes:** API telemetry has migrated from classic `applicationinsights` SDK to pure OTel via `@azure/monitor-opentelemetry` (classic SDK banned by ESLint). Desktop telemetry guidance in §3.5 updated to match.
+- **0 verdict-threatening findings.** The Option 3 shim recommendation stands. All structural claims (20 handlers, 3 agents/2 edges, `buildModelProvider()` at lines 54-72, 597 runner.ts lines, emit_ui pattern, no packages/desktop conflict) verified correct.
+
+### Added
+
+- Mermaid flowchart diagram (§1.1): Option 3 architecture — Web vs Electron deployment fronts, shared KickstartRunner, AgentBackend seam, auth/provider flavors.
+- Mermaid sequence diagram (§1.1): Single Electron user turn through CopilotBackend path.
+- Cross-reference from §18.10 to §1.1 diagrams.
+
+### Learnings
+
+1. **Telemetry migrations can silently outpace DPs** — `appinsights.ts` underwent a full OTel migration (DP #1030) that invalidated multiple DP table entries. DPs referencing telemetry should pin to the actual import path, not the npm package name.
+2. **Line-number references in DPs rot fast** — even mechanical fixes (Nibbler B3) shift counts. Prefer semantic anchors ("the `buildModelProvider()` function") over line numbers where possible.
+3. **Mermaid diagrams render natively in GitHub PR review** — reviewers can preview without plugins. Good practice for any DP that proposes multi-package architecture.

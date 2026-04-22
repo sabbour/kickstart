@@ -1,19 +1,25 @@
 # Design Proposal: Kickstart as a Local Electron Desktop App
 
-> **Status:** 🚧 Work in progress (rev 7). Additive deployment — SWA + Functions contract is frozen. Filed as an in-repo DP rather than a GitHub issue so edits flow through normal PR review.
+> **Status:** 🚧 Work in progress (rev 8). Additive deployment — SWA + Functions contract is frozen. Filed as an in-repo DP rather than a GitHub issue so edits flow through normal PR review.
 >
 > **Owner:** Leela (Lead) · **Co-authors:** Ahmed Sabbour (brainstorm partner)
 
 **Author:** Leela (Lead)
 **Date:** 2026-04-21
-**Status:** DRAFT rev 7 — exploratory, no implementation issue filed yet
+**Status:** DRAFT rev 8 — exploratory, no implementation issue filed yet
 **Revised:** 2026-04-21 — rev 2: additive constraint, LLM provider matrix, auth recombination
 **Revised:** 2026-04-21 — rev 3: Copilot CLI piggyback analysis, Copilot SDK discovery, provider priority rerank
 **Revised:** 2026-04-21 — rev 4: `@openai/agents` + `@github/copilot-sdk` interop analysis → verdict: incompatible at model-provider level. BYOK is P0, Copilot SDK is P1 alternative runtime.
 **Revised:** 2026-04-21 — rev 5: Dual-runtime strategies evaluated. Option 1 (full SDK switch for Electron) recommended at M effort. Shim rejected as premature.
 **Revised:** 2026-04-21 — rev 6: Node.js SDK source validation. 8 claims verified, 2 major corrections: (1) native sub-agent support exists (handoffs NOT a gap), (2) BYOK support in SDK could unify P0/P1 into single runtime. Spike gates reduced from 4 to 2.
 **Revised:** 2026-04-21 — rev 7: Option 3 (KickstartRunner shim) re-evaluated with corrected SDK facts. Verdict FLIPPED: shim now RECOMMENDED over Option 1. Leakage surface shrank from 6→2; shim pays off on day 1 since dual-runtime is the requirement, not a speculation.
+**Revised:** 2026-04-22 — rev 8: Reconciled DP with current repo code (runner.ts, agents-otel-bridge.ts, converse.ts, telemetry, handler count, agent topology). Added mermaid architecture diagram for Option 3 target.
 **Audience:** Ahmed Sabbour, squad
+
+> ### Rev 8 Changelog
+>
+> - **Reconciled with repo:** Re-surveyed all critical source files against DP claims. Fixed minor line-reference drifts (`agents-otel-bridge.ts` 262→277, `Runner.run()` 316→319). Added substantive reconciliation notes for telemetry migration (§2, §3.5): API layer has migrated from classic `applicationinsights` SDK to pure OTel via `@azure/monitor-opentelemetry`; desktop telemetry guidance updated accordingly.
+> - **Added mermaid architecture diagram:** Option 3 target architecture (§1.1) + Electron turn sequence diagram. Referenced from §18.10.
 
 ---
 
@@ -33,6 +39,115 @@
 > - Electron work lands in a **new package** (`packages/desktop/` or `apps/desktop/`)
 >   and touches `packages/web/api/` **only** to extract pure handler cores via
 >   refactor (never delete, never modify existing behavior).
+
+---
+
+## 1.1 Target Architecture — Option 3 (KickstartRunner Shim) *(rev 8)*
+
+> Visual overview of the recommended architecture (§18.10). Two deployment fronts share one runtime through the `AgentBackend` abstraction.
+
+```mermaid
+flowchart TB
+    subgraph web["🌐 Web — SWA (existing, frozen)"]
+        style web fill:#e8f5e9,stroke:#388e3c
+        swa_fe["React 19 + A2UI\n(packages/web)"]
+        swa_fn["Azure Functions v4\n(packages/web/api)"]
+        swa_fe -->|"HTTP / SSE\n/api/*"| swa_fn
+    end
+
+    subgraph electron["🖥️ Electron — Desktop (new)"]
+        style electron fill:#fff3e0,stroke:#f57c00
+        e_renderer["BrowserWindow\n(same React app, unmodified)"]
+        e_server["Local HTTP server\nExpress / Hono on 127.0.0.1"]
+        e_auth["Provider Manager\n(gh auth · az login · BYOK)"]
+        e_renderer -->|"HTTP / SSE\n/api/*"| e_server
+    end
+
+    subgraph shared["🔷 Shared Runtime — packages/harness"]
+        style shared fill:#e1f5fe,stroke:#0288d1
+
+        runner["<b>KickstartRunner</b>\n(orchestrator)"]
+
+        subgraph above["Above the Backend Seam (shared)"]
+            guard_in["Input Guardrails"]
+            guard_out["Output Guardrails"]
+            sse_dispatch["SSE Dispatch"]
+            a2ui_drain["A2UI Drain\n+ emit_ui processing"]
+            output_proc["Output Processing\n(resolveOutputText)"]
+        end
+
+        subgraph seam["AgentBackend Interface"]
+            oai_be["<b>OpenAIBackend</b>\nwraps @openai/agents\n~200 lines (extracted)"]
+            cop_be["<b>CopilotBackend</b>\nwraps @github/copilot-sdk\n~300 lines (new)"]
+        end
+
+        subgraph below["Below the Backend Seam (shared)"]
+            agents["Agents\ntriage → codesmith\ntriage → reviewer"]
+            pack_tools["Pack Tools\nemit_ui · fetch · write · read\nvalidate · search_components"]
+            prompts["Prompt Templates\n*.agent.md"]
+        end
+
+        runner --> above
+        above --> seam
+        seam --> below
+    end
+
+    subgraph providers["LLM Providers"]
+        style providers fill:#f3e5f5,stroke:#7b1fa2
+        aoai["Azure OpenAI\n(az login / API key)"]
+        gh_models["GitHub Models API\n(gh auth token)"]
+        copilot_llm["GitHub Copilot\n(subscription)"]
+        byok["BYOK\n(OpenAI / Ollama)"]
+    end
+
+    swa_fn --> runner
+    e_server --> runner
+    e_auth -.->|config| e_server
+
+    oai_be -.-> aoai
+    oai_be -.-> gh_models
+    oai_be -.-> byok
+    cop_be -.-> copilot_llm
+```
+
+**Legend:** 🟢 Green = Web-only (existing, frozen) · 🟠 Orange = Electron-only (new) · 🔵 Blue = Shared code (same in both deployments) · 🟣 Purple = External SDKs / providers
+
+#### Electron Turn Sequence (single user message)
+
+```mermaid
+sequenceDiagram
+    participant UI as BrowserWindow<br/>(React + A2UI)
+    participant HTTP as Local HTTP Server<br/>(Express/Hono)
+    participant KR as KickstartRunner<br/>(shared orchestrator)
+    participant CB as CopilotBackend<br/>(@github/copilot-sdk)
+    participant LLM as Copilot LLM
+
+    UI->>HTTP: POST /api/converse {message}
+    HTTP->>KR: run(session, message, sseWrite)
+    KR->>KR: Input guardrails
+    KR->>CB: execute(config)
+    CB->>LLM: session.sendMessage()
+    loop Streaming events
+        LLM-->>CB: assistant.message_delta
+        CB-->>KR: yield {type: text_delta}
+        KR-->>KR: drain A2UI emissions
+        KR-->>HTTP: sseWrite('chunk', delta)
+        HTTP-->>UI: SSE: chunk
+        LLM-->>CB: tool.execution_start
+        CB-->>KR: yield {type: tool_start}
+        KR-->>HTTP: sseWrite('tool_start')
+        HTTP-->>UI: SSE: tool_start
+        Note over CB,LLM: Tool executes<br/>(emit_ui → a2ui queue)
+        LLM-->>CB: tool.execution_complete
+        CB-->>KR: yield {type: tool_done}
+        KR-->>KR: drain A2UI → sseWrite('a2ui')
+        KR-->>HTTP: sseWrite('tool_done')
+        HTTP-->>UI: SSE: a2ui + tool_done
+    end
+    KR->>KR: Output guardrails
+    KR-->>HTTP: sseWrite('end')
+    HTTP-->>UI: SSE: end
+```
 
 ---
 
@@ -62,7 +177,9 @@ Kickstart today runs as a hosted SWA + Azure Functions app. That's fine for demo
 | Infra | `infra/` (Bicep) | Azure | SWA + Key Vault + App Insights + Log Analytics |
 | Auth | SWA built-in auth (Entra ID) | Azure-managed | `x-ms-token-aad-access-token` header injection |
 | GitHub | OAuth code flow via Functions | Server-side | `kickstart-github-session` encrypted cookie |
-| Telemetry | `applicationinsights` + `@azure/monitor-opentelemetry` | Server-side | Connection string in env vars, secret-redacting processors |
+| Telemetry | `@azure/monitor-opentelemetry` (pure OTel) | Server-side | Connection string in env vars, secret-redacting processors |
+
+> **Reconciliation (rev 8, 2026-04-22):** The §2 table previously listed `applicationinsights` (classic SDK) alongside `@azure/monitor-opentelemetry`. The API layer has fully migrated to pure OTel: `appinsights.ts` uses only `useAzureMonitor()` from `@azure/monitor-opentelemetry`, and the classic `applicationinsights` SDK is explicitly banned via ESLint `no-restricted-imports`. All manual telemetry (`trackException`, `trackEvent`, `trackTrace`) emits through `@opentelemetry/api` / `@opentelemetry/api-logs`. Table corrected.
 
 **Secrets surface today:** `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_CLIENT_ID/SECRET/TENANT_ID`, `OPENAI_API_KEY` (fallback), `APPLICATIONINSIGHTS_CONNECTION_STRING`, GitHub OAuth `clientId`/`clientSecret`/`sessionSecret`. All live in Azure Functions app settings or Key Vault — never shipped to the browser.
 
@@ -155,11 +272,13 @@ Unchanged from prior DP. The harness is already environment-agnostic. The MCP se
 
 | Concern | Desktop approach |
 |---------|-----------------|
-| App Insights | Optional. Phase 1: use `applicationinsights` SDK with user consent toggle. |
+| App Insights | Optional. Phase 1: use `@azure/monitor-opentelemetry` (pure OTel) with user consent toggle. |
 | User consent | First-run wizard: "Help improve Kickstart by sending anonymous usage data?" Default OFF. |
 | Anonymous IDs | Random UUID on first launch, stored in app config. No PII. |
-| Offline buffering | `applicationinsights` SDK supports disk-based retry. |
+| Offline buffering | OTel SDK + Azure Monitor exporter supports disk-based retry. |
 | Crash reports | Phase 1: Electron `crashReporter` module. |
+
+> **Reconciliation (rev 8, 2026-04-22):** §3.5 previously referenced the classic `applicationinsights` SDK for desktop telemetry. The server-side API layer (`appinsights.ts`) has fully migrated to pure OTel via `@azure/monitor-opentelemetry`, and the classic SDK is banned by ESLint. Desktop should follow the same OTel-first approach: use `@azure/monitor-opentelemetry` with `useAzureMonitor()` and inject the `APPLICATIONINSIGHTS_CONNECTION_STRING` only when the user opts in. This aligns the desktop telemetry stack with the existing server-side implementation. Table entries updated.
 
 ### 3.6 Auto-Update
 
@@ -1113,7 +1232,7 @@ the codebase:
 | File | Lines | Imports | Role |
 |------|-------|---------|------|
 | `runner.ts` | 597 | `Agent`, `Runner`, `tool`, `setDefaultModelProvider`, `OpenAIProvider`, `setTraceProcessors`, `FunctionTool` | Core agent loop, model provider, tool wrapping, SSE streaming |
-| `agents-otel-bridge.ts` | 262 | `TracingProcessor`, `Trace`, `Span`, `SpanData` | OTel telemetry bridge |
+| `agents-otel-bridge.ts` | 277 | `TracingProcessor`, `Trace`, `Span`, `SpanData` | OTel telemetry bridge |
 | `types/tool.ts` | 10 | `Tool as SDKTool` | `ToolContribution` type definition |
 | `mcp/server.ts` | 215 | `FunctionTool` | MCP tool manifest |
 
@@ -1336,7 +1455,7 @@ tests are unit-level and don't touch the runtime.
 | Component | SWA-specific | Electron/Copilot-specific | Shared |
 |-----------|-------------|--------------------------|--------|
 | Runner | `runner.ts` (597 lines) | `copilot-runner.ts` (~400 lines) | 0 (separate implementations) |
-| OTel bridge | `agents-otel-bridge.ts` (262 lines) | `copilot-telemetry.ts` (~50 lines) | 0 |
+| OTel bridge | `agents-otel-bridge.ts` (277 lines) | `copilot-telemetry.ts` (~50 lines) | 0 |
 | Tool adapter | N/A (direct) | `copilot-tool-adapter.ts` (~80 lines) | 0 |
 | Event translator | N/A (built into runner) | `copilot-event-translator.ts` (~120 lines) | 0 |
 | Handoff manager | Built into `@openai/agents` | `copilot-handoff-manager.ts` (~150 lines) | 0 |
@@ -1798,6 +1917,8 @@ SDK). The abstraction pays off on day 1, not speculatively.
 
 #### The shim architecture
 
+> See the **Mermaid architecture diagram in §1.1** for a visual overview of this design, and the **Electron turn sequence diagram** showing a single user message flowing through the CopilotBackend path.
+
 The key insight is WHERE to draw the abstraction boundary. The current `Runner.run()` (597 lines)
 does 5 things: (1) guardrails, (2) tool wrapping, (3) agent construction, (4) LLM execution +
 streaming, (5) output processing. Only step 4 differs between backends.
@@ -1907,7 +2028,7 @@ New implementation in `packages/desktop/src/copilot-backend.ts`. Responsibilitie
 
 #### Shared Runner refactor (~100 lines changed in runner.ts)
 
-The current `Runner.run()` (316-570) refactors into:
+The current `Runner.run()` (319-570) refactors into:
 
 ```typescript
 class Runner {
