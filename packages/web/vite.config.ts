@@ -150,6 +150,12 @@ export default defineConfig({
           if (id.includes('/node_modules/@fluentui/react-icons')) return 'vendor-fluent-icons';
           if (id.includes('/node_modules/@fluentui/')) return 'vendor-fluent';
           if (id.includes('/node_modules/react-dom/') || id.includes('/node_modules/react/')) return 'vendor-react';
+          // Zod v4 is only reachable from pack client modules, which boot via
+          // a dynamic import (see `packages/web/src/main.tsx`). Isolating the
+          // v4 subpath keeps it in the lazy chunk graph — otherwise rolldown
+          // would merge it with zod v3 and drag it into the boot preload, where
+          // Zod v4's `new Function` JIT probe would trip CSP. See issue #1042.
+          if (id.includes('/node_modules/zod/v4/')) return 'vendor-zod-v4';
           if (id.includes('/node_modules/zod/')) return 'vendor-zod';
           if (id.includes('/node_modules/yaml/')) return 'vendor-yaml';
           if (id.includes('/node_modules/highlight.js/')) return 'vendor-highlight';

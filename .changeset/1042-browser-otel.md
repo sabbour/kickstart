@@ -43,10 +43,17 @@ workspace under one trace id.
   `@microsoft/applicationinsights-web` is explicitly disqualified (would
   require `unsafe-inline`).
 - Any init failure is swallowed so telemetry can never break app boot.
-- CSP hardening: configure Zod v4 with `jitless: true` at the first line of
-  `main.tsx` so object schemas never invoke `new Function(...)`; the
-  Playwright CSP smoke scenario now runs under the production
-  `script-src 'self'` (no `'unsafe-eval'`) with zero violations.
+- CSP hardening: `packages/pack-*` declare `zod@^4` while `packages/web` is
+  pinned to `zod@^3`; pack client renderers therefore drag Zod v4's module
+  graph into the boot bundle, where v4's `allowsEval` probe (`new Function("")`)
+  trips `script-src 'self'`. Fixed without a library swap, version bump, or
+  CSP relaxation by (a) dynamic-importing `registerPackComponents` from
+  `main.tsx` and routing `/node_modules/zod/v4/` to a dedicated
+  `vendor-zod-v4` manual chunk so v4 is no longer in the boot preload
+  payload, and (b) calling Zod v4's documented `config({ jitless: true })`
+  via `src/lib/configure-zod.ts` (first import in `main.tsx`) so the `new
+  Function` probe never runs. The Playwright CSP smoke scenario now boots
+  under the production `script-src 'self'` with zero violations.
 
 ### Kill switch
 
