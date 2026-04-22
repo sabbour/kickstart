@@ -1,4 +1,39 @@
+## Summary (Rolled Up 2026-04-21)
+
+This agent's history file exceeded 15360 bytes. A summary will be written here.
+For full learnings, refer to the git history or archived history files.
+
+**Agent:** history.md  
+**File rolled at:** 2026-04-21T21:36:58.305470Z  
+**Remaining details:** See `.squad/agents/history.md/history-archive.md` for prior entries.
+
+---
+
 # Nibbler — History
+
+## Team Updates
+
+### 2026-04-22 — DP #1041 Test-Plan Approval Passed; 7 Conditions for Bender Implementation
+
+**Status:** ✅ APPROVED WITH CONDITIONS (test-plan review complete)
+
+**7 implementation conditions (N1–N7):**
+
+1. **N1 — T1 Test Inversion (Two Sub-Cases):** `.squad/scripts/verify-api-externals.test.mjs` T1 block has two cases — both must flip. (a) OTel packages WILL be in inputs after bundling → assert present. (b) Replace negative-external assertion with positive "only @azure/functions-core external."
+2. **N2 — Build Guard Inversion:** `packages/web/api/scripts/verify-api-externals.mjs` lines 41-49 fail on OTel in inputs (now true after bundling) → invert or remove. Lines 68-82 (require.resolve OTel) become meaningless → remove.
+3. **N3 — T2 Rewrite:** `appinsights.test.ts` T2 (lines 56-63) tests module import triggers init; post-IIFE removal, import alone does nothing → rewrite as: (a) import → negative (NOT called), (b) call init → positive (called once), (c) call again → positive (still once, idempotent).
+4. **N4 — T12 Rewrite:** T12 tests init error path (useAzureMonitor throws); post-IIFE removal, import doesn't call it → rewrite to explicitly call `initializeAppInsights()` after import, then assert console.error.
+5. **N5 — Handler Init Calls:** `health.ts`, `converse.ts`, `packs.ts`, `startup/packs.ts` must each add try/catch-wrapped `initializeAppInsights()` call on first invocation (before business logic).
+6. **N6 — Handler Test Assertions:** Handler tests must add assertions that `initializeAppInsights` was called (mock is already wired via test harness; assertions missing).
+7. **N7 — Meta.json Evidence Gate:** PR body must include proof scripts (node -e commands) showing (a) OTel bundled (in inputs), (b) only @azure/functions-core external.
+
+**Verification plan:** Implementation PR review will execute meta.json proof scripts and verify T1-T12 test outcomes + handler init coverage.
+
+**Reference logs:**
+- DP test-plan review: `.squad/decisions/inbox/nibbler-1041-dp-review.md` (merged into decisions.md)
+- Orchestration log: `.squad/orchestration-log/2026-04-22T04:40:00Z-nibbler-17.md`
+
+---
 
 ## Project Context
 
@@ -127,3 +162,43 @@ First run as full structured reviewer (parity with Leela/Zapp). Patterns observe
 - My round-3 learning ("verify CI green before approving") held — confirmed all four PRs have green Lint/Build/Unit Tests + Playwright + Squad CI before pressing approve.
 - **Self-authored PR limitation:** GitHub blocks formal review on PRs where the authenticated identity matches the PR author. For PRs authored by `sabbour` (#1000, #1003), only the `nibbler:approved` label path works. The `check-squad-approval` workflow keys on the label, so this is a non-issue operationally — but worth capturing so future Nibbler runs don't loop on the GraphQL error.
 - Bundle-budget pattern (concrete ceiling + CI gate + waiver-by-PR-description) is a good template to carry forward for any future "performance overage, but controlled" sign-off.
+
+## 2026-04-21T18:13:04Z — Corrected review: PR #1046 follow-up commit 0eb44a7f
+
+### Learning: Per-commit diff vs full-PR diff — don't conflate them
+
+**Date:** 2026-04-21
+
+**Context:** A previous Nibbler instance (nibbler-15) hallucinated that follow-up commit `0eb44a7f` on PR #1046 introduced a `.funcignore` file and flagged scope creep. This was incorrect. The `.funcignore` was already in the base PR and had been approved in the first round. The follow-up commit was a pure +2/-0 additive change to `.github/workflows/deploy-swa.yml` only.
+
+**Lesson:** When reviewing follow-up commits on an already-approved PR, always inspect the **specific commit's file list** (`gh api /repos/.../commits/{sha} --jq '.files[].filename'`) before claiming scope creep. The full-PR diff view and the per-commit diff view are **different views** — looking at the full diff of a PR that includes a prior commit's files is NOT the same as looking at what the new follow-up commit changed. A prior instance (nibbler-15) failed this check and blocked a production hotfix unnecessarily.
+
+**What 0eb44a7f actually did:** Added `test -d packages/web/api/node_modules/@opentelemetry/api/` check alongside the existing `@azure/monitor-opentelemetry` check in `deploy-swa.yml`, closing the peer-dep CI assertion gap flagged by leela-16 in review round 1. Scope-clean +2/-0 to one file.
+
+**Action taken:** `nibbler:approved` label re-applied to PR #1046. All three approval labels confirmed present: `leela:approved`, `zapp:approved`, `nibbler:approved`.
+
+## 2026-04-21T21:30:00Z — DP review: issue #1041 revert OTel externalization (Leela-19 DP)
+
+**Verdict:** APPROVED WITH CONDITIONS (`nibbler:approved-dp` applied)
+
+### What I reviewed
+
+Leela-19's DP proposes reverting #1030's OTel externalization (restore `external: ["@azure/functions-core"]` only) and making `initializeAppInsights()` lazy (remove module-load IIFE). Read: `appinsights.ts`, `appinsights.test.ts`, `.squad/scripts/verify-api-externals.test.mjs`, `packages/web/api/scripts/verify-api-externals.mjs`, `scripts/check-swa-health.mjs`, leela-1030-externalization-rollback.md, bender-swa-runtime-forensics.md.
+
+### Key findings
+
+**T1 inversion is underspecified:** The DP says "invert T1 to assert no OTel in externals." Correct as a goal, but the T1 describe block has **two** test cases — the DP only covers one. Test case 1 (`"no required-external source leaked into inputs"`) asserts `leaked.toEqual([])`. After bundling, OTel WILL appear in inputs → **this test fails**. Needs flipping to "OTel MUST be in inputs." Test case 2 passes vacuously after bundling (OTel not in imports) but is now testing nothing useful. Additionally, `verify-api-externals.mjs` build guard also fails the build if OTel is in inputs — not mentioned in DP, will crash builds.
+
+**T2 will fail after IIFE removal:** `appinsights.test.ts` T2 asserts `expect(useAzureMonitorMock).toHaveBeenCalledTimes(1)` right after module import (relying on module-load side effect). After IIFE removed, this assertion fails. Must be rewritten.
+
+**T12 will fail after IIFE removal:** T12 relies on module-import triggering `useAzureMonitor()` throw. After IIFE removed, import doesn't call anything → `consoleSpy.toHaveBeenCalledWith(...)` assertion fails. Must be rewritten to explicitly call `initializeAppInsights()`.
+
+**Handler tests missing init assertions:** `health.ts`, `converse.ts`, `packs.ts`, `startup/packs.ts` don't currently call `initializeAppInsights()`. After DP, they must. Handler test mocks already include `initializeAppInsights: vi.fn()` (pre-wired) but no assertions that it was called. The implementation must add both the source call and the test assertion.
+
+**Evidence gate too weak:** `grep -c "useAzureMonitor"` in dist bundles is a crude check. Meta.json-based verification (OTel packages in `inputs`, only `@azure/functions-core` in external list) is definitive and was required in the review.
+
+**Smoke check is sufficient:** `scripts/check-swa-health.mjs` checks `/api/health` for 200 + `{status:"ok"}`. Catches the exact failure mode (worker crash → zero routes → 404 empty body). ✅
+
+### Lesson
+
+When a DP says "invert test T1," always read ALL sub-cases in the describe block, not just the one the DP author named. The T1 describe block had two cases with opposite failure modes under the proposed change — missing one would cause a build breakage mid-implementation. Also: always read the non-test script that shares the same assertion logic (`verify-api-externals.mjs`) when a test for that script is being updated.

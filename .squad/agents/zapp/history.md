@@ -1,4 +1,33 @@
+## Summary (Rolled Up 2026-04-21)
+
+This agent's history file exceeded 15360 bytes. A summary will be written here.
+For full learnings, refer to the git history or archived history files.
+
+**Agent:** history.md  
+**File rolled at:** 2026-04-21T21:36:58.305760Z  
+**Remaining details:** See `.squad/agents/history.md/history-archive.md` for prior entries.
+
+---
+
 # Zapp — Security Architect
+
+## Team Updates
+
+### 2026-04-22 — DP #1041 Approval Passed; Conditions Recorded for Bender Implementation
+
+**Status:** ✅ APPROVED WITH CONDITIONS (security review complete)
+
+**Conditions for merge:**
+- **C1:** `initializeAppInsights()` must be first statement in each handler function body
+- **C2:** Error logging in `catch` block must use `sanitizeError(err)` — no raw error output
+
+**Verification plan:** Code review of implementation PR (Bender) will verify both C1 and C2 are satisfied. C1 enforcement via visual inspection of handler bodies; C2 enforcement via grep + code context.
+
+**Reference logs:**
+- DP security review: `.squad/decisions/inbox/zapp-1041-dp-review.md` (merged into decisions.md)
+- Orchestration log: `.squad/orchestration-log/2026-04-22T04:40:00Z-zapp-13.md`
+
+---
 
 ## About Me
 
@@ -10,6 +39,35 @@ Security architect owning threat modeling, approval gates, and compliance for Ki
 - Tool schema: LLM-facing tool definitions, A2UI component validation, payload bounds
 - Session security: ownership binding, TTL enforcement, resume semantics
 - Dependency governance: lockfile integrity, version pinning, security scans
+
+## 2026-04-21 — DP Security Review: #1041 Revert OTel Externalization
+
+**Verdict:** ✅ APPROVED WITH CONDITIONS
+
+**Scope:** Leela's DP proposes reverting #1030's esbuild externalization (restore bundle-everything) and changing `initializeAppInsights()` from eager module-load IIFE to lazy handler-level call. All #1030 redaction work preserved.
+
+**Findings (all clear):**
+- Redaction pipeline integrity: ✅ OTel API defaults to no-op providers pre-init — zero egress before redactors installed.
+- globalThis singleton guard: ✅ `Symbol.for('kickstart.azmon.started')` check→set is synchronous; JS event loop prevents interleaving.
+- Connection-string handling: ✅ Never logged or echoed; init-failure path uses `sanitizeError()`.
+- Supply-chain surface: ✅ Bundling eliminates 152 runtime-resolvable packages from deploy artifact.
+- Bundle information leak: ✅ Only public npm packages bundled; no dev/test/internal code paths.
+- Redactor wiring: ✅ Lazy init changes timing only; `RedactingSpanExporter` + `RedactingLogRecordProcessor` remain wired.
+
+**Conditions:**
+- C1: `initializeAppInsights()` must be first statement in each handler body.
+- C2: `sanitizeError(err)` in catch block must remain unchanged.
+
+**Label:** `zapp:approved-dp` applied. Decision filed: `zapp-1041-dp-review.md`.
+
+## Learnings
+
+- **OTel no-op provider is a security safety net.** Before any real provider is registered via `useAzureMonitor()`, the OTel API returns no-op tracers/loggers that accept calls but export nothing. This makes eager→lazy init transitions safe from a data-egress perspective — you lose telemetry coverage, but you cannot leak unredacted data.
+- **`Symbol.for()` + single-threaded JS = effectively atomic guards.** The `globalThis[Symbol.for(...)]` pattern for cross-bundle singleton flags is safe without locks as long as the check→set path has no `await`. This is a recurring pattern in OTel and can be trusted for init-once semantics in the Functions worker model.
+- **Bundling is strictly better than externalizing for supply-chain security in SWA.** SWA's uncontrolled server-side `npm install` creates a mutation window where `node_modules/` can be tampered. Self-contained bundles are immune. This is a durable architectural principle for any Azure SWA deployment.
+- **Redaction-layer wiring survives lazy init because the provider config is declarative.** The `spanProcessors` and `logRecordProcessors` arrays passed to `useAzureMonitor()` are part of the function's internal logic, not the call timing. Lazy vs. eager changes when the pipeline is built, not what is built.
+
+---
 
 ## 2026-04-21 — Four-way review gate structural shift
 

@@ -1,4 +1,38 @@
+## Summary (Rolled Up 2026-04-21)
+
+This agent's history file exceeded 15360 bytes. A summary will be written here.
+For full learnings, refer to the git history or archived history files.
+
+**Agent:** history.md  
+**File rolled at:** 2026-04-21T21:36:58.305220Z  
+**Remaining details:** See `.squad/agents/history.md/history-archive.md` for prior entries.
+
+---
+
 # Leela — Lead
+
+## Team Updates
+
+### 2026-04-22 — DP #1041 (OTel Revert) All Approvals Passed; Implementation Dispatched
+
+**Milestone:** Production 404 root-cause diagnosed (Bender-15 forensics) and architectural fix approved by full DP-stage review. Leela authored DP, Zapp approved security conditions, Nibbler approved test-plan conditions.
+
+**DP details:** `.squad/decisions/inbox/leela-1030-externalization-rollback.md` (decision file merged into decisions.md)
+
+**Approvals:**
+- ✅ Zapp-13 security review: APPROVED WITH CONDITIONS (C1: init first in handlers, C2: sanitizeError in logs)
+- ✅ Nibbler-17 test-plan review: APPROVED WITH CONDITIONS (N1–N7: test inversion, lazy-init tests, handler assertions, evidence gates)
+- ✅ Leela: Applied `leela:approved-dp` label to #1041
+
+**Dispatcher:** Bender (implementation PR ownership)
+
+**Status:** Leela locked out per Reviewer Rejection Protocol (residual lock from earlier MCP-DP session); implementation proceeds under Bender with Zapp/Nibbler oversight.
+
+**Reference logs:** 
+- Session log: `.squad/log/2026-04-22T04:40:00Z-1041-dp-approved.md`
+- Orchestration logs: `.squad/orchestration-log/2026-04-22T04:40:00Z-leela-19.md`
+
+---
 
 ## About Me
 Lead engineer and architect. Owns roadmap prioritization, design reviews, technical decisions, and team coordination. Expert in process governance, architecture patterns, and escalation handling. Responsibility: ensure all work follows DP gate, security approval, and quality standards before shipping.
@@ -118,3 +152,91 @@ For comprehensive work history prior to 2026-04-20, see git log and .squad/orche
 2. Ideas-tab curated-only model; future user-supplied inspirations will reopen threat
 3. Composition-reliability harness constraints: fail-loud, ≤2 retries, redacted logs
 4. DP-time conditions enforce at PR time non-negotiable (Reviewer Rejection Protocol on #1000 sets precedent)
+
+## 2026-04-21 — PR #1046 Post-Mortem: OTel Deploy Hotfix Triage
+
+### Context
+PR #1046 (commit ef4d8f0f) merged, deploying DP Amendment #1 / Option B:
+- `.funcignore` created at `packages/web/api/.funcignore` — does NOT list `node_modules/`
+- `materialize-api-externals.mjs` postbuild copies 152 OTel/AppInsights packages to `packages/web/api/node_modules/`
+- CI verify step PASSED: packages confirmed present on disk in `packages/web/api/node_modules/`
+- SWA deploy completed ("Status: Succeeded")
+- Smoke check: IDENTICAL 8× HTTP 404 empty body failure
+
+### Key Evidence (run 24755110357, job 72426556545)
+
+**Zip timing analysis (definitive):**
+- Web app zip (27MB): 0.87 seconds → ~31 MB/s effective throughput
+- API zip: **5.52 seconds** → at same rate = **~171MB** of content
+- API without node_modules: only ~29MB → expected zip time ~0.94s → DOES NOT EXPLAIN 5.52s
+- API with node_modules (223MB total, ~143MB after .funcignore exclusions): ~171MB → matches 5.52s
+- **Conclusion: StaticSitesClient IS including node_modules in the API zip. `.funcignore` IS being respected.**
+
+**Critical structural issue found:**
+- `packages/web/api/package.json` lists `"@aks-kickstart/harness": "*"` as a runtime dependency
+- `@aks-kickstart/harness` is a private workspace-only package — NOT published to npm
+- The Azure SWA platform processing window is ~30 seconds ("Status: InProgress")
+- If the platform runs `npm install` on the deployed API (server-side), it FAILS on `@aks-kickstart/harness` → broken/empty node_modules → MODULE_NOT_FOUND → 404
+
+**`appinsights.ts` module-level side-effect confirmed:**
+- Static ESM imports from `@azure/monitor-opentelemetry`, `@opentelemetry/sdk-trace-base`, etc. at top of module
+- Module-level IIFE `{ initializeAppInsights(); }` runs at load time
+- If ANY static import fails → module fails to load → all functions never register → 404
+
+**`.funcignore` mechanism scope confirmed wrong in Option B theory:**
+- `.funcignore` was designed for `func pack` (Azure Functions Core Tools CLI)
+- `entrypoint.sh` just runs `./StaticSitesClient $INPUT_ACTION` — no `.funcignore` reading visible
+- However, timing evidence suggests StaticSitesClient DOES either (a) respect `.funcignore` OR (b) always includes node_modules with `skip_api_build: true`
+
+### Learnings
+
+1. **Zip timing is a reliable proxy for zip content**: app(27MB)/0.87s ratio establishes per-step compression throughput; API's 5.52s implies ~171MB, consistent with node_modules included.
+
+2. **The verify CI step is necessary but NOT sufficient**: it confirms packages are on disk in CI runner at step time, but says nothing about what the SWA platform does AFTER upload.
+
+3. **`@aks-kickstart/harness: "*"` in API package.json is a deployment landmine**: Any server-side `npm install` attempt will fail because this workspace package is not on the public npm registry.
+
+4. **The root 404 cause is ambiguous between two scenarios**:
+   - (A) Packages ARE in zip but Azure SWA platform reinstalls node_modules server-side → workspace dep failure → broken node_modules → 404
+   - (B) Packages ARE in zip and deployed, but OTel static ESM imports fail at Azure Functions v4 worker startup → uncaught module-load error → all routes 404
+
+5. **Option B (`.funcignore`) theory was based on wrong model**: the mechanism works but was solving the wrong problem. The packages ship, but something post-deploy breaks them.
+
+6. **The definitive bifurcation test**: deploy a minimal `/api/ping` function with ZERO external/OTel imports. If ping→200 but health→404, the cause is OTel-specific. If ping→404, cause is deployment infrastructure.
+
+## 2026-04-21 — DP: #1030 Externalization Rollback (Issue #1041)
+
+### Context
+Coordinator forensic analysis identified `17b2fbd9` as the breaking commit (PR #1030/#1034). Last green: `60f6420b`. DP posted to #1041 as authoritative fix proposal.
+
+### Verified Regressions (two independent, stacking)
+
+1. **Esbuild externalization** (`esbuild.config.mjs:86–100`): Changed from `external: ["@azure/functions-core"]` to externalizing 10 OTel packages. The `materialize-api-externals.mjs` script fails to produce the complete transitive closure (misses peerDependencies). Missing deps → ESM import fails at module load → worker crash → 404.
+
+2. **Eager module-load IIFE** (`appinsights.ts:267–269`): Changed from conditional `startAzureMonitor(connString)` (env-var gated) to unconditional `initializeAppInsights()` at module load. Any throw kills function registration → 404.
+
+### Key Architectural Insight: globalThis Singleton
+
+The externalization rationale ("multiple bundled copies wipe each other's OTel providers") was overcorrection. `@opentelemetry/api` uses `globalThis[Symbol.for('opentelemetry.js.api.1')]` — a process-global singleton via `Symbol.for()`. Bundling multiple copies into different function bundles still yields ONE provider registry per worker process. The `Symbol.for('kickstart.azmon.started')` guard adds a second layer of idempotency.
+
+### DP Outcome
+- **Fix:** Restore bundle-everything, delete materialize script, make init lazy (handler-level), keep verify script with inverted assertions, keep all #1030 redaction/pipeline work.
+- **Assigned:** Bender (backend), with fabrication guard (must paste build + grep evidence).
+- **Reviewers:** Leela (arch), Zapp (security), Nibbler (tests, sonnet model).
+- **Decision file:** `.squad/decisions/inbox/leela-1030-externalization-rollback.md`
+
+### Learnings
+
+1. **`globalThis` + `Symbol.for()` is the correct singleton mechanism for OTel in per-function esbuild bundles.** Externalizing to "share module identity" is unnecessary when the library already uses process-global singletons.
+
+2. **Module-load side effects are deployment landmines.** An unconditional IIFE that calls into an external dependency at import time has zero fault isolation — any throw kills the entire function registration chain.
+
+3. **Transitive closure of peerDependencies is structurally unreliable.** The materialize script only walked `dependencies` and `optionalDependencies`. `@azure/monitor-opentelemetry`'s peerDeps include most `@opentelemetry/*` packages. This is a fundamental design flaw in the externalization approach.
+
+4. **DP #1046 Option B (`.funcignore`) was disproved empirically.** Merged, zero impact. Validates the "try, measure, learn" approach but underscores the need for root-cause analysis before shotgun fixes.
+
+5. **Preview envs as regression canaries:** Builds predating the breaking change (April 10–14) still serve 200, providing a reliable baseline comparison for deploy-infrastructure vs. code regressions.
+
+6. **SWA server-side `npm install` is a platform-level mutation point outside our control.** `skip_api_build: true` only disables client-side Oryx — the SWA service still runs `npm install --production` during the ~30s post-upload window. This can overwrite any `node_modules/` materialized client-side. Before #1030, bundles were self-contained and indifferent to `node_modules/` state (the server-side install was harmless). After #1030, bundles critically depend on `node_modules/`, turning the latent hazard into the production outage. Documented by Ahmed on unmerged `swa-pkg-fix` branch (`68e5f875`). Confirmed empirically by Bender-15: `request-context` header on 404s proves HOST up, WORKER crashed. Bundling is the only strategy that makes function bundles immune to this deploy-infra mutation.
+
+7. **DP addendum posted** to #1041 incorporating Bender-15's deploy-infra findings. Adds: server-side `npm install` as pre-existing hazard in §2, bundling-as-immunization in §4, `node_modules/` mutation risk in §5, and metafile-based external verification in §9.

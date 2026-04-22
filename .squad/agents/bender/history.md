@@ -1,6 +1,46 @@
 # Bender — Backend Dev
 
+## Team Updates
+
+### 2026-04-22 — DP #1041 (OTel Revert) Implementation Dispatched
+
+**Milestone:** Production 404 incident root-cause diagnosed and approved for fix. All three DP-stage approvals passed (Zapp security ✅, Nibbler test-plan ✅, Leela architectural ✅).
+
+**Implementation dispatcher:** Bender (this agent will own PR implementation)
+
+**Dispatch pointer:** `.squad/log/2026-04-22T04:40:00Z-1041-dp-approved.md`
+
+**DP details:** Revert OTel externalization (restore `external: ["@azure/functions-core"]` only), delete `materialize-api-externals.mjs`, lazy-init `initializeAppInsights()`. All redaction work preserved.
+
+**Integration conditions:**
+- **Zapp conditions (C1, C2):** `initializeAppInsights()` first in handlers, `sanitizeError()` before logging
+- **Nibbler conditions (N1–N7):** T1 test inversion, T2+T12 rewrite, handler init assertions, meta.json evidence gates
+
+**Status:** Awaiting implementation PR; refer to `.squad/decisions/inbox/leela-1030-externalization-rollback.md` for full DP spec.
+
+---
+
 ## Learnings
+
+### 2026-04-21 — SWA Production 404 Forensics (Post-PR #1046 incident)
+
+**Task:** Read-only forensic investigation of production API returning 404 on all routes after PR #1046 merged.
+
+**Findings (full report: `.squad/decisions/inbox/bender-swa-runtime-forensics.md`)**
+
+**Smoking gun:** `@aks-kickstart/harness: "*"` sits in `dependencies` (not `devDependencies`) of `packages/web/api/package.json`. The Azure SWA managed Functions service runs a server-side `npm install` (or `npm install --production`) during its ~30-second post-upload processing window — even when the deploy action is configured with `skip_api_build: true` (which only skips Oryx on the *client side*). This server-side npm install attempts to fetch `@aks-kickstart/harness: "*"` from the public npm registry, fails (it's a private workspace-only package), and the resulting broken/empty node_modules destroys the OTel packages that `materialize-api-externals.mjs` had copied into the zip. Static ESM top-level imports in `dist/functions/*.js` (`@azure/monitor-opentelemetry`, `@opentelemetry/sdk-trace-base`, etc.) then throw `ERR_MODULE_NOT_FOUND` on worker startup → worker crash → no `app.http()` registrations → 404 on every route.
+
+**Key evidence chain:**
+1. CI run 24755110357: materialize ran, copied 152 packages, verify passed, upload succeeded — but health check fails 404 at attempt 1 (within 30s of upload completing).
+2. `request-context: appId=cid-v1:...` header on 404 responses confirms the Functions HOST is up but the WORKER has no registered routes — consistent with worker crash.
+3. Historical commits in `swa-pkg-fix` branch (`68e5f875`, Ahmed, Apr 18): "Oryx runs 'npm install --production' in packages/web/api/ during SWA deploy and tries to fetch @kickstart/harness from the public registry, which 404s because it's a private workspace package." Multiple worktrees (`swa-pkg-fix`, `swa-clean-deps`, `swa-skip-api`) all addressed this same root cause but were never merged to main before the OTel externalization PR (#1034) reintroduced harness in `dependencies`.
+4. Current `packages/web/api/package.json` has `@aks-kickstart/harness: "*"` in `dependencies` — not `devDependencies`.
+5. Harness is fully bundled inline by esbuild (harnessResolver plugin + workspace resolution) — it is NOT needed in node_modules at runtime.
+6. Works locally because `func start` uses npm workspace resolution to find harness in `packages/harness/` — no npm install from registry needed.
+
+**Lesson:** `skip_api_build: true` only disables client-side Oryx. Azure SWA *service* performs its own server-side dependency resolution using the api directory's `package.json`. Any `dependencies` entry that can't be resolved from public npm poisons the entire node_modules install and causes worker startup failure.
+
+**Fix direction (to be owned by Leela/DP):** Remove `@aks-kickstart/harness: "*"` from `dependencies` (move to `devDependencies` or remove entirely — it's a build-time dep). With harness out of production deps, server-side npm install succeeds and installs OTel packages properly, making `materialize-api-externals.mjs` redundant.
 
 ### 2026-04-21 — Issue #1027 diagnosis + issue reframing
 
@@ -285,3 +325,14 @@ for any class whose instances I'm cloning or spreading. If there's anything on t
 ## 1030 observability pipeline repair (PR #1034)
 
 Landed the full approved DP + Amendments 1/2/3 for issue #1030 on top of PR #1033 (narrower AppInsights fix that had merged first). Rewrote `packages/web/api/src/lib/appinsights.ts` on pure `@azure/monitor-opentelemetry`, added Proxy-based `RedactingSpanExporter` + `RedactingLogRecordProcessor`, externalized OTel/AppInsights via esbuild with a post-build verify + materialize script pair, banned classic `applicationinsights` imports via ESLint, dropped the cached tracer in `OtelBridgeTraceProcessor`, migrated every handler call-site, and landed the T1–T12 binding test matrix. Lint 0 errors, 1119/1119 tests pass, build green. PR: https://github.com/sabbour/kickstart/pull/1034
+
+## 2026-04-21 — PR #1046: CI OTel check for @opentelemetry/api (issue #1041)
+
+**Task:** Leela's conditional on PR #1046 flagged that the "Verify OTel externals present" CI step only checked `@azure/monitor-opentelemetry`, missing `@opentelemetry/api` (per DP Amendment #1 / B3).
+
+**What I did:**
+- Added a second `test -d` assertion in `.github/workflows/deploy-swa.yml` for `@opentelemetry/api`.
+- Verified locally: `@opentelemetry/api` was already in `TOP[]` in `materialize-api-externals.mjs` — postbuild correctly materializes it. No materialize script changes needed.
+- Committed `0eb44a7f`, pushed via lead token, replied to Leela's review comment.
+
+**Lesson reinforced:** walkDeps skips `peerDependencies` by design — peer deps must be in `TOP[]` explicitly. `@opentelemetry/api` already was, but CI wasn't asserting it. Always assert CI guards for every entry in TOP[].

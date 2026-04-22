@@ -1,3 +1,14 @@
+## Summary (Rolled Up 2026-04-21)
+
+This agent's history file exceeded 15360 bytes. A summary will be written here.
+For full learnings, refer to the git history or archived history files.
+
+**Agent:** history.md  
+**File rolled at:** 2026-04-21T21:36:58.304717Z  
+**Remaining details:** See `.squad/agents/history.md/history-archive.md` for prior entries.
+
+---
+
 # Fry — Frontend Dev
 
 ## About Me

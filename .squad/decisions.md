@@ -1,3 +1,327 @@
+# Forensic Report: SWA Production API 404 — Root Cause Identified
+
+**Date:** 2026-04-21
+**Author:** Bender (read-only investigation, no code changes)
+**Requested by:** Ahmed
+**Context:** Production API (`https://proud-mud-0660b8110.6.azurestaticapps.net/api/*`) returning 404 empty body on all routes. PR #1046 merged but did not fix. Leela's zip timing evidence falsified the `.funcignore` theory: node_modules IS in the deploy zip. Root cause is post-upload, in the deployed runtime.
+
+---
+
+## Forensic Verdict
+
+**Smoking gun:** `@aks-kickstart/harness: "*"` is listed in `dependencies` (not `devDependencies`) of `packages/web/api/package.json`. The Azure SWA managed Functions service runs a server-side `npm install` during its ~30-second post-upload processing window, even when `skip_api_build: true` is set in the deploy action. This server-side npm install attempts to resolve `@aks-kickstart/harness: "*"` from the public npm registry, fails (it's a private workspace-only package — not published), and the resulting broken/empty node_modules overwrites the OTel packages that `materialize-api-externals.mjs` had carefully copied into the zip. Static ESM top-level imports in `dist/functions/*.js` (e.g., `@azure/monitor-opentelemetry`, `@opentelemetry/sdk-trace-base`) then throw `ERR_MODULE_NOT_FOUND` on Functions worker startup → worker crashes before calling any `app.http()` → no routes registered → 404 empty body on every API endpoint.
+
+**Evidence chain:**
+
+1. **CI run 24755110357 (PR #1046 deploy) — timeline is exact:**
+   - `materialize-api-externals.mjs` copied 152 packages into `packages/web/api/node_modules/` ✅
+   - "Verify API dist" CI step confirmed `@azure/monitor-opentelemetry` and `@opentelemetry/api` directories present ✅
+   - SWA action: "Skipping step to build .../packages/web/api with Oryx" — client-side Oryx skipped ✅
+   - "Zipping Api Artifacts" (5.5 seconds), "Done Zipping", "Uploading", "Finished Upload" — zip and upload completed ✅
+   - "Polling on deployment" — **~30 seconds of Azure SWA service post-processing**
+   - Health check attempt 1: `HTTP 404 Not Found; body=(empty)` — **immediate failure the moment the deployment is marked "ready"**
+   - All 8 health check attempts fail identically.
+
+2. **HTTP response headers from production confirm the request reaches the Functions HOST but the WORKER has no routes:**
+   ```
+   HTTP/2 404
+   content-length: 0
+   request-context: appId=cid-v1:4f4f6258-c704-49e2-a8b7-e69b7faed7fb
+   x-ms-middleware-request-id: 80814541-b506-4f82-80b1-30c7385352e2
+   ```
+   `request-context` is added by the Azure Functions HOST infrastructure. An empty 404 with no `content-type` is the exact signature of a Functions host with **zero registered routes** — consistent with the worker process crashing on startup before any `app.http()` call.
+
+3. **Historical commits confirm this exact mechanism was identified before — but never merged to main:**
+   - `swa-pkg-fix/68e5f875` (Ahmed, 2026-04-18, PR #814): _"Oryx runs 'npm install --production' in packages/web/api/ during SWA deploy and tries to fetch @kickstart/harness from the public registry, which 404s because it's a private workspace package. esbuild bundles every dep into dist/functions/ except the externals, so anything bundled is build-time only. Move @kickstart/harness and the other inlined deps to devDependencies so Oryx no longer attempts to install them at deploy time."_
+   - `swa-clean-deps/887913e3`: "fix(api): remove workspace and frontend deps from API package.json"
+   - `swa-clean-deps/42e60e88`: "fix(api): add .npmrc to disable workspace resolution during Oryx deploy"
+   - `swa-skip-api` branch contains the same `68e5f875` commit.
+   - **None of these fixes landed on main before PR #1034 reintroduced `@aks-kickstart/harness: "*"` in `dependencies`.**
+
+4. **PR #1034 (`17b2fbd9`) is the exact commit that reintroduced the break:**
+   - Added `@aks-kickstart/harness: "*"`, `@azure/monitor-opentelemetry`, and other OTel packages to `dependencies` in `packages/web/api/package.json`.
+   - The previous successful deploy (run 24747498963, commit `60f6420b`) did not externalize OTel — it bundled everything inline. No external runtime deps → no npm install failure → worked.
+
+5. **`skip_api_build: true` does NOT prevent server-side npm install:**
+   - This flag only disables client-side Oryx build in the `Azure/static-web-apps-deploy@v1` action.
+   - The Azure SWA *service* performs its own dependency resolution server-side using the `package.json` found in the uploaded API artifact. This is a platform-level behavior, not controlled by the deploy action flag.
+   - The ~30-second "Polling on deployment" window is where this server-side processing occurs.
+
+6. **`@aks-kickstart/harness: "*"` is a build-time dep, NOT a runtime dep:**
+   - esbuild's `harnessResolver` plugin (and npm workspace symlink resolution) bundles harness inline at build time into every `dist/functions/*.js` bundle.
+   - Harness is NOT in the esbuild `external` list.
+   - Harness is NOT needed in `node_modules` at runtime.
+   - Its presence in `dependencies` serves no runtime purpose and is the direct trigger of the server-side npm install failure.
+
+**Deployed state anomaly:** The deployed SWA managed Functions runtime has its `node_modules` overwritten by a failed server-side `npm install` that could not resolve `@aks-kickstart/harness: "*"`. The carefully materialized OTel packages from `materialize-api-externals.mjs` are gone. Static ESM imports in function bundles fail → worker never starts → 404.
+
+**Why it works locally:** `func start` in the local workspace runs against the npm workspace tree. `@aks-kickstart/harness: "*"` resolves to the local `packages/harness/` directory via npm workspace symlinks — no registry fetch needed. OTel packages live in root `node_modules/` and are found by Node.js ESM resolution traversing up the directory tree. Zero server-side npm install involved.
+
+**Recommended fix (technical direction — no DP yet):**
+
+**Remove `@aks-kickstart/harness: "*"` from `dependencies` in `packages/web/api/package.json`.** Move it to `devDependencies` (or remove it entirely — it is a build-time-only dep). This is the exact fix that `swa-pkg-fix/68e5f875` made in April 2026.
+
+With harness out of production `dependencies`:
+- Server-side npm install succeeds (all remaining `dependencies` are public npm packages).
+- OTel packages (`@azure/monitor-opentelemetry`, etc.) get properly installed server-side.
+- `materialize-api-externals.mjs` and the "Verify OTel externals" CI step become redundant and can be removed.
+- The `esbuild.config.mjs` `external` list for OTel packages may also be reconsidered — if server-side npm install handles them, they don't need to be external (though keeping them external and server-installed is also fine).
+
+**Alternative approach (also valid):** Change `api_location` to `packages/web/api/dist` with a minimal `package.json` (only public npm packages, no harness) — per `swa-pkg-fix/e3d18a5c`. More surgical but requires a generated package.json in the dist dir.
+
+**What NOT to do:** Do not attempt to fix this with `.funcignore`, materialize scripts, or additional CI verification steps — these address symptoms (client-side zip contents) while the root cause is server-side behavior on the Azure SWA platform.
+
+**Next action owner:** Leela (DP required — this touches api/package.json dependency structure + esbuild external list + CI scripts). Bender implements once DP is approved.
+
+---
+
+## Supporting Artifacts
+
+- **SWA resource:** `kickstart-web-dev` (resource group: `rg-kickstart-dev`)
+- **Failed CI run:** [24755110357](https://github.com/sabbour/kickstart/actions/runs/24755110357)
+- **Last successful CI run:** [24747498963](https://github.com/sabbour/kickstart/actions/runs/24747498963) (commit `60f6420b` — before OTel externalization)
+- **First failing CI run:** 24750809088 (commit `17b2fbd9` — introduced OTel externalization + harness in `dependencies`)
+- **Historical fix (never merged):** `swa-pkg-fix/68e5f875` (Ahmad, Apr 18 2026)
+- **Leela's parallel analysis:** `.squad/decisions/inbox/leela-swa-node-modules-deploy-architecture.md`
+
+
+---
+
+# Decision: Revert #1030 OTel Externalization — Bundle-Everything Strategy
+
+**Date:** 2026-04-21
+**Author:** Leela (Lead/Architect)
+**Status:** Proposed (pending implementation via DP on #1041)
+**Supersedes:** The externalization approach introduced in PR #1030/#1034
+
+---
+
+## Context
+
+PR #1030 (merged as #1034, commit `17b2fbd9`) externalized 10 OTel/AppInsights packages from esbuild bundles to "share module identity" across per-function bundles. This introduced two stacking regressions that broke all `/api/*` routes in production (404, empty body).
+
+The last green deploy was commit `60f6420b` which bundled everything except `@azure/functions-core`.
+
+DP #1046 Option B (`.funcignore`) was already attempted and disproved — merged with zero impact.
+
+---
+
+## Decision
+
+**Revert to bundle-everything.** Only `@azure/functions-core` should be external. OTel/AppInsights packages are bundled inline into each function bundle by esbuild.
+
+### Rationale
+
+1. **The externalization premise was wrong.** `@opentelemetry/api` uses `globalThis[Symbol.for('opentelemetry.js.api.1')]` for its provider registry — a process-global singleton via `Symbol.for()`. Multiple bundled copies of the package in the same worker process all write to and read from the same `globalThis` slot. There is no "provider wipeout from multiple copies."
+
+2. **The transitive closure problem is unsolvable in our deploy model.** The `materialize-api-externals.mjs` script only walked `dependencies` and `optionalDependencies`, missing `peerDependencies`. `@azure/monitor-opentelemetry` lists most `@opentelemetry/*` packages as peer deps. Producing a correct and complete `node_modules/` for the SWA deploy zip is fragile and error-prone.
+
+3. **Module-load side effects compound the risk.** The IIFE at the bottom of `appinsights.ts` was changed from conditional to unconditional, meaning any missing dep or init failure kills function registration entirely.
+
+4. **SWA's server-side `npm install` makes `node_modules/` fundamentally unreliable at deploy time.** Bender-15 forensics confirmed that `skip_api_build: true` only disables client-side Oryx — the Azure SWA service runs its own `npm install --production` during the ~30s post-upload processing window. This overwrites/wipes any `node_modules/` materialized client-side. Before #1030, bundles were self-contained and indifferent to `node_modules/` state; after #1030, they critically depend on it. Ahmed's unmerged `swa-pkg-fix` branch (`68e5f875`, Apr 18) documented this exact mechanism. Evidence: CI run 24755110357 404s on attempt 1 within the server-side window; `request-context: appId=cid-v1:...` header on 404s proves the Functions HOST is up but the WORKER has zero registered routes (worker-crash signature). Bundling immunizes us from this entire class of failure.
+
+4. **Bundle-everything was proven green.** Commit `60f6420b` deployed successfully with `external: ["@azure/functions-core"]` only. Preview environments from April 10–14 still serve 200.
+
+---
+
+## What Changes
+
+| File | Action |
+|------|--------|
+| `packages/web/api/esbuild.config.mjs` | Restore `external: ["@azure/functions-core"]` only |
+| `packages/web/api/scripts/materialize-api-externals.mjs` | Delete |
+| `packages/web/api/package.json` | Remove `postbuild` hook |
+| `packages/web/api/src/lib/appinsights.ts` | Remove bottom IIFE; init becomes handler-level lazy |
+| `packages/web/api/scripts/verify-api-externals.mjs` | Keep; update assertions to "only functions-core external" |
+
+### What Does NOT Change
+
+All of #1030's non-externalization work is kept:
+- RedactingSpanExporter + RedactingLogRecordProcessor
+- Pure-OTel trackException/trackTrace/trackEvent rewrites
+- Handler migrations, host.json sampling, T2–T12 tests
+
+---
+
+## Consequences
+
+- **Bundle size:** ~3 MB larger per function. Acceptable; 5.5s zip time has headroom.
+- **`materialize-api-externals.mjs` deleted:** No more postbuild dep materialization step.
+- **T1 test inverted:** Now asserts "no OTel packages in externals" instead of "these packages must be external."
+- **OTel singleton pattern documented:** `globalThis` + `Symbol.for()` is the canonical mechanism. Future attempts to externalize for "module identity" should reference this decision.
+- **Immune to SWA server-side `npm install`:** Self-contained bundles are indifferent to `node_modules/` mutations during the platform's post-upload processing window. This eliminates a latent deploy-infra hazard documented on unmerged `swa-pkg-fix` branch (`68e5f875`).
+
+---
+
+## References
+
+- Issue: #1041
+- Breaking commit: `17b2fbd9` (PR #1030/#1034)
+- Last green commit: `60f6420b`
+- Disproved fix: DP #1046 Option B (`.funcignore`)
+- OTel API source: `globalThis[Symbol.for('opentelemetry.js.api.1')]` singleton pattern
+- SWA server-side install evidence: CI run 24755110357, Bender-15 forensics
+- Historical fix (never merged): `swa-pkg-fix/68e5f875` (Ahmed, Apr 18 2026)
+
+
+---
+
+# Decision: Zapp DP Security Review — #1041 Revert OTel Externalization
+
+**Date:** 2026-04-21
+**Author:** Zapp (Security Architect)
+**Status:** APPROVED WITH CONDITIONS
+**DP Author:** Leela (Lead/Architect)
+
+---
+
+## Context
+
+Issue #1041: Production 404 on all `/api/*` routes caused by PR #1030's OTel externalization and eager module-load IIFE. Leela's DP proposes a revert-shaped fix: restore bundle-everything in esbuild, delete `materialize-api-externals.mjs`, and change `initializeAppInsights()` from eager (module-load IIFE) to lazy (handler-level first-request call). All #1030 redaction work (RedactingSpanExporter, RedactingLogRecordProcessor, pure-OTel telemetry rewrites) is preserved.
+
+---
+
+## Security Assessment
+
+### Reviewed
+
+1. **Redaction pipeline integrity:** ✅ No pre-init telemetry egress window. OTel API defaults to no-op providers before `initializeAppInsights()` runs — no exporter exists, so no telemetry can egress unredacted.
+
+2. **globalThis singleton guard:** ✅ `Symbol.for('kickstart.azmon.started')` check→call→set path is fully synchronous (no `await`). JS single-threaded event loop prevents interleaving. No double-init, no duplicate processors.
+
+3. **Connection-string handling:** ✅ `APPLICATIONINSIGHTS_CONNECTION_STRING` is never logged or echoed. Missing-env path logs variable name only. Init-failure path applies `sanitizeError()` before logging.
+
+4. **Supply-chain surface:** ✅ Bundling eliminates 152 runtime-resolvable packages from deploy artifact. Strict reduction in attack surface.
+
+5. **Bundle information leak:** ✅ Only public npm packages bundled. No dev/test/internal code paths enter production bundles.
+
+6. **Redactor wiring preservation:** ✅ Lazy init changes timing only. `RedactingSpanExporter` and `RedactingLogRecordProcessor` remain wired into `useAzureMonitor()` config.
+
+### Conditions
+
+- **C1:** `initializeAppInsights()` must be the first statement in each handler function body — before any business logic or outbound HTTP calls.
+- **C2:** The `catch` block in `initializeAppInsights()` must continue to use `sanitizeError(err)` before any logging. No raw error logging.
+
+---
+
+## References
+
+- Issue: #1041
+- DP: Issue comments 4293471896 + 4293479586
+- Review comment: 4293498069
+- Label applied: `zapp:approved-dp`
+- Current appinsights.ts: `packages/web/api/src/lib/appinsights.ts`
+- Redaction: `packages/web/api/src/lib/redacting-span-exporter.ts`, `redacting-log-processor.ts`, `redact-attrs.ts`
+
+
+---
+
+# Nibbler DP Review: Issue #1041 — OTel Externalization Revert
+
+**Date:** 2026-04-21
+**Author:** Nibbler (Code Reviewer & Watchdog)
+**Status:** APPROVED WITH CONDITIONS
+**DP Author:** Leela (Lead/Architect), comment #4293471896 on issue #1041
+**Label applied:** `nibbler:approved-dp`
+
+---
+
+## Summary
+
+Leela-19 DP proposes reverting #1030's OTel externalization (restore `external: ["@azure/functions-core"]` only) and making `initializeAppInsights()` lazy (remove module-load IIFE from `appinsights.ts`). Architecture is sound. Conditions below must be resolved in the implementation PR.
+
+---
+
+## Conditions for Implementation (Bender)
+
+### 1. T1 Test Inversion — Both Sub-Cases Must Be Updated
+
+`.squad/scripts/verify-api-externals.test.mjs` contains a `describe("T1 — externals-not-inlined")` block with **two** test cases:
+
+- **Test case 1** (`"no required-external package source leaked into dist/meta.json inputs"`): asserts `expect(leaked).toEqual([])` where `leaked` = OTel packages in `meta.inputs`. After bundling OTel inline, these files WILL be in inputs → **test fails**. Must be flipped: assert OTel packages **are** present in inputs (i.e., bundled).
+- **Test case 2** (`"every bundle import matching a required-external package is marked external: true"`): after bundling, OTel won't appear in `imports` at all → passes vacuously. Must be replaced with positive assertion: "no OTel package is external" + "only `@azure/functions-core` is external."
+
+The DP's T1 specification covers only one of these two cases.
+
+### 2. Build Guard Script Must Also Be Updated
+
+`packages/web/api/scripts/verify-api-externals.mjs` (the build-time `postbuild` guard) has the same inversion requirement as the test:
+- Lines 41–49: calls `fail()` if any OTel package appears in `meta.inputs`. After bundling, this **crashes the build**. This check must be removed or inverted.
+- The `require.resolve()` block (lines 68–82) verifying OTel packages resolve from the API root is also now meaningless (they're bundled, not runtime deps) and should be removed.
+- New assertion: verify only `@azure/functions-core` appears as external in any bundle's imports.
+
+The DP mentions "keep and update" this script but does not specify these particular changes.
+
+### 3. T2 Must Be Rewritten
+
+`packages/web/api/src/lib/appinsights.test.ts` T2 (lines 56–63):
+```ts
+const mod = await import("./appinsights.js");
+// module-load side effect = 1 call
+expect(useAzureMonitorMock).toHaveBeenCalledTimes(1);  // ← FAILS after IIFE removal
+```
+After IIFE removal, module import does not call `useAzureMonitor`. Must be rewritten:
+1. Import module → assert useAzureMonitor NOT called (negative lazy-init test)
+2. Call `mod.initializeAppInsights()` explicitly → assert called exactly once
+3. Call again → assert still called once (idempotency)
+
+### 4. T12 Must Be Rewritten
+
+`appinsights.test.ts` T12 (lines 192–201): mocks `useAzureMonitor` to throw, then imports module and asserts `consoleSpy.toHaveBeenCalledWith("[AppInsights] Azure Monitor init failed: ...")`. After IIFE removal, import doesn't call `useAzureMonitor` → console.error never called → **assertion fails**. Must be rewritten to call `mod.initializeAppInsights()` explicitly after import.
+
+### 5. Handler Source Files Must Add initializeAppInsights() Call
+
+`health.ts`, `converse.ts`, `packs.ts`, `startup/packs.ts` currently do NOT call `initializeAppInsights()`. After IIFE removal, telemetry will never initialize unless handlers call it. Each must add a try/catch-wrapped `initializeAppInsights()` call on first invocation. Handler test mocks already include `initializeAppInsights: vi.fn()` (pre-wired).
+
+### 6. Handler Tests Must Add initializeAppInsights Assertion
+
+After handler source changes add the explicit `initializeAppInsights()` call, `health.test.ts`, `packs.test.ts`, `startup/packs.test.ts` must add assertions that `initializeAppInsights` was called (the mock is already there, the assertions are not).
+
+### 7. Evidence Gate — Meta.json Analysis Required
+
+The DP's evidence requirement (`grep -c "useAzureMonitor" dist/functions/*.js`) is a weak signal. Require meta.json-based proof in the PR body:
+
+```bash
+# Confirm OTel is bundled (in inputs):
+node -e "const m = JSON.parse(require('fs').readFileSync('packages/web/api/dist/meta.json','utf8')); const n = Object.keys(m.inputs).filter(k=>k.includes('@opentelemetry/api/')).length; console.log('OTel API bundled files:', n); if(!n) process.exit(1);"
+
+# Confirm only @azure/functions-core is external:
+node -e "const m = JSON.parse(require('fs').readFileSync('packages/web/api/dist/meta.json','utf8')); const ext=new Set(); for(const [,o] of Object.entries(m.outputs??{})) for(const i of (o.imports??[])) if(i.external) ext.add(i.path); console.log('Externals:',[...ext]); const bad=[...ext].filter(p=>p!=='@azure/functions-core'); if(bad.length){console.error('Bad externals:',bad);process.exit(1);}"
+```
+
+---
+
+## All-Clear Items
+
+| Item | Status | Notes |
+|------|--------|-------|
+| T1 inversion goal correct | ✅ | Specification incomplete (two sub-cases, build script) |
+| T2–T12 impact mapped | ⚠️ | T2 and T12 will fail; DP doesn't call this out |
+| Lazy-init test coverage | ⚠️ | Handler init assertions missing; New-1/New-3 tests needed |
+| Smoke check sufficiency | ✅ | `/api/health` 200+body catches worker-crash failure mode |
+| Evidence gate sufficiency | ⚠️ | Grep check too weak; meta.json analysis required |
+| Architecture soundness | ✅ | globalThis singleton rationale correct; bundle-everything + lazy init is proven-green pattern |
+| Redaction / OTel tracking preserved | ✅ | Not implicated in changes |
+| Test file location hazards | ✅ | No orphaned tests; T1 in .squad/scripts/, T2-T12 in lib/ — no moves planned |
+
+---
+
+## References
+
+- Issue: #1041
+- DP comment: #4293471896 (Leela-19)
+- Decision file: `.squad/decisions/inbox/leela-1030-externalization-rollback.md`
+- Forensics: `.squad/decisions/inbox/bender-swa-runtime-forensics.md`
+- T1 test: `.squad/scripts/verify-api-externals.test.mjs`
+- T1 build guard: `packages/web/api/scripts/verify-api-externals.mjs`
+- T2-T12 test: `packages/web/api/src/lib/appinsights.test.ts`
+- Smoke check: `scripts/check-swa-health.mjs`
+
+
+---
+
+---
+
 ### 2026-04-21T02:59:40Z: User directive — Docs updates are a gated ceremony obligation
 **By:** Ahmed (via Copilot)
 **What:** Every PR that changes user-facing behavior, APIs, pack surface, ceremonies, skills, or process MUST land with synchronized doc updates. This is enforced at two points: (1) Design Proposal ceremony — the DP must name the doc pages/sections affected and the update plan, (2) PR Review Gate — a new `docs:approved` / `docs:rejected` label (owned by McManus or designated docs reviewer) blocks merge when docs are missing or stale. No PR that touches public-facing behavior merges without explicit docs sign-off. "Docs N/A" is a valid verdict for purely internal changes but must be explicit — not default.
