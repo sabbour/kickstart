@@ -96,6 +96,11 @@ jobs:
           SWA_HEALTHCHECK_URL: ${{ steps.production_url.outputs.base_url }}/api/health
         run: node scripts/check-swa-health.mjs
 
+      - name: Smoke check live API packs registry
+        env:
+          SWA_HEALTHCHECK_URL: ${{ steps.production_url.outputs.base_url }}/api/packs
+        run: node scripts/check-swa-health.mjs
+
   preview:
     name: Deploy PR preview to Azure Static Web Apps
     if: >-
@@ -154,6 +159,13 @@ jobs:
       - name: Smoke check preview API health
         env:
           SWA_HEALTHCHECK_URL: ${{ steps.preview_url.outputs.base_url }}/api/health
+          SWA_HEALTHCHECK_ATTEMPTS: "4"
+          SWA_HEALTHCHECK_DELAY_MS: "10000"
+        run: node scripts/check-swa-health.mjs
+
+      - name: Smoke check preview API packs registry
+        env:
+          SWA_HEALTHCHECK_URL: ${{ steps.preview_url.outputs.base_url }}/api/packs
           SWA_HEALTHCHECK_ATTEMPTS: "4"
           SWA_HEALTHCHECK_DELAY_MS: "10000"
         run: node scripts/check-swa-health.mjs

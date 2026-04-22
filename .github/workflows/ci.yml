@@ -2,6 +2,9 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -11,6 +14,7 @@ jobs:
   classify-trusted-retro-log-pr:
     name: Classify trusted retro-log PR
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
     outputs:
       trusted_retro_log_pr: ${{ steps.classify.outputs.trusted_retro_log_pr }}
     steps:
@@ -83,6 +87,7 @@ jobs:
 
       - name: Detect docs-gate scope
         id: docs_gate
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v8
         with:
           script: |
@@ -131,7 +136,9 @@ jobs:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
     needs: [classify-trusted-retro-log-pr]
-    if: needs.classify-trusted-retro-log-pr.outputs.trusted_retro_log_pr != 'true'
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.classify-trusted-retro-log-pr.outputs.trusted_retro_log_pr != 'true'
 
     steps:
       - name: Checkout code
@@ -171,7 +178,7 @@ jobs:
           lint_build_result="${{ needs.lint-build.result }}"
           e2e_result="${{ needs.e2e.result }}"
 
-          if [[ "$classify_result" != "success" || ! "$lint_build_result" =~ ^(success|skipped)$ || ! "$e2e_result" =~ ^(success|skipped)$ ]]; then
+          if [[ ! "$classify_result" =~ ^(success|skipped)$ || ! "$lint_build_result" =~ ^(success|skipped)$ || ! "$e2e_result" =~ ^(success|skipped)$ ]]; then
             echo "CI failed: classify=${classify_result}, lint-build=${lint_build_result}, e2e=${e2e_result}"
             exit 1
           fi
