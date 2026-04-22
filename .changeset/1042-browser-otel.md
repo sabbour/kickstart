@@ -43,19 +43,18 @@ workspace under one trace id.
   `@microsoft/applicationinsights-web` is explicitly disqualified (would
   require `unsafe-inline`).
 - Any init failure is swallowed so telemetry can never break app boot.
-- CSP hardening: pack client renderers statically pull `zod` into the boot
-  bundle. Root `@openai/agents` requires `zod@^4`, but web + pack-core were
-  already pinned to `zod@^3`; with packs declaring `^4`, three different
-  Zod instances coexisted and web's boot chunk ended up executing v4's
-  `allowsEval` probe (`new Function("")`), violating `script-src 'self'`.
-  Fixed at the source by aligning `pack-azure`, `pack-aks-automatic`, and
-  `pack-github` down to `zod@^3.25.76` — matching `web` and `pack-core`.
-  An audit (see PR #1088) confirmed pack schemas use only v3-compatible
-  APIs, so no schema edits were required. `harness` stays on `zod@^4`
-  (server-only; required by `@openai/agents`) but never reaches the web
-  bundle. No library swap, no version bump in web, no CSP relaxation, no
-  `'unsafe-eval'`. `registerPackComponents` is still dynamically imported
-  from `main.tsx` as a boot-chunk hygiene win.
+- CSP hardening: Zod v4 ships an `allowsEval` probe (`new Function("")`)
+  that fires when the first v4 `z.object` schema is constructed. It reaches
+  the web bundle transitively via `openai` + `zod-to-json-schema` (both
+  hoisted to the monorepo root, where `zod@4` lives), not via workspace
+  pack imports. Fixed without a library swap, version bump, or CSP
+  relaxation: `src/lib/configure-zod.ts` calls Zod v4's documented
+  `config({ jitless: true })` as the first import in `main.tsx`, and
+  `vite.config.ts` aliases `zod/v4` to the root `node_modules/zod/v4`
+  install so the mutation targets the exact `globalConfig` singleton the
+  bundled v4 code reads. `registerPackComponents` is also dynamic-imported
+  from `main.tsx` as an orthogonal boot-chunk hygiene win. No
+  `'unsafe-eval'`, no schema edits, no pack/harness dependency changes.
 
 ### Kill switch
 

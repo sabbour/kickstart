@@ -1,3 +1,8 @@
+// MUST be the first import: disables Zod v4's JIT (`new Function`) path
+// before any v4 schema is constructed anywhere in the web bundle. See
+// `src/lib/configure-zod.ts` for why this file imports zod/v4 via a
+// vite alias that pins to the root zod instance.
+import './lib/configure-zod';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';

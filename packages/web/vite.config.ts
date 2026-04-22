@@ -126,6 +126,14 @@ export default defineConfig({
       '@aks-kickstart/pack-azure/client': resolve(__dirname, '../pack-azure/src/client.ts'),
       '@aks-kickstart/pack-aks-automatic/client': resolve(__dirname, '../pack-aks-automatic/src/client.ts'),
       '@aks-kickstart/pack-github/client': resolve(__dirname, '../pack-github/src/client.ts'),
+      // Force `zod/v4` to resolve to the monorepo-root `zod` install (the v4
+      // instance that `openai` + `zod-to-json-schema` — hoisted to root —
+      // actually bundle). `configure-zod.ts` mutates its `globalConfig` to set
+      // `jitless: true` so Zod v4's `allowsEval` probe (`new Function`) never
+      // fires under `script-src 'self'`. Without this alias, web-local
+      // `packages/web/node_modules/zod`'s v4 subpath is a separate module
+      // instance and the mutation has no effect on the bundled code. #1042.
+      'zod/v4': resolve(__dirname, '../../node_modules/zod/v4/index.js'),
       react: resolve(__dirname, 'node_modules/react'),
       'react-dom': resolve(__dirname, 'node_modules/react-dom'),
     },
