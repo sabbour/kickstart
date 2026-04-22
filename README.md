@@ -10,13 +10,13 @@ Kickstart helps developers go from "I have an app" to "it's running on Azure" th
 
 ## Features
 
-- **Harness + packs architecture** — domain-agnostic runtime (`@kickstart/harness`) + domain packs (`pack-core`, `pack-azure`, `pack-aks-automatic`, `pack-github`)
+- **Harness + packs architecture** — domain-agnostic runtime (`@aks-kickstart/harness`) + domain packs (`pack-core`, `pack-azure`, `pack-aks-automatic`, `pack-github`)
 - **A2UI component system** — Fluent UI 2 styled components rendered from structured JSON emitted by agents via `core.emit_ui`
 - **Component playground** — Interactive demo surface for exploring A2UI components, scenarios, and questionnaire flows
 - **Azure and GitHub integration** — Login cards, resource pickers, and action buttons with real API integration via UserAction pause/resume
 - **`@openai/agents` SDK** — Agents call tools; UserActions pause the runner for browser-side interactions (MSAL popup, GitHub OAuth, etc.)
 - **Guardrails engine** — Cross-cutting checks at input, tool-call, and output stages contributed by packs
-- **MCP server** — IDE integration for VS Code Copilot and Claude Code via `@kickstart/mcp-server`
+- **MCP server** — IDE integration for VS Code Copilot and Claude Code via `@aks-kickstart/mcp-server`
 - **Monorepo** — `packages/harness` (runtime), `packages/pack-*` (domain packs), `packages/web` (React 19 + Vite 6), `packages/mcp-server`
 
 ## Two Surfaces, One Harness
@@ -26,7 +26,7 @@ Kickstart helps developers go from "I have an app" to "it's running on Azure" th
 | **Web Portal** | Azure Static Web Apps with a Copilot-style chat panel | Azure OpenAI (hosted) |
 | **IDE (MCP)** | MCP server for VS Code and Claude Code | User's own LLM |
 
-Both surfaces use `@kickstart/harness` — the pack registry, Runner, SSE adapter, and session management.
+Both surfaces use `@aks-kickstart/harness` — the pack registry, Runner, SSE adapter, and session management.
 
 ## Quick Start
 
@@ -89,15 +89,19 @@ Open the A2UI playground at [**/?playground**](https://kickstart.aks.azure.sabbo
 
 ```
 packages/
-  core/           Conversation engine, prompts, generators
-  web/            React frontend + Azure Functions API
-    src/           React app (components, hooks, services, A2UI catalog)
-    api/           Azure Functions API
-    css/           Stylesheets (Fluent 2 theme, A2UI overrides)
-    public/        Static assets (icons, favicon)
-  mcp-server/     MCP server for IDE integration
-infra/            Bicep templates
-docs-site/        Docusaurus documentation site
+  harness/              @aks-kickstart/harness — runtime engine (sessions, Runner, SSE, MCP adapter)
+  pack-core/            @aks-kickstart/pack-core — base agents, skills, tools, components, guardrails
+  pack-azure/           @aks-kickstart/pack-azure — Azure agents, tools, user actions
+  pack-aks-automatic/   @aks-kickstart/pack-aks-automatic — AKS Automatic deployment pack
+  pack-github/          @aks-kickstart/pack-github — GitHub agents, tools, user actions
+  web/                  @aks-kickstart/web — React SPA + Azure Functions API
+    src/                React app (components, hooks, services, A2UI catalog)
+    api/                Azure Functions API
+    css/                Stylesheets (Fluent 2 theme, A2UI overrides)
+    public/             Static assets (icons, favicon)
+  mcp-server/           @aks-kickstart/mcp-server — MCP adapter for IDE clients
+infra/                  Bicep templates
+docs-site/              Docusaurus documentation site
 ```
 
 ## Documentation

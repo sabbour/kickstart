@@ -215,7 +215,7 @@ describe("myTool", () => {
 ### Step 5 — Build and verify
 
 ```bash
-npm run build -w @kickstart/core
+npm run build -w @aks-kickstart/harness
 ```
 
 Start the dev server and open a conversation. Ask the AI to do something that should trigger your tool. Watch the SSE stream in browser DevTools (Network → `converse` → EventStream) to see `tool_call` and `tool_result` events.

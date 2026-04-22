@@ -137,18 +137,22 @@ E2E tests use their own dev server on port 4281 — they don't conflict with the
 
 ```
 packages/
-├── core/           # TypeScript conversation engine
-├── web/            # React 19 + Vite 6 frontend
-│   ├── api/        # Azure Functions API (TypeScript)
-│   ├── src/        # React app
-│   │   ├── components/   # Chat, FileEditor, Landing
-│   │   ├── hooks/        # useA2UI, useChat
-│   │   ├── services/     # API client, demo scenarios, virtual-fs
-│   │   ├── catalog/      # Custom A2UI components
-│   │   └── vendor/       # Vendored A2UI v0.9
-│   ├── css/        # Stylesheets (Fluent 2, A2UI overrides)
-│   └── public/     # Static assets (copied to dist/)
-└── mcp-server/     # MCP server for IDE integration
+├── harness/            # @aks-kickstart/harness — runtime engine (sessions, Runner, SSE, MCP adapter)
+├── pack-core/          # @aks-kickstart/pack-core — base agents, skills, tools, components, guardrails
+├── pack-azure/         # @aks-kickstart/pack-azure — Azure agents, tools, user actions
+├── pack-aks-automatic/ # @aks-kickstart/pack-aks-automatic — AKS Automatic deployment pack
+├── pack-github/        # @aks-kickstart/pack-github — GitHub agents, tools, user actions
+├── web/                # @aks-kickstart/web — React SPA + Azure Functions API
+│   ├── api/            #   Azure Functions API (TypeScript)
+│   ├── src/            #   React app
+│   │   ├── components/ #     Chat, FileEditor, Landing
+│   │   ├── hooks/      #     useA2UI, useChat
+│   │   ├── services/   #     API client, demo scenarios, virtual-fs
+│   │   ├── catalog/    #     Custom A2UI components (kickstart catalog)
+│   │   └── vendor/     #     Vendored A2UI v0.9
+│   ├── css/            #   Stylesheets (Fluent 2, A2UI overrides)
+│   └── public/         #   Static assets (copied to dist/)
+└── mcp-server/         # @aks-kickstart/mcp-server — MCP adapter for IDE clients
 ```
 
 ## npm Scripts Reference
@@ -158,7 +162,7 @@ packages/
 | `npm run dev` | Full-stack dev server (Vite + SWA CLI in parallel) |
 | `npm run dev:vite` | Vite dev server only (HMR, port 5173) |
 | `npm run build` | Build all packages |
-| `npm run api:build` | Build core + API only |
+| `npm run api:build` | Build harness + API only |
 | `npm test` | Unit/integration tests (vitest) |
 | `npm run test:e2e` | Playwright E2E tests |
 | `npm run test:e2e:ui` | Playwright E2E tests with UI |

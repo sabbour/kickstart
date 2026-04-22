@@ -46,25 +46,25 @@ Kickstart v2 uses a **harness + packs architecture**. The harness is domain-agno
 
 ```
 packages/
-  harness/              @kickstart/harness — runtime engine (Runner, pack registry, session, SSE)
-  pack-core/            @kickstart/pack-core — base agents, skills, tools, components
-  pack-azure/           @kickstart/pack-azure — Azure-specific agents, tools, auth
-  pack-aks-automatic/   @kickstart/pack-aks-automatic — AKS Automatic deployment pack
-  pack-github/          @kickstart/pack-github — GitHub agents, tools, OAuth
-  web/                  @kickstart/web — React 19 frontend + Azure Functions API
-  mcp-server/           @kickstart/mcp-server — MCP adapter for IDE integration
+  harness/              @aks-kickstart/harness — runtime engine (Runner, pack registry, session, SSE)
+  pack-core/            @aks-kickstart/pack-core — base agents, skills, tools, components
+  pack-azure/           @aks-kickstart/pack-azure — Azure-specific agents, tools, auth
+  pack-aks-automatic/   @aks-kickstart/pack-aks-automatic — AKS Automatic deployment pack
+  pack-github/          @aks-kickstart/pack-github — GitHub agents, tools, OAuth
+  web/                  @aks-kickstart/web — React 19 frontend + Azure Functions API
+  mcp-server/           @aks-kickstart/mcp-server — MCP adapter for IDE integration
 infra/                  Azure infrastructure (Bicep templates)
 ```
 
 | Package | Description |
 |---------|-------------|
-| `@kickstart/harness` | Domain-agnostic runtime: Runner, pack registry, session management, SSE streaming, skill resolver, guardrail engine |
-| `@kickstart/pack-core` | Base agents (triage, codesmith, reviewer), core tools (emit_ui, write_file), A2UI catalog, guardrails |
-| `@kickstart/pack-azure` | Azure authentication, ARM API tools, resource pickers, smart components (login, resource picker, cost estimator) |
-| `@kickstart/pack-aks-automatic` | AKS Automatic deployment agents, manifests, cluster configuration |
-| `@kickstart/pack-github` | GitHub authentication, repo/PR tools, smart components (login, repo picker, commit UI) |
-| `@kickstart/web` | React 19 SPA frontend with Fluent UI 2, Azure Functions backend, A2UI renderer, virtual file system |
-| `@kickstart/mcp-server` | MCP (Model Context Protocol) adapter for VS Code Copilot and Claude Code |
+| `@aks-kickstart/harness` | Domain-agnostic runtime: Runner, pack registry, session management, SSE streaming, skill resolver, guardrail engine |
+| `@aks-kickstart/pack-core` | Base agents (triage, codesmith, reviewer), core tools (emit_ui, write_file), A2UI catalog, guardrails |
+| `@aks-kickstart/pack-azure` | Azure authentication, ARM API tools, resource pickers, smart components (login, resource picker, cost estimator) |
+| `@aks-kickstart/pack-aks-automatic` | AKS Automatic deployment agents, manifests, cluster configuration |
+| `@aks-kickstart/pack-github` | GitHub authentication, repo/PR tools, smart components (login, repo picker, commit UI) |
+| `@aks-kickstart/web` | React 19 SPA frontend with Fluent UI 2, Azure Functions backend, A2UI renderer, virtual file system |
+| `@aks-kickstart/mcp-server` | MCP (Model Context Protocol) adapter for VS Code Copilot and Claude Code |
 
 ## Development Workflow
 

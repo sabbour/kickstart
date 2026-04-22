@@ -93,7 +93,7 @@ export async function handleMyTool(
     };
   }
 
-  // 2. Perform logic using @kickstart/core
+  // 2. Perform logic using @aks-kickstart/harness
   const result = await doSomething(session);
 
   // 3. Build A2UI component (optional)
@@ -169,7 +169,7 @@ packages/mcp-server/src/tools/my-tool.ts
 Implement the handler following the standard pattern:
 
 ```typescript
-import type { SessionState } from "@kickstart/core";
+import type { SessionState } from "@aks-kickstart/harness";
 import { createA2UIResource } from "../a2ui.js";
 import type { A2UICapability } from "../a2ui.js";
 
@@ -192,7 +192,7 @@ export async function handleMyTool(
     };
   }
 
-  // Your logic here — use @kickstart/core APIs
+  // Your logic here — use @aks-kickstart/harness APIs
   const summary = `Processed session ${sessionId}`;
 
   return {
@@ -229,7 +229,7 @@ The IDE's LLM reads the tool description to decide when to call it. Be specific 
 If your tool should return structured UI, build A2UI components and wrap them with `createA2UIResource()`:
 
 ```typescript
-import type { CardComponent, TextComponent } from "@kickstart/core";
+import type { CardComponent, TextComponent } from "@aks-kickstart/harness";
 
 const text: TextComponent = {
   type: "Text",
@@ -260,8 +260,8 @@ Add tests in `packages/mcp-server/src/__tests__/`:
 
 ```typescript
 import { handleMyTool } from "../tools/my-tool.js";
-import type { SessionState } from "@kickstart/core";
-import { InMemoryArtifactStore } from "@kickstart/core";
+import type { SessionState } from "@aks-kickstart/harness";
+import { InMemoryArtifactStore } from "@aks-kickstart/harness";
 
 describe("handleMyTool", () => {
   const sessions = new Map<string, SessionState>();
@@ -297,8 +297,8 @@ describe("handleMyTool", () => {
 ### Step 5 — Build and test locally
 
 ```bash
-npm run build -w @kickstart/mcp-server
-npm run test -w @kickstart/mcp-server
+npm run build -w @aks-kickstart/mcp-server
+npm run test -w @aks-kickstart/mcp-server
 ```
 
 ### Step 6 — Configure IDE clients

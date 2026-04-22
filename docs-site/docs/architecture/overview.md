@@ -11,20 +11,20 @@ Kickstart is a **harness + packs** system. The harness is domain-agnostic; packs
 ```
 kickstart/
 ├── packages/
-│   ├── harness/           @kickstart/harness — runtime engine
+│   ├── harness/           @aks-kickstart/harness — runtime engine
 │   │   └── src/
 │   │       ├── runtime/       Runner, session, SSE adapter
 │   │       ├── a2ui/          A2UI v0.9 message types and helpers
 │   │       ├── mcp/           MCP adapter utilities
 │   │       └── types/         Shared Zod schemas (AgentOutput, etc.)
-│   ├── pack-core/         @kickstart/pack-core — base agents, skills, tools, components
-│   ├── pack-azure/        @kickstart/pack-azure — Azure agents, tools, user actions
-│   ├── pack-aks-automatic/ @kickstart/pack-aks-automatic — AKS Automatic deployment pack
-│   ├── pack-github/       @kickstart/pack-github — GitHub agents, tools, user actions
-│   ├── web/               @kickstart/web — React SPA + Azure Functions API
+│   ├── pack-core/         @aks-kickstart/pack-core — base agents, skills, tools, components
+│   ├── pack-azure/        @aks-kickstart/pack-azure — Azure agents, tools, user actions
+│   ├── pack-aks-automatic/ @aks-kickstart/pack-aks-automatic — AKS Automatic deployment pack
+│   ├── pack-github/       @aks-kickstart/pack-github — GitHub agents, tools, user actions
+│   ├── web/               @aks-kickstart/web — React SPA + Azure Functions API
 │   │   ├── api/               Azure Functions (converse, resume, packs manifest)
 │   │   └── src/               React app, A2UI renderer, catalog components
-│   └── mcp-server/        @kickstart/mcp-server — MCP adapter for IDE clients
+│   └── mcp-server/        @aks-kickstart/mcp-server — MCP adapter for IDE clients
 └── infra/                 Bicep templates for Azure provisioning
 ```
 

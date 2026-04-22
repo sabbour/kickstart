@@ -40,8 +40,8 @@ interface Pack {
 ## Registering a Pack
 
 ```typescript
-import { packRegistry } from "@kickstart/harness";
-import { azurePack } from "@kickstart/pack-azure";
+import { packRegistry } from "@aks-kickstart/harness";
+import { azurePack } from "@aks-kickstart/pack-azure";
 
 packRegistry.register(azurePack);
 packRegistry.seal();  // called once at server startup; no new registrations after this

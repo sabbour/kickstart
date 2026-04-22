@@ -538,7 +538,7 @@ if (wantsStream) {
 The API uses esbuild and auto-discovers function files — no manual registration needed:
 
 ```bash
-npm run build -w @kickstart/api
+npm run build -w @aks-kickstart/api
 ```
 
 Start the development server and test your endpoint:

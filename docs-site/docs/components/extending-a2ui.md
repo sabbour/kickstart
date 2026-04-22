@@ -6,6 +6,18 @@ sidebar_position: 2
 
 > How to add new components, register them across the stack, teach the LLM to use them, and build playground scenarios — including smart components with built-in authentication, validation, and state management.
 
+:::warning Out of date — harness + packs rewrite pending
+This guide still describes the pre-harness "4-layer stack" where the catalog and Zod validator lived in `packages/core/`. That package was removed in v1.0.0 and replaced by the **harness + packs** model: each pack now owns its own components, Zod schemas, and client registration via `./server-manifest` and `./client` subpath exports.
+
+For the current component-authoring flow, start here:
+
+- [Packs, skills & actions](../guides/packs-and-skills.md) — pack subpath entrypoints (`./server-manifest`, `./client`), `registerClient(target)`, and pack-contributed `previews` fixtures.
+- [Custom Kickstart catalog](./custom-catalog.md) — the in-repo catalog registered in `packages/web/src/catalog/`.
+- [Architecture overview](../architecture/overview.md) — where components fit in the harness request flow.
+
+The **React / Fluent 2 / action-dispatch / playground-scenario** guidance below is still accurate for in-repo `packages/web/src/catalog/components/*.tsx`. The **backend validator** and **LLM catalog** sections point at paths that no longer exist — treat them as historical context until this page is rewritten (tracked in the docs inbox).
+:::
+
 This guide walks through the full lifecycle of extending Kickstart's A2UI component system — from defining a React component to seeing it rendered by the LLM in production.
 
 ## The 4-Layer Stack

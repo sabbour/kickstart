@@ -4,9 +4,11 @@ sidebar_position: 1
 
 # Custom Kickstart Catalog
 
-Kickstart extends the A2UI v0.9 basic catalog with **22 custom components** designed for the AKS deployment onboarding experience. These components are registered in `packages/web/src/catalog/kickstart-catalog.ts`.
+Kickstart extends the A2UI v0.9 basic catalog with **21 custom components** designed for the AKS deployment onboarding experience. These components are registered in `packages/web/src/catalog/kickstart-catalog.ts`.
 
-> **Contract test:** `packages/core/src/__tests__/custom-component-count.test.ts` asserts that exactly 22 `.tsx` component files exist in `packages/web/src/catalog/components/`. When adding a new component, bump the count in that test and update this page.
+> **Contract test:** `packages/web/src/catalog/__tests__/custom-component-count.test.ts` asserts the expected number of `.tsx` component files in `packages/web/src/catalog/components/`. When adding or removing a component, keep this page and the contract test in sync.
+>
+> `ArchitectureDiagram` is no longer part of this catalog — it now ships from `@aks-kickstart/pack-aks-automatic` as a pack-contributed renderer.
 
 ## Component Categories
 
@@ -18,7 +20,7 @@ Kickstart extends the A2UI v0.9 basic catalog with **22 custom components** desi
 | **Navigation & Progress** | ProgressSteps, SteppedCarousel, GenerationProgress |
 | **GitHub** | GitHubRepoPicker, GitHubAction, GitHubCommit |
 | **Azure** | AzureResourcePicker, AzureResourceForm, AzureAction |
-| **Deployment** | ArchitectureDiagram, FileEditor, CostEstimate |
+| **Deployment** | FileEditor, CostEstimate |
 
 ## Forms & Input
 
@@ -177,10 +179,6 @@ Form for configuring new Azure resources, pre-filled with sensible defaults for 
 
 ## Deployment Components
 
-### ArchitectureDiagram
-
-Renders a Mermaid diagram as an SVG architecture diagram. Used in the Design phase to visualise the proposed topology.
-
 ### FileEditor
 
 Interactive code editor for reviewing and editing generated deployment files. Backed by the in-memory virtual file system.
@@ -192,3 +190,7 @@ Monthly cost breakdown by Azure service with a total. Line items include name, S
 ### GenerationProgress
 
 Multi-step generation and deployment tracker with per-step status (pending / running / success / error / skipped) and an overall status indicator. Used during the Generate and Deploy phases to show live progress.
+
+### ArchitectureDiagram (pack-contributed)
+
+Renders a Mermaid diagram as an SVG architecture diagram, used in the Design phase to visualise the proposed topology. Ships from `@aks-kickstart/pack-aks-automatic`, not the in-repo kickstart catalog.

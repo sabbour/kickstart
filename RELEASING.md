@@ -8,8 +8,7 @@ Before cutting a release, make sure these entry points agree:
 
 - `README.md`
 - `CHANGELOG.md`
-- `docs-site/docs/`
-- `docs-site/docs/architecture/v2-implementation-brief.md`
+- `docs-site/docs/` (canonical docs site — start at `intro.md` and `architecture/overview.md`)
 
 If you fix an old `docs/*` link during release prep, update the source link or `docs/README.md` redirect map instead of recreating legacy stubs.
 
@@ -38,8 +37,8 @@ Create a markdown file in `.changeset/` with a random name (e.g., `.changeset/co
 
 ```markdown
 ---
-"@kickstart/core": minor
-"@kickstart/web": minor
+"@aks-kickstart/harness": minor
+"@aks-kickstart/web": minor
 ---
 
 Add new deployment progress tracking to the conversation engine.
@@ -65,7 +64,7 @@ Add new deployment progress tracking to the conversation engine.
 The three workspace packages are **linked** in `.changeset/config.json`:
 
 ```json
-"linked": [["@kickstart/core", "@kickstart/mcp-server", "@kickstart/web"]]
+"linked": [["@aks-kickstart/harness", "@aks-kickstart/mcp-server", "@aks-kickstart/web"]]
 ```
 
 This means when any linked package gets a version bump, all linked packages get at least the same bump level. This keeps versions in sync across the monorepo.
@@ -121,7 +120,7 @@ When creating PRs that include user-facing changes, agents should add a changese
 ```bash
 cat > .changeset/$(date +%s)-description.md << 'EOF'
 ---
-"@kickstart/core": patch
+"@aks-kickstart/harness": patch
 ---
 
 Fix conversation engine phase transition edge case.

@@ -22,7 +22,7 @@ Packs are the **product knowledge layer** — they carry domain expertise indepe
 
 ### Core Pack
 
-**Package:** `@kickstart/pack-core`  
+**Package:** `@aks-kickstart/pack-core`  
 **Enabled:** Always (required)  
 **Purpose:** Foundation agents and cross-domain tools
 
@@ -46,7 +46,7 @@ The core pack provides:
 
 ### Azure Pack
 
-**Package:** `@kickstart/pack-azure`  
+**Package:** `@aks-kickstart/pack-azure`  
 **Enabled:** By default (disable with `KICKSTART_PACKS`)  
 **Purpose:** Azure infrastructure and cloud deployment
 
@@ -85,7 +85,7 @@ The Azure pack equips agents with Azure-specific knowledge and operations:
 
 ### GitHub Pack
 
-**Package:** `@kickstart/pack-github`  
+**Package:** `@aks-kickstart/pack-github`  
 **Enabled:** By default (disable with `KICKSTART_PACKS`)  
 **Purpose:** GitHub repository and CI/CD operations
 
@@ -110,7 +110,7 @@ The GitHub pack enables repository management and GitHub Actions workflows:
 
 ### AKS Automatic Pack
 
-**Package:** `@kickstart/pack-aks-automatic`  
+**Package:** `@aks-kickstart/pack-aks-automatic`  
 **Enabled:** By default (disable with `KICKSTART_PACKS`)  
 **Purpose:** AKS Automatic cluster management and Kubernetes deployment
 
@@ -144,7 +144,7 @@ The AKS Automatic pack brings Kubernetes expertise and cluster operations:
 
 The harness automatically discovers packs from the `packages/` directory. A valid pack has:
 1. A `src/index.ts` (or `src/index.js`) file
-2. A `package.json` with name like `@kickstart/pack-*`
+2. A `package.json` with name like `@aks-kickstart/pack-*`
 3. A `.pack.js` or `.pack.ts` export with a `Pack` object
 
 ### Registration
@@ -378,10 +378,10 @@ ls -1 packages/pack-*/package.json | xargs grep '"name"'
 
 Output:
 ```
-"@kickstart/pack-core": true
-"@kickstart/pack-azure": true
-"@kickstart/pack-github": true
-"@kickstart/pack-aks-automatic": true
+"@aks-kickstart/pack-core": true
+"@aks-kickstart/pack-azure": true
+"@aks-kickstart/pack-github": true
+"@aks-kickstart/pack-aks-automatic": true
 ```
 
 ### List Pack Agents

@@ -9,25 +9,25 @@ Kickstart is organized as an npm workspaces monorepo.
 ```
 kickstart/
 ├── packages/
-│   ├── harness/           # @kickstart/harness — runtime engine
+│   ├── harness/           # @aks-kickstart/harness — runtime engine
 │   │   └── src/
 │   │       ├── runtime/   # Runner, session, skill resolver, SSE adapter
 │   │       ├── a2ui/      # A2UI v0.9 message types and helpers
 │   │       ├── mcp/       # MCP adapter utilities
 │   │       └── types/     # Zod schemas (AgentOutput, pack primitives)
 │   │
-│   ├── pack-core/         # @kickstart/pack-core — base agents, skills, tools, components
+│   ├── pack-core/         # @aks-kickstart/pack-core — base agents, skills, tools, components
 │   │   └── src/
 │   │       ├── agents/    # .agent.md files for triage, codesmith, reviewer
 │   │       ├── skills/    # SKILL.md files
 │   │       ├── tools/     # core.emit_ui, core.write_file, etc.
 │   │       └── components/ # Basic + rich A2UI component renderers
 │   │
-│   ├── pack-azure/        # @kickstart/pack-azure — Azure agents, tools, user actions
-│   ├── pack-aks-automatic/ # @kickstart/pack-aks-automatic — AKS Automatic deployment pack
-│   ├── pack-github/       # @kickstart/pack-github — GitHub agents, tools, user actions
+│   ├── pack-azure/        # @aks-kickstart/pack-azure — Azure agents, tools, user actions
+│   ├── pack-aks-automatic/ # @aks-kickstart/pack-aks-automatic — AKS Automatic deployment pack
+│   ├── pack-github/       # @aks-kickstart/pack-github — GitHub agents, tools, user actions
 │   │
-│   ├── web/               # @kickstart/web — React frontend + Azure Functions API
+│   ├── web/               # @aks-kickstart/web — React frontend + Azure Functions API
 │   │   ├── src/           # React app source
 │   │   │   ├── vendor/    # Vendored A2UI renderer
 │   │   │   ├── components/ # App-shell components (Layout, Sidebar, Topbar, …)
@@ -37,7 +37,7 @@ kickstart/
 │   │   │   └── src/functions/  # converse.ts, resume.ts, packs.ts
 │   │   └── package.json
 │   │
-│   └── mcp-server/        # @kickstart/mcp-server — MCP adapter wrapping the Runner
+│   └── mcp-server/        # @aks-kickstart/mcp-server — MCP adapter wrapping the Runner
 │       └── src/
 │           └── index.ts   # MCP server entry point
 │
