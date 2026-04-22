@@ -44,6 +44,22 @@ export interface SessionCtx {
   intent: AppIntent | null;
   artifacts: Map<string, Artifact>;
   a2uiEmissions: A2UIMessage[];
+  /**
+   * Live surface IDs known to have an outstanding `createSurface` within this
+   * session. Used by `core.emit_ui` to enforce idempotent surface lifecycle
+   * (D11, #1075): reject duplicate `createSurface` and reject
+   * `updateComponents` / `updateDataModel` / `deleteSurface` targeting a
+   * surface that has not been created. Transient; not persisted across
+   * session restart. Bounded by `maxLiveSurfaces`.
+   */
+  liveSurfaceIds: Set<string>;
+  /**
+   * Upper bound on `liveSurfaceIds.size`. Resolved once at harness module
+   * load from `KICKSTART_MAX_LIVE_SURFACES` (default 1000, clamped
+   * [10, 100000]). Enforced in `core.emit_ui` on `createSurface` to guard
+   * against runaway in-memory growth (Zapp M1, #1075).
+   */
+  readonly maxLiveSurfaces: number;
   negotiatedCatalog: A2UICatalog;
   recentTurns: Turn[];
   activeAgent: string;

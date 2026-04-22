@@ -17,12 +17,34 @@ export interface SessionData {
 
 const DEFAULT_CATALOG: A2UICatalog = { id: 'kickstart', components: [], userActions: [] };
 
+// ── Live-surface cap (D11 / Zapp M1, #1075) ─────────────────────────────────
+// Resolved ONCE at module load so every `Session` in this process shares the
+// same cap. Misconfiguration falls back silently to the default — misconfig
+// should never crash session initialisation.
+const DEFAULT_MAX_LIVE_SURFACES = 1000;
+const MIN_LIVE_SURFACES_CAP = 10;
+const MAX_LIVE_SURFACES_CAP = 100_000;
+
+function resolveMaxLiveSurfaces(): number {
+  const raw = process.env.KICKSTART_MAX_LIVE_SURFACES;
+  if (!raw) return DEFAULT_MAX_LIVE_SURFACES;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n)) return DEFAULT_MAX_LIVE_SURFACES;
+  return Math.min(MAX_LIVE_SURFACES_CAP, Math.max(MIN_LIVE_SURFACES_CAP, n));
+}
+
+const MAX_LIVE_SURFACES = resolveMaxLiveSurfaces();
+
 export class Session implements SessionCtx {
   readonly sessionId: string;
   user: { oid: string; tid?: string; upn?: string };
   intent: AppIntent | null = null;
   artifacts: Map<string, Artifact> = new Map();
   a2uiEmissions: A2UIMessage[] = [];
+  /** D11 / #1075 — live surface ids for idempotency guard in `core.emit_ui`. */
+  liveSurfaceIds: Set<string> = new Set();
+  /** Zapp M1 / #1075 — per-session live-surface cap (process-wide constant). */
+  readonly maxLiveSurfaces: number = MAX_LIVE_SURFACES;
   negotiatedCatalog: A2UICatalog = DEFAULT_CATALOG;
   recentTurns: Turn[] = [];
   activeAgent = 'core.triage';
@@ -46,6 +68,20 @@ export class Session implements SessionCtx {
 
   recordA2UIEmission(msg: A2UIMessage): void {
     this.a2uiEmissions.push(msg);
+    // Keep `liveSurfaceIds` in sync with the append-only log. The tool-side
+    // guard in `core.emit_ui` enforces dedupe/existence invariants BEFORE
+    // calling this method; we mirror the set here so the invariant survives
+    // any non-tool call path that ever lands in the future.
+    // Narrow structural checks — avoid importing the full union type discriminator logic.
+    const m = msg as unknown as {
+      createSurface?: { surfaceId?: string };
+      deleteSurface?: { surfaceId?: string };
+    };
+    if (m.createSurface && typeof m.createSurface.surfaceId === 'string') {
+      this.liveSurfaceIds.add(m.createSurface.surfaceId);
+    } else if (m.deleteSurface && typeof m.deleteSurface.surfaceId === 'string') {
+      this.liveSurfaceIds.delete(m.deleteSurface.surfaceId);
+    }
   }
 
   recordArtifact(artifact: Artifact): void {

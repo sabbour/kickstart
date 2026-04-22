@@ -84,8 +84,23 @@ describe('core.emit_ui', () => {
 
   beforeEach(() => {
     session = makeSessionCtx();
+    // #1075 / D11 — many existing tests invoke `updateComponents` /
+    // `updateDataModel` / `deleteSurface` against a surfaceId without first
+    // issuing a `createSurface`. The new idempotency guard requires the
+    // target surface to be live, so we pre-seed the non-create-fixture
+    // surfaceIds this file uses. `surface-001` is deliberately NOT preseeded
+    // because fixtures exercise both `createSurface surface-001` (where the
+    // id must start unused) and `updateComponents surface-001` standalone
+    // (where it must start live) — the latter seeds inline.
+    for (const id of ['main', 's', 'triage-surface', 'x']) {
+      session.liveSurfaceIds.add(id);
+    }
     vi.clearAllMocks();
   });
+
+  // Convenience for the handful of tests that exercise a non-create fixture
+  // on `surface-001` without a preceding createSurface.
+  const seedSurface001 = () => session.liveSurfaceIds.add('surface-001');
 
   // ── Valid messages — return value ─────────────────────────────────────────
 
@@ -96,14 +111,17 @@ describe('core.emit_ui', () => {
     });
 
     it('updateComponents returns a string acknowledgement', async () => {
+      seedSurface001();
       expect(String(await invoke(validUpdateComponents))).toContain('updateComponents');
     });
 
     it('updateDataModel returns a string acknowledgement', async () => {
+      seedSurface001();
       expect(String(await invoke(validUpdateDataModel))).toContain('updateDataModel');
     });
 
     it('deleteSurface returns a string acknowledgement', async () => {
+      seedSurface001();
       expect(String(await invoke(validDeleteSurface))).toContain('deleteSurface');
     });
   });
@@ -117,6 +135,7 @@ describe('core.emit_ui', () => {
     });
 
     it('updateComponents is recorded on the session', async () => {
+      seedSurface001();
       await invoke(validUpdateComponents);
       expect(session.a2uiEmissions).toHaveLength(1);
     });
@@ -331,6 +350,8 @@ describe('core.emit_ui', () => {
       });
 
       it(`${op}: tool invocation records an emission on the op-named payload key`, async () => {
+        // #1075 — non-create ops need `surface-001` live; createSurface needs it NOT live.
+        if (op !== 'createSurface') seedSurface001();
         await invoke(fixture);
         expect(session.a2uiEmissions).toHaveLength(1);
         const recorded = session.a2uiEmissions[0] as Record<string, unknown>;
@@ -675,6 +696,201 @@ describe('core.emit_ui', () => {
       });
       expect(String(result)).toContain('updateComponents');
       expect(session.a2uiEmissions).toHaveLength(1);
+    });
+  });
+
+  // ── #1075 / D11 — emit_ui idempotency + surface cap ─────────────────────
+  //
+  // Covers:
+  //   • Leela DP v1 cases 1–5 (dedupe / distinct / update-before-create /
+  //     delete-clears-slot / race proxy).
+  //   • Nibbler's 5 additive conditions (parameterized missing-surface,
+  //     recovery-path wording, parse-before-guard ordering, race sets
+  //     assertion — condition 5 "skip appendComponents" is honoured by
+  //     intentionally NOT adding such a test).
+  //   • Leela DP v2 cases 7–9 (surfaceId length lower / upper bounds,
+  //     session-scoped live-surface cap).
+
+  describe('#1075 — surface lifecycle idempotency (D11)', () => {
+    let freshSession: ReturnType<typeof makeSessionCtx>;
+    const freshInvoke = (message: unknown) =>
+      emitUiTool.tool.invoke(new RunContext(freshSession), JSON.stringify({ message }));
+
+    beforeEach(() => {
+      // Use an un-seeded session for this block so the guard semantics are
+      // exercised end-to-end without the shared preseed.
+      freshSession = makeSessionCtx();
+    });
+
+    // Leela v1 case 1
+    it('rejects a second createSurface with the same surfaceId', async () => {
+      const first = String(await freshInvoke(validCreateSurface));
+      expect(first).toContain('createSurface');
+      const second = String(await freshInvoke(validCreateSurface));
+      expect(second).toMatch(/already exists/);
+      expect(second).toMatch(/use updateComponents to modify it/);
+      expect(freshSession.a2uiEmissions).toHaveLength(1);
+      expect(freshSession.liveSurfaceIds.has('surface-001')).toBe(true);
+    });
+
+    // Leela v1 case 2
+    it('createSurface on two distinct surfaceIds both succeed', async () => {
+      await freshInvoke(validCreateSurface);
+      await freshInvoke({
+        ...validCreateSurface,
+        createSurface: { ...validCreateSurface.createSurface, surfaceId: 'surface-002' },
+      });
+      expect(freshSession.a2uiEmissions).toHaveLength(2);
+      expect(freshSession.liveSurfaceIds).toEqual(new Set(['surface-001', 'surface-002']));
+    });
+
+    // Leela v1 case 3 + Nibbler condition 1 (parameterized over three ops) +
+    // Nibbler condition 2 (assert recovery-path wording, not just the throw).
+    const nonCreateFixtures = [
+      { op: 'updateComponents', fixture: validUpdateComponents },
+      { op: 'updateDataModel', fixture: validUpdateDataModel },
+      { op: 'deleteSurface', fixture: validDeleteSurface },
+    ] as const;
+
+    for (const { op, fixture } of nonCreateFixtures) {
+      it(`${op} on a non-existent surface rejects with the recovery path in the message`, async () => {
+        const result = String(await freshInvoke(fixture));
+        expect(result).toMatch(/does not exist/);
+        expect(result).toMatch(/call createSurface first/);
+        expect(freshSession.a2uiEmissions).toHaveLength(0);
+      });
+    }
+
+    // Assert the recovery-path wording on the duplicate-createSurface branch
+    // too (Nibbler condition 2 for the create path).
+    it('createSurface rejection message names updateComponents as the recovery path', async () => {
+      await freshInvoke(validCreateSurface);
+      const result = String(await freshInvoke(validCreateSurface));
+      expect(result).toMatch(/use updateComponents to modify it/);
+    });
+
+    // Leela v1 case 4
+    it('deleteSurface frees the slot — create → delete → create succeeds', async () => {
+      await freshInvoke(validCreateSurface);
+      await freshInvoke(validDeleteSurface);
+      const third = String(await freshInvoke(validCreateSurface));
+      expect(third).toContain('createSurface');
+      expect(freshSession.a2uiEmissions).toHaveLength(3);
+      expect(freshSession.liveSurfaceIds).toEqual(new Set(['surface-001']));
+    });
+
+    // Leela v1 case 5 + Nibbler condition 4 (assert the set + emissions, not
+    // just thrown count). Two concurrent createSurface calls with the same
+    // id — exactly one wins.
+    it('race: two concurrent createSurface calls — exactly one wins', async () => {
+      const results = await Promise.all([
+        freshInvoke(validCreateSurface).then(String),
+        freshInvoke(validCreateSurface).then(String),
+      ]);
+      const oks = results.filter((r) => r.includes('createSurface') && !/already exists/.test(r));
+      const rejects = results.filter((r) => /already exists/.test(r));
+      expect(oks).toHaveLength(1);
+      expect(rejects).toHaveLength(1);
+      expect(freshSession.liveSurfaceIds.size).toBe(1);
+      expect(freshSession.a2uiEmissions).toHaveLength(1);
+    });
+
+    // Nibbler condition 3 — parse-before-guard ordering. A schema-invalid
+    // payload whose surfaceId would otherwise dedupe must throw the
+    // validation error (not the dedupe error), proving the guard cannot run
+    // on un-validated input and cannot mutate the live set from a malformed
+    // payload.
+    it('schema validation runs before the guard (malformed envelope → invalid, not dedupe)', async () => {
+      await freshInvoke(validCreateSurface);
+      const malformed = String(
+        await freshInvoke({
+          version: A2UI_VERSION,
+          op: 'createSurface' as const,
+          // Missing `catalogId` — violates the schema.
+          createSurface: { surfaceId: 'surface-001' },
+        }),
+      );
+      expect(malformed).toMatch(/An error occurred|invalid/i);
+      expect(malformed).not.toMatch(/already exists/);
+      // Side-effect-free on malformed input.
+      expect(freshSession.liveSurfaceIds.size).toBe(1);
+      expect(freshSession.a2uiEmissions).toHaveLength(1);
+    });
+
+    // ── Leela DP v2 — surfaceId length bounds ─────────────────────────────
+
+    // Case 7 — empty string rejects at schema layer.
+    it('rejects empty surfaceId at schema layer', async () => {
+      const result = String(
+        await freshInvoke({
+          version: A2UI_VERSION,
+          op: 'createSurface' as const,
+          createSurface: { surfaceId: '', catalogId: 'test-catalog', sendDataModel: null },
+        }),
+      );
+      expect(result).toMatch(/An error occurred|invalid/i);
+      expect(freshSession.a2uiEmissions).toHaveLength(0);
+      expect(freshSession.liveSurfaceIds.size).toBe(0);
+    });
+
+    // Case 8 — 128 chars pass, 129 chars reject.
+    it('accepts a 128-char surfaceId and rejects a 129-char one', async () => {
+      const id128 = 'a'.repeat(128);
+      const id129 = 'a'.repeat(129);
+      const ok = String(
+        await freshInvoke({
+          version: A2UI_VERSION,
+          op: 'createSurface' as const,
+          createSurface: { surfaceId: id128, catalogId: 'test-catalog', sendDataModel: null },
+        }),
+      );
+      expect(ok).toContain('createSurface');
+      const bad = String(
+        await freshInvoke({
+          version: A2UI_VERSION,
+          op: 'createSurface' as const,
+          createSurface: { surfaceId: id129, catalogId: 'test-catalog', sendDataModel: null },
+        }),
+      );
+      expect(bad).toMatch(/An error occurred|invalid/i);
+      expect(freshSession.liveSurfaceIds.has(id128)).toBe(true);
+      expect(freshSession.liveSurfaceIds.has(id129)).toBe(false);
+    });
+
+    // Case 9 — session-scoped live-surface cap, live-count semantics.
+    it('enforces maxLiveSurfaces and releases slots on deleteSurface', async () => {
+      // Override the cap to 3 via a dedicated session instance.
+      const capped = makeSessionCtx({ maxLiveSurfaces: 3 });
+      const capInvoke = (message: unknown) =>
+        emitUiTool.tool.invoke(new RunContext(capped), JSON.stringify({ message }));
+
+      const mk = (id: string) => ({
+        version: A2UI_VERSION,
+        op: 'createSurface' as const,
+        createSurface: { surfaceId: id, catalogId: 'test-catalog', sendDataModel: null },
+      });
+      const del = (id: string) => ({
+        version: A2UI_VERSION,
+        op: 'deleteSurface' as const,
+        deleteSurface: { surfaceId: id },
+      });
+
+      expect(String(await capInvoke(mk('a')))).toContain('createSurface');
+      expect(String(await capInvoke(mk('b')))).toContain('createSurface');
+      expect(String(await capInvoke(mk('c')))).toContain('createSurface');
+
+      // Fourth create rejects with the cap error, naming the cap value.
+      const fourth = String(await capInvoke(mk('d')));
+      expect(fourth).toMatch(/session surface cap reached \(3\)/);
+      expect(capped.a2uiEmissions).toHaveLength(3);
+      expect(capped.liveSurfaceIds.size).toBe(3);
+
+      // deleteSurface frees a slot → next create succeeds (cap is live-count,
+      // not lifetime-count).
+      expect(String(await capInvoke(del('a')))).toContain('deleteSurface');
+      expect(capped.liveSurfaceIds.size).toBe(2);
+      expect(String(await capInvoke(mk('d')))).toContain('createSurface');
+      expect(capped.liveSurfaceIds).toEqual(new Set(['b', 'c', 'd']));
     });
   });
 });
