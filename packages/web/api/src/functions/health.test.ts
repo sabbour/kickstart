@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import * as appinsightsModule from "../lib/appinsights.js";
 
 // ---------------------------------------------------------------------------
 // Hoisted mock setup (vi.mock factories run before variable declarations)
@@ -393,3 +394,15 @@ describe("503 response redaction — no raw error details in unauthenticated res
   });
 });
 
+// ---------------------------------------------------------------------------
+// N3 — Nibbler: initializeAppInsights is called inside the handler (not at module load)
+// ---------------------------------------------------------------------------
+
+describe("N3 — initializeAppInsights called inside health handler", () => {
+  it("calls initializeAppInsights as the first statement of each handler invocation", async () => {
+    const spy = vi.spyOn(appinsightsModule, "initializeAppInsights");
+    await healthHandler(makeRequest(), makeContext());
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+});

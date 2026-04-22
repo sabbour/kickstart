@@ -53,11 +53,15 @@ describe("appinsights module (pure-OTel wiring, DP #1030 amendments 1–3)", () 
   });
 
   // T2 ------------------------------------------------------------------
-  it("T2: initializeAppInsights is idempotent — useAzureMonitor called exactly once", async () => {
+  it("T2: module import does NOT call useAzureMonitor (no module-load IIFE); explicit initializeAppInsights() calls it exactly once", async () => {
     process.env.APPLICATIONINSIGHTS_CONNECTION_STRING = CONN;
     const mod = await import("./appinsights.js");
-    // module-load side effect = 1 call
+    // No IIFE — module import must NOT trigger useAzureMonitor
+    expect(useAzureMonitorMock).not.toHaveBeenCalled();
+    // Explicit call triggers it
+    mod.initializeAppInsights();
     expect(useAzureMonitorMock).toHaveBeenCalledTimes(1);
+    // Idempotency: second and third calls are no-ops
     mod.initializeAppInsights();
     mod.initializeAppInsights();
     expect(useAzureMonitorMock).toHaveBeenCalledTimes(1);
@@ -189,14 +193,22 @@ describe("appinsights module (pure-OTel wiring, DP #1030 amendments 1–3)", () 
     mpSpy.mockRestore();
   });
 
-  it("T12: telemetry init failure does not break — useAzureMonitor throws, module still loads", async () => {
+  it("T12: telemetry init failure does not break — useAzureMonitor throws, initializeAppInsights catches and marks started", async () => {
     process.env.APPLICATIONINSIGHTS_CONNECTION_STRING = CONN;
     useAzureMonitorMock.mockImplementationOnce(() => {
       throw new Error("simulated init failure");
     });
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    await expect(import("./appinsights.js")).resolves.toBeDefined();
+    const mod = await import("./appinsights.js");
+    // No IIFE — import alone must NOT call useAzureMonitor
+    expect(useAzureMonitorMock).not.toHaveBeenCalled();
+    expect(consoleSpy).not.toHaveBeenCalled();
+    // Explicit call triggers it and catches the error
+    mod.initializeAppInsights();
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("[AppInsights] Azure Monitor init failed:"));
+    // STARTED flag is set even on failure — no infinite-retry
+    mod.initializeAppInsights();
+    expect(useAzureMonitorMock).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();
   });
 });

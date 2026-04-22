@@ -18,17 +18,26 @@ and we never want to repeat the root causes.
 
 ## Bundling contract
 
-- `@azure/monitor-opentelemetry`,
-  `@azure/monitor-opentelemetry-exporter`, and the OTel API packages
-  (`@opentelemetry/api`, `@opentelemetry/api-logs`) are marked `external` in
-  `esbuild.config.mjs`.
+- OTel / Azure Monitor packages (`@azure/monitor-opentelemetry`,
+  `@azure/monitor-opentelemetry-exporter`, `@opentelemetry/api`,
+  `@opentelemetry/api-logs`, etc.) are **bundled inline** by esbuild into
+  each function bundle. Only `@azure/functions-core` remains external
+  (it is a virtual module injected by the Functions worker).
+- The `@opentelemetry/api` package stores its provider registry on
+  `globalThis[Symbol.for('opentelemetry.js.api.1')]`. Multiple bundled
+  copies of the package in the same worker process all read/write the same
+  `globalThis` slot — there is no provider wipeout from multiple copies.
+  This is the canonical OTel singleton mechanism.
 - `scripts/verify-api-externals.mjs` runs after every `npm run build` and
-  fails the build if any required-external package ends up inlined or
-  imports are not marked `external: true`. The same guard is enforced as a
-  vitest test (`.squad/scripts/verify-api-externals.test.mjs`).
-- `scripts/materialize-api-externals.mjs` (`postbuild`) installs the
-  externalized packages into `packages/web/api/node_modules/` so they reach
-  the SWA zip (which only ships `packages/web/api/`).
+  fails the build if any package other than `@azure/functions-core` is
+  marked external, or if OTel packages are absent from bundle inputs
+  (proving they are inlined). The same guard is enforced as a vitest test
+  (`.squad/scripts/verify-api-externals.test.mjs`).
+- **`initializeAppInsights()` is called lazily** — as the first statement
+  inside each handler body (wrapped in try/catch). There is no module-load
+  IIFE. The `globalThis` STARTED flag (`Symbol.for('kickstart.azmon.started')`)
+  ensures `useAzureMonitor()` is called only once per worker process even
+  when multiple handlers are invoked concurrently.
 
 ## Telemetry contract
 
@@ -71,13 +80,12 @@ not drop Exception telemetry before the SDK can flush it.
 
 ## If `verify-api-externals.mjs` fires
 
-1. Check `dist/meta.json` — look for any leaked input path under
-   `node_modules/@azure/monitor-opentelemetry/` or friends.
-2. If someone added a new OTel package import, either add it to the
-   `external` list in `esbuild.config.mjs` or vendor it into
-   `src/lib/appinsights.ts` (only that file may import the distro).
-3. If `require.resolve` fails for the API root, re-run the postbuild:
-   `npm run postbuild -w @aks-kickstart/api`.
+1. Check `dist/meta.json` — look for OTel packages in `outputs[bundle].imports`
+   with `external: true`. Remove them from the `external` list in
+   `esbuild.config.mjs`.
+2. If an OTel package is missing from `meta.inputs`, check that it is imported
+   (directly or transitively) by `src/lib/appinsights.ts` and that it is NOT
+   in the `external` list.
 
 ## Test matrix (T1–T12)
 

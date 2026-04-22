@@ -2,10 +2,11 @@
  * esbuild config for @aks-kickstart/api
  *
  * Bundles each Azure Function entry point into a self-contained ESM file.
- * OTel / Azure Monitor packages stay external so every bundle in the worker
- * process shares the same module identity + globalThis singletons (see
- * issue #1030 — multiple bundled copies of @opentelemetry/api give every
- * bundle its own registry and wipe each other's providers).
+ * OTel / Azure Monitor packages are bundled inline. @opentelemetry/api uses
+ * globalThis[Symbol.for('opentelemetry.js.api.1')] for its provider registry,
+ * so multiple bundled copies in the same worker process share the same
+ * globalThis slot — no provider wipeout (see issue #1041 + decision
+ * leela-1030-externalization-rollback.md).
  */
 
 import * as esbuild from "esbuild";
@@ -78,22 +79,10 @@ await esbuild.build({
   target: "node22",
   metafile: true,
   // @azure/functions-core is a virtual module injected by the Functions worker.
-  //
-  // Every package below MUST stay external so the worker process sees a single
-  // module identity — they register against globalThis singletons (OTel trace
-  // provider, logs provider, meter provider) and multiple bundled copies give
-  // each bundle its own registry that silently wipes the others (issue #1030).
+  // OTel/AppInsights packages are bundled inline — see decision
+  // leela-1030-externalization-rollback.md for rationale.
   external: [
     "@azure/functions-core",
-    "@azure/monitor-opentelemetry",
-    "@azure/monitor-opentelemetry-exporter",
-    "applicationinsights",
-    "@opentelemetry/api",
-    "@opentelemetry/api-logs",
-    "@opentelemetry/sdk-trace-base",
-    "@opentelemetry/sdk-logs",
-    "@opentelemetry/sdk-metrics",
-    "@opentelemetry/core",
   ],
   banner: {
     js: "import { createRequire as __kickstartCreateRequire } from 'node:module'; const require = __kickstartCreateRequire(import.meta.url);",
@@ -103,7 +92,7 @@ await esbuild.build({
   sourcemap: process.env.KICKSTART_API_SOURCEMAP === "1",
   plugins: [harnessResolver],
 }).then(async (result) => {
-  // T1 binding test reads this metafile to assert externalization stuck.
+  // T1 binding test reads this metafile to assert bundle-everything strategy.
   const metaPath = resolve(__dirname, "dist/meta.json");
   mkdirSync(dirname(metaPath), { recursive: true });
   writeFileSync(metaPath, JSON.stringify(result.metafile, null, 2), "utf8");

@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto";
 import { app } from "@azure/functions";
 import type { HttpRequest, InvocationContext } from "@azure/functions";
 import { Logger, extractTraceId, extractRequestMetadata } from "../lib/logger.js";
-import { trackException, trackEvent, flushAppInsights } from "../lib/appinsights.js";
+import { trackException, trackEvent, flushAppInsights, initializeAppInsights } from "../lib/appinsights.js";
 import { getRegistry } from "../startup/packs.js";
 import { getOrCreateSession } from "@aks-kickstart/harness/runtime/session";
 import { Runner } from "@aks-kickstart/harness/runtime/runner";
@@ -31,6 +31,7 @@ async function converse(
   request: HttpRequest,
   ctx: InvocationContext,
 ): Promise<Response> {
+  try { initializeAppInsights(); } catch { /* init failure must not kill the request path */ }
   const startTime = Date.now();
   const requestId = randomUUID();
   const traceId = extractTraceId(request.headers);

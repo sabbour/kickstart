@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { app } from "@azure/functions";
 import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { Logger, extractTraceId, extractRequestMetadata } from "../lib/logger.js";
-import { trackException, trackEvent, flushAppInsights } from "../lib/appinsights.js";
+import { trackException, trackEvent, flushAppInsights, initializeAppInsights } from "../lib/appinsights.js";
 import { getRegistry, getLoadErrors } from "../startup/packs.js";
 import type { PackLoadError } from "../startup/packs.js";
 import { sanitizeError } from "../telemetry/sanitize-error.js";
@@ -133,6 +133,7 @@ app.http("health", {
   methods: ["GET"],
   authLevel: "anonymous",
   handler: async (req: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    try { initializeAppInsights(); } catch { /* init failure must not kill the request path */ }
     const startTime = Date.now();
     const requestId = randomUUID();
     const traceId = extractTraceId(req.headers);
