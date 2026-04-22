@@ -98,6 +98,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-22 | #1083 "feat(harness): wire handoffs frontmatter to SDK (D2) — closes #1073" | L | impl=1m | review=9m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=5m | ci=9m | reviewer=bot | human_comments=0 | issue=#1073 | estimate=M | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-22 | #1072 "feat: structured event payload, triage branch-on-event, createSurface guard (#1062 Layers 1-3)" | XL | impl=1m | review=18m | cycles=1 | merged-with-rework | @sabbour | first_review=3m | ci=9m | reviewer=bot | human_comments=2 | issue=#1062 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-22 | #1071 "feat(harness): thread conversation history across turns (#1062 Layer 0)" | L | impl=1m | review=9m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=6m | ci=8m | reviewer=bot | human_comments=0 | issue=#1062 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
