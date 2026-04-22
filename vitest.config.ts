@@ -9,6 +9,7 @@ export default defineConfig({
       "@aks-kickstart/harness/runtime/session": resolve(__dirname, "packages/harness/src/runtime/session.ts"),
       "@aks-kickstart/harness/runtime/runner": resolve(__dirname, "packages/harness/src/runtime/runner.ts"),
       "@aks-kickstart/harness/runtime/sse": resolve(__dirname, "packages/harness/src/runtime/sse.ts"),
+      "@aks-kickstart/harness/runtime/guardrails": resolve(__dirname, "packages/harness/src/runtime/guardrails.ts"),
       "@aks-kickstart/harness": resolve(__dirname, "packages/harness/src/index.ts"),
       "@aks-kickstart/core": resolve(__dirname, "packages/harness/src/index.ts"),
       "@aks-kickstart/pack-azure/client": resolve(__dirname, "packages/pack-azure/src/client.ts"),

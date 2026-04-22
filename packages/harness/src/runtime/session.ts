@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { A2UIMessageV09 as A2UIMessage } from '../types/a2ui.js';
-import type { Artifact, A2UICatalog, SessionCtx, Turn, PendingUserAction, AppIntent, AzureCredential } from '../types/session.js';
+import type { Artifact, A2UICatalog, SessionCtx, Turn, PendingUserAction, AppIntent, AzureCredential, ClientHydrationMessage } from '../types/session.js';
 import type { Phase } from '../index.js';
+
+export type { ClientHydrationMessage } from '../types/session.js';
 
 export interface SessionData {
   sessionId: string;
@@ -121,4 +123,117 @@ export function getOrCreateSession(
   // Update last-active time for TTL cleanup
   session.touch();
   return session;
+}
+
+// ---------------------------------------------------------------------------
+// Cold-session hydration (#1074 D3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Default maximum number of client-supplied history messages accepted at the
+ * request boundary for cold-session hydration (Leela DP, Zapp M1).
+ */
+export const HYDRATION_DEFAULT_CAP = 20;
+
+/**
+ * Default maximum byte length per hydrated message `content`. Combined with
+ * {@link HYDRATION_DEFAULT_CAP} this gives a hard 80 KB ceiling on the history
+ * that a single `POST /api/converse` invocation can seed.
+ */
+export const HYDRATION_CONTENT_MAX_BYTES = 4 * 1024;
+
+/**
+ * Feature-flag helper (Nibbler nit) — callers must read this instead of
+ * thrashing `process.env.HARNESS_SESSION_HISTORY_ENABLED` inline. The same
+ * flag gates both the read-path history threading in the runner (#1071) and
+ * the write-path cold hydration here (#1074) — this is intentional per
+ * Leela's DP note and documented in `converse.md`.
+ */
+export function isHistoryHydrationEnabled(): boolean {
+  const raw = process.env.HARNESS_SESSION_HISTORY_ENABLED;
+  if (!raw) return false;
+  const v = raw.trim().toLowerCase();
+  return v === '1' || v === 'true';
+}
+
+/**
+ * Anon-hydration interlock flag (Zapp M4).
+ *
+ * Defaults to `false`. While `false`, an anonymous session
+ * (`session.user.oid === 'anonymous'`) may not seed its recentTurns via
+ * client-supplied `messages[]` — this prevents the #1079 anon-sessionId
+ * guess vector from being amplified by cold-hydration. Authenticated users
+ * hydrate freely regardless of this flag.
+ */
+export function isAnonHydrationAllowed(): boolean {
+  const raw = process.env.HARNESS_ALLOW_ANON_HYDRATION;
+  if (!raw) return false;
+  const v = raw.trim().toLowerCase();
+  return v === '1' || v === 'true';
+}
+
+export interface HydrateColdSessionResult {
+  /** Number of turns actually appended to `session.recentTurns`. */
+  hydrated: number;
+  /**
+   * Reason the hydration was a no-op, if any. `null` when hydration ran (even
+   * if `hydrated === 0`, e.g. an empty `messages: []` on a brand-new session).
+   */
+  ignored: null | 'warm' | 'disabled';
+}
+
+/**
+ * Hydrate a brand-new (cold-start) `Session` from client-supplied history.
+ *
+ * Contract (Leela DP + Zapp M1–M3):
+ *  - Hydrates **only** when `session.recentTurns.length === 0` — warm sessions
+ *    are server-authoritative and client `messages` are ignored.
+ *  - The feature flag `HARNESS_SESSION_HISTORY_ENABLED` must be on;
+ *    otherwise the helper is a no-op regardless of session state.
+ *  - Messages are expected to already be schema-validated (strict zod
+ *    discriminatedUnion at the handler) and guardrail-scanned (per-user-turn
+ *    input guardrails at the handler, fail-closed). This helper does NOT
+ *    re-validate — its job is the atomic "brand-new detection + push"
+ *    primitive.
+ *  - Each appended turn is stamped `trust: 'client-hydrated'` so the runner
+ *    can render it inside a delimited untrusted-context block.
+ *
+ * Synchronous in-process hydration; JS event-loop makes the existence check
+ * + push race-free for a given sessionId. Two concurrent cold-hydrations on
+ * the same `Session` instance → first writer wins; the second call observes
+ * `recentTurns.length > 0` and no-ops. Regression-guarded by the race test.
+ */
+export function hydrateColdSession(
+  session: Session,
+  messages: readonly ClientHydrationMessage[] | undefined,
+  opts: { enabled?: boolean; cap?: number } = {},
+): HydrateColdSessionResult {
+  const enabled = opts.enabled ?? isHistoryHydrationEnabled();
+  if (!enabled) {
+    return { hydrated: 0, ignored: 'disabled' };
+  }
+  if (session.recentTurns.length > 0) {
+    return { hydrated: 0, ignored: 'warm' };
+  }
+  if (!messages || messages.length === 0) {
+    return { hydrated: 0, ignored: null };
+  }
+
+  const cap = opts.cap ?? HYDRATION_DEFAULT_CAP;
+  const slice = messages.slice(0, cap);
+  const nowIso = new Date().toISOString();
+  let hydrated = 0;
+  for (const m of slice) {
+    // role filter is a defense-in-depth belt over the schema's suspenders.
+    if (m.role !== 'user' && m.role !== 'assistant') continue;
+    if (typeof m.content !== 'string' || m.content.length === 0) continue;
+    session.recordTurn({
+      role: m.role,
+      content: m.content,
+      timestamp: nowIso,
+      trust: 'client-hydrated',
+    });
+    hydrated++;
+  }
+  return { hydrated, ignored: null };
 }
