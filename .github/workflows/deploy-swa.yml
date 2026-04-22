@@ -45,6 +45,17 @@ jobs:
       - name: Verify API dist
         run: test -f packages/web/api/dist/functions/health.js || (echo "❌ API bundle not found at packages/web/api/dist/functions/" && exit 1)
 
+      - name: Verify OTel externals present
+        run: |
+          # Regression guard for https://github.com/sabbour/kickstart/issues/1041
+          # materialize-api-externals.mjs (postbuild) must have copied OTel packages
+          # into packages/web/api/node_modules/ so they ship in the SWA deploy zip.
+          # If this fails: the postbuild step did not run, or materialize script failed.
+          test -d packages/web/api/node_modules/@azure/monitor-opentelemetry || \
+            (echo "❌ @azure/monitor-opentelemetry not found in packages/web/api/node_modules/ — OTel externals were not materialized. This will cause MODULE_NOT_FOUND at runtime and 404 on all API endpoints. See https://github.com/sabbour/kickstart/issues/1041" && exit 1)
+          test -d packages/web/api/node_modules/@opentelemetry/api || \
+            (echo "❌ Missing @opentelemetry/api in deploy artifact — see issue #1041" && exit 1)
+
       - name: Deploy to Azure Static Web Apps
         id: swa_deploy
         uses: Azure/static-web-apps-deploy@v1
