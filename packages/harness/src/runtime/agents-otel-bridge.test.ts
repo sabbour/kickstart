@@ -167,6 +167,137 @@ describe('OtelBridgeTraceProcessor', () => {
     expect(excCall.message).not.toContain('sk-leak1234');
   });
 
+  it('sanitizes the stack trace first line so secrets in err.stack do not leak via exception.stacktrace (#1040)', async () => {
+    const { tracer, spans } = makeTracerSpy();
+    const bridge = new OtelBridgeTraceProcessor(tracer);
+
+    // Real Error with a hand-crafted stack whose line 0 contains a secret
+    // that V8 would naturally echo from the original Error.message.
+    const err = new Error('Bearer abc123def-unsanitized-secret');
+    err.name = 'AgentSpanError';
+    err.stack =
+      'AgentSpanError: Bearer abc123def-unsanitized-secret\n' +
+      '    at Agent.run (/app/packages/harness/src/runtime/runner.ts:42:7)\n' +
+      '    at processTicksAndRejections (node:internal/process/task_queues:95:5)';
+
+    await bridge.onTraceStart({ traceId: 't1', name: 'wf' } as unknown as Parameters<typeof bridge.onTraceStart>[0]);
+    const badSpan = {
+      traceId: 't1',
+      spanId: 's1',
+      parentId: null,
+      spanData: { type: 'generation', model: 'gpt-4o' },
+      error: err,
+    };
+    await bridge.onSpanStart(badSpan as unknown as Parameters<typeof bridge.onSpanStart>[0]);
+    await bridge.onSpanEnd(badSpan as unknown as Parameters<typeof bridge.onSpanEnd>[0]);
+
+    const gen = spans.find((s) => s.name === 'generation.gpt-4o');
+    expect(gen).toBeDefined();
+    // @ts-expect-error — test spy accessor
+    const recorded = gen.recordException.mock.calls[0][0] as Error;
+
+    // Secret must NOT appear in the exception message OR the stacktrace.
+    expect(recorded.message).not.toContain('abc123def');
+    expect(recorded.stack).toBeDefined();
+    expect(recorded.stack).not.toContain('abc123def');
+    // Line 0 rewritten with the sanitized message.
+    const lines = (recorded.stack as string).split('\n');
+    expect(lines[0]).toMatch(/^AgentSpanError: /);
+    expect(lines[0]).toContain('[REDACTED]');
+    // Frame lines preserved intact.
+    expect(lines[1]).toContain('at Agent.run');
+    expect(lines[1]).toContain('runner.ts:42:7');
+    expect(lines[2]).toContain('processTicksAndRejections');
+    // exception.type surfaces as the Error's name.
+    expect(recorded.name).toBe('AgentSpanError');
+  });
+
+  it('does not serialize error.cause into the exported span (#1040 cause-chain isolation)', async () => {
+    const { tracer, spans } = makeTracerSpy();
+    const bridge = new OtelBridgeTraceProcessor(tracer);
+
+    const secret = 'secret-token-xyz-should-not-leak';
+    const outer = new Error('outer failure', { cause: new Error(secret) });
+    outer.name = 'AgentSpanError';
+
+    await bridge.onTraceStart({ traceId: 't1', name: 'wf' } as unknown as Parameters<typeof bridge.onTraceStart>[0]);
+    const badSpan = {
+      traceId: 't1',
+      spanId: 's1',
+      parentId: null,
+      spanData: { type: 'agent', name: 'a' },
+      error: outer,
+    };
+    await bridge.onSpanStart(badSpan as unknown as Parameters<typeof bridge.onSpanStart>[0]);
+    await bridge.onSpanEnd(badSpan as unknown as Parameters<typeof bridge.onSpanEnd>[0]);
+
+    const agent = spans.find((s) => s.name === 'agent.a');
+    expect(agent).toBeDefined();
+    // @ts-expect-error — test spy accessor
+    const recorded = agent.recordException.mock.calls[0][0] as Error & { cause?: unknown };
+    expect(recorded.message).not.toContain(secret);
+    expect(recorded.stack ?? '').not.toContain(secret);
+    // The reconstructed Error is fresh — no cause forwarded.
+    expect(recorded.cause).toBeUndefined();
+    // @ts-expect-error — test spy accessor
+    const statusCall = agent.setStatus.mock.calls[0][0];
+    expect(statusCall.message).not.toContain(secret);
+  });
+
+  it('falls back safely when sdkSpan.error is a non-Error throwable (plain object / null stack)', async () => {
+    const { tracer, spans } = makeTracerSpy();
+    const bridge = new OtelBridgeTraceProcessor(tracer);
+
+    await bridge.onTraceStart({ traceId: 't1', name: 'wf' } as unknown as Parameters<typeof bridge.onTraceStart>[0]);
+
+    // Case A: plain error-shaped object — not `instanceof Error`.
+    const plainSpan = {
+      traceId: 't1',
+      spanId: 's1',
+      parentId: null,
+      spanData: { type: 'agent', name: 'a' },
+      error: { name: 'Weird', message: 'boom' },
+    };
+    // Case B: real Error but .stack is undefined (some minified / stripped envs).
+    const stacklessErr = new Error('stackless');
+    stacklessErr.name = 'AgentSpanError';
+    delete (stacklessErr as { stack?: string }).stack;
+    const stacklessSpan = {
+      traceId: 't1',
+      spanId: 's2',
+      parentId: null,
+      spanData: { type: 'agent', name: 'b' },
+      error: stacklessErr,
+    };
+
+    await expect(
+      bridge.onSpanStart(plainSpan as unknown as Parameters<typeof bridge.onSpanStart>[0]),
+    ).resolves.not.toThrow();
+    await expect(
+      bridge.onSpanEnd(plainSpan as unknown as Parameters<typeof bridge.onSpanEnd>[0]),
+    ).resolves.not.toThrow();
+    await expect(
+      bridge.onSpanStart(stacklessSpan as unknown as Parameters<typeof bridge.onSpanStart>[0]),
+    ).resolves.not.toThrow();
+    await expect(
+      bridge.onSpanEnd(stacklessSpan as unknown as Parameters<typeof bridge.onSpanEnd>[0]),
+    ).resolves.not.toThrow();
+
+    const agentA = spans.find((s) => s.name === 'agent.a');
+    const agentB = spans.find((s) => s.name === 'agent.b');
+    expect(agentA).toBeDefined();
+    expect(agentB).toBeDefined();
+    // Both spans must have had ERROR status set and recordException called.
+    // @ts-expect-error — test spy accessor
+    expect(agentA.setStatus.mock.calls[0][0].code).toBe(2);
+    // @ts-expect-error — test spy accessor
+    expect(agentA.recordException).toHaveBeenCalledTimes(1);
+    // @ts-expect-error — test spy accessor
+    expect(agentB.setStatus.mock.calls[0][0].code).toBe(2);
+    // @ts-expect-error — test spy accessor
+    expect(agentB.recordException).toHaveBeenCalledTimes(1);
+  });
+
   it('shutdown force-ends any remaining open spans without throwing', async () => {
     const { tracer, spans } = makeTracerSpy();
     const bridge = new OtelBridgeTraceProcessor(tracer);

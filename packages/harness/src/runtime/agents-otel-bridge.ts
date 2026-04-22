@@ -179,7 +179,28 @@ function applySpanAttributes(otelSpan: OtelSpan, sdkSpan: Span<SpanData>): void 
     // HTTP payloads. Redact before emitting to Application Insights.
     const safeMsg = sanitizeText(sdkSpan.error.message);
     otelSpan.setStatus({ code: SpanStatusCode.ERROR, message: safeMsg });
-    otelSpan.recordException({ name: 'AgentSpanError', message: safeMsg });
+
+    // Construct a real Error so recordException() populates
+    // exception.stacktrace (and hence App Insights' Call Stack / Failed
+    // method fields). See issue #1040 + DP Amendment #1.
+    //
+    // Security (Zapp blocker): V8's Error.stack begins with a
+    // "ErrorName: message" line that echoes the ORIGINAL unsanitized
+    // message — bypassing sanitizeText() for exception.stacktrace.
+    // Replace line 0 with the already-sanitized safeMsg while preserving
+    // the frame lines (which are structural, not PII).
+    //
+    // error.cause is intentionally NOT forwarded: OTel's recordException()
+    // only reads name/message/stack from an Error, and a cause chain can
+    // carry secrets from upstream failures (confirmed by isolation test).
+    const errToRecord = new Error(safeMsg);
+    errToRecord.name = 'AgentSpanError';
+    if (sdkSpan.error instanceof Error && sdkSpan.error.stack) {
+      const stackLines = sdkSpan.error.stack.split('\n');
+      stackLines[0] = `AgentSpanError: ${safeMsg}`;
+      errToRecord.stack = stackLines.join('\n');
+    }
+    otelSpan.recordException(errToRecord);
   }
 }
 
