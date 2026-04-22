@@ -125,6 +125,21 @@ jobs:
           fi
           echo "✅ Smoke gate integrity verified"
 
+      - name: Guard against useAzureMonitor double-export regression
+        run: |
+          # Protects the single-path redaction guarantee from DP #1035.
+          # appinsights.ts must NOT import/call useAzureMonitor alongside a
+          # custom spanProcessors registration — that creates a double-export
+          # pipeline where the raw (unredacted) exporter wins the race.
+          APP_INSIGHTS=packages/web/api/src/lib/appinsights.ts
+          if [ -f "$APP_INSIGHTS" ] \
+             && grep -qE '\buseAzureMonitor\b' "$APP_INSIGHTS" \
+             && grep -qE '\bspanProcessors\b' "$APP_INSIGHTS"; then
+            echo "::error file=$APP_INSIGHTS::Regression: useAzureMonitor found alongside spanProcessors. This re-introduces the double-export bypass closed by #1035. Use a single manual tracer-provider path."
+            exit 1
+          fi
+          echo "✅ appinsights.ts single-path redaction integrity verified"
+
       - name: Changeset status
         if: steps.docs_gate.outputs.requireChangeset == 'true'
         run: |
