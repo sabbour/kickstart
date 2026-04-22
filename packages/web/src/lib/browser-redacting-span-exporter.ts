@@ -1,3 +1,4 @@
+import type { Attributes } from "@opentelemetry/api";
 import type { ReadableSpan, SpanExporter } from "@opentelemetry/sdk-trace-base";
 import type { ExportResult } from "@opentelemetry/core";
 import { redactBrowserAttributes } from "./browser-redact-attrs";
@@ -42,7 +43,7 @@ export function redactBrowserSpan(span: ReadableSpan): ReadableSpan {
         const res = Reflect.get(target, prop, target);
         return new Proxy(res, {
           get(rTarget, rProp, _r) {
-            if (rProp === "attributes") return redactBrowserAttributes((rTarget as { attributes?: Record<string, unknown> }).attributes ?? {});
+            if (rProp === "attributes") return redactBrowserAttributes(((rTarget as { attributes?: Attributes }).attributes ?? {}) as Attributes);
             const v = Reflect.get(rTarget, rProp, rTarget);
             return typeof v === "function" ? (v as (...args: unknown[]) => unknown).bind(rTarget) : v;
           },

@@ -122,6 +122,42 @@ export interface ActiveBrowserTelemetry {
 let active: ActiveBrowserTelemetry | null = null;
 
 /**
+ * Resolved once the async telemetry bootstrap has finished — regardless of
+ * whether it actually initialised a provider. Tests (Playwright) and the
+ * SPA-nav kill-switch poller can `await` this to avoid a race against the
+ * first user-initiated fetch. Exposed on `window.__kickstartTelemetryReady`
+ * for the E2E scenarios (#1042 review — Leela blocker 2).
+ */
+let _readyResolve: (() => void) | null = null;
+const ready: Promise<void> = new Promise<void>((resolve) => {
+  _readyResolve = resolve;
+});
+
+/** Mark the async bootstrap complete. Idempotent. */
+export function markBrowserTelemetryReady(): void {
+  if (_readyResolve) {
+    const r = _readyResolve;
+    _readyResolve = null;
+    r();
+  }
+  if (typeof window !== "undefined") {
+    try {
+      Object.defineProperty(window, "__kickstartTelemetryReady", {
+        value: ready,
+        configurable: true,
+        writable: true,
+      });
+    } catch {
+      // Ignore — harmless if window is frozen.
+    }
+  }
+}
+
+export function getBrowserTelemetryReady(): Promise<void> {
+  return ready;
+}
+
+/**
  * Initialize the browser tracer provider + fetch instrumentation. Safe to
  * call more than once — subsequent calls are no-ops until the active handle
  * is explicitly `shutdown()`.
