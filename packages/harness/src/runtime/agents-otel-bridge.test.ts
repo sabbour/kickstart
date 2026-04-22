@@ -326,4 +326,28 @@ describe('OtelBridgeTraceProcessor', () => {
     expect(firstTracer).toBeDefined();
     expect(secondTracer).toBeDefined();
   });
+
+  // #1073 T6 — handoff span emission (regression guard). Bridge already
+  // shapes the span name as `handoff.from→to`; this asserts the mapping
+  // stays stable so Application Insights keeps grouping handoffs together.
+  it('T6 (#1073): emits a handoff.<from>→<to> OTel span with from_agent/to_agent attributes', async () => {
+    const { tracer, spans } = makeTracerSpy();
+    const bridge = new OtelBridgeTraceProcessor(tracer);
+
+    await bridge.onTraceStart({ traceId: 't-handoff', name: 'wf' } as unknown as Parameters<typeof bridge.onTraceStart>[0]);
+    const handoffSpan = makeSpan({
+      traceId: 't-handoff',
+      spanId: 's-handoff',
+      spanData: { type: 'handoff', from_agent: 'core.triage', to_agent: 'core.codesmith' },
+    });
+    await bridge.onSpanStart(handoffSpan as unknown as Parameters<typeof bridge.onSpanStart>[0]);
+    await bridge.onSpanEnd(handoffSpan as unknown as Parameters<typeof bridge.onSpanEnd>[0]);
+
+    const ho = spans.find((s) => s.name.startsWith('handoff.'));
+    expect(ho).toBeDefined();
+    expect(ho!.name).toBe('handoff.core.triage→core.codesmith');
+    expect(ho!.attributes['openai.agents.from_agent']).toBe('core.triage');
+    expect(ho!.attributes['openai.agents.to_agent']).toBe('core.codesmith');
+    expect(ho!.ended).toBe(true);
+  });
 });

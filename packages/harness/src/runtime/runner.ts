@@ -12,8 +12,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { Agent, Runner as SDKRunner, tool, setDefaultModelProvider, OpenAIProvider, setTraceProcessors } from '@openai/agents';
+import { Agent, Runner as SDKRunner, handoff, tool, setDefaultModelProvider, OpenAIProvider, setTraceProcessors } from '@openai/agents';
 import type { FunctionTool, AgentInputItem } from '@openai/agents';
+import type { GuardrailContribution } from '../types/guardrail.js';
 import type { Turn } from '../types/session.js';
 import { OtelBridgeTraceProcessor } from './agents-otel-bridge.js';
 import type { AgentContribution } from '../types/agent.js';
@@ -369,11 +370,140 @@ export function toAgentInputItems(turns: readonly Turn[]): AgentInputItem[] {
 }
 
 // ---------------------------------------------------------------------------
+// Runner turn budget (#1073, Zapp Z2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Default per-turn cap on SDK agent loop iterations. Each iteration is one
+ * model call plus any tool-invocation round, so 10 is a generous ceiling
+ * for the expected triage → specialist → triage chain while still acting
+ * as a runtime circuit-breaker against mutual-handoff ping-pong (per
+ * Zapp Z2 on #1073). Can be overridden via `KICKSTART_RUNNER_MAX_TURNS`.
+ */
+export const RUNNER_MAX_TURNS_DEFAULT = 10;
+
+/**
+ * Resolve the per-run `maxTurns` cap passed to `sdkRunner.run()`.
+ *
+ * Honors `KICKSTART_RUNNER_MAX_TURNS` when set to a positive integer; any
+ * invalid / non-positive value falls back to the default. Exported for
+ * unit-testing.
+ */
+export function resolveMaxTurns(): number {
+  const raw = process.env.KICKSTART_RUNNER_MAX_TURNS;
+  if (!raw) return RUNNER_MAX_TURNS_DEFAULT;
+  const n = Number.parseInt(raw.trim(), 10);
+  if (!Number.isFinite(n) || n <= 0) return RUNNER_MAX_TURNS_DEFAULT;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 
 export class Runner {
   constructor(private readonly registry: PackRegistry) {}
+
+  /**
+   * Build an SDK `Agent` instance for the given agent id, recursively
+   * resolving frontmatter `handoffs[]` into SDK `handoff()` calls.
+   *
+   * ### Per-turn cache invariant (cycle safety — Leela DP §B, #1073)
+   *
+   * A `Map<agentId, Agent>` is passed in and shared across every recursive
+   * call inside one turn. The caller MUST pass a fresh empty Map per turn
+   * so tool closures (`session`, `sseWrite`, `abortCtrl`) are rebuilt and
+   * don't leak across turns (Nibbler N1/N2).
+   *
+   * The cycle-safety trick: an Agent with an empty `handoffs: []` array is
+   * constructed and inserted into the cache BEFORE we recurse into its
+   * declared targets. This way, if target B's handoffs include A again
+   * (A↔B cycle), the recursive `buildAgentInstance(A)` returns the
+   * already-cached A placeholder instead of recursing forever. Handoff
+   * instances are then pushed onto `agent.handoffs` after the recursion
+   * returns — the SDK exposes `handoffs` as a mutable array, so late-push
+   * is safe.
+   *
+   * Do not reorder: cache MUST be populated before the recursion into
+   * targets, otherwise A↔B blows the stack.
+   */
+  private buildAgentInstance(
+    agentName: string,
+    cache: Map<string, Agent<any, any>>,
+    ctx: {
+      session: Session;
+      sseWrite: SSEWriter;
+      abortCtrl: AbortController;
+      toolGuardrails: GuardrailContribution[];
+      isHalted: () => boolean;
+      setHalted: () => void;
+    },
+  ): Agent<any, any> {
+    const cached = cache.get(agentName);
+    if (cached) return cached;
+
+    const agentContrib = this.registry.getAgent(agentName);
+
+    // Build tools list
+    const toolContribs = this.registry.getToolsForAgent(agentName);
+    const tools = toolContribs.map((contrib) => {
+      if ('wireName' in contrib) {
+        return wrapUserAction(
+          contrib as UserActionContribution,
+          ctx.session,
+          ctx.sseWrite,
+          ctx.abortCtrl,
+          this.registry,
+        );
+      }
+      return wrapTool(
+        contrib as ToolContribution,
+        ctx.toolGuardrails,
+        agentName,
+        ctx.sseWrite,
+        ctx.abortCtrl,
+        ctx.isHalted,
+        ctx.setHalted,
+      );
+    });
+
+    // Build dynamic instructions: base + skills stub + catalog hint
+    const skills = this.registry.getSkillsForAgent(agentName);
+    const skillsBlock = skills.length > 0
+      ? `\n\n## Available Skills\n${skills.map((s) => `- **${s.id}**: ${s.description}`).join('\n')}`
+      : '';
+
+    const components = this.registry.components;
+    const catalogBlock = components.length > 0
+      ? `\n\n## A2UI Component Catalog (${components.length} components available)\n${components.map((c) => c.name).join(', ')}`
+      : '';
+
+    const instructions = agentContrib.instructionsBase + skillsBlock + catalogBlock;
+    const modelName = resolveModelName(agentContrib.model);
+
+    // Construct with empty handoffs; insert into cache BEFORE recursing so
+    // A↔B cycles terminate on the second visit. See doc-comment invariant.
+    const agent = new Agent({
+      name: agentContrib.name,
+      instructions,
+      tools,
+      model: modelName,
+      outputType: AgentOutput,
+      handoffs: [],
+    });
+    cache.set(agentName, agent);
+
+    // Resolve each frontmatter handoff recursively. PackRegistry.seal()
+    // guarantees every target exists and belongs to the same pack (#1073
+    // Z1), so a missing target here is a programmer error, not user input.
+    for (const h of agentContrib.handoffs ?? []) {
+      const target = this.buildAgentInstance(h.agent, cache, ctx);
+      const description = h.prompt ? `${h.label}. ${h.prompt}` : h.label;
+      agent.handoffs.push(handoff(target, { toolDescriptionOverride: description }));
+    }
+
+    return agent;
+  }
 
   async run(
     session: Session,
@@ -429,53 +559,23 @@ export class Runner {
     const isHalted = () => guardrailHalted;
     const setHalted = () => { guardrailHalted = true; };
 
-    // Build tools list
-    const toolContribs = this.registry.getToolsForAgent(agentName);
-    const tools = toolContribs.map((contrib) => {
-      if ('wireName' in contrib) {
-        // UserActionContribution
-        return wrapUserAction(
-          contrib as UserActionContribution,
-          session,
-          sseWrite,
-          abortCtrl,
-          this.registry,
-        );
-      }
-      return wrapTool(
-        contrib as ToolContribution,
-        toolGuardrails,
-        agentName,
-        sseWrite,
-        abortCtrl,
-        isHalted,
-        setHalted,
-      );
-    });
-
-    // Build dynamic instructions: base + skills stub + catalog hint
-    const skills = this.registry.getSkillsForAgent(agentName);
-    const skillsBlock = skills.length > 0
-      ? `\n\n## Available Skills\n${skills.map((s) => `- **${s.id}**: ${s.description}`).join('\n')}`
-      : '';
-
-    const components = this.registry.components;
-    const catalogBlock = components.length > 0
-      ? `\n\n## A2UI Component Catalog (${components.length} components available)\n${components.map((c) => c.name).join(', ')}`
-      : '';
-
-    const instructions = agentContrib.instructionsBase + skillsBlock + catalogBlock;
-
-    // Build the @openai/agents Agent
+    // Build tools list + agent tree (with recursively-resolved handoffs).
+    // Per-turn cache: MUST be a fresh Map so closures bind to this turn's
+    // session / sseWrite / abortCtrl (Nibbler N1/N2, #1073).
+    const agentBuildCache = new Map<string, Agent<any, any>>();
+    const buildCtx = {
+      session,
+      sseWrite,
+      abortCtrl,
+      toolGuardrails,
+      isHalted,
+      setHalted,
+    };
+    const agent = this.buildAgentInstance(agentName, agentBuildCache, buildCtx);
     const modelName = resolveModelName(agentContrib.model);
-
-    const agent = new Agent({
-      name: agentContrib.name,
-      instructions,
-      tools,
-      model: modelName,
-      outputType: AgentOutput,
-    });
+    // Skills executed telemetry — resolved from the root agent only (its
+    // sub-agent skills are reported independently if/when that agent runs).
+    const skillsExecuted = this.registry.getSkillsForAgent(agentName).map((s) => s.id);
 
     let fullText = '';
     // Buffer all text chunks — output guardrails must pass before any chunk is sent to the client.
@@ -484,7 +584,6 @@ export class Runner {
     // Debug telemetry — track tool calls and matched skills for the `end` event.
     const toolsExecuted: Array<{ name: string; status: 'ok' | 'error' }> = [];
     const pendingToolNames = new Map<string, number>(); // toolName → index in toolsExecuted
-    const skillsExecuted = skills.map((s) => s.id);
 
     try {
       const sdkRunner = getSdkRunner();
@@ -506,6 +605,9 @@ export class Runner {
         stream: true,
         context: session,
         signal: abortCtrl.signal,
+        // #1073 Zapp Z2: explicit circuit-breaker so mutual handoffs can't
+        // ping-pong until token exhaustion. See resolveMaxTurns().
+        maxTurns: resolveMaxTurns(),
       });
 
       for await (const event of result) {

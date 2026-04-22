@@ -370,6 +370,159 @@ Use ARM.
     expect(() => registry.register({ name: 'core', version: '1.0.0' })).toThrow(/sealed/);
   });
 
+  // ── #1073 D2: handoff validation at seal() ─────────────────────────────
+  describe('seal() — handoff validation (#1073)', () => {
+    it('accepts intra-pack handoff targets that exist', () => {
+      const registry = new PackRegistry();
+      registry.register({
+        name: 'core',
+        version: '1.0.0',
+        agents: [
+          {
+            name: 'core.triage',
+            description: 'triage',
+            model: { envVar: 'M' },
+            toolAllowlist: [],
+            handoffs: [{ label: 'Go', agent: 'core.codesmith' }],
+            userInvocable: true,
+            modelInvocable: true,
+            instructionsBase: 'triage',
+            source: { kind: 'inline' },
+          },
+          {
+            name: 'core.codesmith',
+            description: 'codesmith',
+            model: { envVar: 'M' },
+            toolAllowlist: [],
+            handoffs: [],
+            userInvocable: false,
+            modelInvocable: true,
+            instructionsBase: 'codesmith',
+            source: { kind: 'inline' },
+          },
+        ],
+      });
+      registry.enable(['core']);
+      expect(() => registry.seal()).not.toThrow();
+    });
+
+    it('throws with pack, agent, and target tokens when handoff target is unknown (T4, Nibbler N6)', () => {
+      const registry = new PackRegistry();
+      registry.register({
+        name: 'core',
+        version: '1.0.0',
+        agents: [{
+          name: 'core.triage',
+          description: 'triage',
+          model: { envVar: 'M' },
+          toolAllowlist: [],
+          handoffs: [{ label: 'Go', agent: 'core.ghost' }],
+          userInvocable: true,
+          modelInvocable: true,
+          instructionsBase: 'triage',
+          source: { kind: 'inline' },
+        }],
+      });
+      registry.enable(['core']);
+      try {
+        registry.seal();
+        throw new Error('expected seal() to throw');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        // All three tokens must appear in the error for fast diagnosis.
+        expect(msg).toContain('core');        // pack
+        expect(msg).toContain('core.triage'); // agent
+        expect(msg).toContain('core.ghost');  // target
+        expect(msg).toMatch(/unknown handoff target/i);
+      }
+    });
+
+    it('rejects cross-pack handoff targets (T5, Zapp Z1)', () => {
+      const registry = new PackRegistry();
+      registry.register({
+        name: 'core',
+        version: '1.0.0',
+        agents: [{
+          name: 'core.codesmith',
+          description: 'codesmith',
+          model: { envVar: 'M' },
+          toolAllowlist: [],
+          handoffs: [],
+          userInvocable: false,
+          modelInvocable: true,
+          instructionsBase: 'codesmith',
+          source: { kind: 'inline' },
+        }],
+      });
+      registry.register({
+        name: 'azure',
+        version: '1.0.0',
+        dependsOn: ['core'],
+        agents: [{
+          name: 'azure.architect',
+          description: 'architect',
+          model: { envVar: 'M' },
+          toolAllowlist: [],
+          handoffs: [{ label: 'Code', agent: 'core.codesmith' }],
+          userInvocable: false,
+          modelInvocable: true,
+          instructionsBase: 'architect',
+          source: { kind: 'inline' },
+        }],
+      });
+      registry.enable(['azure']);
+      try {
+        registry.seal();
+        throw new Error('expected seal() to throw');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        expect(msg).toMatch(/cross-pack/i);
+        expect(msg).toContain('azure');            // source pack
+        expect(msg).toContain('azure.architect');  // source agent
+        expect(msg).toContain('core.codesmith');   // target
+      }
+    });
+
+    it('ignores inactive packs when validating handoffs', () => {
+      // An inactive pack with a bogus handoff must NOT fail seal — the
+      // agent is unreachable, the handoff is dead config.
+      const registry = new PackRegistry();
+      registry.register({
+        name: 'core',
+        version: '1.0.0',
+        agents: [{
+          name: 'core.triage',
+          description: 'triage',
+          model: { envVar: 'M' },
+          toolAllowlist: [],
+          handoffs: [],
+          userInvocable: true,
+          modelInvocable: true,
+          instructionsBase: 'triage',
+          source: { kind: 'inline' },
+        }],
+      });
+      registry.register({
+        name: 'dead',
+        version: '1.0.0',
+        agents: [{
+          name: 'dead.ghost',
+          description: 'ghost',
+          model: { envVar: 'M' },
+          toolAllowlist: [],
+          handoffs: [{ label: 'Nope', agent: 'dead.missing' }],
+          userInvocable: false,
+          modelInvocable: true,
+          instructionsBase: 'ghost',
+          source: { kind: 'inline' },
+        }],
+      });
+      // Only enable 'core' → 'dead' is inactive.
+      registry.enable(['core']);
+      expect(() => registry.seal()).not.toThrow();
+    });
+  });
+
   it('detects circular dependencies iteratively', () => {
     const registry = new PackRegistry();
     registry.register({ name: 'a', version: '1.0.0', dependsOn: ['b'] });

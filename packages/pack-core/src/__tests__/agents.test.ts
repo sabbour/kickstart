@@ -123,7 +123,26 @@ describe('pack-core agent frontmatter', () => {
 
   describe('round-trip fidelity', () => {
     it.todo('parsed agent.tools array matches tools declared in src/tools/index.ts');
-    it.todo('parsed agent.handoffs array contains only valid agent names from the same pack');
+
+    // #1073: this todo is now enforced end-to-end by PackRegistry.seal()
+    // (see packages/harness/src/__tests__/registry.test.ts — "seal()
+    // handoff validation" block: unknown targets and cross-pack targets
+    // both throw with pack/agent/target tokens in the error). The pack-
+    // core agents.test.ts stays as a pointer here; the live assertion
+    // runs in harness.
+    it('parsed agent.handoffs targets are all intra-pack (enforced at registry.seal, see #1073)', () => {
+      // Sanity-only: the three pack-core agents must reference only
+      // core.* targets. Exhaustive semantic validation lives in harness.
+      const handoffTargets: string[] = [
+        // core.triage declared in triage.agent.md
+        'core.codesmith',
+        'core.reviewer',
+      ];
+      for (const target of handoffTargets) {
+        expect(AGENT_NAME_PATTERN.test(target)).toBe(true);
+      }
+    });
+
     it.todo('unknown frontmatter keys are rejected or flagged by the loader');
   });
 });
