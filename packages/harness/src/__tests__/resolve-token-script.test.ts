@@ -36,14 +36,12 @@ describe('resolve-token script', () => {
 });
 
 describe('resolve-token role mapping', () => {
-  it('keeps reviewer personas distinct from lead when per-role apps are missing', async () => {
+  it('consolidates lead-tier reviewers (zapp, nibbler) under the lead role while keeping ralph distinct', async () => {
     expect(resolveRoleSlug(projectRoot, 'lead')).toBe('lead');
-    expect(resolveRoleSlug(projectRoot, 'zapp')).toBeNull();
-    expect(resolveRoleSlug(projectRoot, 'nibbler')).toBeNull();
+    expect(resolveRoleSlug(projectRoot, 'zapp')).toBe('lead');
+    expect(resolveRoleSlug(projectRoot, 'nibbler')).toBe('lead');
     expect(resolveRoleSlug(projectRoot, 'ralph')).toBeNull();
 
-    await expect(resolveToken(projectRoot, 'zapp')).resolves.toBeNull();
-    await expect(resolveToken(projectRoot, 'nibbler')).resolves.toBeNull();
     await expect(resolveToken(projectRoot, 'ralph')).resolves.toBeNull();
   });
 
