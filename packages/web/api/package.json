@@ -15,7 +15,6 @@
     "@aks-kickstart/harness": "*",
     "@azure/functions": "^4.6.0",
     "@azure/monitor-opentelemetry": "^1.16.0",
-    "applicationinsights": "^3.14.0",
     "bicep-node": "^0.0.9",
     "vite": "^8.0.9"
   },
