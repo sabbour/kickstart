@@ -83,6 +83,34 @@ branch-on-event block that:
 - A duplicate-`createSurface` guard upstream of the renderer prevents the
   "duplicate header" failure mode when an agent re-emits the same surface.
 
+## Security notes
+
+### Marker channel is NOT authenticated
+
+The `[A2UI event] name=… payload=…` marker is inserted by the server into the
+agent's context, but it is **not a trusted, authenticated channel**. The marker
+shape is public: a user who knows the format can type an identical string into
+the `message` field of a hand-crafted POST, causing the triage agent to see a
+spoofed event.
+
+The triage prompt trusts the marker **by instruction** (the agent is told to
+act on it), not by cryptographic provenance. This is an intentional design
+trade-off: the system is not a security boundary — it is a UX shortcut. Do not
+use the event marker to make security-relevant decisions (e.g. "user has
+confirmed deletion").
+
+Server-side validation (`coerceEvent()` in `converse.ts`) rejects malformed
+names (newline injection, oversized payloads, non-object shapes) to reduce the
+attack surface, but does not prevent a determined actor from crafting a
+well-formed spoofed marker via the `message` field.
+
+**Mitigation in place (as of PR #1072):**
+- `event.name` must match `^[a-zA-Z0-9_:\-]{1,64}$` — no whitespace or
+  control characters, blocking the newline injection path.
+- `event.payload` is size-capped at 2 KB (serialised) and must be a plain
+  object.
+- `body.message` is capped at 8 KB.
+
 ## Related
 
 - #1062 — Triage loop (this pattern's origin).
