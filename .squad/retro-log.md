@@ -98,6 +98,10 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-22 | #1056 "fix(ops): SWA smoke test hard gate + re-enable PR preview environments (closes #1049)" | M | impl=1m | review=26m | cycles=1 | merged-with-rework | @sabbour-squad-frontend[bot] | first_review=4m | ci=9m | reviewer=bot | human_comments=0 | issue=#1049 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1053 "fix(identity): alias zapp to lead role" | S | impl=0m | review=31m | cycles=1 | merged | @sabbour-squad-tester[bot] | first_review=6m | ci=7m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-22 | #1052 "fix(ci): invert OTel externals guard in deploy-swa.yml (#1051 follow-up)" | S | impl=0m | review=10m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=2m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-22 | #1048 "chore(identity): map Nibbler alias to lead role" | S | impl=0m | review=66m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=65m | ci=7m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
