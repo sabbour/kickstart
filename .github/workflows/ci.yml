@@ -108,6 +108,18 @@ jobs:
 
             core.setOutput('requireChangeset', String(requireChangeset));
 
+      - name: Guard against smoke gate regression
+        run: |
+          if grep -nE 'exit 0' .github/workflows/deploy-swa.yml | grep -iE 'smoke|production_url|base_url'; then
+            echo "::error file=.github/workflows/deploy-swa.yml::Regression: smoke-resolve step uses exit 0 (silent skip). Must be exit 1."
+            exit 1
+          fi
+          if grep -nE 'continue-on-error:\s*true' .github/workflows/deploy-swa.yml; then
+            echo "::error file=.github/workflows/deploy-swa.yml::Regression: continue-on-error:true in deploy-swa workflow. Smoke chain must fail loudly."
+            exit 1
+          fi
+          echo "✅ Smoke gate integrity verified"
+
       - name: Changeset status
         if: steps.docs_gate.outputs.requireChangeset == 'true'
         run: |
