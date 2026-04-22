@@ -39,6 +39,22 @@ export interface UserActionReqPayload {
   cancellation?: 'supported' | 'not-supported';
 }
 
+/**
+ * Structured A2UI event metadata attached to the POST /api/converse body
+ * when the user's message originated from an A2UI component action (e.g. a
+ * Button click whose `action.event.name` is `choose_build`).
+ *
+ * Layer 1 of #1062: the user bubble shows the human label (e.g. "Build new")
+ * while the event name + payload travels as structured metadata so the agent
+ * can branch on intent without having to parse free-form text.
+ */
+export interface A2uiEventMetadata {
+  /** The event name, taken verbatim from `action.event.name`. */
+  name: string;
+  /** Optional key-value payload from the component's `action.event.context`. */
+  payload?: Record<string, unknown>;
+}
+
 // ---------------------------------------------------------------------------
 // Stream callbacks
 // ---------------------------------------------------------------------------
@@ -304,6 +320,60 @@ export async function _processSSEStream(
   return state;
 }
 
+// ---------------------------------------------------------------------------
+// Converse POST body composer (pure — exported for unit tests)
+// ---------------------------------------------------------------------------
+
+export interface ComposeConverseRequestBodyParams {
+  sessionId: string | undefined;
+  message: string;
+  clientMessageId: string;
+  clientMessages:
+    | Array<{ role: 'user' | 'assistant'; content: string; phase?: string; usage?: TurnUsage }>
+    | undefined;
+  event?: A2uiEventMetadata;
+}
+
+/**
+ * Shape the JSON body POSTed to `/api/converse` for a streaming turn.
+ *
+ * Exported so unit tests can exercise the wire contract (#1061/#1062 Layer 1)
+ * without needing to spin up the whole React hook. The body carries:
+ *
+ *   - `sessionId`         — server-issued ID from the prior `end` SSE event
+ *                           so the server can rehydrate conversation history.
+ *   - `message`           — the human-readable user-facing bubble text
+ *                           (e.g. the Button's visible label).
+ *   - `event`             — OPTIONAL structured A2UI event metadata
+ *                           ({ name, payload? }) when the turn originated from
+ *                           a component action. The server injects this into
+ *                           the agent-facing prompt so the triage agent can
+ *                           branch-on-event instead of re-parsing free-form
+ *                           bubble text.
+ *   - `messages`          — client-side history fallback for session replay.
+ *   - `clientMessageId`   — browser-assigned request correlation ID.
+ */
+export function _composeConverseRequestBody(
+  params: ComposeConverseRequestBodyParams,
+): Record<string, unknown> {
+  const { sessionId, message, clientMessageId, clientMessages, event } = params;
+  const body: Record<string, unknown> = {
+    sessionId,
+    message,
+    stream: true,
+    clientMessageId,
+  };
+  if (clientMessages && clientMessages.length > 0) {
+    body.messages = clientMessages;
+  }
+  if (event && typeof event.name === 'string' && event.name.length > 0) {
+    body.event = event.payload
+      ? { name: event.name, payload: event.payload }
+      : { name: event.name };
+  }
+  return body;
+}
+
 export function useStreaming() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState('');
@@ -359,6 +429,7 @@ export function useStreaming() {
     callbacks: StreamCallbacks,
     debugMode?: boolean,
     chatHistory?: ChatMessage[],
+    event?: A2uiEventMetadata,
   ) => {
     setIsStreaming(true);
     setStreamText('');
@@ -394,6 +465,14 @@ export function useStreaming() {
         ...(m.usage ? { usage: m.usage } : {}),
       }));
 
+    const requestBody = _composeConverseRequestBody({
+      sessionId,
+      message,
+      clientMessageId,
+      clientMessages,
+      event,
+    });
+
     try {
       const res = await apiFetch('/api/converse', {
         method: 'POST',
@@ -401,13 +480,7 @@ export function useStreaming() {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
         },
-        body: JSON.stringify({
-          sessionId,
-          message,
-          stream: true,
-          clientMessageId,
-          ...(clientMessages?.length ? { messages: clientMessages } : {}),
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       }, debugMode);
 

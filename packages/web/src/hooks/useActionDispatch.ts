@@ -8,7 +8,7 @@ import {
   AUTO_CONTINUE_MAX_CONSECUTIVE,
 } from '@aks-kickstart/harness';
 import { sanitizeActionContext } from '../utils/sanitize-action-context';
-import type { UserActionReqPayload } from './useStreaming';
+import type { UserActionReqPayload, A2uiEventMetadata } from './useStreaming';
 import { clientRegistry } from '../contexts/A2UIRegistryContext';
 
 // ---------------------------------------------------------------------------
@@ -376,6 +376,35 @@ function actionToMessage(action: A2uiClientAction): string {
 }
 
 /**
+ * Build the structured A2UI event metadata that accompanies a button-click
+ * user message posted to `/api/converse`.
+ *
+ * Layer 1 of #1062: the user bubble shows a human label, but the raw event
+ * name (`action.name`, e.g. `choose_build`) and payload (`action.context`)
+ * travel to the server as structured metadata so the triage agent can
+ * branch-on-event instead of re-parsing free-form text.
+ *
+ * Returns `undefined` when there is no useful event signal to pass (e.g. the
+ * action is a bare reply with no distinguishing name or context).
+ */
+export function buildActionEventMetadata(action: A2uiClientAction): A2uiEventMetadata | undefined {
+  const rawName = action?.name;
+  if (typeof rawName !== 'string' || rawName.length === 0) return undefined;
+
+  // Strip routing prefixes so the server sees the semantic event name only.
+  const name = rawName.replace(/^(navigate:|nav:|api:|complete:|continue:|client:)/, '');
+  if (!name) return undefined;
+
+  const rawCtx = action.context;
+  const payload = rawCtx && typeof rawCtx === 'object' && !Array.isArray(rawCtx)
+    ? sanitizeActionContext(rawCtx as Record<string, unknown>)
+    : undefined;
+
+  const hasPayload = payload && Object.keys(payload).length > 0;
+  return hasPayload ? { name, payload } : { name };
+}
+
+/**
  * Parses an `api:` action name into connector name + operation.
  *
  * Format: `api:{connectorName}.{operation}` (e.g. `api:azure-arm.listResources`)
@@ -396,12 +425,12 @@ function parseApiAction(actionName: string): { connectorName: string | undefined
 
 export interface ActionDispatchOptions {
   /** Send a message to the conversation (re-prompts the LLM). */
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, event?: A2uiEventMetadata) => void;
   /**
    * Send an auto-generated continuation message (no user bubble shown).
    * Falls back to onSendMessage if not provided.
    */
-  onAutoContinue?: (message: string) => void;
+  onAutoContinue?: (message: string, event?: A2uiEventMetadata) => void;
   /** Optional callback for navigate actions (in addition to re-prompting). */
   onNavigate?: (phase: string, context: Record<string, unknown>) => void;
   /**
@@ -505,8 +534,9 @@ export function useActionDispatch(options: ActionDispatchOptions): ActionDispatc
         consecutiveRef.current = 0;
         setConsecutiveAutoContinueCount(0);
         const message = actionToMessage(action);
+        const event = buildActionEventMetadata(action);
         logDebug(message);
-        optionsRef.current.onSendMessage(message);
+        optionsRef.current.onSendMessage(message, event);
         break;
       }
 

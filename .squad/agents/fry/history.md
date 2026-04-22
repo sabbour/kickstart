@@ -211,3 +211,50 @@ PR: https://github.com/sabbour/kickstart/pull/1004
 - Targeted suite (my new test + `component-examples.test.ts`): 34/34 green.
 
 **PR #1003.** Changeset: web/patch. Rollback: single revert.
+
+## 2026-04-22 — #1062 Layers 1–3: A2UI event payload bridge
+
+Shipped the client half of the #1062 triage-loop fix in branch
+`squad/1062-client-payload-prompt-ui`:
+
+- **Layer 1 (wire contract).** `POST /api/converse` now accepts an optional
+  `event: { name, payload? }` field. Client carries the button's human label
+  in `message` and the structured event name / sanitized payload in `event`.
+  Extracted a pure `_composeConverseRequestBody` helper + exported
+  `buildActionEventMetadata` from `useActionDispatch` so the wire contract
+  is unit-testable without React.
+- **Layer 2 (triage prompt).** Added an explicit branch-on-event rule keyed
+  to the `[A2UI event] name=<name> payload=<json>` marker the server
+  injects. Per Ahmed's steering input, the rule tells the agent to inspect
+  context and prior turns rather than hardcoding a switch table. Prompt-
+  text vitest regression guards against silent deletion.
+- **Layer 3 (surface guard).** Extracted `_filterMessagesForProcessor` from
+  `useA2UI.processMessages`; duplicate `createSurface` messages for already
+  existing surfaces are dropped with a debug log. Subsequent `updateComponents`
+  for the same surface still land — "updates-or-no-op" contract from DP v3.
+
+**Test results:** 17 new unit tests passing; full suite 1112 passing with
+zero new failures. The one preexisting `@testing-library/react` resolution
+error in `pack-core/src/__tests__/components/basic-components.test.tsx` is
+unchanged from main.
+
+**Playwright:** wrote `button-click-payload.spec.ts` scaffold that skips
+until `HARNESS_SESSION_HISTORY_ENABLED=1` — per DP v3 test item 8, the
+end-to-end regression only passes once Bender's Layer 0 lands.
+
+**Learnings:**
+
+1. `sanitizeActionContext` allowlist drops `action` / `confirmed` keys.
+   Kept the sanitisation because the event payload eventually reaches an
+   LLM prompt (server-side marker injection). Only the `value` key survives
+   from the typical `{action, value, confirmed}` Button payload — that's
+   fine because the event *name* already carries the intent.
+2. Avoided touching `runner.ts` (Bender's scope). Layer 1's server-side
+   change lives entirely in `converse.ts` via a small pure
+   `composeAgentInput()` function — Bender's session-adapter will see the
+   marker as ordinary user-turn content without any coupling.
+3. Extracting pure helpers (`_composeConverseRequestBody`,
+   `_filterMessagesForProcessor`, `buildActionEventMetadata`) let me cover
+   all three layers without React Testing Library (not installed in this
+   package). Underscore prefix matches the existing `_performSdkNonStreamingFetch`
+   convention in the same hook.

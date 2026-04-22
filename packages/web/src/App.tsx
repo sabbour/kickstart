@@ -13,6 +13,7 @@ import { useSessions } from './hooks/useSessions';
 import { useNavigation } from './hooks/useNavigation';
 import type { NavState } from './hooks/useNavigation';
 import { useStreaming } from './hooks/useStreaming';
+import type { A2uiEventMetadata } from './hooks/useStreaming';
 // TODO(Step 5): useMockStreaming removed — mock mode deleted in Step 1
 import { useAPIConnectorRegistry } from './contexts/APIConnectorContext';
 import { useArtifacts } from './contexts/ArtifactContext';
@@ -71,8 +72,8 @@ export function App() {
   const { getArtifact } = useArtifacts();
 
   const { handler: actionHandler, resetConsecutiveCount } = useActionDispatch({
-    onSendMessage: (msg) => handleSendMessage(msg),
-    onAutoContinue: (msg) => handleSendMessage(msg, true),
+    onSendMessage: (msg, event) => handleSendMessage(msg, false, undefined, event),
+    onAutoContinue: (msg, event) => handleSendMessage(msg, true, undefined, event),
     connectorRegistry,
     onDebugAction: debugEnabled ? (evt) => logAction({ ...evt, timestamp: Date.now() }) : undefined,
     onClientAction: (operation) => {
@@ -445,7 +446,7 @@ export function App() {
     }
   }, [resolveArtifactContent, fs, openGeneratedFile, a2ui, progressiveQueue, setConversationPhase]);
 
-  const handleSendMessage = useCallback(async (text: string, isAutoContinue = false, explicitSessionId?: string) => {
+  const handleSendMessage = useCallback(async (text: string, isAutoContinue = false, explicitSessionId?: string, event?: A2uiEventMetadata) => {
     // Manual messages reset the consecutive auto-continue counter
     if (!isAutoContinue) {
       resetConsecutiveCount();
@@ -660,7 +661,7 @@ export function App() {
           setMessages(prev => [...prev, errorMsg]);
           sessions.addMessage(sessionId!, errorMsg);
         },
-      }, debugEnabled, activeSession?.messages ?? []);
+      }, debugEnabled, activeSession?.messages ?? [], event);
     }
   }, [
     clearActionLog,
