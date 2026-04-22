@@ -124,6 +124,11 @@ export class PackRegistry {
 
   seal(): void {
     this.sealed = true;
+    // #1073: validate every handoff target at seal-time so unknown or
+    // cross-pack references fail fast at startup, not mid-turn. All three
+    // tokens (pack, agent, target) appear in the thrown error to make
+    // debugging trivial (Nibbler N6, Zapp Z1).
+    this.validateHandoffsIntraPackOrThrow();
     // Snapshot and freeze playground stubs at seal time — post-seal mutations blocked.
     const stubs: Record<string, PlaygroundStub> = {};
     for (const registeredPack of this.packs.values()) {
@@ -136,6 +141,44 @@ export class PackRegistry {
       }
     }
     this._sealedPlaygroundStubs = Object.freeze(stubs);
+  }
+
+  /**
+   * Iterate every active agent's frontmatter `handoffs[]` and validate
+   * that each target (a) is a registered agent and (b) belongs to the
+   * SAME pack as the source (intra-pack only — Zapp Z1 on #1073).
+   *
+   * Cross-pack handoffs are deferred until the trust model is reviewed.
+   * Every error message includes three tokens (pack, agent, target) so a
+   * grep on any of them surfaces the offender.
+   */
+  private validateHandoffsIntraPackOrThrow(): void {
+    for (const registeredPack of this.packs.values()) {
+      const packName = registeredPack.pack.name;
+      if (!this.isPackActive(packName)) continue;
+      for (const agent of registeredPack.agents) {
+        for (const h of agent.handoffs ?? []) {
+          const target = h.agent;
+          const targetAgent = this.agentsByName.get(target);
+          if (!targetAgent) {
+            throw new Error(
+              `Unknown handoff target "${target}" declared by agent "${agent.name}" in pack "${packName}". ` +
+              `All handoff targets must be registered agents. ` +
+              `(pack="${packName}", agent="${agent.name}", target="${target}")`,
+            );
+          }
+          const targetPack = this.packNameFromAgent(targetAgent.name);
+          if (targetPack !== packName) {
+            throw new Error(
+              `Cross-pack handoff rejected: agent "${agent.name}" in pack "${packName}" ` +
+              `declares handoff to "${target}" in pack "${targetPack}". ` +
+              `Cross-pack handoffs are deferred until the trust model is reviewed (see #1073, Zapp Z1). ` +
+              `(pack="${packName}", agent="${agent.name}", target="${target}")`,
+            );
+          }
+        }
+      }
+    }
   }
 
   getAgent(name: string): AgentContribution {
