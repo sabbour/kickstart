@@ -98,6 +98,22 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-22 | #1052 "fix(ci): invert OTel externals guard in deploy-swa.yml (#1051 follow-up)" | S | impl=0m | review=10m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=2m | ci=5m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1048 "chore(identity): map Nibbler alias to lead role" | S | impl=0m | review=66m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=65m | ci=7m | reviewer=bot | human_comments=0 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1051 "fix(api): revert #1030 externalization to unblock SWA prod deploy (#1041)" | L | impl=7m | review=33m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=30m | ci=6m | reviewer=bot | human_comments=0 | issue=#1041 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-22 | #1046 "fix: ship OTel externals in Functions deploy (#1041 hotfix)" | M | impl=1m | review=28m | cycles=1 | merged | @sabbour-squad-lead[bot] | first_review=4m | ci=7m | reviewer=human | human_comments=1 | issue=#1041 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1039 "Fix: emit_ui tool schema strict-mode compliance (#1032)" | L | impl=1m | review=9m | cycles=1 | merged | @sabbour | first_review=2m | ci=7m | reviewer=bot | human_comments=0 | issue=#1032 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1034 "fix(observability): pure-OTel AppInsights pipeline + redaction (#1030)" | XL | impl=3m | review=16m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=6m | ci=7m | reviewer=bot | human_comments=0 | issue=#1030 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1033 "fix(observability): repair AppInsights telemetry pipeline (closes #1030)" | L | impl=1m | review=4m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=1m | ci=7m | reviewer=bot | human_comments=0 | issue=#1030 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
+- 2026-04-21 | #1029 "fix: quarantine invalid pack skill manifests; close raw error leak (closes #1027)" | L | impl=1m | review=36m | cycles=2 | merged-with-rework | @sabbour-squad-backend[bot] | first_review=11m | ci=6m | reviewer=bot | human_comments=0 | issue=#1027 | estimate=unknown | rejections_by_reviewer=nibbler:1,leela:0,zapp:0 | reverted=false
+
 - 2026-04-21 | #1022 "fix(web): sparkle.svg asset + local CSP-compliant sample media (#1018)" | M | impl=1m | review=67m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=20m | ci=8m | reviewer=bot | human_comments=1 | issue=#1018 | estimate=M | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-21 | #1023 "refactor(web-api): simplify widget-inspirations prompt generation (#1020)" | L | impl=1m | review=7m | cycles=1 | closed | @sabbour-squad-frontend[bot] | first_review=n/a | ci=5m | reviewer=none | human_comments=0 | issue=#1020 | estimate=M | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
