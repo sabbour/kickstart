@@ -94,6 +94,36 @@ describe("initBrowserTelemetry — default-off & resilience (#1042 Leela round 2
     expect(result).toBeNull();
   });
 
+  it("surfaces init failure via window.__kickstartTelemetryInitError (round 4 diagnostic)", () => {
+    // Round 4: init errors used to be `console.debug`-only, which masked
+    // the root cause of CSP eval violations. We now also stash the message
+    // on `window` so E2E and prod debugging can see it.
+    // Source guards on `typeof window !== "undefined"` (node test env has
+    // no window), so stub one the same way the flush-hook test does.
+    const originalWindow = (globalThis as { window?: unknown }).window;
+    (globalThis as { window?: unknown }).window = globalThis;
+    try {
+      delete (globalThis as Record<string, unknown>).__kickstartTelemetryInitError;
+      exporterCtor.mockImplementation(function MockErroring() {
+        throw new Error("round-4-diagnostic-probe");
+      });
+      const result = initBrowserTelemetry({
+        enabled: true,
+        connectionString:
+          "InstrumentationKey=11111111-1111-1111-1111-111111111111;IngestionEndpoint=https://x/",
+      });
+      expect(result).toBeNull();
+      expect((globalThis as { __kickstartTelemetryInitError?: string }).__kickstartTelemetryInitError)
+        .toBe("round-4-diagnostic-probe");
+    } finally {
+      if (originalWindow === undefined) {
+        delete (globalThis as { window?: unknown }).window;
+      } else {
+        (globalThis as { window?: unknown }).window = originalWindow;
+      }
+    }
+  });
+
   it("short-circuits on fake/zero-UUID InstrumentationKey BEFORE constructing exporter (round 3)", () => {
     const result = initBrowserTelemetry({
       enabled: true,

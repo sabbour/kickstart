@@ -296,10 +296,23 @@ export function initBrowserTelemetry(
     return active;
   } catch (err) {
     // Never break app boot because telemetry failed to initialize.
-    // `console.debug` (not warn/error) so CI logs surface the cause without
-    // polluting production consoles. See Leela round 3 review.
+    // `console.error` (upgraded from debug in round 4) so Playwright + CI
+    // logs surface the cause by default. Exposing the message on
+    // `window.__kickstartTelemetryInitError` lets E2E scenarios assert on it.
     // eslint-disable-next-line no-console
-    console.debug("[browser-telemetry] init failed:", err);
+    console.error("[kickstart-browser-telemetry] init failed:", err);
+    if (typeof window !== "undefined") {
+      try {
+        const message = err instanceof Error ? err.message : String(err);
+        Object.defineProperty(window, "__kickstartTelemetryInitError", {
+          value: message,
+          configurable: true,
+          writable: true,
+        });
+      } catch {
+        // Ignore — harmless if window is frozen.
+      }
+    }
     return null;
   }
 }

@@ -219,10 +219,21 @@ test.describe('Browser telemetry — #1042 Phase 1', () => {
     const cspViolations: string[] = [];
     // SecurityPolicyViolationEvent fires on both the window and inside the
     // page; we proxy it through console so Playwright can observe it.
+    // Round 4 diagnosis: serialize sourceFile / line / column / sample so
+    // failing runs pinpoint the offending transitive that invokes eval/new
+    // Function — see PR #1088 round-4 review.
     await page.addInitScript(() => {
       window.addEventListener('securitypolicyviolation', (e) => {
+        const detail = {
+          directive: e.violatedDirective,
+          blocked: e.blockedURI,
+          source: e.sourceFile,
+          line: e.lineNumber,
+          col: e.columnNumber,
+          sample: (e.sample ?? '').slice(0, 200),
+        };
         // eslint-disable-next-line no-console
-        console.error(`[csp-violation] ${e.violatedDirective} :: ${e.blockedURI}`);
+        console.error(`[csp-violation] ${JSON.stringify(detail)}`);
       });
     });
     page.on('console', (msg) => {
