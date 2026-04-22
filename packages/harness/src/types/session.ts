@@ -64,6 +64,15 @@ export interface SessionCtx {
   recentTurns: Turn[];
   activeAgent: string;
   pendingUserAction: PendingUserAction | null;
+  /**
+   * Per-turn record of skills pulled by `core.read_skill`. Reset at the top
+   * of every `Runner.run` turn inside a try/finally. See `SkillTrackingCtx`
+   * in `pack-core/src/tools/read_skill.ts` for the narrow consumer view.
+   * Optional on the interface so unrelated consumers need not populate it.
+   */
+  skillsPulled?: Set<string>;
+  skillsPulledBytes?: number;
+  skillsPulledTokens?: number;
   recordA2UIEmission(msg: A2UIMessage): void;
   recordArtifact(artifact: Artifact): void;
   recordTurn(turn: Turn): void;

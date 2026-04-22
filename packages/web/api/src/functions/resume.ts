@@ -12,6 +12,7 @@ import type { HttpRequest, InvocationContext } from "@azure/functions";
 import { getRegistry } from "../startup/packs.js";
 import { sessionStore } from "@aks-kickstart/harness/runtime/session";
 import { Runner } from "@aks-kickstart/harness/runtime/runner";
+import { createReadSkillTool } from "../../../../pack-core/src/tools/read_skill.js";
 import { SSE_RESPONSE_HEADERS, formatSSEFrame } from "@aks-kickstart/harness/runtime/sse";
 import { getOidFromPrincipalHeader } from "@aks-kickstart/harness/runtime/resume";
 import { z } from "zod";
@@ -98,7 +99,7 @@ async function resume(
   }
 
   const registry = getRegistry();
-  const runner = new Runner(registry);
+  const runner = new Runner(registry, { readSkillToolFactory: createReadSkillTool });
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({

@@ -17,6 +17,7 @@ import { trackException, trackEvent, flushAppInsights, initializeAppInsights } f
 import { getRegistry } from "../startup/packs.js";
 import { getOrCreateSession } from "@aks-kickstart/harness/runtime/session";
 import { Runner } from "@aks-kickstart/harness/runtime/runner";
+import { createReadSkillTool } from "../../../../pack-core/src/tools/read_skill.js";
 import { SSE_RESPONSE_HEADERS, formatSSEFrame } from "@aks-kickstart/harness/runtime/sse";
 import type { SSEEventType } from "@aks-kickstart/harness/runtime/sse";
 import { sanitizeError } from "../telemetry/sanitize-error.js";
@@ -250,7 +251,7 @@ async function converse(
   }
 
   const requestLogger = logger.withContext({ request_id: requestId });
-  const runner = new Runner(registry);
+  const runner = new Runner(registry, { readSkillToolFactory: createReadSkillTool });
   const abortController = new AbortController();
   const encoder = new TextEncoder();
   let eventCount = 0;

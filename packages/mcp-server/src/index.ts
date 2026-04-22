@@ -41,6 +41,7 @@ import {
   buildInterruptContent,
 } from '@aks-kickstart/harness';
 import type { McpContentItem } from '@aks-kickstart/harness';
+import { createReadSkillTool } from '@aks-kickstart/pack-core';
 
 import {
   registerInterrupt,
@@ -69,7 +70,7 @@ const APP_RESOURCE_URI = 'kickstart://app/main' as const;
 
 const registry = getRegistry();
 
-const runner = new Runner(registry);
+const runner = new Runner(registry, { readSkillToolFactory: createReadSkillTool });
 
 // ── Connection-level state ─────────────────────────────────────────
 // Assigned at initialize handshake; never client-supplied (Zapp condition 2).
