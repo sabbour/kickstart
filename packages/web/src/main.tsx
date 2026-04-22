@@ -1,12 +1,3 @@
-// MUST be the first import: disables Zod v4's JIT (`new Function`) path before
-// any v4 schema is constructed, so the app boots under `script-src 'self'`
-// with no `'unsafe-eval'`. Complementary to the `vendor-zod-v4` code-split in
-// `vite.config.ts` + the dynamic import of `registerPackComponents` below:
-// splitting v4 off the boot preload keeps it out of the initial payload, but
-// the lazy chunk still executes within ms of boot (well inside the CSP
-// smoke's assertion window). `configure-zod` installs Zod v4's documented
-// `jitless` setting so the `allowsEval` probe never fires.
-import './lib/configure-zod';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';

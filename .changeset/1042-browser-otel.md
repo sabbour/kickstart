@@ -43,17 +43,19 @@ workspace under one trace id.
   `@microsoft/applicationinsights-web` is explicitly disqualified (would
   require `unsafe-inline`).
 - Any init failure is swallowed so telemetry can never break app boot.
-- CSP hardening: `packages/pack-*` declare `zod@^4` while `packages/web` is
-  pinned to `zod@^3`; pack client renderers therefore drag Zod v4's module
-  graph into the boot bundle, where v4's `allowsEval` probe (`new Function("")`)
-  trips `script-src 'self'`. Fixed without a library swap, version bump, or
-  CSP relaxation by (a) dynamic-importing `registerPackComponents` from
-  `main.tsx` and routing `/node_modules/zod/v4/` to a dedicated
-  `vendor-zod-v4` manual chunk so v4 is no longer in the boot preload
-  payload, and (b) calling Zod v4's documented `config({ jitless: true })`
-  via `src/lib/configure-zod.ts` (first import in `main.tsx`) so the `new
-  Function` probe never runs. The Playwright CSP smoke scenario now boots
-  under the production `script-src 'self'` with zero violations.
+- CSP hardening: pack client renderers statically pull `zod` into the boot
+  bundle. Root `@openai/agents` requires `zod@^4`, but web + pack-core were
+  already pinned to `zod@^3`; with packs declaring `^4`, three different
+  Zod instances coexisted and web's boot chunk ended up executing v4's
+  `allowsEval` probe (`new Function("")`), violating `script-src 'self'`.
+  Fixed at the source by aligning `pack-azure`, `pack-aks-automatic`, and
+  `pack-github` down to `zod@^3.25.76` — matching `web` and `pack-core`.
+  An audit (see PR #1088) confirmed pack schemas use only v3-compatible
+  APIs, so no schema edits were required. `harness` stays on `zod@^4`
+  (server-only; required by `@openai/agents`) but never reaches the web
+  bundle. No library swap, no version bump in web, no CSP relaxation, no
+  `'unsafe-eval'`. `registerPackComponents` is still dynamically imported
+  from `main.tsx` as a boot-chunk hygiene win.
 
 ### Kill switch
 
