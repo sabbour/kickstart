@@ -15,20 +15,33 @@ import { context, trace } from "@opentelemetry/api";
 import {
   WebTracerProvider,
   BatchSpanProcessor,
+  StackContextManager,
 } from "@opentelemetry/sdk-trace-web";
 import {
   TraceIdRatioBasedSampler,
   ParentBasedSampler,
 } from "@opentelemetry/sdk-trace-base";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
-import { ZoneContextManager } from "@opentelemetry/context-zone";
 import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { AzureMonitorTraceExporter } from "@azure/monitor-opentelemetry-exporter";
 import { BrowserRedactingSpanExporter } from "./browser-redacting-span-exporter";
 
-/** Runtime flag name — operators flip this in App Settings (kill switch). */
+/** Runtime flag name — operators flip this in App Settings (disable switch). */
 export const BROWSER_TELEMETRY_FLAG = "web.telemetry.browser.enabled";
+
+/**
+ * Detect Application Insights connection strings whose InstrumentationKey is
+ * the all-zero placeholder UUID. These are test / CI / doc-example strings —
+ * the Azure Monitor exporter will construct, but outbound ingestion will
+ * fail silently. We short-circuit here so:
+ *   - CI Playwright runs don't wedge on exporter retries
+ *   - `console.debug` records exactly why telemetry was skipped
+ */
+export function isFakeConnectionString(s: string | undefined | null): boolean {
+  if (!s) return false;
+  return /InstrumentationKey=0{8}-0{4}-0{4}-0{4}-0{12}/i.test(s);
+}
 
 /** Default sampling ratio — 10% per Zapp Decision 4. */
 const DEFAULT_SAMPLING_RATIO = 0.1;
@@ -193,6 +206,14 @@ export function initBrowserTelemetry(
   const connectionString = config?.connectionString || resolveConnectionString();
   if (!connectionString) return null;
 
+  if (isFakeConnectionString(connectionString)) {
+    // eslint-disable-next-line no-console
+    console.debug(
+      "[browser-telemetry] skipping init: fake/zero InstrumentationKey detected",
+    );
+    return null;
+  }
+
   try {
     const samplingRatio =
       typeof config?.samplingRatio === "number" ? config.samplingRatio : DEFAULT_SAMPLING_RATIO;
@@ -207,7 +228,12 @@ export function initBrowserTelemetry(
     });
 
     provider.register({
-      contextManager: new ZoneContextManager(),
+      // StackContextManager (not ZoneContextManager) — Zone.js evaluates
+      // monkey-patched function bodies via `eval` / `new Function`, which
+      // trips a strict CSP `script-src 'self'` without `'unsafe-eval'`.
+      // StackContextManager is sync-only, which is fine for FetchInstrumentation
+      // spans (synchronous entry into fetch()).
+      contextManager: new StackContextManager(),
       // Explicit W3C-only propagator — `tracestate` is not propagated
       // outbound on the browser leg (Zapp Decision 3 / DP §proposal).
       propagator: new W3CTraceContextPropagator(),
@@ -268,8 +294,12 @@ export function initBrowserTelemetry(
     }
 
     return active;
-  } catch {
+  } catch (err) {
     // Never break app boot because telemetry failed to initialize.
+    // `console.debug` (not warn/error) so CI logs surface the cause without
+    // polluting production consoles. See Leela round 3 review.
+    // eslint-disable-next-line no-console
+    console.debug("[browser-telemetry] init failed:", err);
     return null;
   }
 }

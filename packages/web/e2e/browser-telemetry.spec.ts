@@ -38,8 +38,12 @@ const TRACEPARENT_RE = /^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$/;
 
 // A fake connection string — string shape must satisfy the Azure Monitor
 // exporter parser but the value is never exercised against live ingestion.
+// NOTE: InstrumentationKey is NOT all-zero, otherwise the production short-
+// circuit in `isFakeConnectionString` would skip exporter construction and
+// scenarios 1/2/6 would have nothing to assert on. The ingestion endpoint
+// is a test hostname and network calls are intercepted per-test.
 const FAKE_CONN_STR =
-  'InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://test.in.applicationinsights.azure.com/';
+  'InstrumentationKey=11111111-1111-1111-1111-111111111111;IngestionEndpoint=https://test.in.applicationinsights.azure.com/';
 
 async function enableBrowserTelemetry(page: Page) {
   await page.addInitScript((conn) => {

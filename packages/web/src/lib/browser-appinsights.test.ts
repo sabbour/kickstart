@@ -83,15 +83,25 @@ describe("initBrowserTelemetry — default-off & resilience (#1042 Leela round 2
       initBrowserTelemetry({
         enabled: true,
         connectionString:
-          "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://x/",
+          "InstrumentationKey=11111111-1111-1111-1111-111111111111;IngestionEndpoint=https://x/",
       }),
     ).not.toThrow();
+    const result = initBrowserTelemetry({
+      enabled: true,
+      connectionString:
+        "InstrumentationKey=11111111-1111-1111-1111-111111111111;IngestionEndpoint=https://x/",
+    });
+    expect(result).toBeNull();
+  });
+
+  it("short-circuits on fake/zero-UUID InstrumentationKey BEFORE constructing exporter (round 3)", () => {
     const result = initBrowserTelemetry({
       enabled: true,
       connectionString:
         "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://x/",
     });
     expect(result).toBeNull();
+    expect(exporterCtor).not.toHaveBeenCalled();
   });
 
   it("markBrowserTelemetryReady resolves the ready promise AND installs a no-op flush hook even when init never ran", async () => {
