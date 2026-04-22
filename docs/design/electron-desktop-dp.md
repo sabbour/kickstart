@@ -1,6 +1,6 @@
 # Design Proposal: Kickstart as a Local Electron Desktop App
 
-> **Status:** 🚧 Work in progress (rev 6). Additive deployment — SWA + Functions contract is frozen. Filed as an in-repo DP rather than a GitHub issue so edits flow through normal PR review.
+> **Status:** 🚧 Work in progress (rev 7). Additive deployment — SWA + Functions contract is frozen. Filed as an in-repo DP rather than a GitHub issue so edits flow through normal PR review.
 >
 > **Owner:** Leela (Lead) · **Co-authors:** Ahmed Sabbour (brainstorm partner)
 
@@ -1765,12 +1765,372 @@ Original 4 gates from rev 5 → revised to 2:
 simplifies dramatically: one runtime (`CopilotRunner`) serving both BYOK and Copilot-native
 paths. P0 and P1 merge. Effort drops from M+spike to M.
 
-**Revised recommendation:** Proceed with Option 1. Prioritize the Phase 1 spike to validate:
-(1) structured output via system prompt, (2) `assistant.message_delta` as emit_ui drain trigger.
-If BYOK-through-SDK works, skip the `@openai/agents` path entirely for Electron.
+**Revised recommendation:** ~~Proceed with Option 1.~~ **SUPERSEDED by §18.10 below.**
+
+---
+
+### 18.10. Option 3 Revisited — KickstartRunner Shim (post-source-validation) *(rev 7)*
+
+> **Context:** In rev 5 (§18.8), Option 3 (KickstartRunner shim) was rejected as "premature
+> abstraction" citing 6 leaky abstraction costs. Rev 6 (§18.9) corrected two major claims via
+> source-code validation: native `customAgents` for handoffs, Zod support for tool params.
+> Ahmed's directive: re-evaluate Option 3 with corrected facts. Drop BYOK-through-Copilot-SDK
+> (his explicit rejection) — focus purely on the shim question.
+
+#### Why rev 5's rejection is now wrong
+
+Rev 5 identified 6 leaky abstraction surfaces. Post-rev-6, here's what changed:
+
+| # | Rev 5 leak | Rev 6 finding | Status |
+|---|-----------|---------------|--------|
+| 1 | Handoff model mismatch — `Handoff[]` vs system prompt swap | `customAgents[]` with native sub-agent lifecycle events | **ELIMINATED** |
+| 2 | Tool parameter format — Zod vs JSON Schema | Both supported; `client.ts` auto-converts Zod→JSON Schema | **ELIMINATED** |
+| 3 | Structured output — `outputType` vs nothing | Confirmed: no `outputType` in Copilot SDK | **STILL LEAKS** |
+| 4 | Streaming event model — `raw_model_stream_event` vs session events | `assistant.message_delta` identified as drain trigger | **REDUCED** |
+| 5 | Agent construction — `new Agent()` vs `SessionConfig` | `customAgents` maps directly to `AgentContribution.handoffs` | **REDUCED → near-ELIMINATED** |
+| 6 | OTel bridge — `TracingProcessor` vs `TelemetryConfig` | SDK handles OTel internally; config-only on Copilot side | **REDUCED** |
+
+**Leakage surface: 6 → 2** (structured output + streaming event model).
+
+Rev 5 also argued the shim "only pays off with a third runtime." That was wrong: Ahmed's
+requirement IS two simultaneous runtimes (SWA stays on `@openai/agents`; Electron gets Copilot
+SDK). The abstraction pays off on day 1, not speculatively.
+
+#### The shim architecture
+
+The key insight is WHERE to draw the abstraction boundary. The current `Runner.run()` (597 lines)
+does 5 things: (1) guardrails, (2) tool wrapping, (3) agent construction, (4) LLM execution +
+streaming, (5) output processing. Only step 4 differs between backends.
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         Runner.run() — SHARED                           │
+│                                                                         │
+│  ┌─ input guardrails ──────────────────────────────────────────────┐    │
+│  │  runGuardrails('input', ...) — unchanged, no SDK dependency     │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                              │                                          │
+│  ┌─ tool resolution ──────────────────────────────────────────────┐    │
+│  │  registry.getToolsForAgent() — unchanged                       │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                              │                                          │
+│  ┌─ backend.execute(config) ──────────────────────────────────────┐    │
+│  │                                                                 │    │
+│  │  ┌─────────────────┐          ┌─────────────────────────┐      │    │
+│  │  │ OpenAIBackend    │    OR    │ CopilotBackend           │      │    │
+│  │  │ @openai/agents   │          │ @github/copilot-sdk      │      │    │
+│  │  │ ~200 lines       │          │ ~300 lines               │      │    │
+│  │  └─────────────────┘          └─────────────────────────────┘      │    │
+│  │                                                                 │    │
+│  │  yields: AsyncIterable<AgentEvent>                              │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                              │                                          │
+│  ┌─ A2UI drain + SSE dispatch ─────────────────────────────────────┐   │
+│  │  process AgentEvent → sseWrite() — shared, no SDK dependency    │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                              │                                          │
+│  ┌─ output guardrails + session recording ─────────────────────────┐   │
+│  │  runGuardrails('output', ...) — unchanged                       │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+#### AgentBackend interface
+
+```typescript
+// packages/harness/src/runtime/agent-backend.ts (~80 lines)
+
+export interface ExecutionConfig {
+  agent: AgentContribution;
+  tools: ToolContribution[];
+  userActions: UserActionContribution[];
+  userMessage: string;
+  instructions: string;         // pre-built: base + skills + catalog
+  session: Session;
+  signal: AbortSignal;
+  // Guardrail hooks passed to backends that need per-tool interception
+  toolGuardrails: GuardrailContribution[];
+  agentName: string;
+}
+
+export type AgentEvent =
+  | { type: 'text_delta'; delta: string }
+  | { type: 'tool_start'; toolName: string }
+  | { type: 'tool_done'; toolName: string }
+  | { type: 'handoff'; agent: string }
+  | { type: 'user_action_req'; payload: UserActionPayload }
+  | { type: 'final_output'; output: unknown }  // structured if backend supports it
+
+export interface AgentBackend {
+  execute(config: ExecutionConfig): AsyncIterable<AgentEvent>;
+}
+```
+
+**Why this works:** Guardrails (input + output) stay in the shared `Runner.run()`. Tool-stage
+guardrails are passed to backends via `ExecutionConfig.toolGuardrails` because the interception
+point differs: `@openai/agents` wraps `FunctionTool.invoke()`; Copilot SDK uses
+`SessionHooks.onPreToolUse`. Both produce the same effect — the backend just uses its native
+mechanism.
+
+#### OpenAIBackend (~200 lines)
+
+Extracted from current `runner.ts:406-474`. Responsibilities:
+
+1. Call `getSdkRunner().run(agent, message, { stream: true, context, signal })`
+2. Translate `raw_model_stream_event` → `{ type: 'text_delta' }`
+3. Translate `run_item_stream_event` → `tool_start` / `tool_done` / `handoff`
+4. Wrap tools with guardrail interception (existing `wrapTool()` + `wrapUserAction()` move here)
+5. Yield `{ type: 'final_output', output: result.finalOutput }` at end
+
+This is a PURE EXTRACTION from the current runner — ~200 lines move out, no new code written.
+
+#### CopilotBackend (~300 lines)
+
+New implementation in `packages/desktop/src/copilot-backend.ts`. Responsibilities:
+
+1. Translate `AgentContribution` → `SessionConfig`:
+   - `customAgents` from `agentContrib.handoffs` (native mapping — no simulation)
+   - `systemMessage: { mode: 'replace', content: instructions }` (full control)
+   - `availableTools` from `agentContrib.toolAllowlist` + `excludedTools` for built-in tools
+   - `telemetry` from env config
+2. Register tools via `defineTool()`:
+   - `ToolContribution.tool` → `defineTool(name, { description, parameters: zodSchema, handler })`
+   - Tool guardrails via `SessionHooks.onPreToolUse` (allow/deny + modify args)
+   - Post-tool guardrails via `SessionHooks.onPostToolUse` (modify results)
+3. Register UserActions via `onUserInputRequest` handler
+4. Session event loop → `AgentEvent`:
+   - `assistant.message_delta` → `{ type: 'text_delta' }`
+   - `tool.execution_start` → `{ type: 'tool_start' }`
+   - `tool.execution_complete` → `{ type: 'tool_done' }`
+   - Sub-agent transition events → `{ type: 'handoff' }`
+5. `onPermissionRequest` handler: auto-approve pack tools, prompt for shell/write
+
+#### Shared Runner refactor (~100 lines changed in runner.ts)
+
+The current `Runner.run()` (316-570) refactors into:
+
+```typescript
+class Runner {
+  constructor(
+    private readonly registry: PackRegistry,
+    private readonly backend: AgentBackend,  // injected
+  ) {}
+
+  async run(session, userMessage, sseWrite, signal?) {
+    // [1] Input guardrails — UNCHANGED (lines 343-358)
+    // [2] Tool resolution — UNCHANGED (lines 367-388)
+    // [3] Build instructions — UNCHANGED (lines 390-401)
+    // [4] NEW: delegate to backend
+    const config: ExecutionConfig = {
+      agent: agentContrib, tools: toolContribs, userActions: ...,
+      userMessage: guardedMessage, instructions, session, signal: abortCtrl.signal,
+      toolGuardrails, agentName,
+    };
+
+    for await (const event of this.backend.execute(config)) {
+      // Drain A2UI on every event
+      for (const msg of session.drainA2UIEmissions()) sseWrite('a2ui', msg);
+
+      switch (event.type) {
+        case 'text_delta': fullText += event.delta; chunkBuffer.push(event.delta); break;
+        case 'tool_start': sseWrite('tool_start', { toolName: event.toolName }); break;
+        case 'tool_done':  sseWrite('tool_done', { toolName: event.toolName }); break;
+        case 'handoff':    session.activeAgent = event.agent; sseWrite('phase', { agent: event.agent }); break;
+        case 'user_action_req': sseWrite('user_action_req', event.payload); break;
+        case 'final_output': /* resolveOutputText fallback handles structured or text */ break;
+      }
+    }
+
+    // [5] Output guardrails — UNCHANGED (lines 502-517)
+    // [6] Session recording + SSE flush — UNCHANGED (lines 519-545)
+  }
+}
+```
+
+#### Effort comparison (corrected)
+
+| Component | Option 1 (Full SDK switch) | Option 3 (Shim) |
+|-----------|---------------------------|-----------------|
+| `agent-backend.ts` (interface) | — | ~80 lines (new) |
+| `OpenAIBackend` | — | ~200 lines (extracted from runner.ts) |
+| `CopilotBackend` | ~800 lines (full CopilotRunner) | ~300 lines (just execution) |
+| Runner.ts refactor | 0 (leave as-is) | ~100 lines changed |
+| Guardrail re-implementation | ~150 lines (re-implement in CopilotRunner) | 0 (shared) |
+| SSE event dispatch | ~80 lines (re-implement in CopilotRunner) | 0 (shared) |
+| A2UI drain logic | ~30 lines (re-implement) | 0 (shared) |
+| Output guardrail + recording | ~50 lines (re-implement) | 0 (shared) |
+| OTel bridge | ~50 lines (CopilotRunner config) | ~20 lines (CopilotBackend config) |
+| Pack tool changes | 0 | 0 |
+| **Total new/changed code** | **~1,160 lines** | **~700 lines** |
+| **Unique (non-shared) code** | **~1,160 lines** | **~500 lines** |
+
+**Key delta: Option 1 re-implements ~310 lines of shared logic** (guardrails, SSE dispatch, A2UI
+drain, output processing) that Option 3 writes once.
+
+Rev 5 estimated Option 1 at ~800 lines because it undercounted CopilotRunner complexity — the
+guardrail re-implementation, SSE event translation, A2UI drain, and output processing all need
+to be written again. Option 3 is both LESS total code and LESS unique code.
+
+#### Maintenance cost comparison
+
+| Scenario | Option 1 impact | Option 3 impact |
+|----------|----------------|-----------------|
+| New SSE event type (e.g. `progress`) | Add to BOTH runners | Add to shared Runner + `AgentEvent` type |
+| New guardrail stage (e.g. `schema`) | Add to BOTH runners | Add to shared Runner only |
+| Pack tool needs new context field | Update BOTH tool-wrapping layers | Update `ExecutionConfig` + both backends |
+| Copilot SDK breaking change | Fix CopilotRunner (~800 lines) | Fix CopilotBackend (~300 lines) |
+| `@openai/agents` upgrade | Fix Runner (~597 lines) | Fix OpenAIBackend (~200 lines) |
+| Third runtime (MCP sampling) | Start from scratch | Add `SamplingBackend` (~200 lines) |
+| A2UI drain timing change | Fix in 2 places | Fix in 1 place |
+| New `AgentOutput` field (e.g. `confidence`) | Fix in 2 places | Fix `AgentEvent.final_output` handling once |
+
+**Option 3 wins in 6/8 scenarios**, ties in 1, loses in 0. The only scenario where effort is
+comparable is "pack tool needs new context" — both options update similar code.
+
+**Third runtime is not speculative.** The MCP Apps Option B DP (§ leela-mcp-apps-option-b-dp.md)
+already proposes `SamplingModelProvider` as a third execution path. With Option 3, that becomes
+`SamplingBackend` implementing `AgentBackend`. With Option 1, it's a third standalone runner.
+
+#### Handling the 2 remaining leaks
+
+**Leak 1: Structured output (`outputType`)**
+
+The `AgentOutput` Zod schema enforces `{ message: string, intent?: enum }` via the `@openai/agents`
+`outputType` parameter. Copilot SDK has no equivalent.
+
+**Resolution: Option C — make structured output backend-optional.**
+
+- `AgentEvent.final_output` is typed `unknown` — backends populate it if they can.
+- `OpenAIBackend` yields `{ type: 'final_output', output: result.finalOutput }` (structured).
+- `CopilotBackend` yields `{ type: 'final_output', output: undefined }` (no enforcement).
+- The shared Runner already has `resolveOutputText(finalOutput, fullText)` which falls back
+  to `fullText` when `finalOutput` has no `message` field. **Zero new code needed.**
+- Intent extraction on the Copilot side: add a lightweight `extractIntent(text): string | undefined`
+  function (~20 lines) that pattern-matches "I'll continue..." → `continue`, etc. Degrades
+  gracefully — intent is a UI hint, not a control flow signal.
+
+**Impact: MINIMAL.** The existing fallback path handles this. Intent accuracy degrades slightly
+on the Copilot backend — acceptable for P1.
+
+**Leak 2: emit_ui streaming fidelity (A2UI drain timing)**
+
+`@openai/agents` fires `raw_model_stream_event` on every token, triggering A2UI drain. Copilot SDK
+fires `assistant.message_delta` on text chunks, which may arrive at different granularity.
+
+**Resolution: drain A2UI on EVERY `AgentEvent`, regardless of type.**
+
+The shared Runner loop already does this:
+```typescript
+for await (const event of this.backend.execute(config)) {
+  for (const msg of session.drainA2UIEmissions()) sseWrite('a2ui', msg);
+  // ... process event
+}
+```
+
+If Copilot SDK fires events less frequently, A2UI messages queue slightly longer but still
+drain on the next event. Worst case: ~100-200ms additional latency on A2UI messages. The spike
+should validate this is acceptable.
+
+**Impact: LOW.** Same drain logic, slightly different timing. Spike gate still needed to
+confirm UX acceptability.
+
+#### Test strategy
+
+```
+                    ┌─────────────────────────────┐
+                    │   AgentBackend contract      │
+                    │   tests (mock-based)         │
+                    │   ~15 tests                  │
+                    └──────────────┬───────────────┘
+                                   │
+                    ┌──────────────┴───────────────┐
+                    │                              │
+           ┌───────▼──────┐              ┌────────▼─────────┐
+           │ OpenAIBackend │              │ CopilotBackend    │
+           │ unit tests    │              │ unit tests        │
+           │ ~20 tests     │              │ ~20 tests         │
+           └───────────────┘              └──────────────────┘
+                    │                              │
+           ┌───────▼──────────────────────────────▼──┐
+           │   Runner integration tests               │
+           │   (both backends, real guardrails)        │
+           │   ~30 tests                               │
+           └───────────────────────────────────────────┘
+```
+
+- **Contract tests:** Verify any `AgentBackend` implementation produces correct `AgentEvent`
+  sequences for known scenarios (tool call, handoff, error, abort).
+- **Backend unit tests:** Mock the underlying SDK, verify event translation.
+- **Integration tests:** Run full `Runner.run()` with each backend against test guardrails.
+
+**vs Option 1:** Option 1 needs ~50 integration tests per runner (no shared contract). Option 3
+needs ~15 contract + 20+20 backend + 30 integration = 85 total but with 15 reusable contract
+tests that catch regressions in EITHER backend.
+
+#### Spike gates (unchanged from rev 6, applies to BOTH options)
+
+| Gate | Validation | Effort |
+|------|-----------|--------|
+| Structured output via system prompt | JSON instruction + parse + retry. Measure success rate over 50 prompts | 1 day |
+| `assistant.message_delta` as A2UI drain trigger | Measure event frequency + A2UI latency vs current SSE UX | 1 day |
+
+**Spike effort: 2 days.** Same for both Option 1 and Option 3. The spike validates Copilot SDK
+behavior, not the abstraction layer.
+
+#### Decision: Option 1 vs Option 3
+
+| Criterion | Option 1 | Option 3 | Winner |
+|-----------|----------|----------|--------|
+| Total new code | ~1,160 lines | ~700 lines | **Option 3** |
+| Unique (non-shared) code | ~1,160 lines | ~500 lines | **Option 3** |
+| Pack tool changes | 0 | 0 | Tie |
+| Upfront complexity | Lower | Slightly higher (interface design) | Option 1 |
+| Ongoing maintenance (dual-runtime) | Higher (duplicated logic) | Lower (shared logic) | **Option 3** |
+| Third-runtime readiness | Start over | Add a backend | **Option 3** |
+| SDK breaking change blast radius | ~800 lines | ~300 lines | **Option 3** |
+| Guardrail consistency guarantee | Manual — must keep in sync | Structural — one implementation | **Option 3** |
+| Test reuse | None | Contract tests cover both | **Option 3** |
+| Structured output handling | Same gap | Same gap | Tie |
+| Risk of over-engineering | None | Low (interface is small) | Option 1 (slightly) |
+
+**Score: Option 3 wins 6, Option 1 wins 2, Tie 3.**
+
+#### RECOMMENDATION: Option 3 — KickstartRunner Shim
+
+**Confidence: HIGH (8/10)**
+
+The verdict FLIPS from rev 5's "reject" to "recommend." The corrected facts eliminate 4 of 6
+leaky abstraction costs, and Ahmed's actual requirement (two simultaneous runtimes) means the
+abstraction pays off immediately, not speculatively.
+
+**The 2/10 uncertainty:**
+1. emit_ui drain timing fidelity — needs 1-day spike
+2. Copilot SDK is in preview — `AgentEvent` contract may need updating if session event types
+   change. Mitigation: the interface is small (~80 lines) and backends are isolated.
+
+**What changed from rev 5:**
+
+| Rev 5 argument against Option 3 | Rev 7 status |
+|----------------------------------|-------------|
+| "6 leaky abstraction surfaces" | 4 eliminated, 2 remain (and one is already handled) |
+| "premature — only pays off with 3rd runtime" | Ahmed's requirement IS dual-runtime; pays off day 1 |
+| "L effort (~1,470 lines)" | **M- effort (~700 lines)** — Zod unification + native handoffs shrink it |
+| "maintenance cost: 2x test suites" | Contract tests provide reuse; shared guardrails prevent drift |
+| "handoffs leak through" | Native `customAgents` — clean mapping, no leakage |
+| "structured output leaks through" | `resolveOutputText()` fallback already handles it — zero new code |
+
+**Implementation sequence:**
+1. Spike: 2 days — validate structured output + A2UI drain timing on Copilot SDK
+2. Phase 1: Extract `AgentBackend` interface + `OpenAIBackend` from current `runner.ts` (~2 days)
+3. Phase 2: Implement `CopilotBackend` in `packages/desktop/` (~3 days)
+4. Phase 3: Integration tests + Electron shell wiring (~3 days)
+
+**Total: ~2 weeks** (M effort). Same as Option 1, but with lower ongoing maintenance.
 
 — Leela
 
 ---
 
 **Tracked in:** https://github.com/sabbour/kickstart/issues/1043
+
+**Tracked in:** sabbour/kickstart PR #1045 · docs/design/electron-desktop-dp.md
