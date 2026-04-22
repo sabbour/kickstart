@@ -19,6 +19,34 @@ import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import type { SpanExporter, ExportResult } from "@opentelemetry/sdk-trace-base";
 import { RedactingSpanExporter, redactSpan } from "./redacting-span-exporter.js";
 
+// Minimal SpanImpl-style class with prototype methods + getters. Used only by
+// the #1036 tests for links/resource redaction where we need to inject custom
+// links and resource shapes that the real BasicTracerProvider doesn't expose
+// as cleanly.
+class FakeSpanImpl {
+  name = "unit-under-test";
+  kind = 0;
+  startTime: [number, number] = [0, 0];
+  endTime: [number, number] = [0, 0];
+  status = { code: 0 };
+  attributes: Record<string, unknown> = {};
+  links: { attributes?: Record<string, unknown>; context?: unknown }[] = [];
+  events: { name: string; attributes: Record<string, unknown>; time: [number, number] }[] = [];
+  resource: { attributes: Record<string, unknown>; merge(): unknown } = {
+    attributes: {},
+    merge() { return this; },
+  };
+  instrumentationScope = { name: "test" };
+  droppedAttributesCount = 0;
+  droppedEventsCount = 0;
+  droppedLinksCount = 0;
+  _ctx = { traceId: "a".repeat(32), spanId: "b".repeat(16), traceFlags: 1 };
+
+  spanContext() { return this._ctx; }
+  get duration(): [number, number] { return [0, 0]; }
+  get ended(): boolean { return true; }
+}
+
 class CapturingExporter implements SpanExporter {
   captured: ReadableSpan[] = [];
   export(spans: ReadableSpan[], resultCallback: (r: ExportResult) => void): void {
@@ -113,5 +141,75 @@ describe("RedactingSpanExporter (T9)", () => {
     expect((out.attributes["http.url"] as string)).toContain("?<redacted>");
     // Original input attributes must remain untouched.
     expect((readableSpan.attributes["http.url"] as string)).toContain("code=S");
+  });
+
+  it("redacts PII in span.links[].attributes (#1036)", async () => {
+    const sink = new CapturingExporter();
+    const exporter = new RedactingSpanExporter(sink);
+
+    const span = new FakeSpanImpl() as unknown as ReadableSpan;
+    (span as FakeSpanImpl).links = [
+      {
+        context: { traceId: "c".repeat(32), spanId: "d".repeat(16), traceFlags: 1 },
+        attributes: {
+          "http.url": "https://example.com?token=secret",
+          "exception.message": "bearer eyJhbGciOi.abc.def should vanish",
+        },
+      },
+    ];
+
+    await new Promise<void>((resolve) => exporter.export([span], () => resolve()));
+
+    const exported = sink.captured[0];
+    const links = exported.links ?? [];
+    expect(links).toHaveLength(1);
+    const linkAttrs = (links[0] as { attributes?: Record<string, unknown> }).attributes ?? {};
+
+    // URL query param stripped on http.url link attribute
+    expect(String(linkAttrs["http.url"])).toContain("?<redacted>");
+    expect(String(linkAttrs["http.url"])).not.toContain("token=secret");
+    // Bearer token in exception.message scrubbed by sanitizeText
+    expect(String(linkAttrs["exception.message"])).not.toContain("eyJhbGciOi.abc.def");
+
+    // Input links must remain untouched
+    const origLink = (span as FakeSpanImpl).links[0] as { attributes: Record<string, unknown> };
+    expect(String(origLink.attributes["http.url"])).toContain("token=secret");
+  });
+
+  it("redacts PII in span.resource.attributes (#1036)", async () => {
+    const sink = new CapturingExporter();
+    const exporter = new RedactingSpanExporter(sink);
+
+    const span = new FakeSpanImpl() as unknown as ReadableSpan;
+    (span as FakeSpanImpl).resource = {
+      attributes: {
+        "service.instance.id": "bearer eyJhbGciOi.abc.def contains-a-jwt",
+        "service.name": "kickstart-api",
+      },
+      merge() { return this; },
+    };
+
+    await new Promise<void>((resolve) => exporter.export([span], () => resolve()));
+
+    const exported = sink.captured[0];
+    const resAttrs = exported.resource.attributes;
+
+    // Bearer token in service.instance.id must be scrubbed by sanitizeText
+    expect(String(resAttrs["service.instance.id"])).not.toContain("eyJhbGciOi.abc.def");
+    expect(String(resAttrs["service.instance.id"])).toContain("[REDACTED]");
+    // Non-sensitive value passes through unchanged
+    expect(resAttrs["service.name"]).toBe("kickstart-api");
+  });
+
+  it("resource proxy handles undefined/null attributes without throwing (#1036)", () => {
+    const span = new FakeSpanImpl() as unknown as ReadableSpan;
+    // Simulate a resource whose attributes are undefined (defensive null guard)
+    (span as FakeSpanImpl).resource = {
+      attributes: undefined as unknown as Record<string, unknown>,
+      merge() { return this; },
+    };
+    const out = redactSpan(span);
+    expect(() => out.resource.attributes).not.toThrow();
+    expect(out.resource.attributes).toEqual({});
   });
 });

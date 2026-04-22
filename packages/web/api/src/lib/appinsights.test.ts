@@ -1,11 +1,13 @@
 /**
  * Binding tests for packages/web/api/src/lib/appinsights.ts.
  *
- * Covers issue #1030 DP amendments 1–3:
+ * Covers DP #1030 amendments 1–3 and DP #1035 security fix:
  *   T2  — module-scope idempotency guard
  *   T3  — manual trackException flows through the exporter pipeline
  *   T4  — flushAppInsights awaits tracer+logger+meter forceFlush
- *   T11 — HTTP instrumentation strips query strings from http.url / url.full
+ *   T_SINGLE_PATH — ONLY one BatchSpanProcessor wrapping RedactingSpanExporter
+ *                   is registered; no raw AzureMonitorTraceExporter outside the
+ *                   redacting wrapper (#1035 regression guard)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -13,20 +15,67 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const CONN =
   "InstrumentationKey=00000000-0000-0000-0000-000000000001;IngestionEndpoint=https://example.in.applicationinsights.azure.com/";
 
-const useAzureMonitorMock = vi.fn();
-vi.mock("@azure/monitor-opentelemetry", () => ({
-  useAzureMonitor: (...args: unknown[]) => useAzureMonitorMock(...args),
-  shutdownAzureMonitor: vi.fn(),
+// Capture the NodeSDK config passed during initialization.
+let capturedSdkConfig: Record<string, unknown> = {};
+const sdkStartMock = vi.fn();
+
+vi.mock("@opentelemetry/sdk-node", () => ({
+  // Use a regular function (not an arrow) so it can be called with `new`.
+  NodeSDK: function NodeSDKMock(this: Record<string, unknown>, cfg: Record<string, unknown>) {
+    capturedSdkConfig = cfg;
+    this.start = sdkStartMock;
+  },
 }));
 
 vi.mock("@azure/monitor-opentelemetry-exporter", () => ({
   AzureMonitorTraceExporter: class {
     constructor(public readonly opts: unknown) {}
-    export(_spans: unknown[], cb: (r: { code: number }) => void) {
-      cb({ code: 0 });
-    }
+    export(_spans: unknown[], cb: (r: { code: number }) => void) { cb({ code: 0 }); }
     shutdown() { return Promise.resolve(); }
     forceFlush() { return Promise.resolve(); }
+  },
+  AzureMonitorLogExporter: class {
+    constructor(public readonly opts: unknown) {}
+    export(_records: unknown[], cb: (r: { code: number }) => void) { cb({ code: 0 }); }
+    shutdown() { return Promise.resolve(); }
+    forceFlush() { return Promise.resolve(); }
+  },
+  AzureMonitorMetricExporter: class {
+    constructor(public readonly opts: unknown) {}
+    export(_metrics: unknown[], cb: (r: { code: number }) => void) { cb({ code: 0 }); }
+    shutdown() { return Promise.resolve(); }
+    forceFlush() { return Promise.resolve(); }
+  },
+}));
+
+vi.mock("@opentelemetry/sdk-logs", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@opentelemetry/sdk-logs")>();
+  return {
+    ...original,
+    BatchLogRecordProcessor: class {
+      constructor(public readonly exporter: unknown) {}
+      onEmit() {}
+      async forceFlush() {}
+      async shutdown() {}
+    },
+  };
+});
+
+vi.mock("@opentelemetry/sdk-metrics", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@opentelemetry/sdk-metrics")>();
+  return {
+    ...original,
+    PeriodicExportingMetricReader: class {
+      constructor(public readonly opts: unknown) {}
+      async forceFlush() {}
+      async shutdown() {}
+    },
+  };
+});
+
+vi.mock("@opentelemetry/instrumentation-http", () => ({
+  HttpInstrumentation: class {
+    constructor(public readonly opts: unknown) {}
   },
 }));
 
@@ -34,11 +83,12 @@ function clearStarted() {
   delete (globalThis as Record<symbol, unknown>)[Symbol.for("kickstart.azmon.started")];
 }
 
-describe("appinsights module (pure-OTel wiring, DP #1030 amendments 1–3)", () => {
+describe("appinsights module (NodeSDK wiring, DP #1030 amendments + #1035 fix)", () => {
   const prevConn = process.env.APPLICATIONINSIGHTS_CONNECTION_STRING;
 
   beforeEach(() => {
-    useAzureMonitorMock.mockClear();
+    sdkStartMock.mockClear();
+    capturedSdkConfig = {};
     clearStarted();
     vi.resetModules();
   });
@@ -53,42 +103,66 @@ describe("appinsights module (pure-OTel wiring, DP #1030 amendments 1–3)", () 
   });
 
   // T2 ------------------------------------------------------------------
-  it("T2: module import does NOT call useAzureMonitor (no module-load IIFE); explicit initializeAppInsights() calls it exactly once", async () => {
+  it("T2: initializeAppInsights is idempotent — NodeSDK.start() called exactly once", async () => {
     process.env.APPLICATIONINSIGHTS_CONNECTION_STRING = CONN;
     const mod = await import("./appinsights.js");
-    // No IIFE — module import must NOT trigger useAzureMonitor
-    expect(useAzureMonitorMock).not.toHaveBeenCalled();
-    // Explicit call triggers it
-    mod.initializeAppInsights();
-    expect(useAzureMonitorMock).toHaveBeenCalledTimes(1);
-    // Idempotency: second and third calls are no-ops
+    expect(sdkStartMock).toHaveBeenCalledTimes(1);
     mod.initializeAppInsights();
     mod.initializeAppInsights();
-    expect(useAzureMonitorMock).toHaveBeenCalledTimes(1);
+    expect(sdkStartMock).toHaveBeenCalledTimes(1);
   });
 
-  it("T2b: cross-bundle flag — useAzureMonitor is skipped when globalThis STARTED is already set", async () => {
+  it("T2b: cross-bundle flag — NodeSDK is skipped when globalThis STARTED is already set", async () => {
     process.env.APPLICATIONINSIGHTS_CONNECTION_STRING = CONN;
     (globalThis as Record<symbol, unknown>)[Symbol.for("kickstart.azmon.started")] = true;
-    const mod = await import("./appinsights.js");
-    expect(useAzureMonitorMock).not.toHaveBeenCalled();
-    mod.initializeAppInsights();
-    expect(useAzureMonitorMock).not.toHaveBeenCalled();
+    await import("./appinsights.js");
+    expect(sdkStartMock).not.toHaveBeenCalled();
   });
 
-  it("does not start the distro when the connection string is missing", async () => {
+  it("does not start the SDK when the connection string is missing", async () => {
     delete process.env.APPLICATIONINSIGHTS_CONNECTION_STRING;
     await import("./appinsights.js");
-    expect(useAzureMonitorMock).not.toHaveBeenCalled();
+    expect(sdkStartMock).not.toHaveBeenCalled();
   });
 
   it("never imports the classic applicationinsights shim (no setup/start side-effects)", async () => {
-    // Negative lock — this file should not pull applicationinsights.
     const appinsightsSource = await import("node:fs").then((fs) =>
       fs.readFileSync(new URL("./appinsights.ts", import.meta.url), "utf8"),
     );
     expect(appinsightsSource).not.toMatch(/from ['"]applicationinsights['"]/);
     expect(appinsightsSource).not.toMatch(/TelemetryClient/);
+  });
+
+  // T_SINGLE_PATH -------------------------------------------------------
+  it("T_SINGLE_PATH: registers exactly ONE BatchSpanProcessor wrapping RedactingSpanExporter — no raw exporter outside wrapper (#1035)", async () => {
+    process.env.APPLICATIONINSIGHTS_CONNECTION_STRING = CONN;
+    await import("./appinsights.js");
+
+    const { BatchSpanProcessor } = await import("@opentelemetry/sdk-trace-base");
+    const { RedactingSpanExporter } = await import("./redacting-span-exporter.js");
+
+    const processors = capturedSdkConfig.spanProcessors as unknown[];
+    expect(processors, "spanProcessors should be defined in NodeSDK config").toBeDefined();
+    expect(processors).toHaveLength(1);
+    expect(processors[0]).toBeInstanceOf(BatchSpanProcessor);
+
+    // The inner exporter on the BSP MUST be a RedactingSpanExporter.
+    const bsp = processors[0] as { _exporter: unknown };
+    expect(bsp._exporter).toBeInstanceOf(RedactingSpanExporter);
+
+    // AzureMonitorTraceExporter must only appear inside the redacting wrapper,
+    // never directly as a registered processor's exporter.
+    const { AzureMonitorTraceExporter } = await import("@azure/monitor-opentelemetry-exporter");
+    expect(bsp._exporter).not.toBeInstanceOf(AzureMonitorTraceExporter);
+  });
+
+  it("T_SINGLE_PATH: useAzureMonitor is NOT imported in appinsights.ts (regression guard — would re-enable double export)", async () => {
+    const appinsightsSource = await import("node:fs").then((fs) =>
+      fs.readFileSync(new URL("./appinsights.ts", import.meta.url), "utf8"),
+    );
+    // If useAzureMonitor is imported again, the internal distro BSP would
+    // register alongside ours, creating an unredacted duplicate export path.
+    expect(appinsightsSource).not.toMatch(/import\s*\{[^}]*useAzureMonitor[^}]*\}\s*from/);
   });
 
   // T3 ------------------------------------------------------------------
@@ -118,7 +192,9 @@ describe("appinsights module (pure-OTel wiring, DP #1030 amendments 1–3)", () 
         return s;
       }),
     };
-    const getTracerSpy = vi.spyOn(trace, "getTracer").mockReturnValue(tracer as unknown as ReturnType<typeof trace.getTracer>);
+    const getTracerSpy = vi.spyOn(trace, "getTracer").mockReturnValue(
+      tracer as unknown as ReturnType<typeof trace.getTracer>,
+    );
 
     mod.trackException(new Error("boom"), { foo: "bar" });
 
@@ -144,7 +220,6 @@ describe("appinsights module (pure-OTel wiring, DP #1030 amendments 1–3)", () 
     const mod = await import("./appinsights.js");
     mod.initializeAppInsights();
 
-    const flushSpy = vi.fn().mockResolvedValue(undefined);
     const delegateFlush = vi.fn().mockResolvedValue(undefined);
     const loggerFlush = vi.fn().mockResolvedValue(undefined);
     const meterFlush = vi.fn().mockResolvedValue(undefined);
@@ -152,10 +227,16 @@ describe("appinsights module (pure-OTel wiring, DP #1030 amendments 1–3)", () 
     const fakeTracerProvider = {
       getTracer: () => ({ startSpan: () => ({ end: () => undefined }) }),
       getDelegate: () => ({ forceFlush: delegateFlush }),
-      forceFlush: flushSpy,
+      forceFlush: vi.fn().mockResolvedValue(undefined),
     } as unknown as ReturnType<typeof trace.getTracerProvider>;
-    const fakeLoggerProvider = { forceFlush: loggerFlush, getLogger: () => ({ emit: () => undefined }) } as unknown as ReturnType<typeof logs.getLoggerProvider>;
-    const fakeMeterProvider = { forceFlush: meterFlush, getMeter: () => ({}) } as unknown as ReturnType<typeof metrics.getMeterProvider>;
+    const fakeLoggerProvider = {
+      forceFlush: loggerFlush,
+      getLogger: () => ({ emit: () => undefined }),
+    } as unknown as ReturnType<typeof logs.getLoggerProvider>;
+    const fakeMeterProvider = {
+      forceFlush: meterFlush,
+      getMeter: () => ({}),
+    } as unknown as ReturnType<typeof metrics.getMeterProvider>;
 
     const tpSpy = vi.spyOn(trace, "getTracerProvider").mockReturnValue(fakeTracerProvider);
     const lpSpy = vi.spyOn(logs, "getLoggerProvider").mockReturnValue(fakeLoggerProvider);
@@ -183,8 +264,14 @@ describe("appinsights module (pure-OTel wiring, DP #1030 amendments 1–3)", () 
       getTracer: () => ({ startSpan: () => ({ end: () => undefined }) }),
       getDelegate: () => ({ forceFlush: vi.fn().mockRejectedValue(new Error("net err")) }),
     } as unknown as ReturnType<typeof trace.getTracerProvider>);
-    const lpSpy = vi.spyOn(logs, "getLoggerProvider").mockReturnValue({ forceFlush: vi.fn().mockResolvedValue(undefined), getLogger: () => ({ emit: () => undefined }) } as unknown as ReturnType<typeof logs.getLoggerProvider>);
-    const mpSpy = vi.spyOn(metrics, "getMeterProvider").mockReturnValue({ forceFlush: vi.fn().mockResolvedValue(undefined), getMeter: () => ({}) } as unknown as ReturnType<typeof metrics.getMeterProvider>);
+    const lpSpy = vi.spyOn(logs, "getLoggerProvider").mockReturnValue({
+      forceFlush: vi.fn().mockResolvedValue(undefined),
+      getLogger: () => ({ emit: () => undefined }),
+    } as unknown as ReturnType<typeof logs.getLoggerProvider>);
+    const mpSpy = vi.spyOn(metrics, "getMeterProvider").mockReturnValue({
+      forceFlush: vi.fn().mockResolvedValue(undefined),
+      getMeter: () => ({}),
+    } as unknown as ReturnType<typeof metrics.getMeterProvider>);
 
     await expect(mod.flushAppInsights()).resolves.toBeUndefined();
 
@@ -193,22 +280,16 @@ describe("appinsights module (pure-OTel wiring, DP #1030 amendments 1–3)", () 
     mpSpy.mockRestore();
   });
 
-  it("T12: telemetry init failure does not break — useAzureMonitor throws, initializeAppInsights catches and marks started", async () => {
+  it("T12: telemetry init failure does not break — NodeSDK.start() throws, module still loads", async () => {
     process.env.APPLICATIONINSIGHTS_CONNECTION_STRING = CONN;
-    useAzureMonitorMock.mockImplementationOnce(() => {
+    sdkStartMock.mockImplementationOnce(() => {
       throw new Error("simulated init failure");
     });
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const mod = await import("./appinsights.js");
-    // No IIFE — import alone must NOT call useAzureMonitor
-    expect(useAzureMonitorMock).not.toHaveBeenCalled();
-    expect(consoleSpy).not.toHaveBeenCalled();
-    // Explicit call triggers it and catches the error
-    mod.initializeAppInsights();
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("[AppInsights] Azure Monitor init failed:"));
-    // STARTED flag is set even on failure — no infinite-retry
-    mod.initializeAppInsights();
-    expect(useAzureMonitorMock).toHaveBeenCalledTimes(1);
+    await expect(import("./appinsights.js")).resolves.toBeDefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[AppInsights] Azure Monitor init failed:"),
+    );
     consoleSpy.mockRestore();
   });
 });

@@ -26,11 +26,26 @@ export function redactSpan(span: ReadableSpan): ReadableSpan {
     ...e,
     attributes: e.attributes ? redactAttributes(e.attributes) : e.attributes,
   }));
+  const redactedLinks = (span.links ?? []).map((link) => ({
+    ...link,
+    attributes: link.attributes ? redactAttributes(link.attributes) : link.attributes,
+  }));
 
   return new Proxy(span, {
     get(target, prop, _receiver) {
       if (prop === "attributes") return redactedAttributes;
       if (prop === "events") return redactedEvents;
+      if (prop === "links") return redactedLinks;
+      if (prop === "resource") {
+        const res = Reflect.get(target, prop, target);
+        return new Proxy(res, {
+          get(rTarget, rProp, _r) {
+            if (rProp === "attributes") return redactAttributes(rTarget.attributes ?? {});
+            const v = Reflect.get(rTarget, rProp, rTarget);
+            return typeof v === "function" ? (v as Function).bind(rTarget) : v;
+          },
+        });
+      }
       // Force `this === target` so prototype methods (spanContext) and
       // getters (duration, ended, droppedAttributesCount, …) bind to the
       // real SpanImpl instance. Functions are rebound defensively in case
