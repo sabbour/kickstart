@@ -46,7 +46,19 @@ dp-46-body.md
 
 # Squad: GitHub App identity (keys, config, tokens — never commit)
 .squad/identity/keys/
+.squad/identity/keys/*.pem
 .squad/identity/apps/
+.squad/identity/apps/*.json
 .squad/identity/config.json
+
+# Squad: runtime state (gh config dirs, escalation logs, test fixtures)
+.squad/runtime/
+
+# Squad: per-ceremony gh CLI config (isolates auth from human hosts.yml — #1087)
+.squad/runtime/
+
+# Squad: local session artifacts (may contain captured agent output — #1087 C/R5)
+events.jsonl
+.copilot/session-state/
 .squad-*-token
 .squad-*-token.json

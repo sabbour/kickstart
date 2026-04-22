@@ -341,7 +341,15 @@ prompt: |
   {% endif %}
 
   {only if identity configured:}
-  GIT IDENTITY: Commit as `{app_slug}[bot]`. Resolve the token with `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1`, verify `[ -n "$TOKEN" ] || exit 1`, and export `GH_TOKEN="$TOKEN"`. Agent-authored GitHub writes must use that app token; do not fall back to ambient `gh`/`git` auth. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
+  GIT IDENTITY: Commit as `{app_slug}[bot]`. Before any write:
+  ```bash
+  unset GH_TOKEN GITHUB_TOKEN
+  export GH_CONFIG_DIR="{team_root}/.squad/runtime/gh-config/{ceremony_id}"
+  mkdir -p "$GH_CONFIG_DIR"
+  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+  [ -n "$TOKEN" ] || exit 1
+  ```
+  Use the token **inline** on each write: `GH_TOKEN="$TOKEN" gh <command>`. **Never `export GH_TOKEN`** — the token persists in env and bleeds into `set -x` / tool-capture. After any write, run `.squad/scripts/post-flight-check.mjs` synchronously against the write actor. Agent-authored GitHub writes must use this app token; do not fall back to ambient `gh`/`git` auth. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
   {end identity block}
 
   TASK: {specific task description}
@@ -723,6 +731,57 @@ When spawning an agent that may do git operations (commit, push, PR), resolve th
 
 **If config exists but role/app resolution fails for a write-capable agent, stop and fix the mapping.** Do not silently drop into ambient auth for agent-authored writes.
 
+<!-- SQUAD-TOKEN-HANDLING-BLOCK v1 -->
+### Pre-Spawn: Token Handling (governance hard boundary — issue #1087)
+
+Before dispatching any write-capable agent, the coordinator MUST set up fail-closed token handling in the spawn environment. These rules are binding, not advisory — the #1086 / #1087 incidents happened because the advisory form of this block was ignored.
+
+**6. Isolate `gh` auth and unset ambient tokens** (Zapp C6). At the start of every spawn prompt that includes the identity block, emit these lines before token resolution:
+
+```bash
+unset GH_TOKEN GITHUB_TOKEN
+export GH_CONFIG_DIR="{team_root}/.squad/runtime/gh-config/{ceremony_id}"
+mkdir -p "$GH_CONFIG_DIR"
+```
+
+This guarantees a bare `gh` call fails rather than falling back to the human operator's `~/.config/gh/hosts.yml`. **Never use `/tmp` for `GH_CONFIG_DIR`** — it violates the repo runtime policy. The ceremony-id directory is disposable.
+
+**7. The one-liner write form is MANDATORY** (Zapp C7). This form:
+
+```bash
+TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+[ -n "$TOKEN" ] || exit 1
+GH_TOKEN="$TOKEN" gh pr review ...    # token scoped to the single call
+```
+
+is **REQUIRED**. `export GH_TOKEN; gh …` is **forbidden** because (a) the token persists in env across subsequent commands, (b) `set -x` or a stray `env`/`printenv` dumps the value, and (c) tool-call stdout capture bleeds the token into session logs.
+
+**8. The never-echo rule** (Zapp C2, Nibbler gap 6). No agent — coordinator included — may echo, paste, log, or otherwise surface any `ghs_`, `ghp_`, `gho_`, `ghu_`, `ghr_`, `ghe_`, `github_pat_`, `Authorization: Bearer …`, `x-access-token:…`, or `-----BEGIN … PRIVATE KEY-----` substring. Capture with `$(…)` only — never run the resolver as a bare command. The coordinator runs every agent's captured response through `.squad/scripts/scrub-secrets.mjs --response` before surfacing it to the user or writing it to `events.jsonl`.
+
+**9. Post-flight identity check is SYNCHRONOUS and blocking** (Zapp C4+C5, Nibbler gaps 3+4+5). After any agent-authored GitHub write (review, comment, label, PR create, issue edit, commit push), the spawn epilogue MUST verify the actor via `.squad/scripts/post-flight-check.mjs` in the same subshell the write ran in. The check:
+
+- Verifies `user.login == expected-bot-login` **AND** `user.type == "Bot"` (defends against login collision).
+- On mismatch, attempts revoke with the correct bot token:
+  - **Reviews:** `PUT /repos/{o}/{r}/pulls/{n}/reviews/{id}/dismissals` — reviews cannot be deleted, only dismissed.
+  - **Comments:** `DELETE /repos/{o}/{r}/issues/comments/{id}`.
+  - **Labels:** `DELETE /repos/{o}/{r}/issues/{n}/labels/{name}`.
+  - **PR create / issue edit / commit push:** cannot be auto-revoked; opens a P1 `governance:identity-mismatch` issue and halts the ceremony (no auto-retry loop).
+- Ceremony success is NOT declared until this check passes. Async post-flight leaves a governance-failed artifact live in the public record — forbidden.
+
+**10. Anti-pattern list — embed in every Lead/Reviewer/Bender/Fry/Hermes/Scribe spawn prompt.** Each of these is a P1 governance failure:
+
+- ❌ `node resolve-token.mjs --required <role>` as a bare command (leaks to chat/log).
+- ❌ `echo "$TOKEN"` or any print of the token value.
+- ❌ `export GH_TOKEN; gh …` without the inline one-liner form.
+- ❌ A `gh` call without `GH_TOKEN` set in the same subshell (falls back to `hosts.yml`).
+- ❌ Pasting a `ghs_` / `ghp_` / PEM substring into a response, PR body, commit message, or decision record — even as "evidence" of a prior leak.
+- ❌ `tmux capture-pane`, `script`, `history`, `cat ~/.*_history`, `ps ewwf`, or reads from `/proc/*/environ` in an agent session.
+- ❌ Committing `.squad/identity/keys/*.pem` or `.squad/identity/apps/*.json` (path-level refusal in Scribe's secret-scrub).
+
+**Rotation-on-leak.** If any of the above fires, treat the installation token as compromised AND rotate the App private key. The ephemeral token revocation by GitHub's scanner is a safety net, not the primary control — the App private key has no expiry. Runbook: `.squad/identity/README.md`.
+
+<!-- /SQUAD-TOKEN-HANDLING-BLOCK -->
+
 ### Pre-Spawn: Worktree Setup
 
 When spawning an agent for issue-based work (user request references an issue number, or agent is working on a GitHub issue):
@@ -841,27 +900,46 @@ prompt: |
   {end MCP block}
   
   {only if .squad/identity/config.json exists — omit entirely if no identity configured:}
-  ## GIT IDENTITY — Bot Authentication
-  This project uses GitHub App identity for git operations. When pushing code or creating PRs, authenticate as the bot.
+  ## GIT IDENTITY — Bot Authentication (hard boundary, issue #1087)
+  This project uses GitHub App identity for git operations. When pushing code or creating PRs, authenticate as the bot. These rules are binding — violation is a P1 governance failure.
   
-  **Resolve token at runtime (fail closed for writes):**
+  **Step A — Fail-closed environment setup (do this FIRST, before any git/gh call):**
+  ```bash
+  unset GH_TOKEN GITHUB_TOKEN
+  export GH_CONFIG_DIR="{team_root}/.squad/runtime/gh-config/{ceremony_id}"
+  mkdir -p "$GH_CONFIG_DIR"
+  ```
+  This prevents any bare `gh` call from silently falling back to the human operator's `~/.config/gh/hosts.yml`.
+  
+  **Step B — Resolve the token with the one-liner form (MANDATORY):**
   ```bash
   TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
   [ -n "$TOKEN" ] || exit 1
-  export GH_TOKEN="$TOKEN"
   ```
-  `resolve-token.mjs` only uses explicit config keys or explicit alias mappings; it does **not** guess another app. `--required` prints a reason to stderr and exits non-zero when write auth is not explicitly configured.
+  `resolve-token.mjs` uses only explicit config keys or explicit alias mappings; it does **not** guess another app. `--required` prints a reason to stderr and exits non-zero when write auth is not explicitly configured. Never run the resolver as a bare command — it leaks the token into chat context. Always capture with `$(…)`.
+  
+  **Step C — Use the token inline, never `export`:**
+  - **Push:** `git push "https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git" {branch}`
+  - **PR create:** `GH_TOKEN="$TOKEN" gh pr create ...`
+  - **Review / comment / label:** `GH_TOKEN="$TOKEN" gh pr review ...` etc.
+  - **PR body MUST include:** `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`
+  
+  `export GH_TOKEN; gh …` is **forbidden**: the token persists across subsequent commands, `set -x` dumps it, and tool-call stdout capture bleeds it into session logs.
+  
+  **Step D — Post-flight identity check (SYNCHRONOUS, blocking):**
+  After any bot-authored write, verify the actor in the same subshell:
+  ```bash
+  GH_TOKEN="$TOKEN" node "{team_root}/.squad/scripts/post-flight-check.mjs" \
+    --kind <review|comment|label|pr-create|issue-edit|commit> \
+    --owner {owner} --repo {repo} [--pr N | --issue N | --sha SHA] [--id ID] \
+    --expected-login {app_slug}[bot]
+  ```
+  Exit 0 = OK, exit 1 = mismatch auto-revoked, exit 2 = mismatch revoke FAILED (HALT, file P1). Do not declare ceremony success until this passes. The check verifies both `user.login == expected` AND `user.type == "Bot"` (login-match alone is spoofable by a human account).
   
   **Git commit identity:**
   - `git -c user.name="{app_slug}[bot]" -c user.email="{app_slug}[bot]@users.noreply.github.com" commit ...`
   
-  **Agent-authored writes must stay on app identity:**
-  - **Push:** `git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git {branch}`
-  - **PR create:** `GH_TOKEN=$TOKEN gh pr create ...`
-  **PR body must include:** `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`
-  - **Do not use** ambient `gh` or `git` auth for normal agent-authored writes.
-  
-  **Never log or echo the token value.**
+  **Never echo the token.** No `echo "$TOKEN"`, no `env`, no `printenv`, no `set -x` around token-handling blocks, no pasting `ghs_`/`ghp_`/PEM material into responses, PR bodies, commit messages, or decision records — even as "evidence" of a past leak. See `.squad/identity/README.md` for the rotation-on-leak runbook.
   {end identity block}
   
   **Requested by:** {current user name}
@@ -942,7 +1020,7 @@ prompt: |
   4. SESSION LOG: Write .squad/log/{timestamp}-{topic}.md. Brief. Use ISO 8601 UTC timestamp.
   5. CROSS-AGENT: Append team updates to affected agents' history.md.
   6. HISTORY SUMMARIZATION [HARD GATE]: If any history.md >= 15360 bytes (15KB), summarize now.
-  7. GIT COMMIT: Stage only the exact `.squad/` files Scribe wrote in this session. Use `git status --porcelain` filtered to allowed paths (decisions.md, decisions-archive.md, agents/{name}/history.md, agents/{name}/history-archive.md, log/*, orchestration-log/*). Stage each file individually with `git add -- <path>`. Handle renames by extracting destination path (`-replace '^.* -> ',''`). Commit with -F (write msg to temp file). Skip if nothing staged. ⚠️ NEVER use `git add .squad/` or broad globs.
+  7. GIT COMMIT: Stage only the exact `.squad/` files Scribe wrote in this session. Use `git status --porcelain` filtered to allowed paths (decisions.md, decisions-archive.md, agents/{name}/history.md, agents/{name}/history-archive.md, log/*, orchestration-log/*). Stage each file individually with `git add -- <path>`. Handle renames by extracting destination path (`-replace '^.* -> ',''`). **Before committing, run `node .squad/scripts/scribe-escalation-guard.mjs check --role scribe --paths <files>` — if it exits non-zero, HALT (Nibbler gap 9: self-review loop guard; auto-retry blocked for 24h). Then run `node .squad/scripts/scrub-secrets.mjs --staged` — if it exits non-zero, run `node .squad/scripts/scribe-escalation-guard.mjs record --role scribe --paths <files> --reason "<short>"` and HALT, do NOT auto-retry on the same files, flag for Leela remediation.** Commit with -F (write msg to temp file). Skip if nothing staged. ⚠️ NEVER use `git add .squad/` or broad globs.
   8. HEALTH REPORT: Log decisions.md before/after size, inbox count processed, history files summarized.
 
   Never speak to user. ⚠️ End with plain text summary after all tool calls.
