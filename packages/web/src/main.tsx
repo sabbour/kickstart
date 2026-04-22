@@ -1,3 +1,7 @@
+// MUST be the first import: disables Zod's JIT (`new Function`) path before
+// any schema is constructed, so the app loads under `script-src 'self'` with
+// no `'unsafe-eval'`. See `./lib/configure-zod.ts`.
+import './lib/configure-zod';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';

@@ -43,6 +43,10 @@ workspace under one trace id.
   `@microsoft/applicationinsights-web` is explicitly disqualified (would
   require `unsafe-inline`).
 - Any init failure is swallowed so telemetry can never break app boot.
+- CSP hardening: configure Zod v4 with `jitless: true` at the first line of
+  `main.tsx` so object schemas never invoke `new Function(...)`; the
+  Playwright CSP smoke scenario now runs under the production
+  `script-src 'self'` (no `'unsafe-eval'`) with zero violations.
 
 ### Kill switch
 
