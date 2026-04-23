@@ -47,7 +47,7 @@ export const TextApi = {
         'The text content to display. While simple Markdown formatting is supported (i.e. without HTML, images, or links), utilizing dedicated UI components is generally preferred for a richer and more structured presentation.',
       ),
       variant: z
-        .enum(['h1', 'h2', 'h3', 'h4', 'h5', 'caption', 'body'])
+        .enum(['h1', 'h2', 'h3', 'h4', 'h5', 'subtitle1', 'subtitle2', 'caption', 'body', 'body1', 'body2'])
         .default('body')
         .describe('A hint for the base text style.')
         .optional(),

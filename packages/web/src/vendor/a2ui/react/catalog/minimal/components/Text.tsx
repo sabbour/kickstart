@@ -20,7 +20,7 @@ import {CommonSchemas} from '../../../../web_core/index';
 
 export const TextSchema = z.object({
   text: CommonSchemas.DynamicString,
-  variant: z.enum(['h1', 'h2', 'h3', 'h4', 'h5', 'caption', 'body']).optional(),
+  variant: z.enum(['h1', 'h2', 'h3', 'h4', 'h5', 'subtitle1', 'subtitle2', 'caption', 'body', 'body1', 'body2']).optional(),
 });
 
 export const TextApiDef = {

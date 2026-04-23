@@ -94,7 +94,7 @@ Each component object has:
 **Content:**
 | Component | Props |
 |-----------|-------|
-| Text | text (string), variant? (h1/h2/h3/subtitle1/subtitle2/caption/body) |
+| Text | text (string), variant? (h1/h2/h3/h4/h5/subtitle1/subtitle2/caption/body) |
 | Markdown | content (string: markdown text) |
 | Image | url (string), alt? (string) |
 | CodeBlock | code (string), language? (string), filename? (string) |
@@ -111,7 +111,7 @@ Each component object has:
 **Data display:**
 | Component | Props |
 |-----------|-------|
-| ProgressSteps | steps (array of {label, status}) |
+| ProgressSteps | steps (array of {id, label, status}) — status must be one of: pending, active, complete, error |
 
 ### Children rules
 - Column and Row use \`children: ["id1", "id2"]\` — an array of child component ID strings.
