@@ -49,9 +49,11 @@ const { DebugPanel } = await import('../components/Chat/DebugPanel');
 import type { ChatMessage, TokenUsageSummary } from '../types';
 import { GENERATION_PROGRESS_TITLE, getLatestConversationPhase, rebuildChatSessionState } from '../utils/chat-a2ui';
 import { summarizeTokenUsage } from '../utils/chat-usage';
-import { A2uiSurface, basicCatalog } from '../vendor/a2ui/react';
+import { A2uiSurface } from '../vendor/a2ui/react';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
-import { MessageProcessor } from '../vendor/a2ui/web_core/index';
+import { Catalog, MessageProcessor } from '../vendor/a2ui/web_core/index';
+import { BASIC_FUNCTIONS } from '../vendor/a2ui/web_core/basic_catalog/index';
+import { fluentOverrides } from '../catalog/fluent-components/index';
 import type { A2uiMessage } from '../vendor/a2ui/web_core/schema/server-to-client';
 
 const debugState = vi.hoisted(() => ({
@@ -282,15 +284,20 @@ describe('chat/debug UI regressions', () => {
 
   it('shows a warning for missing referenced components while debug mode is enabled', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const testCatalog = new Catalog<ReactComponentImplementation>(
+      'test-catalog',
+      fluentOverrides,
+      BASIC_FUNCTIONS,
+    );
     const processor = new MessageProcessor<ReactComponentImplementation>(
-      [basicCatalog],
+      [testCatalog],
       () => undefined,
     );
 
     const surfaceMessages: A2uiMessage[] = [
       {
         version: 'v0.9',
-        createSurface: { surfaceId: 'msg-1', catalogId: basicCatalog.id },
+        createSurface: { surfaceId: 'msg-1', catalogId: testCatalog.id },
       },
       {
         version: 'v0.9',
