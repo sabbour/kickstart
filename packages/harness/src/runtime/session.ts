@@ -53,7 +53,9 @@ const MIN_LIVE_SURFACES_CAP = 10;
 const MAX_LIVE_SURFACES_CAP = 100_000;
 
 function resolveMaxLiveSurfaces(): number {
-  const raw = process.env.KICKSTART_MAX_LIVE_SURFACES;
+  const raw = typeof process !== "undefined" && process.env
+    ? process.env.KICKSTART_MAX_LIVE_SURFACES
+    : undefined;
   if (!raw) return DEFAULT_MAX_LIVE_SURFACES;
   const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n)) return DEFAULT_MAX_LIVE_SURFACES;
@@ -325,7 +327,9 @@ export const HYDRATION_CONTENT_MAX_BYTES = 4 * 1024;
  * hydrate freely regardless of this flag.
  */
 export function isAnonHydrationAllowed(): boolean {
-  const raw = process.env.HARNESS_ALLOW_ANON_HYDRATION;
+  const raw = typeof process !== "undefined" && process.env
+    ? process.env.HARNESS_ALLOW_ANON_HYDRATION
+    : undefined;
   if (!raw) return false;
   const v = raw.trim().toLowerCase();
   return v === '1' || v === 'true';
