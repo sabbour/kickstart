@@ -29,10 +29,6 @@ jobs:
           script: |
             const AUTO_MERGE_MARKER = '<!-- squad-auto-merge -->';
             const LOW_RISK_LABEL = 'squad:chore-auto';
-            const TRUSTED_RETRO_LABEL = 'retro-log';
-            const TRUSTED_RETRO_BRANCH_PREFIX = 'retro-log/pr-';
-            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'sabbour-squad-scribe[bot]']);
-            const TRUSTED_RETRO_ONLY_PATHS = new Set(['.squad/retro-log.md']);
             const DEPENDABOT_AUTHOR = 'dependabot[bot]';
             const DEPENDABOT_BRANCH_PREFIX = 'dependabot/';
             const XL_THRESHOLD = 1000;
@@ -120,16 +116,6 @@ jobs:
               }
               // hasNibblerRejection
               return ['leela:approved', 'zapp:approved'];
-            }
-
-            function isTrustedRetroLogPr(pr, labels, changedFiles) {
-              return (
-                labels.has(TRUSTED_RETRO_LABEL) &&
-                TRUSTED_RETRO_AUTHORS.has(pr.author?.login ?? '') &&
-                (pr.headRefName ?? '').startsWith(TRUSTED_RETRO_BRANCH_PREFIX) &&
-                changedFiles.length > 0 &&
-                changedFiles.every((filename) => TRUSTED_RETRO_ONLY_PATHS.has(filename))
-              );
             }
 
             function isDependabotPr(pr) {
@@ -370,7 +356,6 @@ jobs:
 
             const labels = new Set(pr.labels.nodes.map((label) => label.name));
             const changedFiles = await listChangedFiles(pr.number);
-            const trustedRetroLogPr = isTrustedRetroLogPr(pr, labels, changedFiles);
             const dependabotPr = isDependabotPr(pr);
             const zappRequirementReason = getZappRequirementReason(pr, labels, changedFiles);
             const clearedApprovals = await clearApprovalLabels(pr, labels);
@@ -413,8 +398,6 @@ jobs:
 
             const requiredApprovals = dependabotPr
               ? []
-              : trustedRetroLogPr
-              ? []
               : getRequiredApprovals(pr, labels, changedFiles);
             const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
             if (missingApprovals.length > 0) {
@@ -423,7 +406,7 @@ jobs:
 
             // Docs gate: every non-trusted PR must carry either docs:approved or
             // docs:not-applicable on the current head, and docs:rejected always blocks.
-            if (!dependabotPr && !trustedRetroLogPr) {
+            if (!dependabotPr) {
               const docsBlocker = getDocsBlocker(labels);
               if (docsBlocker) {
                 blockers.push(docsBlocker);
@@ -518,9 +501,7 @@ jobs:
                 AUTO_MERGE_MARKER,
                 '🤖 Auto-merge armed.',
                 '',
-                trustedRetroLogPr
-                  ? '- trusted retro-log PR path is green (`retro-log` label + `retro-log/pr-*` branch + trusted bot author + `.squad/retro-log.md` only)'
-                  : dependabotPr
+                dependabotPr
                   ? '- Dependabot auto-merge: CI is green and `dependabot[bot]` author in `dependabot/*` branch'
                   : labels.has(LOW_RISK_LABEL)
                   ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : DOCS_NA_LABEL}\` for the docs gate`

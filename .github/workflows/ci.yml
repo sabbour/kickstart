@@ -15,51 +15,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  classify-trusted-retro-log-pr:
-    name: Classify trusted retro-log PR
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    outputs:
-      trusted_retro_log_pr: ${{ steps.classify.outputs.trusted_retro_log_pr }}
-    steps:
-      - name: Classify trusted retro-log PR
-        id: classify
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const TRUSTED_RETRO_LABEL = 'retro-log';
-            const TRUSTED_RETRO_BRANCH_PREFIX = 'retro-log/pr-';
-            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'sabbour-squad-scribe[bot]']);
-            const TRUSTED_RETRO_ONLY_PATHS = new Set(['.squad/retro-log.md']);
-
-            async function listChangedFiles(prNumber) {
-              const files = await github.paginate(github.rest.pulls.listFiles, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: prNumber,
-                per_page: 100,
-              });
-              return files.map((file) => file.filename);
-            }
-
-            const pr = context.payload.pull_request;
-            const labels = new Set((pr.labels ?? []).map((label) => label.name));
-            const changedFiles = await listChangedFiles(pr.number);
-            const trustedRetroLogPr = (
-              labels.has(TRUSTED_RETRO_LABEL) &&
-              TRUSTED_RETRO_AUTHORS.has(pr.user?.login ?? '') &&
-              (pr.head?.ref ?? '').startsWith(TRUSTED_RETRO_BRANCH_PREFIX) &&
-              changedFiles.length > 0 &&
-              changedFiles.every((filename) => TRUSTED_RETRO_ONLY_PATHS.has(filename))
-            );
-
-            core.setOutput('trusted_retro_log_pr', trustedRetroLogPr ? 'true' : 'false');
-
   lint-build:
     name: Lint, Build & Unit Tests
     runs-on: ubuntu-latest
-    needs: [classify-trusted-retro-log-pr]
-    if: needs.classify-trusted-retro-log-pr.outputs.trusted_retro_log_pr != 'true'
 
     steps:
       - name: Checkout code
@@ -159,7 +117,6 @@ jobs:
   e2e:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
-    needs: [classify-trusted-retro-log-pr]
     # Disabled to save CI minutes — re-enable by removing `if: false`
     if: false
 
@@ -201,17 +158,16 @@ jobs:
   ci-gate:
     name: CI Gate
     runs-on: ubuntu-latest
-    needs: [classify-trusted-retro-log-pr, lint-build, e2e]
+    needs: [lint-build, e2e]
     if: always()
     steps:
       - name: Check results
         run: |
-          classify_result="${{ needs.classify-trusted-retro-log-pr.result }}"
           lint_build_result="${{ needs.lint-build.result }}"
           e2e_result="${{ needs.e2e.result }}"
 
-          if [[ ! "$classify_result" =~ ^(success|skipped)$ || ! "$lint_build_result" =~ ^(success|skipped)$ || ! "$e2e_result" =~ ^(success|skipped)$ ]]; then
-            echo "CI failed: classify=${classify_result}, lint-build=${lint_build_result}, e2e=${e2e_result}"
+          if [[ ! "$lint_build_result" =~ ^(success|skipped)$ || ! "$e2e_result" =~ ^(success|skipped)$ ]]; then
+            echo "CI failed: lint-build=${lint_build_result}, e2e=${e2e_result}"
             exit 1
           fi
-          echo "CI passed: classify=${classify_result}, lint-build=${lint_build_result}, e2e=${e2e_result}"
+          echo "CI passed: lint-build=${lint_build_result}, e2e=${e2e_result}"
