@@ -76,13 +76,19 @@ vi.mock('../telemetry/sanitize-error.js', () => ({
 }));
 
 vi.mock('@aks-kickstart/harness/runtime/session', () => ({
-  getOrCreateSession: vi.fn(() => ({
-    sessionId: 'test-session',
-    oid: 'anonymous',
-    recentTurns: [],
-    activeAgent: 'core.triage',
-    user: { oid: 'anonymous' },
+  getOrCreateSessionResult: vi.fn(() => ({
+    session: {
+      sessionId: 'test-session',
+      oid: 'anonymous',
+      recentTurns: [],
+      activeAgent: 'core.triage',
+      user: { oid: 'anonymous' },
+    },
+    created: true,
   })),
+  generateAnonSessionToken: vi.fn(() => 'mock-anon-token'),
+  validateAnonSessionToken: vi.fn(() => true),
+  isAnonymousSession: vi.fn(() => true),
   hydrateColdSession: vi.fn(() => ({ hydrated: 0, ignored: null })),
   isAnonHydrationAllowed: vi.fn(() => false),
   sessionStore: { delete: vi.fn() },
