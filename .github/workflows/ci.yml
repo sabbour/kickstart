@@ -10,6 +10,10 @@ permissions:
   contents: read
   pull-requests: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   classify-trusted-retro-log-pr:
     name: Classify trusted retro-log PR
@@ -70,6 +74,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: "npm"
           registry-url: "https://npm.pkg.github.com"
           scope: "@aks-kickstart"
           always-auth: true
@@ -167,6 +172,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+          cache: "npm"
           registry-url: "https://npm.pkg.github.com"
           scope: "@aks-kickstart"
           always-auth: true
@@ -178,6 +184,14 @@ jobs:
 
       - name: Build all workspaces
         run: npm run build
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
