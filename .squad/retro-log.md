@@ -98,6 +98,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-04-23 | #1105 "chore(ci): harden ci.yml — concurrency, npm cache, Playwright cache" | S | impl=4m | review=65m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=55m | ci=7m | reviewer=bot | human_comments=0 | issue=#1101 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-23 | #1099 "feat(harness): remove HARNESS_SESSION_HISTORY_ENABLED flag (#1098)" | L | impl=1m | review=19m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=3m | ci=9m | reviewer=bot | human_comments=0 | issue=#1098 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-22 | #1091 "fix(#1087): token-leak prevention & governance hardening" | XL | impl=4m | review=37m | cycles=3 | merged-with-rework | @sabbour-squad-frontend[bot] | first_review=5m | ci=8m | reviewer=human | human_comments=1 | issue=#1087 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
