@@ -2,30 +2,18 @@
  * Multi-turn click regression for #1062 (Layers 0 + 1 + 2 combined).
  *
  * This test is a back-to-back button-click simulation that proves the P0
- * regression would be caught end-to-end once Bender's Layer 0 lands:
+ * regression would be caught end-to-end:
  *
  *   Turn 1: user types "help me build something"  → agent emits intent menu
  *   Turn 2: user clicks "Build new"               → agent must NOT re-emit
  *                                                   the intent menu.
  *
- * It is skipped until the harness session-history feature flag is flipped on
- * in the CI environment (`HARNESS_SESSION_HISTORY_ENABLED=1`). This is
- * mandated by the Layer 0 rollout plan on #1062: before Bender's runner
- * change lands, threading history is a no-op and the agent will still loop.
+ * History threading is unconditional since #1098.
  */
 
 import { test, expect } from './helpers';
 
-const SESSION_HISTORY_FLAG = process.env.HARNESS_SESSION_HISTORY_ENABLED;
-const FLAG_ON = SESSION_HISTORY_FLAG === '1' || SESSION_HISTORY_FLAG === 'true';
-
 test.describe('Button click → structured event payload (#1062)', () => {
-  test.skip(
-    !FLAG_ON,
-    `Skipped: HARNESS_SESSION_HISTORY_ENABLED is not set to "1". ` +
-      `This regression guard requires Bender's Layer 0 session-history threading ` +
-      `to be live end-to-end. Re-enable by exporting HARNESS_SESSION_HISTORY_ENABLED=1.`,
-  );
 
   test('POST body carries structured event metadata when a Button is clicked', async ({ page }) => {
     // Intercept the converse call and inspect the payload the client sends.

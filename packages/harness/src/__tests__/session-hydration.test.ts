@@ -4,7 +4,7 @@
  * Covers Leela's DP + Nibbler's additive conditions + Zapp's M3 trust marker:
  *  - brand-new session + valid messages → hydrated
  *  - warm session + messages → ignored
- *  - flag off → ignored (default + explicit)
+ *  - explicit enabled=false → disabled no-op
  *  - empty `messages: []` distinct from `undefined` (Nibbler #2)
  *  - 21st message capped / dropped via the `cap` option (Nibbler #5 peer case)
  *  - tool/system roles never make it past the helper (defense in depth)
@@ -19,7 +19,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   Session,
   hydrateColdSession,
-  isHistoryHydrationEnabled,
   isAnonHydrationAllowed,
   HYDRATION_DEFAULT_CAP,
 } from '../runtime/session.js';
@@ -30,36 +29,27 @@ function makeSession(oid = 'user-1'): Session {
   return new Session({ sessionId: 'sess-1', user: { oid } });
 }
 
-describe('isHistoryHydrationEnabled / isAnonHydrationAllowed — env flag helpers', () => {
-  const originalHistory = process.env.HARNESS_SESSION_HISTORY_ENABLED;
+describe('isAnonHydrationAllowed — env flag helper', () => {
   const originalAnon = process.env.HARNESS_ALLOW_ANON_HYDRATION;
 
   afterEach(() => {
-    if (originalHistory === undefined) delete process.env.HARNESS_SESSION_HISTORY_ENABLED;
-    else process.env.HARNESS_SESSION_HISTORY_ENABLED = originalHistory;
     if (originalAnon === undefined) delete process.env.HARNESS_ALLOW_ANON_HYDRATION;
     else process.env.HARNESS_ALLOW_ANON_HYDRATION = originalAnon;
   });
 
   it('defaults OFF when flag unset', () => {
-    delete process.env.HARNESS_SESSION_HISTORY_ENABLED;
     delete process.env.HARNESS_ALLOW_ANON_HYDRATION;
-    expect(isHistoryHydrationEnabled()).toBe(false);
     expect(isAnonHydrationAllowed()).toBe(false);
   });
 
   it('accepts "1" and "true" (case-insensitive) as ON', () => {
     for (const v of ['1', 'true', 'TRUE', 'True']) {
-      process.env.HARNESS_SESSION_HISTORY_ENABLED = v;
-      expect(isHistoryHydrationEnabled()).toBe(true);
       process.env.HARNESS_ALLOW_ANON_HYDRATION = v;
       expect(isAnonHydrationAllowed()).toBe(true);
     }
   });
 
   it('rejects other truthy strings', () => {
-    process.env.HARNESS_SESSION_HISTORY_ENABLED = 'yes';
-    expect(isHistoryHydrationEnabled()).toBe(false);
     process.env.HARNESS_ALLOW_ANON_HYDRATION = 'on';
     expect(isAnonHydrationAllowed()).toBe(false);
   });

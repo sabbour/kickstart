@@ -14,8 +14,7 @@
  *
  * They are intentionally narrow — the full end-to-end click → POST round-trip
  * is covered by the Playwright regression in
- * `packages/web/e2e/button-click-payload.spec.ts` (guarded by
- * HARNESS_SESSION_HISTORY_ENABLED).
+ * `packages/web/e2e/button-click-payload.spec.ts`.
  */
 
 import { describe, expect, it, vi } from 'vitest';

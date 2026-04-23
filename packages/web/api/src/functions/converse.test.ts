@@ -84,7 +84,6 @@ vi.mock('@aks-kickstart/harness/runtime/session', () => ({
     user: { oid: 'anonymous' },
   })),
   hydrateColdSession: vi.fn(() => ({ hydrated: 0, ignored: null })),
-  isHistoryHydrationEnabled: vi.fn(() => false),
   isAnonHydrationAllowed: vi.fn(() => false),
   sessionStore: { delete: vi.fn() },
   HYDRATION_DEFAULT_CAP: 20,
