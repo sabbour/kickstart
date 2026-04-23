@@ -63,8 +63,18 @@ jobs:
             echo "❌ @azure/monitor-opentelemetry found in node_modules/ — revert contract violated. See issue #1041/#1051"
             exit 1
           fi
-          grep -q "useAzureMonitor" packages/web/api/dist/functions/health.js || \
-            (echo "❌ useAzureMonitor not bundled into health.js — esbuild externals misconfigured. See issue #1041/#1051" && exit 1)
+          # Guard: AzureMonitorTraceExporter is the named export imported by
+          # packages/web/api/src/lib/appinsights.ts:57. The identifier survives
+          # verbatim because packages/web/api/esbuild.config.mjs has no
+          # minify/mangle. If minify is ever enabled, swap this to a more
+          # stable sentinel. See issue #1041/#1051 and DP #1035.
+          grep -q "AzureMonitorTraceExporter" packages/web/api/dist/functions/health.js || {
+            echo "❌ AzureMonitorTraceExporter not found in health.js — OTel exporter was externalized."
+            echo "   Check packages/web/api/esbuild.config.mjs externals list and"
+            echo "   scripts/verify-api-externals.mjs MUST_BE_INLINED."
+            echo "   See DP #1035 (PII double-export contract) and issue #1095."
+            exit 1
+          }
           echo "✅ OTel bundled inline; node_modules/ clean"
 
       - name: Deploy to Azure Static Web Apps
