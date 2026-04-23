@@ -23,6 +23,8 @@ permissions:
 
 jobs:
   retro:
+    # Disabled per user request — retro-log collection turned off
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Create squad scribe app token
