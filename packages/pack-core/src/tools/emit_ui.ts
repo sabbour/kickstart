@@ -3,6 +3,11 @@ import { z } from 'zod';
 import { A2UIMessageSchema } from '@aks-kickstart/harness';
 import type { A2UIMessageV09 } from '@aks-kickstart/harness';
 import type { ToolContribution, SessionCtx } from '@aks-kickstart/harness';
+import {
+  DecisionCardSchema,
+  RadioGroupSchema,
+  QuestionnaireSchema,
+} from '../schemas/rich-component-schemas.js';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -287,6 +292,10 @@ const A2UIComponentSchema = z.discriminatedUnion('component', [
       }),
     ).describe('Accordion sections, each with a title and child IDs.'),
   }).strict(),
+  // ── Rich domain components (registry-derived #1130) ────────────────────
+  DecisionCardSchema,
+  RadioGroupSchema,
+  QuestionnaireSchema,
 ]);
 
 // Full discriminated union for the A2UI v0.9 envelope.

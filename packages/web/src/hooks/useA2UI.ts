@@ -63,6 +63,11 @@ export function _filterMessagesForProcessor(
         ...msg,
         updateComponents: { ...msg.updateComponents, components: validated as any },
       });
+      // #1130: collect surfaceId from updateComponents so the client knows
+      // which surface was updated (required for in-place DecisionCard → RadioGroup).
+      if (msg.updateComponents.surfaceId) {
+        surfaceIds.push(msg.updateComponents.surfaceId);
+      }
       continue;
     }
     if (msg.createSurface) {
