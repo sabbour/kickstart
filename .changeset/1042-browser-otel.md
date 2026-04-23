@@ -27,8 +27,14 @@ workspace under one trace id.
   receive `traceparent` and never produce spans. Default sampling 10%.
 - `W3CTraceContextPropagator` configured for `traceparent` only;
   `tracestate` propagation disabled.
-- Five Playwright E2E scenarios covering traceparent propagation, ingestion
-  assertion, redaction, SPA-nav flush, and third-party isolation.
+- Three active Playwright E2E scenarios covering SPA-nav flush (3),
+  third-party fetch isolation (4), and CSP smoke under production CSP (5).
+  Scenarios covering traceparent propagation (1), mock ingestion + trace-id
+  correlation (2), and bearer/query-string redaction on the wire (6) are
+  carried in the spec as `test.skip(...)` and deferred to #1094; bodies are
+  preserved verbatim so re-enabling is a one-line flip. Phase-1a scope is
+  therefore: CSP unblock (Zod v4 `jitless` + `zod/v4` root alias), the
+  redacting exporter wiring, and 10% default head sampling.
 
 ### Guardrails
 

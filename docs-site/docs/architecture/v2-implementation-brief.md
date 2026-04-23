@@ -24,7 +24,6 @@ Decision 1): dynamic script injection would require widening CSP with
 - `@opentelemetry/sdk-trace-web`
 - `@opentelemetry/instrumentation-fetch` — scoped to `/api/*` only
   (`ignoreUrls: [/^(?!.*\/api\/).*/]`)
-- `@opentelemetry/context-zone`
 - `@azure/monitor-opentelemetry-exporter`
 - `BrowserRedactingSpanExporter` (new — mirrors the server-side
   `RedactingSpanExporter`, wraps the Azure Monitor exporter)
@@ -97,7 +96,8 @@ gzipped.
 ### Phase 3 — GA
 
 - Flag enabled for all users.
-- All 5 Playwright scenarios green.
+- All 6 Playwright scenarios green (scenarios 1/2/6 deferred to #1094 in
+  Phase 1a must be re-enabled and passing before GA).
 - Redaction audit on a sampled week of ingestion.
 - IP anonymization verified on the App Insights resource.
 
