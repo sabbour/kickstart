@@ -15,6 +15,7 @@ import {
   _resetLastFallbackIdxForTests,
   nextFocusDomain,
   pickFallbackIdea,
+  stripMarkdown,
 } from "./widget-inspirations-data.js";
 
 // ---------------------------------------------------------------------------
@@ -99,5 +100,116 @@ describe("nextFocusDomain", () => {
     _resetFocusCursorForTests(FOCUS_DOMAINS.length - 1);
     expect(nextFocusDomain()).toBe(FOCUS_DOMAINS[FOCUS_DOMAINS.length - 1]);
     expect(nextFocusDomain()).toBe(FOCUS_DOMAINS[0]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stripMarkdown
+// ---------------------------------------------------------------------------
+
+describe("stripMarkdown", () => {
+  it("returns plain text unchanged", () => {
+    const plain = "I want to build a pod dashboard with live metrics.";
+    expect(stripMarkdown(plain)).toBe(plain);
+  });
+
+  it("strips bold markers (**text** and __text__)", () => {
+    expect(stripMarkdown("Use a **Column** as the root")).toBe(
+      "Use a Column as the root",
+    );
+    expect(stripMarkdown("Use a __Column__ as the root")).toBe(
+      "Use a Column as the root",
+    );
+  });
+
+  it("strips italic markers (*text* and _text_)", () => {
+    expect(stripMarkdown("Add a *subtle* hint")).toBe("Add a subtle hint");
+    expect(stripMarkdown("Add a _subtle_ hint")).toBe("Add a subtle hint");
+  });
+
+  it("strips bold-italic markers (***text*** and ___text___)", () => {
+    expect(stripMarkdown("A ***critical*** alert")).toBe("A critical alert");
+    expect(stripMarkdown("A ___critical___ alert")).toBe("A critical alert");
+  });
+
+  it("strips heading prefixes", () => {
+    expect(stripMarkdown("# Heading 1\n## Heading 2\n### Heading 3")).toBe(
+      "Heading 1\nHeading 2\nHeading 3",
+    );
+  });
+
+  it("strips horizontal rules", () => {
+    expect(stripMarkdown("Above\n---\nBelow")).toBe("Above\n\nBelow");
+    expect(stripMarkdown("Above\n***\nBelow")).toBe("Above\n\nBelow");
+    expect(stripMarkdown("Above\n___\nBelow")).toBe("Above\n\nBelow");
+  });
+
+  it("strips inline code backticks", () => {
+    expect(stripMarkdown("Use the `Button` component")).toBe(
+      "Use the Button component",
+    );
+  });
+
+  it("strips fenced code blocks but keeps content", () => {
+    const input = "Before\n```json\n{\"key\": \"value\"}\n```\nAfter";
+    expect(stripMarkdown(input)).toBe('Before\n{"key": "value"}\nAfter');
+  });
+
+  it("strips blockquotes", () => {
+    expect(stripMarkdown("> This is a quote")).toBe("This is a quote");
+  });
+
+  it("strips unordered list bullets", () => {
+    expect(stripMarkdown("- Item one\n- Item two")).toBe(
+      "Item one\nItem two",
+    );
+    expect(stripMarkdown("* Item one\n* Item two")).toBe(
+      "Item one\nItem two",
+    );
+  });
+
+  it("strips ordered list prefixes", () => {
+    expect(stripMarkdown("1. First\n2. Second\n3. Third")).toBe(
+      "First\nSecond\nThird",
+    );
+  });
+
+  it("converts links to text", () => {
+    expect(stripMarkdown("See [the docs](https://example.com) for more")).toBe(
+      "See the docs for more",
+    );
+  });
+
+  it("converts images to alt text", () => {
+    expect(stripMarkdown("![logo](https://example.com/logo.png)")).toBe(
+      "logo",
+    );
+  });
+
+  it("collapses excessive blank lines", () => {
+    expect(stripMarkdown("A\n\n\n\n\nB")).toBe("A\n\nB");
+  });
+
+  it("handles a realistic LLM response with mixed markdown", () => {
+    const llmOutput = `### AKS Node Pool Monitor
+
+**Description:** A real-time node pool health panel.
+
+- Shows node status via a Table
+- Uses **Badges** for health indicators
+- Includes a *progress bar* for capacity
+
+---
+
+Use a \`Column\` as the root.`;
+
+    const cleaned = stripMarkdown(llmOutput);
+    expect(cleaned).not.toContain("###");
+    expect(cleaned).not.toContain("**");
+    expect(cleaned).not.toContain("---");
+    expect(cleaned).not.toContain("`");
+    expect(cleaned).toContain("AKS Node Pool Monitor");
+    expect(cleaned).toContain("Column");
+    expect(cleaned).toContain("Badges");
   });
 });

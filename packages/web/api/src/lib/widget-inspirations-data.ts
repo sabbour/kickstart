@@ -187,3 +187,55 @@ export function pickFallbackIdea(): WidgetIdea {
 export function _resetLastFallbackIdxForTests(value = -1): void {
   lastFallbackIdx = value;
 }
+
+// ---------------------------------------------------------------------------
+// Markdown stripping (safety net for LLM output rendered in plain-text areas)
+//
+// The system prompt asks for plain prose, but LLMs occasionally slip in
+// markdown syntax anyway.  This function removes common markdown artifacts
+// so the textarea never shows raw `**bold**`, `### headings`, or `---`.
+// ---------------------------------------------------------------------------
+
+/**
+ * Strip common markdown syntax from a string, returning plain text.
+ *
+ * Handles: bold/italic (`**`, `__`, `*`, `_`), headings (`#`…`######`),
+ * horizontal rules (`---`, `***`, `___`), inline code (`` ` ``),
+ * fenced code blocks (`` ``` ``), bullet/numbered list prefixes,
+ * blockquotes (`>`), links (`[text](url)`), and images (`![alt](url)`).
+ */
+export function stripMarkdown(text: string): string {
+  return (
+    text
+      // Fenced code blocks (``` … ```) — remove fences, keep content
+      .replace(/```[\s\S]*?```/g, (m) =>
+        m.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, ""),
+      )
+      // Images ![alt](url) → alt
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+      // Links [text](url) → text
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+      // Headings: strip leading #…#
+      .replace(/^#{1,6}\s+/gm, "")
+      // Horizontal rules (standalone ---, ***, ___)
+      .replace(/^[-*_]{3,}\s*$/gm, "")
+      // Bold/italic (order matters: longest delimiter first)
+      .replace(/\*{3}(.+?)\*{3}/g, "$1")
+      .replace(/_{3}(.+?)_{3}/g, "$1")
+      .replace(/\*{2}(.+?)\*{2}/g, "$1")
+      .replace(/_{2}(.+?)_{2}/g, "$1")
+      .replace(/(?<!\w)\*(.+?)\*(?!\w)/g, "$1")
+      .replace(/(?<!\w)_(.+?)_(?!\w)/g, "$1")
+      // Inline code
+      .replace(/`([^`]+)`/g, "$1")
+      // Blockquotes
+      .replace(/^>\s?/gm, "")
+      // Unordered list bullets (-, *, +)
+      .replace(/^[\t ]*[-*+]\s+/gm, "")
+      // Ordered list prefixes (1., 2., …)
+      .replace(/^[\t ]*\d+\.\s+/gm, "")
+      // Collapse multiple blank lines into one
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
+}
