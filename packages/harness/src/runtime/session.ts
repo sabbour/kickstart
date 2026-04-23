@@ -1,7 +1,32 @@
-import { randomUUID, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { A2UIMessageV09 as A2UIMessage } from '../types/a2ui.js';
 import type { Artifact, A2UICatalog, SessionCtx, Turn, PendingUserAction, AppIntent, AzureCredential, ClientHydrationMessage } from '../types/session.js';
 import type { Phase } from '../index.js';
+
+// ── Browser-compatible crypto helpers (replaces node:crypto) ─────────────────
+
+/** Encode a Uint8Array to a base64url string (no padding). */
+function toBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** SHA-256 hash of a UTF-8 string, returned as base64url. */
+async function sha256Base64Url(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
+  return toBase64Url(hash);
+}
+
+/** Constant-time comparison of two equal-length strings (XOR-based). */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
 
 export type { ClientHydrationMessage } from '../types/session.js';
 
@@ -164,7 +189,7 @@ export function getOrCreateSession(
   oid: string,
   workspaceRoot = '/workspace',
 ): Session {
-  const id = sessionId ?? randomUUID();
+  const id = sessionId ?? crypto.randomUUID();
   let session = sessionStore.get(id);
   if (!session) {
     session = new Session({ sessionId: id, user: { oid }, workspaceRoot });
@@ -208,10 +233,11 @@ export class AnonTokenGenerationError extends Error {
  *   exhaustion, FIPS restrictions, etc.). The caller should respond with
  *   503 + Retry-After rather than letting the server crash.
  */
-export function generateAnonSessionToken(session: Session): string {
+export async function generateAnonSessionToken(session: Session): Promise<string> {
   try {
-    const token = randomBytes(32).toString('base64url');
-    session.anonTokenHash = createHash('sha256').update(token).digest('base64url');
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const token = toBase64Url(bytes);
+    session.anonTokenHash = await sha256Base64Url(token);
     return token;
   } catch (err) {
     throw new AnonTokenGenerationError(err);
@@ -222,13 +248,13 @@ export function generateAnonSessionToken(session: Session): string {
  * Validate a client-supplied anonymous session token against the stored hash.
  * Uses timing-safe comparison to prevent timing side-channels.
  */
-export function validateAnonSessionToken(session: Session, token: string): boolean {
+export async function validateAnonSessionToken(session: Session, token: string): Promise<boolean> {
   if (!session.anonTokenHash) return false;
   if (typeof token !== 'string' || token.length === 0) return false;
-  const incoming = createHash('sha256').update(token).digest('base64url');
-  const expected = session.anonTokenHash;
   try {
-    return timingSafeEqual(Buffer.from(incoming), Buffer.from(expected));
+    const incoming = await sha256Base64Url(token);
+    const expected = session.anonTokenHash;
+    return timingSafeEqual(incoming, expected);
   } catch {
     return false;
   }
@@ -258,7 +284,7 @@ export function getOrCreateSessionResult(
   oid: string,
   workspaceRoot = '/workspace',
 ): SessionResult {
-  const id = sessionId ?? randomUUID();
+  const id = sessionId ?? crypto.randomUUID();
   let session = sessionStore.get(id);
   let created = false;
   if (!session) {

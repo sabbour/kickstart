@@ -385,7 +385,7 @@ async function converse(
     if (sessionCreated) {
       // New anonymous session: mint a token and return it to the client.
       try {
-        anonSessionToken = generateAnonSessionToken(session);
+        anonSessionToken = await generateAnonSessionToken(session);
       } catch (err) {
         if (err instanceof AnonTokenGenerationError) {
           logger.error("Crypto failure generating anonymous session token", {
@@ -405,7 +405,7 @@ async function converse(
     } else {
       // Resumed anonymous session: validate the client-supplied token.
       const clientToken = request.headers.get("x-anon-session-token") ?? "";
-      if (!validateAnonSessionToken(session, clientToken)) {
+      if (!await validateAnonSessionToken(session, clientToken)) {
         logger.warn("Anonymous session token validation failed", {
           session_id: session.sessionId,
           token_present: clientToken.length > 0,
