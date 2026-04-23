@@ -17,4 +17,21 @@ describe('AgentOutput schema', () => {
   it('rejects unknown top-level fields', () => {
     expect(() => AgentOutput.parse({ message: 'ok', extra: true })).toThrow();
   });
+
+  // #1130 — message is now optional for surface-only turns
+  it('accepts output without a message (surface-only turn)', () => {
+    const result = AgentOutput.parse({ intent: 'continue' });
+    expect(result).toEqual({ intent: 'continue' });
+    expect(result.message).toBeUndefined();
+  });
+
+  it('accepts output with empty object (no message, no intent)', () => {
+    const result = AgentOutput.parse({});
+    expect(result).toEqual({});
+  });
+
+  it('still accepts output with message present', () => {
+    const result = AgentOutput.parse({ message: 'hello', intent: 'continue' });
+    expect(result.message).toBe('hello');
+  });
 });

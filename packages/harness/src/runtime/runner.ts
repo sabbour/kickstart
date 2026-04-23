@@ -340,6 +340,16 @@ export function resolveOutputText(finalOutput: unknown, fullText: string): strin
   ) {
     return (finalOutput as { message: string }).message;
   }
+  // AgentOutput.message is optional (#1130) — surface-only turns (e.g.
+  // DecisionCard with no prose) produce finalOutput without a message field.
+  // Return empty string so no chat bubble is emitted.
+  if (
+    finalOutput !== null &&
+    typeof finalOutput === 'object' &&
+    !('message' in finalOutput)
+  ) {
+    return '';
+  }
   return fullText;
 }
 
@@ -536,7 +546,10 @@ export class Runner {
 
     const components = this.registry.components;
     const catalogBlock = components.length > 0
-      ? `\n\n## A2UI Component Catalog (${components.length} components available)\n${components.map((c) => c.name).join(', ')}`
+      ? `\n\n## A2UI Component Catalog (${components.length} components available)\n${components.map((c) => {
+          const hint = (c as { llmHint?: string }).llmHint;
+          return hint ? `- **${c.name}** — ${hint}` : `- ${c.name}`;
+        }).join('\n')}`
       : '';
 
     const instructions = agentContrib.instructionsBase + skillsBlock + catalogBlock;

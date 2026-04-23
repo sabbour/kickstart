@@ -53,6 +53,7 @@ export function _filterMessagesForProcessor(
   validateComponents: (raw: Array<Record<string, unknown>>) => unknown,
   catalogId: string,
 ): { safeMessages: A2uiMsg[]; surfaceIds: string[] } {
+  const seen = new Set<string>();
   const surfaceIds: string[] = [];
   const safeMessages: A2uiMsg[] = [];
   for (const msg of msgs) {
@@ -72,10 +73,10 @@ export function _filterMessagesForProcessor(
         console.debug(
           `[useA2UI] createSurface dropped: surface "${targetId}" already exists (treating as update / no-op).`,
         );
-        surfaceIds.push(targetId);
+        if (!seen.has(targetId)) { seen.add(targetId); surfaceIds.push(targetId); }
         continue;
       }
-      surfaceIds.push(targetId);
+      if (!seen.has(targetId)) { seen.add(targetId); surfaceIds.push(targetId); }
       safeMessages.push({
         ...msg,
         createSurface: { ...msg.createSurface, catalogId },
