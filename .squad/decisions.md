@@ -1,8 +1,140 @@
+### 2026-04-23T09:12:33Z: Decision: CI/CD Workflow Optimization
+**By:** Bender (Backend Dev)
+**Status:** Accepted (owner request)
+
+GitHub Actions usage was burning ~18,000+ minutes/month across squad workflows. Top consumers: Playwright E2E (4610 min), heartbeat (2813 min), auto-merge (2509 min), review-gate (1440 min). Waste sources: (1) no concurrency groups causing duplicate runs on rapid-fire events, (2) over-broad trigger types like `edited` causing cascading re-runs, (3) workflows firing on all issues/PRs instead of only squad-related ones.
+
+**Decision:**
+1. Disabled Playwright E2E via `if: false` — kept definition for easy re-enablement.
+2. Added concurrency groups to 8 workflows keyed on issue/PR number with `cancel-in-progress: true` (except pr-retro which uses `false` to avoid losing entries).
+3. Stripped unnecessary triggers: removed `edited` from auto-merge, review-gate, visible-trail; removed `unlabeled` from auto-merge; removed `reopened` from review-gate; removed `synchronize` from visible-trail.
+4. Added squad-label early exit on heartbeat so non-squad issues/PRs are skipped immediately.
+5. Added path filters to squad-ci to only run when test/squad source files change.
+6. Fixed pr-retro concurrency from global `squad-retro-log` to per-PR `squad-retro-${{ PR number }}`.
+
+**Consequences:** Estimated savings ~8000+ minutes/month. No logic changes inside workflow steps — only triggers, concurrency groups, job-level conditions. Playwright E2E can be re-enabled by removing the `if: false` line. The `edited` trigger removal is safe because all affected workflows already check conditions via API calls, not event payloads. Commit d0e523d3.
+
+---
+
 ### 2026-04-21T02:59:40Z: User directive — Docs updates are a gated ceremony obligation
 **By:** Ahmed (via Copilot)
 **What:** Every PR that changes user-facing behavior, APIs, pack surface, ceremonies, skills, or process MUST land with synchronized doc updates. This is enforced at two points: (1) Design Proposal ceremony — the DP must name the doc pages/sections affected and the update plan, (2) PR Review Gate — a new `docs:approved` / `docs:rejected` label (owned by McManus or designated docs reviewer) blocks merge when docs are missing or stale. No PR that touches public-facing behavior merges without explicit docs sign-off. "Docs N/A" is a valid verdict for purely internal changes but must be explicit — not default.
 **Why:** User observed doc updates were not being enforced as part of ceremonies or gates — PRs have been landing without accompanying doc changes.
-# Review Round 3: Design Proposals & PRs (2026-04-21)
+### 2026-04-21T02:59:40Z: Decision: Local-only media assets for A2UI component examples
+**Author:** Fry (Frontend Dev)
+**Issue:** #1018
+**PR:** #1022
+
+All A2UI component example envelopes that include a media `url` prop (Video, AudioPlayer, Image, Icon, Media) **must** reference locally-hosted assets served from the same origin. External URLs are prohibited.
+
+**Context:** Kickstart enforces `default-src 'self'` as its base CSP with no explicit `media-src` directive. Any external media URL in an A2UI component example will produce a CSP violation and a broken Playground preview in production. The w3schools demo URLs (`mov_bbb.mp4`, `horse.mp3`) that shipped in `core-previews.ts` triggered this in #1018.
+
+**Constraints:**
+- CSP must remain strict: `default-src 'self'`, no `media-src` whitelist additions. Per Ahmed's "align to spec" directive.
+- Sample media must be committed to the repo and bundled (not fetched at runtime from external sources).
+
+**Rationale:** Broader CSP (`media-src https://...`) was explicitly rejected — it widens the attack surface and contradicts the spec alignment directive. Local assets are auditable, cacheable, and always available regardless of external service availability.
+
+**Canonical sample paths:**
+| Asset | Path |
+|---|---|
+| Video | `/assets/samples/sample.mp4` |
+| Audio | `/assets/samples/sample.mp3` |
+| Icons | `/assets/icons/fluent/<name>.svg` |
+
+Source files: `packages/web/public/assets/samples/`, `packages/web/public/assets/icons/fluent/`
+
+**Scope:** Applies to all A2UI example envelopes, component previews in `core-previews.ts`, sample prompts, SKILL.md examples, and any new A2UI component documentation that includes a media `url` prop.
+
+**Documentation:** `packages/pack-core/src/skills/a2ui-media-discipline/SKILL.md` — full pattern, examples, anti-patterns.
+
+---
+
+### 2026-04-21T02:59:40Z: Decision: Wire the 4-way review gate into CI (squad-review-gate + squad-auto-merge + visible trail)
+**Author:** Leela (Lead)
+**Status:** Decided (pending PR #993 merge)
+
+The PR Review Gate is now a four-way gate: Leela (architecture) + Zapp (security) + Nibbler (code quality) + Docs reviewer. Ahmed's audit caught that enforcement was documentation-only — squad-review-gate.yml, squad-auto-merge.yml, and squad-visible-trail.cjs still only knew about Leela + Zapp.
+
+**Wiring changes:**
+1. `squad/review-gate` status check requires 4 dimensions: `leela:approved`, `nibbler:approved`, `zapp:approved` (standard path; security-sensitive paths only), and exactly one of `docs:approved` or `docs:not-applicable`.
+2. `squad-auto-merge` clears APPROVAL_LABELS = ['leela:approved', 'zapp:approved', 'nibbler:approved'] on every synchronize.
+3. Three-way rejection-preservation matrix: if exactly one of (Leela, Zapp, Nibbler) is rejecting, the other two approvals are preserved.
+4. Low-risk path (`squad:chore-auto`) still requires `nibbler:approved`. Code-quality review is cheap and fast; many historical regressions would have been caught by a code-quality pass.
+5. Docs markers (`docs:approved`, `docs:not-applicable`) are **not** cleared on synchronize — they describe the PR's content, not a per-commit reviewer signoff.
+6. Three new labels added: `docs:approved` (`0E8A16`), `docs:rejected` (`D93F0B`), `docs:not-applicable` (`BFD4F2`).
+7. Visible trail comment now renders 4 reviewers — Leela, Zapp, Nibbler, and Docs statuses.
+
+**Alternatives rejected:**
+- Nibbler optional on `squad:chore-auto` — rejected; cost is near-zero, value is real.
+- Docs marker cleared on synchronize — rejected; docs state is a PR-content property, not a per-commit reviewer signoff.
+- Separate docs status check context — rejected; keeping docs inside `squad/review-gate` means one status check, one branch-protection entry.
+
+**Action items:**
+- [ ] After PR #993 merges, run the `Sync Squad Custom Labels` workflow once to create the three new `docs:*` labels
+- [ ] Amend branch-protection required checks if the `squad/review-gate` context needs re-registering
+- [ ] Any in-flight PRs on long-running branches will lose `nibbler:approved` on their next push and need a fresh Nibbler pass — expected and correct
+
+---
+
+### 2026-04-21T02:59:40Z: Decision: Recalibrate Sprint Planning + Cadence Retro for 6-hour sprint cadence
+**Author:** Leela (Lead)
+**Status:** Decided (pending PR #993 merge)
+
+PR #993 originally defined Sprint Planning as "weekly (Monday)" with 2h/8h/24h/80h estimate bands. Ahmed clarified the squad's actual cadence is **6-hour sprints on a fixed UTC schedule**, not weekly.
+
+**Sprint Planning cadence:** Every 6 hours on fixed UTC anchors: **00:00 / 06:00 / 12:00 / 18:00 UTC**. Timestamped per 6h anchor: `.squad/sprints/{YYYY-MM-DDThh}Z.md`
+
+**Estimate bands (sized for a single 6h sprint):**
+| Label | Time band | Points | Fits in a 6h sprint? |
+|-------|-----------|--------|----------------------|
+| `estimate:S` | ~15 min | 1 | ✅ |
+| `estimate:M` | ~1 hour | 3 | ✅ |
+| `estimate:L` | ~3 hours | 8 | ✅ (at most one per sprint) |
+| `estimate:XL` | >3 hours | 20 | ❌ |
+
+**XL-split rule:** `estimate:XL` never enters sprint scope. Leela splits them during triage into S/M/L children, each with their own estimate label.
+
+**Cadence Retrospective:** Runs end of each 6h sprint. Output appended as a comment to a rolling daily issue `Cadence Retro · {YYYY-MM-DD}` — up to 4 comments per UTC day, one per closed sprint. Avoids 4 new retro issues every day.
+
+**Rationale:**
+- Anchor times align to `00 / 06 / 12 / 18 UTC` for predictable globally-readable timestamps; keeps all four sprints in a single UTC day.
+- Estimate bands chosen so S = trivial change anyone can finish, M = single focused task, L = sprint's hero item, XL = physical impossibility, forcing the split.
+- XL-split over "XL spans multiple sprints" — the alternative destroys the "one PR = one issue = one sprint of scope" invariant.
+- Retro as daily-bucketed comments, not per-sprint issues — four new retro issues per day is noise, not signal.
+
+**Action items (picked up after merge):**
+- [ ] Flip PR #993 ready-for-review once Ahmed reviews the recalibration
+- [ ] Follow-up on #992: decide fate of `squad-weekly-pulse.yml` (rename to `squad-sprint-pulse.yml` at 6h cadence, or leave as weekly summary)
+- [ ] First 6h Sprint Planning ceremony at next UTC anchor after merge
+- [ ] First Cadence Retro at following anchor — confirms rolling daily issue pattern works
+
+---
+
+### 2026-04-21T02:59:40Z: Decision: Nibbler — Round 4 review decisions
+**Author:** Nibbler (Code Reviewer, Lead-tier)
+**Scope:** PRs #1005, #1000 (re-approval), #1003, #1004
+
+**Decisions:**
+1. **PR #1005 — APPROVED.** core_emit_ui strict-mode schema regression (#998) fix. Parametrised conformance test walks every pack-core tool; explicit regression assertion pinned to `createSurface.sendDataModel`; runtime contract preserved via `stripNulls` before A2UIMessageSchema.parse; sibling sweep for `list_files.ts` included. CI green (940 tests). Formal review + `nibbler:approved` label.
+
+2. **PR #1000 — APPROVED (re-approval after revise).** All three round-3 blockers resolved: path aliases aligned across tsconfig files; concrete bundle-budget gate; pack-authoring docs. Single-revert rollback confirmed. Full CI green. `nibbler:approved` label re-applied.
+
+3. **PR #1003 — APPROVED.** #995 Core-tab density + preview coverage. Named-constant geometry module is single source of truth consumed by CSS, unit test, and Playwright. Stable data-attribute selectors on cards. `nibbler:approved` label.
+
+4. **PR #1004 — APPROVED.** #997 workspace black void. `min-height: 0` chain complete. Explicit geometry assertions use named constants. Two viewport states. Formal review + `nibbler:approved` label.
+
+**Conventions carried forward:**
+- **Bundle-overage pattern:** concrete ceiling + CI gate + waiver-by-PR-description line is approved shape.
+- **Self-authored PRs:** GitHub blocks formal `gh pr review --approve` when authenticated identity matches PR author. For PRs authored by `sabbour`, only `nibbler:approved` label path available.
+- **Named-constant geometry:** for any layout regression where CSS, unit, and E2E all assert geometry, the single-source-of-truth module pattern is approved.
+- **CI-green precheck before approve:** remain mandatory — never approve on PR-body test counts alone; always verify checks panel.
+
+**Consequences:**
+- Four PRs cleared on first round-4 pass — continues validating DP-stage gate reduces PR-stage rework.
+- Bundle-budget script is now baseline — future pack additions must either raise ceiling (with waiver note) or split into lazy chunks.
+
+---
 
 **Reviewer:** Leela (Lead)  
 **Date:** 2026-04-21T04:30:00Z  
