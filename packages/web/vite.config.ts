@@ -5,83 +5,106 @@ import { readFileSync } from 'fs';
 import { execSync } from 'child_process';
 
 /**
- * Stubs Node.js built-ins that are pulled into the browser bundle transitively
- * (e.g. harness/runtime/registry → node:fs). These modules are never actually
- * called in browser code — only the static imports need to resolve cleanly.
+ * Node.js built-in stubs shared by the Vite (rolldown) plugin and the
+ * esbuild optimizeDeps plugin. These modules are never actually called in
+ * browser code — only the static imports need to resolve cleanly.
  */
+const _throws = `const _notBrowser = () => { throw new Error('Node.js built-in not available in browser context'); };`;
+const nodeBuiltinStubs: Record<string, string> = {
+  'node:fs': [
+    _throws,
+    `export const readFileSync = _notBrowser;`,
+    `export const realpathSync = _notBrowser;`,
+    `export const statSync = _notBrowser;`,
+    `export const readdirSync = _notBrowser;`,
+    `export const existsSync = () => false;`,
+    `export const mkdirSync = _notBrowser;`,
+    `export const writeFileSync = _notBrowser;`,
+    `export const unlinkSync = _notBrowser;`,
+    `export const promises = { readFile: _notBrowser, writeFile: _notBrowser, mkdir: _notBrowser, readdir: _notBrowser, unlink: _notBrowser, stat: _notBrowser };`,
+    `export default { readFileSync, realpathSync, statSync, readdirSync, existsSync, mkdirSync, writeFileSync, unlinkSync, promises };`,
+  ].join('\n'),
+  'node:path': [
+    _throws,
+    `export const resolve = _notBrowser;`,
+    `export const relative = _notBrowser;`,
+    `export const join = (...p) => p.filter(Boolean).join('/');`,
+    `export const dirname = _notBrowser;`,
+    `export const basename = _notBrowser;`,
+    `export const extname = _notBrowser;`,
+    `export const sep = '/';`,
+    `export default { resolve, relative, join, dirname, basename, extname, sep };`,
+  ].join('\n'),
+  'node:crypto': [
+    `export const randomUUID = () => globalThis.crypto.randomUUID();`,
+    `export default { randomUUID };`,
+  ].join('\n'),
+  'node:url': [
+    `export const fileURLToPath = (url) => typeof url === 'string' ? url.replace(/^file:\\/\\//, '') : url.pathname;`,
+    `export const pathToFileURL = (p) => new URL('file://' + p);`,
+    `export default { fileURLToPath, pathToFileURL };`,
+  ].join('\n'),
+  'node:os': [
+    `export const type = () => 'Browser';`,
+    `export const hostname = () => 'browser';`,
+    `export const platform = () => 'browser';`,
+    `export const arch = () => 'unknown';`,
+    `export const release = () => '0.0.0';`,
+    `export const tmpdir = () => '/tmp';`,
+    `export const homedir = () => '/';`,
+    `export default { type, hostname, platform, arch, release, tmpdir, homedir };`,
+  ].join('\n'),
+  'node:child_process': [
+    `const _nop = () => { throw new Error('child_process not available in browser'); };`,
+    `export const spawn = _nop;`,
+    `export const spawnSync = _nop;`,
+    `export const exec = _nop;`,
+    `export default { spawn, spawnSync, exec };`,
+  ].join('\n'),
+  'node:process': [
+    `const p = (typeof globalThis !== 'undefined' && globalThis.process) || { env: {}, platform: 'browser', versions: {}, pid: 0 };`,
+    `export const env = p.env || {};`,
+    `export const platform = p.platform || 'browser';`,
+    `export const versions = p.versions || {};`,
+    `export const pid = p.pid || 0;`,
+    `export default p;`,
+  ].join('\n'),
+};
+
+/** Vite (rolldown) plugin — handles production builds and dev-served source. */
 function stubNodeBuiltins(): Plugin {
-  const _throws = `const _notBrowser = () => { throw new Error('Node.js built-in not available in browser context'); };`;
-  const stubs: Record<string, string> = {
-    'node:fs': [
-      _throws,
-      `export const readFileSync = _notBrowser;`,
-      `export const realpathSync = _notBrowser;`,
-      `export const statSync = _notBrowser;`,
-      `export const readdirSync = _notBrowser;`,
-      `export const existsSync = () => false;`,
-      `export const mkdirSync = _notBrowser;`,
-      `export const writeFileSync = _notBrowser;`,
-      `export const unlinkSync = _notBrowser;`,
-      `export const promises = { readFile: _notBrowser, writeFile: _notBrowser, mkdir: _notBrowser, readdir: _notBrowser, unlink: _notBrowser, stat: _notBrowser };`,
-      `export default { readFileSync, realpathSync, statSync, readdirSync, existsSync, mkdirSync, writeFileSync, unlinkSync, promises };`,
-    ].join('\n'),
-    'node:path': [
-      _throws,
-      `export const resolve = _notBrowser;`,
-      `export const relative = _notBrowser;`,
-      `export const join = (...p) => p.filter(Boolean).join('/');`,
-      `export const dirname = _notBrowser;`,
-      `export const basename = _notBrowser;`,
-      `export const extname = _notBrowser;`,
-      `export const sep = '/';`,
-      `export default { resolve, relative, join, dirname, basename, extname, sep };`,
-    ].join('\n'),
-    'node:crypto': [
-      `export const randomUUID = () => globalThis.crypto.randomUUID();`,
-      `export default { randomUUID };`,
-    ].join('\n'),
-    'node:url': [
-      `export const fileURLToPath = (url) => typeof url === 'string' ? url.replace(/^file:\\/\\//, '') : url.pathname;`,
-      `export const pathToFileURL = (p) => new URL('file://' + p);`,
-      `export default { fileURLToPath, pathToFileURL };`,
-    ].join('\n'),
-    'node:os': [
-      `export const type = () => 'Browser';`,
-      `export const hostname = () => 'browser';`,
-      `export const platform = () => 'browser';`,
-      `export const arch = () => 'unknown';`,
-      `export const release = () => '0.0.0';`,
-      `export const tmpdir = () => '/tmp';`,
-      `export const homedir = () => '/';`,
-      `export default { type, hostname, platform, arch, release, tmpdir, homedir };`,
-    ].join('\n'),
-    'node:child_process': [
-      `const _nop = () => { throw new Error('child_process not available in browser'); };`,
-      `export const spawn = _nop;`,
-      `export const spawnSync = _nop;`,
-      `export const exec = _nop;`,
-      `export default { spawn, spawnSync, exec };`,
-    ].join('\n'),
-    'node:process': [
-      `const p = (typeof globalThis !== 'undefined' && globalThis.process) || { env: {}, platform: 'browser', versions: {}, pid: 0 };`,
-      `export const env = p.env || {};`,
-      `export const platform = p.platform || 'browser';`,
-      `export const versions = p.versions || {};`,
-      `export const pid = p.pid || 0;`,
-      `export default p;`,
-    ].join('\n'),
-  };
   return {
     name: 'stub-node-builtins',
-    // Must run before Vite/rolldown's built-in node externalization.
     enforce: 'pre',
     resolveId(id) {
-      if (Object.prototype.hasOwnProperty.call(stubs, id)) return `\0${id}`;
+      if (Object.prototype.hasOwnProperty.call(nodeBuiltinStubs, id)) return `\0${id}`;
     },
     load(id) {
       if (!id.startsWith('\0')) return;
       const realId = id.slice(1);
-      return stubs[realId] ?? null;
+      return nodeBuiltinStubs[realId] ?? null;
+    },
+  };
+}
+
+/**
+ * Rolldown plugin for Vite's optimizeDeps pre-bundling (dev mode only).
+ * In dev, Vite 8 pre-bundles node_modules with Rolldown in a separate pass
+ * that does NOT run the main Vite plugin pipeline. So `node:*` imports in
+ * dependencies (e.g. @azure/monitor-opentelemetry-exporter → node:process)
+ * get externalized instead of stubbed. This plugin intercepts those imports
+ * during pre-bundling and returns the same inline stubs used in production.
+ */
+function stubNodeBuiltinsOptimizeDeps(): Plugin {
+  return {
+    name: 'stub-node-builtins-optimize-deps',
+    resolveId(id) {
+      if (Object.prototype.hasOwnProperty.call(nodeBuiltinStubs, id)) return `\0opt:${id}`;
+    },
+    load(id) {
+      if (!id.startsWith('\0opt:')) return;
+      const realId = id.slice('\0opt:'.length);
+      return nodeBuiltinStubs[realId] ?? null;
     },
   };
 }
@@ -163,6 +186,11 @@ export default defineConfig({
           if (id.includes('/node_modules/highlight.js/')) return 'vendor-highlight';
         },
       },
+    },
+  },
+  optimizeDeps: {
+    rolldownOptions: {
+      plugins: [stubNodeBuiltinsOptimizeDeps()],
     },
   },
   json: {
