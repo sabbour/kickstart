@@ -1,0 +1,21 @@
+{
+  "universe_usage_history": [
+    {
+      "universe": "Futurama",
+      "assignment_id": "imagine-init-2026-04-08",
+      "used_at": "2026-04-08T12:30:00Z"
+    }
+  ],
+  "assignment_cast_snapshots": {
+    "imagine-init-2026-04-08": {
+      "universe": "Futurama",
+      "agents": {
+        "leela": "Leela",
+        "fry": "Fry",
+        "bender": "Bender",
+        "hermes": "Hermes"
+      },
+      "created_at": "2026-04-08T12:30:00Z"
+    }
+  }
+}

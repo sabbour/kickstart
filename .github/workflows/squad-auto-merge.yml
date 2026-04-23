@@ -1,0 +1,531 @@
+name: Squad Auto Merge
+
+on:
+  pull_request_target:
+    types: [labeled, unlabeled, synchronize, reopened, ready_for_review, edited]
+  workflow_run:
+    workflows: ['CI', 'Squad Review Gate']
+    types: [completed]
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  issues: write
+  pull-requests: write
+  statuses: read
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge for approved PRs
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const AUTO_MERGE_MARKER = '<!-- squad-auto-merge -->';
+            const LOW_RISK_LABEL = 'squad:chore-auto';
+            const TRUSTED_RETRO_LABEL = 'retro-log';
+            const TRUSTED_RETRO_BRANCH_PREFIX = 'retro-log/pr-';
+            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'sabbour-squad-scribe[bot]']);
+            const TRUSTED_RETRO_ONLY_PATHS = new Set(['.squad/retro-log.md']);
+            const DEPENDABOT_AUTHOR = 'dependabot[bot]';
+            const DEPENDABOT_BRANCH_PREFIX = 'dependabot/';
+            const XL_THRESHOLD = 1000;
+            const APPROVAL_LABELS = ['leela:approved', 'zapp:approved', 'nibbler:approved'];
+            const DOCS_APPROVED_LABEL = 'docs:approved';
+            const DOCS_NA_LABEL = 'docs:not-applicable';
+            const DOCS_REJECTED_LABEL = 'docs:rejected';
+            const REVIEW_GATE_CONTEXT = 'squad/review-gate';
+            const SENSITIVE_PATH_PATTERNS = [
+              /^\.github\/workflows\//i,
+              /(^|[\/._-])(auth|guardrail|guardrails|security)([\/._-]|$)/i,
+            ];
+            const TRUSTED_CI_WORKFLOW = '.github/workflows/ci.yml';
+            const TRUSTED_REVIEW_WORKFLOW = '.github/workflows/squad-review-gate.yml';
+
+            function getTimestamp(node) {
+              const value = node.completedAt ?? node.startedAt ?? node.created_at ?? null;
+              return value ? new Date(value).getTime() : 0;
+            }
+
+            function dedupeBy(nodes, keyForNode) {
+              const latestByKey = new Map();
+              for (const node of nodes) {
+                const key = keyForNode(node);
+                if (!key) {
+                  continue;
+                }
+                const current = latestByKey.get(key);
+                if (!current || getTimestamp(node) >= getTimestamp(current)) {
+                  latestByKey.set(key, node);
+                }
+              }
+              return latestByKey;
+            }
+
+            function getPrNumber() {
+              if (context.eventName === 'pull_request_target') {
+                return context.payload.pull_request?.number ?? null;
+              }
+              if (context.eventName === 'workflow_run') {
+                return context.payload.workflow_run?.pull_requests?.[0]?.number ?? null;
+              }
+              return null;
+            }
+
+            function isSuccessfulCheckRun(node) {
+              return node?.status === 'COMPLETED' && node?.conclusion === 'SUCCESS';
+            }
+
+            function isSecurityPatch(pr, labels) {
+              const securitySignals = [
+                pr.title,
+                pr.body,
+                pr.headRefName,
+                ...labels,
+              ].filter(Boolean).join(' ');
+              return /security|cve-\d{4}-\d+|ghsa-|vuln|vulnerability/i.test(securitySignals);
+            }
+
+            function isSensitivePath(filename) {
+              return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(filename));
+            }
+
+            function getPreservedApprovalLabels(labels) {
+              // Three-way preservation matrix: on synchronize, each reviewer's own
+              // approval is cleared, but if exactly one reviewer is in a rejection
+              // loop, the OTHER reviewers' approvals are preserved so the fix cycle
+              // only reopens the rejecting reviewer's review, not all of them.
+              const hasLeelaRejection = labels.has('leela:rejected');
+              const hasZappRejection = labels.has('zapp:rejected');
+              const hasNibblerRejection = labels.has('nibbler:rejected');
+              const rejectionCount = [hasLeelaRejection, hasZappRejection, hasNibblerRejection]
+                .filter(Boolean).length;
+
+              if (rejectionCount !== 1) {
+                // Zero or multiple rejections → preserve nothing; all approvals clear.
+                return [];
+              }
+
+              if (hasLeelaRejection) {
+                return ['zapp:approved', 'nibbler:approved'];
+              }
+              if (hasZappRejection) {
+                return ['leela:approved', 'nibbler:approved'];
+              }
+              // hasNibblerRejection
+              return ['leela:approved', 'zapp:approved'];
+            }
+
+            function isTrustedRetroLogPr(pr, labels, changedFiles) {
+              return (
+                labels.has(TRUSTED_RETRO_LABEL) &&
+                TRUSTED_RETRO_AUTHORS.has(pr.author?.login ?? '') &&
+                (pr.headRefName ?? '').startsWith(TRUSTED_RETRO_BRANCH_PREFIX) &&
+                changedFiles.length > 0 &&
+                changedFiles.every((filename) => TRUSTED_RETRO_ONLY_PATHS.has(filename))
+              );
+            }
+
+            function isDependabotPr(pr) {
+              return (
+                pr.author?.login === DEPENDABOT_AUTHOR &&
+                (pr.headRefName ?? '').startsWith(DEPENDABOT_BRANCH_PREFIX)
+              );
+            }
+
+            function getZappRequirementReason(pr, labels, changedFiles) {
+              if (!labels.has(LOW_RISK_LABEL)) {
+                return 'standard review path';
+              }
+
+              if (isSecurityPatch(pr, labels)) {
+                return 'security-sensitive title/body/branch/label signal';
+              }
+
+              const sensitiveFiles = changedFiles.filter(isSensitivePath);
+              if (sensitiveFiles.length > 0) {
+                const preview = sensitiveFiles.slice(0, 3).map((file) => `\`${file}\``).join(', ');
+                return `sensitive paths touched (${preview}${sensitiveFiles.length > 3 ? ', …' : ''})`;
+              }
+
+              return null;
+            }
+
+            function getRequiredApprovals(pr, labels, changedFiles) {
+              if (!labels.has(LOW_RISK_LABEL)) {
+                return [...APPROVAL_LABELS];
+              }
+
+              // Low-risk path: Leela + Nibbler always; Zapp only if sensitive.
+              // Nibbler (code quality) stays required — see decision
+              // .squad/decisions/inbox/leela-4way-gate-wiring-2026-04-21.md.
+              const required = ['leela:approved', 'nibbler:approved'];
+              if (getZappRequirementReason(pr, labels, changedFiles)) {
+                required.push('zapp:approved');
+              }
+              return required;
+            }
+
+            function getDocsBlocker(labels) {
+              if (labels.has(DOCS_REJECTED_LABEL)) {
+                return `docs reviewer rejected (\`${DOCS_REJECTED_LABEL}\`)`;
+              }
+              if (!labels.has(DOCS_APPROVED_LABEL) && !labels.has(DOCS_NA_LABEL)) {
+                return `missing docs marker (one of \`${DOCS_APPROVED_LABEL}\` or \`${DOCS_NA_LABEL}\` is required)`;
+              }
+              return null;
+            }
+
+            async function listComments(prNumber) {
+              return github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                per_page: 100,
+              });
+            }
+
+            async function listChangedFiles(prNumber) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                per_page: 100,
+              });
+              return files.map((file) => file.filename);
+            }
+
+            async function upsertAuditComment(prNumber, body, createIfMissing = true) {
+              const comments = await listComments(prNumber);
+              const existing = comments.find((comment) => comment.body?.includes(AUTO_MERGE_MARKER));
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+                return;
+              }
+
+              if (!createIfMissing) {
+                return;
+              }
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            }
+
+            async function disableAutoMerge(pr, reason, commentBody = null) {
+              if (!pr.autoMergeRequest) {
+                return;
+              }
+
+              await github.graphql(
+                `
+                  mutation DisableAutoMerge($pullRequestId: ID!) {
+                    disablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId }) {
+                      clientMutationId
+                    }
+                  }
+                `,
+                { pullRequestId: pr.id },
+              );
+
+              if (commentBody) {
+                await upsertAuditComment(pr.number, commentBody, false);
+              }
+
+              core.info(`Disabled auto-merge for PR #${pr.number}: ${reason}`);
+            }
+
+            async function clearApprovalLabels(pr, labels) {
+              if (context.eventName !== 'pull_request_target' || context.payload.action !== 'synchronize') {
+                return { removed: [], preserved: [] };
+              }
+
+              const preserved = getPreservedApprovalLabels(labels);
+              const labelsToClear = APPROVAL_LABELS.filter((label) => !preserved.includes(label));
+              const removed = [];
+              for (const label of APPROVAL_LABELS) {
+                if (!labelsToClear.includes(label)) {
+                  continue;
+                }
+                if (!labels.has(label)) {
+                  continue;
+                }
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    name: label,
+                  });
+                  labels.delete(label);
+                  removed.push(label);
+                } catch (error) {
+                  if (error.status !== 404) {
+                    throw error;
+                  }
+                }
+              }
+              return { removed, preserved };
+            }
+
+            async function getTrustedWorkflowRuns(headSha, prNumber) {
+              const response = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                event: 'pull_request',
+                head_sha: headSha,
+                per_page: 100,
+              });
+
+              return response.data.workflow_runs.filter((run) =>
+                run.head_sha === headSha &&
+                run.conclusion === 'success' &&
+                (run.pull_requests ?? []).some((pullRequest) => pullRequest.number === prNumber),
+              );
+            }
+
+            const prNumber = getPrNumber();
+            if (!prNumber) {
+              core.info('No pull request associated with this event.');
+              return;
+            }
+
+            const query = `
+              query AutoMergeCandidate($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    id
+                    number
+                    title
+                    body
+                    author {
+                      login
+                    }
+                    state
+                    isDraft
+                    mergeStateStatus
+                    additions
+                    deletions
+                    headRefName
+                    headRefOid
+                    autoMergeRequest {
+                      enabledAt
+                    }
+                    labels(first: 50) {
+                      nodes {
+                        name
+                      }
+                    }
+                    commits(last: 1) {
+                      nodes {
+                        commit {
+                          oid
+                          statusCheckRollup {
+                            contexts(first: 100) {
+                              nodes {
+                                __typename
+                                ... on CheckRun {
+                                  name
+                                  status
+                                  conclusion
+                                  startedAt
+                                  completedAt
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const result = await github.graphql(query, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              number: prNumber,
+            });
+
+            const pr = result.repository.pullRequest;
+            if (!pr || pr.state !== 'OPEN') {
+              core.info(`PR #${prNumber} is not open.`);
+              return;
+            }
+
+            const labels = new Set(pr.labels.nodes.map((label) => label.name));
+            const changedFiles = await listChangedFiles(pr.number);
+            const trustedRetroLogPr = isTrustedRetroLogPr(pr, labels, changedFiles);
+            const dependabotPr = isDependabotPr(pr);
+            const zappRequirementReason = getZappRequirementReason(pr, labels, changedFiles);
+            const clearedApprovals = await clearApprovalLabels(pr, labels);
+            if (clearedApprovals.removed.length > 0) {
+              const preservedLabelsSummary = clearedApprovals.preserved
+                .map((label) => `\`${label}\``)
+                .join(', ');
+              await disableAutoMerge(
+                pr,
+                'new commits require fresh approvals',
+                [
+                  AUTO_MERGE_MARKER,
+                  '🤖 Auto-merge disarmed.',
+                  '',
+                  `- removed stale approval labels: ${clearedApprovals.removed.join(', ')}`,
+                  clearedApprovals.preserved.length > 0
+                    ? `- preserved ${preservedLabelsSummary} because the opposite reviewer is already in a rejection loop`
+                    : '- new commits require fresh approval labels before re-arming',
+                ].join('\n'),
+              );
+              core.info(`Cleared stale approval labels for PR #${pr.number}: ${clearedApprovals.removed.join(', ')}`);
+              return;
+            }
+
+            if (pr.isDraft) {
+              core.info(`PR #${pr.number} is draft; skipping.`);
+              return;
+            }
+
+            const changed = (pr.additions ?? 0) + (pr.deletions ?? 0);
+            const blockers = [];
+
+            if (changed > XL_THRESHOLD) {
+              blockers.push(`PR is XL (${changed} changed lines)`);
+            }
+
+            if (/refactor/i.test(pr.title ?? '')) {
+              blockers.push('PR title is marked refactor');
+            }
+
+            const requiredApprovals = dependabotPr
+              ? []
+              : trustedRetroLogPr
+              ? []
+              : getRequiredApprovals(pr, labels, changedFiles);
+            const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
+            if (missingApprovals.length > 0) {
+              blockers.push(`missing fresh approval labels: ${missingApprovals.join(', ')}`);
+            }
+
+            // Docs gate: every non-trusted PR must carry either docs:approved or
+            // docs:not-applicable on the current head, and docs:rejected always blocks.
+            if (!dependabotPr && !trustedRetroLogPr) {
+              const docsBlocker = getDocsBlocker(labels);
+              if (docsBlocker) {
+                blockers.push(docsBlocker);
+              }
+            }
+
+            if (pr.mergeStateStatus === 'DIRTY') {
+              blockers.push('PR has merge conflicts');
+            }
+
+            if (blockers.length > 0) {
+              await disableAutoMerge(
+                pr,
+                blockers.join('; '),
+                [
+                  AUTO_MERGE_MARKER,
+                  '🤖 Auto-merge disarmed.',
+                  '',
+                  ...blockers.map((blocker) => `- ${blocker}`),
+                  '',
+                  'GitHub will keep this PR on the manual merge path until the blockers are cleared.',
+                ].join('\n'),
+              );
+              core.info(`PR #${pr.number} is not eligible: ${blockers.join('; ')}`);
+              return;
+            }
+
+            const headSha = pr.headRefOid ?? pr.commits.nodes[0]?.commit?.oid ?? null;
+            if (!headSha) {
+              core.info(`PR #${pr.number} has no head SHA to evaluate.`);
+              return;
+            }
+
+            const rawCheckRuns = pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts?.nodes ?? [];
+            const checkRuns = [...dedupeBy(rawCheckRuns.filter((node) => node?.__typename === 'CheckRun'), (node) => node.name).values()];
+            const ciGate = checkRuns.find((node) => node.name === 'CI Gate');
+            if (!isSuccessfulCheckRun(ciGate)) {
+              core.info(`PR #${pr.number} does not yet have a green CI Gate check.`);
+              return;
+            }
+
+            const combinedStatus = await github.rest.repos.getCombinedStatusForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: headSha,
+            });
+            const latestStatuses = dedupeBy(combinedStatus.data.statuses, (status) => status.context);
+            const reviewGate = latestStatuses.get(REVIEW_GATE_CONTEXT) ?? null;
+            if (!reviewGate || reviewGate.state !== 'success' || reviewGate.creator?.login !== 'github-actions[bot]') {
+              core.info(`PR #${pr.number} does not yet have a trusted green ${REVIEW_GATE_CONTEXT} status.`);
+              return;
+            }
+
+            const trustedRuns = await getTrustedWorkflowRuns(headSha, pr.number);
+            const hasTrustedCiRun = trustedRuns.some((run) => run.path?.startsWith(TRUSTED_CI_WORKFLOW));
+            const hasTrustedReviewRun = trustedRuns.some((run) => run.path?.startsWith(TRUSTED_REVIEW_WORKFLOW));
+
+            if (!hasTrustedCiRun) {
+              core.info(`PR #${pr.number} is missing a successful CI workflow run for ${headSha}.`);
+              return;
+            }
+
+            if (!hasTrustedReviewRun) {
+              core.info(`PR #${pr.number} is missing a successful Squad Review Gate workflow run for ${headSha}.`);
+              return;
+            }
+
+            if (pr.autoMergeRequest) {
+              core.info(`PR #${pr.number} already has auto-merge enabled.`);
+              return;
+            }
+
+            await github.graphql(
+              `
+                mutation EnableAutoMerge($pullRequestId: ID!) {
+                  enablePullRequestAutoMerge(input: {
+                    pullRequestId: $pullRequestId,
+                    mergeMethod: SQUASH
+                  }) {
+                    pullRequest {
+                      number
+                    }
+                  }
+                }
+              `,
+              { pullRequestId: pr.id },
+            );
+
+            await upsertAuditComment(
+              pr.number,
+              [
+                AUTO_MERGE_MARKER,
+                '🤖 Auto-merge armed.',
+                '',
+                trustedRetroLogPr
+                  ? '- trusted retro-log PR path is green (`retro-log` label + `retro-log/pr-*` branch + trusted bot author + `.squad/retro-log.md` only)'
+                  : dependabotPr
+                  ? '- Dependabot auto-merge: CI is green and `dependabot[bot]` author in `dependabot/*` branch'
+                  : labels.has(LOW_RISK_LABEL)
+                  ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : DOCS_NA_LABEL}\` for the docs gate`
+                  : `- fresh \`leela:approved\` + \`zapp:approved\` + \`nibbler:approved\` labels are present on the current head, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : DOCS_NA_LABEL}\` for the docs gate`,
+                '- trusted merge signals are green: `CI Gate` from workflow `CI` and `squad/review-gate` from `Squad Review Gate`',
+                '- PR is not XL and title is not marked `refactor`',
+                '',
+                'GitHub will squash-merge this PR automatically once the remaining branch protections are satisfied.',
+              ].join('\n'),
+            );
+
+            core.info(`Enabled auto-merge for PR #${pr.number}.`);

@@ -1,0 +1,41 @@
+name: Squad Visible Trail
+
+on:
+  issues:
+    types: [labeled, unlabeled]
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, edited, labeled, unlabeled, synchronize]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: squad-visible-trail-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  issue-trail:
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Upsert visible issue trail
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { handleIssueEvent } = require('./.github/scripts/squad-visible-trail.cjs');
+            await handleIssueEvent({ github, context, core });
+
+  pr-trail:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Upsert visible PR trail
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { handlePullRequestEvent } = require('./.github/scripts/squad-visible-trail.cjs');
+            await handlePullRequestEvent({ github, context, core });

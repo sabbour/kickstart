@@ -1,0 +1,152 @@
+name: Squad · Release Cadence
+
+# Daily at 17:00 Pacific, check for pending changesets. If any are pending,
+# Leela opens a Release PR (draft) that consumes changesets and bumps versions.
+# Cron UTC: 00:00 UTC = 17:00 PDT. Shift to `0 1 * * *` during PST.
+#
+# No deploy is triggered by this workflow. Main = pre-prod. The release PR,
+# when merged to main, stamps the version and main's usual deploy path runs.
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  cadence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Leela app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: 3340358
+          private-key: ${{ secrets.SQUAD_LEAD_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for pending changesets
+        id: check
+        run: |
+          set -e
+          if ls .changeset/*.md 2>/dev/null | grep -v README.md | grep -q .; then
+            echo "pending=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pending=false" >> "$GITHUB_OUTPUT"
+            echo "No pending changesets. Nothing to release today."
+          fi
+
+      - name: Abort if no changesets
+        if: steps.check.outputs.pending != 'true'
+        run: exit 0
+
+      - name: Abort if release PR already open
+        if: steps.check.outputs.pending == 'true'
+        id: existing
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const existing = prs.find(p => p.head.ref === 'release/cadence');
+            if (existing) {
+              core.info(`Release PR already open: #${existing.number}`);
+              core.setOutput('exists', 'true');
+            } else {
+              core.setOutput('exists', 'false');
+            }
+
+      - name: Create release branch
+        if: steps.existing.outputs.exists == 'false'
+        run: |
+          set -e
+          git config user.name "squad-leela[bot]"
+          git config user.email "leela@squad.local"
+          git checkout -B release/cadence
+          npm run changeset:version
+          git add -A
+          git commit -m "chore(release): daily cadence [leela]" -m "Working as Leela — see .squad/agents/leela/charter.md"
+          git push --force-with-lease origin release/cadence
+
+      - name: Open release PR (as Leela, with Scribe curating notes)
+        if: steps.existing.outputs.exists == 'false'
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const body = [
+              '**Working as Leela (Lead)** · see `.squad/agents/leela/charter.md`',
+              '',
+              '## Daily release cadence',
+              '',
+              'Pending changesets were found at 17:00 Pacific. This PR consumes them and bumps versions in lockstep.',
+              '',
+              '### Checklist',
+              '- [ ] CI green',
+              '- [ ] Scribe curates the GitHub Release notes (`squad:scribe` comment)',
+              '- [ ] Zapp reviews if any changeset touches auth/secrets/CORS/tool schemas',
+              '- [ ] Merge to `main` — main is pre-prod, no separate deploy',
+              '',
+              '### After merge',
+              'Tag the commit with `v<version>` to mark the versioned release. The tag is a marker only. No deploy is triggered today.',
+              '',
+              '---',
+              '_Opened by `.github/workflows/squad-release-cadence.yml`. See `.squad/extensions/kickstart-aks-dev/skills/release-process.md`._',
+            ].join('\n');
+
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'chore(release): daily cadence',
+              head: 'release/cadence',
+              base: 'main',
+              body,
+              draft: true,
+            });
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.data.number,
+              labels: ['squad:leela', 'release'],
+            });
+
+            // Scribe is the curator; request @copilot to adopt Scribe persona for release notes
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.data.number,
+              body: [
+                '@copilot — **work as Scribe** (see `.squad/agents/scribe/charter.md`).',
+                '',
+                'Curate the GitHub Release notes from the consumed changesets:',
+                '- Group entries into **Added / Changed / Fixed / Removed / Security**',
+                '- Call out breaking changes at the top with a migration note',
+                '- Link each bullet to its PR',
+                '',
+                'Post the draft notes as a comment on this PR. Do not publish the GitHub Release until merge.',
+              ].join('\n'),
+            });

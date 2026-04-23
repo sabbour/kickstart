@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "swaName": {
+      "value": "kickstart-web-dev"
+    },
+    "location": {
+      "value": "centralus"
+    },
+    "skuName": {
+      "value": "Standard"
+    },
+    "repositoryUrl": {
+      "value": "https://github.com/sabbour/kickstart"
+    },
+    "branch": {
+      "value": "main"
+    },
+    "entraClientId": {
+      "value": "e71a23c6-aeb4-459a-88fc-07ff96fc9b92"
+    },
+    "customDomainHostname": {
+      "value": "kickstart.aks.azure.sabbour.me"
+    },
+    "openAiEndpoint": {
+      "value": "https://<your-openai-resource>.openai.azure.com/"
+    },
+    "openAiChatDeployment": {
+      "value": "gpt-5.4-mini"
+    },
+    "openAiCodexDeployment": {
+      "value": "gpt-5.4"
+    },
+    "keyVaultName": {
+      "value": "kv-kickstart-dev"
+    },
+    "logAnalyticsWorkspaceName": {
+      "value": "law-kickstart-dev"
+    },
+    "appInsightsName": {
+      "value": "ai-kickstart-dev"
+    }
+  }
+}

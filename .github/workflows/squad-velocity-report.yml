@@ -1,0 +1,290 @@
+name: Squad · Velocity Report
+
+# Every Sunday at 17:00 Pacific, Scribe refreshes a rolling 4-week velocity
+# dashboard in .squad/velocity.md. Cron UTC: 00:00 Monday UTC = Sunday 17:00 PDT.
+# Shift to `0 1 * * 1` during PST (roughly Nov-Mar) to keep 17:00 local.
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: squad-velocity-report
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  velocity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare target branch
+        run: |
+          set -e
+          TARGET_BRANCH="${{ github.event.repository.default_branch }}"
+          git fetch origin "$TARGET_BRANCH"
+          git checkout "$TARGET_BRANCH" || git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          git reset --hard "origin/$TARGET_BRANCH"
+
+      - name: Build rolling velocity snapshot
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+
+            const RETRO_PATH = '.squad/retro-log.md';
+            const VELOCITY_PATH = '.squad/velocity.md';
+            const MARKER = '<!-- snapshots below this line, newest at top -->';
+            const SIZE_POINTS = { S: 1, M: 3, L: 8, XL: 20 };
+            const SIZE_ORDER = ['S', 'M', 'L', 'XL'];
+            const ESTIMATE_BANDS = {
+              S: { minMinutesExclusive: null, maxMinutesInclusive: 4 * 60, label: '≤4h' },
+              M: { minMinutesExclusive: 4 * 60, maxMinutesInclusive: 16 * 60, label: '>4h to ≤16h' },
+              L: { minMinutesExclusive: 16 * 60, maxMinutesInclusive: 48 * 60, label: '>16h to ≤48h' },
+              XL: { minMinutesExclusive: 48 * 60, maxMinutesInclusive: null, label: '>48h' },
+            };
+
+            const formatPacificDate = (date) => {
+              const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/Los_Angeles',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+              }).formatToParts(date);
+              const map = Object.fromEntries(
+                parts
+                  .filter((part) => part.type !== 'literal')
+                  .map((part) => [part.type, part.value])
+              );
+              return `${map.year}-${map.month}-${map.day}`;
+            };
+
+            const parseDay = (text) => new Date(`${text}T00:00:00Z`);
+            const addDays = (text, days) => {
+              const value = parseDay(text);
+              value.setUTCDate(value.getUTCDate() + days);
+              return value.toISOString().slice(0, 10);
+            };
+
+            const percentile = (values, p) => {
+              if (!values.length) return null;
+              const sorted = [...values].sort((a, b) => a - b);
+              const index = Math.min(
+                sorted.length - 1,
+                Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)
+              );
+              return sorted[index];
+            };
+
+            const formatMinutes = (value) => (value == null ? 'n/a' : `${value}m`);
+            const formatPercent = (value) => (value == null ? 'n/a' : `${value.toFixed(1)}%`);
+            const formatRatio = (numerator, denominator) => {
+              if (!denominator) return null;
+              return (numerator / denominator) * 100;
+            };
+            const statusForRate = (rate, threshold) => {
+              if (rate == null) return '🟡 insufficient-data';
+              if (rate <= threshold) return '🟢 on-target';
+              if (rate <= threshold * 2) return '🟡 watch';
+              return '🔴 off-target';
+            };
+            const withinEstimateBand = (estimate, actualMinutes) => {
+              const band = ESTIMATE_BANDS[estimate];
+              if (!band) return false;
+              if (band.minMinutesExclusive != null && actualMinutes <= band.minMinutesExclusive) return false;
+              if (band.maxMinutesInclusive != null && actualMinutes > band.maxMinutesInclusive) return false;
+              return true;
+            };
+
+            const reportDate = formatPacificDate(new Date());
+            const weekEndDates = Array.from({ length: 4 }, (_, index) => addDays(reportDate, -21 + (index * 7)));
+            const windowStartText = addDays(reportDate, -27);
+
+            const retro = fs.existsSync(RETRO_PATH)
+              ? fs.readFileSync(RETRO_PATH, 'utf8')
+              : '';
+
+            const parseEntry = (line) => {
+              const match = line.match(
+                /^- (\d{4}-\d{2}-\d{2}) \| #(\d+) "(.+)" \| (S|M|L|XL) \| impl=(\d+)m \| review=(\d+)m \| cycles=(\d+) \| (merged-with-rework|merged|closed) \| @([^|\s]+)(.*)$/
+              );
+              if (!match) return null;
+
+              const suffix = match[9] ?? '';
+              const issueMatch = suffix.match(/\| issue=(#[0-9]+|none)\b/);
+              const estimateMatch = suffix.match(/\| estimate=(S|M|L|XL|unknown)\b/);
+              const rejectionsMatch = suffix.match(/\| rejections_by_reviewer=([^|]+)/);
+              const revertedMatch = suffix.match(/\| reverted=(true|false)\b/);
+              const zappMatch = rejectionsMatch?.[1]?.match(/(?:^|,)zapp:(\d+)/);
+              const implMin = Number.parseInt(match[5], 10);
+              const reviewMin = Number.parseInt(match[6], 10);
+
+              return {
+                date: match[1],
+                pr: Number.parseInt(match[2], 10),
+                title: match[3],
+                size: match[4],
+                implMin,
+                reviewMin,
+                leadMin: implMin + reviewMin,
+                cycles: Number.parseInt(match[7], 10),
+                outcome: match[8],
+                author: match[9],
+                issue: issueMatch?.[1] ?? 'none',
+                estimate: estimateMatch?.[1] ?? 'unknown',
+                zappRejected: zappMatch ? Number.parseInt(zappMatch[1], 10) : 0,
+                reverted: revertedMatch?.[1] === 'true',
+                hasExtendedData: Boolean(issueMatch || estimateMatch || rejectionsMatch || revertedMatch),
+              };
+            };
+
+            const entries = retro
+              .split('\n')
+              .filter((line) => /^- \d{4}-\d{2}-\d{2} \| #\d+/.test(line))
+              .map(parseEntry)
+              .filter(Boolean)
+              .filter((entry) => entry.date >= windowStartText && entry.date <= reportDate);
+
+            const shipped = entries.filter((entry) => entry.outcome.startsWith('merged'));
+            const shippedWithExtended = shipped.filter((entry) => entry.hasExtendedData);
+
+            const weeklyBuckets = weekEndDates.map((endDate) => {
+              const start = addDays(endDate, -6);
+              const rows = shipped.filter((entry) => entry.date >= start && entry.date <= endDate);
+              return {
+                label: endDate,
+                prs: rows.length,
+                points: rows.reduce((sum, entry) => sum + SIZE_POINTS[entry.size], 0),
+              };
+            });
+
+            const weeklyPoints = weeklyBuckets.map((bucket) => bucket.points);
+            const velocityMedian = percentile(weeklyPoints, 50) ?? 0;
+            const velocityMin = weeklyPoints.length ? Math.min(...weeklyPoints) : 0;
+            const velocityMax = weeklyPoints.length ? Math.max(...weeklyPoints) : 0;
+
+            const leadTimeRows = SIZE_ORDER.map((size) => {
+              const values = shipped
+                .filter((entry) => entry.size === size)
+                .map((entry) => entry.leadMin);
+              return {
+                size,
+                count: values.length,
+                p50: percentile(values, 50),
+                p90: percentile(values, 90),
+              };
+            });
+
+            const estimateAccuracyRows = SIZE_ORDER.map((estimate) => {
+              const samples = shippedWithExtended.filter((entry) => entry.estimate === estimate);
+              const inside = samples.filter((entry) => withinEstimateBand(estimate, entry.leadMin)).length;
+              return {
+                estimate,
+                band: ESTIMATE_BANDS[estimate].label,
+                samples: samples.length,
+                inside,
+                accuracy: formatRatio(inside, samples.length),
+              };
+            });
+
+            const reworkRate = formatRatio(
+              shipped.filter((entry) => entry.outcome === 'merged-with-rework').length,
+              shipped.length
+            );
+            const zappRejectedRate = formatRatio(
+              shippedWithExtended.filter((entry) => entry.zappRejected > 0).length,
+              shippedWithExtended.length
+            );
+            const revertRate = formatRatio(
+              shippedWithExtended.filter((entry) => entry.reverted).length,
+              shippedWithExtended.length
+            );
+
+            const lines = [
+              `## Snapshot · ${reportDate}`,
+              '',
+              `Window: ${windowStartText} → ${reportDate} (rolling 4 weeks)`,
+              '',
+              '### Weekly throughput',
+              '| Week ending | Merged PRs | Size points |',
+              '| --- | ---: | ---: |',
+              ...weeklyBuckets.map((bucket) => `| ${bucket.label} | ${bucket.prs} | ${bucket.points} |`),
+              '',
+              '### Lead time percentiles by actual size',
+              '| Size | Sample PRs | P50 lead time | P90 lead time |',
+              '| --- | ---: | ---: | ---: |',
+              ...leadTimeRows.map((row) => `| ${row.size} | ${row.count} | ${formatMinutes(row.p50)} | ${formatMinutes(row.p90)} |`),
+              '',
+              '### Rolling 4-week velocity',
+              `- Median throughput: **${velocityMedian}** size-points/week`,
+              `- Noise band: **${velocityMin} → ${velocityMax}** size-points/week`,
+              '',
+              '### Estimate accuracy',
+              '_Actual = impl + review. Predicted bands follow issue estimate calibration._',
+              '',
+              '| Estimate | Predicted band | Sample PRs | Inside band | Accuracy |',
+              '| --- | --- | ---: | ---: | ---: |',
+              ...estimateAccuracyRows.map((row) => `| ${row.estimate} | ${row.band} | ${row.samples} | ${row.inside} | ${formatPercent(row.accuracy)} |`),
+              '',
+              '### Quality SLO panel',
+              '| Signal | Actual | Target | Status |',
+              '| --- | ---: | ---: | --- |',
+              `| Rework rate | ${formatPercent(reworkRate)} | ≤ 20.0% | ${statusForRate(reworkRate, 20)} |`,
+              `| Zapp rejected rate | ${formatPercent(zappRejectedRate)} | ≤ 5.0% | ${statusForRate(zappRejectedRate, 5)} |`,
+              `| Revert rate | ${formatPercent(revertRate)} | ≤ 2.0% | ${statusForRate(revertRate, 2)} |`,
+              '',
+              '### Sample notes',
+              `- Retro rows analyzed: **${entries.length}**`,
+              `- Merged PRs in window: **${shipped.length}**`,
+              `- Rows with estimate/rejection/revert metadata: **${shippedWithExtended.length}**`,
+              '',
+              '---',
+              '',
+            ];
+
+            const snapshot = lines.join('\n');
+            const header = [
+              '# Squad Velocity',
+              '',
+              'Workflow-owned rolling weekly snapshots derived from `.squad/retro-log.md`.',
+              'Scribe rewrites the current week on rerun, but preserves older snapshots below it.',
+              '',
+              MARKER,
+              '',
+            ].join('\n');
+
+            const current = fs.existsSync(VELOCITY_PATH)
+              ? fs.readFileSync(VELOCITY_PATH, 'utf8')
+              : header;
+            const existing = current.includes(MARKER) ? current : header;
+            const [beforeMarker, afterMarkerRaw = ''] = existing.split(MARKER);
+            const afterMarker = afterMarkerRaw.replace(/^\s+/, '');
+            const snapshotPattern = new RegExp(`## Snapshot · ${reportDate}[\\s\\S]*?(?=\\n## Snapshot · |$)`, 'm');
+            const remaining = afterMarker.replace(snapshotPattern, '').replace(/^\s+/, '');
+            const next = `${beforeMarker}${MARKER}\n\n${snapshot}${remaining}`.replace(/\n{3,}/g, '\n\n');
+
+            fs.mkdirSync('.squad', { recursive: true });
+            fs.writeFileSync(VELOCITY_PATH, next);
+
+      - name: Commit velocity report (as Scribe)
+        run: |
+          set -e
+          TARGET_BRANCH="${{ github.event.repository.default_branch }}"
+          git config user.name "squad-scribe[bot]"
+          git config user.email "scribe@squad.local"
+          git add .squad/velocity.md
+          if git diff --cached --quiet; then
+            echo "No velocity changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(velocity): weekly snapshot [scribe]" -m "Working as Scribe — see .squad/agents/scribe/charter.md"
+          git pull --rebase origin "$TARGET_BRANCH"
+          git push origin "$TARGET_BRANCH"

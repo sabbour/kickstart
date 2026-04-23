@@ -1,0 +1,75 @@
+{
+  "name": "@aks-kickstart/web",
+  "version": "1.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Kickstart web frontend — Azure Portal-style UX for AI-guided AKS deployment",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "postbuild": "node scripts/check-bundle-budget.mjs",
+    "size-limit": "size-limit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@aks-kickstart/harness": "*",
+    "@aks-kickstart/pack-aks-automatic": "*",
+    "@aks-kickstart/pack-azure": "*",
+    "@aks-kickstart/pack-github": "*",
+    "@azure/monitor-opentelemetry-exporter": "^1.0.0-beta.32",
+    "@fluentui/react-components": "^9.73.7",
+    "@fluentui/react-icons": "^2.0.324",
+    "@mermaid-js/layout-elk": "0.2.1",
+    "@monaco-editor/react": "^4.7.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/core": "^2.0.0",
+    "@opentelemetry/instrumentation": "^0.215.0",
+    "@opentelemetry/instrumentation-fetch": "^0.215.0",
+    "@opentelemetry/sdk-trace-base": "^2.7.0",
+    "@opentelemetry/sdk-trace-web": "^2.7.0",
+    "@preact/signals-core": "^1.13.0",
+    "date-fns": "^4.1.0",
+    "dompurify": "^3.4.0",
+    "highlight.js": "^11.11.1",
+    "jszip": "^3.10.1",
+    "mermaid": "^11.14.0",
+    "monaco-editor": "^0.55.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.1"
+  },
+  "devDependencies": {
+    "@size-limit/file": "^12.1.0",
+    "@types/dompurify": "^3.2.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "size-limit": "^12.1.0",
+    "typescript": "^5.8.0",
+    "vite": "^8.0.9"
+  },
+  "keywords": [
+    "aks",
+    "azure",
+    "kickstart",
+    "portal"
+  ],
+  "size-limit": [
+    {
+      "name": "main entry (browser OTel budget — #1042 DP-D)",
+      "path": "dist/assets/index-*.js",
+      "limit": "331 KB",
+      "gzip": true
+    },
+    {
+      "name": "playground route",
+      "path": "dist/assets/Playground-*.js",
+      "limit": "60 KB",
+      "gzip": true
+    }
+  ],
+  "license": "MIT"
+}

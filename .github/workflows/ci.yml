@@ -1,0 +1,218 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  classify-trusted-retro-log-pr:
+    name: Classify trusted retro-log PR
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    outputs:
+      trusted_retro_log_pr: ${{ steps.classify.outputs.trusted_retro_log_pr }}
+    steps:
+      - name: Classify trusted retro-log PR
+        id: classify
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const TRUSTED_RETRO_LABEL = 'retro-log';
+            const TRUSTED_RETRO_BRANCH_PREFIX = 'retro-log/pr-';
+            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'sabbour-squad-scribe[bot]']);
+            const TRUSTED_RETRO_ONLY_PATHS = new Set(['.squad/retro-log.md']);
+
+            async function listChangedFiles(prNumber) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                per_page: 100,
+              });
+              return files.map((file) => file.filename);
+            }
+
+            const pr = context.payload.pull_request;
+            const labels = new Set((pr.labels ?? []).map((label) => label.name));
+            const changedFiles = await listChangedFiles(pr.number);
+            const trustedRetroLogPr = (
+              labels.has(TRUSTED_RETRO_LABEL) &&
+              TRUSTED_RETRO_AUTHORS.has(pr.user?.login ?? '') &&
+              (pr.head?.ref ?? '').startsWith(TRUSTED_RETRO_BRANCH_PREFIX) &&
+              changedFiles.length > 0 &&
+              changedFiles.every((filename) => TRUSTED_RETRO_ONLY_PATHS.has(filename))
+            );
+
+            core.setOutput('trusted_retro_log_pr', trustedRetroLogPr ? 'true' : 'false');
+
+  lint-build:
+    name: Lint, Build & Unit Tests
+    runs-on: ubuntu-latest
+    needs: [classify-trusted-retro-log-pr]
+    if: needs.classify-trusted-retro-log-pr.outputs.trusted_retro_log_pr != 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Fetch main branch for changeset status
+        run: git fetch origin main:main --deepen=50 || git fetch origin main:main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: "npm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@aks-kickstart"
+          always-auth: true
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: TypeScript check (web)
+        run: cd packages/web && npx tsc --noEmit
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Detect docs-gate scope
+        id: docs_gate
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const paths = files.map(file => file.filename);
+            const labels = context.payload.pull_request.labels.map(label => label.name);
+
+            const userFacing = paths.some(path =>
+              /^packages\/[^/]+\/src\//.test(path) &&
+              !path.includes('__tests__') &&
+              !path.endsWith('.test.ts') &&
+              !path.endsWith('.test.tsx') &&
+              !path.includes('/e2e/')
+            );
+            const hasDocsSite = paths.some(path => path.startsWith('docs-site/docs/'));
+            const skipDocs = labels.includes('skip-docs');
+            const requireChangeset = userFacing && !hasDocsSite && !skipDocs;
+
+            core.setOutput('requireChangeset', String(requireChangeset));
+
+      - name: Guard against smoke gate regression
+        run: |
+          if grep -nE 'exit 0' .github/workflows/deploy-swa.yml | grep -iE 'smoke|production_url|base_url'; then
+            echo "::error file=.github/workflows/deploy-swa.yml::Regression: smoke-resolve step uses exit 0 (silent skip). Must be exit 1."
+            exit 1
+          fi
+          if grep -nE 'continue-on-error:\s*true' .github/workflows/deploy-swa.yml; then
+            echo "::error file=.github/workflows/deploy-swa.yml::Regression: continue-on-error:true in deploy-swa workflow. Smoke chain must fail loudly."
+            exit 1
+          fi
+          echo "✅ Smoke gate integrity verified"
+
+      - name: Guard against useAzureMonitor double-init regression
+        run: |
+          # Protects the single-init invariant from DP #1030 / DP #1035.
+          # The real regression pattern is *multiple* useAzureMonitor() call-sites
+          # in appinsights.ts — a second call wipes the OTel global registry and
+          # re-wires the exporter pipeline, bypassing RedactingSpanExporter.
+          # Count call-sites (literal `useAzureMonitor(`). Expect exactly one.
+          APP_INSIGHTS=packages/web/api/src/lib/appinsights.ts
+          if [ ! -f "$APP_INSIGHTS" ]; then
+            echo "::error file=$APP_INSIGHTS::Guard failed: expected file not found."
+            exit 1
+          fi
+          count=$(grep -cE '\buseAzureMonitor[[:space:]]*\(' "$APP_INSIGHTS" || true)
+          if [ "$count" != "1" ]; then
+            echo "::error file=$APP_INSIGHTS::Regression: expected exactly 1 reference to useAzureMonitor( in appinsights.ts, found $count. Multiple call-sites re-initialize the OTel global TracerProvider and break the single-path redaction pipeline (DP #1030 / DP #1035). Zero references means the documented invariant anchor was removed."
+            exit 1
+          fi
+          echo "✅ appinsights.ts useAzureMonitor single-init invariant verified (count=1)"
+
+      - name: Changeset status
+        if: steps.docs_gate.outputs.requireChangeset == 'true'
+        run: |
+          # Create a local main branch for changesets to compare against
+          git fetch origin main:main --no-tags || git fetch origin main:main
+          npx changeset status
+
+  e2e:
+    name: Playwright E2E Tests
+    runs-on: ubuntu-latest
+    needs: [classify-trusted-retro-log-pr]
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.classify-trusted-retro-log-pr.outputs.trusted_retro_log_pr != 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: "npm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@aks-kickstart"
+          always-auth: true
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build all workspaces
+        run: npm run build
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Playwright E2E tests
+        run: npx playwright test
+
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    needs: [classify-trusted-retro-log-pr, lint-build, e2e]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          classify_result="${{ needs.classify-trusted-retro-log-pr.result }}"
+          lint_build_result="${{ needs.lint-build.result }}"
+          e2e_result="${{ needs.e2e.result }}"
+
+          if [[ ! "$classify_result" =~ ^(success|skipped)$ || ! "$lint_build_result" =~ ^(success|skipped)$ || ! "$e2e_result" =~ ^(success|skipped)$ ]]; then
+            echo "CI failed: classify=${classify_result}, lint-build=${lint_build_result}, e2e=${e2e_result}"
+            exit 1
+          fi
+          echo "CI passed: classify=${classify_result}, lint-build=${lint_build_result}, e2e=${e2e_result}"

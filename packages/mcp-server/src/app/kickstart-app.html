@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kickstart — AKS Onboarding</title>
+<style>
+/* ── Fluent 2 Design Tokens ─────────────────────────────────────── */
+:root {
+  --color-brand-primary: #0078d4;
+  --color-brand-primary-hover: #106ebe;
+  --color-brand-primary-active: #005a9e;
+  --color-brand-light: #deecf9;
+  --color-brand-lighter: #eff6fc;
+  --color-brand-foreground-1: #0078d4;
+  --color-brand-background-2: #deecf9;
+  --color-brand-stroke-1: #0078d4;
+
+  --color-neutral-background-1: #ffffff;
+  --color-neutral-background-1-hover: #f5f5f5;
+  --color-neutral-background-2: #faf9f8;
+  --color-neutral-background-3: #f3f2f1;
+  --color-neutral-background-4: #edebe9;
+  --color-neutral-background-inverted: #1b1a19;
+  --color-neutral-foreground-1: #242424;
+  --color-neutral-foreground-2: #424242;
+  --color-neutral-foreground-3: #616161;
+  --color-neutral-foreground-disabled: #a19f9d;
+  --color-neutral-foreground-on-brand: #ffffff;
+  --color-neutral-stroke-1: #d1d1d1;
+  --color-neutral-stroke-2: #e1dfdd;
+
+  --color-success: #107c10;
+  --color-success-background: #dff6dd;
+  --color-warning: #ffb900;
+  --color-warning-background: #fff4ce;
+  --color-error: #d13438;
+  --color-error-background: #fde7e9;
+
+  --color-copilot-gradient-start: #7b2ff2;
+  --color-copilot-gradient-end: #0078d4;
+  --color-copilot-bg: #f7f7ff;
+
+  --font-family-base: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-family-mono: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+
+  --font-size-100: 10px;
+  --font-size-200: 12px;
+  --font-size-300: 14px;
+  --font-size-400: 16px;
+  --font-size-500: 20px;
+  --font-size-600: 24px;
+
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --spacing-xxs: 2px;
+  --spacing-xs: 4px;
+  --spacing-s: 8px;
+  --spacing-m: 12px;
+  --spacing-l: 16px;
+  --spacing-xl: 24px;
+  --spacing-xxl: 32px;
+  --spacing-xxxl: 48px;
+
+  --radius-none: 0;
+  --radius-small: 2px;
+  --radius-medium: 4px;
+  --radius-large: 8px;
+  --radius-xlarge: 12px;
+  --radius-circular: 9999px;
+
+  --shadow-2: 0 1px 2px rgba(0,0,0,0.12);
+  --shadow-4: 0 2px 4px rgba(0,0,0,0.14);
+  --shadow-8: 0 4px 8px rgba(0,0,0,0.14);
+
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+}
+
+/* ── Reset & base ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  color: var(--color-neutral-foreground-1);
+  background: var(--color-neutral-background-1);
+  overflow: hidden;
+}
+
+/* ── App layout ─────────────────────────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-s);
+  padding: var(--spacing-s) var(--spacing-l);
+  background: linear-gradient(135deg, var(--color-copilot-gradient-start), var(--color-copilot-gradient-end));
+  color: #fff;
+  flex-shrink: 0;
+}
+.app-header-icon { font-size: 18px; }
+.app-header-title { font-size: var(--font-size-300); font-weight: var(--font-weight-semibold); }
+
+/* ── Phase indicator ────────────────────────────────────────────── */
+.phase-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-s) var(--spacing-l);
+  background: var(--color-neutral-background-2);
+  border-bottom: 1px solid var(--color-neutral-stroke-2);
+  flex-shrink: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.phase-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-200);
+  color: var(--color-neutral-foreground-3);
+}
+.phase-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--color-neutral-stroke-1);
+  flex-shrink: 0;
+}
+.phase-dot.active {
+  background: var(--color-brand-primary);
+  box-shadow: 0 0 0 2px var(--color-brand-light);
+}
+.phase-dot.completed { background: var(--color-success); }
+.phase-connector {
+  width: 16px; height: 1px;
+  background: var(--color-neutral-stroke-2);
+  flex-shrink: 0;
+}
+.phase-connector.completed { background: var(--color-success); }
+
+/* ── Messages area ──────────────────────────────────────────────── */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-l);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-m);
+}
+
+.chat-bubble {
+  max-width: 92%;
+  padding: var(--spacing-s) var(--spacing-m);
+  border-radius: var(--radius-large);
+  font-size: var(--font-size-300);
+  line-height: 1.5;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+.chat-bubble.user {
+  align-self: flex-end;
+  background: var(--color-brand-primary);
+  color: var(--color-neutral-foreground-on-brand);
+  border-bottom-right-radius: var(--radius-small);
+}
+.chat-bubble.assistant {
+  align-self: flex-start;
+  background: var(--color-neutral-background-3);
+  border-bottom-left-radius: var(--radius-small);
+}
+.chat-bubble.error {
+  background: var(--color-error-background);
+  color: var(--color-error);
+}
+
+/* ── Typing indicator ───────────────────────────────────────────── */
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  align-self: flex-start;
+  padding: var(--spacing-s) var(--spacing-m);
+}
+.typing-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--color-neutral-foreground-3);
+  animation: typingBounce 1.2s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+
+/* ── Input area ─────────────────────────────────────────────────── */
+.input-area {
+  display: flex;
+  gap: var(--spacing-s);
+  padding: var(--spacing-s) var(--spacing-l);
+  border-top: 1px solid var(--color-neutral-stroke-2);
+  background: var(--color-neutral-background-1);
+  flex-shrink: 0;
+}
+.input-area textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--color-neutral-stroke-1);
+  border-radius: var(--radius-medium);
+  padding: var(--spacing-s) var(--spacing-m);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  background: var(--color-neutral-background-1);
+  color: var(--color-neutral-foreground-1);
+  outline: none;
+  min-height: 36px;
+  max-height: 120px;
+}
+.input-area textarea:focus {
+  border-color: var(--color-brand-primary);
+  box-shadow: 0 0 0 1px var(--color-brand-primary);
+}
+.send-btn {
+  width: 36px; height: 36px;
+  border: none;
+  border-radius: var(--radius-medium);
+  background: var(--color-brand-primary);
+  color: var(--color-neutral-foreground-on-brand);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--duration-fast);
+}
+.send-btn:hover { background: var(--color-brand-primary-hover); }
+.send-btn:active { background: var(--color-brand-primary-active); }
+.send-btn:disabled {
+  background: var(--color-neutral-background-4);
+  color: var(--color-neutral-foreground-disabled);
+  cursor: not-allowed;
+}
+
+/* ── A2UI Components ────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-m);
+  border: 1px solid var(--color-neutral-stroke-1);
+  border-radius: var(--radius-medium);
+  background: var(--color-neutral-background-1);
+  color: var(--color-neutral-foreground-1);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--duration-fast);
+}
+.btn:hover { background: var(--color-neutral-background-3); }
+.btn.primary {
+  background: var(--color-brand-primary);
+  color: var(--color-neutral-foreground-on-brand);
+  border-color: var(--color-brand-primary);
+}
+.btn.primary:hover { background: var(--color-brand-primary-hover); }
+
+.card {
+  border: 1px solid var(--color-neutral-stroke-2);
+  border-radius: var(--radius-large);
+  background: var(--color-neutral-background-1);
+  overflow: hidden;
+}
+.card-header {
+  padding: var(--spacing-m) var(--spacing-l);
+  border-bottom: 1px solid var(--color-neutral-stroke-2);
+}
+.card-title {
+  font-size: var(--font-size-300);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+.card-subtitle {
+  font-size: var(--font-size-200);
+  color: var(--color-neutral-foreground-3);
+  margin: var(--spacing-xxs) 0 0;
+}
+.card-body { padding: var(--spacing-m) var(--spacing-l); }
+.card-footer { padding: var(--spacing-m) var(--spacing-l); border-top: 1px solid var(--color-neutral-stroke-2); }
+
+.form-group { margin-bottom: var(--spacing-m); }
+.form-label {
+  display: block;
+  font-size: var(--font-size-200);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-neutral-foreground-2);
+}
+.form-label .required { color: var(--color-error); }
+.form-input {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-s);
+  border: 1px solid var(--color-neutral-stroke-1);
+  border-radius: var(--radius-medium);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  background: var(--color-neutral-background-1);
+  color: var(--color-neutral-foreground-1);
+}
+.form-input:focus { border-color: var(--color-brand-primary); outline: none; box-shadow: 0 0 0 1px var(--color-brand-primary); }
+.form-hint { display: block; font-size: var(--font-size-100); color: var(--color-neutral-foreground-3); margin-top: var(--spacing-xxs); }
+
+.code-block {
+  border: 1px solid var(--color-neutral-stroke-2);
+  border-radius: var(--radius-medium);
+  overflow: hidden;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-200);
+}
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-s);
+  background: var(--color-neutral-background-3);
+  font-size: var(--font-size-100);
+  color: var(--color-neutral-foreground-3);
+}
+.code-block-copy {
+  border: none;
+  background: none;
+  color: var(--color-brand-foreground-1);
+  cursor: pointer;
+  font-size: var(--font-size-100);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xxs);
+}
+.code-block pre {
+  margin: 0;
+  padding: var(--spacing-s);
+  overflow-x: auto;
+  background: var(--color-neutral-background-2);
+  color: var(--color-neutral-foreground-1);
+}
+.code-block code { font-family: inherit; }
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 2px var(--spacing-s);
+  border-radius: var(--radius-circular);
+  font-size: var(--font-size-100);
+  font-weight: var(--font-weight-semibold);
+}
+.status-badge-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+}
+.status-badge.success { background: var(--color-success-background); color: var(--color-success); }
+.status-badge.success .status-badge-dot { background: var(--color-success); }
+.status-badge.error { background: var(--color-error-background); color: var(--color-error); }
+.status-badge.error .status-badge-dot { background: var(--color-error); }
+.status-badge.warning { background: var(--color-warning-background); color: var(--color-warning); }
+.status-badge.warning .status-badge-dot { background: var(--color-warning); }
+
+.tabs { display: flex; border-bottom: 1px solid var(--color-neutral-stroke-2); }
+.tab-item {
+  padding: var(--spacing-s) var(--spacing-l);
+  border: none;
+  background: none;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-300);
+  color: var(--color-neutral-foreground-3);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tab-item.active { color: var(--color-brand-primary); border-bottom-color: var(--color-brand-primary); }
+.tab-content { padding: var(--spacing-m) 0; }
+
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--color-neutral-stroke-2);
+  border-top-color: var(--color-brand-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Header -->
+  <header class="app-header">
+    <span class="app-header-icon" aria-hidden="true">✦</span>
+    <span class="app-header-title">Kickstart</span>
+  </header>
+
+  <!-- Phase bar -->
+  <nav class="phase-bar" id="phase-bar" aria-label="Conversation progress"></nav>
+
+  <!-- Messages -->
+  <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Chat messages"></div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <textarea id="input" placeholder="Describe your app…" rows="1" aria-label="Message input"></textarea>
+    <button class="send-btn" id="send-btn" aria-label="Send message" title="Send">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M1.5 1.3l13 6.7-13 6.7 1.2-5.7H8v-2H2.7z"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   Kickstart MCP App — IDE Surface
+   Self-contained: A2UI renderer, chat logic, postMessage protocol
+   ========================================================================== */
+
+(function () {
+  "use strict";
+
+  // ── State ──────────────────────────────────────────────────────────
+  let sessionId = null;
+  let isWaiting = false;
+
+  const messagesEl = document.getElementById("messages");
+  const inputEl = document.getElementById("input");
+  const sendBtn = document.getElementById("send-btn");
+  const phaseBarEl = document.getElementById("phase-bar");
+  var trustedParentOrigin = resolveTrustedParentOrigin();
+
+  function tryResolveOrigin(value) {
+    if (!value || typeof value !== "string") return "";
+    try {
+      var origin = new URL(value, window.location.href).origin;
+      return origin && origin !== "null" ? origin : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function resolveTrustedParentOrigin() {
+    if (!window.parent || window.parent === window) return "";
+
+    var params = new URLSearchParams(window.location.search);
+    var queryOrigin = tryResolveOrigin(params.get("parentOrigin"));
+    if (queryOrigin) return queryOrigin;
+
+    var ancestors = window.location.ancestorOrigins;
+    if (ancestors && ancestors.length > 0) {
+      var ancestorOrigin = tryResolveOrigin(ancestors[0]);
+      if (ancestorOrigin) return ancestorOrigin;
+    }
+
+    var referrerOrigin = tryResolveOrigin(document.referrer);
+    if (referrerOrigin) return referrerOrigin;
+
+    return tryResolveOrigin(window.location.href);
+  }
+
+  // ── PostMessage protocol ───────────────────────────────────────────
+
+  /**
+   * Send a message to the MCP server via postMessage to parent.
+   * MCP App iframe spec: messages go to window.parent.
+   */
+  function sendToServer(msg) {
+    if (window.parent && window.parent !== window && trustedParentOrigin) {
+      window.parent.postMessage(msg, trustedParentOrigin);
+    }
+  }
+
+  /**
+   * Handle incoming messages from the MCP server.
+   */
+  window.addEventListener("message", function (event) {
+    if (!window.parent || window.parent === window) return;
+    if (event.source !== window.parent) return;
+    if (!trustedParentOrigin || event.origin !== trustedParentOrigin) return;
+
+    const data = event.data;
+    if (!data || typeof data !== "object" || !data.type) return;
+
+    switch (data.type) {
+      case "response":
+        handleServerResponse(data);
+        break;
+      case "error":
+        handleServerError(data);
+        break;
+    }
+  });
+
+  function handleServerResponse(data) {
+    setWaiting(false);
+
+    if (data.sessionId) {
+      sessionId = data.sessionId;
+    }
+
+    // Update phase indicator if provided
+    if (data.phase) {
+      updatePhaseFromName(data.phase);
+    }
+
+    // Render A2UI component tree if present
+    if (data.a2ui) {
+      const el = renderA2UI(data.a2ui);
+      addAssistantBubble(el);
+    }
+
+    // Render plain text if present (and no A2UI)
+    if (data.text && !data.a2ui) {
+      addMessage("assistant", data.text);
+    }
+  }
+
+  function handleServerError(data) {
+    setWaiting(false);
+    addMessage("error", data.message || "An error occurred.");
+  }
+
+  // ── Chat UI ────────────────────────────────────────────────────────
+
+  function addMessage(role, text) {
+    const bubble = document.createElement("div");
+    bubble.className = "chat-bubble " + role;
+    bubble.setAttribute("role", "article");
+    bubble.textContent = text;
+    messagesEl.appendChild(bubble);
+    scrollToBottom();
+  }
+
+  function addAssistantBubble(contentEl) {
+    const bubble = document.createElement("div");
+    bubble.className = "chat-bubble assistant";
+    bubble.setAttribute("role", "article");
+    bubble.appendChild(contentEl);
+    messagesEl.appendChild(bubble);
+    scrollToBottom();
+  }
+
+  function setWaiting(val) {
+    isWaiting = val;
+    sendBtn.disabled = val;
+    const existing = messagesEl.querySelector(".typing-indicator");
+    if (val && !existing) {
+      const indicator = document.createElement("div");
+      indicator.className = "typing-indicator";
+      indicator.setAttribute("aria-label", "Kickstart is thinking");
+      for (var i = 0; i < 3; i++) {
+        var dot = document.createElement("span");
+        dot.className = "typing-dot";
+        indicator.appendChild(dot);
+      }
+      messagesEl.appendChild(indicator);
+      scrollToBottom();
+    } else if (!val && existing) {
+      existing.remove();
+    }
+  }
+
+  function scrollToBottom() {
+    requestAnimationFrame(function () {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
+  }
+
+  // ── Input handling ─────────────────────────────────────────────────
+
+  function send() {
+    var text = inputEl.value.trim();
+    if (!text || isWaiting) return;
+
+    addMessage("user", text);
+    inputEl.value = "";
+    inputEl.style.height = "auto";
+    setWaiting(true);
+
+    if (!sessionId) {
+      sendToServer({ type: "kickstart" });
+    } else {
+      sendToServer({ type: "converse", sessionId: sessionId, message: text });
+    }
+  }
+
+  inputEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  });
+
+  inputEl.addEventListener("input", function () {
+    inputEl.style.height = "auto";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+  });
+
+  sendBtn.addEventListener("click", send);
+
+  // ── Phase bar ──────────────────────────────────────────────────────
+
+  var PHASES = [
+    { id: "Discover", label: "Discover" },
+    { id: "Design",   label: "Design" },
+    { id: "Generate", label: "Generate" },
+    { id: "Review",   label: "Review" },
+    { id: "Handoff",  label: "Handoff" },
+    { id: "Deploy",   label: "Deploy" },
+  ];
+
+  var currentPhaseIndex = 0;
+
+  function renderPhaseBar() {
+    clearChildren(phaseBarEl);
+    for (var i = 0; i < PHASES.length; i++) {
+      var status = i < currentPhaseIndex ? "completed" : i === currentPhaseIndex ? "active" : "";
+      var step = document.createElement("span");
+      step.className = "phase-step";
+
+      var dot = document.createElement("span");
+      dot.className = "phase-dot" + (status ? " " + status : "");
+      step.appendChild(dot);
+
+      var label = document.createElement("span");
+      label.textContent = PHASES[i].label;
+      step.appendChild(label);
+      phaseBarEl.appendChild(step);
+
+      if (i < PHASES.length - 1) {
+        var connector = document.createElement("span");
+        connector.className = "phase-connector" + (i < currentPhaseIndex ? " completed" : "");
+        phaseBarEl.appendChild(connector);
+      }
+    }
+  }
+
+  function updatePhaseFromName(phaseName) {
+    for (var i = 0; i < PHASES.length; i++) {
+      if (PHASES[i].id === phaseName) {
+        currentPhaseIndex = i;
+        renderPhaseBar();
+        return;
+      }
+    }
+  }
+
+  // ── A2UI Renderer ──────────────────────────────────────────────────
+  // Adapted from packages/web/js/framework/a2ui-renderer.js
+  // Renders A2UI component descriptors into DOM elements.
+
+  function clearChildren(el) {
+    while (el.firstChild) {
+      el.removeChild(el.firstChild);
+    }
+  }
+
+  function createCardHeader(title, subtitle, styleText) {
+    var header = document.createElement("div");
+    header.className = "card-header";
+    if (styleText) header.style.cssText = styleText;
+
+    var content = document.createElement("div");
+    if (title) {
+      var heading = document.createElement("h3");
+      heading.className = "card-title";
+      heading.textContent = title;
+      content.appendChild(heading);
+    }
+    if (subtitle) {
+      var text = document.createElement("p");
+      text.className = "card-subtitle";
+      text.textContent = subtitle;
+      content.appendChild(text);
+    }
+
+    header.appendChild(content);
+    return header;
+  }
+
+  function createCardBody(styleText) {
+    var body = document.createElement("div");
+    body.className = "card-body";
+    if (styleText) body.style.cssText = styleText;
+    return body;
+  }
+
+  function sanitizeNavigationUrl(value) {
+    if (typeof value !== "string" || !value) return "";
+    try {
+      var url = new URL(value, window.location.href);
+      if (url.protocol === "http:" || url.protocol === "https:") {
+        return url.toString();
+      }
+    } catch (e) {
+      return "";
+    }
+    return "";
+  }
+
+  function createNavigationLink(href, label, className, styleText) {
+    var safeHref = sanitizeNavigationUrl(href);
+    if (!safeHref) {
+      var disabled = document.createElement("span");
+      disabled.className = className;
+      if (styleText) disabled.style.cssText = styleText;
+      disabled.textContent = label;
+      disabled.setAttribute("aria-disabled", "true");
+      disabled.style.opacity = "0.6";
+      disabled.style.cursor = "not-allowed";
+      return disabled;
+    }
+
+    var link = document.createElement("a");
+    link.href = safeHref;
+    link.className = className;
+    link.target = "_blank";
+    link.rel = "noopener";
+    if (styleText) link.style.cssText = styleText;
+    link.textContent = label;
+    return link;
+  }
+
+  function createStatusIcon(status) {
+    var el = document.createElement("span");
+    if (status === "completed") {
+      el.textContent = "✓";
+      el.style.color = "var(--color-success)";
+      return el;
+    }
+    if (status === "running") {
+      el.className = "spinner";
+      el.style.width = "14px";
+      el.style.height = "14px";
+      el.style.borderWidth = "2px";
+      return el;
+    }
+    if (status === "error") {
+      el.textContent = "✕";
+      el.style.color = "var(--color-error)";
+      return el;
+    }
+
+    el.textContent = "○";
+    el.style.color = "var(--color-neutral-foreground-disabled)";
+    return el;
+  }
+
+  var RENDERERS = {
+    Text: renderText,
+    Button: renderButton,
+    TextField: renderTextField,
+    Row: renderRow,
+    Column: renderColumn,
+    Card: renderCardA2UI,
+    Tabs: renderTabs,
+    ConversationPhase: renderConversationPhase,
+    CodeBlock: renderCodeBlockA2UI,
+    ResourcePicker: renderResourcePicker,
+    GenerationProgress: renderGenerationProgress,
+    ArchitectureDiagram: renderArchitectureDiagram,
+    CostEstimate: renderCostEstimate,
+    HandoffCard: renderHandoffCard,
+    RepoPicker: renderRepoPicker,
+    WorkflowStatus: renderWorkflowStatus,
+    CodespaceLink: renderCodespaceLink,
+    AppOverview: renderAppOverview,
+  };
+
+  function renderA2UI(schema, ctx) {
+    ctx = ctx || {};
+    if (Array.isArray(schema)) {
+      var wrapper = document.createElement("div");
+      for (var i = 0; i < schema.length; i++) {
+        wrapper.appendChild(renderA2UI(schema[i], ctx));
+      }
+      return wrapper;
+    }
+    if (!schema || typeof schema !== "object") return createFallback(schema);
+    if (typeof schema.type !== "string") return createFallback(schema);
+    if (!Object.prototype.hasOwnProperty.call(RENDERERS, schema.type)) {
+      return createFallback(schema);
+    }
+    var renderer = RENDERERS[schema.type];
+    if (typeof renderer !== "function") return createFallback(schema);
+    return renderer(schema, ctx);
+  }
+
+  // ── Standard components ────────────────────────────────────────────
+
+  function renderText(schema) {
+    var el = document.createElement(schema.variant === "heading" ? "h3" : "p");
+    el.textContent = schema.text || schema.content || "";
+    if (schema.style) Object.assign(el.style, schema.style);
+    if (schema.className) el.className = schema.className;
+    return el;
+  }
+
+  function renderButton(schema, ctx) {
+    var btn = document.createElement("button");
+    btn.className = "btn" + (schema.primary ? " primary" : "") + (schema.className ? " " + schema.className : "");
+    btn.textContent = schema.label || "Button";
+    if (schema.disabled) btn.disabled = true;
+    if (schema.action) {
+      btn.addEventListener("click", function () {
+        sendToServer({ type: "action", sessionId: sessionId, actionType: schema.action, payload: schema.data || {} });
+      });
+    }
+    return btn;
+  }
+
+  function renderTextField(schema, ctx) {
+    var group = document.createElement("div");
+    group.className = "form-group";
+    if (schema.label) {
+      var label = document.createElement("label");
+      label.className = "form-label";
+      label.textContent = schema.label;
+      if (schema.required) {
+        var star = document.createElement("span");
+        star.className = "required";
+        star.textContent = " *";
+        label.appendChild(star);
+      }
+      group.appendChild(label);
+    }
+    var input = document.createElement(schema.multiline ? "textarea" : "input");
+    input.className = "form-input";
+    input.placeholder = schema.placeholder || "";
+    input.value = schema.value || "";
+    if (schema.name) input.name = schema.name;
+    if (schema.required) input.required = true;
+    if (schema.multiline) input.rows = schema.rows || 3;
+    group.appendChild(input);
+    if (schema.hint) {
+      var hint = document.createElement("span");
+      hint.className = "form-hint";
+      hint.textContent = schema.hint;
+      group.appendChild(hint);
+    }
+    return group;
+  }
+
+  function renderRow(schema, ctx) {
+    var row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.gap = schema.gap || "var(--spacing-l)";
+    row.style.alignItems = schema.align || "flex-start";
+    if (schema.wrap) row.style.flexWrap = "wrap";
+    var children = schema.children || [];
+    for (var i = 0; i < children.length; i++) row.appendChild(renderA2UI(children[i], ctx));
+    return row;
+  }
+
+  function renderColumn(schema, ctx) {
+    var col = document.createElement("div");
+    col.style.display = "flex";
+    col.style.flexDirection = "column";
+    col.style.gap = schema.gap || "var(--spacing-m)";
+    col.style.flex = schema.flex || "1";
+    var children = schema.children || [];
+    for (var i = 0; i < children.length; i++) col.appendChild(renderA2UI(children[i], ctx));
+    return col;
+  }
+
+  function renderCardA2UI(schema, ctx) {
+    var card = document.createElement("article");
+    card.className = "card" + (schema.className ? " " + schema.className : "");
+    if (schema.title || schema.subtitle) {
+      card.appendChild(createCardHeader(schema.title || "", schema.subtitle || ""));
+    }
+    var body = createCardBody();
+    card.appendChild(body);
+    var children = schema.children || [];
+    for (var i = 0; i < children.length; i++) body.appendChild(renderA2UI(children[i], ctx));
+    return card;
+  }
+
+  function renderTabs(schema, ctx) {
+    var wrapper = document.createElement("div");
+    var tabBar = document.createElement("div");
+    tabBar.className = "tabs";
+    tabBar.setAttribute("role", "tablist");
+    var contentArea = document.createElement("div");
+    contentArea.className = "tab-content";
+    var tabs = schema.tabs || [];
+    var activeIndex = schema.activeTab || 0;
+
+    function showTab(index) {
+      clearChildren(tabBar);
+      clearChildren(contentArea);
+      for (var i = 0; i < tabs.length; i++) {
+        var btn = document.createElement("button");
+        btn.className = "tab-item" + (i === index ? " active" : "");
+        btn.setAttribute("role", "tab");
+        btn.setAttribute("aria-selected", String(i === index));
+        btn.textContent = tabs[i].label;
+        (function(idx) { btn.addEventListener("click", function() { showTab(idx); }); })(i);
+        tabBar.appendChild(btn);
+      }
+      var active = tabs[index];
+      if (active && active.children) {
+        for (var j = 0; j < active.children.length; j++) {
+          contentArea.appendChild(renderA2UI(active.children[j], ctx));
+        }
+      }
+    }
+    showTab(activeIndex);
+    wrapper.appendChild(tabBar);
+    wrapper.appendChild(contentArea);
+    return wrapper;
+  }
+
+  // ── Custom Kickstart components ────────────────────────────────────
+
+  function renderConversationPhase(schema) {
+    var el = document.createElement("div");
+    el.className = "phase-bar";
+    el.style.background = "none";
+    el.style.border = "none";
+    el.style.padding = "var(--spacing-xs) 0";
+    el.setAttribute("aria-label", "Conversation phase");
+    var phases = schema.phases || [];
+    var current = typeof schema.currentPhase === "number" ? schema.currentPhase : 0;
+    // If currentPhase is a string, resolve index
+    if (typeof schema.currentPhase === "string") {
+      for (var k = 0; k < phases.length; k++) {
+        var p = phases[k];
+        var pid = typeof p === "string" ? p : p.id;
+        if (pid === schema.currentPhase) { current = k; break; }
+      }
+    }
+    for (var i = 0; i < phases.length; i++) {
+      var phase = phases[i];
+      var label = typeof phase === "string" ? phase : phase.label || phase.id;
+      var st = i < current ? "completed" : i === current ? "active" : "";
+      var step = document.createElement("span");
+      step.className = "phase-step";
+
+      var dot = document.createElement("span");
+      dot.className = "phase-dot" + (st ? " " + st : "");
+      step.appendChild(dot);
+
+      var textEl = document.createElement("span");
+      textEl.textContent = label || "";
+      step.appendChild(textEl);
+      el.appendChild(step);
+
+      if (i < phases.length - 1) {
+        var conn = document.createElement("span");
+        conn.className = "phase-connector" + (i < current ? " completed" : "");
+        el.appendChild(conn);
+      }
+    }
+    // Also update top-level phase bar
+    if (typeof schema.currentPhase === "string") updatePhaseFromName(schema.currentPhase);
+    return el;
+  }
+
+  function renderCodeBlockA2UI(schema) {
+    var block = document.createElement("div");
+    block.className = "code-block";
+    var code = schema.code || "";
+    var lang = schema.language || "";
+    var header = document.createElement("div");
+    header.className = "code-block-header";
+
+    var label = document.createElement("span");
+    label.textContent = lang;
+    header.appendChild(label);
+
+    var copyBtn = document.createElement("button");
+    copyBtn.className = "code-block-copy";
+    copyBtn.setAttribute("aria-label", "Copy code");
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", function () {
+      try {
+        navigator.clipboard.writeText(code);
+        copyBtn.textContent = "✓ Copied";
+        setTimeout(function () { copyBtn.textContent = "Copy"; }, 2000);
+      } catch (e) { /* clipboard may not be available in sandbox */ }
+    });
+    header.appendChild(copyBtn);
+    block.appendChild(header);
+
+    var pre = document.createElement("pre");
+    var codeEl = document.createElement("code");
+    codeEl.textContent = code;
+    pre.appendChild(codeEl);
+    block.appendChild(pre);
+    return block;
+  }
+
+  function renderResourcePicker(schema, ctx) {
+    var group = document.createElement("div");
+    group.className = "form-group";
+    var label = document.createElement("label");
+    label.className = "form-label";
+    label.textContent = schema.label || "Select resource";
+    group.appendChild(label);
+    var select = document.createElement("select");
+    select.className = "form-input";
+    select.name = schema.name || "resource";
+    var ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = schema.placeholder || "-- Select --";
+    ph.disabled = true;
+    ph.selected = true;
+    select.appendChild(ph);
+    var options = schema.options || [];
+    for (var i = 0; i < options.length; i++) {
+      var opt = document.createElement("option");
+      opt.value = options[i].value || options[i].id;
+      opt.textContent = options[i].label || options[i].name;
+      select.appendChild(opt);
+    }
+    select.addEventListener("change", function () {
+      sendToServer({ type: "action", sessionId: sessionId, actionType: "select", payload: { resource: select.value } });
+    });
+    group.appendChild(select);
+    if (schema.hint) {
+      var hint = document.createElement("span");
+      hint.className = "form-hint";
+      hint.textContent = schema.hint;
+      group.appendChild(hint);
+    }
+    return group;
+  }
+
+  function renderGenerationProgress(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    var steps = schema.steps || [];
+    card.appendChild(createCardHeader(schema.title || "Deployment Progress"));
+    var body = createCardBody();
+    var list = document.createElement("div");
+    list.style.display = "flex";
+    list.style.flexDirection = "column";
+    list.style.gap = "var(--spacing-s)";
+    for (var i = 0; i < steps.length; i++) {
+      var row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.gap = "var(--spacing-s)";
+
+      var iconWrap = document.createElement("span");
+      iconWrap.style.width = "20px";
+      iconWrap.style.textAlign = "center";
+      iconWrap.appendChild(createStatusIcon(steps[i].status));
+      row.appendChild(iconWrap);
+
+      var label = document.createElement("span");
+      label.style.flex = "1";
+      label.textContent = steps[i].label || "";
+      row.appendChild(label);
+
+      var duration = document.createElement("span");
+      duration.style.fontSize = "var(--font-size-200)";
+      duration.style.color = "var(--color-neutral-foreground-3)";
+      duration.textContent = steps[i].duration || "";
+      row.appendChild(duration);
+
+      list.appendChild(row);
+    }
+    body.appendChild(list);
+    card.appendChild(body);
+    return card;
+  }
+
+  function renderArchitectureDiagram(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    var comps = schema.components || [];
+    card.appendChild(createCardHeader(schema.title || "Architecture"));
+    var body = createCardBody("text-align:center;padding:var(--spacing-l)");
+    var list = document.createElement("div");
+    list.style.display = "flex";
+    list.style.flexWrap = "wrap";
+    list.style.justifyContent = "center";
+    list.style.gap = "var(--spacing-m)";
+    for (var i = 0; i < comps.length; i++) {
+      var item = document.createElement("div");
+      item.className = "card";
+      item.style.minWidth = "100px";
+      item.style.textAlign = "center";
+      item.style.padding = "var(--spacing-m)";
+
+      var icon = document.createElement("div");
+      icon.style.fontSize = "24px";
+      icon.style.marginBottom = "var(--spacing-xs)";
+      icon.textContent = comps[i].icon || "📦";
+      item.appendChild(icon);
+
+      var name = document.createElement("div");
+      name.style.fontWeight = "var(--font-weight-semibold)";
+      name.textContent = comps[i].name || "";
+      item.appendChild(name);
+
+      var description = document.createElement("div");
+      description.style.fontSize = "var(--font-size-200)";
+      description.style.color = "var(--color-neutral-foreground-3)";
+      description.textContent = comps[i].description || "";
+      item.appendChild(description);
+
+      list.appendChild(item);
+    }
+    body.appendChild(list);
+    card.appendChild(body);
+    return card;
+  }
+
+  function renderCostEstimate(schema) {
+    var items = schema.items || [];
+    var total = schema.total != null ? schema.total : items.reduce(function (s, it) { return s + (it.cost || 0); }, 0);
+    var card = document.createElement("article");
+    card.className = "card";
+    card.appendChild(createCardHeader(schema.title || "Estimated Monthly Cost"));
+    var body = createCardBody();
+    var table = document.createElement("table");
+    table.style.width = "100%";
+    table.style.borderCollapse = "collapse";
+
+    var thead = document.createElement("thead");
+    var headRow = document.createElement("tr");
+    headRow.style.borderBottom = "1px solid var(--color-neutral-stroke-2)";
+    var headers = [
+      { text: "Resource", align: "left" },
+      { text: "SKU", align: "left" },
+      { text: "$/mo", align: "right" }
+    ];
+    for (var i = 0; i < headers.length; i++) {
+      var th = document.createElement("th");
+      th.style.textAlign = headers[i].align;
+      th.style.padding = "var(--spacing-s)";
+      th.textContent = headers[i].text;
+      headRow.appendChild(th);
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement("tbody");
+    for (var j = 0; j < items.length; j++) {
+      var row = document.createElement("tr");
+      row.style.borderBottom = "1px solid var(--color-neutral-stroke-2)";
+
+      var nameCell = document.createElement("td");
+      nameCell.style.padding = "var(--spacing-s)";
+      nameCell.textContent = items[j].name || "";
+      row.appendChild(nameCell);
+
+      var skuCell = document.createElement("td");
+      skuCell.style.padding = "var(--spacing-s)";
+      skuCell.style.color = "var(--color-neutral-foreground-3)";
+      skuCell.textContent = items[j].sku || "";
+      row.appendChild(skuCell);
+
+      var costCell = document.createElement("td");
+      costCell.style.textAlign = "right";
+      costCell.style.padding = "var(--spacing-s)";
+      costCell.textContent = "$" + (items[j].cost || 0).toFixed(2);
+      row.appendChild(costCell);
+
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+
+    var tfoot = document.createElement("tfoot");
+    var footRow = document.createElement("tr");
+    var totalLabel = document.createElement("td");
+    totalLabel.colSpan = 2;
+    totalLabel.style.padding = "var(--spacing-s)";
+    totalLabel.style.fontWeight = "var(--font-weight-semibold)";
+    totalLabel.textContent = "Total";
+    footRow.appendChild(totalLabel);
+
+    var totalValue = document.createElement("td");
+    totalValue.style.textAlign = "right";
+    totalValue.style.padding = "var(--spacing-s)";
+    totalValue.style.fontWeight = "var(--font-weight-semibold)";
+    totalValue.textContent = "$" + total.toFixed(2);
+    footRow.appendChild(totalValue);
+    tfoot.appendChild(footRow);
+    table.appendChild(tfoot);
+
+    body.appendChild(table);
+    card.appendChild(body);
+    return card;
+  }
+
+  function renderHandoffCard(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    var actions = schema.actions || [];
+    card.appendChild(createCardHeader(schema.title || "Next Steps"));
+    var body = createCardBody();
+    var description = document.createElement("p");
+    description.style.marginBottom = "var(--spacing-l)";
+    description.textContent = schema.description || "";
+    body.appendChild(description);
+
+    var actionRow = document.createElement("div");
+    actionRow.style.display = "flex";
+    actionRow.style.flexWrap = "wrap";
+    actionRow.style.gap = "var(--spacing-s)";
+    for (var i = 0; i < actions.length; i++) {
+      var action = actions[i];
+      var btn = document.createElement("button");
+      btn.className = "btn" + (action.primary ? " primary" : "");
+      btn.textContent = action.label || "Continue";
+      btn.disabled = !action.id;
+      if (action.id) {
+        (function (currentAction, currentButton) {
+          currentButton.addEventListener("click", function () {
+            sendToServer({ type: "action", sessionId: sessionId, actionType: currentAction.id, payload: currentAction.data || {} });
+          });
+        })(action, btn);
+      }
+      actionRow.appendChild(btn);
+    }
+    body.appendChild(actionRow);
+    card.appendChild(body);
+    return card;
+  }
+
+  // ── GitHub components ──────────────────────────────────────────────
+
+  function renderRepoPicker(schema, ctx) {
+    var group = document.createElement("div");
+    group.className = "form-group";
+    var label = document.createElement("label");
+    label.className = "form-label";
+    label.textContent = schema.label || "Repository";
+    group.appendChild(label);
+    var input = document.createElement("input");
+    input.className = "form-input";
+    input.placeholder = schema.placeholder || "Search repositories…";
+    input.value = schema.value || "";
+    input.setAttribute("autocomplete", "off");
+    group.appendChild(input);
+    // Simplified for IDE panel — no dropdown, just send selection via action
+    input.addEventListener("change", function () {
+      sendToServer({ type: "action", sessionId: sessionId, actionType: "select", payload: { repo: input.value } });
+    });
+    if (schema.hint) {
+      var hint = document.createElement("span");
+      hint.className = "form-hint";
+      hint.textContent = schema.hint;
+      group.appendChild(hint);
+    }
+    return group;
+  }
+
+  function renderWorkflowStatus(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    var runs = schema.runs || [];
+    var statusColor = function (s) {
+      switch (s) {
+        case "success":     return "var(--color-success)";
+        case "in_progress": return "var(--color-warning)";
+        case "failure":     return "var(--color-error)";
+        default:            return "var(--color-neutral-foreground-disabled)";
+      }
+    };
+    card.appendChild(createCardHeader(schema.title || "Workflow Runs"));
+    var body = createCardBody();
+    var list = document.createElement("div");
+    list.style.display = "flex";
+    list.style.flexDirection = "column";
+    list.style.gap = "var(--spacing-s)";
+    for (var i = 0; i < runs.length; i++) {
+      var r = runs[i];
+      var item = document.createElement("div");
+      item.style.display = "flex";
+      item.style.alignItems = "center";
+      item.style.gap = "var(--spacing-s)";
+      item.style.padding = "var(--spacing-s)";
+      item.style.borderRadius = "var(--radius-medium)";
+      item.style.border = "1px solid var(--color-neutral-stroke-2)";
+
+      var dot = document.createElement("span");
+      dot.style.width = "10px";
+      dot.style.height = "10px";
+      dot.style.borderRadius = "50%";
+      dot.style.flexShrink = "0";
+      dot.style.background = statusColor(r.status);
+      item.appendChild(dot);
+
+      var name = document.createElement("span");
+      name.style.flex = "1";
+      name.style.fontWeight = "var(--font-weight-semibold)";
+      name.textContent = r.name || "";
+      item.appendChild(name);
+
+      var branch = document.createElement("span");
+      branch.style.fontSize = "var(--font-size-200)";
+      branch.style.color = "var(--color-neutral-foreground-3)";
+      branch.textContent = r.branch || "";
+      item.appendChild(branch);
+
+      var status = document.createElement("span");
+      status.style.fontSize = "var(--font-size-200)";
+      status.style.textTransform = "capitalize";
+      status.style.color = statusColor(r.status);
+      status.textContent = (r.status || "").replace(/_/g, " " );
+      item.appendChild(status);
+
+      list.appendChild(item);
+    }
+    body.appendChild(list);
+    card.appendChild(body);
+    return card;
+  }
+
+  function renderCodespaceLink(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    card.style.cssText = "border:2px solid var(--color-brand-stroke-1);background:var(--color-brand-background-2)";
+    var body = createCardBody("text-align:center;padding:var(--spacing-xl)");
+
+    var icon = document.createElement("div");
+    icon.style.fontSize = "32px";
+    icon.style.marginBottom = "var(--spacing-m)";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "🚀";
+    body.appendChild(icon);
+
+    var title = document.createElement("h3");
+    title.style.marginBottom = "var(--spacing-xs)";
+    title.style.fontSize = "var(--font-size-500)";
+    title.textContent = schema.repoFullName || "repository";
+    body.appendChild(title);
+
+    var branch = document.createElement("p");
+    branch.style.fontSize = "var(--font-size-200)";
+    branch.style.color = "var(--color-neutral-foreground-3)";
+    branch.style.marginBottom = "var(--spacing-l)";
+    branch.appendChild(document.createTextNode("Branch: "));
+    var strong = document.createElement("strong");
+    strong.textContent = schema.branch || "main";
+    branch.appendChild(strong);
+    body.appendChild(branch);
+
+    var actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.gap = "var(--spacing-m)";
+    actions.style.justifyContent = "center";
+    actions.style.flexWrap = "wrap";
+    actions.appendChild(createNavigationLink(schema.codespaceUrl, "⬡ Open in Codespaces", "btn primary", "text-decoration:none"));
+    actions.appendChild(createNavigationLink(schema.vscodeUrl, "⌨ Open in vscode.dev", "btn", "text-decoration:none"));
+    body.appendChild(actions);
+
+    card.appendChild(body);
+    return card;
+  }
+
+  function renderAppOverview(schema) {
+    var card = document.createElement("article");
+    card.className = "card";
+    var statusColors = {
+      draft: "var(--color-neutral-foreground-3)",
+      running: "var(--color-success)",
+      stopped: "var(--color-error)",
+      deploying: "var(--color-warning)"
+    };
+    var color = statusColors[schema.status] || statusColors.draft;
+    var services = schema.services || [];
+    var header = document.createElement("div");
+    header.className = "card-header";
+    header.style.display = "flex";
+    header.style.alignItems = "center";
+    header.style.justifyContent = "space-between";
+
+    var headingWrap = document.createElement("div");
+    var title = document.createElement("h3");
+    title.className = "card-title";
+    title.style.display = "flex";
+    title.style.alignItems = "center";
+    title.style.gap = "var(--spacing-s)";
+    var emoji = document.createElement("span");
+    emoji.setAttribute("aria-hidden", "true");
+    emoji.textContent = "📦";
+    title.appendChild(emoji);
+    title.appendChild(document.createTextNode(schema.appName || "App"));
+    headingWrap.appendChild(title);
+    if (schema.description) {
+      var subtitle = document.createElement("p");
+      subtitle.className = "card-subtitle";
+      subtitle.style.marginTop = "var(--spacing-xxs)";
+      subtitle.textContent = schema.description;
+      headingWrap.appendChild(subtitle);
+    }
+    header.appendChild(headingWrap);
+
+    var status = document.createElement("span");
+    status.style.display = "inline-flex";
+    status.style.alignItems = "center";
+    status.style.gap = "var(--spacing-xs)";
+    status.style.fontSize = "var(--font-size-200)";
+    var dot = document.createElement("span");
+    dot.style.width = "8px";
+    dot.style.height = "8px";
+    dot.style.borderRadius = "50%";
+    dot.style.background = color;
+    status.appendChild(dot);
+    status.appendChild(document.createTextNode(schema.status || "draft"));
+    header.appendChild(status);
+    card.appendChild(header);
+
+    var body = createCardBody();
+    var tags = document.createElement("div");
+    tags.style.display = "flex";
+    tags.style.flexWrap = "wrap";
+    tags.style.gap = "var(--spacing-s)";
+    tags.style.alignItems = "center";
+    if (schema.runtime) {
+      var runtime = document.createElement("span");
+      runtime.style.display = "inline-block";
+      runtime.style.padding = "2px var(--spacing-s)";
+      runtime.style.borderRadius = "var(--radius-small)";
+      runtime.style.background = "var(--color-brand-background-2)";
+      runtime.style.color = "var(--color-brand-foreground-1)";
+      runtime.style.fontSize = "var(--font-size-200)";
+      runtime.style.fontWeight = "var(--font-weight-semibold)";
+      runtime.textContent = schema.runtime;
+      tags.appendChild(runtime);
+    }
+    for (var i = 0; i < services.length; i++) {
+      var service = document.createElement("span");
+      service.style.display = "inline-block";
+      service.style.padding = "2px var(--spacing-s)";
+      service.style.borderRadius = "var(--radius-small)";
+      service.style.background = "var(--color-neutral-background-3)";
+      service.style.fontSize = "var(--font-size-200)";
+      service.textContent = services[i];
+      tags.appendChild(service);
+    }
+    body.appendChild(tags);
+    if (schema.url) {
+      var linkWrap = document.createElement("div");
+      linkWrap.style.marginTop = "var(--spacing-m)";
+      linkWrap.appendChild(
+        createNavigationLink(
+          schema.url,
+          "🔗 " + schema.url,
+          "",
+          "font-size:var(--font-size-200);color:var(--color-brand-foreground-1)"
+        )
+      );
+      body.appendChild(linkWrap);
+    }
+    card.appendChild(body);
+    return card;
+  }
+
+  function createFallback(schema) {
+    var el = document.createElement("div");
+    el.style.padding = "var(--spacing-s)";
+    el.style.border = "1px dashed var(--color-warning)";
+    el.style.borderRadius = "var(--radius-medium)";
+    el.style.fontSize = "var(--font-size-200)";
+    el.style.color = "var(--color-neutral-foreground-3)";
+    el.textContent = "Unknown component: " + (schema && schema.type || "null");
+    return el;
+  }
+
+  // ── Boot ────────────────────────────────────────────────────────────
+
+  renderPhaseBar();
+
+  // Auto-kickstart on load
+  setWaiting(true);
+  sendToServer({ type: "kickstart" });
+
+})();
+</script>
+</body>
+</html>

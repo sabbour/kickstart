@@ -1,0 +1,36 @@
+# Dependabot configuration
+# Automatically opens PRs when security advisories or new versions are available.
+#
+# @openai/agents SDK upgrade policy:
+# - This SDK is pinned to an EXACT version (no ^ or ~) in packages/web/api/package.json
+#   and the root package.json. Do NOT bump the version without:
+#   1. Reading the SDK changelog for breaking changes to Agent/Runner/ModelProvider APIs
+#   2. Verifying agents-azure-provider.ts (AzureOpenAI + useResponses: false) still works
+#   3. Re-running all agents-* tests and the full API test suite
+#   4. Confirming setTracingDisabled() still exists (security invariant)
+#   5. Updating the pinned version in BOTH package.json files simultaneously
+# Rollback: revert both package.json files and run `npm install --workspaces`
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    groups:
+      # Batch minor/patch updates together to reduce PR noise
+      non-breaking:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # @openai/agents is manually governed — Dependabot PRs are advisory only.
+      # The SDK path is feature-flagged and changes require a full security review.
+      - dependency-name: "@openai/agents"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "openai"
+        update-types: ["version-update:semver-major"]

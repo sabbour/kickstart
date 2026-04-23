@@ -1,0 +1,18 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "",
+    "AZURE_CLIENT_ID": "<entra-app-client-id>",
+    "AZURE_CLIENT_SECRET": "<entra-app-client-secret>",
+    "AZURE_TENANT_ID": "<azure-tenant-id>",
+    "AZURE_OPENAI_ENDPOINT": "https://<your-openai-resource>.cognitiveservices.azure.com/",
+    "AZURE_OPENAI_API_KEY": "<your-openai-api-key>",
+    "GITHUB_CLIENT_ID": "<github-oauth-client-id>",
+    "KICKSTART_CHAT_MODEL": "gpt-4o-mini",
+    "KICKSTART_CODEX_MODEL": "gpt-4o",
+    "KICKSTART_INSPIRE_MODEL": "gpt-4o-mini",
+    "KICKSTART_MODEL": "gpt-4o-mini",
+    "APPLICATIONINSIGHTS_CONNECTION_STRING": "<paste-connection-string-from-azure-portal>"
+  }
+}

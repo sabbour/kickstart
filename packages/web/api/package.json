@@ -1,0 +1,32 @@
+{
+  "name": "@aks-kickstart/api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Azure Functions API for Kickstart web surface — LLM proxy",
+  "type": "module",
+  "main": "dist/functions/*.js",
+  "scripts": {
+    "build": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true})\" && node esbuild.config.mjs && node scripts/verify-api-externals.mjs",
+    "build:tsc": "tsc",
+    "start": "func start",
+    "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
+  },
+  "dependencies": {
+    "@aks-kickstart/harness": "*",
+    "@azure/functions": "^4.6.0",
+    "@azure/monitor-opentelemetry-exporter": "^1.0.0-beta.39",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/api-logs": "^0.208.0",
+    "@opentelemetry/instrumentation-http": "^0.208.0",
+    "@opentelemetry/sdk-logs": "^0.208.0",
+    "@opentelemetry/sdk-metrics": "^2.7.0",
+    "@opentelemetry/sdk-node": "^0.208.0",
+    "@opentelemetry/sdk-trace-base": "^2.7.0",
+    "bicep-node": "^0.0.9",
+    "vite": "^8.0.9"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "esbuild": "^0.28.0"
+  }
+}

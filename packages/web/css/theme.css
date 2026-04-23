@@ -1,0 +1,152 @@
+/* ==========================================================================
+   Theme — Fluent 2 Design Tokens as CSS Custom Properties
+   ========================================================================== */
+
+:root {
+  /* --- Brand colors --- */
+  --color-brand-primary: #0078d4;
+  --color-brand-primary-hover: #106ebe;
+  --color-brand-primary-active: #005a9e;
+  --color-brand-light: #deecf9;
+  --color-brand-lighter: #eff6fc;
+
+  /* --- Neutral palette --- */
+  --color-neutral-background-1: #ffffff;
+  --color-neutral-background-2: #faf9f8;
+  --color-neutral-background-3: #f3f2f1;
+  --color-neutral-background-4: #edebe9;
+  --color-neutral-background-5: #d2d0ce;
+  --color-neutral-background-inverted: #1b1a19;
+  --color-neutral-background-dark: #252423;
+  --color-neutral-foreground-1: #242424;
+  --color-neutral-foreground-2: #424242;
+  --color-neutral-foreground-3: #616161;
+  --color-neutral-foreground-disabled: #a19f9d;
+  --color-neutral-foreground-on-brand: #ffffff;
+  --color-neutral-stroke-1: #d1d1d1;
+  --color-neutral-stroke-2: #e1dfdd;
+
+  /* --- Semantic colors --- */
+  --color-success: #107c10;
+  --color-success-background: #dff6dd;
+  --color-warning: #ffb900;
+  --color-warning-background: #fff4ce;
+  --color-error: #d13438;
+  --color-error-background: #fde7e9;
+  --color-info: #0078d4;
+  --color-info-background: #deecf9;
+
+  /* --- Copilot --- */
+  --color-copilot-gradient-start: #7b2ff2;
+  --color-copilot-gradient-end: #0078d4;
+  --color-copilot-bg: #f7f7ff;
+
+  /* --- Typography --- */
+  --font-family-base: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-family-mono: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+
+  --font-size-100: 10px;
+  --font-size-200: 12px;
+  --font-size-300: 14px;
+  --font-size-400: 16px;
+  --font-size-500: 20px;
+  --font-size-600: 24px;
+  --font-size-700: 28px;
+  --font-size-800: 32px;
+  --font-size-900: 40px;
+
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-100: 14px;
+  --line-height-200: 16px;
+  --line-height-300: 20px;
+  --line-height-400: 22px;
+  --line-height-500: 28px;
+  --line-height-600: 32px;
+
+  /* --- Spacing (4px grid) --- */
+  --spacing-xxs: 2px;
+  --spacing-xs: 4px;
+  --spacing-s: 8px;
+  --spacing-m: 12px;
+  --spacing-l: 16px;
+  --spacing-xl: 24px;
+  --spacing-xxl: 32px;
+  --spacing-xxxl: 48px;
+
+  /* --- Border radius --- */
+  --radius-none: 0;
+  --radius-small: 2px;
+  --radius-medium: 4px;
+  --radius-large: 8px;
+  --radius-xlarge: 12px;
+  --radius-circular: 9999px;
+
+  /* --- Shadows --- */
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --shadow-4: 0 2px 4px rgba(0, 0, 0, 0.14);
+  --shadow-8: 0 4px 8px rgba(0, 0, 0, 0.14);
+  --shadow-16: 0 8px 16px rgba(0, 0, 0, 0.14);
+  --shadow-28: 0 14px 28px rgba(0, 0, 0, 0.14);
+
+  /* --- Transitions --- */
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 400ms;
+  --easing-ease: cubic-bezier(0.33, 0, 0.67, 1);
+  --easing-ease-out: cubic-bezier(0, 0, 0, 1);
+  --easing-ease-in: cubic-bezier(1, 0, 1, 1);
+
+  /* --- Layout --- */
+  --topbar-height: 48px;
+  --chat-max-width: 760px;
+  --sessions-sidebar-width: 260px;
+  --file-viewer-width: 420px;
+}
+
+/* Smooth transition when switching themes */
+html,
+body,
+.app-shell {
+  transition: background-color var(--duration-normal) var(--easing-ease),
+              color var(--duration-normal) var(--easing-ease);
+}
+
+/* ==========================================================================
+   Dark theme overrides (activated via data-theme="dark" on <html>)
+   ========================================================================== */
+
+[data-theme="dark"] {
+  /* --- Brand colors (keep brand recognisable, darken backgrounds) --- */
+  --color-brand-light: #004578;
+  --color-brand-lighter: #003263;
+
+  /* --- Neutral palette — dark surface stack --- */
+  --color-neutral-background-1: #1b1a19;
+  --color-neutral-background-2: #252423;
+  --color-neutral-background-3: #292827;
+  --color-neutral-background-4: #323130;
+  --color-neutral-background-5: #3b3a39;
+  --color-neutral-background-inverted: #f3f2f1;
+  --color-neutral-background-dark: #141414;
+
+  /* --- Foreground --- */
+  --color-neutral-foreground-1: #f3f2f1;
+  --color-neutral-foreground-2: #c8c6c4;
+  --color-neutral-foreground-3: #a19f9d;
+  --color-neutral-foreground-disabled: #605e5c;
+
+  /* --- Strokes --- */
+  --color-neutral-stroke-1: #484644;
+  --color-neutral-stroke-2: #3b3a39;
+
+  /* --- Semantic colors --- */
+  --color-success-background: #093807;
+  --color-warning-background: #3a2e02;
+  --color-error-background: #3b0509;
+  --color-info-background: #002848;
+  --color-copilot-bg: #1a1a2e;
+}

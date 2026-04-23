@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@aks-kickstart/harness": ["../harness/src/index.ts"],
+      "@aks-kickstart/pack-azure/client": ["../pack-azure/src/client.ts"],
+      "@aks-kickstart/pack-aks-automatic/client": ["../pack-aks-automatic/src/client.ts"],
+      "@aks-kickstart/pack-github/client": ["../pack-github/src/client.ts"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["src/vendor"]
+}

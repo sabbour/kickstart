@@ -1,0 +1,22 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true,
+    "types": ["node"],
+    "paths": {
+      "@aks-kickstart/harness": ["../../harness/src/index.ts"],
+      "@aks-kickstart/harness/runtime/registry": ["../../harness/src/runtime/registry.ts"],
+      "@aks-kickstart/harness/runtime/session": ["../../harness/src/runtime/session.ts"],
+      "@aks-kickstart/harness/runtime/sse": ["../../harness/src/runtime/sse.ts"],
+      "@aks-kickstart/harness/runtime/runner": ["../../harness/src/runtime/runner.ts"],
+      "@aks-kickstart/harness/runtime/resume": ["../../harness/src/runtime/resume.ts"]
+    }
+  },
+  "references": [
+    { "path": "../../harness" }
+  ],
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

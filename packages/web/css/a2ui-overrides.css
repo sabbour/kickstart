@@ -1,0 +1,28 @@
+/* ==========================================================================
+   A2UI Override Styles
+   All catalog components now use Fluent UI v9 React components with Griffel
+   (makeStyles + tokens) for styling. The generic element-level overrides
+   that previously targeted raw <button>, <input>, <span>, etc. have been
+   removed because they used !important rules that fought Fluent's runtime
+   CSS injection, making components render as unstyled plain HTML.
+   ========================================================================== */
+
+/* ---------- Assistant avatar ---------- */
+.assistant-avatar {
+  flex-shrink: 0;
+  border-radius: var(--radius-circular);
+  margin-right: var(--spacing-s);
+  margin-top: 2px;
+}
+
+/* Assistant bubble wrapper — flex row for avatar + bubble */
+.chat-bubble-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.chat-bubble-row .chat-bubble.assistant {
+  flex: 1;
+  min-width: 0;
+}

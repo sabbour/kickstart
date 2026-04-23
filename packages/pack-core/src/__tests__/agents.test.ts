@@ -1,0 +1,148 @@
+/**
+ * @file agents.test.ts
+ * @suite 6a — Agent frontmatter parse (pack-core)
+ *
+ * Verifies that each `.agent.md` file in `packages/pack-core/agents/` parses
+ * correctly through `loader-agent.ts` (from #476 / @aks-kickstart/harness).
+ *
+ * Tests are written as `it.todo()` scaffolding. When Fry delivers Phase B
+ * (the three .agent.md files) and Bender delivers the agent loader (#476),
+ * replace each todo with a live assertion.
+ *
+ * Expected agent files (Phase A names approved in #477 DP):
+ *   packages/pack-core/src/agents/core.triage.agent.md
+ *   packages/pack-core/src/agents/core.codesmith.agent.md
+ *   packages/pack-core/src/agents/core.reviewer.agent.md
+ *
+ * @depends #476 loader-agent.ts (AgentLoader / parseAgentFrontmatter)
+ * @depends Phase A of #477 (the three .agent.md files)
+ */
+
+import { describe, it, expect } from 'vitest';
+import path from 'node:path';
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const AGENTS_DIR = path.resolve(__dirname, '../agents');
+const AGENT_NAMES = ['core.triage', 'core.codesmith', 'core.reviewer'];
+
+/** Regex for the pack.verb_noun tool-name format required by the DP §6a. */
+const TOOL_NAME_PATTERN = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9_]*$/;
+
+/** Regex for core.* agent name format. */
+const AGENT_NAME_PATTERN = /^core\.[a-z][a-z0-9-]*$/;
+
+// ── When loader-agent.ts ships from #476, uncomment and fill in: ─────────────
+//
+// import { parseAgentFrontmatter } from '@aks-kickstart/harness';
+// OR: import { parseAgentFrontmatter } from '../../../src/loaders/loader-agent.js';
+//
+// type AgentFrontmatter = {
+//   name: string;
+//   description: string;
+//   model: string;
+//   tools: string[];
+//   handoffs: string[];
+//   'user-invocable'?: boolean;
+//   'model-invocable'?: boolean;
+// };
+
+// ── Test suite ───────────────────────────────────────────────────────────────
+
+describe('pack-core agent frontmatter', () => {
+
+  // ── File existence ──────────────────────────────────────────────────────
+
+  describe('file presence', () => {
+    it.todo('core.triage.agent.md exists on disk');
+    it.todo('core.codesmith.agent.md exists on disk');
+    it.todo('core.reviewer.agent.md exists on disk');
+  });
+
+  // ── Parse without error ─────────────────────────────────────────────────
+
+  describe('parses without error', () => {
+    for (const agentName of AGENT_NAMES) {
+      it.todo(`${agentName}.agent.md parses through loader-agent without throwing`);
+    }
+  });
+
+  // ── Required fields ─────────────────────────────────────────────────────
+
+  describe('required frontmatter fields', () => {
+    for (const agentName of AGENT_NAMES) {
+      it.todo(`${agentName}: "name" field is present and non-empty`);
+      it.todo(`${agentName}: "description" field is present and non-empty`);
+      it.todo(`${agentName}: "model" field is present and non-empty`);
+      it.todo(`${agentName}: "tools" field is an array`);
+      it.todo(`${agentName}: "handoffs" field is an array`);
+    }
+
+    it.todo('missing "name" field causes parseAgentFrontmatter to throw');
+    it.todo('missing "model" field causes parseAgentFrontmatter to throw');
+    it.todo('missing "tools" field causes parseAgentFrontmatter to throw');
+  });
+
+  // ── Naming conventions ───────────────────────────────────────────────────
+
+  describe('naming conventions', () => {
+    for (const agentName of AGENT_NAMES) {
+      it.todo(`${agentName}: agent name follows core.* format`);
+      it.todo(`${agentName}: all tool names in frontmatter follow pack.verb_noun format`);
+    }
+
+    it('AGENT_NAME_PATTERN matches expected format', () => {
+      // Sanity-check the regex itself — this test is live
+      expect(AGENT_NAME_PATTERN.test('core.triage')).toBe(true);
+      expect(AGENT_NAME_PATTERN.test('core.codesmith')).toBe(true);
+      expect(AGENT_NAME_PATTERN.test('core.reviewer')).toBe(true);
+      expect(AGENT_NAME_PATTERN.test('azure.provision')).toBe(false);
+      expect(AGENT_NAME_PATTERN.test('core')).toBe(false);
+    });
+
+    it('TOOL_NAME_PATTERN matches expected format', () => {
+      // Sanity-check the regex itself — this test is live
+      expect(TOOL_NAME_PATTERN.test('core.emit_ui')).toBe(true);
+      expect(TOOL_NAME_PATTERN.test('core.write_file')).toBe(true);
+      expect(TOOL_NAME_PATTERN.test('emit_ui')).toBe(false);       // missing pack prefix
+      expect(TOOL_NAME_PATTERN.test('core.EMIT_UI')).toBe(false);  // uppercase rejected
+    });
+  });
+
+  // ── Invocability flags ──────────────────────────────────────────────────
+
+  describe('invocability flags', () => {
+    it.todo('core.triage: "user-invocable" is true (entry-point agent)');
+    it.todo('core.triage: "model-invocable" is a boolean when present');
+    it.todo('core.codesmith: "user-invocable" is false (model-only agent)');
+    it.todo('core.reviewer: "model-invocable" is true');
+    it.todo('agent with "user-invocable: true" appears in registry.listUserAgents()');
+  });
+
+  // ── Round-trip fidelity ─────────────────────────────────────────────────
+
+  describe('round-trip fidelity', () => {
+    it.todo('parsed agent.tools array matches tools declared in src/tools/index.ts');
+
+    // #1073: this todo is now enforced end-to-end by PackRegistry.seal()
+    // (see packages/harness/src/__tests__/registry.test.ts — "seal()
+    // handoff validation" block: unknown targets and cross-pack targets
+    // both throw with pack/agent/target tokens in the error). The pack-
+    // core agents.test.ts stays as a pointer here; the live assertion
+    // runs in harness.
+    it('parsed agent.handoffs targets are all intra-pack (enforced at registry.seal, see #1073)', () => {
+      // Sanity-only: the three pack-core agents must reference only
+      // core.* targets. Exhaustive semantic validation lives in harness.
+      const handoffTargets: string[] = [
+        // core.triage declared in triage.agent.md
+        'core.codesmith',
+        'core.reviewer',
+      ];
+      for (const target of handoffTargets) {
+        expect(AGENT_NAME_PATTERN.test(target)).toBe(true);
+      }
+    });
+
+    it.todo('unknown frontmatter keys are rejected or flagged by the loader');
+  });
+});

@@ -1,0 +1,59 @@
+name: Feature Request
+description: Propose a new feature with structured problem statement and acceptance criteria.
+title: "[Feature]: "
+labels: ["squad"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Request
+        Use this template to describe a feature for Kickstart. Focus on the **problem** and **user impact** — the implementing agent will propose the solution in a Design Proposal (DP) comment.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Description
+      description: What problem does this feature solve? Who experiences this problem and when?
+      placeholder: "Users currently have to manually configure X, which leads to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-impact
+    attributes:
+      label: User Impact
+      description: How does this affect users today? What's the cost of not solving it?
+      placeholder: "Without this, users must spend ~30 minutes configuring..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        What must be true for this feature to be considered done?
+        Use checkboxes (- [ ]) for each criterion.
+      placeholder: |
+        - [ ] User can do X without manual configuration
+        - [ ] Works with Azure/AKS Automatic
+        - [ ] Accessible (WCAG A compliant)
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected-areas
+    attributes:
+      label: Affected Areas
+      description: Which packages, components, or systems does this touch?
+      placeholder: "packages/core, packages/web, infra/"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any mockups, links, prior art, or other context.
+    validations:
+      required: false

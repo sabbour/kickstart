@@ -1,0 +1,35 @@
+{
+  "name": "@aks-kickstart/mcp-server",
+  "version": "1.0.1",
+  "description": "MCP server for AKS Kickstart — exposes conversation tools and A2UI responses",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "kickstart-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"const fs=require('fs'),p=require('path');const d=p.join('dist','app');fs.mkdirSync(d,{recursive:true});fs.copyFileSync(p.join('src','app','kickstart-app.html'),p.join(d,'kickstart-app.html'))\"",
+    "start": "node dist/index.js",
+    "dev": "node --loader ts-node/esm src/index.ts",
+    "test": "vitest run",
+    "clean": "node -e \"const f=require('fs');f.rmSync('dist',{recursive:true,force:true});f.rmSync('tsconfig.tsbuildinfo',{force:true})\""
+  },
+  "dependencies": {
+    "@aks-kickstart/harness": "*",
+    "@aks-kickstart/pack-core": "*",
+    "@aks-kickstart/pack-azure": "*",
+    "@aks-kickstart/pack-aks-automatic": "*",
+    "@aks-kickstart/pack-github": "*",
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.4"
+  },
+  "keywords": [
+    "mcp",
+    "kickstart",
+    "aks",
+    "a2ui"
+  ]
+}
