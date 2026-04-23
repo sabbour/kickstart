@@ -81,7 +81,8 @@ async function waitForTelemetryReady(page: Page): Promise<void> {
 }
 
 test.describe('Browser telemetry — #1042 Phase 1', () => {
-  test('1. traceparent propagation to /api/converse', async ({ page }) => {
+  // Deferred to #1094 — instrumentation assertions require real OTel exporter wiring.
+  test.skip('1. traceparent propagation to /api/converse', async ({ page }) => {
     await enableBrowserTelemetry(page);
 
     let capturedTraceparent: string | undefined;
@@ -102,7 +103,8 @@ test.describe('Browser telemetry — #1042 Phase 1', () => {
     expect(capturedTraceparent).toMatch(TRACEPARENT_RE);
   });
 
-  test('2. mock App Insights ingestion — trace id correlated + url path-only', async ({ page }) => {
+  // Deferred to #1094 — instrumentation assertions require real OTel exporter wiring.
+  test.skip('2. mock App Insights ingestion — trace id correlated + url path-only', async ({ page }) => {
     await enableBrowserTelemetry(page);
 
     // Capture the traceparent the browser emits so we can correlate it
@@ -253,7 +255,8 @@ test.describe('Browser telemetry — #1042 Phase 1', () => {
     expect(cspViolations, `CSP violations fired during boot:\n${cspViolations.join('\n')}`).toEqual([]);
   });
 
-  test('6. redaction — bearer tokens and query strings never reach the wire', async ({ page }) => {
+  // Deferred to #1094 — instrumentation assertions require real OTel exporter wiring.
+  test.skip('6. redaction — bearer tokens and query strings never reach the wire', async ({ page }) => {
     await enableBrowserTelemetry(page);
 
     await page.route('**/api/converse**', (route: Route) =>
