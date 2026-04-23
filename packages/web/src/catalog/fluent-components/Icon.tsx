@@ -1,7 +1,7 @@
 import React from 'react';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
 import {IconApi} from '../../vendor/a2ui/web_core/basic_catalog/index';
-import {Body1, makeStyles, tokens} from '@fluentui/react-components';
+import {Body1, makeStyles, mergeClasses, tokens} from '@fluentui/react-components';
 import { getFluentIcon } from '../icons/fluent-icons';
 
 const useStyles = makeStyles({
@@ -60,7 +60,7 @@ export const Icon = createReactComponent(IconApi, ({props}) => {
 
   // Text-based fallback (Material Symbols via CSS class, or plain text)
   return (
-    <span className={`${classes.root} ${classes.text}`} aria-hidden={isDecorative} aria-label={a11yLabel || undefined} role={a11yLabel ? 'img' : undefined}>
+    <span className={mergeClasses(classes.root, classes.text)} aria-hidden={isDecorative} aria-label={a11yLabel || undefined} role={a11yLabel ? 'img' : undefined}>
       {iconName}
     </span>
   );

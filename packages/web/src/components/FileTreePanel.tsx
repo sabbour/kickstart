@@ -18,6 +18,7 @@ import {
   Spinner,
   Tooltip,
   makeStyles,
+  mergeClasses,
   shorthands,
   tokens,
 } from '@fluentui/react-components';
@@ -253,7 +254,7 @@ function TreeNodeItem({
   return (
     <>
       <button
-        className={`${classes.treeNode} ${isSelected ? classes.treeNodeSelected : ''}`}
+        className={mergeClasses(classes.treeNode, isSelected && classes.treeNodeSelected)}
         style={{ paddingLeft: `${8 + depth * 16}px` }}
         onClick={handleClick}
         title={node.path}

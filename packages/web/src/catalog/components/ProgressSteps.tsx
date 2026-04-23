@@ -7,6 +7,7 @@ import {
   Caption1,
   Badge,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 
@@ -98,7 +99,7 @@ export const ProgressSteps = createReactComponent(ProgressStepsApi, ({ props }) 
           aria-current={step.status === 'active' ? 'step' : undefined}
         >
           <div
-            className={`${classes.dot} ${getDotClass(step.status)}`}
+            className={mergeClasses(classes.dot, getDotClass(step.status))}
             aria-label={`Step ${i + 1}: ${getStatusText(step.status)}`}
             role="img"
           >

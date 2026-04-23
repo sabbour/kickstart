@@ -11,6 +11,7 @@ import {
   Subtitle1,
   Caption1,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 import {
@@ -125,7 +126,7 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
 
           return (
             <div key={i} className={classes.indicator} role="tab" aria-selected={i === clampedStep} aria-label={`Step ${i + 1}: ${step.title}`}>
-              <div className={`${classes.pill} ${pillClass}`} aria-hidden="true" />
+              <div className={mergeClasses(classes.pill, pillClass)} aria-hidden="true" />
               <Caption1
                 style={{
                   color: i === clampedStep
@@ -147,7 +148,10 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
       {/* Active step content — key forces remount so CSS animation replays */}
       <div
         key={clampedStep}
-        className={`${classes.body} ${direction === 'next' ? classes.bodyEnterNext : classes.bodyEnterPrev}`}
+        className={mergeClasses(
+          classes.body,
+          direction === 'next' ? classes.bodyEnterNext : classes.bodyEnterPrev,
+        )}
         role="tabpanel"
         aria-live="polite"
         aria-label={`Step ${clampedStep + 1}: ${activeStepData?.title}`}

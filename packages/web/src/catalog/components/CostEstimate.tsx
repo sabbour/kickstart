@@ -19,6 +19,7 @@ import {
   Spinner,
   Subtitle1,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 import { MoneyRegular } from '@fluentui/react-icons';
@@ -553,7 +554,7 @@ export function CostEstimateView({
                 <tr>
                   <th className={classes.th}>Resource</th>
                   {hasSkuOptions && <th className={classes.th}>SKU</th>}
-                  <th className={`${classes.th} ${classes.thRight}`}>Est. / month</th>
+                  <th className={mergeClasses(classes.th, classes.thRight)}>Est. / month</th>
                 </tr>
               </thead>
               <tbody>
@@ -591,7 +592,7 @@ export function CostEstimateView({
                           )}
                         </td>
                       )}
-                      <td className={`${classes.td} ${classes.tdRight}`}>
+                      <td className={mergeClasses(classes.td, classes.tdRight)}>
                         {renderResourceEstimate(resource)}
                         {baseResource?.pricingTiers && baseResource.pricingTiers.length > 0 && (
                           <div className={classes.pricingTiers}>
