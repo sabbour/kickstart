@@ -90,7 +90,6 @@ export function _filterMessagesForProcessor(
 
 export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   const processorRef = useRef<MessageProcessor<ReactComponentImplementation> | null>(null);
-  const subscriptionsRef = useRef<Array<{ unsubscribe(): void }>>([]);
   const [surfaces, setSurfaces] = useState<Map<string, SurfaceModel<ReactComponentImplementation>>>(new Map());
 
   // Keep a stable ref to the handler so the MessageProcessor (created once)
@@ -101,7 +100,7 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   if (!processorRef.current) {
     const catalog = getKickstartCatalog();
     const catalogs = catalog ? [catalog] : [];
-    const proc = new MessageProcessor<ReactComponentImplementation>(
+    processorRef.current = new MessageProcessor<ReactComponentImplementation>(
       catalogs,
       (action: A2uiClientAction) => {
         if (handlerRef.current) {
@@ -112,44 +111,44 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
         }
       }
     );
-
-    // Bind surface lifecycle events to React state at creation time instead
-    // of in a useEffect. This avoids a React 19 StrictMode ordering bug:
-    // useEffect cleanups run in registration order, so useA2UI's cleanup
-    // (unsubscribe) fires BEFORE the consumer's cleanup (deleteSurface).
-    // That leaves disposed surfaces in React state because onSurfaceDeleted
-    // has no listener. By subscribing here, the listener stays active through
-    // StrictMode cleanup/remount cycles. Subscriptions are stored so they can
-    // be cleaned up on final unmount to prevent memory leaks.
-    subscriptionsRef.current.push(
-      proc.onSurfaceCreated((surface) => {
-        setSurfaces(prev => {
-          const next = new Map(prev);
-          next.set(surface.id, surface);
-          return next;
-        });
-      })
-    );
-
-    subscriptionsRef.current.push(
-      proc.onSurfaceDeleted((id) => {
-        setSurfaces(prev => {
-          const next = new Map(prev);
-          next.delete(id);
-          return next;
-        });
-      })
-    );
-
-    processorRef.current = proc;
   }
 
-  // Clean up subscriptions on final unmount to prevent memory leaks.
-  // In StrictMode dev double-mount, the ref-init block does not re-run so
-  // subscriptions persist through the cycle — this is intentional (see above).
+  // Subscribe to surface lifecycle events inside useEffect so that
+  // React 19 StrictMode double-mount (mount → cleanup → remount) properly
+  // re-establishes listeners. The previous approach stored subscriptions in
+  // a ref during render and cleaned them up in a separate useEffect; the
+  // cleanup fired during StrictMode remount but the ref-init never re-ran,
+  // leaving listeners permanently unsubscribed. That caused
+  // A2UIEnvelopePreview surfaces to never reach React state, showing
+  // "Missing component: root" on every Playground card in dev mode.
+  //
+  // Effect-cleanup ordering note: useA2UI's cleanup fires BEFORE the
+  // consumer's cleanup (e.g. A2UIEnvelopePreview's deleteSurface), so a
+  // deleted surface may briefly remain in React state. This is harmless —
+  // the remount effect re-subscribes and the consumer's remount effect
+  // re-creates the surface, overwriting the stale entry. React batches
+  // all state updates from the mount/cleanup/remount cycle into a single
+  // render, so the disposed surface is never visible.
   useEffect(() => {
-    const subs = subscriptionsRef.current;
-    return () => { for (const s of subs) s.unsubscribe(); };
+    const proc = processorRef.current!;
+    const sub1 = proc.onSurfaceCreated((surface) => {
+      setSurfaces(prev => {
+        const next = new Map(prev);
+        next.set(surface.id, surface);
+        return next;
+      });
+    });
+    const sub2 = proc.onSurfaceDeleted((id) => {
+      setSurfaces(prev => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+    });
+    return () => {
+      sub1.unsubscribe();
+      sub2.unsubscribe();
+    };
   }, []);
 
   const processor = processorRef.current;
