@@ -12,7 +12,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: squad-retro-log
+  group: squad-retro-${{ github.event.pull_request.number || github.event.after || github.run_id }}
   cancel-in-progress: false
 
 permissions:

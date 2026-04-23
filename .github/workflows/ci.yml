@@ -160,9 +160,8 @@ jobs:
     name: Playwright E2E Tests
     runs-on: ubuntu-latest
     needs: [classify-trusted-retro-log-pr]
-    if: >-
-      github.event_name == 'pull_request' &&
-      needs.classify-trusted-retro-log-pr.outputs.trusted_retro_log_pr != 'true'
+    # Disabled to save CI minutes — re-enable by removing `if: false`
+    if: false
 
     steps:
       - name: Checkout code

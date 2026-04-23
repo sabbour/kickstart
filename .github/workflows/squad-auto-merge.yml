@@ -2,10 +2,14 @@ name: Squad Auto Merge
 
 on:
   pull_request_target:
-    types: [labeled, unlabeled, synchronize, reopened, ready_for_review, edited]
+    types: [labeled, synchronize, reopened, ready_for_review]
   workflow_run:
     workflows: ['CI', 'Squad Review Gate']
     types: [completed]
+
+concurrency:
+  group: squad-auto-merge-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   actions: read
