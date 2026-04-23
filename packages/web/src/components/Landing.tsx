@@ -357,7 +357,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
             <div className="landing-footer-meta">
               <span className="landing-footer-version">
                 Kickstart Preview v{__BUILD_VERSION__.replace(`-${__BUILD_SHA__}`, '')}-<a
-                  href={`https://github.com/sabbour/kickstart/commit/${__BUILD_SHA_FULL__}`}
+                  href={`https://github.com/azure-management-and-platforms/kickstart/commit/${__BUILD_SHA_FULL__}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="landing-footer-sha"
