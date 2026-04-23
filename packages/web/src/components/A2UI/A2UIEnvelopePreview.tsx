@@ -12,7 +12,7 @@
  *   />
  */
 
-import React, { useEffect, useCallback, memo } from 'react';
+import React, { useEffect, useCallback, memo, useState } from 'react';
 import { useA2UI } from '../../hooks/useA2UI';
 import { A2UISurfaceWrapper } from './A2UISurfaceWrapper';
 
@@ -36,7 +36,8 @@ export const A2UIEnvelopePreview = memo(function A2UIEnvelopePreview({
 }: A2UIEnvelopePreviewProps) {
   // Stable no-op handler — previews are read-only, no actions wired.
   const actionHandler = useCallback(() => {}, []);
-  const { surfaces, processMessages, processor } = useA2UI({ actionHandler });
+  const { processMessages, processor } = useA2UI({ actionHandler });
+  const [renderVersion, setRenderVersion] = useState(0);
 
   useEffect(() => {
     const msgs: unknown[] = [
@@ -45,26 +46,25 @@ export const A2UIEnvelopePreview = memo(function A2UIEnvelopePreview({
     ];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const createdIds = processMessages(msgs as any);
+    setRenderVersion((v) => v + 1);
     return () => {
       for (const id of createdIds) {
         try { processor.model.deleteSurface(id); } catch { /* already gone */ }
       }
     };
-    // processMessages and processor are stable refs; re-run only when surfaceId changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [surfaceId]);
+  }, [components, processMessages, processor, surfaceId]);
 
-  const surfaceEntries = Array.from(surfaces.entries());
+  const surface = processor.model.getSurface(surfaceId);
 
-  if (surfaceEntries.length === 0) {
+  if (!surface) {
     return <>{loading}</>;
   }
 
   return (
-    <>
-      {surfaceEntries.map(([id, surface]) => (
-        <A2UISurfaceWrapper key={id} surface={surface} isActive={isActive} />
-      ))}
-    </>
+    <A2UISurfaceWrapper
+      key={`${surfaceId}-${renderVersion}`}
+      surface={surface}
+      isActive={isActive}
+    />
   );
 });
