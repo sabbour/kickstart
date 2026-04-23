@@ -18,13 +18,18 @@ function stubNodeBuiltins(): Plugin {
       `export const realpathSync = _notBrowser;`,
       `export const statSync = _notBrowser;`,
       `export const readdirSync = _notBrowser;`,
-      `export default { readFileSync, realpathSync, statSync, readdirSync };`,
+      `export const existsSync = () => false;`,
+      `export const mkdirSync = _notBrowser;`,
+      `export const writeFileSync = _notBrowser;`,
+      `export const unlinkSync = _notBrowser;`,
+      `export const promises = { readFile: _notBrowser, writeFile: _notBrowser, mkdir: _notBrowser, readdir: _notBrowser, unlink: _notBrowser, stat: _notBrowser };`,
+      `export default { readFileSync, realpathSync, statSync, readdirSync, existsSync, mkdirSync, writeFileSync, unlinkSync, promises };`,
     ].join('\n'),
     'node:path': [
       _throws,
       `export const resolve = _notBrowser;`,
       `export const relative = _notBrowser;`,
-      `export const join = _notBrowser;`,
+      `export const join = (...p) => p.filter(Boolean).join('/');`,
       `export const dirname = _notBrowser;`,
       `export const basename = _notBrowser;`,
       `export const extname = _notBrowser;`,
@@ -39,6 +44,31 @@ function stubNodeBuiltins(): Plugin {
       `export const fileURLToPath = (url) => typeof url === 'string' ? url.replace(/^file:\\/\\//, '') : url.pathname;`,
       `export const pathToFileURL = (p) => new URL('file://' + p);`,
       `export default { fileURLToPath, pathToFileURL };`,
+    ].join('\n'),
+    'node:os': [
+      `export const type = () => 'Browser';`,
+      `export const hostname = () => 'browser';`,
+      `export const platform = () => 'browser';`,
+      `export const arch = () => 'unknown';`,
+      `export const release = () => '0.0.0';`,
+      `export const tmpdir = () => '/tmp';`,
+      `export const homedir = () => '/';`,
+      `export default { type, hostname, platform, arch, release, tmpdir, homedir };`,
+    ].join('\n'),
+    'node:child_process': [
+      `const _nop = () => { throw new Error('child_process not available in browser'); };`,
+      `export const spawn = _nop;`,
+      `export const spawnSync = _nop;`,
+      `export const exec = _nop;`,
+      `export default { spawn, spawnSync, exec };`,
+    ].join('\n'),
+    'node:process': [
+      `const p = (typeof globalThis !== 'undefined' && globalThis.process) || { env: {}, platform: 'browser', versions: {}, pid: 0 };`,
+      `export const env = p.env || {};`,
+      `export const platform = p.platform || 'browser';`,
+      `export const versions = p.versions || {};`,
+      `export const pid = p.pid || 0;`,
+      `export default p;`,
     ].join('\n'),
   };
   return {
@@ -96,6 +126,14 @@ export default defineConfig({
       '@aks-kickstart/pack-azure/client': resolve(__dirname, '../pack-azure/src/client.ts'),
       '@aks-kickstart/pack-aks-automatic/client': resolve(__dirname, '../pack-aks-automatic/src/client.ts'),
       '@aks-kickstart/pack-github/client': resolve(__dirname, '../pack-github/src/client.ts'),
+      // Force `zod/v4` to resolve to the monorepo-root `zod` install (the v4
+      // instance that `openai` + `zod-to-json-schema` — hoisted to root —
+      // actually bundle). `configure-zod.ts` mutates its `globalConfig` to set
+      // `jitless: true` so Zod v4's `allowsEval` probe (`new Function`) never
+      // fires under `script-src 'self'`. Without this alias, web-local
+      // `packages/web/node_modules/zod`'s v4 subpath is a separate module
+      // instance and the mutation has no effect on the bundled code. #1042.
+      'zod/v4': resolve(__dirname, '../../node_modules/zod/v4/index.js'),
       react: resolve(__dirname, 'node_modules/react'),
       'react-dom': resolve(__dirname, 'node_modules/react-dom'),
     },

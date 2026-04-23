@@ -1,3 +1,8 @@
+// MUST be the first import: disables Zod v4's JIT (`new Function`) path
+// before any v4 schema is constructed anywhere in the web bundle. See
+// `src/lib/configure-zod.ts` for why this file imports zod/v4 via a
+// vite alias that pins to the root zod instance.
+import './lib/configure-zod';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
@@ -8,6 +13,25 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { DebugProvider } from './contexts/DebugContext';
 import { A2UIRegistryProvider, clientRegistry } from './contexts/A2UIRegistryContext';
 import { InMemoryArtifactStore } from '@aks-kickstart/harness';
+import { fetchBrowserTelemetryConfig, initBrowserTelemetry, markBrowserTelemetryReady } from './lib/browser-appinsights';
+
+// Browser telemetry bootstrap (issue #1042 / DP-D revision 2). Flag-gated,
+// disabled by default; any init failure is swallowed so telemetry can never
+// break app boot. Runs before React mounts so the first /api/converse fetch
+// is already instrumented. `markBrowserTelemetryReady()` resolves the
+// `window.__kickstartTelemetryReady` promise once the async bootstrap has
+// settled — Playwright (and any production caller that needs to defer a
+// fetch until instrumentation is live) awaits it.
+void (async () => {
+  try {
+    const config = await fetchBrowserTelemetryConfig();
+    initBrowserTelemetry(config);
+  } catch {
+    // Silent — telemetry is non-critical.
+  } finally {
+    markBrowserTelemetryReady();
+  }
+})();
 
 // ---------------------------------------------------------------------------
 // Phase A bootstrap ordering (DP Step 10)

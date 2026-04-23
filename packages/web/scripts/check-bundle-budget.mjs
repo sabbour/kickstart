@@ -33,9 +33,12 @@ const distDir = resolve(__dirname, '..', 'dist');
 const assetsDir = resolve(distDir, 'assets');
 
 // Budgeted chunks. Each entry pairs a prefix matcher with a gzipped ceiling.
-// Measured post-#1000: index ≈ 228 642 gz, Playground ≈ 39 613 gz.
+// #1042 (browser OTel + Azure Monitor exporter, DP-D revision 2): raises the
+// main-entry ceiling by the DP's hard budget of ≤100 KB gzipped delta.
+// New ceiling = 228 642 baseline + 102 400 (100 KiB) ≈ 331 000 gz. Current
+// measured with the feature: ≈ 308 512 gz (delta ≈ 79 870 B, ≈ 78 KiB).
 const BUDGETS = [
-  { label: 'main entry', prefix: 'index-', suffix: '.js', maxGz: 260_000 },
+  { label: 'main entry', prefix: 'index-', suffix: '.js', maxGz: 331_000 },
   { label: 'playground route', prefix: 'Playground-', suffix: '.js', maxGz: 60_000 },
 ];
 

@@ -258,3 +258,45 @@ end-to-end regression only passes once Bender's Layer 0 lands.
    all three layers without React Testing Library (not installed in this
    package). Underscore prefix matches the existing `_performSdkNonStreamingFetch`
    convention in the same hook.
+
+## Learnings — #1042 browser OTel (2026-04-22)
+
+**Context:** Shipped Phase 1 of browser-side Application Insights behind a
+flag. DP-D revision 2 was fully approved; this PR lands the disabled-by-
+default plumbing.
+
+1. **BrowserRedactingSpanExporter pattern.** Mirror the server-side Proxy
+   decorator: wrap `ReadableSpan` via `new Proxy(span, …)`. Key traps:
+   `attributes`, `events`, `links` → redacted copies; `spanContext` → rewrap
+   to strip `traceState` (Zapp Decision 3 — never propagate outbound);
+   everything else → bind back to the real span so `spanContext().traceId`
+   keeps working inside the Azure Monitor exporter. Object-spread breaks;
+   Proxy is load-bearing.
+2. **Azure Monitor exporter in a browser bundle.** `@azure/monitor-
+   opentelemetry-exporter@1.0.0-beta.32` has no `browser` field and its
+   `platform/index.js` statically re-exports the Node build (file-based
+   persistence, `node:fs`/`node:os`/`node:child_process`/`node:process`).
+   Vite's `stubNodeBuiltins` plugin needed extending — added `existsSync`
+   to the `node:fs` stub plus whole-module stubs for `node:os`,
+   `node:child_process`, `node:process` so the dead persist code path type-
+   checks but is never invoked. No patch-package needed.
+3. **Fetch instrumentation allow-list.** `ignoreUrls: [/^(?!.*\/api\/).*/]`
+   ignores everything that is NOT under `/api/`. Paired with
+   `propagateTraceHeaderCorsUrls: [/\/api\//]` as defense-in-depth. Zapp's
+   third-party isolation rule (no `traceparent` on CDN/auth fetches) is
+   satisfied by the `ignoreUrls` regex alone, but the allow-list makes the
+   intent grep-able in code review.
+4. **size-limit + Vite.** `@size-limit/preset-app` boots headless Chrome
+   via `estimo` — not viable in the default dev container. `@size-limit/file`
+   is the right choice for a pure gzipped-size budget gate; pair it with
+   the existing `scripts/check-bundle-budget.mjs` so we get two independent
+   failure modes in CI. `gzip: true` on each entry is important — default
+   is raw size.
+5. **Playwright + OTel interception.** The `page.route('**/*
+   applicationinsights.azure.com/**', …)` pattern intercepts the Azure
+   Monitor exporter's POST transparently — no SDK hook needed. Expose a
+   `window.__kickstartFlushTelemetry` force-flush hook in the production
+   init so tests can drain the BatchSpanProcessor before assertions. The
+   helpers.ts generic `/api/**` → 503 route is correctly shadowed by the
+   more-specific per-test routes (Playwright picks the last-registered
+   matching handler).
