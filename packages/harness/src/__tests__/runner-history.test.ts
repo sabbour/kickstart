@@ -5,12 +5,10 @@
  *     are replayed into the SDK input; system and tool turns are dropped.
  *   - Z2: sanitized text (guardedMessage) is what lands in `recentTurns`,
  *     not the raw userMessage. Guardrail-on-capture invariant.
- *   - Feature flag: `HARNESS_SESSION_HISTORY_ENABLED` defaults OFF; only
- *     "1"/"true" (case-insensitive) enable it.
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { toAgentInputItems, isHistoryEnabled } from '../runtime/runner.js';
+import { describe, expect, it } from 'vitest';
+import { toAgentInputItems } from '../runtime/runner.js';
 import type { Turn } from '../types/session.js';
 
 describe('toAgentInputItems() — role filter (Z1)', () => {
@@ -83,41 +81,5 @@ describe('toAgentInputItems() — role filter (Z1)', () => {
 
   it('returns an empty array for an empty input', () => {
     expect(toAgentInputItems([])).toEqual([]);
-  });
-});
-
-describe('isHistoryEnabled() — feature flag', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it('defaults to OFF when the env var is unset', () => {
-    vi.stubEnv('HARNESS_SESSION_HISTORY_ENABLED', '');
-    expect(isHistoryEnabled()).toBe(false);
-  });
-
-  it('is OFF for value "0"', () => {
-    vi.stubEnv('HARNESS_SESSION_HISTORY_ENABLED', '0');
-    expect(isHistoryEnabled()).toBe(false);
-  });
-
-  it('is OFF for value "false"', () => {
-    vi.stubEnv('HARNESS_SESSION_HISTORY_ENABLED', 'false');
-    expect(isHistoryEnabled()).toBe(false);
-  });
-
-  it('is ON for value "1"', () => {
-    vi.stubEnv('HARNESS_SESSION_HISTORY_ENABLED', '1');
-    expect(isHistoryEnabled()).toBe(true);
-  });
-
-  it('is ON for value "true" (case-insensitive)', () => {
-    vi.stubEnv('HARNESS_SESSION_HISTORY_ENABLED', 'TRUE');
-    expect(isHistoryEnabled()).toBe(true);
-  });
-
-  it('is OFF for an unrelated string', () => {
-    vi.stubEnv('HARNESS_SESSION_HISTORY_ENABLED', 'yes');
-    expect(isHistoryEnabled()).toBe(false);
   });
 });

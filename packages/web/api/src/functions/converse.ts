@@ -19,7 +19,6 @@ import { getRegistry } from "../startup/packs.js";
 import {
   getOrCreateSession,
   hydrateColdSession,
-  isHistoryHydrationEnabled,
   isAnonHydrationAllowed,
   sessionStore,
   HYDRATION_DEFAULT_CAP,
@@ -50,8 +49,7 @@ interface ConverseRequest {
   };
   /**
    * Client-supplied prior-turn history for cold-session hydration (#1074 D3).
-   * Only hydrated when the resolved session is brand-new AND the feature
-   * flag `HARNESS_SESSION_HISTORY_ENABLED` is on. Schema-validated via a
+   * Only hydrated when the resolved session is brand-new. Schema-validated via a
    * strict zod `discriminatedUnion` (Zapp M1); no silent role dropping.
    */
   messages?: ClientHydrationMessage[];
@@ -387,16 +385,7 @@ async function converse(
   //      hydration on any block.
   //   6. hydrateColdSession stamps each turn `trust: 'client-hydrated'` (M3).
   if (validatedMessages !== undefined) {
-    if (!isHistoryHydrationEnabled()) {
-      logger.info("session-hydration-disabled", {
-        session_id: session.sessionId,
-        turn_count: validatedMessages.length,
-      });
-      trackEvent("session-hydration-disabled", {
-        requestId,
-        turnCount: String(validatedMessages.length),
-      });
-    } else if (session.recentTurns.length > 0) {
+    if (session.recentTurns.length > 0) {
       // Warm session: server is source of truth. Nibbler condition 3 — emit
       // a named, asserted log event so observability contracts are stable.
       logger.info("session-hydration-ignored", {

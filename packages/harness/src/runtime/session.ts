@@ -188,20 +188,6 @@ export const HYDRATION_DEFAULT_CAP = 20;
 export const HYDRATION_CONTENT_MAX_BYTES = 4 * 1024;
 
 /**
- * Feature-flag helper (Nibbler nit) — callers must read this instead of
- * thrashing `process.env.HARNESS_SESSION_HISTORY_ENABLED` inline. The same
- * flag gates both the read-path history threading in the runner (#1071) and
- * the write-path cold hydration here (#1074) — this is intentional per
- * Leela's DP note and documented in `converse.md`.
- */
-export function isHistoryHydrationEnabled(): boolean {
-  const raw = process.env.HARNESS_SESSION_HISTORY_ENABLED;
-  if (!raw) return false;
-  const v = raw.trim().toLowerCase();
-  return v === '1' || v === 'true';
-}
-
-/**
  * Anon-hydration interlock flag (Zapp M4).
  *
  * Defaults to `false`. While `false`, an anonymous session
@@ -233,8 +219,6 @@ export interface HydrateColdSessionResult {
  * Contract (Leela DP + Zapp M1–M3):
  *  - Hydrates **only** when `session.recentTurns.length === 0` — warm sessions
  *    are server-authoritative and client `messages` are ignored.
- *  - The feature flag `HARNESS_SESSION_HISTORY_ENABLED` must be on;
- *    otherwise the helper is a no-op regardless of session state.
  *  - Messages are expected to already be schema-validated (strict zod
  *    discriminatedUnion at the handler) and guardrail-scanned (per-user-turn
  *    input guardrails at the handler, fail-closed). This helper does NOT
@@ -253,7 +237,7 @@ export function hydrateColdSession(
   messages: readonly ClientHydrationMessage[] | undefined,
   opts: { enabled?: boolean; cap?: number } = {},
 ): HydrateColdSessionResult {
-  const enabled = opts.enabled ?? isHistoryHydrationEnabled();
+  const enabled = opts.enabled ?? true;
   if (!enabled) {
     return { hydrated: 0, ignored: 'disabled' };
   }

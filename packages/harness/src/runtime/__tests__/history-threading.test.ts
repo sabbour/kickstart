@@ -10,10 +10,9 @@
  * Also codifies:
  *   - Z1: only user/assistant roles replayed to the SDK.
  *   - Z2: sanitized text (not raw userMessage) lands in `session.recentTurns`.
- *   - Feature-flag OFF fallback: SDK still receives only the current message.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Mock the SDK so `sdkRunner.run()` returns an empty stream we can inspect ──
 // We capture every call's `input` argument for later assertions.
@@ -85,12 +84,7 @@ describe('#1062 Layer 0 — harness conversation history threading', () => {
     runCalls.length = 0;
   });
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it('flag ON: turn 3 SDK input contains turn-1 + turn-2 history (regression guard)', async () => {
-    vi.stubEnv('HARNESS_SESSION_HISTORY_ENABLED', '1');
+  it('threads history on every turn (default)', async () => {
 
     const registry = makeFakeRegistry();
     const runner = new Runner(registry);
@@ -136,35 +130,7 @@ describe('#1062 Layer 0 — harness conversation history threading', () => {
     });
   });
 
-  it('flag OFF: SDK receives only the current message (byte-compat fallback)', async () => {
-    vi.stubEnv('HARNESS_SESSION_HISTORY_ENABLED', '0');
-
-    const registry = makeFakeRegistry();
-    const runner = new Runner(registry);
-    const session = new Session({ sessionId: 's2', user: { oid: 'u1' } });
-    const events: Array<{ event: string; data: unknown }> = [];
-    const sse = makeSSEWriter(events);
-
-    await runner.run(session, 'first', sse);
-    await runner.run(session, 'second', sse);
-
-    expect(runCalls).toHaveLength(2);
-    expect(typeof runCalls[0].input).toBe('string');
-    expect(runCalls[0].input).toBe('first');
-    expect(typeof runCalls[1].input).toBe('string');
-    expect(runCalls[1].input).toBe('second');
-
-    // Turns are still recorded (sanitized) regardless of flag — Z2.
-    expect(session.recentTurns.map((t) => t.role)).toEqual([
-      'user',
-      'assistant',
-      'user',
-      'assistant',
-    ]);
-  });
-
   it('Z2: sanitized text (guardedMessage) is what lands in recentTurns, not raw userMessage', async () => {
-    vi.stubEnv('HARNESS_SESSION_HISTORY_ENABLED', '1');
 
     const registry = {
       getAgent: (name: string) => ({
@@ -218,7 +184,6 @@ describe('#1062 Layer 0 — harness conversation history threading', () => {
   });
 
   it('Z1: tool and system turns in history are dropped from the SDK input', async () => {
-    vi.stubEnv('HARNESS_SESSION_HISTORY_ENABLED', '1');
 
     const registry = makeFakeRegistry();
     const runner = new Runner(registry);

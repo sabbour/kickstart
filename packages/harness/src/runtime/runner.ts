@@ -348,22 +348,6 @@ export function resolveOutputText(finalOutput: unknown, fullText: string): strin
 // ---------------------------------------------------------------------------
 
 /**
- * Feature flag: when true, the Runner threads `session.recentTurns` into the
- * SDK on every turn instead of sending only the current `guardedMessage`.
- *
- * Default: OFF in first merge. Flipped to ON in a follow-up after preview
- * validation (see DP v3 rollout plan on #1062).
- *
- * Env values "1" or "true" (case-insensitive) enable the feature.
- */
-export function isHistoryEnabled(): boolean {
-  const raw = process.env.HARNESS_SESSION_HISTORY_ENABLED;
-  if (!raw) return false;
-  const v = raw.trim().toLowerCase();
-  return v === '1' || v === 'true';
-}
-
-/**
  * Convert a bounded list of `session.recentTurns` into the SDK's
  * `AgentInputItem[]` shape expected by `Runner.run()`.
  *
@@ -681,18 +665,12 @@ export class Runner {
     try {
       const sdkRunner = getSdkRunner();
 
-      // #1062 Layer 0: thread conversation history across turns when the
-      // feature flag is on. `session.recentTurns` already contains the
+      // #1062 Layer 0: thread conversation history across turns (unconditional
+      // since #1098 rollout). `session.recentTurns` already contains the
       // sanitized current user turn (appended after input guardrails above);
       // passing the whole history as `AgentInputItem[]` gives the model full
-      // context of the conversation instead of the single current message.
-      //
-      // Flag OFF path is byte-identical to pre-#1062 behavior: pass the bare
-      // `guardedMessage` string — the SDK treats that as a one-shot user item
-      // with no history.
-      const runInput: string | AgentInputItem[] = isHistoryEnabled()
-        ? toAgentInputItems(session.recentTurns)
-        : guardedMessage;
+      // context of the conversation.
+      const runInput: AgentInputItem[] = toAgentInputItems(session.recentTurns);
 
       const result = await sdkRunner.run(agent, runInput, {
         stream: true,

@@ -9,7 +9,6 @@
  * Coverage matrix (issue #1074 AC + Zapp M1–M4 / L4 + Nibbler additive):
  *  - brand-new session + valid messages[] → hydrated, recentTurns populated
  *  - warm session + messages[] → ignored, session-hydration-ignored event
- *  - flag OFF → ignored, session-hydration-disabled event
  *  - empty messages[] distinct from absent messages (Nibbler #2)
  *  - Zod rejects unknown role / extra fields / case variants (Zapp L4)
  *  - Array over cap (21 messages) → 400 HYDRATION_ARRAY_TOO_LARGE (Nibbler #5)
@@ -125,7 +124,7 @@ vi.mock('../startup/packs.js', () => ({
 vi.mock('@aks-kickstart/harness/runtime/session', () => ({
   getOrCreateSession: getOrCreateSessionMock,
   hydrateColdSession: hydrateColdSessionMock,
-  isHistoryHydrationEnabled: vi.fn(() => process.env.HARNESS_SESSION_HISTORY_ENABLED === 'true'),
+  isHistoryHydrationEnabled: vi.fn(() => true),
   isAnonHydrationAllowed: vi.fn(() => process.env.HARNESS_ALLOW_ANON_HYDRATION === 'true'),
   sessionStore: sessionStoreMock,
   HYDRATION_DEFAULT_CAP: 20,
@@ -218,7 +217,6 @@ beforeEach(() => {
   runnerRunMock.mockResolvedValue(undefined);
   trackEventMock.mockReset();
   guardrailsMock.length = 0;
-  process.env.HARNESS_SESSION_HISTORY_ENABLED = 'true';
   // Tests default to an authenticated-like flow (the M4 anon interlock is
   // exercised explicitly in its own describe block below). Setting the flag
   // here avoids having to mint a SWA principal header in every test — the
@@ -228,7 +226,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  delete process.env.HARNESS_SESSION_HISTORY_ENABLED;
   delete process.env.HARNESS_ALLOW_ANON_HYDRATION;
 });
 
@@ -316,24 +313,6 @@ describe('#1074 — warm session / flag off', () => {
     const ignored = trackEventMock.mock.calls.filter((c) => c[0] === 'session-hydration-ignored');
     expect(ignored).toHaveLength(1);
     expect(ignored[0][1]).toMatchObject({ reason: 'warm' });
-  });
-
-  it('flag off: messages accepted at boundary but never hydrated; emits session-hydration-disabled', async () => {
-    process.env.HARNESS_SESSION_HISTORY_ENABLED = 'false';
-    const res = await converseHandler(
-      makeRequest({
-        body: {
-          message: 'continue',
-          messages: [{ role: 'user', content: 'x' }],
-        },
-      }),
-      makeContext(),
-    );
-    expect(res.status).toBe(200);
-    await drainSSE(res);
-    expect(hydrateColdSessionMock).not.toHaveBeenCalled();
-    const disabled = trackEventMock.mock.calls.filter((c) => c[0] === 'session-hydration-disabled');
-    expect(disabled).toHaveLength(1);
   });
 
   // Nibbler #2: empty array distinct from absent.

@@ -26,14 +26,10 @@ SSE event types defined in `@aks-kickstart/harness/runtime/sse`.
 
 The browser already assembles prior chat history into `messages` on every
 request (`useStreaming.ts`). The server hydrates the session from this array
-only when **both** of the following are true:
-
-1. `HARNESS_SESSION_HISTORY_ENABLED=true` (same flag as the #1071 read-path).
-2. The resolved session is brand-new (`session.recentTurns.length === 0`).
+only when the resolved session is brand-new (`session.recentTurns.length === 0`).
 
 A warm session ignores `messages` (server is source of truth) and emits a
-`session-hydration-ignored` telemetry event. A cold session with the flag off
-emits `session-hydration-disabled` and skips hydration without error.
+`session-hydration-ignored` telemetry event.
 
 #### Schema (strict)
 
@@ -93,15 +89,12 @@ Count-only — never include `content`, substrings, or payloads:
 |---------------------------------|------------------------------------------------------------------------|
 | `session-hydrated`              | Cold session hydrated; `{ turnCount, userTurnCount, assistantTurnCount }` |
 | `session-hydration-ignored`     | Warm session — client `messages` silently dropped; `{ reason: 'warm' }` |
-| `session-hydration-disabled`    | Feature flag off; `messages` accepted at boundary but not hydrated      |
 | `session-hydration-rejected`    | `{ reason: 'invalid-schema' \| 'array-too-large' \| 'content-too-large' \| 'blocked-by-guardrail' \| 'anon-hydration-forbidden' }` |
 
 ### Feature flags
 
-| Flag                                | Default | Effect                                                     |
-|-------------------------------------|---------|------------------------------------------------------------|
-| `HARNESS_SESSION_HISTORY_ENABLED`   | `false` | Gates both read-path history threading (#1071) and write-path hydration (#1074) |
-| `HARNESS_ALLOW_ANON_HYDRATION`      | `false` | Gates hydration for anonymous sessions; see #1079          |
+| Flag                           | Default | Effect                                            |
+|--------------------------------|---------|---------------------------------------------------|
+| `HARNESS_ALLOW_ANON_HYDRATION` | `false` | Gates hydration for anonymous sessions; see #1079 |
 
-Both flags accept `"1"` or `"true"` (case-insensitive) as on; anything else is
-off.
+The flag accepts `"1"` or `"true"` (case-insensitive) as on; anything else is off.
