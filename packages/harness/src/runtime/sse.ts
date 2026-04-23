@@ -1,7 +1,7 @@
 /**
  * SSE (Server-Sent Events) utilities for the v2 harness runtime.
  *
- * 9 event types used across converse and resume handlers:
+ * 10 event types used across converse and resume handlers:
  *   start           – turn began (no data)
  *   chunk           – text delta from the model
  *   a2ui            – A2UI protocol message emitted by a skill/tool
@@ -11,6 +11,7 @@
  *   user_action_req – agent needs a browser-side UserAction result to continue
  *   end             – turn completed (may carry session metadata)
  *   error           – unrecoverable error in the stream
+ *   session_token   – per-session anonymous token for session resumption (#1079)
  */
 
 export type SSEEventType =
@@ -22,11 +23,12 @@ export type SSEEventType =
   | 'phase'
   | 'user_action_req'
   | 'end'
-  | 'error';
+  | 'error'
+  | 'session_token';
 
 export const SSE_EVENT_TYPES = new Set<SSEEventType>([
   'start', 'chunk', 'a2ui', 'tool_start', 'tool_done',
-  'phase', 'user_action_req', 'end', 'error',
+  'phase', 'user_action_req', 'end', 'error', 'session_token',
 ]);
 
 /** Opaque writer type passed to Runner and resume handler. */

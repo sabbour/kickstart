@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { A2UIMessageV09 as A2UIMessage } from '../types/a2ui.js';
 import type { Artifact, A2UICatalog, SessionCtx, Turn, PendingUserAction, AppIntent, AzureCredential, ClientHydrationMessage } from '../types/session.js';
 import type { Phase } from '../index.js';
@@ -64,6 +64,13 @@ export class Session implements SessionCtx {
   skillsPulledTokens?: number;
   /** Leela BLOCK-1: real first-class field; no type-cast side-channel needed. */
   lastActiveAt: number = Date.now();
+  /**
+   * SHA-256 hash of the per-session anonymous token (#1079). Only set for
+   * anonymous sessions. The raw token is returned to the client exactly once
+   * (in the SSE `start` event + `X-Anon-Session-Token` header); subsequent
+   * requests must present it for session resumption.
+   */
+  anonTokenHash?: string;
 
   constructor(opts: {
     sessionId: string;
@@ -140,7 +147,8 @@ export const sessionStore = new Map<string, Session>();
 const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [id, session] of sessionStore) {
-    if (now - session.lastActiveAt > SESSION_TTL_MS) {
+    const ttl = isAnonymousSession(session) ? ANON_SESSION_TTL_MS : SESSION_TTL_MS;
+    if (now - session.lastActiveAt > ttl) {
       sessionStore.delete(id);
     }
   }
@@ -168,6 +176,100 @@ export function getOrCreateSession(
   // Update last-active time for TTL cleanup
   session.touch();
   return session;
+}
+
+// ---------------------------------------------------------------------------
+// Anonymous session token (#1079)
+// ---------------------------------------------------------------------------
+
+/** TTL for anonymous sessions — 10 min (shorter than the 30 min default). */
+export const ANON_SESSION_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * Error thrown when crypto primitives fail during anonymous token generation.
+ * Callers should catch this and return 503 (Service Unavailable) with a
+ * Retry-After header instead of letting the process crash.
+ */
+export class AnonTokenGenerationError extends Error {
+  override readonly name = 'AnonTokenGenerationError';
+  constructor(cause: unknown) {
+    super('ANON_TOKEN_GENERATION_FAILED');
+    this.cause = cause;
+  }
+}
+
+/**
+ * Generate a cryptographically random per-session token for an anonymous
+ * session. Stores the SHA-256 hash on the session; returns the raw token
+ * (base64url, 32 bytes of entropy). The caller sends the raw token to the
+ * client exactly once.
+ *
+ * @throws {AnonTokenGenerationError} if crypto primitives fail (entropy
+ *   exhaustion, FIPS restrictions, etc.). The caller should respond with
+ *   503 + Retry-After rather than letting the server crash.
+ */
+export function generateAnonSessionToken(session: Session): string {
+  try {
+    const token = randomBytes(32).toString('base64url');
+    session.anonTokenHash = createHash('sha256').update(token).digest('base64url');
+    return token;
+  } catch (err) {
+    throw new AnonTokenGenerationError(err);
+  }
+}
+
+/**
+ * Validate a client-supplied anonymous session token against the stored hash.
+ * Uses timing-safe comparison to prevent timing side-channels.
+ */
+export function validateAnonSessionToken(session: Session, token: string): boolean {
+  if (!session.anonTokenHash) return false;
+  if (typeof token !== 'string' || token.length === 0) return false;
+  const incoming = createHash('sha256').update(token).digest('base64url');
+  const expected = session.anonTokenHash;
+  try {
+    return timingSafeEqual(Buffer.from(incoming), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
+/** Check if a session belongs to an anonymous (unauthenticated) user. */
+export function isAnonymousSession(session: Session): boolean {
+  return session.user.oid === 'anonymous';
+}
+
+/**
+ * Extended result from {@link getOrCreateSessionResult} that also reports
+ * whether the session was freshly created vs. resumed from the store.
+ */
+export interface SessionResult {
+  session: Session;
+  created: boolean;
+}
+
+/**
+ * Like {@link getOrCreateSession} but also returns a `created` flag so
+ * callers can distinguish new-session from resume without peeking at the
+ * store directly.
+ */
+export function getOrCreateSessionResult(
+  sessionId: string | undefined,
+  oid: string,
+  workspaceRoot = '/workspace',
+): SessionResult {
+  const id = sessionId ?? randomUUID();
+  let session = sessionStore.get(id);
+  let created = false;
+  if (!session) {
+    session = new Session({ sessionId: id, user: { oid }, workspaceRoot });
+    sessionStore.set(id, session);
+    created = true;
+  } else if (session.user.oid !== oid) {
+    throw new Error('SESSION_OID_MISMATCH');
+  }
+  session.touch();
+  return { session, created };
 }
 
 // ---------------------------------------------------------------------------
