@@ -21,6 +21,7 @@ import {
   generateAnonSessionToken,
   validateAnonSessionToken,
   isAnonymousSession,
+  AnonTokenGenerationError,
   hydrateColdSession,
   isAnonHydrationAllowed,
   sessionStore,
@@ -383,7 +384,23 @@ async function converse(
   if (isAnonymousSession(session)) {
     if (sessionCreated) {
       // New anonymous session: mint a token and return it to the client.
-      anonSessionToken = generateAnonSessionToken(session);
+      try {
+        anonSessionToken = generateAnonSessionToken(session);
+      } catch (err) {
+        if (err instanceof AnonTokenGenerationError) {
+          logger.error("Crypto failure generating anonymous session token", {
+            session_id: session.sessionId,
+            cause: String(err.cause),
+          });
+          trackException(err, { requestId, context: "anon-token-crypto-failure" });
+          await flushAppInsights();
+          return new Response(
+            JSON.stringify({ error: "Unable to generate session token — please retry", code: "ANON_TOKEN_GENERATION_FAILED" }),
+            { status: 503, headers: { "Content-Type": "application/json", "Retry-After": "5" } },
+          );
+        }
+        throw err;
+      }
       logger.info("Anonymous session token generated", { session_id: session.sessionId });
     } else {
       // Resumed anonymous session: validate the client-supplied token.

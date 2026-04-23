@@ -488,7 +488,7 @@ export type { ResolveSkillsOptions } from './runtime/skill-resolver.js';
 
 // ── Step 11–12: Runner + Resume ──────────────────────────────────────────────
 export { Runner } from './runtime/runner.js';
-export { Session, sessionStore, getOrCreateSession, getOrCreateSessionResult, generateAnonSessionToken, validateAnonSessionToken, isAnonymousSession, ANON_SESSION_TTL_MS } from './runtime/session.js';
+export { Session, sessionStore, getOrCreateSession, getOrCreateSessionResult, generateAnonSessionToken, validateAnonSessionToken, isAnonymousSession, ANON_SESSION_TTL_MS, AnonTokenGenerationError } from './runtime/session.js';
 export { handleResume } from './runtime/resume.js';
 export type { ResumeHandlerInput, ResumeHandlerResult, ClientPrincipal } from './runtime/resume.js';
 

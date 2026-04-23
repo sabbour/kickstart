@@ -186,15 +186,36 @@ export function getOrCreateSession(
 export const ANON_SESSION_TTL_MS = 10 * 60 * 1000;
 
 /**
+ * Error thrown when crypto primitives fail during anonymous token generation.
+ * Callers should catch this and return 503 (Service Unavailable) with a
+ * Retry-After header instead of letting the process crash.
+ */
+export class AnonTokenGenerationError extends Error {
+  override readonly name = 'AnonTokenGenerationError';
+  constructor(cause: unknown) {
+    super('ANON_TOKEN_GENERATION_FAILED');
+    this.cause = cause;
+  }
+}
+
+/**
  * Generate a cryptographically random per-session token for an anonymous
  * session. Stores the SHA-256 hash on the session; returns the raw token
  * (base64url, 32 bytes of entropy). The caller sends the raw token to the
  * client exactly once.
+ *
+ * @throws {AnonTokenGenerationError} if crypto primitives fail (entropy
+ *   exhaustion, FIPS restrictions, etc.). The caller should respond with
+ *   503 + Retry-After rather than letting the server crash.
  */
 export function generateAnonSessionToken(session: Session): string {
-  const token = randomBytes(32).toString('base64url');
-  session.anonTokenHash = createHash('sha256').update(token).digest('base64url');
-  return token;
+  try {
+    const token = randomBytes(32).toString('base64url');
+    session.anonTokenHash = createHash('sha256').update(token).digest('base64url');
+    return token;
+  } catch (err) {
+    throw new AnonTokenGenerationError(err);
+  }
 }
 
 /**
