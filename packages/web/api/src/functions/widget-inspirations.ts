@@ -22,6 +22,7 @@ import {
   ALLOWED_A2UI_COMPONENTS,
   nextFocusDomain,
   pickFallbackIdea,
+  stripMarkdown,
   type WidgetIdea,
 } from "../lib/widget-inspirations-data.js";
 
@@ -39,7 +40,9 @@ Do not invent namespaced types (e.g., "aks/PodTable", "Chart", "Container") or s
 
 Focus on: ${focus}.
 
-Generate realistic ideas with sample data (pod names, metrics, namespaces) and clear interactions. Keep ideas constructive and appropriate for a professional audience.`;
+Generate realistic ideas with sample data (pod names, metrics, namespaces) and clear interactions. Keep ideas constructive and appropriate for a professional audience.
+
+IMPORTANT: Respond in plain prose only. Do NOT use any markdown formatting — no bold (**), no italic (*), no headings (#), no horizontal rules (---), no bullet lists, no numbered lists, no code fences. The output is rendered in a plain-text textarea.`;
 
 /** Check whether Azure OpenAI env vars are configured. */
 function isOpenAIConfigured(): boolean {
@@ -74,7 +77,13 @@ async function generateWidgetIdeas(): Promise<WidgetIdea[]> {
   if (!Array.isArray(parsed) || parsed.length === 0) {
     throw new Error("Invalid response format from OpenAI");
   }
-  return parsed;
+  // Safety-net: strip any markdown the LLM slipped into the prompt text
+  return parsed.map((idea) => ({
+    ...idea,
+    title: stripMarkdown(idea.title),
+    subtitle: stripMarkdown(idea.subtitle),
+    prompt: stripMarkdown(idea.prompt),
+  }));
 }
 
 /** Generate widget idea prompt via Azure OpenAI (streaming mode — returns raw prompt text). */
@@ -97,8 +106,15 @@ async function* generateWidgetPromptStream(): AsyncGenerator<string> {
     { temperature: 1.0, maxTokens: 400 },
   );
 
+  // Buffer the full response so we can strip markdown that may span chunks,
+  // then re-yield character-by-character to preserve the streaming UX.
+  let buffer = "";
   for await (const chunk of stream) {
-    yield chunk;
+    buffer += chunk;
+  }
+  const cleaned = stripMarkdown(buffer);
+  for (const char of cleaned) {
+    yield char;
   }
 }
 
