@@ -65,14 +65,22 @@ const turn1SSE = sseResponse([
 ]);
 
 // Turn 2: RadioGroup with Foundry vs KAITO (after pick_track=agentic_app)
+// Each turn must createSurface because prepareChatA2ui scopes surfaceIds per turn.
 const turn2SSE = sseResponse([
   { event: 'start', data: { sessionId: 'phase-a-test' } },
   {
     event: 'a2ui',
     data: {
       version: 'v0.9',
+      createSurface: { surfaceId: 'triage-inference', catalogId: 'kickstart', sendDataModel: false },
+    },
+  },
+  {
+    event: 'a2ui',
+    data: {
+      version: 'v0.9',
       updateComponents: {
-        surfaceId: 'triage-main',
+        surfaceId: 'triage-inference',
         components: [
           { id: 'root', component: 'Column', children: ['inference-group'] },
           {
@@ -82,7 +90,6 @@ const turn2SSE = sseResponse([
               { id: 'foundry', label: 'Azure AI Foundry', description: 'Managed model endpoints — no GPU nodes needed.', recommended: true },
               { id: 'kaito', label: 'KAITO on AKS', description: 'Run open-source models on GPU nodes in your cluster.', recommended: false },
             ],
-            value: undefined,
             action: { event: { name: 'select_inference' } },
           },
         ],
@@ -99,8 +106,15 @@ const turn3SSE = sseResponse([
     event: 'a2ui',
     data: {
       version: 'v0.9',
+      createSurface: { surfaceId: 'triage-kaito', catalogId: 'kickstart', sendDataModel: false },
+    },
+  },
+  {
+    event: 'a2ui',
+    data: {
+      version: 'v0.9',
       updateComponents: {
-        surfaceId: 'triage-main',
+        surfaceId: 'triage-kaito',
         components: [
           { id: 'root', component: 'Column', children: ['kaito-form'] },
           {
@@ -126,6 +140,15 @@ test.describe('Phase A: Triage DecisionCard flow (#1130)', () => {
     let turnCount = 0;
     const turns = [turn1SSE, turn2SSE, turn3SSE];
 
+    // Health check must return 200 so the app sends converse requests
+    await page.route('**/api/health', route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok' }),
+      }),
+    );
+
     await page.route('**/api/converse', async (route) => {
       const sse = turns[turnCount] ?? turn1SSE;
       turnCount++;
@@ -137,9 +160,10 @@ test.describe('Phase A: Triage DecisionCard flow (#1130)', () => {
     });
 
     await page.goto('/');
+    await page.waitForSelector('#landing-page', { timeout: 10_000 });
 
     // ── Turn 1: type a message and verify DecisionCard appears ───────────
-    const input = page.getByPlaceholder(/message|ask|type/i);
+    const input = page.getByRole('textbox', { name: 'Describe your app' });
     await input.fill('I want to build an AI chatbot on AKS');
     await input.press('Enter');
 
