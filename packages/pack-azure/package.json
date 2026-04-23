@@ -1,0 +1,49 @@
+{
+  "name": "@aks-kickstart/pack-azure",
+  "version": "1.0.1",
+  "description": "Azure pack — agents, skills, tools, user actions, and components for Kickstart v2",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server-manifest.js",
+      "types": "./dist/server-manifest.d.ts"
+    },
+    "./server-manifest": {
+      "import": "./dist/server-manifest.js",
+      "types": "./dist/server-manifest.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aks-kickstart/harness": "*",
+    "@openai/agents": "^0.8.4",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@fluentui/react-components": "*",
+    "@fluentui/react-icons": "*",
+    "typescript": "*",
+    "vitest": "*"
+  },
+  "peerDependencies": {
+    "@fluentui/react-components": "^9.0.0",
+    "@fluentui/react-icons": "^2.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  }
+}

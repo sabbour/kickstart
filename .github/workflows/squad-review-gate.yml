@@ -1,0 +1,169 @@
+name: Squad Review Gate
+on:
+  pull_request:
+    types: [labeled, unlabeled, opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  quality-slo-safety-brake:
+    # Blocks merge of velocity-oriented process PRs while any Quality SLO in
+    # .squad/velocity.md is 🔴. See issue #806 and the design proposal at
+    # https://github.com/sabbour/kickstart/issues/806#issuecomment-4288707735.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head (script + tests)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout base ref for velocity.md (prevents self-editing bypass)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          sparse-checkout: |
+            .squad/velocity.md
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+          path: base-ref
+      - name: Self-test the brake parser
+        # Cheap sanity check so a broken parser never silently lets PRs through.
+        run: node .squad/scripts/check-quality-slo-brake.mjs --self-test
+      - name: Evaluate Quality SLO safety brake
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          labels="$(printf '%s' "$PR_LABELS" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const a=JSON.parse(d||"[]");process.stdout.write(a.join(","))})')"
+          echo "Evaluating brake for labels: ${labels:-<none>}"
+          node .squad/scripts/check-quality-slo-brake.mjs \
+            --velocity-file=base-ref/.squad/velocity.md \
+            --labels="$labels"
+
+  check-squad-approval:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check squad approval labels
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const LOW_RISK_LABEL = 'squad:chore-auto';
+            const TRUSTED_RETRO_LABEL = 'retro-log';
+            const TRUSTED_RETRO_BRANCH_PREFIX = 'retro-log/pr-';
+            const TRUSTED_RETRO_AUTHORS = new Set(['github-actions[bot]', 'sabbour-squad-scribe[bot]']);
+            const TRUSTED_RETRO_ONLY_PATHS = new Set(['.squad/retro-log.md']);
+            const SENSITIVE_PATH_PATTERNS = [
+              /^\.github\/workflows\//i,
+              /(^|[\/._-])(auth|guardrail|guardrails|security)([\/._-]|$)/i,
+            ];
+
+            function isSecurityPatch(pr, labels) {
+              const securitySignals = [
+                pr.title,
+                pr.body,
+                pr.head?.ref,
+                ...labels,
+              ].filter(Boolean).join(' ');
+              return /security|cve-\d{4}-\d+|ghsa-|vuln|vulnerability/i.test(securitySignals);
+            }
+
+            function isSensitivePath(filename) {
+              return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(filename));
+            }
+
+            function isTrustedRetroLogPr(pr, labels, changedFiles) {
+              return (
+                labels.has(TRUSTED_RETRO_LABEL) &&
+                TRUSTED_RETRO_AUTHORS.has(pr.user?.login ?? '') &&
+                (pr.head?.ref ?? '').startsWith(TRUSTED_RETRO_BRANCH_PREFIX) &&
+                changedFiles.length > 0 &&
+                changedFiles.every((filename) => TRUSTED_RETRO_ONLY_PATHS.has(filename))
+              );
+            }
+
+            async function listChangedFiles(prNumber) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                per_page: 100,
+              });
+              return files.map((file) => file.filename);
+            }
+
+            const pr = context.payload.pull_request;
+            const labels = new Set(pr.labels.map((label) => label.name));
+            const changedFiles = await listChangedFiles(pr.number);
+            const trustedRetroLogPr = isTrustedRetroLogPr(pr, labels, changedFiles);
+            if (trustedRetroLogPr) {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: pr.head.sha,
+                state: 'success',
+                description: 'Squad review gate: trusted retro-log PR',
+                context: 'squad/review-gate'
+              });
+              return;
+            }
+            const leelaApproved = labels.has('leela:approved');
+            const zappApproved = labels.has('zapp:approved');
+            const nibblerApproved = labels.has('nibbler:approved');
+            const docsApproved = labels.has('docs:approved');
+            const docsNotApplicable = labels.has('docs:not-applicable');
+            const leelaRejected = labels.has('leela:rejected');
+            const zappRejected = labels.has('zapp:rejected');
+            const nibblerRejected = labels.has('nibbler:rejected');
+            const docsRejected = labels.has('docs:rejected');
+            const isLowRisk = labels.has(LOW_RISK_LABEL);
+            const touchesSensitivePaths = changedFiles.some(isSensitivePath);
+            const hasSecuritySignals = isSecurityPatch(pr, labels);
+
+            const requiresZapp = !isLowRisk || hasSecuritySignals || touchesSensitivePaths;
+            // Nibbler (code quality) is required on every path — per .squad/ceremonies.md
+            // the 4-way gate is the standard. Code review is cheap and Nibbler is fast,
+            // so low-risk PRs still get a code-quality pass.
+            const requiredApprovals = ['leela:approved', 'nibbler:approved'];
+            if (requiresZapp) {
+              requiredApprovals.push('zapp:approved');
+            }
+
+            const hasDocsMarker = docsApproved || docsNotApplicable;
+            const rejectionLabels = [];
+            if (leelaRejected) rejectionLabels.push('leela:rejected');
+            if (zappRejected && requiresZapp) rejectionLabels.push('zapp:rejected');
+            if (nibblerRejected) rejectionLabels.push('nibbler:rejected');
+            if (docsRejected) rejectionLabels.push('docs:rejected');
+
+            const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
+            const leelaStatus = leelaApproved ? '✅' : '⏳';
+            const zappStatus = zappApproved ? '✅' : (requiresZapp ? '⏳' : '➖');
+            const nibblerStatus = nibblerApproved ? '✅' : '⏳';
+            const docsStatus = docsApproved ? '✅' : docsNotApplicable ? '➖ N/A' : '⏳';
+
+            let state, description;
+            if (rejectionLabels.length > 0) {
+              state = 'failure';
+              description = `Squad review gate: rejected — ${rejectionLabels.join(', ')}`;
+            } else if (missingApprovals.length === 0 && hasDocsMarker) {
+              state = 'success';
+              description = isLowRisk && !requiresZapp
+                ? `Squad review gate: low-risk path Leela ✅ Nibbler ✅ Docs ${docsStatus}`
+                : `Squad review gate: Leela ✅ Zapp ✅ Nibbler ✅ Docs ${docsStatus}`;
+            } else {
+              state = 'pending';
+              description = isLowRisk && !requiresZapp
+                ? `Squad review gate: low-risk path Leela ${leelaStatus} Nibbler ${nibblerStatus} Docs ${docsStatus}`
+                : `Squad review gate: Leela ${leelaStatus} Zapp ${zappStatus} Nibbler ${nibblerStatus} Docs ${docsStatus}`;
+            }
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: pr.head.sha,
+              state,
+              description,
+              context: 'squad/review-gate'
+            });

@@ -1,0 +1,65 @@
+{
+  "name": "kickstart",
+  "private": true,
+  "version": "1.0.2",
+  "description": "AI-guided onboarding for deploying apps to AKS",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "packages/web/api"
+  ],
+  "squad": {
+    "worktrees": true
+  },
+  "scripts": {
+    "build": "npm run clean --workspaces --if-present && npm run build -w @aks-kickstart/harness && npm run build -w @aks-kickstart/pack-core -w @aks-kickstart/pack-azure -w @aks-kickstart/pack-aks-automatic -w @aks-kickstart/pack-github && npm run build -w @aks-kickstart/mcp-server && npm run build -w @aks-kickstart/web && npm run build -w @aks-kickstart/api",
+    "test": "npx vitest run",
+    "lint": "eslint packages/*/src/**/*.ts packages/*/src/**/*.tsx",
+    "api:build": "npm run build -w @aks-kickstart/harness && npm run build -w @aks-kickstart/api",
+    "clean": "npm run clean --workspaces --if-present",
+    "dev": "npm run build -w @aks-kickstart/harness && npm run build -w @aks-kickstart/api && concurrently -n vite,func,swa -c cyan,magenta,yellow \"npm run dev:vite\" \"npm run dev:func\" \"npm run dev:swa\"",
+    "dev:vite": "cd packages/web && npx vite --port 5173",
+    "dev:func": "cd packages/web/api && func start --cors '*' --port 7071",
+    "dev:swa": "node scripts/dev-swa.mjs",
+    "dev:web": "npx serve packages/web -l 4280 --no-clipboard",
+    "deploy": "node scripts/deploy-swa.mjs",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:status": "changeset status"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "overrides": {
+    "cookie": "0.7.2",
+    "tmp": "0.2.5",
+    "hono": "4.12.14",
+    "follow-redirects": "1.16.0"
+  },
+  "optionalDependencies": {
+    "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.16",
+    "@rollup/rollup-linux-x64-gnu": "4.60.1",
+    "lightningcss-linux-x64-gnu": "1.32.0"
+  },
+  "devDependencies": {
+    "@azure/static-web-apps-cli": "^2.0.8",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "@changesets/changelog-github": "^0.6.0",
+    "@changesets/cli": "^2.31.0",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.59.1",
+    "@types/jszip": "^3.4.1",
+    "@types/node": "^25.6.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.2",
+    "@typescript-eslint/parser": "^8.58.2",
+    "concurrently": "^9.2.1",
+    "eslint": "^10.2.1",
+    "monaco-editor": "0.55.1",
+    "serve": "^14.2.6",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.2"
+  }
+}

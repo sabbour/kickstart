@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18.035 17.5">
+  <g transform="translate(-0.993,-1.174)">
+    <g transform="matrix(1.015,0,0,1.015,16.902,-2.699)">
+      <path d="m -6.849,4.272 a 1.119,1.11 0 0 0 -0.429,0.109 l -5.852,2.796 a 1.119,1.11 0 0 0 -0.606,0.753 l -1.444,6.281 a 1.119,1.11 0 0 0 0.152,0.851 1.119,1.11 0 0 0 0.064,0.088 l 4.051,5.037 a 1.119,1.11 0 0 0 0.875,0.418 l 6.496,-0.002 a 1.119,1.11 0 0 0 0.875,-0.417 L 1.382,15.149 A 1.119,1.11 0 0 0 1.598,14.21 L 0.152,7.929 A 1.119,1.11 0 0 0 -0.453,7.176 L -6.307,4.381 A 1.119,1.11 0 0 0 -6.849,4.272 Z" style="fill:#326ce5;fill-opacity:1;stroke:none"/>
+      <path d="M -6.852,3.818 A 1.181,1.172 0 0 0 -7.304,3.933 l -6.179,2.951 a 1.181,1.172 0 0 0 -0.639,0.795 l -1.524,6.631 a 1.181,1.172 0 0 0 0.16,0.899 1.181,1.172 0 0 0 0.067,0.093 l 4.276,5.317 a 1.181,1.172 0 0 0 0.924,0.441 l 6.858,-0.002 a 1.181,1.172 0 0 0 0.924,-0.44 l 4.275,-5.318 a 1.181,1.172 0 0 0 0.228,-0.991 L 0.539,7.678 A 1.181,1.172 0 0 0 -0.1,6.883 L -6.279,3.932 A 1.181,1.172 0 0 0 -6.852,3.818 Z m 0.003,0.455 a 1.119,1.11 0 0 1 0.543,0.109 l 5.853,2.795 A 1.119,1.11 0 0 1 0.152,7.929 L 1.598,14.21 a 1.119,1.11 0 0 1 -0.216,0.939 l -4.049,5.037 a 1.119,1.11 0 0 1 -0.875,0.417 l -6.496,0.002 a 1.119,1.11 0 0 1 -0.875,-0.418 l -4.051,-5.037 a 1.119,1.11 0 0 1 -0.064,-0.088 1.119,1.11 0 0 1 -0.152,-0.851 l 1.444,-6.281 a 1.119,1.11 0 0 1 0.606,-0.753 l 5.852,-2.796 a 1.119,1.11 0 0 1 0.429,-0.109 z" style="fill:#ffffff;fill-opacity:1;stroke:none"/>
+    </g>
+    <text x="10" y="16.812" text-anchor="middle" font-family="Arial" font-size="2.822" fill="#fff">rct</text>
+    <g transform="translate(0,0)">
+      <!-- Back page (template stacking) -->
+      <rect x="7.8" y="4" width="5.5" height="7" rx="0.4" fill="none" stroke="#fff" stroke-width="0.6" opacity="0.5"/>
+      <!-- Front page (document with arrow) -->
+      <rect x="6.5" y="5" width="5.5" height="7" rx="0.4" fill="none" stroke="#fff" stroke-width="0.9"/>
+      <!-- Horizontal lines on document -->
+      <line x1="7.7" y1="6.7" x2="10.8" y2="6.7" stroke="#fff" stroke-width="0.6" stroke-linecap="round"/>
+      <line x1="7.7" y1="8.3" x2="10.8" y2="8.3" stroke="#fff" stroke-width="0.6" stroke-linecap="round"/>
+      <line x1="7.7" y1="9.9" x2="9.5" y2="9.9" stroke="#fff" stroke-width="0.6" stroke-linecap="round"/>
+      <!-- Arrow pointing right (claim) -->
+      <line x1="10.5" y1="10.5" x2="13.5" y2="10.5" stroke="#fff" stroke-width="0.9" stroke-linecap="round"/>
+      <polyline points="12.5,9.5 13.5,10.5 12.5,11.5" fill="none" stroke="#fff" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

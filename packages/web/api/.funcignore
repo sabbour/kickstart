@@ -1,0 +1,54 @@
+# .funcignore — Azure Functions Core Tools packaging exclusion manifest
+#
+# IMPORTANT: node_modules/ is intentionally NOT listed here.
+# Azure/static-web-apps-deploy@v1 excludes node_modules/ from the API zip by
+# default (platform-level packager behavior, independent of .gitignore).
+# The postbuild script (scripts/materialize-api-externals.mjs) copies the
+# externalized OTel + AppInsights packages from repo-root node_modules into
+# packages/web/api/node_modules/ so they ship in the SWA deployment zip.
+# Listing node_modules/ here would re-exclude those materialized packages,
+# breaking all API endpoints at runtime (MODULE_NOT_FOUND → 0 routes → 404).
+# See: https://github.com/sabbour/kickstart/issues/1041
+#
+# Upstream reference: Azure/azure-functions-core-tools
+#   src/Cli/func/StaticResources/funcignore (SHA 17bd0f697c2d413e7ca64b117dd1456a8fdda716)
+
+# Source maps — bloat the upload zip, not needed at runtime
+*.js.map
+
+# TypeScript source — compiled to dist/, raw .ts files serve no purpose in deploy
+*.ts
+
+# Git internals
+.git*
+
+# Editor / local config
+.vscode
+
+# Local development settings — must never ship (contains secrets)
+local.settings.json
+local.settings.json.template
+
+# Docs
+getting_started.md
+CHANGELOG.md
+OBSERVABILITY.md
+
+# Test fixtures
+test
+
+# TypeScript compiler artifacts
+*.tsbuildinfo
+
+# Build config and source — not needed at runtime (P2, per Zapp review)
+src/
+scripts/
+esbuild.config.mjs
+tsconfig.json
+
+# Node type definitions and dev-only packages — not needed at runtime
+node_modules/@types/
+node_modules/azure-functions-core-tools/
+node_modules/typescript/
+node_modules/esbuild/
+node_modules/vite/

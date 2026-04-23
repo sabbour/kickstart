@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "defaultModel": "gpt-5.4",
+  "agentModelOverrides": {
+    "zapp": "gpt-5.3-codex"
+  },
+  "worktrees": true
+}

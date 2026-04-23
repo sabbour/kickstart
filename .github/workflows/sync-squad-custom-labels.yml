@@ -1,0 +1,93 @@
+# Custom companion to sync-squad-labels.yml.
+#
+# The upstream sync-squad-labels.yml workflow is overwritten on every
+# `squad upgrade`, which would clobber any locally-added labels. This
+# workflow lives alongside it and syncs labels that are NOT in the
+# upstream list (review gates, pulse/retro labels, release PRs, etc.).
+#
+# Same upsert pattern as sync-squad-labels.yml, but it also re-runs when this
+# workflow changes so new custom labels roll out on merge.
+
+name: Sync Squad Custom Labels
+
+on:
+  push:
+    paths:
+      - '.squad/team.md'
+      - '.ai-team/team.md'
+      - '.github/workflows/sync-squad-custom-labels.yml'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  sync-custom-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync custom squad labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: 'process',           color: '5319E7', description: 'Process improvement tracked by the weekly pulse' },
+              { name: 'docs:sweep',        color: 'C5DEF5', description: 'Rolling docs sweep issue' },
+              { name: 'skip-docs',         color: 'BFDADC', description: 'Explicitly bypass docs and changeset gate for this PR' },
+              { name: 'pulse:daily',       color: 'BFD4F2', description: 'Daily pulse rolling issue' },
+              { name: 'pulse:weekly',      color: '6B8EB5', description: 'Weekly pulse issue' },
+              { name: 'release',           color: '0E8A16', description: 'Release PR opened by the cadence workflow' },
+              { name: 'estimate:S',        color: '0E8A16', description: 'Small issue (~15 min, 1 point) — fits in a 6h sprint' },
+              { name: 'estimate:M',        color: '1D76DB', description: 'Medium issue (~1 hour, 3 points) — fits in a 6h sprint' },
+              { name: 'estimate:L',        color: 'FBCA04', description: 'Large issue (~3 hours, 8 points) — at most one per 6h sprint' },
+              { name: 'estimate:XL',       color: 'D93F0B', description: 'Extra-large issue (>3 hours, 20 points) — does NOT enter a sprint; must be split during triage' },
+              { name: 'squad:chore-auto',  color: 'BFDADC', description: 'Opt in low-risk PR for auto-merge when gates pass' },
+              { name: 'leela:approved',    color: '0E8A16', description: 'Architecture review approved' },
+              { name: 'leela:rejected',    color: 'D93F0B', description: 'Architecture review rejected' },
+              { name: 'zapp:approved',     color: '0E8A16', description: 'Security review approved' },
+              { name: 'zapp:rejected',     color: 'D93F0B', description: 'Security review rejected' },
+              { name: 'nibbler:approved',  color: '0E8A16', description: 'Code quality review approved' },
+              { name: 'nibbler:rejected',  color: 'D93F0B', description: 'Code quality review rejected' },
+              { name: 'docs:approved',     color: '0E8A16', description: 'Docs review approved — user-facing docs updated or in-PR changeset landed' },
+              { name: 'docs:rejected',     color: 'D93F0B', description: 'Docs review rejected — required documentation is missing or stale' },
+              { name: 'docs:not-applicable', color: 'BFD4F2', description: 'Docs gate satisfied without docs changes — DP explicitly declared Docs impact: N/A' },
+              { name: 'retro-log',         color: 'C5DEF5', description: 'Retrospective log entry' },
+              { name: 'process:succeeded', color: '0E8A16', description: 'Process experiment hit its target signal' },
+              { name: 'process:no-effect', color: 'FBCA04', description: 'Process experiment inside noise band — extended' },
+              { name: 'process:reverted',  color: 'D93F0B', description: 'Process experiment regressed signal — revert recommended' }
+            ];
+
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name
+                });
+                await github.rest.issues.updateLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  color: label.color,
+                  description: label.description
+                });
+                core.info(`Updated label: ${label.name}`);
+              } catch (err) {
+                if (err.status === 404) {
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label.name,
+                    color: label.color,
+                    description: label.description
+                  });
+                  core.info(`Created label: ${label.name}`);
+                } else {
+                  throw err;
+                }
+              }
+            }
+
+            core.info(`Custom label sync complete: ${labels.length} labels synced`);

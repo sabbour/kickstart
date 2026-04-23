@@ -1,0 +1,109 @@
+# Adds squad-tagged issues and PRs to a GitHub Projects v2 board.
+#
+# Replaces the project-board steps that were removed from
+# heartbeat / triage / issue-assign in Squad v0.9.1. Set the repo
+# variable SQUAD_PROJECT_NUMBER to the target project number to enable.
+# If the project lives under a different owner or needs cross-repo
+# access, provide a PAT via the COPILOT_ASSIGN_TOKEN secret; otherwise
+# this falls back to the default GITHUB_TOKEN.
+
+name: Squad Project Sync
+
+on:
+  issues:
+    types: [opened, labeled, reopened]
+  pull_request:
+    types: [opened, reopened]
+  workflow_dispatch:
+
+permissions:
+  issues: read
+  contents: read
+  repository-projects: write
+
+jobs:
+  add-to-project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add issue or PR to squad project
+        uses: actions/github-script@v7
+        env:
+          PROJECT_NUMBER: ${{ vars.SQUAD_PROJECT_NUMBER }}
+          GH_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN || secrets.GITHUB_TOKEN }}
+        with:
+          github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const projectNumberRaw = process.env.PROJECT_NUMBER;
+            if (!projectNumberRaw) {
+              core.info('SQUAD_PROJECT_NUMBER repo variable is not set — skipping project sync.');
+              return;
+            }
+            const projectNumber = parseInt(projectNumberRaw, 10);
+            if (Number.isNaN(projectNumber)) {
+              core.info(`SQUAD_PROJECT_NUMBER is not a number ("${projectNumberRaw}") — skipping.`);
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const payload = context.payload;
+            let contentNodeId = null;
+            let qualifies = false;
+
+            if (payload.issue) {
+              const labels = (payload.issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+              qualifies = labels.some(name => name === 'squad' || name.startsWith('squad:'));
+              if (!qualifies) {
+                core.info(`Issue #${payload.issue.number} has no squad label — skipping.`);
+                return;
+              }
+              contentNodeId = payload.issue.node_id;
+            } else if (payload.pull_request) {
+              const pr = payload.pull_request;
+              const title = pr.title || '';
+              const branch = (pr.head && pr.head.ref) || '';
+              qualifies = title.startsWith('squad/') || branch.startsWith('squad/');
+              if (!qualifies) {
+                core.info(`PR #${pr.number} title/branch does not start with "squad/" — skipping.`);
+                return;
+              }
+              contentNodeId = pr.node_id;
+            } else {
+              core.info('Manual dispatch with no issue/PR context — nothing to add.');
+              return;
+            }
+
+            // Resolve the project ID. Try user() first, then organization().
+            const projectQuery = `
+              query($owner: String!, $number: Int!) {
+                user(login: $owner)         { projectV2(number: $number) { id } }
+                organization(login: $owner) { projectV2(number: $number) { id } }
+              }`;
+
+            let projectId = null;
+            try {
+              const result = await github.graphql(projectQuery, { owner, number: projectNumber });
+              projectId = (result.user && result.user.projectV2 && result.user.projectV2.id)
+                || (result.organization && result.organization.projectV2 && result.organization.projectV2.id);
+            } catch (err) {
+              core.warning(`Failed to resolve project: ${err.message}`);
+              return;
+            }
+
+            if (!projectId) {
+              core.warning(`Could not find ProjectV2 #${projectNumber} for owner "${owner}".`);
+              return;
+            }
+
+            const addMutation = `
+              mutation($projectId: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                  item { id }
+                }
+              }`;
+
+            try {
+              const res = await github.graphql(addMutation, { projectId, contentId: contentNodeId });
+              core.info(`Added item ${res.addProjectV2ItemById.item.id} to project #${projectNumber}.`);
+            } catch (err) {
+              core.warning(`Failed to add item to project: ${err.message}`);
+            }

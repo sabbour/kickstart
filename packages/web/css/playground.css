@@ -1,0 +1,44 @@
+/* ----------------------------------------------------------------
+   Playground (sidebar layout)
+   Renders inside Layout → .app-shell → .app-layout → .chat-main
+   all of which have overflow: hidden. We must fill the space and
+   manage our own scroll containers.
+
+   Component styling is handled by Fluent UI v9 (makeStyles + tokens).
+   This file retains layout-only rules: flex containers and scroll
+   areas for the Create / Components / Icons / Workspace views.
+   ---------------------------------------------------------------- */
+
+/* Fill the entire .chat-main area */
+.playground-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--fontFamilyBase);
+}
+
+/* ---- Components / Icons scroll container ---- */
+.playground-gallery-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px;
+}
+
+/* ---- Create View: JSON Editor ---- */
+.playground-create-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 40px 20px;
+  background: var(--color-neutral-background-2);
+}
+
+/* ---- Rendered Custom Surfaces ---- */
+.playground-surfaces {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

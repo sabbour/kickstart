@@ -1,0 +1,189 @@
+name: Squad · Shipping Forecast
+
+# Monday 17:00 Pacific (00:00 UTC Tuesday): recompute milestone shipping
+# forecasts from the latest velocity snapshot and issue estimate labels.
+
+on:
+  schedule:
+    - cron: '0 0 * * 2'
+  workflow_dispatch:
+    inputs:
+      milestone:
+        description: 'Milestone title to forecast (exact match)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Build milestone forecast
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+
+            const VELOCITY_PATH = '.squad/velocity.md';
+            const FORECAST_MARKER = '<!-- squad-shipping-forecast -->';
+            const SIZE_POINTS = { S: 1, M: 3, L: 8, XL: 20 };
+
+            if (!fs.existsSync(VELOCITY_PATH)) {
+              core.setFailed('Missing .squad/velocity.md. Merge the velocity report workflow first.');
+              return;
+            }
+
+            const velocityText = fs.readFileSync(VELOCITY_PATH, 'utf8');
+            const latestSnapshot = velocityText.match(/## Snapshot · (\d{4}-\d{2}-\d{2})[\s\S]*?(?=\n## Snapshot · |$)/);
+            if (!latestSnapshot) {
+              core.setFailed('Unable to parse the latest velocity snapshot.');
+              return;
+            }
+
+            const snapshotDate = latestSnapshot[1];
+            const snapshotBody = latestSnapshot[0];
+            const medianMatch = snapshotBody.match(/Median throughput: \*\*(\d+)\*\* size-points\/week/);
+            const bandMatch = snapshotBody.match(/Noise band: \*\*(\d+) → (\d+)\*\* size-points\/week/);
+            if (!medianMatch || !bandMatch) {
+              core.setFailed('Velocity snapshot is missing throughput fields.');
+              return;
+            }
+
+            const velocityMedian = Number.parseInt(medianMatch[1], 10);
+            const velocityP10 = Number.parseInt(bandMatch[1], 10);
+            const velocityP90 = Number.parseInt(bandMatch[2], 10);
+
+            const now = new Date();
+            const today = now.toISOString().slice(0, 10);
+            const milestoneInput = core.getInput('milestone');
+
+            const allMilestones = await github.paginate(github.rest.issues.listMilestones, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const milestones = milestoneInput
+              ? allMilestones.filter((milestone) => milestone.title === milestoneInput)
+              : allMilestones;
+
+            if (!milestones.length) {
+              core.setFailed(milestoneInput
+                ? `No open milestone found with title "${milestoneInput}".`
+                : 'No open milestones found.');
+              return;
+            }
+
+            const addDays = (start, days) => {
+              const date = new Date(start);
+              date.setUTCDate(date.getUTCDate() + Math.ceil(days));
+              return date.toISOString().slice(0, 10);
+            };
+
+            const issuePoints = (issue) => {
+              const estimate = issue.labels
+                .map((label) => typeof label === 'string' ? label : label.name)
+                .find((name) => /^estimate:(S|M|L|XL)$/i.test(name ?? ''));
+              if (!estimate) {
+                return { estimate: 'unknown', points: 0 };
+              }
+              const size = estimate.split(':')[1].toUpperCase();
+              return { estimate: size, points: SIZE_POINTS[size] ?? 0 };
+            };
+
+            const forecastForMilestone = async (milestone) => {
+              const issues = await github.paginate(github.rest.issues.listForRepo, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                milestone: String(milestone.number),
+                per_page: 100,
+              });
+
+              const openIssues = issues.filter((issue) => !issue.pull_request);
+              const enriched = openIssues.map((issue) => {
+                const { estimate, points } = issuePoints(issue);
+                return { issue, estimate, points };
+              });
+
+              const remainingIssues = enriched.length;
+              const remainingPoints = enriched.reduce((sum, item) => sum + item.points, 0);
+              const missingEstimates = enriched.filter((item) => item.estimate === 'unknown');
+              const criticalPath = [...enriched]
+                .filter((item) => item.points > 0)
+                .sort((a, b) => b.points - a.points || a.issue.number - b.issue.number)
+                .slice(0, 3);
+
+              let shipLine = 'Ship: insufficient velocity data';
+              if (remainingPoints === 0) {
+                shipLine = `Ship: ${today} (no remaining estimated work)`;
+              } else if (velocityP10 > 0 && velocityP90 > 0) {
+                const earlyDate = addDays(now, (remainingPoints / velocityP90) * 7);
+                const lateDate = addDays(now, (remainingPoints / velocityP10) * 7);
+                shipLine = `Ship: ${earlyDate}–${lateDate} (range derived from current velocity band)`;
+              }
+
+              const summary = [
+                `Remaining: ${remainingIssues} issues, ${remainingPoints} pts.`,
+                `Velocity: ${velocityMedian} pts/wk (P10 ${velocityP10}, P90 ${velocityP90}).`,
+                shipLine,
+                missingEstimates.length
+                  ? `Missing estimates: ${missingEstimates.map((item) => `#${item.issue.number}`).join(', ')}.`
+                  : 'Missing estimates: none.',
+              ].join(' ');
+
+              const bodyLines = [
+                FORECAST_MARKER,
+                `### Shipping forecast (${today})`,
+                '',
+                `Velocity snapshot: ${snapshotDate}`,
+                '',
+                summary,
+                '',
+                'Critical path issues:',
+                ...(criticalPath.length
+                  ? criticalPath.map((item) => `- #${item.issue.number} (${item.points} pts) ${item.issue.title}`)
+                  : ['- None']),
+              ];
+
+              const baseDescription = (milestone.description || '')
+                .replace(new RegExp(`${FORECAST_MARKER}[\\s\\S]*$`), '')
+                .trimEnd();
+              const nextDescription = `${baseDescription}${baseDescription ? '\n\n' : ''}${bodyLines.join('\n')}`.trim();
+
+              await github.rest.issues.updateMilestone({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                milestone_number: milestone.number,
+                title: milestone.title,
+                description: nextDescription,
+                due_on: milestone.due_on,
+                state: milestone.state,
+              });
+
+              return { milestone, summary, criticalPath, missingEstimates };
+            };
+
+            const reports = [];
+            for (const milestone of milestones) {
+              reports.push(await forecastForMilestone(milestone));
+            }
+
+            await core.summary
+              .addHeading('Shipping forecast')
+              .addRaw(reports.map((report) => [
+                `### ${report.milestone.title}`,
+                report.summary,
+                report.criticalPath.length
+                  ? `Critical path: ${report.criticalPath.map((item) => `#${item.issue.number}`).join(', ')}`
+                  : 'Critical path: none',
+              ].join('\n')).join('\n\n'))
+              .write();
