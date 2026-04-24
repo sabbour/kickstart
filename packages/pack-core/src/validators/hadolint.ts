@@ -3,20 +3,25 @@
  *
  * Binary resolution order:
  *   1. Check PATH for `hadolint`
- *   2. Download pinned release to node_modules/.cache on first use
+ *   2. Download pinned release to node_modules/.cache on first use (with SHA256 verification)
  *   3. Graceful skip with reason if unavailable
  *
  * Security: content is piped to stdin — no temp files, no shell expansion.
+ * Downloaded binary is SHA256-verified before execution (Zapp supply-chain requirement).
  */
 
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, chmodSync, createWriteStream } from 'node:fs';
+import { existsSync, mkdirSync, chmodSync, createWriteStream, readFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { get as httpsGet } from 'node:https';
+import { createHash } from 'node:crypto';
 import type { ValidatorResult, Violation } from './index.js';
 
 const HADOLINT_VERSION = 'v2.12.0';
 const HADOLINT_URL = `https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64`;
+
+/** SHA256 checksum of hadolint v2.12.0 Linux x86_64 binary — pinned for supply-chain integrity. */
+export const HADOLINT_SHA256 = '56de6d5e5ec427e17b74fa48d51271c7fc0d61244bf5c90e828aab8362d55010';
 
 /** Cache directory for downloaded binaries. */
 function cacheDir(): string {
@@ -24,7 +29,7 @@ function cacheDir(): string {
 }
 
 /** Attempt to find hadolint on PATH. */
-function findOnPath(): string | null {
+export function findOnPath(): string | null {
   try {
     const result = execFileSync('which', ['hadolint'], {
       encoding: 'utf-8',
@@ -37,13 +42,28 @@ function findOnPath(): string | null {
   }
 }
 
-/** Download hadolint to cache directory. Returns path or null on failure. */
+/** Verify SHA256 checksum of a file. Returns true if it matches. */
+export function verifySha256(filePath: string, expectedHash: string): boolean {
+  try {
+    const data = readFileSync(filePath);
+    const hash = createHash('sha256').update(data).digest('hex');
+    return hash === expectedHash;
+  } catch {
+    return false;
+  }
+}
+
+/** Download hadolint to cache directory with checksum verification. Returns path or null on failure. */
 async function downloadHadolint(): Promise<string | null> {
   const dir = cacheDir();
   const binaryPath = join(dir, 'hadolint');
 
   if (existsSync(binaryPath)) {
-    return binaryPath;
+    if (verifySha256(binaryPath, HADOLINT_SHA256)) {
+      return binaryPath;
+    }
+    // Cached binary failed checksum — remove and re-download
+    try { unlinkSync(binaryPath); } catch { /* ignore */ }
   }
 
   try {
@@ -75,6 +95,12 @@ async function downloadHadolint(): Promise<string | null> {
         res.pipe(ws);
         ws.on('finish', () => {
           ws.close();
+          // Verify checksum before trusting the binary (Zapp supply-chain requirement)
+          if (!verifySha256(binaryPath, HADOLINT_SHA256)) {
+            try { unlinkSync(binaryPath); } catch { /* ignore */ }
+            resolve(null);
+            return;
+          }
           try {
             chmodSync(binaryPath, 0o755);
             resolve(binaryPath);
@@ -94,10 +120,14 @@ async function downloadHadolint(): Promise<string | null> {
   });
 }
 
-/** Resolve hadolint binary path: PATH → cache → download → null. */
+/** Resolve hadolint binary path: PATH (with SHA256 check) → cache → download → null. */
 export async function resolveHadolint(): Promise<string | null> {
   const onPath = findOnPath();
-  if (onPath) return onPath;
+  if (onPath) {
+    // Never trust an unverified binary — even on PATH (Zapp supply-chain requirement)
+    if (verifySha256(onPath, HADOLINT_SHA256)) return onPath;
+    // PATH binary failed checksum — fall through to cached/downloaded copy
+  }
 
   return downloadHadolint();
 }
@@ -117,6 +147,32 @@ function mapSeverity(level: string): 'error' | 'warning' | 'info' {
   }
 }
 
+/**
+ * Well-known hadolint rule → one-line fix hint mapping.
+ * Keeps the UI actionable without piping raw wiki content.
+ */
+export const HADOLINT_FIX_HINTS: Record<string, string> = {
+  DL3000: 'Use absolute WORKDIR paths.',
+  DL3001: 'Do not use `apt-get upgrade` or `dist-upgrade` in Dockerfiles.',
+  DL3002: 'Last USER should not be root.',
+  DL3003: 'Use WORKDIR instead of `cd` to switch directories.',
+  DL3004: 'Do not use sudo — the container already runs as root unless USER is set.',
+  DL3006: 'Always tag the base image version explicitly.',
+  DL3007: 'Pin the base image to a specific version tag (avoid `:latest`).',
+  DL3008: 'Pin package versions in `apt-get install` (e.g., `curl=7.68.0-1ubuntu2`).',
+  DL3009: 'Delete apt-get lists after install: `rm -rf /var/lib/apt/lists/*`.',
+  DL3013: 'Pin pip package versions.',
+  DL3015: 'Add `--no-install-recommends` to `apt-get install`.',
+  DL3018: 'Pin apk package versions.',
+  DL3020: 'Use COPY instead of ADD for local files.',
+  DL3025: 'Use JSON notation for CMD and ENTRYPOINT (exec form).',
+  DL3027: 'Do not use `apt`; use `apt-get` or `apt-cache` instead.',
+  DL3028: 'Pin npm package versions in `npm install`.',
+  DL3059: 'Combine multiple consecutive RUN instructions to reduce layers.',
+  DL4006: 'Set `SHELL ["/bin/bash", "-o", "pipefail", "-c"]` before RUN with pipes.',
+  SC2086: 'Double quote variables to prevent globbing and word splitting.',
+};
+
 /** Raw hadolint JSON output item. */
 interface HadolintItem {
   line: number;
@@ -126,7 +182,21 @@ interface HadolintItem {
 }
 
 /**
+ * Sanitize a violation message — cap length, strip control chars.
+ * Prevents untrusted validator output from polluting agent/UI context (Zapp requirement).
+ */
+const MAX_MESSAGE_LENGTH = 256;
+export function sanitizeMessage(msg: string): string {
+  // Strip ANSI escape sequences and control characters
+  const cleaned = msg.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  return cleaned.length > MAX_MESSAGE_LENGTH
+    ? cleaned.slice(0, MAX_MESSAGE_LENGTH) + '…'
+    : cleaned;
+}
+
+/**
  * Parse hadolint JSON output into our Violation schema.
+ * Includes fix hints for well-known rules and sanitizes messages.
  * Exported for unit testing.
  */
 export function parseHadolintOutput(json: string): Violation[] {
@@ -139,12 +209,17 @@ export function parseHadolintOutput(json: string): Violation[] {
 
   if (!Array.isArray(items)) return [];
 
-  return items.map((item) => ({
-    rule: item.code ?? 'unknown',
-    severity: mapSeverity(item.level ?? 'info'),
-    line: item.line ?? 0,
-    message: item.message ?? '',
-  }));
+  return items.map((item) => {
+    const rule = item.code ?? 'unknown';
+    const fix = HADOLINT_FIX_HINTS[rule];
+    return {
+      rule,
+      severity: mapSeverity(item.level ?? 'info'),
+      line: item.line ?? 0,
+      message: sanitizeMessage(item.message ?? ''),
+      ...(fix ? { fix } : {}),
+    };
+  });
 }
 
 /**
@@ -187,7 +262,7 @@ export async function runHadolint(
         path,
         status: 'skipped',
         violations: [],
-        reason: `hadolint execution failed: ${stderr || 'unknown error'}`,
+        reason: `hadolint execution failed: ${sanitizeMessage(stderr || 'unknown error')}`,
       });
     });
 
@@ -198,7 +273,7 @@ export async function runHadolint(
           path,
           status: 'skipped',
           violations: [],
-          reason: `hadolint exited with code ${code}: ${stderr}`,
+          reason: `hadolint exited with code ${code}: ${sanitizeMessage(stderr)}`,
         });
         return;
       }

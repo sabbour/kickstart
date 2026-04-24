@@ -9,6 +9,15 @@ import type { ValidatorResult } from '../validators/index.js';
 /** Maximum content size per file (10 MB) — Zapp advisory. */
 const MAX_CONTENT_BYTES = 10 * 1024 * 1024;
 
+/** Maximum number of files per invocation — Zapp input cap. */
+const MAX_FILE_COUNT = 20;
+
+/** Maximum aggregate bytes across all files (50 MB) — Zapp input cap. */
+const MAX_AGGREGATE_BYTES = 50 * 1024 * 1024;
+
+/** Maximum violations surfaced per file — prevents unbounded output. */
+const MAX_VIOLATIONS_PER_FILE = 25;
+
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const ArtifactFileSchema = z.object({
@@ -23,12 +32,19 @@ const ValidateArtifactsInputSchema = z.object({
   files: z
     .array(ArtifactFileSchema)
     .min(1)
+    .max(MAX_FILE_COUNT, `Cannot validate more than ${MAX_FILE_COUNT} files per invocation`)
     .describe(
       'Array of in-memory artifacts to validate. Each entry includes the file path and its content. ' +
       'The dispatcher routes each file to the appropriate validator based on filename/extension: ' +
-      'Dockerfile → hadolint, others → skipped (no validator yet).',
+      `Dockerfile → hadolint, others → skipped (no validator yet). Max ${MAX_FILE_COUNT} files per call.`,
     ),
-});
+}).refine(
+  (input) => {
+    const totalBytes = input.files.reduce((sum, f) => sum + Buffer.byteLength(f.content, 'utf-8'), 0);
+    return totalBytes <= MAX_AGGREGATE_BYTES;
+  },
+  { message: `Aggregate content size exceeds ${MAX_AGGREGATE_BYTES} byte limit` },
+);
 
 /** Output schema returned as JSON to the LLM. */
 export const ValidateArtifactsResultSchema = z.object({
@@ -94,9 +110,28 @@ export const validateArtifactsTool: ToolContribution = {
       'Returns per-file status (pass/fail/skipped) with detailed violations including rule ID, severity, line number, and message.',
     parameters: ValidateArtifactsInputSchema,
     execute: async (input): Promise<string> => {
-      const results = await Promise.all(
+      // Aggregate byte cap (Zapp input boundary)
+      const totalBytes = input.files.reduce((sum, f) => sum + Buffer.byteLength(f.content, 'utf-8'), 0);
+      if (totalBytes > MAX_AGGREGATE_BYTES) {
+        return JSON.stringify({
+          results: [{
+            path: '*',
+            status: 'skipped' as const,
+            violations: [],
+            reason: `Aggregate content size (${totalBytes} bytes) exceeds ${MAX_AGGREGATE_BYTES} byte limit`,
+          }],
+        });
+      }
+
+      const rawResults = await Promise.all(
         input.files.map((f) => dispatch(f.path, f.content)),
       );
+
+      // Cap violations per file to prevent unbounded output (Zapp untrusted-output boundary)
+      const results = rawResults.map((r) => ({
+        ...r,
+        violations: r.violations.slice(0, MAX_VIOLATIONS_PER_FILE),
+      }));
 
       const output: ValidateArtifactsResult = { results };
       return JSON.stringify(output);

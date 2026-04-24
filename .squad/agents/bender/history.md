@@ -2,6 +2,18 @@
 
 ## Learnings
 
+### 2026-04-24T04:32:55-07:00 — Issue #10: core.validate_artifacts + hadolint hardening
+
+**Task:** Implement approved DP for #10 — harden validate_artifacts tool with input caps, fix hints, supply-chain verification, and output sanitization.
+
+**Outcome:** PR #27 opened (draft) targeting `dev`.
+
+**Key learnings:**
+- (2026-04-24T04:32:55-07:00) The `@openai/agents` SDK catches zod validation errors in `tool.invoke()` and returns them as error strings rather than throwing — tests that expect `rejects.toThrow()` on schema violations need to assert on the returned string content instead.
+- (2026-04-24T04:32:55-07:00) hadolint v2.12.0 Linux x86_64 SHA256: `56de6d5e5ec427e17b74fa48d51271c7fc0d61244bf5c90e828aab8362d55010` — pinned for supply-chain integrity in both code and CI.
+- (2026-04-24T04:32:55-07:00) Violation output sanitization (ANSI stripping, message cap, violation count cap) is critical for the untrusted-output boundary — validator stderr/stdout must never flow raw into agent prompts or UI rendering.
+- (2026-04-24T04:32:55-07:00) Decision filed: retry-exhaustion UX shows "Unable to auto-fix — manual review recommended" after 2 failed retries; skipped state always surfaces a warning, never silently treated as pass.
+
 ### 2026-04-24T00:01:12-07:00 — Issue #5 DP drafting
 ### 2026-04-23T15:53:28-07:00 — Issue #16 implementation: chat-tier default model
 

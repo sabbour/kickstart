@@ -1,12 +1,12 @@
 /**
  * @file validate_artifacts.test.ts
- * @suite Phase C → Phase 1 — core.validate_artifacts tool (#1136)
+ * @suite Phase C → Phase 1 — core.validate_artifacts tool (#10)
  *
- * Updated from the stub test to match the new dispatcher architecture.
- * Input is now `files: {path, content}[]` (not `files: string[]`).
+ * Tests dispatcher architecture, input caps, and output capping.
+ * Input is `files: {path, content}[]`.
  * Tool dispatches to hadolint for Dockerfiles, skips other file types.
  *
- * @depends #1136 (validate_artifacts rewrite)
+ * @depends #10 (validate_artifacts + hadolint)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -74,6 +74,88 @@ describe('core.validate_artifacts', () => {
         { path: 'Dockerfile', content: 'FROM node:20' },
       ]);
       expect(() => JSON.parse(String(raw))).not.toThrow();
+    });
+
+    it('routes .dockerfile extension to hadolint', async () => {
+      const { runHadolint } = await import('../../validators/hadolint.js');
+      await invoke([{ path: 'app.dockerfile', content: 'FROM node:20' }]);
+      expect(runHadolint).toHaveBeenCalledWith('app.dockerfile', 'FROM node:20');
+    });
+  });
+
+  // ── Input caps (Zapp security) ──────────────────────────────────────────
+
+  describe('input caps', () => {
+    it('rejects more than 20 files via schema', async () => {
+      const files = Array.from({ length: 21 }, (_, i) => ({
+        path: `file-${i}.yaml`,
+        content: 'content',
+      }));
+      const raw = await invoke(files);
+      // SDK catches zod validation errors and returns them as error strings
+      expect(String(raw)).toContain('error');
+    });
+
+    it('rejects aggregate content exceeding 50MB via schema refinement', async () => {
+      // Schema-level refine should catch aggregate size before execute runs
+      const bigContent = 'x'.repeat(9 * 1024 * 1024);
+      const files = Array.from({ length: 6 }, (_, i) => ({
+        path: `file-${i}.yaml`,
+        content: bigContent,
+      }));
+      const raw = await invoke(files);
+      // Schema refinement triggers an error before dispatch
+      expect(String(raw).toLowerCase()).toContain('error');
+    });
+
+    it('rejects aggregate content exceeding 50MB', async () => {
+      // Now caught at schema level (refine) — SDK returns error string, not JSON
+      const bigContent = 'x'.repeat(9 * 1024 * 1024);
+      const files = Array.from({ length: 6 }, (_, i) => ({
+        path: `file-${i}.yaml`,
+        content: bigContent,
+      }));
+      const raw = await invoke(files);
+      expect(String(raw).toLowerCase()).toContain('error');
+    });
+  });
+
+  // ── Skipped-state surfacing (Zapp requirement) ──────────────────────────
+
+  describe('skipped-state surfacing', () => {
+    it('returns reason string when file type has no validator', async () => {
+      const raw = await invoke([{ path: 'unknown.xyz', content: 'data' }]);
+      const result = JSON.parse(String(raw));
+      expect(result.results[0].status).toBe('skipped');
+      expect(result.results[0].reason).toBeDefined();
+      expect(typeof result.results[0].reason).toBe('string');
+    });
+  });
+
+  // ── Retry exhaustion scenario ───────────────────────────────────────────
+
+  describe('retry exhaustion scenario', () => {
+    it('returns persistent violations on repeated calls (agent retry simulation)', async () => {
+      const { runHadolint } = await import('../../validators/hadolint.js');
+      const persistentFailure = {
+        path: 'Dockerfile',
+        status: 'fail' as const,
+        violations: [
+          { rule: 'DL3007', severity: 'error' as const, line: 1, message: 'unpinned', fix: 'Pin the base image.' },
+        ],
+      };
+      vi.mocked(runHadolint).mockResolvedValue(persistentFailure);
+
+      // Simulate 3 calls (initial + 2 retries) — each returns the same failure
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const raw = await invoke([{ path: 'Dockerfile', content: 'FROM ubuntu' }]);
+        const result = JSON.parse(String(raw));
+        expect(result.results[0].status).toBe('fail');
+        expect(result.results[0].violations).toHaveLength(1);
+        expect(result.results[0].violations[0].rule).toBe('DL3007');
+      }
+
+      expect(runHadolint).toHaveBeenCalledTimes(3);
     });
   });
 
