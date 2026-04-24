@@ -120,16 +120,24 @@ async function downloadHadolint(): Promise<string | null> {
   });
 }
 
+type HadolintDeps = {
+  findOnPath: () => string | null;
+  verifySha256: (filePath: string, expectedHash: string) => boolean;
+  downloadHadolint: () => Promise<string | null>;
+};
+
 /** Resolve hadolint binary path: PATH (with SHA256 check) → cache → download → null. */
-export async function resolveHadolint(): Promise<string | null> {
-  const onPath = findOnPath();
+export async function resolveHadolint(
+  deps: HadolintDeps = { findOnPath, verifySha256, downloadHadolint },
+): Promise<string | null> {
+  const onPath = deps.findOnPath();
   if (onPath) {
     // Never trust an unverified binary — even on PATH (Zapp supply-chain requirement)
-    if (verifySha256(onPath, HADOLINT_SHA256)) return onPath;
+    if (deps.verifySha256(onPath, HADOLINT_SHA256)) return onPath;
     // PATH binary failed checksum — fall through to cached/downloaded copy
   }
 
-  return downloadHadolint();
+  return deps.downloadHadolint();
 }
 
 /** Map hadolint severity to our severity. */

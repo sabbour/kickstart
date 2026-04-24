@@ -5,8 +5,8 @@
  * Tests the parseHadolintOutput function directly (no binary needed).
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { parseHadolintOutput, HADOLINT_FIX_HINTS, sanitizeMessage } from '../../validators/hadolint.js';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { parseHadolintOutput, HADOLINT_FIX_HINTS, sanitizeMessage, resolveHadolint } from '../../validators/hadolint.js';
 
 describe('parseHadolintOutput', () => {
   it('parses valid hadolint JSON into violations with fix hints', () => {
@@ -161,32 +161,19 @@ describe('sanitizeMessage (stderr sanitization — Zapp Fix 3)', () => {
 });
 
 describe('resolveHadolint provenance (Zapp Fix 1)', () => {
-  it('rejects PATH binary with wrong SHA256', async () => {
-    // Dynamic import to allow mocking fs/child_process per test
-    vi.doMock('node:child_process', () => ({
-      execFileSync: () => '/usr/local/bin/hadolint',
-      spawn: vi.fn(),
-    }));
-    vi.doMock('node:fs', () => ({
-      existsSync: () => false,
-      readFileSync: () => Buffer.from('fake-binary-content'),
-      mkdirSync: vi.fn(),
-      chmodSync: vi.fn(),
-      createWriteStream: vi.fn(),
-      unlinkSync: vi.fn(),
-    }));
-    vi.doMock('node:crypto', () => ({
-      createHash: () => ({
-        update: () => ({
-          digest: () => 'aaaa_wrong_hash_aaaa',
-        }),
-      }),
-    }));
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-    const { resolveHadolint } = await import('../../validators/hadolint.js');
-    const result = await resolveHadolint();
+  it('rejects PATH binary with wrong SHA256', async () => {
+    const result = await resolveHadolint({
+      findOnPath: () => '/usr/local/bin/hadolint',
+      verifySha256: () => false,
+      downloadHadolint: async () => null,
+    });
+
     // PATH binary hash doesn't match → should NOT return /usr/local/bin/hadolint
     expect(result).not.toBe('/usr/local/bin/hadolint');
-    vi.restoreAllMocks();
+    expect(result).toBeNull();
   });
 });
