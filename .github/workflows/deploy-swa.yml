@@ -15,14 +15,6 @@ on:
       - 'package-lock.json'
       - 'scripts/**'
       - 'tsconfig.json'
-  pull_request:
-    paths:
-      - '.github/workflows/deploy-swa.yml'
-      - 'packages/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'scripts/**'
-      - 'tsconfig.json'
 
 permissions:
   contents: read
@@ -110,77 +102,6 @@ jobs:
       - name: Smoke check live API packs registry
         env:
           SWA_HEALTHCHECK_URL: ${{ steps.production_url.outputs.base_url }}/api/packs
-          SWA_HEALTHCHECK_REQUIRE_JSON_OK: "false"
-        run: node scripts/check-swa-health.mjs
-
-
-  preview:
-    name: Deploy PR preview to Azure Static Web Apps
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          submodules: true
-          lfs: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build all workspaces
-        run: npm run build
-
-      - name: Verify API dist
-        run: test -f packages/web/api/dist/functions/health.js || (echo "❌ API bundle not found at packages/web/api/dist/functions/" && exit 1)
-
-      - name: Deploy PR preview to Azure Static Web Apps
-        id: swa_preview
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: "upload"
-          app_location: "packages/web/dist"
-          api_location: "packages/web/api"
-          output_location: ""
-          skip_app_build: true
-          skip_api_build: true
-          production_branch: "main"
-
-      - name: Resolve preview smoke test target
-        id: preview_url
-        run: |
-          DEPLOYMENT_URL="${{ steps.swa_preview.outputs.static_web_app_url }}"
-          if [ -z "$DEPLOYMENT_URL" ]; then
-            echo "::error::SWA preview deploy produced no URL — cannot smoke check" >&2
-            exit 1
-          fi
-          echo "base_url=${DEPLOYMENT_URL}" >> "$GITHUB_OUTPUT"
-
-      - name: Smoke check preview API health
-        env:
-          SWA_HEALTHCHECK_URL: ${{ steps.preview_url.outputs.base_url }}/api/health
-          SWA_HEALTHCHECK_ATTEMPTS: "4"
-          SWA_HEALTHCHECK_DELAY_MS: "10000"
-        run: node scripts/check-swa-health.mjs
-
-      - name: Smoke check preview API packs registry
-        env:
-          SWA_HEALTHCHECK_URL: ${{ steps.preview_url.outputs.base_url }}/api/packs
-          SWA_HEALTHCHECK_ATTEMPTS: "4"
-          SWA_HEALTHCHECK_DELAY_MS: "10000"
           SWA_HEALTHCHECK_REQUIRE_JSON_OK: "false"
         run: node scripts/check-swa-health.mjs
 
