@@ -32,80 +32,80 @@ afterEach(() => {
 });
 
 describe('generateAnonSessionToken', () => {
-  it('returns a non-empty base64url string', () => {
+  it('returns a non-empty base64url string', async () => {
     const session = new Session({ sessionId: 's1', user: { oid: 'anonymous' } });
-    const token = generateAnonSessionToken(session);
+    const token = await generateAnonSessionToken(session);
     expect(typeof token).toBe('string');
     expect(token.length).toBeGreaterThan(0);
     // base64url characters only
     expect(token).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
-  it('stores a hash on the session after generation', () => {
+  it('stores a hash on the session after generation', async () => {
     const session = new Session({ sessionId: 's1', user: { oid: 'anonymous' } });
     expect(session.anonTokenHash).toBeUndefined();
-    generateAnonSessionToken(session);
+    await generateAnonSessionToken(session);
     expect(session.anonTokenHash).toBeDefined();
     expect(typeof session.anonTokenHash).toBe('string');
     expect(session.anonTokenHash!.length).toBeGreaterThan(0);
   });
 
-  it('generates unique tokens across calls', () => {
+  it('generates unique tokens across calls', async () => {
     const s1 = new Session({ sessionId: 's1', user: { oid: 'anonymous' } });
     const s2 = new Session({ sessionId: 's2', user: { oid: 'anonymous' } });
-    const t1 = generateAnonSessionToken(s1);
-    const t2 = generateAnonSessionToken(s2);
+    const t1 = await generateAnonSessionToken(s1);
+    const t2 = await generateAnonSessionToken(s2);
     expect(t1).not.toBe(t2);
   });
 
-  it('stored hash differs from raw token (one-way)', () => {
+  it('stored hash differs from raw token (one-way)', async () => {
     const session = new Session({ sessionId: 's1', user: { oid: 'anonymous' } });
-    const token = generateAnonSessionToken(session);
+    const token = await generateAnonSessionToken(session);
     expect(session.anonTokenHash).not.toBe(token);
   });
 });
 
 describe('validateAnonSessionToken', () => {
-  it('returns true for a matching token', () => {
+  it('returns true for a matching token', async () => {
     const session = new Session({ sessionId: 's1', user: { oid: 'anonymous' } });
-    const token = generateAnonSessionToken(session);
-    expect(validateAnonSessionToken(session, token)).toBe(true);
+    const token = await generateAnonSessionToken(session);
+    expect(await validateAnonSessionToken(session, token)).toBe(true);
   });
 
-  it('returns false for a wrong token', () => {
+  it('returns false for a wrong token', async () => {
     const session = new Session({ sessionId: 's1', user: { oid: 'anonymous' } });
-    generateAnonSessionToken(session);
-    expect(validateAnonSessionToken(session, 'wrong-token-value')).toBe(false);
+    await generateAnonSessionToken(session);
+    expect(await validateAnonSessionToken(session, 'wrong-token-value')).toBe(false);
   });
 
-  it('returns false when no hash is stored', () => {
+  it('returns false when no hash is stored', async () => {
     const session = new Session({ sessionId: 's1', user: { oid: 'anonymous' } });
-    expect(validateAnonSessionToken(session, 'any-token')).toBe(false);
+    expect(await validateAnonSessionToken(session, 'any-token')).toBe(false);
   });
 
-  it('returns false for empty string', () => {
+  it('returns false for empty string', async () => {
     const session = new Session({ sessionId: 's1', user: { oid: 'anonymous' } });
-    generateAnonSessionToken(session);
-    expect(validateAnonSessionToken(session, '')).toBe(false);
+    await generateAnonSessionToken(session);
+    expect(await validateAnonSessionToken(session, '')).toBe(false);
   });
 
-  it('returns false for non-string input', () => {
+  it('returns false for non-string input', async () => {
     const session = new Session({ sessionId: 's1', user: { oid: 'anonymous' } });
-    generateAnonSessionToken(session);
+    await generateAnonSessionToken(session);
     // @ts-expect-error intentional bad input
-    expect(validateAnonSessionToken(session, undefined)).toBe(false);
+    expect(await validateAnonSessionToken(session, undefined)).toBe(false);
     // @ts-expect-error intentional bad input
-    expect(validateAnonSessionToken(session, null)).toBe(false);
+    expect(await validateAnonSessionToken(session, null)).toBe(false);
     // @ts-expect-error intentional bad input
-    expect(validateAnonSessionToken(session, 123)).toBe(false);
+    expect(await validateAnonSessionToken(session, 123)).toBe(false);
   });
 
-  it('re-generating a token invalidates the previous one', () => {
+  it('re-generating a token invalidates the previous one', async () => {
     const session = new Session({ sessionId: 's1', user: { oid: 'anonymous' } });
-    const token1 = generateAnonSessionToken(session);
-    const token2 = generateAnonSessionToken(session);
-    expect(validateAnonSessionToken(session, token1)).toBe(false);
-    expect(validateAnonSessionToken(session, token2)).toBe(true);
+    const token1 = await generateAnonSessionToken(session);
+    const token2 = await generateAnonSessionToken(session);
+    expect(await validateAnonSessionToken(session, token1)).toBe(false);
+    expect(await validateAnonSessionToken(session, token2)).toBe(true);
   });
 });
 
@@ -159,27 +159,27 @@ describe('ANON_SESSION_TTL_MS', () => {
 });
 
 describe('anonymous session token — integration scenario', () => {
-  it('full flow: create session → generate token → validate on resume', () => {
+  it('full flow: create session → generate token → validate on resume', async () => {
     // 1. Create anonymous session
     const { session } = getOrCreateSessionResult(undefined, 'anonymous');
     expect(isAnonymousSession(session)).toBe(true);
 
     // 2. Generate token
-    const token = generateAnonSessionToken(session);
+    const token = await generateAnonSessionToken(session);
     expect(token).toBeTruthy();
 
     // 3. Resume with valid token
     const { session: resumed } = getOrCreateSessionResult(session.sessionId, 'anonymous');
-    expect(validateAnonSessionToken(resumed, token)).toBe(true);
+    expect(await validateAnonSessionToken(resumed, token)).toBe(true);
 
     // 4. Attacker tries with wrong token
-    expect(validateAnonSessionToken(resumed, 'attacker-guessed-token')).toBe(false);
+    expect(await validateAnonSessionToken(resumed, 'attacker-guessed-token')).toBe(false);
   });
 
-  it('attacker cannot resume another anonymous session without the token', () => {
+  it('attacker cannot resume another anonymous session without the token', async () => {
     // Victim creates session
     const { session: victimSession } = getOrCreateSessionResult(undefined, 'anonymous');
-    const victimToken = generateAnonSessionToken(victimSession);
+    const victimToken = await generateAnonSessionToken(victimSession);
 
     // Attacker guesses the sessionId but doesn't have the token
     const { session: attackerResumed } = getOrCreateSessionResult(
@@ -187,10 +187,10 @@ describe('anonymous session token — integration scenario', () => {
       'anonymous',
     );
     // Without the real token, validation fails
-    expect(validateAnonSessionToken(attackerResumed, '')).toBe(false);
-    expect(validateAnonSessionToken(attackerResumed, 'guess')).toBe(false);
+    expect(await validateAnonSessionToken(attackerResumed, '')).toBe(false);
+    expect(await validateAnonSessionToken(attackerResumed, 'guess')).toBe(false);
 
     // With the real token, validation succeeds (proves the mechanism works)
-    expect(validateAnonSessionToken(attackerResumed, victimToken)).toBe(true);
+    expect(await validateAnonSessionToken(attackerResumed, victimToken)).toBe(true);
   });
 });

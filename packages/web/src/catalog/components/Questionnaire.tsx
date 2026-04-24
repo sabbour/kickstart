@@ -94,74 +94,76 @@ export const Questionnaire = createReactComponent(QuestionnaireApi, ({ props }) 
   };
 
   return (
-    <Card className={classes.root}>
-      <Subtitle1 style={{ marginBottom: tokens.spacingVerticalM }}>
-        {props.submitLabel || 'Questionnaire'}
-      </Subtitle1>
+    <div data-testid="a2ui-Questionnaire">
+      <Card className={classes.root}>
+        <Subtitle1 style={{ marginBottom: tokens.spacingVerticalM }}>
+          {props.submitLabel || 'Questionnaire'}
+        </Subtitle1>
 
-      {(props.questions || []).map((q) => {
-        const qType = q.type || 'text';
-        const qId = q.id;
-        const qLabel = q.label as string;
+        {(props.questions || []).map((q) => {
+          const qType = q.type || 'text';
+          const qId = q.id;
+          const qLabel = q.label as string;
 
-        return (
-          <div key={qId} className={classes.question}>
-            <Label className={classes.label} htmlFor={`q-${qId}`}>
-              {qLabel}
-              {q.required && <span className={classes.required} aria-hidden="true">*</span>}
-            </Label>
+          return (
+            <div key={qId} className={classes.question}>
+              <Label className={classes.label} htmlFor={`q-${qId}`}>
+                {qLabel}
+                {q.required && <span className={classes.required} aria-hidden="true">*</span>}
+              </Label>
 
-            {qType === 'text' && (
-              <Input
-                id={`q-${qId}`}
-                style={{ width: '100%' }}
-                value={(answers[qId] as string) || ''}
-                onChange={(_e, data) => updateAnswer(qId, data.value)}
-                aria-required={q.required || undefined}
-              />
-            )}
+              {qType === 'text' && (
+                <Input
+                  id={`q-${qId}`}
+                  style={{ width: '100%' }}
+                  value={(answers[qId] as string) || ''}
+                  onChange={(_e, data) => updateAnswer(qId, data.value)}
+                  aria-required={q.required || undefined}
+                />
+              )}
 
-            {qType === 'choice' && q.choices && (
-              <FluentRadioGroup
-                id={`q-${qId}`}
-                value={(answers[qId] as string) || ''}
-                onChange={(_e, data) => updateAnswer(qId, data.value)}
-                aria-required={q.required || undefined}
-              >
-                {q.choices.map((c) => (
-                  <Radio
-                    key={c.id}
-                    value={c.id}
-                    label={c.label as string}
-                  />
-                ))}
-              </FluentRadioGroup>
-            )}
-
-            {qType === 'multiChoice' && q.choices && (
-              <div className={classes.checkboxGroup}>
-                {q.choices.map((c) => {
-                  const selected = ((answers[qId] as string[]) || []).includes(c.id);
-                  return (
-                    <Checkbox
+              {qType === 'choice' && q.choices && (
+                <FluentRadioGroup
+                  id={`q-${qId}`}
+                  value={(answers[qId] as string) || ''}
+                  onChange={(_e, data) => updateAnswer(qId, data.value)}
+                  aria-required={q.required || undefined}
+                >
+                  {q.choices.map((c) => (
+                    <Radio
                       key={c.id}
-                      checked={selected}
-                      onChange={() => toggleMultiChoice(qId, c.id)}
+                      value={c.id}
                       label={c.label as string}
                     />
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
+                  ))}
+                </FluentRadioGroup>
+              )}
 
-      <div className={classes.footer}>
-        <Button appearance="primary" disabled={!isComplete} onClick={handleSubmit}>
-          {(props.submitLabel as string) || 'Submit'}
-        </Button>
-      </div>
-    </Card>
+              {qType === 'multiChoice' && q.choices && (
+                <div className={classes.checkboxGroup}>
+                  {q.choices.map((c) => {
+                    const selected = ((answers[qId] as string[]) || []).includes(c.id);
+                    return (
+                      <Checkbox
+                        key={c.id}
+                        checked={selected}
+                        onChange={() => toggleMultiChoice(qId, c.id)}
+                        label={c.label as string}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        <div className={classes.footer}>
+          <Button appearance="primary" disabled={!isComplete} onClick={handleSubmit}>
+            {(props.submitLabel as string) || 'Submit'}
+          </Button>
+        </div>
+      </Card>
+    </div>
   );
 });

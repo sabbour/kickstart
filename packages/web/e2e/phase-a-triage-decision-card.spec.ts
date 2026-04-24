@@ -1,200 +1,218 @@
-/**
- * Phase A — Triage emits DecisionCard + 4-track pick + Foundry/KAITO branch.
- *
- * #1130: validates the user-testable outcome end-to-end:
- *   1. Fresh session → type "I want to build an AI chatbot on AKS"
- *   2. DecisionCard visible with 4 track buttons
- *   3. Click "Agentic AI App" → RadioGroup with Foundry/KAITO
- *   4. Click "KAITO" → Questionnaire surfaces
- *   5. No CodeBlock in chat (D1 compliance)
- *
- * The test mocks the /api/converse endpoint so it doesn't need a live LLM.
- * Each "turn" returns the SSE events the real runner would produce after the
- * triage agent calls core.emit_ui.
- */
-
 import { test, expect } from './helpers';
+import type { Page, Route } from '@playwright/test';
 
-// ── SSE response builders ────────────────────────────────────────────────────
-
-function sseResponse(events: Array<{ event: string; data: unknown }>): string {
-  return events.map((e) => `event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`).join('');
+function sseEvent(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
-// Turn 1: DecisionCard + 4 track buttons
-const turn1SSE = sseResponse([
-  { event: 'start', data: { sessionId: 'phase-a-test' } },
-  {
-    event: 'a2ui',
-    data: {
+function triageDecisionTurn(sessionId: string): string {
+  return [
+    sseEvent('start', { sessionId }),
+    sseEvent('chunk', { delta: 'Let’s pick the right AKS track for your idea.' }),
+    sseEvent('a2ui', {
       version: 'v0.9',
-      createSurface: { surfaceId: 'triage-main', catalogId: 'kickstart', sendDataModel: false },
-    },
-  },
-  {
-    event: 'a2ui',
-    data: {
+      createSurface: { surfaceId: 'shared:triage-main', catalogId: 'kickstart' },
+    }),
+    sseEvent('a2ui', {
       version: 'v0.9',
       updateComponents: {
-        surfaceId: 'triage-main',
+        surfaceId: 'shared:triage-main',
         components: [
-          { id: 'root', component: 'Column', children: ['decision', 'track-buttons'] },
+          { id: 'root', component: 'Column', children: ['decision', 'track-buttons'], gap: '12px' },
           {
             id: 'decision',
             component: 'DecisionCard',
             title: 'What would you like to build on AKS?',
-            recommendation: 'AKS Automatic handles infrastructure, scaling, and security.',
-            rationale: 'All tracks deploy to AKS Automatic.',
+            recommendation: 'AKS Automatic handles infrastructure, scaling, and security so you can focus on your app.',
             alternatives: ['Static site', 'Containerized web app', 'Agentic AI app', 'Existing repo uplift'],
             badge: 'recommended',
           },
-          { id: 'track-buttons', component: 'Row', children: ['btn-static', 'btn-container', 'btn-agentic', 'btn-uplift'] },
-          { id: 'btn-static-text', component: 'Text', text: 'Static Site' },
-          { id: 'btn-static', component: 'Button', child: 'btn-static-text', action: { event: { name: 'pick_track', payload: { value: 'static_site' } } } },
-          { id: 'btn-container-text', component: 'Text', text: 'Containerized Web App' },
-          { id: 'btn-container', component: 'Button', child: 'btn-container-text', action: { event: { name: 'pick_track', payload: { value: 'containerized_web' } } } },
-          { id: 'btn-agentic-text', component: 'Text', text: 'Agentic AI App' },
-          { id: 'btn-agentic', component: 'Button', child: 'btn-agentic-text', action: { event: { name: 'pick_track', payload: { value: 'agentic_app' } } } },
-          { id: 'btn-uplift-text', component: 'Text', text: 'Existing Repo Uplift' },
-          { id: 'btn-uplift', component: 'Button', child: 'btn-uplift-text', action: { event: { name: 'pick_track', payload: { value: 'repo_uplift' } } } },
+          {
+            id: 'track-buttons',
+            component: 'Row',
+            children: ['btn-static', 'btn-container', 'btn-agentic', 'btn-uplift'],
+            gap: '8px',
+            wrap: true,
+          },
+          {
+            id: 'btn-static',
+            component: 'Button',
+            child: 'btn-static-text',
+            action: { event: { name: 'pick_track', context: { value: 'static_site', label: 'Static site' } } },
+          },
+          { id: 'btn-static-text', component: 'Text', text: 'Static site' },
+          {
+            id: 'btn-container',
+            component: 'Button',
+            child: 'btn-container-text',
+            action: { event: { name: 'pick_track', context: { value: 'containerized_web', label: 'Containerized web app' } } },
+          },
+          { id: 'btn-container-text', component: 'Text', text: 'Containerized web app' },
+          {
+            id: 'btn-agentic',
+            component: 'Button',
+            child: 'btn-agentic-text',
+            action: { event: { name: 'pick_track', context: { value: 'agentic_app', label: 'Agentic AI app' } } },
+          },
+          { id: 'btn-agentic-text', component: 'Text', text: 'Agentic AI app' },
+          {
+            id: 'btn-uplift',
+            component: 'Button',
+            child: 'btn-uplift-text',
+            action: { event: { name: 'pick_track', context: { value: 'repo_uplift', label: 'Existing repo uplift' } } },
+          },
+          { id: 'btn-uplift-text', component: 'Text', text: 'Existing repo uplift' },
         ],
       },
-    },
-  },
-  { event: 'end', data: { sessionId: 'phase-a-test', model: 'gpt-5.4' } },
-]);
+    }),
+    sseEvent('end', { sessionId, model: 'test-model' }),
+  ].join('');
+}
 
-// Turn 2: RadioGroup with Foundry vs KAITO (after pick_track=agentic_app)
-// Each turn must createSurface because prepareChatA2ui scopes surfaceIds per turn.
-const turn2SSE = sseResponse([
-  { event: 'start', data: { sessionId: 'phase-a-test' } },
-  {
-    event: 'a2ui',
-    data: {
+function triageInferenceTurn(sessionId: string): string {
+  return [
+    sseEvent('start', { sessionId }),
+    sseEvent('a2ui', {
       version: 'v0.9',
-      createSurface: { surfaceId: 'triage-inference', catalogId: 'kickstart', sendDataModel: false },
-    },
-  },
-  {
-    event: 'a2ui',
-    data: {
+      createSurface: { surfaceId: 'shared:triage-main', catalogId: 'kickstart' },
+    }),
+    sseEvent('a2ui', {
       version: 'v0.9',
       updateComponents: {
-        surfaceId: 'triage-inference',
+        surfaceId: 'shared:triage-main',
         components: [
-          { id: 'root', component: 'Column', children: ['inference-group'] },
+          { id: 'root', component: 'Column', children: ['inference'] },
           {
-            id: 'inference-group',
+            id: 'inference',
             component: 'RadioGroup',
             options: [
-              { id: 'foundry', label: 'Azure AI Foundry', description: 'Managed model endpoints — no GPU nodes needed.', recommended: true },
-              { id: 'kaito', label: 'KAITO on AKS', description: 'Run open-source models on GPU nodes in your cluster.', recommended: false },
+              { id: 'foundry', label: 'Azure AI Foundry agents', description: 'Managed agent tooling and orchestration' },
+              { id: 'kaito', label: 'KAITO-hosted OSS model', description: 'More control over the model stack' },
             ],
             action: { event: { name: 'select_inference' } },
           },
         ],
       },
-    },
-  },
-  { event: 'end', data: { sessionId: 'phase-a-test', model: 'gpt-5.4' } },
-]);
+    }),
+    sseEvent('end', { sessionId, model: 'test-model' }),
+  ].join('');
+}
 
-// Turn 3: Questionnaire (after select_inference=kaito)
-const turn3SSE = sseResponse([
-  { event: 'start', data: { sessionId: 'phase-a-test' } },
-  {
-    event: 'a2ui',
-    data: {
+function triageQuestionnaireTurn(sessionId: string): string {
+  return [
+    sseEvent('start', { sessionId }),
+    sseEvent('a2ui', {
       version: 'v0.9',
-      createSurface: { surfaceId: 'triage-kaito', catalogId: 'kickstart', sendDataModel: false },
-    },
-  },
-  {
-    event: 'a2ui',
-    data: {
+      createSurface: { surfaceId: 'shared:triage-main', catalogId: 'kickstart' },
+    }),
+    sseEvent('a2ui', {
       version: 'v0.9',
       updateComponents: {
-        surfaceId: 'triage-kaito',
+        surfaceId: 'shared:triage-main',
         components: [
-          { id: 'root', component: 'Column', children: ['kaito-form'] },
+          { id: 'root', component: 'Column', children: ['requirements'] },
           {
-            id: 'kaito-form',
+            id: 'requirements',
             component: 'Questionnaire',
-            questions: [
-              { id: 'q-model', label: 'Which model?', type: 'choice', choices: [{ id: 'llama', label: 'Llama-3.1-70B' }, { id: 'mistral', label: 'Mistral-Large' }, { id: 'phi', label: 'Phi-4' }] },
-              { id: 'q-gpu', label: 'GPU budget', type: 'choice', choices: [{ id: '1xa100', label: '1x A100' }, { id: '2xa100', label: '2x A100' }, { id: '4xa100', label: '4x A100' }] },
-              { id: 'q-use', label: 'Describe what the agent does', type: 'text', required: true },
-            ],
             submitLabel: 'Continue',
-            onSubmit: { event: { name: 'kaito_answers' } },
+            questions: [
+              {
+                id: 'model-family',
+                label: 'Model family',
+                type: 'choice',
+                choices: [
+                  { id: 'llama', label: 'Llama' },
+                  { id: 'mistral', label: 'Mistral' },
+                ],
+                required: true,
+              },
+              { id: 'gpu-budget', label: 'GPU budget', required: true },
+              { id: 'data-source', label: 'Primary data source' },
+            ],
+            onSubmit: { event: { name: 'submit_requirements' } },
           },
         ],
       },
-    },
-  },
-  { event: 'end', data: { sessionId: 'phase-a-test', model: 'gpt-5.4' } },
-]);
+    }),
+    sseEvent('end', { sessionId, model: 'test-model' }),
+  ].join('');
+}
 
-test.describe('Phase A: Triage DecisionCard flow (#1130)', () => {
-  test('full 3-turn flow: DecisionCard → RadioGroup → Questionnaire, no CodeBlock', async ({ page }) => {
-    let turnCount = 0;
-    const turns = [turn1SSE, turn2SSE, turn3SSE];
+async function setupHealthRoute(page: Page) {
+  await page.route('**/api/health', route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok' }),
+    }),
+  );
+}
 
-    // Health check must return 200 so the app sends converse requests
-    await page.route('**/api/health', route =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'ok' }),
-      }),
-    );
+test.describe('Phase A triage decision card', () => {
+  test('keeps the shared triage surface stable across pick_track and select_inference', async ({ page }) => {
+    await setupHealthRoute(page);
 
-    await page.route('**/api/converse', async (route) => {
-      const sse = turns[turnCount] ?? turn1SSE;
-      turnCount++;
-      await route.fulfill({
+    let turn = 0;
+    await page.route('**/api/converse', async (route: Route) => {
+      turn += 1;
+
+      if (turn === 1) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          headers: { 'Cache-Control': 'no-cache', Connection: 'keep-alive' },
+          body: triageDecisionTurn('phase-a-triage'),
+        });
+      }
+
+      if (turn === 2) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          headers: { 'Cache-Control': 'no-cache', Connection: 'keep-alive' },
+          body: triageInferenceTurn('phase-a-triage'),
+        });
+      }
+
+      return route.fulfill({
         status: 200,
         contentType: 'text/event-stream',
-        body: sse,
+        headers: { 'Cache-Control': 'no-cache', Connection: 'keep-alive' },
+        body: triageQuestionnaireTurn('phase-a-triage'),
       });
     });
 
+    const healthReady = page.waitForResponse('**/api/health', { timeout: 10_000 });
     await page.goto('/');
-    await page.waitForSelector('#landing-page', { timeout: 10_000 });
+    await healthReady;
 
-    // ── Turn 1: type a message and verify DecisionCard appears ───────────
-    const input = page.getByRole('textbox', { name: 'Describe your app' });
-    await input.fill('I want to build an AI chatbot on AKS');
-    await input.press('Enter');
+    await page.getByRole('textbox', { name: /describe your app/i }).fill('I want to build an AI chatbot on AKS');
+    await page.getByRole('button', { name: /send/i }).click();
 
-    // Wait for the DecisionCard title
-    await expect(page.getByText('What would you like to build on AKS?')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('What would you like to build on AKS?')).toBeVisible();
+    await expect(page.getByRole('button', { name: /static site/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /containerized web app/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /agentic ai app/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /existing repo uplift/i })).toBeVisible();
 
-    // Verify 4 track buttons are visible
-    await expect(page.getByRole('button', { name: /Static Site/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Containerized Web App/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Agentic AI App/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Existing Repo Uplift/i })).toBeVisible();
+    const surfaces = page.locator('.a2ui-surface-wrapper');
+    await expect(surfaces).toHaveCount(1);
+    await expect(surfaces.first()).toHaveAttribute('data-surface-id', 'shared:triage-main');
 
-    // D1 compliance: no CodeBlock in chat
-    await expect(page.locator('[data-component="CodeBlock"]')).toHaveCount(0);
+    await page.getByRole('button', { name: /agentic ai app/i }).click();
 
-    // ── Turn 2: click "Agentic AI App" → RadioGroup ──────────────────────
-    await page.getByRole('button', { name: /Agentic AI App/i }).click();
+    await expect(page.getByRole('radiogroup', { name: /options/i })).toBeVisible();
+    await expect(page.getByText(/azure ai foundry agents/i)).toBeVisible();
+    await expect(page.getByText(/kaito-hosted oss model/i)).toBeVisible();
+    await expect(surfaces).toHaveCount(1);
+    await expect(surfaces.first()).toHaveAttribute('data-surface-id', 'shared:triage-main');
 
-    // RadioGroup should appear with Foundry and KAITO options
-    await expect(page.getByText('Azure AI Foundry')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('KAITO on AKS')).toBeVisible();
+    await page.getByRole('radio', { name: /kaito-hosted oss model/i }).click();
 
-    // ── Turn 3: click KAITO → Questionnaire ──────────────────────────────
-    await page.getByText('KAITO on AKS').click();
-
-    // Questionnaire should appear with model, GPU, and use case fields
-    await expect(page.getByText('Which model?')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('GPU budget')).toBeVisible();
-    await expect(page.getByText('Describe what the agent does')).toBeVisible();
-
-    // D1 compliance: still no CodeBlock
+    await expect(page.getByText(/model family/i)).toBeVisible();
+    await expect(surfaces).toHaveCount(1);
+    await expect(surfaces.first()).toHaveAttribute('data-surface-id', 'shared:triage-main');
+    await expect(page.locator('[data-surface-id^="assistant-turn-2::"], [data-surface-id^="assistant-turn-3::"]')).toHaveCount(0);
     await expect(page.locator('[data-component="CodeBlock"]')).toHaveCount(0);
   });
 });

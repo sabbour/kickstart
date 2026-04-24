@@ -43,9 +43,8 @@ export interface A2UIHandle {
  * Pure and exported so it can be exercised without a React rendering context.
  *
  * @returns Filtered batch + the list of surfaceIds referenced by createSurface
- *          messages (including those that were dropped as duplicates). Callers
- *          use the returned IDs to list the rendered surfaces without
- *          special-casing "already existed".
+ *          and updateComponents messages. Callers use the returned IDs to list
+ *          the rendered surfaces without special-casing "already existed".
  */
 export function _filterMessagesForProcessor(
   msgs: A2uiMsg[],
@@ -58,6 +57,7 @@ export function _filterMessagesForProcessor(
   const safeMessages: A2uiMsg[] = [];
   for (const msg of msgs) {
     if (msg.updateComponents) {
+      surfaceIds.push(msg.updateComponents.surfaceId);
       const rawComponents = msg.updateComponents.components as Array<Record<string, unknown>>;
       const validated = validateComponents(rawComponents);
       safeMessages.push({

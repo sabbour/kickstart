@@ -177,6 +177,16 @@ describe('chat/debug UI regressions', () => {
     expect(markup).not.toContain('Deploy now');
   });
 
+  it('does not render an empty assistant bubble for a surface-only follow-up turn', () => {
+    const markup = renderChatMessage({
+      id: 'assistant-2',
+      role: 'assistant',
+      text: '',
+    }, false);
+
+    expect(markup).toBe('');
+  });
+
   it('does not render the separate action timeline in chat shell debug mode', () => {
     debugState.actionLog = [{
       timestamp: 1,

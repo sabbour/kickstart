@@ -435,6 +435,16 @@ export function resolveMaxTurns(): number {
   return n;
 }
 
+function normalizeComponentHint(hint: string | undefined): string | undefined {
+  if (typeof hint !== 'string') return undefined;
+  const cleaned = hint
+    .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return undefined;
+  return cleaned.length > 240 ? `${cleaned.slice(0, 237)}...` : cleaned;
+}
+
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
@@ -547,7 +557,7 @@ export class Runner {
     const components = this.registry.components;
     const catalogBlock = components.length > 0
       ? `\n\n## A2UI Component Catalog (${components.length} components available)\n${components.map((c) => {
-          const hint = (c as { llmHint?: string }).llmHint;
+          const hint = normalizeComponentHint((c as { llmHint?: string }).llmHint);
           return hint ? `- **${c.name}** — ${hint}` : `- ${c.name}`;
         }).join('\n')}`
       : '';

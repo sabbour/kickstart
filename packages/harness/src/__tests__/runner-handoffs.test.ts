@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { PackRegistry } from '../runtime/registry.js';
 import { Runner, resolveMaxTurns, RUNNER_MAX_TURNS_DEFAULT } from '../runtime/runner.js';
 import type { AgentContribution } from '../types/agent.js';
+import type { ComponentContribution } from '../types/component.js';
 
 function makeAgent(
   name: string,
@@ -51,6 +52,31 @@ function buildRegistry(agents: AgentContribution[]): PackRegistry {
   // validator path via the registry.test.ts suite instead.
   registry.seal();
   return registry;
+}
+
+function buildRegistryWithComponents(
+  agents: AgentContribution[],
+  components: ComponentContribution[],
+): PackRegistry {
+  const registry = new PackRegistry();
+  registry.register({
+    name: 'core',
+    version: '1.0.0',
+    agents,
+    components,
+  });
+  registry.enable(['core']);
+  registry.seal();
+  return registry;
+}
+
+function makeComponent(name: string, llmHint?: string): ComponentContribution {
+  return {
+    name,
+    propertySchema: z.object({}).strict(),
+    renderer: null,
+    llmHint,
+  };
 }
 
 // Tiny fakes for the per-turn build context. `buildAgentInstance` only
@@ -212,6 +238,57 @@ describe('#1073 resolveMaxTurns — Zapp Z2 runtime circuit-breaker', () => {
     expect(resolveMaxTurns()).toBe(RUNNER_MAX_TURNS_DEFAULT);
     vi.stubEnv('KICKSTART_RUNNER_MAX_TURNS', '-5');
     expect(resolveMaxTurns()).toBe(RUNNER_MAX_TURNS_DEFAULT);
+  });
+});
+
+describe('#1130 Runner.buildAgentInstance — catalog hint injection', () => {
+  beforeEach(() => {
+    vi.stubEnv('KICKSTART_CHAT_MODEL', 'gpt-4o-mini');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('injects prop-aware llm hints for components that provide them', () => {
+    const registry = buildRegistryWithComponents(
+      [makeAgent('core.triage')],
+      [
+        makeComponent('core/DecisionCard', 'Decision helper with title and recommendation props.'),
+        makeComponent('core/Text'),
+      ],
+    );
+
+    const runner = new Runner(registry);
+    const triage = callBuild(runner, 'core.triage') as { instructions: string };
+
+    expect(triage.instructions).toContain('## A2UI Component Catalog (2 components available)');
+    expect(triage.instructions).toContain(
+      '- **core/DecisionCard** — Decision helper with title and recommendation props.',
+    );
+    expect(triage.instructions).toContain('- core/Text');
+  });
+
+  it('normalizes llm hints before injecting them into instructions', () => {
+    const registry = buildRegistryWithComponents(
+      [makeAgent('core.triage')],
+      [
+        makeComponent(
+          'core/RadioGroup',
+          'Single-select picker.\n\nUse action on pick.\u0007 '.concat('x'.repeat(260)),
+        ),
+      ],
+    );
+
+    const runner = new Runner(registry);
+    const triage = callBuild(runner, 'core.triage') as { instructions: string };
+
+    expect(triage.instructions).toContain('- **core/RadioGroup** — Single-select picker. Use action on pick.');
+    expect(triage.instructions).not.toContain('\n\nUse action on pick');
+    expect(triage.instructions).not.toContain('\u0007');
+    const injectedLine = triage.instructions.split('\n').find((line) => line.includes('core/RadioGroup'));
+    expect(injectedLine).toBeDefined();
+    expect(injectedLine!.length).toBeLessThanOrEqual(270);
   });
 });
 // Avoid an unused-import warning on `z` while keeping it handy for future tests.

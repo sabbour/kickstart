@@ -19,7 +19,7 @@ beforeAll(() => {
   clientRegistry.register({
     name: 'Column',
     schema: z.object({ children: z.array(z.string()).optional() }),
-    render: ({ context, buildChild }) => (
+    render: ({ context, buildChild }: { context: any; buildChild: (id: string) => React.ReactNode }) => (
       <div data-testid="column">
         {Array.isArray(context.componentModel.properties.children)
           ? context.componentModel.properties.children.map((childId: string) => buildChild(childId))
@@ -30,7 +30,7 @@ beforeAll(() => {
   clientRegistry.register({
     name: 'Text',
     schema: z.object({ text: z.string() }),
-    render: ({ context }) => <span>{String(context.componentModel.properties.text ?? '')}</span>,
+    render: ({ context }: { context: any }) => <span>{String(context.componentModel.properties.text ?? '')}</span>,
   } as any);
   clientRegistry.seal();
 });
