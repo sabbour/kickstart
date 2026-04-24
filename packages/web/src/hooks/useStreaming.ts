@@ -90,10 +90,10 @@ export interface StreamCallbacks {
    */
   onUserActionReq?: (payload: UserActionReqPayload) => void;
   /**
-   * v2: fired when the `end` event carries an intent field.
-   * Used by useNavigation to trigger onIntent routing without direct phase leakage.
-   * TODO(Step N, #480): Full intent→navigation wiring will land when skill resolver ships.
+   * v2: fired when a `write_file` tool completes, providing file path and content.
+   * Used to route generated files to the editor pane instead of chat.
    */
+  onWriteFile?: (file: { path: string; content: string }) => void;
   onIntent?: (intent: AppIntent) => void;
 }
 
@@ -588,9 +588,17 @@ export function useStreaming() {
               }
 
               case 'tool_start':
-              case 'tool_done':
-                // Tool lifecycle — no UI callback needed for v2 core; future steps may add one
+                // Tool lifecycle — no UI callback needed for v2 core
                 break;
+
+              case 'tool_done': {
+                // Intercept write_file tool completions → route files to editor pane
+                const doneToolName = typeof parsed.toolName === 'string' ? parsed.toolName : '';
+                if (doneToolName === 'core.write_file' && typeof parsed.path === 'string' && typeof parsed.content === 'string') {
+                  callbacks.onWriteFile?.({ path: parsed.path, content: parsed.content });
+                }
+                break;
+              }
 
               case 'session_token': {
                 // #23: persist anonymous session token for subsequent requests

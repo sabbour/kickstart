@@ -38,6 +38,7 @@ import {
   rebuildChatSessionState,
 } from './utils/chat-a2ui';
 import { summarizeTokenUsage } from './utils/chat-usage';
+import { normalizePath as validateAndNormalizePath } from './utils/path-validation';
 import type { AppMode, ChatMessage, A2uiPayloadItem, ConversationPhaseId, SetupGenerationEvent } from './types';
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
@@ -531,6 +532,26 @@ export function App() {
     }
   }, [resolveArtifactContent, fs, openGeneratedFile, a2ui, claimSurfaceIdsForAssistantMessage, progressiveQueue, setConversationPhase]);
 
+  // Per Zapp: treat write_file SSE payloads as untrusted — normalize paths,
+  // reject traversal/absolute, cap file size before writing to VFS.
+  const MAX_WRITE_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+  const handleWriteFile = useCallback((file: { path: string; content: string }) => {
+    const safePath = validateAndNormalizePath(file.path);
+    if (!safePath) {
+      console.warn('[write_file] Rejected invalid path:', file.path);
+      return;
+    }
+    const byteLength = new TextEncoder().encode(file.content).byteLength;
+    if (byteLength > MAX_WRITE_FILE_SIZE) {
+      console.warn('[write_file] Rejected oversized file:', safePath, byteLength);
+      return;
+    }
+    fs.write(safePath, file.content);
+    if (!viewerFileRef.current) {
+      openGeneratedFile(safePath);
+    }
+  }, [fs, openGeneratedFile]);
+
   const handleSendMessage = useCallback(async (text: string, isAutoContinue = false, explicitSessionId?: string, event?: A2uiEventMetadata) => {
     // Manual messages reset the consecutive auto-continue counter
     if (!isAutoContinue) {
@@ -680,6 +701,7 @@ export function App() {
         onA2UI: handleIncomingA2UI,
         onSetupEvent: handleIncomingSetupEvent,
         onPhase: (phase) => setConversationPhase(phase),
+        onWriteFile: handleWriteFile,
         onComplete: (fullText, model, receivedSessionId, debugInfo, usage) => {
           const phase = currentPhaseRef.current || undefined;
           // Store the backend session ID on first response
@@ -752,6 +774,7 @@ export function App() {
     clearActionLog,
     debugEnabled,
     finalizeStepwiseAssistantTurn,
+    handleWriteFile,
     healthCheckResult,
     mockStreaming,
     processIncomingA2UI,

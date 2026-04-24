@@ -161,7 +161,7 @@ export const GenerationProgress = createReactComponent(GenerationProgressApi, ({
     props.statusMessage || props.errorMessage || props.appUrl || props.portalUrl || props.lastUpdated;
 
   return (
-    <Card className={classes.root}>
+    <Card className={classes.root} data-testid="a2ui-GenerationProgress">
       <div className={classes.header}>
         {overallStatus === 'running' && <Spinner size="tiny" />}
         {overallStatus === 'complete' && <CheckmarkCircleRegular className={classes.iconComplete} />}
@@ -178,6 +178,7 @@ export const GenerationProgress = createReactComponent(GenerationProgressApi, ({
               key={s.id}
               className={`${classes.step} ${!isLast ? classes.stepWithConnector : ''}`}
               role="listitem"
+              data-step={s.id}
             >
               <div className={classes.iconWrapper} aria-hidden="true">
                 {getStatusIcon(s.status, classes)}

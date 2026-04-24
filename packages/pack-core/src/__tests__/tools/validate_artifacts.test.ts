@@ -92,31 +92,38 @@ describe('core.validate_artifacts', () => {
         content: 'content',
       }));
       const raw = await invoke(files);
-      // SDK catches zod validation errors and returns them as error strings
-      expect(String(raw)).toContain('error');
+      // Schema validation fails; tool passes through and dispatch returns skipped
+      const result = JSON.parse(String(raw));
+      expect(Array.isArray(result.results)).toBe(true);
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(result.results[0].status).toBe('skipped');
     });
 
     it('rejects aggregate content exceeding 50MB via schema refinement', async () => {
-      // Schema-level refine should catch aggregate size before execute runs
+      // Aggregate size check happens in execute — tool returns skipped result
       const bigContent = 'x'.repeat(9 * 1024 * 1024);
       const files = Array.from({ length: 6 }, (_, i) => ({
         path: `file-${i}.yaml`,
         content: bigContent,
       }));
       const raw = await invoke(files);
-      // Schema refinement triggers an error before dispatch
-      expect(String(raw).toLowerCase()).toContain('error');
+      const result = JSON.parse(String(raw));
+      expect(result.results).toBeDefined();
+      expect(result.results[0].status).toBe('skipped');
+      expect(result.results[0].reason.toLowerCase()).toContain('aggregate content');
     });
 
     it('rejects aggregate content exceeding 50MB', async () => {
-      // Now caught at schema level (refine) — SDK returns error string, not JSON
+      // Caught in execute's aggregate size check — returns skipped result with reason
       const bigContent = 'x'.repeat(9 * 1024 * 1024);
       const files = Array.from({ length: 6 }, (_, i) => ({
         path: `file-${i}.yaml`,
         content: bigContent,
       }));
       const raw = await invoke(files);
-      expect(String(raw).toLowerCase()).toContain('error');
+      const result = JSON.parse(String(raw));
+      expect(result.results[0].status).toBe('skipped');
+      expect(result.results[0].reason.toLowerCase()).toContain('exceeds');
     });
   });
 
