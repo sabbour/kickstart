@@ -41,6 +41,28 @@ async function findFreePort(start, maxAttempts = 10) {
   return null;
 }
 
+/**
+ * Health-check: wait for a URL to respond with HTTP 2xx.
+ * Retries up to `maxAttempts` times with `intervalMs` between attempts.
+ */
+async function waitForHealthy(url, { maxAttempts = 10, intervalMs = 2000, label = url } = {}) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) {
+        console.log(`[dev-swa] ✓ ${label} is ready (attempt ${attempt}/${maxAttempts})`);
+        return true;
+      }
+    } catch { /* not ready yet */ }
+    if (attempt < maxAttempts) {
+      console.log(`[dev-swa] Waiting for ${label}… (attempt ${attempt}/${maxAttempts})`);
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+  }
+  console.error(`[dev-swa] ✗ ${label} did not become healthy after ${maxAttempts} attempts`);
+  return false;
+}
+
 const DEFAULT_PORT = Number(process.env.SWA_CLI_PORT) || 4280;
 
 const port = await findFreePort(DEFAULT_PORT);
@@ -64,4 +86,15 @@ const args = [
 ];
 
 const child = spawn('npx', args, { stdio: 'inherit', env });
+
+// Health-check after SWA starts — verify Vite and Functions hosts
+child.on('spawn', async () => {
+  const viteOk = await waitForHealthy('http://localhost:5173', { label: 'Vite dev server' });
+  const funcOk = await waitForHealthy('http://localhost:7071/api/health', { label: 'Functions host' });
+  if (!viteOk || !funcOk) {
+    console.error('[dev-swa] One or more upstream servers failed health check. SWA may not work correctly.');
+    console.error('[dev-swa] Ensure Vite (port 5173) and Azure Functions (port 7071) are running.');
+  }
+});
+
 child.on('exit', (code) => process.exit(code ?? 0));

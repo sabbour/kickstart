@@ -7,7 +7,7 @@ import type {
   TokenUsageSummary,
   TurnUsage,
 } from '../types';
-import { apiFetch, SessionExpiredError } from '../services/api-client';
+import { apiFetch, SessionExpiredError, storeAnonSessionToken } from '../services/api-client';
 import { normalizeConversationPhase } from '../utils/chat-a2ui';
 import type { AppIntent } from '@aks-kickstart/harness';
 
@@ -148,7 +148,7 @@ export async function _performSdkNonStreamingFetch(
       ...(clientMessages?.length ? { messages: clientMessages } : {}),
     }),
     signal,
-  }, debugMode);
+  }, debugMode, sessionId);
 
   if (!res.ok) {
     throw new Error(`API error: ${res.status}`);
@@ -209,6 +209,7 @@ export async function _processSSEStream(
     onPhase?: (phase: string) => void;
     onError?: (msg: string) => void;
     onUserActionReq?: () => void;
+    onSessionToken?: (payload: { sessionId: string; token: string }) => void;
   },
   signal?: AbortSignal,
 ): Promise<SSEStreamResult> {
@@ -297,6 +298,13 @@ export async function _processSSEStream(
               callbacks.onUserActionReq?.();
               await reader.cancel();
               return state;
+
+            case 'session_token': {
+              // #23: capture token for anonymous session propagation
+              if (typeof parsed.sessionId === 'string') state.sessionId = parsed.sessionId;
+              callbacks.onSessionToken?.(parsed as { sessionId: string; token: string });
+              break;
+            }
 
             default:
               // v1 / generic fallback compat
@@ -482,7 +490,7 @@ export function useStreaming() {
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,
-      }, debugMode);
+      }, debugMode, sessionId);
 
       if (res.status === 406) {
         // Streaming not available — fall back to non-streaming JSON path.
@@ -583,6 +591,17 @@ export function useStreaming() {
               case 'tool_done':
                 // Tool lifecycle — no UI callback needed for v2 core; future steps may add one
                 break;
+
+              case 'session_token': {
+                // #23: persist anonymous session token for subsequent requests
+                const tokenSessionId = typeof parsed.sessionId === 'string' ? parsed.sessionId : undefined;
+                const token = typeof parsed.token === 'string' ? parsed.token : undefined;
+                if (tokenSessionId && token) {
+                  storeAnonSessionToken(tokenSessionId, token);
+                  lastSessionId = tokenSessionId;
+                }
+                break;
+              }
 
               case 'phase':
                 if (typeof parsed.agent === 'string') {

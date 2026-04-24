@@ -58,6 +58,17 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      - name: Auth bypass regression gate (#23)
+        run: |
+          # Fail if any auth bypass env var references exist in API source
+          # Exclude test files (*.test.ts, *.spec.ts) which may contain these strings for regression tests
+          if grep -rE "DEV_AUTH_BYPASS|KICKSTART_DEV_AUTH_BYPASS" packages/web/api/src/ \
+             --exclude="*.test.ts" --exclude="*.spec.ts"; then
+            echo "::error::Auth bypass reference found in API source code. This is forbidden per issue #23."
+            exit 1
+          fi
+          echo "✓ No auth bypass references found"
+
       - name: Detect docs-gate scope
         id: docs_gate
         if: github.event_name == 'pull_request'

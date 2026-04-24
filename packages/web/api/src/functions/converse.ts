@@ -367,9 +367,15 @@ async function converse(
     logger.info("Session resolved", { action: sessionCreated ? "created" : "resumed" });
   } catch (err) {
     if (err instanceof Error && err.message === "SESSION_OID_MISMATCH") {
-      logger.warn("Session ownership mismatch");
+      logger.warn("Session ownership mismatch", {
+        code: "SESSION_OID_MISMATCH",
+        sessionId: body.sessionId,
+      });
       trackEvent("session-oid-mismatch", { requestId });
-      return new Response("Forbidden", { status: 403 });
+      return new Response(
+        JSON.stringify({ error: "Forbidden", code: "SESSION_OID_MISMATCH" }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
     }
 
     const sanitizedError = sanitizeError(err);
@@ -407,8 +413,9 @@ async function converse(
       const clientToken = request.headers.get("x-anon-session-token") ?? "";
       if (!await validateAnonSessionToken(session, clientToken)) {
         logger.warn("Anonymous session token validation failed", {
+          code: "ANON_TOKEN_INVALID",
           session_id: session.sessionId,
-          token_present: clientToken.length > 0,
+          hasClientToken: clientToken.length > 0,
         });
         trackEvent("anon-session-token-invalid", { requestId });
         return new Response(
