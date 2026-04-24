@@ -42,8 +42,7 @@ test.describe('Button click → structured event payload (#1062)', () => {
     // block is intentionally narrow — we only prove the wire contract is in
     // place on the first turn.
     const firstUserTurn = await page
-      .locator('textarea[placeholder], input[placeholder]')
-      .first()
+      .getByRole('textbox', { name: 'Describe your app' })
       .elementHandle()
       .catch(() => null);
 

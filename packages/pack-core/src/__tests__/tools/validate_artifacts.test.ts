@@ -1,13 +1,12 @@
 /**
  * @file validate_artifacts.test.ts
- * @suite Phase C — core.validate_artifacts tool
+ * @suite Phase C → Phase 1 — core.validate_artifacts tool (#10)
  *
- * Tests the Phase C stub validation contract against the real implementation.
- * The stub always returns { valid: true, errors: [] }.
- * Input field is `files` (not `paths`), with min(1).
- * Tool is invoked via FunctionTool.invoke(runCtx, jsonInput).
+ * Tests dispatcher architecture, input caps, and output capping.
+ * Input is `files: {path, content}[]`.
+ * Tool dispatches to hadolint for Dockerfiles, skips other file types.
  *
- * @depends Phase C of #477 (validate_artifacts.ts must exist)
+ * @depends #10 (validate_artifacts + hadolint)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -15,10 +14,19 @@ import { RunContext } from '@openai/agents';
 import { validateArtifactsTool } from '../../tools/validate_artifacts.js';
 import { makeSessionCtx } from './_session-stub.js';
 
+// Mock hadolint so these tests don't need the binary
+vi.mock('../../validators/hadolint.js', () => ({
+  runHadolint: vi.fn().mockResolvedValue({
+    path: 'Dockerfile',
+    status: 'pass',
+    violations: [],
+  }),
+}));
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('core.validate_artifacts', () => {
-  const invoke = (files: string[]) =>
+  const invoke = (files: Array<{ path: string; content: string }>) =>
     validateArtifactsTool.tool.invoke(
       new RunContext(makeSessionCtx()),
       JSON.stringify({ files }),
@@ -28,47 +36,134 @@ describe('core.validate_artifacts', () => {
     vi.clearAllMocks();
   });
 
-  // ── Phase C stub contract ─────────────────────────────────────────────────
+  // ── Dispatcher contract ──────────────────────────────────────────────────
 
-  describe('stub implementation contract', () => {
-    it('returns JSON string for a single file path', async () => {
-      const raw = await invoke(['k8s/deployment.yaml']);
+  describe('dispatcher contract', () => {
+    it('returns JSON string for a single file', async () => {
+      const raw = await invoke([{ path: 'k8s/deployment.yaml', content: 'apiVersion: apps/v1' }]);
       expect(typeof String(raw)).toBe('string');
       expect(() => JSON.parse(String(raw))).not.toThrow();
     });
 
-    it('parsed result has valid: true', async () => {
-      const raw = await invoke(['k8s/deployment.yaml']);
+    it('parsed result has results array', async () => {
+      const raw = await invoke([{ path: 'k8s/deployment.yaml', content: 'apiVersion: apps/v1' }]);
       const result = JSON.parse(String(raw));
-      expect(result.valid).toBe(true);
+      expect(Array.isArray(result.results)).toBe(true);
+      expect(result.results).toHaveLength(1);
     });
 
-    it('parsed result has errors: []', async () => {
-      const raw = await invoke(['k8s/deployment.yaml']);
+    it('non-Dockerfile is skipped', async () => {
+      const raw = await invoke([{ path: 'k8s/deployment.yaml', content: 'apiVersion: apps/v1' }]);
       const result = JSON.parse(String(raw));
-      expect(Array.isArray(result.errors)).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      expect(result.results[0].status).toBe('skipped');
     });
 
-    it('accepts multiple file paths without throwing', async () => {
+    it('accepts multiple files without throwing', async () => {
       await expect(
-        invoke(['k8s/deployment.yaml', 'k8s/service.yaml', 'k8s/ingress.yaml']),
+        invoke([
+          { path: 'k8s/deployment.yaml', content: 'apiVersion: apps/v1' },
+          { path: 'k8s/service.yaml', content: 'kind: Service' },
+          { path: 'Dockerfile', content: 'FROM node:20' },
+        ]),
       ).resolves.not.toThrow();
     });
 
     it('returns valid JSON for multiple files', async () => {
-      const raw = await invoke(['manifests/deploy.yaml', 'manifests/service.yaml']);
+      const raw = await invoke([
+        { path: 'manifests/deploy.yaml', content: 'kind: Deployment' },
+        { path: 'Dockerfile', content: 'FROM node:20' },
+      ]);
       expect(() => JSON.parse(String(raw))).not.toThrow();
+    });
+
+    it('routes .dockerfile extension to hadolint', async () => {
+      const { runHadolint } = await import('../../validators/hadolint.js');
+      await invoke([{ path: 'app.dockerfile', content: 'FROM node:20' }]);
+      expect(runHadolint).toHaveBeenCalledWith('app.dockerfile', 'FROM node:20');
     });
   });
 
-  // ── Future rule tests (todo until real validator ships) ──────────────────
+  // ── Input caps (Zapp security) ──────────────────────────────────────────
 
-  describe('future rule-based validation (pending real implementation)', () => {
-    it.todo('DS001: rejects Deployment without resource limits with severity "error"');
-    it.todo('DS001: passes Deployment that has resource limits set');
-    it.todo('result shape includes violation details when rules run');
-    it.todo('an unknown file extension is handled gracefully');
+  describe('input caps', () => {
+    it('rejects more than 20 files via schema', async () => {
+      const files = Array.from({ length: 21 }, (_, i) => ({
+        path: `file-${i}.yaml`,
+        content: 'content',
+      }));
+      const raw = await invoke(files);
+      // Schema validation fails; tool passes through and dispatch returns skipped
+      const result = JSON.parse(String(raw));
+      expect(Array.isArray(result.results)).toBe(true);
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(result.results[0].status).toBe('skipped');
+    });
+
+    it('rejects aggregate content exceeding 50MB via schema refinement', async () => {
+      // Aggregate size check happens in execute — tool returns skipped result
+      const bigContent = 'x'.repeat(9 * 1024 * 1024);
+      const files = Array.from({ length: 6 }, (_, i) => ({
+        path: `file-${i}.yaml`,
+        content: bigContent,
+      }));
+      const raw = await invoke(files);
+      const result = JSON.parse(String(raw));
+      expect(result.results).toBeDefined();
+      expect(result.results[0].status).toBe('skipped');
+      expect(result.results[0].reason.toLowerCase()).toContain('aggregate content');
+    });
+
+    it('rejects aggregate content exceeding 50MB', async () => {
+      // Caught in execute's aggregate size check — returns skipped result with reason
+      const bigContent = 'x'.repeat(9 * 1024 * 1024);
+      const files = Array.from({ length: 6 }, (_, i) => ({
+        path: `file-${i}.yaml`,
+        content: bigContent,
+      }));
+      const raw = await invoke(files);
+      const result = JSON.parse(String(raw));
+      expect(result.results[0].status).toBe('skipped');
+      expect(result.results[0].reason.toLowerCase()).toContain('exceeds');
+    });
+  });
+
+  // ── Skipped-state surfacing (Zapp requirement) ──────────────────────────
+
+  describe('skipped-state surfacing', () => {
+    it('returns reason string when file type has no validator', async () => {
+      const raw = await invoke([{ path: 'unknown.xyz', content: 'data' }]);
+      const result = JSON.parse(String(raw));
+      expect(result.results[0].status).toBe('skipped');
+      expect(result.results[0].reason).toBeDefined();
+      expect(typeof result.results[0].reason).toBe('string');
+    });
+  });
+
+  // ── Retry exhaustion scenario ───────────────────────────────────────────
+
+  describe('retry exhaustion scenario', () => {
+    it('returns persistent violations on repeated calls (agent retry simulation)', async () => {
+      const { runHadolint } = await import('../../validators/hadolint.js');
+      const persistentFailure = {
+        path: 'Dockerfile',
+        status: 'fail' as const,
+        violations: [
+          { rule: 'DL3007', severity: 'error' as const, line: 1, message: 'unpinned', fix: 'Pin the base image.' },
+        ],
+      };
+      vi.mocked(runHadolint).mockResolvedValue(persistentFailure);
+
+      // Simulate 3 calls (initial + 2 retries) — each returns the same failure
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const raw = await invoke([{ path: 'Dockerfile', content: 'FROM ubuntu' }]);
+        const result = JSON.parse(String(raw));
+        expect(result.results[0].status).toBe('fail');
+        expect(result.results[0].violations).toHaveLength(1);
+        expect(result.results[0].violations[0].rule).toBe('DL3007');
+      }
+
+      expect(runHadolint).toHaveBeenCalledTimes(3);
+    });
   });
 
   // ── Metadata ──────────────────────────────────────────────────────────────

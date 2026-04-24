@@ -266,6 +266,7 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
         { label: 'Cluster', value: 'aks-prod' },
         { label: 'Region', value: 'East US' },
         { label: 'Nodes', value: '3' },
+        { label: 'Pull request', value: 'PR #42', badge: 'success', link: 'https://github.com/octocat/kickstart-sample/pull/42' },
       ],
     },
   ],

@@ -1,7 +1,32 @@
-import { randomUUID } from 'node:crypto';
 import type { A2UIMessageV09 as A2UIMessage } from '../types/a2ui.js';
 import type { Artifact, A2UICatalog, SessionCtx, Turn, PendingUserAction, AppIntent, AzureCredential, ClientHydrationMessage } from '../types/session.js';
 import type { Phase } from '../index.js';
+
+// ── Browser-compatible crypto helpers (replaces node:crypto) ─────────────────
+
+/** Encode a Uint8Array to a base64url string (no padding). */
+function toBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** SHA-256 hash of a UTF-8 string, returned as base64url. */
+async function sha256Base64Url(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
+  return toBase64Url(hash);
+}
+
+/** Constant-time comparison of two equal-length strings (XOR-based). */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
 
 export type { ClientHydrationMessage } from '../types/session.js';
 
@@ -28,7 +53,9 @@ const MIN_LIVE_SURFACES_CAP = 10;
 const MAX_LIVE_SURFACES_CAP = 100_000;
 
 function resolveMaxLiveSurfaces(): number {
-  const raw = process.env.KICKSTART_MAX_LIVE_SURFACES;
+  const raw = typeof process !== "undefined" && process.env
+    ? process.env.KICKSTART_MAX_LIVE_SURFACES
+    : undefined;
   if (!raw) return DEFAULT_MAX_LIVE_SURFACES;
   const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n)) return DEFAULT_MAX_LIVE_SURFACES;
@@ -64,6 +91,13 @@ export class Session implements SessionCtx {
   skillsPulledTokens?: number;
   /** Leela BLOCK-1: real first-class field; no type-cast side-channel needed. */
   lastActiveAt: number = Date.now();
+  /**
+   * SHA-256 hash of the per-session anonymous token (#1079). Only set for
+   * anonymous sessions. The raw token is returned to the client exactly once
+   * (in the SSE `start` event + `X-Anon-Session-Token` header); subsequent
+   * requests must present it for session resumption.
+   */
+  anonTokenHash?: string;
 
   constructor(opts: {
     sessionId: string;
@@ -140,7 +174,8 @@ export const sessionStore = new Map<string, Session>();
 const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [id, session] of sessionStore) {
-    if (now - session.lastActiveAt > SESSION_TTL_MS) {
+    const ttl = isAnonymousSession(session) ? ANON_SESSION_TTL_MS : SESSION_TTL_MS;
+    if (now - session.lastActiveAt > ttl) {
       sessionStore.delete(id);
     }
   }
@@ -156,7 +191,7 @@ export function getOrCreateSession(
   oid: string,
   workspaceRoot = '/workspace',
 ): Session {
-  const id = sessionId ?? randomUUID();
+  const id = sessionId ?? crypto.randomUUID();
   let session = sessionStore.get(id);
   if (!session) {
     session = new Session({ sessionId: id, user: { oid }, workspaceRoot });
@@ -168,6 +203,101 @@ export function getOrCreateSession(
   // Update last-active time for TTL cleanup
   session.touch();
   return session;
+}
+
+// ---------------------------------------------------------------------------
+// Anonymous session token (#1079)
+// ---------------------------------------------------------------------------
+
+/** TTL for anonymous sessions — 10 min (shorter than the 30 min default). */
+export const ANON_SESSION_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * Error thrown when crypto primitives fail during anonymous token generation.
+ * Callers should catch this and return 503 (Service Unavailable) with a
+ * Retry-After header instead of letting the process crash.
+ */
+export class AnonTokenGenerationError extends Error {
+  override readonly name = 'AnonTokenGenerationError';
+  constructor(cause: unknown) {
+    super('ANON_TOKEN_GENERATION_FAILED');
+    this.cause = cause;
+  }
+}
+
+/**
+ * Generate a cryptographically random per-session token for an anonymous
+ * session. Stores the SHA-256 hash on the session; returns the raw token
+ * (base64url, 32 bytes of entropy). The caller sends the raw token to the
+ * client exactly once.
+ *
+ * @throws {AnonTokenGenerationError} if crypto primitives fail (entropy
+ *   exhaustion, FIPS restrictions, etc.). The caller should respond with
+ *   503 + Retry-After rather than letting the server crash.
+ */
+export async function generateAnonSessionToken(session: Session): Promise<string> {
+  try {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const token = toBase64Url(bytes);
+    session.anonTokenHash = await sha256Base64Url(token);
+    return token;
+  } catch (err) {
+    throw new AnonTokenGenerationError(err);
+  }
+}
+
+/**
+ * Validate a client-supplied anonymous session token against the stored hash.
+ * Uses timing-safe comparison to prevent timing side-channels.
+ */
+export async function validateAnonSessionToken(session: Session, token: string): Promise<boolean> {
+  if (!session.anonTokenHash) return false;
+  if (typeof token !== 'string' || token.length === 0) return false;
+  try {
+    const incoming = await sha256Base64Url(token);
+    const expected = session.anonTokenHash;
+    return timingSafeEqual(incoming, expected);
+  } catch {
+    return false;
+  }
+}
+
+/** Check if a session belongs to an anonymous (unauthenticated) user. */
+export function isAnonymousSession(session: Session): boolean {
+  return session.user.oid === 'anonymous';
+}
+
+/**
+ * Extended result from {@link getOrCreateSessionResult} that also reports
+ * whether the session was freshly created vs. resumed from the store.
+ */
+export interface SessionResult {
+  session: Session;
+  created: boolean;
+}
+
+/**
+ * Like {@link getOrCreateSession} but also returns a `created` flag so
+ * callers can distinguish new-session from resume without peeking at the
+ * store directly.
+ */
+export function getOrCreateSessionResult(
+  sessionId: string | undefined,
+  oid: string,
+  workspaceRoot = '/workspace',
+): SessionResult {
+  const id = sessionId ?? crypto.randomUUID();
+  let session = sessionStore.get(id);
+  let created = false;
+  if (!session) {
+    session = new Session({ sessionId: id, user: { oid }, workspaceRoot });
+    sessionStore.set(id, session);
+    created = true;
+  } else if (session.user.oid !== oid) {
+    throw new Error('SESSION_OID_MISMATCH');
+  }
+  session.touch();
+  return { session, created };
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +327,9 @@ export const HYDRATION_CONTENT_MAX_BYTES = 4 * 1024;
  * hydrate freely regardless of this flag.
  */
 export function isAnonHydrationAllowed(): boolean {
-  const raw = process.env.HARNESS_ALLOW_ANON_HYDRATION;
+  const raw = typeof process !== "undefined" && process.env
+    ? process.env.HARNESS_ALLOW_ANON_HYDRATION
+    : undefined;
   if (!raw) return false;
   const v = raw.trim().toLowerCase();
   return v === '1' || v === 'true';

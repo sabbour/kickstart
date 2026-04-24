@@ -12,6 +12,8 @@ interface A2UISurfaceWrapperProps {
 export function A2UISurfaceWrapper({ surface, isActive = true }: A2UISurfaceWrapperProps) {
   return (
     <div
+      data-testid="a2ui-surface"
+      data-surface-id={surface.id}
       className="a2ui-surface-wrapper"
       style={{
         borderRadius: 'var(--radius-large, 8px)',

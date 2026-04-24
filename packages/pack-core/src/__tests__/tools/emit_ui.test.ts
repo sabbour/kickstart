@@ -893,4 +893,381 @@ describe('core.emit_ui', () => {
       expect(capped.liveSurfaceIds).toEqual(new Set(['b', 'c', 'd']));
     });
   });
+
+  // ── Rich component variants (#1130) ──────────────────────────────────────
+
+  describe('rich component variants (DecisionCard, RadioGroup, Questionnaire)', () => {
+    beforeEach(async () => {
+      // Seed a surface for updateComponents calls
+      await invoke(validCreateSurface);
+    });
+
+    it('DecisionCard with valid props is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'dc1',
+            component: 'DecisionCard',
+            title: 'Choose a track',
+            recommendation: 'AKS Automatic is the way to go',
+            rationale: null,
+            alternatives: null,
+            badge: null,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('DecisionCard with all props is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'dc2',
+            component: 'DecisionCard',
+            title: 'Deploy options',
+            recommendation: 'Use AKS Automatic',
+            rationale: 'Fully managed, secure by default',
+            alternatives: ['Static site', 'Container web app'],
+            badge: 'recommended',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('DecisionCard rejects injected props (strict)', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'dc3',
+            component: 'DecisionCard',
+            title: 'Test',
+            recommendation: 'Test',
+            rationale: null,
+            alternatives: null,
+            badge: null,
+            injected_prop: 'bad',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toMatch(/An error occurred|invalid/i);
+    });
+
+    it('RadioGroup with valid props is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'rg1',
+            component: 'RadioGroup',
+            options: [
+              { id: 'opt1', label: 'Option 1', description: null, recommended: null },
+              { id: 'opt2', label: 'Option 2', description: 'Second option', recommended: true },
+            ],
+            value: null,
+            action: { event: { name: 'select', payload: null } },
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('RadioGroup rejects injected props (strict)', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'rg2',
+            component: 'RadioGroup',
+            options: [{ id: 'a', label: 'A', description: null, recommended: null }],
+            value: null,
+            action: { event: { name: 'pick', payload: null } },
+            extra: 'nope',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toMatch(/An error occurred|invalid/i);
+    });
+
+    it('Questionnaire with valid props is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'q1',
+            component: 'Questionnaire',
+            questions: [
+              { id: 'q-model', label: 'Which model?', type: 'choice', choices: [{ id: 'gpt4', label: 'GPT-4o' }], required: true },
+              { id: 'q-desc', label: 'Describe your use case', type: null, choices: null, required: null },
+            ],
+            submitLabel: 'Continue',
+            onSubmit: { event: { name: 'submit_answers', payload: null } },
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('Questionnaire rejects injected props (strict)', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'q2',
+            component: 'Questionnaire',
+            questions: [{ id: 'a', label: 'Q?', type: null, choices: null, required: null }],
+            submitLabel: null,
+            onSubmit: null,
+            hackProp: true,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toMatch(/An error occurred|invalid/i);
+    });
+  });
+
+  // ── Phase B rich component variants (SummaryCard, ArchitectureDiagram) ──
+  describe('rich component variants — Phase B (SummaryCard, ArchitectureDiagram)', () => {
+    beforeEach(async () => {
+      await invoke(validCreateSurface);
+    });
+
+    it('SummaryCard with minimal props is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'sc1',
+            component: 'SummaryCard',
+            title: 'Your AKS plan',
+            items: [
+              { label: 'Platform', value: 'AKS Automatic', badge: null, link: null },
+            ],
+            children: null,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('SummaryCard with all props including children is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [
+            {
+              id: 'sc2',
+              component: 'SummaryCard',
+              title: 'Your AKS plan',
+              items: [
+                { label: 'Platform', value: 'AKS Automatic', badge: 'success', link: null },
+                { label: 'Cost', value: '~$420/mo', badge: 'info', link: null },
+              ],
+              children: ['diagram-1'],
+            },
+            {
+              id: 'diagram-1',
+              component: 'ArchitectureDiagram',
+              title: 'Solution Architecture',
+              description: 'AKS with KAITO',
+              diagram: null,
+              nodes: [
+                { id: 'aks', label: 'AKS Automatic', type: 'aks' },
+                { id: 'kaito', label: 'KAITO Pod', type: null },
+              ],
+              edges: [
+                { from: 'aks', to: 'kaito', label: 'inference' },
+              ],
+            },
+          ],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('SummaryCard rejects injected props (strict)', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'sc3',
+            component: 'SummaryCard',
+            title: 'Test',
+            items: [{ label: 'A', value: 'B', badge: null, link: null }],
+            children: null,
+            hackedField: 'bad',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toMatch(/An error occurred|invalid/i);
+    });
+
+    it('ArchitectureDiagram with diagram string is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'ad1',
+            component: 'ArchitectureDiagram',
+            diagram: 'graph TD\n  A-->B',
+            nodes: null,
+            edges: null,
+            title: 'My Diagram',
+            description: null,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('ArchitectureDiagram with structured nodes/edges is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'ad2',
+            component: 'ArchitectureDiagram',
+            diagram: null,
+            nodes: [
+              { id: 'aks', label: 'AKS Automatic', type: 'aks' },
+              { id: 'kaito', label: 'KAITO Pod', type: 'ai' },
+              { id: 'ingress', label: 'Ingress', type: 'networking' },
+              { id: 'storage', label: 'Azure Files', type: 'storage' },
+            ],
+            edges: [
+              { from: 'ingress', to: 'aks', label: 'HTTPS' },
+              { from: 'aks', to: 'kaito', label: 'inference' },
+              { from: 'kaito', to: 'storage', label: 'model weights' },
+            ],
+            title: 'Solution Architecture',
+            description: 'AKS Automatic with KAITO',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('ArchitectureDiagram rejects injected props (strict)', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'ad3',
+            component: 'ArchitectureDiagram',
+            diagram: 'graph TD\n  A-->B',
+            nodes: null,
+            edges: null,
+            title: null,
+            description: null,
+            extraField: 'nope',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toMatch(/An error occurred|invalid/i);
+    });
+
+    it('SummaryCard + ArchitectureDiagram + Buttons compose in adjacency list', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [
+            { id: 'root', component: 'Column', children: ['plan', 'actions'] },
+            {
+              id: 'plan',
+              component: 'SummaryCard',
+              title: 'Your AKS plan',
+              items: [
+                { label: 'Platform', value: 'AKS Automatic', badge: 'success', link: null },
+              ],
+              children: ['arch'],
+            },
+            {
+              id: 'arch',
+              component: 'ArchitectureDiagram',
+              title: 'Solution Architecture',
+              description: null,
+              diagram: null,
+              nodes: [
+                { id: 'aks', label: 'AKS', type: 'aks' },
+                { id: 'app', label: 'App', type: null },
+              ],
+              edges: [{ from: 'aks', to: 'app', label: null }],
+            },
+            { id: 'actions', component: 'Row', children: ['approve', 'revise'] },
+            { id: 'approve-text', component: 'Text', text: 'Looks right — generate' },
+            {
+              id: 'approve',
+              component: 'Button',
+              child: 'approve-text',
+              action: {
+                event: {
+                  name: 'approve_plan',
+                  payload: { confirmed: true, id: null, value: null, action: 'approve_plan', target: null },
+                },
+              },
+            },
+            { id: 'revise-text', component: 'Text', text: 'Revise' },
+            {
+              id: 'revise',
+              component: 'Button',
+              child: 'revise-text',
+              action: {
+                event: {
+                  name: 'revise_plan',
+                  payload: { confirmed: null, id: null, value: null, action: 'revise_plan', target: null },
+                },
+              },
+            },
+          ],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+  });
 });

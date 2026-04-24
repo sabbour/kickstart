@@ -1,3 +1,7 @@
+[![CI](https://github.com/azure-management-and-platforms/kickstart/actions/workflows/ci.yml/badge.svg?branch=dev&event=push)](https://github.com/azure-management-and-platforms/kickstart/actions/workflows/ci.yml)
+
+[![Deployment](https://github.com/azure-management-and-platforms/kickstart/actions/workflows/deploy-swa.yml/badge.svg?branch=dev&event=push)](https://github.com/azure-management-and-platforms/kickstart/actions/workflows/deploy-swa.yml)
+
 # Kickstart
 
 **AI-guided onboarding for deploying apps to AKS Automatic.**
@@ -58,6 +62,7 @@ npm run dev
 - **http://localhost:5173** — Vite dev server (HMR, frontend only)
 
 > **Note:** The API requires Azure OpenAI credentials. See [DEVELOPMENT.md](./DEVELOPMENT.md) for configuration details. Without credentials, the app runs in **demo mode** automatically.
+> **Default model:** Chat-tier harness agents default to `gpt-5.4` when `KICKSTART_CHAT_MODEL` is unset. Set `KICKSTART_CHAT_MODEL` to point at a different Azure OpenAI deployment.
 
 ### Run MCP server (IDE)
 

@@ -1,0 +1,11 @@
+{
+  "phase": "design",
+  "request_summary": "Architecture design for KAITO deployment",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Designing the KAITO workspace configuration for your model.\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"architecture-diagram\",\"components\":[\"kaito-workspace\",\"gpu-nodepool\",\"inference-service\",\"ingress\"]}" },
+    { "event": "a2ui", "data": "{\"type\":\"model-deployment-card\",\"model\":\"llama-3\",\"gpu\":\"A100\",\"replicas\":1}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"design\",\"status\":\"active\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"design\"}" }
+  ]
+}

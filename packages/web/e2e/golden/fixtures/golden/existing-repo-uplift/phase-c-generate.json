@@ -1,0 +1,12 @@
+{
+  "phase": "generate",
+  "request_summary": "Generate uplift manifests",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Generating updated manifests with AKS Automatic best practices.\"}" },
+    { "event": "tool", "data": "{\"name\":\"generate_manifests\",\"status\":\"running\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"file-tree\",\"files\":[\"deployment.yaml\",\"hpa.yaml\",\"pdb.yaml\",\"ingress.yaml\"]}" },
+    { "event": "a2ui", "data": "{\"type\":\"diff-view\",\"additions\":45,\"deletions\":12}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"generate\",\"status\":\"active\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"generate\"}" }
+  ]
+}

@@ -109,7 +109,7 @@ export const RadioGroup = createReactComponent(RadioGroupApi, ({ props, context 
   };
 
   return (
-    <div className={classes.root} role="radiogroup" aria-label="Options">
+    <div className={classes.root} role="radiogroup" aria-label="Options" data-testid="a2ui-RadioGroup">
       {options.map((opt, idx) => (
         <Card
           key={opt.id}

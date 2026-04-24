@@ -1,0 +1,10 @@
+{
+  "phase": "discover",
+  "request_summary": "User describes an AI Foundry agent project",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"I'll help you deploy an AI agent using Azure AI Foundry on AKS.\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"discover\",\"status\":\"active\"}" },
+    { "event": "chunk", "data": "{\"content\":\"Let me understand your AI agent requirements and model preferences.\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"discover\"}" }
+  ]
+}

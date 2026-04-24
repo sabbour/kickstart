@@ -99,37 +99,39 @@ export const DecisionCard = createReactComponent(DecisionCardApi, ({ props }) =>
   const alternatives = props.alternatives ?? [];
 
   return (
-    <Card className={classes.card}>
-      <div className={classes.header}>
-        <Caption1 className={classes.titleText}>{props.title}</Caption1>
-        {badgeCfg && (
-          <Badge color={badgeCfg.color} appearance="tint" size="small">
-            {badgeCfg.label}
-          </Badge>
+    <div data-testid="a2ui-DecisionCard">
+      <Card className={classes.card}>
+        <div className={classes.header}>
+          <Caption1 className={classes.titleText}>{props.title}</Caption1>
+          {badgeCfg && (
+            <Badge color={badgeCfg.color} appearance="tint" size="small">
+              {badgeCfg.label}
+            </Badge>
+          )}
+        </div>
+
+        <div className={classes.recommendationRow}>
+          <CheckmarkCircleRegular className={classes.checkIcon} />
+          <Subtitle2>{props.recommendation}</Subtitle2>
+        </div>
+
+        {props.rationale && (
+          <Body1 className={classes.rationale}>{props.rationale}</Body1>
         )}
-      </div>
 
-      <div className={classes.recommendationRow}>
-        <CheckmarkCircleRegular className={classes.checkIcon} />
-        <Subtitle2>{props.recommendation}</Subtitle2>
-      </div>
-
-      {props.rationale && (
-        <Body1 className={classes.rationale}>{props.rationale}</Body1>
-      )}
-
-      {alternatives.length > 0 && (
-        <>
-          <Caption1 className={classes.alternativesLabel}>Alternatives considered</Caption1>
-          <ul className={classes.alternativesList}>
-            {alternatives.map((alt, idx) => (
-              <li key={idx}>
-                <Body1>{alt}</Body1>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </Card>
+        {alternatives.length > 0 && (
+          <>
+            <Caption1 className={classes.alternativesLabel}>Alternatives considered</Caption1>
+            <ul className={classes.alternativesList}>
+              {alternatives.map((alt, idx) => (
+                <li key={idx}>
+                  <Body1>{alt}</Body1>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </Card>
+    </div>
   );
 });

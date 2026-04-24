@@ -273,6 +273,38 @@ describe('prepareChatA2ui', () => {
       language: 'bicep',
     });
   });
+
+  it('leaves shared surfaces unscoped so later turns can update them in place', () => {
+    const payload: A2uiPayloadItem[] = [
+      {
+        version: 'v0.9',
+        createSurface: { surfaceId: 'shared:triage-main', catalogId: 'kickstart' },
+      },
+      {
+        version: 'v0.9',
+        updateComponents: {
+          surfaceId: 'shared:triage-main',
+          components: [{ id: 'decision', component: 'DecisionCard', title: 'Track', recommendation: 'Use AKS' }],
+        },
+      },
+    ];
+
+    const prepared = prepareChatA2ui(payload, 'assistant-turn-shared');
+
+    expect(prepared.renderableMessages).toEqual([
+      {
+        version: 'v0.9',
+        createSurface: { surfaceId: 'shared:triage-main', catalogId: 'kickstart' },
+      },
+      {
+        version: 'v0.9',
+        updateComponents: {
+          surfaceId: 'shared:triage-main',
+          components: [{ id: 'decision', component: 'DecisionCard', title: 'Track', recommendation: 'Use AKS' }],
+        },
+      },
+    ]);
+  });
 });
 
 describe('rebuildChatSessionState', () => {
@@ -367,6 +399,59 @@ describe('rebuildChatSessionState', () => {
         text: '📄 Dockerfile is available in the workspace.',
         variant: 'body2',
       },
+      ]);
+  });
+
+  it('reuses the same shared surface id across assistant turns during replay', () => {
+    const restored = rebuildChatSessionState([
+      {
+        id: 'assistant-turn-11',
+        a2uiMessages: [
+          {
+            version: 'v0.9',
+            createSurface: { surfaceId: 'shared:triage-main', catalogId: 'kickstart' },
+          },
+          {
+            version: 'v0.9',
+            updateComponents: {
+              surfaceId: 'shared:triage-main',
+              components: [{ id: 'decision', component: 'DecisionCard', title: 'Track', recommendation: 'Use AKS' }],
+            },
+          },
+        ],
+      },
+      {
+        id: 'assistant-turn-12',
+        a2uiMessages: [
+          {
+            version: 'v0.9',
+            createSurface: { surfaceId: 'shared:triage-main', catalogId: 'kickstart' },
+          },
+          {
+            version: 'v0.9',
+            updateComponents: {
+              surfaceId: 'shared:triage-main',
+              components: [{
+                id: 'inference',
+                component: 'RadioGroup',
+                options: [{ id: 'foundry', label: 'Azure AI Foundry' }],
+                action: { event: { name: 'select_inference' } },
+              }],
+            },
+          },
+        ],
+      },
+    ]);
+
+    expect(restored.renderableMessages.map((message) =>
+      message.createSurface?.surfaceId
+      ?? message.updateComponents?.surfaceId
+      ?? null,
+    )).toEqual([
+      'shared:triage-main',
+      'shared:triage-main',
+      'shared:triage-main',
+      'shared:triage-main',
     ]);
   });
 });

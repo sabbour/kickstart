@@ -1,0 +1,12 @@
+{
+  "phase": "deploy",
+  "request_summary": "Deploy to AKS cluster",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Preparing your deployment. Let me create a pull request with these manifests.\"}" },
+    { "event": "tool", "data": "{\"name\":\"create_pull_request\",\"status\":\"running\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"pr-link\",\"url\":\"https://github.com/test-org/test-repo/pull/1\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"deploy\",\"status\":\"active\"}" },
+    { "event": "chunk", "data": "{\"content\":\"Your pull request has been created successfully.\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"deploy\"}" }
+  ]
+}

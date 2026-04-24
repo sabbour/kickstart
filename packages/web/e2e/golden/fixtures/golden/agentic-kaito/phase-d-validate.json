@@ -1,0 +1,12 @@
+{
+  "phase": "validate",
+  "request_summary": "Validate KAITO manifests",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Validating your KAITO workspace manifests against deployment safeguards.\"}" },
+    { "event": "tool", "data": "{\"name\":\"validate_artifacts\",\"status\":\"running\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"validation-results\",\"passed\":8,\"failed\":0,\"warnings\":1}" },
+    { "event": "a2ui", "data": "{\"type\":\"safeguard-card\",\"id\":\"DS003\",\"severity\":\"passed\",\"title\":\"Pod disruption budget configured\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"validate\",\"status\":\"active\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"validate\"}" }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "phase": "validate",
+  "request_summary": "Validate generated manifests",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Running deployment safeguards validation on your manifests.\"}" },
+    { "event": "tool", "data": "{\"name\":\"validate_artifacts\",\"status\":\"running\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"validation-results\",\"passed\":12,\"failed\":0,\"warnings\":1}" },
+    { "event": "a2ui", "data": "{\"type\":\"safeguard-card\",\"id\":\"DS001\",\"severity\":\"passed\",\"title\":\"Container image uses a tag\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"validate\",\"status\":\"active\"}" },
+    { "event": "chunk", "data": "{\"content\":\"All deployment safeguards passed. Your manifests are production-ready.\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"validate\"}" }
+  ]
+}

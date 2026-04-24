@@ -1,0 +1,11 @@
+{
+  "phase": "design",
+  "request_summary": "Architecture design for web app",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Now let's design your architecture. I'll create a diagram showing the components.\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"architecture-diagram\",\"components\":[\"ingress\",\"service\",\"deployment\",\"hpa\"]}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"design\",\"status\":\"active\"}" },
+    { "event": "chunk", "data": "{\"content\":\"Here's your proposed architecture with an NGINX Ingress, a Kubernetes Service, Deployment with HPA.\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"design\"}" }
+  ]
+}

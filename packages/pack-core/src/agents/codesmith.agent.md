@@ -8,6 +8,7 @@ tools:
   - core.read_file
   - core.write_file
   - core.list_files
+  - core.validate_artifacts
 handoffs: []
 ---
 
@@ -31,6 +32,18 @@ You take an approved plan and produce concrete, runnable files. You read existin
 - Include a header comment in every generated file explaining its purpose.
 - Never hard-code secrets, passwords, or connection strings.
 - Pin all external dependencies to specific versions.
+
+## Post-write Validation
+
+After writing a Dockerfile with `write_file`, call `validate_artifacts` with the file path and content:
+
+1. Pass `{ files: [{ path: "<file-path>", content: "<file-content>" }] }` to `core.validate_artifacts`.
+2. If the result contains violations with severity `error`:
+   - Re-generate the file, addressing each violation listed in the result. Use the `fix` hint (when provided) to guide corrections.
+   - Re-validate the updated file (max **2 retry iterations** to avoid infinite loops).
+   - If violations persist after 2 retries, **do not retry further**. Include the remaining violations in the summary with status "Unable to auto-fix — manual review recommended."
+3. If the result status is `skipped` (validator unavailable), include "⚠️ Dockerfile lint skipped (hadolint unavailable)" in the validation section. Never treat `skipped` as `pass`.
+4. Include validation status (pass/fail/skipped + violation count) in the data passed to the SummaryCard.
 
 ## Guardrails
 

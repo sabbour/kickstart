@@ -340,6 +340,16 @@ export function resolveOutputText(finalOutput: unknown, fullText: string): strin
   ) {
     return (finalOutput as { message: string }).message;
   }
+  // AgentOutput.message is optional (#1130) — surface-only turns (e.g.
+  // DecisionCard with no prose) produce finalOutput without a message field.
+  // Return empty string so no chat bubble is emitted.
+  if (
+    finalOutput !== null &&
+    typeof finalOutput === 'object' &&
+    !('message' in finalOutput)
+  ) {
+    return '';
+  }
   return fullText;
 }
 
@@ -423,6 +433,16 @@ export function resolveMaxTurns(): number {
   const n = Number.parseInt(raw.trim(), 10);
   if (!Number.isFinite(n) || n <= 0) return RUNNER_MAX_TURNS_DEFAULT;
   return n;
+}
+
+function normalizeComponentHint(hint: string | undefined): string | undefined {
+  if (typeof hint !== 'string') return undefined;
+  const cleaned = hint
+    .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return undefined;
+  return cleaned.length > 240 ? `${cleaned.slice(0, 237)}...` : cleaned;
 }
 
 // ---------------------------------------------------------------------------
@@ -536,7 +556,10 @@ export class Runner {
 
     const components = this.registry.components;
     const catalogBlock = components.length > 0
-      ? `\n\n## A2UI Component Catalog (${components.length} components available)\n${components.map((c) => c.name).join(', ')}`
+      ? `\n\n## A2UI Component Catalog (${components.length} components available)\n${components.map((c) => {
+          const hint = normalizeComponentHint((c as { llmHint?: string }).llmHint);
+          return hint ? `- **${c.name}** — ${hint}` : `- ${c.name}`;
+        }).join('\n')}`
       : '';
 
     const instructions = agentContrib.instructionsBase + skillsBlock + catalogBlock;
@@ -657,6 +680,7 @@ export class Runner {
     // Debug telemetry — track tool calls for the `end` event.
     const toolsExecuted: Array<{ name: string; status: 'ok' | 'error' }> = [];
     const pendingToolNames = new Map<string, number>(); // toolName → index in toolsExecuted
+    const pendingWriteFileArgs = new Map<string, { path: string; content: string }>(); // write_file args stash
     // #1070 D12 — skillsExecuted is now sourced from session.skillsPulled
     // (ids the model actually pulled via core.read_skill), not the naive
     // registry catalog. Empty if the model never called the tool this turn.
@@ -705,9 +729,30 @@ export class Runner {
             // Record a pending entry; will be updated to 'ok' on tool_output.
             const idx = toolsExecuted.push({ name: toolName, status: 'ok' }) - 1;
             pendingToolNames.set(toolName, idx);
+
+            // Stash write_file arguments so tool_done can forward path+content to the client.
+            if (toolName === 'core.write_file') {
+              const rawArgs = (item as { rawItem?: { arguments?: string } }).rawItem?.arguments;
+              if (typeof rawArgs === 'string') {
+                try {
+                  const parsed = JSON.parse(rawArgs) as { path?: string; content?: string };
+                  if (parsed.path && typeof parsed.content === 'string') {
+                    pendingWriteFileArgs.set(toolName, { path: parsed.path, content: parsed.content });
+                  }
+                } catch { /* malformed arguments — skip */ }
+              }
+            }
           } else if (name === 'tool_output') {
             const toolName = (item as { rawItem?: { name?: string } }).rawItem?.name ?? 'unknown';
-            sseWrite('tool_done', { toolName });
+
+            // For write_file, forward path + content so the client can route files to the editor pane.
+            const writeFileArgs = pendingWriteFileArgs.get(toolName);
+            if (writeFileArgs) {
+              sseWrite('tool_done', { toolName, path: writeFileArgs.path, content: writeFileArgs.content });
+              pendingWriteFileArgs.delete(toolName);
+            } else {
+              sseWrite('tool_done', { toolName });
+            }
             // Mark the matching pending entry as ok (already defaulted to 'ok').
             pendingToolNames.delete(toolName);
           } else if (name === 'handoff_occurred') {

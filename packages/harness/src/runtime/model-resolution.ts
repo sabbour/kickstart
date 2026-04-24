@@ -3,7 +3,7 @@
  *
  * Fallback chain is tier-aware:
  *   KICKSTART_CODEX_MODEL → AZURE_OPENAI_CODEX_DEPLOYMENT
- *   KICKSTART_CHAT_MODEL  → AZURE_OPENAI_CHAT_DEPLOYMENT
+ *   KICKSTART_CHAT_MODEL  → AZURE_OPENAI_CHAT_DEPLOYMENT → gpt-5.4 (only when both AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY are set)
  *
  * Cross-tier fallback is intentionally blocked: a missing KICKSTART_CODEX_MODEL
  * will NOT silently route to AZURE_OPENAI_CHAT_DEPLOYMENT, preventing silent
@@ -13,6 +13,7 @@
 import type { ModelRef } from '../types/agent.js';
 
 const CODEX_TIER_VAR = 'KICKSTART_CODEX_MODEL';
+const DEFAULT_CHAT_MODEL = 'gpt-5.4';
 
 export function resolveModelName(ref: ModelRef): string {
   if (!('envVar' in ref)) {
@@ -30,6 +31,17 @@ export function resolveModelName(ref: ModelRef): string {
   if (tierFallback) {
     console.warn(`[harness] Model env var ${ref.envVar} not set — falling back to ${tierFallbackVar}`);
     return tierFallback;
+  }
+
+  if (!isCodexTier) {
+    // Only apply the built-in default when the runner would actually use
+    // Azure OpenAI. runner.ts requires BOTH AZURE_OPENAI_ENDPOINT AND
+    // AZURE_OPENAI_API_KEY — if only the endpoint is set, the runner falls
+    // through to vanilla OpenAI, creating a data-egress risk (Zapp PR#24).
+    if (process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_API_KEY) {
+      return DEFAULT_CHAT_MODEL;
+    }
+    // Fall through to the throw below — fail closed.
   }
 
   // Log full diagnostic server-side; keep user-facing message generic

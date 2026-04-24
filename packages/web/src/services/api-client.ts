@@ -8,6 +8,37 @@ export class SessionExpiredError extends Error {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Anonymous session token propagation (#23)
+//
+// The API mints a per-session bearer token for anonymous users. The client
+// must persist and forward it on every subsequent request for that session.
+// Uses sessionStorage (tab-scoped, cleared on tab close) per Zapp's approval.
+// ---------------------------------------------------------------------------
+
+const ANON_TOKEN_PREFIX = 'kickstart:anon-token:';
+
+/** Store an anonymous session token received from a `session_token` SSE event. */
+export function storeAnonSessionToken(sessionId: string, token: string): void {
+  try {
+    sessionStorage.setItem(`${ANON_TOKEN_PREFIX}${sessionId}`, token);
+  } catch { /* quota exceeded or unavailable — degrade gracefully */ }
+}
+
+/** Retrieve a previously stored anonymous session token for a session. */
+export function getAnonSessionToken(sessionId: string): string | null {
+  try {
+    return sessionStorage.getItem(`${ANON_TOKEN_PREFIX}${sessionId}`);
+  } catch { return null; }
+}
+
+/** Clear the anonymous session token (e.g. on sign-out or new session). */
+export function clearAnonSessionToken(sessionId: string): void {
+  try {
+    sessionStorage.removeItem(`${ANON_TOKEN_PREFIX}${sessionId}`);
+  } catch { /* noop */ }
+}
+
 /**
  * Wrapper around fetch() for authenticated API endpoints.
  *
@@ -18,10 +49,17 @@ export class SessionExpiredError extends Error {
  * When `debugMode` is true, adds the `x-kickstart-debug: true` header so
  * the backend returns debug metadata in the SSE stream.
  */
-export async function apiFetch(url: string, init?: RequestInit, debugMode?: boolean): Promise<Response> {
+export async function apiFetch(url: string, init?: RequestInit, debugMode?: boolean, sessionId?: string): Promise<Response> {
   const headers = new Headers(init?.headers);
   if (debugMode) {
     headers.set('x-kickstart-debug', 'true');
+  }
+  // Attach anonymous session token if we have one for this session (#23)
+  if (sessionId) {
+    const anonToken = getAnonSessionToken(sessionId);
+    if (anonToken) {
+      headers.set('x-anon-session-token', anonToken);
+    }
   }
   const res = await fetch(url, { ...init, headers, redirect: 'manual' });
 

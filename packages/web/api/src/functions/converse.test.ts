@@ -76,13 +76,19 @@ vi.mock('../telemetry/sanitize-error.js', () => ({
 }));
 
 vi.mock('@aks-kickstart/harness/runtime/session', () => ({
-  getOrCreateSession: vi.fn(() => ({
-    sessionId: 'test-session',
-    oid: 'anonymous',
-    recentTurns: [],
-    activeAgent: 'core.triage',
-    user: { oid: 'anonymous' },
+  getOrCreateSessionResult: vi.fn(() => ({
+    session: {
+      sessionId: 'test-session',
+      oid: 'anonymous',
+      recentTurns: [],
+      activeAgent: 'core.triage',
+      user: { oid: 'anonymous' },
+    },
+    created: true,
   })),
+  generateAnonSessionToken: vi.fn(() => 'mock-anon-token'),
+  validateAnonSessionToken: vi.fn(() => true),
+  isAnonymousSession: vi.fn(() => true),
   hydrateColdSession: vi.fn(() => ({ hydrated: 0, ignored: null })),
   isAnonHydrationAllowed: vi.fn(() => false),
   sessionStore: { delete: vi.fn() },
@@ -251,5 +257,137 @@ describe('M1 — message size cap (8 KB)', () => {
       makeContext(),
     ) as Response;
     expect(res.status).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #23 — Anonymous session token auth paths
+// ---------------------------------------------------------------------------
+
+describe('#23 — Anonymous session token validation', () => {
+  it('returns 403 with ANON_TOKEN_INVALID when resumed session lacks token', async () => {
+    // Override session mock to simulate a resumed (not created) anonymous session
+    const sessionMod = await import('@aks-kickstart/harness/runtime/session');
+    vi.mocked(sessionMod.getOrCreateSessionResult).mockReturnValueOnce({
+      session: {
+        sessionId: 'test-session',
+        oid: 'anonymous',
+        recentTurns: [],
+        activeAgent: 'core.triage',
+        user: { oid: 'anonymous' },
+      },
+      created: false,
+    } as ReturnType<typeof sessionMod.getOrCreateSessionResult>);
+    vi.mocked(sessionMod.validateAnonSessionToken).mockResolvedValueOnce(false);
+
+    const req = {
+      headers: { get: (name: string) => name === 'x-anon-session-token' ? '' : null },
+      url: 'https://example.com/api/converse',
+      method: 'POST',
+      json: vi.fn().mockResolvedValue({ message: 'pick_track', sessionId: 'test-session' }),
+    };
+
+    const res = await converseHandler(req, makeContext()) as Response;
+    expect(res.status).toBe(403);
+    const body = await res.json() as { code: string };
+    expect(body.code).toBe('ANON_TOKEN_INVALID');
+  });
+
+  it('returns 403 with ANON_TOKEN_INVALID when token is invalid', async () => {
+    const sessionMod = await import('@aks-kickstart/harness/runtime/session');
+    vi.mocked(sessionMod.getOrCreateSessionResult).mockReturnValueOnce({
+      session: {
+        sessionId: 'test-session',
+        oid: 'anonymous',
+        recentTurns: [],
+        activeAgent: 'core.triage',
+        user: { oid: 'anonymous' },
+      },
+      created: false,
+    } as ReturnType<typeof sessionMod.getOrCreateSessionResult>);
+    vi.mocked(sessionMod.validateAnonSessionToken).mockResolvedValueOnce(false);
+
+    const req = {
+      headers: { get: (name: string) => name === 'x-anon-session-token' ? 'bad-token' : null },
+      url: 'https://example.com/api/converse',
+      method: 'POST',
+      json: vi.fn().mockResolvedValue({ message: 'pick_track', sessionId: 'test-session' }),
+    };
+
+    const res = await converseHandler(req, makeContext()) as Response;
+    expect(res.status).toBe(403);
+    const body = await res.json() as { code: string };
+    expect(body.code).toBe('ANON_TOKEN_INVALID');
+  });
+
+  it('returns 200 when resumed session has valid token', async () => {
+    const sessionMod = await import('@aks-kickstart/harness/runtime/session');
+    vi.mocked(sessionMod.getOrCreateSessionResult).mockReturnValueOnce({
+      session: {
+        sessionId: 'test-session',
+        oid: 'anonymous',
+        recentTurns: [],
+        activeAgent: 'core.triage',
+        user: { oid: 'anonymous' },
+      },
+      created: false,
+    } as ReturnType<typeof sessionMod.getOrCreateSessionResult>);
+    vi.mocked(sessionMod.validateAnonSessionToken).mockResolvedValueOnce(true);
+
+    const req = {
+      headers: { get: (name: string) => name === 'x-anon-session-token' ? 'valid-token' : null },
+      url: 'https://example.com/api/converse',
+      method: 'POST',
+      json: vi.fn().mockResolvedValue({ message: 'hello', sessionId: 'test-session' }),
+    };
+
+    const res = await converseHandler(req, makeContext()) as Response;
+    expect(res.status).toBe(200);
+  });
+
+  it('returns 403 with SESSION_OID_MISMATCH as structured JSON', async () => {
+    const sessionMod = await import('@aks-kickstart/harness/runtime/session');
+    vi.mocked(sessionMod.getOrCreateSessionResult).mockImplementationOnce(() => {
+      throw new Error('SESSION_OID_MISMATCH');
+    });
+
+    const res = await converseHandler(
+      makeRequest({ message: 'hello', sessionId: 'test-session' }),
+      makeContext(),
+    ) as Response;
+    expect(res.status).toBe(403);
+    const body = await res.json() as { code: string };
+    expect(body.code).toBe('SESSION_OID_MISMATCH');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #23 — Production safety: no auth bypass references in converse.ts
+// ---------------------------------------------------------------------------
+
+describe('#23 — No auth bypass in production code', () => {
+  it('converse.ts contains no DEV_AUTH_BYPASS references', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const converseSource = readFileSync(
+      resolve(import.meta.dirname ?? '.', 'converse.ts'),
+      'utf-8',
+    );
+    expect(converseSource).not.toMatch(/DEV_AUTH_BYPASS|KICKSTART_DEV_AUTH_BYPASS/);
+  });
+
+  it('converse.ts has no NODE_ENV conditional in auth validation section', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const converseSource = readFileSync(
+      resolve(import.meta.dirname ?? '.', 'converse.ts'),
+      'utf-8',
+    );
+    // The auth section is between principal extraction and session resolution
+    const authSection = converseSource.slice(
+      converseSource.indexOf('x-ms-client-principal'),
+      converseSource.indexOf('// #1079: emit the anonymous session token'),
+    );
+    expect(authSection).not.toMatch(/process\.env\.NODE_ENV/);
   });
 });

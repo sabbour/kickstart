@@ -1,0 +1,12 @@
+{
+  "phase": "validate",
+  "request_summary": "Validate Foundry agent manifests",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Running safeguards on your Foundry agent manifests.\"}" },
+    { "event": "tool", "data": "{\"name\":\"validate_artifacts\",\"status\":\"running\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"validation-results\",\"passed\":10,\"failed\":0,\"warnings\":2}" },
+    { "event": "a2ui", "data": "{\"type\":\"safeguard-card\",\"id\":\"DS005\",\"severity\":\"passed\",\"title\":\"Resource limits set\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"validate\",\"status\":\"active\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"validate\"}" }
+  ]
+}

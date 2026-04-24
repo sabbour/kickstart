@@ -31,6 +31,10 @@ export function ChatMessage({ message, getSurface, isActive = true, debugEnabled
     );
   }
 
+  if (!message.text && (!message.surfaceIds || message.surfaceIds.length === 0) && !debugEnabled) {
+    return null;
+  }
+
   // Assistant message
   return (
     <div className="chat-bubble-row">

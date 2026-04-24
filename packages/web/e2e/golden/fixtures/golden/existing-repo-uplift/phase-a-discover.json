@@ -1,0 +1,10 @@
+{
+  "phase": "discover",
+  "request_summary": "User provides existing repo for uplift",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"I'll analyze your existing repository and suggest AKS Automatic improvements.\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"discover\",\"status\":\"active\"}" },
+    { "event": "chunk", "data": "{\"content\":\"Scanning your repository structure and existing Kubernetes manifests.\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"discover\"}" }
+  ]
+}

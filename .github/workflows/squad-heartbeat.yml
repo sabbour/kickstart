@@ -22,9 +22,17 @@ permissions:
   pull-requests: read
   repository-projects: write
 
+concurrency:
+  group: squad-heartbeat-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   heartbeat:
     runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue && contains(join(github.event.issue.labels.*.name, ','), 'squad')) ||
+      (github.event.pull_request && contains(join(github.event.pull_request.labels.*.name, ','), 'squad'))
     steps:
       - uses: actions/checkout@v5
 

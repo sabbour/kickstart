@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Kickstart web frontend — Azure Portal-style UX for AI-guided AKS deployment",
   "scripts": {
-    "dev": "vite",
+    "dev": "node ../../scripts/dev-swa.mjs",
+    "dev:vite-only": "vite",
     "build": "vite build",
     "postbuild": "node scripts/check-bundle-budget.mjs",
     "size-limit": "size-limit",

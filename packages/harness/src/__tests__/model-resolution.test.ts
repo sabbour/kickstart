@@ -2,11 +2,14 @@
  * Unit tests for resolveModelName() — model-resolution.ts
  *
  * Covers:
+ * - KICKSTART_CHAT_MODEL unset + Azure fully configured (endpoint+key) → uses built-in gpt-5.4 default
+ * - KICKSTART_CHAT_MODEL unset + Azure endpoint only (no key) → throws (runner would fall to OpenAI)
+ * - KICKSTART_CHAT_MODEL unset + neither endpoint nor key → throws (fail-closed, data-egress guard)
  * - Primary env var set → returns it directly, no fallback
  * - KICKSTART_CHAT_MODEL unset, tier-correct fallback (AZURE_OPENAI_CHAT_DEPLOYMENT) set → uses it + warns
  * - KICKSTART_CODEX_MODEL unset, tier-correct fallback (AZURE_OPENAI_CODEX_DEPLOYMENT) set → uses it + warns
  * - KICKSTART_CODEX_MODEL unset, cross-tier fallback only (AZURE_OPENAI_CHAT_DEPLOYMENT) set → throws (tier mismatch)
- * - All unset → throws user-friendly error without raw env var names
+ * - Codex tier all unset → throws user-friendly error without raw env var names
  * - ref.id shortcut → returns id without touching env
  */
 
@@ -24,9 +27,32 @@ describe('resolveModelName', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns primary env var when set', () => {
-    vi.stubEnv('KICKSTART_CHAT_MODEL', 'gpt-5.4-mini');
-    expect(resolveModelName({ envVar: 'KICKSTART_CHAT_MODEL' })).toBe('gpt-5.4-mini');
+  it('defaults chat tier to gpt-5.4 when both Azure endpoint and API key are set', () => {
+    vi.stubEnv('AZURE_OPENAI_ENDPOINT', 'https://my.openai.azure.com');
+    vi.stubEnv('AZURE_OPENAI_API_KEY', 'test-key');
+    expect(resolveModelName({ envVar: 'KICKSTART_CHAT_MODEL' })).toBe('gpt-5.4');
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it('throws for chat tier when endpoint is set but API key is missing (would fall to OpenAI)', () => {
+    vi.stubEnv('AZURE_OPENAI_ENDPOINT', 'https://my.openai.azure.com');
+    // AZURE_OPENAI_API_KEY not set — runner would fall through to vanilla OpenAI
+    expect(() => resolveModelName({ envVar: 'KICKSTART_CHAT_MODEL' })).toThrow(
+      'Agent model is not configured. Contact your administrator.',
+    );
+  });
+
+  it('throws for chat tier when neither Azure endpoint nor API key is configured (fail-closed)', () => {
+    // No AZURE_OPENAI_ENDPOINT, no AZURE_OPENAI_API_KEY, no KICKSTART_CHAT_MODEL
+    expect(() => resolveModelName({ envVar: 'KICKSTART_CHAT_MODEL' })).toThrow(
+      'Agent model is not configured. Contact your administrator.',
+    );
+  });
+
+  it('returns primary chat env var when set', () => {
+    vi.stubEnv('KICKSTART_CHAT_MODEL', 'custom-model');
+    expect(resolveModelName({ envVar: 'KICKSTART_CHAT_MODEL' })).toBe('custom-model');
     expect(console.warn).not.toHaveBeenCalled();
   });
 
@@ -70,18 +96,18 @@ describe('resolveModelName', () => {
   });
 
 
-  it('throws user-friendly error when all env vars are unset', () => {
-    expect(() => resolveModelName({ envVar: 'KICKSTART_CHAT_MODEL' })).toThrow(
+  it('throws user-friendly error for codex tier when all env vars are unset', () => {
+    expect(() => resolveModelName({ envVar: 'KICKSTART_CODEX_MODEL' })).toThrow(
       'Agent model is not configured. Contact your administrator.',
     );
     // Must NOT leak the raw env var name to the thrown message
     let thrown: Error | undefined;
     try {
-      resolveModelName({ envVar: 'KICKSTART_CHAT_MODEL' });
+      resolveModelName({ envVar: 'KICKSTART_CODEX_MODEL' });
     } catch (e) {
       thrown = e as Error;
     }
-    expect(thrown?.message).not.toContain('KICKSTART_CHAT_MODEL');
+    expect(thrown?.message).not.toContain('KICKSTART_CODEX_MODEL');
     expect(thrown?.message).not.toContain('AZURE_OPENAI');
   });
 

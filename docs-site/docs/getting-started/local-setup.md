@@ -38,7 +38,7 @@ Create `packages/web/api/local.settings.json`:
     "AzureWebJobsStorage": "",
     "AZURE_OPENAI_ENDPOINT": "https://your-resource.cognitiveservices.azure.com/",
     "AZURE_OPENAI_API_KEY": "your-api-key",
-    "KICKSTART_CHAT_MODEL": "gpt-5.4-mini",
+    "KICKSTART_CHAT_MODEL": "gpt-5.4",
     "KICKSTART_CODEX_MODEL": "gpt-5.4",
     "KICKSTART_INSPIRE_MODEL": "gpt-5.4-nano"
   }

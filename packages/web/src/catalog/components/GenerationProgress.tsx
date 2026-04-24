@@ -13,6 +13,7 @@ import {
   Spinner,
   Subtitle1,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 import {
@@ -339,7 +340,7 @@ export const GenerationProgress = createReactComponent(GenerationProgressApi, ({
             return (
               <div
                 key={step.id}
-                className={`${classes.step} ${!isLast ? classes.stepWithConnector : ''}`}
+                className={mergeClasses(classes.step, !isLast && classes.stepWithConnector)}
                 role="listitem"
                 aria-label={getAccessibleStepLabel(step)}
               >
@@ -347,7 +348,7 @@ export const GenerationProgress = createReactComponent(GenerationProgressApi, ({
                   {getStatusIcon(step.status)}
                 </div>
                 <div className={classes.stepContent}>
-                  <Body1 className={`${classes.stepLabel} ${getLabelClass(step.status)}`}>
+                  <Body1 className={mergeClasses(classes.stepLabel, getLabelClass(step.status))}>
                     {step.label}
                   </Body1>
                   {step.detail && (

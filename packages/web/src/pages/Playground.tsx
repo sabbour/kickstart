@@ -15,7 +15,7 @@ import {
   MessageBar, MessageBarBody,
   TabList, Tab,
   Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent, DialogActions,
-  makeStyles, tokens,
+  makeStyles, mergeClasses, tokens,
 } from '@fluentui/react-components';
 import {
   Dismiss24Regular, Sparkle24Regular,
@@ -770,7 +770,10 @@ const ComponentCard = memo(({ comp, onCardClick, compact = false }: ComponentCar
     <Card
       appearance="outline"
       style={{ padding: tokens.spacingVerticalM }}
-      className={`${classes.compCardClickable} ${isCompact ? classes.compCardCompact : classes.compCardPreview}`}
+      className={mergeClasses(
+        classes.compCardClickable,
+        isCompact ? classes.compCardCompact : classes.compCardPreview,
+      )}
       role="button"
       tabIndex={0}
       aria-label={`Open ${comp.name} detail`}
@@ -828,7 +831,7 @@ const ScenarioCard = memo(({ scenario, onCardClick }: ScenarioCardProps) => {
     <Card
       appearance="outline"
       style={{ padding: tokens.spacingVerticalM }}
-      className={`${classes.compCardClickable} ${classes.compCardPreview}`}
+      className={mergeClasses(classes.compCardClickable, classes.compCardPreview)}
       role="button"
       tabIndex={0}
       aria-label={`Open ${scenario.title} scenario detail`}
@@ -1270,7 +1273,7 @@ function PlaygroundInner() {
   }, []);
 
   return (
-    <div className={`playground-page ${classes.playgroundPage}`}>
+    <div className={mergeClasses('playground-page', classes.playgroundPage)}>
       <div className={classes.shellRow}>
         {/* ---- Mobile overlay ---- */}
         {sidebarOpen && (
@@ -1284,7 +1287,7 @@ function PlaygroundInner() {
         {/* ---- Left Sidebar ---- */}
         <aside
           id="playground-sidebar"
-          className={`${classes.sidebar}${sidebarOpen ? ` ${classes.sidebarOpen}` : ''}`}
+          className={mergeClasses(classes.sidebar, sidebarOpen && classes.sidebarOpen)}
           aria-label="Playground navigation"
         >
           <div className={classes.sidebarBrand}>

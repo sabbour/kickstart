@@ -1,0 +1,11 @@
+{
+  "phase": "design",
+  "request_summary": "Design uplift changes for existing repo",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Based on your existing manifests, here are the recommended improvements.\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"architecture-diagram\",\"components\":[\"existing-deployment\",\"upgraded-ingress\",\"added-hpa\",\"added-pdb\"]}" },
+    { "event": "a2ui", "data": "{\"type\":\"uplift-summary\",\"changes\":3,\"additions\":2,\"removals\":0}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"design\",\"status\":\"active\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"design\"}" }
+  ]
+}

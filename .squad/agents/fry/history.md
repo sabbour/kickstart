@@ -32,6 +32,7 @@ Sprint 1 locked: #474 (Nuke v1) → #475 (Harness types) → #476 (Registry + lo
 
 ## Learnings
 
+- (2026-04-24T00:01:12-07:00) For cross-turn chat updates, turn-prefix scoping alone is insufficient. Safe frontend pattern is to reserve a stable surface namespace (proposed `shared:`) for chat-persistent surfaces, resolve those through a replay-safe logical→rendered registry, and keep all other surface IDs turn-scoped so existing per-turn file/progress surfaces stay isolated.
 - (2026-04-17T12:06:45Z) For #474 Step 1, safe frontend cut line is "preserve the shell, delete the fixtures." Treat `kickstart-catalog.ts`, playground demo/stub sources, and `types.ts` as replace-in-place seams because too many live files depend on them for hard-delete without immediate successors.
 - (2026-04-17T06:28:51Z) **Playwright race condition:** `waitForResponse` MUST be registered before `page.goto()` — registering after creates a race where the response arrives before the listener is attached.
 - (2026-04-17T06:28:51Z) **Auth E2E tests:** Must use `request.post()` (real HTTP) not `page.route()` mock interception; `page.route()` short-circuits before auth headers are evaluated.
@@ -98,205 +99,31 @@ Posted DP to https://github.com/sabbour/kickstart/issues/477#issuecomment-426812
 
 ## 2026-04-21 — #1018: sparkle.svg 404 + CSP external media fix (PR #1022)
 
-Working as **Fry (Frontend Dev)**.
 
-**Root causes:**
-1. `sparkle.svg` was registered in `playground-icons.ts` and used in `core-previews.ts` (Image + Icon previews) but never committed to `packages/web/public/assets/icons/fluent/`. Build copies `public/` verbatim so the missing file caused a 404.
-2. `core-previews.ts` Video + AudioPlayer example envelopes referenced `https://www.w3schools.com/html/mov_bbb.mp4` / `https://www.w3schools.com/html/horse.mp3`. No explicit `media-src` in CSP → falls back to `default-src 'self'` → blocked.
+## Summary (History Archived 2026-04-23T22:53:28Z)
 
-**Fix:**
-- `sparkle.svg` — extracted Sparkle24Regular path data from `@fluentui/react-icons` (already a dep), committed SVG to `packages/web/public/assets/icons/fluent/sparkle.svg` following the exact same format used by all other Fluent SVGs in that directory.
-- `sample.mp4` + `sample.mp3` — generated minimal valid binary stubs (Node.js, no ffmpeg) committed to `packages/web/public/assets/samples/`. Same origin, no external dependency.
-- Updated `core-previews.ts` to reference `/assets/samples/sample.mp4` and `/assets/samples/sample.mp3`.
-- CSP unchanged.
-- New SKILL.md: `packages/pack-core/src/skills/a2ui-media-discipline/SKILL.md`.
+Fry owns frontend and A2UI catalog. Key contributions:
+- Led #474 Step 1 frontend cutline analysis: preserve shell, delete fixtures, replace in-place seams
+- Shipped #446 (Agents SDK UI adaptation) with 406 fallback in useStreaming.ts
+- Expanded K8s icon catalog and ArchitectureDiagram security model
+- Participated in 4-way review gate — approved 5+ DPs and PRs with consistent pattern discipline
+- Identified Playwright race condition (waitForResponse MUST precede page.goto)
+- Established safe frontend cut line for v2 nuke: preserve components/contexts/hooks shell
 
-**Learnings:**
-- **Asset bundling pattern:** Vite copies `packages/web/public/` verbatim into `dist/`. Any static asset referenced by a URL path (not a `import`) must live in `public/`, not `src/assets/`. The fluent icon SVGs in `public/assets/icons/fluent/` follow this pattern.
-- **Fluent SVG vendor pattern:** SVGs are sourced from `@fluentui/react-icons` path data (in `lib-cjs/atoms/svg/<name>.js`) and committed as standalone `.svg` files — they're not imported as React components in the icon catalog, they're served as static assets.
-- **CSP boundary:** `default-src 'self'` is the fallback for `media-src`. Any component example with an external `url` prop will be silently broken in production. The safe default is always a local `/assets/` path.
-- **Local media pattern:** Minimal valid MP3/MP4 stubs can be generated programmatically in Node.js without ffmpeg (ID3v2 header + MPEG frame for MP3; ftyp + mvhd moov box for MP4). Size ~2KB total — negligible bundle impact.
+[Full archive in session store for detailed learnings]
 
+## 2026-04-24T07:01:12Z — Session Close (Scribe)
+**Role:** Frontend (DP amendment + impl)
+**Issue:** #5
+**Outcomes:**
+- DP amendment: shared surface namespace design (resolved Nibbler rejection)
+- Frontend implementation completed: shared namespace integration, useA2UI fix, tests
+- PR #25 opened targeting dev
 
+**Critical Events:**
+- Submitted design clarification on cross-turn surface scoping
+- Nibbler approved amended DP
+- Parallel impl with Bender (backend)
 
+**Carry-forward:** PR #25 merge pending review gate
 
-## 2026-04-17 — #477 pack-core Phases D–H (commits 92ba022, 833b44d, be1c2da)
-
-Working as **Fry (Frontend Dev)**.
-
-### Phase D — 27 basic Fluent components (commit 92ba022)
-Ported 27 basic Fluent renderers from `packages/web/src/catalog/fluent-components/` into `packages/pack-core/src/components/basic/`. Created a minimal vendor shim at `packages/pack-core/src/vendor/a2ui/` (schema/common-types.ts, basic_catalog, simplified adapter, ChildList helper). Vendor shim strips GenericBinder binding machinery — renderer field holds the raw React.FC. Added `@fluentui/react-components`, `@fluentui/react-icons` to peer/devDeps.
-
-### Phase E — 12 rich components + GenerationProgress (commits 833b44d, be1c2da)
-Ported 11 domain-neutral rich components from `packages/web/src/catalog/components/` into `packages/pack-core/src/components/rich/`: ArchitectureDiagram, AuthCard (generic injected-callback version, no Azure/GitHub service deps), CodeBlock, DecisionCard, FileEditor, FormGroup, Markdown, ProgressSteps, Questionnaire, RadioGroup, SteppedCarousel, SummaryCard. Created domain-neutral `GenerationProgress.tsx` (removed Azure deployment polling; props-only). Total rich: 13. Added vendor stubs: `sanitize.ts`, `ArtifactContext.tsx`, `MessageTextContext.tsx`. New deps: react-markdown, remark-gfm, highlight.js, @monaco-editor/react, dompurify.
-
-### Agent/skill rename + Phase F-H (commit be1c2da)
-**Agent rename**: `core.orchestrator/architect/implementer` → `core.triage/codesmith/reviewer` to match issue spec and Hermes' registration test expectations. Updated all agent frontmatter `name:` fields and cross-references. Rewrote system prompts to be domain-neutral (no AKS/Azure-specific instructions).
-
-**Skills replaced**: Removed 5 AKS-specific skills, created 5 issue-spec behavior skills:
-- `collaborator-voice` — tone/voice guidelines, applies to `*`, priority 90
-- `a2ui-output-discipline` — emit_ui discipline rules, applies to `*`, priority 85
-- `file-generation-batching` — batch write_file rules, applies to `core.codesmith`, priority 80
-- `teach-then-ask` — pedagogical interaction pattern, applies to `*`, priority 75
-- `phase-acceleration` — when to skip confirmations, applies to `*`, priority 70
-
-**New tool**: `core.list_files` — lists workspace files with 500-file cap, path confinement, recursive option.
-
-**Guardrails (3)**:
-- `token-budget` — input stage; blocks at 128k tokens; uses optional extension field for future `SessionCtx.tokenUsage`
-- `no-pii-in-logs` — output stage; detects SSN, credit-card, IP-in-log patterns
-- `no-secrets-in-artifacts` — tool stage, applies to `core.write_file`; entropy threshold (4.5 bits/char, 20+ char tokens) + named secret patterns (AWS key, GitHub PAT, private key header, Azure SAS, connection strings)
-
-**corePack manifest** (`src/core-pack.ts`): wires `name: 'core'`, `version: '0.1.0'`, `agentsDir`, `skillsDir`, 6 tools, 40 components (27 basic via `fluentOverrides` array + 13 rich), 3 guardrails. Exported from `src/index.ts` as `corePack`.
-
-**Known gaps for follow-up**:
-- Registration test expects "exactly 39 components" (has 40 — ArchitectureDiagram is bonus). Test is `it.todo()` so no immediate CI failure.
-- `validate_artifacts` tool is still a stub returning `{valid: true}`.
-- `search_components` tool retained (also exported) alongside new `list_files`.
-- Guardrail `token-budget` and tool `list_files` reference extension fields not in base `SessionCtx` — using safe `as unknown` casts with TODO comments.
-
-## 2026-04-21 — Round 3: Design Reviews + Work Assignments
-
-**Status Update:** DP reviews for #995, #997, #987 all approved. PR #1000 blocked on red CI (TS2307/TS2352). PR #1001 merged.
-
-**Work Assignments (in-flight):**
-- **#995** — Core components tab rendering (estimate:M). DP `leela:approved`. Ready for implementation.
-- **#997** — Workspace black void (estimate:S). DP `leela:approved`. Ready for implementation.
-- **#987** — Ideas tab restoration (estimate:M). DP `leela:approved` but blocked pending #991 merge. Cannot start until PR #1000 is fixed & merged.
-
-**⚠️ Critical Note — PR #1000 Rejection:**
-- **PR #1000** (pack rendering engine, #991) was REJECTED by Zapp+Nibbler for missing CI grep rule on `dangerouslySetInnerHTML`/`eval`/`new Function` in pack client code. DP #991 set this as a "same-PR hard-fail" condition. Fry is **LOCKED OUT** from revising this PR per the Reviewer Rejection Protocol.
-- **Action:** Bender (or bender-1000-revise agent) will add the missing CI grep step + allow-list comment. Fry can resume #987, #995, #997 work in parallel.
-
-**Other issues remain yours:** #987 (blocked), #995, #997 are assigned and ready to pick up once #1000 is fixed.
-
-## 2026-04-21 — #997 Workspace black void fix (PR #1004)
-
-Working as **Fry (Frontend Dev)**.
-
-**Root cause:** Classic flex `min-height: 0` pitfall in the Playground Workspace chain (`#panel-workspace` → `PlaygroundWorkspace.body` → `.viewerWrapper` → `FileViewer.rootFill`). Column-flex children defaulted to `min-height: auto` (= content min-size), so the editor pane collapsed and the page-body dark background leaked through below the editor as a "black void".
-
-**Fix (layout-only, 3 files):**
-- `Playground.tsx` — `#panel-workspace` inline style: add `minHeight: 0`, drop redundant `height: '100%'` (conflicted with `flex: 1`).
-- `PlaygroundWorkspace.tsx` — `.body` and `.viewerWrapper` styles: add `minHeight: 0` (+ `minWidth: 0` on wrapper).
-- `FileViewer.tsx` — `rootFill` style: add `minHeight: 0`.
-
-**Test:** `packages/web/e2e/workspace-layout.spec.ts` — explicit geometry assertions with named constants (`MAX_EDITOR_BOTTOM_SLACK_PX`, `MIN_CODE_WRAPPER_HEIGHT_PX`), two viewport states. `describe.skip` consistent with existing `playground.spec.ts` (#772 E2E blocker).
-
-**Checks:** lint clean, 335/335 vitest pass, Playwright spec parses (`--list` confirms 2 tests).
-
-**Changeset:** `.changeset/workspace-black-void-997.md` — patch bump `@aks-kickstart/web`.
-
-PR: https://github.com/sabbour/kickstart/pull/1004
-
-## 2026-04-21 — #995: Core components tab density + preview regressions → PR #1003
-
-**Context.** Asabbour reported #986 either regressed or landed incomplete: Core tab still rendered tight (6+ cards/row at 1920px) and mixed real previews with `No preview` placeholders. DP approved by Leela/Zapp/Nibbler with an explicit ask from Nibbler to use named-constant geometry in the test assertions.
-
-**Root cause.**
-1. `minmax(260px, 1fr)` + 320px card cap produced 6–7 cards/row at 1920px — looked "tight" and left asymmetric gutters between the 1fr track and the capped card.
-2. `COMPONENT_PREVIEWS` missed Core basic components Video / AudioPlayer / Tabs / Modal / Accordion, so those cards fell back to the "No preview" placeholder. That is the "lack of previews" half of the user complaint — Core-only because those renderers happen to cluster in pack-core basic.
-
-**Fix.**
-- `packages/web/src/pages/playground-layout-constants.ts` (new) — single source of truth for grid geometry (min col px, max card px, gap, preview/compact min-heights).
-- `Playground.tsx` grid styles rewired to consume the constants. `componentGrid` now `minmax(300, 1fr)` with 380px cap + 20px gap; new `compCardPreview` class applies preview min-height.
-- `ComponentCard` emits `data-component-card` / `data-component-has-preview` / `data-testid="component-card-preview"` so tests can target without brittle class selectors.
-- `component-examples.ts` gains Video, AudioPlayer, Tabs, Modal, Accordion previews.
-- New unit suite `playground-core-tab-rendering.test.ts` — asserts (a) every listed core basic renderer has a preview, (b) density math yields 4–5 cards/row at 1280/1920, (c) preview min-height exceeds compact min-height. All thresholds imported, never hard-coded.
-- `playground.spec.ts` — added "Components tab Core density + preview quality (#995)" describe with card bounding-box / computed row-gap / missing-preview count assertions using the same named constants. Sits inside the suite-wide `describe.skip` for #772 — specs activate automatically when #772 lifts.
-
-**Validation.**
-- `npm run lint`: 0 errors, 59 pre-existing warnings (unchanged from #986 baseline).
-- `CI=1 npm test`: 904 passed / 3 skipped / 159 todo. One unrelated pre-existing failure in `pack-core/.../basic-components.test.tsx` (missing `@testing-library/react`, identical on origin/main — out of scope).
-- Targeted suite (my new test + `component-examples.test.ts`): 34/34 green.
-
-**PR #1003.** Changeset: web/patch. Rollback: single revert.
-
-## 2026-04-22 — #1062 Layers 1–3: A2UI event payload bridge
-
-Shipped the client half of the #1062 triage-loop fix in branch
-`squad/1062-client-payload-prompt-ui`:
-
-- **Layer 1 (wire contract).** `POST /api/converse` now accepts an optional
-  `event: { name, payload? }` field. Client carries the button's human label
-  in `message` and the structured event name / sanitized payload in `event`.
-  Extracted a pure `_composeConverseRequestBody` helper + exported
-  `buildActionEventMetadata` from `useActionDispatch` so the wire contract
-  is unit-testable without React.
-- **Layer 2 (triage prompt).** Added an explicit branch-on-event rule keyed
-  to the `[A2UI event] name=<name> payload=<json>` marker the server
-  injects. Per Ahmed's steering input, the rule tells the agent to inspect
-  context and prior turns rather than hardcoding a switch table. Prompt-
-  text vitest regression guards against silent deletion.
-- **Layer 3 (surface guard).** Extracted `_filterMessagesForProcessor` from
-  `useA2UI.processMessages`; duplicate `createSurface` messages for already
-  existing surfaces are dropped with a debug log. Subsequent `updateComponents`
-  for the same surface still land — "updates-or-no-op" contract from DP v3.
-
-**Test results:** 17 new unit tests passing; full suite 1112 passing with
-zero new failures. The one preexisting `@testing-library/react` resolution
-error in `pack-core/src/__tests__/components/basic-components.test.tsx` is
-unchanged from main.
-
-**Playwright:** wrote `button-click-payload.spec.ts` scaffold that skips
-until `HARNESS_SESSION_HISTORY_ENABLED=1` — per DP v3 test item 8, the
-end-to-end regression only passes once Bender's Layer 0 lands.
-
-**Learnings:**
-
-1. `sanitizeActionContext` allowlist drops `action` / `confirmed` keys.
-   Kept the sanitisation because the event payload eventually reaches an
-   LLM prompt (server-side marker injection). Only the `value` key survives
-   from the typical `{action, value, confirmed}` Button payload — that's
-   fine because the event *name* already carries the intent.
-2. Avoided touching `runner.ts` (Bender's scope). Layer 1's server-side
-   change lives entirely in `converse.ts` via a small pure
-   `composeAgentInput()` function — Bender's session-adapter will see the
-   marker as ordinary user-turn content without any coupling.
-3. Extracting pure helpers (`_composeConverseRequestBody`,
-   `_filterMessagesForProcessor`, `buildActionEventMetadata`) let me cover
-   all three layers without React Testing Library (not installed in this
-   package). Underscore prefix matches the existing `_performSdkNonStreamingFetch`
-   convention in the same hook.
-
-## Learnings — #1042 browser OTel (2026-04-22)
-
-**Context:** Shipped Phase 1 of browser-side Application Insights behind a
-flag. DP-D revision 2 was fully approved; this PR lands the disabled-by-
-default plumbing.
-
-1. **BrowserRedactingSpanExporter pattern.** Mirror the server-side Proxy
-   decorator: wrap `ReadableSpan` via `new Proxy(span, …)`. Key traps:
-   `attributes`, `events`, `links` → redacted copies; `spanContext` → rewrap
-   to strip `traceState` (Zapp Decision 3 — never propagate outbound);
-   everything else → bind back to the real span so `spanContext().traceId`
-   keeps working inside the Azure Monitor exporter. Object-spread breaks;
-   Proxy is load-bearing.
-2. **Azure Monitor exporter in a browser bundle.** `@azure/monitor-
-   opentelemetry-exporter@1.0.0-beta.32` has no `browser` field and its
-   `platform/index.js` statically re-exports the Node build (file-based
-   persistence, `node:fs`/`node:os`/`node:child_process`/`node:process`).
-   Vite's `stubNodeBuiltins` plugin needed extending — added `existsSync`
-   to the `node:fs` stub plus whole-module stubs for `node:os`,
-   `node:child_process`, `node:process` so the dead persist code path type-
-   checks but is never invoked. No patch-package needed.
-3. **Fetch instrumentation allow-list.** `ignoreUrls: [/^(?!.*\/api\/).*/]`
-   ignores everything that is NOT under `/api/`. Paired with
-   `propagateTraceHeaderCorsUrls: [/\/api\//]` as defense-in-depth. Zapp's
-   third-party isolation rule (no `traceparent` on CDN/auth fetches) is
-   satisfied by the `ignoreUrls` regex alone, but the allow-list makes the
-   intent grep-able in code review.
-4. **size-limit + Vite.** `@size-limit/preset-app` boots headless Chrome
-   via `estimo` — not viable in the default dev container. `@size-limit/file`
-   is the right choice for a pure gzipped-size budget gate; pair it with
-   the existing `scripts/check-bundle-budget.mjs` so we get two independent
-   failure modes in CI. `gzip: true` on each entry is important — default
-   is raw size.
-5. **Playwright + OTel interception.** The `page.route('**/*
-   applicationinsights.azure.com/**', …)` pattern intercepts the Azure
-   Monitor exporter's POST transparently — no SDK hook needed. Expose a
-   `window.__kickstartFlushTelemetry` force-flush hook in the production
-   init so tests can drain the BatchSpanProcessor before assertions. The
-   helpers.ts generic `/api/**` → 503 route is correctly shadowed by the
-   more-specific per-test routes (Playwright picks the last-registered
-   matching handler).

@@ -56,6 +56,7 @@ export const ALLOWED_A2UI_COMPONENTS: readonly string[] = [
   "Markdown",
   "ProgressSteps",
   "DecisionCard",
+  "TrackPicker",
   "SummaryCard",
   "AuthCard",
   "CodeBlock",
@@ -65,69 +66,69 @@ export const ALLOWED_A2UI_COMPONENTS: readonly string[] = [
 ] as const;
 
 // ---------------------------------------------------------------------------
-// Fallback ideas (AKS/Kubernetes operational widgets)
+// Fallback ideas (DevOps-focused app deployment and operations)
 // ---------------------------------------------------------------------------
 
 export const FALLBACK_IDEAS: WidgetIdea[] = [
   {
-    title: "Deployment Rollout Tracker",
-    subtitle: "Live pod rollout progress with revision history",
+    title: "Deploy a Container App",
+    subtitle: "Step-by-step container deployment to AKS",
     prompt:
-      'I want to build a Kubernetes deployment rollout tracker. Use a Column as the root. Include a Text heading "Rollout: api-gateway", a ProgressSteps component for the 5 rollout stages (Queued, Pulling image, Creating pods, Ready, Rolled out), a Table with columns Revision, Image, Timestamp, Status and 4 sample rows (e.g. revision 42, api:v2.3.1, 10:14 UTC, Active). Add a Row of 3 Badges for pod states (Running, Pending, CrashLoopBackOff) with counts, and a Row of two Buttons: "Rollback to Previous" and "View Logs". Only use core A2UI components.',
+      'Build a container deployment card. Use a Column with a Text heading "Deploy to AKS". Add a ProgressSteps with 4 steps (Select image, Configure, Deploy, Verify). Add a TextField for "Container image" and a ChoicePicker for cluster region (East US, West Europe, Southeast Asia). End with a Row of two Buttons: "Deploy" and "Cancel". Only use core A2UI components.',
   },
   {
-    title: "Namespace Resource Dashboard",
-    subtitle: "CPU, memory, and pod counts across namespaces",
+    title: "Monitor App Health",
+    subtitle: "Health checks and alert status at a glance",
     prompt:
-      'I want to build a namespace resource dashboard. Use a Column as the root with a Text heading "Namespace usage (cluster: prod-eu)". Include a Table with columns Namespace, CPU req/lim, Mem req/lim, Pods, Status and 5 sample rows (ingress-nginx, kube-system, checkout, payments, analytics). Add 3 ProgressSteps rows for the top 3 namespaces by memory pressure (show name and percentage). End with a Row of Badges for namespace health (Healthy, Warning, Critical). Use only core A2UI components (Column, Row, Text, Table, Badge, ProgressSteps).',
+      'Build an app health monitor. Use a Column with a Text heading "App Health". Add a Row of 3 Badges (Healthy, Degraded, Down) showing current status. Add a Table with columns Service, Status, Latency, Uptime and 4 rows (api, web, worker, database). End with a Button "Configure Alerts". Only use core A2UI components.',
   },
   {
-    title: "Container Image Scanner",
-    subtitle: "Registry browser with vulnerability severity counts",
+    title: "Set Up a CI/CD Pipeline",
+    subtitle: "Build, test, and deploy pipeline stages",
     prompt:
-      'I want to build a container image vulnerability scanner. Use a Column with a Text heading, then a Table listing 5 images with columns Repository, Tag, Size, Last pushed, Criticals, Highs, Mediums, Lows (e.g. acr.azurecr.io/api, v2.3.1, 142 MB, 2 days ago, 0, 2, 8, 14). Add a Row of 4 colored Badges for severity counts (Critical, High, Medium, Low). Add a Column with a DecisionCard summarising scan metadata (scanner, last scan, base OS). Finish with a Row with two Buttons: "Rescan Image" and "View Full Report". Use only core A2UI components.',
+      'Build a CI/CD pipeline setup card. Use a Column with a Text heading "CI/CD Pipeline". Add a ProgressSteps with 5 stages (Source, Build, Test, Stage, Production). Add a ChoicePicker for trigger (Push to main, Pull request, Manual). Add a Toggle for "Auto-deploy on success". End with a Row of two Buttons: "Save Pipeline" and "Run Now". Only use core A2UI components.',
   },
   {
-    title: "GitHub Actions Pipeline Monitor",
-    subtitle: "Workflow runs with per-stage status",
+    title: "Connect to Key Vault",
+    subtitle: "Link secrets and certificates to your app",
     prompt:
-      'I want to build a GitHub Actions pipeline monitor. Use a Column with a Text heading "Pipeline: deploy.yml (main)", a ProgressSteps showing 5 stages (Checkout, Build, Test, Push Image, Deploy to AKS) with the 4th failed. Add a Table of the last 6 runs with columns Run #, Trigger, Author, Duration, Status, Branch (e.g. #248, push, @asabbour, 4m 12s, success, main). Include a Row of Badges for overall health (Passing, Flaky, Failing). End with a Row of two Buttons: "Rerun Failed Jobs" and "Open in GitHub". Only use core A2UI components.',
+      'Build a Key Vault connection card. Use a Column with a Text heading "Connect to Azure Key Vault". Add a TextField for "Vault name" and a ChoicePicker for access method (Managed Identity, Service Principal). Add a Table with columns Secret, Type, Expires and 3 rows. End with a Row of two Buttons: "Connect" and "Test Connection". Only use core A2UI components.',
   },
   {
-    title: "Interactive Scaling Panel",
-    subtitle: "Replica count and resource limit controls",
+    title: "Review Deployment Cost",
+    subtitle: "Monthly spend summary by resource type",
     prompt:
-      'I want to build an interactive scaling panel for a Kubernetes deployment. Use a Column with a Text heading "Scale: checkout-api". Add a Row with 3 TextField inputs labelled "Desired replicas" (value 3), "Min replicas" (1), "Max replicas" (10). Add a ChoicePicker for scaling strategy with options RollingUpdate and Recreate. Add 2 ProgressSteps for current CPU (65%) and memory (48%) utilization. Add a Toggle labelled "Enable HPA". End with a Row with two Buttons: "Apply" (primary) and "Dry Run". Use only core A2UI components.',
+      'Build a cost review card. Use a Column with a Text heading "Monthly Cost Summary". Add a Table with columns Resource, Type, Monthly Cost and 4 rows (Cluster, Storage, Networking, Monitoring). Add a Row of 2 Badges (Under Budget, Over Budget). End with a Button "View Full Breakdown". Only use core A2UI components.',
   },
   {
-    title: "Azure Cost Explorer",
-    subtitle: "AKS cluster spend broken down by workload",
+    title: "Scale a Cluster",
+    subtitle: "Adjust node count and resource limits",
     prompt:
-      'I want to build an Azure cost explorer for an AKS cluster. Use a Column root with a Text heading "Cost breakdown — prod-eu — last 30 days ($1,842)". Add a Table with columns Workload, Namespace, Compute, Storage, Egress, Total and 6 sample rows (api-gateway, checkout, payments-db, analytics, ingress-nginx, kube-system). Add 3 ProgressSteps for top 3 spenders as percent of total. Add a Row of Badges for budget status (Under, Near limit, Over). End with a Row of two Buttons: "Export CSV" and "Open in Azure Portal". Only use core A2UI components.',
+      'Build a cluster scaling card. Use a Column with a Text heading "Scale Cluster". Add a Row of two TextField inputs for "Min nodes" (value 2) and "Max nodes" (value 10). Add a Toggle for "Enable autoscaler". Add a ProgressSteps showing current utilization (CPU 65%, Memory 48%). End with a Row of two Buttons: "Apply" and "Preview Changes". Only use core A2UI components.',
   },
   {
-    title: "Pod Log Viewer",
-    subtitle: "Container logs with error highlighting and filtering",
+    title: "Create a New App",
+    subtitle: "Scaffold a new application from a template",
     prompt:
-      'I want to build a Kubernetes pod log viewer. Use a Column root with a ChoicePicker for namespace (default, kube-system, checkout), a ChoicePicker for pod, and a ChoicePicker for container. Add a Row with a TextField labelled "Filter" and a Toggle labelled "Follow logs". Add a Markdown block containing 10 sample log lines, with one error line prefixed "ERROR" and one warning prefixed "WARN". Include a DecisionCard showing pod name, container, start time, and restart count. End with a Row of Buttons: "Download Logs", "Previous Container", "Clear". Use only core A2UI components.',
+      'Build an app creation card. Use a Column with a Text heading "Create New App". Add a TextField for "App name". Add a ChoicePicker for runtime (Node.js, Python, .NET, Java, Go). Add a ChoicePicker for template (Web API, Web App, Worker, Microservice). Add a Toggle for "Add Dockerfile". End with a Row of two Buttons: "Create" and "Preview". Only use core A2UI components.',
   },
   {
-    title: "AKS Cluster Overview",
-    subtitle: "Health summary with node and workload stats",
+    title: "View Container Logs",
+    subtitle: "Recent logs with severity filtering",
     prompt:
-      'I want to build an AKS cluster overview card. Use a Column root with a Text heading "prod-eu — West Europe — Kubernetes 1.30". Add a Row containing three DecisionCards: (1) Nodes (total 12, ready 12, not-ready 0); (2) Workloads (deployments 34, statefulsets 6, daemonsets 4, jobs 2); (3) Cluster info (tier Standard, network Azure CNI Overlay, identity Managed). Add a ProgressSteps for overall pod-capacity utilization (78%). Add a Row of Badges for cluster health (Healthy, Warning, Critical). End with a Row of Buttons: "Upgrade Cluster", "Scale Node Pool", "View Events". Only use core A2UI components.',
+      'Build a log viewer card. Use a Column with a Text heading "Container Logs". Add a ChoicePicker for severity (All, Error, Warning, Info). Add a Markdown block with 6 sample log lines including one ERROR and one WARN entry. End with a Row of two Buttons: "Refresh" and "Download Logs". Only use core A2UI components.',
   },
   {
-    title: "GitOps Sync Status",
-    subtitle: "Flux/Argo CD reconciliation with drift detection",
+    title: "Manage Environment Variables",
+    subtitle: "Configure app settings and secrets",
     prompt:
-      'I want to build a GitOps sync status card. Use a Column root with a Text heading "Flux — infra/k8s@main". Add a Row with two DecisionCards: (1) Source (repo URL, branch, last commit SHA, sync interval 5m); (2) Sync state with Badges for state (Synced / OutOfSync / Progressing) and health (Healthy / Degraded). Add a Table of 6 managed resources with columns Kind, Name, Namespace, Sync, Health. Add a ProgressSteps for current reconciliation progress. End with a Row of three Buttons: "Force Sync", "Suspend", "View Diff". Use only core A2UI components.',
+      'Build an environment variable manager. Use a Column with a Text heading "Environment Variables". Add a Table with columns Name, Value, Source and 4 rows (DATABASE_URL, API_KEY, LOG_LEVEL, REGION). Add a Row of a TextField for "Key" and a TextField for "Value". End with a Row of two Buttons: "Add Variable" and "Save Changes". Only use core A2UI components.',
   },
   {
-    title: "Secret Rotation Planner",
-    subtitle: "Inventory secrets with age and rotation SLAs",
+    title: "Set Up Monitoring",
+    subtitle: "Configure metrics, alerts, and dashboards",
     prompt:
-      'I want to build a secret rotation planner. Use a Column root with a Text heading "Secrets nearing rotation SLA". Add a Row with a ChoicePicker for namespace and a Toggle labelled "Show system secrets". Add a Table with columns Name, Namespace, Type, Age (days), SLA, Status and 6 rows covering mixed states. Add a Row of Badges for overall status (On-track, At-risk, Overdue) with counts. End with a Row of Buttons: "Rotate Selected", "Export Inventory", "Open Runbook". Only use core A2UI components.',
+      'Build a monitoring setup card. Use a Column with a Text heading "Set Up Monitoring". Add a ProgressSteps with 3 steps (Enable metrics, Configure alerts, Create dashboard). Add a Toggle for "Enable Container Insights" and a Toggle for "Enable Prometheus metrics". End with a Row of two Buttons: "Apply" and "Skip for Now". Only use core A2UI components.',
   },
 ];
 

@@ -11,6 +11,7 @@ const PHASE_COMPONENT_NAME = 'ConversationPhase';
 const PHASE_SURFACE_ID = 'phase-indicator';
 const SURFACE_SCOPE_SEPARATOR = '::';
 const STEPWISE_SETUP_SURFACE_SUFFIX = 'setup-progress';
+const SHARED_SURFACE_PREFIX = 'shared:';
 
 const PHASE_ALIASES = {
   discover: 'discover',
@@ -380,6 +381,9 @@ export function extractConversationPhase(items: readonly A2uiPayloadItem[]): Con
 }
 
 function scopeSurfaceId(surfaceId: string, turnId: string): string {
+  if (surfaceId.startsWith(SHARED_SURFACE_PREFIX)) {
+    return surfaceId;
+  }
   const prefix = `${turnId}${SURFACE_SCOPE_SEPARATOR}`;
   return surfaceId.startsWith(prefix) ? surfaceId : `${prefix}${surfaceId}`;
 }

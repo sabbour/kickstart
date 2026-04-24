@@ -157,6 +157,22 @@ Displays a GitHub Actions workflow run with status badge (queued / in_progress /
 
 Shows a single commit with author, message, short SHA, and timestamp.
 
+### SummaryCard — link variant
+
+SummaryCard items support an optional `link` field. When provided, the item value renders as a clickable external link (opens in a new tab) with an external-link icon. Use this for PR URLs, deployment URLs, or any external resource reference.
+
+```json
+{
+  "id": "pr-result",
+  "component": "SummaryCard",
+  "title": "Pull request created",
+  "items": [
+    { "label": "Repository", "value": "octocat/kickstart-sample" },
+    { "label": "Pull request", "value": "PR #42", "badge": "success", "link": "https://github.com/octocat/kickstart-sample/pull/42" }
+  ]
+}
+```
+
 ---
 
 ## Azure Components

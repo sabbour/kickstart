@@ -1,0 +1,7 @@
+{
+  "recorded_at": "2026-04-24T12:17:28Z",
+  "model_version": "gpt-5.4",
+  "prompt_hash": "cd10f7f817df185ec4577dec542df4c47d928081e7247ea76b80e4b8388dc632",
+  "tool_schema_hash": "b769f725a800de7336841bd02f796672eb8230d2819285398ae897e459c91291",
+  "track": "existing-repo-uplift"
+}

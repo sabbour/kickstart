@@ -1,7 +1,7 @@
 import React from 'react';
 import {createReactComponent} from '../../vendor/a2ui/react/adapter';
 import {ImageApi} from '../../vendor/a2ui/web_core/basic_catalog/index';
-import {Image as FluentImage, makeStyles, tokens} from '@fluentui/react-components';
+import {Image as FluentImage, makeStyles, mergeClasses, tokens} from '@fluentui/react-components';
 
 const useStyles = makeStyles({
   root: {
@@ -45,16 +45,16 @@ export const Image = createReactComponent(ImageApi, ({props}) => {
   let shape: 'square' | 'circular' | 'rounded' | undefined;
 
   if (props.variant === 'icon') {
-    className = `${classes.root} ${classes.icon}`;
+    className = mergeClasses(classes.root, classes.icon);
   } else if (props.variant === 'avatar') {
-    className = `${classes.root} ${classes.avatar}`;
+    className = mergeClasses(classes.root, classes.avatar);
     shape = 'circular';
   } else if (props.variant === 'smallFeature') {
-    className = `${classes.root} ${classes.smallFeature}`;
+    className = mergeClasses(classes.root, classes.smallFeature);
   } else if (props.variant === 'largeFeature') {
-    className = `${classes.root} ${classes.largeFeature}`;
+    className = mergeClasses(classes.root, classes.largeFeature);
   } else if (props.variant === 'header') {
-    className = `${classes.root} ${classes.header}`;
+    className = mergeClasses(classes.root, classes.header);
   }
 
   return (

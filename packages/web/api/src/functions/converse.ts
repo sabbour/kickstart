@@ -1,8 +1,8 @@
 /**
  * POST /api/converse — v2 harness converse handler.
  *
- * Loads or creates a Session, runs the Runner, and streams 9 SSE event types:
- *   start | chunk | a2ui | tool_start | tool_done | phase | user_action_req | end | error
+ * Loads or creates a Session, runs the Runner, and streams 10 SSE event types:
+ *   start | chunk | a2ui | tool_start | tool_done | phase | user_action_req | end | error | session_token
  *
  * Leela C4: phase routing is handled via the `end` event's `intent` field which
  * the browser passes to `useNavigation.onIntent()`. This handler does NOT perform
@@ -17,7 +17,11 @@ import { Logger, extractTraceId, extractRequestMetadata } from "../lib/logger.js
 import { trackException, trackEvent, flushAppInsights, initializeAppInsights } from "../lib/appinsights.js";
 import { getRegistry } from "../startup/packs.js";
 import {
-  getOrCreateSession,
+  getOrCreateSessionResult,
+  generateAnonSessionToken,
+  validateAnonSessionToken,
+  isAnonymousSession,
+  AnonTokenGenerationError,
   hydrateColdSession,
   isAnonHydrationAllowed,
   sessionStore,
@@ -354,14 +358,24 @@ async function converse(
   }
 
   let session;
+  let sessionCreated = false;
+  let anonSessionToken: string | undefined;
   try {
-    session = getOrCreateSession(body.sessionId, oid);
-    logger.info("Session resolved", { action: body.sessionId ? "resumed" : "created" });
+    const result = getOrCreateSessionResult(body.sessionId, oid);
+    session = result.session;
+    sessionCreated = result.created;
+    logger.info("Session resolved", { action: sessionCreated ? "created" : "resumed" });
   } catch (err) {
     if (err instanceof Error && err.message === "SESSION_OID_MISMATCH") {
-      logger.warn("Session ownership mismatch");
+      logger.warn("Session ownership mismatch", {
+        code: "SESSION_OID_MISMATCH",
+        sessionId: body.sessionId,
+      });
       trackEvent("session-oid-mismatch", { requestId });
-      return new Response("Forbidden", { status: 403 });
+      return new Response(
+        JSON.stringify({ error: "Forbidden", code: "SESSION_OID_MISMATCH" }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
     }
 
     const sanitizedError = sanitizeError(err);
@@ -369,6 +383,47 @@ async function converse(
     trackException(sanitizedError, { requestId, context: "session-resolution" });
     await flushAppInsights();
     throw err;
+  }
+
+  // #1079: anonymous session token — per-session bearer token that prevents
+  // session hijacking via sessionId guessing among anonymous users.
+  if (isAnonymousSession(session)) {
+    if (sessionCreated) {
+      // New anonymous session: mint a token and return it to the client.
+      try {
+        anonSessionToken = await generateAnonSessionToken(session);
+      } catch (err) {
+        if (err instanceof AnonTokenGenerationError) {
+          logger.error("Crypto failure generating anonymous session token", {
+            session_id: session.sessionId,
+            cause: String(err.cause),
+          });
+          trackException(err, { requestId, context: "anon-token-crypto-failure" });
+          await flushAppInsights();
+          return new Response(
+            JSON.stringify({ error: "Unable to generate session token — please retry", code: "ANON_TOKEN_GENERATION_FAILED" }),
+            { status: 503, headers: { "Content-Type": "application/json", "Retry-After": "5" } },
+          );
+        }
+        throw err;
+      }
+      logger.info("Anonymous session token generated", { session_id: session.sessionId });
+    } else {
+      // Resumed anonymous session: validate the client-supplied token.
+      const clientToken = request.headers.get("x-anon-session-token") ?? "";
+      if (!await validateAnonSessionToken(session, clientToken)) {
+        logger.warn("Anonymous session token validation failed", {
+          code: "ANON_TOKEN_INVALID",
+          session_id: session.sessionId,
+          hasClientToken: clientToken.length > 0,
+        });
+        trackEvent("anon-session-token-invalid", { requestId });
+        return new Response(
+          JSON.stringify({ error: "Invalid or missing session token", code: "ANON_TOKEN_INVALID" }),
+          { status: 403, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    }
   }
 
   // #1074 D3: cold-session hydration from client-supplied history.
@@ -510,6 +565,15 @@ async function converse(
         }
       };
 
+      // #1079: emit the anonymous session token as a dedicated SSE event so
+      // the client can persist it for subsequent requests.
+      if (anonSessionToken) {
+        write("session_token", {
+          sessionId: session.sessionId,
+          token: anonSessionToken,
+        });
+      }
+
       try {
         const agentInput = composeAgentInput(body.message, validatedEvent);
         requestLogger.info("Starting runner", {
@@ -566,9 +630,14 @@ async function converse(
     error_count: errorCount,
   });
 
+  const responseHeaders: Record<string, string> = { ...SSE_RESPONSE_HEADERS };
+  if (anonSessionToken) {
+    responseHeaders["X-Anon-Session-Token"] = anonSessionToken;
+  }
+
   return new Response(stream, {
     status: 200,
-    headers: SSE_RESPONSE_HEADERS,
+    headers: responseHeaders,
   });
 }
 

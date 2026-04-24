@@ -60,7 +60,7 @@ Create `packages/web/api/local.settings.json`:
     "AzureWebJobsStorage": "",
     "AZURE_OPENAI_ENDPOINT": "https://<your-resource>.openai.azure.com",
     "AZURE_OPENAI_API_KEY": "<your-api-key>",
-    "KICKSTART_CHAT_MODEL": "gpt-5.4-mini",
+    "KICKSTART_CHAT_MODEL": "gpt-5.4",
     "KICKSTART_CODEX_MODEL": "gpt-5.4",
     "AZURE_CLIENT_ID": "your-app-id",
     "AZURE_TENANT_ID": "your-tenant-id",
@@ -70,6 +70,8 @@ Create `packages/web/api/local.settings.json`:
 ```
 
 > **Note:** `local.settings.json` is gitignored — it will never be committed. Each developer needs their own copy.
+
+If you omit `KICKSTART_CHAT_MODEL`, chat-tier harness agents now default to the `gpt-5.4` deployment name after checking the legacy `AZURE_OPENAI_CHAT_DEPLOYMENT` fallback.
 
 For a complete list of all environment variables, defaults, and fallback chains, see [Getting Started → Environment Variables](docs-site/docs/getting-started/environment-variables.md).
 

@@ -38,6 +38,7 @@ import {
   rebuildChatSessionState,
 } from './utils/chat-a2ui';
 import { summarizeTokenUsage } from './utils/chat-usage';
+import { normalizePath as validateAndNormalizePath } from './utils/path-validation';
 import type { AppMode, ChatMessage, A2uiPayloadItem, ConversationPhaseId, SetupGenerationEvent } from './types';
 // A2uiClientAction type no longer needed — actions route through useActionDispatch only
 
@@ -51,6 +52,53 @@ export function getInitialAppMode(locationSearch?: string): AppMode {
 let msgSeq = 0;
 function msgId(role: string) {
   return `msg-${Date.now()}-${++msgSeq}-${role}`;
+}
+
+function normalizeMessageSurfaceAttachments(messages: ChatMessage[]): {
+  messages: ChatMessage[];
+  surfaceOwners: Map<string, string>;
+} {
+  const surfaceOwners = new Map<string, string>();
+  let changed = false;
+
+  const normalizedMessages = messages.map((message) => {
+    if (message.role !== 'assistant' || !message.surfaceIds?.length) {
+      return message;
+    }
+
+    const keptIds: string[] = [];
+    const seenInMessage = new Set<string>();
+
+    for (const surfaceId of message.surfaceIds) {
+      if (seenInMessage.has(surfaceId)) {
+        changed = true;
+        continue;
+      }
+      seenInMessage.add(surfaceId);
+
+      if (!surfaceOwners.has(surfaceId)) {
+        surfaceOwners.set(surfaceId, message.id);
+        keptIds.push(surfaceId);
+        continue;
+      }
+
+      changed = true;
+    }
+
+    if (keptIds.length === message.surfaceIds.length) {
+      return message;
+    }
+
+    return {
+      ...message,
+      surfaceIds: keptIds.length > 0 ? keptIds : undefined,
+    };
+  });
+
+  return {
+    messages: changed ? normalizedMessages : messages,
+    surfaceOwners,
+  };
 }
 
 export function App() {
@@ -161,6 +209,7 @@ export function App() {
 
   // Surface IDs revealed progressively via the queue
   const streamingSurfaceIdsRef = useRef<string[]>([]);
+  const surfaceOwnersRef = useRef<Map<string, string>>(new Map());
 
   // Raw A2UI messages accumulated during streaming (for session persistence)
   const streamingA2UIMessagesRef = useRef<A2uiPayloadItem[]>([]);
@@ -185,7 +234,9 @@ export function App() {
   useEffect(() => {
     const active = sessions.getActiveSession();
     if (active) {
-      setMessages(active.messages);
+      const normalized = normalizeMessageSurfaceAttachments(active.messages);
+      surfaceOwnersRef.current = normalized.surfaceOwners;
+      setMessages(normalized.messages);
       const phase = getLatestConversationPhase(active.messages);
       setCurrentPhase(phase);
       currentPhaseRef.current = phase;
@@ -193,6 +244,7 @@ export function App() {
       setMessages([]);
       setCurrentPhase(null);
       currentPhaseRef.current = null;
+      surfaceOwnersRef.current = new Map();
     }
   }, [sessions.activeSessionId]);
 
@@ -225,6 +277,7 @@ export function App() {
   const clearWorkspace = useCallback(async () => {
     workspaceSnapshotSyncSuspendedRef.current = true;
     a2ui.reset();
+    surfaceOwnersRef.current = new Map();
     fs.clear();
     lastPersistedRef.current = new Map();
     clearActionLog();
@@ -240,6 +293,34 @@ export function App() {
       workspaceSnapshotSyncSuspendedRef.current = false;
     }
   }, [a2ui, clearActionLog, fs, resetStepwiseStreamingState, setConversationPhase, vfs]);
+
+  const claimSurfaceIdsForAssistantMessage = useCallback((
+    assistantMessageId: string,
+    candidateIds: string[],
+  ): string[] => {
+    const trackedIds = new Set(streamingSurfaceIdsRef.current);
+    const ownedIds: string[] = [];
+
+    for (const surfaceId of candidateIds) {
+      if (!a2ui.getSurface(surfaceId)) {
+        continue;
+      }
+
+      const owner = surfaceOwnersRef.current.get(surfaceId);
+      if (!owner) {
+        surfaceOwnersRef.current.set(surfaceId, assistantMessageId);
+      } else if (owner !== assistantMessageId) {
+        continue;
+      }
+
+      if (!trackedIds.has(surfaceId)) {
+        trackedIds.add(surfaceId);
+        ownedIds.push(surfaceId);
+      }
+    }
+
+    return ownedIds;
+  }, [a2ui]);
 
   const persistStepwiseStreamingMessage = useCallback((
     sessionId: string,
@@ -315,15 +396,17 @@ export function App() {
       if (renderableMessages.some((message) => Boolean(message.createSurface))) {
         streamingSetupSurfaceCreatedRef.current = true;
       }
-      if (newIds.length > 0) {
-        streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
-        progressiveQueue.enqueue(newIds);
+      const ownedIds = claimSurfaceIdsForAssistantMessage(assistantMessageId, newIds);
+      if (ownedIds.length > 0) {
+        streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...ownedIds];
+        progressiveQueue.enqueue(ownedIds);
       }
     }
 
     persistStepwiseStreamingMessage(sessionId, assistantMessageId, statusText);
   }, [
     a2ui,
+    claimSurfaceIdsForAssistantMessage,
     fs,
     openGeneratedFile,
     persistStepwiseStreamingMessage,
@@ -372,9 +455,10 @@ export function App() {
       if (renderableMessages.some((message) => Boolean(message.createSurface))) {
         streamingSetupSurfaceCreatedRef.current = true;
       }
-      if (newIds.length > 0) {
-        streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
-        progressiveQueue.enqueue(newIds);
+      const ownedIds = claimSurfaceIdsForAssistantMessage(params.assistantMessageId, newIds);
+      if (ownedIds.length > 0) {
+        streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...ownedIds];
+        progressiveQueue.enqueue(ownedIds);
       }
     }
 
@@ -410,6 +494,7 @@ export function App() {
     return true;
   }, [
     a2ui,
+    claimSurfaceIdsForAssistantMessage,
     processIncomingSetupEvent,
     progressiveQueue,
     resetStepwiseStreamingState,
@@ -440,11 +525,32 @@ export function App() {
     }
 
     const newIds = a2ui.processMessages(prepared.renderableMessages);
-    if (newIds.length > 0) {
-      streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...newIds];
-      progressiveQueue.enqueue(newIds);
+    const ownedIds = claimSurfaceIdsForAssistantMessage(turnId, newIds);
+    if (ownedIds.length > 0) {
+      streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...ownedIds];
+      progressiveQueue.enqueue(ownedIds);
     }
-  }, [resolveArtifactContent, fs, openGeneratedFile, a2ui, progressiveQueue, setConversationPhase]);
+  }, [resolveArtifactContent, fs, openGeneratedFile, a2ui, claimSurfaceIdsForAssistantMessage, progressiveQueue, setConversationPhase]);
+
+  // Per Zapp: treat write_file SSE payloads as untrusted — normalize paths,
+  // reject traversal/absolute, cap file size before writing to VFS.
+  const MAX_WRITE_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+  const handleWriteFile = useCallback((file: { path: string; content: string }) => {
+    const safePath = validateAndNormalizePath(file.path);
+    if (!safePath) {
+      console.warn('[write_file] Rejected invalid path:', file.path);
+      return;
+    }
+    const byteLength = new TextEncoder().encode(file.content).byteLength;
+    if (byteLength > MAX_WRITE_FILE_SIZE) {
+      console.warn('[write_file] Rejected oversized file:', safePath, byteLength);
+      return;
+    }
+    fs.write(safePath, file.content);
+    if (!viewerFileRef.current) {
+      openGeneratedFile(safePath);
+    }
+  }, [fs, openGeneratedFile]);
 
   const handleSendMessage = useCallback(async (text: string, isAutoContinue = false, explicitSessionId?: string, event?: A2uiEventMetadata) => {
     // Manual messages reset the consecutive auto-continue counter
@@ -595,6 +701,7 @@ export function App() {
         onA2UI: handleIncomingA2UI,
         onSetupEvent: handleIncomingSetupEvent,
         onPhase: (phase) => setConversationPhase(phase),
+        onWriteFile: handleWriteFile,
         onComplete: (fullText, model, receivedSessionId, debugInfo, usage) => {
           const phase = currentPhaseRef.current || undefined;
           // Store the backend session ID on first response
@@ -667,6 +774,7 @@ export function App() {
     clearActionLog,
     debugEnabled,
     finalizeStepwiseAssistantTurn,
+    handleWriteFile,
     healthCheckResult,
     mockStreaming,
     processIncomingA2UI,
@@ -767,7 +875,9 @@ export function App() {
         openGeneratedFile(filesToRestore[0].path);
       }
 
-      setMessages(session.messages);
+      const normalized = normalizeMessageSurfaceAttachments(session.messages);
+      surfaceOwnersRef.current = normalized.surfaceOwners;
+      setMessages(normalized.messages);
       setConversationPhase(getLatestConversationPhase(session.messages));
       setMode('chat');
       document.body.classList.remove('on-landing');

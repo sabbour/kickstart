@@ -73,7 +73,7 @@ describe('_filterMessagesForProcessor — createSurface guard (#1060)', () => {
       noopValidate,
       'kickstart',
     );
-    expect(surfaceIds).toEqual(['dup-1']);
+    expect(surfaceIds).toEqual(['dup-1', 'dup-1']);
     // Only the updateComponents message survives — that's the "treat subsequent
     // creates as updates-or-no-op" contract from the DP.
     expect(safeMessages).toHaveLength(1);
@@ -91,5 +91,26 @@ describe('_filterMessagesForProcessor — createSurface guard (#1060)', () => {
       'kickstart',
     );
     expect(safeMessages).toHaveLength(2);
+  });
+
+  it('reports updateComponents surface ids even without a createSurface message', () => {
+    const { safeMessages, surfaceIds } = _filterMessagesForProcessor(
+      [
+        {
+          version: 'v0.9',
+          updateComponents: {
+            surfaceId: 'shared:triage-main',
+            components: [{ id: 'branch', component: 'Text', text: 'Choose one' }],
+          },
+        } as any,
+      ],
+      () => true,
+      noopValidate,
+      'kickstart',
+    );
+
+    expect(surfaceIds).toEqual(['shared:triage-main']);
+    expect(safeMessages).toHaveLength(1);
+    expect((safeMessages[0] as any).updateComponents.surfaceId).toBe('shared:triage-main');
   });
 });

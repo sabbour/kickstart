@@ -4,8 +4,18 @@ on:
   pull_request:
     branches: [dev, preview, main, insider]
     types: [opened, synchronize, reopened]
+    paths:
+      - 'test/**'
+      - 'packages/squad-cli/**'
+      - '.squad/scripts/**'
+      - '.squad/templates/**'
   push:
     branches: [dev, insider]
+    paths:
+      - 'test/**'
+      - 'packages/squad-cli/**'
+      - '.squad/scripts/**'
+      - '.squad/templates/**'
 
 permissions:
   contents: read

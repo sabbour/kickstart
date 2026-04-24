@@ -33,12 +33,12 @@ The API key for your Azure OpenAI resource. Found in Azure Portal under **Keys a
 ### KICKSTART_CHAT_MODEL
 
 **Required:** Yes  
-**Default:** None (falls back to `AZURE_OPENAI_CHAT_DEPLOYMENT`)  
-**Example:** `gpt-5.4-mini`
+**Default:** `gpt-5.4` (after checking `AZURE_OPENAI_CHAT_DEPLOYMENT`)  
+**Example:** `gpt-5.4`
 
 The deployment name for chat-tier models. Used for conversation turns, routing decisions, and text generation.
 
-The harness will automatically fall back to `AZURE_OPENAI_CHAT_DEPLOYMENT` if this is not set, with a deprecation warning.
+The harness will automatically fall back to `AZURE_OPENAI_CHAT_DEPLOYMENT` if this is not set, with a deprecation warning. If neither env var is configured, chat-tier agents default to `gpt-5.4`.
 
 ### KICKSTART_CODEX_MODEL
 
@@ -211,7 +211,7 @@ Create `packages/web/api/local.settings.json` with the following structure:
     "AzureWebJobsStorage": "",
     "AZURE_OPENAI_ENDPOINT": "https://your-resource.openai.azure.com/",
     "AZURE_OPENAI_API_KEY": "your-api-key",
-    "KICKSTART_CHAT_MODEL": "gpt-5.4-mini",
+    "KICKSTART_CHAT_MODEL": "gpt-5.4",
     "KICKSTART_CODEX_MODEL": "gpt-5.4",
     "KICKSTART_INSPIRE_MODEL": "gpt-5.4-nano",
     "KICKSTART_PLAYGROUND": "false",
@@ -241,12 +241,12 @@ AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 AZURE_OPENAI_API_KEY=sk-...
 
 # Preferred deployment names (v2 standard)
-KICKSTART_CHAT_MODEL=gpt-5.4-mini
+KICKSTART_CHAT_MODEL=gpt-5.4
 KICKSTART_CODEX_MODEL=gpt-5.4
 KICKSTART_INSPIRE_MODEL=gpt-5.4-nano
 
 # Legacy fallbacks (deprecated, but still supported)
-# AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-5.4-mini
+# AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-5.4
 # AZURE_OPENAI_CODEX_DEPLOYMENT=gpt-5.4
 
 # ============================================================================
@@ -298,15 +298,15 @@ PORT=4280
 
 ### "Agent model is not configured" error
 
-**Cause:** `KICKSTART_CHAT_MODEL` and fallback `AZURE_OPENAI_CHAT_DEPLOYMENT` are both unset.
+**Cause:** `KICKSTART_CHAT_MODEL` is unset and the built-in `gpt-5.4` default does not match any deployment in your Azure OpenAI resource.
 
-**Solution:** Set `KICKSTART_CHAT_MODEL` to a valid Azure OpenAI deployment name.
+**Solution:** Set `KICKSTART_CHAT_MODEL` (or `AZURE_OPENAI_CHAT_DEPLOYMENT`) to a valid Azure OpenAI deployment name for your resource.
 
 ### Model deployment name mismatch
 
 **Cause:** Deployment names don't exist in your Azure OpenAI resource.
 
-**Solution:** Verify deployment names in Azure Portal → your resource → Deployments. Deployment names are NOT the same as model names (e.g., `gpt-5.4-mini` is a deployment name, not a model ID).
+**Solution:** Verify deployment names in Azure Portal → your resource → Deployments. Deployment names are NOT the same as model names (for example `gpt-5.4` is a deployment name here, not a model ID).
 
 ### GitHub OAuth not working
 

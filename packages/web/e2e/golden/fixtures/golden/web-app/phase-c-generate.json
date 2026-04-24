@@ -1,0 +1,12 @@
+{
+  "phase": "generate",
+  "request_summary": "Generate manifests for web app",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Generating your Kubernetes manifests now.\"}" },
+    { "event": "tool", "data": "{\"name\":\"generate_manifests\",\"status\":\"running\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"file-tree\",\"files\":[\"deployment.yaml\",\"service.yaml\",\"ingress.yaml\",\"hpa.yaml\"]}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"generate\",\"status\":\"active\"}" },
+    { "event": "chunk", "data": "{\"content\":\"I've generated 4 manifest files for your web application.\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"generate\"}" }
+  ]
+}
