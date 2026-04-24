@@ -1068,7 +1068,7 @@ describe('core.emit_ui', () => {
             component: 'SummaryCard',
             title: 'Your AKS plan',
             items: [
-              { label: 'Platform', value: 'AKS Automatic', badge: null },
+              { label: 'Platform', value: 'AKS Automatic', badge: null, link: null },
             ],
             children: null,
           }],
@@ -1090,8 +1090,8 @@ describe('core.emit_ui', () => {
               component: 'SummaryCard',
               title: 'Your AKS plan',
               items: [
-                { label: 'Platform', value: 'AKS Automatic', badge: 'success' },
-                { label: 'Cost', value: '~$420/mo', badge: 'info' },
+                { label: 'Platform', value: 'AKS Automatic', badge: 'success', link: null },
+                { label: 'Cost', value: '~$420/mo', badge: 'info', link: null },
               ],
               children: ['diagram-1'],
             },
@@ -1126,7 +1126,7 @@ describe('core.emit_ui', () => {
             id: 'sc3',
             component: 'SummaryCard',
             title: 'Test',
-            items: [{ label: 'A', value: 'B', badge: null }],
+            items: [{ label: 'A', value: 'B', badge: null, link: null }],
             children: null,
             hackedField: 'bad',
           }],
@@ -1222,7 +1222,7 @@ describe('core.emit_ui', () => {
               component: 'SummaryCard',
               title: 'Your AKS plan',
               items: [
-                { label: 'Platform', value: 'AKS Automatic', badge: 'success' },
+                { label: 'Platform', value: 'AKS Automatic', badge: 'success', link: null },
               ],
               children: ['arch'],
             },

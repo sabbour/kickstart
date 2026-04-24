@@ -8,9 +8,11 @@ import {
   Body1Strong,
   Caption1,
   Card,
+  Link,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
+import { Open16Regular } from '@fluentui/react-icons';
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -20,6 +22,7 @@ const SummaryItemSchema = z.object({
   label: DynamicStringSchema,
   value: DynamicStringSchema,
   badge: z.enum(['neutral', 'success', 'warning', 'danger', 'info']).optional(),
+  link: DynamicStringSchema.optional(),
 });
 
 const SummaryCardApi = {
@@ -96,6 +99,11 @@ export const SummaryCard = createReactComponent(SummaryCardApi, ({ props, buildC
   const items = props.items ?? [];
   const childIds: string[] = (props.children as string[] | undefined) ?? [];
 
+  const isSafeUrl = (url: unknown): boolean => {
+    if (typeof url !== 'string') return false;
+    return url.startsWith('https://');
+  };
+
   return (
     <Card className={classes.card}>
       {props.title && (
@@ -106,7 +114,19 @@ export const SummaryCard = createReactComponent(SummaryCardApi, ({ props, buildC
           <React.Fragment key={idx}>
             <Body1 className={classes.label}>{item.label}</Body1>
             <div className={classes.valueRow}>
-              <Body1Strong>{item.value}</Body1Strong>
+              {item.link && isSafeUrl(item.link) ? (
+                <Link
+                  href={String(item.link)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Body1Strong>{item.value}</Body1Strong>
+                  <Open16Regular />
+                </Link>
+              ) : (
+                <Body1Strong>{item.value}</Body1Strong>
+              )}
               {item.badge && (
                 <Badge
                   color={BADGE_COLOR_MAP[item.badge] ?? 'subtle'}

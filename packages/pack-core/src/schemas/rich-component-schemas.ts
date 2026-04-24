@@ -101,6 +101,14 @@ export const SummaryCardSchema = z.object({
         .enum(['neutral', 'success', 'warning', 'danger', 'info'])
         .nullable()
         .describe('Visual badge for this item, or null.'),
+      link: z.union([
+        z.string()
+          .url('Must be a valid URL')
+          .refine(url => url.startsWith('https://'), { message: 'Only HTTPS URLs allowed' }),
+        z.object({ path: z.string() }),
+      ])
+        .nullable()
+        .describe('HTTPS URL or data-binding reference for external link, or null.'),
     }),
   ).describe('Array of key-value summary items displayed in a grid.'),
   children: z.array(z.string()).nullable().describe(
@@ -134,6 +142,28 @@ export const ArchitectureDiagramSchema = z.object({
   description: DynStr.nullable().describe('Subtitle shown below the title, or null.'),
 }).strict();
 
+// ── CreatePRFlow (#1113 Phase D) ────────────────────────────────────────────
+export const CreatePRFlowSchema = z.object({
+  id: z.string().describe('Unique component ID within this surface.'),
+  component: z.literal('github/CreatePRFlow'),
+  status: z
+    .enum(['idle', 'pushing', 'creating_pr', 'done', 'error'])
+    .describe('Current step of the PR-creation flow.'),
+  owner: DynStr.nullable().describe('Repository owner (org or user login), or null.'),
+  repo: DynStr.nullable().describe('Repository name, or null.'),
+  targetBranch: DynStr.nullable().describe('Branch to merge into (e.g. main), or null.'),
+  files: z.array(z.string()).nullable().describe(
+    'List of file paths being committed in this PR, or null.',
+  ),
+  prTitle: DynStr.nullable().describe('Pull request title, or null.'),
+  prUrl: DynStr.nullable().describe('URL of the created pull request, or null.'),
+  prNumber: z.number().int().nullable().describe('PR number, or null.'),
+  errorMessage: DynStr.nullable().describe('Error message if status is error, or null.'),
+  isActive: z.boolean().nullable().describe(
+    'Whether the component is interactive. False makes it read-only/dimmed.',
+  ),
+}).strict();
+
 /** All rich component schemas keyed by component name. */
 export const RICH_COMPONENT_SCHEMAS = new Map<string, z.ZodTypeAny>([
   ['DecisionCard', DecisionCardSchema],
@@ -141,6 +171,7 @@ export const RICH_COMPONENT_SCHEMAS = new Map<string, z.ZodTypeAny>([
   ['Questionnaire', QuestionnaireSchema],
   ['SummaryCard', SummaryCardSchema],
   ['ArchitectureDiagram', ArchitectureDiagramSchema],
+  ['github/CreatePRFlow', CreatePRFlowSchema],
 ]);
 
 /** LLM hints for each rich component — one-liner use-case + key props. */
@@ -165,9 +196,10 @@ export const RICH_COMPONENT_HINTS = new Map<string, string>([
   [
     'SummaryCard',
     'Plan summary card with key-value items grid and optional embedded children. ' +
-      'Props: title (string|null), items (array of {label, value, badge?}), ' +
+      'Props: title (string|null), items (array of {label, value, badge?, link?}), ' +
       'children (array of child component IDs rendered below the items — e.g. an ArchitectureDiagram ' +
       'and action Button row). ' +
+      'Use link on an item to render value as a clickable external link (e.g. PR URL). ' +
       'Exemplar: {"id":"plan","component":"SummaryCard","title":"Your AKS plan",' +
       '"items":[{"label":"Platform","value":"AKS Automatic","badge":"success"},' +
       '{"label":"AI Runtime","value":"KAITO (Llama-3.1-70B)","badge":null},' +
@@ -194,5 +226,17 @@ export const RICH_COMPONENT_HINTS = new Map<string, string>([
     'Flexible container card wrapping a single child component. ' +
       'Props: child (required — ID of the child component inside the card). ' +
       'Wrap multiple elements in a Column or Row first, then reference as child.',
+  ],
+  [
+    'github/CreatePRFlow',
+    'PR-creation card showing status of a push-and-PR workflow. ' +
+      'Props: status ("idle"|"pushing"|"creating_pr"|"done"|"error"), ' +
+      'owner, repo, targetBranch, files (string[]), prTitle, prUrl, prNumber, ' +
+      'errorMessage, isActive. ' +
+      'Exemplar: {"id":"pr-flow","component":"github/CreatePRFlow","status":"done",' +
+      '"owner":"octocat","repo":"kickstart-sample","targetBranch":"main",' +
+      '"files":["infra/main.bicep",".github/workflows/deploy.yml"],' +
+      '"prTitle":"feat: kickstart infra","prUrl":"https://github.com/octocat/kickstart-sample/pull/42",' +
+      '"prNumber":42,"isActive":true}',
   ],
 ]);
