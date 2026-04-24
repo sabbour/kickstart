@@ -1,3 +1,7 @@
+[![CI](https://github.com/azure-management-and-platforms/kickstart/actions/workflows/ci.yml/badge.svg?branch=dev&event=push)](https://github.com/azure-management-and-platforms/kickstart/actions/workflows/ci.yml)
+
+[![Deployment](https://github.com/azure-management-and-platforms/kickstart/actions/workflows/deploy-swa.yml/badge.svg?branch=dev&event=push)](https://github.com/azure-management-and-platforms/kickstart/actions/workflows/deploy-swa.yml)
+
 # Kickstart
 
 **AI-guided onboarding for deploying apps to AKS Automatic.**
