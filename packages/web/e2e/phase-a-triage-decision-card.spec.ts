@@ -139,7 +139,8 @@ test.describe('Phase A: Triage DecisionCard flow (#1130)', () => {
     await page.goto('/');
 
     // ── Turn 1: type a message and verify DecisionCard appears ───────────
-    const input = page.getByPlaceholder(/message|ask|type/i);
+    // Landing textarea uses aria-label, not a placeholder attribute
+    const input = page.getByLabel(/describe/i);
     await input.fill('I want to build an AI chatbot on AKS');
     await input.press('Enter');
 
