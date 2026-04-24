@@ -88,11 +88,59 @@ export const QuestionnaireSchema = z.object({
   onSubmit: ActionSchema.nullable().describe('Action dispatched when the user submits, or null.'),
 }).strict();
 
+// ── SummaryCard (#1113 Phase B) ─────────────────────────────────────────────
+export const SummaryCardSchema = z.object({
+  id: z.string().describe('Unique component ID within this surface.'),
+  component: z.literal('SummaryCard'),
+  title: DynStr.nullable().describe('Card title, or null.'),
+  items: z.array(
+    z.object({
+      label: DynStr.describe('Summary item label (left column).'),
+      value: DynStr.describe('Summary item value (right column).'),
+      badge: z
+        .enum(['neutral', 'success', 'warning', 'danger', 'info'])
+        .nullable()
+        .describe('Visual badge for this item, or null.'),
+    }),
+  ).describe('Array of key-value summary items displayed in a grid.'),
+  children: z.array(z.string()).nullable().describe(
+    'Ordered array of child component IDs rendered below the items grid ' +
+      '(e.g. an ArchitectureDiagram or action buttons), or null.',
+  ),
+}).strict();
+
+// ── ArchitectureDiagram (#1113 Phase B) ─────────────────────────────────────
+export const ArchitectureDiagramSchema = z.object({
+  id: z.string().describe('Unique component ID within this surface.'),
+  component: z.literal('ArchitectureDiagram'),
+  diagram: DynStr.nullable().describe(
+    'Raw Mermaid graph definition string. Preferred input format. Null when using nodes/edges.',
+  ),
+  nodes: z.array(
+    z.object({
+      id: z.string().describe('Unique node identifier used in edges.'),
+      label: z.string().describe('Display label for the node.'),
+      type: z.string().nullable().describe('Node type hint (e.g. "aks", "storage"), or null.'),
+    }),
+  ).nullable().describe('Structured node list — alternative to diagram string, or null.'),
+  edges: z.array(
+    z.object({
+      from: z.string().describe('Source node ID.'),
+      to: z.string().describe('Target node ID.'),
+      label: z.string().nullable().describe('Edge label text, or null.'),
+    }),
+  ).nullable().describe('Structured edge list — used with nodes, or null.'),
+  title: DynStr.nullable().describe('Diagram title shown in the header, or null.'),
+  description: DynStr.nullable().describe('Subtitle shown below the title, or null.'),
+}).strict();
+
 /** All rich component schemas keyed by component name. */
 export const RICH_COMPONENT_SCHEMAS = new Map<string, z.ZodTypeAny>([
   ['DecisionCard', DecisionCardSchema],
   ['RadioGroup', RadioGroupSchema],
   ['Questionnaire', QuestionnaireSchema],
+  ['SummaryCard', SummaryCardSchema],
+  ['ArchitectureDiagram', ArchitectureDiagramSchema],
 ]);
 
 /** LLM hints for each rich component — one-liner use-case + key props. */
@@ -113,5 +161,38 @@ export const RICH_COMPONENT_HINTS = new Map<string, string>([
     'Questionnaire',
     'Multi-question form with text, choice, and multiChoice inputs. Submit fires onSubmit action. ' +
       'Props: questions (array of {id, label, type?, choices?, required?}), submitLabel, onSubmit.',
+  ],
+  [
+    'SummaryCard',
+    'Plan summary card with key-value items grid and optional embedded children. ' +
+      'Props: title (string|null), items (array of {label, value, badge?}), ' +
+      'children (array of child component IDs rendered below the items — e.g. an ArchitectureDiagram ' +
+      'and action Button row). ' +
+      'Exemplar: {"id":"plan","component":"SummaryCard","title":"Your AKS plan",' +
+      '"items":[{"label":"Platform","value":"AKS Automatic","badge":"success"},' +
+      '{"label":"AI Runtime","value":"KAITO (Llama-3.1-70B)","badge":null},' +
+      '{"label":"Estimated cost","value":"~$420/mo","badge":"info"}],' +
+      '"children":["arch-diagram","action-row"]}',
+  ],
+  [
+    'ArchitectureDiagram',
+    'Mermaid-based architecture diagram with zoom/pan controls. Accepts raw Mermaid string via ' +
+      'diagram prop OR structured nodes+edges arrays. ' +
+      'Props: diagram (Mermaid string|null), nodes (array of {id, label, type?}|null), ' +
+      'edges (array of {from, to, label?}|null), title (string|null), description (string|null). ' +
+      'Exemplar: {"id":"arch","component":"ArchitectureDiagram","title":"Solution Architecture",' +
+      '"description":"AKS Automatic with KAITO","diagram":null,' +
+      '"nodes":[{"id":"aks","label":"AKS Automatic","type":"aks"},' +
+      '{"id":"kaito","label":"KAITO Model Pod","type":"ai"},' +
+      '{"id":"ingress","label":"Ingress Controller","type":"networking"},' +
+      '{"id":"storage","label":"Azure Files","type":"storage"}],' +
+      '"edges":[{"from":"ingress","to":"aks","label":"HTTPS"},{"from":"aks","to":"kaito","label":"inference"},' +
+      '{"from":"kaito","to":"storage","label":"model weights"}]}',
+  ],
+  [
+    'Card',
+    'Flexible container card wrapping a single child component. ' +
+      'Props: child (required — ID of the child component inside the card). ' +
+      'Wrap multiple elements in a Column or Row first, then reference as child.',
   ],
 ]);

@@ -7,6 +7,8 @@ import {
   DecisionCardSchema,
   RadioGroupSchema,
   QuestionnaireSchema,
+  SummaryCardSchema,
+  ArchitectureDiagramSchema,
 } from '../schemas/rich-component-schemas.js';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -296,6 +298,9 @@ const A2UIComponentSchema = z.discriminatedUnion('component', [
   DecisionCardSchema,
   RadioGroupSchema,
   QuestionnaireSchema,
+  // ── Phase B rich components (#1113 Phase B) ────────────────────────────
+  SummaryCardSchema,
+  ArchitectureDiagramSchema,
 ]);
 
 // Full discriminated union for the A2UI v0.9 envelope.

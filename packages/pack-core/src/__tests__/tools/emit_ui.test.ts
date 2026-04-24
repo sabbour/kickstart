@@ -1050,4 +1050,224 @@ describe('core.emit_ui', () => {
       expect(result).toMatch(/An error occurred|invalid/i);
     });
   });
+
+  // ── Phase B rich component variants (SummaryCard, ArchitectureDiagram) ──
+  describe('rich component variants — Phase B (SummaryCard, ArchitectureDiagram)', () => {
+    beforeEach(async () => {
+      await invoke(validCreateSurface);
+    });
+
+    it('SummaryCard with minimal props is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'sc1',
+            component: 'SummaryCard',
+            title: 'Your AKS plan',
+            items: [
+              { label: 'Platform', value: 'AKS Automatic', badge: null },
+            ],
+            children: null,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('SummaryCard with all props including children is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [
+            {
+              id: 'sc2',
+              component: 'SummaryCard',
+              title: 'Your AKS plan',
+              items: [
+                { label: 'Platform', value: 'AKS Automatic', badge: 'success' },
+                { label: 'Cost', value: '~$420/mo', badge: 'info' },
+              ],
+              children: ['diagram-1'],
+            },
+            {
+              id: 'diagram-1',
+              component: 'ArchitectureDiagram',
+              title: 'Solution Architecture',
+              description: 'AKS with KAITO',
+              diagram: null,
+              nodes: [
+                { id: 'aks', label: 'AKS Automatic', type: 'aks' },
+                { id: 'kaito', label: 'KAITO Pod', type: null },
+              ],
+              edges: [
+                { from: 'aks', to: 'kaito', label: 'inference' },
+              ],
+            },
+          ],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('SummaryCard rejects injected props (strict)', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'sc3',
+            component: 'SummaryCard',
+            title: 'Test',
+            items: [{ label: 'A', value: 'B', badge: null }],
+            children: null,
+            hackedField: 'bad',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toMatch(/An error occurred|invalid/i);
+    });
+
+    it('ArchitectureDiagram with diagram string is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'ad1',
+            component: 'ArchitectureDiagram',
+            diagram: 'graph TD\n  A-->B',
+            nodes: null,
+            edges: null,
+            title: 'My Diagram',
+            description: null,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('ArchitectureDiagram with structured nodes/edges is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'ad2',
+            component: 'ArchitectureDiagram',
+            diagram: null,
+            nodes: [
+              { id: 'aks', label: 'AKS Automatic', type: 'aks' },
+              { id: 'kaito', label: 'KAITO Pod', type: 'ai' },
+              { id: 'ingress', label: 'Ingress', type: 'networking' },
+              { id: 'storage', label: 'Azure Files', type: 'storage' },
+            ],
+            edges: [
+              { from: 'ingress', to: 'aks', label: 'HTTPS' },
+              { from: 'aks', to: 'kaito', label: 'inference' },
+              { from: 'kaito', to: 'storage', label: 'model weights' },
+            ],
+            title: 'Solution Architecture',
+            description: 'AKS Automatic with KAITO',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('ArchitectureDiagram rejects injected props (strict)', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'ad3',
+            component: 'ArchitectureDiagram',
+            diagram: 'graph TD\n  A-->B',
+            nodes: null,
+            edges: null,
+            title: null,
+            description: null,
+            extraField: 'nope',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toMatch(/An error occurred|invalid/i);
+    });
+
+    it('SummaryCard + ArchitectureDiagram + Buttons compose in adjacency list', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [
+            { id: 'root', component: 'Column', children: ['plan', 'actions'] },
+            {
+              id: 'plan',
+              component: 'SummaryCard',
+              title: 'Your AKS plan',
+              items: [
+                { label: 'Platform', value: 'AKS Automatic', badge: 'success' },
+              ],
+              children: ['arch'],
+            },
+            {
+              id: 'arch',
+              component: 'ArchitectureDiagram',
+              title: 'Solution Architecture',
+              description: null,
+              diagram: null,
+              nodes: [
+                { id: 'aks', label: 'AKS', type: 'aks' },
+                { id: 'app', label: 'App', type: null },
+              ],
+              edges: [{ from: 'aks', to: 'app', label: null }],
+            },
+            { id: 'actions', component: 'Row', children: ['approve', 'revise'] },
+            { id: 'approve-text', component: 'Text', text: 'Looks right — generate' },
+            {
+              id: 'approve',
+              component: 'Button',
+              child: 'approve-text',
+              action: {
+                event: {
+                  name: 'approve_plan',
+                  payload: { confirmed: true, id: null, value: null, action: 'approve_plan', target: null },
+                },
+              },
+            },
+            { id: 'revise-text', component: 'Text', text: 'Revise' },
+            {
+              id: 'revise',
+              component: 'Button',
+              child: 'revise-text',
+              action: {
+                event: {
+                  name: 'revise_plan',
+                  payload: { confirmed: null, id: null, value: null, action: 'revise_plan', target: null },
+                },
+              },
+            },
+          ],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+  });
 });

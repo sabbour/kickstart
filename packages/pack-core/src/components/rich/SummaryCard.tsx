@@ -28,6 +28,7 @@ const SummaryCardApi = {
     .object({
       title: DynamicStringSchema.optional(),
       items: z.array(SummaryItemSchema),
+      children: z.array(z.string()).optional(),
     })
     .strict(),
 };
@@ -53,6 +54,12 @@ const useStyles = makeStyles({
     columnGap: tokens.spacingHorizontalL,
     rowGap: tokens.spacingVerticalXS,
     alignItems: 'center',
+  },
+  childrenArea: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    marginTop: tokens.spacingVerticalS,
   },
   label: {
     color: tokens.colorNeutralForeground3,
@@ -84,9 +91,10 @@ const BADGE_COLOR_MAP: Record<string, BadgeColor> = {
 // Component
 // ---------------------------------------------------------------------------
 
-export const SummaryCard = createReactComponent(SummaryCardApi, ({ props }) => {
+export const SummaryCard = createReactComponent(SummaryCardApi, ({ props, buildChild }) => {
   const classes = useStyles();
   const items = props.items ?? [];
+  const childIds: string[] = (props.children as string[] | undefined) ?? [];
 
   return (
     <Card className={classes.card}>
@@ -112,6 +120,15 @@ export const SummaryCard = createReactComponent(SummaryCardApi, ({ props }) => {
           </React.Fragment>
         ))}
       </div>
+      {childIds.length > 0 && (
+        <div className={classes.childrenArea}>
+          {childIds.map((childId) => (
+            <React.Fragment key={childId}>
+              {buildChild(childId)}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
     </Card>
   );
 });
