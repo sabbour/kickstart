@@ -9,6 +9,7 @@ import {
   QuestionnaireSchema,
   SummaryCardSchema,
   ArchitectureDiagramSchema,
+  TrackPickerSchema,
 } from '../schemas/rich-component-schemas.js';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -296,6 +297,7 @@ const A2UIComponentSchema = z.discriminatedUnion('component', [
   }).strict(),
   // ── Rich domain components (registry-derived #1130) ────────────────────
   DecisionCardSchema,
+  TrackPickerSchema,
   RadioGroupSchema,
   QuestionnaireSchema,
   // ── Phase B rich components (#1113 Phase B) ────────────────────────────

@@ -72,6 +72,7 @@ import {
   RadioGroup,
   SteppedCarousel,
   SummaryCard,
+  TrackPicker,
 } from './catalog/components/index';
 
 const richComponents = [
@@ -96,6 +97,7 @@ const richComponents = [
   RadioGroup,
   SteppedCarousel,
   SummaryCard,
+  TrackPicker,
 ];
 
 for (const impl of richComponents) {

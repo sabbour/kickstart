@@ -11,3 +11,4 @@ export * from './RadioGroup';
 export * from './SteppedCarousel';
 export * from './SummaryCard';
 export { GenerationProgress } from './GenerationProgress.js';
+export * from './TrackPicker';

@@ -42,6 +42,7 @@ import {
   RadioGroup,
   SteppedCarousel,
   SummaryCard,
+  TrackPicker,
 } from "../catalog/components/index";
 import { azureClientComponents } from "@aks-kickstart/pack-azure/client";
 import { aksClientComponents } from "@aks-kickstart/pack-aks-automatic/client";
@@ -82,6 +83,7 @@ function buildBootstrapRegistry(): ClientComponentRegistry {
     RadioGroup,
     SteppedCarousel,
     SummaryCard,
+    TrackPicker,
   ];
   for (const impl of richComponents) registry.register(impl);
   // Pack components — mirrors registerPackComponents() in main.tsx. Stub
