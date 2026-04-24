@@ -32,6 +32,7 @@ Sprint 1 locked: #474 (Nuke v1) → #475 (Harness types) → #476 (Registry + lo
 
 ## Learnings
 
+- (2026-04-24T00:01:12-07:00) For cross-turn chat updates, turn-prefix scoping alone is insufficient. Safe frontend pattern is to reserve a stable surface namespace (proposed `shared:`) for chat-persistent surfaces, resolve those through a replay-safe logical→rendered registry, and keep all other surface IDs turn-scoped so existing per-turn file/progress surfaces stay isolated.
 - (2026-04-17T12:06:45Z) For #474 Step 1, safe frontend cut line is "preserve the shell, delete the fixtures." Treat `kickstart-catalog.ts`, playground demo/stub sources, and `types.ts` as replace-in-place seams because too many live files depend on them for hard-delete without immediate successors.
 - (2026-04-17T06:28:51Z) **Playwright race condition:** `waitForResponse` MUST be registered before `page.goto()` — registering after creates a race where the response arrives before the listener is attached.
 - (2026-04-17T06:28:51Z) **Auth E2E tests:** Must use `request.post()` (real HTTP) not `page.route()` mock interception; `page.route()` short-circuits before auth headers are evaluated.
@@ -110,3 +111,19 @@ Fry owns frontend and A2UI catalog. Key contributions:
 - Established safe frontend cut line for v2 nuke: preserve components/contexts/hooks shell
 
 [Full archive in session store for detailed learnings]
+
+## 2026-04-24T07:01:12Z — Session Close (Scribe)
+**Role:** Frontend (DP amendment + impl)
+**Issue:** #5
+**Outcomes:**
+- DP amendment: shared surface namespace design (resolved Nibbler rejection)
+- Frontend implementation completed: shared namespace integration, useA2UI fix, tests
+- PR #25 opened targeting dev
+
+**Critical Events:**
+- Submitted design clarification on cross-turn surface scoping
+- Nibbler approved amended DP
+- Parallel impl with Bender (backend)
+
+**Carry-forward:** PR #25 merge pending review gate
+
