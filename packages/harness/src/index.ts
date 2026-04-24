@@ -488,7 +488,11 @@ export type { ResolveSkillsOptions } from './runtime/skill-resolver.js';
 
 // ── Step 11–12: Runner + Resume ──────────────────────────────────────────────
 export { Runner } from './runtime/runner.js';
-export { Session, sessionStore, getOrCreateSession } from './runtime/session.js';
+// Session runtime exports are server-only (depend on node:crypto) and must NOT
+// be re-exported from the barrel — the browser Vite build cannot bundle
+// node:crypto.  Consumers should deep-import from
+// '@aks-kickstart/harness/runtime/session' instead.
+export type { Session, SessionResult, SessionData } from './runtime/session.js';
 export { handleResume } from './runtime/resume.js';
 export type { ResumeHandlerInput, ResumeHandlerResult, ClientPrincipal } from './runtime/resume.js';
 

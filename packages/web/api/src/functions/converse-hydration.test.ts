@@ -122,7 +122,13 @@ vi.mock('../startup/packs.js', () => ({
 }));
 
 vi.mock('@aks-kickstart/harness/runtime/session', () => ({
-  getOrCreateSession: getOrCreateSessionMock,
+  getOrCreateSessionResult: (...args: unknown[]) => ({
+    session: getOrCreateSessionMock(...args),
+    created: true,
+  }),
+  generateAnonSessionToken: vi.fn(() => 'mock-anon-token'),
+  validateAnonSessionToken: vi.fn(() => true),
+  isAnonymousSession: vi.fn(() => false),
   hydrateColdSession: hydrateColdSessionMock,
   isHistoryHydrationEnabled: vi.fn(() => true),
   isAnonHydrationAllowed: vi.fn(() => process.env.HARNESS_ALLOW_ANON_HYDRATION === 'true'),

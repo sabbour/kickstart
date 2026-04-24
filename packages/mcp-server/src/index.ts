@@ -34,12 +34,12 @@ import { z } from 'zod';
 
 import {
   Runner,
-  getOrCreateSession,
   isVsCodeClient,
   buildMcpManifest,
   buildA2UIContent,
   buildInterruptContent,
 } from '@aks-kickstart/harness';
+import { getOrCreateSession } from '@aks-kickstart/harness/runtime/session';
 import type { McpContentItem } from '@aks-kickstart/harness';
 import { createReadSkillTool } from '@aks-kickstart/pack-core';
 
