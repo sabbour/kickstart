@@ -3662,3 +3662,69 @@ Single-revert rollback confirmed. Full CI green. `nibbler:approved` label re-app
 
 - Four PRs cleared on the first round-4 pass — continues to validate the DP-stage gate reducing PR-stage rework.
 - Bundle-budget script is now the baseline — future pack additions that breach the ceiling must either raise the number in the script (requiring deliberate edit + waiver note) or split into lazy chunks.
+
+
+---
+
+# Decision: Enable deploy-swa workflow for dev branch
+
+**Author:** Bender (Backend/DevOps)  
+**Date:** 2026-04-23  
+**Decision ID:** bender-deploy-swa-dev-trigger  
+
+## Context
+The team has adopted a dev-first branch strategy where all feature PRs merge to `dev`, and only releases are merged to `main`. However, the `.github/workflows/deploy-swa.yml` workflow was only configured to trigger on pushes to `main`, meaning development builds were not automatically deploying to the Azure Static Web Apps staging environment.
+
+## Decision
+Added `dev` branch to the `push.branches` list in `.github/workflows/deploy-swa.yml`, positioned before `main`:
+
+```yaml
+push:
+  branches:
+    - dev
+    - main
+```
+
+## Rationale
+- **Consistency with branch strategy:** The workflow now mirrors the team's dev-first workflow where `dev` is the primary integration branch.
+- **Immediate feedback:** Development changes now deploy automatically without manual intervention, reducing cycle time.
+- **Zero behavioral change for main:** The `main` branch continues to trigger deployments as before; we only expanded the trigger list.
+
+## Implications
+- Dev branch deployments will now auto-trigger, consuming CI/CD resources (within expected limits).
+- SWA will maintain separate deployment environments for dev and main branches, allowing independent smoke testing and validation.
+
+## Alternative Approaches Considered
+- **Manual deployment triggers on dev:** Rejected—adds friction and human error to the development workflow.
+- **Separate workflow for dev:** Rejected—duplicates logic and maintenance burden; single workflow with multiple branches is simpler.
+
+## Sign-Off
+This change aligns with the established dev-first branch strategy and requires no approval beyond this decision record. Deployed via commit `cb61a678`.
+
+---
+
+### 2026-04-23T10:35: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** In this repo, merge PRs to `dev` unless explicitly told otherwise
+**Why:** User request — fork uses `dev` as the default integration branch, not `main`
+
+---
+
+### 2026-04-23T10:35: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Only releases merge to `main`. All other work merges to `dev`.
+**Why:** User request — `main` is the production release branch, `dev` is the integration branch
+
+---
+
+### 2026-04-23T13:49:54-07:00: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** The Playground idea inspiration prompts should generate simpler ideas that are generalized enough to work as reusable components. Ideas should be related to app deployment, creation, observability, CI/CD, DevOps, etc. including connections to other services.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-23T14:42:45-07:00: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Switch to gpt-5.4 model — opus models are slow right now
+**Why:** User request — session-scoped model preference

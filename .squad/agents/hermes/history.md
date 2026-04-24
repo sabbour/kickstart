@@ -99,3 +99,16 @@ None identified — the test files exist but tested against the stub; no test fi
 ### Key decisions
 - `getPhaseDefinition` now delegates to `PHASE_DEFINITIONS` (was returning empty stub)
 - `PricingConnector` constructor accepts `{ retry: { maxRetries } }` to mirror call-site config; retry loop matches v2-rewrite BaseConnector behaviour so `fetchMock.toHaveBeenCalledTimes(3)` assertion holds
+
+### 2026-04-23T22:53:28Z — Issue #16 Test Strategy Amendment (PR #24)
+
+**Task:** Amend DP test strategy per code quality review feedback (nibbler).
+
+**Outcome:** Amended strategy approved by nibbler-2.
+- Expanded test coverage to include explicit chat model requests and fallback scenarios.
+- Added validator integration tests and E2E chat flow tests.
+- All 23 planned tests defined and integrated into PR #24.
+
+**Key learnings:**
+- (2026-04-23) Code quality review gates require explicit test strategy acknowledgment — verbal agreement is not sufficient.
+- (2026-04-23) Amendment must be re-reviewed by the original reviewer (nibbler) or designated re-reviewer before implementation agent proceeds.
