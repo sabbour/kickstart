@@ -1,0 +1,10 @@
+{
+  "phase": "discover",
+  "request_summary": "User describes a KAITO model deployment",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"I'll help you deploy an AI model using KAITO on AKS Automatic.\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"discover\",\"status\":\"active\"}" },
+    { "event": "chunk", "data": "{\"content\":\"KAITO provides GPU-optimized model hosting. Let me understand your model choice.\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"discover\"}" }
+  ]
+}

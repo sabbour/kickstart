@@ -1,0 +1,13 @@
+{
+  "phase": "validate",
+  "request_summary": "Validate uplifted manifests",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Running deployment safeguards on your uplifted manifests.\"}" },
+    { "event": "tool", "data": "{\"name\":\"validate_artifacts\",\"status\":\"running\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"validation-results\",\"passed\":14,\"failed\":0,\"warnings\":0}" },
+    { "event": "a2ui", "data": "{\"type\":\"safeguard-card\",\"id\":\"DS007\",\"severity\":\"passed\",\"title\":\"Probes configured\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"validate\",\"status\":\"active\"}" },
+    { "event": "chunk", "data": "{\"content\":\"All safeguards passed after uplift. Your manifests are improved.\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"validate\"}" }
+  ]
+}

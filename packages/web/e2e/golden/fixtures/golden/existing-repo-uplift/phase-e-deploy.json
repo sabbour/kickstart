@@ -1,0 +1,12 @@
+{
+  "phase": "deploy",
+  "request_summary": "Create PR with uplifted manifests",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Creating a pull request with your uplifted Kubernetes manifests.\"}" },
+    { "event": "tool", "data": "{\"name\":\"create_pull_request\",\"status\":\"running\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"pr-link\",\"url\":\"https://github.com/test-org/test-repo/pull/4\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"deploy\",\"status\":\"active\"}" },
+    { "event": "chunk", "data": "{\"content\":\"Uplift PR created. Review the diff to see all improvements.\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"deploy\"}" }
+  ]
+}

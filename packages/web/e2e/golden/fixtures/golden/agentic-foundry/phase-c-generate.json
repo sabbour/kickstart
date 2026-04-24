@@ -1,0 +1,11 @@
+{
+  "phase": "generate",
+  "request_summary": "Generate manifests for Foundry agent",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Generating Kubernetes manifests with Foundry integration.\"}" },
+    { "event": "tool", "data": "{\"name\":\"generate_manifests\",\"status\":\"running\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"file-tree\",\"files\":[\"deployment.yaml\",\"service.yaml\",\"configmap.yaml\",\"secret.yaml\"]}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"generate\",\"status\":\"active\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"generate\"}" }
+  ]
+}

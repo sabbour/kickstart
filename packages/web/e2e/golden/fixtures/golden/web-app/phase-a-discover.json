@@ -1,0 +1,10 @@
+{
+  "phase": "discover",
+  "request_summary": "User describes a web application project",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"I'll help you build a web application on AKS. Let me understand your requirements.\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"discover\",\"status\":\"active\"}" },
+    { "event": "chunk", "data": "{\"content\":\"Based on your description, I've identified the key components needed for your web app deployment.\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"discover\"}" }
+  ]
+}

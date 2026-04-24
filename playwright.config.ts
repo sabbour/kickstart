@@ -19,6 +19,16 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'golden',
+      testDir: './packages/web/e2e/golden',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Disable trace/video in golden tests to prevent credential leakage
+        trace: process.env.GOLDEN_LIVE_MODE === 'true' ? 'off' : 'on-first-retry',
+        video: 'off',
+      },
+    },
   ],
 
   webServer: {

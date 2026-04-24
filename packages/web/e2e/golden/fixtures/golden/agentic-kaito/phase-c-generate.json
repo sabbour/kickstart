@@ -1,0 +1,11 @@
+{
+  "phase": "generate",
+  "request_summary": "Generate KAITO workspace manifests",
+  "sse_events": [
+    { "event": "chunk", "data": "{\"content\":\"Generating KAITO workspace and supporting manifests.\"}" },
+    { "event": "tool", "data": "{\"name\":\"generate_manifests\",\"status\":\"running\"}" },
+    { "event": "a2ui", "data": "{\"type\":\"file-tree\",\"files\":[\"workspace.yaml\",\"inference-service.yaml\",\"ingress.yaml\"]}" },
+    { "event": "a2ui", "data": "{\"type\":\"phase-indicator\",\"phase\":\"generate\",\"status\":\"active\"}" },
+    { "event": "done", "data": "{\"status\":\"phase_complete\",\"phase\":\"generate\"}" }
+  ]
+}
