@@ -2,9 +2,19 @@ name: CI
 
 on:
   pull_request:
+    paths-ignore:
+      - '.squad/**'
+      - 'docs-site/**'
+      - '*.md'
+      - '.changeset/**'
   push:
     branches:
       - main
+    paths-ignore:
+      - '.squad/**'
+      - 'docs-site/**'
+      - '*.md'
+      - '.changeset/**'
 
 permissions:
   contents: read
