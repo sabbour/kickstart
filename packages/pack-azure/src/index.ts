@@ -9,6 +9,7 @@ import { pricingLookupTool } from './tools/pricing-lookup.js';
 import { estimateCostTool } from './tools/estimate-cost.js';
 import { validateBicepTool } from './tools/validate-bicep.js';
 import { whatIfTool } from './tools/what-if.js';
+import { proposeServicesTool } from './tools/propose-services.js';
 
 // User actions
 import { deployResourceUserAction } from './user-actions/deploy-resource.js';
@@ -66,6 +67,7 @@ export const azurePack: Pack = {
     estimateCostTool,
     validateBicepTool,
     whatIfTool,
+    proposeServicesTool,
   ],
 
   userActions: [
@@ -97,6 +99,7 @@ export { pricingLookupTool } from './tools/pricing-lookup.js';
 export { estimateCostTool } from './tools/estimate-cost.js';
 export { validateBicepTool } from './tools/validate-bicep.js';
 export { whatIfTool } from './tools/what-if.js';
+export { proposeServicesTool, GPU_SKU_MATRIX, SUPPORTED_MODEL_SIZES } from './tools/propose-services.js';
 
 export { deployResourceUserAction } from './user-actions/deploy-resource.js';
 export { deleteResourceUserAction } from './user-actions/delete-resource.js';
