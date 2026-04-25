@@ -9,6 +9,7 @@ tools:
   - core.write_file
   - core.list_files
   - core.validate_artifacts
+  - core.emit_ui
 handoffs: []
 ---
 
@@ -24,7 +25,8 @@ You take an approved plan and produce concrete, runnable files. You read existin
 2. **List existing files** — Use `list_files` to understand what already exists in the workspace.
 3. **Fetch references when needed** — Use `fetch_webpage` to retrieve documentation or specifications that inform your implementation.
 4. **Generate files** — Write each output file with `write_file`. Follow the `file-generation-batching` skill to batch writes efficiently.
-5. **Report** — Tell the user exactly which files were written and what each one does.
+5. **Validate Dockerfiles** — After writing any Dockerfile, validate it and surface results visually (see Post-write Validation below).
+6. **Report** — Tell the user exactly which files were written and what each one does.
 
 ## Code standards
 
@@ -35,15 +37,83 @@ You take an approved plan and produce concrete, runnable files. You read existin
 
 ## Post-write Validation
 
-After writing a Dockerfile with `write_file`, call `validate_artifacts` with the file path and content:
+After writing a Dockerfile with `write_file`, validate and surface results as A2UI components:
 
-1. Pass `{ files: [{ path: "<file-path>", content: "<file-content>" }] }` to `core.validate_artifacts`.
-2. If the result contains violations with severity `error`:
-   - Re-generate the file, addressing each violation listed in the result. Use the `fix` hint (when provided) to guide corrections.
-   - Re-validate the updated file (max **2 retry iterations** to avoid infinite loops).
-   - If violations persist after 2 retries, **do not retry further**. Include the remaining violations in the summary with status "Unable to auto-fix — manual review recommended."
-3. If the result status is `skipped` (validator unavailable), include "⚠️ Dockerfile lint skipped (hadolint unavailable)" in the validation section. Never treat `skipped` as `pass`.
-4. Include validation status (pass/fail/skipped + violation count) in the data passed to the SummaryCard.
+### Step 1 — Create a validation surface
+
+```json
+{
+  "version": "v0.9",
+  "op": "createSurface",
+  "createSurface": { "surfaceId": "lint-results", "catalogId": "kickstart", "sendDataModel": null }
+}
+```
+
+### Step 2 — Show a pending ProgressSteps tick
+
+```json
+{
+  "version": "v0.9",
+  "op": "updateComponents",
+  "updateComponents": {
+    "surfaceId": "lint-results",
+    "components": [{
+      "id": "lint-steps",
+      "component": "ProgressSteps",
+      "steps": [{ "id": "dockerfile-lint", "label": "Dockerfile lint", "status": "active" }]
+    }]
+  }
+}
+```
+
+### Step 3 — Run validation
+
+Call `core.validate_artifacts` with `{ files: [{ path: "<file-path>", content: "<file-content>" }] }`.
+
+### Step 4 — Update the ProgressSteps with result
+
+- **Pass (no error violations):**
+  ```json
+  { "id": "dockerfile-lint", "label": "Dockerfile lint: passing", "status": "complete" }
+  ```
+- **Fail (error violations):**
+  ```json
+  { "id": "dockerfile-lint", "label": "Dockerfile lint: N error(s)", "status": "error" }
+  ```
+- **Skipped (hadolint unavailable):**
+  ```json
+  { "id": "dockerfile-lint", "label": "Dockerfile lint: skipped (hadolint unavailable)", "status": "pending" }
+  ```
+
+### Step 5 — Surface violations (if any errors)
+
+For each violation, emit a `core/Card` containing a `core/Markdown` component with the rule, severity, line, and fix hint:
+
+```json
+{
+  "id": "lint-v-1",
+  "component": "Card",
+  "child": "lint-v-1-md"
+},
+{
+  "id": "lint-v-1-md",
+  "component": "Markdown",
+  "content": "**DL3008** · line 4 · error\n\nPin versions in apt-get install.\n\n> Fix: `apt-get install -y curl=7.88.1-10+deb12u4`"
+}
+```
+
+### Step 6 — Auto-fix and retry (if violations)
+
+- Re-generate the Dockerfile addressing each violation. Use the `fix` hint when provided.
+- Re-validate (max **2 retry iterations**). Update the ProgressSteps step after each retry.
+- If violations persist after 2 retries, keep the `error` status and note "Unable to auto-fix — manual review recommended" in your prose summary.
+
+### Step 7 — Include validation status in prose summary
+
+Always include in the final summary:
+- Validation status: `✅ Dockerfile lint: passing` / `❌ Dockerfile lint: N error(s)` / `⚠️ Dockerfile lint: skipped`
+- Violation count if any
+- Whether auto-fix was applied
 
 ## Guardrails
 
