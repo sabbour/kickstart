@@ -1270,4 +1270,221 @@ describe('core.emit_ui', () => {
       expect(result).toContain('updateComponents');
     });
   });
+
+  // ── G1/G2 new rich component variants ──────────────────────────────────────
+  describe('rich component variants — G1/G2 (ProgressSteps, CodeBlock, Markdown, GenerationProgress, AuthCard, FormGroup, FileEditor, SteppedCarousel)', () => {
+    beforeEach(async () => {
+      await invoke(validCreateSurface);
+    });
+
+    it('ProgressSteps is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'steps-1',
+            component: 'ProgressSteps',
+            steps: [
+              { id: 'plan', label: 'Plan', status: 'complete' },
+              { id: 'generate', label: 'Generate', status: 'active' },
+              { id: 'deploy', label: 'Deploy', status: 'pending' },
+            ],
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('CodeBlock is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'cb-1',
+            component: 'CodeBlock',
+            code: 'const x = 42;',
+            language: 'typescript',
+            filename: 'main.ts',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('Markdown is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'md-1',
+            component: 'Markdown',
+            content: '## Summary\n\n- Item 1\n- Item 2',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('GenerationProgress is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'gp-1',
+            component: 'GenerationProgress',
+            title: 'Deploying AKS cluster',
+            overallStatus: 'running',
+            steps: [
+              { id: 's1', label: 'Provision nodes', status: 'complete', detail: null, timestamp: null },
+              { id: 's2', label: 'Deploy workload', status: 'running', detail: null, timestamp: null },
+            ],
+            statusMessage: null,
+            appUrl: null,
+            portalUrl: null,
+            errorMessage: null,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('AuthCard is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'auth-1',
+            component: 'AuthCard',
+            provider: 'azure',
+            title: 'Sign in to Azure',
+            description: null,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('FormGroup is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'fg-1',
+            component: 'FormGroup',
+            title: 'Cluster settings',
+            step: 2,
+            child: 'q-1',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('FileEditor (single file) is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'fe-1',
+            component: 'FileEditor',
+            filename: 'Dockerfile',
+            path: null,
+            language: 'dockerfile',
+            readOnly: true,
+            content: 'FROM node:20\nRUN npm install',
+            artifactPath: null,
+            files: null,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('FileEditor (multi-tab) is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'fe-2',
+            component: 'FileEditor',
+            filename: null,
+            path: null,
+            language: null,
+            readOnly: null,
+            content: null,
+            artifactPath: null,
+            files: [
+              { filename: 'main.bicep', path: null, language: 'bicep', content: null, artifactPath: '/infra/main.bicep' },
+              { filename: 'deploy.yml', path: null, language: 'yaml', content: 'name: deploy', artifactPath: null },
+            ],
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('SteppedCarousel is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'sc-1',
+            component: 'SteppedCarousel',
+            steps: [
+              { title: 'Step 1: Configure', child: 'form-config' },
+              { title: 'Step 2: Review', child: 'summary-card' },
+            ],
+            activeStep: 0,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('ProgressSteps rejects invalid status value', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'steps-bad',
+            component: 'ProgressSteps',
+            steps: [
+              { id: 's1', label: 'Step', status: 'unknown' },  // invalid status
+            ],
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('error');
+    });
+  });
 });

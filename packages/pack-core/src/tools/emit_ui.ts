@@ -10,6 +10,14 @@ import {
   SummaryCardSchema,
   ArchitectureDiagramSchema,
   TrackPickerSchema,
+  ProgressStepsSchema,
+  CodeBlockSchema,
+  MarkdownSchema,
+  GenerationProgressSchema,
+  AuthCardSchema,
+  FormGroupSchema,
+  FileEditorSchema,
+  SteppedCarouselSchema,
 } from '../schemas/rich-component-schemas.js';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -303,6 +311,15 @@ const A2UIComponentSchema = z.discriminatedUnion('component', [
   // ── Phase B rich components (#1113 Phase B) ────────────────────────────
   SummaryCardSchema,
   ArchitectureDiagramSchema,
+  // ── G1/G2 remaining rich components (#3) ──────────────────────────────
+  ProgressStepsSchema,
+  CodeBlockSchema,
+  MarkdownSchema,
+  GenerationProgressSchema,
+  AuthCardSchema,
+  FormGroupSchema,
+  FileEditorSchema,
+  SteppedCarouselSchema,
 ]);
 
 // Full discriminated union for the A2UI v0.9 envelope.

@@ -5,13 +5,12 @@
  * code (Azure Functions) can import the pack without pulling in React or
  * Fluent UI dependencies.
  *
- * Component property schemas are provided for the 22 basic components sourced
- * from the a2ui catalog. The 5 Fluent-only overrides (Badge, Accordion, Toggle,
- * ComboBox, MultiSelect) and the 13 rich components use z.unknown() as a
- * placeholder schema.
+ * Component property schemas are provided for all 40 components: the 22 basic
+ * components sourced from the a2ui catalog, the 5 Fluent-only overrides (Badge,
+ * Accordion, Toggle, ComboBox, MultiSelect), and all 13 rich domain components
+ * (schemas defined in rich-component-schemas.ts, server-safe — no JSX).
  *
- * TODO: Extract rich component schemas to a shared non-JSX file so the server
- * can serve accurate JSON schemas for all 40 components.
+ * TODO: Remove this TODO after verifying OpenAI strict-mode validation for all 40.
  */
 
 import { z } from 'zod';
@@ -76,7 +75,7 @@ const serverComponents: ComponentContribution[] = [
     propertySchema: z.unknown(),
     renderer: null,
   })),
-  // 13 rich components — 3 have real schemas (#1130), rest use placeholder
+  // 13 rich components — all now have real schemas (#3 G1/G2)
   ...RICH_COMPONENT_NAMES.map((name) => ({
     name: `core/${name}`,
     propertySchema: RICH_COMPONENT_SCHEMAS.get(name) ?? z.unknown(),
