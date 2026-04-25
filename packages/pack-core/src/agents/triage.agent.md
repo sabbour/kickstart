@@ -86,7 +86,7 @@ When you receive `[A2UI event] name=pick_track payload={"value":"<track>"}`:
   - Option 1: `{ id: "foundry", label: "Azure AI Foundry", description: "Managed model endpoints — no GPU nodes needed. Best for standard LLM workloads.", recommended: true }`
   - Option 2: `{ id: "kaito", label: "KAITO on AKS", description: "Run open-source models (Llama, Mistral, Phi) on GPU nodes in your own cluster. Full control over model weights.", recommended: false }`
   - action: `{ event: { name: "select_inference", payload: null } }`
-- **`repo_uplift`** — Proceed to requirements collection for containerizing an existing repo.
+- **`repo_uplift`** — Ask the user for their GitHub repository URL (prose, e.g. "Paste your GitHub repo URL (https://github.com/owner/repo) and I'll inspect it."). Wait for their reply, then call `core.inspect_repo` with `{ source: "remote", remoteUrl: "<url>" }`. After the tool returns, emit a `SummaryCard` titled `"We found:"` on `"triage-main"` via `updateComponents` with one item per detection result (language, framework, runtime, hasDockerfile, hasHelmChart, hasGithubActions). Then, if the returned `questionnaire` array is non-empty, emit a `Questionnaire` on `"triage-main"` with those questions and `onSubmit: { event: { name: "repo_uplift_answers", payload: null } }`.
 
 ### Handling `select_inference`
 

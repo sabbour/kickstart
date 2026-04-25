@@ -18,5 +18,5 @@ export { genKaitoCrd } from './gen_kaito_crd.js';
 export type { GenKaitoCrdInput, GenKaitoCrdOutput } from './gen_kaito_crd.js';
 export { genFoundryWiring } from './gen_foundry_wiring.js';
 export type { GenFoundryWiringInput, GenFoundryWiringOutput } from './gen_foundry_wiring.js';
-export { genDockerfile, BASE_IMAGE_ALLOWLIST, SUPPORTED_LANGUAGES } from './gen_dockerfile.js';
-export type { GenDockerfileInput, GenDockerfileOutput, SupportedLanguage, Framework } from './gen_dockerfile.js';
+export { createInspectRepoTool, inspectRepo, validateGitHubUrl, validateLocalPath } from './inspect_repo.js';
+export type { InspectRepoInput, InspectRepoOutput } from './inspect_repo.js';

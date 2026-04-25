@@ -1,0 +1,17 @@
+{
+  "name": "express-sample",
+  "version": "1.0.0",
+  "description": "Express sample app",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}
