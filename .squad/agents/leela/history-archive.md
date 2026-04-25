@@ -180,7 +180,7 @@ Core decisions preserved in `.squad/decisions.md` supersede archived entries. Th
 
 
 ### 2026-04-08: Kickstart Architecture Foundation
-- **Rename:** Project is "Imagine" → "Kickstart". Repo will move to sabbour/kickstart.
+- **Rename:** Project is "Imagine" → "Kickstart". Repo will move to azure-management-and-platforms/kickstart.
 - **Dual surface:** Web (SWA + Portal Prototyper) and MCP (tools + future App UI). If we host it, we provide the LLM. If MCP, user's LLM.
 - **Monorepo:** npm workspaces — `packages/core`, `packages/web`, `packages/mcp-server`.
 - **Web stays vanilla JS** — Portal Prototyper is zero-dep, SWA deploys with `skip_app_build: true`. No React unless proven necessary.
@@ -223,7 +223,7 @@ Core decisions preserved in `.squad/decisions.md` supersede archived entries. Th
 - **Full decision:** `.squad/decisions/inbox/leela-pragmatic-a2ui-react.md`
 
 
-### 2026-04-08: Two-Repo Strategy — sabbour/a2ui Fork + sabbour/kickstart App
+### 2026-04-08: Two-Repo Strategy — sabbour/a2ui Fork + azure-management-and-platforms/kickstart App
 - **Pattern:** Mirrors adaptive-ui-framework + adaptive-ui-try-aks split. Framework extensions in fork, app-specific code in Kickstart.
 
 
@@ -237,7 +237,7 @@ Core decisions preserved in `.squad/decisions.md` supersede archived entries. Th
 - **Deferred-but-important:** MCP tools (undefined scope, Phase 1 pivot unclear), multi-surface rendering (P3), cost estimation (scope ambiguous — spike recommended).
 - **Output:** `.squad/decisions/inbox/leela-consolidated-backlog.md` — 20KB canonical backlog with cross-references, superseded items table, effort summary, owner assignments, critical path, and recommendations.
 - **sabbour/a2ui (fork):** Generic catalog components (Table, Chart, Stepper), renderer improvements (streaming, SSR), data binding utilities, schema tooling, upstream contributions. Zero Kickstart/Azure/AKS logic.
-- **sabbour/kickstart (app):** All Kickstart-specific components (CostEstimate, ArchitectureDiagram, FileEditor, AuthCard, WorkflowStatus, etc.), chat UI, LLM integration, phase engine, MCP server, Azure/GitHub APIs.
+- **azure-management-and-platforms/kickstart (app):** All Kickstart-specific components (CostEstimate, ArchitectureDiagram, FileEditor, AuthCard, WorkflowStatus, etc.), chat UI, LLM integration, phase engine, MCP server, Azure/GitHub APIs.
 - **Consumption:** npm workspace + side-by-side checkout. Dev: `npm link @a2ui/react` for instant changes. CI: `file:` dependency OR published GitHub Package (future).
 - **Boundary rule:** If ANY A2UI app could use it → fork. If it knows AKS/Azure/GitHub/Kickstart → app. When unsure → start in app, promote when reuse proven.
 - **Upstream path:** Develop in fork, test in Kickstart, PR to google/A2UI when stable. Bug fixes always upstream.
@@ -388,7 +388,7 @@ Key decision: Lead (Leela) will not write code in future — routing code fixes 
 
 **Branch:** `squad/52-docs-update`
 **Commit:** 6804267 (docs: Update README and architecture docs for v0.3.0 features)
-**PR:** https://github.com/sabbour/kickstart/pull/109
+**PR:** https://github.com/azure-management-and-platforms/kickstart/pull/109
 
 All DP reviewers approved; implementation complete per scope.
 

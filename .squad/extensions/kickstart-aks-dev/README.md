@@ -5,7 +5,7 @@ Codifies development workflows for **Kickstart** — an AI-guided AKS onboarding
 ## Install
 
 ```
-squad plugin install github/sabbour/kickstart-aks-dev-extension
+squad plugin install github/azure-management-and-platforms/kickstart-aks-dev-extension
 ```
 
 ## What's Inside

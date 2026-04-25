@@ -93,7 +93,7 @@ Working as Fry (Frontend Dev) on branch `squad/474-step1-nuke-v1`.
 
 ## 2026-07-16 — #477 Design Proposal: v2 Step 4 pack-core
 
-Posted DP to https://github.com/sabbour/kickstart/issues/477#issuecomment-4268128132
+Posted DP to https://github.com/azure-management-and-platforms/kickstart/issues/477#issuecomment-4268128132
 
 ### Covered
 

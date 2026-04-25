@@ -2,7 +2,7 @@
 
 **Date:** 2025-07-20
 **Issue:** #488 — v2 Step 13: Docs + Cleanup
-**Comment posted:** https://github.com/sabbour/kickstart/issues/488#issuecomment-4269543245
+**Comment posted:** https://github.com/azure-management-and-platforms/kickstart/issues/488#issuecomment-4269543245
 **Status:** Proposed — awaiting Leela + Zapp approval
 
 ---

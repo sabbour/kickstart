@@ -1,7 +1,7 @@
 # Leela — PR #553 Architecture Recheck
 
 **Date:** 2026-04-17  
-**PR:** https://github.com/sabbour/kickstart/pull/553  
+**PR:** https://github.com/azure-management-and-platforms/kickstart/pull/553  
 **Fix commits reviewed:** c1ad322, 48958ab
 
 ## Result: APPROVED ✅

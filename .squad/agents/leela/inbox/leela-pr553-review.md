@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-17  
 **Verdict:** BLOCK  
-**PR:** https://github.com/sabbour/kickstart/pull/553  
+**PR:** https://github.com/azure-management-and-platforms/kickstart/pull/553  
 **Issue:** #482
 
 ---

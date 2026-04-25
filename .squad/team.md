@@ -60,7 +60,7 @@
 
 ## Issue Source
 
-- **Repository:** sabbour/kickstart
+- **Repository:** azure-management-and-platforms/kickstart
 - **Project Board:** https://github.com/users/sabbour/projects/3
 - **Connected:** 2026-04-08
 - **Assign to:** person running the Squad commands

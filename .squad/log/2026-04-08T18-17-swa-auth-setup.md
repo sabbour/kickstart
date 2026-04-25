@@ -17,7 +17,7 @@ Completed Azure Entra ID and Static Web Apps authentication configuration:
 - **Entra App:** e71a23c6-aeb4-459a-88fc-07ff96fc9b92
 - **SWA Resource:** kickstart-web-dev (rg-kickstart-dev)
 - **Secret Expiry:** ~July 2027
-- **GitHub Repo:** sabbour/kickstart
+- **GitHub Repo:** azure-management-and-platforms/kickstart
 
 ## Next Steps
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026  
 **Reviewer:** Leela (Lead Architect)  
-**PR:** https://github.com/sabbour/kickstart/pull/556  
+**PR:** https://github.com/azure-management-and-platforms/kickstart/pull/556  
 **Verdict:** APPROVE_WITH_CONDITIONS
 
 ---

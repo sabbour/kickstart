@@ -145,7 +145,7 @@ Old entries (>7 days)
 - **SWA app settings set:** `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET` both present on `kickstart-web-dev` SWA.
 - **Web redirect URIs added:** `https://proud-mud-0660b8110.6.azurestaticapps.net/.auth/login/aad/callback` and `https://kickstart.aks.azure.sabbour.me/.auth/login/aad/callback` — fixes the missing server-side callback that SWA built-in auth requires.
 - **SPA redirect URIs preserved:** localhost:4280, localhost:8080, kickstart.aks.azure.sabbour.me, kickstart.aks.azure.com still intact.
-- **GitHub secret set:** `AZURE_STATIC_WEB_APPS_API_TOKEN` on `sabbour/kickstart` — enables deploy workflow.
+- **GitHub secret set:** `AZURE_STATIC_WEB_APPS_API_TOKEN` on `azure-management-and-platforms/kickstart` — enables deploy workflow.
 - **Key insight:** SWA built-in auth uses server-side (Web platform) redirect URIs with `/.auth/login/aad/callback` path, NOT SPA redirects. Missing web redirects cause the "AADSTS50011: redirect URI mismatch" error.
 
 

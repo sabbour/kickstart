@@ -199,7 +199,7 @@ This is a focused bug-fix sprint with a single critical blocker (#166). Wave 1 m
 | C2 — ArchitectureDiagram move | ✅ Resolved | Correctly framed as cross-pack move from `packages/pack-core/src/components/rich/` → `packages/pack-aks-automatic/src/components/`; both manifests updated; ownership assigned to #525 |
 | C3 — DeploymentConfirm in Phase E | ✅ Confirmed | `aks/DeploymentConfirm` explicitly added to Phase E scope |
 
-**Comment:** https://github.com/sabbour/kickstart/issues/483#issuecomment-4269284877  
+**Comment:** https://github.com/azure-management-and-platforms/kickstart/issues/483#issuecomment-4269284877  
 **Label Applied:** `leela:approved-dp`
 
 ---

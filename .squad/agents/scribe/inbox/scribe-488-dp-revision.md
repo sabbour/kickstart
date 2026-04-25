@@ -1,8 +1,8 @@
 # Scribe — #488 DP Revision Record
 
 **Date:** 2025-07-24  
-**Issue:** https://github.com/sabbour/kickstart/issues/488  
-**Revision comment:** https://github.com/sabbour/kickstart/issues/488#issuecomment-4269571214
+**Issue:** https://github.com/azure-management-and-platforms/kickstart/issues/488  
+**Revision comment:** https://github.com/azure-management-and-platforms/kickstart/issues/488#issuecomment-4269571214
 
 ## Summary
 
@@ -24,5 +24,5 @@ Posted a combined revision comment on issue #488 addressing all conditions from 
 
 ## Recheck requests posted
 
-- Leela recheck: https://github.com/sabbour/kickstart/issues/488#issuecomment-4269571849
-- Zapp recheck: https://github.com/sabbour/kickstart/issues/488#issuecomment-4269571993
+- Leela recheck: https://github.com/azure-management-and-platforms/kickstart/issues/488#issuecomment-4269571849
+- Zapp recheck: https://github.com/azure-management-and-platforms/kickstart/issues/488#issuecomment-4269571993

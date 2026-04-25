@@ -160,7 +160,7 @@ When the branch is behind `main`, **always rebase** — never merge:
 git fetch origin
 git rebase origin/main
 # Resolve any conflicts
-git push https://x-access-token:${TOKEN}@github.com/sabbour/kickstart.git squad/<issue-number>-<slug> --force-with-lease
+git push https://x-access-token:${TOKEN}@github.com/azure-management-and-platforms/kickstart.git squad/<issue-number>-<slug> --force-with-lease
 ```
 
 ### Marking Ready for Review
@@ -184,19 +184,19 @@ Zapp's review is a **pre-merge gate** for foundational patterns. Nibbler reviews
 **How approvals work (label-based):**
 - **Leela** approves by adding the `leela:approved` label:
   ```bash
-  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "leela:approved" --repo sabbour/kickstart
+  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "leela:approved" --repo azure-management-and-platforms/kickstart
   ```
 - **Zapp** approves by adding the `zapp:approved` label:
   ```bash
-  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "zapp:approved" --repo sabbour/kickstart
+  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "zapp:approved" --repo azure-management-and-platforms/kickstart
   ```
 - **Nibbler** approves by adding the `nibbler:approved` label:
   ```bash
-  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "nibbler:approved" --repo sabbour/kickstart
+  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "nibbler:approved" --repo azure-management-and-platforms/kickstart
   ```
 - **Docs** approves by adding `docs:approved` (docs updated in the PR) or `docs:not-applicable` (DP declared `Docs impact: N/A`):
   ```bash
-  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "docs:approved" --repo sabbour/kickstart
+  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "docs:approved" --repo azure-management-and-platforms/kickstart
   ```
 
 No GitHub formal PR review approval is required — squad agents share a single GitHub account with the repo owner, making self-approval impossible. The `squad/review-gate` status check (`.github/workflows/squad-review-gate.yml`) turns green when all required labels are present **and** a docs marker is present. For explicitly low-risk PRs labeled `squad:chore-auto`, the gate accepts `leela:approved` + `nibbler:approved` + docs marker, unless the PR looks security-sensitive (`security`, `GHSA`, `CVE`, `vulnerability`) or touches sensitive paths (`.github/workflows/**`, auth, guardrail, security code), in which case `zapp:approved` is still required. `Squad Auto Merge` clears all three approval labels (`leela:approved`, `zapp:approved`, `nibbler:approved`) on every `synchronize` so new commits always need fresh approval labels. Docs markers persist across synchronize (they describe the PR content, not a reviewer's per-commit signoff).
@@ -234,7 +234,7 @@ When a PR has review comments or formal review threads, the full feedback loop i
 3. **After fixing (or deciding not to fix), ALWAYS reply to the specific comment:**
    ```bash
    # Reply to a review thread comment (get comment ID from reviewThreads query above)
-   GH_TOKEN=$TOKEN gh api "repos/sabbour/kickstart/pulls/<PR>/comments/<comment_id>/replies" \
+   GH_TOKEN=$TOKEN gh api "repos/azure-management-and-platforms/kickstart/pulls/<PR>/comments/<comment_id>/replies" \
      --method POST \
      -f body="Addressed in <commit_sha>: <what you changed and why, 1-2 sentences>. Resolving thread."
    
@@ -288,7 +288,7 @@ All CI checks must pass, including Playwright E2E tests. If checks fail:
 
     ```bash
     PR_JSON=$(GH_TOKEN=$TOKEN gh pr view {number} --json number,title,body,headRefName,labels)
-    FILES_JSON=$(GH_TOKEN=$TOKEN gh api repos/sabbour/kickstart/pulls/{number}/files --paginate)
+    FILES_JSON=$(GH_TOKEN=$TOKEN gh api repos/azure-management-and-platforms/kickstart/pulls/{number}/files --paginate)
     jq -n --argjson pr "$PR_JSON" --argjson files "$FILES_JSON" '
       ($pr.labels | map(.name)) as $labels
       | ([ $pr.title, $pr.body, $pr.headRefName ] + $labels | map(select(. != null)) | join(" ")) as $signals

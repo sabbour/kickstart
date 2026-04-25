@@ -12,7 +12,7 @@ Bender shipped Azure Functions backend (`packages/web/api`) with Azure OpenAI in
 - **Bender:** 33770db — SWA API backend, converse endpoint, session store, MCP tool
 - **Fry:** 0292460 — api-client.js, engine.js refactor, streaming/error states, demo badge
 - **Hermes:** d4879fa — 53 MCP server tests (a2ui, kickstart, generate-manifests, action)
-- **Also:** 6ca0ca9 — GitHub repo sabbour/kickstart created, CRLF fix
+- **Also:** 6ca0ca9 — GitHub repo azure-management-and-platforms/kickstart created, CRLF fix
 
 ## Decisions Recorded
 

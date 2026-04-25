@@ -232,7 +232,7 @@ describe('buildInboxEntry', () => {
       hypothesis: h,
       grade: g,
       commentUrl: 'https://example.com/42#c1',
-      repo: 'sabbour/kickstart',
+      repo: 'azure-management-and-platforms/kickstart',
     });
     expect(entry).toContain('# Decision: Process experiment graded — #42 tighten DR gate');
     expect(entry).toContain('## Hypothesis');
@@ -330,7 +330,7 @@ function makeStubGithub({ issues = [], rateLimitRemaining = 5000, comments = [] 
 }
 
 describe('runGrader', () => {
-  const context = { repo: { owner: 'sabbour', repo: 'kickstart' } };
+  const context = { repo: { owner: 'azure-management-and-platforms', repo: 'kickstart' } };
   const fs = makeStubFs({ '.squad/velocity.md': SAMPLE_VELOCITY });
   const core = { info: () => {}, warning: () => {}, notice: () => {}, setFailed: () => {} };
 

@@ -1,7 +1,7 @@
 # Leela — PR #556 Recheck Log
 
 **Date:** 2026-04-17  
-**PR:** [#556 pack-aks-automatic](https://github.com/sabbour/kickstart/pull/556)  
+**PR:** [#556 pack-aks-automatic](https://github.com/azure-management-and-platforms/kickstart/pull/556)  
 **Fix commits rechecked:** `bda0fb8`, `a1af8c4`
 
 ## Conditions
