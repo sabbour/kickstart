@@ -34,7 +34,7 @@ jobs:
             const XL_THRESHOLD = 1000;
             const APPROVAL_LABELS = ['leela:approved', 'zapp:approved', 'nibbler:approved'];
             const DOCS_APPROVED_LABEL = 'docs:approved';
-            const DOCS_NA_LABEL = 'docs:not-applicable';
+            const SKIP_DOCS_LABEL = 'skip-docs';
             const DOCS_REJECTED_LABEL = 'docs:rejected';
             const REVIEW_GATE_CONTEXT = 'squad/review-gate';
             const SENSITIVE_PATH_PATTERNS = [
@@ -162,8 +162,8 @@ jobs:
               if (labels.has(DOCS_REJECTED_LABEL)) {
                 return `docs reviewer rejected (\`${DOCS_REJECTED_LABEL}\`)`;
               }
-              if (!labels.has(DOCS_APPROVED_LABEL) && !labels.has(DOCS_NA_LABEL)) {
-                return `missing docs marker (one of \`${DOCS_APPROVED_LABEL}\` or \`${DOCS_NA_LABEL}\` is required)`;
+              if (!labels.has(DOCS_APPROVED_LABEL) && !labels.has(SKIP_DOCS_LABEL)) {
+                return `missing docs marker (one of \`${DOCS_APPROVED_LABEL}\` or \`${SKIP_DOCS_LABEL}\` is required)`;
               }
               return null;
             }
@@ -504,8 +504,8 @@ jobs:
                 dependabotPr
                   ? '- Dependabot auto-merge: CI is green and `dependabot[bot]` author in `dependabot/*` branch'
                   : labels.has(LOW_RISK_LABEL)
-                  ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : DOCS_NA_LABEL}\` for the docs gate`
-                  : `- fresh \`leela:approved\` + \`zapp:approved\` + \`nibbler:approved\` labels are present on the current head, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : DOCS_NA_LABEL}\` for the docs gate`,
+                  ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : SKIP_DOCS_LABEL}\` for the docs gate`
+                  : `- fresh \`leela:approved\` + \`zapp:approved\` + \`nibbler:approved\` labels are present on the current head, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : SKIP_DOCS_LABEL}\` for the docs gate`,
                 '- trusted merge signals are green: `CI Gate` from workflow `CI` and `squad/review-gate` from `Squad Review Gate`',
                 '- PR is not XL and title is not marked `refactor`',
                 '',

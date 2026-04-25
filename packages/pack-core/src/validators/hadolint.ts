@@ -120,16 +120,19 @@ async function downloadHadolint(): Promise<string | null> {
   });
 }
 
-type HadolintDeps = {
-  findOnPath: () => string | null;
-  verifySha256: (filePath: string, expectedHash: string) => boolean;
-  downloadHadolint: () => Promise<string | null>;
+/**
+ * Internal dependency indirection — allows tests to spy on these calls
+ * without mocking Node.js built-in modules (which is unreliable in ESM).
+ * @internal
+ */
+export const _deps = {
+  findOnPath,
+  verifySha256,
+  downloadHadolint,
 };
 
 /** Resolve hadolint binary path: PATH (with SHA256 check) → cache → download → null. */
-export async function resolveHadolint(
-  deps: HadolintDeps = { findOnPath, verifySha256, downloadHadolint },
-): Promise<string | null> {
+export async function resolveHadolint(deps: typeof _deps = _deps): Promise<string | null> {
   const onPath = deps.findOnPath();
   if (onPath) {
     // Never trust an unverified binary — even on PATH (Zapp supply-chain requirement)

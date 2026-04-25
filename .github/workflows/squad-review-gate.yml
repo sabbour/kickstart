@@ -90,7 +90,7 @@ jobs:
             const zappApproved = labels.has('zapp:approved');
             const nibblerApproved = labels.has('nibbler:approved');
             const docsApproved = labels.has('docs:approved');
-            const docsNotApplicable = labels.has('docs:not-applicable');
+            const skipDocs = labels.has('skip-docs');
             const leelaRejected = labels.has('leela:rejected');
             const zappRejected = labels.has('zapp:rejected');
             const nibblerRejected = labels.has('nibbler:rejected');
@@ -108,7 +108,7 @@ jobs:
               requiredApprovals.push('zapp:approved');
             }
 
-            const hasDocsMarker = docsApproved || docsNotApplicable;
+            const hasDocsMarker = docsApproved || skipDocs;
             const rejectionLabels = [];
             if (leelaRejected) rejectionLabels.push('leela:rejected');
             if (zappRejected && requiresZapp) rejectionLabels.push('zapp:rejected');
@@ -119,7 +119,7 @@ jobs:
             const leelaStatus = leelaApproved ? '✅' : '⏳';
             const zappStatus = zappApproved ? '✅' : (requiresZapp ? '⏳' : '➖');
             const nibblerStatus = nibblerApproved ? '✅' : '⏳';
-            const docsStatus = docsApproved ? '✅' : docsNotApplicable ? '➖ N/A' : '⏳';
+            const docsStatus = docsApproved ? '✅' : skipDocs ? '➖ N/A' : '⏳';
 
             let state, description;
             if (rejectionLabels.length > 0) {

@@ -7,6 +7,9 @@ Chronological record of architectural, process, and product decisions. Entries m
 # Amy decision — identity system ADR complete
 
 **Date:** 2026-04-24T00:00:00-07:00  
+# Amy Decision: Identity System ADR Complete
+
+**Date:** 2026-04-24T00:00:00-07:00  
 **Status:** Done
 
 ## What Happened
@@ -79,4 +82,6 @@ Implemented the golden E2E test harness per the approved revised DP (Bender v2, 
 
 - The golden E2E harness, fixtures, and deterministic Playwright coverage remain available in-repo under `packages/web/e2e/golden/` for future re-enablement.
 - The standalone `.github/workflows/golden-e2e.yml` workflow has been removed (commit `a896eb44`). There is no active `golden-gate` branch-protection required check.
+- Every PR to main/dev triggers the golden-e2e workflow (no path filter on trigger).
+- The `golden-gate` job becomes a branch-protection required check.
 - Fixtures must be re-recorded when they exceed 30-day freshness or when prompt/tool-schema hashes drift.
