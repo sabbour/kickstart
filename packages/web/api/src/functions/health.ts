@@ -117,7 +117,8 @@ function diagnoseProblem(err: unknown): { phase: string; hint: string } {
       hint: "One or more pack modules failed to import. Check that all dependencies are installed.",
     };
   }
-  if (msg.includes("seal") || msg.includes("Seal")) {
+  const msgLower = msg.toLowerCase();
+  if (msgLower.includes("seal") || msgLower.includes("handoff")) {
     return {
       phase: "registry-seal",
       hint: "Pack registry failed to seal. Check pack registration logs.",

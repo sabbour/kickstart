@@ -7,9 +7,10 @@
 // Output: installation access token on stdout, or nothing on failure (exit 0).
 
 import { createSign } from 'node:crypto';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
 
 // ============================================================================
 // Base64url helpers
@@ -62,6 +63,7 @@ const ROLE_ALIASES = {
   frontend: ['frontend', 'fry', 'ui', 'frontend-dev'],
   tester: ['tester', 'hermes', 'qa', 'test', 'observability'],
   scribe: ['scribe'],
+  security: ['security', 'auth', 'compliance', 'vulnerability'],
 };
 
 /**
@@ -100,8 +102,17 @@ function resolveRoleSlug(projectRoot, roleKey) {
       if (config.apps[resolvedRole]) {
         return resolvedRole;
       }
+      // Fallback: role has an app registration file but no config.apps entry
+      if (loadAppRegistration(projectRoot, resolvedRole)) {
+        return resolvedRole;
+      }
       break;
     }
+  }
+
+  // Final fallback: check if normalized key has an app registration file
+  if (loadAppRegistration(projectRoot, normalized)) {
+    return normalized;
   }
 
   return null;
@@ -287,13 +298,48 @@ async function resolveTokenWithDiagnostics(projectRoot, roleKey) {
       };
     }
 
-    const pemPath = join(projectRoot, '.squad', 'identity', 'keys', `${resolvedRoleKey}.pem`);
+    // Check in-repo keys first, then config.keysDir, then conventional path
+    const config = loadIdentityConfig(projectRoot);
+    const pemName = `${resolvedRoleKey}.pem`;
+    let pemPath = join(projectRoot, '.squad', 'identity', 'keys', pemName);
+
     if (!existsSync(pemPath)) {
-      return {
-        token: null,
-        resolvedRoleKey,
-        error: `No private key found for role "${resolvedRoleKey}" at .squad/identity/keys/${resolvedRoleKey}.pem.`,
-      };
+      let found = false;
+
+      // Try explicit config.keysDir
+      if (config?.keysDir) {
+        const extPath = join(config.keysDir, pemName);
+        if (existsSync(extPath)) {
+          pemPath = extPath;
+          found = true;
+        }
+      }
+
+      // Try conventional ~/.config/squad/*/keys/
+      if (!found) {
+        const squadConfigDir = join(homedir(), '.config', 'squad');
+        if (existsSync(squadConfigDir)) {
+          try {
+            for (const owner of readdirSync(squadConfigDir)) {
+              const candidate = join(squadConfigDir, owner, 'keys', pemName);
+              if (existsSync(candidate)) {
+                pemPath = candidate;
+                found = true;
+                break;
+              }
+            }
+          } catch { /* ignore scan errors */ }
+        }
+      }
+
+      if (!found) {
+        return {
+          token: null,
+          resolvedRoleKey,
+          error: `No private key found for role "${resolvedRoleKey}" at .squad/identity/keys/${resolvedRoleKey}.pem` +
+            (config?.keysDir ? ` or ${config.keysDir}/${pemName}.` : ' or ~/.config/squad/*/keys/.'),
+        };
+      }
     }
 
     const pem = readFileSync(pemPath, 'utf-8');

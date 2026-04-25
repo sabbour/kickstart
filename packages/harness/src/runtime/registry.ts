@@ -146,9 +146,14 @@ export class PackRegistry {
   /**
    * Iterate every active agent's frontmatter `handoffs[]` and validate
    * that each target (a) is a registered agent and (b) belongs to the
-   * SAME pack as the source (intra-pack only — Zapp Z1 on #1073).
+   * same pack OR a declared dependency (Zapp Z1 on #1073, relaxed for
+   * dependsOn in #1113 Phase B hotfix).
    *
-   * Cross-pack handoffs are deferred until the trust model is reviewed.
+   * Handoffs to packs listed in `dependsOn` are allowed because that
+   * relationship already grants tool and user-action trust at register()
+   * time — extending it to handoffs is consistent.
+   *
+   * Handoffs to packs NOT in the direct dependencies are still rejected.
    * Every error message includes three tokens (pack, agent, target) so a
    * grep on any of them surfaces the offender.
    */
@@ -156,6 +161,7 @@ export class PackRegistry {
     for (const registeredPack of this.packs.values()) {
       const packName = registeredPack.pack.name;
       if (!this.isPackActive(packName)) continue;
+      const allowedPacks = new Set([packName, ...(registeredPack.pack.dependsOn ?? [])]);
       for (const agent of registeredPack.agents) {
         for (const h of agent.handoffs ?? []) {
           const target = h.agent;
@@ -168,11 +174,12 @@ export class PackRegistry {
             );
           }
           const targetPack = this.packNameFromAgent(targetAgent.name);
-          if (targetPack !== packName) {
+          if (!allowedPacks.has(targetPack)) {
             throw new Error(
               `Cross-pack handoff rejected: agent "${agent.name}" in pack "${packName}" ` +
               `declares handoff to "${target}" in pack "${targetPack}". ` +
-              `Cross-pack handoffs are deferred until the trust model is reviewed (see #1073, Zapp Z1). ` +
+              `Handoffs are only allowed to agents in the same pack or declared dependencies (dependsOn). ` +
+              `Add "${targetPack}" to pack "${packName}" dependsOn or remove the handoff. ` +
               `(pack="${packName}", agent="${agent.name}", target="${target}")`,
             );
           }

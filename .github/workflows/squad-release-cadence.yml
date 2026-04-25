@@ -24,7 +24,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v1
         with:
-          app-id: 3340358
+          app-id: ${{ secrets.SQUAD_LEAD_APP_ID }}
           private-key: ${{ secrets.SQUAD_LEAD_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 

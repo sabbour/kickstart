@@ -1,5 +1,6 @@
 {
   "tier": "per-role",
+  "keysDir": "/home/asabbour/.config/squad/asabbour_microsoft/keys",
   "apps": {
     "frontend": {
       "appId": 3369254,

@@ -7,16 +7,18 @@ How to decide who handles what.
 | Work Type | Route To | Examples |
 |-----------|----------|----------|
 | Frontend UX | Fry | Web client routes, A2UI rendering, component authoring, SSE client, playground |
-| Backend & runtime | Bender | Harness, non-UI packs, SDK tools, user actions, guardrails, SWA Functions API, Azure infra |
-| Code review | Leela | Review PRs, check architecture alignment, suggest improvements |
+| Backend & runtime | Bender | Harness, non-UI packs, SDK tools, user actions, guardrails, SWA Functions API, Azure app infra (Bicep, managed identity) |
+| Code review | Leela | Review PRs for architecture alignment, pack boundaries, API contract consistency |
 | Code quality gate | Nibbler | PR correctness, readability, bug patterns, error handling, naming |
 | Testing | Hermes | Four test layers: unit, pack conformance, contract, Playwright E2E |
 | Performance & observability | Hermes | Perf budgets on DPs, p95 latency, first-chunk time, token ceilings, cold-start, resource sizing, tracing spans, structured logging |
 | Scope & priorities | Leela | What to build next, trade-offs, decisions |
 | Architecture | Leela | Pack boundaries, primitive surface, harness contract |
 | Security | Zapp | DP security review, tool schema review, guardrail design |
-| Release notes, docs | Scribe | Release PR curation, pulse issues, decision merging, public docs, CHANGELOG, README |
+| Documentation | Amy | README, ADRs, architecture diagrams, guides, changesets, Docusaurus site, release notes prose |
+| Squad state & CHANGELOG | Scribe | Decision merging, history summaries, CHANGELOG curation, pulse narratives, session logs |
 | Product & DX review | Scribe | Advisory review on DPs and PRs for naming, defaults, newcomer experience |
+| DevOps & CI/CD | Kif | Workflows, CI/CD pipelines, release automation, branch protection, rulesets, project board, GitHub Actions, secrets, GitHub App management |
 | Queue monitoring | Ralph | Stuck PRs, expired gates, missed cron runs |
 
 ## Issue Routing

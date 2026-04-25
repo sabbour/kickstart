@@ -98,9 +98,12 @@ describe('scrub-secrets / pattern set', () => {
 });
 
 describe('scrub-secrets / forbidden paths (Zapp C9)', () => {
-  it('flags identity key and app-registration paths', () => {
+  it('flags identity key paths', () => {
     expect(isForbiddenPath('.squad/identity/keys/lead.pem')).toBe(true);
-    expect(isForbiddenPath('.squad/identity/apps/frontend.json')).toBe(true);
+  });
+
+  it('allows app-registration JSON (public metadata, no secrets)', () => {
+    expect(isForbiddenPath('.squad/identity/apps/frontend.json')).toBe(false);
   });
 
   it('does not flag benign paths', () => {

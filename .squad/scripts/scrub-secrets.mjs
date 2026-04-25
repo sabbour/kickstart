@@ -23,8 +23,9 @@
 //   - PEM private-key block markers (RSA / EC / DSA / OPENSSH / ENCRYPTED)
 //   - Authorization header forms carrying a GH token
 //   - x-access-token basic-auth URL form
-//   - Path-based refusal for `.squad/identity/keys/*.pem` and
-//     `.squad/identity/apps/*.json` being committed.
+//   - Path-based refusal for `.squad/identity/keys/*.pem` being committed.
+//   - App registration JSONs (`.squad/identity/apps/*.json`) are ALLOWED —
+//     they contain only public metadata (appId, slug, clientId, installationId).
 //
 // IMPORTANT: This script must NEVER print a captured secret to any stream.
 // Matches are redacted to `[REDACTED:{kind}]` before any output.
@@ -74,9 +75,11 @@ const PEM_PATTERN = {
 const ALL_PATTERNS = [...TOKEN_PATTERNS, ...HEADER_PATTERNS, PEM_PATTERN];
 
 // Paths that must never appear in a commit regardless of content.
+// NOTE: .squad/identity/apps/*.json contain only public metadata (appId, slug,
+// clientId, installationId) — no secrets. They are allowed in commits.
+// Content-based patterns above catch any actual secrets in any file.
 const FORBIDDEN_PATHS = [
   /^\.squad\/identity\/keys\/.+\.pem$/,
-  /^\.squad\/identity\/apps\/.+\.json$/,
 ];
 
 // --- Scan primitives ----------------------------------------------------------

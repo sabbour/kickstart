@@ -437,7 +437,7 @@ Use ARM.
       }
     });
 
-    it('rejects cross-pack handoff targets (T5, Zapp Z1)', () => {
+    it('allows cross-pack handoff to declared dependency packs', () => {
       const registry = new PackRegistry();
       registry.register({
         name: 'core',
@@ -458,6 +458,43 @@ Use ARM.
         name: 'azure',
         version: '1.0.0',
         dependsOn: ['core'],
+        agents: [{
+          name: 'azure.architect',
+          description: 'architect',
+          model: { envVar: 'M' },
+          toolAllowlist: [],
+          handoffs: [{ label: 'Code', agent: 'core.codesmith' }],
+          userInvocable: false,
+          modelInvocable: true,
+          instructionsBase: 'architect',
+          source: { kind: 'inline' },
+        }],
+      });
+      registry.enable(['azure']);
+      expect(() => registry.seal()).not.toThrow();
+    });
+
+    it('rejects cross-pack handoff to packs not in dependsOn (T5, Zapp Z1)', () => {
+      const registry = new PackRegistry();
+      registry.register({
+        name: 'core',
+        version: '1.0.0',
+        agents: [{
+          name: 'core.codesmith',
+          description: 'codesmith',
+          model: { envVar: 'M' },
+          toolAllowlist: [],
+          handoffs: [],
+          userInvocable: false,
+          modelInvocable: true,
+          instructionsBase: 'codesmith',
+          source: { kind: 'inline' },
+        }],
+      });
+      registry.register({
+        name: 'azure',
+        version: '1.0.0',
+        // No dependsOn — cross-pack handoff should be rejected
         agents: [{
           name: 'azure.architect',
           description: 'architect',
