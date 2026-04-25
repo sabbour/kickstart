@@ -14,6 +14,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
+import { sanitizeActionContext } from '../../utils/sanitize-action-context';
 
 const QuestionnaireApi = {
   name: 'Questionnaire',
@@ -63,7 +64,7 @@ const useStyles = makeStyles({
   },
 });
 
-export const Questionnaire = createReactComponent(QuestionnaireApi, ({ props }) => {
+export const Questionnaire = createReactComponent(QuestionnaireApi, ({ props, context }) => {
   const classes = useStyles();
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
 
@@ -90,7 +91,23 @@ export const Questionnaire = createReactComponent(QuestionnaireApi, ({ props }) 
     });
 
   const handleSubmit = () => {
-    if (props.onSubmit) (props.onSubmit as () => void)();
+    // Dispatch enriched action with submitted answers in context
+    const rawAction = context.componentModel.properties.onSubmit;
+    if (rawAction && typeof rawAction === 'object' && 'event' in rawAction && rawAction.event) {
+      const resolved = context.dataContext.resolveAction(rawAction);
+      const safeContext = sanitizeActionContext(resolved.event.context);
+      context.dispatchAction({
+        event: {
+          ...resolved.event,
+          context: {
+            ...safeContext,
+            answers,
+          },
+        },
+      });
+    } else if (props.onSubmit) {
+      (props.onSubmit as () => void)();
+    }
   };
 
   return (

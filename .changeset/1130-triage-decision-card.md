@@ -38,6 +38,10 @@ first turn (#1130 — Phase A of #1113).
    via the existing `[A2UI event]` marker mechanism; no new UserAction
    contribution needed.
 
+7. **Questionnaire action dispatch fix** — Questionnaire component now
+   properly dispatches ActionSchema with context enrichment, matching the
+   RadioGroup pattern for full user action support.
+
 ### Token cost of enriched catalog
 
 Baseline catalog block: ~80 tokens (40 component names, comma-separated).

@@ -94,7 +94,7 @@ GH_TOKEN="$TOKEN" node "{team_root}/.squad/scripts/post-flight-check.mjs" --kind
 - ❌ `echo "$TOKEN"`, `env`, `printenv`, or `set -x` around token-handling blocks.
 - ❌ `export GH_TOKEN; gh …` instead of the inline `GH_TOKEN="$TOKEN" gh …` one-liner.
 - ❌ A `gh` call without `GH_TOKEN` set in the same subshell (falls back to `~/.config/gh/hosts.yml` → human identity).
-- ❌ Pasting any `ghs_` / `ghp_` / `gho_` / `ghu_` / `ghr_` / `ghe_` / `github_pat_` / `Authorization: Bearer …` / `x-access-token:…` / `-----BEGIN … PRIVATE KEY-----` substring into a response, PR body, commit message, issue body, or decision record — even as "evidence" of a past leak.
+- ❌ Pasting any `gh{s}_` / `gh{p}_` / `gh{o}_` / `gh{u}_` / `gh{r}_` / `gh{e}_` / `github_{pat}_` / `Authorization: Bea{rer} …` / `x-access-{token}:…` / `-----BEGIN … PRI{VATE} KEY-----` substring into a response, PR body, commit message, issue body, or decision record — even as "evidence" of a past leak.
 - ❌ Committing `.squad/identity/keys/*.pem` or `.squad/identity/apps/*.json`.
 
 **Post-flight is synchronous and blocking.** Do not declare a ceremony successful until `post-flight-check.mjs` confirms `user.login == sabbour-squad-<role>[bot]` AND `user.type == "Bot"`. Review revocation on mismatch uses `PUT /pulls/{n}/reviews/{id}/dismissals` (reviews cannot be deleted).

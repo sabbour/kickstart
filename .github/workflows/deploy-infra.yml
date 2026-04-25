@@ -12,9 +12,9 @@ permissions:
   contents: read
 
 env:
-  AZURE_SUBSCRIPTION_ID: '4498459e-01d5-4a3f-b07e-8f1f36598c16'
-  AZURE_RESOURCE_GROUP: 'rg-kickstart-dev'
-  AZURE_LOCATION: 'centralus'
+  AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
 
 jobs:
   deploy:
