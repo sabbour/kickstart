@@ -101,9 +101,9 @@ describe('resolveOutputText', () => {
     expect(resolveOutputText({ message: 42 }, 'fallback')).toBe('fallback');
   });
 
-  it('falls back to fullText when finalOutput has no message field (plain-text agent)', () => {
-    // An agent without AgentOutput structured output produces a non-object finalOutput
-    expect(resolveOutputText({ intent: 'continue' }, 'plain text')).toBe('plain text');
+  it('returns empty string when finalOutput has no message field (surface-only turn #1130)', () => {
+    // AgentOutput.message is optional — surface-only turns emit UI with no prose
+    expect(resolveOutputText({ intent: 'continue' }, 'plain text')).toBe('');
   });
 
   it('does NOT return raw JSON string when finalOutput.message is the clean prose (regression guard for #937)', () => {

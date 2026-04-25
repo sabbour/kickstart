@@ -893,4 +893,161 @@ describe('core.emit_ui', () => {
       expect(capped.liveSurfaceIds).toEqual(new Set(['b', 'c', 'd']));
     });
   });
+
+  // ── Rich component variants (#1130) ──────────────────────────────────────
+
+  describe('rich component variants (DecisionCard, RadioGroup, Questionnaire)', () => {
+    beforeEach(async () => {
+      // Seed a surface for updateComponents calls
+      await invoke(validCreateSurface);
+    });
+
+    it('DecisionCard with valid props is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'dc1',
+            component: 'DecisionCard',
+            title: 'Choose a track',
+            recommendation: 'AKS Automatic is the way to go',
+            rationale: null,
+            alternatives: null,
+            badge: null,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('DecisionCard with all props is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'dc2',
+            component: 'DecisionCard',
+            title: 'Deploy options',
+            recommendation: 'Use AKS Automatic',
+            rationale: 'Fully managed, secure by default',
+            alternatives: ['Static site', 'Container web app'],
+            badge: 'recommended',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('DecisionCard rejects injected props (strict)', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'dc3',
+            component: 'DecisionCard',
+            title: 'Test',
+            recommendation: 'Test',
+            rationale: null,
+            alternatives: null,
+            badge: null,
+            injected_prop: 'bad',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toMatch(/An error occurred|invalid/i);
+    });
+
+    it('RadioGroup with valid props is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'rg1',
+            component: 'RadioGroup',
+            options: [
+              { id: 'opt1', label: 'Option 1', description: null, recommended: null },
+              { id: 'opt2', label: 'Option 2', description: 'Second option', recommended: true },
+            ],
+            value: null,
+            action: { event: { name: 'select', payload: null } },
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('RadioGroup rejects injected props (strict)', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'rg2',
+            component: 'RadioGroup',
+            options: [{ id: 'a', label: 'A', description: null, recommended: null }],
+            value: null,
+            action: { event: { name: 'pick', payload: null } },
+            extra: 'nope',
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toMatch(/An error occurred|invalid/i);
+    });
+
+    it('Questionnaire with valid props is accepted', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'q1',
+            component: 'Questionnaire',
+            questions: [
+              { id: 'q-model', label: 'Which model?', type: 'choice', choices: [{ id: 'gpt4', label: 'GPT-4o' }], required: true },
+              { id: 'q-desc', label: 'Describe your use case', type: null, choices: null, required: null },
+            ],
+            submitLabel: 'Continue',
+            onSubmit: { event: { name: 'submit_answers', payload: null } },
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toContain('updateComponents');
+    });
+
+    it('Questionnaire rejects injected props (strict)', async () => {
+      const msg = {
+        version: A2UI_VERSION,
+        op: 'updateComponents' as const,
+        updateComponents: {
+          surfaceId: 'surface-001',
+          components: [{
+            id: 'q2',
+            component: 'Questionnaire',
+            questions: [{ id: 'a', label: 'Q?', type: null, choices: null, required: null }],
+            submitLabel: null,
+            onSubmit: null,
+            hackProp: true,
+          }],
+        },
+      };
+      const result = String(await invoke(msg));
+      expect(result).toMatch(/An error occurred|invalid/i);
+    });
+  });
 });

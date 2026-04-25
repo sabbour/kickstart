@@ -19,6 +19,10 @@ import type { Pack } from '@aks-kickstart/harness';
 import type { ComponentContribution } from '@aks-kickstart/harness';
 import { resolveAssetURL } from '@aks-kickstart/harness/runtime/asset-url';
 import { BASIC_COMPONENTS } from './vendor/a2ui/web_core/basic_catalog/components/basic_components.js';
+import {
+  RICH_COMPONENT_SCHEMAS,
+  RICH_COMPONENT_HINTS,
+} from './schemas/rich-component-schemas.js';
 
 // Tools (no JSX)
 import { emitUiTool } from './tools/emit_ui.js';
@@ -71,11 +75,12 @@ const serverComponents: ComponentContribution[] = [
     propertySchema: z.unknown(),
     renderer: null,
   })),
-  // 13 rich components — schema placeholder (TODO: extract from tsx)
+  // 13 rich components — 3 have real schemas (#1130), rest use placeholder
   ...RICH_COMPONENT_NAMES.map((name) => ({
     name: `core/${name}`,
-    propertySchema: z.unknown(),
+    propertySchema: RICH_COMPONENT_SCHEMAS.get(name) ?? z.unknown(),
     renderer: null,
+    ...(RICH_COMPONENT_HINTS.has(name) ? { llmHint: RICH_COMPONENT_HINTS.get(name)! } : {}),
   })),
 ];
 
