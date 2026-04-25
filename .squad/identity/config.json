@@ -2,39 +2,67 @@
   "tier": "per-role",
   "keysDir": "/home/asabbour/.config/squad/asabbour_microsoft/keys",
   "apps": {
+    "lead": {
+      "appId": 3492550,
+      "appSlug": "squad-lead",
+      "installationId": 126815909,
+      "roleSlug": "lead",
+      "tier": "per-role"
+    },
     "frontend": {
-      "appId": 3369254,
-      "appSlug": "sabbour-squad-frontend",
-      "installationId": 123734028,
+      "appId": 3492104,
+      "appSlug": "squad-frontend",
+      "installationId": 126813703,
       "roleSlug": "frontend",
       "tier": "per-role"
     },
     "backend": {
-      "appId": 3369262,
-      "appSlug": "sabbour-squad-backend",
-      "installationId": 123734137,
+      "appId": 3492252,
+      "appSlug": "squad-backend",
+      "installationId": 126813738,
       "roleSlug": "backend",
       "tier": "per-role"
     },
     "tester": {
-      "appId": 3369268,
-      "appSlug": "sabbour-squad-tester",
-      "installationId": 123734232,
+      "appId": 3492467,
+      "appSlug": "squad-tester",
+      "installationId": 126813608,
       "roleSlug": "tester",
       "tier": "per-role"
     },
-    "lead": {
-      "appId": 3340358,
-      "appSlug": "sabbour-squad-lead",
-      "installationId": 122992338,
-      "roleSlug": "lead",
+    "scribe": {
+      "appId": 3492574,
+      "appSlug": "squad-scribe",
+      "installationId": 126813931,
+      "roleSlug": "scribe",
       "tier": "per-role"
     },
-    "scribe": {
-      "appId": 3414032,
-      "appSlug": "sabbour-squad-scribe",
-      "installationId": 124811932,
-      "roleSlug": "scribe",
+    "security": {
+      "appId": 3492616,
+      "appSlug": "squad-security",
+      "installationId": 126813812,
+      "roleSlug": "security",
+      "tier": "per-role"
+    },
+    "codereview": {
+      "appId": 3492752,
+      "appSlug": "squad-codereview",
+      "installationId": 126813780,
+      "roleSlug": "codereview",
+      "tier": "per-role"
+    },
+    "devops": {
+      "appId": 3492810,
+      "appSlug": "squad-platform",
+      "installationId": 126820472,
+      "roleSlug": "devops",
+      "tier": "per-role"
+    },
+    "docs": {
+      "appId": 3492820,
+      "appSlug": "squad-docs",
+      "installationId": 126820502,
+      "roleSlug": "docs",
       "tier": "per-role"
     }
   }

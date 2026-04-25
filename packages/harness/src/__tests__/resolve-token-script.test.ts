@@ -36,10 +36,10 @@ describe('resolve-token script', () => {
 });
 
 describe('resolve-token role mapping', () => {
-  it('consolidates lead-tier reviewers (zapp, nibbler) under the lead role while keeping ralph distinct', async () => {
+  it('resolves squad reviewer roles to their own identities after #37 split', async () => {
     expect(resolveRoleSlug(projectRoot, 'lead')).toBe('lead');
-    expect(resolveRoleSlug(projectRoot, 'zapp')).toBe('lead');
-    expect(resolveRoleSlug(projectRoot, 'nibbler')).toBe('lead');
+    expect(resolveRoleSlug(projectRoot, 'zapp')).toBe('security');
+    expect(resolveRoleSlug(projectRoot, 'nibbler')).toBe('codereview');
     expect(resolveRoleSlug(projectRoot, 'ralph')).toBeNull();
 
     await expect(resolveToken(projectRoot, 'ralph')).resolves.toBeNull();

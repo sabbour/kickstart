@@ -57,13 +57,16 @@ function loadIdentityConfig(projectRoot) {
 }
 
 const ROLE_ALIASES = {
-  lead: ['lead', 'leela', 'zapp', 'nibbler', 'architect', 'architecture', 'coordinator', 'squad'],
+  lead: ['lead', 'leela', 'architect', 'architecture', 'coordinator', 'squad'],
   ralph: ['ralph'],
   backend: ['backend', 'bender', 'core', 'core-dev', 'backend-dev'],
   frontend: ['frontend', 'fry', 'ui', 'frontend-dev'],
   tester: ['tester', 'hermes', 'qa', 'test', 'observability'],
   scribe: ['scribe'],
-  security: ['security', 'auth', 'compliance', 'vulnerability'],
+  security: ['security', 'zapp', 'sec', 'auth', 'compliance', 'vulnerability'],
+  codereview: ['codereview', 'nibbler', 'code-review', 'review'],
+  docs: ['docs', 'amy', 'documentation', 'devrel', 'writer'],
+  devops: ['devops', 'kif', 'platform', 'infra', 'infrastructure'],
 };
 
 /**
