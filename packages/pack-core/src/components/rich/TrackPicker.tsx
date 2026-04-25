@@ -102,9 +102,22 @@ export const TrackPicker = createReactComponent(TrackPickerApi, ({ props, contex
         {tracks.map((track) => (
           <Card
             key={track.id}
-            as="button"
+            tabIndex={0}
+            role="button"
             className={classes.tile}
             onClick={() => handleSelect(track.id, String(track.label))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSelect(track.id, String(track.label));
+              }
+            }}
+            onKeyUp={(e) => {
+              if (e.key === ' ') {
+                e.preventDefault();
+                handleSelect(track.id, String(track.label));
+              }
+            }}
             aria-label={String(track.label)}
           >
             <Body1Strong className={classes.tileLabel}>{track.label}</Body1Strong>
