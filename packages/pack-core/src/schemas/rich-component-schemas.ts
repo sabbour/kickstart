@@ -105,8 +105,13 @@ export const SummaryCardSchema = z.object({
         .describe('Visual badge for this item, or null.'),
       link: z.union([
         z.string()
-          .url('Must be a valid URL')
-          .refine(url => url.startsWith('https://'), { message: 'Only HTTPS URLs allowed' }),
+          .refine(
+            (val) => {
+              try { return new URL(val).protocol === 'https:'; } catch { return false; }
+            },
+            { message: 'Only HTTPS URLs allowed' },
+          )
+          .describe('HTTPS URL for external link.'),
         z.object({ path: z.string() }),
       ])
         .nullable()
