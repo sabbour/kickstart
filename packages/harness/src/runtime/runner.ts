@@ -26,6 +26,7 @@ import type { SSEWriter } from './sse.js';
 import { AgentOutput } from '../types/agent-output.js';
 import { runGuardrails } from './guardrails.js';
 import { resolveModelName } from './model-resolution.js';
+import { PlanArtifactMissing } from '../errors/index.js';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -446,6 +447,57 @@ function normalizeComponentHint(hint: string | undefined): string | undefined {
 }
 
 // ---------------------------------------------------------------------------
+// Phase E: Plan artifact validation (PlanArtifactMissing / HARNESS_E001)
+// ---------------------------------------------------------------------------
+
+/**
+ * Agents that require a `plan` artifact in the session before they can run.
+ * If the artifact is missing, the runner surfaces a fixed-copy error Card
+ * instead of calling the LLM.
+ */
+const PLAN_REQUIRED_AGENTS = new Set(['core.architect', 'core.codesmith']);
+
+/**
+ * Emit a fixed-copy A2UI Card surfacing HARNESS_E001 (PlanArtifactMissing).
+ *
+ * Security constraints (Zapp-approved):
+ * - Title copy is FIXED — never derived from user or LLM input.
+ * - errorCode is STABLE — enum-bounded stable code, never free-form.
+ * - Recovery action schema is enum-bounded — targetPhase + reason only.
+ * - Raw error details go to telemetry/console ONLY, never in this payload.
+ */
+function emitPlanArtifactMissingCard(sseWrite: SSEWriter): void {
+  const surfaceId = 'error-plan-artifact-missing';
+  sseWrite('a2ui', {
+    version: 'v0.9',
+    createSurface: { surfaceId, catalogId: 'kickstart' },
+  });
+  sseWrite('a2ui', {
+    version: 'v0.9',
+    updateComponents: {
+      surfaceId,
+      components: [
+        {
+          type: 'Card',
+          id: 'plan-artifact-missing-card',
+          title: 'Plan artifact is missing — please re-approve',
+          errorCode: 'HARNESS_E001',
+          actions: [
+            {
+              label: 'Re-approve',
+              action: {
+                targetPhase: 'architect',
+                reason: 'plan_artifact_missing',
+              },
+            },
+          ],
+        },
+      ],
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 
@@ -596,12 +648,38 @@ export class Runner {
     signal?: AbortSignal,
   ): Promise<void> {
     sseWrite('start', { sessionId: session.sessionId });
+
+    const agentName = session.activeAgent;
+
+    // Plan artifact guard: agents that require a plan artifact throw before
+    // any LLM call if the artifact is absent. Surfaces as a fixed-copy Card
+    // via emitPlanArtifactMissingCard — raw error details go to TELEMETRY ONLY.
+    if (PLAN_REQUIRED_AGENTS.has(agentName)) {
+      if (!session.artifacts.has('plan')) {
+        const phase: 'triage-to-architect' | 'architect-to-codesmith' =
+          agentName === 'core.codesmith' ? 'architect-to-codesmith' : 'triage-to-architect';
+        emitPlanArtifactMissingCard(sseWrite);
+        sseWrite('end', {
+          sessionId: session.sessionId,
+          intent: undefined,
+          model: 'unknown',
+          agentName,
+          skillsExecuted: [],
+          skillsPulledBytes: 0,
+          skillsPulledTokens: 0,
+          toolsExecuted: [],
+        });
+        // Log phase to telemetry only — never expose in SSE payload.
+        console.warn(`[runner] PlanArtifactMissing: phase=${phase} agent=${agentName}`);
+        return;
+      }
+    }
+
     // NOTE(#1062 Z2): the user turn is recorded AFTER input guardrails run so
     // sanitized text lands in `recentTurns` (guardrail-on-capture). Recording
     // the raw userMessage here would persist pre-guardrail PII/credentials and
     // replay them on every subsequent turn when history threading is enabled.
 
-    const agentName = session.activeAgent;
     let agentContrib: AgentContribution;
     try {
       agentContrib = this.registry.getAgent(agentName);

@@ -33,12 +33,30 @@ export interface A2UIHandle {
 }
 
 /**
+ * Per-entry metadata stored for each shared: surface in the registry.
+ * `ownerTurn` is the batch index of the processMessages call that created it.
+ * `createdByAgent` is the agent that issued createSurface (if known, else 'unknown').
+ */
+export interface SharedSurfaceEntry {
+  ownerTurn: number;
+  createdByAgent: string;
+}
+
+/**
  * Filter an incoming A2UI message batch before handing it to the processor.
  *
  * Layer 3 of #1062 (#1060): if a `createSurface` targets a surface that is
  * already present on the canvas, drop that create message (no-op) — any
  * subsequent `updateComponents` for the same surface still lands normally so
  * the agent can update an existing surface without a duplicate-header remount.
+ *
+ * Phase E — shared: surface registry (fail-closed guard):
+ * - `createSurface` with a `shared:` surfaceId registers ownership in
+ *   `sharedRegistry`. Subsequent calls for the same id are treated as
+ *   the existing duplicate-guard path (no-op create, updates flow through).
+ * - `updateComponents`, `updateDataModel`, or `deleteSurface` targeting an
+ *   UNKNOWN `shared:` surfaceId are REJECTED and logged. The only way to
+ *   establish ownership is via an initial `createSurface`.
  *
  * Pure and exported so it can be exercised without a React rendering context.
  *
@@ -51,13 +69,25 @@ export function _filterMessagesForProcessor(
   hasSurface: (id: string) => boolean,
   validateComponents: (raw: Array<Record<string, unknown>>) => unknown,
   catalogId: string,
+  sharedRegistry?: Map<string, SharedSurfaceEntry>,
+  batchIndex?: number,
 ): { safeMessages: A2uiMsg[]; surfaceIds: string[] } {
   const seen = new Set<string>();
   const surfaceIds: string[] = [];
   const safeMessages: A2uiMsg[] = [];
+  const turnIndex = batchIndex ?? 0;
   for (const msg of msgs) {
     if (msg.updateComponents) {
-      surfaceIds.push(msg.updateComponents.surfaceId);
+      const targetId = msg.updateComponents.surfaceId;
+      // Fail-closed guard: unknown shared: target → reject and log.
+      if (targetId.startsWith('shared:') && sharedRegistry && !sharedRegistry.has(targetId)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[useA2UI] updateComponents dropped: shared surface "${targetId}" has no registered owner. Use createSurface to establish ownership first.`,
+        );
+        continue;
+      }
+      surfaceIds.push(targetId);
       const rawComponents = msg.updateComponents.components as Array<Record<string, unknown>>;
       const validated = validateComponents(rawComponents);
       safeMessages.push({
@@ -68,6 +98,10 @@ export function _filterMessagesForProcessor(
     }
     if (msg.createSurface) {
       const targetId = msg.createSurface.surfaceId;
+      // Register shared: surface ownership on first createSurface.
+      if (targetId.startsWith('shared:') && sharedRegistry && !sharedRegistry.has(targetId)) {
+        sharedRegistry.set(targetId, { ownerTurn: turnIndex, createdByAgent: 'unknown' });
+      }
       if (hasSurface(targetId)) {
         // eslint-disable-next-line no-console
         console.debug(
@@ -83,6 +117,26 @@ export function _filterMessagesForProcessor(
       });
       continue;
     }
+    if ('updateDataModel' in msg && msg.updateDataModel) {
+      const targetId = (msg.updateDataModel as { surfaceId: string }).surfaceId;
+      if (targetId.startsWith('shared:') && sharedRegistry && !sharedRegistry.has(targetId)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[useA2UI] updateDataModel dropped: shared surface "${targetId}" has no registered owner.`,
+        );
+        continue;
+      }
+    }
+    if ('deleteSurface' in msg && msg.deleteSurface) {
+      const targetId = (msg.deleteSurface as { surfaceId: string }).surfaceId;
+      if (targetId.startsWith('shared:') && sharedRegistry && !sharedRegistry.has(targetId)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[useA2UI] deleteSurface dropped: shared surface "${targetId}" has no registered owner.`,
+        );
+        continue;
+      }
+    }
     safeMessages.push(msg);
   }
   return { safeMessages, surfaceIds };
@@ -91,6 +145,10 @@ export function _filterMessagesForProcessor(
 export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   const processorRef = useRef<MessageProcessor<ReactComponentImplementation> | null>(null);
   const [surfaces, setSurfaces] = useState<Map<string, SurfaceModel<ReactComponentImplementation>>>(new Map());
+
+  // Shared surface registry: tracks shared:<id> → ownership for fail-closed guard.
+  const sharedSurfaceRegistryRef = useRef(new Map<string, SharedSurfaceEntry>());
+  const batchCounterRef = useRef(0);
 
   // Keep a stable ref to the handler so the MessageProcessor (created once)
   // always calls the latest version without needing to be recreated.
@@ -156,6 +214,7 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   const processMessages = useCallback((msgs: A2uiMsg[]): string[] => {
     // Pre-render validation (Zapp Crit1 / Phase B):
     // Validate and sanitize component props before they reach the A2UI processor.
+    const batch = batchCounterRef.current++;
     const { safeMessages, surfaceIds } = _filterMessagesForProcessor(
       msgs,
       (id) => Boolean(processor.model.getSurface(id)),
@@ -169,6 +228,8 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
           ? validateAndSanitizeComponents(rawComponents, clientRegistry)
           : rawComponents,
       KICKSTART_CATALOG_ID,
+      sharedSurfaceRegistryRef.current,
+      batch,
     );
 
     processor.processMessages(safeMessages as any);
@@ -183,6 +244,8 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
     for (const [id] of processor.model.surfacesMap) {
       try { processor.model.deleteSurface(id); } catch { /* ignore */ }
     }
+    sharedSurfaceRegistryRef.current.clear();
+    batchCounterRef.current = 0;
     setSurfaces(new Map());
   }, [processor]);
 

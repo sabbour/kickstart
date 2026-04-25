@@ -338,6 +338,8 @@ function scopeRenderableMessage(
 }
 
 function scopeSurfaceId(surfaceId: string, turnId: string): string {
+  // shared: surfaces are global across turns — return verbatim, no turn prefix.
+  if (surfaceId.startsWith('shared:')) return surfaceId;
   const prefix = `${turnId}${SURFACE_SCOPE_SEPARATOR}`;
   return surfaceId.startsWith(prefix) ? surfaceId : `${prefix}${surfaceId}`;
 }

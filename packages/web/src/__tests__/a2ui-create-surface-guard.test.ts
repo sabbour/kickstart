@@ -114,3 +114,101 @@ describe('_filterMessagesForProcessor — createSurface guard (#1060)', () => {
     expect((safeMessages[0] as any).updateComponents.surfaceId).toBe('shared:triage-main');
   });
 });
+
+describe('_filterMessagesForProcessor — shared: surface registry (Phase E)', () => {
+  it('createSurface(shared:triage-main) establishes ownership in the registry', () => {
+    const sharedRegistry = new Map<string, { ownerTurn: number; createdByAgent: string }>();
+    _filterMessagesForProcessor(
+      [{ version: 'v0.9', createSurface: { surfaceId: 'shared:triage-main', catalogId: 'kickstart' } } as any],
+      () => false,
+      noopValidate,
+      'kickstart',
+      sharedRegistry,
+      0,
+    );
+    expect(sharedRegistry.has('shared:triage-main')).toBe(true);
+    expect(sharedRegistry.get('shared:triage-main')).toMatchObject({ ownerTurn: 0 });
+  });
+
+  it('updateComponents to a known shared surface routes through', () => {
+    const sharedRegistry = new Map([
+      ['shared:triage-main', { ownerTurn: 0, createdByAgent: 'unknown' }],
+    ]);
+    const { safeMessages } = _filterMessagesForProcessor(
+      [
+        {
+          version: 'v0.9',
+          updateComponents: {
+            surfaceId: 'shared:triage-main',
+            components: [{ type: 'Text', text: 'updated' }],
+          },
+        } as any,
+      ],
+      () => true,
+      noopValidate,
+      'kickstart',
+      sharedRegistry,
+      1,
+    );
+    expect(safeMessages).toHaveLength(1);
+  });
+
+  it('updateComponents to an UNKNOWN shared surface is REJECTED', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const sharedRegistry = new Map<string, { ownerTurn: number; createdByAgent: string }>();
+    const { safeMessages } = _filterMessagesForProcessor(
+      [
+        {
+          version: 'v0.9',
+          updateComponents: {
+            surfaceId: 'shared:ghost',
+            components: [{ type: 'Text', text: 'injected' }],
+          },
+        } as any,
+      ],
+      () => false,
+      noopValidate,
+      'kickstart',
+      sharedRegistry,
+      0,
+    );
+    expect(safeMessages).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no registered owner'));
+    warnSpy.mockRestore();
+  });
+
+  it('registry rebuilds correctly from message replay (createSurface re-registers ownership)', () => {
+    const sharedRegistry = new Map<string, { ownerTurn: number; createdByAgent: string }>();
+    // Simulate message replay: createSurface arrives again (e.g. after reset)
+    _filterMessagesForProcessor(
+      [{ version: 'v0.9', createSurface: { surfaceId: 'shared:replay-surface', catalogId: 'kickstart' } } as any],
+      () => false,
+      noopValidate,
+      'kickstart',
+      sharedRegistry,
+      2,
+    );
+    expect(sharedRegistry.has('shared:replay-surface')).toBe(true);
+    expect(sharedRegistry.get('shared:replay-surface')?.ownerTurn).toBe(2);
+  });
+
+  it('no sharedRegistry provided means guard is inactive (backward-compat)', () => {
+    // Without a registry, unknown shared: targets still pass through.
+    const { safeMessages } = _filterMessagesForProcessor(
+      [
+        {
+          version: 'v0.9',
+          updateComponents: {
+            surfaceId: 'shared:unknown',
+            components: [],
+          },
+        } as any,
+      ],
+      () => false,
+      noopValidate,
+      'kickstart',
+      // no sharedRegistry argument
+    );
+    expect(safeMessages).toHaveLength(1);
+  });
+});
