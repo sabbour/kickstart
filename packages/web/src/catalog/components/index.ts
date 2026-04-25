@@ -19,3 +19,4 @@ export { Questionnaire } from './Questionnaire';
 export { RadioGroup } from './RadioGroup';
 export { SteppedCarousel } from './SteppedCarousel';
 export { SummaryCard } from './SummaryCard';
+export { TrackPicker } from './TrackPicker';

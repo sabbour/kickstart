@@ -56,6 +56,7 @@ export const ALLOWED_A2UI_COMPONENTS: readonly string[] = [
   "Markdown",
   "ProgressSteps",
   "DecisionCard",
+  "TrackPicker",
   "SummaryCard",
   "AuthCard",
   "CodeBlock",

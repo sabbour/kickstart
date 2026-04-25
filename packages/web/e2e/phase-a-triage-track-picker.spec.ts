@@ -8,7 +8,7 @@ function sseEvent(event: string, data: unknown): string {
 function triageDecisionTurn(sessionId: string): string {
   return [
     sseEvent('start', { sessionId }),
-    sseEvent('chunk', { delta: 'Let’s pick the right AKS track for your idea.' }),
+    sseEvent('chunk', { delta: 'Let\u2019s pick the right AKS track for your idea.' }),
     sseEvent('a2ui', {
       version: 'v0.9',
       createSurface: { surfaceId: 'shared:triage-main', catalogId: 'kickstart' },
@@ -18,50 +18,18 @@ function triageDecisionTurn(sessionId: string): string {
       updateComponents: {
         surfaceId: 'shared:triage-main',
         components: [
-          { id: 'root', component: 'Column', children: ['decision', 'track-buttons'], gap: '12px' },
+          { id: 'root', component: 'Column', children: ['track-picker'] },
           {
-            id: 'decision',
-            component: 'DecisionCard',
+            id: 'track-picker',
+            component: 'TrackPicker',
             title: 'What would you like to build on AKS?',
-            recommendation: 'AKS Automatic handles infrastructure, scaling, and security so you can focus on your app.',
-            alternatives: ['Static site', 'Containerized web app', 'Agentic AI app', 'Existing repo uplift'],
-            badge: 'recommended',
+            tracks: [
+              { id: 'static_site', label: 'Static site', description: 'Deploy a static web app on AKS with Ingress' },
+              { id: 'containerized_web', label: 'Containerized web app', description: 'Deploy a containerized web application on AKS Automatic' },
+              { id: 'agentic_app', label: 'Agentic AI app', description: 'Build and deploy an AI-powered agent or chatbot on AKS Automatic' },
+              { id: 'repo_uplift', label: 'Existing repo uplift', description: 'Containerize and deploy an existing repository to AKS Automatic' },
+            ],
           },
-          {
-            id: 'track-buttons',
-            component: 'Row',
-            children: ['btn-static', 'btn-container', 'btn-agentic', 'btn-uplift'],
-            gap: '8px',
-            wrap: true,
-          },
-          {
-            id: 'btn-static',
-            component: 'Button',
-            child: 'btn-static-text',
-            action: { event: { name: 'pick_track', context: { value: 'static_site', label: 'Static site' } } },
-          },
-          { id: 'btn-static-text', component: 'Text', text: 'Static site' },
-          {
-            id: 'btn-container',
-            component: 'Button',
-            child: 'btn-container-text',
-            action: { event: { name: 'pick_track', context: { value: 'containerized_web', label: 'Containerized web app' } } },
-          },
-          { id: 'btn-container-text', component: 'Text', text: 'Containerized web app' },
-          {
-            id: 'btn-agentic',
-            component: 'Button',
-            child: 'btn-agentic-text',
-            action: { event: { name: 'pick_track', context: { value: 'agentic_app', label: 'Agentic AI app' } } },
-          },
-          { id: 'btn-agentic-text', component: 'Text', text: 'Agentic AI app' },
-          {
-            id: 'btn-uplift',
-            component: 'Button',
-            child: 'btn-uplift-text',
-            action: { event: { name: 'pick_track', context: { value: 'repo_uplift', label: 'Existing repo uplift' } } },
-          },
-          { id: 'btn-uplift-text', component: 'Text', text: 'Existing repo uplift' },
         ],
       },
     }),
@@ -148,7 +116,7 @@ async function setupHealthRoute(page: Page) {
   );
 }
 
-test.describe('Phase A triage decision card', () => {
+test.describe('Phase A triage track picker', () => {
   test('keeps the shared triage surface stable across pick_track and select_inference', async ({ page }) => {
     await setupHealthRoute(page);
 
@@ -189,11 +157,16 @@ test.describe('Phase A triage decision card', () => {
     await page.getByRole('textbox', { name: /describe your app/i }).fill('I want to build an AI chatbot on AKS');
     await page.getByRole('button', { name: /send/i }).click();
 
+    // TrackPicker renders with title and 4 equal-weight tiles (buttons)
     await expect(page.getByText('What would you like to build on AKS?')).toBeVisible();
+    await expect(page.getByTestId('a2ui-TrackPicker')).toBeVisible();
     await expect(page.getByRole('button', { name: /static site/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /containerized web app/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /agentic ai app/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /existing repo uplift/i })).toBeVisible();
+
+    // No DecisionCard or recommendation badge present
+    await expect(page.locator('[data-testid="a2ui-DecisionCard"]')).toHaveCount(0);
 
     const surfaces = page.locator('.a2ui-surface-wrapper');
     await expect(surfaces).toHaveCount(1);

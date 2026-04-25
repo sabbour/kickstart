@@ -14,7 +14,7 @@ Kickstart extends the A2UI v0.9 basic catalog with **22 custom components** desi
 |----------|-----------|
 | **Auth** | AuthCard, AzureLoginCard, GitHubLoginCard |
 | **Forms & Input** | RadioGroup, FormGroup, Questionnaire |
-| **Content & Display** | CodeBlock, Markdown, SummaryCard, DecisionCard |
+| **Content & Display** | CodeBlock, Markdown, SummaryCard, DecisionCard, TrackPicker |
 | **Navigation & Progress** | ProgressSteps, SteppedCarousel, GenerationProgress |
 | **GitHub** | GitHubRepoPicker, GitHubAction, GitHubCommit |
 | **Azure** | AzureResourcePicker, AzureResourceForm, AzureAction |
@@ -208,3 +208,53 @@ Monthly cost breakdown by Azure service with a total. Line items include name, S
 ### GenerationProgress
 
 Multi-step generation and deployment tracker with per-step status (pending / running / success / error / skipped) and an overall status indicator. Used during the Generate and Deploy phases to show live progress.
+
+---
+
+## TrackPicker
+
+Equal-weight track/option picker for unbiased choice surfaces. Presents deployment tracks as interactive grid tiles — no recommendation badges or bias. Each tile fires a `pick_track` event when selected.
+
+**Use case:** Triage track selection (e.g. "Static Site", "Containerised App", "AI Workload", "Microservices"). Prefer over `DecisionCard` when all options are equally valid.
+
+**Schema:**
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | `string` | ✅ | Unique component ID within this surface |
+| `component` | `"TrackPicker"` | ✅ | Component discriminator |
+| `title` | `string` | ✅ | Heading displayed above the tile grid |
+| `tracks` | `Track[]` | ✅ | Array of one or more track options |
+
+**Track item:**
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | `string` | ✅ | Track identifier sent in `pick_track` event as `context.value` |
+| `label` | `string` | ✅ | Display label for the tile |
+| `description` | `string` | ✅ | One-line summary shown below the label |
+| `icon` | `string \| null` | — | Optional icon reference |
+
+**Example:**
+
+```json
+{
+  "id": "triage-picker",
+  "component": "TrackPicker",
+  "title": "What kind of app are you deploying?",
+  "tracks": [
+    { "id": "static_site", "label": "Static Site", "description": "HTML/CSS/JS served from a CDN or blob storage", "icon": null },
+    { "id": "containerised_app", "label": "Containerised App", "description": "Docker image deployed to AKS Automatic", "icon": null },
+    { "id": "ai_workload", "label": "AI Workload", "description": "Model served via KAITO or Azure AI Foundry", "icon": null },
+    { "id": "microservices", "label": "Microservices", "description": "Multiple services communicating over the network", "icon": null }
+  ]
+}
+```
+
+**Event emitted on selection:**
+
+```
+pick_track  →  context.value = "<track_id>"
+```
+
+**Accessibility:** Tiles respond to `Enter` and `Space` keys; `role="button"` and `tabIndex` are set on each tile.

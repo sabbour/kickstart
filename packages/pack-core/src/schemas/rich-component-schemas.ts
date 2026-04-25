@@ -164,9 +164,25 @@ export const CreatePRFlowSchema = z.object({
   ),
 }).strict();
 
+// ── TrackPicker (#22) ───────────────────────────────────────────────────────
+export const TrackPickerSchema = z.object({
+  id: z.string().describe('Unique component ID within this surface.'),
+  component: z.literal('TrackPicker'),
+  title: DynStr.describe('Heading displayed above the track tiles.'),
+  tracks: z.array(
+    z.object({
+      id: z.string().describe('Track identifier sent in pick_track event (e.g. "static_site").'),
+      label: DynStr.describe('Display label for this track.'),
+      description: DynStr.describe('One-line summary of the track.'),
+      icon: z.string().nullable().describe('Optional icon reference, or null to omit.'),
+    }).strict(),
+  ).min(1).describe('Array of equal-weight track options — at least one required.'),
+}).strict();
+
 /** All rich component schemas keyed by component name. */
 export const RICH_COMPONENT_SCHEMAS = new Map<string, z.ZodTypeAny>([
   ['DecisionCard', DecisionCardSchema],
+  ['TrackPicker', TrackPickerSchema],
   ['RadioGroup', RadioGroupSchema],
   ['Questionnaire', QuestionnaireSchema],
   ['SummaryCard', SummaryCardSchema],
@@ -181,6 +197,13 @@ export const RICH_COMPONENT_HINTS = new Map<string, string>([
     'Display an architectural decision with a recommended option, rationale, and alternatives. ' +
       'Props: title (required), recommendation (required), rationale, alternatives (string[]), ' +
       'badge ("recommended"|"best-practice"|"required"|"optional"). Read-only — no action slot.',
+  ],
+  [
+    'TrackPicker',
+    'Equal-weight track/option picker with no recommendation bias. ' +
+      'Props: title (required — heading above tiles), tracks (required — array of ' +
+      '{id, label, description, icon?}). Each tile fires pick_track event with ' +
+      'context.value = selected track id. Use instead of DecisionCard for unbiased choice selection.',
   ],
   [
     'RadioGroup',

@@ -60,6 +60,7 @@ const RICH_COMPONENT_NAMES = [
   'RadioGroup',
   'SteppedCarousel',
   'SummaryCard',
+  'TrackPicker',
 ];
 
 const serverComponents: ComponentContribution[] = [
