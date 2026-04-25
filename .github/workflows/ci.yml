@@ -2,12 +2,6 @@ name: CI
 
 on:
   pull_request:
-    paths-ignore:
-      - 'docs-site/**'
-      - 'docs/**'
-      - '.squad/**'
-      - '.changeset/**'
-      - '**/*.md'
   push:
     branches:
       - main
