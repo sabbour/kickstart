@@ -609,7 +609,7 @@ export class Runner {
     const components = this.registry.components;
     const catalogBlock = components.length > 0
       ? `\n\n## A2UI Component Catalog (${components.length} components available)\n${components.map((c) => {
-          const hint = normalizeComponentHint((c as { llmHint?: string }).llmHint);
+          const hint = normalizeComponentHint(c.llmHint);
           return hint ? `- **${c.name}** — ${hint}` : `- ${c.name}`;
         }).join('\n')}`
       : '';
