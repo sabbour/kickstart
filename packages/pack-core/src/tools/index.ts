@@ -10,3 +10,5 @@ export { createReadSkillTool, parseByteCapEnv, DEFAULT_MAX_BYTES_PER_TURN, MIN_M
 export type { SkillRegistry, SkillTrackingCtx, ReadSkillOptions, ReadSkillOutput } from './read_skill.js';
 export { createScaffoldAppTool, validateOutputPath, ALLOWED_SKILLS } from './scaffold_app.js';
 export type { SkillDispatcher, SkillResult, SkillDispatchInput, ScaffoldAppInput, ScaffoldAppOutput } from './scaffold_app.js';
+export { checkSafeguardsTool } from './check_safeguards.js';
+export { fixSafeguardsTool } from './fix_safeguards.js';
