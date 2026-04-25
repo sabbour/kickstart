@@ -12,3 +12,9 @@ export { createScaffoldAppTool, validateOutputPath, ALLOWED_SKILLS } from './sca
 export type { SkillDispatcher, SkillResult, SkillDispatchInput, ScaffoldAppInput, ScaffoldAppOutput } from './scaffold_app.js';
 export { checkSafeguardsTool } from './check_safeguards.js';
 export { fixSafeguardsTool } from './fix_safeguards.js';
+export { genHelm } from './gen_helm.js';
+export type { GenHelmInput, GenHelmOutput, HelmFile } from './gen_helm.js';
+export { genKaitoCrd } from './gen_kaito_crd.js';
+export type { GenKaitoCrdInput, GenKaitoCrdOutput } from './gen_kaito_crd.js';
+export { genFoundryWiring } from './gen_foundry_wiring.js';
+export type { GenFoundryWiringInput, GenFoundryWiringOutput } from './gen_foundry_wiring.js';
