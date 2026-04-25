@@ -153,7 +153,7 @@ export class PackRegistry {
    * relationship already grants tool and user-action trust at register()
    * time — extending it to handoffs is consistent.
    *
-   * Handoffs to packs NOT in the direct dependencies are still rejected.
+   * Handoffs to packs outside the source pack and its direct dependencies are still rejected.
    * Every error message includes three tokens (pack, agent, target) so a
    * grep on any of them surfaces the offender.
    */
