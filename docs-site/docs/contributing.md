@@ -67,7 +67,7 @@ Kickstart is maintained by **Squad** — a coordinated team of AI agents supervi
 
 **If your issue has `squad:copilot`, @copilot will pick it up and follow the same gates as human agents** — see below for Design Proposal and PR Review gates.
 
-See [`.squad/team.md`](https://github.com/sabbour/kickstart/blob/main/.squad/team.md) for the complete capability matrix and [`.squad/routing.md`](https://github.com/sabbour/kickstart/blob/main/.squad/routing.md) for the full routing table.
+See [`.squad/team.md`](https://github.com/azure-management-and-platforms/kickstart/blob/main/.squad/team.md) for the complete capability matrix and [`.squad/routing.md`](https://github.com/azure-management-and-platforms/kickstart/blob/main/.squad/routing.md) for the full routing table.
 
 ---
 
@@ -303,7 +303,7 @@ Once all gates pass:
 
 ```bash
 # Clone the repo
-git clone https://github.com/sabbour/kickstart.git
+git clone https://github.com/azure-management-and-platforms/kickstart.git
 cd kickstart
 
 # Install dependencies
@@ -390,7 +390,7 @@ Agent instructions live in `.agent.md` files inside each pack's `src/agents/` di
 
 ## Documentation
 
-The canonical documentation lives in **`docs-site/docs/`** and is published to [sabbour.github.io/kickstart](https://sabbour.github.io/kickstart/).
+The canonical documentation lives in **`docs-site/docs/`** and is published to [azure-management-and-platforms.github.io/kickstart](https://azure-management-and-platforms.github.io/kickstart/).
 
 **Do not edit files in `docs/`** — that directory contains legacy redirects only. All documentation updates go to `docs-site/docs/`.
 

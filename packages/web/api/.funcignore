@@ -8,7 +8,7 @@
 # packages/web/api/node_modules/ so they ship in the SWA deployment zip.
 # Listing node_modules/ here would re-exclude those materialized packages,
 # breaking all API endpoints at runtime (MODULE_NOT_FOUND → 0 routes → 404).
-# See: https://github.com/sabbour/kickstart/issues/1041
+# See: https://github.com/azure-management-and-platforms/kickstart/issues/1041
 #
 # Upstream reference: Azure/azure-functions-core-tools
 #   src/Cli/func/StaticResources/funcignore (SHA 17bd0f697c2d413e7ca64b117dd1456a8fdda716)

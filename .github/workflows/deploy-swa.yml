@@ -47,7 +47,7 @@ jobs:
         run: test -f packages/web/api/dist/functions/health.js || (echo "❌ API bundle not found at packages/web/api/dist/functions/" && exit 1)
 
       - name: Verify OTel externals bundled (not materialized)
-        # Regression guard for https://github.com/sabbour/kickstart/issues/1041
+        # Regression guard for https://github.com/azure-management-and-platforms/kickstart/issues/1041
         # Post-PR #1051: OTel packages are bundled INLINE into function bundles via esbuild.
         # The old materialize step was deleted — node_modules/ must NOT contain OTel.
         # If this fails: the revert regressed or esbuild externals got re-broken.

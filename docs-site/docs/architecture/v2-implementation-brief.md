@@ -6,7 +6,7 @@ title: Browser telemetry (v2 implementation brief)
 
 > Companion to the server-side observability docs. Source of truth for the
 > design is the **DP-D revision 2** comment on
-> [issue #1042](https://github.com/sabbour/kickstart/issues/1042).
+> [issue #1042](https://github.com/azure-management-and-platforms/kickstart/issues/1042).
 
 ## Goal
 

@@ -1695,7 +1695,7 @@ function PlaygroundInner() {
                 </div>
                 <Body1Strong>Sign in to view components</Body1Strong>
                 <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalS }}>
-                  The component registry requires authentication. See issue <a href="https://github.com/sabbour/kickstart/issues/955" target="_blank" rel="noopener noreferrer">#955</a>.
+                  The component registry requires authentication. See issue <a href="https://github.com/azure-management-and-platforms/kickstart/issues/955" target="_blank" rel="noopener noreferrer">#955</a>.
                 </Caption1>
               </div>
             ) : (

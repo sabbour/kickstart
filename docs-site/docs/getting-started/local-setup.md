@@ -19,7 +19,7 @@ Get Kickstart running locally in a few minutes.
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/sabbour/kickstart.git
+git clone https://github.com/azure-management-and-platforms/kickstart.git
 cd kickstart
 npm install
 ```

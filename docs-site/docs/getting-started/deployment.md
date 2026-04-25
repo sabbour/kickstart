@@ -58,7 +58,7 @@ The Bicep template deploys an Azure Static Web App resource.
     "swaName": { "value": "kickstart-web-dev" },
     "location": { "value": "centralus" },
     "skuName": { "value": "Standard" },
-    "repositoryUrl": { "value": "https://github.com/sabbour/kickstart" },
+    "repositoryUrl": { "value": "https://github.com/azure-management-and-platforms/kickstart" },
     "branch": { "value": "main" }
   }
 }

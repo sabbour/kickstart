@@ -11,10 +11,10 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://sabbour.github.io',
+  url: 'https://azure-management-and-platforms.github.io',
   baseUrl: '/kickstart/',
 
-  organizationName: 'sabbour',
+  organizationName: 'azure-management-and-platforms',
   projectName: 'kickstart',
   deploymentBranch: 'gh-pages',
   trailingSlash: false,
@@ -32,7 +32,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/sabbour/kickstart/tree/main/docs-site/',
+          editUrl: 'https://github.com/azure-management-and-platforms/kickstart/tree/main/docs-site/',
         },
         blog: false,
         theme: {
@@ -62,7 +62,7 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          href: 'https://github.com/sabbour/kickstart',
+          href: 'https://github.com/azure-management-and-platforms/kickstart',
           label: 'GitHub',
           position: 'right',
         },
@@ -89,7 +89,7 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/sabbour/kickstart',
+              href: 'https://github.com/azure-management-and-platforms/kickstart',
             },
             {
               label: 'Azure Kubernetes Service',

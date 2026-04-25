@@ -9,7 +9,7 @@
 Kickstart helps developers go from "I have an app" to "it's running on Azure" through a guided conversation. It frames AKS Automatic as a scalable app platform — no Kubernetes knowledge required.
 
 🌐 **Live app:** [kickstart.aks.azure.sabbour.me](https://kickstart.aks.azure.sabbour.me)
-📖 **Docs:** [sabbour.github.io/kickstart](https://sabbour.github.io/kickstart/)
+📖 **Docs:** [azure-management-and-platforms.github.io/kickstart](https://azure-management-and-platforms.github.io/kickstart/)
 🎮 **Playground:** [/?playground](https://kickstart.aks.azure.sabbour.me/?playground) — Explore the A2UI component library and demo scenarios
 
 ## Features
@@ -107,25 +107,25 @@ docs-site/        Docusaurus documentation site
 
 ## Documentation
 
-📖 **Full docs:** [sabbour.github.io/kickstart](https://sabbour.github.io/kickstart/)
+📖 **Full docs:** [azure-management-and-platforms.github.io/kickstart](https://azure-management-and-platforms.github.io/kickstart/)
 
 > **Single source of truth:** `docs-site/docs/` is the canonical documentation. All doc updates go there. The `docs/` directory contains redirect stubs only.
 
-- **[Architecture](https://sabbour.github.io/kickstart/docs/architecture/overview)** — System design, A2UI integration, JSON envelope format
-- **[Getting Started](https://sabbour.github.io/kickstart/docs/getting-started/local-setup)** — Local setup, project structure
-- **[Deployment Guide](https://sabbour.github.io/kickstart/docs/getting-started/deployment)** — Azure resources, CI/CD, environment variables
-- **[Custom Components](https://sabbour.github.io/kickstart/docs/components/custom-catalog)** — Kickstart A2UI catalog
+- **[Architecture](https://azure-management-and-platforms.github.io/kickstart/docs/architecture/overview)** — System design, A2UI integration, JSON envelope format
+- **[Getting Started](https://azure-management-and-platforms.github.io/kickstart/docs/getting-started/local-setup)** — Local setup, project structure
+- **[Deployment Guide](https://azure-management-and-platforms.github.io/kickstart/docs/getting-started/deployment)** — Azure resources, CI/CD, environment variables
+- **[Custom Components](https://azure-management-and-platforms.github.io/kickstart/docs/components/custom-catalog)** — Kickstart A2UI catalog
 - **[Contributing](./CONTRIBUTING.md)** — Dev setup, code style
 
 ## Extending Kickstart
 
-Want to build on the platform? The [Extension Guide](https://sabbour.github.io/kickstart/docs/extending/overview) covers five extension points:
+Want to build on the platform? The [Extension Guide](https://azure-management-and-platforms.github.io/kickstart/docs/extending/overview) covers five extension points:
 
-- **[Conversation Phases](https://sabbour.github.io/kickstart/docs/extending/conversation-phases)** — Add new phases to the guided flow (e.g., Monitor, Test)
-- **[LLM Tools](https://sabbour.github.io/kickstart/docs/extending/llm-tools)** — Expose new functions to the LLM via OpenAI function calling
-- **[Integration Kits](https://sabbour.github.io/kickstart/docs/extending/integration-kits)** — Bundle tools, connectors, prompts, and auth into a composable unit
-- **[API Endpoints](https://sabbour.github.io/kickstart/docs/extending/api-endpoints)** — Add Azure Functions endpoints with SSE streaming
-- **[MCP Tools](https://sabbour.github.io/kickstart/docs/extending/mcp-tools)** — Extend the IDE integration for VS Code Copilot and Claude Code
+- **[Conversation Phases](https://azure-management-and-platforms.github.io/kickstart/docs/extending/conversation-phases)** — Add new phases to the guided flow (e.g., Monitor, Test)
+- **[LLM Tools](https://azure-management-and-platforms.github.io/kickstart/docs/extending/llm-tools)** — Expose new functions to the LLM via OpenAI function calling
+- **[Integration Kits](https://azure-management-and-platforms.github.io/kickstart/docs/extending/integration-kits)** — Bundle tools, connectors, prompts, and auth into a composable unit
+- **[API Endpoints](https://azure-management-and-platforms.github.io/kickstart/docs/extending/api-endpoints)** — Add Azure Functions endpoints with SSE streaming
+- **[MCP Tools](https://azure-management-and-platforms.github.io/kickstart/docs/extending/mcp-tools)** — Extend the IDE integration for VS Code Copilot and Claude Code
 
 ## License
 

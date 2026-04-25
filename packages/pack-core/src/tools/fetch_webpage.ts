@@ -81,7 +81,7 @@ export const fetchWebpageTool: ToolContribution = {
       const response = await fetch(safeUrl.toString(), {
         headers: {
           'Accept': 'text/html,text/markdown,text/plain,*/*',
-          'User-Agent': 'Kickstart/2 (https://github.com/sabbour/kickstart)',
+          'User-Agent': 'Kickstart/2 (https://github.com/azure-management-and-platforms/kickstart)',
         },
         redirect: 'error',
         signal: AbortSignal.timeout(15_000),

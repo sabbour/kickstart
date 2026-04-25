@@ -108,7 +108,7 @@ For the full release workflow — cutting releases, tagging, deploying — see *
 
 ## Documentation
 
-The canonical documentation lives in **`docs-site/docs/`** and is published to [sabbour.github.io/kickstart](https://sabbour.github.io/kickstart/). This is the single source of truth.
+The canonical documentation lives in **`docs-site/docs/`** and is published to [azure-management-and-platforms.github.io/kickstart](https://azure-management-and-platforms.github.io/kickstart/). This is the single source of truth.
 
 **Do not edit files in `docs/`** — that directory contains the redirect map only. All documentation updates go to `docs-site/docs/`.
 
@@ -259,4 +259,4 @@ These are living documents. If you find workflows unclear or outdated, file an i
 
 ## Infrastructure
 
-Azure infrastructure lives in `infra/` and uses Bicep. See the [Deployment Guide](https://sabbour.github.io/kickstart/docs/getting-started/deployment) for full details.
+Azure infrastructure lives in `infra/` and uses Bicep. See the [Deployment Guide](https://azure-management-and-platforms.github.io/kickstart/docs/getting-started/deployment) for full details.
