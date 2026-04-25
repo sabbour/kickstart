@@ -33,6 +33,7 @@ These run via GitHub Actions on schedule or events. Documented here for referenc
 | Weekly Pulse | cron `0 0 * * 2` (Mon 17:00 PT) | `.github/workflows/squad-weekly-pulse.yml` | Scribe | new issue `Weekly Pulse · YYYY-MM-DD` |
 | Release Cadence | cron `0 0 * * *` (17:00 PT) | `.github/workflows/squad-release-cadence.yml` | Leela + Scribe | draft PR on `release/cadence` branch |
 | Process Grader | cron `0 8 * * *` (08:00 UTC) | `.github/workflows/squad-process-grader.yml` | Scribe | grade comment + outcome label on due `process` issues, Scribe inbox entry |
+| Project Board Automation | PR/issue label/state changes | `.github/workflows/squad-project-board-automate.yml` | Bender | automatic column moves on project board |
 
 All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 
@@ -215,6 +216,91 @@ Any prior outcome label on the issue is cleared before the new one is applied so
 2. The corresponding `process:{outcome}` label.
 3. A Scribe inbox entry under `.squad/decisions/inbox/process-grader-{issue}-{date}.md` so the next decisions-merge run folds the result into `.squad/decisions.md`.
 4. On `no-effect` extensions, an edited issue body with the new `Revisit:` date.
+
+---
+
+## Project Board Label-Driven Automation
+
+| Field | Value |
+|-------|-------|
+| **Trigger** | auto |
+| **When** | during PR/issue lifecycle (label changes, PR open, PR merge) |
+| **Workflow** | `.github/workflows/squad-project-board-automate.yml` |
+| **Facilitator** | Bender (Backend infrastructure) |
+| **Participants** | PR authors, reviewers |
+| **Enabled** | ✅ yes |
+
+**Purpose:** Automatically move PRs and issues between project board columns based on workflow state and review labels, keeping the project board in sync with actual work progress without manual intervention.
+
+**Column State Machine (6-stage workflow):**
+
+```
+Backlog → Assigned → In Progress → In Review → Approved → Merged
+```
+
+| Column | Trigger | Auto-Move? | Notes |
+|--------|---------|-----------|-------|
+| **Backlog** | Issue/PR created without squad labels | Auto | Default column for unqualified items; squad-tagged items start here |
+| **In Progress** | Branch push to `squad/NNN-*` branch OR `squad:in-progress` label added | Auto | Indicates active development work |
+| **In Review** | PR opened from `squad/NNN-*` branch | Auto | PR awaiting reviewer feedback |
+| **Approved** | `leela:approved` + `nibbler:approved` + (`docs:approved` OR `skip-docs`) | Auto | All required approvals collected; ready to merge |
+| **Merged** | PR merged to `main` | Auto | Terminal state; work complete |
+
+**Label-to-Column Mappings (Reference):**
+
+| Condition | Moves To | Notes |
+|-----------|----------|-------|
+| `leela:approved` + `nibbler:approved` + docs marker | "Approved" | All review gates passed; requires both Leela (architecture) and Nibbler (code quality) |
+| `docs:approved` OR `skip-docs` | Counts toward "Approved" | Either explicit docs review approval or skip-docs exemption |
+| PR opened from `squad/NNN-*` branch | "In Review" | Automatically applied when PR title/branch matches squad naming convention |
+| Branch push to `squad/NNN-*` | "In Progress" | Triggered by `pull_request.synchronize` event |
+| PR merged to main | "Merged" | Terminal state; non-blocking (items remain in "Merged" for auditing) |
+
+**Automation Rules:**
+
+1. **Soft moves only:** The workflow checks the current column before moving. If an item is manually positioned in a later column (e.g., a PR manually moved from "In Review" to "Approved" to force merge), the automation respects that override and does not move it backwards.
+
+2. **Label presence required:** Items automatically transition columns *only* when labels/events explicitly match. Removals of labels (e.g., `-nibbler:approved`) do not trigger backwards transitions; manual re-positioning is required.
+
+3. **Non-blocking:** Project board state does not affect CI/CD gates. A PR in "Backlog" will still pass CI; the board is a visibility tool, not an enforcement mechanism.
+
+4. **Idempotent:** Moving an item to the same column is a no-op (no API churn, no logging spam).
+
+**Example Workflow:**
+
+```
+1. Issue #42 created with squad:bender label
+   → Added to "Backlog" by squad-project-sync.yml
+
+2. Bender opens PR #100 from squad/42-fix-auth branch
+   → Automatically moved to "In Progress" by squad-project-board-automate.yml
+
+3. Bender pushes changes to PR #100
+   → Already in "In Progress"; no move (idempotent)
+
+4. Leela approves, adds leela:approved label
+   → Still waiting on nibbler and docs; no move yet
+
+5. Nibbler reviews, adds nibbler:approved label, PR has docs:approved
+   → All gates met → automatically moved to "Approved"
+
+6. PR merged to main
+   → Automatically moved to "Merged" column
+
+7. Project board shows full trail: Backlog → In Progress → In Review → Approved → Merged
+```
+
+**Configuration:**
+
+The workflow requires `SQUAD_PROJECT_NUMBER` repo variable to be set to the GitHub Projects v2 number. If unset, the workflow logs an info message and exits gracefully (non-blocking).
+
+If cross-repo or personal project access is needed, provide a PAT via the `COPILOT_ASSIGN_TOKEN` secret; otherwise the workflow uses `GITHUB_TOKEN`.
+
+**Interaction with Ceremonies:**
+
+- **Design Proposal / Design Review:** Not impacted; ceremonies happen before code is written, independent of project board state.
+- **PR Review Gate:** Project board state is descriptive only; reviewers still apply approval labels (Leela, Nibbler, Zapp, Docs). The board reflects these decisions visually.
+- **Retrospective:** If an SLO is tripped (e.g., "PRs in In Review > 3 days"), the retro can inspect project board history to identify bottlenecks.
 
 ---
 

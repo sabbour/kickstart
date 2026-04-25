@@ -1,0 +1,350 @@
+# Automates project board column movements based on labels and PR lifecycle events.
+#
+# This workflow implements Leela's label-driven project board automation design
+# (see .squad/decisions/label-project-board-design.md). It moves PRs and issues
+# between project columns based on:
+#
+# 1. Label state (e.g., leela:approved + nibbler:approved → "Approved" column)
+# 2. PR lifecycle (opened, merged)
+# 3. Branch naming conventions (squad/NNN-* triggers "In Progress")
+#
+# The workflow reads the current column and only updates if the label state
+# indicates a forward transition, skipping the update when the item is already
+# at or beyond the target column (preserves manual drag-and-drop moves).
+#
+# Column mappings (5-stage):
+# - Backlog:     Squad-tagged issue/PR with no other rule matching
+# - In Progress: PR synchronized — push on an existing squad/ PR branch
+#                (`pull_request.synchronize` event on a squad/* head ref)
+# - In Review:   PR opened or reopened from a squad/ branch
+# - Approved:    All required approvals present (leela:approved + nibbler:approved + docs marker)
+# - Merged:      PR merged to main
+#
+# Note: raw branch pushes before a PR is opened do not trigger this workflow.
+# Only `pull_request` events (opened, synchronize, labeled, etc.) are handled.
+
+name: Squad Project Board Automation
+
+on:
+  pull_request:
+    types: [opened, synchronize, labeled, unlabeled, reopened, closed]
+  issues:
+    types: [opened, labeled, unlabeled, reopened]
+  workflow_dispatch:
+
+permissions:
+  issues: read
+  pull-requests: read
+  contents: read
+  repository-projects: write
+
+concurrency:
+  group: squad-project-automate-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  automate-project-board:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Automate project board columns
+        uses: actions/github-script@v7
+        env:
+          PROJECT_NUMBER: ${{ vars.SQUAD_PROJECT_NUMBER }}
+          GH_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN || secrets.GITHUB_TOKEN }}
+        with:
+          github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const projectNumberRaw = process.env.PROJECT_NUMBER;
+            if (!projectNumberRaw) {
+              core.info('SQUAD_PROJECT_NUMBER repo variable is not set — skipping project board automation.');
+              return;
+            }
+
+            const projectNumber = parseInt(projectNumberRaw, 10);
+            if (Number.isNaN(projectNumber)) {
+              core.info(`SQUAD_PROJECT_NUMBER is not a number ("${projectNumberRaw}") — skipping.`);
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const payload = context.payload;
+            let contentNodeId = null;
+            let qualifies = false;
+            let contentType = null;
+            let eventType = null;
+
+            // Determine if this is an issue or PR and if it qualifies
+            if (payload.issue) {
+              const labels = (payload.issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+              qualifies = labels.some(name => name === 'squad' || name.startsWith('squad:'));
+              contentNodeId = payload.issue.node_id;
+              contentType = 'issue';
+              eventType = context.eventName === 'issues' ? payload.action : context.eventName;
+              
+              if (!qualifies) {
+                core.info(`Issue #${payload.issue.number} has no squad label — skipping.`);
+                return;
+              }
+            } else if (payload.pull_request) {
+              const pr = payload.pull_request;
+              const title = pr.title || '';
+              const branch = (pr.head && pr.head.ref) || '';
+              
+              // PRs qualify if they start with squad/ OR have squad labels
+              const labels = (pr.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+              qualifies = title.startsWith('squad/') || branch.startsWith('squad/') || 
+                          labels.some(name => name === 'squad' || name.startsWith('squad:'));
+              
+              contentNodeId = pr.node_id;
+              contentType = 'pr';
+              eventType = context.eventName === 'pull_request' ? payload.action : context.eventName;
+              
+              if (!qualifies) {
+                core.info(`PR #${pr.number} is not squad-tagged — skipping.`);
+                return;
+              }
+            } else {
+              core.info('Manual dispatch with no issue/PR context — nothing to automate.');
+              return;
+            }
+
+            // Resolve the project ID
+            const projectQuery = `
+              query($owner: String!, $number: Int!) {
+                user(login: $owner)         { projectV2(number: $number) { id } }
+                organization(login: $owner) { projectV2(number: $number) { id } }
+              }`;
+
+            let projectId = null;
+            try {
+              const result = await github.graphql(projectQuery, { owner, number: projectNumber });
+              projectId = (result.user && result.user.projectV2 && result.user.projectV2.id)
+                || (result.organization && result.organization.projectV2 && result.organization.projectV2.id);
+            } catch (err) {
+              core.warning(`Failed to resolve project: ${err.message}`);
+              return;
+            }
+
+            if (!projectId) {
+              core.warning(`Could not find ProjectV2 #${projectNumber} for owner "${owner}".`);
+              return;
+            }
+
+            // Query project fields to find the Status field and column IDs
+            const fieldsQuery = `
+              query($projectId: ID!) {
+                node(id: $projectId) {
+                  ... on ProjectV2 {
+                    fields(first: 20) {
+                      nodes {
+                        ... on ProjectV2Field {
+                          id
+                          name
+                        }
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options {
+                            id
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }`;
+
+            let statusFieldId = null;
+            let columnIds = {};
+
+            try {
+              const fieldsResult = await github.graphql(fieldsQuery, { projectId });
+              const fields = fieldsResult.node.fields.nodes;
+              
+              // Find the Status field
+              const statusField = fields.find(f => f.name === 'Status');
+              if (statusField) {
+                statusFieldId = statusField.id;
+                // Build a map of column names to IDs
+                if (statusField.options) {
+                  statusField.options.forEach(opt => {
+                    columnIds[opt.name] = opt.id;
+                  });
+                }
+              }
+              
+              core.info(`Found Status field: ${statusFieldId}`);
+              core.info(`Available columns: ${Object.keys(columnIds).join(', ')}`);
+            } catch (err) {
+              core.warning(`Failed to query project fields: ${err.message}`);
+              return;
+            }
+
+            if (!statusFieldId) {
+              core.warning('Project does not have a "Status" field — cannot automate columns.');
+              return;
+            }
+
+            // Query the current item via its content node (projectItems field) to
+            // get the project item ID and current status. Using the content node
+            // avoids the unsupported `filter` argument on ProjectV2.items.
+            const itemQuery = `
+              query($contentId: ID!, $projectId: ID!) {
+                node(id: $contentId) {
+                  ... on Issue {
+                    projectItems(first: 10) {
+                      nodes {
+                        id
+                        project { id }
+                        fieldValueByName(name: "Status") {
+                          ... on ProjectV2ItemFieldSingleSelectValue {
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                  ... on PullRequest {
+                    projectItems(first: 10) {
+                      nodes {
+                        id
+                        project { id }
+                        fieldValueByName(name: "Status") {
+                          ... on ProjectV2ItemFieldSingleSelectValue {
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }`;
+
+            let itemId = null;
+            let currentColumn = null;
+
+            try {
+              const itemResult = await github.graphql(itemQuery, { contentId: contentNodeId, projectId });
+              const contentNode = itemResult.node;
+              const projectItems = (contentNode && (contentNode.projectItems || {}).nodes) || [];
+              const match = projectItems.find(item => item.project && item.project.id === projectId);
+              if (!match) {
+                core.info('Item not yet in project — adding to Backlog.');
+                itemId = null;
+                currentColumn = null;
+              } else {
+                itemId = match.id;
+                currentColumn = match.fieldValueByName?.name || 'Backlog';
+                core.info(`Current column: ${currentColumn}`);
+              }
+            } catch (err) {
+              core.warning(`Failed to query current item: ${err.message}`);
+              return;
+            }
+
+            // Determine target column based on event type and labels
+            let targetColumn = null;
+
+            if (contentType === 'pr') {
+              const pr = payload.pull_request;
+              const labels = (pr.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+              
+              // Rule 1: PR merged → "Merged"
+              if (eventType === 'closed' && pr.merged) {
+                targetColumn = 'Merged';
+                core.info(`PR is merged → moving to "Merged"`);
+              }
+              // Rule 2: All approvals present → "Approved"
+              else if (labels.includes('leela:approved') && 
+                       labels.includes('nibbler:approved') &&
+                       (labels.includes('docs:approved') || labels.includes('skip-docs'))) {
+                targetColumn = 'Approved';
+                core.info(`All approvals present (leela + nibbler + docs) → moving to "Approved"`);
+              }
+              // Rule 3: PR opened/reopened from squad/ branch → "In Review"
+              else if ((eventType === 'opened' || eventType === 'reopened') && 
+                       (pr.title?.startsWith('squad/') || pr.head?.ref?.startsWith('squad/'))) {
+                targetColumn = 'In Review';
+                core.info(`PR opened from squad/ branch → moving to "In Review"`);
+              }
+              // Rule 4: Synchronized (pushed) on squad/ branch → "In Progress"
+              else if (eventType === 'synchronize' && pr.head?.ref?.startsWith('squad/')) {
+                targetColumn = 'In Progress';
+                core.info(`Branch push detected on squad/ branch → moving to "In Progress"`);
+              }
+            }
+
+            // If no target column determined, add the item if needed and exit
+            if (!targetColumn) {
+              if (!itemId) {
+                core.info('No state transition triggered; adding item to Backlog.');
+                targetColumn = 'Backlog';
+              } else {
+                core.info(`No state transition triggered; current column is "${currentColumn}".`);
+                return;
+              }
+            }
+
+            // If item not yet in project, add it first
+            if (!itemId) {
+              core.info(`Adding item to project (target column: ${targetColumn})...`);
+              const addMutation = `
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                    item { id }
+                  }
+                }`;
+
+              try {
+                const addResult = await github.graphql(addMutation, { projectId, contentId: contentNodeId });
+                itemId = addResult.addProjectV2ItemById.item.id;
+                core.info(`Added item ${itemId} to project.`);
+              } catch (err) {
+                core.warning(`Failed to add item to project: ${err.message}`);
+                return;
+              }
+            }
+
+            // Move item to target column only if it is a forward move.
+            // Column rank prevents automated events from moving an item
+            // backwards past a position a human manually dragged it to.
+            const COLUMN_RANK = { 'Backlog': 0, 'In Progress': 1, 'In Review': 2, 'Approved': 3, 'Merged': 4 };
+            const currentRank = COLUMN_RANK[currentColumn] ?? -1;
+            const targetRank = COLUMN_RANK[targetColumn] ?? -1;
+
+            if (targetRank <= currentRank) {
+              core.info(`Skipping move — "${currentColumn}" is already at or beyond "${targetColumn}".`);
+              return;
+            }
+
+            if (targetColumn !== currentColumn) {
+              const columnId = columnIds[targetColumn];
+              if (!columnId) {
+                core.warning(`Column "${targetColumn}" not found in project — skipping move.`);
+                return;
+              }
+
+              core.info(`Moving item ${itemId} from "${currentColumn || 'unset'}" to "${targetColumn}" (${columnId})...`);
+              
+              const updateMutation = `
+                mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                  updateProjectV2ItemFieldValue(input: { projectId: $projectId, itemId: $itemId, fieldId: $fieldId, value: $value }) {
+                    projectV2Item { id }
+                  }
+                }`;
+
+              try {
+                const updateResult = await github.graphql(updateMutation, {
+                  projectId,
+                  itemId,
+                  fieldId: statusFieldId,
+                  value: { singleSelectOptionId: columnId }
+                });
+                core.info(`Successfully moved item to "${targetColumn}".`);
+              } catch (err) {
+                core.warning(`Failed to move item to "${targetColumn}": ${err.message}`);
+              }
+            } else {
+              core.info(`Item already in "${targetColumn}" — no move needed.`);
+            }
