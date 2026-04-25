@@ -19,6 +19,7 @@ import { resolveAssetURL } from '@aks-kickstart/harness/runtime/asset-url';
 // Tools (no JSX)
 import { validateManifestsTool } from './tools/validate-manifests.js';
 import { validateSafeguardsTool } from './tools/validate-safeguards.js';
+import { buildArchitectureDiagramTool } from './tools/build-architecture-diagram.js';
 
 // User actions (no JSX)
 import { aksDeployUserAction } from './user-actions/deploy.js';
@@ -61,6 +62,7 @@ export const aksAutomaticPackServer: Pack = {
   tools: [
     validateManifestsTool,
     validateSafeguardsTool,
+    buildArchitectureDiagramTool,
   ],
 
   userActions: [

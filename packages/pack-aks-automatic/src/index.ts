@@ -3,6 +3,7 @@ import type { Pack, ComponentContribution } from '@aks-kickstart/harness';
 // Tools
 import { validateManifestsTool } from './tools/validate-manifests.js';
 import { validateSafeguardsTool } from './tools/validate-safeguards.js';
+import { buildArchitectureDiagramTool } from './tools/build-architecture-diagram.js';
 
 // User actions
 import { aksDeployUserAction } from './user-actions/deploy.js';
@@ -42,6 +43,7 @@ export const aksAutomaticPack: Pack = {
   tools: [
     validateManifestsTool,
     validateSafeguardsTool,
+    buildArchitectureDiagramTool,
   ],
 
   userActions: [
@@ -63,6 +65,8 @@ export const aksAutomaticPack: Pack = {
 // Named exports for individual contributions
 export { validateManifestsTool } from './tools/validate-manifests.js';
 export { validateSafeguardsTool, SAFEGUARD_RULES } from './tools/validate-safeguards.js';
+export { buildArchitectureDiagramTool, buildArchitectureDiagram } from './tools/build-architecture-diagram.js';
+export type { PlanInput, DiagramOutput } from './tools/build-architecture-diagram.js';
 
 export { aksDeployUserAction } from './user-actions/deploy.js';
 

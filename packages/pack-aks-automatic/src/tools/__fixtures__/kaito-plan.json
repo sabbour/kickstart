@@ -1,0 +1,27 @@
+{
+  "clusterName": "kaito-demo-cluster",
+  "nodePools": [
+    { "name": "system", "mode": "System", "vmSize": "Standard_D4s_v5", "count": 3 },
+    { "name": "gpu-pool", "mode": "User", "vmSize": "Standard_NC24ads_A100_v4", "count": 2 }
+  ],
+  "workloads": [
+    { "name": "web-frontend", "type": "Deployment", "replicas": 3 },
+    { "name": "api-server", "type": "Deployment", "replicas": 2 }
+  ],
+  "ingress": {
+    "type": "Application Gateway",
+    "host": "kaito-demo.example.com"
+  },
+  "storage": {
+    "type": "Azure Disk",
+    "name": "Premium SSD"
+  },
+  "kaito": {
+    "model": "falcon-7b",
+    "gpu": "A100"
+  },
+  "cicd": {
+    "provider": "GitHub Actions",
+    "registry": "ACR"
+  }
+}

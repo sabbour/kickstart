@@ -1,0 +1,17 @@
+{
+  "clusterName": "foundry-cluster",
+  "nodePools": [
+    { "name": "system", "mode": "System", "vmSize": "Standard_D4s_v5" },
+    { "name": "app-pool", "mode": "User", "vmSize": "Standard_D8s_v5" }
+  ],
+  "workloads": [
+    { "name": "chat-api", "type": "Deployment", "replicas": 3 }
+  ],
+  "ingress": {
+    "type": "Ingress NGINX"
+  },
+  "foundry": {
+    "endpoint": "https://eastus.api.cognitive.microsoft.com",
+    "model": "gpt-4o"
+  }
+}

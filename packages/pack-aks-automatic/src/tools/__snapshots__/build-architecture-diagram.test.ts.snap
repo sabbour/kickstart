@@ -1,0 +1,210 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`aks.build_architecture_diagram > snapshot for Foundry plan matches golden 1`] = `
+{
+  "description": "AKS Automatic cluster, with 2 node pools, running 1 workload, connected to Azure AI Foundry, exposed via Ingress NGINX.",
+  "edges": [
+    {
+      "from": "control-plane",
+      "label": "connects",
+      "to": "foundry",
+    },
+    {
+      "from": "control-plane",
+      "label": "manages",
+      "to": "pool-app-pool",
+    },
+    {
+      "from": "control-plane",
+      "label": "manages",
+      "to": "pool-system",
+    },
+    {
+      "from": "ingress",
+      "label": "routes to",
+      "to": "control-plane",
+    },
+    {
+      "from": "ingress",
+      "label": "exposes",
+      "to": "workload-chat-api",
+    },
+    {
+      "from": "pool-app-pool",
+      "label": "runs",
+      "to": "workload-chat-api",
+    },
+    {
+      "from": "workload-chat-api",
+      "label": "calls",
+      "to": "foundry",
+    },
+  ],
+  "nodes": [
+    {
+      "id": "control-plane",
+      "label": "AKS Automatic\\nfoundry-cluster",
+      "type": "compute",
+    },
+    {
+      "id": "foundry",
+      "label": "Foundry\\ngpt-4o",
+      "type": "network",
+    },
+    {
+      "id": "ingress",
+      "label": "Ingress NGINX",
+      "type": "network",
+    },
+    {
+      "id": "pool-app-pool",
+      "label": "app-pool\\nUser Pool (Standard_D8s_v5)",
+      "type": "compute",
+    },
+    {
+      "id": "pool-system",
+      "label": "system\\nSystem Pool (Standard_D4s_v5)",
+      "type": "compute",
+    },
+    {
+      "id": "workload-chat-api",
+      "label": "chat-api (Deployment)",
+      "type": "compute",
+    },
+  ],
+  "schema_version": "1",
+  "title": "Architecture: foundry-cluster",
+}
+`;
+
+exports[`aks.build_architecture_diagram > snapshot for KAITO plan matches golden 1`] = `
+{
+  "description": "AKS Automatic cluster, with 2 node pools, running 2 workloads, with KAITO AI model serving, exposed via Application Gateway, using Azure Disk, with GitHub Actions pipeline.",
+  "edges": [
+    {
+      "from": "cicd",
+      "label": "pushes",
+      "to": "registry",
+    },
+    {
+      "from": "control-plane",
+      "label": "manages",
+      "to": "pool-gpu-pool",
+    },
+    {
+      "from": "control-plane",
+      "label": "manages",
+      "to": "pool-system",
+    },
+    {
+      "from": "ingress",
+      "label": "routes to",
+      "to": "control-plane",
+    },
+    {
+      "from": "ingress",
+      "label": "exposes",
+      "to": "workload-api-server",
+    },
+    {
+      "from": "ingress",
+      "label": "exposes",
+      "to": "workload-web-frontend",
+    },
+    {
+      "from": "pool-gpu-pool",
+      "label": "hosts",
+      "to": "kaito",
+    },
+    {
+      "from": "pool-gpu-pool",
+      "label": "runs",
+      "to": "workload-api-server",
+    },
+    {
+      "from": "pool-gpu-pool",
+      "label": "runs",
+      "to": "workload-web-frontend",
+    },
+    {
+      "from": "registry",
+      "label": "pulls",
+      "to": "control-plane",
+    },
+    {
+      "from": "workload-api-server",
+      "label": "inference",
+      "to": "kaito",
+    },
+    {
+      "from": "workload-api-server",
+      "label": "persists",
+      "to": "storage",
+    },
+    {
+      "from": "workload-web-frontend",
+      "label": "inference",
+      "to": "kaito",
+    },
+    {
+      "from": "workload-web-frontend",
+      "label": "persists",
+      "to": "storage",
+    },
+  ],
+  "nodes": [
+    {
+      "id": "cicd",
+      "label": "GitHub Actions",
+      "type": "compute",
+    },
+    {
+      "id": "control-plane",
+      "label": "AKS Automatic\\nkaito-demo-cluster",
+      "type": "compute",
+    },
+    {
+      "id": "ingress",
+      "label": "Application Gateway",
+      "type": "network",
+    },
+    {
+      "id": "kaito",
+      "label": "KAITO\\nfalcon-7b",
+      "type": "compute",
+    },
+    {
+      "id": "pool-gpu-pool",
+      "label": "gpu-pool\\nUser Pool (Standard_NC24ads_A100_v4)",
+      "type": "compute",
+    },
+    {
+      "id": "pool-system",
+      "label": "system\\nSystem Pool (Standard_D4s_v5)",
+      "type": "compute",
+    },
+    {
+      "id": "registry",
+      "label": "ACR",
+      "type": "storage",
+    },
+    {
+      "id": "storage",
+      "label": "Premium SSD",
+      "type": "storage",
+    },
+    {
+      "id": "workload-api-server",
+      "label": "api-server (Deployment)",
+      "type": "compute",
+    },
+    {
+      "id": "workload-web-frontend",
+      "label": "web-frontend (Deployment)",
+      "type": "compute",
+    },
+  ],
+  "schema_version": "1",
+  "title": "Architecture: kaito-demo-cluster",
+}
+`;
