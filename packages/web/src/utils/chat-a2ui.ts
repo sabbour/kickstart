@@ -546,6 +546,70 @@ export function rebuildChatSessionState(
   return { renderableMessages, files, phase };
 }
 
+/**
+ * Ownership-resolution step used by the App when an assistant turn receives
+ * A2UI surface ids. The previous behaviour kept ownership pinned to whichever
+ * message first claimed a surface — when the agent reused a `shared:` surface
+ * across turns (a `createSurface` is dropped as a no-op and `updateComponents`
+ * mutates the existing model in place), the new turn could not claim the
+ * surface and the live update would render under the *previous* assistant
+ * bubble instead of the new one.
+ *
+ * The fix transfers ownership to the current `assistantMessageId` whenever an
+ * existing surface is referenced again. The caller uses
+ * `transferredFromMessageIds` to strip the surface ids from the prior message
+ * bubbles so the surface only renders once, in the right place.
+ *
+ * Note: this helper **mutates** the provided `surfaceOwners` map in place
+ * (assigning new owners and transferring existing ones). Callers that need
+ * an immutable update should clone the map before passing it in.
+ */
+export interface ClaimSurfaceOwnershipParams {
+  candidateIds: readonly string[];
+  assistantMessageId: string;
+  alreadyTracked: ReadonlySet<string>;
+  surfaceExists: (surfaceId: string) => boolean;
+  surfaceOwners: Map<string, string>;
+}
+
+export interface ClaimSurfaceOwnershipResult {
+  /** Surface ids newly attributed to `assistantMessageId` this call. */
+  ownedIds: string[];
+  /** Maps surfaceId → prior owner messageId for transferred surfaces. */
+  transferredFromMessageIds: Map<string, string>;
+}
+
+export function claimSurfaceOwnership(
+  params: ClaimSurfaceOwnershipParams,
+): ClaimSurfaceOwnershipResult {
+  const { candidateIds, assistantMessageId, alreadyTracked, surfaceExists, surfaceOwners } = params;
+  const ownedIds: string[] = [];
+  const seen = new Set<string>();
+  const transferredFromMessageIds = new Map<string, string>();
+
+  for (const surfaceId of candidateIds) {
+    if (!surfaceExists(surfaceId)) continue;
+
+    const owner = surfaceOwners.get(surfaceId);
+    if (!owner) {
+      surfaceOwners.set(surfaceId, assistantMessageId);
+    } else if (owner !== assistantMessageId) {
+      // Transfer ownership: a prior assistant message owned this surface,
+      // but the agent updated it in this new turn. The current turn now
+      // owns the live surface; the prior bubble should drop the reference.
+      transferredFromMessageIds.set(surfaceId, owner);
+      surfaceOwners.set(surfaceId, assistantMessageId);
+    }
+
+    if (!alreadyTracked.has(surfaceId) && !seen.has(surfaceId)) {
+      seen.add(surfaceId);
+      ownedIds.push(surfaceId);
+    }
+  }
+
+  return { ownedIds, transferredFromMessageIds };
+}
+
 export function getLatestConversationPhase(messages: readonly ChatMessage[]): ConversationPhaseId | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];

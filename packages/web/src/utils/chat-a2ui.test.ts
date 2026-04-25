@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ChatMessage, A2uiPayloadItem, SetupGenerationEvent } from '../types';
 import {
   GENERATION_PROGRESS_TITLE,
+  claimSurfaceOwnership,
   getLatestConversationPhase,
   prepareStepwiseSetup,
   prepareChatA2ui,
@@ -633,5 +634,91 @@ describe('getLatestConversationPhase', () => {
     ];
 
     expect(getLatestConversationPhase(messages)).toBe('generate');
+  });
+});
+
+describe('claimSurfaceOwnership', () => {
+  const existingSurfaces = new Set(['shared:track-picker', 'shared:other', 'msg-1#0']);
+  const surfaceExists = (id: string) => existingSurfaces.has(id);
+
+  it('claims unowned surfaces for the current assistant message', () => {
+    const surfaceOwners = new Map<string, string>();
+
+    const result = claimSurfaceOwnership({
+      candidateIds: ['shared:track-picker', 'msg-1#0'],
+      assistantMessageId: 'assistant-1',
+      alreadyTracked: new Set(),
+      surfaceExists,
+      surfaceOwners,
+    });
+
+    expect(result.ownedIds).toEqual(['shared:track-picker', 'msg-1#0']);
+    expect(result.transferredFromMessageIds.size).toBe(0);
+    expect(surfaceOwners.get('shared:track-picker')).toBe('assistant-1');
+    expect(surfaceOwners.get('msg-1#0')).toBe('assistant-1');
+  });
+
+  it('skips surfaces that no longer exist in the processor', () => {
+    const surfaceOwners = new Map<string, string>();
+
+    const result = claimSurfaceOwnership({
+      candidateIds: ['shared:missing'],
+      assistantMessageId: 'assistant-1',
+      alreadyTracked: new Set(),
+      surfaceExists,
+      surfaceOwners,
+    });
+
+    expect(result.ownedIds).toEqual([]);
+    expect(surfaceOwners.size).toBe(0);
+  });
+
+  it('does not re-emit ids the streaming queue already tracks', () => {
+    const surfaceOwners = new Map<string, string>([
+      ['shared:track-picker', 'assistant-1'],
+    ]);
+
+    const result = claimSurfaceOwnership({
+      candidateIds: ['shared:track-picker', 'shared:track-picker'],
+      assistantMessageId: 'assistant-1',
+      alreadyTracked: new Set(['shared:track-picker']),
+      surfaceExists,
+      surfaceOwners,
+    });
+
+    expect(result.ownedIds).toEqual([]);
+    expect(result.transferredFromMessageIds.size).toBe(0);
+  });
+
+  it('transfers ownership when a prior assistant message owned the surface', () => {
+    const surfaceOwners = new Map<string, string>([
+      ['shared:track-picker', 'assistant-1'],
+    ]);
+
+    const result = claimSurfaceOwnership({
+      candidateIds: ['shared:track-picker'],
+      assistantMessageId: 'assistant-2',
+      alreadyTracked: new Set(),
+      surfaceExists,
+      surfaceOwners,
+    });
+
+    expect(result.ownedIds).toEqual(['shared:track-picker']);
+    expect(result.transferredFromMessageIds.get('shared:track-picker')).toBe('assistant-1');
+    expect(surfaceOwners.get('shared:track-picker')).toBe('assistant-2');
+  });
+
+  it('deduplicates repeated candidate ids within a single call', () => {
+    const surfaceOwners = new Map<string, string>();
+
+    const result = claimSurfaceOwnership({
+      candidateIds: ['shared:other', 'shared:other'],
+      assistantMessageId: 'assistant-1',
+      alreadyTracked: new Set(),
+      surfaceExists,
+      surfaceOwners,
+    });
+
+    expect(result.ownedIds).toEqual(['shared:other']);
   });
 });

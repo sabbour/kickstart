@@ -28,6 +28,7 @@ import { VirtualFileSystem } from './services/virtual-fs';
 import {
   applyStepwiseSetupEvent,
   buildStepwiseSetupMessages,
+  claimSurfaceOwnership,
   createStepwiseSetupState,
   getLatestConversationPhase,
   getSetupEventKey,
@@ -202,6 +203,13 @@ export function App() {
 
   // Messages for the active session
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Ref mirroring the latest committed `messages` so callbacks can compute
+  // derived updates without relying on side effects inside state updaters
+  // (which React 18 concurrent rendering may invoke multiple times).
+  const messagesRef = useRef<ChatMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Current conversation phase from SSE events
   const [currentPhase, setCurrentPhase] = useState<ConversationPhaseId | null>(null);
@@ -297,30 +305,54 @@ export function App() {
   const claimSurfaceIdsForAssistantMessage = useCallback((
     assistantMessageId: string,
     candidateIds: string[],
+    sessionId: string | null,
   ): string[] => {
     const trackedIds = new Set(streamingSurfaceIdsRef.current);
-    const ownedIds: string[] = [];
+    const { ownedIds, transferredFromMessageIds } = claimSurfaceOwnership({
+      candidateIds,
+      assistantMessageId,
+      alreadyTracked: trackedIds,
+      surfaceExists: (id) => Boolean(a2ui.getSurface(id)),
+      surfaceOwners: surfaceOwnersRef.current,
+    });
 
-    for (const surfaceId of candidateIds) {
-      if (!a2ui.getSurface(surfaceId)) {
-        continue;
-      }
-
-      const owner = surfaceOwnersRef.current.get(surfaceId);
-      if (!owner) {
-        surfaceOwnersRef.current.set(surfaceId, assistantMessageId);
-      } else if (owner !== assistantMessageId) {
-        continue;
-      }
-
-      if (!trackedIds.has(surfaceId)) {
-        trackedIds.add(surfaceId);
-        ownedIds.push(surfaceId);
+    if (transferredFromMessageIds.size > 0) {
+      // The agent updated a surface that a prior assistant message owned.
+      // Strip the surfaceId from that older bubble (in React state and the
+      // persisted session) so the live surface only renders under the
+      // current turn — fixing the "updates the wrong surface" bug where
+      // new A2UI content appeared under an old assistant message.
+      //
+      // Compute the next messages array and the persistence updates from
+      // `messagesRef.current` (committed state) outside `setMessages`, so we
+      // never rely on side effects inside the state updater (which React 18
+      // concurrent rendering / StrictMode may invoke multiple times).
+      const prev = messagesRef.current;
+      const persistUpdates: Array<{ messageId: string; surfaceIds: string[] | undefined }> = [];
+      let mutated = false;
+      const next = prev.map(msg => {
+        if (msg.role !== 'assistant' || !msg.surfaceIds?.length) return msg;
+        const filtered = msg.surfaceIds.filter(
+          (id) => transferredFromMessageIds.get(id) !== msg.id,
+        );
+        if (filtered.length === msg.surfaceIds.length) return msg;
+        const nextSurfaceIds = filtered.length > 0 ? filtered : undefined;
+        persistUpdates.push({ messageId: msg.id, surfaceIds: nextSurfaceIds });
+        mutated = true;
+        return { ...msg, surfaceIds: nextSurfaceIds };
+      });
+      if (mutated) {
+        setMessages(next);
+        if (sessionId) {
+          for (const { messageId, surfaceIds: nextSurfaceIds } of persistUpdates) {
+            sessions.updateMessage(sessionId, messageId, { surfaceIds: nextSurfaceIds });
+          }
+        }
       }
     }
 
     return ownedIds;
-  }, [a2ui]);
+  }, [a2ui, sessions]);
 
   const persistStepwiseStreamingMessage = useCallback((
     sessionId: string,
@@ -396,7 +428,7 @@ export function App() {
       if (renderableMessages.some((message) => Boolean(message.createSurface))) {
         streamingSetupSurfaceCreatedRef.current = true;
       }
-      const ownedIds = claimSurfaceIdsForAssistantMessage(assistantMessageId, newIds);
+      const ownedIds = claimSurfaceIdsForAssistantMessage(assistantMessageId, newIds, sessionId);
       if (ownedIds.length > 0) {
         streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...ownedIds];
         progressiveQueue.enqueue(ownedIds);
@@ -455,7 +487,7 @@ export function App() {
       if (renderableMessages.some((message) => Boolean(message.createSurface))) {
         streamingSetupSurfaceCreatedRef.current = true;
       }
-      const ownedIds = claimSurfaceIdsForAssistantMessage(params.assistantMessageId, newIds);
+      const ownedIds = claimSurfaceIdsForAssistantMessage(params.assistantMessageId, newIds, params.sessionId);
       if (ownedIds.length > 0) {
         streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...ownedIds];
         progressiveQueue.enqueue(ownedIds);
@@ -501,7 +533,7 @@ export function App() {
     sessions,
   ]);
 
-  const processIncomingA2UI = useCallback((msgs: A2uiPayloadItem[], turnId: string) => {
+  const processIncomingA2UI = useCallback((msgs: A2uiPayloadItem[], turnId: string, sessionId: string | null) => {
     const prepared = prepareChatA2ui(msgs, turnId, {
       currentPhase: currentPhaseRef.current,
       resolveArtifactContent,
@@ -525,7 +557,7 @@ export function App() {
     }
 
     const newIds = a2ui.processMessages(prepared.renderableMessages);
-    const ownedIds = claimSurfaceIdsForAssistantMessage(turnId, newIds);
+    const ownedIds = claimSurfaceIdsForAssistantMessage(turnId, newIds, sessionId);
     if (ownedIds.length > 0) {
       streamingSurfaceIdsRef.current = [...streamingSurfaceIdsRef.current, ...ownedIds];
       progressiveQueue.enqueue(ownedIds);
@@ -620,7 +652,7 @@ export function App() {
     progressiveQueue.reset();
 
     const handleIncomingA2UI = (payload: A2uiPayloadItem[]) => {
-      processIncomingA2UI(payload, assistantMessageId);
+      processIncomingA2UI(payload, assistantMessageId, sessionId!);
     };
     const handleIncomingSetupEvent = (event: SetupGenerationEvent) => {
       processIncomingSetupEvent(event, assistantMessageId, sessionId!);
