@@ -99,6 +99,7 @@ export interface StreamCallbacks {
 
 // Target ~80 rAF frames to reveal all text (~1.3s at 60fps)
 const REVEAL_FRAMES = 80;
+const AUTH_REDIRECT_PENDING_KEY = 'kickstart:auth-redirect-pending';
 
 // ---------------------------------------------------------------------------
 // SDK 406 non-streaming fallback
@@ -739,7 +740,11 @@ export function useStreaming() {
       if (err instanceof Error && err.name === 'AbortError') return;
       cancelReveal();
       if (err instanceof SessionExpiredError) {
-        callbacks.onError(err.message);
+        try {
+          sessionStorage.setItem(AUTH_REDIRECT_PENDING_KEY, '1');
+        } catch {
+          // ignore storage failures
+        }
         window.location.href = buildSwaLoginUrl();
         return;
       }

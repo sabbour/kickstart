@@ -217,6 +217,10 @@ export interface ChatMessage {
   id: string;
   role: ChatRole;
   text: string;
+  intent?: 'warning';
+  retryable?: boolean;
+  retryText?: string;
+  retrySessionId?: string;
   model?: string;
   phase?: ConversationPhaseId | string | null;
   timestamp?: number;

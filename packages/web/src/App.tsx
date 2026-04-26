@@ -21,7 +21,7 @@ import { ConversationSessionProvider } from './contexts/ConversationSessionConte
 import { useTheme } from './contexts/ThemeContext';
 import { useDebug } from './contexts/DebugContext';
 import { useVirtualFS } from './contexts/VirtualFSContext';
-import { healthCheck, type HealthCheckResult } from './services/api-client';
+import { healthCheck, SESSION_EXPIRED_ERROR_MESSAGE, type HealthCheckResult } from './services/api-client';
 // TODO(Step 5): mock-streaming removed — mock mode deleted in Step 1
 // isMockMode and isPlaygroundMode permanently return false
 import { VirtualFileSystem } from './services/virtual-fs';
@@ -53,6 +53,86 @@ export function getInitialAppMode(locationSearch?: string): AppMode {
 let msgSeq = 0;
 function msgId(role: string) {
   return `msg-${Date.now()}-${++msgSeq}-${role}`;
+}
+
+const PENDING_AUTH_RETRY_KEY = 'kickstart:pending-auth-retry';
+const AUTH_REDIRECT_PENDING_KEY = 'kickstart:auth-redirect-pending';
+const AUTH_RETRY_STATUS_MESSAGE = 'Session restored. Retrying your previous request…';
+
+interface PendingAuthRetryPayload {
+  localSessionId: string;
+  message: string;
+  isAutoContinue: boolean;
+  event?: A2uiEventMetadata;
+  createdAt: number;
+}
+
+function savePendingAuthRetry(payload: PendingAuthRetryPayload): void {
+  try {
+    sessionStorage.setItem(PENDING_AUTH_RETRY_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function clearPendingAuthRetry(): void {
+  try {
+    sessionStorage.removeItem(PENDING_AUTH_RETRY_KEY);
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function clearAuthRedirectPending(): void {
+  try {
+    sessionStorage.removeItem(AUTH_REDIRECT_PENDING_KEY);
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function isAuthRedirectPending(): boolean {
+  try {
+    return sessionStorage.getItem(AUTH_REDIRECT_PENDING_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function loadPendingAuthRetry(): PendingAuthRetryPayload | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_AUTH_RETRY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PendingAuthRetryPayload>;
+    if (
+      typeof parsed.localSessionId !== 'string'
+      || typeof parsed.message !== 'string'
+      || typeof parsed.isAutoContinue !== 'boolean'
+    ) {
+      clearPendingAuthRetry();
+      return null;
+    }
+    if (typeof parsed.createdAt !== 'number' || !Number.isFinite(parsed.createdAt)) {
+      clearPendingAuthRetry();
+      return null;
+    }
+    return {
+      localSessionId: parsed.localSessionId,
+      message: parsed.message,
+      isAutoContinue: parsed.isAutoContinue,
+      ...(parsed.event ? { event: parsed.event } : {}),
+      createdAt: parsed.createdAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isSessionExpiredWarningMessage(message: ChatMessage): boolean {
+  if (message.role !== 'assistant') return false;
+  // Backward-compat: older persisted sessions stored the same message with a ⚠️ prefix.
+  const normalized = message.text.replace(/^⚠️\s*/, '').trim();
+  return normalized === SESSION_EXPIRED_ERROR_MESSAGE;
 }
 
 function normalizeMessageSurfaceAttachments(messages: ChatMessage[]): {
@@ -451,6 +531,7 @@ export function App() {
     sessionId: string;
     debugInfo?: ChatMessage['debugInfo'];
     errorMessage?: string;
+    retryText?: string;
     model?: string;
     usage?: ChatMessage['usage'];
   }): boolean => {
@@ -505,6 +586,12 @@ export function App() {
       id: params.assistantMessageId,
       role: 'assistant',
       text: finalText,
+      ...(params.errorMessage ? { intent: 'warning' as const } : {}),
+      ...(params.errorMessage && params.retryText ? {
+        retryable: true,
+        retryText: params.retryText,
+        retrySessionId: params.sessionId,
+      } : {}),
       ...(params.model ? { model: params.model } : {}),
       surfaceIds,
       phase: 'generate',
@@ -584,9 +671,15 @@ export function App() {
     }
   }, [fs, openGeneratedFile]);
 
-  const handleSendMessage = useCallback(async (text: string, isAutoContinue = false, explicitSessionId?: string, event?: A2uiEventMetadata) => {
+  const handleSendMessage = useCallback(async (
+    text: string,
+    isAutoContinue = false,
+    explicitSessionId?: string,
+    event?: A2uiEventMetadata,
+    isAuthRetry = false,
+  ) => {
     // Manual messages reset the consecutive auto-continue counter
-    if (!isAutoContinue) {
+    if (!isAutoContinue && !isAuthRetry) {
       resetConsecutiveCount();
     }
 
@@ -601,20 +694,48 @@ export function App() {
 
     const assistantMessageId = msgId('assistant');
 
-    // Add user message (auto-continue shows a subtle indicator instead of the full text)
-    const userMsg: ChatMessage = {
-      id: msgId(isAutoContinue ? 'auto-continue' : 'user'),
-      role: 'user',
-      text,
-      timestamp: Date.now(),
-      isAutoContinue,
-    };
-    setMessages(prev => [...prev, userMsg]);
-    sessions.addMessage(sessionId!, userMsg);
+    if (isAuthRetry) {
+      const activeSession = sessions.sessions.find((s) => s.id === sessionId);
+      if (activeSession) {
+        let replaced = false;
+        const nextMessages = activeSession.messages
+          .map((message) => {
+            if (!isSessionExpiredWarningMessage(message)) {
+              return message;
+            }
+            // Defensive de-duplication: older sessions may include multiple stale
+            // expired warnings; keep one and replace it with retry status.
+            if (replaced) return null;
+            replaced = true;
+            return {
+              ...message,
+              text: AUTH_RETRY_STATUS_MESSAGE,
+              intent: 'warning' as const,
+              timestamp: Date.now(),
+            };
+          })
+          .filter((message): message is ChatMessage => message !== null);
+        if (replaced) {
+          setMessages(nextMessages);
+          sessions.updateSession(sessionId!, { messages: nextMessages });
+        }
+      }
+    } else {
+      // Add user message (auto-continue shows a subtle indicator instead of the full text)
+      const userMsg: ChatMessage = {
+        id: msgId(isAutoContinue ? 'auto-continue' : 'user'),
+        role: 'user',
+        text,
+        timestamp: Date.now(),
+        isAutoContinue,
+      };
+      setMessages(prev => [...prev, userMsg]);
+      sessions.addMessage(sessionId!, userMsg);
+    }
 
     if (!healthCheckResult?.ok) {
       // Build specific error message based on health check phase
-      let errorText = '⚠️ The API is not available. ';
+      let errorText = 'The API is not available. ';
       
       if (healthCheckResult?.error) {
         const { phase, message, hint } = healthCheckResult.error;
@@ -638,10 +759,15 @@ export function App() {
         id: msgId('error'),
         role: 'assistant',
         text: errorText,
+        intent: 'warning',
+        retryable: true,
+        retryText: text,
+        retrySessionId: sessionId!,
         timestamp: Date.now(),
       };
       setMessages(prev => [...prev, errorMsg]);
       sessions.addMessage(sessionId!, errorMsg);
+      clearPendingAuthRetry();
       return;
     }
 
@@ -666,6 +792,7 @@ export function App() {
         onSetupEvent: handleIncomingSetupEvent,
         onPhase: (phase) => setConversationPhase(phase),
         onComplete: (fullText, model) => {
+          clearPendingAuthRetry();
           if (finalizeStepwiseAssistantTurn({
             assistantMessageId,
             sessionId: sessionId!,
@@ -699,10 +826,12 @@ export function App() {
           sessions.addMessage(sessionId!, assistantMsg);
         },
         onError: (error) => {
+          clearPendingAuthRetry();
           if (finalizeStepwiseAssistantTurn({
             assistantMessageId,
             sessionId: sessionId!,
             errorMessage: error,
+            retryText: text,
           })) {
             streamingSurfaceIdsRef.current = [];
             streamingA2UIMessagesRef.current = [];
@@ -716,7 +845,11 @@ export function App() {
           const errorMsg: ChatMessage = {
             id: msgId('error'),
             role: 'assistant',
-            text: `⚠️ ${error}`,
+            text: error,
+            intent: 'warning',
+            retryable: true,
+            retryText: text,
+            retrySessionId: sessionId!,
             timestamp: Date.now(),
           };
           setMessages(prev => [...prev, errorMsg]);
@@ -727,6 +860,14 @@ export function App() {
       // For real streaming, use the backend session ID if available
       const activeSession = sessions.getActiveSession();
       const backendSessionId = activeSession?.backendSessionId;
+
+      savePendingAuthRetry({
+        localSessionId: sessionId!,
+        message: text,
+        isAutoContinue,
+        ...(event ? { event } : {}),
+        createdAt: Date.now(),
+      });
       
       streaming.send(text, backendSessionId, {
         onChunk: () => {},
@@ -735,6 +876,7 @@ export function App() {
         onPhase: (phase) => setConversationPhase(phase),
         onWriteFile: handleWriteFile,
         onComplete: (fullText, model, receivedSessionId, debugInfo, usage) => {
+          clearPendingAuthRetry();
           const phase = currentPhaseRef.current || undefined;
           // Store the backend session ID on first response
           if (receivedSessionId && !activeSession?.backendSessionId) {
@@ -777,10 +919,12 @@ export function App() {
           sessions.addMessage(sessionId!, assistantMsg);
         },
         onError: (error) => {
+          clearPendingAuthRetry();
           if (finalizeStepwiseAssistantTurn({
             assistantMessageId,
             sessionId: sessionId!,
             errorMessage: error,
+            retryText: text,
           })) {
             streamingSurfaceIdsRef.current = [];
             streamingA2UIMessagesRef.current = [];
@@ -794,7 +938,11 @@ export function App() {
           const errorMsg: ChatMessage = {
             id: msgId('error'),
             role: 'assistant',
-            text: `⚠️ ${error}`,
+            text: error,
+            intent: 'warning',
+            retryable: true,
+            retryText: text,
+            retrySessionId: sessionId!,
             timestamp: Date.now(),
           };
           setMessages(prev => [...prev, errorMsg]);
@@ -832,6 +980,8 @@ export function App() {
   }, [clearWorkspace, sessions, handleSendMessage, nav.pushSession]);
 
   const handleClearAllSessions = useCallback(async () => {
+    clearPendingAuthRetry();
+    clearAuthRedirectPending();
     sessions.clearAllSessions();
     setMessages([]);
     await vfs.clearWorkspaceSnapshots().catch((err) => {
@@ -848,6 +998,8 @@ export function App() {
   }, [sessions, vfs]);
 
   const handleNewSession = useCallback(async (pushHistory = true) => {
+    clearPendingAuthRetry();
+    clearAuthRedirectPending();
     await clearWorkspace();
     setMessages([]);
     setMode('landing');
@@ -941,10 +1093,46 @@ export function App() {
     }
   }, []);
 
+  const lastHandledAuthRetryAtRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isAuthRedirectPending()) return;
+    const pending = loadPendingAuthRetry();
+    if (!pending) {
+      clearAuthRedirectPending();
+      return;
+    }
+    if (lastHandledAuthRetryAtRef.current === pending.createdAt) return;
+
+    const sessionExists = sessions.sessions.some((session) => session.id === pending.localSessionId);
+    if (!sessionExists) {
+      clearPendingAuthRetry();
+      lastHandledAuthRetryAtRef.current = pending.createdAt;
+      return;
+    }
+
+    if (mode !== 'chat' || sessions.activeSessionId !== pending.localSessionId) {
+      return;
+    }
+
+    clearAuthRedirectPending();
+    lastHandledAuthRetryAtRef.current = pending.createdAt;
+    void handleSendMessage(
+      pending.message,
+      pending.isAutoContinue,
+      pending.localSessionId,
+      pending.event,
+      true,
+    );
+  }, [handleSendMessage, mode, sessions.activeSessionId, sessions.sessions]);
+
   const isStreaming = mockEnabled ? mockStreaming.isStreaming : streaming.isStreaming;
   const baseStreamText = mockEnabled ? mockStreaming.streamText : streaming.streamText;
   const currentStreamText = stepwiseStreamingActive ? stepwiseStreamingText : baseStreamText;
   const usageSummary = useMemo(() => summarizeTokenUsage(messages), [messages]);
+  const handleRetryMessage = useCallback((message: ChatMessage) => {
+    if (isStreaming || !message.retryable || !message.retryText || !message.retrySessionId) return;
+    void handleSendMessage(message.retryText, false, message.retrySessionId);
+  }, [handleSendMessage, isStreaming]);
   const fsFiles = useSyncExternalStore(fs.subscribe, fs.getSnapshot, fs.getSnapshot);
   const hasFiles = fsFiles.length > 0 || vfsFiles.length > 0;
   const activeSession = sessions.getActiveSession();
@@ -1120,6 +1308,7 @@ export function App() {
               streamingSurfaceIds={progressiveQueue.visibleIds}
               currentPhase={currentPhase}
               onSend={handleSendMessage}
+              onRetryMessage={handleRetryMessage}
               getSurface={a2ui.getSurface}
               debugEnabled={debugEnabled}
               usageSummary={usageSummary}

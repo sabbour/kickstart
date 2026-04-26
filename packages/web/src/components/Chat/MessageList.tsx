@@ -14,9 +14,18 @@ interface MessageListProps {
   streamingSurfaceIds?: string[];
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
   debugEnabled?: boolean;
+  onRetryMessage?: (message: ChatMessageType) => void;
 }
 
-export function MessageList({ messages, isStreaming, streamingText, streamingSurfaceIds, getSurface, debugEnabled }: MessageListProps) {
+export function MessageList({
+  messages,
+  isStreaming,
+  streamingText,
+  streamingSurfaceIds,
+  getSurface,
+  debugEnabled,
+  onRetryMessage,
+}: MessageListProps) {
   const lastIndex = messages.length - 1;
   const hasStreamingSurfaces = (streamingSurfaceIds?.length ?? 0) > 0;
 
@@ -29,6 +38,8 @@ export function MessageList({ messages, isStreaming, streamingText, streamingSur
           getSurface={getSurface}
           isActive={index === lastIndex}
           debugEnabled={debugEnabled}
+          onRetry={onRetryMessage}
+          retryDisabled={isStreaming}
         />
       ))}
 

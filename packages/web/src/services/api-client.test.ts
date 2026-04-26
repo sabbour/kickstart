@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { apiFetch, buildSwaLoginUrl, healthCheck, SessionExpiredError } from './api-client';
+import { apiFetch, buildSwaLoginUrl, healthCheck, SessionExpiredError, SESSION_EXPIRED_ERROR_MESSAGE } from './api-client';
 
 describe('healthCheck', () => {
   beforeEach(() => {
@@ -146,5 +146,10 @@ describe('auth redirect and refresh handling', () => {
 
     await expect(apiFetch('/api/converse')).rejects.toBeInstanceOf(SessionExpiredError);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses the canonical session-expired message', () => {
+    const error = new SessionExpiredError();
+    expect(error.message).toBe(SESSION_EXPIRED_ERROR_MESSAGE);
   });
 });

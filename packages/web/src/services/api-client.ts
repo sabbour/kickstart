@@ -1,9 +1,11 @@
 // Typed API client for the Kickstart backend
 // Supports both streaming (SSE) and standard request modes
 
+export const SESSION_EXPIRED_ERROR_MESSAGE = 'Your session has expired. Please sign in again. You may be redirected to the login page.';
+
 export class SessionExpiredError extends Error {
   constructor() {
-    super('Your session has expired. Please sign in again. You may be redirected to the login page.');
+    super(SESSION_EXPIRED_ERROR_MESSAGE);
     this.name = 'SessionExpiredError';
   }
 }

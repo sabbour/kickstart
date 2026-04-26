@@ -14,12 +14,24 @@ interface ChatShellProps {
   streamingSurfaceIds?: string[];
   currentPhase?: string | null;
   onSend: (text: string) => void;
+  onRetryMessage?: (message: ChatMessage) => void;
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
   debugEnabled?: boolean;
   usageSummary?: TokenUsageSummary | null;
 }
 
-export function ChatShell({ messages, isStreaming, streamingText, streamingSurfaceIds, currentPhase, onSend, getSurface, debugEnabled, usageSummary }: ChatShellProps) {
+export function ChatShell({
+  messages,
+  isStreaming,
+  streamingText,
+  streamingSurfaceIds,
+  currentPhase,
+  onSend,
+  onRetryMessage,
+  getSurface,
+  debugEnabled,
+  usageSummary,
+}: ChatShellProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages or streaming updates
@@ -56,6 +68,7 @@ export function ChatShell({ messages, isStreaming, streamingText, streamingSurfa
             streamingSurfaceIds={streamingSurfaceIds}
             getSurface={getSurface}
             debugEnabled={debugEnabled}
+            onRetryMessage={onRetryMessage}
           />
           <div ref={messagesEndRef} />
         </div>

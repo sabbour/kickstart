@@ -1,5 +1,5 @@
 import React from 'react';
-import { BotSparkle24Regular } from '@fluentui/react-icons';
+import { ArrowClockwise24Regular, BotSparkle24Regular, Warning24Regular } from '@fluentui/react-icons';
 import { A2UISurfaceWrapper } from '../A2UI/A2UISurfaceWrapper';
 import { DebugPanel } from './DebugPanel';
 import { MessageTextProvider } from '../../contexts/MessageTextContext';
@@ -13,9 +13,18 @@ interface ChatMessageProps {
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
   isActive?: boolean;
   debugEnabled?: boolean;
+  onRetry?: (message: ChatMessageType) => void;
+  retryDisabled?: boolean;
 }
 
-export function ChatMessage({ message, getSurface, isActive = true, debugEnabled = false }: ChatMessageProps) {
+export function ChatMessage({
+  message,
+  getSurface,
+  isActive = true,
+  debugEnabled = false,
+  onRetry,
+  retryDisabled = false,
+}: ChatMessageProps) {
   if (message.role === 'user') {
     if (message.isAutoContinue) {
       return (
@@ -36,6 +45,9 @@ export function ChatMessage({ message, getSurface, isActive = true, debugEnabled
   }
 
   // Assistant message
+  const isWarning = message.intent === 'warning';
+  const canRetry = Boolean(message.retryable && message.retryText && message.retrySessionId && onRetry);
+
   return (
     <div className="chat-bubble-row">
       <BotSparkle24Regular className="assistant-avatar" />
@@ -45,7 +57,22 @@ export function ChatMessage({ message, getSurface, isActive = true, debugEnabled
         )}
         {/* Render text with basic markdown-like formatting */}
         {message.text && (
-          <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(formatText(message.text)) }} />
+          <div className={isWarning ? 'chat-message-warning' : undefined}>
+            {isWarning && <Warning24Regular className="chat-message-warning-icon" aria-hidden="true" />}
+            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(formatText(message.text)) }} />
+          </div>
+        )}
+        {canRetry && (
+          <button
+            type="button"
+            className="chat-message-retry-button"
+            onClick={() => onRetry?.(message)}
+            disabled={retryDisabled}
+            aria-label="Retry failed message"
+          >
+            <ArrowClockwise24Regular className="chat-message-retry-icon" aria-hidden="true" />
+            <span>Try again</span>
+          </button>
         )}
 
         {/* Provide assistant message text to A2UI components for best-guess auto-selection */}
