@@ -171,7 +171,7 @@ describe('pack-core agent frontmatter', () => {
       expect(TRIAGE_PROMPT).toContain('Do not require the user to restate the use case or data sources if they already provided them');
       expect(TRIAGE_PROMPT).toContain('make every field optional (`required: false`)');
       expect(TRIAGE_PROMPT).toContain('Do not present a stale fixed list of model families');
-      expect(TRIAGE_PROMPT).toContain('Model override (text, optional: leave blank to use the recommended/default model in Azure AI Foundry');
+      expect(TRIAGE_PROMPT).toContain('Model override (text, optional: leave blank to use the recommended/default model in Microsoft Foundry');
     });
 
     it('keeps repo uplift tool and surface instructions consistent', () => {
@@ -180,6 +180,13 @@ describe('pack-core agent frontmatter', () => {
       expect(TRIAGE_PROMPT).toContain('SummaryCard` titled `"We found:"` on `"shared:triage-main"`');
       expect(TRIAGE_PROMPT).toContain('Questionnaire` on `"shared:triage-main"`');
       expect(TRIAGE_PROMPT).not.toContain('on `"triage-main"`');
+    });
+
+    it('uses the KAITO model search tool instead of a static supported-model list', () => {
+      expect(TRIAGE_PROMPT).toContain('- core.search_kaito_models');
+      expect(TRIAGE_PROMPT).toContain('call `core.search_kaito_models`');
+      expect(TRIAGE_PROMPT).toContain('do not rely on memory or a static list');
+      expect(TRIAGE_PROMPT).not.toContain('choice: Llama-3.1-70B, Mistral-Large, Phi-4');
     });
   });
 });

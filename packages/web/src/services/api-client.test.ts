@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { healthCheck } from './api-client';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { apiFetch, buildSwaLoginUrl, healthCheck, SessionExpiredError } from './api-client';
 
 describe('healthCheck', () => {
   beforeEach(() => {
@@ -71,5 +71,80 @@ describe('healthCheck', () => {
     expect(result.ok).toBe(false);
     expect(result.error?.phase).toBe('api-error');
     expect(result.error?.message).toContain('500');
+  });
+});
+
+describe('auth redirect and refresh handling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('builds SWA login URL for the current route including hash session state', () => {
+    vi.stubGlobal('window', {
+      location: {
+        pathname: '/session/local-123',
+        search: '?debug=1',
+        hash: '#files',
+      },
+    });
+
+    expect(buildSwaLoginUrl()).toBe(
+      '/.auth/login/aad?post_login_redirect_uri=%2Fsession%2Flocal-123%3Fdebug%3D1%23files',
+    );
+  });
+
+  it('refreshes an expired SWA auth session and retries the original request once', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, {
+        status: 302,
+        headers: { Location: '/.auth/login/aad?post_login_redirect_uri=.referrer' },
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await apiFetch('/api/converse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'hello' }),
+    });
+
+    expect(res.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/.auth/refresh');
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/converse');
+  });
+
+  it('throws SessionExpiredError when refresh does not restore the session', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, {
+        status: 302,
+        headers: { Location: '/.auth/login/aad?post_login_redirect_uri=.referrer' },
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 401 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiFetch('/api/converse')).rejects.toBeInstanceOf(SessionExpiredError);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws SessionExpiredError when the refresh request fails', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, {
+        status: 302,
+        headers: { Location: '/.auth/login/aad?post_login_redirect_uri=.referrer' },
+      }))
+      .mockRejectedValueOnce(new Error('refresh failed'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiFetch('/api/converse')).rejects.toBeInstanceOf(SessionExpiredError);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

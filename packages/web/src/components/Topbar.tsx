@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ThemeToggle } from './ThemeToggle';
 import { useDebug } from '../contexts/DebugContext';
+import { buildSwaLoginUrl } from '../services/api-client';
 
 interface AuthUser {
   userDetails: string;
@@ -116,7 +117,7 @@ export function Topbar({
             className="topbar-signin"
             aria-label="Sign in with Microsoft"
             onClick={() => {
-              window.location.href = '/.auth/login/aad?post_login_redirect_uri=/';
+              window.location.href = buildSwaLoginUrl();
             }}
           >
             <svg

@@ -4,6 +4,7 @@ import type { ReactComponentImplementation } from './vendor/a2ui/react/adapter.j
 // Tools
 import { emitUiTool } from './tools/emit_ui.js';
 import { fetchWebpageTool } from './tools/fetch_webpage.js';
+import { searchKaitoModelsTool } from './tools/search_kaito_models.js';
 import { readFileTool } from './tools/read_file.js';
 import { writeFileTool } from './tools/write_file.js';
 import { listFilesTool } from './tools/list_files.js';
@@ -80,6 +81,7 @@ export const corePack: Pack = {
   tools: [
     emitUiTool,
     fetchWebpageTool,
+    searchKaitoModelsTool,
     readFileTool,
     writeFileTool,
     listFilesTool,

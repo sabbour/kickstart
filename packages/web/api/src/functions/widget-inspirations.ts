@@ -18,6 +18,7 @@ import type {
   HttpResponseInit,
   InvocationContext,
 } from "@azure/functions";
+import { checkRateLimit, rateLimitResponse } from "../lib/rate-limiter.js";
 import {
   ALLOWED_A2UI_COMPONENTS,
   nextFocusDomain,
@@ -139,6 +140,11 @@ app.http("widget-inspirations", {
     context: InvocationContext,
   ): Promise<HttpResponseInit> => {
     try {
+      const rateCheck = checkRateLimit(request);
+      if (!rateCheck.allowed) {
+        return rateLimitResponse(rateCheck.retryAfterMs ?? 60_000);
+      }
+
       const isStreaming = request.query.get("stream") === "true";
 
       // Streaming mode

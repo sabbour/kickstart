@@ -7,7 +7,7 @@ import type {
   TokenUsageSummary,
   TurnUsage,
 } from '../types';
-import { apiFetch, SessionExpiredError, storeAnonSessionToken } from '../services/api-client';
+import { apiFetch, buildSwaLoginUrl, SessionExpiredError, storeAnonSessionToken } from '../services/api-client';
 import { normalizeConversationPhase } from '../utils/chat-a2ui';
 import type { AppIntent } from '@aks-kickstart/harness';
 
@@ -740,7 +740,7 @@ export function useStreaming() {
       cancelReveal();
       if (err instanceof SessionExpiredError) {
         callbacks.onError(err.message);
-        window.location.href = '/.auth/login/aad?post_login_redirect_uri=/';
+        window.location.href = buildSwaLoginUrl();
         return;
       }
       const errMsg = err instanceof Error ? err.message : 'Connection failed';

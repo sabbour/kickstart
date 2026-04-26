@@ -39,6 +39,7 @@ import type { FunctionTool } from '@openai/agents';
 import {
   emitUiTool,
   fetchWebpageTool,
+  searchKaitoModelsTool,
   readFileTool,
   writeFileTool,
   listFilesTool,
@@ -119,6 +120,7 @@ const stubRegistry = {
 const tools = [
   { name: 'core.emit_ui', contrib: emitUiTool },
   { name: 'core.fetch_webpage', contrib: fetchWebpageTool },
+  { name: 'core.search_kaito_models', contrib: searchKaitoModelsTool },
   { name: 'core.read_file', contrib: readFileTool },
   { name: 'core.write_file', contrib: writeFileTool },
   { name: 'core.list_files', contrib: listFilesTool },

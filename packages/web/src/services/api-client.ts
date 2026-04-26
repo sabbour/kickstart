@@ -8,6 +8,35 @@ export class SessionExpiredError extends Error {
   }
 }
 
+const SWA_LOGIN_PATH = '/.auth/login/aad';
+const SWA_REFRESH_PATH = '/.auth/refresh';
+
+export function getCurrentAuthRedirectTarget(): string {
+  if (typeof window === 'undefined') {
+    return '/';
+  }
+  const target = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  return target || '/';
+}
+
+export function buildSwaLoginUrl(redirectTarget = getCurrentAuthRedirectTarget()): string {
+  return `${SWA_LOGIN_PATH}?post_login_redirect_uri=${encodeURIComponent(redirectTarget)}`;
+}
+
+async function refreshSwaAuthSession(): Promise<boolean> {
+  try {
+    const res = await fetch(SWA_REFRESH_PATH, {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      redirect: 'manual',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Anonymous session token propagation (#23)
 //
@@ -61,9 +90,16 @@ export async function apiFetch(url: string, init?: RequestInit, debugMode?: bool
       headers.set('x-anon-session-token', anonToken);
     }
   }
-  const res = await fetch(url, { ...init, headers, redirect: 'manual' });
+  const requestInit = { ...init, headers, redirect: 'manual' as const };
+  const res = await fetch(url, requestInit);
 
   if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+    if (await refreshSwaAuthSession()) {
+      const retryRes = await fetch(url, requestInit);
+      if (!(retryRes.type === 'opaqueredirect' || (retryRes.status >= 300 && retryRes.status < 400))) {
+        return retryRes;
+      }
+    }
     throw new SessionExpiredError();
   }
 

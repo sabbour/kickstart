@@ -1,5 +1,7 @@
 export { emitUiTool } from './emit_ui.js';
 export { fetchWebpageTool } from './fetch_webpage.js';
+export { searchKaitoModelsTool, parseKaitoSupportedModels, KAITO_SUPPORTED_MODELS_URL } from './search_kaito_models.js';
+export type { KaitoModelSummary } from './search_kaito_models.js';
 export { readFileTool } from './read_file.js';
 export { writeFileTool } from './write_file.js';
 export { listFilesTool } from './list_files.js';

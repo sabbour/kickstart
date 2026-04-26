@@ -1,4 +1,5 @@
 import type { AzureARMConnector, AzureSubscription } from '@aks-kickstart/harness';
+import { buildSwaLoginUrl } from './api-client';
 
 export interface AzureUserSummary {
   name?: string;
@@ -29,7 +30,6 @@ interface SWAMeResponse {
   clientPrincipal?: SWAClientPrincipal | null;
 }
 
-const LOGIN_REDIRECT_PATH = '/.auth/login/aad';
 const LOGOUT_REDIRECT_PATH = '/.auth/logout?post_logout_redirect_uri=/';
 
 function readNonEmptyString(value: unknown): string | undefined {
@@ -61,11 +61,6 @@ function toUserSummary(principal: SWAClientPrincipal | null): AzureUserSummary |
     ...(username ? { username } : {}),
     ...(tenantId ? { tenantId } : {}),
   };
-}
-
-function buildLoginRedirectPath(): string {
-  const redirectTarget = `${window.location.pathname}${window.location.search}${window.location.hash}` || '/';
-  return `${LOGIN_REDIRECT_PATH}?post_login_redirect_uri=${encodeURIComponent(redirectTarget)}`;
 }
 
 async function getSwaPrincipal(): Promise<SWAClientPrincipal | null> {
@@ -140,7 +135,7 @@ export async function signInToAzure(
 ): Promise<AzureAuthSessionState> {
   const principal = await getSwaPrincipal().catch(() => null);
   if (!principal) {
-    window.location.assign(buildLoginRedirectPath());
+    window.location.assign(buildSwaLoginUrl());
     return {
       configured: true,
       authenticated: false,
