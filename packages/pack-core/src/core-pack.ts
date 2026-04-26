@@ -1,17 +1,6 @@
 import type { Pack, ComponentContribution } from '@aks-kickstart/harness';
 import type { ReactComponentImplementation } from './vendor/a2ui/react/adapter.js';
-
-// Tools
-import { emitUiTool } from './tools/emit_ui.js';
-import { fetchWebpageTool } from './tools/fetch_webpage.js';
-import { searchKaitoModelsTool } from './tools/search_kaito_models.js';
-import { readFileTool } from './tools/read_file.js';
-import { writeFileTool } from './tools/write_file.js';
-import { listFilesTool } from './tools/list_files.js';
-import { validateArtifactsTool } from './tools/validate_artifacts.js';
-import { checkSafeguardsTool } from './tools/check_safeguards.js';
-import { fixSafeguardsTool } from './tools/fix_safeguards.js';
-import { createSearchComponentsTool } from './tools/search_components.js';
+import { createCoreTools } from './core-tools.js';
 
 // Guardrails
 import { tokenBudgetGuardrail } from './guardrails/token_budget.js';
@@ -78,18 +67,7 @@ export const corePack: Pack = {
   agentsDir: new URL('./agents/', import.meta.url),
   skillsDir: new URL('./skills/', import.meta.url),
 
-  tools: [
-    emitUiTool,
-    fetchWebpageTool,
-    searchKaitoModelsTool,
-    readFileTool,
-    writeFileTool,
-    listFilesTool,
-    validateArtifactsTool,
-    checkSafeguardsTool,
-    fixSafeguardsTool,
-    createSearchComponentsTool({ components: coreComponents }),
-  ],
+  tools: createCoreTools(coreComponents),
 
   components: coreComponents,
 

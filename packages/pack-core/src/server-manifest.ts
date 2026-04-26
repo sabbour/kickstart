@@ -24,14 +24,7 @@ import {
 } from './schemas/rich-component-schemas.js';
 
 // Tools (no JSX)
-import { emitUiTool } from './tools/emit_ui.js';
-import { fetchWebpageTool } from './tools/fetch_webpage.js';
-import { searchKaitoModelsTool } from './tools/search_kaito_models.js';
-import { readFileTool } from './tools/read_file.js';
-import { writeFileTool } from './tools/write_file.js';
-import { listFilesTool } from './tools/list_files.js';
-import { validateArtifactsTool } from './tools/validate_artifacts.js';
-import { createSearchComponentsTool } from './tools/search_components.js';
+import { createCoreTools } from './core-tools.js';
 
 // Guardrails (no JSX)
 import { tokenBudgetGuardrail } from './guardrails/token_budget.js';
@@ -96,16 +89,7 @@ export const corePackServer: Pack = {
   agentsDir: resolveAssetURL(import.meta.url, './agents/', './pack-assets/core/agents/'),
   skillsDir: resolveAssetURL(import.meta.url, './skills/', './pack-assets/core/skills/'),
 
-  tools: [
-    emitUiTool,
-    fetchWebpageTool,
-    searchKaitoModelsTool,
-    readFileTool,
-    writeFileTool,
-    listFilesTool,
-    validateArtifactsTool,
-    createSearchComponentsTool({ components: serverComponents }),
-  ],
+  tools: createCoreTools(serverComponents),
 
   components: serverComponents,
 

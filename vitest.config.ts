@@ -6,6 +6,7 @@ export default defineConfig({
     alias: {
       "@aks-kickstart/harness/runtime/redact": resolve(__dirname, "packages/harness/src/runtime/redact.ts"),
       "@aks-kickstart/harness/runtime/registry": resolve(__dirname, "packages/harness/src/runtime/registry.ts"),
+      "@aks-kickstart/harness/runtime/asset-url": resolve(__dirname, "packages/harness/src/runtime/asset-url.ts"),
       "@aks-kickstart/harness/runtime/session": resolve(__dirname, "packages/harness/src/runtime/session.ts"),
       "@aks-kickstart/harness/runtime/runner": resolve(__dirname, "packages/harness/src/runtime/runner.ts"),
       "@aks-kickstart/harness/runtime/sse": resolve(__dirname, "packages/harness/src/runtime/sse.ts"),
