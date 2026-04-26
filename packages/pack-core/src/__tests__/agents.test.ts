@@ -20,11 +20,16 @@
 
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const AGENTS_DIR = path.resolve(__dirname, '../agents');
 const AGENT_NAMES = ['core.triage', 'core.codesmith', 'core.reviewer'];
+const TRIAGE_PROMPT = readFileSync(path.join(AGENTS_DIR, 'triage.agent.md'), 'utf8');
 
 /** Regex for the pack.verb_noun tool-name format required by the DP §6a. */
 const TOOL_NAME_PATTERN = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9_]*$/;
@@ -144,5 +149,37 @@ describe('pack-core agent frontmatter', () => {
     });
 
     it.todo('unknown frontmatter keys are rejected or flagged by the loader');
+  });
+
+  describe('triage prompt behavior', () => {
+    it('uses contextual first-turn routing instead of forcing the generic track picker', () => {
+      expect(TRIAGE_PROMPT).toContain('Use track selection as a lightweight router');
+      expect(TRIAGE_PROMPT).toContain('If the track is obvious, do **not** ask the user to pick a generic track');
+      expect(TRIAGE_PROMPT).toContain('Requests for an AI-backed model, agent, chatbot, retrieval, planning, prediction, document analysis, or tool-using workflow imply `agentic_app`');
+      expect(TRIAGE_PROMPT).not.toContain('On the **first turn**, emit a `TrackPicker` showing the four deployment tracks available on AKS Automatic');
+    });
+
+    it('keeps first-turn track picker copy platform-neutral for gradual AKS disclosure', () => {
+      expect(TRIAGE_PROMPT).toContain('Gradually disclose AKS Automatic');
+      expect(TRIAGE_PROMPT).toContain('"title":"Which path fits your app?"');
+      expect(TRIAGE_PROMPT).not.toContain('"title":"What would you like to build on AKS?"');
+      expect(TRIAGE_PROMPT).not.toContain('"description":"Deploy a containerized web application on AKS Automatic"');
+      expect(TRIAGE_PROMPT).not.toContain('"description":"Build and deploy an AI-powered agent or chatbot on AKS Automatic"');
+    });
+
+    it('makes Foundry follow-up fields optional and inferred from prior context', () => {
+      expect(TRIAGE_PROMPT).toContain('Do not require the user to restate the use case or data sources if they already provided them');
+      expect(TRIAGE_PROMPT).toContain('make every field optional (`required: false`)');
+      expect(TRIAGE_PROMPT).toContain('Do not present a stale fixed list of model families');
+      expect(TRIAGE_PROMPT).toContain('Model override (text, optional: leave blank to use the recommended/default model in Azure AI Foundry');
+    });
+
+    it('keeps repo uplift tool and surface instructions consistent', () => {
+      expect(TRIAGE_PROMPT).toContain('- core.inspect_repo');
+      expect(TRIAGE_PROMPT).toContain('call `core.inspect_repo`');
+      expect(TRIAGE_PROMPT).toContain('SummaryCard` titled `"We found:"` on `"shared:triage-main"`');
+      expect(TRIAGE_PROMPT).toContain('Questionnaire` on `"shared:triage-main"`');
+      expect(TRIAGE_PROMPT).not.toContain('on `"triage-main"`');
+    });
   });
 });
