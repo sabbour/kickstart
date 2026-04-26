@@ -38,6 +38,16 @@ describe('validateGitHubUrl', () => {
     expect(result).toBe('https://github.com/owner/repo');
   });
 
+  it('accepts and normalizes a GitHub HTTPS URL with .git suffix', () => {
+    const result = validateGitHubUrl('https://github.com/owner/repo.git');
+    expect(result).toBe('https://github.com/owner/repo');
+  });
+
+  it('accepts and normalizes a GitHub HTTPS URL with .git suffix and trailing slash', () => {
+    const result = validateGitHubUrl('https://github.com/owner/repo.git/');
+    expect(result).toBe('https://github.com/owner/repo');
+  });
+
   it('rejects SSH URLs', () => {
     expect(() => validateGitHubUrl('git@github.com:owner/repo.git')).toThrow(
       /only GitHub HTTPS URLs/,
@@ -144,7 +154,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects Python language', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.language).toBe('python');
@@ -152,7 +162,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects FastAPI framework', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.framework).toBe('fastapi');
@@ -160,7 +170,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects Python 3.11 runtime from pyproject.toml', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.runtime).toBe('python3.11');
@@ -168,7 +178,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects postgres database dependency (from sqlalchemy + asyncpg)', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.deps.database).toContain('postgres');
@@ -176,7 +186,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('generates db provisioning questionnaire item', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.questionnaire.some((q) => q.id.startsWith('db-provisioning-'))).toBe(true);
@@ -184,7 +194,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('reports no Dockerfile (fixture has none)', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.hasDockerfile).toBe(false);
@@ -192,7 +202,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('output contains no raw version numbers in dep names', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       const depNames = result.deps.database ?? [];
@@ -207,7 +217,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects javascript language', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.language).toBe('javascript');
@@ -215,7 +225,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects Express framework', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.framework).toBe('express');
@@ -223,7 +233,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects postgres dependency (from pg)', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.deps.database).toContain('postgres');
@@ -231,7 +241,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects entrypoint from scripts.start', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.entrypoint).toBe('src/index.js');
@@ -239,7 +249,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('output contains no raw version strings in database dep names', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       for (const dep of result.deps.database ?? []) {
@@ -254,7 +264,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects Go language', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.language).toBe('go');
@@ -262,7 +272,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects Gin framework', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.framework).toBe('gin');
@@ -270,7 +280,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects Go 1.21 runtime from go.mod', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.runtime).toBe('go1.21');
@@ -278,7 +288,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('detects postgres dep (from lib/pq)', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       expect(result.deps.database).toContain('postgres');
@@ -286,7 +296,7 @@ describe('inspectRepo — local fixtures', () => {
 
     it('output dep names are canonical (no version numbers)', async () => {
       const result = await inspectRepo(
-        { source: 'local', localPath: fixturePath },
+        { source: 'local', remoteUrl: null, localPath: fixturePath },
         FIXTURES_DIR,
       );
       for (const dep of result.deps.database ?? []) {
@@ -311,7 +321,7 @@ describe('inspectRepo output shape', () => {
 
   it('always returns questionnaire as an array', async () => {
     const result: InspectRepoOutput = await inspectRepo(
-      { source: 'local', localPath: join(FIXTURES_DIR, 'gin-sample') },
+      { source: 'local', remoteUrl: null, localPath: join(FIXTURES_DIR, 'gin-sample') },
       FIXTURES_DIR,
     );
     expect(Array.isArray(result.questionnaire)).toBe(true);
@@ -319,7 +329,7 @@ describe('inspectRepo output shape', () => {
 
   it('always returns hasDockerfile, hasHelmChart, hasGithubActions as booleans', async () => {
     const result = await inspectRepo(
-      { source: 'local', localPath: join(FIXTURES_DIR, 'express-sample') },
+      { source: 'local', remoteUrl: null, localPath: join(FIXTURES_DIR, 'express-sample') },
       FIXTURES_DIR,
     );
     expect(typeof result.hasDockerfile).toBe('boolean');

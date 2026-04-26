@@ -17,7 +17,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { FunctionTool } from '@openai/agents';
-import { emitUiTool, fetchWebpageTool, searchKaitoModelsTool, readFileTool, writeFileTool, listFilesTool, validateArtifactsTool } from '../tools/index.js';
+import { emitUiTool, fetchWebpageTool, searchKaitoModelsTool, readFileTool, writeFileTool, listFilesTool, validateArtifactsTool, createInspectRepoTool } from '../tools/index.js';
 import { createSearchComponentsTool } from '../tools/search_components.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -90,6 +90,7 @@ const tools = [
   { name: 'core.write_file', contrib: writeFileTool },
   { name: 'core.list_files', contrib: listFilesTool },
   { name: 'core.validate_artifacts', contrib: validateArtifactsTool },
+  { name: 'core.inspect_repo', contrib: createInspectRepoTool() },
   { name: 'core.search_components', contrib: createSearchComponentsTool(stubRegistry) },
 ] as const;
 

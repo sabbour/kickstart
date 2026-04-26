@@ -30,6 +30,7 @@ import {
   writeFileTool,
   listFilesTool,
   validateArtifactsTool,
+  createInspectRepoTool,
 } from '../tools/index.js';
 import { createSearchComponentsTool } from '../tools/search_components.js';
 
@@ -108,6 +109,7 @@ const tools = [
   { name: 'core.write_file', contrib: writeFileTool },
   { name: 'core.list_files', contrib: listFilesTool },
   { name: 'core.validate_artifacts', contrib: validateArtifactsTool },
+  { name: 'core.inspect_repo', contrib: createInspectRepoTool() },
   { name: 'core.search_components', contrib: createSearchComponentsTool(stubRegistry) },
 ] as const;
 
@@ -140,5 +142,28 @@ describe('pack-core tool strict-mode `required` conformance (#998)', () => {
     const csObj = (createSurfaceBranch!.properties as Record<string, Record<string, unknown>>)
       .createSurface;
     expect(csObj.required).toContain('sendDataModel');
+  });
+
+  it('core.inspect_repo: nullable source-specific fields are listed in required', () => {
+    const schema = getToolSchema(createInspectRepoTool());
+    expect(schema).toBeTruthy();
+
+    expect([...(schema!.required as string[])].sort()).toEqual(
+      ['localPath', 'remoteUrl', 'source'].sort(),
+    );
+
+    const properties = schema!.properties as Record<string, Record<string, unknown>>;
+    for (const key of ['remoteUrl', 'localPath']) {
+      const field = properties[key];
+      const hasNullableAnyOf =
+        Array.isArray(field.anyOf) &&
+        (field.anyOf as Array<Record<string, unknown>>).some((branch) => branch.type === 'null');
+      const hasNullableType = Array.isArray(field.type) && (field.type as unknown[]).includes('null');
+      const hasNullableFlag = field.nullable === true;
+
+      expect(hasNullableAnyOf || hasNullableType || hasNullableFlag, `${key} should accept null`).toBe(
+        true,
+      );
+    }
   });
 });

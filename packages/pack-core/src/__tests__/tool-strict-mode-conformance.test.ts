@@ -44,6 +44,7 @@ import {
   writeFileTool,
   listFilesTool,
   validateArtifactsTool,
+  createInspectRepoTool,
 } from '../tools/index.js';
 import { createSearchComponentsTool } from '../tools/search_components.js';
 
@@ -125,6 +126,7 @@ const tools = [
   { name: 'core.write_file', contrib: writeFileTool },
   { name: 'core.list_files', contrib: listFilesTool },
   { name: 'core.validate_artifacts', contrib: validateArtifactsTool },
+  { name: 'core.inspect_repo', contrib: createInspectRepoTool() },
   { name: 'core.search_components', contrib: createSearchComponentsTool(stubRegistry) },
 ] as const;
 

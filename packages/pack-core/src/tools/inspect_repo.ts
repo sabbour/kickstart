@@ -47,7 +47,7 @@ const PARTIAL_READ_ALLOWLIST: Array<{ file: string; lines: number }> = [
 
 // ── URL validation ───────────────────────────────────────────────────────────
 
-const GITHUB_HTTPS_RE = /^https:\/\/github\.com\/([A-Za-z0-9_.\-]+)\/([A-Za-z0-9_.\-]+)\/?$/;
+const GITHUB_HTTPS_RE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?\/?$/;
 
 export function validateGitHubUrl(url: string): string {
   const trimmed = url.trim();
@@ -57,7 +57,7 @@ export function validateGitHubUrl(url: string): string {
     );
   }
   // Return without trailing slash or .git
-  return trimmed.replace(/\.git$/, '').replace(/\/$/, '');
+  return trimmed.replace(/\/$/, '').replace(/\.git$/, '');
 }
 
 // ── Dev-mode path validation ─────────────────────────────────────────────────
@@ -209,7 +209,7 @@ function pyDepsFromPyproject(content: string): string[] {
   const projectDeps = content.match(/dependencies\s*=\s*\[([\s\S]*?)\]/)?.[1] ?? '';
   const combined = dependenciesBlock + '\n' + projectDeps;
   for (const line of combined.split('\n')) {
-    const m = line.match(/["']?([a-z][a-z0-9_\-]*)["']?\s*[=><![\s]/i);
+    const m = line.match(/["']?([a-z][a-z0-9_-]*)["']?\s*[=><![\s]/i);
     if (m?.[1]) deps.push(m[1].toLowerCase().replace(/-/g, '_'));
   }
   return deps;
@@ -457,8 +457,8 @@ function redactOutput(output: InspectRepoOutput): InspectRepoOutput {
 
 export interface InspectRepoInput {
   source: 'remote' | 'local';
-  remoteUrl?: string;
-  localPath?: string;
+  remoteUrl: string | null;
+  localPath: string | null;
 }
 
 export interface InspectRepoOutput {
@@ -565,13 +565,15 @@ export const InspectRepoInputSchema = z.object({
   ),
   remoteUrl: z
     .string()
-    .optional()
-    .describe('GitHub HTTPS URL — required when source=remote. Format: https://github.com/<owner>/<repo>'),
+    .nullable()
+    .describe(
+      'GitHub HTTPS URL — required when source=remote and otherwise null. Format: https://github.com/<owner>/<repo>',
+    ),
   localPath: z
     .string()
-    .optional()
+    .nullable()
     .describe(
-      'Absolute path to a local repository root — required when source=local. Dev mode only (IS_DEV_MODE=true).',
+      'Absolute path to a local repository root — required when source=local and otherwise null. Dev mode only (IS_DEV_MODE=true).',
     ),
 });
 
