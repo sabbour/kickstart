@@ -27,6 +27,7 @@ import { AgentOutput } from '../types/agent-output.js';
 import { runGuardrails } from './guardrails.js';
 import { resolveModelName } from './model-resolution.js';
 import { PlanArtifactMissing } from '../errors/index.js';
+import { sanitizeError } from './sanitize-error.js';
 import { z } from 'zod';
 import { buildRunConfig } from './run-config.js';
 import type { RunConfig } from './run-config.js';
@@ -1118,7 +1119,7 @@ export class Runner {
       // halts are intentional — don't count them as infrastructure failures.
       runnerCircuitBreaker.recordFailure();
       sseWrite('error', {
-        message: err instanceof Error ? err.message : String(err),
+        message: sanitizeError(err),
       });
       // Emit `end` even on hard failure so the Debug panel can surface
       // agentName and model. skillsExecuted/toolsExecuted may be partial.
