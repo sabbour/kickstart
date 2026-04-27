@@ -24,6 +24,7 @@ export function makeSessionCtx(
       userActions: ['confirm', 'cancel'],
     },
     recentTurns: [],
+    toolCallItems: [],
     activeAgent: 'core.triage',
     pendingUserAction: null,
     recordA2UIEmission(msg) {
@@ -43,6 +44,12 @@ export function makeSessionCtx(
     },
     recordTurn(turn) {
       this.recentTurns.push(turn);
+    },
+    recordToolCallRecord(record) {
+      this.toolCallItems.push(record);
+      if (this.toolCallItems.length > 200) {
+        this.toolCallItems.splice(0, this.toolCallItems.length - 200);
+      }
     },
     async getAzureCreds() {
       return null;
