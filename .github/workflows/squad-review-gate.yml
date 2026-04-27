@@ -67,18 +67,13 @@ jobs:
             const touchesSensitivePaths = changedFiles.some(isSensitivePath);
             const hasSecuritySignals = isSecurityPatch(pr, labels);
 
-            // Low-risk exception (squad:chore-auto): security:approved only required when
-            // PR touches sensitive paths or has security signals. This is an intentional
-            // design decision — routine chores without security-relevant changes don't need
-            // a full security review. Ceremonies.md documents the standard path (security always
-            // required); this is the documented low-risk exception. See squad.agent.md ceremonies.
             const requiresZapp = !isLowRisk || hasSecuritySignals || touchesSensitivePaths;
-            const requiredApprovals = ['codereview:approved'];
+            const requiredApprovals = ['nibbler:approved'];
             if (requiresZapp) {
-              requiredApprovals.push('security:approved');
+              requiredApprovals.push('zapp:approved');
             }
             if (isArchitecturePR) {
-              requiredApprovals.push('architecture:approved');
+              requiredApprovals.push('leela:approved');
             }
 
             const hasDocsMarker = docsApproved || skipDocs;
@@ -130,7 +125,7 @@ jobs:
             const hasChangeset = paths.some(p => p.startsWith('.changeset/') && p.endsWith('.md') && !p.endsWith('README.md'));
             const hasDocsSite = paths.some(p => p.startsWith('docs-site/docs/'));
             const hasApiDocs = paths.some(p => p === 'docs-site/docs/extending/api-endpoints.md');
-            const skipDocs = labels.includes('skip-docs') || labels.includes('docs:not-applicable');
+            const skipDocs = labels.includes('skip-docs');
 
             // User-facing signal: touches packages/*/src/ but is not test-only
             const userFacing = paths.some(p =>
@@ -188,7 +183,7 @@ jobs:
             ];
 
             if (skipDocs) {
-              lines.push('> ℹ️ `skip-docs` or `docs:not-applicable` label present. Docs/changeset requirement explicitly bypassed for this PR.');
+              lines.push('> ℹ️ `skip-docs` label present. Docs/changeset requirement explicitly bypassed for this PR.');
             } else if (needsDocsGate) {
               lines.push('> ❌ This PR touches `packages/*/src/` but has neither a changeset nor a `docs-site/docs/` update. Add one of them or apply `skip-docs` before merging.');
             } else if (userFacing && !hasChangeset && hasDocsSite) {

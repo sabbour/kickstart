@@ -32,7 +32,7 @@ jobs:
           script: |
             const pr = context.payload.pull_request;
             const appliedLabel = context.payload.label.name;
-            const REVIEWER_NAMESPACES = ['codereview', 'security', 'architecture', 'docs'];
+            const REVIEWER_NAMESPACES = ['nibbler', 'zapp', 'leela', 'docs'];
 
             const matchedReviewer = REVIEWER_NAMESPACES.find(r =>
               appliedLabel === `${r}:approved` || appliedLabel === `${r}:rejected`
@@ -72,7 +72,7 @@ jobs:
             const DEPENDABOT_AUTHOR = 'dependabot[bot]';
             const DEPENDABOT_BRANCH_PREFIX = 'dependabot/';
             const XL_THRESHOLD = 1000;
-            const ALL_REVIEWER_LABELS = ['codereview:approved', 'security:approved', 'architecture:approved'];
+            const ALL_REVIEWER_LABELS = ['nibbler:approved', 'zapp:approved', 'leela:approved'];
             const DOCS_APPROVED_LABEL = 'docs:approved';
             const SKIP_DOCS_LABEL = 'skip-docs';
             const DOCS_NOT_APPLICABLE_LABEL = 'docs:not-applicable';
@@ -163,19 +163,17 @@ jobs:
 
               if (!labels.has(LOW_RISK_LABEL)) {
                 // Standard path: nibbler + zapp always; leela only for architecture PRs
-                const required = ['codereview:approved', 'security:approved'];
-                if (isArchitecture) required.push('architecture:approved');
+                const required = ['nibbler:approved', 'zapp:approved'];
+                if (isArchitecture) required.push('leela:approved');
                 return required;
               }
 
-              // Low-risk exception (squad:chore-auto): security:approved only required when
-              // PR has security-sensitive changes. Intentional design — routine chores don't need
-              // full security review. Standard path always requires it. See squad.agent.md ceremonies.
-              const required = ['codereview:approved'];
+              // Low-risk path: nibbler always; zapp only if security-sensitive; leela only if architecture
+              const required = ['nibbler:approved'];
               if (getZappRequirementReason(pr, labels, changedFiles)) {
-                required.push('security:approved');
+                required.push('zapp:approved');
               }
-              if (isArchitecture) required.push('architecture:approved');
+              if (isArchitecture) required.push('leela:approved');
               return required;
             }
 

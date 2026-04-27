@@ -4,7 +4,7 @@
 # (see .squad/decisions/label-project-board-design.md). It moves PRs and issues
 # between project columns based on:
 #
-# 1. Label state (e.g., codereview:approved + security:approved → "Approved" column)
+# 1. Label state (e.g., nibbler:approved + zapp:approved → "Approved" column)
 # 2. PR lifecycle (opened, merged)
 # 3. Branch naming conventions (squad/NNN-* triggers "In Progress")
 #
@@ -17,7 +17,7 @@
 # - In Progress: PR synchronized — push on an existing squad/ PR branch
 #                (`pull_request.synchronize` event on a squad/* head ref)
 # - In Review:   PR opened or reopened from a squad/ branch
-# - Approved:    All required approvals present (codereview:approved + security:approved + docs marker; architecture:approved if architecture)
+# - Approved:    All required approvals present (nibbler:approved + zapp:approved + docs marker; leela:approved if architecture)
 # - Merged:      PR merged to main
 #
 # Note: raw branch pushes before a PR is opened do not trigger this workflow.
@@ -53,9 +53,9 @@ jobs:
       (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
       startsWith(github.event.label.name, 'squad:') ||
       github.event.label.name == 'squad' ||
-      contains(github.event.label.name, 'codereview:') ||
-      contains(github.event.label.name, 'security:') ||
-      contains(github.event.label.name, 'architecture:') ||
+      contains(github.event.label.name, 'nibbler:') ||
+      contains(github.event.label.name, 'zapp:') ||
+      contains(github.event.label.name, 'leela:') ||
       contains(github.event.label.name, 'docs:') ||
       github.event.label.name == 'skip-docs' ||
       github.event.label.name == 'architecture' ||
@@ -273,16 +273,19 @@ jobs:
                 core.info(`PR is merged → moving to "Merged"`);
               }
               // Rule 2: All required approvals present → "Approved"
-              // Low-risk exception: squad:chore-auto PRs only need codereview:approved (matching
-              // the gate logic in squad-review-gate.yml and squad-auto-merge.yml).
-              else if (labels.includes('codereview:approved') &&
-                       (labels.includes('security:approved') || labels.includes('squad:chore-auto')) &&
-                       (!labels.includes('architecture') || labels.includes('architecture:approved')) &&
+              // squad:chore-auto mirrors the low-risk path in squad-review-gate.yml and
+              // squad-auto-merge.yml: Nibbler is always required; Zapp is waived for
+              // chore-auto PRs (unless overridden by security signals / sensitive paths,
+              // which the gate workflows enforce before nibbler:approved can land).
+              else if (labels.includes('nibbler:approved') && 
+                       (labels.includes('zapp:approved') || labels.includes('squad:chore-auto')) &&
+                       (!labels.includes('architecture') || labels.includes('leela:approved')) &&
                        (labels.includes('docs:approved') || labels.includes('skip-docs') || labels.includes('docs:not-applicable'))) {
                 const isArchitecturePR = labels.includes('architecture');
-                const isLowRisk = labels.includes('squad:chore-auto') && !labels.includes('security:approved');
+                const isLowRisk = labels.includes('squad:chore-auto') && !labels.includes('zapp:approved');
+                const approvalSummary = isLowRisk ? 'nibbler (chore-auto fast lane)' : `nibbler + zapp${isArchitecturePR ? ' + leela' : ''}`;
                 targetColumn = 'Approved';
-                core.info(`All required approvals present (codereview${isLowRisk ? ' [low-risk path]' : ' + security'}${isArchitecturePR ? ' + architecture' : ''} + docs) → moving to "Approved"`);
+                core.info(`All required approvals present (${approvalSummary} + docs) → moving to "Approved"`);
               }
               // Rule 3: PR opened/reopened from squad/ branch → "In Review"
               else if ((eventType === 'opened' || eventType === 'reopened') && 
