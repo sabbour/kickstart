@@ -85,3 +85,1177 @@ Implemented the golden E2E test harness per the approved revised DP (Bender v2, 
 - Every PR to main/dev triggers the golden-e2e workflow (no path filter on trigger).
 - The `golden-gate` job becomes a branch-protection required check.
 - Fixtures must be re-recorded when they exceed 30-day freshness or when prompt/tool-schema hashes drift.
+---
+
+# Dev Branch Protection Rules Setup
+
+## Attempt Summary
+Attempted to set up branch protection rules on `dev` branch via GitHub REST API to enforce the PR ceremony workflow.
+
+## Configuration Identified
+- **Branch**: `dev` (confirmed to exist, currently unprotected)
+- **Required Status Check**: "CI Gate" (from ci.yml workflow job)
+- **Intended Rules**:
+  - Require 1 PR approval
+  - Require "CI Gate" status check to pass
+  - Block force pushes
+  - Block deletions
+  - Do NOT require conversation resolution
+  - No admin enforcement needed
+
+## Blocker: Admin Access Required
+Branch protection rules require **admin permissions** on the repository. Current user `asabbour_microsoft` has:
+- ✅ pull, push, triage
+- ❌ admin (required for branch protection)
+- ❌ maintain
+
+## Resolution Required
+This task must be completed by a repository admin. The exact API call needed:
+
+```bash
+gh api PUT /repos/azure-management-and-platforms/kickstart/branches/dev/protection \
+  -f required_pull_request_reviews='{"required_approving_review_count":1}' \
+  -f required_status_checks='{"strict":false,"contexts":["CI Gate"]}' \
+  -F allow_force_pushes=false \
+  -F allow_deletions=false
+```
+
+Or via curl with proper JSON:
+```bash
+curl -X PUT \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: token $TOKEN" \
+  https://api.github.com/repos/azure-management-and-platforms/kickstart/branches/dev/protection \
+  -d '{
+    "required_status_checks": {"strict": false, "contexts": ["CI Gate"]},
+    "enforce_admins": false,
+    "required_pull_request_reviews": {"required_approving_review_count": 1},
+    "restrictions": null,
+    "allow_force_pushes": false,
+    "allow_deletions": false
+  }'
+```
+
+## Decision Requested
+- Assign an admin to apply these branch protection rules to `dev`
+- Rules are ready to be applied immediately
+---
+
+# Decision: sync-secrets.mjs and secret-based app-id in workflows
+
+**Date:** 2026-04-24
+**Author:** Bender (Backend Dev)
+**Status:** Accepted
+
+## Context
+
+Workflow `squad-release-cadence.yml` had a hardcoded `app-id: 3340358` which was stale (the lead app is actually `3492550`). PEM keys and app IDs were not being uploaded to GitHub secrets in any automated way.
+
+## Decision
+
+1. **Created `.squad/scripts/sync-secrets.mjs`** — reads identity config, uploads `SQUAD_{ROLE}_APP_PRIVATE_KEY` and `SQUAD_{ROLE}_APP_ID` secrets for every role that has a local PEM file. PEM content is piped via stdin to `gh secret set` (never logged or echoed).
+
+2. **Changed `squad-release-cadence.yml`** line 27 from `app-id: 3340358` to `app-id: ${{ secrets.SQUAD_LEAD_APP_ID }}` so the workflow always uses the value set by sync-secrets.
+
+## Convention
+
+All workflows should reference `${{ secrets.SQUAD_{ROLE}_APP_ID }}` instead of hardcoding numeric app IDs. Run `node .squad/scripts/sync-secrets.mjs` after provisioning new apps or rotating keys.
+---
+
+### 2026-04-24T03:34:17Z: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** This local repo folder is connected to the org repo (azure-management-and-platforms/kickstart) ONLY. Do not look at, scan, merge, or fix anything on azure-management-and-platforms/kickstart. All PR references, CI checks, and Ralph scans must target the org repo exclusively.
+**Why:** User request — the azure-management-and-platforms/kickstart repo is not the active work target from this checkout.
+---
+
+### 2026-04-24T03:54:32Z: User directive — ceremony enforcement
+**By:** Ahmed Sabbour (via Copilot)
+**What:** The full PR workflow (Design Proposal → Design Review → Code → PR Review Gate → Merge) must be followed for ALL code changes, including CI fixes and "small" changes. No exceptions. Ralph's speed-loop does not override ceremony gates. This session's bypass of the DP/DR/review pipeline was a governance violation.
+**Why:** User observed that agents pushed code directly without peer review, design proposals, or the Leela/Zapp/Nibbler review cycle — violating the ceremonies defined in squad.agent.md and ceremonies.md.
+---
+
+### 2026-04-24T04:20:54Z: User directive — no shortcuts
+**By:** Ahmed Sabbour (via Copilot)
+**What:** "I want to see amazing progress WITHOUT SHORTCUTS (shitcuts)" — full ceremony pipeline enforced at all times. DP → DR → Code → PR Review Gate → Merge. No exceptions, no bypassing ceremonies for "small" changes. Ralph runs autonomously while user sleeps.
+**Why:** User trust directive — the team must prove it can operate with discipline unsupervised.
+---
+
+### 2026-04-24T04:28:23Z: User directive — use worktrees
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Use git worktrees locally to allow parallel work on multiple issues. Each issue gets its own worktree checkout so agents don't block each other on branch switching.
+**Why:** User request — enables true parallel implementation across issues.
+---
+
+### 2026-04-24T10:12:58-07:00: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** PEM keys for GitHub Apps stored locally outside the repo, not in .squad/identity/keys/. Symlink or env var approach needed for resolve-token.mjs to find them.
+**Why:** User request — keeps secrets completely outside the repo tree
+---
+
+### 2026-04-24T11:02:26Z: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** OAuth user-to-server authentication deferred. Bot installation tokens cover current needs. Add OAuth later only if branch protection or org policy blocks bot actors from merging/approving.
+**Why:** User request — not needed now, adds complexity
+---
+
+### 2026-04-24T12:59:10-07:00: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Never leak tokens in checks. Do not run resolve-token.mjs as a bare command — always capture with $(...). This is a P1 governance rule (anti-pattern #1 in squad.agent.md).
+**Why:** User request after observing a token leak in chat output — captured for team memory
+---
+
+### 2026-04-24T13:31:14-07:00: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** When reviewers (Zapp, Nibbler, Leela) submit CHANGES_REQUESTED reviews, they must use native GitHub code suggestion blocks (`suggestion` fenced blocks in review comments on specific lines), not just plain-text comments. This enables one-click "commit suggestion" for the author.
+**Why:** User request — makes the review→fix loop faster and more actionable with native GitHub UI
+---
+
+### 2026-04-24T13:56:41-07:00: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** For any PR that requires docs updates, Amy should jump into the PR branch and create/update the required documentation directly — not just assess and label, but commit the actual docs changes to the PR.
+**Why:** User request — docs should be part of the PR, not a follow-up task after merge.
+---
+
+### 2026-04-24T14:05:53-07:00: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Enable automerge by default on squad PRs. When a PR passes all review gates (leela:approved + zapp:approved + nibbler:approved + docs label + CI green), it should auto-merge without manual intervention.
+**Why:** User request — reduce friction in the merge pipeline. The review gate is the quality control; once it passes, there's no reason to wait for a human click.
+---
+
+# Bender decision inbox — prefer callback-based app creation
+
+**Date:** 2026-04-24T10:40:12.502-07:00
+**Context:** GitHub App setup in `.squad/scripts/` needs a reliable manifest flow that actually saves credentials.
+
+## Decision
+
+Prefer `.squad/scripts/create-app.mjs` over `generate-app-manifests.mjs` for GitHub App creation. The new script completes the manifest flow by capturing GitHub's callback code, exchanging it, and saving the resulting credentials.
+
+## Why
+
+- GitHub redirects manifest creation back with `?code=...`, and that code must be exchanged immediately.
+- Static HTML can submit a manifest, but it cannot complete the conversion step or persist the PEM and app registration.
+- Centralizing the manifest gotchas in one script reduces repeated operator mistakes.
+
+## Consequences
+
+- `generate-app-manifests.mjs` remains a reference generator, not the primary setup path.
+- Future setup docs and operator instructions should point to `create-app.mjs` first.
+---
+
+# Bender decision inbox — externalize app private keys
+
+**Date:** 2026-04-24T10:48:43.003-07:00
+**Context:** GitHub App setup scripts need to stop storing PEM material inside the repo without leaving repo-local mirrors behind.
+
+## Decision
+
+Store GitHub App PEM files outside the repo by default under `~/.config/squad/{owner}/keys/`. Do not create `.squad/identity/keys/{role}.pem` symlinks or any other repo-local mirror.
+
+## Why
+
+- The repo should not be the storage boundary for long-lived private keys.
+- The token resolver already supports explicit external key paths, so duplicating or mirroring keys inside the repo adds risk without value.
+- A `--keys-dir` override keeps local automation flexible for nonstandard environments.
+
+## Consequences
+
+- App creation now depends on the operator's user config directory by default.
+- Backup and rotation procedures must treat the external config directory as the only source of truth for PEM material.
+- Follow-up configuration must point resolvers at the external key path instead of expecting an in-repo file.
+---
+
+# Bender decision inbox — external key directory via config
+
+**Date:** 2026-04-24T10:49:35.684-07:00
+**Context:** `create-app.mjs` now stores PEM files outside the repo, so token resolution needs a single configured source for role private keys.
+
+## Decision
+
+Use `.squad/identity/config.json.keysDir` as the repo-local pointer to the external PEM directory. `resolve-token.mjs` expands `~` and reads `{keysDir}/{role}.pem`; if `keysDir` is absent, it falls back to the legacy `.squad/identity/keys/{role}.pem` path.
+
+## Why
+
+- The repo needs one stable place to record where external key material lives.
+- Keeping the fallback preserves compatibility for older setups while new flows write only to external storage.
+- `create-app.mjs` can wire the new flow automatically by setting `keysDir` when the config is missing it.
+
+## Consequences
+
+- Operators can move keys out of the repo without manually editing `resolve-token.mjs`.
+- Existing setups keep working until they migrate `config.json.keysDir`.
+- App registration JSON remains repo-local and non-secret, while PEM material stays external.
+---
+
+# Bender decision inbox — separate user OAuth token flow
+
+**Date:** 2026-04-24T11:00:28.567-07:00
+**Context:** GitHub Apps in Squad now need both installation tokens and user-to-server OAuth tokens without storing new secrets in the repo.
+
+## Decision
+
+Store GitHub App OAuth client secrets and user OAuth tokens alongside PEM files in the external `keysDir`, and make `resolve-token.mjs --user` a separate opt-in path from installation-token resolution.
+
+## Why
+
+- OAuth client secrets and refresh tokens are secret material and belong in the same external storage boundary as PEM files.
+- Installation tokens and user tokens represent different identities and should never be conflated implicitly.
+- A dedicated `oauth-login.mjs` flow keeps browser authorization and token exchange out of the normal app-token resolver path.
+
+## Consequences
+
+- `create-app.mjs` must save an external `{role}.oauth.json` file with the client secret and callback URL.
+- Users need to run `oauth-login.mjs` once per role before `resolve-token.mjs --user` can succeed.
+- `resolve-token.mjs` now handles refresh-token rotation for user OAuth tokens while preserving the existing installation-token default.
+---
+
+# Leela decision inbox — role clarity audit and boundary alignment
+
+**Date:** 2026-04-24T13:20:49-07:00
+**Context:** Team expanded to 10 members (8 active + Scribe + Ralph). Ahmed requested crystal-clear role boundaries with no overlap.
+
+## Decisions
+
+### 1. Amy (Docs) vs Scribe boundary
+
+Amy owns all user-facing documentation: README, ADRs, guides, Docusaurus site, changesets, release notes prose. Scribe owns mechanical `.squad/` state: `decisions.md`, `history.md`, `retro-log.md`, `velocity.md`, pulse issues, session logs, CHANGELOG curation from aggregated changesets. No overlap.
+
+### 2. Kif (DevOps) vs Bender (Backend) boundary
+
+Bender writes product code including application-level Azure infrastructure (Bicep, OIDC, managed identity, AKS defaults). Kif manages CI/CD pipelines, GitHub Actions workflows, release automation, branch protection, rulesets, project board, GitHub App management. Bender does NOT write workflows; Kif does NOT write product features or app infrastructure.
+
+### 3. Kif (DevOps) vs Leela (Lead) boundary
+
+Leela makes architectural decisions and reviews. Kif implements operational infrastructure. Leela decides "we need X capability"; Kif builds it. Leela reviews Kif's DPs for alignment.
+
+### 4. Amy (Docs) vs Leela (Lead) boundary
+
+Leela makes architecture decisions. Amy documents them as ADRs. Leela doesn't write docs; Amy doesn't make decisions.
+
+### 5. Zapp (Security) vs Nibbler (Code Review) boundary
+
+Both review PRs but through different lenses. Nibbler reviews for code quality (correctness, readability, patterns, error handling). Zapp reviews for security (injection, auth bypass, trust boundaries, secret handling). Both approvals required for merge. Neither substitutes for the other.
+
+### 6. PR Review Gate expanded to four-way
+
+PR Review Gate now explicitly requires four review dimensions: Nibbler (code quality) + Zapp (security) + Leela (architecture) + Amy (docs). Merge requires `leela:approved` + `zapp:approved` + `nibbler:approved` + (`docs:approved` or `docs:not-applicable`) + CI green.
+
+### 7. Routing keywords non-overlapping
+
+Removed "public docs, CHANGELOG, README" from Scribe routing. Amy gets all documentation routing. Kif gets all DevOps/CI/CD routing. Scribe is spawned by coordinator for internal `.squad/` state, not by user request.
+
+### 8. Ceremonies updated for new roles
+
+- Design Proposal: Amy added as participant (docs impact assessment)
+- Design Review: Amy added (docs impact)
+- PR Review Gate: Amy added (docs review dimension)
+- Retrospective: Kif added when CI/workflow failure
+- Release: Kif owns process, Amy writes release notes
+
+## Consequences
+
+- All 8 active agent charters now have explicit `## Boundaries` sections with hand-off descriptions
+- `routing.md` has non-overlapping routing keywords
+- `ceremonies.md` has updated participant lists and an end-to-end process flow comment
+- Scribe no longer routes for user-facing docs; Amy does
+- Bender no longer claims CI/CD; Kif does
+---
+
+# Decision: Decompose PR #54 into 4 focused PRs
+
+**Date:** 2026-04-25  
+**Author:** Kif (DevOps)  
+**Requested by:** Copilot (Squad Coordinator)  
+**Trigger:** Leela + Zapp flagged PR #54 (squad/44-org-migration-all-refs) for mixing 4 concerns
+
+## Decision
+
+Split PR #54 into 4 isolated PRs following squad branch convention:
+
+| PR | Branch | Concern | Status |
+|----|--------|---------|--------|
+| **#55** | `squad/54-a-org-refs` | chore: org reference migration (docs, .squad, infra, packages) | **OPEN — fast lane** |
+| _hold_ | `squad/54-b-ci-workflows` | ci: deploy-swa.yml + squad-review-gate.yml (Kif-owned, needs DP) | HOLD — awaits #55 merge |
+| _hold_ | `squad/54-c-release-config` | chore: .changeset/config.json first-time init (Scribe gate) | HOLD — awaits #55 merge |
+| _hold_ | `squad/54-d-playground` | feat: Playground.tsx 2004 lines (Fry-owned) | HOLD — awaits #55 merge |
+
+## Commit SHAs
+
+- 54-A: `d9031a873e7db7d060f0e0a93b4b45350ee29c90`
+- 54-B: `6e303837eaa66cd4e22ab21977f5cdeb187cca38`
+- 54-C: `61bfbe82576f2d8adafcf849066502e7bd6d9094`
+- 54-D: `de8e13f545224adb2e253e7780e50c10ddbeef99`
+
+## Governance notes
+
+- 54-B requires a Kif Design Proposal before code review: "Deploy SWA + Squad Review Gate CI workflows". Leela must approve DP before code review proceeds.
+- 54-D flagged needs-review: Fry should review before merge.
+- Original PR #54 (squad/44-org-migration-all-refs) should be closed/superseded once all 4 land.
+---
+
+### 2026-04-27: User directive
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Working directly with Copilot to create and approve changes has been noticeably faster than routing through Squad ceremonies. Squad process has too much friction relative to the value it adds in the current workflow.
+**Why:** User request — captured for DevOps bottleneck review context
+---
+
+### 2026-04-27: Strict-mode schema violation prevention — harness helpers + charter enforcement
+
+**By:** Ahmed Sabbour (via Copilot)
+
+**What:** Added three prevention mechanisms so Squad agents don't re-introduce OpenAI strict-mode Zod violations:
+
+1. **Harness helpers** (`packages/harness/src/runtime/z-strict.ts`, exported as `@aks-kickstart/harness/runtime/z-strict`):
+   - `strictOptional(schema)` — compliant replacement for `.optional()`
+   - `stripNulls(value)` — centralised from `emit_ui.ts` local copy
+   - `isHttpsUrl(val)` — for use with `.refine()` instead of `z.string().url()`
+   - Full substitution table in JSDoc so agents have context at read time
+
+2. **Bender charter updated** — explicit `## Tool Schema Rules` section listing forbidden patterns and their replacements, pointing to the harness helpers
+
+3. **Skill doc** (`.squad/skills/openai-strict-mode-schemas/SKILL.md`) — the full reference for any agent or pack author writing tool schemas
+
+4. **`emit_ui.ts` refactored** — removed local `stripNulls` copy; now imports from harness
+
+5. **`vitest.config.ts` updated** — added `@aks-kickstart/harness/runtime/z-strict` alias so the new helper resolves in tests
+
+**Why:** All tool schemas are written by Squad agents. Prevention must happen at the tools they reach for, not at code-review time. Harness helpers + charter = the right place to close the loop.
+
+**Status:** 44/44 conformance tests passing.
+---
+
+# Decision: Align CI workflows with new approval model (nibbler+zapp, leela conditional)
+
+**Author:** Kif  
+**Date:** 2026-04-27  
+**Status:** Implemented  
+
+## Context
+
+`ceremonies.md` was updated to change the PR Review Gate model:
+
+- **Old:** Leela + Nibbler always; Zapp for non-low-risk PRs
+- **New:** Nibbler + Zapp always; Leela conditional (only for PRs with `architecture` label)
+
+Root cause: Amy (docs) was committing after Leela/Nibbler/Zapp approved, causing GitHub to auto-dismiss all reviews. Fix is two-phase: Amy commits first, then reviewers approve. The review model is simultaneously simplified so Leela is opt-in.
+
+## Decision
+
+Updated three workflows to reflect the new model:
+
+### `squad-review-gate.yml`
+- `requiredApprovals` now starts with `['nibbler:approved']`, adds `zapp:approved` when `requiresZapp` is true (unchanged logic), and adds `leela:approved` only when `architecture` label is present.
+- Leela rejection only counts when the PR has the `architecture` label.
+- Status description is built dynamically from `requiredApprovals` (removed hardcoded `leelaStatus`/`zappStatus`/`nibblerStatus` vars).
+- `docs:not-applicable` accepted alongside `skip-docs`.
+
+### `squad-auto-merge.yml`
+- `APPROVAL_LABELS` renamed to `ALL_REVIEWER_LABELS` (still clears all three on synchronize, intent is clearer).
+- `getRequiredApprovals()`: standard path returns `['nibbler:approved', 'zapp:approved']` + optional leela; low-risk path returns `['nibbler:approved']` + conditional zapp + optional leela.
+- `getPreservedApprovalLabels()`: simplified using `.filter(l => labels.has(l))` to only preserve labels actually present on the PR — handles conditional Leela cleanly.
+- `getDocsBlocker()` + audit comments: accept `docs:not-applicable`.
+
+### `squad-project-board-automate.yml`
+- "Approved" column trigger: `nibbler:approved + zapp:approved + docs marker`; leela required only when `architecture` label present.
+- File header comments updated.
+
+## Consequences
+
+- Simpler review cycle: most PRs only need Nibbler + Zapp.
+- Architecture PRs still get Leela's design review.
+- Eliminates the post-Amy-commit dismissal loop for standard PRs.
+- `docs:not-applicable` is now a valid docs exemption everywhere (backward-compatible with `skip-docs`).
+---
+
+# Kif — DevOps Bottleneck Audit
+
+**Date:** 2026-04-27  
+**Status:** Proposed  
+**Author:** Kif (DevOps)  
+**Requested by:** Ahmed Sabbour
+
+---
+
+## Context
+
+Ahmed has observed that working directly with GitHub Copilot CLI is significantly faster than routing through Squad ceremonies. This audit identified concrete structural causes and proposes changes ordered by impact.
+
+---
+
+## Recommended Decisions (priority order)
+
+### Decision 1 — Fast lane for S-size and chore-auto issues (HIGH IMPACT)
+
+**Change:** Codify formally in `ceremonies.md` that `estimate:S` and `squad:chore-auto` issues bypass the Design Proposal and Design Review ceremonies. A one-line "what + why" comment on the issue is sufficient. Implementation proceeds immediately.
+
+**Rationale:** S-size calibration is ≤2h (1 point). The DP ceremony alone takes 30-90 min. The ceremony overhead exceeds the implementation cost. Security and architecture are still caught at PR review — Zapp and Nibbler still review the code.
+
+**Tradeoff:** Small risk that an S-size change hides a deeper architectural issue. Mitigation: the PR review gate still runs; Zapp and Nibbler catch it at code review. If an S issue turns out to be larger during implementation, the agent bumps it to M and writes a proper DP.
+
+**Effort:** Low — ceremonies.md edit only.
+
+---
+
+### Decision 2 — Async Design Review: start coding when DP is posted (HIGH IMPACT)
+
+**Change:** Implementation may begin when the DP comment is posted. Leela and Zapp have a 24-hour async window to raise blocking concerns. If no blocking feedback arrives, the implementing agent proceeds and addresses any DP feedback iteratively via PR review.
+
+**Rationale:** The current synchronous DR creates a "waiting for approvals" delay of 30-120 min between posting a DP and writing the first line of code. Most DPs are approved as-written. Requiring synchronous multi-session approval before coding is multi-agent coordination overhead that returns zero value when one person is doing all the work.
+
+**Tradeoff:** Risk that a security issue is caught at PR instead of DP. Mitigation: Zapp still does a full PR security review; nothing ships past the security gate.
+
+**Effort:** Low — ceremonies.md edit only.
+
+---
+
+### Decision 3 — Consolidate project board additions to squad-project-board-automate.yml (MEDIUM IMPACT)
+
+**Change:** Remove the "Add issue to project board" steps from:
+- `squad-triage.yml` (step: "Add issue to project board")
+- `squad-issue-assign.yml` (step: "Add issue to project board")
+- `squad-heartbeat.yml` (step: "Add triaged issues to project board")
+
+`squad-project-sync.yml` and `squad-project-board-automate.yml` together cover all cases. The three removed steps are redundant and fire on the same events, resulting in duplicate GraphQL `addProjectV2ItemById` calls per issue.
+
+**Also fix:** `squad-triage.yml` and `squad-issue-assign.yml` hardcode project `#3`. They should use the `SQUAD_PROJECT_NUMBER` variable for consistency. (Short-term fix; full fix is removal.)
+
+**Estimated savings:** ~50-100 workflow runs/week eliminated.
+
+**Tradeoff:** None. All three workflows retain their primary function; they just stop duplicating the board sync.
+
+**Effort:** Low — remove steps from 3 workflow files.
+
+---
+
+### Decision 4 — Remove `synchronize` from squad-review-gate.yml triggers (LOW-MEDIUM IMPACT)
+
+**Change:** Remove `synchronize` from `squad-review-gate.yml` on.pull_request.types.
+
+**Rationale:** The gate result on a `synchronize` event where no labels changed is deterministic — it produces the same commit status as the previous run. The `labeled` and `unlabeled` events already cover all state transitions. The `synchronize` trigger adds ~40-60 redundant runs/week.
+
+**Important:** Do NOT remove `synchronize` from `squad-auto-merge.yml` — it intentionally clears approval labels on new commits (correct behavior).
+
+**Effort:** Low — one-line YAML change.
+
+---
+
+### Decision 5 — Add early-exit label guard to squad-visible-trail.yml (LOW IMPACT)
+
+**Change:** Add an early-exit `if:` condition to squad-visible-trail.yml similar to what squad-project-board-automate.yml has — only act on label events for squad: and reviewer labels. Non-squad label events (e.g., bug, type:feature) should be a no-op.
+
+**Rationale:** squad-visible-trail fires on every issue/PR label event. Most label events are irrelevant to the visible trail (type:bug, priority:p1, estimate:M, etc.). An early-exit filter would reduce this workflow's runs by ~60-70%.
+
+**Effort:** Low — add `if:` condition to job.
+
+---
+
+### Decision 6 — Explicitly document the minimum viable ceremony path (LOW IMPACT)
+
+**Change:** Add a "Minimum Ceremony Path" table to ceremonies.md showing which ceremonies are required per issue size and risk level:
+
+| Issue type | DP required? | DR approval mode | PR reviewers |
+|------------|-------------|-----------------|--------------|
+| `estimate:S` or `squad:chore-auto` | No (one-line comment only) | N/A | Nibbler + docs marker |
+| `estimate:M`, standard | Yes (full DP) | Async 24h | Nibbler + Zapp + docs marker |
+| `estimate:L`/`XL`, or security-sensitive | Yes (full DP) | Synchronous (both must approve) | Nibbler + Zapp + docs marker; Leela if architecture |
+| Architecture label | Yes (full DP) | Synchronous | Nibbler + Zapp + Leela + docs marker |
+
+**Rationale:** The current ceremonies.md has no shortcuts. Every issue reads as "full ceremony required." The fast-lane path exists informally (squad:chore-auto reduces Zapp requirement) but isn't presented as a discoverable first-class option.
+
+**Effort:** Low — ceremonies.md edit.
+
+---
+
+## What to Keep As-Is
+
+- `ci.yml` — non-negotiable quality gate
+- `squad-secret-scan.yml` — security non-negotiable
+- `squad-review-gate.yml` — keep all triggers except `synchronize` (see Decision 4)
+- `squad-auto-merge.yml` — core value, eliminates manual merge clicks
+- `squad-velocity-report.yml` — valuable metrics
+- `squad-process-grader.yml` — closed-loop process improvement
+- `squad-weekly-pulse.yml` — good weekly summary
+- `squad-release-cadence.yml` — changeset automation is valuable
+
+## What Could Be Made Optional / Deferred
+
+- `squad-daily-pulse.yml` — useful for active teams; generates noise when team is inactive
+- `squad-shipping-forecast.yml` — low value if milestones aren't actively managed
+- `squad-monthly-docs-sweep.yml` — already monthly, low cost, keep
+
+---
+
+## Root Cause Summary
+
+Squad's ceremony layer was designed for **multi-agent coordination** — preventing Bender, Fry, and Hermes from trampling each other's architecture when working in parallel on different issues. When Ahmed works with a single Copilot session, those coordination ceremonies become self-referential friction. The DP→DR→PR pipeline was designed for a team of 8 autonomous agents running concurrently; it should be proportionally lighter for a team of 1+Copilot.
+
+The fix is not to tear Squad down — it's to make the ceremony path proportional to the actual coordination need of each change.
+---
+
+# Harness Deep Technical Audit — OpenAI Agents SDK Best Practices
+**Author:** Leela (Lead)  
+**Date:** 2026-04-27  
+**Requested by:** Ahmed Sabbour  
+**Type:** Technical Audit / Decision Record
+
+---
+
+## Executive Summary
+
+1. **`useResponses: false` is hardcoded on both providers** (`runner.ts` L100, L106). The harness is running on Chat Completions, not the Responses API. This is a deliberate Azure-compatibility workaround (#932), but it means the team is not benefiting from stateful sessions, native file/web search, or the `previous_response_id` threading model. The hand-rolled `recentTurns` threading is a competent substitute, but it's load-bearing complexity that the SDK would manage for free on Responses API.
+
+2. **No retry/backoff anywhere in the call path.** Runner.ts catches errors and emits them as SSE, but there is zero retry logic for HTTP 429 or 500 from OpenAI. The SDK may retry internally, but the harness adds no policy of its own. Under load this is a silent failure mode.
+
+3. **Raw OpenAI SDK error messages are forwarded to the SSE client** (`runner.ts` L934: `err.message`). OpenAI error messages often contain model names, deployment IDs, and token counts. These are exposed to the browser verbatim. This is both an information-leakage risk and a misleading UX (users see "This model's maximum context length is…" not a human error message).
+
+4. **Strict-mode schema violations in three packs still use `.optional()` instead of `strictOptional()`** (`propose-services.ts`, `validate-manifests.ts`, `api-get.ts`). These pass today because `useResponses: false` means Chat Completions doesn't enforce strict mode. If the flag is ever flipped, those tools will 400 immediately. The `z-strict.ts` helpers exist but adoption is incomplete.
+
+5. **The component catalog is injected verbatim into every agent's system prompt at build time.** With ~30+ components each with `llmHint` text, this is a non-trivial context burn on every turn. There is no catalog budget or lazy-load pattern analogous to the skill pull (`core.read_skill`) approach.
+
+---
+
+## Dimension-by-Dimension Findings
+
+### 1. Tool Schema / Strict Mode
+
+**Current state:**  
+`packages/harness/src/runtime/z-strict.ts` provides `strictOptional()`, `stripNulls()`, and `isHttpsUrl()`. The schema conformance engine (`schema-conformance.ts`) covers I1–I5. A universal registry-driven conformance test (`schema-conformance.test.ts`) validates every tool and user action automatically at the API startup code path. This is excellent architecture.
+
+**Issues:**
+
+- **`packages/pack-azure/src/tools/propose-services.ts` L17–37:** `PlanNodePoolSchema` and sub-schemas use raw `.optional()` on `mode`, `vmSize`, `count`, `type`, `replicas`, `host`, etc. These are I2 violations under strict mode. The conformance test currently passes because the SDK test path doesn't run with `strict: true` on Chat Completions, but if `useResponses: true` is ever set, these will fail with HTTP 400.
+
+- **`packages/pack-aks-automatic/src/tools/validate-manifests.ts` L26–28:** `manifestName: z.string().nullable().optional()` — the `.optional()` is an I2 violation. Should be `strictOptional(z.string())`.
+
+- **`packages/pack-github/src/tools/api-get.ts` (inferred from L70–75):** `params: z.string().nullable().optional()` — same I2 violation.
+
+- **I6 gap (not formally defined but real):** The conformance test covers I1–I5 but does not check for `.refine()` validators on fields. Zod `.refine()` predicates are silently dropped when the Zod schema is serialised to JSON Schema, meaning the model never sees the constraint. `arm-get.ts` and `arm-deploy-resource.ts` use `.regex(...)` on `apiVersion` — this produces a `"pattern"` key in JSON Schema which is valid, but `.refine()` would not. No current violations, but there's no test for this either.
+
+**Recommendations:**
+- Replace all `.optional()` in tool-facing schemas with `strictOptional()` (see Quick Wins).
+- Add an I2 conformance sweep across pack-azure and pack-aks-automatic specifically.
+- Document I6 (refine-silencing) in `z-strict.ts` as a known pattern to avoid.
+
+---
+
+### 2. Function/Tool Calling Best Practices
+
+**Current state:**  
+Most tool descriptions are functional. Security-sensitive tools (`arm_deploy_resource`, `fetch_webpage`, `read_skill`) are particularly good — they state what they do, when to use them, and their constraints. The `core.emit_ui` description with the inline spec-compliant JSON example is exemplary.
+
+**Issues:**
+
+- **`core.list_files` (`list_files.ts` L43):** Description is: *"List files in the workspace. Returns relative paths. Limited to 500 entries."* This does not tell the model **when** to use it (e.g. "Use before reading files to discover what exists in the workspace, or to check whether a file was generated."). Minimal descriptions make the model underuse or misuse tools.
+
+- **`core.search_components` (`search_components.ts` L39):** Description says "Use this to discover which UI components are available before calling `core.emit_ui`" — this is correct but the WHEN guidance could be stronger: the model often skips this and goes straight to `emit_ui` with guessed component names.
+
+- **`core.validate_artifacts` (`validate_artifacts.ts` L108):** No explicit instruction on WHEN to call it. Codesmith's agent prompt handles this, but standalone the tool looks passive.
+
+- **`azure.arm_get` (`arm-get.ts` L67):** Missing "Use this to inspect existing Azure resources before proposing changes. Do not use for listing — use Azure Resource Graph for list operations." The model currently has no guidance on when ARM GET vs. listing is appropriate.
+
+- **`azure.propose_services` (`propose-services.ts` L126):** Description is clear on the two tracks but doesn't state that the model should call this BEFORE generating CRDs or Helm charts. Sequencing guidance is missing.
+
+- **Tool naming:** The dot-namespace convention (`core.emit_ui`, `azure.arm_get`) deviates from OpenAI's snake_case examples but is internally consistent. It's fine — OpenAI allows periods in tool names. No change needed.
+
+- **Single-responsibility check:** All tools are reasonably scoped. `core.scaffold_app` is the broadest — it dispatches to multiple skill generators — but this is a deliberate coordinator pattern, not a SRP violation.
+
+**Recommendations:**
+- Augment `core.list_files`, `azure.arm_get`, and `core.validate_artifacts` descriptions with explicit "Use this when…" sentences (Quick Win, ~20 min).
+- Consider a `core.list_workspace_artifacts` tool alias that makes the discovery use-case semantically explicit if `list_files` is consistently underused.
+
+---
+
+### 3. Agent Prompts / System Prompts
+
+**Current state:**  
+The triage agent prompt is genuinely excellent — it has a clear persona, explicit behavioral rules, branch-on-event handling, track selection logic with examples, inline component examples, and guardrails against common failure modes (re-emitting menus, generating code, probing AKS branding too early). This is well above average for production agent prompts.
+
+**Issues:**
+
+- **Catalog injection is unbounded** (`runner.ts` L610–615): Every agent's system prompt is built as:
+  ```
+  {base instructions} + skills block + catalog block
+  ```
+  The catalog block lists ALL active components with their `llmHint`. With 30+ rich components, each with multi-sentence hints, this is easily 2,000–4,000 tokens injected on every single turn. There is no `core.read_component` lazy pull analogous to `core.read_skill`. The reviewer agent, for example, never emits UI — it pays the full catalog tax for zero benefit.
+
+- **Context window management:** The session keeps a 50-turn sliding window (`session.ts` L138). At typical turn sizes this is manageable, but there's no token-count gate — a session with 50 turns of dense technical content plus the system prompt plus the catalog block could silently approach or exceed context limits, causing the SDK to truncate silently.
+
+- **Prompt injection via event payload (`converse.ts` L191):** The `[A2UI event]` marker is injected as:
+  ```
+  {user message}\n\n[A2UI event] name={validated_name} payload={json}
+  ```
+  `event.name` is allowlist-validated (`EVENT_NAME_RE`). `event.payload` is size-capped and shape-validated. This is adequate. However, the payload values themselves (object property values) are not sanitized — a malicious user could embed `\n\n[system instructions]` inside a payload value. Low severity given the 2KB cap and JSON encoding, but worth documenting.
+
+- **Client-hydrated turns:** The `UNTRUSTED_BEGIN/END` delimiter pattern (`runner.ts` L386–395) is a good mitigation, but it relies on the LLM respecting the markers. There's no enforcement — a sufficiently adversarial prompt in the hydrated history could instruct the model to ignore the delimiter. This is a known limitation of all current prompt-injection mitigations.
+
+**Recommendations:**
+- **Implement lazy catalog loading** analogous to skills. Give agents a `core.read_component` tool (or extend `core.search_components` to return `llmHint`) and trim the catalog block in the system prompt to just component names. This is an architectural change — DP required.
+- Add a token-count gate to `toAgentInputItems` or to the session sliding window. When estimated token count for the full input exceeds a configurable threshold (e.g., 80% of model max), trim oldest turns. Currently there is no such gate.
+- Document the event.payload injection vector in `.squad/decisions` as a known, accepted low-severity risk.
+
+---
+
+### 4. Skills / Knowledge Retrieval
+
+**Current state:**  
+The `core.read_skill` pull-based pattern is the right design for this codebase. The main LLM acts as the router; skills are listed in the system prompt by id+description; the model pulls bodies on demand. The 50KiB per-turn byte cap, re-read deduplication, and structured error responses (`not_available`, `unknown_skill`, `budget_exhausted`) are all well-implemented.
+
+**Issues:**
+
+- **No semantic search for skills.** The model must match skill IDs exactly from the system prompt listing. If the listing is long or the model makes a typo, it gets `unknown_skill` and recovers. This works for small catalogs (current state) but doesn't scale. There's no equivalent of `core.search_components` for skills — no way for the model to search by keyword before pulling.
+
+- **Token estimation is a rough heuristic** (`read_skill.ts` L179, L222: `Math.ceil(body.length / 4)`). This underestimates for non-ASCII content (Japanese, Arabic, code with lots of braces). A 50KiB budget expressed in character-length / 4 is a fair approximation for English prose, but could overflow on multilingual skill bodies.
+
+- **No file_search / vector store.** The Responses API offers a built-in `file_search` tool. Given `useResponses: false`, this isn't available. If the Responses API is adopted, file_search could replace the pull pattern for richer semantic retrieval. Worth evaluating but not urgent given the current catalog sizes.
+
+**Recommendations:**
+- Add a `core.search_skills` tool (analogous to `core.search_components`) that returns skill id+description matches by keyword. Low-lift, builds on existing `registry.listSkillsForAgent()`.
+- Revisit skill token estimation when non-English SKILL.md files are added.
+
+---
+
+### 5. Structured Output / A2UI
+
+**Current state:**  
+The A2UI pattern is architecturally sound. `emit_ui` is a tool call (not `response_format`) — correct for side-effectful, multi-call emission. `AgentOutput` is used as the `outputType` for structured final output — correct SDK usage. The discriminated union on `op` produces `oneOf` branches that satisfy OpenAI's strict-mode object requirements. `stripNulls()` is called before parse. Surface lifecycle invariants (dedupe, cap, exists checks) are enforced server-side.
+
+**Issues:**
+
+- **`A2UIMessageInputSchema` uses `op` as a discriminator but `A2UIMessageSchema` (harness side) strips it.** The runtime `withDiscriminator` preprocessor reconstitutes op from the payload key. This works but creates a two-schema mismatch that is non-obvious to pack authors. If someone writes a tool that calls `A2UIMessageSchema.parse()` directly without the preprocessor, they'll get a parse error that's hard to debug.
+
+- **The closed payload key set in `A2UIActionSchema` (`emit_ui.ts` L79–86: `confirmed`, `id`, `value`, `action`, `target`) is a hardcoded list.** Per the comment, growing it past ~8 entries should trigger a switch to JSON-string encoding. This is a maintenance trap — the comment must be discovered and remembered. No test enforces the size limit.
+
+- **`response_format` with JSON Schema** is NOT used anywhere — all structured data flows through tool calls. This is the correct choice for this architecture (multi-call, side-effectful) but means there's no guardrail against the model producing malformed `AgentOutput` that the SDK might recover silently.
+
+**Recommendations:**
+- Export a helper `parseA2UIMessage(raw)` that encapsulates the `withDiscriminator` preprocessor + `stripNulls` so pack authors have a one-stop parse function. Reduces the two-schema confusion risk.
+- Add a test that asserts `A2UIActionSchema` payload key count ≤ 8 to force a decision when keys are added.
+
+---
+
+### 6. Responses API Usage
+
+**Current state:**  
+`useResponses: false` is hardcoded on both providers (`runner.ts` L100, L106). The harness uses Chat Completions. This was a deliberate decision to work around Azure OpenAI's v1 endpoint shape (#932). The `@openai/agents` SDK v0.8.4 supports both.
+
+**Issues:**
+
+- **Missing Responses API benefits:** Stateful conversation threading (`previous_response_id`), built-in `web_search_preview` and `file_search` tools, and the newer model capabilities that are Responses-only (o-series reasoning models with streaming). The harness implements its own conversation threading (`toAgentInputItems`, `recentTurns`) which is good but duplicates what the SDK provides for free.
+
+- **Azure OpenAI Responses API availability:** The stated reason for `useResponses: false` is Azure endpoint shape. As of early 2026, Azure OpenAI supports the Responses API on `2025-03-01-preview` and later. The `buildAzureBaseUrl()` comment should be revisited. It's possible `useResponses: true` now works on Azure.
+
+- **SDK version:** `@openai/agents 0.8.4` is pinned (`harness/package.json` L87). The changelog for 0.8.x should be checked — there have been Responses API stability improvements in recent SDK releases.
+
+- **No streaming backpressure.** The SSE writer is fire-and-forget (`stream.write()` in `sse.ts`). If the client disconnects or the response buffer fills, the write silently drops. The runner propagates a disconnect signal (`signal` → `abortCtrl`) but only for client-initiated aborts, not for back-pressure.
+
+**Recommendations:**
+- **Evaluate Responses API on Azure** against `2025-03-01-preview` or later. If it works, create a DP for migrating and removing the hand-rolled history threading. This is the biggest architectural improvement available.
+- Track `@openai/agents` upgrade from 0.8.4 — check release notes for Responses API stability fixes.
+- Add a comment to both `useResponses: false` lines with a dated rationale and a link to the tracking issue.
+
+---
+
+### 7. Error Handling & Retries
+
+**Current state:**  
+The runner has a two-level try/catch: inner (SDK stream loop) and outer (try/finally for skill counter reset). AbortErrors are handled correctly — UserAction interrupts vs. guardrail halts are distinguished. SSE `error` events are emitted with a message. The `end` event is emitted even on hard failure so the debug panel has agentName and model info.
+
+**Issues:**
+
+- **No retry logic for 429 or 500.** `runner.ts` L924–938 catches all non-AbortErrors and emits the raw `err.message` to the client. There is no backoff, no retry with jitter, no circuit breaker. Under sustained 429 load, every turn will immediately fail and surface a raw OpenAI error to the user.
+
+- **Raw error messages forwarded to client** (`runner.ts` L934):
+  ```ts
+  sseWrite('error', { message: err instanceof Error ? err.message : String(err) });
+  ```
+  OpenAI API error messages contain deployment names, token counts, model names, and quota details. These are exposed to the browser verbatim. This is an information-leakage risk and produces confusing UX ("This model's maximum context length is 8192 tokens. Your messages resulted in 9123 tokens.").
+
+- **Tool execution errors are not caught individually.** If `core.write_file` throws because the workspace is full, the exception propagates to the SDK which re-throws it into the runner's catch block. The error reaches the client as a raw error SSE. There's no per-tool error telemetry.
+
+- **No turn-level timeout.** The SDK stream is awaited without a timeout. A hanging OpenAI call (not a 429 but a genuine network stall) will hold the HTTP connection open until Azure Functions times out the function (default 5 min). There's a 15s timeout on `fetch_webpage` and 30s on ARM calls, but no cap on the model inference call itself.
+
+**Recommendations:**
+- **Cap error messages before SSE emission** (Quick Win): truncate to 200 chars and strip known PII patterns. At minimum: `err.message.slice(0, 200)`.
+- Add a `KICKSTART_RUNNER_TURN_TIMEOUT_MS` env var (default: 120s) and wrap the `sdkRunner.run()` call in a `Promise.race` with a timeout signal.
+- Implement basic exponential backoff for 429 responses. The SDK may offer retry hooks — check `@openai/agents` 0.8.4 docs.
+
+---
+
+### 8. Security / Guardrails
+
+**Current state:**  
+Three-stage guardrail system (input, output, tool) with fail-closed semantics, core-first ordering, dual-eval chaining, and opaque SSE error payloads. Path confinement (workspace sandboxing) on read_file and write_file with symlink resolution. SSRF guard with DNS rebinding check on fetch_webpage. ARM path allowlist + denylist (role assignment paths blocked). GitHub path allowlist. Event name regex allowlist on the converse endpoint.
+
+**Issues:**
+
+- **No content guardrails are registered in the shipped pack code.** The three-stage guardrail framework is well-designed but currently empty — the `core` pack does not register any guardrail implementations. Input content guardrails (PII detection, credential leakage, injection patterns) are infrastructure that exists but is not populated. This is a significant gap for a production system.
+
+- **`core.inspect_repo` uses `os.tmpdir()` for git clones** (`inspect_repo.ts`). The code clones repos to a random path under `tmpdir()`. If the cleanup fails (e.g., on exception), stale clones accumulate. There is no cleanup registry or deferred cleanup in a `finally` block visible in the first 80 lines. Need to verify full cleanup coverage.
+
+- **ARM token retrieval is fragile** (`arm-get.ts` L79–80):
+  ```ts
+  session?.tokens?.['azure'] ?? session?.tokens?.['azure-token']
+  ```
+  This is not using the `SessionCtx.getAzureCreds()` method defined in `session.ts` L144. It's a direct property access on an `unknown as` cast. If the token key changes, this silently returns undefined and the ARM call fails with a confusing error. Not a security issue per se, but a correctness smell.
+
+- **Session store is in-process Map** (`session.ts` L171). This is a single-instance limitation. Azure Functions scale-out will create separate session stores per instance. Cross-instance session resumption will fail with "Session not found." Not a security issue, but a reliability concern that's frequently miscategorized as one.
+
+- **`Session.getAzureCreds()` and `getGithubToken()` are stubs** (`session.ts` L144–152). Both return `undefined` with a TODO comment. Azure credential injection is happening via a direct cast on `session.tokens` in each Azure tool. This bypasses the intended interface.
+
+**Recommendations:**
+- **Register at minimum one content guardrail** in the `core` pack that blocks common credential patterns (Bearer tokens, SAS tokens, private keys) from appearing in user input or model output.
+- Audit `inspect_repo.ts` for cleanup coverage in all exception paths.
+- Fix ARM token retrieval to use `session.getAzureCreds()` and actually implement the method.
+- Document the in-process session store limitation and note that distributed sessions (Redis, Cosmos DB) are required for production multi-instance deployment.
+
+---
+
+## Priority Matrix
+
+| # | Issue | Severity | File | Effort |
+|---|-------|----------|------|--------|
+| P1 | Raw OpenAI error messages sent to client | **Critical** | `runner.ts:934` | < 1hr |
+| P2 | No retry/backoff for 429/500 | **Critical** | `runner.ts` | 2–4hr |
+| P3 | No content guardrails registered | **Critical** | `core/pack` | 1 day |
+| P4 | `.optional()` instead of `strictOptional()` in 3 packs | **High** | `propose-services.ts`, `validate-manifests.ts`, `api-get.ts` | < 1hr |
+| P5 | `useResponses: false` — not using Responses API | **High** | `runner.ts:100,106` | DP required |
+| P6 | Component catalog injected into every agent system prompt (context waste) | **High** | `runner.ts:609-615` | DP required |
+| P7 | No turn-level timeout on model inference | **High** | `runner.ts` | 2hr |
+| P8 | `getAzureCreds()` / `getGithubToken()` are stubs; tokens accessed via raw cast | **High** | `session.ts:144-152`, `arm-get.ts:79` | 1–2hr |
+| P9 | No token-count gate on conversation history (silent context overflow) | **Medium** | `runner.ts`, `session.ts` | 4hr |
+| P10 | `core.list_files` / `azure.arm_get` descriptions too sparse | **Medium** | `list_files.ts:43`, `arm-get.ts:67` | < 30min |
+| P11 | No semantic skill search (ID-only matching) | **Medium** | `read_skill.ts` | 4hr |
+| P12 | `op` discriminator two-schema mismatch (withDiscriminator complexity) | **Medium** | `emit_ui.ts`, harness types | 2hr |
+| P13 | `inspect_repo` cleanup coverage on exception paths | **Medium** | `inspect_repo.ts` | 1hr |
+| P14 | Session store is in-process (no cross-instance sessions) | **Medium** | `session.ts:171` | DP required |
+| P15 | Token estimation heuristic (len/4) — inaccurate for non-ASCII | **Low** | `read_skill.ts:179,222` | 2hr |
+| P16 | A2UIActionSchema payload key set is a silent maintenance trap | **Low** | `emit_ui.ts:79-86` | < 30min |
+| P17 | Event payload values not sanitised (low-severity injection vector) | **Low** | `converse.ts:191` | 1hr |
+
+---
+
+## Quick Wins (< 1 hour each)
+
+1. **Cap error messages before SSE emission** (`runner.ts:934`): change `err.message` to `err.message.slice(0, 200).replace(/\b(sk-|Bearer |eyJ)[^\s]*/g, '[REDACTED]')` or similar. Stops OpenAI internals leaking to browser.
+
+2. **Fix `.optional()` → `strictOptional()` in three tools:**
+   - `propose-services.ts`: 6 fields in `PlanNodePoolSchema`, `PlanWorkloadSchema`, etc.
+   - `validate-manifests.ts`: `manifestName` field
+   - `api-get.ts`: `params` field
+
+3. **Improve sparse tool descriptions:**
+   - `core.list_files`: add "Use before reading files to discover what exists in the workspace."
+   - `azure.arm_get`: add "Use to inspect an existing Azure resource by its full ARM path."
+
+4. **Add a test that asserts `A2UIActionSchema` payload key count ≤ 8** to force a decision when the list grows.
+
+5. **Add dated rationale comments to both `useResponses: false` lines** in `runner.ts` referencing #932 and noting when Azure Responses API availability should be re-evaluated.
+
+---
+
+## Architectural Concerns (DP Required)
+
+### AC1: Responses API Migration
+- **What:** Switch both providers to `useResponses: true`. Evaluate Azure AOAI Responses API on `2025-03-01-preview`.
+- **Impact:** If successful, removes `toAgentInputItems` / `recentTurns` hand-rolled threading, enables `previous_response_id` stateful sessions, unlocks `file_search` and `web_search_preview` built-in tools.
+- **Risk:** Azure endpoint compatibility must be verified first. Breaking change to the converse handler (no longer needs to thread history manually). The 50-turn window logic, `hydrateColdSession`, and `trust: 'client-hydrated'` markers would need revalidation.
+- **DP scope:** Proof-of-concept on dev environment, verify Azure AOAI Responses API endpoints, define migration path.
+
+### AC2: Lazy Catalog Loading
+- **What:** Remove the verbatim component catalog from agent system prompts. Inject only component names. Let agents pull full hints via `core.search_components` when needed.
+- **Impact:** ~1,000–3,000 tokens saved per turn (all agents), cleaner context window.
+- **Risk:** Agents that rely on catalog hints in their system prompt for component selection may underperform without them. Needs A/B testing.
+- **DP scope:** Measure current catalog token cost per agent, prototype lazy loading, evaluate quality impact.
+
+### AC3: Distributed Session Store
+- **What:** Replace the in-process `sessionStore` Map with an external store (Azure Cosmos DB, Redis).
+- **Impact:** Enables horizontal scale-out on Azure Functions. Current in-process store means a session routed to a different instance = "Session not found."
+- **Risk:** Adds external dependency, increases cold-start latency, requires Session serialization/deserialization (currently not implemented).
+- **DP scope:** Define Session serialization format, choose store technology, design eviction strategy.
+
+### AC4: Content Guardrail Implementation
+- **What:** Implement at least two guardrail functions in the `core` pack: (a) input guardrail blocking credential patterns (tokens, keys, SAS URLs), (b) output guardrail blocking same patterns from model responses.
+- **Impact:** Fills the largest current security gap.
+- **Risk:** False positives (blocking legitimate technical content about authentication). Needs careful pattern design and an opt-out signal.
+- **DP scope:** Define guardrail patterns, false-positive rate budget, and the redact-vs-block decision per pattern.
+
+---
+
+*End of audit. Filed to `.squad/decisions/inbox/` for Scribe to merge.*
+---
+
+### 2026-04-27: PR Review Gate — Phase split + simplification
+**By:** Leela (at Ahmed's direction)
+**What:** Split PR Review Gate into two phases. Phase 1: Amy commits docs first (parallel with CI). Phase 2: Nibbler + Zapp approval reviews after Phase 1 is complete. Leela required only for architecture PRs (has `architecture` label or touches pack boundaries). Hermes removed from gate (CI enforces tests). Added no-commit-after-approval rule and duplicate-review guard.
+**Why:** PR #80 showed Amy's post-approval docs commit dismissing all reviews, forcing a second review cycle. The 5-reviewer gate was creating excessive churn. Leela submitted duplicate approval reviews with no guard to prevent it.
+---
+
+# Kif Decision — Fast Lane & Ceremony Optimizations
+
+**Date:** 2026-04-27T02:56:41-07:00
+**Author:** Kif (DevOps Engineer)
+**Status:** Active
+
+## What Changed
+
+### Fast Lane (estimate:S and squad:chore-auto)
+
+Fast lane is now active. Issues labeled `estimate:S` or `squad:chore-auto` skip both the Design Proposal and Design Review ceremonies entirely. The implementing agent proceeds directly to code.
+
+**Rationale:** DP + synchronous DR overhead (1.5–3.5h) exceeds S-size implementation time (25–40 min). The ceremony was inverting the cost model for routine work.
+
+**Files changed:** `.squad/ceremonies.md` — DP and DR sections each have a "Fast Lane exemption" block; a "Minimum Ceremony Path" reference table was added after the ceremony overview.
+
+### Async DR for estimate:M
+
+For `estimate:M` issues, DR runs **in parallel** with implementation start — no waiting period:
+1. Agent posts DP comment on the issue.
+2. DR reviewers (Zapp, Nibbler, Leela) are invoked immediately alongside implementation.
+3. If a reviewer raises a blocking concern before the first PR commit, implementation pauses to address it.
+4. If no blocking concern by the time the PR is ready to open, the agent proceeds.
+
+With Ralph running continuously, reviewers respond in minutes. No hard time window.
+
+**Files changed:** `.squad/ceremonies.md` — DR section has a new "Parallel DR for estimate:M" block.
+
+### Synchronize trigger removed from squad-review-gate.yml
+
+Removed `synchronize` from the `on.pull_request.types` list. The gate result is deterministic until labels change; firing on every commit push was burning ~50 runs/week with identical outcomes.
+
+**Remaining triggers:** `labeled`, `unlabeled`, `opened`, `reopened`, `ready_for_review`.
+
+### Board-add deduplication
+
+Removed the "Add issue to project board" steps from:
+- `squad-triage.yml` — was hardcoding project `#3`
+- `squad-issue-assign.yml` — was hardcoding project `#3`
+- `squad-heartbeat.yml` — Ralph's label additions trigger `squad-project-board-automate.yml` on the label event; the heartbeat step was redundant
+
+`squad-project-board-automate.yml` and `squad-project-sync.yml` remain the authoritative board-add handlers.
+
+**Note:** `squad-heartbeat.yml` has a SYNC comment pointing at 3 additional template files. The template files were NOT modified — run `squad upgrade` to propagate when ready.
+
+### Early-exit on squad-visible-trail.yml
+
+Added label/branch guards to both jobs:
+- `issue-trail`: skips unless the triggering label or any existing label starts with `squad:`
+- `pr-trail`: skips unless the PR branch starts with `squad/` or any PR label starts with `squad:`
+
+This prevents ~60–70% of runs from being no-ops (non-squad label events triggering a full job spin-up).
+
+## Ceremony Path Summary
+
+| Size / Type | DP | DR | DR mode |
+|---|---|---|---|
+| `estimate:S` | ❌ Skip | ❌ Skip | Fast lane |
+| `chore-auto` | ❌ Skip | ❌ Skip | Fast lane |
+| `estimate:M` | ✅ Post | ✅ Parallel | DR runs concurrently with implementation; blockers resolved before PR |
+| `estimate:L` | ✅ Post | ✅ Sync | Wait for all approvals |
+| `estimate:XL` | ✅ Post | ✅ Sync | Wait for all approvals |
+---
+
+# Semantic Flexibility — Architecture Analysis
+**Author:** Leela (Lead)  
+**Date:** 2026-04-27  
+**Requested by:** Ahmed Sabbour  
+**Type:** Architecture Analysis / Decision Record
+
+---
+
+## The Short Answer
+
+The rigidity Ahmed is feeling is real and has a concrete cause: **`core.triage` is trying to be a domain expert for every pack, but it can only hand off to two generic agents** (`core.codesmith` and `core.reviewer`). The AKS architect, Azure architect, and GitHub publisher specialists exist but are effectively orphaned — triage can't reach them. The compensation is a 180-line prescriptive prompt that encodes domain rules that should live in the specialist agents. That's the flowchart feeling.
+
+The fix is not a wholesale rewrite. It's reconnecting the routing to the specialists that already exist.
+
+---
+
+## Q1: Where does the rigidity actually come from?
+
+### The agent graph topology is the primary cause
+
+The full registered agent graph is:
+
+```
+core.triage
+  ├─► core.codesmith     (generic file generator, no handoffs)
+  └─► core.reviewer      (read-only review, no handoffs)
+
+aks.architect            (user-invocable, model-invocable — but UNREACHABLE from triage)
+  ├─► aks.manifests_author
+  ├─► aks.reviewer
+  └─► core.codesmith
+
+azure.architect          (user-invocable, model-invocable — but UNREACHABLE from triage)
+  ├─► azure.ops
+  └─► core.codesmith
+
+github.publisher         (model-invocable only, no handoffs)
+
+azure.ops                (model-invocable, routes back to azure.architect)
+```
+
+**`core.triage` has no edges to `aks.architect`, `azure.architect`, or `github.publisher`** — despite all three being registered as `model-invocable: true` and `user-invocable: true`. The session starts with `activeAgent = 'core.triage'` and there is no path from triage to the domain specialists. The user must somehow land on the specialist agent through a direct entry point (if the UI offers one), or triage handles everything itself.
+
+This is the root of the problem. The compensating mechanism is the 180-line triage prompt that tries to encode AKS networking rules, Azure cost estimation guidance, KAITO GPU SKU selection, and GitHub CI/CD patterns — all things the specialist agents already know, in their own prompts, with access to the right tools.
+
+**`runner.ts` L635–639** — handoffs are built strictly from the frontmatter:
+```ts
+for (const h of agentContrib.handoffs ?? []) {
+  const target = this.buildAgentInstance(h.agent, cache, ctx);
+  const description = h.prompt ? `${h.label}. ${h.prompt}` : h.label;
+  agent.handoffs.push(handoff(target, { toolDescriptionOverride: description }));
+}
+```
+No dynamic discovery. The model's routing vocabulary is exactly the enumerated `handoffs[]` list.
+
+### The handoff mechanism itself is NOT rigid
+
+This is important: the SDK `handoff()` call creates a **tool** that the model calls voluntarily. The model decides when to invoke "Generate files" or "Review artifacts" — this is already semantic, model-decided routing. The problem is not the mechanism; it's that the vocabulary of available handoffs is too small.
+
+### The triage prompt is a compensating smell, not a root cause
+
+The triage prompt's `## Track Selection` section (the 80-line block telling the model exactly what to do for each `pick_track` event) exists because triage has no specialist to route to. It becomes the de facto AKS architect, Azure architect, etc. Remove the specialist routing gap and you can gut most of that prescriptive text.
+
+### Tool allowlists per agent are a secondary cause
+
+`core.triage` has: `emit_ui`, `inspect_repo`, `search_kaito_models`, `search_components`. It cannot call `azure.arm_get` or `aks.validate_manifests` even if it wanted to. This forces a handoff before any domain-specific work can happen. Fine in principle — separation of concerns. The problem is that after the handoff, the agent the user lands on (`core.codesmith`) doesn't have those tools either and doesn't have the domain context to use them well.
+
+### `AgentOutput.intent` is a sparse vocabulary
+
+`types/agent-output.ts`: intent is `continue | advance | revise | auto-continue-files`. This is used for frontend navigation hints, not for agent routing — so it doesn't cause rigidity in tool/agent selection. But it means the model has no way to signal "I need a specialist I don't have a handoff to."
+
+---
+
+## Q2: Does the Responses API fix semantic flexibility?
+
+**No. These are orthogonal concerns.**
+
+The Responses API would help the harness by:
+- Eliminating the `toAgentInputItems` / `recentTurns` hand-rolled threading (the SDK manages state)
+- Enabling `previous_response_id` for stateful sessions
+- Unlocking `file_search` and `web_search_preview` as built-in tools
+
+None of these change the agent graph topology or the tool selection logic. A prescriptive triage agent on Responses API is still a prescriptive triage agent. The model's routing decisions come from its prompt and the available handoff tools — not from the API surface.
+
+**Do migrate to Responses API — but as a separate workstream that reduces harness complexity.** Don't conflate it with the semantic routing problem. Doing them together in one PR is a guaranteed merge nightmare.
+
+One Responses API feature that IS relevant: **`file_search` over a skills vector store** could enable semantic skill discovery instead of the current exact-ID match. But that's a capability improvement, not a routing architecture improvement.
+
+---
+
+## Q3: What's the right architecture?
+
+### The actual diagnosis
+
+The current architecture has two independent routing layers that are not connected:
+
+**Layer 1 — User-facing entry points** (`user-invocable: true`):
+- `core.triage`, `aks.architect`, `azure.architect`
+- These accept user conversations directly
+
+**Layer 2 — Pipeline specialists** (`model-invocable: true`):
+- `aks.manifests_author`, `aks.reviewer`, `azure.ops`, `github.publisher`, `core.codesmith`, `core.reviewer`
+- These should receive handoffs from Layer 1
+
+The gap: `core.triage` (the primary entry for all users) has no edges to Layer 1 specialists in other packs. The specialists are `user-invocable` but only reachable if the user somehow jumps there directly — there's no automatic routing from triage to them.
+
+### What needs to happen
+
+**Option A: Wire triage → specialists (recommended, incremental)**
+
+Add handoffs from `core.triage` to `aks.architect`, `azure.architect`, and (optionally) `github.publisher`. Then gut the domain-specific sections of the triage prompt — those rules belong in the specialist agents.
+
+The triage agent becomes a lightweight intent router:
+- Understand the user's goal
+- Identify the right specialist
+- Hand off with context
+
+The specialist agents keep their detailed domain prompts (they already have them).
+
+This is a **2-file change** (triage frontmatter + triage prompt body) plus a `dependsOn` declaration in pack-core to reference the other packs. The registry's `validateHandoffsIntraPackOrThrow` enforces intra-pack or `dependsOn` scope — `registry.ts` L160–188.
+
+```yaml
+# core.triage frontmatter — proposed
+handoffs:
+  - label: AKS architecture and Kubernetes workloads
+    agent: aks.architect
+    prompt: User needs AKS cluster design, manifest authoring, or Kubernetes guidance.
+  - label: Azure infrastructure and resource management
+    agent: azure.architect
+    prompt: User needs Azure resource design, Bicep authoring, or cost estimation.
+  - label: GitHub integration and CI/CD
+    agent: github.publisher
+    prompt: User wants to publish artifacts to GitHub or set up CI/CD pipelines.
+  - label: Generate files
+    agent: core.codesmith
+    prompt: Requirements are clear and no specialist is needed. Please generate the files.
+  - label: Review artifacts
+    agent: core.reviewer
+    prompt: Files are ready for review.
+```
+
+The triage prompt shrinks dramatically — it no longer needs to know AKS networking rules or KAITO GPU SKUs. The specialist agents handle that. Triage's job becomes: understand intent + pick the right first specialist + hand off with a context summary.
+
+**Option B: Universal dispatcher (more ambitious, more flexible)**
+
+A single "orchestrator" agent that has ALL agents as handoff targets and a minimal prompt focused on decomposing work and delegating. Specialists report back, orchestrator decides what's next. This is the "planner + executors" pattern.
+
+This requires all specialists to have back-handoffs to the orchestrator — currently they don't (they handoff among themselves). It's a larger graph redesign. Not wrong, but Option A is the right first step and delivers 80% of the benefit.
+
+**Option C: Dynamic agent discovery (most flexible, most complex)**
+
+A `core.list_agents` tool that returns registered agent names and descriptions. The triage (or orchestrator) agent calls it at turn time to discover available specialists, then uses those as routing targets. The handoff targets aren't fixed in frontmatter — they're discovered at runtime.
+
+This requires either:
+a. A new `PackRegistry.listAgents()` method (easy to add)
+b. A new harness primitive that creates handoff tools dynamically (hard — SDK `handoff()` is built at agent construction time, before the run starts)
+
+The SDK limitation is the blocker: `handoff()` creates an agent instance, and agents are built before the stream starts (`buildAgentInstance` in `runner.ts` L534+). You can't discover agents at inference time and create new handoff tools mid-stream. You'd need to either pre-build all model-invocable agents and attach them as potential handoffs, or redesign the builder.
+
+Pre-building all agents is actually achievable: at turn start, build ALL model-invocable agents and attach them as handoffs to the active agent. Cost: some overhead per turn. Benefit: the model can discover and route to any specialist dynamically.
+
+### Should tools be more general?
+
+Not necessarily. The tool schemas are appropriate for their purposes — `azure.arm_get` should remain specific to ARM. What should change is **which tools each agent can see**.
+
+The more impactful change is making the orchestrating agents (triage, specialists) tool-aware across pack boundaries. A triage agent that can call `core.inspect_repo` to understand the user's codebase, then hand off to `aks.architect` with that context, is more useful than one that either does all the AKS reasoning itself or blindly hands off.
+
+### The planner pattern — worth it?
+
+A two-phase "plan then execute" pattern (one agent creates a task graph, dispatchers execute sub-tasks) is the right long-term architecture for complex multi-step workflows. But it requires:
+- Task graph representation (what is a "task"?)
+- Parallel execution support in the runner (currently strictly sequential)
+- Result aggregation
+
+The current runner is strictly sequential: one agent runs, produces output, hands off, the next agent runs. Parallel execution would require significant runner changes. Option A (wire triage → specialists) gets to semantic routing without touching the runner.
+
+---
+
+## Q4: Migration path
+
+### Phase 1 — Connect the graph (days, zero runner changes)
+
+**Step 1.1: Add `dependsOn` to pack-core**
+
+In `pack-core/src/server-manifest.ts` (or equivalent), add `dependsOn: ['aks', 'azure', 'github']`. This is what the registry needs to allow intra-pack handoffs across pack boundaries (`registry.ts` L164: `const allowedPacks = new Set([packName, ...(registeredPack.pack.dependsOn ?? [])])`).
+
+**Step 1.2: Wire triage handoffs**
+
+Update `triage.agent.md` frontmatter to add `aks.architect`, `azure.architect`, `github.publisher` as handoff targets with clear labels and routing prompts.
+
+**Step 1.3: Slim the triage prompt**
+
+Remove the domain-specific sections (track selection flowcharts for KAITO SKUs, Azure cost estimation, AKS networking) from the triage body. Replace with 2-3 sentences per domain: "For AKS workloads, hand off to the AKS Architect." The full domain knowledge already exists in those agents' prompts. This isn't about making triage stupider — it's about not duplicating domain logic.
+
+**What breaks:** Nothing in the runner. The schema-conformance tests don't care about handoffs. The only risk is the triage agent making worse routing decisions if the prompt reduction is too aggressive — validate with A/B testing against the current prompt.
+
+### Phase 2 — Improve intent reading (days to weeks)
+
+**Step 2.1: Structured routing signal**
+
+Add an `agent` field to `AgentOutput`:
+```ts
+export const AgentOutput = z.object({
+  message: z.string().optional(),
+  intent: z.enum(['continue', 'advance', 'revise', 'auto-continue-files']).optional(),
+  suggestedAgent: z.string().optional(),  // NEW: hint for next agent if no handoff called
+}).strict();
+```
+
+This lets agents signal routing intent to the frontend (for "deep link" UI patterns) without being authoritative about it.
+
+**Step 2.2: Richer skill vocabulary**
+
+Add SKILL.md files for each routing domain (e.g., `core/route-to-aks`, `core/route-to-azure`) that give triage agent context about when to use each specialist. The `core.read_skill` pull pattern means these don't burn context unless needed.
+
+### Phase 3 — Dynamic agent discovery (weeks)
+
+**Step 3.1: Pre-build all model-invocable agents**
+
+In `runner.ts buildAgentInstance()`, after building the active agent, iterate `registry.agents` and pre-build all `model-invocable: true` agents, attaching them as handoffs to the orchestrating agent. This gives the model a discovery mechanism without requiring mid-stream handoff tool creation.
+
+**What breaks:** Agent build cache per-turn is already there (`agentBuildCache` Map). The cost is building N more agents at turn start — should be fast since it's pure in-memory construction. Verify there are no cycles in the expanded graph (the cycle detection in `registry.ts` L495+ should catch them at registration time).
+
+### Phase 4 — Responses API (independent workstream)
+
+This is orthogonal — do it in parallel or after Phase 1. The Responses API migration simplifies the runner but doesn't change agent routing logic. Concrete steps:
+
+1. Test `useResponses: true` against Azure AOAI `2025-03-01-preview`
+2. If it works, remove `toAgentInputItems` and `recentTurns` threading (the SDK manages this)
+3. Evaluate `file_search` for semantic skill retrieval (replaces ID-based `core.read_skill`)
+
+**Do NOT mix Phase 1 and Phase 4 in one PR.** Routing changes touch agent prompts; Responses API touches the runner and session model. Separate branches, separate review.
+
+---
+
+## What changes what
+
+| Change | Files | Effort | Breaks |
+|--------|-------|--------|--------|
+| Wire triage → pack specialists | `triage.agent.md`, pack-core manifest | 1 day | Nothing (additive) |
+| Slim triage prompt | `triage.agent.md` | 0.5 days | Risk: worse routing if over-trimmed — A/B test |
+| Add `dependsOn` to pack-core | server manifest | 30 min | Nothing |
+| Richer `AgentOutput` (suggestedAgent) | `agent-output.ts`, runner | 2 hrs | Minor: conformance test needs update |
+| Pre-build model-invocable agents | `runner.ts` | 0.5 days | Low: verify no graph cycles |
+| Responses API | `runner.ts`, `session.ts`, converse handler | 3–5 days | Medium: session threading rewrite |
+
+---
+
+## Recommendation
+
+Do Phase 1 now. It fixes the actual cause of Ahmed's "extreme rigidity" feeling — triage routing to specialists that already exist but are unreachable. It requires ~2 files changed, zero runner modifications, and delivers the semantic routing behavior immediately.
+
+The triage agent prompt is compensating for a missing routing edge. Add the edge, slim the prompt, and the model will naturally reason about which specialist to engage based on user intent. That IS semantic routing — the model deciding "this is an AKS workload, I should involve the AKS architect" rather than following a decision tree.
+
+Phases 2–4 are incremental improvements on a now-sound foundation.
+
+---
+
+*Filed to `.squad/decisions/inbox/` for Scribe to merge.*
+---
+
+# Kif Decision — Workflow Efficiency Optimizations
+
+**Date:** 2026-04-27T01:49:03.870-07:00  
+**Author:** Kif (DevOps)  
+**Status:** Done
+
+## Context
+
+Actions usage metrics for the week of 4/20–4/27/2026 showed three workflows consuming disproportionate minutes:
+- `squad-review-gate.yml`: 829 min / 433 runs (reported as 2 jobs/run)
+- `squad-docs-gate.yml`: 320 min / 320 runs
+- `squad-project-board-automate.yml`: 222 min / 222 runs (firing on every label event)
+
+## Decisions Made
+
+### 1. Merged squad-docs-gate.yml into squad-review-gate.yml
+
+Both workflows triggered on the same PR events (`opened`, `synchronize`, `labeled`, etc.), effectively doubling the per-PR job cost. Merged all three docs-gate steps into the `check-squad-approval` job as additional steps:
+- `Inspect changed files for docs gate` (API-based, no checkout needed)
+- `Post or update docs gate comment`
+- `Enforce docs or changeset for user-facing code`
+
+Also dropped the unnecessary `actions/checkout@v5` from the original docs-gate (it used only the GitHub REST API). Deleted `squad-docs-gate.yml`.
+
+**Expected impact:** ~320 fewer workflow runs/week, ~320 minutes/week saved.
+
+### 2. Added label-name early-exit to squad-project-board-automate.yml
+
+The workflow fired on every `labeled`/`unlabeled` event regardless of which label changed. Added a job-level `if:` condition that short-circuits for irrelevant labels while always running for non-label events (opened, synchronize, closed, reopened, workflow_dispatch).
+
+Relevant labels: `squad:*`, `squad`, `nibbler:*`, `zapp:*`, `leela:*`, `docs:*`, `skip-docs`, `architecture`, `ready-for-review`, `do-not-merge`, `blocked`.
+
+**Expected impact:** Significant reduction in wasted runs — most label events on PRs are unrelated to board automation.
+
+### 3. The "2 jobs" mystery
+
+The reported "2 jobs/run" for `squad-review-gate` was actually both `squad-review-gate` and `squad-docs-gate` running concurrently on the same PR events. The review-gate itself only had 1 job. Merging resolves this.
+
+## Preserved Invariants
+
+- `squad/review-gate` commit status context string unchanged (branch protection safe)
+- `pull-requests: write` permission added to review-gate to support comment posting
+- `reopened` trigger added to review-gate (was missing; docs-gate had it)
+- Draft PR guard (`if: github.event.pull_request.draft == false`) added to review-gate job from docs-gate

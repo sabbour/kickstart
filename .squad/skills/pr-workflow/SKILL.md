@@ -182,24 +182,24 @@ Before a PR can merge, it must pass the **four-way review gate**:
 Zapp's review is a **pre-merge gate** for foundational patterns. Nibbler reviews every PR (including `squad:chore-auto`) because code-quality review is cheap and fast. The docs gate is satisfied by **one of** `docs:approved` or `docs:not-applicable`; `docs:rejected` fails the gate.
 
 **How approvals work (label-based):**
-- **Leela** approves by adding the `leela:approved` label:
+- **Leela** approves by adding the `architecture:approved` label:
   ```bash
-  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "leela:approved" --repo azure-management-and-platforms/kickstart
+  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "architecture:approved" --repo azure-management-and-platforms/kickstart
   ```
-- **Zapp** approves by adding the `zapp:approved` label:
+- **Zapp** approves by adding the `security:approved` label:
   ```bash
-  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "zapp:approved" --repo azure-management-and-platforms/kickstart
+  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "security:approved" --repo azure-management-and-platforms/kickstart
   ```
-- **Nibbler** approves by adding the `nibbler:approved` label:
+- **Nibbler** approves by adding the `codereview:approved` label:
   ```bash
-  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "nibbler:approved" --repo azure-management-and-platforms/kickstart
+  GH_TOKEN=$TOKEN gh pr edit {number} --add-label "codereview:approved" --repo azure-management-and-platforms/kickstart
   ```
 - **Docs** approves by adding `docs:approved` (docs updated in the PR) or `docs:not-applicable` (DP declared `Docs impact: N/A`):
   ```bash
   GH_TOKEN=$TOKEN gh pr edit {number} --add-label "docs:approved" --repo azure-management-and-platforms/kickstart
   ```
 
-No GitHub formal PR review approval is required — squad agents share a single GitHub account with the repo owner, making self-approval impossible. The `squad/review-gate` status check (`.github/workflows/squad-review-gate.yml`) turns green when all required labels are present **and** a docs marker is present. For explicitly low-risk PRs labeled `squad:chore-auto`, the gate accepts `leela:approved` + `nibbler:approved` + docs marker, unless the PR looks security-sensitive (`security`, `GHSA`, `CVE`, `vulnerability`) or touches sensitive paths (`.github/workflows/**`, auth, guardrail, security code), in which case `zapp:approved` is still required. `Squad Auto Merge` clears all three approval labels (`leela:approved`, `zapp:approved`, `nibbler:approved`) on every `synchronize` so new commits always need fresh approval labels. Docs markers persist across synchronize (they describe the PR content, not a reviewer's per-commit signoff).
+No GitHub formal PR review approval is required — squad agents share a single GitHub account with the repo owner, making self-approval impossible. The `squad/review-gate` status check (`.github/workflows/squad-review-gate.yml`) turns green when all required labels are present **and** a docs marker is present. For explicitly low-risk PRs labeled `squad:chore-auto`, the gate accepts `architecture:approved` + `codereview:approved` + docs marker, unless the PR looks security-sensitive (`security`, `GHSA`, `CVE`, `vulnerability`) or touches sensitive paths (`.github/workflows/**`, auth, guardrail, security code), in which case `security:approved` is still required. `Squad Auto Merge` clears all three approval labels (`architecture:approved`, `security:approved`, `codereview:approved`) on every `synchronize` so new commits always need fresh approval labels. Docs markers persist across synchronize (they describe the PR content, not a reviewer's per-commit signoff).
 
 ### Requesting Copilot Review
 
@@ -267,7 +267,7 @@ When a PR has review comments or formal review threads, the full feedback loop i
 
 **NEVER silently fix code and move on.** A reply is required for every piece of feedback, even if the fix is trivial. This is not optional.
 
-**Why this matters:** `require_conversation_resolution: true` is enforced in branch protection. Unresolved threads block the `squad/review-gate` status check. Even if the required label set for the PR is present (`leela:approved` + `zapp:approved` + `nibbler:approved` + one of `docs:approved` / `docs:not-applicable`, or the low-risk `squad:chore-auto` path), GitHub will not allow merge while threads are open.
+**Why this matters:** `require_conversation_resolution: true` is enforced in branch protection. Unresolved threads block the `squad/review-gate` status check. Even if the required label set for the PR is present (`architecture:approved` + `security:approved` + `codereview:approved` + one of `docs:approved` / `docs:not-applicable`, or the low-risk `squad:chore-auto` path), GitHub will not allow merge while threads are open.
 
 ### CI Requirements
 
@@ -281,10 +281,10 @@ All CI checks must pass, including Playwright E2E tests. If checks fail:
 **Rule:** Never call `GH_TOKEN=$TOKEN gh pr merge` without first verifying ALL of the following:
 
 1. **Squad label gate** — verify the PR satisfies one of the allowed approval paths on the current head:
-    - standard path: `leela:approved` + `zapp:approved` + `nibbler:approved` + (`docs:approved` OR `docs:not-applicable`)
-    - low-risk path: `squad:chore-auto` + `leela:approved` + `nibbler:approved` + (`docs:approved` OR `docs:not-applicable`)
-    - low-risk sensitive path: `squad:chore-auto` + `leela:approved` + `nibbler:approved` + `zapp:approved` + (`docs:approved` OR `docs:not-applicable`) when the PR text looks security-sensitive or it touches `.github/workflows/**`, auth, guardrail, or security code
-    - Any path fails immediately if `leela:rejected`, `zapp:rejected`, `nibbler:rejected`, or `docs:rejected` is present.
+    - standard path: `architecture:approved` + `security:approved` + `codereview:approved` + (`docs:approved` OR `docs:not-applicable`)
+    - low-risk path: `squad:chore-auto` + `architecture:approved` + `codereview:approved` + (`docs:approved` OR `docs:not-applicable`)
+    - low-risk sensitive path: `squad:chore-auto` + `architecture:approved` + `codereview:approved` + `security:approved` + (`docs:approved` OR `docs:not-applicable`) when the PR text looks security-sensitive or it touches `.github/workflows/**`, auth, guardrail, or security code
+    - Any path fails immediately if `architecture:rejected`, `security:rejected`, `codereview:rejected`, or `docs:rejected` is present.
 
     ```bash
     PR_JSON=$(GH_TOKEN=$TOKEN gh pr view {number} --json number,title,body,headRefName,labels)
@@ -296,12 +296,12 @@ All CI checks must pass, including Playwright E2E tests. If checks fail:
       | ($files | map(.filename) | any(test("^\\.github/workflows/|(^|[/._-])(auth|guardrail|guardrails|security)([/._-]|$)"; "i"))) as $sensitive_paths
       | (($labels | index("docs:approved")) or ($labels | index("docs:not-applicable"))) as $docs_ok
       | (($labels | index("docs:rejected")) | not) as $docs_not_rejected
-      | (($labels | index("leela:rejected")) | not) as $no_leela_reject
-      | (($labels | index("zapp:rejected")) | not) as $no_zapp_reject
-      | (($labels | index("nibbler:rejected")) | not) as $no_nibbler_reject
-      | (($labels | index("leela:approved")) and ($labels | index("nibbler:approved"))) as $core_ok
-      | (($labels | index("squad:chore-auto")) and $core_ok and ((($security or $sensitive_paths) | not) or ($labels | index("zapp:approved"))))
-        or ($core_ok and ($labels | index("zapp:approved")))
+      | (($labels | index("architecture:rejected")) | not) as $no_leela_reject
+      | (($labels | index("security:rejected")) | not) as $no_zapp_reject
+      | (($labels | index("codereview:rejected")) | not) as $no_nibbler_reject
+      | (($labels | index("architecture:approved")) and ($labels | index("codereview:approved"))) as $core_ok
+      | (($labels | index("squad:chore-auto")) and $core_ok and ((($security or $sensitive_paths) | not) or ($labels | index("security:approved"))))
+        or ($core_ok and ($labels | index("security:approved")))
       | . and $docs_ok and $docs_not_rejected and $no_leela_reject and $no_zapp_reject and $no_nibbler_reject
     '
     ```
@@ -328,9 +328,9 @@ GH_TOKEN=$TOKEN gh pr merge <N> --squash --delete-branch
 
 Qualifying GitHub PRs can now skip the manual merge command: the `Squad Auto Merge` workflow arms squash auto-merge when trusted merge signals are green (`CI Gate` from workflow `CI` plus `squad/review-gate` from `Squad Review Gate`), the PR is neither XL (>1000 changed lines) nor titled `refactor`, and one of these approval paths is satisfied on the current head:
 
-- standard path: fresh `leela:approved` + `zapp:approved` + `nibbler:approved` + (`docs:approved` OR `docs:not-applicable`)
-- low-risk path: opt-in `squad:chore-auto` + fresh `leela:approved` + `nibbler:approved` + (`docs:approved` OR `docs:not-applicable`)
-- low-risk sensitive path: opt-in `squad:chore-auto` + fresh `leela:approved` + `nibbler:approved` + `zapp:approved` + (`docs:approved` OR `docs:not-applicable`) when the PR text looks security-sensitive or it touches `.github/workflows/**`, auth, guardrail, or security code
+- standard path: fresh `architecture:approved` + `security:approved` + `codereview:approved` + (`docs:approved` OR `docs:not-applicable`)
+- low-risk path: opt-in `squad:chore-auto` + fresh `architecture:approved` + `codereview:approved` + (`docs:approved` OR `docs:not-applicable`)
+- low-risk sensitive path: opt-in `squad:chore-auto` + fresh `architecture:approved` + `codereview:approved` + `security:approved` + (`docs:approved` OR `docs:not-applicable`) when the PR text looks security-sensitive or it touches `.github/workflows/**`, auth, guardrail, or security code
 
 Any `*:rejected` label (including `docs:rejected`) disarms auto-merge and fails the `squad/review-gate` status check.
 
@@ -402,8 +402,8 @@ Example: `squad/42-fix-login-validation`
 □ Zapp reviews security
 □ Nibbler reviews code quality
 □ Docs reviewer applies `docs:approved` or `docs:not-applicable`
-□ Address all review comments
-□ Resolve all threads
+□ Address all review comments (reply to every Copilot + human comment — fix or dismiss with justification)
+□ Resolve all threads (0 unresolved before merge)
 □ Update board → In review
 □ GH_TOKEN=$TOKEN gh pr merge --squash --delete-branch
 □ Update board → Done

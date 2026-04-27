@@ -3,8 +3,8 @@
 <!--
 END-TO-END PROCESS FLOW:
 
-Issue → Lead triages → Design Proposal (Lead facilitates) →
-Design Review (Lead + Zapp + Nibbler + Amy approve) →
+Issue → Lead triages → Design Proposal (Leela approves architecture) →
+Design Review (Leela architecture + Zapp security + Amy docs approve) →
 Implementation (Bender/Fry/Hermes) → PR →
 PR Review Gate (Zapp security + Nibbler code quality + Lead architecture + Amy docs) →
 CI green → Merge →
@@ -17,10 +17,37 @@ Ceremonies are structured team interactions that the Squad coordinator triggers 
 
 | Ceremony | Trigger | When | Facilitator | Participants | Gate? |
 |----------|---------|------|-------------|--------------|-------|
-| Design Proposal | auto | before work | Leela | assigned agent, Amy (docs impact) | ✅ Blocks implementation until DP posted |
-| Design Review | auto | before code | Leela | Zapp (security), Nibbler (code quality), Amy (docs impact), all-relevant | ✅ Blocks code until approved |
-| PR Review Gate | auto | before merge | Nibbler | Leela (architecture), Zapp (security), Amy (docs), Hermes (tests) | ✅ Blocks merge until all feedback addressed |
+| Design Proposal | auto | before work | Leela | assigned agent, Leela (architecture approval), Amy (docs impact) | ✅ Blocks implementation until DP posted + `architecture:approved` on issue |
+| Design Review | auto | before code | Leela | Leela (architecture), Zapp (security), Amy (docs impact) | ✅ Blocks code until `architecture:approved` + `security:approved` + `docs:approved` on issue |
+| PR Review Gate | auto | before merge | Nibbler | Nibbler (code), Zapp (security), Amy (docs — Phase 1), Leela (architecture — conditional) | ✅ Blocks merge until all feedback addressed |
 | Retrospective | auto | after failure | Leela | Nibbler, Kif (if CI/workflow failure), all-involved | ❌ Diagnostic, not blocking |
+
+## Minimum Ceremony Path
+
+Quick-reference for ceremony requirements by size/type. Apply the first matching row.
+
+| Size / Type | DP required? | DR required? | DR mode | Notes |
+|---|---|---|---|---|
+| `estimate:S` | ❌ No | ❌ No | — | Fast lane: straight to code |
+| `chore-auto` | ❌ No | ❌ No | — | Fast lane: straight to code |
+| `estimate:M` | ✅ Yes | ✅ Yes | Parallel | Post DP + start coding; DR runs concurrently; blockers resolved before PR opens |
+| `estimate:L` | ✅ Yes | ✅ Yes | Sync | Wait for all approvals before coding |
+| `estimate:XL` | ✅ Yes | ✅ Yes | Sync | Wait for all approvals before coding |
+
+## Sizing Guide — Leela's triage decision criteria
+
+Use this table to pick the right `estimate:*` label during triage. Apply the **first** row whose description fits.
+
+| Label | Time | Points | Fits in 6h sprint? | Apply when… |
+|---|---|---|---|---|
+| `estimate:S` | ~15 min | 1 | ✅ Yes | Single-file change, no design decisions — typo fix, rename, small config tweak, boilerplate add. No DP or DR needed; fast lane applies. If implementation turns out larger, bump to M and write a DP. |
+| `estimate:M` | ~1 hour | 3 | ✅ Yes | Multi-file change **or** a single file requiring a design choice. Needs a DP; DR runs in parallel. Clear scope — no unknowns that could cause it to balloon. |
+| `estimate:L` | ~3 hours | 8 | ⚠️ At most one | Touches 3+ files **or** introduces a new pattern/abstraction. Needs full DP + synchronous DR. Can be broken into S/M sub-issues, but the issue stays L if they are tightly coupled. |
+| `estimate:XL` | >3 hours | 20 | ❌ No | Feature or refactor spanning multiple components. **Must be split during triage** — Leela decomposes into child issues before assigning. Never enters a sprint whole. |
+
+**Escalation rule:** When in doubt between two sizes, pick the smaller one and leave a one-line note on the issue. The PR Review Gate catches anything that turned out to be larger.
+
+---
 
 ## Automated workflows (not coordinator ceremonies)
 
@@ -47,11 +74,17 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 | **When** | before |
 | **Condition** | any issue assigned to an agent for implementation work |
 | **Facilitator** | Leela |
-| **Participants** | assigned agent, Amy (docs impact assessment) |
+| **Participants** | assigned agent, Leela (architecture approval), Amy (docs impact assessment) |
 | **Time budget** | focused |
 | **Enabled** | ✅ yes |
 
-**Gate:** No implementation code may be written until the DP is posted as a comment on the issue.
+### Fast Lane exemption
+
+If the issue is labeled `estimate:S` **or** `squad:chore-auto`, skip the DP entirely. The implementing agent proceeds directly to code. No DP comment is required, and the Design Review ceremony is also skipped (see [Design Review](#design-review) below).
+
+> **Rationale:** For S-size work (≤2h implementation), the ceremony overhead (write DP, wait for DR approval) exceeds the implementation time. Fast lane eliminates this inversion.
+
+**Gate:** No implementation code may be written until the DP is posted as a comment on the issue AND Leela has posted `architecture:approved` on the issue — **unless the Fast Lane exemption applies**.
 
 **DP structure** (the implementing agent posts a comment with):
 - Problem statement (cite the issue body)
@@ -70,8 +103,9 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 **Agenda:**
 1. Assigned agent drafts a Design Proposal comment on the issue
 2. Leela reviews for completeness — does it cover architecture alignment with `docs/v2-implementation-brief.md`?
-3. If incomplete, Leela requests revisions before proceeding to Design Review
-4. DP comment posted → triggers Design Review ceremony
+3. If incomplete, Leela requests revisions before proceeding
+4. Leela approves: posts `architecture:approved` label on the issue
+5. DP comment posted + `architecture:approved` present → triggers Design Review ceremony
 
 ---
 
@@ -83,21 +117,36 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 | **When** | before |
 | **Condition** | DP comment posted on an issue, OR multi-agent task involving 2+ agents modifying shared systems |
 | **Facilitator** | Leela |
-| **Participants** | all-relevant, Zapp (security), Nibbler (code quality), Amy (docs impact) |
+| **Participants** | Leela (architecture), Zapp (security), Amy (docs impact) |
 | **Time budget** | focused |
 | **Enabled** | ✅ yes |
 
-**Gate:** No implementation code may be written until all reviewers approve the DP.
+**Gate:** No implementation code may be written until `architecture:approved` + `security:approved` + `docs:approved` are all present on the issue — **unless the Fast Lane or Async DR exemption applies (see below)**.
+
+### Fast Lane exemption
+
+If the issue is labeled `estimate:S` **or** `squad:chore-auto`, skip the DR entirely. The implementing agent proceeds directly to code.
+
+### Parallel DR for `estimate:M`
+
+If the issue is labeled `estimate:M`:
+1. The implementing agent posts the DP comment on the issue.
+2. DR reviewers (Leela, Zapp, Amy) are invoked **in parallel** with the start of implementation — no waiting period.
+3. If a reviewer raises a blocking concern **before the first PR commit**, implementation pauses to address it.
+4. If no blocking concern is raised by the time implementation is ready to open a PR, the agent proceeds.
+
+> With Ralph running continuously, DR reviewers respond in minutes. The parallel model captures the same protection as synchronous DR without the pre-code idle wait.
+
+### Synchronous DR (default for `estimate:L` and `estimate:XL`)
 
 **Agenda:**
 1. Review the DP comment on the issue
-2. Leela evaluates architecture alignment and pack boundaries
-3. Zapp evaluates security surface (tool schemas, guardrails, trust boundaries)
-4. Nibbler evaluates code quality implications (patterns, test coverage expectations, complexity)
-5. Amy evaluates the docs plan: are the listed docs tasks complete and correct? If the DP says "no docs impact" but Amy disagrees, she flags it. Amy's approved docs plan becomes her commit checklist during PR review.
-6. Identify risks and edge cases
-7. All reviewers approve → implementation proceeds
-8. Decisions captured as comments on the issue
+2. Leela evaluates architecture alignment and pack boundaries → posts `architecture:approved` or blocks
+3. Zapp evaluates security surface (tool schemas, guardrails, trust boundaries) → posts `security:approved` or blocks
+4. Amy evaluates the docs plan: are the listed docs tasks complete and correct? If the DP says "no docs impact" but Amy disagrees, she flags it. Amy's approved docs plan becomes her commit checklist during PR review → posts `docs:approved` on the issue or blocks
+5. Identify risks and edge cases
+6. All three labels present (`architecture:approved` + `security:approved` + `docs:approved`) on the issue → implementation proceeds
+7. Decisions captured as comments on the issue
 
 ---
 
@@ -109,26 +158,38 @@ All crons are UTC. `0 0 * * *` = 17:00 PDT / 16:00 PST.
 | **When** | before merge |
 | **Condition** | PR opened by a squad agent |
 | **Facilitator** | Nibbler |
-| **Participants** | Leela (architecture), Zapp (security), Amy (docs review), Hermes (test coverage) |
+| **Participants** | Nibbler (code quality), Zapp (security), Amy (docs — Phase 1), Leela (architecture — conditional) |
 | **Time budget** | focused |
 | **Enabled** | ✅ yes |
 
-**Gate:** PR may NOT be merged until all review threads are resolved and all reviewers have approved.
+**Gate:** PR may NOT be merged until all review threads are resolved and all review gates are clear.
 
-**Review dimensions:**
+**Two-phase structure:**
+
+**Phase 1 — Docs pass (runs in parallel with CI):**
+- Amy reviews the PR and commits any missing or updated docs directly to the PR branch (commit as `sabbour-squad-docs[bot]`). PRs ship with complete docs — no follow-up tasks after merge.
+- Amy then applies `docs:approved`, `docs:not-applicable`, or `skip-docs` (all three are accepted by the docs gate).
+- Phase 1 MUST be complete — Amy's commit landed (if any) and the label applied — before Phase 2 begins.
+- No approval reviews from Nibbler, Zapp, or Leela during Phase 1.
+
+**Phase 2 — Approval reviews (after Phase 1 is complete):**
 1. **Nibbler** — code correctness, readability, bug patterns, error handling, naming
-2. **Leela** — architecture alignment, pack boundaries, API contract consistency
-3. **Zapp** — security surface, input validation, trust boundaries, secret handling
-4. **Hermes** — test coverage for new/changed code, edge cases, regression risk
-5. **Amy** — documentation impact, changeset presence, docs accuracy. **Amy is an active contributor, not just a reviewer.** If docs are missing or need updating, Amy pushes the docs changes directly to the PR branch (commit as `sabbour-squad-docs[bot]`), then applies the docs label. PRs ship with complete docs — no follow-up tasks after merge.
+2. **Zapp** — security surface, input validation, trust boundaries, secret handling
+3. **Leela** — architecture alignment, pack boundaries, API contract consistency. **Conditional:** required only when the PR has an `architecture` label OR touches pack boundaries, new packs, API surface, or system design. NOT required for bug fixes, feature additions within existing packs, or docs-only changes.
+
+**Hard rules:**
+- **No commits after approvals:** Once Phase 2 begins (any approval review submitted), no further commits to the PR branch are permitted. If a commit is needed after approvals, the review cycle restarts from Phase 1.
+- **Duplicate-review guard:** Before submitting a review, check whether you already have a review submitted for the current HEAD commit (`gh pr reviews {N}`). If yes, do not submit another. This prevents duplicate reviews from coordinator retry spawns.
 
 **Feedback labels:**
-- `nibbler:approved` / `nibbler:rejected` — code quality gate
-- `leela:approved` / `leela:rejected` — architecture gate
-- `zapp:approved` / `zapp:rejected` — security gate
-- `docs:approved` / `docs:not-applicable` — documentation gate (Amy applies after review + any needed docs commits)
+- `codereview:approved` / `codereview:rejected` — code quality gate
+- `architecture:approved` / `architecture:rejected` — architecture gate
+- `security:approved` / `security:rejected` — security gate
+- `docs:approved` / `docs:not-applicable` / `skip-docs` — documentation gate (Amy applies after review + any needed docs commits)
 
-**Merge criteria:** All four approval labels present (`leela:approved` + `zapp:approved` + `nibbler:approved` + `docs:approved` or `docs:not-applicable`) + CI green. Any rejection blocks merge and triggers revision by a different agent (per Reviewer Rejection Protocol).
+> **Mutual exclusivity:** For each reviewer namespace, `:approved` and `:rejected` are mutually exclusive. Adding one automatically removes the other — enforced by `squad-auto-merge.yml` on every `labeled` event. A PR will never carry both `codereview:approved` and `codereview:rejected` simultaneously.
+
+**Merge criteria:** `codereview:approved` + `security:approved` + (`docs:approved` OR `docs:not-applicable`) + CI green. `architecture:approved` is additionally required when the PR has an `architecture` label or touches pack boundaries. **Low-risk exception:** PRs labeled `squad:chore-auto` that don't touch sensitive paths or carry security signals only require `codereview:approved` (security review is skipped — enforced by `squad-review-gate.yml`). Any rejection blocks merge and triggers revision by a different agent (per Reviewer Rejection Protocol).
 
 **Auto-merge (default):** When a PR is opened, the coordinator or implementing agent enables auto-merge immediately: `gh pr merge {N} --auto --squash`. The PR merges automatically once all required status checks pass and all review gates clear. No manual merge click needed — the review gate IS the quality control.
 
@@ -243,15 +304,15 @@ Backlog → Assigned → In Progress → In Review → Approved → Merged
 | **Backlog** | Issue/PR created without squad labels | Auto | Default column for unqualified items; squad-tagged items start here |
 | **In Progress** | Branch push to `squad/NNN-*` branch OR `squad:in-progress` label added | Auto | Indicates active development work |
 | **In Review** | PR opened from `squad/NNN-*` branch | Auto | PR awaiting reviewer feedback |
-| **Approved** | `leela:approved` + `nibbler:approved` + (`docs:approved` OR `skip-docs`) | Auto | All required approvals collected; ready to merge |
+| **Approved** | `codereview:approved` + `security:approved` (or `squad:chore-auto` low-risk) + (`docs:approved` OR `docs:not-applicable`) | Auto | All required approvals collected; ready to merge |
 | **Merged** | PR merged to `main` | Auto | Terminal state; work complete |
 
 **Label-to-Column Mappings (Reference):**
 
 | Condition | Moves To | Notes |
 |-----------|----------|-------|
-| `leela:approved` + `nibbler:approved` + docs marker | "Approved" | All review gates passed; requires both Leela (architecture) and Nibbler (code quality) |
-| `docs:approved` OR `skip-docs` | Counts toward "Approved" | Either explicit docs review approval or skip-docs exemption |
+| `codereview:approved` + `security:approved` (or `squad:chore-auto` low-risk) + docs marker | "Approved" | All required review gates passed; `architecture:approved` additionally required for PRs with `architecture` label |
+| `docs:approved` OR `docs:not-applicable` OR `skip-docs` | Counts toward "Approved" | Either explicit docs review approval (Amy committed docs), not-applicable, or explicitly skipped |
 | PR opened from `squad/NNN-*` branch | "In Review" | Automatically applied when PR title/branch matches squad naming convention |
 | Branch push to `squad/NNN-*` | "In Progress" | Triggered by `pull_request.synchronize` event |
 | PR merged to main | "Merged" | Terminal state; non-blocking (items remain in "Merged" for auditing) |
@@ -260,7 +321,7 @@ Backlog → Assigned → In Progress → In Review → Approved → Merged
 
 1. **Soft moves only:** The workflow checks the current column before moving. If an item is manually positioned in a later column (e.g., a PR manually moved from "In Review" to "Approved" to force merge), the automation respects that override and does not move it backwards.
 
-2. **Label presence required:** Items automatically transition columns *only* when labels/events explicitly match. Removals of labels (e.g., `-nibbler:approved`) do not trigger backwards transitions; manual re-positioning is required.
+2. **Label presence required:** Items automatically transition columns *only* when labels/events explicitly match. Removals of labels (e.g., `-codereview:approved`) do not trigger backwards transitions; manual re-positioning is required. **Known interaction with mutual exclusivity:** when a required reviewer's `:rejected` label is applied, mutual exclusivity silently removes their `:approved` label — but because label removals don't trigger backwards moves, the board card will remain visually in "Approved" until the next label addition or a manual drag. If a PR appears stuck in "Approved" after a rejection, drag it back to "In Review".
 
 3. **Non-blocking:** Project board state does not affect CI/CD gates. A PR in "Backlog" will still pass CI; the board is a visibility tool, not an enforcement mechanism.
 
@@ -278,10 +339,10 @@ Backlog → Assigned → In Progress → In Review → Approved → Merged
 3. Bender pushes changes to PR #100
    → Already in "In Progress"; no move (idempotent)
 
-4. Leela approves, adds leela:approved label
-   → Still waiting on nibbler and docs; no move yet
+4. Amy reviews docs (Phase 1), commits any missing docs, applies docs:approved label
+   → Phase 1 complete; Phase 2 begins
 
-5. Nibbler reviews, adds nibbler:approved label, PR has docs:approved
+5. Nibbler + Zapp review (Phase 2), add codereview:approved + security:approved labels
    → All gates met → automatically moved to "Approved"
 
 6. PR merged to main

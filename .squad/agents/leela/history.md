@@ -118,3 +118,22 @@ For comprehensive work history prior to 2026-04-20, see git log and .squad/orche
 2. Ideas-tab curated-only model; future user-supplied inspirations will reopen threat
 3. Composition-reliability harness constraints: fail-loud, ≤2 retries, redacted logs
 4. DP-time conditions enforce at PR time non-negotiable (Reviewer Rejection Protocol on #1000 sets precedent)
+
+## Learnings (2026-04-27 — Harness patterns audit against OpenAI Agents SDK)
+- **Agent.asTool()** available in `@openai/agents-core` v0.8.4 — we don't use it. Critical gap for flexible triage orchestration.
+- **Handoff input filters** (`handoff({ inputFilter })`) and `RunConfig.handoffInputFilter` — we pass full context on every handoff, causing token bloat.
+- **RunConfig** has `callModelInputFilter`, `handoffInputFilter`, `inputGuardrails`, `outputGuardrails` — we use none of these. Wrapping our options in RunConfig is shovel-ready.
+- **Our guardrails are home-rolled** in `guardrails.ts` — sequential, blocking. SDK-native guardrails run in parallel with agent inference.
+- **MaxTurnsExceededError** — we catch generically, should handle specifically with user-friendly recovery.
+- **History threading** — our `toAgentInputItems()` strips tool calls. SDK's `callModelInputFilter` is the right place for selective trimming.
+- **useResponses: false** blocks tool search, hosted tools, server-managed history. Worth revisiting as Azure OpenAI v1 matures.
+- **Deterministic chaining** (codesmith → reviewer → quality gate) and **LLM-as-Judge** are high-value patterns we don't implement.
+- **Key files:** `runner.ts`, `guardrails.ts`, `schema-conformance.ts`, `agent-output.ts`, `triage.agent.md`
+- **Decision written to:** `.squad/decisions/inbox/leela-harness-patterns-audit-2026-04-27.md`
+
+## Learnings (2026-04-27 — PR Review Gate simplification, PR #80)
+- **Phase split:** Amy's docs commits must precede approval reviews. Split gate into Phase 1 (Amy docs, parallel with CI) and Phase 2 (Nibbler + Zapp approval reviews). Phase 1 must fully complete before Phase 2 begins — this prevents post-approval commits from dismissing existing reviews.
+- **Simplified gate:** `nibbler:approved` + `zapp:approved` are the required set. `leela:approved` is now conditional — only required for PRs with `architecture` label or touching pack boundaries.
+- **Hermes removed from PR Review Gate:** Test coverage is enforced by CI status checks, not manual reviews. Hermes no longer participates in the PR Review Gate.
+- **Duplicate-review guard added:** Before submitting a review, check `gh pr reviews {N}` for the current HEAD. Do not submit if a review already exists for that commit.
+- **No-commit-after-approval rule added:** Once any Phase 2 approval is submitted, no further commits are permitted to the branch. Any needed commit restarts the cycle from Phase 1.

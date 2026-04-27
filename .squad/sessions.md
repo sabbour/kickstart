@@ -276,3 +276,35 @@ Inbox now empty and ready for next session.
 1 file processed and merged into `decisions.md`:
 - `leela-dependabot-policy.md` → merged
 Inbox now empty and ready for next session.
+
+---
+
+## Session: 2026-04-27 — Auth Redirect Key Centralisation + Test Quality (Issues #81 #82, PR #83)
+
+**Trigger:** Post-merge cleanup after PR #80 (auth redirect loop fix). Ralph board scan showed no open issues; Nibbler's review nits from #80 were filed as tracked issues and immediately resolved.
+
+**Session Type:** Housekeeping / refactor cycle.
+
+### Issues Filed
+
+| Issue | Label | Summary |
+|-------|-------|---------|
+| #81 | `squad:hermes` | `AUTH_REDIRECT_PENDING_KEY` duplicated across 3 files — centralise to canonical source in `api-client.ts` |
+| #82 | `squad:hermes` | Test 3 in `auth-redirect-loop.test.ts` was a strict subset of Test 2 — dead coverage |
+
+### PR #83 — `squad/81-82-test-quality` → `dev` (squash-merged)
+
+**Changes:**
+
+- Exported `AUTH_REDIRECT_PENDING_KEY` from `api-client.ts` (canonical auth constants)
+- Removed duplicate definitions in `useStreaming.ts` and `App.tsx`; both now import from `api-client.ts`
+- Replaced dead Test 3 with a new test covering the `storage.setItem` throw path (`QuotaExceededError` in private browsing — redirect fires despite storage failure)
+- Restored dropped `// Target ~80 rAF frames` comment (Nibbler nit from #80)
+- Fixed `DOMException` constructor usage — second arg sets `.name`, not first (Copilot reviewer comment, resolved)
+- Changeset: `.changeset/83-centralise-auth-redirect-key.md` — patch bump, `@aks-kickstart/web`
+
+**Gates:** Leela ✅ Zapp ✅ Nibbler ✅ Docs ✅ — CI green, merged, worktree cleaned.
+
+### Board State
+
+Empty — no open issues, no open PRs.

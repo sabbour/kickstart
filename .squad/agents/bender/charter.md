@@ -53,6 +53,32 @@ Always work inside a dedicated worktree under `.worktrees/`, branched from `orig
 Read `.squad/decisions.md` and the brief section relevant to the change.
 
 
+## Tool Schema Rules (hard boundary — enforced by CI conformance test)
+
+Every Zod schema used as `tool()` `parameters` or a `UserActionContribution` parameter **must** pass the OpenAI strict-mode invariants checked by `packages/web/api/src/startup/schema-conformance.test.ts`. Violations cause HTTP 400 in production — no exceptions.
+
+**Import the harness helpers, don't reinvent:**
+
+```ts
+import { strictOptional, stripNulls, isHttpsUrl } from '@aks-kickstart/harness/runtime/z-strict';
+```
+
+**Forbidden patterns — these will fail the conformance test:**
+
+| ❌ Do NOT write | ✅ Write this instead |
+|-----------------|----------------------|
+| `field: z.string().optional()` | `field: strictOptional(z.string())` |
+| `z.record(z.string(), z.string())` | Closed `z.object({…}).strict()` or JSON-string encoding |
+| `.passthrough()` on any tool schema | Remove it; use `.strict()` |
+| `z.unknown()` in tool params | A typed union or `z.string()` |
+| `z.string().url()` | `z.string().refine(isHttpsUrl, { message: '…' })` |
+| `.describe()` on a shared/reused schema | Describe only on leaf nodes (prevents `$ref`+`description` sibling) |
+
+**If you used `strictOptional()`, call `stripNulls(input)` in `execute()`** before any internal schema parse. This converts `null` → `undefined` so server-side `.optional()` schemas work correctly.
+
+**The conformance test is the gate.** If `npx vitest run packages/web/api/src/startup/schema-conformance.test.ts` passes, the schema is valid. If it fails, the PR does not merge.
+
+
 <!-- SQUAD-TOKEN-HANDLING-BLOCK v1 -->
 ## Token handling (hard boundary — issue #1087)
 

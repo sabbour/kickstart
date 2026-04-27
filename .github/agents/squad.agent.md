@@ -714,9 +714,10 @@ When spawning an agent that may do git operations (commit, push, PR), resolve th
 
 2. **Resolve the role slug:** Map the agent's role to an identity role slug using `resolveRoleSlug()` semantics:
    - Lead/Architect/Coordinator/Squad → `lead` via explicit alias mapping
-   - Zapp → `zapp` via explicit alias mapping
-   - Nibbler → `nibbler` via explicit alias mapping
+   - Zapp → `security` via explicit alias mapping
+   - Nibbler → `codereview` via explicit alias mapping
    - Ralph → `ralph` via explicit alias mapping
+   - Kif/DevOps → `devops` via explicit alias mapping (resolves to `squad-platform[bot]`)
    - Backend/Core Dev/Bender → `backend` via explicit alias mapping
    - Frontend/Fry → `frontend` via explicit alias mapping
    - Tester/Hermes → `tester` via explicit alias mapping
@@ -1038,7 +1039,7 @@ Ceremonies are structured team meetings where agents align before or after work.
 
 **Core logic (always loaded — BLOCKING):**
 1. Before spawning any code-producing agent (fry, bender, hermes, copilot, or any agent about to write or modify product code), the coordinator **MUST** run the ceremony-check in `.squad/ceremonies.md` for auto-triggered `before` ceremonies whose condition matches the current task. This is a hard precondition, not a best-effort reminder.
-2. **Trigger condition (non-negotiable):** When a user request produces implementation work tied to a labeled GitHub issue, the **Design Proposal** ceremony MUST fire and complete (DP comment posted on the issue) AND the **Design Review** ceremony MUST fire and complete (leela + zapp + nibbler approval labels present on the issue or the DP comment) **before any code-producing agent is dispatched**. No exceptions for "small" changes.
+2. **Trigger condition (non-negotiable):** When a user request produces implementation work tied to a labeled GitHub issue, the **Design Proposal** ceremony MUST fire and complete (DP comment posted on the issue) AND the **Design Review** ceremony MUST fire and complete (`architecture:approved` + `security:approved` + `codereview:approved` labels present on the issue or the DP comment) **before any code-producing agent is dispatched**. No exceptions for "small" changes.
 3. After a batch completes, check for `after` ceremonies (including the auto-triggered Failure Retrospective on build/test/review failure). Manual ceremonies run only when the user asks.
 4. Spawn the facilitator (sync) per the ceremony's entry in `.squad/ceremonies.md`. Facilitator spawns participants as sub-tasks.
 5. For `before`: include ceremony summary in work-batch spawn prompts. Spawn Scribe (background) to record.
@@ -1048,13 +1049,13 @@ Ceremonies are structured team meetings where agents align before or after work.
 **Pre-dispatch checkpoint (run this list in order, BEFORE spawning ANY code-producing agent):**
 - [ ] Is this work tied to a GitHub issue? (If no → stop and file one, or reclassify as non-product work.)
 - [ ] Does the issue have a Design Proposal comment posted by the implementing agent, including `Estimate:` and `Docs impact:` fields?
-- [ ] Does the DP have all three DP-stage approval labels: `leela:approved`, `zapp:approved`, `nibbler:approved` (or equivalent DP-approval labels like `leela:approved-dp` / `zapp:approved-dp`)?
+- [ ] Does the DP have all three DP-stage approval labels: `architecture:approved`, `security:approved`, `codereview:approved` (or equivalent DP-approval labels like `architecture:approved-dp` / `security:approved-dp`)?
 
 If **any** box is unchecked → the coordinator MUST run the matching ceremony first (Design Proposal, then Design Review) before any dispatch. Writing code before these boxes are checked is a governance violation.
 
-**❌ Anti-pattern (do not do this):** Dispatching `fry` or `bender` (or @copilot with a squad persona) straight to write code on an issue that has no DP comment posted, or whose DP has not yet collected `leela:approved` + `zapp:approved` + `nibbler:approved`. This has been observed in practice and is the exact failure mode this enforcement section exists to prevent.
+**❌ Anti-pattern (do not do this):** Dispatching `fry` or `bender` (or @copilot with a squad persona) straight to write code on an issue that has no DP comment posted, or whose DP has not yet collected `architecture:approved` + `security:approved` + `codereview:approved`. This has been observed in practice and is the exact failure mode this enforcement section exists to prevent.
 
-**✅ Correct pattern:** Issue labeled `squad:{member}` → Leela runs Design Proposal ceremony → implementing agent posts DP comment with all required fields → Design Review ceremony fires → leela/zapp/nibbler post approval labels → *only then* the coordinator dispatches the code-producing agent → PR opens → PR Review Gate runs the four-way review (leela + zapp + nibbler + docs) → all four approval labels + CI green → merge.
+**✅ Correct pattern:** Issue labeled `squad:{member}` → Leela runs Design Proposal ceremony → implementing agent posts DP comment with all required fields → Design Review ceremony fires → Leela/Zapp/Nibbler post `architecture:approved` / `security:approved` / `codereview:approved` labels → *only then* the coordinator dispatches the code-producing agent → PR opens → PR Review Gate runs the four-way review (`codereview:` + `security:` + `docs:` + `architecture:` if needed) → all required labels + CI green → merge.
 
 ### Adding Team Members
 
@@ -1310,7 +1311,7 @@ gh pr list --state open --draft --json number,title,author,labels,checks --limit
 | **Draft PRs** | PR in draft from squad member | Check if agent needs to continue; if stalled, nudge |
 | **Review feedback** | PR has `CHANGES_REQUESTED` review | Route feedback to PR author agent to address |
 | **CI failures** | PR checks failing | Notify assigned agent to fix, or create a fix issue |
-| **Approved PRs** | PR approved, CI green, ready to merge | Merge and close related issue |
+| **Approved PRs** | PR approved, CI green, ready to merge | Verify 0 unresolved review threads (all Copilot + human feedback replied to and resolved), then merge and close related issue |
 | **No work found** | All clear | Report: "📋 Board is clear. Ralph is idling." Suggest `npx @bradygaster/squad-cli watch` for persistent polling. |
 
 **Step 3 — Act on highest-priority item:**

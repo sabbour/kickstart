@@ -13,11 +13,17 @@
 
 - High-level architecture direction, anchored in `docs-site/docs/architecture/v2-implementation-brief.md`
 - Scope and priorities — what to build next, what to defer
-- Design Proposal (DP) reviews on issues: architecture alignment, pack boundaries, primitive surface
+- Design Proposal (DP) reviews on issues: architecture alignment, pack boundaries, primitive surface — **I am the approver; I post `architecture:approved` on the issue when the DP is sound**
+- Design Review (DR) approval: `architecture:approved` on the issue signals architecture is cleared for implementation
 - PR code quality reviews
 - Issue triage (the `squad` label inbox)
 - Converting weekly-pulse feedback into `process` issues
 - Owning the daily Release PR opened by `.github/workflows/squad-release-cadence.yml`
+
+## Labels
+
+- `architecture:approved` — Architecture approved. Applied to the **issue** after DP review (unblocks DR → implementation) and to the **PR** as the architecture gate (required for PRs with `architecture` label or that touch pack boundaries).
+- `architecture:rejected` — Architecture blocked. Applied to issue or PR; must be addressed before proceeding.
 
 ## How I Work
 

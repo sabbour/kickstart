@@ -108,65 +108,10 @@ jobs:
             core.info(`🔄 Ralph triaged ${results.length} issue(s)`);
 
 
-      - name: Add triaged issues to project board
-        if: steps.check-script.outputs.has_script == 'true' && hashFiles('triage-results.json') != ''
-        uses: actions/github-script@v8
-        with:
-          github-token: ${{ secrets.COPILOT_ASSIGN_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const path = 'triage-results.json';
-            if (!fs.existsSync(path)) return;
+      # Board-add removed: when Ralph applies squad:* labels (above), squad-project-board-automate.yml
+      # fires on the label event and handles the board-add authoritatively. No duplication needed.
 
-            const results = JSON.parse(fs.readFileSync(path, 'utf8'));
-            if (results.length === 0) return;
-
-            const projectNumber = 3;
-            const owner = context.repo.owner;
-
-            let projectId;
-            try {
-              const projectResult = await github.graphql(`
-                query($owner: String!, $number: Int!) {
-                  user(login: $owner) {
-                    projectV2(number: $number) {
-                      id
-                    }
-                  }
-                }
-              `, { owner, number: projectNumber });
-              projectId = projectResult.user.projectV2.id;
-            } catch (err) {
-              core.warning(`Failed to find project board: ${err.message}`);
-              return;
-            }
-
-            for (const decision of results) {
-              try {
-                const { data: issue } = await github.rest.issues.get({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: decision.issueNumber
-                });
-
-                await github.graphql(`
-                  mutation($projectId: ID!, $contentId: ID!) {
-                    addProjectV2ItemById(input: {
-                      projectId: $projectId
-                      contentId: $contentId
-                    }) {
-                      item { id }
-                    }
-                  }
-                `, { projectId, contentId: issue.node_id });
-
-                core.info(`Added #${decision.issueNumber} to project board`);
-              } catch (err) {
-                core.warning(`Failed to add #${decision.issueNumber} to project board: ${err.message}`);
-              }
-            }
-
-      # Copilot auto-assign step (uses PAT if available)
+      # Copilot auto-assign step
       - name: Ralph — Assign @copilot issues
         if: success()
         uses: actions/github-script@v8

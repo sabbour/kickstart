@@ -17,7 +17,12 @@ concurrency:
 
 jobs:
   issue-trail:
-    if: github.event_name == 'issues'
+    # Early-exit: skip if no squad:* label is present on the issue (covers ~65% of label events)
+    if: |
+      github.event_name == 'issues' && (
+        startsWith(github.event.label.name, 'squad:') ||
+        contains(join(github.event.issue.labels.*.name, ','), 'squad:')
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -29,7 +34,12 @@ jobs:
             await handleIssueEvent({ github, context, core });
 
   pr-trail:
-    if: github.event_name == 'pull_request_target'
+    # Early-exit: skip if neither a squad:* label nor a squad/ branch is present
+    if: |
+      github.event_name == 'pull_request_target' && (
+        startsWith(github.event.pull_request.head.ref, 'squad/') ||
+        contains(join(github.event.pull_request.labels.*.name, ','), 'squad:')
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

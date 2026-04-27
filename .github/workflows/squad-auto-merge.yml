@@ -23,6 +23,46 @@ jobs:
   auto-merge:
     runs-on: ubuntu-latest
     steps:
+      - name: Enforce reviewer label mutual exclusivity
+        # When {reviewer}:approved is applied, remove {reviewer}:rejected (and vice versa).
+        # Runs only on labeled events so it is a near-zero-cost no-op on all other triggers.
+        if: github.event_name == 'pull_request_target' && github.event.action == 'labeled'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const appliedLabel = context.payload.label.name;
+            const REVIEWER_NAMESPACES = ['codereview', 'security', 'architecture', 'docs'];
+
+            const matchedReviewer = REVIEWER_NAMESPACES.find(r =>
+              appliedLabel === `${r}:approved` || appliedLabel === `${r}:rejected`
+            );
+            if (!matchedReviewer) {
+              core.info(`"${appliedLabel}" is not a reviewer label — skipping`);
+              return;
+            }
+
+            const opposite = appliedLabel.endsWith(':approved')
+              ? `${matchedReviewer}:rejected`
+              : `${matchedReviewer}:approved`;
+
+            if (!pr.labels.some(l => l.name === opposite)) {
+              core.info(`Opposite label "${opposite}" not present — nothing to remove`);
+              return;
+            }
+
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                name: opposite,
+              });
+              core.info(`Removed "${opposite}" — mutually exclusive with "${appliedLabel}"`);
+            } catch (err) {
+              if (err.status !== 404) throw err;
+            }
+
       - name: Enable auto-merge for approved PRs
         uses: actions/github-script@v8
         with:
@@ -32,9 +72,10 @@ jobs:
             const DEPENDABOT_AUTHOR = 'dependabot[bot]';
             const DEPENDABOT_BRANCH_PREFIX = 'dependabot/';
             const XL_THRESHOLD = 1000;
-            const APPROVAL_LABELS = ['leela:approved', 'zapp:approved', 'nibbler:approved'];
+            const ALL_REVIEWER_LABELS = ['codereview:approved', 'security:approved', 'architecture:approved'];
             const DOCS_APPROVED_LABEL = 'docs:approved';
             const SKIP_DOCS_LABEL = 'skip-docs';
+            const DOCS_NOT_APPLICABLE_LABEL = 'docs:not-applicable';
             const DOCS_REJECTED_LABEL = 'docs:rejected';
             const REVIEW_GATE_CONTEXT = 'squad/review-gate';
             const SENSITIVE_PATH_PATTERNS = [
@@ -92,32 +133,6 @@ jobs:
               return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(filename));
             }
 
-            function getPreservedApprovalLabels(labels) {
-              // Three-way preservation matrix: on synchronize, each reviewer's own
-              // approval is cleared, but if exactly one reviewer is in a rejection
-              // loop, the OTHER reviewers' approvals are preserved so the fix cycle
-              // only reopens the rejecting reviewer's review, not all of them.
-              const hasLeelaRejection = labels.has('leela:rejected');
-              const hasZappRejection = labels.has('zapp:rejected');
-              const hasNibblerRejection = labels.has('nibbler:rejected');
-              const rejectionCount = [hasLeelaRejection, hasZappRejection, hasNibblerRejection]
-                .filter(Boolean).length;
-
-              if (rejectionCount !== 1) {
-                // Zero or multiple rejections → preserve nothing; all approvals clear.
-                return [];
-              }
-
-              if (hasLeelaRejection) {
-                return ['zapp:approved', 'nibbler:approved'];
-              }
-              if (hasZappRejection) {
-                return ['leela:approved', 'nibbler:approved'];
-              }
-              // hasNibblerRejection
-              return ['leela:approved', 'zapp:approved'];
-            }
-
             function isDependabotPr(pr) {
               return (
                 pr.author?.login === DEPENDABOT_AUTHOR &&
@@ -144,17 +159,23 @@ jobs:
             }
 
             function getRequiredApprovals(pr, labels, changedFiles) {
+              const isArchitecture = labels.has('architecture');
+
               if (!labels.has(LOW_RISK_LABEL)) {
-                return [...APPROVAL_LABELS];
+                // Standard path: nibbler + zapp always; leela only for architecture PRs
+                const required = ['codereview:approved', 'security:approved'];
+                if (isArchitecture) required.push('architecture:approved');
+                return required;
               }
 
-              // Low-risk path: Leela + Nibbler always; Zapp only if sensitive.
-              // Nibbler (code quality) stays required — see decision
-              // .squad/decisions/inbox/leela-4way-gate-wiring-2026-04-21.md.
-              const required = ['leela:approved', 'nibbler:approved'];
+              // Low-risk exception (squad:chore-auto): security:approved only required when
+              // PR has security-sensitive changes. Intentional design — routine chores don't need
+              // full security review. Standard path always requires it. See squad.agent.md ceremonies.
+              const required = ['codereview:approved'];
               if (getZappRequirementReason(pr, labels, changedFiles)) {
-                required.push('zapp:approved');
+                required.push('security:approved');
               }
+              if (isArchitecture) required.push('architecture:approved');
               return required;
             }
 
@@ -162,8 +183,8 @@ jobs:
               if (labels.has(DOCS_REJECTED_LABEL)) {
                 return `docs reviewer rejected (\`${DOCS_REJECTED_LABEL}\`)`;
               }
-              if (!labels.has(DOCS_APPROVED_LABEL) && !labels.has(SKIP_DOCS_LABEL)) {
-                return `missing docs marker (one of \`${DOCS_APPROVED_LABEL}\` or \`${SKIP_DOCS_LABEL}\` is required)`;
+              if (!labels.has(DOCS_APPROVED_LABEL) && !labels.has(SKIP_DOCS_LABEL) && !labels.has(DOCS_NOT_APPLICABLE_LABEL)) {
+                return `missing docs marker (one of \`${DOCS_APPROVED_LABEL}\`, \`${SKIP_DOCS_LABEL}\`, or \`${DOCS_NOT_APPLICABLE_LABEL}\` is required)`;
               }
               return null;
             }
@@ -237,19 +258,12 @@ jobs:
 
             async function clearApprovalLabels(pr, labels) {
               if (context.eventName !== 'pull_request_target' || context.payload.action !== 'synchronize') {
-                return { removed: [], preserved: [] };
+                return { removed: [] };
               }
 
-              const preserved = getPreservedApprovalLabels(labels);
-              const labelsToClear = APPROVAL_LABELS.filter((label) => !preserved.includes(label));
               const removed = [];
-              for (const label of APPROVAL_LABELS) {
-                if (!labelsToClear.includes(label)) {
-                  continue;
-                }
-                if (!labels.has(label)) {
-                  continue;
-                }
+              for (const label of ALL_REVIEWER_LABELS) {
+                if (!labels.has(label)) continue;
                 try {
                   await github.rest.issues.removeLabel({
                     owner: context.repo.owner,
@@ -260,12 +274,10 @@ jobs:
                   labels.delete(label);
                   removed.push(label);
                 } catch (error) {
-                  if (error.status !== 404) {
-                    throw error;
-                  }
+                  if (error.status !== 404) throw error;
                 }
               }
-              return { removed, preserved };
+              return { removed };
             }
 
             async function getTrustedWorkflowRuns(headSha, prNumber) {
@@ -360,9 +372,6 @@ jobs:
             const zappRequirementReason = getZappRequirementReason(pr, labels, changedFiles);
             const clearedApprovals = await clearApprovalLabels(pr, labels);
             if (clearedApprovals.removed.length > 0) {
-              const preservedLabelsSummary = clearedApprovals.preserved
-                .map((label) => `\`${label}\``)
-                .join(', ');
               await disableAutoMerge(
                 pr,
                 'new commits require fresh approvals',
@@ -371,9 +380,7 @@ jobs:
                   '🤖 Auto-merge disarmed.',
                   '',
                   `- removed stale approval labels: ${clearedApprovals.removed.join(', ')}`,
-                  clearedApprovals.preserved.length > 0
-                    ? `- preserved ${preservedLabelsSummary} because the opposite reviewer is already in a rejection loop`
-                    : '- new commits require fresh approval labels before re-arming',
+                  '- new commits require fresh approval labels before re-arming',
                 ].join('\n'),
               );
               core.info(`Cleared stale approval labels for PR #${pr.number}: ${clearedApprovals.removed.join(', ')}`);
@@ -504,8 +511,8 @@ jobs:
                 dependabotPr
                   ? '- Dependabot auto-merge: CI is green and `dependabot[bot]` author in `dependabot/*` branch'
                   : labels.has(LOW_RISK_LABEL)
-                  ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : SKIP_DOCS_LABEL}\` for the docs gate`
-                  : `- fresh \`leela:approved\` + \`zapp:approved\` + \`nibbler:approved\` labels are present on the current head, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : SKIP_DOCS_LABEL}\` for the docs gate`,
+                  ? `- opt-in \`${LOW_RISK_LABEL}\` label is present and fresh ${requiredApprovals.map((label) => `\`${label}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head${zappRequirementReason ? ` (${zappRequirementReason})` : ''}, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : labels.has(SKIP_DOCS_LABEL) ? SKIP_DOCS_LABEL : DOCS_NOT_APPLICABLE_LABEL}\` for the docs gate`
+                  : `- fresh ${requiredApprovals.map(l => `\`${l}\``).join(' + ')} label${requiredApprovals.length > 1 ? 's are' : ' is'} present on the current head, plus \`${labels.has(DOCS_APPROVED_LABEL) ? DOCS_APPROVED_LABEL : labels.has(SKIP_DOCS_LABEL) ? SKIP_DOCS_LABEL : DOCS_NOT_APPLICABLE_LABEL}\` for the docs gate`,
                 '- trusted merge signals are green: `CI Gate` from workflow `CI` and `squad/review-gate` from `Squad Review Gate`',
                 '- PR is not XL and title is not marked `refactor`',
                 '',

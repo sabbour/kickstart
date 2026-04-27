@@ -18,6 +18,8 @@
 | Hermes | Tester + Observability | `.squad/agents/hermes/charter.md` | ✅ Active |
 | Zapp | Security Architect | `.squad/agents/zapp/charter.md` | ✅ Active |
 | Nibbler | Code Reviewer & Watchdog | `.squad/agents/nibbler/charter.md` | ✅ Active |
+| Kif | DevOps | `.squad/agents/kif/charter.md` | ✅ Active |
+| Amy | Documentation | `.squad/agents/amy/charter.md` | ✅ Active |
 | Scribe | Scribe + Product/DX | `.squad/agents/scribe/charter.md` | 📋 Silent |
 | Ralph | Work Monitor | - | 🔄 Monitor |
 

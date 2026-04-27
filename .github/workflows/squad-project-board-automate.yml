@@ -4,7 +4,7 @@
 # (see .squad/decisions/label-project-board-design.md). It moves PRs and issues
 # between project columns based on:
 #
-# 1. Label state (e.g., leela:approved + nibbler:approved → "Approved" column)
+# 1. Label state (e.g., codereview:approved + security:approved → "Approved" column)
 # 2. PR lifecycle (opened, merged)
 # 3. Branch naming conventions (squad/NNN-* triggers "In Progress")
 #
@@ -17,7 +17,7 @@
 # - In Progress: PR synchronized — push on an existing squad/ PR branch
 #                (`pull_request.synchronize` event on a squad/* head ref)
 # - In Review:   PR opened or reopened from a squad/ branch
-# - Approved:    All required approvals present (leela:approved + nibbler:approved + docs marker)
+# - Approved:    All required approvals present (codereview:approved + security:approved + docs marker; architecture:approved if architecture)
 # - Merged:      PR merged to main
 #
 # Note: raw branch pushes before a PR is opened do not trigger this workflow.
@@ -45,6 +45,23 @@ concurrency:
 jobs:
   automate-project-board:
     runs-on: ubuntu-latest
+    # Early-exit for label events on irrelevant labels to reduce wasted runs.
+    # Non-label events (opened, synchronize, closed, reopened, workflow_dispatch)
+    # always proceed. Label events only proceed for squad/docs/approval labels.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
+      startsWith(github.event.label.name, 'squad:') ||
+      github.event.label.name == 'squad' ||
+      contains(github.event.label.name, 'codereview:') ||
+      contains(github.event.label.name, 'security:') ||
+      contains(github.event.label.name, 'architecture:') ||
+      contains(github.event.label.name, 'docs:') ||
+      github.event.label.name == 'skip-docs' ||
+      github.event.label.name == 'architecture' ||
+      github.event.label.name == 'ready-for-review' ||
+      github.event.label.name == 'do-not-merge' ||
+      github.event.label.name == 'blocked'
     steps:
       - name: Automate project board columns
         uses: actions/github-script@v7
@@ -255,12 +272,17 @@ jobs:
                 targetColumn = 'Merged';
                 core.info(`PR is merged → moving to "Merged"`);
               }
-              // Rule 2: All approvals present → "Approved"
-              else if (labels.includes('leela:approved') && 
-                       labels.includes('nibbler:approved') &&
-                       (labels.includes('docs:approved') || labels.includes('skip-docs'))) {
+              // Rule 2: All required approvals present → "Approved"
+              // Low-risk exception: squad:chore-auto PRs only need codereview:approved (matching
+              // the gate logic in squad-review-gate.yml and squad-auto-merge.yml).
+              else if (labels.includes('codereview:approved') &&
+                       (labels.includes('security:approved') || labels.includes('squad:chore-auto')) &&
+                       (!labels.includes('architecture') || labels.includes('architecture:approved')) &&
+                       (labels.includes('docs:approved') || labels.includes('skip-docs') || labels.includes('docs:not-applicable'))) {
+                const isArchitecturePR = labels.includes('architecture');
+                const isLowRisk = labels.includes('squad:chore-auto') && !labels.includes('security:approved');
                 targetColumn = 'Approved';
-                core.info(`All approvals present (leela + nibbler + docs) → moving to "Approved"`);
+                core.info(`All required approvals present (codereview${isLowRisk ? ' [low-risk path]' : ' + security'}${isArchitecturePR ? ' + architecture' : ''} + docs) → moving to "Approved"`);
               }
               // Rule 3: PR opened/reopened from squad/ branch → "In Review"
               else if ((eventType === 'opened' || eventType === 'reopened') && 
