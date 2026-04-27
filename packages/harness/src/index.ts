@@ -506,7 +506,10 @@ export type {
 // ── Step 11–12: Runner + Resume ──────────────────────────────────────────────
 export { Runner } from './runtime/runner.js';
 export { Session, sessionStore, getOrCreateSession, getOrCreateSessionResult, generateAnonSessionToken, validateAnonSessionToken, isAnonymousSession, ANON_SESSION_TTL_MS, AnonTokenGenerationError } from './runtime/session.js';
-export { handleResume } from './runtime/resume.js';
+export type { ISessionStore, IAsyncSessionStore, EvictionSchedulerHandle } from './runtime/session-store.js';
+export { InMemorySessionStore, createSessionStore, startEvictionScheduler } from './runtime/session-store.js';
+export { AzureTableSessionStore } from './runtime/session-store-azure-table.js';
+export type { AzureTableSessionStoreOptions } from './runtime/session-store-azure-table.js';
 export type { ResumeHandlerInput, ResumeHandlerResult, ClientPrincipal } from './runtime/resume.js';
 
 // ── Step 12: MCP adapter utilities ──────────────────────────────────────────

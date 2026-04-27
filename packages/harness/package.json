@@ -65,6 +65,14 @@
       "import": "./dist/runtime/resume.js",
       "types": "./dist/runtime/resume.d.ts"
     },
+    "./runtime/session-store": {
+      "import": "./dist/runtime/session-store.js",
+      "types": "./dist/runtime/session-store.d.ts"
+    },
+    "./runtime/session-store-azure-table": {
+      "import": "./dist/runtime/session-store-azure-table.js",
+      "types": "./dist/runtime/session-store-azure-table.d.ts"
+    },
     "./mcp/server": {
       "import": "./dist/mcp/server.js",
       "types": "./dist/mcp/server.d.ts"
@@ -82,6 +90,7 @@
     "typescript": "*"
   },
   "dependencies": {
+    "@azure/data-tables": "^13.0.0",
     "@openai/agents": "0.8.4",
     "@opentelemetry/api": "^1.9.1",
     "yaml": "^2.8.1",
