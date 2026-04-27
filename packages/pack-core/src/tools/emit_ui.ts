@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { A2UIMessageSchema } from '@aks-kickstart/harness';
 import type { A2UIMessageV09 } from '@aks-kickstart/harness';
 import type { ToolContribution, SessionCtx } from '@aks-kickstart/harness';
+import { stripNulls } from '@aks-kickstart/harness/runtime/z-strict';
 import {
   DecisionCardSchema,
   RadioGroupSchema,
@@ -399,27 +400,6 @@ const EmitUiInputSchema = z.object({
 });
 
 // ── Tool ──────────────────────────────────────────────────────────────────────
-
-// Recursively drop properties whose value is `null`. LLMs under strict-mode
-// tool schemas must include every property declared in `properties` — even
-// fields that semantically mean "unset" (e.g. `sendDataModel`, `action`,
-// `children`) — and they signal "unset" with `null`. The harness
-// A2UIMessageSchema treats those fields as `.optional()` (undefined = absent),
-// so we collapse `null` → absent here before runtime validation.
-function stripNulls<T>(value: T): T {
-  if (Array.isArray(value)) {
-    return value.map((v) => stripNulls(v)) as unknown as T;
-  }
-  if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (v === null) continue;
-      out[k] = stripNulls(v);
-    }
-    return out as T;
-  }
-  return value;
-}
 
 export const emitUiTool: ToolContribution = {
   name: 'core.emit_ui',

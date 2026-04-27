@@ -7,6 +7,7 @@ export default defineConfig({
       "@aks-kickstart/harness/runtime/redact": resolve(__dirname, "packages/harness/src/runtime/redact.ts"),
       "@aks-kickstart/harness/runtime/registry": resolve(__dirname, "packages/harness/src/runtime/registry.ts"),
       "@aks-kickstart/harness/runtime/schema-conformance": resolve(__dirname, "packages/harness/src/runtime/schema-conformance.ts"),
+      "@aks-kickstart/harness/runtime/z-strict": resolve(__dirname, "packages/harness/src/runtime/z-strict.ts"),
       "@aks-kickstart/harness/runtime/asset-url": resolve(__dirname, "packages/harness/src/runtime/asset-url.ts"),
       "@aks-kickstart/harness/runtime/session": resolve(__dirname, "packages/harness/src/runtime/session.ts"),
       "@aks-kickstart/harness/runtime/runner": resolve(__dirname, "packages/harness/src/runtime/runner.ts"),

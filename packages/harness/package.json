@@ -37,6 +37,10 @@
       "import": "./dist/runtime/schema-conformance.js",
       "types": "./dist/runtime/schema-conformance.d.ts"
     },
+    "./runtime/z-strict": {
+      "import": "./dist/runtime/z-strict.js",
+      "types": "./dist/runtime/z-strict.d.ts"
+    },
     "./runtime/session": {
       "import": "./dist/runtime/session.js",
       "types": "./dist/runtime/session.d.ts"

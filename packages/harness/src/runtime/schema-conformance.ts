@@ -3,45 +3,63 @@
  *
  * Shared OpenAI strict-mode JSON-schema conformance helpers.
  *
- * OpenAI's Responses API enforces strict-mode invariants on every function
- * tool's JSON-schema parameters object. These walkers and collectors are the
- * single source of truth for those checks; they are consumed by the
- * universal pack conformance test (which discovers tools and user actions
- * dynamically through `PackRegistry`) and by per-pack regression tests that
- * cover specific schema shapes (e.g. `core.emit_ui` discriminated unions).
+ * Primary validator: `assertStrictlyConformant()` calls
+ * `toStrictJsonSchema()` from `openai/lib/transform` — the same function
+ * the OpenAI SDK runs before sending schemas to the API. This is the
+ * authoritative source for I2 enforcement (all properties must be required).
+ * It is NOT a maintained forbidden-pattern list.
  *
- * The five invariants validated:
+ * Secondary walkers (I1, I4, I5) cover invariants that `toStrictJsonSchema()`
+ * silently accepts but the API rejects:
  *
- *   I1 — every `{ type: "object" }` node carries a `properties` key
- *        (an object, possibly empty). `z.record(...)` drops it.
- *   I2 — every property declared on an object node appears in `required`.
- *        Optional fields buried inside `z.discriminatedUnion` are the
- *        recurring offender (#998).
- *   I3 — every `{ type: "object" }` node sets `additionalProperties: false`
- *        explicitly. `z.record(...)` and `.passthrough()` produce
- *        `additionalProperties: <schema>` or `{}` instead (#1032).
- *   I4 — every property schema either has a `type` key or one of the
- *        documented combinators (`oneOf` / `anyOf` / `allOf` / `$ref` /
- *        `const`). A bare `{}` node causes the API to 400 with
- *        "schema must have a 'type' key" (#966).
+ *   I1 — every `{ type: "object" }` node carries a `properties` key.
+ *   I4 — every property schema has a `type` key or a combinator.
+ *   I5 — no schema node emits `format` values OpenAI rejects (e.g. `uri`).
  *
- *   I5 — no model-facing schema node emits JSON Schema `format` values known
- *        to be rejected by OpenAI strict-mode validators (e.g. `uri` from
- *        `z.string().url()`).
- *
- * Originally lifted from pack-core's three test-local walkers (#998, #1032,
- * #966). Promoted into the harness so every pack — not just pack-core —
- * shares one implementation.
+ * Note: I2 (optional without nullable) and I3 (additionalProperties) are
+ * handled authoritatively by `toStrictJsonSchema()` — I2 throws, I3 is
+ * auto-fixed — so the walkers for those are kept only for defence-in-depth
+ * in per-pack unit tests that run before the SDK transform.
  */
 
 import { tool } from '@openai/agents';
 import type { FunctionTool } from '@openai/agents';
+import type { JSONSchema } from 'openai/lib/jsonschema';
+import { toStrictJsonSchema } from 'openai/lib/transform';
 import type { z, ZodObject } from 'zod';
 import type { ToolContribution } from '../types/tool.js';
 import type { UserActionContribution } from '../types/user-action.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Walker
+// ─────────────────────────────────────────────────────────────────────────────
+// Authoritative validator (uses OpenAI SDK directly)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Authoritative I2 enforcement: calls `toStrictJsonSchema()` from the
+ * `openai` package — the exact function the SDK runs before the API call.
+ *
+ * Throws with OpenAI's own error message if any property is `.optional()`
+ * without `.nullable()`:
+ *
+ *   "Zod field at `properties/x` uses `.optional()` without `.nullable()`
+ *    which is not supported by the API. See: https://platform.openai.com/..."
+ *
+ * Pass the schema returned by `getToolJsonSchema()` or
+ * `getUserActionJsonSchema()`. The function operates on a deep clone so the
+ * original schema node is not mutated.
+ */
+export function assertStrictlyConformant(schema: SchemaNode, toolName: string): void {
+  try {
+    toStrictJsonSchema(structuredClone(schema) as JSONSchema);
+  } catch (e) {
+    throw new Error(`[${toolName}] ${(e as Error).message}`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Walker (secondary checks — I1, I4, I5)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type SchemaNode = Record<string, unknown>;
