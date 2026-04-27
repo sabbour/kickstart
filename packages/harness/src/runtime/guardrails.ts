@@ -10,9 +10,20 @@
  * - Tool-stage block halts ALL remaining tool calls for the turn.
  * - Dual-eval chaining: each guardrail runs on the current (possibly already
  *   redacted) payload so downstream guardrails see the cleaned form.
+ *
+ * SDK-native parallel adapters (toSdkInputGuardrail / toSdkOutputGuardrail):
+ * - Wrap GuardrailContributions as SDK InputGuardrail / OutputGuardrail objects.
+ * - Multiple rules run concurrently via the SDK's Promise.all pipeline.
+ * - block  → tripwireTriggered: true (SDK throws InputGuardrailTripwireTriggered).
+ * - redact → tripwireTriggered: false + emits guardrail_warn + stores redacted text
+ *   in outputInfo so the runner can update session.recentTurns after the SDK run.
+ * - Dual-eval chaining is intentionally broken for speed (DP #116 tradeoff).
+ * - Tool stage retains sequential custom pipeline (SDK has no tool-arg hook).
  */
 
+import type { InputGuardrail, OutputGuardrail, AgentOutputType } from '@openai/agents';
 import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '../types/guardrail.js';
+import type { SSEWriter } from './sse.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -147,4 +158,125 @@ export async function runGuardrails(
   Object.assign(input, current);
 
   return { blocked: false, mutatedInput: input };
+}
+
+// ---------------------------------------------------------------------------
+// SDK-native parallel adapters
+// ---------------------------------------------------------------------------
+
+/** Opaque message used for all SDK tripwire blocks — never reveals guardrail details. */
+const OPAQUE_BLOCK_MESSAGE = 'Request could not be completed';
+
+/**
+ * Extracts the user-facing text from an SDK input (string or AgentInputItem[]).
+ * Returns the content of the last user-role item, or '' if none found.
+ */
+function extractUserText(input: string | unknown[]): string {
+  if (typeof input === 'string') return input;
+  for (let i = input.length - 1; i >= 0; i--) {
+    const item = input[i] as { role?: string; content?: string | Array<{ type?: string; text?: string }> };
+    if (item?.role === 'user') {
+      if (typeof item.content === 'string') return item.content;
+      if (Array.isArray(item.content)) {
+        return item.content
+          .filter((c) => c.type === 'input_text' || c.type === 'text')
+          .map((c) => c.text ?? '')
+          .join('');
+      }
+    }
+  }
+  return '';
+}
+
+/**
+ * Wraps a GuardrailContribution as an SDK-native InputGuardrail.
+ *
+ * - block  → tripwireTriggered: true  (SDK throws InputGuardrailTripwireTriggered)
+ * - redact → tripwireTriggered: false + emits guardrail_warn + preserves
+ *            { verdict: 'redact', redacted } in outputInfo so the runner can
+ *            update session.recentTurns with the cleaned text after the SDK run
+ * - pass   → tripwireTriggered: false
+ * - any throw → tripwireTriggered: true (fail-closed)
+ *
+ * runInParallel is false so all input guardrails complete before the LLM starts
+ * (security invariant). Multiple contributions still run concurrently with each
+ * other via the SDK's internal Promise.all.
+ */
+export function toSdkInputGuardrail(
+  contrib: GuardrailContribution,
+  agentName: string,
+  sseWrite: SSEWriter,
+): InputGuardrail {
+  return {
+    name: contrib.id,
+    runInParallel: false,
+    execute: async ({ input }) => {
+      if (!matchesAnyGlob(contrib.appliesTo, agentName)) {
+        return { tripwireTriggered: false, outputInfo: { verdict: 'pass' } };
+      }
+      const text = extractUserText(input as string | unknown[]);
+      let result: GuardrailResult;
+      try {
+        result = await contrib.evaluate({ stage: 'input', userMessage: text });
+      } catch {
+        return { tripwireTriggered: true, outputInfo: { verdict: 'block', reason: OPAQUE_BLOCK_MESSAGE } };
+      }
+      if (result.verdict === 'block') {
+        return { tripwireTriggered: true, outputInfo: result };
+      }
+      if (result.verdict === 'redact') {
+        // Emit opaque warning (no pattern/detail per security invariant), then
+        // preserve the redacted text in outputInfo so the runner can update
+        // session.recentTurns after the SDK run completes.
+        sseWrite('guardrail_warn', { message: 'Some personal information was removed from your request.' });
+        return { tripwireTriggered: false, outputInfo: result };
+      }
+      return { tripwireTriggered: false, outputInfo: result };
+    },
+  };
+}
+
+/**
+ * Wraps a GuardrailContribution as an SDK-native OutputGuardrail.
+ *
+ * - block  → tripwireTriggered: true  (SDK throws OutputGuardrailTripwireTriggered)
+ * - redact → tripwireTriggered: false + emits guardrail_warn SSE + stores redacted in outputInfo
+ * - pass   → tripwireTriggered: false
+ * - any throw → tripwireTriggered: true (fail-closed)
+ *
+ * The runner reads result.outputGuardrailResults after the stream to apply
+ * any redacted output text before flushing chunks to the client.
+ */
+export function toSdkOutputGuardrail(
+  contrib: GuardrailContribution,
+  agentName: string,
+  sseWrite: SSEWriter,
+): OutputGuardrail<AgentOutputType> {
+  return {
+    name: contrib.id,
+    execute: async ({ agentOutput }) => {
+      if (!matchesAnyGlob(contrib.appliesTo, agentName)) {
+        return { tripwireTriggered: false, outputInfo: { verdict: 'pass' } };
+      }
+      // Extract text from structured AgentOutput ({message, intent}) or plain string
+      const text = typeof agentOutput === 'string'
+        ? agentOutput
+        : (agentOutput as { message?: string }).message ?? JSON.stringify(agentOutput);
+      let result: GuardrailResult;
+      try {
+        result = await contrib.evaluate({ stage: 'output', proposedOutput: text });
+      } catch {
+        return { tripwireTriggered: true, outputInfo: { verdict: 'block', reason: OPAQUE_BLOCK_MESSAGE } };
+      }
+      if (result.verdict === 'block') {
+        return { tripwireTriggered: true, outputInfo: result };
+      }
+      if (result.verdict === 'redact') {
+        // Content was redacted — emit opaque warning (no pattern/detail per security invariant)
+        sseWrite('guardrail_warn', { message: 'Some personal information was removed from your response.' });
+        return { tripwireTriggered: false, outputInfo: result };
+      }
+      return { tripwireTriggered: false, outputInfo: result };
+    },
+  };
 }

@@ -89,6 +89,8 @@ function makeBuildCtx() {
     sseWrite: (() => {}) as any,
     abortCtrl,
     toolGuardrails: [] as any,
+    inputGuardContribs: [] as any,
+    outputGuardContribs: [] as any,
     isHalted: () => false,
     setHalted: () => {},
   };

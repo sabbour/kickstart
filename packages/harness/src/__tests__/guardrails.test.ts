@@ -21,7 +21,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { runGuardrails, applyRedact } from '../../src/runtime/guardrails.js';
+import { runGuardrails, applyRedact, toSdkInputGuardrail, toSdkOutputGuardrail } from '../../src/runtime/guardrails.js';
 import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '../../src/types/guardrail.js';
 
 // ── Helper to build a guardrail contribution ─────────────────────────────────
@@ -257,5 +257,153 @@ describe('applyRedact', () => {
     const input: GuardrailInput = { stage: 'input', userMessage: 'original' };
     applyRedact(input, { verdict: 'pass' });
     expect(input.userMessage).toBe('original');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// SDK adapter tests — toSdkInputGuardrail / toSdkOutputGuardrail (#116)
+// ──────────────────────────────────────────────────────────────────────────────
+
+function makeSseWrite() {
+  return vi.fn() as ReturnType<typeof vi.fn>;
+}
+
+function makeContrib(verdict: GuardrailResult, appliesTo?: string[]): GuardrailContribution {
+  return {
+    id: 'test-guardrail',
+    appliesTo: appliesTo ?? ['*'],
+    evaluate: vi.fn().mockResolvedValue(verdict),
+  };
+}
+
+describe('toSdkInputGuardrail', () => {
+  it('block → tripwireTriggered: true', async () => {
+    const contrib = makeContrib({ verdict: 'block', reason: 'not allowed' });
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkInputGuardrail(contrib, 'my-agent', sseWrite);
+    const result = await guardrail.execute({ input: 'bad input', context: {} as any });
+    expect(result.tripwireTriggered).toBe(true);
+    expect(result.outputInfo).toMatchObject({ verdict: 'block' });
+    expect(sseWrite).not.toHaveBeenCalled();
+  });
+
+  it('redact → tripwireTriggered: false, preserves redacted in outputInfo, emits guardrail_warn', async () => {
+    const contrib = makeContrib({ verdict: 'redact', redacted: 'cleaned' });
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkInputGuardrail(contrib, 'my-agent', sseWrite);
+    const result = await guardrail.execute({ input: 'pii message', context: {} as any });
+    expect(result.tripwireTriggered).toBe(false);
+    expect(result.outputInfo).toMatchObject({ verdict: 'redact', redacted: 'cleaned' });
+    expect(sseWrite).toHaveBeenCalledWith('guardrail_warn', expect.any(Object));
+  });
+
+  it('pass → tripwireTriggered: false, no SSE', async () => {
+    const contrib = makeContrib({ verdict: 'pass' });
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkInputGuardrail(contrib, 'my-agent', sseWrite);
+    const result = await guardrail.execute({ input: 'hello', context: {} as any });
+    expect(result.tripwireTriggered).toBe(false);
+    expect(sseWrite).not.toHaveBeenCalled();
+  });
+
+  it('throw → fail-closed (tripwireTriggered: true)', async () => {
+    const contrib: GuardrailContribution = {
+      id: 'failing-guard',
+      appliesTo: ['*'],
+      evaluate: vi.fn().mockRejectedValue(new Error('boom')),
+    };
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkInputGuardrail(contrib, 'my-agent', sseWrite);
+    const result = await guardrail.execute({ input: 'test', context: {} as any });
+    expect(result.tripwireTriggered).toBe(true);
+    expect(sseWrite).not.toHaveBeenCalled();
+  });
+
+  it('non-matching appliesTo → pass (skips evaluation)', async () => {
+    const contrib = makeContrib({ verdict: 'block' }, ['other-agent']);
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkInputGuardrail(contrib, 'my-agent', sseWrite);
+    const result = await guardrail.execute({ input: 'bad input', context: {} as any });
+    expect(result.tripwireTriggered).toBe(false);
+    expect(contrib.evaluate).not.toHaveBeenCalled();
+  });
+
+  it('runInParallel is false (security invariant)', () => {
+    const contrib = makeContrib({ verdict: 'pass' });
+    const guardrail = toSdkInputGuardrail(contrib, 'my-agent', makeSseWrite());
+    expect(guardrail.runInParallel).toBe(false);
+  });
+
+  it('extracts text from message array input', async () => {
+    const contrib = makeContrib({ verdict: 'pass' });
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkInputGuardrail(contrib, 'my-agent', sseWrite);
+    const input = [{ role: 'user', content: 'hello from array' }];
+    await guardrail.execute({ input, context: {} as any });
+    expect(contrib.evaluate).toHaveBeenCalledWith(
+      expect.objectContaining({ userMessage: 'hello from array' }),
+    );
+  });
+});
+
+describe('toSdkOutputGuardrail', () => {
+  it('block → tripwireTriggered: true', async () => {
+    const contrib = makeContrib({ verdict: 'block', reason: 'harmful' });
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkOutputGuardrail(contrib, 'my-agent', sseWrite);
+    const result = await guardrail.execute({ agentOutput: 'bad output', context: {} as any, agent: {} as any });
+    expect(result.tripwireTriggered).toBe(true);
+    expect(sseWrite).not.toHaveBeenCalled();
+  });
+
+  it('redact → tripwireTriggered: false + emits guardrail_warn', async () => {
+    const contrib = makeContrib({ verdict: 'redact', redacted: 'safe output' });
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkOutputGuardrail(contrib, 'my-agent', sseWrite);
+    const result = await guardrail.execute({ agentOutput: 'pii output', context: {} as any, agent: {} as any });
+    expect(result.tripwireTriggered).toBe(false);
+    expect(result.outputInfo).toMatchObject({ verdict: 'redact', redacted: 'safe output' });
+    expect(sseWrite).toHaveBeenCalledWith('guardrail_warn', expect.any(Object));
+  });
+
+  it('pass → tripwireTriggered: false, no SSE', async () => {
+    const contrib = makeContrib({ verdict: 'pass' });
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkOutputGuardrail(contrib, 'my-agent', sseWrite);
+    const result = await guardrail.execute({ agentOutput: 'fine output', context: {} as any, agent: {} as any });
+    expect(result.tripwireTriggered).toBe(false);
+    expect(sseWrite).not.toHaveBeenCalled();
+  });
+
+  it('throw → fail-closed (tripwireTriggered: true)', async () => {
+    const contrib: GuardrailContribution = {
+      id: 'bad-guard',
+      appliesTo: ['*'],
+      evaluate: vi.fn().mockRejectedValue(new Error('kaboom')),
+    };
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkOutputGuardrail(contrib, 'my-agent', sseWrite);
+    const result = await guardrail.execute({ agentOutput: 'test', context: {} as any, agent: {} as any });
+    expect(result.tripwireTriggered).toBe(true);
+    expect(sseWrite).not.toHaveBeenCalled();
+  });
+
+  it('non-matching appliesTo → pass (skips evaluation)', async () => {
+    const contrib = makeContrib({ verdict: 'block' }, ['other-agent']);
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkOutputGuardrail(contrib, 'my-agent', sseWrite);
+    const result = await guardrail.execute({ agentOutput: 'harmful', context: {} as any, agent: {} as any });
+    expect(result.tripwireTriggered).toBe(false);
+    expect(contrib.evaluate).not.toHaveBeenCalled();
+  });
+
+  it('extracts text from structured AgentOutput object', async () => {
+    const contrib = makeContrib({ verdict: 'pass' });
+    const sseWrite = makeSseWrite();
+    const guardrail = toSdkOutputGuardrail(contrib, 'my-agent', sseWrite);
+    await guardrail.execute({ agentOutput: { message: 'struct message', intent: 'greet' }, context: {} as any, agent: {} as any });
+    expect(contrib.evaluate).toHaveBeenCalledWith(
+      expect.objectContaining({ proposedOutput: 'struct message' }),
+    );
   });
 });

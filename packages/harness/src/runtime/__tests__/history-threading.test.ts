@@ -23,6 +23,9 @@ vi.mock('@openai/agents', async () => {
 
   class FakeStreamResult implements AsyncIterable<never> {
     finalOutput: Promise<{ message: string; intent?: string }>;
+    /** Populated by FakeSDKRunner to simulate SDK input guardrail evaluation. */
+    inputGuardrailResults: Array<{ guardrail: { name: string }; output: { tripwireTriggered: boolean; outputInfo: unknown } }> = [];
+    outputGuardrailResults: Array<{ guardrail: { name: string }; output: { tripwireTriggered: boolean; outputInfo: unknown } }> = [];
     constructor(message: string) {
       this.finalOutput = Promise.resolve({ message });
     }
@@ -34,9 +37,27 @@ vi.mock('@openai/agents', async () => {
 
   class FakeSDKRunner {
     constructor(_opts?: unknown) {}
-    async run(agent: unknown, input: unknown, options: unknown): Promise<FakeStreamResult> {
+    async run(agent: any, input: unknown, options: unknown): Promise<FakeStreamResult> {
       runCalls.push({ agent, input, options });
-      return new FakeStreamResult(`assistant-reply-${runCalls.length}`);
+      const result = new FakeStreamResult(`assistant-reply-${runCalls.length}`);
+      // Simulate SDK input guardrail evaluation so guardrail-on-capture (Z2) is tested.
+      const text = typeof input === 'string'
+        ? input
+        : (Array.isArray(input) ? (input.slice(-1)[0] as { content?: string })?.content ?? '' : '');
+      for (const g of agent.inputGuardrails ?? []) {
+        const output = await g.execute({ input: text, agent, context: {} });
+        result.inputGuardrailResults.push({ guardrail: { name: g.name }, output });
+        // Simulate real SDK behaviour: throw InputGuardrailTripwireTriggered when
+        // any guardrail returns tripwireTriggered: true so the runner's pop handler fires.
+        if (output.tripwireTriggered) {
+          throw new actual.InputGuardrailTripwireTriggered(
+            `Input guardrail triggered: ${g.name}`,
+            { guardrail: g, output },
+            undefined as any,
+          );
+        }
+      }
+      return result;
     }
   }
 
@@ -130,7 +151,7 @@ describe('#1062 Layer 0 — harness conversation history threading', () => {
     });
   });
 
-  it('Z2: sanitized text (guardedMessage) is what lands in recentTurns, not raw userMessage', async () => {
+  it('Z2: input guardrail redact updates the recorded user turn — raw PII is never persisted', async () => {
 
     const registry = {
       getAgent: (name: string) => ({
@@ -173,14 +194,16 @@ describe('#1062 Layer 0 — harness conversation history threading', () => {
 
     await runner.run(session, 'my password is SECRET123 please help', sse);
 
+    // Z2: the SDK-native parallel guardrail returns redact → tripwireTriggered: false.
+    // The runner's post-run logic reads inputGuardrailResults and updates the recorded
+    // user turn with the redacted text so raw PII never persists in recentTurns.
     const userTurn = session.recentTurns.find((t) => t.role === 'user');
-    expect(userTurn).toBeDefined();
-    expect(userTurn!.content).not.toContain('SECRET123');
-    expect(userTurn!.content).toContain('[redacted]');
+    expect(userTurn).toBeDefined(); // turn is kept — run completed normally
+    expect(userTurn?.content).toBe('my password is [redacted] please help');
 
-    const sdkInput = runCalls[0].input as Array<{ role: string; content: unknown }>;
-    const replayedUser = sdkInput.find((i) => i.role === 'user') as { content: string } | undefined;
-    expect(replayedUser?.content).not.toContain('SECRET123');
+    // A guardrail_warn SSE event should have been emitted.
+    const warnEvent = events.find((e) => e.event === 'guardrail_warn');
+    expect(warnEvent).toBeDefined();
   });
 
   it('Z1: tool and system turns in history are dropped from the SDK input', async () => {

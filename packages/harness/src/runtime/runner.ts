@@ -12,7 +12,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { Agent, Runner as SDKRunner, handoff, tool, setDefaultModelProvider, OpenAIProvider, setTraceProcessors, MaxTurnsExceededError } from '@openai/agents';
+import { Agent, Runner as SDKRunner, handoff, tool, setDefaultModelProvider, OpenAIProvider, setTraceProcessors, MaxTurnsExceededError, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered } from '@openai/agents';
 import type { FunctionTool, AgentInputItem, CallModelInputFilter } from '@openai/agents';
 import type { GuardrailContribution } from '../types/guardrail.js';
 import type { Turn, ToolCallRecord } from '../types/session.js';
@@ -24,7 +24,7 @@ import type { PackRegistry } from './registry.js';
 import type { Session } from './session.js';
 import type { SSEWriter } from './sse.js';
 import { AgentOutput } from '../types/agent-output.js';
-import { runGuardrails } from './guardrails.js';
+import { runGuardrails, toSdkInputGuardrail, toSdkOutputGuardrail } from './guardrails.js';
 import { resolveModelName } from './model-resolution.js';
 import { PlanArtifactMissing, ChainDepthExceeded } from '../errors/index.js';
 import { sanitizeError } from './sanitize-error.js';
@@ -804,6 +804,8 @@ export class Runner {
       sseWrite: SSEWriter;
       abortCtrl: AbortController;
       toolGuardrails: GuardrailContribution[];
+      inputGuardContribs: GuardrailContribution[];
+      outputGuardContribs: GuardrailContribution[];
       isHalted: () => boolean;
       setHalted: () => void;
       handoffInputFilter?: import('./run-config.js').HandoffInputFilter;
@@ -883,6 +885,17 @@ export class Runner {
     const instructions = agentContrib.instructionsBase + skillsBlock + catalogBlock;
     const modelName = resolveModelName(agentContrib.model);
 
+    // Construct SDK-native input/output guardrails for parallel execution (#116).
+    // Each contribution is wrapped as an SDK InputGuardrail / OutputGuardrail so
+    // the SDK runs all rules concurrently (Promise.all internally) before/after the LLM.
+    // Tool-stage guardrails remain on the custom sequential pipeline (SDK has no hook).
+    const sdkInputGuardrails = ctx.inputGuardContribs.map((g) =>
+      toSdkInputGuardrail(g, agentName, ctx.sseWrite),
+    );
+    const sdkOutputGuardrails = ctx.outputGuardContribs.map((g) =>
+      toSdkOutputGuardrail(g, agentName, ctx.sseWrite),
+    );
+
     // Construct with empty handoffs; insert into cache BEFORE recursing so
     // A↔B cycles terminate on the second visit. See doc-comment invariant.
     const agent = new Agent({
@@ -892,6 +905,8 @@ export class Runner {
       model: modelName,
       outputType: AgentOutput,
       handoffs: [],
+      inputGuardrails: sdkInputGuardrails,
+      outputGuardrails: sdkOutputGuardrails,
     });
     cache.set(agentName, agent);
 
@@ -950,6 +965,13 @@ export class Runner {
     // sanitized text lands in `recentTurns` (guardrail-on-capture). Recording
     // the raw userMessage here would persist pre-guardrail PII/credentials and
     // replay them on every subsequent turn when history threading is enabled.
+    // NOTE(#116): With SDK-native parallel guardrails, input guardrails run
+    // INSIDE the SDK before the first LLM call. The user turn is recorded here
+    // (before the SDK run) so history threading always includes the current
+    // message. If an SDK input guardrail tripwires, the turn is popped from
+    // recentTurns in the tripwire error handler (guardrail-on-capture). On any
+    // other SDK run failure, the turn is popped in the catch-all error handler
+    // to prevent raw input from persisting when the run did not complete cleanly.
 
     let agentContrib: AgentContribution;
     try {
@@ -976,31 +998,11 @@ export class Runner {
       signal.addEventListener('abort', () => abortCtrl.abort(signal.reason), { once: true });
     }
 
-    // ── Input guardrail hook ────────────────────────────────────────────────
-    const inputGuardrails = this.registry.getGuardrailsByStage('input');
-    const guardInput = { stage: 'input' as const, userMessage };
-    let guardedMessage = userMessage;
-    try {
-      const inputResult = await runGuardrails('input', guardInput, inputGuardrails, agentName);
-      if (inputResult.blocked) {
-        sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
-        return;
-      }
-      const sanitized = inputResult.mutatedInput.userMessage ?? guardedMessage;
-      if (sanitized !== guardedMessage) {
-        // Content was redacted — emit opaque warning (no pattern/detail per security invariant)
-        sseWrite('guardrail_warn', { message: 'Some personal information was removed from your message.' });
-      }
-      guardedMessage = sanitized;
-    } catch {
-      // Fail-closed: unexpected throw from engine
-      sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
-      return;
-    }
-
-    // Record the SANITIZED user turn (Z2: guardrail-on-capture). The 50-turn
-    // sliding window in Session.recordTurn keeps recentTurns bounded.
-    session.recordTurn({ role: 'user', content: guardedMessage });
+    // Record the user turn now so history threading includes the current message
+    // in runInput (built from session.recentTurns below). SDK-native input
+    // guardrails run inside the SDK before the first LLM call. If a tripwire
+    // fires, the recorded turn is popped in the tripwire error handler.
+    session.recordTurn({ role: 'user', content: userMessage });
 
     // ── Tool guardrail setup ────────────────────────────────────────────────
     const toolGuardrails = this.registry.getGuardrailsByStage('tool');
@@ -1022,12 +1024,19 @@ export class Runner {
     // #1070 D5: `buildAgentInstance` also wires `core.read_skill` into every
     // agent it constructs (scoped via `agentName`/`session` captured in the
     // tool factory) so handoff targets get the same pull-based skill access.
+    //
+    // #116: input/output guardrail contribs are passed so the SDK-native
+    // parallel adapters can be attached to each Agent instance.
+    const inputGuardContribs = this.registry.getGuardrailsByStage('input');
+    const outputGuardContribs = this.registry.getGuardrailsByStage('output');
     const agentBuildCache = new Map<string, Agent<any, any>>();
     const buildCtx = {
       session,
       sseWrite,
       abortCtrl,
       toolGuardrails,
+      inputGuardContribs,
+      outputGuardContribs,
       isHalted,
       setHalted,
       // #104: thread handoff input filter into every handoff() call in the agent tree.
@@ -1077,7 +1086,9 @@ export class Runner {
       let runInput: AgentInputItem[] | string;
       if (useThreadId) {
         // Thread mode: history lives server-side — only send the current message.
-        runInput = guardedMessage;
+        // With SDK-native guardrails (#116), input guardrails run inside the SDK
+        // before the first LLM call, so we pass the raw userMessage here.
+        runInput = userMessage;
       } else {
         // #101 Token-count gate: trim oldest turns before injecting history so
         // large tool outputs can't silently exhaust the context window.
@@ -1241,25 +1252,34 @@ export class Runner {
         outputText = resolveOutputText(finalOutput, fullText);
       } catch { /* finalOutput not available when interrupted */ }
 
-      // ── Output guardrail hook (runs BEFORE any chunk is sent to the client) ─
+      // ── SDK-native input guardrail redaction (parallel, #116) ────────────
+      // Input guardrails ran inside the SDK before the first LLM call. A block
+      // verdict throws InputGuardrailTripwireTriggered (caught below). A redact
+      // verdict stores the cleaned text in outputInfo — update the recorded user
+      // turn so only the sanitized version persists in session.recentTurns.
       if (!guardrailHalted) {
-        const outputGuardrails = this.registry.getGuardrailsByStage('output');
-        const outGuardInput = { stage: 'output' as const, proposedOutput: outputText };
-        try {
-          const outResult = await runGuardrails('output', outGuardInput, outputGuardrails, agentName);
-          if (outResult.blocked) {
-            sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
-            return;
+        for (const gr of result.inputGuardrailResults ?? []) {
+          if (gr.output.outputInfo?.verdict === 'redact' && typeof gr.output.outputInfo.redacted === 'string') {
+            const lastUserTurn = session.recentTurns[session.recentTurns.length - 1];
+            if (lastUserTurn?.role === 'user') {
+              lastUserTurn.content = gr.output.outputInfo.redacted;
+            }
+            break;
           }
-          const sanitizedOutput = outResult.mutatedInput.proposedOutput ?? outputText;
-          if (sanitizedOutput !== outputText) {
-            // Content was redacted — emit opaque warning (no pattern/detail per security invariant)
-            sseWrite('guardrail_warn', { message: 'Some personal information was removed from your message.' });
+        }
+      }
+
+      // ── SDK-native output guardrail results (parallel, #116) ──────────────
+      // Output guardrails ran inside the SDK after the LLM finished. A block
+      // verdict throws OutputGuardrailTripwireTriggered (caught below). A
+      // redact verdict stores the cleaned text in outputInfo — apply it here
+      // BEFORE any chunk is sent to the client so the client never sees PII.
+      if (!guardrailHalted) {
+        for (const gr of result.outputGuardrailResults ?? []) {
+          if (gr.output.outputInfo?.verdict === 'redact' && typeof gr.output.outputInfo.redacted === 'string') {
+            outputText = gr.output.outputInfo.redacted;
+            break;
           }
-          outputText = sanitizedOutput;
-        } catch {
-          sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
-          return;
         }
       }
 
@@ -1339,6 +1359,39 @@ export class Runner {
       // #102: successful run — reset circuit breaker consecutive-failure counter.
       runnerCircuitBreaker.recordSuccess();
     } catch (err: unknown) {
+      // SDK input guardrail tripwire: block verdict on user message.
+      // Pop the recorded user turn (guardrail-on-capture — never persist blocked input).
+      if (err instanceof InputGuardrailTripwireTriggered) {
+        const lastTurn = session.recentTurns[session.recentTurns.length - 1];
+        if (lastTurn?.role === 'user') session.recentTurns.pop();
+        sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
+        sseWrite('end', {
+          sessionId: session.sessionId,
+          intent: undefined,
+          model: modelName,
+          agentName,
+          skillsExecuted: getSkillsExecuted(),
+          skillsPulledBytes: session.skillsPulledBytes ?? 0,
+          skillsPulledTokens: session.skillsPulledTokens ?? 0,
+          toolsExecuted,
+        });
+        return;
+      }
+      // SDK output guardrail tripwire: block verdict on LLM response.
+      if (err instanceof OutputGuardrailTripwireTriggered) {
+        sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
+        sseWrite('end', {
+          sessionId: session.sessionId,
+          intent: undefined,
+          model: modelName,
+          agentName,
+          skillsExecuted: getSkillsExecuted(),
+          skillsPulledBytes: session.skillsPulledBytes ?? 0,
+          skillsPulledTokens: session.skillsPulledTokens ?? 0,
+          toolsExecuted,
+        });
+        return;
+      }
       // AbortError: may be a UserAction interrupt OR a guardrail halt
       if (err instanceof Error && err.name === 'AbortError') {
         if (guardrailHalted) {
@@ -1367,6 +1420,12 @@ export class Runner {
         });
         return;
       }
+      // Guardrail-on-capture: the SDK run failed before completing normally, so
+      // input guardrails may not have had a chance to sanitize the raw user input.
+      // Pop the recorded user turn to prevent unredacted text from replaying in
+      // future turns via history threading.
+      const lastTurnOnError = session.recentTurns[session.recentTurns.length - 1];
+      if (lastTurnOnError?.role === 'user') session.recentTurns.pop();
       sseWrite('error', {
         message: sanitizeError(err),
       });
@@ -1473,7 +1532,9 @@ export class Runner {
     const setHalted = () => { guardrailHalted = true; };
 
     const agentBuildCache = new Map<string, Agent<any, any>>();
-    const buildCtx = { session, sseWrite, abortCtrl, toolGuardrails, isHalted, setHalted };
+    const inputGuardContribs = this.registry.getGuardrailsByStage('input');
+    const outputGuardContribs = this.registry.getGuardrailsByStage('output');
+    const buildCtx = { session, sseWrite, abortCtrl, toolGuardrails, inputGuardContribs, outputGuardContribs, isHalted, setHalted };
     const agent = this.buildAgentInstance(agentName, agentBuildCache, buildCtx);
     const modelName = resolveModelName(agentContrib.model);
 
