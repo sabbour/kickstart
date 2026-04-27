@@ -38,13 +38,7 @@ const ValidateArtifactsInputSchema = z.object({
       'The dispatcher routes each file to the appropriate validator based on filename/extension: ' +
       `Dockerfile → hadolint, others → skipped (no validator yet). Max ${MAX_FILE_COUNT} files per call.`,
     ),
-}).refine(
-  (input) => {
-    const totalBytes = input.files.reduce((sum, f) => sum + Buffer.byteLength(f.content, 'utf-8'), 0);
-    return totalBytes <= MAX_AGGREGATE_BYTES;
-  },
-  { message: `Aggregate content size exceeds ${MAX_AGGREGATE_BYTES} byte limit` },
-);
+});
 
 /** Output schema returned as JSON to the LLM. */
 export const ValidateArtifactsResultSchema = z.object({

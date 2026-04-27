@@ -92,14 +92,11 @@ describe('core.validate_artifacts', () => {
         content: 'content',
       }));
       const raw = await invoke(files);
-      // Schema validation fails; tool passes through and dispatch returns skipped
-      const result = JSON.parse(String(raw));
-      expect(Array.isArray(result.results)).toBe(true);
-      expect(result.results.length).toBeGreaterThan(0);
-      expect(result.results[0].status).toBe('skipped');
+      // ZodObject .max(20) enforced by SDK — returns an error string, not JSON
+      expect(() => JSON.parse(String(raw))).toThrow(SyntaxError);
     });
 
-    it('rejects aggregate content exceeding 50MB via schema refinement', async () => {
+    it('rejects aggregate content exceeding 50MB via execute() guard', async () => {
       // Aggregate size check happens in execute — tool returns skipped result
       const bigContent = 'x'.repeat(9 * 1024 * 1024);
       const files = Array.from({ length: 6 }, (_, i) => ({
