@@ -62,6 +62,7 @@ const coreComponents: ComponentContribution[] = [
 export const corePack: Pack = {
   name: 'core',
   version: '0.1.0',
+  dependsOn: ['aks', 'azure', 'github'],
 
   // Agents and skills are loaded from directory by the harness registry
   agentsDir: new URL('./agents/', import.meta.url),

@@ -135,16 +135,20 @@ describe('pack-core agent frontmatter', () => {
     // both throw with pack/agent/target tokens in the error). The pack-
     // core agents.test.ts stays as a pointer here; the live assertion
     // runs in harness.
-    it('parsed agent.handoffs targets are all intra-pack (enforced at registry.seal, see #1073)', () => {
-      // Sanity-only: the three pack-core agents must reference only
-      // core.* targets. Exhaustive semantic validation lives in harness.
-      const handoffTargets: string[] = [
-        // core.triage declared in triage.agent.md
-        'core.codesmith',
-        'core.reviewer',
-      ];
-      for (const target of handoffTargets) {
+    it('triage handoffs include intra-pack core agents and cross-pack specialists (enforced at registry.seal via dependsOn, see #1073 and #107)', () => {
+      // Intra-pack core targets
+      const coreTargets: string[] = ['core.codesmith', 'core.reviewer'];
+      for (const target of coreTargets) {
         expect(AGENT_NAME_PATTERN.test(target)).toBe(true);
+      }
+
+      // Cross-pack specialist targets (allowed via corePack.dependsOn: ['aks', 'azure', 'github'])
+      const specialistTargets = ['aks.architect', 'azure.architect', 'github.publisher'];
+      for (const target of specialistTargets) {
+        // Specialist agents follow <pack>.<name> naming; they are NOT core.* agents
+        expect(AGENT_NAME_PATTERN.test(target)).toBe(false);
+        // All targets must be declared in triage.agent.md frontmatter
+        expect(TRIAGE_PROMPT).toContain(`agent: ${target}`);
       }
     });
 

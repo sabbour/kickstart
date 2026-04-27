@@ -45,3 +45,32 @@ describe('triage.agent.md — branch-on-event instructions (#1062 Layer 2)', () 
     expect(body).toMatch(/choose_deploy/);
   });
 });
+
+describe('triage.agent.md — specialist handoff routing (#107)', () => {
+  const body = readFileSync(TRIAGE_PATH, 'utf-8');
+
+  it('declares aks.architect as a handoff target in frontmatter', () => {
+    expect(body).toContain('agent: aks.architect');
+  });
+
+  it('declares azure.architect as a handoff target in frontmatter', () => {
+    expect(body).toContain('agent: azure.architect');
+  });
+
+  it('declares github.publisher as a handoff target in frontmatter', () => {
+    expect(body).toContain('agent: github.publisher');
+  });
+
+  it('routes agentic_app + AKS intent to aks.architect', () => {
+    expect(body).toContain('aks.architect');
+    expect(body).toMatch(/agentic.app.*aks|aks.*agentic.app/si);
+  });
+
+  it('routes azure infra to azure.architect', () => {
+    expect(body).toContain('azure.architect');
+  });
+
+  it('routes publish flow to github.publisher', () => {
+    expect(body).toContain('github.publisher');
+  });
+});

@@ -293,3 +293,80 @@ describe('#1130 Runner.buildAgentInstance — catalog hint injection', () => {
 });
 // Avoid an unused-import warning on `z` while keeping it handy for future tests.
 void z;
+
+describe('#107 Runner.buildAgentInstance — triage specialist handoff edges', () => {
+  beforeEach(() => {
+    vi.stubEnv('KICKSTART_CHAT_MODEL', 'gpt-4o-mini');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function buildMultiPackRegistry(): PackRegistry {
+    const registry = new PackRegistry();
+    // Specialist packs must be registered before core so dependsOn resolves correctly.
+    registry.register({ name: 'aks', version: '1.0.0', agents: [makeAgent('aks.architect')] });
+    registry.register({ name: 'azure', version: '1.0.0', agents: [makeAgent('azure.architect')] });
+    registry.register({ name: 'github', version: '1.0.0', agents: [makeAgent('github.publisher')] });
+    registry.register({
+      name: 'core',
+      version: '1.0.0',
+      dependsOn: ['aks', 'azure', 'github'],
+      agents: [
+        makeAgent('core.triage', [
+          { label: 'AKS architecture', agent: 'aks.architect', prompt: 'AKS workload.' },
+          { label: 'Azure infrastructure', agent: 'azure.architect', prompt: 'Azure infra.' },
+          { label: 'Publish to GitHub', agent: 'github.publisher', prompt: 'Publish files.' },
+          { label: 'Generate files', agent: 'core.codesmith' },
+          { label: 'Review artifacts', agent: 'core.reviewer' },
+        ]),
+        makeAgent('core.codesmith'),
+        makeAgent('core.reviewer'),
+      ],
+    });
+    registry.enable(['core', 'aks', 'azure', 'github']);
+    registry.seal();
+    return registry;
+  }
+
+  it('seal() accepts cross-pack handoffs when dependsOn declares the target packs', () => {
+    // This should not throw — the cross-pack validation path in registry.seal()
+    // must allow aks.*, azure.*, and github.* because core declares dependsOn.
+    expect(() => buildMultiPackRegistry()).not.toThrow();
+  });
+
+  it('triage hands off to aks.architect (transfer_to_aks_architect)', () => {
+    const runner = new Runner(buildMultiPackRegistry());
+    const triage = callBuild(runner, 'core.triage');
+    const toolNames = triage.handoffs.map((h: any) => h.toolName as string);
+    expect(toolNames).toContain('transfer_to_aks_architect');
+  });
+
+  it('triage hands off to azure.architect (transfer_to_azure_architect)', () => {
+    const runner = new Runner(buildMultiPackRegistry());
+    const triage = callBuild(runner, 'core.triage');
+    const toolNames = triage.handoffs.map((h: any) => h.toolName as string);
+    expect(toolNames).toContain('transfer_to_azure_architect');
+  });
+
+  it('triage hands off to github.publisher (transfer_to_github_publisher)', () => {
+    const runner = new Runner(buildMultiPackRegistry());
+    const triage = callBuild(runner, 'core.triage');
+    const toolNames = triage.handoffs.map((h: any) => h.toolName as string);
+    expect(toolNames).toContain('transfer_to_github_publisher');
+  });
+
+  it('triage retains core.codesmith and core.reviewer handoff edges', () => {
+    const runner = new Runner(buildMultiPackRegistry());
+    const triage = callBuild(runner, 'core.triage');
+    const toolNames = triage.handoffs.map((h: any) => h.toolName as string);
+    expect(toolNames).toContain('transfer_to_core_codesmith');
+    expect(toolNames).toContain('transfer_to_core_reviewer');
+  });
+
+  it('triage has exactly five handoff edges after wiring specialists', () => {
+    const runner = new Runner(buildMultiPackRegistry());
+    const triage = callBuild(runner, 'core.triage');
+    expect(triage.handoffs).toHaveLength(5);
+  });
+});
