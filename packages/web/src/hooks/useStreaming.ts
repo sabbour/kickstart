@@ -383,6 +383,48 @@ export function _composeConverseRequestBody(
   return body;
 }
 
+// ---------------------------------------------------------------------------
+// SessionExpiredError handler — extracted for unit testability (#80)
+//
+// Handles a SessionExpiredError thrown by apiFetch() inside useStreaming.send().
+// When isAuthRetry is true (we already redirected once and came back still
+// unauthenticated), surfaces the error via onError instead of redirecting again
+// — this breaks the infinite redirect loop.
+//
+// Parameters redirect and storage are injected so the pure logic can be
+// exercised in unit tests without stubbing browser globals.
+// ---------------------------------------------------------------------------
+
+/**
+ * Handle a `SessionExpiredError` thrown during a streaming send.
+ *
+ * - First attempt (`isAuthRetry = false`): sets `AUTH_REDIRECT_PENDING_KEY` in
+ *   session storage and navigates the browser to the AAD login page.
+ * - Auth-retry attempt (`isAuthRetry = true`): calls `onError` with the
+ *   session-expired message instead of redirecting, breaking the infinite loop.
+ *
+ * @internal — exported for unit testing only; not part of the public API.
+ */
+export function _handleSessionExpiredError(
+  err: SessionExpiredError,
+  isAuthRetry: boolean,
+  onError: (msg: string) => void,
+  // Inject for testability; defaults use real browser APIs
+  redirect: (url: string) => void = (url) => { window.location.href = url; },
+  storage: Pick<Storage, 'setItem'> = typeof sessionStorage !== 'undefined' ? sessionStorage : { setItem: () => undefined },
+): void {
+  if (isAuthRetry) {
+    onError(err.message);
+    return;
+  }
+  try {
+    storage.setItem(AUTH_REDIRECT_PENDING_KEY, '1');
+  } catch {
+    // ignore storage failures (e.g. private browsing quota)
+  }
+  redirect(buildSwaLoginUrl());
+}
+
 export function useStreaming() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamText, setStreamText] = useState('');
@@ -439,6 +481,7 @@ export function useStreaming() {
     debugMode?: boolean,
     chatHistory?: ChatMessage[],
     event?: A2uiEventMetadata,
+    isAuthRetry?: boolean,
   ) => {
     setIsStreaming(true);
     setStreamText('');
@@ -740,12 +783,7 @@ export function useStreaming() {
       if (err instanceof Error && err.name === 'AbortError') return;
       cancelReveal();
       if (err instanceof SessionExpiredError) {
-        try {
-          sessionStorage.setItem(AUTH_REDIRECT_PENDING_KEY, '1');
-        } catch {
-          // ignore storage failures
-        }
-        window.location.href = buildSwaLoginUrl();
+        _handleSessionExpiredError(err, isAuthRetry ?? false, callbacks.onError);
         return;
       }
       const errMsg = err instanceof Error ? err.message : 'Connection failed';

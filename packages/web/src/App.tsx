@@ -948,7 +948,7 @@ export function App() {
           setMessages(prev => [...prev, errorMsg]);
           sessions.addMessage(sessionId!, errorMsg);
         },
-      }, debugEnabled, activeSession?.messages ?? [], event);
+      }, debugEnabled, activeSession?.messages ?? [], event, isAuthRetry);
     }
   }, [
     clearActionLog,
