@@ -16,7 +16,12 @@
 
 ## Confidence
 
-`high` — enforced by CI conformance test since issue #1005. Pattern confirmed across `emit_ui`, all pack tools, all user actions.
+`confidence: high` | `status: established` | `last_reviewed: 2025-04-28`
+
+Enforced by CI conformance test since issue #1005. Pattern confirmed across `emit_ui`, all pack tools, all user actions.
+
+### Changelog
+- **2025-04-28** — Bumped confidence to `high` / status to `established`. ESLint enforcement rules (#97, #99), expanded conformance tests (#98), and schema fixes (#89–#92) have all landed. Skill is now fully enforced end-to-end.
 
 ---
 
