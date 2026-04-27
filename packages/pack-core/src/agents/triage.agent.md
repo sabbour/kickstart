@@ -127,16 +127,21 @@ When you receive `[A2UI event] name=pick_track payload={"value":"<track>"}`:
 
 When you receive `[A2UI event] name=select_inference payload={"value":"<choice>"}`:
 
-- **`foundry`** — Do not require the user to restate the use case or data sources if they already provided them. Infer those values from the conversation and show them in the plan or a `SummaryCard`. Prefer the deployment's configured/default Foundry model unless the user asks to choose one. Do not present a stale fixed list of model families. If you still need information, ask **one question at a time** (maximum 3 questions total before routing), choosing the single most important missing piece first:
-  - Model override (only if the user has expressed a preference)
-  - Use-case or data-source corrections (only if the inferred values appear wrong)
-  - Database/cache or external service needs (only if not inferable)
-  - Scaling expectations (only if not inferable)
+- **`foundry`** — Do not require the user to restate the use case or data sources if they already provided them. Infer those values from the conversation and show them in the plan or a `SummaryCard`. Prefer the deployment's configured/default Foundry model unless the user asks to choose one. Do not present a stale fixed list of model families. If you need a form, make every field optional (`required: false`) and ask only for overrides. **All question `id` values MUST be prefixed with `foundry.`** to prevent state bleed when the user switches between KAITO and Foundry modes:
+  - `id: "foundry.model"` — Model override (text, optional: leave blank to use the recommended/default model in Microsoft Foundry)
+  - `id: "foundry.use-case"` — Use-case corrections (text, optional: only if the inferred use case is wrong or incomplete)
+  - `id: "foundry.data-sources"` — Data-source corrections (text, optional: only if inferred sources are wrong or missing)
+  - `id: "foundry.db-cache"` — Database/cache or external service needs (text, optional)
+  - `id: "foundry.scaling"` — Scaling expectations (text, optional)
+  - `onSubmit: { event: { name: "foundry_answers", payload: null } }`
   - Once the requirements are clear, mention that the deployment plan will target AKS Automatic.
-- **`kaito`** — Infer the use case from conversation context. Before presenting model choices, call `core.search_kaito_models` against the user's requested model/family, or use query `"*"` when they want to browse. Use the returned `sourceUrl` and `matches` as the current KAITO-supported preset list; do not rely on memory or a static list in this prompt. If no supported preset matches, explain that the model is not in the current KAITO preset catalog and ask whether they want another supported preset or a generic endpoint. Treat GPU sizes as user constraints until live regional capacity APIs are available. Ask **one question at a time** (maximum 3 questions total), starting with the single most important missing piece — typically the model or model family if not yet specified. Candidate questions (ask only what you need):
-   - Model or model family (if not specified; use `core.search_kaito_models` results to suggest options)
-   - GPU preference or budget (if model is known and SKU matters)
-   - Database/cache or external service needs (if not inferable)
+- **`kaito`** — Infer the use case from conversation context. Before presenting model choices, call `core.search_kaito_models` against the user's requested model/family, or use query `"*"` when they want to browse. Use the returned `sourceUrl` and `matches` as the current KAITO-supported preset list; do not rely on memory or a static list in this prompt. If no supported preset matches, explain that the model is not in the current KAITO preset catalog and ask whether they want another supported preset or a generic endpoint. Treat GPU sizes as user constraints until live regional capacity APIs are available. Emit a `Questionnaire` on `"shared:triage-main"` via `updateComponents` asking. **All question `id` values MUST be prefixed with `kaito.`** to prevent state bleed when the user switches between KAITO and Foundry modes:
+   - `id: "kaito.model"` — Model or model family (text, optional; populate choices from `core.search_kaito_models` results when available)
+   - `id: "kaito.gpu-budget"` — GPU preference or budget (text, optional; ask for target latency/cost if they do not know SKU names)
+   - `id: "kaito.use-case"` — Use-case corrections (text, optional: only if the inferred use case is wrong or incomplete)
+   - `id: "kaito.db-cache"` — Database/cache or external service needs (text, optional)
+   - `id: "kaito.scaling"` — Scaling expectations (text, optional)
+   - `onSubmit: { event: { name: "kaito_answers", payload: null } }`
    - Once the requirements are clear, mention that the deployment plan will target AKS Automatic.
 - **`generic_endpoint`** — Infer the use case, model role, and data sources from conversation context. Do not reject an endpoint because it is not Microsoft Foundry or KAITO. Ask **one question at a time** (maximum 3 questions total), starting with the single most important missing piece — typically the endpoint URL/provider if not yet provided. Candidate questions (ask only what you need, only if not inferable):
    - Endpoint/provider (if not yet provided)

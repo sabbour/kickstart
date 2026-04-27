@@ -85,7 +85,7 @@ function triageQuestionnaireTurn(sessionId: string): string {
             submitLabel: 'Continue',
             questions: [
               {
-                id: 'model-family',
+                id: 'kaito.model-family',
                 label: 'Model family',
                 type: 'choice',
                 choices: [
@@ -94,8 +94,8 @@ function triageQuestionnaireTurn(sessionId: string): string {
                 ],
                 required: true,
               },
-              { id: 'gpu-budget', label: 'GPU budget', required: true },
-              { id: 'data-source', label: 'Primary data source' },
+              { id: 'kaito.gpu-budget', label: 'GPU budget', required: true },
+              { id: 'kaito.data-source', label: 'Primary data source' },
             ],
             onSubmit: { event: { name: 'submit_requirements' } },
           },

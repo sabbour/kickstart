@@ -194,6 +194,21 @@ function normalizePlaygroundComponents(raw: any[]): any[] {
 // Components are grouped by pack name (prefix of component.name, e.g. "core" for "core/Button").
 // The list is empty until pack-core lands (Step 4) and registry is wired in (Step 5).
 
+// Client-only auth components — not in the server-side pack registry but have previews
+// in COMPONENT_PREVIEWS. Surfaced in the Components tab under the "core" group.
+const USER_ACTION_CONTRIBUTIONS: ComponentContribution[] = [
+  {
+    name: 'core/AzureLoginCard',
+    propertySchema: {} as ComponentContribution['propertySchema'],
+    renderer: undefined as unknown as ComponentContribution['renderer'],
+  },
+  {
+    name: 'core/GitHubLoginCard',
+    propertySchema: {} as ComponentContribution['propertySchema'],
+    renderer: undefined as unknown as ComponentContribution['renderer'],
+  },
+];
+
 function packNameFromId(id: string): string {
   return id.split('/')[0] ?? id;
 }
@@ -1000,9 +1015,9 @@ function PlaygroundInner() {
     }
   }, [debugEnabled]);
 
-  // Registry-driven filtered components (Phase C)
+  // Registry-driven filtered components (Phase C) + client-only User Action components
   const filteredComponents = useMemo((): ComponentContribution[] => {
-    const comps = registry.components;
+    const comps = [...registry.components, ...USER_ACTION_CONTRIBUTIONS];
     if (!filterQuery.trim()) return comps;
     const query = filterQuery.toLowerCase();
     return comps.filter(c => c.name.toLowerCase().includes(query));

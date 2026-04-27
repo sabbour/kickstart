@@ -346,4 +346,14 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
       currency: 'USD',
     },
   ],
+
+  // ── User Actions ──────────────────────────────────────────────────────────
+
+  'core/AzureLoginCard': [
+    { id: 'root', component: 'AzureLoginCard', displayName: 'Azure User', showTokenInfo: true },
+  ],
+
+  'core/GitHubLoginCard': [
+    { id: 'root', component: 'GitHubLoginCard' },
+  ],
 };
