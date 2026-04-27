@@ -49,55 +49,35 @@ for (const impl of fluentOverrides) {
   clientRegistry.register(impl);
 }
 
-// Step 1b: Kickstart rich components (domain-neutral)
-import {
-  AuthCard,
-  AzureAction,
-  AzureLoginCard,
-  AzureResourceForm,
-  AzureResourcePicker,
-  CodeBlock,
-  CostEstimate,
-  DecisionCard,
-  FileEditor,
-  FormGroup,
-  GenerationProgress,
-  GitHubAction,
-  GitHubCommit,
-  GitHubLoginCard,
-  GitHubRepoPicker,
-  Markdown,
-  ProgressSteps,
-  Questionnaire,
-  RadioGroup,
-  SteppedCarousel,
-  SummaryCard,
-  TrackPicker,
-} from './catalog/components/index';
+// Step 1b: Kickstart rich components (domain-neutral) — lazy-loaded so each
+// component's module is only fetched when the first instance of that type is
+// rendered. Vite code-splits each dynamic import into its own chunk, reducing
+// the initial bundle delivered to the browser. See createLazyRegistration.tsx.
+import { createLazyRegistration } from './catalog/createLazyRegistration';
 
 const richComponents = [
-  AuthCard,
-  AzureAction,
-  AzureLoginCard,
-  AzureResourceForm,
-  AzureResourcePicker,
-  CodeBlock,
-  CostEstimate,
-  DecisionCard,
-  FileEditor,
-  FormGroup,
-  GenerationProgress,
-  GitHubAction,
-  GitHubCommit,
-  GitHubLoginCard,
-  GitHubRepoPicker,
-  Markdown,
-  ProgressSteps,
-  Questionnaire,
-  RadioGroup,
-  SteppedCarousel,
-  SummaryCard,
-  TrackPicker,
+  createLazyRegistration('AuthCard', () => import('./catalog/components/AuthCard')),
+  createLazyRegistration('AzureAction', () => import('./catalog/components/AzureAction')),
+  createLazyRegistration('AzureLoginCard', () => import('./catalog/components/AzureLoginCard')),
+  createLazyRegistration('AzureResourceForm', () => import('./catalog/components/AzureResourceForm')),
+  createLazyRegistration('AzureResourcePicker', () => import('./catalog/components/AzureResourcePicker')),
+  createLazyRegistration('CodeBlock', () => import('./catalog/components/CodeBlock')),
+  createLazyRegistration('CostEstimate', () => import('./catalog/components/CostEstimate')),
+  createLazyRegistration('DecisionCard', () => import('./catalog/components/DecisionCard')),
+  createLazyRegistration('FileEditor', () => import('./catalog/components/FileEditor')),
+  createLazyRegistration('FormGroup', () => import('./catalog/components/FormGroup')),
+  createLazyRegistration('GenerationProgress', () => import('./catalog/components/GenerationProgress')),
+  createLazyRegistration('GitHubAction', () => import('./catalog/components/GitHubAction')),
+  createLazyRegistration('GitHubCommit', () => import('./catalog/components/GitHubCommit')),
+  createLazyRegistration('GitHubLoginCard', () => import('./catalog/components/GitHubLoginCard')),
+  createLazyRegistration('GitHubRepoPicker', () => import('./catalog/components/GitHubRepoPicker')),
+  createLazyRegistration('Markdown', () => import('./catalog/components/Markdown')),
+  createLazyRegistration('ProgressSteps', () => import('./catalog/components/ProgressSteps')),
+  createLazyRegistration('Questionnaire', () => import('./catalog/components/Questionnaire')),
+  createLazyRegistration('RadioGroup', () => import('./catalog/components/RadioGroup')),
+  createLazyRegistration('SteppedCarousel', () => import('./catalog/components/SteppedCarousel')),
+  createLazyRegistration('SummaryCard', () => import('./catalog/components/SummaryCard')),
+  createLazyRegistration('TrackPicker', () => import('./catalog/components/TrackPicker')),
 ];
 
 for (const impl of richComponents) {

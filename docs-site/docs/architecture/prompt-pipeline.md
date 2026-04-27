@@ -67,7 +67,31 @@ Skills are authored as `SKILL.md` files inside packs. They are pure text — no 
 {registered component list with schemas}
 ```
 
-## Guardrails
+## Triage Interaction Model
+
+The `core.triage` agent follows a **one-question-at-a-time** policy for gathering requirements. This replaces the previous form-dump pattern where all clarification questions were presented in a single multi-field `Questionnaire` component.
+
+### Policy (as encoded in `triage.agent.md`)
+
+| Rule | Detail |
+|------|--------|
+| One question per turn | Never emit more than one question in a single response |
+| Route immediately when clear | If the user's message makes intent unambiguous, route without any questions |
+| Re-evaluate after each answer | After receiving an answer, decide whether routing is now possible before asking another question |
+| Hard cap | Maximum 3 questions before forced routing, regardless of remaining ambiguity |
+
+### Ordering heuristic
+
+The agent is instructed to ask the **most discriminating question first** — the single piece of information that most reduces routing ambiguity. Examples:
+
+- **`repo_uplift` track:** After `core.inspect_repo` returns its questionnaire array, only the first (highest-value) question is asked. The next is asked only if routing is still ambiguous after the first answer.
+- **`kaito` inference:** If the model family is already specified in the user's request, the agent skips the model question entirely and proceeds to routing or asks the next most-important gap.
+
+### Why this matters
+
+User research shows that 3–5 questions presented at once overwhelm users and increase abandonment. The one-Q model keeps each turn focused and allows the agent to route as early as possible — often after 0 or 1 questions.
+
+
 
 Guardrails contributed by packs run at three stages:
 

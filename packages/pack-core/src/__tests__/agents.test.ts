@@ -167,18 +167,19 @@ describe('pack-core agent frontmatter', () => {
       expect(TRIAGE_PROMPT).not.toContain('"description":"Build and deploy an AI-powered agent or chatbot on AKS Automatic"');
     });
 
-    it('makes Foundry follow-up fields optional and inferred from prior context', () => {
+    it('makes Foundry follow-up fields use one-Q-at-a-time instead of a form dump', () => {
       expect(TRIAGE_PROMPT).toContain('Do not require the user to restate the use case or data sources if they already provided them');
-      expect(TRIAGE_PROMPT).toContain('make every field optional (`required: false`)');
+      expect(TRIAGE_PROMPT).toContain('one question at a time');
       expect(TRIAGE_PROMPT).toContain('Do not present a stale fixed list of model families');
-      expect(TRIAGE_PROMPT).toContain('Model override (text, optional: leave blank to use the recommended/default model in Microsoft Foundry');
+      expect(TRIAGE_PROMPT).toContain('Model override');
     });
 
     it('keeps repo uplift tool and surface instructions consistent', () => {
       expect(TRIAGE_PROMPT).toContain('- core.inspect_repo');
       expect(TRIAGE_PROMPT).toContain('call `core.inspect_repo`');
       expect(TRIAGE_PROMPT).toContain('SummaryCard` titled `"We found:"` on `"shared:triage-main"`');
-      expect(TRIAGE_PROMPT).toContain('Questionnaire` on `"shared:triage-main"`');
+      // Repo uplift now asks one question at a time instead of emitting a full Questionnaire form
+      expect(TRIAGE_PROMPT).toContain('ask the **single most important** question');
       expect(TRIAGE_PROMPT).not.toContain('on `"triage-main"`');
     });
 

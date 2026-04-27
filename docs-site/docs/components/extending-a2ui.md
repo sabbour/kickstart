@@ -147,17 +147,25 @@ The LLM defines static context in the action JSON (e.g. `{ label: "Pick a runtim
 
 ### Register in the catalog
 
-```typescript
-// packages/web/src/catalog/kickstart-catalog.ts
-import { StatusBanner } from './components/StatusBanner';
+Rich components use **lazy registration** so their module chunk is only downloaded when the component first renders in the UI. This keeps the initial page load fast.
 
-const kickstartComponents: ReactComponentImplementation[] = [
-  ...Array.from(basicCatalog.components.values()),
-  ...fluentOverrides,
-  // ... existing components ...
-  StatusBanner,
+```typescript
+// packages/web/src/main.tsx  (Step 1b section)
+import { createLazyRegistration } from './catalog/createLazyRegistration';
+
+// Add your component to the richComponents array:
+const richComponents = [
+  // ... existing lazy registrations ...
+  createLazyRegistration('StatusBanner', () => import('./catalog/components/StatusBanner')),
 ];
 ```
+
+`createLazyRegistration(name, importFn)` registers a placeholder that:
+1. Renders a Fluent UI `Skeleton` fallback while the component module downloads.
+2. Swaps in the real component once the chunk resolves.
+3. Lets Vite/Rollup split the component into its own chunk automatically.
+
+**Important:** The `name` string must exactly match the `name` field in your component's API object (`StatusBannerApi.name`). If the factory module does not export a symbol with that exact name, the lazy wrapper throws at runtime.
 
 ## Step 2: Add the Backend Validation Schema
 
