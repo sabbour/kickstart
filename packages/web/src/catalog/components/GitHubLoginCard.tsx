@@ -13,6 +13,7 @@ import {
   MessageBar,
   MessageBarBody,
   Spinner,
+  Tooltip,
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
@@ -226,15 +227,29 @@ export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props
           <MessageBarBody>{error}</MessageBarBody>
         </MessageBar>
       )}
+      {!usePlaygroundStub && session?.configured === false && (
+        <MessageBar intent="info">
+          <MessageBarBody>
+            GitHub Sign In is not available in this environment. The GitHub OAuth app has not been configured.
+          </MessageBarBody>
+        </MessageBar>
+      )}
       <div className={classes.actions}>
-        <Button
-          appearance="primary"
-          onClick={() => void handleSignIn()}
-          disabled={loading || (!usePlaygroundStub && session?.configured === false)}
-          icon={loading ? <Spinner size="tiny" /> : undefined}
+        <Tooltip
+          content="GitHub Sign In is not available in this environment. The GitHub OAuth app has not been configured."
+          relationship="label"
+          positioning="above-start"
+          visible={!usePlaygroundStub && session?.configured === false ? undefined : false}
         >
-          {loading ? "Checking sign-in…" : "Sign in with GitHub"}
-        </Button>
+          <Button
+            appearance="primary"
+            onClick={() => void handleSignIn()}
+            disabled={loading || (!usePlaygroundStub && session?.configured === false)}
+            icon={loading ? <Spinner size="tiny" /> : undefined}
+          >
+            {loading ? "Checking sign-in…" : "Sign in with GitHub"}
+          </Button>
+        </Tooltip>
       </div>
       {usePlaygroundStub && (
         <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalXS }}>

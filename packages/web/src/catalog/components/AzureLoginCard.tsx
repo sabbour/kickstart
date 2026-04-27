@@ -13,6 +13,7 @@ import {
   MessageBar,
   MessageBarBody,
   Spinner,
+  Tooltip,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
@@ -122,13 +123,18 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
   }, [connector, fetchSubscriptions, usePlaygroundStub]);
 
   const handleSignIn = async () => {
-    if (usePlaygroundStub || !connector) {
-      // Stub mode — show stub subscriptions
+    if (usePlaygroundStub) {
+      // Explicit demo/playground mode — enter stub session
       const stubSession = createAzureStubSession(true);
       setAuthenticated(stubSession.authenticated);
       setSubscriptions(stubSession.subscriptions);
       setAuthTime(new Date());
       if (props.onSignIn) (props.onSignIn as () => void)();
+      return;
+    }
+
+    if (!connector) {
+      // Connector absent outside playground mode — do not silently stub
       return;
     }
 
@@ -164,10 +170,16 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
         <CardHeader
           header={<Body1Strong>Azure</Body1Strong>}
           description={
-            <Caption1>
-              <span className={classes.statusDot} />
-              Connected
-            </Caption1>
+            usePlaygroundStub ? (
+              <Caption1 style={{ color: tokens.colorPaletteMarigoldForeground2 }}>
+                Demo Mode
+              </Caption1>
+            ) : (
+              <Caption1>
+                <span className={classes.statusDot} />
+                Connected
+              </Caption1>
+            )
           }
         />
         <div className={classes.signedIn}>
@@ -224,17 +236,31 @@ export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }
           <MessageBarBody>{error}</MessageBarBody>
         </MessageBar>
       )}
+      {!usePlaygroundStub && !connector && (
+        <MessageBar intent="warning">
+          <MessageBarBody>
+            Azure connector not available in this environment.
+          </MessageBarBody>
+        </MessageBar>
+      )}
       <div className={classes.actions}>
-        <Button
-          appearance="primary"
-          onClick={handleSignIn}
-          disabled={loading}
-          icon={loading ? <Spinner size="tiny" /> : undefined}
+        <Tooltip
+          content="Azure connector not available in this environment."
+          relationship="label"
+          positioning="above-start"
+          visible={!usePlaygroundStub && !connector ? undefined : false}
         >
-          {loading ? 'Signing in…' : 'Sign in to Azure'}
-        </Button>
+          <Button
+            appearance="primary"
+            onClick={() => void handleSignIn()}
+            disabled={loading || (!usePlaygroundStub && !connector)}
+            icon={loading ? <Spinner size="tiny" /> : undefined}
+          >
+            {loading ? 'Signing in…' : 'Sign in to Azure'}
+          </Button>
+        </Tooltip>
       </div>
-      {!connector && (
+      {usePlaygroundStub && (
         <Caption1 style={{ color: tokens.colorNeutralForeground3, marginTop: tokens.spacingVerticalXS }}>
           Running in offline mode — sign-in will use stub data
         </Caption1>

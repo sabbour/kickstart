@@ -195,3 +195,30 @@ func --version
 ### OpenAI errors
 
 Verify your local settings file is present and both deployment names match real Azure OpenAI deployments in your resource.
+
+## Authentication States
+
+Kickstart shows different UI states depending on whether GitHub OAuth and Azure connectors are configured.
+
+### GitHub Sign In — "not available in this environment"
+
+If `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` are not configured, the GitHub Sign In button is **disabled** and shows an info banner:
+
+> _"GitHub Sign In is not available in this environment. The GitHub OAuth app has not been configured."_
+
+This is expected in local dev without OAuth credentials. No 503 errors are thrown — the button is simply inert.
+
+**To enable GitHub login locally:** Create a GitHub OAuth App (Settings → Developer settings → OAuth Apps), add your `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` to `local.settings.json`, and set the callback URL to `http://localhost:4280/api/github-auth/callback`.
+
+### Azure Sign In — disabled state vs. Demo Mode
+
+| Situation | UI State |
+|-----------|----------|
+| Azure connector absent, `KICKSTART_PLAYGROUND=false` | Sign In button disabled with "not available" tooltip |
+| Azure connector absent, `KICKSTART_PLAYGROUND=true` | **Demo Mode** — mock user shown with a blue "Demo Mode" badge |
+| Azure connector present, authenticated | Green "Connected" dot |
+
+**Demo Mode** is an explicit opt-in via `KICKSTART_PLAYGROUND=true`. It shows a mock authenticated user so you can test UI flows without a real Azure identity. A blue "Demo Mode" badge replaces the green Connected dot to make it clear you are in a simulated state.
+
+> ⚠️ Never deploy with `KICKSTART_PLAYGROUND=true` in production — demo mode bypasses real authentication.
+
