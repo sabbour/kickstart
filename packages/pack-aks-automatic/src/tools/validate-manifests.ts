@@ -19,8 +19,7 @@ const ValidateManifestsInputSchema = z.object({
   manifestName: z
     .string()
     .nullable()
-    .optional()
-    .describe('Optional display name for the manifest (used in error messages)'),
+    .describe('Optional display name for the manifest; pass null to use the default "manifest" label'),
 });
 
 const ManifestDiagnosticSchema = z.object({

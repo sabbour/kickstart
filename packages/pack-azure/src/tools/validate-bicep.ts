@@ -9,8 +9,7 @@ const ValidateBicepInputSchema = z.object({
   templateName: z
     .string()
     .nullable()
-    .optional()
-    .describe('Optional display name for the template (used in error messages)'),
+    .describe('Optional display name for the template; pass null to use the default "template" label'),
 });
 
 const DiagnosticSchema = z.object({

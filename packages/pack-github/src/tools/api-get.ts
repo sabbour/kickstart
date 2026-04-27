@@ -53,9 +53,8 @@ const ApiGetInputSchema = z.object({
   params: z
     .string()
     .nullable()
-    .optional()
     .describe(
-      'Optional query string parameters as a JSON-encoded object of string→string entries. ' +
+      'Optional query string parameters as a JSON-encoded object of string→string entries; pass null to omit. ' +
       'Example: \'{"per_page":"50"}\'.',
     ),
 });

@@ -45,13 +45,11 @@ const WhatIfInputSchema = z.object({
   parameters: z
     .string()
     .nullable()
-    .optional()
-    .describe('Optional ARM template parameters object, encoded as a JSON string'),
+    .describe('Optional ARM template parameters object, encoded as a JSON string; pass null to omit'),
   deploymentName: z
     .string()
     .nullable()
-    .optional()
-    .describe('Optional deployment name for tracking'),
+    .describe('Optional deployment name for tracking; pass null to auto-generate'),
 });
 
 const WhatIfChangeSchema = z.object({

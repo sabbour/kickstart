@@ -82,11 +82,11 @@ const STEP_LABELS: Record<StepId, string> = {
 
 const ProposedServicesSchema = z.object({
   track: z.enum(['kaito', 'foundry']).describe('Deployment track from azure.propose_services'),
-}).passthrough();
+});
 
 const PlanSchema = z.object({
-  clusterName: z.string().max(1000).optional(),
-}).passthrough();
+  clusterName: z.string().max(1000).nullable(),
+});
 
 export const ScaffoldAppInputSchema = z.object({
   plan: PlanSchema.describe('AKS plan from Phase A/B'),

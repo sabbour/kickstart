@@ -16,25 +16,25 @@ export const SUPPORTED_MODEL_SIZES = Object.keys(GPU_SKU_MATRIX);
 
 const PlanNodePoolSchema = z.object({
   name: z.string().max(1000),
-  mode: z.enum(['System', 'User']).optional(),
-  vmSize: z.string().max(1000).optional(),
-  count: z.number().optional(),
+  mode: z.enum(['System', 'User']).nullable(),
+  vmSize: z.string().max(1000).nullable(),
+  count: z.number().nullable(),
 });
 
 const PlanWorkloadSchema = z.object({
   name: z.string().max(1000),
-  type: z.string().max(1000).optional(),
-  replicas: z.number().optional(),
+  type: z.string().max(1000).nullable(),
+  replicas: z.number().nullable(),
 });
 
 const PlanSchema = z.object({
-  clusterName: z.string().max(1000).optional(),
-  nodePools: z.array(PlanNodePoolSchema).max(100).optional(),
-  workloads: z.array(PlanWorkloadSchema).max(100).optional(),
-  ingress: z.object({ type: z.string().max(1000).optional(), host: z.string().max(1000).optional() }).optional(),
-  storage: z.object({ type: z.string().max(1000).optional(), name: z.string().max(1000).optional() }).optional(),
-  kaito: z.object({ model: z.string().max(1000).optional(), gpu: z.string().max(1000).optional() }).optional(),
-  foundry: z.object({ endpoint: z.string().max(1000).optional(), model: z.string().max(1000).optional() }).optional(),
+  clusterName: z.string().max(1000).nullable(),
+  nodePools: z.array(PlanNodePoolSchema).max(100).nullable(),
+  workloads: z.array(PlanWorkloadSchema).max(100).nullable(),
+  ingress: z.object({ type: z.string().max(1000).nullable(), host: z.string().max(1000).nullable() }).nullable(),
+  storage: z.object({ type: z.string().max(1000).nullable(), name: z.string().max(1000).nullable() }).nullable(),
+  kaito: z.object({ model: z.string().max(1000).nullable(), gpu: z.string().max(1000).nullable() }).nullable(),
+  foundry: z.object({ endpoint: z.string().max(1000).nullable(), model: z.string().max(1000).nullable() }).nullable(),
 });
 
 export const ProposeServicesInputSchema = z.object({

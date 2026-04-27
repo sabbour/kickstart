@@ -20,7 +20,7 @@ const EstimateCostInputSchema = z.object({
     .min(1)
     .describe('List of resource line items to include in the estimate'),
   currencyCode: z.string().default('USD').describe('ISO 4217 currency code'),
-  region: z.string().nullable().optional().describe('Azure region for context, e.g. "eastus"'),
+  region: z.string().nullable().describe('Azure region for context, e.g. "eastus"; pass null if unknown'),
 });
 
 const EstimateCostOutputSchema = z.object({

@@ -16,13 +16,11 @@ const PricingLookupInputSchema = z.object({
   skuName: z
     .string()
     .nullable()
-    .optional()
-    .describe('Optional SKU name filter, e.g. "D2s v3", "Standard_LRS"'),
+    .describe('Optional SKU name filter, e.g. "D2s v3", "Standard_LRS"; pass null to omit'),
   armRegionName: z
     .string()
     .nullable()
-    .optional()
-    .describe('ARM region name, e.g. "eastus", "westeurope". Omit for global pricing.'),
+    .describe('ARM region name, e.g. "eastus", "westeurope"; pass null for global pricing.'),
   currencyCode: z
     .string()
     .default('USD')

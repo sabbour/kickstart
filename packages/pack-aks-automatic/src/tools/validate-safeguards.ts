@@ -34,8 +34,7 @@ const ValidateSafeguardsInputSchema = z.object({
   manifestName: z
     .string()
     .nullable()
-    .optional()
-    .describe('Optional display name for the manifest'),
+    .describe('Optional display name for the manifest; pass null to use the default "manifest" label'),
 });
 
 const ViolationSchema = z.object({

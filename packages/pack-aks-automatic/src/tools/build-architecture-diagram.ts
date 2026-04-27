@@ -6,52 +6,52 @@ import type { ToolContribution } from '@aks-kickstart/harness';
 
 const PlanNodePoolSchema = z.object({
   name: z.string().max(1000, 'Pool name must be ≤1000 chars'),
-  mode: z.enum(['System', 'User']).nullable().optional(),
-  vmSize: z.string().max(1000, 'VM size must be ≤1000 chars').nullable().optional(),
-  count: z.number().nullable().optional(),
+  mode: z.enum(['System', 'User']).nullable(),
+  vmSize: z.string().max(1000, 'VM size must be ≤1000 chars').nullable(),
+  count: z.number().nullable(),
 });
 
 const PlanWorkloadSchema = z.object({
   name: z.string().max(1000, 'Workload name must be ≤1000 chars'),
-  type: z.string().max(1000, 'Workload type must be ≤1000 chars').nullable().optional(),
-  replicas: z.number().nullable().optional(),
+  type: z.string().max(1000, 'Workload type must be ≤1000 chars').nullable(),
+  replicas: z.number().nullable(),
 });
 
 const PlanIngressSchema = z.object({
-  type: z.string().max(1000, 'Ingress type must be ≤1000 chars').nullable().optional(),
-  host: z.string().max(1000, 'Ingress host must be ≤1000 chars').nullable().optional(),
+  type: z.string().max(1000, 'Ingress type must be ≤1000 chars').nullable(),
+  host: z.string().max(1000, 'Ingress host must be ≤1000 chars').nullable(),
 });
 
 const PlanStorageSchema = z.object({
-  type: z.string().max(1000, 'Storage type must be ≤1000 chars').nullable().optional(),
-  name: z.string().max(1000, 'Storage name must be ≤1000 chars').nullable().optional(),
+  type: z.string().max(1000, 'Storage type must be ≤1000 chars').nullable(),
+  name: z.string().max(1000, 'Storage name must be ≤1000 chars').nullable(),
 });
 
 const PlanKaitoSchema = z.object({
-  model: z.string().max(1000, 'KAITO model must be ≤1000 chars').nullable().optional(),
-  gpu: z.string().max(1000, 'KAITO gpu must be ≤1000 chars').nullable().optional(),
+  model: z.string().max(1000, 'KAITO model must be ≤1000 chars').nullable(),
+  gpu: z.string().max(1000, 'KAITO gpu must be ≤1000 chars').nullable(),
 });
 
 const PlanFoundrySchema = z.object({
-  endpoint: z.string().max(1000, 'Foundry endpoint must be ≤1000 chars').nullable().optional(),
-  model: z.string().max(1000, 'Foundry model must be ≤1000 chars').nullable().optional(),
+  endpoint: z.string().max(1000, 'Foundry endpoint must be ≤1000 chars').nullable(),
+  model: z.string().max(1000, 'Foundry model must be ≤1000 chars').nullable(),
 });
 
 const PlanCiCdSchema = z.object({
-  provider: z.string().max(1000, 'CI/CD provider must be ≤1000 chars').nullable().optional(),
-  registry: z.string().max(1000, 'CI/CD registry must be ≤1000 chars').nullable().optional(),
+  provider: z.string().max(1000, 'CI/CD provider must be ≤1000 chars').nullable(),
+  registry: z.string().max(1000, 'CI/CD registry must be ≤1000 chars').nullable(),
 });
 
 const BuildArchitectureDiagramInputSchema = z.object({
   plan: z.object({
-    clusterName: z.string().max(1000, 'Cluster name must be ≤1000 chars').nullable().optional(),
-    nodePools: z.array(PlanNodePoolSchema).max(100, 'Node pools must be ≤100').nullable().optional(),
-    workloads: z.array(PlanWorkloadSchema).max(100, 'Workloads must be ≤100').nullable().optional(),
-    ingress: PlanIngressSchema.nullable().optional(),
-    storage: PlanStorageSchema.nullable().optional(),
-    kaito: PlanKaitoSchema.nullable().optional(),
-    foundry: PlanFoundrySchema.nullable().optional(),
-    cicd: PlanCiCdSchema.nullable().optional(),
+    clusterName: z.string().max(1000, 'Cluster name must be ≤1000 chars').nullable(),
+    nodePools: z.array(PlanNodePoolSchema).max(100, 'Node pools must be ≤100').nullable(),
+    workloads: z.array(PlanWorkloadSchema).max(100, 'Workloads must be ≤100').nullable(),
+    ingress: PlanIngressSchema.nullable(),
+    storage: PlanStorageSchema.nullable(),
+    kaito: PlanKaitoSchema.nullable(),
+    foundry: PlanFoundrySchema.nullable(),
+    cicd: PlanCiCdSchema.nullable(),
   }).describe('The plan artifact from Phase A/B describing the AKS topology'),
 });
 
@@ -113,8 +113,8 @@ export function buildArchitectureDiagram(plan: PlanInput): DiagramOutput {
   const pools = [...(plan.nodePools ?? [])].sort((a, b) => cmp(a.name, b.name));
   if (pools.length === 0) {
     // Default pools when none specified
-    pools.push({ name: 'system', mode: 'System' });
-    pools.push({ name: 'user', mode: 'User' });
+    pools.push({ name: 'system', mode: 'System', vmSize: null, count: null });
+    pools.push({ name: 'user', mode: 'User', vmSize: null, count: null });
   }
 
   // Pre-assign pool IDs with separate collision tracking (avoids cross-type ID collisions)
