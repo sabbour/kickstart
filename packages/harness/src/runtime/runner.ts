@@ -26,7 +26,7 @@ import type { SSEWriter } from './sse.js';
 import { AgentOutput } from '../types/agent-output.js';
 import { runGuardrails } from './guardrails.js';
 import { resolveModelName } from './model-resolution.js';
-import { PlanArtifactMissing } from '../errors/index.js';
+import { PlanArtifactMissing, ChainDepthExceeded } from '../errors/index.js';
 import { sanitizeError } from './sanitize-error.js';
 import { z } from 'zod';
 import { buildRunConfig } from './run-config.js';
@@ -157,8 +157,79 @@ export function isResponsesApiEnabled(): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// runChain / runWithGate — Deterministic sequential agent execution (#119)
+// ---------------------------------------------------------------------------
+
+/**
+ * Maximum number of steps allowed in a single `runChain()` call.
+ * Prevents misconfigured chains from looping indefinitely.
+ */
+export const CHAIN_MAX_STEPS = 10;
+
+/** A single step in a deterministic agent chain. */
+export interface ChainStep {
+  agentName: string;
+  /**
+   * Explicit input for this step. When omitted the previous step's output
+   * is forwarded as the input (pass-through chaining).
+   */
+  input?: string;
+}
+
+/** Combined result returned after a full `runChain()` execution. */
+export interface ChainResult {
+  /** Per-step outputs in execution order. */
+  steps: Array<{ agentName: string; output: string }>;
+  /** Output of the final step (empty string when the chain was aborted). */
+  finalOutput: string;
+  /** `true` when the chain was stopped early (e.g. reviewer rejection). */
+  aborted: boolean;
+  /** Human-readable reason supplied by the step that triggered the abort. */
+  abortReason?: string;
+}
+
+/** Structured verdict emitted by the gate reviewer. */
+export interface GateResult {
+  approved: boolean;
+  feedback?: string;
+}
+
+/**
+ * Parse a reviewer's raw text output for a binary APPROVED / REJECTED verdict.
+ *
+ * **Conservative by design**: any ambiguous output is treated as a rejection
+ * so the chain never silently passes without an explicit approval signal.
+ *
+ * Exported for unit-testing.
+ */
+export function parseGateVerdict(output: string): GateResult {
+  const APPROVED_RE = /\bAPPROVED\b/i;
+  const REJECTED_RE = /\bREJECTED\b/i;
+
+  if (APPROVED_RE.test(output)) {
+    // An explicit REJECTED keyword beats APPROVED when both appear in the
+    // same response (e.g. "not REJECTED, APPROVED") — parse positionally:
+    // find the last occurrence of each keyword; approve only when APPROVED
+    // appears after REJECTED (or REJECTED is absent).
+    const allApproved = [...output.matchAll(/\bAPPROVED\b/gi)];
+    const allRejected = [...output.matchAll(/\bREJECTED\b/gi)];
+    const lastApproved = allApproved.length ? allApproved[allApproved.length - 1].index! : -1;
+    const lastRejected = allRejected.length ? allRejected[allRejected.length - 1].index! : -1;
+    if (lastRejected === -1 || lastApproved > lastRejected) {
+      return { approved: true };
+    }
+  }
+  if (REJECTED_RE.test(output)) {
+    return { approved: false, feedback: output };
+  }
+  // Ambiguous → conservative rejection
+  return { approved: false, feedback: 'Reviewer did not produce a clear verdict.' };
+}
+
+// ---------------------------------------------------------------------------
 // Build model provider (Azure-aware)
 // ---------------------------------------------------------------------------
+
 
 /**
  * Build the Azure OpenAI baseURL for use with the OpenAI-compatible SDK.
@@ -1093,6 +1164,40 @@ export class Runner {
         }
       }
 
+      // ── Deterministic codesmith→reviewer chain (#119) ─────────────────────
+      // When codesmith completes a generation turn, automatically run the
+      // reviewer as a deterministic gate instead of relying on the model to
+      // call the voluntary handoff. The reviewer receives both the codesmith
+      // output and the gate prompt so it evaluates the actual generated content.
+      if (agentName === 'core.codesmith' && !guardrailHalted) {
+        const reviewerGatePrompt =
+          'Review the generated files in the workspace. ' +
+          'Respond with APPROVED or REJECTED: <reason>.';
+        // Pass codesmith output into reviewer input (mirrors runWithGate logic)
+        // so the reviewer evaluates the actual generated content, not just
+        // the static gate prompt in isolation.
+        const reviewInput = outputText
+          ? `${outputText}\n\n${reviewerGatePrompt}`
+          : reviewerGatePrompt;
+        sseWrite('chain_step', { step: 1, agentName: 'core.reviewer' });
+        const reviewerResult = await this.runStep(
+          'core.reviewer',
+          reviewInput,
+          session,
+          sseWrite,
+          signal,
+        );
+        if (!reviewerResult.aborted) {
+          const verdict = parseGateVerdict(reviewerResult.output);
+          if (!verdict.approved) {
+            sseWrite('error', {
+              code: 'CHAIN_REJECTED',
+              message: verdict.feedback ?? 'Reviewer rejected the generated output.',
+            });
+          }
+        }
+      }
+
       sseWrite('end', {
         sessionId: session.sessionId,
         intent,
@@ -1170,5 +1275,307 @@ export class Runner {
 
     // Continue the conversation with the result
     await this.run(session, continuationMessage, sseWrite);
+  }
+
+  // ---------------------------------------------------------------------------
+  // runStep — shared inner primitive for runChain / runWithGate (#119)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Run a single agent step within a deterministic chain.
+   *
+   * Unlike `run()`, this method:
+   * - Does NOT emit `start` / `end` SSE events (caller owns those).
+   * - Does NOT run input guardrails (chain inputs are harness-generated,
+   *   not raw user input).
+   * - DOES run output guardrails before emitting chunks.
+   * - Records the input as a user turn and the output as an assistant turn.
+   * - Emits `chunk`, `tool_start`, `tool_done`, `a2ui`, and `phase` SSE events
+   *   so the client sees full streaming output for each chain step.
+   *
+   * Exported as `public` for testability; treat as an internal primitive.
+   */
+  async runStep(
+    agentName: string,
+    input: string,
+    session: Session,
+    sseWrite: SSEWriter,
+    signal?: AbortSignal,
+  ): Promise<{ output: string; aborted: boolean; abortReason?: string }> {
+    let agentContrib: AgentContribution;
+    try {
+      agentContrib = this.registry.getAgent(agentName);
+    } catch {
+      return { output: '', aborted: true, abortReason: `Unknown agent: ${agentName}` };
+    }
+
+    // Update active agent so session state is consistent
+    const savedAgent = session.activeAgent;
+    session.activeAgent = agentName;
+
+    // Record input as user turn so the agent has conversation context
+    if (input) {
+      session.recordTurn({ role: 'user', content: input });
+    }
+
+    const abortCtrl = new AbortController();
+    if (signal) {
+      signal.addEventListener('abort', () => abortCtrl.abort(signal.reason), { once: true });
+    }
+
+    const toolGuardrails = this.registry.getGuardrailsByStage('tool');
+    let guardrailHalted = false;
+    const isHalted = () => guardrailHalted;
+    const setHalted = () => { guardrailHalted = true; };
+
+    const agentBuildCache = new Map<string, Agent<any, any>>();
+    const buildCtx = { session, sseWrite, abortCtrl, toolGuardrails, isHalted, setHalted };
+    const agent = this.buildAgentInstance(agentName, agentBuildCache, buildCtx);
+    const modelName = resolveModelName(agentContrib.model);
+
+    let fullText = '';
+    const chunkBuffer: string[] = [];
+
+    try {
+      const sdkRunner = getSdkRunner();
+      const runInput: AgentInputItem[] = toAgentInputItems(session.recentTurns);
+
+      const result = await sdkRunner.run(agent, runInput, {
+        stream: true,
+        context: session,
+        signal: abortCtrl.signal,
+        maxTurns: resolveMaxTurns(),
+      });
+
+      for await (const event of result) {
+        const a2uiMessages = session.drainA2UIEmissions();
+        for (const msg of a2uiMessages) {
+          sseWrite('a2ui', msg);
+        }
+
+        if (event.type === 'raw_model_stream_event') {
+          const data = event.data;
+          if (data.type === 'output_text_delta') {
+            const delta = (data as { delta: string }).delta;
+            fullText += delta;
+            chunkBuffer.push(delta);
+          }
+        } else if (event.type === 'run_item_stream_event') {
+          const { name, item } = event;
+          if (name === 'tool_called') {
+            const toolName = (item as { rawItem?: { name?: string } }).rawItem?.name ?? 'unknown';
+            sseWrite('tool_start', { toolName });
+          } else if (name === 'tool_output') {
+            const toolName = (item as { rawItem?: { name?: string } }).rawItem?.name ?? 'unknown';
+            sseWrite('tool_done', { toolName });
+          } else if (name === 'handoff_occurred') {
+            const newAgentName = (item as { agent?: { name?: string } }).agent?.name;
+            if (newAgentName) {
+              session.activeAgent = newAgentName;
+              sseWrite('phase', { agent: newAgentName });
+            }
+          }
+        } else if (event.type === 'agent_updated_stream_event') {
+          const newAgentName = event.agent?.name;
+          if (newAgentName && newAgentName !== agentName) {
+            session.activeAgent = newAgentName;
+            sseWrite('phase', { agent: newAgentName });
+          }
+        }
+      }
+
+      // Final a2ui drain
+      for (const msg of session.drainA2UIEmissions()) {
+        sseWrite('a2ui', msg);
+      }
+
+      let outputText = fullText;
+      try {
+        const finalOutput = await result.finalOutput;
+        outputText = resolveOutputText(finalOutput, fullText);
+      } catch { /* not available when interrupted */ }
+
+      // Output guardrails
+      if (!guardrailHalted) {
+        const outputGuardrails = this.registry.getGuardrailsByStage('output');
+        const outGuardInput = { stage: 'output' as const, proposedOutput: outputText };
+        try {
+          const outResult = await runGuardrails('output', outGuardInput, outputGuardrails, agentName);
+          if (outResult.blocked) {
+            sseWrite('error', GUARDRAIL_BLOCK_EVENT);
+            session.activeAgent = savedAgent;
+            return { output: '', aborted: true, abortReason: 'Guardrail blocked step output' };
+          }
+          outputText = outResult.mutatedInput.proposedOutput ?? outputText;
+        } catch {
+          sseWrite('error', GUARDRAIL_BLOCK_EVENT);
+          session.activeAgent = savedAgent;
+          return { output: '', aborted: true, abortReason: 'Guardrail error on step output' };
+        }
+      }
+
+      // Record assistant turn
+      if (outputText) {
+        session.recordTurn({ role: 'assistant', content: outputText });
+      }
+
+      // Flush buffered chunks
+      if (chunkBuffer.length > 0) {
+        if (outputText !== fullText) {
+          sseWrite('chunk', { delta: outputText });
+        } else {
+          for (const delta of chunkBuffer) {
+            sseWrite('chunk', { delta });
+          }
+        }
+      }
+
+      return { output: outputText, aborted: false };
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        if (guardrailHalted) {
+          return { output: '', aborted: true, abortReason: 'Guardrail halted step' };
+        }
+        return { output: '', aborted: true, abortReason: 'Step aborted' };
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      sseWrite('error', { message: msg });
+      return { output: '', aborted: true, abortReason: msg };
+    } finally {
+      // Restore active agent to what it was before the step if we haven't
+      // already updated it via a handoff event inside the step.
+      // (Only restore when still pointing at this step's agent — handoff
+      // events update session.activeAgent to the handoff target, which
+      // we want to preserve.)
+      if (session.activeAgent === agentName) {
+        session.activeAgent = savedAgent;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // runChain — deterministic N-step sequential execution (#119)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Run a deterministic chain of agent steps in order.
+   *
+   * - Output from step N becomes the implicit input to step N+1 unless an
+   *   explicit `input` is provided on the step.
+   * - Emits `chain_step` SSE event before each step (step index is 0-based).
+   * - Aborts and returns early if any step is aborted or returns empty output.
+   * - Throws `ChainDepthExceeded` when the number of steps exceeds
+   *   `CHAIN_MAX_STEPS` (security circuit-breaker).
+   */
+  async runChain(
+    steps: ChainStep[],
+    session: Session,
+    sseWrite: SSEWriter,
+    signal?: AbortSignal,
+  ): Promise<ChainResult> {
+    if (steps.length > CHAIN_MAX_STEPS) {
+      throw new ChainDepthExceeded(CHAIN_MAX_STEPS);
+    }
+
+    const results: ChainResult['steps'] = [];
+    let previousOutput = '';
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i]!;
+      const input = step.input !== undefined ? step.input : previousOutput;
+      sseWrite('chain_step', { step: i, agentName: step.agentName });
+
+      const stepResult = await this.runStep(step.agentName, input, session, sseWrite, signal);
+      results.push({ agentName: step.agentName, output: stepResult.output });
+
+      if (stepResult.aborted) {
+        return {
+          steps: results,
+          finalOutput: '',
+          aborted: true,
+          abortReason: stepResult.abortReason,
+        };
+      }
+
+      previousOutput = stepResult.output;
+    }
+
+    return { steps: results, finalOutput: previousOutput, aborted: false };
+  }
+
+  // ---------------------------------------------------------------------------
+  // runWithGate — gated two-step chain: generator → reviewer (#119)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Run a gated chain: `generator` produces output, then `reviewer` evaluates
+   * it.  The reviewer's verdict is parsed for an explicit `APPROVED` or
+   * `REJECTED` keyword.  Ambiguous output is treated as a rejection
+   * (conservative by design — see `parseGateVerdict()`).
+   *
+   * `reviewer.gatePrompt` is appended to the generator's output before being
+   * passed as the reviewer's input so the reviewer always has both context and
+   * explicit instructions.
+   *
+   * Returns:
+   * - `aborted: false, finalOutput: generatorOutput` on approval.
+   * - `aborted: true, abortReason: reviewerFeedback` on rejection.
+   */
+  async runWithGate(
+    generator: ChainStep,
+    reviewer: ChainStep & { gatePrompt: string },
+    session: Session,
+    sseWrite: SSEWriter,
+    signal?: AbortSignal,
+  ): Promise<ChainResult> {
+    // Step 0 — generator
+    sseWrite('chain_step', { step: 0, agentName: generator.agentName });
+    const genResult = await this.runStep(
+      generator.agentName,
+      generator.input ?? '',
+      session,
+      sseWrite,
+      signal,
+    );
+    const genStep = { agentName: generator.agentName, output: genResult.output };
+
+    if (genResult.aborted) {
+      return { steps: [genStep], finalOutput: '', aborted: true, abortReason: genResult.abortReason };
+    }
+
+    // Step 1 — gated reviewer
+    sseWrite('chain_step', { step: 1, agentName: reviewer.agentName });
+    const reviewInput = genResult.output
+      ? `${genResult.output}\n\n${reviewer.gatePrompt}`
+      : reviewer.gatePrompt;
+    const reviewResult = await this.runStep(
+      reviewer.agentName,
+      reviewInput,
+      session,
+      sseWrite,
+      signal,
+    );
+    const reviewStep = { agentName: reviewer.agentName, output: reviewResult.output };
+
+    if (reviewResult.aborted) {
+      return {
+        steps: [genStep, reviewStep],
+        finalOutput: '',
+        aborted: true,
+        abortReason: reviewResult.abortReason,
+      };
+    }
+
+    const verdict = parseGateVerdict(reviewResult.output);
+    if (!verdict.approved) {
+      return {
+        steps: [genStep, reviewStep],
+        finalOutput: '',
+        aborted: true,
+        abortReason: verdict.feedback,
+      };
+    }
+
+    return { steps: [genStep, reviewStep], finalOutput: genResult.output, aborted: false };
   }
 }

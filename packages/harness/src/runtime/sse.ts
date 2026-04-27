@@ -24,11 +24,12 @@ export type SSEEventType =
   | 'user_action_req'
   | 'end'
   | 'error'
-  | 'session_token';
+  | 'session_token'
+  | 'chain_step';
 
 export const SSE_EVENT_TYPES = new Set<SSEEventType>([
   'start', 'chunk', 'a2ui', 'tool_start', 'tool_done',
-  'phase', 'user_action_req', 'end', 'error', 'session_token',
+  'phase', 'user_action_req', 'end', 'error', 'session_token', 'chain_step',
 ]);
 
 /** Opaque writer type passed to Runner and resume handler. */
