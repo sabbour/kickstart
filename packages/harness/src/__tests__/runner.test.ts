@@ -151,6 +151,11 @@ describe('resolveOutputText', () => {
     expect(resolveOutputText({ intent: 'continue' }, 'plain text')).toBe('');
   });
 
+  it('returns empty string when finalOutput.message is null (strict-mode surface-only turn #90)', () => {
+    // OpenAI strict-mode: model sends null for absent fields instead of omitting them
+    expect(resolveOutputText({ message: null, intent: 'continue' }, 'plain text')).toBe('');
+  });
+
   it('does NOT return raw JSON string when finalOutput.message is the clean prose (regression guard for #937)', () => {
     const jsonTokenStream = '{"message":"Hello there","intent":"continue"}';
     const finalOutput = { message: 'Hello there', intent: 'continue' };

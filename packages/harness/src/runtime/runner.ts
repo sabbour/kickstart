@@ -356,13 +356,14 @@ export function resolveOutputText(finalOutput: unknown, fullText: string): strin
   ) {
     return (finalOutput as { message: string }).message;
   }
-  // AgentOutput.message is optional (#1130) — surface-only turns (e.g.
-  // DecisionCard with no prose) produce finalOutput without a message field.
+  // AgentOutput.message is strictOptional (#90 + #1130) — the model sets it to
+  // null (strict-mode) or omits it entirely (legacy) for surface-only turns.
   // Return empty string so no chat bubble is emitted.
   if (
     finalOutput !== null &&
     typeof finalOutput === 'object' &&
-    !('message' in finalOutput)
+    (!('message' in finalOutput) ||
+      (finalOutput as { message?: unknown }).message === null)
   ) {
     return '';
   }
