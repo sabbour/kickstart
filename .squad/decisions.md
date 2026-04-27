@@ -1259,3 +1259,118 @@ The reported "2 jobs/run" for `squad-review-gate` was actually both `squad-revie
 - `pull-requests: write` permission added to review-gate to support comment posting
 - `reopened` trigger added to review-gate (was missing; docs-gate had it)
 - Draft PR guard (`if: github.event.pull_request.draft == false`) added to review-gate job from docs-gate
+
+## Decision: fry-postflight-commit-author
+
+**Date:** 2026-04-28
+**Author:** Fry (Copilot coding agent)
+**Related PR:** #141 (issues #110, #113)
+
+### Finding
+
+When running as the Copilot coding agent, `git commit` is attributed to the human operator (asabbour), not to the squad bot identity (squad-frontend[bot]). The `post-flight-check.mjs --kind pr-create` verifies both the PR creator AND the head commit author. The PR creator is correct (squad-frontend[bot]) but the head commit author is the human, causing a MISMATCH exit code 2.
+
+### Resolution
+
+This is expected behavior for the Copilot coding agent environment. The coding agent runs under the human's git identity by design — it is not possible to sign commits as the bot from within this context.
+
+The PR itself was created with the correct bot token (squad-frontend[bot], is_bot=true). The code changes are correct and all tests pass.
+
+**Action required from team:** Squad governance process should document that Copilot coding agent commits will have human commit authors, and the post-flight check for `pr-create` kind should either skip the commit-author check for coding-agent sessions or accept both human and bot authors.
+
+## Decision: kif-pr86-label-sync-fix
+
+**Date:** 2026-04-27
+**Author:** Kif (DevOps)
+**Context:** Fixing Nibbler's two hard blockers on PR #86 (`squad/squad-governance`)
+
+### What was fixed
+
+**Blocker 1 — Missing labels in sync-squad-custom-labels.yml**
+
+PR #86 renamed reviewer approval labels from generic names to reviewer-named labels (`zapp:approved`, `nibbler:approved`, `leela:approved`) in both gate workflows, but `sync-squad-custom-labels.yml` was never updated.
+
+**Fix:** Added all six new reviewer-named labels to the sync list. Old names retained for backward compat.
+
+**Blocker 2 — chore-auto fast lane inconsistency**
+
+`squad-project-board-automate.yml` Rule 2 (Approved column) always required `zapp:approved`, silently diverging from gate workflows that waive it for `squad:chore-auto`.
+
+**Fix:** Updated Rule 2 to mirror the fast-lane: `zapp:approved` is waived when `squad:chore-auto` is present.
+
+### Standing rule established
+
+Whenever a label name is introduced or renamed in any gate workflow, the author **must** also update `sync-squad-custom-labels.yml` in the same PR. Kif will add this as a PR checklist item.
+
+## Decision: leela-session-store-backend
+
+**Date:** 2025-05-01
+**Author:** Leela (Lead Architect)
+**Issues:** #117 (XL decomposition)
+
+### Decision
+
+Azure Table Storage is chosen as the first production distributed session backend (Phase 2 of #117), over Redis and Cosmos DB.
+
+### Rationale
+
+| Option | Verdict | Reason |
+|---|---|---|
+| Azure Table Storage | ✅ Chosen | Serverless, cheap, already available in the Azure org, sufficient for <1 KB serialized session blobs |
+| Redis (Azure Cache for Redis) | Deferred | Higher latency headroom than needed at current scale; requires additional provisioning |
+| Cosmos DB | Rejected | Cost not justified at current scale; feature set exceeds requirements |
+
+### Constraints
+
+- `ISessionStore` interface (Phase 1 of #117) must be established first so either backend can be swapped without runner changes.
+- Session blobs must stay under 64 KB (Azure Table row limit). Enforce in `AzureTableSessionStore.set()`.
+- TTL enforced via `expiresAt` timestamp + lazy delete — Azure Table has no native TTL.
+
+### Consequences
+
+- Future Redis adapter remains possible without changes to caller code.
+- Multi-replica ACA deployments no longer need sticky sessions once Phase 3 (TTL/routing) lands.
+
+---
+
+### 2026-04-27T16:47:23Z: Governance durability directives
+**By:** Ahmed Sabbour (via Copilot)
+**What:** Four standing rules that must survive session restarts, encoded in session-start files.
+
+---
+
+#### Rule 1 — Ceremony gate is non-negotiable before code
+
+No implementing agent (Bender, Fry, Hermes, or @copilot) may write product code before:
+1. A Design Proposal comment is posted on the issue (skip only if `estimate:S` or `squad:chore-auto`).
+2. All three DR approval labels are present: `architecture:approved`, `security:approved`, `codereview:approved` (same fast-lane exemption).
+
+This is now a hard pre-dispatch checkpoint in `.github/copilot-instructions.md`. The coordinator must also enforce it via the pre-dispatch checklist in `.squad/ceremonies.md` before dispatching any code-producing agent.
+
+---
+
+#### Rule 2 — Changesets are written by the implementing agent, in the PR branch, at PR time
+
+The agent writing the code (Bender, Fry, Hermes, or @copilot) is responsible for running `npm run changeset` and committing the changeset file in their own PR branch. Changesets are never written in a separate bundled PR after the fact.
+
+- Amy reviews changeset quality during the PR Review Gate. She does not write them.
+- Scribe curates CHANGELOG entries from aggregated changesets at release time. Scribe does not write them.
+- "No changeset" is only acceptable for `estimate:S` internal-only changes or docs-only PRs, and must be stated explicitly in the PR body.
+
+Encoded in: `.github/copilot-instructions.md`, Amy's charter, Scribe's charter.
+
+---
+
+#### Rule 3 — No bundled unrelated doc/changelog PRs
+
+Documentation updates and changesets belong in the same PR as the code change they describe. Opening a separate PR to bundle unrelated doc changes or changelogs is not acceptable. Each PR ships its own docs and changeset, or explicitly states why they are not needed.
+
+Encoded in: `.github/copilot-instructions.md` (Changeset Requirement section, Docs and changeset checklist in pr-workflow skill).
+
+---
+
+#### Rule 4 — All GitHub writes by agents use bot identity
+
+When `.squad/identity/config.json` exists, every agent-authored GitHub write (PR create, issue comment, label, review) MUST use the role app token. Falling back to ambient `gh` auth (the human operator's `~/.config/gh/hosts.yml`) is a governance violation.
+
+Encoded in: `.github/copilot-instructions.md` (Bot Identity section). The coordinator must include the full identity block in every write-capable agent spawn prompt when `.squad/identity/config.json` is present.

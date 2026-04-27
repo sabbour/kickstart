@@ -21,6 +21,72 @@ Before starting work, check your capability profile in `.squad/team.md` under th
   🤖 This issue doesn't match my capability profile (reason: {why}). Suggesting reassignment to a squad member.
   ```
 
+## Pre-Dispatch Checkpoint — MUST complete before writing any code
+
+**These checks are non-negotiable. Writing code before they pass is a governance violation.**
+
+Before touching a single source file, verify all three boxes:
+
+- [ ] **Issue exists.** The work is tied to a GitHub issue number. If no issue exists, stop and create one before proceeding.
+- [ ] **Design Proposal posted.** A DP comment has been posted on the issue by the implementing agent, containing: problem statement, proposed approach, `Estimate:` field, files to modify, pack boundaries, security considerations, docs and changeset plan, alternatives considered. Fast-lane exemption: skip DP only if the issue is labeled `estimate:S` OR `squad:chore-auto`.
+- [ ] **Design Review approved.** The DP comment has all three approval labels present on the issue: `architecture:approved`, `security:approved`, `codereview:approved`. Fast-lane exemption: skip DR only if `estimate:S` OR `squad:chore-auto`.
+
+If any box is unchecked → run the missing ceremony first. Do not proceed to code.
+
+## Changeset Requirement — every code-producing PR
+
+The agent writing the code is responsible for including a changeset in the same PR branch. This is not Amy's job. This is not Scribe's job.
+
+**Before opening a PR, from inside the worktree:**
+
+```bash
+npm run changeset
+```
+
+- Select affected packages.
+- Pick bump type: `patch` for fixes, `minor` for new behaviour, `major` for breaking changes.
+- Write the changeset body in the user's voice — what the user gains or loses, not what files changed.
+
+**Exceptions** (no changeset needed, but state this explicitly in the PR body):
+- `estimate:S` internal-only changes (refactor, test-only, dev tooling with no user-visible effect)
+- Docs-only changes
+
+Changeset is committed and pushed as part of the PR branch. Do not open the PR without it (unless explicitly exempt).
+
+Amy will review the changeset quality during the PR Review Gate. Scribe curates CHANGELOG entries from aggregated changesets at release time. Neither of them writes the changeset — you do.
+
+## Bot Identity — all GitHub writes
+
+This repo has a per-role GitHub App identity configured. Every agent-authored GitHub write (PR create, issue comment, label, review) MUST use the bot token, not ambient `gh` auth.
+
+**Before any `gh` or `git push` command that writes to GitHub:**
+
+```bash
+# 1. Isolate gh auth — prevents silent fallback to the human operator's auth
+unset GH_TOKEN GITHUB_TOKEN
+export GH_CONFIG_DIR="$(git rev-parse --show-toplevel)/.squad/runtime/gh-config/$$"
+mkdir -p "$GH_CONFIG_DIR"
+
+# 2. Resolve the role token — fails closed if no app is configured
+ROLE_SLUG="<your-role-slug>"   # lead | frontend | backend | tester | security | codereview | devops | docs
+TOKEN=$(node "$(git rev-parse --show-toplevel)/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG") || exit 1
+[ -n "$TOKEN" ] || exit 1
+```
+
+Role slug mapping: Leela → `lead`, Fry → `frontend`, Bender → `backend`, Hermes → `tester`, Zapp → `security`, Nibbler → `codereview`, Kif → `devops`, Amy → `docs`. The Copilot coding agent acting as a squad member uses the role slug of that member.
+
+**Use the token inline — never `export GH_TOKEN`:**
+
+```bash
+git push "https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git" HEAD
+GH_TOKEN="$TOKEN" gh pr create --draft --title "..." --body "..."
+GH_TOKEN="$TOKEN" gh issue comment <N> --body "..."
+```
+
+**PR body must include:** `🤖 Created by [squad-{role}](https://github.com/apps/squad-{role})`
+
+**Never echo the token.** No `echo "$TOKEN"`, no `env`, no `printenv` near token-handling blocks.
+
 ## Branch Naming
 
 Use the squad branch convention:

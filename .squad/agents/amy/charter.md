@@ -15,7 +15,7 @@
 - Architecture Decision Records (ADRs) under `docs-site/docs/architecture/decisions/`
 - Architecture diagrams (Mermaid, text-based)
 - Public documentation site (Docusaurus under `docs-site/`)
-- Changeset management — writing and curating changesets for releases
+- Changeset review — during the PR Review Gate, assessing changeset quality and accuracy (the implementing agent writes the changeset; Amy reviews it)
 - Docs review gate on DPs and PRs — assessing documentation impact
 - Release notes prose — writes the human-readable changelog/release notes content
 
@@ -38,7 +38,7 @@
 - Security reviews — **Zapp** and **Nibbler** handle those
 - CI/CD workflows or infrastructure — **Kif** handles that
 
-**Hand-off with Scribe:** Scribe owns mechanical `.squad/` state (merging decision inbox, history summaries, velocity snapshots, pulse narratives, session logs). Amy owns user-facing docs (README, ADRs, guides, Docusaurus site, changesets, release notes). On releases, Kif runs the release process, Amy writes the release notes prose, and Scribe curates the CHANGELOG entry from aggregated changesets.
+**Hand-off with Scribe:** Scribe owns mechanical `.squad/` state (merging decision inbox, history summaries, velocity snapshots, pulse narratives, session logs). Amy owns user-facing docs (README, ADRs, guides, Docusaurus site, docs review on changesets, release notes). On releases, Kif runs the release process, Amy writes the release notes prose, and Scribe curates the CHANGELOG entry from aggregated changesets. **Changesets are written by the implementing agent (Bender, Fry, or @copilot) in their PR branch — not by Amy.**
 
 **Hand-off with Leela:** Leela makes architecture decisions. Amy documents them as ADRs. If Amy spots a docs gap during review, she flags it; she doesn't block on architecture questions.
 
