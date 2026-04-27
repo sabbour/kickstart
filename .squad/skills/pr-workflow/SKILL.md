@@ -403,6 +403,34 @@ Use the GraphQL mutation from the "Update project board fields" section above to
 
 ---
 
+### Proactive BEHIND Branch Scan (run SECOND, every cycle)
+
+Run this AFTER the thread scan and BEFORE checking CI or merge readiness.
+
+```bash
+# Identify all BEHIND PRs
+gh pr list --repo azure-management-and-platforms/kickstart --state open \
+  --json number,title,mergeStateStatus \
+  --jq '.[] | select(.mergeStateStatus=="BEHIND") | "#\(.number) \(.title)"'
+```
+
+**Per-PR update procedure:**
+1. Attempt update-branch via the API (never pass a body — `expected_head_sha=""` causes HTTP 422):
+   ```bash
+   gh api repos/azure-management-and-platforms/kickstart/pulls/<N>/update-branch -X PUT
+   ```
+2. Success → GitHub triggers `squad-review-gate.yml` automatically via `pull_request.synchronize` — no label cycling needed.
+3. HTTP 422 "merge conflict between base and head" → real conflict. Route to the implementing agent with the worktree path for manual rebase.
+
+**Why this matters:** Every PR that merges into `dev` makes ALL remaining open PRs `BEHIND`. `strict_required_status_checks_policy: true` means a PR with all green checks and correct labels will silently stay stuck at "Waiting" — forever — until updated. Catching this proactively on every cycle prevents PRs from stalling invisibly.
+
+**Trigger cadence:** Run the scan:
+- At the start of every monitoring cycle
+- Immediately after any PR merges into `dev`
+- Any time a PR shows `UNKNOWN` or `BEHIND` mergeStateStatus
+
+---
+
 ## Sprint Cycle
 
 Ralph runs continuous sprints:
@@ -446,7 +474,9 @@ Example: `squad/42-fix-login-validation`
 □ Implement (design already approved)
 □ Open draft PR: GH_TOKEN=$TOKEN gh pr create --draft
 □ Post progress comments on PR
-□ Update branch (BEHIND) via API: gh api --method PUT repos/.../pulls/{N}/update-branch
+□ PROACTIVE: scan ALL open PRs for BEHIND state (see "Proactive BEHIND Branch Scan" section)
+□ For each BEHIND PR: gh api repos/azure-management-and-platforms/kickstart/pulls/{N}/update-branch -X PUT
+□ HTTP 422 on update-branch → real conflict → route to implementing agent for rebase
 □ All CI green
 □ GH_TOKEN=$TOKEN gh pr ready
 □ Request copilot-pull-request-reviewer[bot] review via API

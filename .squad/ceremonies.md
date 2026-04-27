@@ -189,11 +189,25 @@ If the issue is labeled `estimate:M`:
 
 > **Mutual exclusivity:** For each reviewer namespace, `:approved` and `:rejected` are mutually exclusive. Adding one automatically removes the other — enforced by `squad-auto-merge.yml` on every `labeled` event. A PR will never carry both `nibbler:approved` and `nibbler:rejected` simultaneously.
 
-**Merge criteria:** `nibbler:approved` + `zapp:approved` + (`docs:approved` OR `docs:not-applicable`) + CI green. `leela:approved` is additionally required when the PR has an `architecture` label or touches pack boundaries. Any rejection blocks merge and triggers revision by a different agent (per Reviewer Rejection Protocol).
+**Merge criteria:** `nibbler:approved` + `zapp:approved` + (`docs:approved` OR `docs:not-applicable`) + CI green + **branch up to date with `dev`**. `leela:approved` is additionally required when the PR has an `architecture` label or touches pack boundaries. Any rejection blocks merge and triggers revision by a different agent (per Reviewer Rejection Protocol).
 
 **Auto-merge (default):** When a PR is opened, the coordinator or implementing agent enables auto-merge immediately: `gh pr merge {N} --auto --squash`. The PR merges automatically once all required status checks pass and all review gates clear. No manual merge click needed — the review gate IS the quality control.
 
-> **Branch must be up to date (`strict_required_status_checks_policy: true`):** The `ci-gate` ruleset requires every branch to be up to date with `dev` before merging. A PR with all checks green but state `BEHIND` will stay stuck — auto-merge will not fire. Whenever a PR merges into `dev`, all remaining open PRs become `BEHIND` and need a branch update. Use `gh api --method PUT repos/azure-management-and-platforms/kickstart/pulls/<N>/update-branch` for each. Since PR #156, `squad-review-gate.yml` triggers on `pull_request.synchronize`, so the gate re-evaluates automatically on the new commit — label cycling is no longer required after `update-branch` (it remains a manual fallback if the workflow doesn't fire). See the **Keeping the Branch Current** section in `.squad/skills/pr-workflow/SKILL.md` for the full procedure.
+> **⚠️ Branch-currency rule — run SECOND on every monitoring cycle (after thread scan):**
+> A PR in the `BEHIND` state will never auto-merge — even if all checks are green and all labels are applied. GitHub enforces `strict_required_status_checks_policy: true`, which requires every branch to be up to date with `dev` before merge.
+>
+> **Run this scan on every cycle:**
+> ```bash
+> gh pr list --repo azure-management-and-platforms/kickstart --state open \
+>   --json number,mergeStateStatus \
+>   --jq '.[] | select(.mergeStateStatus=="BEHIND") | .number'
+> ```
+> For every `BEHIND` PR:
+> 1. **Attempt update-branch:** `gh api repos/azure-management-and-platforms/kickstart/pulls/<N>/update-branch -X PUT`
+> 2. If update-branch fails with HTTP 422 (merge conflict): the branch has a real conflict — route to the implementing agent for manual rebase.
+> 3. After update-branch, the `squad-review-gate.yml` workflow auto-fires on `pull_request.synchronize` — no label cycling needed.
+>
+> **Trigger:** Any PR merging into `dev` makes all remaining open PRs `BEHIND`. Do not wait to discover this mid-cycle.
 
 **Feedback reply protocol (required for all reviewers and authors):**
 
@@ -220,6 +234,7 @@ All review feedback must be acknowledged before a thread may be resolved. Review
 - If yes → repeat from step 1. The author keeps iterating until **0 unresolved threads remain**.
 - If a reviewer re-requests changes after fixes, the cycle restarts — new feedback must be triaged the same way.
 - The merge gate does NOT open until all threads from ALL sources are resolved.
+- **0 BEHIND PRs:** all open PR branches must be up to date with `dev` — run `update-branch` sweep after every merge into dev.
 
 This protocol applies to all agents (squad members AND @copilot). It is enforced by the coordinator and documented in `.github/copilot-instructions.md` for @copilot compliance.
 
