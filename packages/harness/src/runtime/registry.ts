@@ -161,7 +161,11 @@ export class PackRegistry {
     for (const registeredPack of this.packs.values()) {
       const packName = registeredPack.pack.name;
       if (!this.isPackActive(packName)) continue;
-      const allowedPacks = new Set([packName, ...(registeredPack.pack.dependsOn ?? [])]);
+      const allowedPacks = new Set([
+        packName,
+        ...(registeredPack.pack.dependsOn ?? []),
+        ...(registeredPack.pack.handoffTargets ?? []),
+      ]);
       for (const agent of registeredPack.agents) {
         for (const h of agent.handoffs ?? []) {
           const target = h.agent;
@@ -178,8 +182,9 @@ export class PackRegistry {
             throw new Error(
               `Cross-pack handoff rejected: agent "${agent.name}" in pack "${packName}" ` +
               `declares handoff to "${target}" in pack "${targetPack}". ` +
-              `Handoffs are only allowed to agents in the same pack or declared dependencies (dependsOn). ` +
-              `Add "${targetPack}" to pack "${packName}" dependsOn or remove the handoff. ` +
+              `Handoffs are only allowed to agents in the same pack, declared dependencies (dependsOn), ` +
+              `or declared handoff targets (handoffTargets). ` +
+              `Add "${targetPack}" to pack "${packName}" handoffTargets or remove the handoff. ` +
               `(pack="${packName}", agent="${agent.name}", target="${target}")`,
             );
           }

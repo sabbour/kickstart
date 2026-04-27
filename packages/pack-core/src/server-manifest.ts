@@ -85,7 +85,7 @@ const serverComponents: ComponentContribution[] = [
 export const corePackServer: Pack = {
   name: 'core',
   version: '0.1.0',
-  dependsOn: ['aks', 'azure', 'github'],
+  handoffTargets: ['aks', 'azure', 'github'],
 
   agentsDir: resolveAssetURL(import.meta.url, './agents/', './pack-assets/core/agents/'),
   skillsDir: resolveAssetURL(import.meta.url, './skills/', './pack-assets/core/skills/'),

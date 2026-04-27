@@ -311,7 +311,7 @@ describe('#107 Runner.buildAgentInstance — triage specialist handoff edges', (
     registry.register({
       name: 'core',
       version: '1.0.0',
-      dependsOn: ['aks', 'azure', 'github'],
+      handoffTargets: ['aks', 'azure', 'github'],
       agents: [
         makeAgent('core.triage', [
           { label: 'AKS architecture', agent: 'aks.architect', prompt: 'AKS workload.' },
@@ -329,9 +329,9 @@ describe('#107 Runner.buildAgentInstance — triage specialist handoff edges', (
     return registry;
   }
 
-  it('seal() accepts cross-pack handoffs when dependsOn declares the target packs', () => {
+  it('seal() accepts cross-pack handoffs when handoffTargets declares the target packs', () => {
     // This should not throw — the cross-pack validation path in registry.seal()
-    // must allow aks.*, azure.*, and github.* because core declares dependsOn.
+    // must allow aks.*, azure.*, and github.* because core declares handoffTargets.
     expect(() => buildMultiPackRegistry()).not.toThrow();
   });
 

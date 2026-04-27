@@ -142,7 +142,7 @@ describe('pack-core agent frontmatter', () => {
         expect(AGENT_NAME_PATTERN.test(target)).toBe(true);
       }
 
-      // Cross-pack specialist targets (allowed via corePack.dependsOn: ['aks', 'azure', 'github'])
+      // Cross-pack specialist targets (allowed via corePack.handoffTargets: ['aks', 'azure', 'github'])
       const specialistTargets = ['aks.architect', 'azure.architect', 'github.publisher'];
       for (const target of specialistTargets) {
         // Specialist agents follow <pack>.<name> naming; they are NOT core.* agents

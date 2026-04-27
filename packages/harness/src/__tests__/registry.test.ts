@@ -474,7 +474,7 @@ Use ARM.
       expect(() => registry.seal()).not.toThrow();
     });
 
-    it('rejects cross-pack handoff to packs not in dependsOn (T5, Zapp Z1)', () => {
+    it('rejects cross-pack handoff to packs not in dependsOn or handoffTargets (T5, Zapp Z1)', () => {
       const registry = new PackRegistry();
       registry.register({
         name: 'core',
@@ -518,6 +518,44 @@ Use ARM.
         expect(msg).toContain('azure.architect');  // source agent
         expect(msg).toContain('core.codesmith');   // target
       }
+    });
+
+    it('accepts cross-pack handoff when only handoffTargets (not dependsOn) lists the target pack', () => {
+      // core has handoffTargets: ['azure'] but no dependsOn — handoff should be allowed.
+      const registry = new PackRegistry();
+      registry.register({
+        name: 'azure',
+        version: '1.0.0',
+        agents: [{
+          name: 'azure.architect',
+          description: 'architect',
+          model: { envVar: 'M' },
+          toolAllowlist: [],
+          handoffs: [],
+          userInvocable: false,
+          modelInvocable: true,
+          instructionsBase: 'architect',
+          source: { kind: 'inline' },
+        }],
+      });
+      registry.register({
+        name: 'core',
+        version: '1.0.0',
+        handoffTargets: ['azure'],
+        agents: [{
+          name: 'core.triage',
+          description: 'triage',
+          model: { envVar: 'M' },
+          toolAllowlist: [],
+          handoffs: [{ label: 'Azure infra', agent: 'azure.architect' }],
+          userInvocable: true,
+          modelInvocable: true,
+          instructionsBase: 'triage',
+          source: { kind: 'inline' },
+        }],
+      });
+      registry.enable(['core', 'azure']);
+      expect(() => registry.seal()).not.toThrow();
     });
 
     it('ignores inactive packs when validating handoffs', () => {
@@ -564,6 +602,16 @@ Use ARM.
     const registry = new PackRegistry();
     registry.register({ name: 'a', version: '1.0.0', dependsOn: ['b'] });
     expect(() => registry.register({ name: 'b', version: '1.0.0', dependsOn: ['a'] })).toThrow(/Circular dependency/);
+  });
+
+  it('handoffTargets does not create circular dependency cycles', () => {
+    // core → handoffTargets: ['azure'], azure → dependsOn: ['core']
+    // This would be a cycle if handoffTargets were traversed by assertNoCycles, but it must not throw.
+    const registry = new PackRegistry();
+    registry.register({ name: 'core', version: '1.0.0', handoffTargets: ['azure'] });
+    registry.register({ name: 'azure', version: '1.0.0', dependsOn: ['core'] });
+    registry.enable(['core', 'azure']);
+    expect(() => registry.seal()).not.toThrow();
   });
 
   it('merges skillsDir file skills with inline skills[] and detects cross-source duplicates', () => {

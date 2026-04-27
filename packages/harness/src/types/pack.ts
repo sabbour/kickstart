@@ -12,6 +12,13 @@ export interface Pack {
   name: string;
   version: string;
   dependsOn?: string[];
+  /**
+   * Packs whose agents this pack may hand off to, without declaring a full
+   * dependency. Unlike `dependsOn`, entries here are NOT traversed by
+   * `assertNoCycles()` and do not grant tool or user-action trust — they
+   * only widen the allowed handoff targets checked by `validateHandoffs()`.
+   */
+  handoffTargets?: string[];
   agentsDir?: URL;
   agents?: AgentContribution[];   // inline agent registrations (no .md file required)
   skillsDir?: URL;
