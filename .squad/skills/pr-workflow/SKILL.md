@@ -145,7 +145,7 @@ export GH_TOKEN="$TOKEN"
    ## Testing
    <how tested>" \
      --head squad/<issue-number>-<slug> \
-     --base main
+     --base dev
    ```
 
 2. **Post findings as PR comments** as work progresses:
@@ -155,13 +155,58 @@ export GH_TOKEN="$TOKEN"
 
 ### Keeping the Branch Current
 
-When the branch is behind `main`, **always rebase** — never merge:
+#### Why this matters — `strict_required_status_checks_policy: true`
+
+The `ci-gate` repository ruleset has `strict_required_status_checks_policy: true`. This means **every branch must be up to date with `dev` before GitHub will merge it** — even if all required status checks are already green and auto-merge is enabled. A PR in the `BEHIND` state will stay permanently stuck at "Waiting" until its branch is updated.
+
+This trips up multiple PRs at once whenever a PR merges into `dev` (all remaining PRs immediately become `BEHIND`).
+
+#### Updating a branch (preferred — no rebase needed)
+
+Use the GitHub API to merge `dev` into the PR branch. This creates a new merge commit (no force-push), but the new SHA will not have any existing commit statuses — workflows must re-run on the new SHA:
+
+```bash
+gh api --method PUT repos/azure-management-and-platforms/kickstart/pulls/<N>/update-branch
+```
+
+If the branch has conflicts (state `DIRTY`), the API call will fail — resolve conflicts locally then force-push (see below).
+
+To update all open PRs that are `BEHIND` in one pass:
+
+```bash
+gh pr list --state open --json number,mergeStateStatus \
+  | jq -r '.[] | select(.mergeStateStatus=="BEHIND") | .number' \
+  | xargs -I{} gh api --method PUT repos/azure-management-and-platforms/kickstart/pulls/{}/update-branch
+```
+
+#### After updating — re-trigger the review gate (manual fallback)
+
+`squad/review-gate` commit statuses are SHA-specific. After `update-branch` creates a new merge commit, the new SHA has no `squad/review-gate` status and GitHub shows **"Expected — Waiting for status to be reported"**, blocking auto-merge.
+
+Since PR #156 added `pull_request.synchronize` to `squad-review-gate.yml`, the gate **re-evaluates automatically** whenever a new commit is pushed — including after `update-branch`. You should not need to cycle a label manually.
+
+If the workflow does not fire automatically (e.g., CI queue delay or a missed event), you can force re-evaluation by cycling a label:
+
+```bash
+# Manual fallback only — normally not required since synchronize trigger fires automatically
+gh api --method DELETE repos/azure-management-and-platforms/kickstart/issues/<N>/labels/docs:not-applicable
+gh api --method POST   repos/azure-management-and-platforms/kickstart/issues/<N>/labels -f 'labels[]=docs:not-applicable'
+```
+
+> **Note:** `gh pr edit --add-label` is observed to silently fail on this repo — always use the REST API (`gh api --method POST`) for label writes.
+
+#### Resolving conflicts (DIRTY state)
+
+When the PR is `DIRTY` (has merge conflicts), the API update will fail. Fix locally:
+
 ```bash
 git fetch origin
-git rebase origin/main
+git rebase origin/dev
 # Resolve any conflicts
 git push https://x-access-token:${TOKEN}@github.com/azure-management-and-platforms/kickstart.git squad/<issue-number>-<slug> --force-with-lease
 ```
+
+Then re-trigger the gate as above.
 
 ### Marking Ready for Review
 
@@ -213,6 +258,13 @@ GH_TOKEN=$TOKEN gh api "repos/${REPO_NWO}/pulls/<N>/requested_reviewers" \
 
 ### Handling Review Feedback
 
+**Review sources — all carry equal weight and none can be skipped:**
+- `copilot-pull-request-reviewer[bot]` (GitHub Copilot PR review bot)
+- Squad reviewers: Leela, Zapp, Nibbler, Amy
+- Human reviewers
+
+**❌ FORBIDDEN: Resolving a thread without first posting a reply.** This applies even if the code was already fixed. The reply is the proof that the feedback was read and considered. Fix + reply + resolve is an indivisible unit. If you resolve a thread without a reply, re-open it and add the reply before merge.
+
 When a PR has review comments or formal review threads, the full feedback loop is:
 
 1. **Read ALL feedback** — check both formal review threads AND top-level comments:
@@ -261,7 +313,7 @@ When a PR has review comments or formal review threads, the full feedback loop i
 
 5. **Verify all threads are resolved before attempting merge:**
    ```bash
-   UNRESOLVED=$(GH_TOKEN=$TOKEN gh pr view <N> --json reviewThreads --jq '[.reviewThreads[] | select(.isResolved == false)] | length')
+   UNRESOLVED=$(GH_TOKEN=$TOKEN gh pr view <N> --json reviewThreads --jq '.reviewThreads | map(select(.isResolved == false)) | length')
    # Must be 0 before proceeding
    ```
 
@@ -309,7 +361,7 @@ All CI checks must pass, including Playwright E2E tests. If checks fail:
 
 2. **Conversation resolution** — all review threads resolved:
    ```bash
-   GH_TOKEN=$TOKEN gh pr view {number} --json reviewThreads --jq '[.reviewThreads[] | select(.isResolved == false)] | length'
+   GH_TOKEN=$TOKEN gh pr view {number} --json reviewThreads --jq '.reviewThreads | map(select(.isResolved == false)) | length'
    ```
    Must return `0`.
 
@@ -394,16 +446,20 @@ Example: `squad/42-fix-login-validation`
 □ Implement (design already approved)
 □ Open draft PR: GH_TOKEN=$TOKEN gh pr create --draft
 □ Post progress comments on PR
-□ Rebase if behind main (never merge)
+□ Update branch (BEHIND) via API: gh api --method PUT repos/.../pulls/{N}/update-branch
 □ All CI green
 □ GH_TOKEN=$TOKEN gh pr ready
-□ Request @copilot review via API
+□ Request copilot-pull-request-reviewer[bot] review via API
 □ Leela reviews code quality
 □ Zapp reviews security
 □ Nibbler reviews code quality
 □ Docs reviewer applies `docs:approved` or `docs:not-applicable`
-□ Address all review comments (reply to every Copilot + human comment — fix or dismiss with justification)
-□ Resolve all threads (0 unresolved before merge)
+□ For EACH review thread (copilot-pull-request-reviewer[bot], squad, human — all equal):
+     1. Fix or decide to dismiss
+     2. POST reply comment: "Addressed in {sha}: …" OR "Dismissed: {justification}"
+     3. THEN resolve thread via resolveReviewThread mutation
+     ❌ Do NOT resolve without a reply — forbidden
+□ Verify 0 unresolved threads (gh pr view <N> --json reviewThreads --jq '.reviewThreads | map(select(.isResolved==false)) | length')
 □ Update board → In review
 □ GH_TOKEN=$TOKEN gh pr merge --squash --delete-branch
 □ Update board → Done

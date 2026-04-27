@@ -193,29 +193,33 @@ If the issue is labeled `estimate:M`:
 
 **Auto-merge (default):** When a PR is opened, the coordinator or implementing agent enables auto-merge immediately: `gh pr merge {N} --auto --squash`. The PR merges automatically once all required status checks pass and all review gates clear. No manual merge click needed — the review gate IS the quality control.
 
+> **Branch must be up to date (`strict_required_status_checks_policy: true`):** The `ci-gate` ruleset requires every branch to be up to date with `dev` before merging. A PR with all checks green but state `BEHIND` will stay stuck — auto-merge will not fire. Whenever a PR merges into `dev`, all remaining open PRs become `BEHIND` and need a branch update. Use `gh api --method PUT repos/azure-management-and-platforms/kickstart/pulls/<N>/update-branch` for each. Since PR #156, `squad-review-gate.yml` triggers on `pull_request.synchronize`, so the gate re-evaluates automatically on the new commit — label cycling is no longer required after `update-branch` (it remains a manual fallback if the workflow doesn't fire). See the **Keeping the Branch Current** section in `.squad/skills/pr-workflow/SKILL.md` for the full procedure.
+
 **Feedback reply protocol (required for all reviewers and authors):**
 
-All review feedback — from squad reviewers (Leela, Zapp, Nibbler, Amy), the GitHub Copilot review agent, and human reviewers — must be triaged and resolved before merge. No comment is ignored.
+All review feedback must be acknowledged before a thread may be resolved. Review sources all carry equal weight — none can be skipped:
+- Squad bot reviewers: Leela, Zapp, Nibbler, Amy
+- **GitHub Copilot PR review bot (`copilot-pull-request-reviewer[bot]`)**
+- Human reviewers
+- CI/CD status checks (failures are implicit feedback — fix before merge)
 
-**For each unresolved comment or review thread, the author MUST:**
+**Strict order for every thread — no exceptions:**
 1. **Read and consider** the feedback
-2. **Act or dismiss:**
-   - **Act:** Make the code/docs change, commit, then reply: `"Addressed in {sha}: {description}"`
-   - **Dismiss with justification:** If the feedback is incorrect or not applicable, reply with a clear reason why: `"Dismissed: {justification}"` — e.g., "This is intentional because X" or "False positive — the pattern is safe here because Y"
-3. **Resolve the thread** via GitHub GraphQL API (`resolveReviewThread` mutation) after replying
-4. **Never silently skip** — every comment gets a reply, even if dismissed
+2. **Act or dismiss** — pick exactly one:
+   - **Act:** Make the code/docs change, commit
+   - **Dismiss:** Decide the feedback is incorrect or not applicable
+3. **Post a reply** (this step is mandatory and comes BEFORE resolving):
+   - After acting: `"Addressed in {sha}: {description of what changed and why}"`
+   - After dismissing: `"Dismissed: {clear justification — why this is intentional or a false positive}"`
+4. **Resolve the thread** via `resolveReviewThread` GraphQL mutation — only AFTER the reply is posted
+
+**❌ FORBIDDEN — resolving without a reply.** Closing a thread silently — even after fixing the underlying code — is a protocol violation. The reply is the proof that the feedback was considered. Fix + reply + resolve is the indivisible unit. Any agent that resolves a thread without a reply must re-open it and add the reply.
 
 **Iteration loop (hard gate):**
 - After addressing a batch of feedback, re-check: are there still unresolved threads?
 - If yes → repeat from step 1. The author keeps iterating until **0 unresolved threads remain**.
 - If a reviewer re-requests changes after fixes, the cycle restarts — new feedback must be triaged the same way.
 - The merge gate does NOT open until all threads from ALL sources are resolved.
-
-**Feedback sources (all are equal — none can be skipped):**
-- Squad bot reviewers (Leela, Zapp, Nibbler, Amy)
-- GitHub Copilot review agent (automated AI review)
-- Human reviewers
-- CI/CD status checks (failures are implicit feedback — fix before merge)
 
 This protocol applies to all agents (squad members AND @copilot). It is enforced by the coordinator and documented in `.github/copilot-instructions.md` for @copilot compliance.
 

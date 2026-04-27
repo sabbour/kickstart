@@ -123,15 +123,21 @@ When opening a PR:
 
 ## PR Review Feedback — Required Loop
 
-When addressing any review comment (from Copilot, Leela, Zapp, Nibbler, or any reviewer):
+Review sources that MUST be acknowledged (all carry equal weight):
+- Squad reviewers: Leela, Zapp, Nibbler, Amy
+- GitHub Copilot PR review bot (`copilot-pull-request-reviewer[bot]`)
+- Human reviewers
+
+**Strict order — no exceptions:**
 1. Fix the code (or decide not to and explain why)
-2. Reply to the specific comment with what you did: "Addressed in {sha}: {description}"
-3. Resolve the thread via GitHub GraphQL API (resolveReviewThread mutation)
+2. **Post a reply** to the specific comment: `"Addressed in {sha}: {description}"` or `"Dismissed: {justification}"`
+3. **Only after the reply is posted** — resolve the thread via `resolveReviewThread` GraphQL mutation
 4. Verify 0 unresolved threads before attempting merge
 
-Never silently fix and move on. A reply is required on every comment.
+**❌ FORBIDDEN: Resolving a thread without first posting a reply.**
+Silently marking a thread resolved — even after fixing the code — is a protocol violation. The reply is what proves the feedback was considered. Fix + reply + resolve is the indivisible unit.
 
-The full protocol is defined in `.squad/ceremonies.md` under the **PR Review Gate** section.
+The full protocol with API commands is in `.squad/skills/pr-workflow/SKILL.md` under **Handling Review Feedback**.
 
 ## Decisions
 
