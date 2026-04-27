@@ -222,9 +222,41 @@ Before a PR can merge, it must pass the **four-way review gate**:
 1. **Leela** — architecture alignment with the approved DP
 2. **Zapp** — security concerns (auth, injection, secrets, CORS)
 3. **Nibbler** — code quality, test coverage, maintainability
-4. **Docs** — user-facing documentation is in the PR or an explicit `docs:not-applicable` is justified
+4. **Docs (Amy)** — documentation coverage for any new interface, API, behavior, or developer-facing surface
 
 Zapp's review is a **pre-merge gate** for foundational patterns. Nibbler reviews every PR (including `squad:chore-auto`) because code-quality review is cheap and fast. The docs gate is satisfied by **one of** `docs:approved` or `docs:not-applicable`; `docs:rejected` fails the gate.
+
+#### Amy's Docs Scope — What Counts as In-Scope
+
+Amy's docs review scope is **not limited to user-facing content**. It includes:
+
+- User-facing docs: README, setup guides, environment variable references
+- Engineering and developer guides (guides for contributors and pack authors)
+- Architecture Decision Records (ADRs) under `docs-site/docs/architecture/decisions/`
+- API and interface documentation for any **new exported interface, class, or function** (e.g., `ISessionStore`, `asTool()`, `runChain()`)
+- Agent/SDK-level documentation (new agent runner behaviors, new session abstractions, new harness APIs)
+- Docusaurus site content covering architecture and engineering patterns
+- Developer tooling changes that affect how contributors write code (ESLint rules, schema requirements)
+
+#### When `docs:not-applicable` Is Appropriate
+
+`docs:not-applicable` should **only** be applied when **all** of the following are true:
+
+1. The PR is a **pure internal refactor** with no new interfaces, behaviors, or APIs exposed to callers or contributors.
+2. OR the PR is a **trivial bug fix** that changes no observable behavior and introduces no new concepts.
+3. OR the PR is **tooling/CI/config only** with no developer-facing surface.
+4. AND the DP explicitly stated `Docs impact: N/A` **AND** that claim holds up under Amy's scrutiny.
+
+**Implementing agents (Bender, Fry, Hermes, @copilot) must NOT self-apply `docs:not-applicable`.** Only Amy can apply this label — it requires Amy's explicit sign-off that no documentation is warranted. If an implementing agent believes docs are not needed, they should note it in the PR description; Amy will make the final call.
+
+Examples of PRs that are **NOT** `docs:not-applicable` even if they seem internal:
+- New exported interface or class (e.g., `ISessionStore`) → developer guide needed
+- New harness API (e.g., `asTool()`, `runChain()`) → API reference needed
+- New runtime behavior (e.g., guardrail pipeline, thread ID persistence) → guide/README update needed
+- Architecture change with accepted tradeoffs → ADR needed
+- New environment variable (e.g., `KICKSTART_USE_RESPONSES`, `KICKSTART_GUARDRAILS_DISABLED`) → env-vars reference update needed
+- New ESLint rules affecting contributor workflow → contributing guide update needed
+- New user-visible UI state (e.g., Demo Mode badge, recovery card) → user guide update needed
 
 **How approvals work (label-based):**
 - **Leela** approves by adding the `architecture:approved` label:
@@ -239,7 +271,7 @@ Zapp's review is a **pre-merge gate** for foundational patterns. Nibbler reviews
   ```bash
   GH_TOKEN=$TOKEN gh pr edit {number} --add-label "codereview:approved" --repo azure-management-and-platforms/kickstart
   ```
-- **Docs** approves by adding `docs:approved` (docs updated in the PR) or `docs:not-applicable` (DP declared `Docs impact: N/A`):
+- **Amy (Docs)** approves by adding `docs:approved` (docs written or updated in the PR) or `docs:not-applicable` (Amy has reviewed and confirmed no documentation is needed). **Implementing agents must not self-apply `docs:not-applicable`.**
   ```bash
   GH_TOKEN=$TOKEN gh pr edit {number} --add-label "docs:approved" --repo azure-management-and-platforms/kickstart
   ```
