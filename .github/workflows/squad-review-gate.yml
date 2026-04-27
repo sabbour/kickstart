@@ -6,7 +6,7 @@ name: Squad Review Gate
 
 on:
   pull_request:
-    types: [labeled, unlabeled, opened, reopened, ready_for_review]
+    types: [labeled, unlabeled, opened, reopened, ready_for_review, synchronize]
 
 concurrency:
   group: squad-review-gate-${{ github.event.pull_request.number || github.run_id }}
@@ -85,7 +85,7 @@ jobs:
               const capitalized = name.charAt(0).toUpperCase() + name.slice(1);
               return `${capitalized} ${labels.has(label) ? '✅' : '⏳'}`;
             });
-            const prefix = isLowRisk && !requiresZapp ? 'low-risk path ' : '';
+            const prefix = isLowRisk && !requiresSecurity ? 'low-risk path ' : '';
 
             let state, description;
             if (docsRejected) {
