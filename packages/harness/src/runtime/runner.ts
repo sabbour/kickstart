@@ -13,9 +13,9 @@
 
 import { randomUUID } from 'node:crypto';
 import { Agent, Runner as SDKRunner, handoff, tool, setDefaultModelProvider, OpenAIProvider, setTraceProcessors } from '@openai/agents';
-import type { FunctionTool, AgentInputItem } from '@openai/agents';
+import type { FunctionTool, AgentInputItem, CallModelInputFilter } from '@openai/agents';
 import type { GuardrailContribution } from '../types/guardrail.js';
-import type { Turn } from '../types/session.js';
+import type { Turn, ToolCallRecord } from '../types/session.js';
 import { OtelBridgeTraceProcessor } from './agents-otel-bridge.js';
 import type { AgentContribution } from '../types/agent.js';
 import type { ToolContribution } from '../types/tool.js';
@@ -30,10 +30,88 @@ import { PlanArtifactMissing } from '../errors/index.js';
 import { z } from 'zod';
 import { buildRunConfig } from './run-config.js';
 import type { RunConfig } from './run-config.js';
+import { withRetry, CircuitBreaker, CircuitOpenError } from '../utils/retry.js';
 
 // ---------------------------------------------------------------------------
-// Universal tool factories (D5 / #1070 — core.read_skill)
+// Retry / circuit-breaker — module-level state (#102)
 // ---------------------------------------------------------------------------
+
+/**
+ * Module-level circuit breaker for sdkRunner.run() calls.
+ * Opens after 5 consecutive failures and prevents further calls until reset
+ * by a successful turn. Reset is automatic on success via `recordSuccess()`.
+ */
+const runnerCircuitBreaker = new CircuitBreaker(5);
+
+// ---------------------------------------------------------------------------
+// callModelInputFilter — large tool result summarisation (#103)
+// ---------------------------------------------------------------------------
+
+/**
+ * Maximum content length (characters) for a tool result item before it is
+ * truncated. Results longer than this are trimmed with "[... truncated]" to
+ * avoid exhausting context budget.
+ */
+export const TOOL_RESULT_MAX_CHARS = 2000;
+
+/**
+ * Return true when an `AgentInputItem` is a function_call_result whose
+ * `output` text content exceeds `TOOL_RESULT_MAX_CHARS`.
+ */
+export function isLargeToolResult(item: AgentInputItem): boolean {
+  if ((item as { type?: string }).type !== 'function_call_result') return false;
+  const output = (item as { output?: unknown }).output;
+  if (typeof output === 'string') {
+    return output.length > TOOL_RESULT_MAX_CHARS;
+  }
+  // ToolCallOutputContent array — measure total char length.
+  if (Array.isArray(output)) {
+    const total = (output as Array<{ text?: string }>)
+      .map((c) => (typeof c.text === 'string' ? c.text.length : 0))
+      .reduce((a, b) => a + b, 0);
+    return total > TOOL_RESULT_MAX_CHARS;
+  }
+  return false;
+}
+
+/**
+ * Return a copy of a function_call_result item with its output truncated to
+ * `TOOL_RESULT_MAX_CHARS` characters. The original item is not mutated.
+ */
+export function summarizeToolResult(item: AgentInputItem): AgentInputItem {
+  const output = (item as { output?: unknown }).output;
+  let truncatedOutput: string | Array<{ type: string; text: string }>;
+
+  if (typeof output === 'string') {
+    truncatedOutput = `${output.slice(0, TOOL_RESULT_MAX_CHARS)}[... truncated]`;
+  } else if (Array.isArray(output)) {
+    const joined = (output as Array<{ text?: string }>)
+      .map((c) => (typeof c.text === 'string' ? c.text : ''))
+      .join('');
+    truncatedOutput = [{ type: 'output_text', text: `${joined.slice(0, TOOL_RESULT_MAX_CHARS)}[... truncated]` }];
+  } else {
+    return item;
+  }
+
+  return { ...(item as object), output: truncatedOutput } as AgentInputItem;
+}
+
+/**
+ * `CallModelInputFilter` implementation (#103).
+ *
+ * Applied before every model call. Summarises (truncates) any
+ * `function_call_result` items whose output exceeds `TOOL_RESULT_MAX_CHARS`.
+ * Large results are trimmed with "[... truncated]" rather than dropped so
+ * the model retains awareness that the tool ran.
+ *
+ * Exported for unit-testing.
+ */
+export const callModelInputFilter: CallModelInputFilter = ({ modelData }) => {
+  const filtered = modelData.input.map((item) =>
+    isLargeToolResult(item) ? summarizeToolResult(item) : item,
+  );
+  return { ...modelData, input: filtered };
+};
 
 /**
  * Factory contract for harness-provided universal tools that must be bound
@@ -404,7 +482,7 @@ export function resolveOutputText(finalOutput: unknown, fullText: string): strin
 const UNTRUSTED_BEGIN = '[BEGIN UNTRUSTED CONTEXT — client-hydrated, unverified]';
 const UNTRUSTED_END = '[END UNTRUSTED CONTEXT]';
 
-export function toAgentInputItems(turns: readonly Turn[]): AgentInputItem[] {
+export function toAgentInputItems(turns: readonly Turn[], toolCallItems?: readonly ToolCallRecord[]): AgentInputItem[] {
   const items: AgentInputItem[] = [];
   for (const turn of turns) {
     const rawText = typeof turn.content === 'string' ? turn.content : '';
@@ -423,6 +501,20 @@ export function toAgentInputItems(turns: readonly Turn[]): AgentInputItem[] {
     }
     // system / tool turns intentionally dropped — see doc-comment.
   }
+
+  // Append stored tool call + result items from previous turns (#103).
+  // These give the model context about prior tool actions. They are appended
+  // at the end so any client-hydrated history comes first, followed by
+  // server-authoritative tool context.
+  if (toolCallItems && toolCallItems.length > 0) {
+    for (const record of toolCallItems) {
+      items.push(record.callItem);
+      if (record.resultItem) {
+        items.push(record.resultItem);
+      }
+    }
+  }
+
   return items;
 }
 
@@ -792,6 +884,8 @@ export class Runner {
     const toolsExecuted: Array<{ name: string; status: 'ok' | 'error' }> = [];
     const pendingToolNames = new Map<string, number>(); // toolName → index in toolsExecuted
     const pendingWriteFileArgs = new Map<string, { path: string; content: string }>(); // write_file args stash
+    // #103: track pending tool_call rawItems by callId so we can pair them with tool_output.
+    const pendingToolCallItemsByCallId = new Map<string, AgentInputItem>(); // callId → function_call item
     // #1070 D12 — skillsExecuted is now sourced from session.skillsPulled
     // (ids the model actually pulled via core.read_skill), not the naive
     // registry catalog. Empty if the model never called the tool this turn.
@@ -800,21 +894,43 @@ export class Runner {
     try {
       const sdkRunner = getSdkRunner();
 
+      // #102: Guard against open circuit breaker before attempting the SDK call.
+      if (runnerCircuitBreaker.isOpen) {
+        throw new CircuitOpenError();
+      }
+
       // #1062 Layer 0: thread conversation history across turns (unconditional
       // since #1098 rollout). `session.recentTurns` already contains the
       // sanitized current user turn (appended after input guardrails above);
       // passing the whole history as `AgentInputItem[]` gives the model full
       // context of the conversation.
-      const runInput: AgentInputItem[] = toAgentInputItems(session.recentTurns);
+      // #103: also include tool call/result items from prior turns.
+      const runInput: AgentInputItem[] = toAgentInputItems(session.recentTurns, session.toolCallItems);
 
-      const result = await sdkRunner.run(agent, runInput, {
-        stream: true,
-        context: session,
-        signal: abortCtrl.signal,
-        // #1073 Zapp Z2: explicit circuit-breaker so mutual handoffs can't
-        // ping-pong until token exhaustion. See resolveMaxTurns().
-        maxTurns: resolvedRunConfig.maxTurns ?? resolveMaxTurns(),
-      });
+      // #102: withRetry wraps the sdkRunner.run() call so transient 429/500/503
+      // errors are retried with exponential backoff + jitter. 4xx codes outside
+      // the list (401, 403, 400) fail immediately without retrying.
+      const result = await withRetry(
+        () => sdkRunner.run(agent, runInput, {
+          stream: true,
+          context: session,
+          signal: abortCtrl.signal,
+          // #1073 Zapp Z2: explicit circuit-breaker so mutual handoffs can't
+          // ping-pong until token exhaustion. See resolveMaxTurns().
+          maxTurns: resolvedRunConfig.maxTurns ?? resolveMaxTurns(),
+          // #103: trim large tool results before they reach the model.
+          callModelInputFilter,
+        }),
+        {
+          retryOn: [429, 500, 503],
+          maxAttempts: 3,
+          backoff: 'exponential',
+          jitter: true,
+          onRetry: (attempt, err) => {
+            console.warn('[runner] Retrying sdkRunner.run()', { attempt, err: err instanceof Error ? err.message : String(err) });
+          },
+        },
+      );
 
       for await (const event of result) {
         // Drain a2uiEmissions immediately on every event (Leela C2)
@@ -841,6 +957,13 @@ export class Runner {
             const idx = toolsExecuted.push({ name: toolName, status: 'ok' }) - 1;
             pendingToolNames.set(toolName, idx);
 
+            // #103: stash the function_call rawItem by callId for later pairing.
+            const callRawItem = (item as { rawItem?: AgentInputItem }).rawItem;
+            const callId = callRawItem ? (callRawItem as { callId?: string }).callId : undefined;
+            if (callRawItem && callId) {
+              pendingToolCallItemsByCallId.set(callId, callRawItem);
+            }
+
             // Stash write_file arguments so tool_done can forward path+content to the client.
             if (toolName === 'core.write_file') {
               const rawArgs = (item as { rawItem?: { arguments?: string } }).rawItem?.arguments;
@@ -855,6 +978,17 @@ export class Runner {
             }
           } else if (name === 'tool_output') {
             const toolName = (item as { rawItem?: { name?: string } }).rawItem?.name ?? 'unknown';
+
+            // #103: pair the result item with its pending call item and persist to session.
+            const resultRawItem = (item as { rawItem?: AgentInputItem }).rawItem;
+            const resultCallId = resultRawItem ? (resultRawItem as { callId?: string }).callId : undefined;
+            if (resultRawItem && resultCallId) {
+              const callItem = pendingToolCallItemsByCallId.get(resultCallId);
+              if (callItem) {
+                session.recordToolCallRecord({ callItem, resultItem: resultRawItem });
+                pendingToolCallItemsByCallId.delete(resultCallId);
+              }
+            }
 
             // For write_file, forward path + content so the client can route files to the editor pane.
             const writeFileArgs = pendingWriteFileArgs.get(toolName);
@@ -968,6 +1102,8 @@ export class Runner {
         skillsPulledTokens: session.skillsPulledTokens ?? 0,
         toolsExecuted,
       });
+      // #102: successful run — reset circuit breaker consecutive-failure counter.
+      runnerCircuitBreaker.recordSuccess();
     } catch (err: unknown) {
       // AbortError: may be a UserAction interrupt OR a guardrail halt
       if (err instanceof Error && err.name === 'AbortError') {
@@ -978,6 +1114,9 @@ export class Runner {
         // UserAction interrupt — user_action_req was already written by the tool wrapper.
         return;
       }
+      // #102: record failure against circuit breaker. AbortError and guardrail
+      // halts are intentional — don't count them as infrastructure failures.
+      runnerCircuitBreaker.recordFailure();
       sseWrite('error', {
         message: err instanceof Error ? err.message : String(err),
       });

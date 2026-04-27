@@ -1,4 +1,5 @@
 import type { A2UIMessageV09 as A2UIMessage } from './a2ui.js';
+import type { AgentInputItem } from '@openai/agents';
 
 export interface AppIntent {
   id?: string;
@@ -36,6 +37,19 @@ export interface Turn {
    *    server-authored context.
    */
   trust?: 'server' | 'client-hydrated';
+}
+
+/**
+ * A paired tool call + result record captured within a turn (#103).
+ *
+ * Stored in `Session.toolCallItems` so the model retains context about prior
+ * tool actions across turns. The `callItem` is a `function_call` AgentInputItem
+ * and `resultItem` is the corresponding `function_call_result`. Both are
+ * verbatim SDK items captured from `run_item_stream_event`.
+ */
+export interface ToolCallRecord {
+  callItem: AgentInputItem;
+  resultItem?: AgentInputItem;
 }
 
 /**
@@ -102,9 +116,16 @@ export interface SessionCtx {
   skillsPulled?: Set<string>;
   skillsPulledBytes?: number;
   skillsPulledTokens?: number;
+  /**
+   * Paired tool call + result items captured during each turn (#103).
+   * Bounded to the last 200 pairs (same window as recentTurns).
+   * Used by `toAgentInputItems` to replay tool context across turns.
+   */
+  toolCallItems: ToolCallRecord[];
   recordA2UIEmission(msg: A2UIMessage): void;
   recordArtifact(artifact: Artifact): void;
   recordTurn(turn: Turn): void;
+  recordToolCallRecord(record: ToolCallRecord): void;
   getAzureCreds(): Promise<AzureCredential>;
   // TODO(Step 3): Replace with a typed token/result contract once resume/runtime wiring lands.
   getGithubToken(): Promise<unknown>;

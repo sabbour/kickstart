@@ -1,5 +1,5 @@
 import type { A2UIMessageV09 as A2UIMessage } from '../types/a2ui.js';
-import type { Artifact, A2UICatalog, SessionCtx, Turn, PendingUserAction, AppIntent, AzureCredential, ClientHydrationMessage } from '../types/session.js';
+import type { Artifact, A2UICatalog, SessionCtx, Turn, PendingUserAction, AppIntent, AzureCredential, ClientHydrationMessage, ToolCallRecord } from '../types/session.js';
 import type { Phase } from '../index.js';
 
 // ── Browser-compatible crypto helpers (replaces node:crypto) ─────────────────
@@ -89,6 +89,11 @@ export class Session implements SessionCtx {
   skillsPulled?: Set<string>;
   skillsPulledBytes?: number;
   skillsPulledTokens?: number;
+  /**
+   * Paired tool call + result items captured during each turn (#103).
+   * Bounded to the last 200 records via a sliding window in `recordToolCallRecord`.
+   */
+  toolCallItems: ToolCallRecord[] = [];
   /** Leela BLOCK-1: real first-class field; no type-cast side-channel needed. */
   lastActiveAt: number = Date.now();
   /**
@@ -138,6 +143,17 @@ export class Session implements SessionCtx {
     // Keep a bounded sliding window of recent turns (last 50)
     if (this.recentTurns.length > 50) {
       this.recentTurns.splice(0, this.recentTurns.length - 50);
+    }
+  }
+
+  /**
+   * Record a tool call + result pair captured during a turn (#103).
+   * Keeps a bounded sliding window of the last 200 records.
+   */
+  recordToolCallRecord(record: ToolCallRecord): void {
+    this.toolCallItems.push(record);
+    if (this.toolCallItems.length > 200) {
+      this.toolCallItems.splice(0, this.toolCallItems.length - 200);
     }
   }
 
