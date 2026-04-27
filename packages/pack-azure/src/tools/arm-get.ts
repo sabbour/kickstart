@@ -53,10 +53,18 @@ const ArmGetOutputSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.string(),
-  location: z.string().optional(),
-  properties: z.record(z.string(), z.unknown()).optional(),
-  tags: z.record(z.string(), z.string()).optional(),
-  raw: z.unknown(),
+  location: z.string().nullable(),
+  // Open-keyed objects (z.record / z.unknown) violate I1+I3+I4 under OpenAI
+  // strict-mode. Encode them as JSON strings; callers parse if needed.
+  properties: z
+    .string()
+    .nullable()
+    .describe('JSON-encoded resource-specific properties returned by ARM'),
+  tags: z
+    .string()
+    .nullable()
+    .describe('JSON-encoded resource tags, e.g. {"env":"prod","team":"platform"}'),
+  raw: z.string().describe('JSON-encoded full ARM API response'),
 });
 
 // ── Tool ──────────────────────────────────────────────────────────────────────
@@ -101,10 +109,10 @@ export const armGetTool: ToolContribution = {
         id: data['id'] ?? safePath,
         name: data['name'] ?? '',
         type: data['type'] ?? '',
-        location: data['location'],
-        properties: data['properties'] as Record<string, unknown> | undefined,
-        tags: data['tags'] as Record<string, string> | undefined,
-        raw: data,
+        location: data['location'] ?? null,
+        properties: data['properties'] != null ? JSON.stringify(data['properties']) : null,
+        tags: data['tags'] != null ? JSON.stringify(data['tags']) : null,
+        raw: JSON.stringify(data),
       });
     },
   }),

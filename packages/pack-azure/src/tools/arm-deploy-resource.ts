@@ -34,9 +34,14 @@ const ArmDeployResourceOutputSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.string(),
-  location: z.string().optional(),
-  provisioningState: z.string().optional(),
-  properties: z.record(z.string(), z.unknown()).optional(),
+  location: z.string().nullable(),
+  provisioningState: z.string().nullable(),
+  // Open-keyed object (z.record / z.unknown) violates I1+I3+I4. Encode as a
+  // JSON string; callers parse if needed.
+  properties: z
+    .string()
+    .nullable()
+    .describe('JSON-encoded resource-specific properties returned by ARM'),
 });
 
 // ── Tool ──────────────────────────────────────────────────────────────────────
@@ -115,8 +120,8 @@ function parseResourceResponse(
     id: data['id'] ?? safePath,
     name: data['name'] ?? '',
     type: data['type'] ?? '',
-    location: data['location'],
-    provisioningState: props?.['provisioningState'],
-    properties: props,
+    location: data['location'] ?? null,
+    provisioningState: props?.['provisioningState'] ?? null,
+    properties: props != null ? JSON.stringify(props) : null,
   });
 }

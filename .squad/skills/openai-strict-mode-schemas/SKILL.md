@@ -86,6 +86,33 @@ z.object({
 // In execute(): const env = JSON.parse(input.envJson) as Record<string, string>
 ```
 
+**This applies to both input (parameters) and output schemas.** Output schemas that use
+`z.record()` or `z.unknown()` also violate I1+I3+I4 when tested with `assertStrictlyConformant()`.
+Encode open-keyed fields as JSON strings even in return-value schemas:
+
+```ts
+// ❌ Output schema with open map — fails assertStrictlyConformant()
+const OutSchema = z.object({
+  tags: z.record(z.string(), z.string()).optional(),
+  properties: z.record(z.string(), z.unknown()).optional(),
+  raw: z.unknown(),
+});
+
+// ✅ Encode open-keyed fields as nullable JSON strings
+const OutSchema = z.object({
+  tags: z.string().nullable().describe('JSON-encoded tags, e.g. {"env":"prod"}'),
+  properties: z.string().nullable().describe('JSON-encoded resource properties'),
+  raw: z.string().describe('JSON-encoded full response'),
+});
+
+// In execute(): stringify before returning
+return OutSchema.parse({
+  tags: data.tags != null ? JSON.stringify(data.tags) : null,
+  properties: data.properties != null ? JSON.stringify(data.properties) : null,
+  raw: JSON.stringify(data),
+});
+```
+
 ### `.passthrough()` → `.strict()`
 
 `.passthrough()` sets `additionalProperties: {}` instead of `additionalProperties: false`.
