@@ -127,6 +127,23 @@ When set to `1`, disables all content guardrails (PII detection, credential leak
 
 Useful when working on harness internals where guardrail redaction interferes with test assertions.
 
+### KICKSTART_USE_RESPONSES
+
+**Required:** No  
+**Default:** unset (disabled)  
+**Allowed values:** `1`, unset
+
+When set to `1`, enables the **Responses API threading** mode. Instead of passing the full conversation history on every turn, the runner persists the `previous_response_id` returned by the OpenAI Responses API and passes it on subsequent turns. This can reduce token usage for long conversations.
+
+**Behaviour:**
+- **Turn 1:** Full history is sent as normal. The response ID is stored in `session.responseId`.
+- **Turn 2+:** Only the current user message is sent, plus `previousResponseId` pointing to the last response. The model reconstructs context server-side.
+- **Flag off (default):** Byte-identical to the previous behaviour. No regression.
+
+**Limitations:**
+- Requires the model deployment to support the Responses API (check your Azure OpenAI resource).
+- Session continuity depends on the response ID remaining valid. If the ID expires or is unavailable, the runner falls back to full history automatically.
+
 ## Authentication & Security
 
 ### GITHUB_CLIENT_ID

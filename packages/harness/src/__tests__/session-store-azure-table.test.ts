@@ -157,6 +157,22 @@ describe('AzureTableSessionStore', () => {
     await store.init();
     expect(fakeClient.createTable).toHaveBeenCalledOnce();
   });
+
+  it('get() restores responseId from persisted session data', async () => {
+    const session = makeSession('resp-thread');
+    session.responseId = 'resp_abc123';
+    await store.set('resp-thread', session);
+    const retrieved = await store.get('resp-thread');
+    expect(retrieved?.responseId).toBe('resp_abc123');
+  });
+
+  it('get() leaves responseId undefined when not persisted', async () => {
+    const session = makeSession('no-resp-id');
+    // responseId deliberately not set
+    await store.set('no-resp-id', session);
+    const retrieved = await store.get('no-resp-id');
+    expect(retrieved?.responseId).toBeUndefined();
+  });
 });
 
 // ── Factory integration ───────────────────────────────────────────────────────

@@ -1059,27 +1059,42 @@ export class Runner {
         throw new CircuitOpenError();
       }
 
-      // #1062 Layer 0: thread conversation history across turns (unconditional
-      // since #1098 rollout). `session.recentTurns` already contains the
-      // sanitized current user turn (appended after input guardrails above);
-      // passing the whole history as `AgentInputItem[]` gives the model full
-      // context of the conversation.
+      // #126 / #114 Phase 3: Responses API thread ID persistence.
       //
-      // #101 Token-count gate: trim oldest turns before injecting history so
-      // large tool outputs can't silently exhaust the context window.
-      const { turns: boundedTurns, wasTrimmed } = trimHistoryToTokenBudget(session.recentTurns);
-      if (wasTrimmed) {
-        console.warn('[runner] History trimmed to fit context window');
-        sseWrite('chunk', { delta: '\n> *Earlier parts of this conversation were trimmed to fit within context limits.*\n\n' });
+      // When the Responses API flag is on AND the session already has a
+      // `responseId` from a prior turn, pass `previousResponseId` to the SDK
+      // so it can continue the server-side thread without re-sending the full
+      // history. The SDK accepts a plain user-string as input in this mode.
+      //
+      // On the first turn (session.responseId absent) or when the flag is off,
+      // fall back to the full `toAgentInputItems()` history path (#1062 Layer 0)
+      // so there is zero regression for flag-off callers.
+      const useResponses = isResponsesApiEnabled();
+      const useThreadId = useResponses && !!session.responseId;
+
+      // #1062 Layer 0 / #101 / #103: full history with token trimming and tool call items,
+      // or current message only when resuming a server-side Responses API thread.
+      let runInput: AgentInputItem[] | string;
+      if (useThreadId) {
+        // Thread mode: history lives server-side — only send the current message.
+        runInput = guardedMessage;
+      } else {
+        // #101 Token-count gate: trim oldest turns before injecting history so
+        // large tool outputs can't silently exhaust the context window.
+        const { turns: boundedTurns, wasTrimmed } = trimHistoryToTokenBudget(session.recentTurns);
+        if (wasTrimmed) {
+          console.warn('[runner] History trimmed to fit context window');
+          sseWrite('chunk', { delta: '\n> *Earlier parts of this conversation were trimmed to fit within context limits.*\n\n' });
+        }
+        // #103: also include tool call/result items from prior turns.
+        runInput = toAgentInputItems(boundedTurns, session.toolCallItems);
       }
-      // #103: also include tool call/result items from prior turns.
-      const runInput: AgentInputItem[] = toAgentInputItems(boundedTurns, session.toolCallItems);
 
       // #102: withRetry wraps the sdkRunner.run() call so transient 429/500/503
       // errors are retried with exponential backoff + jitter. 4xx codes outside
       // the list (401, 403, 400) fail immediately without retrying.
       const result = await withRetry(
-        () => sdkRunner.run(agent, runInput, {
+        () => sdkRunner.run(agent, runInput as AgentInputItem[], {
           stream: true,
           context: session,
           signal: abortCtrl.signal,
@@ -1088,6 +1103,8 @@ export class Runner {
           maxTurns: resolvedRunConfig.maxTurns ?? resolveMaxTurns(),
           // #103: trim large tool results before they reach the model.
           callModelInputFilter,
+          // Pass the previous response ID so the Responses API resumes the thread.
+          ...(useThreadId ? { previousResponseId: session.responseId } : {}),
         }),
         {
           retryOn: [429, 500, 503],
@@ -1250,6 +1267,16 @@ export class Runner {
       // (possibly redacted) output, never raw LLM content that may contain PII/credentials.
       if (outputText) {
         session.recordTurn({ role: 'assistant', content: outputText });
+      }
+
+      // #126 / #114 Phase 3: persist the new response ID for the next turn.
+      // Only update when the Responses API flag is on — the flag-off path
+      // continues to use `toAgentInputItems()` exclusively.
+      if (useResponses) {
+        const newResponseId = result.lastResponseId;
+        if (newResponseId) {
+          session.responseId = newResponseId;
+        }
       }
 
       // ── Flush buffered chunks now that output guardrails have passed ────────

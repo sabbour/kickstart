@@ -103,6 +103,15 @@ export class Session implements SessionCtx {
    * requests must present it for session resumption.
    */
   anonTokenHash?: string;
+  /**
+   * The last Responses API response ID for this session (#126 / #114 Phase 3).
+   * Set after each successful SDK run when `KICKSTART_USE_RESPONSES=1` to
+   * the `result.lastResponseId` returned by the SDK. On subsequent turns the
+   * runner passes this as `previousResponseId` instead of re-sending the full
+   * `inputItems` history, letting the OpenAI Responses API maintain the
+   * thread server-side. Absent on first turn (fallback: full history).
+   */
+  responseId?: string;
 
   constructor(opts: {
     sessionId: string;

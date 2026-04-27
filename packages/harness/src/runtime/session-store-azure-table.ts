@@ -37,6 +37,7 @@ function hydrateSession(raw: Record<string, unknown>): Session {
   if (typeof raw.lastActiveAt === 'number') s.lastActiveAt = raw.lastActiveAt;
   if (typeof raw.activeAgent === 'string') s.activeAgent = raw.activeAgent;
   if (typeof raw.anonTokenHash === 'string') s.anonTokenHash = raw.anonTokenHash;
+  if (typeof raw.responseId === 'string') s.responseId = raw.responseId;
   return s;
 }
 
