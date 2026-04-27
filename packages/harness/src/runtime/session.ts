@@ -184,7 +184,12 @@ export class Session implements SessionCtx {
 
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 min
 
-export const sessionStore = new Map<string, Session>();
+export type { ISessionStore } from './session-store.js';
+export { InMemorySessionStore, createSessionStore } from './session-store.js';
+import { createSessionStore } from './session-store.js';
+
+/** Module-level singleton; backed by InMemorySessionStore (Phase 1). */
+export const sessionStore = createSessionStore('memory');
 
 // Cleanup stale sessions periodically
 const cleanupTimer = setInterval(() => {
