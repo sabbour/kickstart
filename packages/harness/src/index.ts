@@ -507,6 +507,8 @@ export type {
 export { Runner } from './runtime/runner.js';
 export type { RunConfig, HandoffCallback, HandoffContext, HandoffInputFilter } from './runtime/run-config.js';
 export { buildRunConfig, defaultHandoffInputFilter, defaultHandoffCallback } from './runtime/run-config.js';
+export { asTool, AS_TOOL_MAX_TURNS_DEFAULT } from './runtime/as-tool.js';
+export type { AsToolOptions } from './runtime/as-tool.js';
 export { Session, sessionStore, getOrCreateSession, getOrCreateSessionResult, generateAnonSessionToken, validateAnonSessionToken, isAnonymousSession, ANON_SESSION_TTL_MS, AnonTokenGenerationError } from './runtime/session.js';
 export type { ISessionStore, IAsyncSessionStore, EvictionSchedulerHandle } from './runtime/session-store.js';
 export { InMemorySessionStore, createSessionStore, startEvictionScheduler } from './runtime/session-store.js';
