@@ -13,6 +13,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { _handleSessionExpiredError } from '../hooks/useStreaming';
+// Import the canonical constant from api-client so tests stay in sync if the key value changes.
 import { AUTH_REDIRECT_PENDING_KEY, SessionExpiredError, SESSION_EXPIRED_ERROR_MESSAGE } from '../services/api-client';
 
 describe('_handleSessionExpiredError (redirect loop guard)', () => {
