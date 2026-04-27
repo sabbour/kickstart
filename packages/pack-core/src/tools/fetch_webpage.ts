@@ -57,7 +57,7 @@ function assertSafeUrl(rawUrl: string): URL {
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const FetchWebpageInputSchema = z.object({
-  url: z.string().url().describe('The HTTPS URL to fetch. Private IP ranges and non-HTTPS URLs are rejected.'),
+  url: z.string().describe('The HTTPS URL to fetch. Private IP ranges and non-HTTPS URLs are rejected.'),
 });
 
 // ── Tool ──────────────────────────────────────────────────────────────────────

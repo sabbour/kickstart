@@ -155,6 +155,17 @@ At startup, the registry reads each pack's `agentsDir` and `skillsDir` to load:
 
 These files use a standardized format. See [Architecture → Skill Injection](../architecture/skill-injection.md) for details.
 
+### Schema conformance
+
+Tool parameters and user-action parameters are model-facing OpenAI function schemas, so they must pass the shared strict-mode checks in `@aks-kickstart/harness/runtime/schema-conformance`. The registry-driven test at `packages/web/api/src/startup/schema-conformance.test.ts` loads packs through the same startup path as Azure Functions and validates every registered tool and user action.
+
+When authoring schemas:
+
+- Keep the OpenAI-facing shape strict: object schemas need explicit `properties`, every property must appear in `required`, and `additionalProperties` must be `false`.
+- Avoid Zod helpers that emit OpenAI-rejected JSON Schema `format` values. For example, use `z.string()` plus runtime validation instead of `z.string().url()` for tool inputs; `z.string().url()` emits `format: "uri"`, which OpenAI rejects.
+- Put security and domain validation in the tool/action implementation when the model-facing schema has to stay simpler for OpenAI compatibility.
+- Component `propertySchema` fixtures are validated by the A2UI preview/scenario tests; keep component schemas strict as described in [Extending the A2UI Component System](../components/extending-a2ui.md).
+
 ### Enabling/Disabling Packs
 
 Set the `KICKSTART_PACKS` environment variable to a comma-separated list:

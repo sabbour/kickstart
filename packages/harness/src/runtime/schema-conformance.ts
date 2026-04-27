@@ -10,7 +10,7 @@
  * dynamically through `PackRegistry`) and by per-pack regression tests that
  * cover specific schema shapes (e.g. `core.emit_ui` discriminated unions).
  *
- * The four invariants validated:
+ * The five invariants validated:
  *
  *   I1 — every `{ type: "object" }` node carries a `properties` key
  *        (an object, possibly empty). `z.record(...)` drops it.
@@ -24,6 +24,10 @@
  *        documented combinators (`oneOf` / `anyOf` / `allOf` / `$ref` /
  *        `const`). A bare `{}` node causes the API to 400 with
  *        "schema must have a 'type' key" (#966).
+ *
+ *   I5 — no model-facing schema node emits JSON Schema `format` values known
+ *        to be rejected by OpenAI strict-mode validators (e.g. `uri` from
+ *        `z.string().url()`).
  *
  * Originally lifted from pack-core's three test-local walkers (#998, #1032,
  * #966). Promoted into the harness so every pack — not just pack-core —
@@ -153,6 +157,52 @@ export function collectMissingTypes(schema: unknown, rootPath = 'root'): string[
   return issues;
 }
 
+// OpenAI strict-mode validation rejects these JSON Schema format values. Keep
+// this list aligned with observed API validation errors and add a regression
+// test whenever a new unsupported format is discovered.
+const OPENAI_UNSUPPORTED_FORMATS = new Set(['uri']);
+
+/** I5 — OpenAI strict mode rejects some JSON Schema `format` values. */
+export function collectUnsupportedFormats(schema: unknown, rootPath = 'root'): string[] {
+  const issues = new Set<string>();
+
+  const recordIssue = (node: SchemaNode, path: string): void => {
+    if (typeof node.format === 'string' && OPENAI_UNSUPPORTED_FORMATS.has(node.format)) {
+      issues.add(`${path} (format=${JSON.stringify(node.format)})`);
+    }
+  };
+
+  const scanNode = (value: unknown, path: string): void => {
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        scanNode(item, `${path}[${index}]`);
+      });
+      return;
+    }
+
+    if (!isPlainObject(value)) {
+      return;
+    }
+
+    recordIssue(value, path);
+
+    for (const [key, child] of Object.entries(value)) {
+      if (Array.isArray(child)) {
+        child.forEach((item, index) => {
+          scanNode(item, `${path}.${key}[${index}]`);
+        });
+      } else if (isPlainObject(child)) {
+        scanNode(child, `${path}.${key}`);
+      }
+    }
+  };
+
+  walkSchema(schema, rootPath, recordIssue);
+  scanNode(schema, rootPath);
+
+  return [...issues];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Aggregator
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,6 +218,8 @@ export interface SchemaConformanceReport {
   additionalPropertiesViolations: string[];
   /** I4 violations. */
   missingTypes: string[];
+  /** I5 violations. */
+  unsupportedFormats: string[];
 }
 
 export function reportSchemaConformance(name: string, schema: unknown): SchemaConformanceReport {
@@ -177,6 +229,7 @@ export function reportSchemaConformance(name: string, schema: unknown): SchemaCo
     strictRequiredViolations: collectStrictRequiredViolations(schema),
     additionalPropertiesViolations: collectAdditionalPropertiesViolations(schema),
     missingTypes: collectMissingTypes(schema),
+    unsupportedFormats: collectUnsupportedFormats(schema),
   };
 }
 
@@ -185,7 +238,8 @@ export function reportHasIssues(report: SchemaConformanceReport): boolean {
     report.missingProperties.length > 0 ||
     report.strictRequiredViolations.length > 0 ||
     report.additionalPropertiesViolations.length > 0 ||
-    report.missingTypes.length > 0
+    report.missingTypes.length > 0 ||
+    report.unsupportedFormats.length > 0
   );
 }
 
@@ -206,6 +260,10 @@ export function formatReport(report: SchemaConformanceReport): string {
   if (report.missingTypes.length > 0) {
     lines.push('  I4 — node missing type/combinator:');
     for (const issue of report.missingTypes) lines.push(`    - ${issue}`);
+  }
+  if (report.unsupportedFormats.length > 0) {
+    lines.push('  I5 — unsupported OpenAI JSON Schema format:');
+    for (const issue of report.unsupportedFormats) lines.push(`    - ${issue}`);
   }
   return lines.join('\n');
 }

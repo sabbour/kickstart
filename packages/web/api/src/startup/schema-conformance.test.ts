@@ -28,6 +28,7 @@ import {
   formatReport,
   getToolJsonSchema,
   getUserActionJsonSchema,
+  collectUnsupportedFormats,
 } from '@aks-kickstart/harness/runtime/schema-conformance';
 import { _resetRegistryState, getRegistry } from './packs.js';
 
@@ -118,5 +119,32 @@ describe('OpenAI strict-mode schema conformance — every registered user action
     const schema = getUserActionJsonSchema(contrib);
     const report = reportSchemaConformance(name, schema);
     expect(reportHasIssues(report) ? formatReport(report) : null).toBeNull();
+  });
+});
+
+describe('OpenAI strict-mode schema conformance — unsupported formats', () => {
+  it('flags z.string().url() schemas before OpenAI rejects format=uri at runtime', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        url: { type: 'string', format: 'uri' },
+        nested: {
+          type: 'object',
+          properties: {
+            callbackUrl: { type: 'string', format: 'uri' },
+            ignoredNumericFormat: { type: 'string', format: 123 },
+          },
+          required: ['callbackUrl', 'ignoredNumericFormat'],
+          additionalProperties: false,
+        },
+      },
+      required: ['url', 'nested'],
+      additionalProperties: false,
+    };
+
+    expect(collectUnsupportedFormats(schema)).toEqual([
+      'root.properties.url (format="uri")',
+      'root.properties.nested.properties.callbackUrl (format="uri")',
+    ]);
   });
 });
