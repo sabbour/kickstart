@@ -21,7 +21,7 @@ import { ConversationSessionProvider } from './contexts/ConversationSessionConte
 import { useTheme } from './contexts/ThemeContext';
 import { useDebug } from './contexts/DebugContext';
 import { useVirtualFS } from './contexts/VirtualFSContext';
-import { healthCheck, SESSION_EXPIRED_ERROR_MESSAGE, type HealthCheckResult } from './services/api-client';
+import { healthCheck, SESSION_EXPIRED_ERROR_MESSAGE, AUTH_REDIRECT_PENDING_KEY, type HealthCheckResult } from './services/api-client';
 // TODO(Step 5): mock-streaming removed — mock mode deleted in Step 1
 // isMockMode and isPlaygroundMode permanently return false
 import { VirtualFileSystem } from './services/virtual-fs';
@@ -56,7 +56,6 @@ function msgId(role: string) {
 }
 
 const PENDING_AUTH_RETRY_KEY = 'kickstart:pending-auth-retry';
-const AUTH_REDIRECT_PENDING_KEY = 'kickstart:auth-redirect-pending';
 const AUTH_RETRY_STATUS_MESSAGE = 'Session restored. Retrying your previous request…';
 
 interface PendingAuthRetryPayload {

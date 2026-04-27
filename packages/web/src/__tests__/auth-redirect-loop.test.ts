@@ -13,9 +13,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { _handleSessionExpiredError } from '../hooks/useStreaming';
-import { SessionExpiredError, SESSION_EXPIRED_ERROR_MESSAGE } from '../services/api-client';
-
-const AUTH_REDIRECT_PENDING_KEY = 'kickstart:auth-redirect-pending';
+import { AUTH_REDIRECT_PENDING_KEY, SessionExpiredError, SESSION_EXPIRED_ERROR_MESSAGE } from '../services/api-client';
 
 describe('_handleSessionExpiredError (redirect loop guard)', () => {
   let redirect: (url: string) => void;
@@ -46,13 +44,19 @@ describe('_handleSessionExpiredError (redirect loop guard)', () => {
     expect(storage.setItem).not.toHaveBeenCalled();
   });
 
-  it('does NOT re-set AUTH_REDIRECT_PENDING_KEY on auth retry failure', () => {
-    // App.tsx clears AUTH_REDIRECT_PENDING_KEY before the retry call.
-    // If the retry also fails, the key must NOT be re-set — otherwise
-    // the effect fires again and the loop continues.
-    _handleSessionExpiredError(new SessionExpiredError(), true, onError, redirect, storage);
+  it('redirects even when storage.setItem throws (private browsing / quota exceeded)', () => {
+    const throwingStorage: Pick<Storage, 'setItem'> = {
+      setItem: vi.fn().mockImplementation(() => { throw new DOMException('QuotaExceededError', 'QuotaExceededError'); }) as Storage['setItem'],
+    };
 
-    expect(storage.setItem).not.toHaveBeenCalledWith(AUTH_REDIRECT_PENDING_KEY, '1');
+    // Must not throw — the catch block in _handleSessionExpiredError swallows storage errors
+    expect(() =>
+      _handleSessionExpiredError(new SessionExpiredError(), false, onError, redirect, throwingStorage)
+    ).not.toThrow();
+
+    // Redirect still happens despite storage failure
+    expect(redirect).toHaveBeenCalledOnce();
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it('surfaces a descriptive error message so the user can act on it', () => {

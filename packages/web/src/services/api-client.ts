@@ -2,6 +2,7 @@
 // Supports both streaming (SSE) and standard request modes
 
 export const SESSION_EXPIRED_ERROR_MESSAGE = 'Your session has expired. Please sign in again. You may be redirected to the login page.';
+export const AUTH_REDIRECT_PENDING_KEY = 'kickstart:auth-redirect-pending';
 
 export class SessionExpiredError extends Error {
   constructor() {

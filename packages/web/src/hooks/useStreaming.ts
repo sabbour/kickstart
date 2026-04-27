@@ -7,7 +7,7 @@ import type {
   TokenUsageSummary,
   TurnUsage,
 } from '../types';
-import { apiFetch, buildSwaLoginUrl, SessionExpiredError, storeAnonSessionToken } from '../services/api-client';
+import { apiFetch, buildSwaLoginUrl, SessionExpiredError, storeAnonSessionToken, AUTH_REDIRECT_PENDING_KEY } from '../services/api-client';
 import { normalizeConversationPhase } from '../utils/chat-a2ui';
 import type { AppIntent } from '@aks-kickstart/harness';
 
@@ -99,7 +99,6 @@ export interface StreamCallbacks {
 
 // Target ~80 rAF frames to reveal all text (~1.3s at 60fps)
 const REVEAL_FRAMES = 80;
-const AUTH_REDIRECT_PENDING_KEY = 'kickstart:auth-redirect-pending';
 
 // ---------------------------------------------------------------------------
 // SDK 406 non-streaming fallback
