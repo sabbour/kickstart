@@ -1,3 +1,14 @@
+/**
+ * @deprecated Use the focused tools instead:
+ *   - `core.show_card`  — informational / display surfaces
+ *   - `core.show_form`  — interactive form surfaces
+ *   - `core.confirm`    — confirmation dialogs
+ *   - `core.navigate`   — data-model updates and surface deletion
+ *
+ * `core.emit_ui` is retained for backward compatibility during migration but
+ * will be removed in the next major release.  See issue #112 for the
+ * migration guide.
+ */
 import { tool } from '@openai/agents';
 import { z } from 'zod';
 import { A2UIMessageSchema } from '@aks-kickstart/harness';

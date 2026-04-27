@@ -1,4 +1,9 @@
+/** @deprecated Use show_card, show_form, confirm, or navigate instead. */
 export { emitUiTool } from './emit_ui.js';
+export { showCardTool } from './show_card.js';
+export { showFormTool } from './show_form.js';
+export { confirmTool } from './confirm.js';
+export { navigateTool } from './navigate.js';
 export { fetchWebpageTool } from './fetch_webpage.js';
 export { searchKaitoModelsTool, parseKaitoSupportedModels, KAITO_SUPPORTED_MODELS_URL } from './search_kaito_models.js';
 export type { KaitoModelSummary } from './search_kaito_models.js';

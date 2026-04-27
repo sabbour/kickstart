@@ -1,5 +1,9 @@
 import type { ComponentContribution, ToolContribution } from '@aks-kickstart/harness';
 import { emitUiTool } from './tools/emit_ui.js';
+import { showCardTool } from './tools/show_card.js';
+import { showFormTool } from './tools/show_form.js';
+import { confirmTool } from './tools/confirm.js';
+import { navigateTool } from './tools/navigate.js';
 import { fetchWebpageTool } from './tools/fetch_webpage.js';
 import { searchKaitoModelsTool } from './tools/search_kaito_models.js';
 import { readFileTool } from './tools/read_file.js';
@@ -13,6 +17,12 @@ import { createInspectRepoTool } from './tools/inspect_repo.js';
 
 export function createCoreTools(components: ComponentContribution[]): ToolContribution[] {
   return [
+    // Focused UI tools (split from the deprecated core.emit_ui — #112)
+    showCardTool,
+    showFormTool,
+    confirmTool,
+    navigateTool,
+    // Deprecated: retained for backward compatibility — remove in next major.
     emitUiTool,
     fetchWebpageTool,
     searchKaitoModelsTool,
