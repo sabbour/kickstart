@@ -1,7 +1,7 @@
 /**
  * SSE (Server-Sent Events) utilities for the v2 harness runtime.
  *
- * 10 event types used across converse and resume handlers:
+ * 11 event types used across converse and resume handlers:
  *   start           – turn began (no data)
  *   chunk           – text delta from the model
  *   a2ui            – A2UI protocol message emitted by a skill/tool
@@ -12,6 +12,8 @@
  *   end             – turn completed (may carry session metadata)
  *   error           – unrecoverable error in the stream
  *   session_token   – per-session anonymous token for session resumption (#1079)
+ *   guardrail_warn  – content was modified by a guardrail (e.g. PII redacted) (#115)
+ *   chain_step      – a step in the deterministic codesmith→reviewer chain completed (#119)
  */
 
 export type SSEEventType =
@@ -25,11 +27,12 @@ export type SSEEventType =
   | 'end'
   | 'error'
   | 'session_token'
+  | 'guardrail_warn'
   | 'chain_step';
 
 export const SSE_EVENT_TYPES = new Set<SSEEventType>([
   'start', 'chunk', 'a2ui', 'tool_start', 'tool_done',
-  'phase', 'user_action_req', 'end', 'error', 'session_token', 'chain_step',
+  'phase', 'user_action_req', 'end', 'error', 'session_token', 'guardrail_warn', 'chain_step',
 ]);
 
 /** Opaque writer type passed to Runner and resume handler. */

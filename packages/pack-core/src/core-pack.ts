@@ -4,7 +4,7 @@ import { createCoreTools } from './core-tools.js';
 
 // Guardrails
 import { tokenBudgetGuardrail } from './guardrails/token_budget.js';
-import { noPiiInLogsGuardrail } from './guardrails/no_pii_in_logs.js';
+import { noPiiGuardrail } from './guardrails/no_pii_in_logs.js';
 import { noSecretsInArtifactsGuardrail } from './guardrails/no_secrets_in_artifacts.js';
 import { noCredentialLeakGuardrail } from './guardrails/no-credential-leak.js';
 
@@ -74,7 +74,7 @@ export const corePack: Pack = {
 
   guardrails: [
     tokenBudgetGuardrail,
-    noPiiInLogsGuardrail,
+    noPiiGuardrail,
     noSecretsInArtifactsGuardrail,
     noCredentialLeakGuardrail,
   ],

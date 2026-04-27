@@ -1,16 +1,17 @@
 /**
- * Pack-core guardrail tests — Step 11.
+ * Pack-core guardrail tests — Step 11 + #115.
  *
  * Tests the real implementations (no mocks) for:
  *   token-budget          — input stage
- *   no-pii-in-logs        — output + tool stages (redact)
+ *   no-pii                — input + output + tool stages (redact), GUID context-gating, kill-switch
+ *   no-pii-in-logs        — backward-compat alias → same as no-pii
  *   no-secrets-in-artifacts — tool stage (block)
- *   no-credential-leak    — all 3 stages (always block)
+ *   no-credential-leak    — all 3 stages (always block), new patterns (#115), kill-switch
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { tokenBudgetGuardrail } from '../guardrails/token_budget.js';
-import { noPiiInLogsGuardrail } from '../guardrails/no_pii_in_logs.js';
+import { noPiiGuardrail, noPiiInLogsGuardrail } from '../guardrails/no_pii_in_logs.js';
 import { noSecretsInArtifactsGuardrail } from '../guardrails/no_secrets_in_artifacts.js';
 import { noCredentialLeakGuardrail } from '../guardrails/no-credential-leak.js';
 import type { GuardrailInput } from '@aks-kickstart/harness';
@@ -29,17 +30,20 @@ describe('token-budget guardrail', () => {
   });
 });
 
-// ── no-pii-in-logs ───────────────────────────────────────────────────────────
+// ── no-pii (core/no-pii) ─────────────────────────────────────────────────────
 
-describe('no-pii-in-logs guardrail', () => {
-  it('has correct id and stages', () => {
-    expect(noPiiInLogsGuardrail.id).toBe('core/no-pii-in-logs');
-    expect(noPiiInLogsGuardrail.stages).toContain('output');
-    expect(noPiiInLogsGuardrail.stages).toContain('tool');
+describe('no-pii guardrail', () => {
+  afterEach(() => { delete process.env.KICKSTART_GUARDRAILS_DISABLED; });
+
+  it('has correct id and all 3 stages', () => {
+    expect(noPiiGuardrail.id).toBe('core/no-pii');
+    expect(noPiiGuardrail.stages).toContain('input');
+    expect(noPiiGuardrail.stages).toContain('output');
+    expect(noPiiGuardrail.stages).toContain('tool');
   });
 
   it('passes clean output', async () => {
-    const result = await noPiiInLogsGuardrail.evaluate({
+    const result = await noPiiGuardrail.evaluate({
       stage: 'output',
       proposedOutput: 'Deployment successful for my-app',
     });
@@ -47,7 +51,7 @@ describe('no-pii-in-logs guardrail', () => {
   });
 
   it('redacts email from output', async () => {
-    const result = await noPiiInLogsGuardrail.evaluate({
+    const result = await noPiiGuardrail.evaluate({
       stage: 'output',
       proposedOutput: 'Contact user@example.com for details',
     });
@@ -57,7 +61,7 @@ describe('no-pii-in-logs guardrail', () => {
   });
 
   it('redacts SSN from output', async () => {
-    const result = await noPiiInLogsGuardrail.evaluate({
+    const result = await noPiiGuardrail.evaluate({
       stage: 'output',
       proposedOutput: 'SSN 123-45-6789',
     });
@@ -66,7 +70,7 @@ describe('no-pii-in-logs guardrail', () => {
   });
 
   it('redacts phone number from output', async () => {
-    const result = await noPiiInLogsGuardrail.evaluate({
+    const result = await noPiiGuardrail.evaluate({
       stage: 'output',
       proposedOutput: 'Call 555-123-4567 for support',
     });
@@ -74,13 +78,76 @@ describe('no-pii-in-logs guardrail', () => {
     expect(result.redacted as string).toContain('[REDACTED-PHONE]');
   });
 
+  it('redacts email from INPUT stage', async () => {
+    const result = await noPiiGuardrail.evaluate({
+      stage: 'input',
+      userMessage: 'My email is alice@contoso.com please help',
+    });
+    expect(result.verdict).toBe('redact');
+    expect(result.redacted as string).toContain('[REDACTED-EMAIL]');
+    expect(result.redacted as string).not.toContain('alice@contoso.com');
+  });
+
+  it('passes clean input', async () => {
+    const result = await noPiiGuardrail.evaluate({
+      stage: 'input',
+      userMessage: 'Deploy my app to AKS cluster',
+    });
+    expect(result.verdict).toBe('pass');
+  });
+
+  it('redacts Azure subscription ID adjacent to "subscriptionId" keyword', async () => {
+    const result = await noPiiGuardrail.evaluate({
+      stage: 'input',
+      userMessage: 'My subscriptionId is 12345678-1234-1234-1234-123456789abc — help me deploy',
+    });
+    expect(result.verdict).toBe('redact');
+    expect(result.redacted as string).toContain('[REDACTED-SUB-ID]');
+    expect(result.redacted as string).not.toContain('12345678-1234-1234-1234-123456789abc');
+  });
+
+  it('does NOT redact a GUID in a k8s manifest without a subscription context keyword', async () => {
+    const result = await noPiiGuardrail.evaluate({
+      stage: 'input',
+      userMessage: 'Apply manifest with uid: 12345678-1234-1234-1234-123456789abc to namespace default',
+    });
+    // "uid" is not a sub-id or oid keyword — should not redact
+    expect(result.verdict).toBe('pass');
+  });
+
+  it('redacts AAD objectId adjacent to "objectId" keyword', async () => {
+    const result = await noPiiGuardrail.evaluate({
+      stage: 'output',
+      proposedOutput: 'User objectId: abcdef01-1234-5678-abcd-ef0123456789',
+    });
+    expect(result.verdict).toBe('redact');
+    expect(result.redacted as string).toContain('[REDACTED-OID]');
+  });
+
   it('passes on tool stage without PII', async () => {
-    const result = await noPiiInLogsGuardrail.evaluate({
+    const result = await noPiiGuardrail.evaluate({
       stage: 'tool',
       toolName: 'core.write_file',
       toolArgs: { content: 'clean content', path: 'output.txt' },
     });
     expect(result.verdict).toBe('pass');
+  });
+
+  it('kill-switch: returns pass when KICKSTART_GUARDRAILS_DISABLED=true', async () => {
+    process.env.KICKSTART_GUARDRAILS_DISABLED = 'true';
+    const result = await noPiiGuardrail.evaluate({
+      stage: 'input',
+      userMessage: 'alice@example.com is my email',
+    });
+    expect(result.verdict).toBe('pass');
+  });
+});
+
+// ── backward-compat alias ─────────────────────────────────────────────────────
+
+describe('noPiiInLogsGuardrail (backward-compat alias)', () => {
+  it('is the same object as noPiiGuardrail', () => {
+    expect(noPiiInLogsGuardrail).toBe(noPiiGuardrail);
   });
 });
 
@@ -132,6 +199,8 @@ describe('no-secrets-in-artifacts guardrail', () => {
 // ── no-credential-leak ────────────────────────────────────────────────────────
 
 describe('no-credential-leak guardrail', () => {
+  afterEach(() => { delete process.env.KICKSTART_GUARDRAILS_DISABLED; });
+
   it('has correct id and all 3 stages', () => {
     expect(noCredentialLeakGuardrail.id).toBe('core/no-credential-leak');
     expect(noCredentialLeakGuardrail.stages).toContain('input');
@@ -173,6 +242,38 @@ describe('no-credential-leak guardrail', () => {
     expect(result.verdict).toBe('block');
   });
 
+  it('blocks Azure subscription key', async () => {
+    const result = await noCredentialLeakGuardrail.evaluate({
+      stage: 'input',
+      userMessage: 'SubscriptionKey: abcdefghijklmnopqrstuvwxyz123456',
+    });
+    expect(result.verdict).toBe('block');
+  });
+
+  it('blocks Azure client secret', async () => {
+    const result = await noCredentialLeakGuardrail.evaluate({
+      stage: 'input',
+      userMessage: 'ClientSecret=my~super~secret~password~here~1234',
+    });
+    expect(result.verdict).toBe('block');
+  });
+
+  it('blocks Postgres DSN with password', async () => {
+    const result = await noCredentialLeakGuardrail.evaluate({
+      stage: 'input',
+      userMessage: 'Connect to postgresql://admin:s3cr3tpass@mydb.postgres.database.azure.com/mydb',
+    });
+    expect(result.verdict).toBe('block');
+  });
+
+  it('blocks ARM Bearer token (non-JWT)', async () => {
+    const result = await noCredentialLeakGuardrail.evaluate({
+      stage: 'output',
+      proposedOutput: 'Authorization: Bearer abcdefghijklmnopqrstuvwxyz1234567890',
+    });
+    expect(result.verdict).toBe('block');
+  });
+
   it('passes clean input', async () => {
     const result = await noCredentialLeakGuardrail.evaluate({
       stage: 'input',
@@ -188,5 +289,14 @@ describe('no-credential-leak guardrail', () => {
     });
     expect(result.verdict).toBe('block');
     expect(result.verdict).not.toBe('redact');
+  });
+
+  it('kill-switch: returns pass when KICKSTART_GUARDRAILS_DISABLED=true', async () => {
+    process.env.KICKSTART_GUARDRAILS_DISABLED = 'true';
+    const result = await noCredentialLeakGuardrail.evaluate({
+      stage: 'input',
+      userMessage: 'my token is ghp_abcdefghijklmnopqrstuvwxyz1234567',
+    });
+    expect(result.verdict).toBe('pass');
   });
 });

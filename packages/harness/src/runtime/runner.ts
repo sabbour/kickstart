@@ -986,7 +986,12 @@ export class Runner {
         sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
         return;
       }
-      guardedMessage = inputResult.mutatedInput.userMessage ?? guardedMessage;
+      const sanitized = inputResult.mutatedInput.userMessage ?? guardedMessage;
+      if (sanitized !== guardedMessage) {
+        // Content was redacted — emit opaque warning (no pattern/detail per security invariant)
+        sseWrite('guardrail_warn', { message: 'Some personal information was removed from your message.' });
+      }
+      guardedMessage = sanitized;
     } catch {
       // Fail-closed: unexpected throw from engine
       sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
@@ -1229,7 +1234,12 @@ export class Runner {
             sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
             return;
           }
-          outputText = outResult.mutatedInput.proposedOutput ?? outputText;
+          const sanitizedOutput = outResult.mutatedInput.proposedOutput ?? outputText;
+          if (sanitizedOutput !== outputText) {
+            // Content was redacted — emit opaque warning (no pattern/detail per security invariant)
+            sseWrite('guardrail_warn', { message: 'Some personal information was removed from your message.' });
+          }
+          outputText = sanitizedOutput;
         } catch {
           sseWrite('error', { code: 'GUARDRAIL_BLOCK', message: 'Request could not be completed' });
           return;

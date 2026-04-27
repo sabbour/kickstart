@@ -1,7 +1,7 @@
 import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@aks-kickstart/harness';
 
 /**
- * no-credential-leak guardrail.
+ * no-credential-leak guardrail (#115).
  *
  * Detects credentials in ALL pipeline stages (input, output, tool) and ALWAYS
  * returns `block` — credentials are never redacted, only blocked.
@@ -11,13 +11,22 @@ import type { GuardrailContribution, GuardrailInput, GuardrailResult } from '@ak
  *  - GitHub PATs (ghp_, ghs_, github_pat_)
  *  - Azure SAS tokens (sv=…&sig=…)
  *  - Azure connection strings (AccountKey=, SharedAccessSignature=)
+ *  - Azure subscription keys (SubscriptionKey=…)
+ *  - Azure client secrets (ClientSecret=…)
+ *  - ARM Bearer tokens (Authorization: Bearer …)
+ *  - Postgres/SQL DSN passwords (postgres://user:pass@…)
  *  - JWT bearer tokens
  *  - SSH private keys
+ *  - Generic connection strings with passwords
+ *
+ * Kill-switch: set KICKSTART_GUARDRAILS_DISABLED=true to bypass (dev only).
  */
 
 const CREDENTIAL_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
   // Azure access token (JWT Bearer)
   { name: 'azure-access-token', pattern: /Bearer\s+eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/i },
+  // ARM Bearer token (explicit — also catches non-JWT Bearer headers)
+  { name: 'arm-bearer-token', pattern: /[Aa]uthorization:\s*Bearer\s+[A-Za-z0-9_.\\-]{20,}/ },
   // Generic JWT (three base64url segments)
   { name: 'jwt-token', pattern: /eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}/ },
   // GitHub PATs (min 30 chars after prefix — real tokens are 36+ but check 30+ for test coverage)
@@ -28,6 +37,12 @@ const CREDENTIAL_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
   { name: 'azure-sas-token', pattern: /sv=\d{4}-\d{2}-\d{2}[^"'\s]*&sig=[A-Za-z0-9%+/=]{20,}/i },
   // Azure storage connection string / account key
   { name: 'azure-connection-string', pattern: /(?:AccountKey|SharedAccessSignature)=[A-Za-z0-9+/=]{20,}/i },
+  // Azure subscription key (APIM / Cognitive Services)
+  { name: 'azure-subscription-key', pattern: /[Ss]ubscription[Kk]ey["'\s:=]+[A-Za-z0-9+/=]{20,}/ },
+  // Azure client secret (service principal)
+  { name: 'azure-client-secret', pattern: /[Cc]lient[Ss]ecret["'\s:=]+[A-Za-z0-9~._\-]{20,}/ },
+  // Postgres/SQL DSN password: postgres://user:pass@host
+  { name: 'postgres-dsn-password', pattern: /postgres(?:ql)?:\/\/[^:]+:[^@]{8,}@/ },
   // Generic connection strings with passwords
   { name: 'connection-string-password', pattern: /(?:Password|Pwd)=[^;]{8,}/i },
   // SSH private key block
@@ -51,6 +66,10 @@ export const noCredentialLeakGuardrail: GuardrailContribution = {
   appliesTo: ['*'],
   stages: ['input', 'output', 'tool'],
   async evaluate(input: GuardrailInput): Promise<GuardrailResult> {
+    if (process.env.KICKSTART_GUARDRAILS_DISABLED === 'true') {
+      return { verdict: 'pass' };
+    }
+
     let text: string;
 
     switch (input.stage) {

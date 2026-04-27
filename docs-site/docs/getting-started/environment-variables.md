@@ -115,6 +115,18 @@ When `true`, enables playground scenarios for component development and testing.
 
 When `true`, enables debugging tools and verbose logging in the runtime. Useful for investigating agent behavior and pack interactions.
 
+### KICKSTART_GUARDRAILS_DISABLED
+
+**Required:** No  
+**Default:** `false`  
+**Allowed values:** `1`, unset
+
+When set to `1`, disables all content guardrails (PII detection, credential leak detection) for the current process.
+
+> ⚠️ **Development only.** Never set this variable in staging or production. All guardrail rules — including `core/no-pii` and `core/no-credential-leak` — are bypassed when this flag is set.
+
+Useful when working on harness internals where guardrail redaction interferes with test assertions.
+
 ## Authentication & Security
 
 ### GITHUB_CLIENT_ID

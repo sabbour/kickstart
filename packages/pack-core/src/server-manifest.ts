@@ -28,7 +28,7 @@ import { createCoreTools } from './core-tools.js';
 
 // Guardrails (no JSX)
 import { tokenBudgetGuardrail } from './guardrails/token_budget.js';
-import { noPiiInLogsGuardrail } from './guardrails/no_pii_in_logs.js';
+import { noPiiGuardrail } from './guardrails/no_pii_in_logs.js';
 import { noSecretsInArtifactsGuardrail } from './guardrails/no_secrets_in_artifacts.js';
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ export const corePackServer: Pack = {
 
   guardrails: [
     tokenBudgetGuardrail,
-    noPiiInLogsGuardrail,
+    noPiiGuardrail,
     noSecretsInArtifactsGuardrail,
   ],
 };
