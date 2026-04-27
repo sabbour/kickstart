@@ -10,7 +10,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpenAIProvider } from '@openai/agents';
-import { buildAzureBaseUrl, buildModelProvider, resolveOutputText } from '../../src/runtime/runner.js';
+import { buildAzureBaseUrl, buildModelProvider, isResponsesApiEnabled, resolveOutputText } from '../../src/runtime/runner.js';
 
 describe('buildAzureBaseUrl', () => {
   it('appends /openai/v1 when endpoint has no trailing slash', () => {
@@ -75,6 +75,51 @@ describe('buildModelProvider', () => {
     expect(console.log).toHaveBeenCalledWith(
       '[runner] Building model provider: Standard OpenAI (or dev/test fallback)',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isResponsesApiEnabled — feature flag (Phase 1 of #114)
+// ---------------------------------------------------------------------------
+
+describe('isResponsesApiEnabled', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns false when KICKSTART_USE_RESPONSES is absent', () => {
+    vi.stubEnv('KICKSTART_USE_RESPONSES', '');
+    expect(isResponsesApiEnabled()).toBe(false);
+  });
+
+  it('returns true when KICKSTART_USE_RESPONSES is "1"', () => {
+    vi.stubEnv('KICKSTART_USE_RESPONSES', '1');
+    expect(isResponsesApiEnabled()).toBe(true);
+  });
+
+  it('returns true when KICKSTART_USE_RESPONSES is "true"', () => {
+    vi.stubEnv('KICKSTART_USE_RESPONSES', 'true');
+    expect(isResponsesApiEnabled()).toBe(true);
+  });
+
+  it('returns false when KICKSTART_USE_RESPONSES is "0"', () => {
+    vi.stubEnv('KICKSTART_USE_RESPONSES', '0');
+    expect(isResponsesApiEnabled()).toBe(false);
+  });
+
+  it('returns false when KICKSTART_USE_RESPONSES is "false"', () => {
+    vi.stubEnv('KICKSTART_USE_RESPONSES', 'false');
+    expect(isResponsesApiEnabled()).toBe(false);
+  });
+
+  it('returns true when KICKSTART_USE_RESPONSES is "yes"', () => {
+    vi.stubEnv('KICKSTART_USE_RESPONSES', 'yes');
+    expect(isResponsesApiEnabled()).toBe(true);
+  });
+
+  it('is case-insensitive (TRUE → true)', () => {
+    vi.stubEnv('KICKSTART_USE_RESPONSES', 'TRUE');
+    expect(isResponsesApiEnabled()).toBe(true);
   });
 });
 

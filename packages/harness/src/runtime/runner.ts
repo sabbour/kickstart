@@ -62,6 +62,20 @@ export interface RunnerOptions {
 }
 
 // ---------------------------------------------------------------------------
+// Feature flag: KICKSTART_USE_RESPONSES
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true when the KICKSTART_USE_RESPONSES env var is set to a truthy
+ * value ("1", "true", "yes", "on").  Default is false so existing behaviour
+ * is unchanged until the flag is explicitly enabled (Phase 2 of #114).
+ */
+export function isResponsesApiEnabled(): boolean {
+  const val = (process.env.KICKSTART_USE_RESPONSES ?? '').toLowerCase().trim();
+  return val === '1' || val === 'true' || val === 'yes' || val === 'on';
+}
+
+// ---------------------------------------------------------------------------
 // Build model provider (Azure-aware)
 // ---------------------------------------------------------------------------
 
@@ -89,6 +103,7 @@ export function buildAzureBaseUrl(endpoint: string): string {
 export function buildModelProvider(): OpenAIProvider {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
+  const useResponses = isResponsesApiEnabled();
 
   if (endpoint && apiKey) {
     // Azure OpenAI — use the v1 OpenAI-compatible surface (see #932).
@@ -97,13 +112,13 @@ export function buildModelProvider(): OpenAIProvider {
     return new OpenAIProvider({
       apiKey,
       baseURL: azureBaseUrl,
-      useResponses: false,
+      useResponses,
     });
   }
 
   // Standard OpenAI (dev/test) — reads OPENAI_API_KEY from env automatically
   console.log('[runner] Building model provider: Standard OpenAI (or dev/test fallback)');
-  return new OpenAIProvider({ useResponses: false });
+  return new OpenAIProvider({ useResponses });
 }
 
 // Lazily-initialised shared provider + SDK runner
