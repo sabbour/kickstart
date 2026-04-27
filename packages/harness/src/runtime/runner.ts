@@ -12,7 +12,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { Agent, Runner as SDKRunner, handoff, tool, setDefaultModelProvider, OpenAIProvider, setTraceProcessors } from '@openai/agents';
+import { Agent, Runner as SDKRunner, handoff, tool, setDefaultModelProvider, OpenAIProvider, setTraceProcessors, MaxTurnsExceededError } from '@openai/agents';
 import type { FunctionTool, AgentInputItem, CallModelInputFilter } from '@openai/agents';
 import type { GuardrailContribution } from '../types/guardrail.js';
 import type { Turn, ToolCallRecord } from '../types/session.js';
@@ -679,6 +679,89 @@ function emitPlanArtifactMissingCard(sseWrite: SSEWriter): void {
   });
 }
 
+/**
+ * Emit a recovery Card when MaxTurnsExceededError is thrown (#100).
+ *
+ * Security constraints (consistent with emitPlanArtifactMissingCard):
+ * - Title and message copy are FIXED — never derived from user or LLM input.
+ * - Raw error details go to telemetry/console ONLY, never in this payload.
+ */
+function emitMaxTurnsRecoveryCard(sseWrite: SSEWriter): void {
+  const surfaceId = 'error-max-turns-exceeded';
+  sseWrite('a2ui', {
+    version: 'v0.9',
+    createSurface: { surfaceId, catalogId: 'kickstart' },
+  });
+  sseWrite('a2ui', {
+    version: 'v0.9',
+    updateComponents: {
+      surfaceId,
+      components: [
+        {
+          type: 'Card',
+          id: 'max-turns-exceeded-card',
+          title: 'Conversation limit reached',
+          message: 'This conversation has reached its maximum length. Start a new conversation to continue.',
+          actions: [
+            {
+              label: 'Start New Conversation',
+              action: { href: '/' },
+            },
+          ],
+        },
+      ],
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Token-count gate on conversation history (#101)
+// ---------------------------------------------------------------------------
+
+/** Maximum context window size (tokens) assumed for all models. */
+export const TOKEN_CONTEXT_LIMIT = 128_000;
+
+/**
+ * Trim threshold: trim oldest turns when estimated tokens exceed 80% of the
+ * context window to prevent silent context overflow on long conversations.
+ */
+export const TOKEN_TRIM_THRESHOLD = Math.floor(TOKEN_CONTEXT_LIMIT * 0.8); // 102,400
+
+/**
+ * Estimate total tokens for a list of turns using the char/4 heuristic.
+ * Cheap and allocation-free — avoids a heavy tiktoken dependency.
+ * Exported for unit-testing (#101).
+ */
+export function estimateTurnsTokens(turns: readonly Turn[]): number {
+  let chars = 0;
+  for (const turn of turns) {
+    if (typeof turn.content === 'string') {
+      chars += turn.content.length;
+    }
+  }
+  return Math.ceil(chars / 4);
+}
+
+/**
+ * Return a trimmed copy of `turns` so the estimated token count fits within
+ * `budget`. Oldest turns are removed first; at least one turn is always kept.
+ * Returns the original array reference (no copy) when no trimming is needed.
+ * Exported for unit-testing (#101).
+ */
+export function trimHistoryToTokenBudget(
+  turns: readonly Turn[],
+  budget: number = TOKEN_TRIM_THRESHOLD,
+): { turns: readonly Turn[]; wasTrimmed: boolean } {
+  if (estimateTurnsTokens(turns) <= budget) {
+    return { turns, wasTrimmed: false };
+  }
+  const mutable = [...turns];
+  while (mutable.length > 1 && estimateTurnsTokens(mutable) > budget) {
+    mutable.shift();
+  }
+  return { turns: mutable, wasTrimmed: true };
+}
+
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
@@ -976,8 +1059,16 @@ export class Runner {
       // sanitized current user turn (appended after input guardrails above);
       // passing the whole history as `AgentInputItem[]` gives the model full
       // context of the conversation.
+      //
+      // #101 Token-count gate: trim oldest turns before injecting history so
+      // large tool outputs can't silently exhaust the context window.
+      const { turns: boundedTurns, wasTrimmed } = trimHistoryToTokenBudget(session.recentTurns);
+      if (wasTrimmed) {
+        console.warn('[runner] History trimmed to fit context window');
+        sseWrite('chunk', { delta: '\n> *Earlier parts of this conversation were trimmed to fit within context limits.*\n\n' });
+      }
       // #103: also include tool call/result items from prior turns.
-      const runInput: AgentInputItem[] = toAgentInputItems(session.recentTurns, session.toolCallItems);
+      const runInput: AgentInputItem[] = toAgentInputItems(boundedTurns, session.toolCallItems);
 
       // #102: withRetry wraps the sdkRunner.run() call so transient 429/500/503
       // errors are retried with exponential backoff + jitter. 4xx codes outside
@@ -1223,6 +1314,22 @@ export class Runner {
       // #102: record failure against circuit breaker. AbortError and guardrail
       // halts are intentional — don't count them as infrastructure failures.
       runnerCircuitBreaker.recordFailure();
+      // #100: MaxTurnsExceededError — show a friendly recovery card, not a raw error.
+      if (err instanceof MaxTurnsExceededError) {
+        console.warn('[runner] MaxTurnsExceededError: conversation limit reached');
+        emitMaxTurnsRecoveryCard(sseWrite);
+        sseWrite('end', {
+          sessionId: session.sessionId,
+          intent: undefined,
+          model: modelName,
+          agentName,
+          skillsExecuted: getSkillsExecuted(),
+          skillsPulledBytes: session.skillsPulledBytes ?? 0,
+          skillsPulledTokens: session.skillsPulledTokens ?? 0,
+          toolsExecuted,
+        });
+        return;
+      }
       sseWrite('error', {
         message: sanitizeError(err),
       });
