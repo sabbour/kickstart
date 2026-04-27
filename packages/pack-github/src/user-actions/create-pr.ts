@@ -14,6 +14,7 @@ const CreatePRParametersSchema = z.object({
     .describe('Pull request title (max 255 characters)'),
   prBody: z
     .string()
+    .nullable()
     .optional()
     .describe('Pull request description body'),
 });

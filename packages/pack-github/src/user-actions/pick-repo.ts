@@ -7,6 +7,7 @@ const PickRepoParametersSchema = z.object({
     .describe('GitHub organization or user login to list repositories for'),
   reason: z
     .string()
+    .nullable()
     .optional()
     .describe('Optional explanation for why a repository is needed'),
 });

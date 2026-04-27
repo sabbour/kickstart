@@ -20,9 +20,14 @@ const ArmDeployResourceInputSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}(-preview)?$/, 'Must be an API version like 2023-01-01 or 2023-01-01-preview')
     .describe('ARM API version, e.g. "2023-03-01"'),
+  // OpenAI strict-mode forbids open-keyed objects (z.record), so the ARM
+  // body is passed as a JSON-encoded string and parsed inside execute().
   body: z
-    .record(z.string(), z.unknown())
-    .describe('Full ARM resource body for the PUT request'),
+    .string()
+    .describe(
+      'Full ARM resource body for the PUT request, JSON-encoded as a string. ' +
+      'Example: \'{"location":"eastus","properties":{...}}\'.',
+    ),
 });
 
 const ArmDeployResourceOutputSchema = z.object({
@@ -54,10 +59,29 @@ export const armDeployResourceTool: ToolContribution = {
       const token = getAzureToken(session);
       const url = `${ARM_BASE_URL}${safePath}?api-version=${encodeURIComponent(input.apiVersion)}`;
 
+      // Validate that `body` is well-formed JSON; the model passes it as a
+      // string under OpenAI strict-mode (which forbids open-keyed objects).
+      let parsedBody: unknown;
+      try {
+        parsedBody = JSON.parse(input.body);
+      } catch (err) {
+        throw new Error(
+          `azure.arm_deploy_resource: body must be a valid JSON string. ${(err as Error).message}`,
+          { cause: err },
+        );
+      }
+      if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+        throw new Error(
+          'azure.arm_deploy_resource: body must decode to a JSON object (got '
+            + (parsedBody === null ? 'null' : Array.isArray(parsedBody) ? 'array' : typeof parsedBody)
+            + ').',
+        );
+      }
+
       const response = await fetch(url, {
         method: 'PUT',
         headers: armAuthHeaders(token),
-        body: JSON.stringify(input.body),
+        body: JSON.stringify(parsedBody),
         signal: AbortSignal.timeout(30_000),
       });
 

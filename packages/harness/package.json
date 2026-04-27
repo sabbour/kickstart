@@ -33,6 +33,10 @@
       "import": "./dist/runtime/registry.js",
       "types": "./dist/runtime/registry.d.ts"
     },
+    "./runtime/schema-conformance": {
+      "import": "./dist/runtime/schema-conformance.js",
+      "types": "./dist/runtime/schema-conformance.d.ts"
+    },
     "./runtime/session": {
       "import": "./dist/runtime/session.js",
       "types": "./dist/runtime/session.d.ts"

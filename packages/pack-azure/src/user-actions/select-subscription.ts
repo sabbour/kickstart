@@ -12,10 +12,12 @@ import type { UserActionContribution } from '@aks-kickstart/harness';
 const SelectSubscriptionParametersSchema = z.object({
   reason: z
     .string()
+    .nullable()
     .optional()
     .describe('Optional explanation for why authentication is needed, shown in the auth UI'),
   preferredSubscriptionId: z
     .string()
+    .nullable()
     .optional()
     .describe('Optional subscription ID to pre-select if the user has multiple subscriptions'),
 });

@@ -485,6 +485,23 @@ export { matchesSkill } from './runtime/skill-matcher.js';
 export { PackRegistry } from './runtime/registry.js';
 export { resolveSkills } from './runtime/skill-resolver.js';
 export type { ResolveSkillsOptions } from './runtime/skill-resolver.js';
+export {
+  walkSchema,
+  collectMissingProperties,
+  collectStrictRequiredViolations,
+  collectAdditionalPropertiesViolations,
+  collectMissingTypes,
+  reportSchemaConformance,
+  reportHasIssues,
+  formatReport,
+  getToolJsonSchema,
+  getUserActionJsonSchema,
+} from './runtime/schema-conformance.js';
+export type {
+  SchemaNode,
+  SchemaVisitor,
+  SchemaConformanceReport,
+} from './runtime/schema-conformance.js';
 
 // ── Step 11–12: Runner + Resume ──────────────────────────────────────────────
 export { Runner } from './runtime/runner.js';

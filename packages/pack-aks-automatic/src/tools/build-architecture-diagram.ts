@@ -6,52 +6,52 @@ import type { ToolContribution } from '@aks-kickstart/harness';
 
 const PlanNodePoolSchema = z.object({
   name: z.string().max(1000, 'Pool name must be ≤1000 chars'),
-  mode: z.enum(['System', 'User']).optional(),
-  vmSize: z.string().max(1000, 'VM size must be ≤1000 chars').optional(),
-  count: z.number().optional(),
+  mode: z.enum(['System', 'User']).nullable().optional(),
+  vmSize: z.string().max(1000, 'VM size must be ≤1000 chars').nullable().optional(),
+  count: z.number().nullable().optional(),
 });
 
 const PlanWorkloadSchema = z.object({
   name: z.string().max(1000, 'Workload name must be ≤1000 chars'),
-  type: z.string().max(1000, 'Workload type must be ≤1000 chars').optional(),
-  replicas: z.number().optional(),
+  type: z.string().max(1000, 'Workload type must be ≤1000 chars').nullable().optional(),
+  replicas: z.number().nullable().optional(),
 });
 
 const PlanIngressSchema = z.object({
-  type: z.string().max(1000, 'Ingress type must be ≤1000 chars').optional(),
-  host: z.string().max(1000, 'Ingress host must be ≤1000 chars').optional(),
+  type: z.string().max(1000, 'Ingress type must be ≤1000 chars').nullable().optional(),
+  host: z.string().max(1000, 'Ingress host must be ≤1000 chars').nullable().optional(),
 });
 
 const PlanStorageSchema = z.object({
-  type: z.string().max(1000, 'Storage type must be ≤1000 chars').optional(),
-  name: z.string().max(1000, 'Storage name must be ≤1000 chars').optional(),
+  type: z.string().max(1000, 'Storage type must be ≤1000 chars').nullable().optional(),
+  name: z.string().max(1000, 'Storage name must be ≤1000 chars').nullable().optional(),
 });
 
 const PlanKaitoSchema = z.object({
-  model: z.string().max(1000, 'KAITO model must be ≤1000 chars').optional(),
-  gpu: z.string().max(1000, 'KAITO gpu must be ≤1000 chars').optional(),
+  model: z.string().max(1000, 'KAITO model must be ≤1000 chars').nullable().optional(),
+  gpu: z.string().max(1000, 'KAITO gpu must be ≤1000 chars').nullable().optional(),
 });
 
 const PlanFoundrySchema = z.object({
-  endpoint: z.string().max(1000, 'Foundry endpoint must be ≤1000 chars').optional(),
-  model: z.string().max(1000, 'Foundry model must be ≤1000 chars').optional(),
+  endpoint: z.string().max(1000, 'Foundry endpoint must be ≤1000 chars').nullable().optional(),
+  model: z.string().max(1000, 'Foundry model must be ≤1000 chars').nullable().optional(),
 });
 
 const PlanCiCdSchema = z.object({
-  provider: z.string().max(1000, 'CI/CD provider must be ≤1000 chars').optional(),
-  registry: z.string().max(1000, 'CI/CD registry must be ≤1000 chars').optional(),
+  provider: z.string().max(1000, 'CI/CD provider must be ≤1000 chars').nullable().optional(),
+  registry: z.string().max(1000, 'CI/CD registry must be ≤1000 chars').nullable().optional(),
 });
 
 const BuildArchitectureDiagramInputSchema = z.object({
   plan: z.object({
-    clusterName: z.string().max(1000, 'Cluster name must be ≤1000 chars').optional(),
-    nodePools: z.array(PlanNodePoolSchema).max(100, 'Node pools must be ≤100').optional(),
-    workloads: z.array(PlanWorkloadSchema).max(100, 'Workloads must be ≤100').optional(),
-    ingress: PlanIngressSchema.optional(),
-    storage: PlanStorageSchema.optional(),
-    kaito: PlanKaitoSchema.optional(),
-    foundry: PlanFoundrySchema.optional(),
-    cicd: PlanCiCdSchema.optional(),
+    clusterName: z.string().max(1000, 'Cluster name must be ≤1000 chars').nullable().optional(),
+    nodePools: z.array(PlanNodePoolSchema).max(100, 'Node pools must be ≤100').nullable().optional(),
+    workloads: z.array(PlanWorkloadSchema).max(100, 'Workloads must be ≤100').nullable().optional(),
+    ingress: PlanIngressSchema.nullable().optional(),
+    storage: PlanStorageSchema.nullable().optional(),
+    kaito: PlanKaitoSchema.nullable().optional(),
+    foundry: PlanFoundrySchema.nullable().optional(),
+    cicd: PlanCiCdSchema.nullable().optional(),
   }).describe('The plan artifact from Phase A/B describing the AKS topology'),
 });
 

@@ -10,6 +10,7 @@ const SetSecretParametersSchema = z.object({
     .describe('GitHub Actions secret name (e.g. AZURE_CLIENT_ID)'),
   hint: z
     .string()
+    .nullable()
     .optional()
     .describe('Optional hint shown in the UI to help the user find the value'),
 });

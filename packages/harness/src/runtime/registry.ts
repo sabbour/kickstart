@@ -287,16 +287,27 @@ export class PackRegistry {
     return [...this.componentsByName.values()].filter((component) => this.isPackActive(this.packNameFromComponent(component.name)));
   }
 
+  /**
+   * Every active pack tool. Used by conformance tests that discover tools
+   * dynamically through the registry rather than hand-maintaining rosters.
+   */
+  get tools(): ToolContribution[] {
+    return [...this.toolsByName.values()].filter((tool) => this.isPackActive(this.packNameFromTool(tool.name)));
+  }
+
+  /**
+   * Every active pack user action. Public for the same reason as `tools`.
+   */
+  get userActions(): UserActionContribution[] {
+    return [...this.userActionsByName.values()].filter((action) => this.isPackActive(this.packNameFromUserAction(action.name)));
+  }
+
   get catalog(): A2UICatalog {
     return buildCatalogSnapshot(this.components, this.userActions);
   }
 
   negotiateCatalog(advertisedCatalogIds: readonly string[] | undefined): A2UICatalog {
     return negotiateCatalog(advertisedCatalogIds, buildCatalogSnapshot(this.components, this.userActions));
-  }
-
-  private get userActions(): UserActionContribution[] {
-    return [...this.userActionsByName.values()].filter((action) => this.isPackActive(this.packNameFromUserAction(action.name)));
   }
 
   private loadAgents(

@@ -20,9 +20,15 @@ const ArmUpdateResourceInputSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}(-preview)?$/, 'Must be an API version like 2023-01-01 or 2023-01-01-preview')
     .describe('ARM API version, e.g. "2023-03-01"'),
+  // OpenAI strict-mode forbids open-keyed objects (z.record), so the
+  // partial patch body is passed as a JSON-encoded string and parsed in
+  // execute().
   patch: z
-    .record(z.string(), z.unknown())
-    .describe('Partial ARM resource body — only the fields to change'),
+    .string()
+    .describe(
+      'Partial ARM resource body — only the fields to change, JSON-encoded as a string. ' +
+      'Example: \'{"properties":{"description":"new"}}\'.',
+    ),
 });
 
 const ArmUpdateResourceOutputSchema = z.object({
@@ -54,10 +60,29 @@ export const armUpdateResourceTool: ToolContribution = {
       const token = getAzureToken(session);
       const url = `${ARM_BASE_URL}${safePath}?api-version=${encodeURIComponent(input.apiVersion)}`;
 
+      // Validate the patch is well-formed JSON; the model passes it as a
+      // string under OpenAI strict-mode.
+      let parsedPatch: unknown;
+      try {
+        parsedPatch = JSON.parse(input.patch);
+      } catch (err) {
+        throw new Error(
+          `azure.arm_update_resource: patch must be a valid JSON string. ${(err as Error).message}`,
+          { cause: err },
+        );
+      }
+      if (!parsedPatch || typeof parsedPatch !== 'object' || Array.isArray(parsedPatch)) {
+        throw new Error(
+          'azure.arm_update_resource: patch must decode to a JSON object (got '
+            + (parsedPatch === null ? 'null' : Array.isArray(parsedPatch) ? 'array' : typeof parsedPatch)
+            + ').',
+        );
+      }
+
       const response = await fetch(url, {
         method: 'PATCH',
         headers: armAuthHeaders(token),
-        body: JSON.stringify(input.patch),
+        body: JSON.stringify(parsedPatch),
         signal: AbortSignal.timeout(30_000),
       });
 

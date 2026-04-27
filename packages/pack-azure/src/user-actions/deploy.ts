@@ -16,15 +16,19 @@ const DeployParametersSchema = z.object({
   deploymentName: z
     .string()
     .describe('Deployment name for tracking in Azure'),
+  // OpenAI strict-mode forbids open-keyed objects (z.record). The template
+  // and parameters are passed as JSON-encoded strings.
   template: z
-    .record(z.string(), z.unknown())
-    .describe('ARM JSON template object to deploy'),
+    .string()
+    .describe('ARM JSON template object to deploy, encoded as a JSON string'),
   parameters: z
-    .record(z.string(), z.unknown())
+    .string()
+    .nullable()
     .optional()
-    .describe('ARM template parameters'),
+    .describe('ARM template parameters, encoded as a JSON string'),
   whatIfSummary: z
     .string()
+    .nullable()
     .optional()
     .describe('Pre-computed what-if summary to show in the confirm UI'),
 });

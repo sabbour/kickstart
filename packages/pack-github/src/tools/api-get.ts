@@ -47,11 +47,17 @@ const ApiGetInputSchema = z.object({
     .describe(
       'GitHub API path, e.g. /repos/{owner}/{repo} or /users/{username}. Must start with /.',
     ),
+  // OpenAI strict-mode forbids open-keyed objects (z.record), so query
+  // params are passed as a JSON-encoded string mapping key → value and
+  // parsed inside execute().
   params: z
-    .record(z.string(), z.string())
+    .string()
     .nullable()
     .optional()
-    .describe('Optional query string parameters'),
+    .describe(
+      'Optional query string parameters as a JSON-encoded object of string→string entries. ' +
+      'Example: \'{"per_page":"50"}\'.',
+    ),
 });
 
 // ── Tool ──────────────────────────────────────────────────────────────────────
@@ -78,7 +84,30 @@ export const apiGetTool: ToolContribution = {
       validateGithubPath(input.path);
       const url = new URL(`${GITHUB_API_BASE}${input.path}`);
       if (input.params) {
-        for (const [key, value] of Object.entries(input.params)) {
+        let parsedParams: unknown;
+        try {
+          parsedParams = JSON.parse(input.params);
+        } catch (err) {
+          throw new Error(
+            `github.api_get: params must be a valid JSON string. ${(err as Error).message}`,
+            { cause: err },
+          );
+        }
+        if (
+          !parsedParams ||
+          typeof parsedParams !== 'object' ||
+          Array.isArray(parsedParams)
+        ) {
+          throw new Error(
+            'github.api_get: params must decode to a JSON object of string→string entries.',
+          );
+        }
+        for (const [key, value] of Object.entries(parsedParams as Record<string, unknown>)) {
+          if (typeof value !== 'string') {
+            throw new Error(
+              `github.api_get: params["${key}"] must be a string (got ${typeof value}).`,
+            );
+          }
           url.searchParams.set(key, value);
         }
       }

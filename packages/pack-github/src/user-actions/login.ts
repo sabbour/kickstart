@@ -4,6 +4,7 @@ import type { UserActionContribution } from '@aks-kickstart/harness';
 const LoginParametersSchema = z.object({
   reason: z
     .string()
+    .nullable()
     .optional()
     .describe('Optional explanation for why GitHub authentication is needed'),
 });

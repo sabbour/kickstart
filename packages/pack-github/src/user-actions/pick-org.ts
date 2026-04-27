@@ -4,6 +4,7 @@ import type { UserActionContribution } from '@aks-kickstart/harness';
 const PickOrgParametersSchema = z.object({
   reason: z
     .string()
+    .nullable()
     .optional()
     .describe('Optional explanation for why an org or user account is needed'),
 });

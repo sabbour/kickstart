@@ -27,18 +27,22 @@ const AksDeployParametersSchema = z.object({
     .describe('Azure subscription ID or name'),
   namespace: z
     .string()
+    .nullable()
     .optional()
     .describe('Kubernetes namespace for workload deployments (default: default)'),
   manifests: z
     .array(z.string())
+    .nullable()
     .optional()
     .describe('Kubernetes YAML manifests to apply after cluster is ready'),
   deploymentSummary: z
     .string()
+    .nullable()
     .optional()
     .describe('Human-readable summary of what will be deployed — shown in the confirm UI'),
   safeguardReport: z
     .string()
+    .nullable()
     .optional()
     .describe('Pre-computed safeguard compliance report to display in the confirm UI'),
 });

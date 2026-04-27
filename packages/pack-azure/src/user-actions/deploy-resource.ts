@@ -24,9 +24,12 @@ const DeployResourceParametersSchema = z.object({
   resourceName: z
     .string()
     .describe('Display name of the resource being deployed'),
+  // OpenAI strict-mode forbids open-keyed objects (z.record). The body is
+  // passed as a JSON-encoded string; the runner forwards it verbatim to
+  // azure.arm_deploy_resource which performs the JSON parse + ARM PUT.
   body: z
-    .record(z.string(), z.unknown())
-    .describe('Full ARM resource body for the PUT request'),
+    .string()
+    .describe('Full ARM resource body for the PUT request, JSON-encoded as a string'),
   confirmationMessage: z
     .string()
     .describe('Human-readable description of what this deployment will do, shown in the confirm UI'),

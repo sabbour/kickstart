@@ -9,6 +9,26 @@ import { getAzureToken } from '../services/azure-auth.js';
 
 const ARM_BASE_URL = 'https://management.azure.com';
 
+function parseJsonField(name: string, value: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch (err) {
+    throw new Error(
+      `azure.what_if: ${name} must be a valid JSON string. ${(err as Error).message}`,
+      { cause: err },
+    );
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(
+      `azure.what_if: ${name} must decode to a JSON object (got `
+        + (parsed === null ? 'null' : Array.isArray(parsed) ? 'array' : typeof parsed)
+        + ').',
+    );
+  }
+  return parsed as Record<string, unknown>;
+}
+
 const WhatIfInputSchema = z.object({
   scopePath: z
     .string()
@@ -16,14 +36,17 @@ const WhatIfInputSchema = z.object({
       'ARM scope path for the deployment (resource group or subscription level). ' +
       'Example: /subscriptions/{uuid}/resourceGroups/{rg}',
     ),
+  // OpenAI strict-mode forbids open-keyed objects (z.record), so the ARM
+  // template and parameters are passed as JSON-encoded strings and parsed
+  // inside execute().
   template: z
-    .record(z.string(), z.unknown())
-    .describe('ARM or Bicep-compiled JSON template object to evaluate'),
+    .string()
+    .describe('ARM or Bicep-compiled JSON template object to evaluate, encoded as a JSON string'),
   parameters: z
-    .record(z.string(), z.unknown())
+    .string()
     .nullable()
     .optional()
-    .describe('Optional ARM template parameters object'),
+    .describe('Optional ARM template parameters object, encoded as a JSON string'),
   deploymentName: z
     .string()
     .nullable()
@@ -82,8 +105,8 @@ export const whatIfTool: ToolContribution = {
       const body = {
         properties: {
           mode: 'Incremental',
-          template: input.template,
-          parameters: input.parameters ?? {},
+          template: parseJsonField('template', input.template),
+          parameters: input.parameters ? parseJsonField('parameters', input.parameters) : {},
         },
       };
 

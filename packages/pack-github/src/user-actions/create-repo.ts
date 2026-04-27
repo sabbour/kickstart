@@ -7,10 +7,12 @@ const CreateRepoParametersSchema = z.object({
     .describe('GitHub organization or user login to create the repository under'),
   suggestedName: z
     .string()
+    .nullable()
     .optional()
     .describe('Suggested repository name to pre-fill in the creation form'),
   private: z
     .boolean()
+    .nullable()
     .optional()
     .default(true)
     .describe('Whether the repository should be private (default: true)'),

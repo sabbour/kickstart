@@ -24,9 +24,12 @@ const UpdateResourceParametersSchema = z.object({
   resourceName: z
     .string()
     .describe('Display name of the resource being updated'),
+  // OpenAI strict-mode forbids open-keyed objects (z.record). The patch is
+  // passed as a JSON-encoded string; the runner forwards it verbatim to
+  // azure.arm_update_resource which performs the JSON parse + ARM PATCH.
   patch: z
-    .record(z.string(), z.unknown())
-    .describe('Partial ARM resource body for the PATCH request — only changed fields'),
+    .string()
+    .describe('Partial ARM resource body for the PATCH request — only changed fields, JSON-encoded as a string'),
   confirmationMessage: z
     .string()
     .describe('Human-readable description of what this update will change, shown in the confirm UI'),
