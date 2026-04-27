@@ -353,6 +353,44 @@ npm run dev
 cd docs-site && npm install && npm start
 ```
 
+### Strict Zod Schema Requirements for Tool and Schema Files
+
+All tool files (`packages/*/src/tools/**/*.ts`) and schema files (`packages/*/src/types/**/*.ts`) **must** use the `z-strict` wrappers instead of importing Zod directly. ESLint will error on violations at lint time.
+
+#### Import path
+
+```typescript
+// ✅ Correct — always import from z-strict
+import { z, strictOptional } from '@aks-kickstart/harness/runtime/z-strict';
+
+// ❌ Wrong — ESLint will flag this in tool/schema files
+import { z } from 'zod';
+```
+
+#### Optional fields
+
+```typescript
+// ✅ Correct — use strictOptional() which adds .nullable() automatically
+const schema = z.object({
+  name: z.string(),
+  region: strictOptional(z.string()),  // string | null | undefined
+});
+
+// ❌ Wrong — ESLint will flag this in tool/schema files
+const schema = z.object({
+  name: z.string(),
+  region: z.string().optional(),       // string | undefined (I2 violation)
+});
+```
+
+**Why:** The OpenAI function-calling schema requires `nullable` for fields that may be absent. Using `.optional()` alone produces a schema mismatch that causes runtime I2 strict-mode violations. The `strictOptional()` wrapper ensures both `optional()` and `nullable()` are applied together.
+
+**ESLint rules enforcing this:**
+- `no-restricted-imports` — prevents `import { z } from 'zod'` in tool/schema files
+- `no-restricted-syntax` — prevents `.optional()` member access in tool/schema files
+
+These rules are enforced via the shared ESLint config. Violations are errors (not warnings) and will block CI.
+
 ---
 
 ## Adding New A2UI Components

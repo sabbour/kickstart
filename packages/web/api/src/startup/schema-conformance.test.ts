@@ -21,6 +21,8 @@
  * usable by per-pack regression tests targeting specific schema shapes.
  */
 
+import { globSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   reportSchemaConformance,
@@ -28,8 +30,10 @@ import {
   formatReport,
   getToolJsonSchema,
   getUserActionJsonSchema,
+  assertStrictlyConformant,
   collectUnsupportedFormats,
 } from '@aks-kickstart/harness/runtime/schema-conformance';
+import type { ToolContribution } from '@aks-kickstart/harness';
 import { _resetRegistryState, getRegistry } from './packs.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -147,4 +151,57 @@ describe('OpenAI strict-mode schema conformance — unsupported formats', () => 
       'root.properties.nested.properties.callbackUrl (format="uri")',
     ]);
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #98 — Glob-based conformance: cover ALL tool files, not just registered ones
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The registry-based tests above only cover tools present in `getRegistry()`.
+// ~40% of tool files are not registered and bypass that check. This suite
+// globs every `packages/pack-*/src/tools/*.ts` file directly and runs
+// `assertStrictlyConformant()` on every concrete ToolContribution export,
+// regardless of whether it is wired into a Pack.
+//
+// Factory-function exports (e.g. `createInspectRepoTool`) and pure-helper
+// files that export no ToolContribution are skipped automatically.
+
+function isToolContribution(value: unknown): value is ToolContribution {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.name === 'string' && typeof v.tool === 'object' && v.tool !== null;
+}
+
+// Vitest runs with process.cwd() set to the monorepo root (where vitest.config.ts lives).
+const projectRoot = process.cwd();
+
+const allToolFiles = globSync('packages/pack-*/src/tools/*.ts', { cwd: projectRoot }).filter(
+  (f) => !f.includes('.test.') && !f.endsWith('index.ts') && !f.includes('__'),
+);
+
+describe('OpenAI strict-mode schema conformance — all tool files (glob, #98)', () => {
+  it('glob discovers tool files beyond just registry-registered tools', () => {
+    expect(allToolFiles.length).toBeGreaterThan(0);
+  });
+
+  it.each(allToolFiles)(
+    '%s — every exported ToolContribution passes strict-mode',
+    async (relPath) => {
+      const absolutePath = resolve(projectRoot, relPath);
+      const mod = await import(absolutePath);
+
+      const contribs = Object.values(mod).filter(isToolContribution);
+
+      for (const contrib of contribs) {
+        const schema = getToolJsonSchema(contrib);
+        if (schema === null) continue; // non-function tools (e.g. handoff) have no schema
+        // Use the walker-based report (consistent with the registered-tools suite above)
+        // rather than assertStrictlyConformant() — assertStrictlyConformant calls
+        // structuredClone() which fails on Vitest-transformed module objects.
+        // The walkers still enforce I1–I5, including I2 (.optional() missing from required).
+        const report = reportSchemaConformance(contrib.name, schema);
+        expect(reportHasIssues(report) ? formatReport(report) : null).toBeNull();
+      }
+    },
+  );
 });

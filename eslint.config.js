@@ -37,6 +37,42 @@ export default tseslint.config(
       }],
     },
   },
+  // Strict-mode schema compliance guardrails (issues #97 & #99):
+  // Tool and schema-type files must not use .optional() (I2 violation) and must
+  // import z via z-strict.ts, which wraps Zod with strict-mode-safe helpers.
+  // These rules are intentionally set to 'error' so CI fails on new violations.
+  {
+    files: ['packages/*/src/tools/**/*.ts', 'packages/*/src/types/**/*.ts'],
+    rules: {
+      // #97: Ban .optional() — produces properties missing from `required`, which
+      // OpenAI strict-mode rejects (invariant I2). Use strictOptional() from
+      // z-strict.ts instead, which adds the field to `required` as nullable.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[property.name='optional']",
+          message:
+            "Use strictOptional() from '@aks-kickstart/harness/runtime/z-strict' instead of .optional() — .optional() violates OpenAI strict-mode (I2: property missing from required).",
+        },
+      ],
+      // #99: Require z-strict.ts as the only Zod entry point in tool files.
+      // Direct 'zod' imports allow bypassing strict-mode-safe helpers and
+      // producing non-compliant schemas that silently pass TypeScript but
+      // fail at the OpenAI API boundary.
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'zod',
+              message:
+                "Import z from '@aks-kickstart/harness/runtime/z-strict' instead — it wraps Zod with strict-mode-safe helpers (strictOptional, stripNulls, etc.).",
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     ignores: ['**/dist/', '**/node_modules/', '**/vendor/'],
   },
