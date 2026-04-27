@@ -505,6 +505,8 @@ export type {
 
 // ── Step 11–12: Runner + Resume ──────────────────────────────────────────────
 export { Runner } from './runtime/runner.js';
+export type { RunConfig, HandoffCallback, HandoffContext, HandoffInputFilter } from './runtime/run-config.js';
+export { buildRunConfig, defaultHandoffInputFilter, defaultHandoffCallback } from './runtime/run-config.js';
 export { Session, sessionStore, getOrCreateSession, getOrCreateSessionResult, generateAnonSessionToken, validateAnonSessionToken, isAnonymousSession, ANON_SESSION_TTL_MS, AnonTokenGenerationError } from './runtime/session.js';
 export type { ISessionStore, IAsyncSessionStore, EvictionSchedulerHandle } from './runtime/session-store.js';
 export { InMemorySessionStore, createSessionStore, startEvictionScheduler } from './runtime/session-store.js';

@@ -28,6 +28,8 @@ import { runGuardrails } from './guardrails.js';
 import { resolveModelName } from './model-resolution.js';
 import { PlanArtifactMissing } from '../errors/index.js';
 import { z } from 'zod';
+import { buildRunConfig } from './run-config.js';
+import type { RunConfig } from './run-config.js';
 
 // ---------------------------------------------------------------------------
 // Universal tool factories (D5 / #1070 — core.read_skill)
@@ -557,6 +559,7 @@ export class Runner {
       toolGuardrails: GuardrailContribution[];
       isHalted: () => boolean;
       setHalted: () => void;
+      handoffInputFilter?: import('./run-config.js').HandoffInputFilter;
     },
   ): Agent<any, any> {
     const cached = cache.get(agentName);
@@ -651,7 +654,11 @@ export class Runner {
     for (const h of agentContrib.handoffs ?? []) {
       const target = this.buildAgentInstance(h.agent, cache, ctx);
       const description = h.prompt ? `${h.label}. ${h.prompt}` : h.label;
-      agent.handoffs.push(handoff(target, { toolDescriptionOverride: description }));
+      agent.handoffs.push(handoff(target, {
+        toolDescriptionOverride: description,
+        // #104: apply default handoff input filter (strips A2UI outputs, compresses old turns).
+        inputFilter: ctx.handoffInputFilter,
+      }));
     }
 
     return agent;
@@ -662,6 +669,7 @@ export class Runner {
     userMessage: string,
     sseWrite: SSEWriter,
     signal?: AbortSignal,
+    runConfig?: RunConfig,
   ): Promise<void> {
     sseWrite('start', { sessionId: session.sessionId });
 
@@ -748,6 +756,13 @@ export class Runner {
     const isHalted = () => guardrailHalted;
     const setHalted = () => { guardrailHalted = true; };
 
+    // #105: resolve run options through RunConfig so every call site is consistent.
+    // #104/#108: wire default handoff filter and onHandoff callback.
+    const resolvedRunConfig = buildRunConfig(runConfig ?? {});
+    const { onHandoff: onHandoffCallback } = resolvedRunConfig;
+    // Track the handoff turn count for the onHandoff callback (#108).
+    let handoffTurnCount = 0;
+
     // Build tools list + agent tree (with recursively-resolved handoffs).
     // Per-turn cache: MUST be a fresh Map so closures bind to this turn's
     // session / sseWrite / abortCtrl (Nibbler N1/N2, #1073).
@@ -763,6 +778,8 @@ export class Runner {
       toolGuardrails,
       isHalted,
       setHalted,
+      // #104: thread handoff input filter into every handoff() call in the agent tree.
+      handoffInputFilter: resolvedRunConfig.handoffInputFilter,
     };
     const agent = this.buildAgentInstance(agentName, agentBuildCache, buildCtx);
     const modelName = resolveModelName(agentContrib.model);
@@ -796,7 +813,7 @@ export class Runner {
         signal: abortCtrl.signal,
         // #1073 Zapp Z2: explicit circuit-breaker so mutual handoffs can't
         // ping-pong until token exhaustion. See resolveMaxTurns().
-        maxTurns: resolveMaxTurns(),
+        maxTurns: resolvedRunConfig.maxTurns ?? resolveMaxTurns(),
       });
 
       for await (const event of result) {
@@ -852,6 +869,20 @@ export class Runner {
           } else if (name === 'handoff_occurred') {
             const newAgentName = (item as { agent?: { name?: string } }).agent?.name;
             if (newAgentName) {
+              // #108: fire onHandoff callback before updating session.activeAgent
+              // so `from` still reflects the handing-off agent.
+              handoffTurnCount += 1;
+              if (onHandoffCallback) {
+                try {
+                  await onHandoffCallback(session.activeAgent, newAgentName, {
+                    turn: handoffTurnCount,
+                    sessionId: session.sessionId,
+                  });
+                } catch (cbErr) {
+                  // Never let a callback error abort the run — log and continue.
+                  console.warn('[runner] onHandoff callback threw:', cbErr);
+                }
+              }
               session.activeAgent = newAgentName;
               sseWrite('phase', { agent: newAgentName });
             }
