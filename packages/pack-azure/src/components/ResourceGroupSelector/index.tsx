@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { Card, CardHeader, Text, Spinner, tokens, makeStyles } from '@fluentui/react-components';
 import type { ComponentContribution } from '@aks-kickstart/harness';
@@ -46,6 +46,11 @@ const useStyles = makeStyles({
 
 export const ResourceGroupSelectorRenderer: React.FC<{ props: ResourceGroupSelectorProps }> = ({ props }) => {
   const classes = useStyles();
+  const [selectedResourceGroup, setSelectedResourceGroup] = useState(props.selectedResourceGroup);
+
+  useEffect(() => {
+    setSelectedResourceGroup(props.selectedResourceGroup);
+  }, [props.selectedResourceGroup]);
 
   return (
     <Card className={classes.card}>
@@ -66,11 +71,21 @@ export const ResourceGroupSelectorRenderer: React.FC<{ props: ResourceGroupSelec
       {props.status === 'loaded' && props.resourceGroups && (
         <div className={classes.rgList}>
           {props.resourceGroups.map((rg) => {
-            const isSelected = rg.name === props.selectedResourceGroup;
+            const isSelected = rg.name === selectedResourceGroup;
             return (
               <div
                 key={rg.name}
                 className={`${classes.rgItem} ${isSelected ? classes.selected : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isSelected}
+                onClick={() => setSelectedResourceGroup(rg.name)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedResourceGroup(rg.name);
+                  }
+                }}
               >
                 <Text size={200} weight={isSelected ? 'semibold' : 'regular'}>
                   {String(rg.name)}

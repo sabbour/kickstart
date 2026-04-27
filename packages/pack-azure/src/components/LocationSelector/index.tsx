@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { Card, CardHeader, Text, tokens, makeStyles } from '@fluentui/react-components';
 import type { ComponentContribution } from '@aks-kickstart/harness';
@@ -52,6 +52,11 @@ const useStyles = makeStyles({
 
 export const LocationSelectorRenderer: React.FC<{ props: LocationSelectorProps }> = ({ props }) => {
   const classes = useStyles();
+  const [selectedLocation, setSelectedLocation] = useState(props.selectedLocation);
+
+  useEffect(() => {
+    setSelectedLocation(props.selectedLocation);
+  }, [props.selectedLocation]);
 
   const locations = props.locations ?? [];
   const grouped = props.groupByGeography
@@ -75,11 +80,21 @@ export const LocationSelectorRenderer: React.FC<{ props: LocationSelectorProps }
           <Text size={200} weight="semibold" className={classes.groupHeader}>{geo}</Text>
           <div className={classes.locationList}>
             {locs.map((loc) => {
-              const isSelected = loc.name === props.selectedLocation;
+              const isSelected = loc.name === selectedLocation;
               return (
                 <div
                   key={loc.name}
                   className={`${classes.locationItem} ${isSelected ? classes.selectedItem : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  onClick={() => setSelectedLocation(loc.name)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedLocation(loc.name);
+                    }
+                  }}
                 >
                   <Text size={200} weight={isSelected ? 'semibold' : 'regular'}>
                     {String(loc.displayName)}

@@ -28,7 +28,8 @@ import {
   listGitHubRepos,
   type GitHubSessionState,
 } from "../../services/github-handoff";
-// TODO(Step 9): playground-auth-stub removed in Step 1 — stubs always return false/empty
+import { usePlaygroundMockMode } from "../../contexts/PlaygroundMockModeContext";
+
 const createGitHubStubRepo = (args: { owner: string; name: string; description?: string; private?: boolean }): GitHubRepo => ({
   name: args.name,
   full_name: `${args.owner}/${args.name}`,
@@ -37,10 +38,47 @@ const createGitHubStubRepo = (args: { owner: string; name: string; description?:
   private: args.private,
   default_branch: 'main',
 });
-const DEFAULT_GITHUB_STUB_OWNER = 'stub-owner';
-const listGitHubStubRepos = (_owner: string): GitHubRepo[] => [];
-const createGitHubStubSession = (_connected: boolean): GitHubSessionState => ({ authenticated: false, configured: false, owners: [] });
-const shouldUsePlaygroundAuthStub = (): false => false;
+const DEFAULT_GITHUB_MOCK_OWNER = 'kickstart-mock';
+const listGitHubStubRepos = (owner: string): GitHubRepo[] => [
+  createGitHubStubRepo({
+    owner,
+    name: 'kickstart-sample',
+    description: 'Mock repository for testing the playground flow',
+    private: false,
+  }),
+  {
+    ...createGitHubStubRepo({
+      owner,
+      name: 'private-deployments',
+      description: 'Mock private deployment repo',
+      private: true,
+    }),
+    language: 'TypeScript',
+    stargazers_count: 3,
+    updated_at: '2026-04-26T19:00:00Z',
+  },
+];
+const createGitHubStubSession = (connected: boolean): GitHubSessionState => ({
+  authenticated: connected,
+  configured: true,
+  viewer: connected
+    ? {
+        login: DEFAULT_GITHUB_MOCK_OWNER,
+        name: 'Mock GitHub User',
+        avatarUrl: 'https://github.com/github.png',
+        htmlUrl: `https://github.com/${DEFAULT_GITHUB_MOCK_OWNER}`,
+      }
+    : undefined,
+  owners: connected
+    ? [{
+        login: DEFAULT_GITHUB_MOCK_OWNER,
+        type: 'User',
+        label: `${DEFAULT_GITHUB_MOCK_OWNER} (mock)`,
+        avatarUrl: 'https://github.com/github.png',
+        htmlUrl: `https://github.com/${DEFAULT_GITHUB_MOCK_OWNER}`,
+      }]
+    : [],
+});
 import { sanitizeActionContext } from "../../utils/sanitize-action-context";
 
 const GitHubRepoPickerApi = {
@@ -149,7 +187,7 @@ function repoParts(fullName: string): { owner: string; repo: string } {
 export const GitHubRepoPicker = createReactComponent(GitHubRepoPickerApi, ({ props, context }) => {
   const classes = useStyles();
   const allowCreate = props.allowCreate !== false;
-  const usePlaygroundStub = shouldUsePlaygroundAuthStub();
+  const [usePlaygroundStub] = usePlaygroundMockMode();
 
   const [session, setSession] = useState<GitHubSessionState | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -176,7 +214,7 @@ export const GitHubRepoPicker = createReactComponent(GitHubRepoPickerApi, ({ pro
       const nextSession = createGitHubStubSession(true);
       setSession(nextSession);
       setError(undefined);
-      setSelectedOwner((current) => current || DEFAULT_GITHUB_STUB_OWNER);
+      setSelectedOwner((current) => current || DEFAULT_GITHUB_MOCK_OWNER);
       setAuthLoading(false);
       return;
     }
@@ -299,7 +337,7 @@ export const GitHubRepoPicker = createReactComponent(GitHubRepoPickerApi, ({ pro
     try {
       const createdRepo = usePlaygroundStub
         ? createGitHubStubRepo({
-            owner: selectedOwner || DEFAULT_GITHUB_STUB_OWNER,
+            owner: selectedOwner || DEFAULT_GITHUB_MOCK_OWNER,
             name: createName.trim(),
             description: createDescription.trim() || undefined,
             private: createPrivate,

@@ -9,7 +9,7 @@
 
 import React, { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react';
 import {
-  Button, CounterBadge, SearchBox,
+  Button, CounterBadge, SearchBox, Switch,
   Card, CardHeader,
   Textarea, Subtitle2, Caption1, Body1Strong,
   MessageBar, MessageBarBody,
@@ -42,6 +42,7 @@ import {
 } from './playground-icons';
 import { getFluentIcon } from '../catalog/icons/fluent-icons';
 import { apiFetch } from '../services/api-client';
+import { usePlaygroundMockMode } from '../contexts/PlaygroundMockModeContext';
 import { FALLBACK_WIDGET_IDEAS } from '../lib/fallback-ideas';
 import { COMPONENT_PREVIEWS } from '../catalog/component-previews';
 import {
@@ -320,6 +321,7 @@ const useStyles = makeStyles({
   topbarActions: {
     display: 'flex',
     gap: tokens.spacingHorizontalXS,
+    alignItems: 'center',
     flexShrink: 0,
   },
   menuButton: {
@@ -881,6 +883,7 @@ const ICON_SECTIONS = [
 function PlaygroundInner() {
   const classes = useStyles();
   const { debugEnabled, toggleDebug } = useDebug();
+  const [mockMode, setMockMode] = usePlaygroundMockMode();
   const [activeTab, setActiveTab] = useState<'create' | 'ideas' | 'components' | 'icons' | 'workspace'>('create');
   const [filterQuery, setFilterQuery] = useState('');
   const [iconFilter, setIconFilter] = useState('');
@@ -1379,6 +1382,12 @@ function PlaygroundInner() {
               </div>
             )}
             <div className={classes.topbarActions}>
+              <Switch
+                checked={mockMode}
+                onChange={(_event, data) => setMockMode(data.checked)}
+                label={mockMode ? 'Mock data' : 'Real services'}
+                title="Toggle mocked UserAction/API behavior for playground testing"
+              />
               {activeTab === 'create' && (
                 <Button appearance="outline" size="small" onClick={handleClearAll}>Clear All</Button>
               )}

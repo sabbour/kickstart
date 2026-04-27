@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { z } from 'zod';
 import {
   Card,
@@ -61,6 +61,11 @@ const useStyles = makeStyles({
 export const OrgPickerRenderer: React.FC<{ props: OrgPickerProps }> = ({ props }) => {
   const classes = useStyles();
   const containerClass = props.isActive ? classes.card : `${classes.card} ${classes.inactive}`;
+  const [selectedOwner, setSelectedOwner] = useState(props.selectedOwner);
+
+  useEffect(() => {
+    setSelectedOwner(props.selectedOwner);
+  }, [props.selectedOwner]);
 
   return (
     <Card className={containerClass}>
@@ -74,11 +79,21 @@ export const OrgPickerRenderer: React.FC<{ props: OrgPickerProps }> = ({ props }
       {props.status === 'loaded' && props.owners && (
         <div className={classes.list}>
           {props.owners.map((owner) => {
-            const isSelected = owner.login === props.selectedOwner;
+            const isSelected = owner.login === selectedOwner;
             return (
               <div
                 key={owner.login}
                 className={`${classes.item} ${isSelected ? classes.selectedItem : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isSelected}
+                onClick={() => setSelectedOwner(owner.login)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedOwner(owner.login);
+                  }
+                }}
               >
                 <Text size={300} weight={isSelected ? 'semibold' : 'regular'}>
                   {String(owner.login)}

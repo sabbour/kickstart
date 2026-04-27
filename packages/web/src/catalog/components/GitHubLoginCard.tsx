@@ -22,9 +22,28 @@ import {
   signOutGitHub,
   type GitHubSessionState,
 } from "../../services/github-handoff";
-// TODO(Step 9): playground-auth-stub removed in Step 1 — stubs always return false/undefined
-const createGitHubStubSession = (_connected: boolean): GitHubSessionState => ({ authenticated: false, configured: false, owners: [] });
-const shouldUsePlaygroundAuthStub = (): false => false;
+import { usePlaygroundMockMode } from "../../contexts/PlaygroundMockModeContext";
+
+const MOCK_GITHUB_OWNER = {
+  login: "kickstart-mock",
+  type: "User" as const,
+  label: "kickstart-mock (mock)",
+  avatarUrl: "https://github.com/github.png",
+  htmlUrl: "https://github.com/kickstart-mock",
+};
+const createGitHubStubSession = (connected: boolean): GitHubSessionState => ({
+  authenticated: connected,
+  configured: true,
+  viewer: connected
+    ? {
+        login: MOCK_GITHUB_OWNER.login,
+        name: "Mock GitHub User",
+        avatarUrl: MOCK_GITHUB_OWNER.avatarUrl,
+        htmlUrl: MOCK_GITHUB_OWNER.htmlUrl,
+      }
+    : undefined,
+  owners: connected ? [MOCK_GITHUB_OWNER] : [],
+});
 
 const GitHubLoginCardApi = {
   name: "GitHubLoginCard",
@@ -72,7 +91,7 @@ const useStyles = makeStyles({
 
 export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props }) => {
   const classes = useStyles();
-  const usePlaygroundStub = shouldUsePlaygroundAuthStub();
+  const [usePlaygroundStub] = usePlaygroundMockMode();
 
   const [session, setSession] = useState<GitHubSessionState | null>(null);
   const [loading, setLoading] = useState(true);

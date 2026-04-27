@@ -1,11 +1,345 @@
-import React, { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import React, { createContext, useContext, useMemo, type ReactNode } from 'react';
 import {
   APIConnectorRegistry,
-  AzureARMConnector,
-  GitHubConnector,
   PricingConnector,
 } from '@aks-kickstart/harness';
-import type { APIConnector } from '@aks-kickstart/harness';
+import type {
+  APIConnector,
+  AzureLocation,
+  AzureResource,
+  AzureResourceGroup,
+  AzureSubscription,
+  GitHubCommitFilesInput,
+  GitHubCommitFilesResult,
+} from '@aks-kickstart/harness';
+import { apiFetch, buildSwaLoginUrl } from '../services/api-client';
+import {
+  getGitHubSession,
+  signInWithGitHubPopup,
+} from '../services/github-handoff';
+import { isPlaygroundMockModeEnabled } from './PlaygroundMockModeContext';
+
+interface ArmListResponse<T> {
+  value?: T[];
+}
+
+const MOCK_SUBSCRIPTIONS: AzureSubscription[] = [
+  {
+    subscriptionId: '00000000-0000-0000-0000-000000000001',
+    displayName: 'Mock Kickstart Subscription',
+    state: 'Enabled',
+    tenantId: '00000000-0000-0000-0000-000000000099',
+  },
+];
+
+const MOCK_LOCATIONS: AzureLocation[] = [
+  { name: 'eastus', displayName: 'East US' },
+  { name: 'eastus2', displayName: 'East US 2' },
+  { name: 'westus2', displayName: 'West US 2' },
+];
+
+const MOCK_RESOURCE_GROUPS: AzureResourceGroup[] = [
+  {
+    id: '/subscriptions/{subscriptionId}/resourceGroups/kickstart-rg',
+    name: 'kickstart-rg',
+    location: 'eastus',
+    provisioningState: 'Succeeded',
+  },
+  {
+    id: '/subscriptions/{subscriptionId}/resourceGroups/networking-rg',
+    name: 'networking-rg',
+    location: 'eastus2',
+    provisioningState: 'Succeeded',
+  },
+];
+
+const MOCK_RESOURCES: AzureResource[] = [
+  {
+    id: '/subscriptions/{subscriptionId}/resourceGroups/kickstart-rg/providers/Microsoft.ContainerService/managedClusters/kickstart-aks',
+    name: 'kickstart-aks',
+    type: 'Microsoft.ContainerService/managedClusters',
+    location: 'eastus',
+  },
+  {
+    id: '/subscriptions/{subscriptionId}/resourceGroups/kickstart-rg/providers/Microsoft.ContainerRegistry/registries/kickstartacr',
+    name: 'kickstartacr',
+    type: 'Microsoft.ContainerRegistry/registries',
+    location: 'eastus',
+  },
+];
+
+const MOCK_GITHUB_OWNER = 'kickstart-mock';
+
+function withSubscriptionId<T extends { id?: string; subscriptionId?: string }>(
+  item: T,
+  subscriptionId: string,
+): T {
+  return {
+    ...item,
+    id: item.id?.replace('{subscriptionId}', subscriptionId),
+    subscriptionId,
+  };
+}
+
+class BrowserAzureARMConnector implements APIConnector {
+  readonly name = 'azure-arm';
+  private authenticated = false;
+
+  isAuthenticated(): boolean {
+    return this.authenticated;
+  }
+
+  async authenticate(): Promise<void> {
+    if (isPlaygroundMockModeEnabled()) {
+      this.authenticated = true;
+      return;
+    }
+
+    const response = await fetch('/.auth/me', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) {
+      throw new Error('Unable to check Microsoft sign-in status.');
+    }
+
+    const body = await response.json().catch(() => undefined) as {
+      clientPrincipal?: { identityProvider?: string } | null;
+    } | undefined;
+    const provider = body?.clientPrincipal?.identityProvider;
+    const isSignedIn = provider === 'aad' || provider === 'azureActiveDirectory';
+    this.authenticated = isSignedIn;
+
+    if (!isSignedIn) {
+      window.location.assign(buildSwaLoginUrl());
+    }
+  }
+
+  async listSubscriptions(): Promise<AzureSubscription[]> {
+    if (isPlaygroundMockModeEnabled()) {
+      this.authenticated = true;
+      return MOCK_SUBSCRIPTIONS;
+    }
+
+    const body = await this.getArmList<AzureSubscription>('/subscriptions?api-version=2022-12-01');
+    return body
+      .map((subscription) => ({
+        ...subscription,
+        subscriptionId: subscription.subscriptionId ?? subscription.id?.split('/').pop() ?? '',
+      }))
+      .filter((subscription) => subscription.subscriptionId);
+  }
+
+  async listLocations(subscriptionId: string): Promise<AzureLocation[]> {
+    if (isPlaygroundMockModeEnabled()) {
+      this.authenticated = true;
+      return MOCK_LOCATIONS.map((location) => ({ ...location, subscriptionId }));
+    }
+
+    return this.getArmList<AzureLocation>(
+      `/subscriptions/${encodeURIComponent(subscriptionId)}/locations?api-version=2022-12-01`,
+    );
+  }
+
+  async listResourceGroups(subscriptionId: string): Promise<AzureResourceGroup[]> {
+    if (isPlaygroundMockModeEnabled()) {
+      this.authenticated = true;
+      return MOCK_RESOURCE_GROUPS.map((group) => withSubscriptionId(group, subscriptionId));
+    }
+
+    const groups = await this.getArmList<AzureResourceGroup>(
+      `/subscriptions/${encodeURIComponent(subscriptionId)}/resourcegroups?api-version=2021-04-01`,
+    );
+    return groups.map((group) => ({ ...group, subscriptionId }));
+  }
+
+  async listResources(subscriptionId: string): Promise<AzureResource[]> {
+    if (isPlaygroundMockModeEnabled()) {
+      this.authenticated = true;
+      return MOCK_RESOURCES.map((resource) => withSubscriptionId(resource, subscriptionId));
+    }
+
+    const resources = await this.getArmList<AzureResource>(
+      `/subscriptions/${encodeURIComponent(subscriptionId)}/resources?api-version=2021-04-01`,
+    );
+    return resources.map((resource) => ({
+      ...resource,
+      subscriptionId,
+      resourceGroup: resource.resourceGroup ?? resource.id.match(/resourceGroups\/([^/]+)/i)?.[1],
+    }));
+  }
+
+  async request(method: string, path: string, body?: unknown): Promise<Response> {
+    if (isPlaygroundMockModeEnabled()) {
+      this.authenticated = true;
+      return new Response(JSON.stringify({
+        id: path,
+        name: path.split('/').filter(Boolean).at(-1) ?? 'mock-resource',
+        method,
+        body,
+        provisioningState: 'Succeeded',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const normalizedPath = path.replace(/^\/+/, '');
+    const headers = new Headers({ Accept: 'application/json' });
+    const init: RequestInit = {
+      method,
+      headers,
+    };
+    if (!['GET', 'HEAD'].includes(method.toUpperCase()) && body !== undefined) {
+      headers.set('Content-Type', 'application/json');
+      init.body = JSON.stringify(body);
+    }
+    const response = await apiFetch(`/api/arm-proxy/${normalizedPath}`, init);
+    this.authenticated = response.ok;
+    return response;
+  }
+
+  private async getArmList<T>(path: string): Promise<T[]> {
+    const response = await this.request('GET', path);
+    const json = await response.json().catch(() => undefined) as ArmListResponse<T> | undefined;
+    if (!response.ok) {
+      const message = readApiError(json, `Azure request failed (${response.status}).`);
+      throw new Error(message);
+    }
+    this.authenticated = true;
+    return Array.isArray(json?.value) ? json.value : [];
+  }
+}
+
+class BrowserGitHubConnector implements APIConnector {
+  readonly name = 'github';
+  private authenticated = false;
+
+  isAuthenticated(): boolean {
+    return this.authenticated;
+  }
+
+  async authenticate(): Promise<void> {
+    if (isPlaygroundMockModeEnabled()) {
+      this.authenticated = true;
+      return;
+    }
+
+    const session = await signInWithGitHubPopup();
+    this.authenticated = session.authenticated;
+  }
+
+  async request(method: string, path: string, body?: unknown): Promise<Response> {
+    if (isPlaygroundMockModeEnabled()) {
+      this.authenticated = true;
+      const payload = (body ?? {}) as Record<string, unknown>;
+      const repoName = typeof payload.name === 'string' && payload.name.trim()
+        ? payload.name.trim()
+        : 'kickstart-sample';
+      return new Response(JSON.stringify({
+        id: 1001,
+        name: repoName,
+        full_name: `${MOCK_GITHUB_OWNER}/${repoName}`,
+        owner: { login: MOCK_GITHUB_OWNER },
+        private: payload.private === true,
+        html_url: `https://github.com/${MOCK_GITHUB_OWNER}/${repoName}`,
+        description: typeof payload.description === 'string' ? payload.description : 'Mock repository',
+        default_branch: 'main',
+        language: 'TypeScript',
+        stargazers_count: 0,
+        updated_at: new Date().toISOString(),
+      }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const normalizedMethod = method.toUpperCase();
+    const repoCreateMatch = path.match(/^\/(?:user|orgs\/([^/]+))\/repos$/);
+    if (normalizedMethod === 'POST' && repoCreateMatch) {
+      const payload = (body ?? {}) as Record<string, unknown>;
+      const owner = repoCreateMatch[1] ?? await this.defaultOwner();
+      return apiFetch('/api/github/repos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner,
+          name: typeof payload.name === 'string' ? payload.name : '',
+          description: typeof payload.description === 'string' ? payload.description : undefined,
+          private: payload.private === true,
+        }),
+      });
+    }
+
+    return new Response(JSON.stringify({
+      error: 'This GitHub operation is not available through the server-owned GitHub handoff endpoints.',
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  async commitFilesAndCreatePullRequest(
+    input: GitHubCommitFilesInput,
+  ): Promise<GitHubCommitFilesResult> {
+    if (isPlaygroundMockModeEnabled()) {
+      this.authenticated = true;
+      return {
+        committedFilesCount: input.files.length,
+        pullRequest: {
+          number: 42,
+          html_url: `https://github.com/${input.owner}/${input.repo}/pull/42`,
+          title: input.title,
+          state: 'open',
+        },
+      };
+    }
+
+    const response = await apiFetch('/api/github/pulls', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const body = await response.json().catch(() => undefined) as
+      | (GitHubCommitFilesResult & { error?: string })
+      | undefined;
+    if (!response.ok) {
+      throw new Error(body?.error ?? `GitHub pull request creation failed (${response.status}).`);
+    }
+    this.authenticated = true;
+    if (!body) {
+      throw new Error('GitHub pull request creation returned an empty response.');
+    }
+    return body;
+  }
+
+  private async defaultOwner(): Promise<string> {
+    if (isPlaygroundMockModeEnabled()) {
+      return MOCK_GITHUB_OWNER;
+    }
+
+    const session = await getGitHubSession();
+    this.authenticated = session.authenticated;
+    const owner = session.viewer?.login ?? session.owners[0]?.login;
+    if (!owner) {
+      throw new Error('Sign in to GitHub before creating a repository.');
+    }
+    return owner;
+  }
+}
+
+function readApiError(body: unknown, fallback: string): string {
+  if (body && typeof body === 'object') {
+    const error = (body as { error?: unknown }).error;
+    if (typeof error === 'string') return error;
+    if (error && typeof error === 'object') {
+      const message = (error as { message?: unknown }).message;
+      if (typeof message === 'string') return message;
+    }
+  }
+  return fallback;
+}
 
 interface APIConnectorContextValue {
   registry: APIConnectorRegistry;
@@ -45,32 +379,11 @@ export function APIConnectorProvider({
     if (externalRegistry) return externalRegistry;
 
     const r = new APIConnectorRegistry();
-    r.register(new AzureARMConnector({
-      auth: { kind: 'oauth2', scopes: ['https://management.azure.com/.default'] },
-      corsProxy: {
-        proxyBaseUrl: '/api/arm-proxy',
-      },
-    }));
-    r.register(new GitHubConnector({
-      auth: { kind: 'oauth2', scopes: ['read:user'] },
-      serverBaseUrl: '/api/github',
-    }));
+    r.register(new BrowserAzureARMConnector());
+    r.register(new BrowserGitHubConnector());
     r.register(new PricingConnector());
     return r;
   }, [externalRegistry]);
-
-  // Pre-authenticate connectors that need it on mount.
-  // Failures are swallowed here — each connector logs its own warning.
-  useEffect(() => {
-    for (const name of registry.names()) {
-      const connector = registry.get(name);
-      if (connector && connector.name !== 'github' && !(connector.isAuthenticated?.() ?? false)) {
-        connector.authenticate?.().catch(() => {
-          // Intentionally silent — stub connectors warn inside authenticate()
-        });
-      }
-    }
-  }, [registry]);
 
   const value = useMemo<APIConnectorContextValue>(
     () => ({

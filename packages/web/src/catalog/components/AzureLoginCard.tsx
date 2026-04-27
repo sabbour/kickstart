@@ -17,11 +17,23 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
+import { usePlaygroundMockMode } from '../../contexts/PlaygroundMockModeContext';
 import type { AzureARMConnector, AzureSubscription } from '@aks-kickstart/harness';
 import type { AzureAuthSessionState } from '../../services/azure-auth';
-// TODO(Step 7): playground-auth-stub removed in Step 1 — stubs always return false/undefined
-const createAzureStubSession = (_connected: boolean): AzureAuthSessionState => ({ authenticated: false, configured: false, subscriptions: [] });
-const shouldUsePlaygroundAuthStub = (): false => false;
+const MOCK_AZURE_SUBSCRIPTIONS: AzureSubscription[] = [
+  {
+    subscriptionId: '00000000-0000-0000-0000-000000000001',
+    displayName: 'Mock Kickstart Subscription',
+    state: 'Enabled',
+    tenantId: '00000000-0000-0000-0000-000000000099',
+  },
+];
+const createAzureStubSession = (connected: boolean): AzureAuthSessionState => ({
+  authenticated: connected,
+  configured: true,
+  user: connected ? { name: 'Mock Azure User', username: 'mock.azure@example.com' } : undefined,
+  subscriptions: connected ? MOCK_AZURE_SUBSCRIPTIONS : [],
+});
 
 const AzureLoginCardApi = {
   name: 'AzureLoginCard',
@@ -79,7 +91,7 @@ const useStyles = makeStyles({
 export const AzureLoginCard = createReactComponent(AzureLoginCardApi, ({ props }) => {
   const classes = useStyles();
   const connector = useAPIConnector('azure-arm') as AzureARMConnector | undefined;
-  const usePlaygroundStub = shouldUsePlaygroundAuthStub();
+  const [usePlaygroundStub] = usePlaygroundMockMode();
 
   const [loading, setLoading] = useState(false);
   const [authenticated, setAuthenticated] = useState(() => usePlaygroundStub ? false : connector?.isAuthenticated() ?? false);

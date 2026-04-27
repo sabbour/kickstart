@@ -10,6 +10,7 @@ import {
 import { sanitizeActionContext } from '../utils/sanitize-action-context';
 import type { UserActionReqPayload, A2uiEventMetadata } from './useStreaming';
 import { clientRegistry } from '../contexts/A2UIRegistryContext';
+import { isPlaygroundMockModeEnabled } from '../contexts/PlaygroundMockModeContext';
 
 // ---------------------------------------------------------------------------
 // v2 UserAction resume dispatch
@@ -43,6 +44,11 @@ export async function dispatchUserActionResult(
   const { onSuccess, onError } = options;
 
   try {
+    if (isPlaygroundMockModeEnabled()) {
+      onSuccess?.();
+      return;
+    }
+
     const res = await fetch('/api/converse/resume', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -1,8 +1,9 @@
 /**
  * Core pack scenario fixtures for the Playground Ideas tab (#987).
  *
- * Each scenario is a full A2UI v0.9 adjacency list composing 2–4 `core/*`
- * primitives into a realistic user workflow. First descriptor MUST have
+ * Each scenario is a full A2UI v0.9 adjacency list composing web-owned
+ * catalog renderers and core primitives into a realistic user workflow.
+ * First descriptor MUST have
  * `id: 'root'`. Descriptor `component` values are the bare renderer names
  * registered in `ClientComponentRegistry` (same convention as
  * `./core-previews.ts`).
@@ -71,6 +72,55 @@ export const CORE_SCENARIOS: readonly Scenario[] = Object.freeze([
       { id: 'cancel-label', component: 'Text', text: 'Cancel' },
       { id: 'confirm', component: 'Button', child: 'confirm-label' },
       { id: 'confirm-label', component: 'Text', text: 'Delete' },
+    ],
+  },
+  {
+    id: 'azure-auth-target-selection',
+    title: 'Sign in and choose Azure resources',
+    description: 'Use the playground mock toggle or real Microsoft sign-in before selecting Azure deployment targets.',
+    components: [
+      { id: 'root', component: 'Column', children: ['heading', 'login', 'target'] },
+      { id: 'heading', component: 'Text', text: 'Test an authenticated Azure deployment flow' },
+      {
+        id: 'login',
+        component: 'AzureLoginCard',
+        displayName: 'Azure operator',
+        showTokenInfo: true,
+      },
+      {
+        id: 'target',
+        component: 'AzureResourcePicker',
+        label: 'Choose the subscription and resource group to test with',
+      },
+    ],
+  },
+  {
+    id: 'github-auth-pr-workflow',
+    title: 'Sign in and prepare a GitHub PR',
+    description: 'Use the playground mock toggle or real GitHub OAuth before browsing repositories and preparing a PR.',
+    components: [
+      { id: 'root', component: 'Column', children: ['heading', 'login', 'repo', 'pr'] },
+      { id: 'heading', component: 'Text', text: 'Test an authenticated GitHub handoff flow' },
+      {
+        id: 'login',
+        component: 'GitHubLoginCard',
+        username: 'octocat',
+      },
+      {
+        id: 'repo',
+        component: 'GitHubRepoPicker',
+        placeholder: 'Select a real repository from the signed-in account',
+        suggestedName: 'kickstart-sample',
+        allowCreate: true,
+      },
+      {
+        id: 'pr',
+        component: 'GitHubCommit',
+        repoFullName: 'kickstart-mock/kickstart-sample',
+        defaultBranch: 'main',
+        suggestedBranchName: 'kickstart/playground-test',
+        suggestedTitle: 'feat: test Kickstart generated artifacts',
+      },
     ],
   },
 ]);

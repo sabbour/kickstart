@@ -21,6 +21,7 @@ import {
 } from '@fluentui/react-components';
 import { Search20Regular } from '@fluentui/react-icons';
 import { useAPIConnector } from '../../contexts/APIConnectorContext';
+import { usePlaygroundMockMode } from '../../contexts/PlaygroundMockModeContext';
 import {
   useConversationSession,
   type DeploymentSourceFile,
@@ -37,9 +38,6 @@ import {
   persistAzureTarget,
   startAzureDeployment,
 } from '../../services/azure-deployments';
-// TODO(Step 7): mock-streaming removed in Step 1 — stubs always return false
-const isMockMode = () => false;
-const isPlaygroundMode = () => false;
 import { sanitizeActionContext } from '../../utils/sanitize-action-context';
 
 const AzureResourcePickerApi = {
@@ -193,11 +191,10 @@ const useStyles = makeStyles({
   },
 });
 
-const ALLOW_FALLBACK_DATA = isMockMode() || isPlaygroundMode();
-
 export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, ({ props, context }) => {
   const classes = useStyles();
   const connector = useAPIConnector('azure-arm') as AzureARMConnector | undefined;
+  const [mockMode] = usePlaygroundMockMode();
   const { backendSessionId, getDeploymentFiles } = useConversationSession();
 
   const label = props.label ? String(props.label) : 'Choose your Azure deployment target';
@@ -245,7 +242,13 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
           throw new Error('Azure sign-in is unavailable in this environment.');
         }
 
-        const session = await getAzureSession(connector);
+        const session = mockMode
+          ? {
+              configured: true,
+              authenticated: true,
+              subscriptions: await connector.listSubscriptions(),
+            }
+          : await getAzureSession(connector);
         if (!session.configured) {
           throw new Error(session.error ?? 'Azure sign-in is not configured on the server.');
         }
@@ -260,7 +263,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
         }
       } catch (loadError) {
         if (cancelled) return;
-        if (ALLOW_FALLBACK_DATA) {
+        if (mockMode) {
           setSubscriptions(STUB_SUBSCRIPTIONS);
           if (!presetSubId && STUB_SUBSCRIPTIONS.length === 1) {
             setSelectedSubId(STUB_SUBSCRIPTIONS[0].subscriptionId);
@@ -281,7 +284,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     return () => {
       cancelled = true;
     };
-  }, [connector, presetSubId]);
+  }, [connector, mockMode, presetSubId]);
 
   useEffect(() => {
     if (!selectedSubId) {
@@ -338,7 +341,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
       } catch (loadError) {
         if (cancelled) return;
 
-        if (ALLOW_FALLBACK_DATA) {
+        if (mockMode) {
           const fallbackResourceGroups = STUB_RESOURCE_GROUPS.map((rg) => ({
             ...rg,
             id: rg.id.replace('{subscriptionId}', selectedSubId),
@@ -367,7 +370,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     return () => {
       cancelled = true;
     };
-  }, [connector, isDeploymentTargetMode, presetRg, selectedSubId]);
+  }, [connector, isDeploymentTargetMode, mockMode, presetRg, selectedSubId]);
 
   useEffect(() => {
     if (!isDeploymentTargetMode || !selectedRg || resourceGroupMode !== 'existing') return;
@@ -391,7 +394,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
       const allResources = await connector.listResources(selectedSubId);
       setResources(allResources);
     } catch (loadError) {
-      if (ALLOW_FALLBACK_DATA) {
+      if (mockMode) {
         setResources(STUB_RESOURCES.map((resource) => ({
           ...resource,
           id: resource.id.replace('{subscriptionId}', selectedSubId),
@@ -403,7 +406,7 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     } finally {
       setLoadingResources(false);
     }
-  }, [connector, isDeploymentTargetMode, selectedSubId]);
+  }, [connector, isDeploymentTargetMode, mockMode, selectedSubId]);
 
   useEffect(() => {
     if (!isDeploymentTargetMode && selectedSubId) {
@@ -471,6 +474,23 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
   };
 
   const handleStartDeployment = useCallback(async () => {
+    if (mockMode) {
+      if (!selectedSubId || !selectedResourceGroupName || !selectedLocation) {
+        setError('Choose a subscription, resource group, and region before continuing.');
+        return;
+      }
+      dispatchResolvedAction('continue:azure-deployment-started', {
+        runId: 'mock-deployment-run',
+        status: 'Running',
+        subscriptionId: selectedSubId,
+        subscriptionName: selectedSubscription?.displayName,
+        resourceGroup: selectedResourceGroupName,
+        location: selectedLocation,
+        mock: true,
+      });
+      return;
+    }
+
     if (!backendSessionId) {
       setError('This chat session is not ready to deploy yet. Send a message first so Kickstart can create a backend session.');
       return;
@@ -538,10 +558,11 @@ export const AzureResourcePicker = createReactComponent(AzureResourcePickerApi, 
     selectedSubId,
     selectedSubscription?.displayName,
     getDeploymentFiles,
+    mockMode,
   ]);
 
   const canStartDeployment = Boolean(
-    backendSessionId
+    (mockMode || backendSessionId)
     && selectedSubId
     && selectedResourceGroupName
     && selectedLocation

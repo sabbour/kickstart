@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { z } from 'zod';
 import {
   Card,
@@ -72,6 +72,11 @@ const useStyles = makeStyles({
 export const RepoPickerRenderer: React.FC<{ props: RepoPickerProps }> = ({ props }) => {
   const classes = useStyles();
   const containerClass = props.isActive ? classes.card : `${classes.card} ${classes.inactive}`;
+  const [selectedRepo, setSelectedRepo] = useState(props.selectedRepo);
+
+  useEffect(() => {
+    setSelectedRepo(props.selectedRepo);
+  }, [props.selectedRepo]);
 
   const header =
     props.mode === 'create' ? 'Create GitHub Repository' : 'Select GitHub Repository';
@@ -94,11 +99,21 @@ export const RepoPickerRenderer: React.FC<{ props: RepoPickerProps }> = ({ props
       {props.mode === 'pick' && props.status === 'loaded' && props.repos && (
         <div className={classes.list}>
           {props.repos.map((repo) => {
-            const isSelected = repo.name === props.selectedRepo;
+            const isSelected = repo.name === selectedRepo;
             return (
               <div
                 key={repo.name}
                 className={`${classes.item} ${isSelected ? classes.selectedItem : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isSelected}
+                onClick={() => setSelectedRepo(repo.name)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedRepo(repo.name);
+                  }
+                }}
               >
                 <Text size={300} weight={isSelected ? 'semibold' : 'regular'}>
                   {ownerPrefix}{String(repo.name)}

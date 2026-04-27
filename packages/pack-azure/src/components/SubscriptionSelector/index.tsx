@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { Card, CardHeader, Text, Spinner, tokens, makeStyles } from '@fluentui/react-components';
 import type { ComponentContribution } from '@aks-kickstart/harness';
@@ -46,6 +46,11 @@ const useStyles = makeStyles({
 
 export const SubscriptionSelectorRenderer: React.FC<{ props: SubscriptionSelectorProps }> = ({ props }) => {
   const classes = useStyles();
+  const [selectedSubscriptionId, setSelectedSubscriptionId] = useState(props.selectedSubscriptionId);
+
+  useEffect(() => {
+    setSelectedSubscriptionId(props.selectedSubscriptionId);
+  }, [props.selectedSubscriptionId]);
 
   return (
     <Card className={classes.card}>
@@ -62,11 +67,21 @@ export const SubscriptionSelectorRenderer: React.FC<{ props: SubscriptionSelecto
       {props.status === 'loaded' && props.subscriptions && (
         <div className={classes.subList}>
           {props.subscriptions.map((sub) => {
-            const isSelected = sub.subscriptionId === props.selectedSubscriptionId;
+            const isSelected = sub.subscriptionId === selectedSubscriptionId;
             return (
               <div
                 key={sub.subscriptionId}
                 className={`${classes.subItem} ${isSelected ? classes.selectedItem : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isSelected}
+                onClick={() => setSelectedSubscriptionId(sub.subscriptionId)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedSubscriptionId(sub.subscriptionId);
+                  }
+                }}
               >
                 <Text size={200} weight={isSelected ? 'semibold' : 'regular'}>
                   {String(sub.displayName)}
