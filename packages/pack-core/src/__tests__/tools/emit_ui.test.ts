@@ -19,22 +19,6 @@ import { A2UIMessageSchema, A2UIMessageEnvelopeSchema, A2UI_VERSION } from '@aks
 import { emitUiTool } from '../../tools/emit_ui.js';
 import { makeSessionCtx } from './_session-stub.js';
 
-// Strip null values from an object — used to normalise fixtures that carry
-// nullable envelope-level fields (e.g. `sendDataModel: null`) before passing
-// to the harness A2UIMessageSchema directly.
-function stripNulls<T>(value: T): T {
-  if (Array.isArray(value)) return value.map(stripNulls) as unknown as T;
-  if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (v === null) continue;
-      out[k] = stripNulls(v);
-    }
-    return out as T;
-  }
-  return value;
-}
-
 // ── Valid message fixtures ─────────────────────────────────────────────────
 // All fixtures include the `op` discriminator field, which is required by the
 // updated EmitUiInputSchema (discriminated union). The runtime A2UIMessageSchema
@@ -142,7 +126,7 @@ describe('core.emit_ui', () => {
 
     it('the recorded emission equals the A2UIMessageSchema-parsed output', async () => {
       await invoke(validCreateSurface);
-      const expected = A2UIMessageSchema.parse(stripNulls(validCreateSurface));
+      const expected = A2UIMessageSchema.parse(validCreateSurface);
       expect(session.a2uiEmissions[0]).toEqual(expected);
     });
   });
@@ -249,7 +233,7 @@ describe('core.emit_ui', () => {
       expect(comps[3].child).toBe('cancel-text');
       const okAction = comps[5].action as { event: { name: string; payload?: unknown } };
       expect(okAction.event.name).toBe('ok');
-      expect(okAction.event.payload).toEqual({ confirmed: true });
+      expect(okAction.event.payload).toEqual({ confirmed: true, id: null, value: null, action: null, target: null });
     });
 
     it('accepts a minimal Text + Button pair (no non-spec fields)', async () => {
@@ -309,8 +293,9 @@ describe('core.emit_ui', () => {
       const btn = emitted.updateComponents.components[0] as {
         action: { event: { name: string; payload: Record<string, unknown> } };
       };
-      // stripNulls removes the null siblings, leaving only `confirmed`.
-      expect(btn.action.event.payload).toEqual({ confirmed: true });
+      // Null siblings remain in the payload — no stripNulls in the harness parse path.
+      // The model sends null for fields it doesn't use; these are preserved as-is.
+      expect(btn.action.event.payload).toEqual({ confirmed: true, id: null, value: null, action: null, target: null });
       expect(btn.action.event.payload).not.toHaveProperty('unknownKey');
     });
   });
@@ -339,12 +324,12 @@ describe('core.emit_ui', () => {
     for (const { op, fixture } of explicitFixtures) {
       it(`${op}: envelope schema selects the branch matching input.op verbatim`, () => {
         expect(fixture.op).toBe(op);
-        const parsed = A2UIMessageEnvelopeSchema.parse(stripNulls(fixture));
+        const parsed = A2UIMessageEnvelopeSchema.parse(fixture);
         expect(parsed.op).toBe(op);
       });
 
       it(`${op}: A2UIMessageSchema (runtime) routes to the op-named payload key`, () => {
-        const parsed = A2UIMessageSchema.parse(stripNulls(fixture)) as Record<string, unknown>;
+        const parsed = A2UIMessageSchema.parse(fixture) as Record<string, unknown>;
         expect(parsed[op]).toBeDefined();
         expect(parsed).not.toHaveProperty('op');
       });

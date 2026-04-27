@@ -4,24 +4,28 @@ export const A2UI_VERSION = 'v0.9' as const;
 export type A2UIVersion = typeof A2UI_VERSION;
 
 export type A2UIComponent = Record<string, unknown>;
-export type A2UIDataValue = unknown;
+// A2UI data-model scalar values: string, number, boolean, or null.
+export type A2UIDataValue = string | number | boolean | null;
+
+/** Scalar type for A2UI data-model values. */
+const A2UIDataValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 export const CreateSurfaceMessagePayload = z.object({
   surfaceId: z.string(),
   catalogId: z.string(),
-  theme: z.unknown().optional(),
-  sendDataModel: z.boolean().optional(),
+  theme: z.record(z.string(), z.unknown()).nullish(),
+  sendDataModel: z.boolean().nullish(),
 }).strict();
 
 export const UpdateComponentsMessagePayload = z.object({
   surfaceId: z.string(),
-  components: z.array(z.unknown()).min(1),
+  components: z.array(z.record(z.string(), z.unknown())).min(1),
 }).strict();
 
 export const UpdateDataModelMessagePayload = z.object({
   surfaceId: z.string(),
-  path: z.string().optional(),
-  value: z.unknown().optional(),
+  path: z.string().nullable(),
+  value: A2UIDataValueSchema.nullable(),
 }).strict();
 
 export const DeleteSurfaceMessagePayload = z.object({

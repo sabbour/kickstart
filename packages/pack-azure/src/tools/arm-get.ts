@@ -2,6 +2,7 @@ import { tool } from '@openai/agents';
 import { z } from 'zod';
 import type { ToolContribution } from '@aks-kickstart/harness';
 import type { SessionCtx } from '@aks-kickstart/harness';
+import { getAzureToken, armAuthHeaders } from '../services/azure-auth.js';
 
 // ── ARM path security (Zapp C1) ───────────────────────────────────────────────
 
@@ -84,18 +85,10 @@ export const armGetTool: ToolContribution = {
       // Two-step ARM path validation (Zapp C1)
       const safePath = validateArmPath(input.path);
 
-      const token = (session as unknown as { tokens?: Record<string, string> })?.tokens?.['azure']
-        ?? (session as unknown as { tokens?: Record<string, string> })?.tokens?.['azure-token'];
-      if (!token) {
-        throw new Error('No Azure token found in session. Please authenticate first via azure:select_subscription.');
-      }
-
+      const token = getAzureToken(session);
       const url = `${ARM_BASE_URL}${safePath}?api-version=${encodeURIComponent(input.apiVersion)}`;
       const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
+        headers: armAuthHeaders(token),
         signal: AbortSignal.timeout(30_000),
       });
 

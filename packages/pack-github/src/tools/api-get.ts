@@ -2,6 +2,7 @@ import { tool } from '@openai/agents';
 import { z } from 'zod';
 import type { ToolContribution } from '@aks-kickstart/harness';
 import type { SessionCtx } from '@aks-kickstart/harness';
+import { getGithubToken } from '../services/github-auth.js';
 
 // ── GitHub path validation (Zapp conditions) ──────────────────────────────────
 
@@ -72,13 +73,7 @@ export const apiGetTool: ToolContribution = {
     parameters: ApiGetInputSchema,
     execute: async (input, runCtx): Promise<unknown> => {
       const session = runCtx?.context as SessionCtx | undefined;
-      const token =
-        (session as unknown as { tokens?: Record<string, string> })?.tokens?.['github'];
-      if (!token) {
-        throw new Error(
-          'No GitHub token found in session. Please authenticate first via github:login.',
-        );
-      }
+      const token = getGithubToken(session);
 
       validateGithubPath(input.path);
       const url = new URL(`${GITHUB_API_BASE}${input.path}`);

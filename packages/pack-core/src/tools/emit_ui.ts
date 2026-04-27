@@ -14,7 +14,6 @@ import { z } from 'zod';
 import { A2UIMessageSchema } from '@aks-kickstart/harness';
 import type { A2UIMessageV09 } from '@aks-kickstart/harness';
 import type { ToolContribution, SessionCtx } from '@aks-kickstart/harness';
-import { stripNulls } from '@aks-kickstart/harness/runtime/z-strict';
 import {
   DecisionCardSchema,
   RadioGroupSchema,
@@ -57,8 +56,8 @@ const A2UIDynamicNumber = z.union([
 ]);
 
 // Action schema for interactive components.
-// Uses a flat event envelope; `payload` is nullable so null is stripped by
-// stripNulls() before runtime validation (satisfies OpenAI strict-mode required).
+// Uses a flat event envelope; `payload` is nullable so null values are accepted
+// directly by the harness schema (satisfies OpenAI strict-mode required).
 //
 // #1032 — The `payload` field WAS `z.record(z.string(), A2UIScalar).nullable()`.
 // OpenAI strict mode rejects records because the converter
@@ -67,7 +66,7 @@ const A2UIDynamicNumber = z.union([
 // key, which violates OpenAI's rule that every object node must declare
 // `properties` (and `additionalProperties: false`). The fix narrows `payload`
 // to a closed object with a fixed key set. Unused keys MUST be set to null
-// and are stripped by `stripNulls()` before `A2UIMessageSchema.parse()`.
+// and are accepted as null by `A2UIMessageSchema.parse()` directly.
 //
 // Closed key set:
 //   - `confirmed` — evidence-backed (see
@@ -114,7 +113,7 @@ const A2UIActionSchema = z.object({
 // OpenAI strict-mode requires every key in `properties` to appear in
 // `required`. All fields in each variant are therefore included in `required`
 // (no `.optional()`). Fields that the LLM may not always populate are typed
-// as `.nullable()` and stripped by stripNulls() before runtime validation.
+// as `.nullable()` — the A2UI harness schema accepts null directly.
 //
 // This schema is a SUBSET of the client-side component catalog schemas
 // (packages/web/src/vendor/a2ui/web_core/basic_catalog/components/basic_components.ts
@@ -450,10 +449,11 @@ export const emitUiTool: ToolContribution = {
       // Re-validate through the full harness A2UIMessageSchema which applies
       // the withDiscriminator preprocessor and strips the 'op' discriminator
       // field. This is the canonical runtime validation path.
+      // a2ui.ts uses .nullable() for optional fields, so null values from the
+      // model are accepted directly without stripping.
       let parsed: A2UIMessageV09;
       try {
-        const cleaned = stripNulls(input.message);
-        parsed = A2UIMessageSchema.parse(cleaned) as A2UIMessageV09;
+        parsed = A2UIMessageSchema.parse(input.message) as A2UIMessageV09;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         throw new Error(`emit_ui: invalid A2UI message — ${msg}`, { cause: err });
