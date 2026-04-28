@@ -62,7 +62,7 @@ When the architecture is ready, create a surface and emit the following structur
   {"id":"plan-card","component":"SummaryCard","title":"Your AKS plan","items":[
     {"label":"Platform","value":"AKS Automatic","badge":"success"},
     {"label":"AI Runtime","value":"KAITO (Llama-3.1-70B)","badge":null},
-    {"label":"Networking","value":"Ingress Controller + TLS","badge":null},
+    {"label":"Networking","value":"Gateway API (App Routing add-on with managed Istio)","badge":null},
     {"label":"Storage","value":"Azure Files (Premium)","badge":null},
     {"label":"Estimated cost","value":"~$420/mo","badge":"info"}
   ],"children":["arch-diagram"]},
