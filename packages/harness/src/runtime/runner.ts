@@ -12,7 +12,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { Agent, Runner as SDKRunner, handoff, tool, setDefaultModelProvider, OpenAIProvider, setTraceProcessors, MaxTurnsExceededError, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered } from '@openai/agents';
+import { Agent, Runner as SDKRunner, handoff, tool, setDefaultModelProvider, setTraceProcessors, MaxTurnsExceededError, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered } from '@openai/agents';
 import type { FunctionTool, AgentInputItem, CallModelInputFilter } from '@openai/agents';
 import type { GuardrailContribution } from '../types/guardrail.js';
 import type { Turn, ToolCallRecord } from '../types/session.js';
@@ -26,6 +26,13 @@ import type { SSEWriter } from './sse.js';
 import { AgentOutput } from '../types/agent-output.js';
 import { runGuardrails, toSdkInputGuardrail, toSdkOutputGuardrail } from './guardrails.js';
 import { resolveModelName } from './model-resolution.js';
+import { asTool } from './as-tool.js';
+import {
+  isResponsesApiEnabled,
+  buildAzureBaseUrl,
+  buildModelProvider,
+  resolveOutputText,
+} from './model-helpers.js';
 import { PlanArtifactMissing, ChainDepthExceeded } from '../errors/index.js';
 import { sanitizeError } from './sanitize-error.js';
 import { z } from 'zod';
@@ -143,18 +150,12 @@ export interface RunnerOptions {
 }
 
 // ---------------------------------------------------------------------------
-// Feature flag: KICKSTART_USE_RESPONSES
+// Feature flag, Azure URL helper, model provider, output-text extraction
+// (moved to model-helpers.ts to break the runner ↔ as-tool circular import;
+//  re-exported here for backwards compatibility with external consumers)
 // ---------------------------------------------------------------------------
 
-/**
- * Returns true when the KICKSTART_USE_RESPONSES env var is set to a truthy
- * value ("1", "true", "yes", "on").  Default is false so existing behaviour
- * is unchanged until the flag is explicitly enabled (Phase 2 of #114).
- */
-export function isResponsesApiEnabled(): boolean {
-  const val = (process.env.KICKSTART_USE_RESPONSES ?? '').toLowerCase().trim();
-  return val === '1' || val === 'true' || val === 'yes' || val === 'on';
-}
+export { isResponsesApiEnabled, buildAzureBaseUrl, buildModelProvider, resolveOutputText } from './model-helpers.js';
 
 // ---------------------------------------------------------------------------
 // runChain / runWithGate — Deterministic sequential agent execution (#119)
@@ -229,50 +230,6 @@ export function parseGateVerdict(output: string): GateResult {
 // ---------------------------------------------------------------------------
 // Build model provider (Azure-aware)
 // ---------------------------------------------------------------------------
-
-
-/**
- * Build the Azure OpenAI baseURL for use with the OpenAI-compatible SDK.
- *
- * Uses the new Azure OpenAI v1 endpoint shape:
- *   https://{resource}.openai.azure.com/openai/v1
- *
- * The SDK will then append `/chat/completions`, producing the correct
- * `/openai/v1/chat/completions` path. The previous shape (`/openai`) resolved
- * to `/openai/chat/completions`, which does not exist on Azure OpenAI and
- * returned HTTP 404 "Resource not found" for every /api/converse call (see #932).
- *
- * Azure OpenAI only serves chat completions under two shapes:
- *   - legacy: /openai/deployments/{name}/chat/completions?api-version=...
- *   - v1:     /openai/v1/chat/completions
- * We target v1 because it matches the OpenAI-compatible surface the SDK uses.
- */
-export function buildAzureBaseUrl(endpoint: string): string {
-  const trimmed = endpoint.replace(/\/$/, '');
-  return `${trimmed}/openai/v1`;
-}
-
-export function buildModelProvider(): OpenAIProvider {
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
-  const apiKey = process.env.AZURE_OPENAI_API_KEY;
-  const useResponses = isResponsesApiEnabled();
-
-  if (endpoint && apiKey) {
-    // Azure OpenAI — use the v1 OpenAI-compatible surface (see #932).
-    const azureBaseUrl = buildAzureBaseUrl(endpoint);
-    console.log('[runner] Building model provider: Azure OpenAI');
-    return new OpenAIProvider({
-      apiKey,
-      baseURL: azureBaseUrl,
-      useResponses,
-    });
-  }
-
-  // Standard OpenAI (dev/test) — reads OPENAI_API_KEY from env automatically
-  console.log('[runner] Building model provider: Standard OpenAI (or dev/test fallback)');
-  return new OpenAIProvider({ useResponses });
-}
-
 // Lazily-initialised shared provider + SDK runner
 let _sdkRunner: SDKRunner | null = null;
 let _otelBridgeInstalled = false;
@@ -484,43 +441,12 @@ function wrapUserAction(
 }
 
 // ---------------------------------------------------------------------------
-// Output text resolution — exported for unit-testing (#937)
+// Output text resolution — re-exported from model-helpers.ts (#937, moved
+// to break the runner ↔ as-tool circular import; see model-helpers.ts)
 // ---------------------------------------------------------------------------
 
-/**
- * Extract the prose display text from a structured AgentOutput finalOutput.
- *
- * When the SDK runs with an `outputType`, the model emits JSON-encoded tokens
- * as the raw stream text (fullText).  The SDK also parses the final JSON and
- * exposes it via `result.finalOutput`.  This helper pulls `finalOutput.message`
- * so callers send clean prose to the client instead of the raw JSON token stream.
- *
- * Falls back to `fullText` when finalOutput is null, not an object, or has no
- * string `message` field (e.g. interrupted runs, plain-text agents without
- * structured output).
- */
-export function resolveOutputText(finalOutput: unknown, fullText: string): string {
-  if (
-    finalOutput !== null &&
-    typeof finalOutput === 'object' &&
-    'message' in finalOutput &&
-    typeof (finalOutput as { message?: unknown }).message === 'string'
-  ) {
-    return (finalOutput as { message: string }).message;
-  }
-  // AgentOutput.message is strictOptional (#90 + #1130) — the model sets it to
-  // null (strict-mode) or omits it entirely (legacy) for surface-only turns.
-  // Return empty string so no chat bubble is emitted.
-  if (
-    finalOutput !== null &&
-    typeof finalOutput === 'object' &&
-    (!('message' in finalOutput) ||
-      (finalOutput as { message?: unknown }).message === null)
-  ) {
-    return '';
-  }
-  return fullText;
-}
+// (resolveOutputText is re-exported at the top of this file via the
+//  model-helpers re-export block; the original body has been removed.)
 
 // ---------------------------------------------------------------------------
 // Conversation history threading (#1062 Layer 0)
@@ -810,9 +736,23 @@ export class Runner {
       setHalted: () => void;
       handoffInputFilter?: import('./run-config.js').HandoffInputFilter;
     },
+    /** Agents currently being constructed in the call stack — guards against circular recursion. */
+    inProgress = new Set<string>(),
   ): Agent<any, any> {
     const cached = cache.get(agentName);
     if (cached) return cached;
+
+    // Guard: if this agent is already being constructed up the call stack, a
+    // circular asTool/handoff chain is present. Throw early rather than
+    // blowing the stack — the cache check above handles already-*completed*
+    // entries; this sentinel covers the window between "started" and "cached".
+    if (inProgress.has(agentName)) {
+      throw new Error(
+        `Circular buildAgentInstance dependency detected: "${agentName}" is already being constructed. ` +
+        `Check the asTools/handoffs configuration for "${agentName}" and its dependencies.`,
+      );
+    }
+    inProgress.add(agentName);
 
     const agentContrib = this.registry.getAgent(agentName);
 
@@ -909,18 +849,64 @@ export class Runner {
       outputGuardrails: sdkOutputGuardrails,
     });
     cache.set(agentName, agent);
+    // Agent is now fully "entered" in the cache — remove from in-progress so
+    // subsequent top-level calls for this agent get the cached instance.
+    inProgress.delete(agentName);
 
     // Resolve each frontmatter handoff recursively. PackRegistry.seal()
     // guarantees every target exists and belongs to the same pack (#1073
     // Z1), so a missing target here is a programmer error, not user input.
     for (const h of agentContrib.handoffs ?? []) {
-      const target = this.buildAgentInstance(h.agent, cache, ctx);
+      const target = this.buildAgentInstance(h.agent, cache, ctx, inProgress);
       const description = h.prompt ? `${h.label}. ${h.prompt}` : h.label;
       agent.handoffs.push(handoff(target, {
         toolDescriptionOverride: description,
         // #104: apply default handoff input filter (strips A2UI outputs, compresses old turns).
         inputFilter: ctx.handoffInputFilter,
       }));
+    }
+
+    // Wire asTool() consultation tools — specialist agents callable as
+    // bounded tools mid-task (no handoff / conversation transfer).
+    for (const ref of agentContrib.asTools ?? []) {
+      let specialistAgent: Agent<any, any>;
+      try {
+        specialistAgent = this.buildAgentInstance(ref.agent, cache, ctx, inProgress);
+      } catch {
+        // The specialist pack may not be loaded in this deployment (e.g.,
+        // aks.architect is declared in triage.agent.md but the aks pack is
+        // disabled). Inject an error-returning stub so the host agent can
+        // report the unavailability to the user rather than crashing the
+        // entire pack load.
+        const stubName = ref.toolName ??
+          `ask_${ref.agent.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '')}`;
+        const stubTool = tool({
+          name: stubName,
+          description: ref.description ?? `Ask the ${ref.agent} specialist.`,
+          parameters: z.object({
+            query: z.string().describe('The question to send to the specialist.'),
+          }),
+          execute: async (): Promise<string> =>
+            `[Specialist agent "${ref.agent}" is unavailable — the pack that provides it is not loaded. ` +
+            `Please answer the user's question using your own knowledge, or let them know this specialist is not available.]`,
+        });
+        // Route stub through wrapTool so tool-stage guardrails still execute.
+        const stubContrib: ToolContribution = { name: stubName, tool: stubTool };
+        agent.tools.push(
+          wrapTool(stubContrib, ctx.toolGuardrails, agentName, ctx.sseWrite, ctx.abortCtrl, ctx.isHalted, ctx.setHalted) as FunctionTool,
+        );
+        continue;
+      }
+      const contrib = asTool(specialistAgent, {
+        toolName: ref.toolName,
+        description: ref.description,
+        maxTurns: ref.maxTurns,
+      });
+      // Route through wrapTool so tool-stage guardrails (redaction/blocking)
+      // apply to the { query } argument before it reaches the specialist.
+      agent.tools.push(
+        wrapTool(contrib, ctx.toolGuardrails, agentName, ctx.sseWrite, ctx.abortCtrl, ctx.isHalted, ctx.setHalted) as FunctionTool,
+      );
     }
 
     return agent;

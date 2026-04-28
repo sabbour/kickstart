@@ -2,7 +2,7 @@ import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { parseFrontmatterFile } from './frontmatter.js';
-import type { AgentContribution, ContributionSource, Handoff, ModelRef } from '../types/agent.js';
+import type { AgentContribution, AsToolRef, ContributionSource, Handoff, ModelRef } from '../types/agent.js';
 import type { Pack } from '../types/pack.js';
 import type { ToolContribution } from '../types/tool.js';
 import type { UserActionContribution } from '../types/user-action.js';
@@ -20,6 +20,13 @@ const handoffSchema = z.object({
   model: modelRefSchema.optional(),
 }).strict();
 
+const asToolRefSchema = z.object({
+  agent: z.string().min(1),
+  description: z.string().min(1).optional(),
+  toolName: z.string().regex(/^[a-zA-Z0-9_-]+$/).optional(),
+  maxTurns: z.number().int().min(1).optional(),
+}).strict();
+
 const agentFrontmatterSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
@@ -27,6 +34,7 @@ const agentFrontmatterSchema = z.object({
   tools: z.array(z.string().min(1)).default([]),
   userActions: z.array(z.string().min(1)).default([]).optional(),
   handoffs: z.array(handoffSchema).default([]),
+  asTools: z.array(asToolRefSchema).default([]).optional(),
   'user-invocable': z.boolean().default(false),
   'model-invocable': z.boolean().optional(),
   'disable-model-invocation': z.boolean().optional(),
@@ -118,6 +126,7 @@ export function loadAgentFile(
     model: parsed.model as ModelRef,
     toolAllowlist: resolveToolAllowlist(pack, allowlist, scope),
     handoffs: parsed.handoffs as Handoff[],
+    ...(parsed.asTools && parsed.asTools.length > 0 ? { asTools: parsed.asTools as AsToolRef[] } : {}),
     userInvocable: parsed['user-invocable'],
     modelInvocable,
     instructionsBase: body,

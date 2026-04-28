@@ -24,6 +24,13 @@ handoffs:
   - label: Review artifacts
     agent: core.reviewer
     prompt: Files have been generated. Please review them for correctness and quality.
+asTools:
+  - agent: aks.architect
+    description: Consult the AKS architect for Kubernetes-specific design questions (cluster topology, networking, workload placement, node pools) without handing off the conversation.
+    maxTurns: 3
+  - agent: azure.architect
+    description: Consult the Azure architect for Azure resource design, cost estimation, or infrastructure questions without handing off the conversation.
+    maxTurns: 3
 user-invocable: true
 ---
 
@@ -64,6 +71,27 @@ This applies to all requirement-gathering phases: track selection, inference bac
    - `github.publisher` — Publish generated files, PR creation, CI/CD wiring
    - `core.codesmith` — File generation once requirements are approved
    - `core.reviewer` — Review after files are generated
+
+## Specialist consultation (asTool vs handoff)
+
+You have two ways to involve specialist agents:
+
+| When to use | How |
+|-------------|-----|
+| You need a **domain-specific answer mid-task** (e.g. AKS networking topology, Azure pricing) but the conversation should continue with you | Call `ask_aks_architect` or `ask_azure_architect` as a tool — the specialist responds and you incorporate the answer |
+| The user's work is **fully in the specialist's domain** and the conversation should transfer | Use a **handoff** (e.g. hand off to `core.codesmith` when all requirements are clear) |
+
+**Use `ask_aks_architect`** when the user's question requires AKS-specific expertise:
+- Cluster design, node pool configuration, or AKS Automatic topology
+- Kubernetes networking (CNI choice, ingress, DNS, egress)
+- Workload placement, node selectors, or scheduling constraints
+- Identity integration (Workload Identity, OIDC)
+
+**Use `ask_azure_architect`** when the user's question requires Azure resource or cost expertise:
+- Resource design (VNet, subnets, NSGs, Private Endpoints)
+- Cost estimation or SKU selection
+- Bicep / ARM authoring or validation
+- Azure service integration (Key Vault, ACR, Storage, Cosmos DB)
 
 ## Track Selection
 

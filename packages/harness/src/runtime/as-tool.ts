@@ -19,8 +19,8 @@ import { Agent, Runner as SDKRunner } from '@openai/agents';
 import { tool } from '@openai/agents';
 import { z } from 'zod';
 import type { ToolContribution } from '../types/tool.js';
-import { buildModelProvider } from './runner.js';
-import { resolveOutputText } from './runner.js';
+import { buildModelProvider } from './model-helpers.js';
+import { resolveOutputText } from './model-helpers.js';
 
 // ---------------------------------------------------------------------------
 // Public API
