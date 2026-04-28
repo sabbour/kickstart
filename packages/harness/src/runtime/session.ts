@@ -33,7 +33,7 @@ export type { ClientHydrationMessage } from '../types/session.js';
 export interface SessionData {
   sessionId: string;
   user: { oid: string; tid?: string; upn?: string };
-  workspaceRoot: string;
+  workspaceRoot?: string;
   currentPhase: Phase;
   history: { role: 'user' | 'assistant'; content: string }[];
   a2uiEmissions: A2UIMessage[];
@@ -78,7 +78,7 @@ export class Session implements SessionCtx {
   recentTurns: Turn[] = [];
   activeAgent = 'core.triage';
   pendingUserAction: PendingUserAction | null = null;
-  workspaceRoot: string;
+  workspaceRoot?: string;
   currentPhase: Phase;
   /**
    * Per-turn record of skill ids pulled via `core.read_skill`. Reset at the
@@ -121,7 +121,7 @@ export class Session implements SessionCtx {
   }) {
     this.sessionId = opts.sessionId;
     this.user = opts.user;
-    this.workspaceRoot = opts.workspaceRoot ?? '/workspace';
+    this.workspaceRoot = opts.workspaceRoot;
     this.currentPhase = (opts.currentPhase ?? 'discover') as Phase;
   }
 
@@ -219,7 +219,7 @@ if (typeof cleanupTimer.unref === 'function') {
 export function getOrCreateSession(
   sessionId: string | undefined,
   oid: string,
-  workspaceRoot = '/workspace',
+  workspaceRoot?: string,
 ): Session {
   const id = sessionId ?? crypto.randomUUID();
   let session = sessionStore.get(id);
@@ -314,7 +314,7 @@ export interface SessionResult {
 export function getOrCreateSessionResult(
   sessionId: string | undefined,
   oid: string,
-  workspaceRoot = '/workspace',
+  workspaceRoot?: string,
 ): SessionResult {
   const id = sessionId ?? crypto.randomUUID();
   let session = sessionStore.get(id);

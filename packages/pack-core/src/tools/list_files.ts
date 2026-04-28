@@ -49,7 +49,10 @@ export const listFilesTool: ToolContribution = {
       const session = runCtx?.context as SessionCtx | undefined;
       // workspaceRoot is an extension field not yet in the base SessionCtx contract.
       const workspaceRoot =
-        (session as unknown as { workspaceRoot?: string } | undefined)?.workspaceRoot ?? process.cwd();
+        (session as unknown as { workspaceRoot?: string } | undefined)?.workspaceRoot;
+      if (!workspaceRoot) {
+        return { error: 'list_files: no server-side workspace available. Files are held in-browser.' };
+      }
 
       const subdir = input.directory ?? '';
       const targetRaw = path.join(workspaceRoot, subdir);

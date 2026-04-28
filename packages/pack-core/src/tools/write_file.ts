@@ -67,8 +67,10 @@ export const writeFileTool: ToolContribution = {
     execute: async (input, runCtx) => {
       const session = runCtx?.context as SessionCtx | undefined;
 
-      const workspaceRoot = (session as unknown as { workspaceRoot?: string })?.workspaceRoot
-        ?? process.cwd();
+      const workspaceRoot = (session as unknown as { workspaceRoot?: string })?.workspaceRoot;
+      if (!workspaceRoot) {
+        return 'write_file: no server-side workspace available. Files are held in-browser.';
+      }
 
       const fullPath = resolveConfinedPath(resolve(workspaceRoot), input.path);
 

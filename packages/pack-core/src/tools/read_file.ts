@@ -49,9 +49,12 @@ export const readFileTool: ToolContribution = {
     execute: async (input, runCtx) => {
       const session = runCtx?.context as SessionCtx | undefined;
 
-      // Use a session-scoped workspace root when available; fall back to process cwd for tests.
-      const workspaceRoot = (session as unknown as { workspaceRoot?: string })?.workspaceRoot
-        ?? process.cwd();
+      // Use a session-scoped workspace root when available; absent in production
+      // (Azure Functions host) — return a clear error rather than crashing.
+      const workspaceRoot = (session as unknown as { workspaceRoot?: string })?.workspaceRoot;
+      if (!workspaceRoot) {
+        return `read_file: no server-side workspace available. Use the in-browser artifact store to access "${input.path}".`;
+      }
 
       const fullPath = resolveConfinedPath(resolve(workspaceRoot), input.path);
 

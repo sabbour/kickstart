@@ -243,11 +243,15 @@ export function createScaffoldAppTool(dispatcher: SkillDispatcher): ToolContribu
       execute: async (input, runCtx) => {
         const session = runCtx?.context as SessionCtx | undefined;
 
-        const workspaceRoot =
-          (session as unknown as { workspaceRoot?: string })?.workspaceRoot ?? process.cwd();
-
         if (!session) {
           throw new Error('scaffold_app: no session context available');
+        }
+
+        const workspaceRoot =
+          (session as unknown as { workspaceRoot?: string })?.workspaceRoot;
+
+        if (!workspaceRoot) {
+          throw new Error('scaffold_app: no server-side workspace available. File output is not yet supported without a workspace root.');
         }
 
         const result = await orchestrateScaffoldApp(
