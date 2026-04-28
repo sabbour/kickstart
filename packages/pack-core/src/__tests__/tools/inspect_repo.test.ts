@@ -2,7 +2,8 @@
  * @file inspect_repo.test.ts
  * @suite core.inspect_repo — language/framework detection + security controls
  *
- * Uses LOCAL fixture repos to avoid real git clones.
+ * Uses LOCAL fixture repos to avoid real network calls for local-path tests.
+ * Remote-path tests mock globalThis.fetch to exercise the GitHub REST API path.
  * Tests:
  *  - Python/FastAPI detection (requirements.txt + pyproject.toml)
  *  - Node/Express detection (package.json)
@@ -10,6 +11,7 @@
  *  - URL allowlist rejections (ssh, git, file, non-github, credentialed)
  *  - Dev-mode path containment rejection
  *  - Output redaction (no raw version strings in dep names)
+ *  - Remote source: GitHub REST API fetch (mocked fetch)
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -335,5 +337,191 @@ describe('inspectRepo output shape', () => {
     expect(typeof result.hasDockerfile).toBe('boolean');
     expect(typeof result.hasHelmChart).toBe('boolean');
     expect(typeof result.hasGithubActions).toBe('boolean');
+  });
+});
+
+// ── Remote source: GitHub REST API (mocked fetch) ────────────────────────────
+
+function makeFetchMock(files: Record<string, string>, dirs: Record<string, string[]> = {}) {
+  return vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    const urlStr = url.toString();
+    const accept = (init?.headers as Record<string, string> | undefined)?.Accept ?? '';
+
+    // Extract path from URL: /repos/owner/repo/contents/PATH (decode percent-encoding for lookup)
+    const match = urlStr.match(/\/repos\/[^/]+\/[^/]+\/contents\/(.*)$/);
+    const path = match ? decodeURIComponent(match[1]) : '';
+
+    if (accept === 'application/vnd.github.v3.raw') {
+      const content = files[path];
+      if (content === undefined) {
+        return new Response('Not Found', { status: 404 });
+      }
+      return new Response(content, { status: 200 });
+    }
+
+    // JSON metadata (existence check) or directory listing
+    if (path in files) {
+      // File existence check — return minimal metadata without body content
+      return new Response(JSON.stringify({ name: path.split('/').pop(), type: 'file' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    const entries = dirs[path];
+    if (entries === undefined) {
+      return new Response('Not Found', { status: 404 });
+    }
+    return new Response(JSON.stringify(entries.map((name) => ({ name, type: 'file' }))), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+}
+
+describe('inspectRepo — remote source (GitHub REST API)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('detects Python/FastAPI from remote repo via GitHub API', async () => {
+    const fetchMock = makeFetchMock({
+      'requirements.txt': 'fastapi\nsqlalchemy\nasyncpg\n',
+      'pyproject.toml': '[tool.poetry.dependencies]\npython = "^3.11"\n',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await inspectRepo({
+      source: 'remote',
+      remoteUrl: 'https://github.com/owner/repo',
+      localPath: null,
+    });
+
+    expect(result.language).toBe('python');
+    expect(result.framework).toBe('fastapi');
+    expect(result.runtime).toBe('python3.11');
+    expect(result.deps.database).toContain('postgres');
+  });
+
+  it('detects Node/Express from remote repo via GitHub API', async () => {
+    const packageJson = JSON.stringify({
+      dependencies: { express: '^4.18.0', pg: '^8.0.0' },
+      scripts: { start: 'node src/index.js' },
+    });
+    const fetchMock = makeFetchMock({ 'package.json': packageJson });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await inspectRepo({
+      source: 'remote',
+      remoteUrl: 'https://github.com/owner/repo',
+      localPath: null,
+    });
+
+    expect(result.language).toBe('javascript');
+    expect(result.framework).toBe('express');
+    expect(result.deps.database).toContain('postgres');
+  });
+
+  it('detects Go/Gin from remote repo via GitHub API', async () => {
+    const goMod = 'module example.com/app\n\ngo 1.21\n\nrequire (\n\tgithub.com/gin-gonic/gin v1.9.1\n\tgithub.com/lib/pq v1.10.9\n)\n';
+    const fetchMock = makeFetchMock({ 'go.mod': goMod });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await inspectRepo({
+      source: 'remote',
+      remoteUrl: 'https://github.com/owner/repo',
+      localPath: null,
+    });
+
+    expect(result.language).toBe('go');
+    expect(result.framework).toBe('gin');
+    expect(result.deps.database).toContain('postgres');
+  });
+
+  it('detects Dockerfile presence from remote repo', async () => {
+    const fetchMock = makeFetchMock({ 'Dockerfile': 'FROM node:20-alpine\nRUN npm install\n' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await inspectRepo({
+      source: 'remote',
+      remoteUrl: 'https://github.com/owner/repo',
+      localPath: null,
+    });
+
+    expect(result.hasDockerfile).toBe(true);
+  });
+
+  it('detects GitHub Actions presence from remote repo', async () => {
+    const fetchMock = makeFetchMock({}, { '.github/workflows': ['ci.yml', 'deploy.yaml'] });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await inspectRepo({
+      source: 'remote',
+      remoteUrl: 'https://github.com/owner/repo',
+      localPath: null,
+    });
+
+    expect(result.hasGithubActions).toBe(true);
+  });
+
+  it('uses GITHUB_TOKEN from env for authenticated API calls', async () => {
+    vi.stubEnv('GITHUB_TOKEN', 'test-token-123');
+    const fetchMock = makeFetchMock({ 'package.json': '{"dependencies":{}}' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await inspectRepo({
+      source: 'remote',
+      remoteUrl: 'https://github.com/owner/repo',
+      localPath: null,
+    });
+
+    const calls = fetchMock.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    const firstHeaders = calls[0]?.[1]?.headers as Record<string, string> | undefined;
+    expect(firstHeaders?.Authorization).toBe('Bearer test-token-123');
+  });
+
+  it('throws a clear error when GitHub API returns 500', async () => {
+    const fetchMock = vi.fn(async () => new Response('Internal Server Error', { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      inspectRepo({ source: 'remote', remoteUrl: 'https://github.com/owner/repo', localPath: null }),
+    ).rejects.toThrow(/GitHub API error 500/);
+  });
+
+  it('throws when remoteUrl is null for remote source', async () => {
+    await expect(
+      inspectRepo({ source: 'remote', remoteUrl: null, localPath: null }),
+    ).rejects.toThrow(/remoteUrl is required/);
+  });
+
+  it('normalizes URLs with .git suffix before API calls', async () => {
+    const fetchMock = makeFetchMock({ 'package.json': '{"dependencies":{}}' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // Should not throw — .git suffix is normalized away
+    const result = await inspectRepo({
+      source: 'remote',
+      remoteUrl: 'https://github.com/owner/repo.git',
+      localPath: null,
+    });
+    expect(result).toBeDefined();
+  });
+
+  it('returns hasDockerfile false when Dockerfile absent', async () => {
+    const fetchMock = makeFetchMock({});
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await inspectRepo({
+      source: 'remote',
+      remoteUrl: 'https://github.com/owner/repo',
+      localPath: null,
+    });
+
+    expect(result.hasDockerfile).toBe(false);
+    expect(result.hasGithubActions).toBe(false);
+    expect(result.hasHelmChart).toBe(false);
   });
 });

@@ -3,47 +3,21 @@
  *
  * Security controls (Zapp-approved):
  *  1. GitHub HTTPS-only URL allowlist
- *  2. Clone isolation (depth 1, 30s timeout, 500 MB cap, no LFS, no submodules)
+ *  2. GitHub REST API file fetch (hardcoded manifest set, no shell execution, no disk writes for remote)
  *  3. Dev-mode path canonicalization + workspace containment
- *  4. Static-file-only inspection (manifest allowlist)
+ *  4. Static-file-only inspection (hardcoded fetch list — see readManifestsFromApi)
  *  5. Output redaction (canonical dep names only — no versions, no URLs, no raw strings)
  */
 
 import { tool } from '@openai/agents';
 import { z } from 'zod';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { promises as fs } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { randomBytes } from 'node:crypto';
 import type { ToolContribution } from '@aks-kickstart/harness';
-
-const execFileAsync = promisify(execFile);
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const CLONE_TIMEOUT_MS = 30_000;
-const MAX_CLONE_BYTES = 500 * 1024 * 1024; // 500 MB
-
-/** Files we are allowed to read (full content). */
-const FULL_READ_ALLOWLIST = new Set([
-  'package.json',
-  'requirements.txt',
-  'pyproject.toml',
-  'poetry.lock',
-  'go.mod',
-  'Cargo.toml',
-  'pom.xml',
-  'build.gradle',
-]);
-
-/** Files we read only the first N lines of. */
-const PARTIAL_READ_ALLOWLIST: Array<{ file: string; lines: number }> = [
-  { file: 'Dockerfile', lines: 50 },
-  { file: 'docker-compose.yml', lines: 50 },
-  { file: 'Makefile', lines: 50 },
-];
+const GH_API_TIMEOUT_MS = 10_000;
 
 // ── URL validation ───────────────────────────────────────────────────────────
 
@@ -58,6 +32,192 @@ export function validateGitHubUrl(url: string): string {
   }
   // Return without trailing slash or .git
   return trimmed.replace(/\/$/, '').replace(/\.git$/, '');
+}
+
+// ── GitHub REST API helpers ───────────────────────────────────────────────────
+
+/** URL-encode each path segment while preserving the `/` separators. */
+function encodeGitHubPath(path: string): string {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
+/**
+ * Fetch a single file from a GitHub repo via the REST API.
+ * Returns the raw text content, or null if the file does not exist (404).
+ * Throws on any other non-2xx response.
+ */
+export async function fetchGitHubFile(
+  owner: string,
+  repo: string,
+  path: string,
+  token?: string,
+): Promise<string | null> {
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeGitHubPath(path)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GH_API_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        Accept: 'application/vnd.github.v3.raw',
+        'User-Agent': 'aks-kickstart/inspect_repo',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`inspect_repo: GitHub API error ${res.status} fetching ${path} from ${owner}/${repo}`);
+  }
+  return res.text();
+}
+
+/**
+ * Check whether a file exists in a GitHub repo without downloading its content.
+ * Returns true if the file exists (200), false if not (404).
+ * Throws on any other non-2xx response.
+ */
+async function checkGitHubFileExists(
+  owner: string,
+  repo: string,
+  path: string,
+  token?: string,
+): Promise<boolean> {
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeGitHubPath(path)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GH_API_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'aks-kickstart/inspect_repo',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+  // Discard the response body — we only need the status code
+  await res.body?.cancel().catch(() => undefined);
+  if (res.status === 404) return false;
+  if (!res.ok) {
+    throw new Error(`inspect_repo: GitHub API error ${res.status} checking ${path} in ${owner}/${repo}`);
+  }
+  return true;
+}
+
+/**
+ * List the entries in a directory within a GitHub repo, including their type.
+ * Returns null if the directory does not exist (404) or the path resolves to a
+ * file rather than a directory (API returns a non-array payload).
+ * Throws on any other non-2xx response.
+ */
+export async function listGitHubDir(
+  owner: string,
+  repo: string,
+  path: string,
+  token?: string,
+): Promise<Array<{ name: string; type: string }> | null> {
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeGitHubPath(path)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GH_API_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'aks-kickstart/inspect_repo',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`inspect_repo: GitHub API error ${res.status} listing ${path} in ${owner}/${repo}`);
+  }
+  const entries = await res.json() as unknown;
+  if (!Array.isArray(entries)) return null; // path is a file, not a directory
+  return (entries as Array<{ name: string; type: string }>).map((e) => ({ name: e.name, type: e.type }));
+}
+
+/**
+ * Build a Manifests object by fetching only the hardcoded manifest set via GitHub REST API.
+ * Files needed only for existence checks use checkGitHubFileExists (no body download).
+ * No files are written to disk.
+ */
+async function readManifestsFromApi(owner: string, repo: string, token?: string): Promise<Manifests> {
+  const [
+    packageJsonRaw,
+    requirementsTxt,
+    pyprojectToml,
+    goMod,
+    cargoToml,
+    pomXmlExists,
+    buildGradleExists,
+    dockerfileRaw,
+    helmChart1Exists,
+    chartsEntries,
+    workflowEntries,
+  ] = await Promise.all([
+    fetchGitHubFile(owner, repo, 'package.json', token),
+    fetchGitHubFile(owner, repo, 'requirements.txt', token),
+    fetchGitHubFile(owner, repo, 'pyproject.toml', token),
+    fetchGitHubFile(owner, repo, 'go.mod', token),
+    fetchGitHubFile(owner, repo, 'Cargo.toml', token),
+    checkGitHubFileExists(owner, repo, 'pom.xml', token),
+    checkGitHubFileExists(owner, repo, 'build.gradle', token),
+    fetchGitHubFile(owner, repo, 'Dockerfile', token),
+    checkGitHubFileExists(owner, repo, 'helm/Chart.yaml', token),
+    listGitHubDir(owner, repo, 'charts', token),
+    listGitHubDir(owner, repo, '.github/workflows', token),
+  ]);
+
+  // Dockerfile: limit to first 50 lines
+  const dockerfile = dockerfileRaw !== null
+    ? dockerfileRaw.split('\n').slice(0, 50).join('\n')
+    : null;
+
+  // charts/*/Chart.yaml: sequential check with early exit, directories only, capped at 20
+  let helmChart2Glob = false;
+  if (chartsEntries && chartsEntries.length > 0) {
+    const MAX_CHART_DIRS = 20;
+    for (const entry of chartsEntries.slice(0, MAX_CHART_DIRS)) {
+      if (entry.type !== 'dir') continue;
+      const found = await checkGitHubFileExists(owner, repo, `charts/${entry.name}/Chart.yaml`, token);
+      if (found) { helmChart2Glob = true; break; }
+    }
+  }
+
+  const hasGithubActions = workflowEntries !== null &&
+    workflowEntries.some((e) => e.name.endsWith('.yaml') || e.name.endsWith('.yml'));
+
+  let packageJson: Record<string, unknown> | null = null;
+  if (packageJsonRaw) {
+    try {
+      packageJson = JSON.parse(packageJsonRaw) as Record<string, unknown>;
+    } catch { /* malformed — ignore */ }
+  }
+
+  return {
+    packageJson,
+    requirementsTxt,
+    pyprojectToml,
+    goMod,
+    cargoToml,
+    pomXml: pomXmlExists,
+    buildGradle: buildGradleExists,
+    dockerfile,
+    hasHelmChart: helmChart1Exists || helmChart2Glob,
+    hasGithubActions,
+  };
 }
 
 // ── Dev-mode path validation ─────────────────────────────────────────────────
@@ -477,91 +637,61 @@ export async function inspectRepo(
   input: InspectRepoInput,
   workspaceRoot: string = process.cwd(),
 ): Promise<InspectRepoOutput> {
-  let repoPath: string;
-  let cloneDir: string | null = null;
+  let manifests: Manifests;
 
   if (input.source === 'remote') {
     if (!input.remoteUrl) {
       throw new Error('inspect_repo: remoteUrl is required for source=remote');
     }
     const safeUrl = validateGitHubUrl(input.remoteUrl);
-    cloneDir = join(tmpdir(), `inspect-repo-${randomBytes(8).toString('hex')}`);
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), CLONE_TIMEOUT_MS);
-      try {
-        await execFileAsync(
-          'git',
-          [
-            'clone',
-            '--depth', '1',
-            '--no-tags',
-            '--no-recurse-submodules',
-            '--config', 'filter.lfs.smudge=',
-            '--config', 'filter.lfs.required=false',
-            safeUrl,
-            cloneDir,
-          ],
-          { signal: controller.signal },
-        );
-      } finally {
-        clearTimeout(timer);
-      }
-
-      // Size cap check
-      const { stdout: duOut } = await execFileAsync('du', ['-sb', cloneDir]);
-      const bytes = parseInt(duOut.trim().split('\t')[0] ?? '0', 10);
-      if (bytes > MAX_CLONE_BYTES) {
-        throw new Error(`inspect_repo: cloned repo exceeds 500 MB limit (${bytes} bytes)`);
-      }
-
-      repoPath = cloneDir;
-    } catch (err) {
-      // Cleanup on error
-      await fs.rm(cloneDir, { recursive: true, force: true }).catch(() => undefined);
-      throw err;
+    // Parse owner/repo from the normalized URL (guaranteed format: https://github.com/<owner>/<repo>)
+    const parts = safeUrl.replace('https://github.com/', '').split('/');
+    if (parts.length !== 2) throw new Error(`inspect_repo: Invalid repo format parsed from: ${safeUrl}`);
+    const [owner, repo] = parts;
+    const token = process.env['GITHUB_TOKEN'];
+    if (!token) {
+      console.warn(
+        'inspect_repo: GITHUB_TOKEN is not set. Unauthenticated GitHub API calls are rate-limited ' +
+        'to 60 req/hr per IP. On a shared host, all invocations share this budget — a single user ' +
+        'can exhaust it in ~5 calls. Set GITHUB_TOKEN to avoid silent failures.',
+      );
     }
+    manifests = await readManifestsFromApi(owner, repo, token);
   } else {
     if (!input.localPath) {
       throw new Error('inspect_repo: localPath is required for source=local');
     }
-    repoPath = validateLocalPath(input.localPath, workspaceRoot);
+    const repoPath = validateLocalPath(input.localPath, workspaceRoot);
+    manifests = await readManifests(repoPath);
   }
 
-  try {
-    const manifests = await readManifests(repoPath);
-    const { language, framework, runtime, entrypoint, dbDeps } =
-      detectLanguageAndFramework(manifests);
+  const { language, framework, runtime, entrypoint, dbDeps } =
+    detectLanguageAndFramework(manifests);
 
-    const questionnaire = buildQuestionnaire(dbDeps, !!manifests.dockerfile, entrypoint);
+  const questionnaire = buildQuestionnaire(dbDeps, !!manifests.dockerfile, entrypoint);
 
-    const output: InspectRepoOutput = {
-      language,
-      ...(framework !== undefined ? { framework } : {}),
-      ...(runtime !== undefined ? { runtime } : {}),
-      deps: {
-        ...(dbDeps.length > 0 ? { database: dbDeps } : {}),
-      },
-      ...(entrypoint !== undefined ? { entrypoint } : {}),
-      hasDockerfile: manifests.dockerfile !== null,
-      hasHelmChart: manifests.hasHelmChart,
-      hasGithubActions: manifests.hasGithubActions,
-      questionnaire,
-    };
+  const output: InspectRepoOutput = {
+    language,
+    ...(framework !== undefined ? { framework } : {}),
+    ...(runtime !== undefined ? { runtime } : {}),
+    deps: {
+      ...(dbDeps.length > 0 ? { database: dbDeps } : {}),
+    },
+    ...(entrypoint !== undefined ? { entrypoint } : {}),
+    hasDockerfile: manifests.dockerfile !== null,
+    hasHelmChart: manifests.hasHelmChart,
+    hasGithubActions: manifests.hasGithubActions,
+    questionnaire,
+  };
 
-    return redactOutput(output);
-  } finally {
-    if (cloneDir) {
-      await fs.rm(cloneDir, { recursive: true, force: true }).catch(() => undefined);
-    }
-  }
+  return redactOutput(output);
 }
 
 // ── Input schema ──────────────────────────────────────────────────────────────
 
 export const InspectRepoInputSchema = z.object({
   source: z.enum(['remote', 'local']).describe(
-    'Whether to inspect a remote GitHub repository (clone) or a local path (dev mode only).',
+    'Whether to inspect a remote GitHub repository (via GitHub REST API) or a local path (dev mode only).',
   ),
   remoteUrl: z
     .string()
