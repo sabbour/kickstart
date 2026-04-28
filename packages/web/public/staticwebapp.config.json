@@ -6,6 +6,9 @@
           "openIdIssuer": "https://login.microsoftonline.com/d91aa5af-8c1e-442c-b77c-0b92988b387b/v2.0",
           "clientIdSettingName": "AZURE_CLIENT_ID",
           "clientSecretSettingName": "AZURE_CLIENT_SECRET"
+        },
+        "login": {
+          "loginParameters": ["scope=openid profile email offline_access https://management.azure.com/user_impersonation"]
         }
       }
     }
