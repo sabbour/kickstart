@@ -109,20 +109,51 @@ export const DeleteSurfaceMessageSchema = z.preprocess(
   DeleteSurfaceEnvelope.transform(withoutDiscriminator),
 );
 
-export const A2UIMessageSchema = z.preprocess(
-  withDiscriminator,
-  A2UIMessageEnvelopeSchema.transform(withoutDiscriminator),
-);
+/** Zod schema for `FileMessage` — matches `{ type: 'file', name, content, mimeType? }`. */
+export const FileMessageSchema = z.object({
+  type: z.literal('file'),
+  name: z.string(),
+  content: z.string(),
+  mimeType: z.string().optional(),
+});
+
+/**
+ * Zod schema for any A2UI message (envelope messages + file events).
+ *
+ * `FileMessage` uses a `type` discriminant and is validated directly.
+ * Envelope messages (createSurface, updateComponents, etc.) go through the
+ * `withDiscriminator` preprocessor that injects the `op` key before the
+ * discriminated-union check.
+ */
+export const A2UIMessageSchema = z.union([
+  FileMessageSchema,
+  z.preprocess(withDiscriminator, A2UIMessageEnvelopeSchema.transform(withoutDiscriminator)),
+]);
 
 export type CreateSurfaceMessage = z.output<typeof CreateSurfaceMessageSchema>;
 export type UpdateComponentsMessage = z.output<typeof UpdateComponentsMessageSchema>;
 export type UpdateDataModelMessage = z.output<typeof UpdateDataModelMessageSchema>;
 export type DeleteSurfaceMessage = z.output<typeof DeleteSurfaceMessageSchema>;
+
+/**
+ * File event — carries a named file payload from the server to the browser.
+ * The frontend stores received files in a `Map<name, content>` in-memory,
+ * enabling in-browser artifact storage without a server filesystem.
+ * `mimeType` is optional; defaults to `undefined` if absent.
+ */
+export type FileMessage = {
+  type: 'file';
+  name: string;
+  content: string;
+  mimeType?: string;
+};
+
 export type A2UIMessageV09 =
   | CreateSurfaceMessage
   | UpdateComponentsMessage
   | UpdateDataModelMessage
-  | DeleteSurfaceMessage;
+  | DeleteSurfaceMessage
+  | FileMessage;
 
 export type CreateSurfaceMessageInput = {
   version: A2UIVersion;

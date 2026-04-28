@@ -18,7 +18,15 @@ export type AllowedSkill = (typeof ALLOWED_SKILLS)[number];
 
 // ── Path validation ───────────────────────────────────────────────────────────
 
-export function validateOutputPath(workspaceRoot: string, relativePath: string): string {
+/**
+ * Validates a skill output path. When `workspaceRoot` is provided the resolved
+ * path is also checked to be within the root (server-side confinement). Without
+ * a root only the relative-path rules are enforced (in-browser mode).
+ *
+ * Returns the resolved absolute path when `workspaceRoot` is given, or the
+ * original `relativePath` when running without a workspace.
+ */
+export function validateOutputPath(workspaceRoot: string | undefined, relativePath: string): string {
   if (!relativePath || relativePath.trim() === '') {
     throw new Error(`scaffold_app: output path must not be empty`);
   }
@@ -36,6 +44,11 @@ export function validateOutputPath(workspaceRoot: string, relativePath: string):
     if (seg === '..') {
       throw new Error(`scaffold_app: output path must not contain ".." traversal: "${relativePath}"`);
     }
+  }
+
+  if (!workspaceRoot) {
+    // In-browser mode: relative-path checks are sufficient; return as-is.
+    return relativePath;
   }
 
   const resolved = resolve(workspaceRoot, relativePath);
@@ -108,7 +121,7 @@ export interface ScaffoldAppOutput {
 
 export async function orchestrateScaffoldApp(
   input: ScaffoldAppInput,
-  workspaceRoot: string,
+  workspaceRoot: string | undefined,
   dispatcher: SkillDispatcher,
   session: Pick<SessionCtx, 'recordA2UIEmission' | 'liveSurfaceIds' | 'maxLiveSurfaces' | 'sessionId' | 'negotiatedCatalog'>,
 ): Promise<ScaffoldAppOutput> {
@@ -238,7 +251,8 @@ export function createScaffoldAppTool(dispatcher: SkillDispatcher): ToolContribu
         'Orchestrates Generation Phase C: dispatches gen-dockerfile, gen-helm, gen-kaito-crd ' +
         '(KAITO track only), gen-foundry-wiring (Foundry track only), and gen-gha-workflow in ' +
         'deterministic order. Validates all output paths (no traversal, no collisions) and emits ' +
-        'a GenerationProgress UI component after each skill completes.',
+        'a GenerationProgress UI component after each skill completes. ' +
+        'Works in both server-side (disk + browser) and in-browser (browser only) modes.',
       parameters: ScaffoldAppInputSchema,
       execute: async (input, runCtx) => {
         const session = runCtx?.context as SessionCtx | undefined;
@@ -247,12 +261,9 @@ export function createScaffoldAppTool(dispatcher: SkillDispatcher): ToolContribu
           throw new Error('scaffold_app: no session context available');
         }
 
+        // workspaceRoot is optional — absent in pure in-browser deployments.
         const workspaceRoot =
           (session as unknown as { workspaceRoot?: string })?.workspaceRoot;
-
-        if (!workspaceRoot) {
-          throw new Error('scaffold_app: no server-side workspace available. File output is not yet supported without a workspace root.');
-        }
 
         const result = await orchestrateScaffoldApp(
           input,

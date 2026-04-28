@@ -2,8 +2,8 @@
  * @file write_file.test.ts
  * @suite Phase C — core.write_file tool
  *
- * Tests path-confinement guards and successful write + overwrite behaviour
- * against the real implementation.
+ * Tests path-confinement guards, successful write + overwrite behaviour, and
+ * the dual-mode emitFile() / disk-write logic introduced in Phase 3 of #165.
  *
  * NOTE: The SDK wraps execution errors in a string result rather than
  * rejecting. Error-case tests check the returned string.
@@ -44,6 +44,12 @@ const invoke = (path: string, content: string) =>
     JSON.stringify({ path, content }),
   );
 
+const invokeNoWorkspace = (path: string, content: string) =>
+  writeFileTool.tool.invoke(
+    new RunContext(makeSessionCtx()),
+    JSON.stringify({ path, content }),
+  );
+
 function storedContent(relativePath: string): string | undefined {
   return _fsStore.get(resolve(WORKSPACE_ROOT, relativePath));
 }
@@ -56,7 +62,7 @@ describe('core.write_file', () => {
     vi.clearAllMocks();
   });
 
-  // ── Happy path ─────────────────────────────────────────────────────────────
+  // ── Happy path (server-side with workspaceRoot) ────────────────────────────
 
   describe('valid relative path writes content', () => {
     it('returns a string confirming the write with the path', async () => {
@@ -96,6 +102,59 @@ describe('core.write_file', () => {
         expect.any(String),
         expect.objectContaining({ recursive: true }),
       );
+    });
+
+    it('emits a FileMessage to the session even when workspaceRoot is present', async () => {
+      const session = { ...makeSessionCtx(), workspaceRoot: WORKSPACE_ROOT };
+      await writeFileTool.tool.invoke(
+        new RunContext(session),
+        JSON.stringify({ path: 'src/app.ts', content: 'export {}' }),
+      );
+      const fileMsg = session.a2uiEmissions.find(
+        (m) => (m as { type?: string }).type === 'file',
+      ) as { type: string; name: string; content: string } | undefined;
+      expect(fileMsg).toBeDefined();
+      expect(fileMsg?.name).toBe('src/app.ts');
+      expect(fileMsg?.content).toBe('export {}');
+    });
+  });
+
+  // ── In-browser mode (no workspaceRoot) ───────────────────────────────────
+
+  describe('in-browser mode (no workspaceRoot)', () => {
+    it('returns a message indicating the file was emitted to browser', async () => {
+      const result = String(await invokeNoWorkspace('src/main.ts', 'const x = 1;'));
+      expect(result).toMatch(/emitted to browser/i);
+      expect(result).toContain('src/main.ts');
+    });
+
+    it('does not write to the filesystem', async () => {
+      const { writeFileSync } = await import('node:fs');
+      await invokeNoWorkspace('src/main.ts', 'hello');
+      expect(writeFileSync).not.toHaveBeenCalled();
+    });
+
+    it('emits a FileMessage to the session a2uiEmissions', async () => {
+      const session = makeSessionCtx();
+      await writeFileTool.tool.invoke(
+        new RunContext(session),
+        JSON.stringify({ path: 'k8s/deploy.yaml', content: 'apiVersion: apps/v1' }),
+      );
+      const fileMsg = session.a2uiEmissions.find(
+        (m) => (m as { type?: string }).type === 'file',
+      ) as { type: string; name: string; content: string } | undefined;
+      expect(fileMsg).toBeDefined();
+      expect(fileMsg?.name).toBe('k8s/deploy.yaml');
+      expect(fileMsg?.content).toBe('apiVersion: apps/v1');
+    });
+
+    it('records the artifact on the session even without a workspace', async () => {
+      const session = makeSessionCtx();
+      await writeFileTool.tool.invoke(
+        new RunContext(session),
+        JSON.stringify({ path: 'helm/values.yaml', content: 'replicaCount: 1' }),
+      );
+      expect(session.artifacts.has('helm/values.yaml')).toBe(true);
     });
   });
 

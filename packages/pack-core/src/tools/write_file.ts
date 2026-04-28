@@ -4,6 +4,7 @@ import { dirname, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import type { ToolContribution } from '@aks-kickstart/harness';
 import type { SessionCtx } from '@aks-kickstart/harness';
+import { emitFile } from '@aks-kickstart/harness';
 
 // ── Path confinement ──────────────────────────────────────────────────────────
 
@@ -62,20 +63,27 @@ export const writeFileTool: ToolContribution = {
     description:
       'Writes UTF-8 text content to a file at the given path within the session workspace. ' +
       'Creates intermediate directories as needed. ' +
-      'Path must be relative to the workspace root; traversal (../) is not allowed. Binary writes are not supported.',
+      'Path must be relative to the workspace root; traversal (../) is not allowed. Binary writes are not supported. ' +
+      'Always emits the file to the browser in-memory store; also writes to disk when a server-side workspace is available.',
     parameters: WriteFileInputSchema,
     execute: async (input, runCtx) => {
       const session = runCtx?.context as SessionCtx | undefined;
-
       const workspaceRoot = (session as unknown as { workspaceRoot?: string })?.workspaceRoot;
-      if (!workspaceRoot) {
-        return 'write_file: no server-side workspace available. Files are held in-browser.';
+
+      if (session) {
+        // Always emit to the browser regardless of server-side workspace availability.
+        emitFile(session, input.path, input.content);
+        // Record the artifact so downstream tools (validate, search) can find it.
+        session.recordArtifact({ path: input.path, kind: 'file' });
       }
 
-      const fullPath = resolveConfinedPath(resolve(workspaceRoot), input.path);
+      if (!workspaceRoot) {
+        // In-browser mode: file emitted to the client-side store; no disk write.
+        return `File '${input.path}' emitted to browser (in-memory store, ${input.content.length} bytes)`;
+      }
 
-      // Record the artifact in the session so downstream tools (validate, search) can find it.
-      session?.recordArtifact({ path: input.path, kind: 'file' });
+      // Server-side mode: also write to disk for local toolchain access.
+      const fullPath = resolveConfinedPath(resolve(workspaceRoot), input.path);
 
       try {
         mkdirSync(dirname(fullPath), { recursive: true });

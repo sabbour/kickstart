@@ -510,6 +510,10 @@ export { buildRunConfig, defaultHandoffInputFilter, defaultHandoffCallback } fro
 export { asTool, AS_TOOL_MAX_TURNS_DEFAULT } from './runtime/as-tool.js';
 export type { AsToolOptions } from './runtime/as-tool.js';
 export { Session, sessionStore, getOrCreateSession, getOrCreateSessionResult, generateAnonSessionToken, validateAnonSessionToken, isAnonymousSession, ANON_SESSION_TTL_MS, AnonTokenGenerationError } from './runtime/session.js';
+export { emitFile } from './runtime/emit-file.js';
+export type { EmitFileSession } from './runtime/emit-file.js';
+export { FileMessageSchema } from './types/a2ui.js';
+export type { FileMessage } from './types/a2ui.js';
 export type { ISessionStore, IAsyncSessionStore, EvictionSchedulerHandle } from './runtime/session-store.js';
 export { InMemorySessionStore, createSessionStore, startEvictionScheduler } from './runtime/session-store.js';
 export { AzureTableSessionStore } from './runtime/session-store-azure-table.js';

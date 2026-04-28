@@ -88,9 +88,22 @@ describe('validateOutputPath', () => {
     expect(() => validateOutputPath(WORKSPACE, '')).toThrow(/empty/);
   });
 
-  it('returns the resolved absolute path', () => {
+  it('returns the resolved absolute path when workspaceRoot is provided', () => {
     const result = validateOutputPath(WORKSPACE, 'helm/values.yaml');
     expect(result).toBe(`${WORKSPACE}/helm/values.yaml`);
+  });
+
+  it('returns the relative path unchanged when workspaceRoot is undefined', () => {
+    const result = validateOutputPath(undefined, 'helm/values.yaml');
+    expect(result).toBe('helm/values.yaml');
+  });
+
+  it('still rejects traversal when workspaceRoot is undefined', () => {
+    expect(() => validateOutputPath(undefined, '../../../etc/passwd')).toThrow(/traversal/);
+  });
+
+  it('still rejects absolute paths when workspaceRoot is undefined', () => {
+    expect(() => validateOutputPath(undefined, '/etc/passwd')).toThrow(/relative/);
   });
 });
 
@@ -291,5 +304,67 @@ describe('orchestrateScaffoldApp — GenerationProgress UI', () => {
     const emissions = session.a2uiEmissions as unknown as Array<Record<string, unknown>>;
     const creates = emissions.filter((e) => 'createSurface' in e);
     expect(creates).toHaveLength(1);
+  });
+});
+
+// ── In-browser mode (no workspaceRoot) ───────────────────────────────────────
+
+describe('orchestrateScaffoldApp — in-browser mode (no workspaceRoot)', () => {
+  it('completes successfully without a workspaceRoot', async () => {
+    const dispatch = makeDispatcher();
+    const session = makeSession();
+    const result = await orchestrateScaffoldApp(makeInput('kaito'), undefined, dispatch, session);
+    expect(result.status).toBe('complete');
+  });
+
+  it('still runs all 4 skills for the kaito track', async () => {
+    const dispatch = makeDispatcher();
+    const session = makeSession();
+    const result = await orchestrateScaffoldApp(makeInput('kaito'), undefined, dispatch, session);
+    expect(result.skillsRun).toEqual([
+      'gen-dockerfile',
+      'gen-helm',
+      'gen-kaito-crd',
+      'gen-gha-workflow',
+    ]);
+  });
+
+  it('returns outputPaths relative to no root', async () => {
+    const dispatch = makeDispatcher({
+      'gen-dockerfile': ['Dockerfile'],
+      'gen-helm': ['helm/values.yaml'],
+      'gen-kaito-crd': ['kaito/workspace.yaml'],
+      'gen-gha-workflow': ['.github/workflows/deploy.yaml'],
+    });
+    const session = makeSession();
+    const result = await orchestrateScaffoldApp(makeInput('kaito'), undefined, dispatch, session);
+    expect(result.outputPaths).toContain('Dockerfile');
+    expect(result.outputPaths).toContain('helm/values.yaml');
+  });
+
+  it('still rejects traversal paths even without a workspaceRoot', async () => {
+    const dispatch = makeDispatcher({ 'gen-dockerfile': ['../../../etc/passwd'] });
+    const session = makeSession();
+    await expect(
+      orchestrateScaffoldApp(makeInput('kaito'), undefined, dispatch, session),
+    ).rejects.toThrow(/traversal/);
+  });
+
+  it('still rejects absolute paths even without a workspaceRoot', async () => {
+    const dispatch = makeDispatcher({ 'gen-dockerfile': ['/etc/cron.d/evil'] });
+    const session = makeSession();
+    await expect(
+      orchestrateScaffoldApp(makeInput('kaito'), undefined, dispatch, session),
+    ).rejects.toThrow(/relative/);
+  });
+
+  it('still emits GenerationProgress A2UI events', async () => {
+    const dispatch = makeDispatcher();
+    const session = makeSession();
+    await orchestrateScaffoldApp(makeInput('foundry'), undefined, dispatch, session);
+
+    const emissions = session.a2uiEmissions as unknown as Array<Record<string, unknown>>;
+    expect(emissions.some((e) => 'createSurface' in e)).toBe(true);
+    expect(emissions.some((e) => 'updateComponents' in e)).toBe(true);
   });
 });
