@@ -10,6 +10,7 @@ import {
   makeStyles,
 } from '@fluentui/react-components';
 import type { ComponentContribution } from '@aks-kickstart/harness';
+import { useGitHubAuthBridge } from '../../auth-bridge.js';
 
 const RepoInfoSchema = z.object({
   repo: z.object({
@@ -51,6 +52,20 @@ export const RepoInfoRenderer: React.FC<{ props: RepoInfoProps }> = ({ props }) 
   const classes = useStyles();
   const containerClass = props.isActive ? classes.card : `${classes.card} ${classes.inactive}`;
   const { repo } = props;
+
+  // Auth gate (issue #179): RepoInfo never displays repo metadata if the
+  // viewer is not authenticated. Server-supplied `props.repo` is treated as
+  // a hint for the next render after sign-in.
+  const bridge = useGitHubAuthBridge();
+  if (!bridge.authenticated) {
+    return (
+      <Card className={containerClass}>
+        <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+          Sign in to GitHub to view repository details.
+        </Text>
+      </Card>
+    );
+  }
 
   return (
     <Card className={containerClass}>

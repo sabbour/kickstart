@@ -11,6 +11,7 @@ import {
   makeStyles,
 } from '@fluentui/react-components';
 import type { ComponentContribution } from '@aks-kickstart/harness';
+import { useGitHubAuthBridge } from '../../auth-bridge.js';
 
 const LoginSchema = z.object({
   status: z.enum(['idle', 'loading', 'success', 'error']).default('idle'),
@@ -51,6 +52,27 @@ export const LoginRenderer: React.FC<{ props: LoginProps }> = ({ props }) => {
   const classes = useStyles();
   const containerClass = props.isActive ? classes.card : `${classes.card} ${classes.inactive}`;
 
+  // Live auth state from the injected GitHubAuthBridge (issue #179). Throws
+  // fail-fast if the host application forgot to call setGitHubAuthHook().
+  const bridge = useGitHubAuthBridge();
+
+  // Bridge wins over server-supplied props for status/viewer when the bridge
+  // has loaded a session. Server props remain authoritative when no session
+  // is available yet (e.g. playground previews before sign-in).
+  const effectiveStatus: LoginProps['status'] = bridge.loading
+    ? 'loading'
+    : bridge.error
+      ? 'error'
+      : bridge.authenticated
+        ? 'success'
+        : props.status;
+  const effectiveViewer = bridge.session?.viewer ?? props.viewerSummary;
+  const effectiveError = bridge.error ?? props.errorMessage;
+
+  const handleSignIn = React.useCallback(() => {
+    void bridge.signIn();
+  }, [bridge]);
+
   return (
     <Card className={containerClass}>
       <CardHeader header={<Text weight="semibold">Sign in to GitHub</Text>} />
@@ -59,31 +81,31 @@ export const LoginRenderer: React.FC<{ props: LoginProps }> = ({ props }) => {
           {String(props.reason)}
         </Text>
       )}
-      {props.status === 'loading' && (
+      {effectiveStatus === 'loading' && (
         <Spinner size="small" label="Authenticating with GitHub…" />
       )}
-      {props.status === 'error' && props.errorMessage && (
+      {effectiveStatus === 'error' && effectiveError && (
         <Text size={200} style={{ color: tokens.colorPaletteRedForeground1 }}>
-          {String(props.errorMessage)}
+          {String(effectiveError)}
         </Text>
       )}
-      {props.status === 'success' && props.viewerSummary && (
+      {effectiveStatus === 'success' && effectiveViewer && (
         <div className={classes.viewer}>
           <Avatar
-            name={String(props.viewerSummary.name ?? props.viewerSummary.login)}
-            image={props.viewerSummary.avatarUrl ? { src: props.viewerSummary.avatarUrl } : undefined}
+            name={String(effectiveViewer.name ?? effectiveViewer.login)}
+            image={effectiveViewer.avatarUrl ? { src: effectiveViewer.avatarUrl } : undefined}
             size={32}
           />
           <Text size={300} weight="semibold">
-            {String(props.viewerSummary.name ?? props.viewerSummary.login)}
+            {String(effectiveViewer.name ?? effectiveViewer.login)}
           </Text>
           <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-            @{String(props.viewerSummary.login)}
+            @{String(effectiveViewer.login)}
           </Text>
         </div>
       )}
-      {props.status === 'idle' && props.isActive && (
-        <Button appearance="primary" disabled>
+      {effectiveStatus === 'idle' && props.isActive && (
+        <Button appearance="primary" onClick={handleSignIn}>
           Sign in with GitHub
         </Button>
       )}

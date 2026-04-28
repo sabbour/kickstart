@@ -7,6 +7,30 @@
 
 import type { ComponentContribution } from '@aks-kickstart/harness';
 
+// GitHub auth bridge — see ./auth-bridge.ts for the contract. Web calls
+// `setGitHubAuthHook(useGitHubAuth)` once at boot; pack-github renderers
+// consume the injected hook so they react to live auth state without
+// importing from `packages/web/`.
+//
+// NOTE: `__resetGitHubAuthHookForTests` is intentionally NOT re-exported
+// here. Test consumers must import it from
+// `@aks-kickstart/pack-github/testing` (see `./testing.ts` and the
+// `./testing` entry in package.json `exports`). This keeps the test-only
+// escape hatch unreachable from the production client surface
+// (Zapp DR boundary on PR #235).
+export {
+  setGitHubAuthHook,
+  useGitHubAuthBridge,
+  isGitHubAuthHookSet,
+} from './auth-bridge.js';
+export type {
+  GitHubAuthHook,
+  GitHubAuthBridgeValue,
+  GitHubAuthBridgeSession,
+  GitHubAuthBridgeViewer,
+  GitHubAuthBridgeOwner,
+} from './auth-bridge.types.js';
+
 export { LoginRenderer, loginContribution } from './components/Login/index.js';
 export { OrgPickerRenderer, orgPickerContribution } from './components/OrgPicker/index.js';
 export { RepoPickerRenderer, repoPickerContribution } from './components/RepoPicker/index.js';

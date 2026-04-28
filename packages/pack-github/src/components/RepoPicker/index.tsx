@@ -12,6 +12,7 @@ import {
   makeStyles,
 } from '@fluentui/react-components';
 import type { ComponentContribution } from '@aks-kickstart/harness';
+import { useGitHubAuthBridge } from '../../auth-bridge.js';
 
 const RepoItemSchema = z.object({
   name: z.string(),
@@ -78,9 +79,33 @@ export const RepoPickerRenderer: React.FC<{ props: RepoPickerProps }> = ({ props
     setSelectedRepo(props.selectedRepo);
   }, [props.selectedRepo]);
 
+  // Live auth state from the GitHubAuthBridge (issue #179). The picker is
+  // gated on `authenticated`; an unauthenticated session prompts sign-in
+  // before any repo list is shown.
+  const bridge = useGitHubAuthBridge();
+  const requiresAuth = !bridge.authenticated && !bridge.loading;
+
   const header =
     props.mode === 'create' ? 'Create GitHub Repository' : 'Select GitHub Repository';
   const ownerPrefix = props.owner ? `${props.owner}/` : '';
+
+  if (requiresAuth) {
+    return (
+      <Card className={containerClass}>
+        <CardHeader header={<Text weight="semibold">{header}</Text>} />
+        <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+          Sign in to GitHub to browse repositories.
+        </Text>
+        {bridge.error && (
+          <Text size={200} style={{ color: tokens.colorPaletteRedForeground1 }}>
+            {String(bridge.error)}
+          </Text>
+        )}
+      </Card>
+    );
+  }
+
+  const effectiveStatus: RepoPickerProps['status'] = bridge.loading ? 'loading' : props.status;
 
   return (
     <Card className={containerClass}>
@@ -90,13 +115,13 @@ export const RepoPickerRenderer: React.FC<{ props: RepoPickerProps }> = ({ props
           Account: {String(props.owner)}
         </Text>
       )}
-      {props.status === 'loading' && <Spinner size="small" label="Loading repositories…" />}
-      {props.status === 'error' && props.errorMessage && (
+      {effectiveStatus === 'loading' && <Spinner size="small" label="Loading repositories…" />}
+      {effectiveStatus === 'error' && props.errorMessage && (
         <Text size={200} style={{ color: tokens.colorPaletteRedForeground1 }}>
           {String(props.errorMessage)}
         </Text>
       )}
-      {props.mode === 'pick' && props.status === 'loaded' && props.repos && (
+      {props.mode === 'pick' && effectiveStatus === 'loaded' && props.repos && (
         <div className={classes.list}>
           {props.repos.map((repo) => {
             const isSelected = repo.name === selectedRepo;

@@ -10,6 +10,7 @@ import {
   Badge,
 } from '@fluentui/react-components';
 import type { ComponentContribution } from '@aks-kickstart/harness';
+import { useGitHubAuthBridge } from '../../auth-bridge.js';
 
 const OwnerSchema = z.object({
   login: z.string(),
@@ -26,6 +27,7 @@ const OrgPickerSchema = z.object({
 });
 
 type OrgPickerProps = z.infer<typeof OrgPickerSchema>;
+type OwnerProp = z.infer<typeof OwnerSchema>;
 
 const useStyles = makeStyles({
   card: {
@@ -67,18 +69,38 @@ export const OrgPickerRenderer: React.FC<{ props: OrgPickerProps }> = ({ props }
     setSelectedOwner(props.selectedOwner);
   }, [props.selectedOwner]);
 
+  // Live owner list from the GitHubAuthBridge (issue #179). Falls back to
+  // server-supplied props.owners only when the bridge has no session loaded
+  // (e.g. playground previews before sign-in completes).
+  const bridge = useGitHubAuthBridge();
+  const liveOwners: OwnerProp[] | undefined = bridge.session?.owners?.map((o) => ({
+    login: o.login,
+    type: o.type,
+    avatarUrl: o.avatarUrl,
+  }));
+
+  const effectiveStatus: OrgPickerProps['status'] = bridge.loading
+    ? 'loading'
+    : bridge.error
+      ? 'error'
+      : liveOwners
+        ? 'loaded'
+        : props.status;
+  const effectiveOwners = liveOwners ?? props.owners;
+  const effectiveError = bridge.error ?? props.errorMessage;
+
   return (
     <Card className={containerClass}>
       <CardHeader header={<Text weight="semibold">Select GitHub Account or Organization</Text>} />
-      {props.status === 'loading' && <Spinner size="small" label="Loading accounts…" />}
-      {props.status === 'error' && props.errorMessage && (
+      {effectiveStatus === 'loading' && <Spinner size="small" label="Loading accounts…" />}
+      {effectiveStatus === 'error' && effectiveError && (
         <Text size={200} style={{ color: tokens.colorPaletteRedForeground1 }}>
-          {String(props.errorMessage)}
+          {String(effectiveError)}
         </Text>
       )}
-      {props.status === 'loaded' && props.owners && (
+      {effectiveStatus === 'loaded' && effectiveOwners && (
         <div className={classes.list}>
-          {props.owners.map((owner) => {
+          {effectiveOwners.map((owner) => {
             const isSelected = owner.login === selectedOwner;
             return (
               <div

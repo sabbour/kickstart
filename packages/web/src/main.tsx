@@ -92,6 +92,14 @@ for (const impl of richComponents) {
 import { registerPackComponents } from './bootstrap/registerPackComponents';
 registerPackComponents(clientRegistry);
 
+// Step 1d: Wire the GitHubAuthContext into pack-github via the auth-bridge
+// (issue #179). Single-assignment at boot — pack-github components fail-fast
+// if rendered without this wiring. Must happen after pack registration but
+// before React mounts.
+import { setGitHubAuthHook } from '@aks-kickstart/pack-github/client';
+import { useGitHubAuth } from './contexts/GitHubAuthContext';
+setGitHubAuthHook(useGitHubAuth);
+
 // Step 2: Seal — ReadonlyMap, no further registrations accepted
 clientRegistry.seal();
 
