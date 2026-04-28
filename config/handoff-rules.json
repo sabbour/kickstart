@@ -1,0 +1,223 @@
+{
+  "$schema": "./schemas/handoff-rules.schema.json",
+  "version": "2.0.0",
+  "extractedFrom": "agent frontmatter on phase1-autonomy-refactor branch as of Phase 1.6",
+  "extractedAt": "2026-04-28",
+  "extractionMethod": "verbatim re-extraction from packages/pack-*/src/agents/*.agent.md frontmatter; provenance per-item.",
+  "agents": {
+    "core.triage": {
+      "role": "router",
+      "userInvocable": true,
+      "modelInvocable": false,
+      "provenance": "extracted",
+      "handoffs": [
+        {
+          "label": "AKS architecture",
+          "target": "aks.architect",
+          "trigger": "User is asking about AKS cluster design, manifests, KAITO, or Kubernetes workloads. Please take over.",
+          "provenance": "extracted"
+        },
+        {
+          "label": "Azure infrastructure",
+          "target": "azure.architect",
+          "trigger": "User is asking about Azure resource design, Bicep/ARM, or cost estimation. Please take over.",
+          "provenance": "extracted"
+        },
+        {
+          "label": "Publish to GitHub",
+          "target": "github.publisher",
+          "trigger": "Files are ready for GitHub. Please guide the user through repository selection and PR creation.",
+          "provenance": "extracted"
+        },
+        {
+          "label": "Generate files",
+          "target": "core.codesmith",
+          "trigger": "Requirements are clear. Please generate the requested files.",
+          "provenance": "extracted"
+        },
+        {
+          "label": "Review artifacts",
+          "target": "core.reviewer",
+          "trigger": "Files have been generated. Please review them for correctness and quality.",
+          "provenance": "extracted"
+        }
+      ],
+      "asTools": [
+        {
+          "target": "aks.architect",
+          "maxTurns": 3,
+          "purpose": "Consult the AKS architect for Kubernetes-specific design questions (cluster topology, networking, workload placement, node pools) without handing off the conversation.",
+          "provenance": "extracted"
+        },
+        {
+          "target": "azure.architect",
+          "maxTurns": 3,
+          "purpose": "Consult the Azure architect for Azure resource design, cost estimation, or infrastructure questions without handing off the conversation.",
+          "provenance": "extracted"
+        }
+      ]
+    },
+    "core.codesmith": {
+      "role": "generator",
+      "userInvocable": false,
+      "modelInvocable": true,
+      "provenance": "extracted",
+      "handoffs": [],
+      "asTools": [
+        {
+          "target": "core.reviewer",
+          "maxTurns": 3,
+          "purpose": "Ask the Reviewer to inspect a specific file or code snippet mid-generation for immediate quality feedback without handing off the conversation.",
+          "provenance": "extracted"
+        }
+      ]
+    },
+    "core.reviewer": {
+      "role": "reviewer",
+      "userInvocable": false,
+      "modelInvocable": true,
+      "provenance": "extracted",
+      "handoffs": [],
+      "asTools": []
+    },
+    "aks.architect": {
+      "role": "domain_architect",
+      "domain": "aks",
+      "userInvocable": true,
+      "modelInvocable": true,
+      "provenance": "extracted",
+      "handoffs": [
+        {
+          "label": "Author manifests",
+          "target": "aks.manifests_author",
+          "trigger": "Architecture is agreed. Please draft the Kubernetes manifests.",
+          "provenance": "extracted"
+        },
+        {
+          "label": "Send for review",
+          "target": "aks.reviewer",
+          "trigger": "Architecture and manifests are ready. Please run the safeguard review.",
+          "provenance": "extracted"
+        },
+        {
+          "label": "Generate files",
+          "target": "core.codesmith",
+          "trigger": "Plan is approved. Please generate the requested files.",
+          "provenance": "extracted"
+        }
+      ],
+      "asTools": [
+        {
+          "target": "azure.architect",
+          "maxTurns": 3,
+          "purpose": "Consult the Azure architect for cross-domain questions (VNET peering, DNS, Private Link, Azure networking) without handing off the conversation.",
+          "provenance": "extracted"
+        },
+        {
+          "target": "core.codesmith",
+          "maxTurns": 5,
+          "purpose": "Ask the Codesmith to generate infrastructure code (Bicep, Helm values, scripts) mid-diagnosis without handing off the conversation.",
+          "provenance": "extracted"
+        }
+      ]
+    },
+    "aks.manifests_author": {
+      "role": "domain_generator",
+      "domain": "aks",
+      "userInvocable": false,
+      "modelInvocable": true,
+      "provenance": "extracted",
+      "handoffs": [
+        {
+          "label": "Back to architecture",
+          "target": "aks.architect",
+          "trigger": "Manifests drafted. Returning to architect for design review.",
+          "provenance": "extracted"
+        },
+        {
+          "label": "Send for review",
+          "target": "aks.reviewer",
+          "trigger": "Manifests are ready. Please run the safeguard and policy review.",
+          "provenance": "extracted"
+        }
+      ],
+      "asTools": []
+    },
+    "aks.reviewer": {
+      "role": "domain_reviewer",
+      "domain": "aks",
+      "userInvocable": false,
+      "modelInvocable": true,
+      "provenance": "extracted",
+      "handoffs": [
+        {
+          "label": "Back to architect",
+          "target": "aks.architect",
+          "trigger": "Review complete. Returning to architect for remediation.",
+          "provenance": "extracted"
+        },
+        {
+          "label": "Back to manifest author",
+          "target": "aks.manifests_author",
+          "trigger": "Review findings require manifest changes. Returning to author.",
+          "provenance": "extracted"
+        }
+      ],
+      "asTools": []
+    },
+    "azure.architect": {
+      "role": "domain_architect",
+      "domain": "azure",
+      "userInvocable": true,
+      "modelInvocable": true,
+      "provenance": "extracted",
+      "handoffs": [
+        {
+          "label": "Deploy resources",
+          "target": "azure.ops",
+          "trigger": "Architecture is reviewed and ready. Please proceed with deployment.",
+          "provenance": "extracted"
+        },
+        {
+          "label": "Generate files",
+          "target": "core.codesmith",
+          "trigger": "Plan is approved. Please generate the requested files.",
+          "provenance": "extracted"
+        }
+      ],
+      "asTools": []
+    },
+    "azure.ops": {
+      "role": "domain_operator",
+      "domain": "azure",
+      "userInvocable": true,
+      "modelInvocable": true,
+      "provenance": "extracted",
+      "handoffs": [
+        {
+          "label": "Back to architect",
+          "target": "azure.architect",
+          "trigger": "Deployment complete. Returning to architect for post-deployment review.",
+          "provenance": "extracted"
+        }
+      ],
+      "asTools": []
+    },
+    "github.publisher": {
+      "role": "publisher",
+      "userInvocable": false,
+      "modelInvocable": true,
+      "provenance": "extracted",
+      "handoffs": [],
+      "asTools": [],
+      "userActions": [
+        "github:login",
+        "github:pick_org",
+        "github:pick_repo",
+        "github:create_repo",
+        "github:create_pr",
+        "github:set_secret"
+      ]
+    }
+  }
+}

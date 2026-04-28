@@ -1,0 +1,163 @@
+{
+  "$schema": "./schemas/tracks.schema.json",
+  "version": "1.0.0",
+  "tracks": [
+    {
+      "id": "static_site",
+      "label": "Static Site",
+      "description": "Frontend-only web app or SPA",
+      "longDescription": "Frontend-only web app (HTML/CSS/JS, SPA), landing page, docs site, or static assets.",
+      "triggers": [
+        "frontend",
+        "spa",
+        "single-page",
+        "landing page",
+        "docs site",
+        "static",
+        "html",
+        "css",
+        "vite",
+        "next.js static",
+        "gatsby",
+        "hugo",
+        "jekyll"
+      ],
+      "handoffPrimary": "azure.architect",
+      "handoffSecondary": [],
+      "nextStep": "collect_requirements",
+      "platformDeploymentTarget": "AKS Automatic",
+      "discloseDeploymentTarget": "after_requirements",
+      "icon": null,
+      "uiOptions": {
+        "trackPickerOrder": 1,
+        "recommended": false
+      }
+    },
+    {
+      "id": "containerized_web",
+      "label": "Containerized Web App",
+      "description": "Application, API, worker, or service in a container",
+      "longDescription": "Containerized application or API (Node, Python, .NET, Java), worker, or custom container. Source-built, existing Dockerfile, or prebuilt image.",
+      "triggers": [
+        "api",
+        "service",
+        "web app",
+        "backend",
+        "worker",
+        "node",
+        "python",
+        "dotnet",
+        ".net",
+        "java",
+        "spring",
+        "fastapi",
+        "express",
+        "container",
+        "dockerfile"
+      ],
+      "handoffPrimary": "azure.architect",
+      "handoffSecondary": [],
+      "nextStep": "collect_requirements",
+      "platformDeploymentTarget": "AKS Automatic",
+      "discloseDeploymentTarget": "after_requirements",
+      "icon": null,
+      "uiOptions": {
+        "trackPickerOrder": 2,
+        "recommended": false
+      },
+      "requirementHints": {
+        "imageSource": "infer (built-from-source / dockerfile / prebuilt-image)",
+        "registry": "do not assume ACR; accept public or private OCI",
+        "askOnlyIfMaterial": [
+          "registry credentials",
+          "database/cache needs",
+          "scale requirements"
+        ]
+      }
+    },
+    {
+      "id": "agentic_app",
+      "label": "Agentic AI App",
+      "description": "AI-powered assistant, model-backed workflow, or chatbot",
+      "longDescription": "AI-powered agent, model-backed workflow, chatbot, assistant, retrieval, planning, prediction, document analysis, or tool-using workflow.",
+      "triggers": [
+        "agent",
+        "agentic",
+        "ai",
+        "llm",
+        "model",
+        "chatbot",
+        "assistant",
+        "rag",
+        "retrieval",
+        "planning",
+        "prediction",
+        "document analysis",
+        "tool-using",
+        "openai",
+        "anthropic",
+        "foundry",
+        "kaito",
+        "azure openai"
+      ],
+      "handoffPrimary": "aks.architect",
+      "handoffSecondary": ["azure.architect"],
+      "nextStep": "select_inference_backend",
+      "platformDeploymentTarget": "AKS Automatic",
+      "discloseDeploymentTarget": "after_requirements",
+      "icon": null,
+      "uiOptions": {
+        "trackPickerOrder": 3,
+        "recommended": false
+      }
+    },
+    {
+      "id": "repo_uplift",
+      "label": "Existing Repo Uplift",
+      "description": "Containerize and deploy an existing repository",
+      "longDescription": "Take an existing GitHub repository and containerize/deploy it. Triage will inspect the repo to detect language, framework, runtime, deployment config, and any existing Dockerfile or Helm chart.",
+      "triggers": [
+        "existing",
+        "repository",
+        "repo",
+        "containerize",
+        "github.com",
+        "uplift",
+        "modernize",
+        "this repo"
+      ],
+      "handoffPrimary": "azure.architect",
+      "handoffSecondary": ["aks.architect"],
+      "nextStep": "inspect_repo",
+      "platformDeploymentTarget": "AKS Automatic",
+      "discloseDeploymentTarget": "after_requirements",
+      "icon": null,
+      "uiOptions": {
+        "trackPickerOrder": 4,
+        "recommended": false
+      },
+      "inspectionHints": {
+        "tool": "core.inspect_repo",
+        "input": { "source": "remote", "remoteUrl": "<url>", "localPath": null },
+        "afterInspection": {
+          "summary": "Emit SummaryCard titled 'We found:' with one item per detection result (language, framework, runtime, hasDockerfile, hasHelmChart, hasGithubActions)",
+          "questionStyle": "Ask the SINGLE most important question from inspect_repo.questionnaire array in PROSE — do not emit multi-field Questionnaire",
+          "maxFollowUps": 3
+        }
+      }
+    }
+  ],
+  "selectionPolicy": {
+    "inferFirst": true,
+    "inferenceRule": "If exactly one track's triggers match, route directly without TrackPicker. Otherwise emit TrackPicker.",
+    "fallback": "If 0 tracks match or the message is genuinely ambiguous, emit TrackPicker with all four tracks as equal-weight tiles.",
+    "platformNeutralFirstTurn": true,
+    "doNotMentionInFirstTurn": ["AKS Automatic"]
+  },
+  "trackPickerSurface": {
+    "surfaceId": "shared:triage-main",
+    "catalogId": "kickstart",
+    "component": "TrackPicker",
+    "title": "Which path fits your app?"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aks-kickstart/config/component-catalog.schema.json",
+  "title": "Component Catalog",
+  "description": "Inventory of UI components by pack and category. Bootstrap data for Phase 3 ingestion; runtime source of truth remains the sealed registry queried via core.search_components.",
+  "type": "object",
+  "required": ["version", "categories", "components"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "extractedFrom": { "type": "string" },
+    "note": { "type": "string" },
+    "categories": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/component" }
+        }
+      }
+    },
+    "decisionFrameworkRef": { "type": "string" },
+    "discoveryAtRuntime": {
+      "type": "object",
+      "required": ["tool", "purpose"],
+      "properties": {
+        "tool": { "type": "string" },
+        "purpose": { "type": "string" }
+      }
+    }
+  },
+  "definitions": {
+    "component": {
+      "type": "object",
+      "required": ["name", "useCase"],
+      "properties": {
+        "name": { "type": "string" },
+        "useCase": { "type": "string" },
+        "interactivity": { "type": "string" },
+        "fields": { "type": "array", "items": { "type": "string" } },
+        "frameworkRef": { "type": "string" },
+        "specializedFor": { "type": "string" },
+        "forbidden": { "type": "string" }
+      }
+    }
+  }
+}

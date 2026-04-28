@@ -1,0 +1,124 @@
+{
+  "$schema": "./schemas/inference-backends.schema.json",
+  "version": "1.0.0",
+  "appliesTo": "agentic_app",
+  "selectionEvent": "select_inference",
+  "uiSurface": {
+    "surfaceId": "shared:triage-main",
+    "component": "RadioGroup",
+    "defaultValue": "foundry",
+    "defaultValueRule": "Set value to 'foundry' UNLESS the user explicitly asks to self-host models, run OSS weights, use GPUs, or bring an existing/generic endpoint. If their prose already indicates an existing hosted, custom, OpenAI-compatible, or generic endpoint, infer 'generic_endpoint' and skip the picker."
+  },
+  "backends": [
+    {
+      "id": "foundry",
+      "label": "Microsoft Foundry",
+      "description": "Managed model endpoints — no GPU nodes needed. Best for standard LLM workloads.",
+      "recommended": true,
+      "deploymentShape": "managed_endpoint",
+      "requiresGpuNodes": false,
+      "handoffPath": "core.codesmith",
+      "questionPolicy": {
+        "maxQuestions": 3,
+        "askOneAtATime": true,
+        "candidateQuestionsInPriorityOrder": [
+          {
+            "key": "model_override",
+            "askOnlyIf": "user has expressed a model preference"
+          },
+          {
+            "key": "use_case_corrections",
+            "askOnlyIf": "inferred values appear wrong"
+          },
+          {
+            "key": "data_source_corrections",
+            "askOnlyIf": "inferred values appear wrong"
+          },
+          {
+            "key": "database_or_cache",
+            "askOnlyIf": "not inferable from conversation"
+          },
+          {
+            "key": "scaling",
+            "askOnlyIf": "not inferable from conversation"
+          }
+        ],
+        "forbidden": [
+          "presenting a stale fixed list of model families",
+          "asking the user to restate use case or data sources they already provided"
+        ]
+      }
+    },
+    {
+      "id": "kaito",
+      "label": "KAITO on AKS",
+      "description": "Run supported open-source model presets on GPU nodes in your own cluster. Full control over model weights.",
+      "recommended": false,
+      "deploymentShape": "in_cluster_workload",
+      "requiresGpuNodes": true,
+      "handoffPath": "aks.architect",
+      "groundingTool": {
+        "tool": "core.search_kaito_models",
+        "callBeforePresentingChoices": true,
+        "queryPattern": "user's requested model/family, or '*' to browse",
+        "useResultField": "matches",
+        "rule": "Use returned matches as the current KAITO-supported preset list; do not rely on memory or a static list."
+      },
+      "questionPolicy": {
+        "maxQuestions": 3,
+        "askOneAtATime": true,
+        "candidateQuestionsInPriorityOrder": [
+          {
+            "key": "model_or_family",
+            "askOnlyIf": "not yet specified",
+            "groundedBy": "core.search_kaito_models"
+          },
+          {
+            "key": "gpu_preference",
+            "askOnlyIf": "model is known and SKU matters"
+          },
+          {
+            "key": "database_or_cache",
+            "askOnlyIf": "not inferable"
+          }
+        ],
+        "fallbackIfNoMatch": "Explain that the model is not in the current KAITO preset catalog; ask whether to switch to another supported preset or use a generic_endpoint."
+      },
+      "constraints": {
+        "gpuCapacity": "Treat GPU sizes as user constraints until live regional capacity APIs are available."
+      }
+    },
+    {
+      "id": "generic_endpoint",
+      "label": "Existing or generic inference endpoint",
+      "description": "Bring an existing hosted, custom, or OpenAI-compatible inference endpoint.",
+      "recommended": false,
+      "deploymentShape": "external_endpoint",
+      "requiresGpuNodes": false,
+      "handoffPath": "azure.architect",
+      "questionPolicy": {
+        "maxQuestions": 3,
+        "askOneAtATime": true,
+        "candidateQuestionsInPriorityOrder": [
+          {
+            "key": "endpoint_or_provider",
+            "askOnlyIf": "not yet provided"
+          },
+          {
+            "key": "auth_secret_name",
+            "askOnlyIf": "not inferable",
+            "forbidden": ["asking the user to paste secret values"]
+          },
+          {
+            "key": "database_or_cache",
+            "askOnlyIf": "not inferable"
+          }
+        ],
+        "forbidden": [
+          "rejecting an endpoint because it is not Microsoft Foundry or KAITO",
+          "asking the user to paste secret values"
+        ]
+      }
+    }
+  ]
+}

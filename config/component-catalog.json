@@ -1,0 +1,160 @@
+{
+  "$schema": "./schemas/component-catalog.schema.json",
+  "version": "1.0.0",
+  "extractedFrom": "packages/*/src/components on main as of Phase 1.5",
+  "note": "This catalog is derived from filesystem inventory plus prompt usage patterns. The runtime sealed component registry (queried by core.search_components) remains the source of truth at execution time. This file is for agent-prompt grounding (Phase 2) and Phase 3 ingestion bootstrap.",
+  "categories": {
+    "basic": "Primitive UI building blocks (one-task components: text, button, image, layout containers).",
+    "rich": "Composite domain-aware components (multi-field forms, pickers, summaries, diagrams).",
+    "specialized": "Pack-specific components for a given domain (Azure resources, AKS clusters, GitHub flows)."
+  },
+  "components": {
+    "core": {
+      "basic": [
+        { "name": "Accordion", "useCase": "Collapsible content sections", "interactivity": "expand/collapse" },
+        { "name": "Alert", "useCase": "Inline status/warning/error banner", "interactivity": "none" },
+        { "name": "AudioPlayer", "useCase": "Audio playback", "interactivity": "media controls" },
+        { "name": "Badge", "useCase": "Inline label/tag with optional severity", "interactivity": "none" },
+        { "name": "Button", "useCase": "Single action trigger", "interactivity": "click event" },
+        { "name": "Card", "useCase": "Generic container with title/body", "interactivity": "container only" },
+        { "name": "CheckBox", "useCase": "Boolean toggle with label", "interactivity": "toggle event" },
+        { "name": "ChildList", "useCase": "Repeating child container", "interactivity": "container only" },
+        { "name": "ChoicePicker", "useCase": "Single-selection picker", "interactivity": "select event" },
+        { "name": "Column", "useCase": "Vertical layout container", "interactivity": "container only" },
+        { "name": "ComboBox", "useCase": "Searchable single-select dropdown", "interactivity": "select event" },
+        { "name": "DateTimeInput", "useCase": "Date/time input field", "interactivity": "change event" },
+        { "name": "Divider", "useCase": "Visual separator", "interactivity": "none" },
+        { "name": "Icon", "useCase": "Inline iconography", "interactivity": "none" },
+        { "name": "Image", "useCase": "Image display (URL required)", "interactivity": "none" },
+        { "name": "Link", "useCase": "Inline hyperlink", "interactivity": "navigation" },
+        { "name": "List", "useCase": "Bulleted/numbered list of items", "interactivity": "none" },
+        { "name": "Modal", "useCase": "Overlay dialog", "interactivity": "open/close + content events" },
+        { "name": "MultiSelect", "useCase": "Multi-selection picker", "interactivity": "multi-select event" },
+        { "name": "Row", "useCase": "Horizontal layout container", "interactivity": "container only" },
+        { "name": "Slider", "useCase": "Numeric range input", "interactivity": "change event" },
+        { "name": "Table", "useCase": "Tabular data display", "interactivity": "optional row events" },
+        { "name": "Tabs", "useCase": "Tabbed content sections", "interactivity": "tab switch event" },
+        { "name": "Text", "useCase": "Inline or block text (text required)", "interactivity": "none" },
+        { "name": "TextField", "useCase": "Single-line text input (label required)", "interactivity": "change event" },
+        { "name": "Toggle", "useCase": "Switch-style boolean toggle", "interactivity": "toggle event" },
+        { "name": "Video", "useCase": "Video playback", "interactivity": "media controls" }
+      ],
+      "rich": [
+        {
+          "name": "ArchitectureDiagram",
+          "useCase": "Render nodes/edges architecture diagram from build_architecture_diagram output",
+          "fields": ["title", "description", "nodes", "edges", "diagram"],
+          "frameworkRef": "ArchitectureDiagram entry in component-selection-framework.md"
+        },
+        {
+          "name": "AuthCard",
+          "useCase": "Login or auth-state display",
+          "interactivity": "auth events"
+        },
+        {
+          "name": "CodeBlock",
+          "useCase": "Syntax-highlighted code or config preview",
+          "interactivity": "copy-to-clipboard",
+          "forbidden": "Do not use for per-file code generation in chat — that is core.codesmith's responsibility (D1 guardrail in triage prompt)"
+        },
+        {
+          "name": "DecisionCard",
+          "useCase": "Side-by-side option comparison",
+          "interactivity": "decision event"
+        },
+        {
+          "name": "FileEditor",
+          "useCase": "In-place file editing surface",
+          "interactivity": "edit/save events"
+        },
+        {
+          "name": "FormGroup",
+          "useCase": "Grouped form field container",
+          "interactivity": "container only"
+        },
+        {
+          "name": "GenerationProgress",
+          "useCase": "Real-time progress for file generation",
+          "interactivity": "none"
+        },
+        {
+          "name": "Markdown",
+          "useCase": "Formatted markdown rendering",
+          "interactivity": "links only"
+        },
+        {
+          "name": "ProgressSteps",
+          "useCase": "Phased workflow visualization (4-8 steps)",
+          "interactivity": "step navigation",
+          "frameworkRef": "ProgressSteps entry in component-selection-framework.md"
+        },
+        {
+          "name": "Questionnaire",
+          "useCase": "Multi-field structured form (3-10 related fields)",
+          "interactivity": "submit event",
+          "frameworkRef": "Questionnaire entry in component-selection-framework.md",
+          "forbidden": "Do not use to bundle unrelated questions; ask sequentially in prose instead (per requirement-gathering rule 1)"
+        },
+        {
+          "name": "RadioGroup",
+          "useCase": "Single-selection from 5-8 options with descriptions",
+          "interactivity": "select event",
+          "frameworkRef": "RadioGroup entry in component-selection-framework.md"
+        },
+        {
+          "name": "SteppedCarousel",
+          "useCase": "Step-through carousel of content panels",
+          "interactivity": "next/prev events"
+        },
+        {
+          "name": "SummaryCard",
+          "useCase": "Read-only structured key-value summary (4-10 items), can embed children like ArchitectureDiagram",
+          "interactivity": "container actions only",
+          "frameworkRef": "SummaryCard entry in component-selection-framework.md"
+        },
+        {
+          "name": "TrackPicker",
+          "useCase": "Specialized RadioGroup for app-track selection at triage entry",
+          "interactivity": "pick_track event",
+          "specializedFor": "core.triage first-turn ambiguous routing"
+        }
+      ]
+    },
+    "azure": {
+      "specialized": [
+        { "name": "AzureAction", "useCase": "Trigger an Azure-specific action (deploy, what-if, etc.)" },
+        { "name": "AzureResourceCard", "useCase": "Display a single Azure resource with its key properties" },
+        { "name": "BicepEditor", "useCase": "Edit/preview a Bicep template inline" },
+        { "name": "CostEstimate", "useCase": "Display Azure cost estimate (used by azure.architect after estimate_cost tool)" },
+        { "name": "DeploymentStatus", "useCase": "Track in-flight Azure deployment status" },
+        { "name": "LocationSelector", "useCase": "Pick an Azure region" },
+        { "name": "ResourceGroupSelector", "useCase": "Pick or create an Azure resource group" },
+        { "name": "SubscriptionSelector", "useCase": "Pick an Azure subscription" }
+      ]
+    },
+    "aks": {
+      "specialized": [
+        { "name": "AksClusterCard", "useCase": "Display AKS cluster summary card" },
+        { "name": "ArchitectureDiagram", "useCase": "AKS-specific architecture diagram (also generic in core)" },
+        { "name": "DeploymentProgress", "useCase": "AKS workload deployment progress" },
+        { "name": "SafeguardViolations", "useCase": "Display AKS safeguard rule violations (used by aks.reviewer after validate_safeguards)" }
+      ]
+    },
+    "github": {
+      "specialized": [
+        { "name": "Action", "useCase": "Trigger a GitHub user action (login, pick_repo, etc.)" },
+        { "name": "CreatePRFlow", "useCase": "Multi-step PR creation flow" },
+        { "name": "Login", "useCase": "GitHub OAuth login surface" },
+        { "name": "OrgPicker", "useCase": "Pick a GitHub organization" },
+        { "name": "RepoInfo", "useCase": "Display GitHub repository metadata" },
+        { "name": "RepoPicker", "useCase": "Pick a GitHub repository" },
+        { "name": "SecretSetter", "useCase": "Set a GitHub Actions secret (delegates to user action)" }
+      ]
+    }
+  },
+  "decisionFrameworkRef": "../docs/architecture/component-selection-framework.md",
+  "discoveryAtRuntime": {
+    "tool": "core.search_components",
+    "purpose": "Sealed component registry is the runtime source of truth; this file may lag for newly-added components. Always call search_components if uncertain whether a specialized component exists."
+  }
+}

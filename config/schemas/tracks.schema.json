@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aks-kickstart/config/tracks.schema.json",
+  "title": "Tracks Configuration",
+  "description": "Defines the application tracks the triage agent routes between.",
+  "type": "object",
+  "required": ["version", "tracks", "selectionPolicy", "trackPickerSurface"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semver of this config schema instance."
+    },
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/track" }
+    },
+    "selectionPolicy": {
+      "type": "object",
+      "required": ["inferFirst", "inferenceRule", "fallback"],
+      "properties": {
+        "inferFirst": { "type": "boolean" },
+        "inferenceRule": { "type": "string" },
+        "fallback": { "type": "string" },
+        "platformNeutralFirstTurn": { "type": "boolean" },
+        "doNotMentionInFirstTurn": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "trackPickerSurface": {
+      "type": "object",
+      "required": ["surfaceId", "catalogId", "component"],
+      "properties": {
+        "surfaceId": { "type": "string" },
+        "catalogId": { "type": "string" },
+        "component": { "type": "string" },
+        "title": { "type": "string" }
+      }
+    }
+  },
+  "definitions": {
+    "track": {
+      "type": "object",
+      "required": [
+        "id",
+        "label",
+        "description",
+        "triggers",
+        "handoffPrimary",
+        "nextStep",
+        "uiOptions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Stable identifier used in events and code."
+        },
+        "label": { "type": "string" },
+        "description": { "type": "string", "maxLength": 200 },
+        "longDescription": { "type": "string" },
+        "triggers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Keyword fragments. If user input contains any of these, this track is a candidate."
+        },
+        "handoffPrimary": {
+          "type": "string",
+          "description": "Default specialist agent to hand off to."
+        },
+        "handoffSecondary": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "nextStep": {
+          "type": "string",
+          "enum": [
+            "collect_requirements",
+            "select_inference_backend",
+            "inspect_repo"
+          ]
+        },
+        "platformDeploymentTarget": { "type": "string" },
+        "discloseDeploymentTarget": {
+          "type": "string",
+          "enum": ["never", "after_requirements", "always"]
+        },
+        "icon": { "type": ["string", "null"] },
+        "uiOptions": {
+          "type": "object",
+          "required": ["trackPickerOrder", "recommended"],
+          "properties": {
+            "trackPickerOrder": { "type": "integer", "minimum": 1 },
+            "recommended": { "type": "boolean" }
+          }
+        },
+        "requirementHints": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "inspectionHints": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

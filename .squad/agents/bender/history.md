@@ -82,3 +82,37 @@ Bender owns backend/DevOps and observability infrastructure. Key contributions t
 - Tests passing, architecture/security gates clear
 
 **Carry-forward:** PR #40 merge pending Nibbler final code review sign-off
+
+---
+
+## 2026-04-28 — Phase 2 config extracts (#207, #208, #209) → PR #238
+
+**Status:** PR opened, ready for review
+
+**Issues:** #207 (estimate:S, fast-lane), #208 (estimate:S, fast-lane), #209 (estimate:M)
+
+**Trigger:** Ahmed Phase 2 kickoff. 6 uncommitted config files in phase1 worktree needed review + commit.
+
+**Worktree:** `.worktrees/phase1-autonomy-refactor` (branch `squad/phase1-autonomy-framework`)
+
+**Outcomes:**
+- Rebased branch onto `origin/dev` (5 docs commits replayed cleanly with no conflicts; branch was 18 commits behind dev).
+- Spot-checked 9/9 agent.md frontmatters against `config/handoff-rules.json` — extraction is byte-for-byte faithful (handoffs + asTools targets + maxTurns all match).
+- Updated `config/schemas/handoff-rules.schema.json` to require `provenance` on agents/handoffs/asTools/proposedAgentChanges/wiringGaps; made top-level `trackToHandoff` optional (it now lives in `proposed.json`); added `oneOf` envelope so both extracted and proposed shapes validate against the same schema.
+- Relaxed `config/schemas/recipes.schema.json` ID regex to accept named patterns (`R7-table-variant`, `R16b`, `R-helm-chart-sibling-PR`, etc.) — 6 schema mismatches → 0.
+- Updated `config/README.md` with extracted-vs-proposed table and the no-silent-fix rule.
+- 4 commits, one issue per commit: 3915ff45 (#207), a390c168 (#208), 9bc87352 (#209), 128223af (changeset).
+- Changeset `.changeset/207-208-209-config-extracts.md` patches web/harness/pack-core.
+- `npm run build` ✅ (web bundle within budget). `npm test` ✅ 2119 passed / 154 todo / 3 skipped.
+- Pushed via `https://x-access-token:${TOKEN}@…` as squad-backend[bot]. PR #238 opened against `dev` (verified `user.login: squad-backend[bot]` on response).
+
+**Critical Events:**
+- Worktree branch was extremely behind dev (18+ commits) — required rebase before PR could land. No conflicts.
+- Issue #207 acceptance criteria included schema + README updates, not just data files. Did all three.
+- `.changeset` config baseBranch is `main` but Ahmed directive was target `dev`. Used `dev` as target — may need follow-up if changesets release flow expects main.
+
+**Carry-forward:**
+- PR #238 review pending: Leela (arch), Zapp (security), Nibbler (codereview), Amy (docs).
+- #210 (`aks-recipes.json` per-shape AKS Automatic recipes) is a separate Bender issue — not in this PR; tackle next.
+- #221 (Leela): wiring-graph doc update should reference the new extracted/proposed split.
+- The proposed.json's `motivation` / `source` fields are populated only on `proposedAgentChanges` and `wiringGaps`. The `trackToHandoff._provenance` / `_source` meta-keys at object level were preserved as-is; consider migrating to per-track `provenance` in a follow-up.

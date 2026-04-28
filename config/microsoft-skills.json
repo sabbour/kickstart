@@ -1,0 +1,425 @@
+{
+  "$schema": "./schemas/microsoft-skills.schema.json",
+  "version": "1.0.0",
+  "extractedFrom": "https://github.com/microsoft/GitHub-Copilot-for-Azure (path: plugin/skills/)",
+  "extractedAt": "2026-04-28",
+  "extractionSource": "phase1-aks-automatic-grounding.md Part 9.1 inventory; cross-validated against simulation transcripts",
+  "loadConvention": {
+    "tool": "core.read_skill",
+    "callPattern": "core.read_skill('<skill-id>', version='<version>')",
+    "citationFormat": "Per `<skill-id>` skill v<version>, [content reference]",
+    "constraintSpecCitationFormat": "Per `<skill-id>` skill v<version>, constraint spec v<x.y.z> (AKS <date>)",
+    "versionPolicy": "If skill has placeholder version (e.g. v0.0.0-placeholder), cite the placeholder; future Phase 3 work may resolve to commit SHA at load time."
+  },
+  "skills": [
+    {
+      "id": "azure-kubernetes",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-kubernetes/SKILL.md",
+      "purpose": "Day-0 AKS cluster planning + creation; Automatic vs Standard SKU selection; networking, security, observability, upgrades, performance defaults",
+      "loadWhen": [
+        "intent:cluster_creation",
+        "intent:cluster_design",
+        "track:containerized_web",
+        "track:agentic_app",
+        "track:repo_uplift",
+        "track:migration_to_aks_automatic",
+        "agent:aks.architect first invocation per session",
+        "agent:azure.architect when AKS is the target compute"
+      ],
+      "validatedBySims": [
+        "sim-01",
+        "sim-02",
+        "sim-03",
+        "sim-05",
+        "sim-06",
+        "sim-07",
+        "sim-09",
+        "sim-11",
+        "sim-12",
+        "sim-04"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-kubernetes-automatic-readiness",
+      "version": "v1.0.0",
+      "path": "plugin/skills/azure-kubernetes/azure-kubernetes-automatic-readiness/SKILL.md",
+      "references": {
+        "constraintSpec": "references/constraint-spec-v1.yaml",
+        "constraintSpecVersion": "v1.1.1 (AKS 2026-03-15)",
+        "migrationGuide": "references/migration-guide-summary.md",
+        "helmRenderingGuidance": "references/helm-rendering-guidance.md"
+      },
+      "purpose": "Assess existing cluster or local manifests for AKS Automatic compatibility; produces fix diffs; cluster-connected (MCP) and offline modes",
+      "loadWhen": [
+        "intent:migration_to_aks_automatic",
+        "intent:readiness_check",
+        "intent:repo_uplift with existing k8s manifests detected",
+        "intent:repo_uplift with charts/ or kustomize/ detected",
+        "agent:aks.reviewer in readiness mode (D7)"
+      ],
+      "validatedBySims": [
+        "sim-02",
+        "sim-07"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-cloud-migrate",
+      "version": "v1.0.0",
+      "path": "plugin/skills/azure-cloud-migrate/SKILL.md",
+      "references": {
+        "paasEquivalents": "references/paas-equivalents.md",
+        "cutoverRunbook": "references/cutover-runbook.md"
+      },
+      "purpose": "Cloud-to-cloud migration playbook (Render/Heroku/Vercel/Fly/AWS/GCP/on-prem \u2192 Azure)",
+      "loadWhen": [
+        "intent:paas_migration",
+        "intent:cloud_migration",
+        "source:render OR source:heroku OR source:vercel OR source:fly OR source:netlify OR source:railway OR source:aws OR source:gcp",
+        "agent:azure.architect when source PaaS is mentioned"
+      ],
+      "validatedBySims": [
+        "sim-10",
+        "sim-11"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-prepare",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-prepare/SKILL.md",
+      "purpose": "Subscription / resource-group / quota / RBAC preflight checks",
+      "loadWhen": [
+        "intent:any_provisioning_intent before generation",
+        "agent:azure.architect first invocation per subscription",
+        "agent:aks.architect first invocation per subscription"
+      ],
+      "validatedBySims": [],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-validate",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-validate/SKILL.md",
+      "purpose": "Post-deploy readiness checks against the deployed cluster",
+      "loadWhen": [
+        "intent:post_deploy_validation",
+        "agent:aks.reviewer in cluster-connected mode",
+        "post-cutover sims (Sim #2 Phase 3 server-side dry-run)"
+      ],
+      "validatedBySims": [
+        "sim-02 (referenced in Phase 3 playbook)"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-deploy",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-deploy/SKILL.md",
+      "purpose": "Deployment orchestration (Bicep deploy, ARM deploy)",
+      "loadWhen": [
+        "agent:azure.ops",
+        "intent:deploy when GHA workflow is not the orchestration path"
+      ],
+      "validatedBySims": [],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-diagnostics",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-diagnostics/SKILL.md",
+      "purpose": "Live troubleshooting (pod crashes, deploy failures, cluster issues)",
+      "loadWhen": [
+        "intent:troubleshoot",
+        "intent:my_deployment_isnt_working",
+        "iteration mode + user reports failure"
+      ],
+      "validatedBySims": [],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-cost",
+      "version": "v1.1.0",
+      "path": "plugin/skills/azure-cost/SKILL.md",
+      "purpose": "Cost analysis: SKU selection, upgrade triggers, multi-tier comparison",
+      "loadWhen": [
+        "agent:azure.architect when generating R16 cost card",
+        "intent:cost_optimization",
+        "intent:reduce_cost",
+        "user objects to cost (cost-shock branch in triage)"
+      ],
+      "validatedBySims": [
+        "sim-11"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-quotas",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-quotas/SKILL.md",
+      "purpose": "Quota discovery + request links",
+      "loadWhen": [
+        "intent:any_plan_with_GPU_SKUs",
+        "intent:any_plan_with_unusual_VM_families",
+        "agent:aks.architect on agentic_app + kaito track (D13)",
+        "fallback when azure.quota_lookup tool not yet available"
+      ],
+      "validatedBySims": [
+        "sim-03"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-rbac",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-rbac/SKILL.md",
+      "purpose": "RBAC role discovery + assignment patterns",
+      "loadWhen": [
+        "agent:aks.architect when generating Workload Identity wiring (role assignments)",
+        "intent:any_plan_that_grants_role"
+      ],
+      "validatedBySims": [
+        "sim-04"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-resource-lookup",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-resource-lookup/SKILL.md",
+      "purpose": "Find existing resources by name / type",
+      "loadWhen": [
+        "intent:check_for_existing_<resource>",
+        "agent:any when user mentions 'existing ACR', 'existing VNet', 'existing Key Vault'",
+        "iteration mode prerequisite check (Sim #9)"
+      ],
+      "validatedBySims": [
+        "sim-09 (used arm_get directly with this skill's pattern)",
+        "sim-04 (used arm_get on cluster + Foundry)"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-resource-visualizer",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-resource-visualizer/SKILL.md",
+      "purpose": "Generate architecture diagrams from live resources",
+      "loadWhen": [
+        "intent:visualize_existing_deployment",
+        "post-deploy diagram generation",
+        "could replace aks.build_architecture_diagram for post-deploy state"
+      ],
+      "validatedBySims": [],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-storage",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-storage/SKILL.md",
+      "purpose": "Azure Storage / disk / files / blob / container storage; ACStor v2 patterns",
+      "loadWhen": [
+        "intent:any_KAITO_scenario_needing_ACStor_v2",
+        "intent:LLM_workload_storage_design",
+        "agent:aks.architect when KAITO preset+adapter mode"
+      ],
+      "validatedBySims": [
+        "sim-03"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-upgrade",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-upgrade/SKILL.md",
+      "purpose": "AKS upgrade orchestration",
+      "loadWhen": [
+        "intent:cluster_upgrade",
+        "iteration scenarios for existing clusters",
+        "Phase 4 of migration playbook"
+      ],
+      "validatedBySims": [],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-compliance",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-compliance/SKILL.md",
+      "purpose": "Azure Policy / regulatory compliance / Service Trust Portal patterns",
+      "loadWhen": [
+        "intent:compliance_check",
+        "user states compliance/residency reason (GDPR, EU residency, SOC 2, ISO 27001, HIPAA)",
+        "agent:azure.architect when complianceMode: true"
+      ],
+      "validatedBySims": [
+        "sim-10",
+        "sim-04"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-enterprise-infra-planner",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-enterprise-infra-planner/SKILL.md",
+      "purpose": "Multi-resource enterprise infra planning; platform team review handoff",
+      "loadWhen": [
+        "intent:enterprise_infra_planning",
+        "user mentions 'platform team', 'GitOps repo', 'IaC monorepo'",
+        "agent:azure.architect for Erin-shaped scenarios (sim #4)"
+      ],
+      "validatedBySims": [],
+      "provenance": "extracted"
+    },
+    {
+      "id": "microsoft-foundry",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/microsoft-foundry/SKILL.md",
+      "purpose": "Foundry / Azure OpenAI playbook (Service Connector, model deployment, OpenAI-compatible API surface)",
+      "loadWhen": [
+        "track:agentic_app + backend:foundry",
+        "intent:any_Foundry_workload",
+        "agent:aks.architect on agentic_app + foundry track",
+        "agent:triage when select_inference returns foundry"
+      ],
+      "validatedBySims": [
+        "sim-06"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "azure-ai",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/azure-ai/SKILL.md",
+      "purpose": "Broader Azure AI services: Azure AI Search (semantic ranker), Document Intelligence, Speech, etc.",
+      "loadWhen": [
+        "intent:RAG_with_Azure_AI_Search",
+        "intent:docs_chatbot",
+        "intent:document_analysis",
+        "agent:azure.architect for chatbot scenarios"
+      ],
+      "validatedBySims": [
+        "sim-06"
+      ],
+      "provenance": "extracted"
+    },
+    {
+      "id": "airunway-aks-setup",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/airunway-aks-setup/SKILL.md",
+      "purpose": "AI Runway \u2014 opinionated AKS-for-AI setup",
+      "loadWhen": [
+        "track:agentic_app + KAITO scenarios",
+        "agent:aks.architect when self-hosted GPU inference"
+      ],
+      "validatedBySims": [],
+      "provenance": "extracted"
+    },
+    {
+      "id": "appinsights-instrumentation",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/appinsights-instrumentation/SKILL.md",
+      "purpose": "App Insights instrumentation patterns for application-level observability beyond Container Insights",
+      "loadWhen": [
+        "intent:application_level_observability",
+        "user requests 'distributed tracing' or 'APM'"
+      ],
+      "validatedBySims": [],
+      "provenance": "extracted"
+    },
+    {
+      "id": "entra-app-registration",
+      "version": "v0.0.0-placeholder",
+      "path": "plugin/skills/entra-app-registration/SKILL.md",
+      "purpose": "Entra app registration + federated credentials (used for Workload Identity wiring)",
+      "loadWhen": [
+        "any plan that wires Workload Identity (D10)",
+        "intent:OIDC_federation_for_GHA",
+        "agent:aks.architect / azure.architect when generating WI bundle"
+      ],
+      "validatedBySims": [
+        "sim-01",
+        "sim-03",
+        "sim-05",
+        "sim-06",
+        "sim-09",
+        "sim-10",
+        "sim-11",
+        "sim-04"
+      ],
+      "provenance": "extracted"
+    }
+  ],
+  "intentToSkillMap": {
+    "_provenance": "derived",
+    "_source": "Cross-reference of skill loadWhen patterns with track / intent classifiers from triage",
+    "containerized_web_with_existing_repo": [
+      "azure-kubernetes",
+      "entra-app-registration"
+    ],
+    "containerized_web_multi_service_with_preview_envs": [
+      "azure-kubernetes",
+      "azure-cost",
+      "entra-app-registration"
+    ],
+    "agentic_app_kaito": [
+      "azure-kubernetes",
+      "airunway-aks-setup",
+      "azure-quotas",
+      "azure-storage",
+      "entra-app-registration"
+    ],
+    "agentic_app_foundry": [
+      "microsoft-foundry",
+      "azure-kubernetes",
+      "entra-app-registration"
+    ],
+    "agentic_app_with_RAG_over_existing_docs": [
+      "microsoft-foundry",
+      "azure-ai",
+      "azure-kubernetes",
+      "entra-app-registration"
+    ],
+    "migration_from_paas": [
+      "azure-cloud-migrate",
+      "azure-kubernetes",
+      "azure-cost",
+      "entra-app-registration"
+    ],
+    "migration_existing_aks_manifests": [
+      "azure-kubernetes-automatic-readiness",
+      "azure-kubernetes"
+    ],
+    "migration_existing_helm_chart": [
+      "azure-kubernetes-automatic-readiness",
+      "azure-kubernetes"
+    ],
+    "iteration_on_prior_kickstart_deploy": [
+      "azure-kubernetes",
+      "azure-resource-lookup"
+    ],
+    "compliance_required_eu_residency": [
+      "azure-compliance",
+      "azure-cloud-migrate",
+      "azure-kubernetes"
+    ],
+    "enterprise_iac_monorepo": [
+      "azure-enterprise-infra-planner",
+      "azure-kubernetes",
+      "entra-app-registration",
+      "azure-rbac",
+      "azure-resource-lookup",
+      "azure-compliance"
+    ],
+    "review_pack_handover_to_sre": [
+      "azure-kubernetes",
+      "azure-kubernetes-automatic-readiness"
+    ]
+  },
+  "phase2Notes": [
+    "Phase 2 prompt rewrites should make `core.read_skill` reflex-called for known intents per intentToSkillMap above. See `tool-usage-framework.md` Category 1 (Discovery) \u2014 skill loading is a Category 1 reflex when the intent matches a known skill.",
+    "When citing skill content in prose, use the citationFormat above. Constraint-spec-grounded findings should always cite spec version + AKS date.",
+    "Skill version policy: if version is `v0.0.0-placeholder`, it means the skill exists in the upstream Microsoft repo but doesn't have a canonical semver tag yet. Cite the placeholder. Phase 3 may resolve to commit SHA at load time for stronger provenance.",
+    "Sim coverage gap: skills with empty `validatedBySims` arrays haven't been exercised by a sim yet. Phase 2 sims should cover: azure-prepare (preflight before generation), azure-validate (post-deploy), azure-diagnostics (troubleshoot), azure-rbac (role assignment patterns), azure-resource-visualizer (post-deploy diagrams), azure-upgrade (cluster upgrades), azure-enterprise-infra-planner (sim-04 partially covered; full enterprise IaC monorepo flow exercised)."
+  ]
+}

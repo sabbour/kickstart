@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aks-kickstart/config/handoff-rules.schema.json",
+  "title": "Handoff Rules Configuration",
+  "description": "Mirror of the actual handoff and asTools wiring across all agents (extracted from frontmatter), or proposed wiring not yet implemented. Every entry carries a provenance marker.",
+  "type": "object",
+  "required": ["version"],
+  "anyOf": [
+    { "required": ["agents"] },
+    { "required": ["trackToHandoff"] },
+    { "required": ["proposedAgentChanges"] }
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "extractedFrom": { "type": "string" },
+    "extractedAt": { "type": "string" },
+    "extractionMethod": { "type": "string" },
+    "purpose": { "type": "string" },
+    "agents": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/agent" }
+    },
+    "trackToHandoff": {
+      "type": "object",
+      "properties": {
+        "_provenance": { "$ref": "#/definitions/provenance" },
+        "_source": { "type": "string" }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["primary"],
+        "properties": {
+          "primary": { "type": "string" },
+          "secondary": { "type": "array", "items": { "type": "string" } },
+          "switchByBackend": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "provenance": { "$ref": "#/definitions/provenance" },
+          "source": { "type": "string" },
+          "motivation": { "type": "string" }
+        }
+      }
+    },
+    "proposedAgentChanges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["agent", "change", "provenance"],
+        "properties": {
+          "agent": { "type": "string" },
+          "change": { "type": "string" },
+          "provenance": { "$ref": "#/definitions/provenance" },
+          "source": { "type": "string" },
+          "motivation": { "type": "string" }
+        }
+      }
+    },
+    "wiringGaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description"],
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" },
+          "suggestedFix": { "type": "string" },
+          "provenance": { "$ref": "#/definitions/provenance" },
+          "source": { "type": "string" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "provenance": {
+      "type": "string",
+      "enum": ["extracted", "proposed", "derived"],
+      "description": "extracted = verbatim from agent frontmatter; proposed = framework/sim recommendation not yet in frontmatter; derived = inferred from other extracted data"
+    },
+    "agent": {
+      "type": "object",
+      "required": ["role", "userInvocable", "modelInvocable", "handoffs", "asTools", "provenance"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "router",
+            "generator",
+            "reviewer",
+            "domain_architect",
+            "domain_generator",
+            "domain_reviewer",
+            "domain_operator",
+            "publisher"
+          ]
+        },
+        "domain": { "type": "string" },
+        "userInvocable": { "type": "boolean" },
+        "modelInvocable": { "type": "boolean" },
+        "provenance": { "$ref": "#/definitions/provenance" },
+        "source": { "type": "string" },
+        "handoffs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "target", "trigger", "provenance"],
+            "properties": {
+              "label": { "type": "string" },
+              "target": { "type": "string" },
+              "trigger": { "type": "string" },
+              "provenance": { "$ref": "#/definitions/provenance" },
+              "source": { "type": "string" },
+              "motivation": { "type": "string" }
+            }
+          }
+        },
+        "asTools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["target", "maxTurns", "purpose", "provenance"],
+            "properties": {
+              "target": { "type": "string" },
+              "maxTurns": { "type": "integer", "minimum": 1, "maximum": 10 },
+              "purpose": { "type": "string" },
+              "provenance": { "$ref": "#/definitions/provenance" },
+              "source": { "type": "string" },
+              "motivation": { "type": "string" }
+            }
+          }
+        },
+        "userActions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

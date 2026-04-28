@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/azure-management-and-platforms/kickstart/config/schemas/recipes.schema.json",
+  "title": "Composition Recipes Catalog",
+  "description": "Catalog of UI composition recipes (R1-R17 + new R18+) surfaced by Phase 1.5 grounding + Phase 1.6 simulations.",
+  "type": "object",
+  "required": ["$schema", "version", "recipes"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "extractedFrom": {
+      "type": "string",
+      "description": "Source documents (Phase 1 grounding artifact + simulation findings)"
+    },
+    "extractedAt": {
+      "type": "string",
+      "format": "date"
+    },
+    "promotionPolicy": {
+      "type": "string",
+      "description": "Rule for marking recipes as promotion_candidate: true (typically: appears in 5+ sims)"
+    },
+    "recipes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "intent", "composition", "fires_when", "validated_by_sims", "provenance"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Recipe identifier (R1-R20, R-prefixed for named patterns)",
+            "pattern": "^(R[0-9]+(\\.[0-9]+)?[a-z]?(-[a-zA-Z-]+)?|R-[a-zA-Z-]+|two-layer-rollback|futureYouDoors|priorDeploymentContext|repeat-user-compression)$"
+          },
+          "name": {
+            "type": "string",
+            "description": "Short human name"
+          },
+          "intent": {
+            "type": "string",
+            "description": "What problem this recipe solves"
+          },
+          "composition": {
+            "type": "string",
+            "description": "Composition signature in pseudo-tree notation (e.g. Card[Text(h2)+Table+Row[Button×N]])"
+          },
+          "components_used": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of UI component names from component-catalog.json that this recipe uses"
+          },
+          "fires_when": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Triggering conditions"
+          },
+          "anti_patterns": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "What NOT to do for this recipe"
+          },
+          "validated_by_sims": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^sim-\\d+" },
+            "description": "Phase 1.6 simulation transcripts that used this recipe"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": ["extracted", "derived", "proposed"],
+            "description": "extracted = from Phase 1 grounding artifact (R1-R17); proposed = new from Phase 1.6 sims; derived = inferred"
+          },
+          "promotion_candidate": {
+            "type": "boolean",
+            "description": "True if recipe appears in 5+ sims and may warrant promotion to first-class rich component in Phase 3"
+          },
+          "variants": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Related recipe IDs that are variants of this one"
+          },
+          "extension_slots": {
+            "type": "object",
+            "description": "Named slots that extensions to this recipe may populate",
+            "additionalProperties": { "type": "string" }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Additional context"
+          }
+        }
+      }
+    },
+    "promotionRecommendations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["recipe", "rationale"],
+        "properties": {
+          "recipe": {
+            "type": "string",
+            "description": "Recipe ID being recommended for promotion"
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why this recipe should be promoted to a first-class component"
+          }
+        }
+      },
+      "description": "Phase 3 recommendations for which recipes to promote to first-class rich components"
+    }
+  }
+}

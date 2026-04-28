@@ -1,0 +1,154 @@
+{
+  "$schema": "./schemas/handoff-rules.schema.json",
+  "version": "1.0.0",
+  "purpose": "Wiring proposed by Phase 1 docs and Phase 1.6 simulation findings that does NOT yet exist in agent frontmatter. Each item has provenance: 'proposed' (with source citation). Phase 2 implementation MAY land any subset; this file documents intent.",
+  "trackToHandoff": {
+    "_provenance": "derived",
+    "_source": "phase1-aks-automatic-grounding.md Part 9.2 + tracks.json patterns; not in agent frontmatter",
+    "static_site": {
+      "primary": "azure.architect",
+      "secondary": []
+    },
+    "containerized_web": {
+      "primary": "azure.architect",
+      "secondary": []
+    },
+    "agentic_app": {
+      "primary": "aks.architect",
+      "secondary": ["azure.architect"],
+      "switchByBackend": {
+        "foundry": "core.codesmith",
+        "kaito": "aks.architect",
+        "generic_endpoint": "azure.architect"
+      }
+    },
+    "repo_uplift": {
+      "primary": "azure.architect",
+      "secondary": ["aks.architect"]
+    },
+    "migration_to_aks_automatic": {
+      "_provenance": "proposed",
+      "_source": "Sim #2 + Sim #7 + grounding artifact D7",
+      "primary": "aks.reviewer",
+      "secondary": ["aks.architect"],
+      "loadSkill": "azure-kubernetes-automatic-readiness"
+    },
+    "paas_migration": {
+      "_provenance": "proposed",
+      "_source": "Sim #10 + Sim #11",
+      "primary": "azure.architect",
+      "secondary": ["aks.architect"],
+      "loadSkill": "azure-cloud-migrate",
+      "openingComposition": "R3"
+    }
+  },
+  "proposedAgentChanges": [
+    {
+      "agent": "aks.reviewer",
+      "change": "set user-invocable: true; add readiness-mode tools (core.read_skill, core.read_file, core.inspect_repo, core.helm_template, core.kustomize_build, core.assess_aks_cluster); permit diff proposal in readiness mode; add github.publisher handoff for review-pack delivery; add core.codesmith asTools (max 3) for diff generation",
+      "provenance": "proposed",
+      "source": "Sim #2 S1, Sim #7 S1, Sim #12, grounding artifact D7"
+    },
+    {
+      "agent": "core.triage",
+      "change": "add tools: core.read_skill, core.read_file, core.priorDeploymentContext (Phase 3); add handoff to aks.reviewer (for SRE handover review-pack scope per D7)",
+      "provenance": "proposed",
+      "source": "Sim #2, Sim #9, Sim #12"
+    },
+    {
+      "agent": "aks.architect",
+      "change": "add tools: core.read_skill, core.search_kaito_models, azure.pricing_lookup, azure.estimate_cost, azure.quota_lookup (Phase 3); add asTools to core.triage (max 1) for track-flip handback",
+      "provenance": "proposed",
+      "source": "Sim #1 S5, Sim #3, Sim #5, Sim #6, Sim #8 (track-flip)"
+    },
+    {
+      "agent": "azure.architect",
+      "change": "add tools: core.read_skill, azure.quota_lookup; add asTools to aks.architect (max 3) — symmetric to existing aks.architect → azure.architect wiring",
+      "provenance": "proposed",
+      "source": "Phase 1 wiring gap + Sim #10 + Sim #11"
+    },
+    {
+      "agent": "core.codesmith",
+      "change": "add tools: aks.validate_manifests, aks.validate_safeguards, azure.validate_bicep, core.read_skill; add asTools to aks.architect (max 3)",
+      "provenance": "proposed",
+      "source": "Sim #2, Sim #5, Sim #9 + Phase 2 plan"
+    },
+    {
+      "agent": "core.reviewer",
+      "change": "add tools: core.read_skill; add asTools to azure.architect (max 2) for cost cross-checks; add asTools to aks.architect (max 2) for cluster-side correctness checks",
+      "provenance": "proposed",
+      "source": "Sim #12 (handover cross-checks) + Phase 1 wiring gap"
+    },
+    {
+      "agent": "github.publisher",
+      "change": "add tools: github.update_pr_description (Phase 3), github.add_pr_comment (Phase 3), github.set_pr_label (Phase 3), github.assign_reviewer (Phase 3), github.set_repo_var (Phase 3); add asTools to azure.architect (max 3) for pre-publish cost questions",
+      "provenance": "proposed",
+      "source": "Sim #1 S10, Sim #11, Sim #12 + Phase 1 wiring gap"
+    }
+  ],
+  "wiringGaps": [
+    {
+      "id": "azure-cannot-consult-aks",
+      "description": "azure.architect has no asTools wiring to aks.architect; must hand off for AKS-specific questions. Cross-cluster questions in Sim #10 and Sim #11 had to either guess or refuse.",
+      "suggestedFix": "Add asTools entry maxTurns:3 symmetric to existing aks.architect → azure.architect",
+      "provenance": "proposed",
+      "source": "Phase 1.5 grounding + Sim #10 + Sim #11"
+    },
+    {
+      "id": "no-handback-to-triage",
+      "description": "No agent has triage as a handoff target; if user changes track mid-conversation (Sim #8: 'use Container Apps instead') the current agent has no clean route. Sim #8 worked because architect reshaped locally — but Phase 2 needs explicit rule for when to handback vs reshape.",
+      "suggestedFix": "Either add triage as handoff target on every architect, or formalize 'named-different-service → reshape locally; named-different-shape → handback via new event'. See Phase 2 plan agent-coordination divergence #2.",
+      "provenance": "proposed",
+      "source": "Phase 1.5 grounding + Sim #8"
+    },
+    {
+      "id": "codesmith-no-reviewer-handoff",
+      "description": "core.codesmith only consults reviewer via asTools (max 3 turns); no formal handoff path. Today the harness auto-runs reviewer post-codesmith, which substitutes for the missing handoff but isn't visible to agents.",
+      "suggestedFix": "Either add explicit codesmith → reviewer handoff for cases needing formal sign-off, OR document the harness auto-reviewer hook in agent-coordination-decisions.md so prompt authors don't try to add manual handoff calls.",
+      "provenance": "proposed",
+      "source": "Phase 1.5 grounding"
+    },
+    {
+      "id": "publisher-no-cost-consultation",
+      "description": "github.publisher has no asTools to azure.architect; cannot answer pre-publish cost questions without refusing or handoff.",
+      "suggestedFix": "Add asTools to azure.architect, maxTurns:3",
+      "provenance": "proposed",
+      "source": "Phase 1.5 grounding"
+    },
+    {
+      "id": "aks-reviewer-needs-readiness-scope",
+      "description": "Per D7, aks.reviewer should own readiness scope (load azure-kubernetes-automatic-readiness skill, propose diffs in readiness mode, expand tools list). Current frontmatter is narrowly scoped to 'safeguard review only'.",
+      "suggestedFix": "Update frontmatter per Phase 2 plan agent #3 (aks.reviewer rewrite). Set user-invocable: true; add tools: core.read_skill, core.read_file, core.inspect_repo, core.helm_template, core.kustomize_build, core.assess_aks_cluster, github.api_get, github.update_pr_description; add asTools to core.codesmith (max 3) for diff generation; add handoff to github.publisher for review-pack delivery.",
+      "provenance": "proposed",
+      "source": "Phase 1.5 grounding D7 + Sim #2 S1 + Sim #7 + Sim #12"
+    },
+    {
+      "id": "triage-no-iteration-mode",
+      "description": "Triage has no rule for recognizing iteration on prior Kickstart deploys (Sim #9). Falls into greenfield architect-plan flow, which re-proposes the cluster.",
+      "suggestedFix": "Add Mode Recognition section to triage prompt + populate priorDeploymentContext via core.priorDeploymentContext (Phase 3 tool) or core.inspect_repo+core.read_file (Phase 2 fallback). See Phase 2 plan agent #1.",
+      "provenance": "proposed",
+      "source": "Sim #9 S1"
+    },
+    {
+      "id": "triage-no-paas-migration-mode",
+      "description": "Triage has no rule for recognizing PaaS-migration intent (Sim #10, #11). Defaults to repo_uplift handler which is too generic.",
+      "suggestedFix": "Add paas_migration sub-track + R3 mapping table opening composition + load azure-cloud-migrate skill.",
+      "provenance": "proposed",
+      "source": "Sim #10, Sim #11"
+    },
+    {
+      "id": "triage-no-bulk-mode",
+      "description": "Triage has no rule for recognizing multi-app bulk scenarios (Sim #11). Would handle as 3 independent conversations.",
+      "suggestedFix": "Add bulk mode + R-shared-infra-decision opening composition + R-bulk-sequenced-PRs.",
+      "provenance": "proposed",
+      "source": "Sim #11 S1"
+    },
+    {
+      "id": "no-migration-phase-state",
+      "description": "Phase 2/3/4 resume hooks (Sim #2 Turn 22 'message me Phase 2', Sim #7 Turn 14) need session-scoped migration_phase state. Without it, 'Phase 2' is just a string.",
+      "suggestedFix": "Add migration_phase: 1|2|3|4 to harness session state; triage recognizes phase-numbered messages.",
+      "provenance": "proposed",
+      "source": "Sim #2 S7, Sim #7"
+    }
+  ]
+}

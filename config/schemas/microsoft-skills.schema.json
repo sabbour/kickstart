@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/azure-management-and-platforms/kickstart/config/schemas/microsoft-skills.schema.json",
+  "title": "Microsoft Skills Catalog",
+  "description": "Maps intent keywords + tracks to Microsoft GitHub-Copilot-for-Azure skill IDs per Phase 1.5 grounding artifact Section 9 (D8).",
+  "type": "object",
+  "required": ["$schema", "version", "extractedFrom", "skills"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "extractedFrom": {
+      "type": "string",
+      "description": "Source URL of the Microsoft skills repo (or file path within it)"
+    },
+    "extractedAt": {
+      "type": "string",
+      "format": "date",
+      "description": "ISO date of extraction"
+    },
+    "extractionSource": {
+      "type": "string",
+      "description": "Human description of how the inventory was assembled"
+    },
+    "loadConvention": {
+      "type": "object",
+      "required": ["tool", "callPattern", "citationFormat"],
+      "properties": {
+        "tool": {
+          "type": "string",
+          "description": "Tool name used to load skills (e.g. core.read_skill)"
+        },
+        "callPattern": {
+          "type": "string",
+          "description": "Example invocation"
+        },
+        "citationFormat": {
+          "type": "string",
+          "description": "Format for citing skill content in agent prose"
+        },
+        "constraintSpecCitationFormat": {
+          "type": "string",
+          "description": "Format for citing skills that include a versioned constraint spec"
+        },
+        "versionPolicy": {
+          "type": "string",
+          "description": "Policy for handling placeholder versions"
+        }
+      }
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "path", "purpose", "loadWhen", "validatedBySims", "provenance"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Skill ID matching the Microsoft repo path slug (e.g. azure-kubernetes)"
+          },
+          "version": {
+            "type": "string",
+            "description": "Skill version. May be semver (v1.0.0) or placeholder (v0.0.0-placeholder)."
+          },
+          "path": {
+            "type": "string",
+            "description": "Path to SKILL.md within the upstream Microsoft repo"
+          },
+          "references": {
+            "type": "object",
+            "description": "Sub-references within the skill (e.g., constraint-spec-v1.yaml)",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "purpose": {
+            "type": "string",
+            "description": "One-line purpose of the skill"
+          },
+          "loadWhen": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Triggering conditions (intents, tracks, agent invocations)"
+          },
+          "validatedBySims": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^sim-\\d+" },
+            "description": "Phase 1.6 simulation transcripts that exercised this skill"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": ["extracted", "derived", "proposed"],
+            "description": "Source of this skill entry"
+          }
+        }
+      }
+    },
+    "intentToSkillMap": {
+      "type": "object",
+      "description": "Cross-reference: composite intent → list of skills to load. Provenance: derived.",
+      "properties": {
+        "_provenance": { "type": "string", "enum": ["extracted", "derived", "proposed"] },
+        "_source": { "type": "string" }
+      },
+      "additionalProperties": {
+        "anyOf": [
+          { "type": "string" },
+          {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        ]
+      }
+    },
+    "phase2Notes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Forward-looking notes for Phase 2 prompt rewriters"
+    }
+  }
+}
