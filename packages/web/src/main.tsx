@@ -7,6 +7,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
 import { APIConnectorProvider } from './contexts/APIConnectorContext';
+import { GitHubAuthProvider } from './contexts/GitHubAuthContext';
 import { ArtifactProvider } from './contexts/ArtifactContext';
 import { VirtualFSProvider } from './contexts/VirtualFSContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -104,11 +105,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <DebugProvider>
         <A2UIRegistryProvider>
           <APIConnectorProvider>
+            <GitHubAuthProvider>
             <ArtifactProvider store={sessionArtifactStore}>
               <VirtualFSProvider>
                 <App />
               </VirtualFSProvider>
             </ArtifactProvider>
+            </GitHubAuthProvider>
           </APIConnectorProvider>
         </A2UIRegistryProvider>
       </DebugProvider>

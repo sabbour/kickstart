@@ -24,11 +24,10 @@ import { Search20Regular, Star20Regular } from "@fluentui/react-icons";
 import type { GitHubRepo } from "@aks-kickstart/harness";
 import {
   createGitHubRepo,
-  getGitHubSession,
   listGitHubRepos,
-  type GitHubSessionState,
 } from "../../services/github-handoff";
 import { usePlaygroundMockMode } from "../../contexts/PlaygroundMockModeContext";
+import { useGitHubAuth } from "../../contexts/GitHubAuthContext";
 
 const createGitHubStubRepo = (args: { owner: string; name: string; description?: string; private?: boolean }): GitHubRepo => ({
   name: args.name,
@@ -58,27 +57,6 @@ const listGitHubStubRepos = (owner: string): GitHubRepo[] => [
     updated_at: '2026-04-26T19:00:00Z',
   },
 ];
-const createGitHubStubSession = (connected: boolean): GitHubSessionState => ({
-  authenticated: connected,
-  configured: true,
-  viewer: connected
-    ? {
-        login: DEFAULT_GITHUB_MOCK_OWNER,
-        name: 'Mock GitHub User',
-        avatarUrl: 'https://github.com/github.png',
-        htmlUrl: `https://github.com/${DEFAULT_GITHUB_MOCK_OWNER}`,
-      }
-    : undefined,
-  owners: connected
-    ? [{
-        login: DEFAULT_GITHUB_MOCK_OWNER,
-        type: 'User',
-        label: `${DEFAULT_GITHUB_MOCK_OWNER} (mock)`,
-        avatarUrl: 'https://github.com/github.png',
-        htmlUrl: `https://github.com/${DEFAULT_GITHUB_MOCK_OWNER}`,
-      }]
-    : [],
-});
 import { sanitizeActionContext } from "../../utils/sanitize-action-context";
 
 const GitHubRepoPickerApi = {
@@ -189,8 +167,8 @@ export const GitHubRepoPicker = createReactComponent(GitHubRepoPickerApi, ({ pro
   const allowCreate = props.allowCreate !== false;
   const [usePlaygroundStub] = usePlaygroundMockMode();
 
-  const [session, setSession] = useState<GitHubSessionState | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const { session, loading: authLoading } = useGitHubAuth();
+
   const [query, setQuery] = useState("");
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [loadingRepos, setLoadingRepos] = useState(false);
@@ -209,33 +187,14 @@ export const GitHubRepoPicker = createReactComponent(GitHubRepoPickerApi, ({ pro
   const [createDescription, setCreateDescription] = useState("");
   const [createPrivate, setCreatePrivate] = useState(false);
 
-  const refreshSession = useCallback(async () => {
-    if (usePlaygroundStub) {
-      const nextSession = createGitHubStubSession(true);
-      setSession(nextSession);
-      setError(undefined);
-      setSelectedOwner((current) => current || DEFAULT_GITHUB_MOCK_OWNER);
-      setAuthLoading(false);
-      return;
-    }
-
-    setAuthLoading(true);
-    try {
-      const nextSession = await getGitHubSession();
-      setSession(nextSession);
-      setError(nextSession.error);
-      setSelectedOwner((current) => current || nextSession.owners[0]?.login || "");
-    } catch (err) {
-      setSession(null);
-      setError(err instanceof Error ? err.message : "Unable to load GitHub session.");
-    } finally {
-      setAuthLoading(false);
-    }
-  }, [usePlaygroundStub]);
-
+  // Seed selectedOwner from context session once it loads.
   useEffect(() => {
-    void refreshSession();
-  }, [refreshSession]);
+    if (!session?.authenticated) return;
+    setSelectedOwner((current) => {
+      if (current) return current;
+      return usePlaygroundStub ? DEFAULT_GITHUB_MOCK_OWNER : (session.owners[0]?.login ?? "");
+    });
+  }, [session, usePlaygroundStub]);
 
   const fetchRepos = useCallback(async (owner: string, pageNumber: number) => {
     if (usePlaygroundStub) {

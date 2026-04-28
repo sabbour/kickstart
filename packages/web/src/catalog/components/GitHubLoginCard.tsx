@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { createReactComponent } from "../../vendor/a2ui/react/adapter";
 import { z } from "zod";
 import { DynamicStringSchema, ActionSchema } from "../../vendor/a2ui/web_core/schema/common-types";
@@ -17,34 +17,9 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import {
-  getGitHubSession,
-  signInWithGitHubPopup,
-  signOutGitHub,
-  type GitHubSessionState,
-} from "../../services/github-handoff";
+import { useGitHubAuth } from "../../contexts/GitHubAuthContext";
 import { usePlaygroundMockMode } from "../../contexts/PlaygroundMockModeContext";
 
-const MOCK_GITHUB_OWNER = {
-  login: "kickstart-mock",
-  type: "User" as const,
-  label: "kickstart-mock (mock)",
-  avatarUrl: "https://github.com/github.png",
-  htmlUrl: "https://github.com/kickstart-mock",
-};
-const createGitHubStubSession = (connected: boolean): GitHubSessionState => ({
-  authenticated: connected,
-  configured: true,
-  viewer: connected
-    ? {
-        login: MOCK_GITHUB_OWNER.login,
-        name: "Mock GitHub User",
-        avatarUrl: MOCK_GITHUB_OWNER.avatarUrl,
-        htmlUrl: MOCK_GITHUB_OWNER.htmlUrl,
-      }
-    : undefined,
-  owners: connected ? [MOCK_GITHUB_OWNER] : [],
-});
 
 const GitHubLoginCardApi = {
   name: "GitHubLoginCard",
@@ -93,90 +68,27 @@ const useStyles = makeStyles({
 export const GitHubLoginCard = createReactComponent(GitHubLoginCardApi, ({ props }) => {
   const classes = useStyles();
   const [usePlaygroundStub] = usePlaygroundMockMode();
+  const { session, loading, error, signIn, signOut } = useGitHubAuth();
 
-  const [session, setSession] = useState<GitHubSessionState | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | undefined>();
-
-  const refreshSession = useCallback(async () => {
-    if (usePlaygroundStub) {
-      setSession(createGitHubStubSession(false));
-      setError(undefined);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const nextSession = await getGitHubSession();
-      setSession(nextSession);
-      setError(nextSession.error);
-    } catch (err) {
-      setSession(null);
-      setError(err instanceof Error ? err.message : "Unable to load GitHub sign-in status.");
-    } finally {
-      setLoading(false);
-    }
-  }, [usePlaygroundStub]);
-
+  // Fire onSignIn callback when session transitions to authenticated.
+  const prevAuthenticated = useRef(session?.authenticated ?? false);
   useEffect(() => {
-    void refreshSession();
-  }, [refreshSession]);
-
-  const handleSignIn = async () => {
-    if (usePlaygroundStub) {
-      setSession(createGitHubStubSession(true));
-      setError(undefined);
-      setLoading(false);
+    if (!prevAuthenticated.current && session?.authenticated) {
       if (props.onSignIn) {
         (props.onSignIn as () => void)();
       }
-      return;
     }
+    prevAuthenticated.current = session?.authenticated ?? false;
+  }, [session?.authenticated, props.onSignIn]);
 
-    setLoading(true);
-    setError(undefined);
-    try {
-      const nextSession = await signInWithGitHubPopup();
-      setSession(nextSession);
-      setError(nextSession.error);
-      if (nextSession.authenticated && props.onSignIn) {
-        (props.onSignIn as () => void)();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign-in failed");
-    } finally {
-      setLoading(false);
-    }
+  const handleSignIn = async () => {
+    await signIn();
   };
 
   const handleSignOut = async () => {
-    if (usePlaygroundStub) {
-      setSession(createGitHubStubSession(false));
-      setError(undefined);
-      setLoading(false);
-      if (props.onSignOut) {
-        (props.onSignOut as () => void)();
-      }
-      return;
-    }
-
-    setLoading(true);
-    setError(undefined);
-    try {
-      await signOutGitHub();
-      setSession({
-        authenticated: false,
-        configured: session?.configured ?? true,
-        owners: [],
-      });
-      if (props.onSignOut) {
-        (props.onSignOut as () => void)();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign-out failed");
-    } finally {
-      setLoading(false);
+    await signOut();
+    if (props.onSignOut) {
+      (props.onSignOut as () => void)();
     }
   };
 
