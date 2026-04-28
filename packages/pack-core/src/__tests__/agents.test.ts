@@ -178,6 +178,12 @@ describe('pack-core agent frontmatter', () => {
       expect(TRIAGE_PROMPT).toContain('Model override');
     });
 
+    it('emits a RadioGroup for data-source question instead of asking in prose', () => {
+      expect(TRIAGE_PROMPT).toContain('emit a `RadioGroup`');
+      expect(TRIAGE_PROMPT).toContain('select_data_source');
+      expect(TRIAGE_PROMPT).not.toContain('documents, websites, business data, or no external data');
+    });
+
     it('keeps repo uplift tool and surface instructions consistent', () => {
       expect(TRIAGE_PROMPT).toContain('- core.inspect_repo');
       expect(TRIAGE_PROMPT).toContain('call `core.inspect_repo`');

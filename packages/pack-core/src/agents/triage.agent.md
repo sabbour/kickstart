@@ -132,13 +132,32 @@ When you receive `[A2UI event] name=select_inference payload={"value":"<choice>"
 
 - **`foundry`** — Do not require the user to restate the use case or data sources if they already provided them. Do not present a stale fixed list of model families. If you still need information, ask **one question at a time** (maximum 3 questions total before routing), choosing the single most important missing piece first:
   - Model override (only if the user has expressed a preference)
-  - Use-case corrections, data-source corrections, database/cache needs, scaling expectations (ask only what is missing)
+  - Data source — **emit a `RadioGroup`** (never ask in prose) on `"shared:triage-main"` via `updateComponents`. Options: Documents, Websites, Business data (APIs/databases), No external data. Event: `select_data_source`. See exemplar below.
+  - Use-case corrections, database/cache needs, scaling expectations (ask only what is missing)
 - **`kaito`** — Before presenting choices, call `core.search_kaito_models` for the user's requested model or use `"*"` to browse. Use returned `matches`; do not rely on memory or a static list. Emit a `Questionnaire` on `"shared:triage-main"` with: model or family, GPU preference, use-case corrections, scaling expectations. `onSubmit: { event: { name: "kaito_answers", payload: null } }`
 - **`generic_endpoint`** — Infer use case from context. Emit an optional-field form for endpoint/provider, model name, auth secret name, protocol, and scaling. Never ask the user to paste secret values.
+
+### Handling `select_data_source`
+
+When you receive `[A2UI event] name=select_data_source payload={"value":"<choice>"}`, treat the selection as the confirmed data source. Re-evaluate whether you have enough information to route — if yes, route immediately. Otherwise, ask the next most-important missing piece (maximum 3 total questions before forced routing).
 
 ## Using A2UI
 
 Call `core.emit_ui` to replace prose questions with structured choices (intent branches, option comparisons, progress summaries). Use `core.search_components` when unsure of a component name.
+
+### RadioGroup exemplar for data-source question (Foundry path)
+
+```json
+{"version":"v0.9","updateComponents":{"surfaceId":"shared:triage-main","components":[
+  {"id":"root","component":"Column","children":["data-source"]},
+  {"id":"data-source","component":"RadioGroup","value":null,"options":[
+    {"id":"documents","label":"Documents","description":"PDFs, Word files, or other uploaded documents","recommended":null},
+    {"id":"websites","label":"Websites","description":"Public or internal web pages via URL crawling","recommended":null},
+    {"id":"business_data","label":"Business data","description":"Databases, APIs, or structured internal data","recommended":null},
+    {"id":"none","label":"No external data","description":"Relies only on the model's built-in knowledge","recommended":null}
+  ],"action":{"event":{"name":"select_data_source","payload":null}}}
+]}}
+```
 
 ### TrackPicker exemplar for ambiguous requests
 
