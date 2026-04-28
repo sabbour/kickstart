@@ -142,3 +142,13 @@ Fry owns frontend and A2UI catalog. Key contributions:
 - All reviewers gate-clear
 
 **Carry-forward:** PR #40 merge pending code review completion
+
+## 2026-04-28 — PR #239 lockout-substitute revision (issue #237)
+
+Acted as designated revision author after Zapp issued `security:rejected` on PR #239 (original author: Bender, locked out per Reviewer Rejection Protocol).
+
+**Fix:** added `https://management.azure.com` to the `connect-src` directive in `packages/web/public/staticwebapp.config.json`. Surgical single-line edit — no other directive touched, no wildcards introduced. The Playwright CSP smoke mirror in `e2e/browser-telemetry.spec.ts` already contained the entry, so no drift.
+
+**Verification:** `arm-direct-csp.test.ts` (CI invariant guard) green; full vitest suite 2137/2137 passing; web + api builds clean; bundle budgets within ceiling.
+
+**Commit:** b9ca7b34 (squad-frontend[bot]). Comment 4337051908 posted on PR #239 pinging Zapp for re-review. Bender did not contribute.

@@ -13,15 +13,12 @@ import type {
   GitHubCommitFilesResult,
 } from '@aks-kickstart/harness';
 import { apiFetch, buildSwaLoginUrl } from '../services/api-client';
+import { armFetchRaw, armList } from '../services/arm-client';
 import {
   getGitHubSession,
   signInWithGitHubPopup,
 } from '../services/github-handoff';
 import { isPlaygroundMockModeEnabled } from './PlaygroundMockModeContext';
-
-interface ArmListResponse<T> {
-  value?: T[];
-}
 
 const MOCK_SUBSCRIPTIONS: AzureSubscription[] = [
   {
@@ -185,30 +182,25 @@ class BrowserAzureARMConnector implements APIConnector {
       });
     }
 
-    const normalizedPath = path.replace(/^\/+/, '');
-    const headers = new Headers({ Accept: 'application/json' });
-    const init: RequestInit = {
-      method,
-      headers,
-    };
-    if (!['GET', 'HEAD'].includes(method.toUpperCase()) && body !== undefined) {
-      headers.set('Content-Type', 'application/json');
-      init.body = JSON.stringify(body);
-    }
-    const response = await apiFetch(`/api/arm-proxy/${normalizedPath}`, init);
+    // ARM is now called directly from the browser using a SWA-issued token
+    // — see issue #237 / DP #194. The legacy /api/arm-proxy round-trip is
+    // gone. armFetchRaw still returns a Response for the legacy
+    // APIConnector.request() shape.
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    const response = await armFetchRaw(method, normalizedPath, body);
     this.authenticated = response.ok;
     return response;
   }
 
   private async getArmList<T>(path: string): Promise<T[]> {
-    const response = await this.request('GET', path);
-    const json = await response.json().catch(() => undefined) as ArmListResponse<T> | undefined;
-    if (!response.ok) {
-      const message = readApiError(json, `Azure request failed (${response.status}).`);
-      throw new Error(message);
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    const result = await armList<T>(normalizedPath);
+    if (!result.ok) {
+      this.authenticated = result.error.kind !== 'auth-error' ? this.authenticated : false;
+      throw new Error(result.error.message);
     }
     this.authenticated = true;
-    return Array.isArray(json?.value) ? json.value : [];
+    return result.value;
   }
 }
 
@@ -327,18 +319,6 @@ class BrowserGitHubConnector implements APIConnector {
     }
     return owner;
   }
-}
-
-function readApiError(body: unknown, fallback: string): string {
-  if (body && typeof body === 'object') {
-    const error = (body as { error?: unknown }).error;
-    if (typeof error === 'string') return error;
-    if (error && typeof error === 'object') {
-      const message = (error as { message?: unknown }).message;
-      if (typeof message === 'string') return message;
-    }
-  }
-  return fallback;
 }
 
 interface APIConnectorContextValue {

@@ -205,7 +205,7 @@ test.describe('Browser telemetry — #1042 Phase 1', () => {
     // goes red and catches it.
     const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
       + "img-src 'self' data: https:; "
-      + "connect-src 'self' https://*.openai.azure.com https://*.applicationinsights.azure.com "
+      + "connect-src 'self' https://management.azure.com https://*.openai.azure.com https://*.applicationinsights.azure.com "
       + "https://*.in.applicationinsights.azure.com https://*.livediagnostics.monitor.azure.com; "
       + "font-src 'self' data:; object-src 'none'; frame-ancestors 'none'; "
       + "base-uri 'self'; form-action 'self'";
