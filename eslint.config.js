@@ -76,4 +76,41 @@ export default tseslint.config(
   {
     ignores: ['**/dist/', '**/node_modules/', '**/vendor/'],
   },
+  // Tool-file guardrail: ban .refine(), .transform(), .pipe() on Zod schemas
+  // used as tool input parameters. These produce ZodEffects which the OpenAI
+  // API rejects with HTTP 400 (type:"None" instead of type:"object").
+  // Move runtime validation into execute() instead.
+  //
+  // Note: this block also repeats the .optional() ban from the broader
+  // packages/*/src/tools rule above. In flat ESLint config, later entries for
+  // the same rule name win on overlapping globs, so the optional() selector
+  // must be included here too to remain active for pack tool files.
+  {
+    files: ['packages/pack-*/src/tools/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[property.name='optional']",
+          message:
+            "Use strictOptional() from '@aks-kickstart/harness/runtime/z-strict' instead of .optional() — .optional() violates OpenAI strict-mode (I2: property missing from required).",
+        },
+        {
+          selector: "CallExpression[callee.property.name='refine']",
+          message:
+            "Do not use .refine() on Zod schemas passed as tool input parameters — it produces ZodEffects which the OpenAI API rejects. Move runtime checks into execute() instead.",
+        },
+        {
+          selector: "CallExpression[callee.property.name='transform']",
+          message:
+            "Do not use .transform() on Zod schemas passed as tool input parameters — it produces ZodEffects which the OpenAI API rejects. Move transformations into execute() instead.",
+        },
+        {
+          selector: "CallExpression[callee.property.name='pipe']",
+          message:
+            "Do not use .pipe() on Zod schemas passed as tool input parameters — it produces ZodEffects which the OpenAI API rejects. Move pipe logic into execute() instead.",
+        },
+      ],
+    },
+  },
 );

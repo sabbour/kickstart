@@ -205,3 +205,47 @@ describe('OpenAI strict-mode schema conformance — all tool files (glob, #98)',
     },
   );
 });
+
+describe('OpenAI strict-mode schema conformance — I0: root must be type:object', () => {
+  it('rejects a $ref-at-root schema (ZodEffects via zodToJsonSchema CJS produces this)', () => {
+    // In some serialization paths (e.g., CJS zod-to-json-schema without the
+    // openAi target), ZodEffects produce a $ref schema at root level with no
+    // type:"object". The OpenAI API rejects such schemas with HTTP 400.
+    const schema = {
+      $ref: '#/definitions/OpenAiAnyType',
+      definitions: {
+        OpenAiAnyType: { type: ['string', 'number', 'integer', 'boolean', 'array', 'null'] },
+      },
+      $schema: 'https://json-schema.org/draft/2019-09/schema#',
+    };
+    const report = reportSchemaConformance('test_refine_tool', schema);
+    expect(report.i0RootType).toHaveLength(1);
+    expect(report.i0RootType[0]).toContain('expected "object"');
+    expect(reportHasIssues(report)).toBe(true);
+  });
+
+  it('accepts a plain type:object root schema (sanity check)', () => {
+    const schema = {
+      type: 'object',
+      properties: { x: { type: 'string' } },
+      required: ['x'],
+      additionalProperties: false,
+    };
+    const report = reportSchemaConformance('test_good_tool', schema);
+    expect(report.i0RootType).toHaveLength(0);
+  });
+
+  it('flags a root schema with type:"None" directly (OpenAI SDK ZodEffects output)', () => {
+    const schema = {
+      type: 'None',
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    };
+    const report = reportSchemaConformance('test_none_tool', schema);
+    expect(report.i0RootType).toHaveLength(1);
+    expect(report.i0RootType[0]).toContain('"None"');
+    expect(report.i0RootType[0]).toContain('expected "object"');
+    expect(reportHasIssues(report)).toBe(true);
+  });
+});

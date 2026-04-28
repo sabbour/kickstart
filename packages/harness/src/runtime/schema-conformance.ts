@@ -104,6 +104,24 @@ export function walkSchema(node: unknown, path: string, visit: SchemaVisitor): v
 // Invariant collectors
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * I0 — root schema must be type:"object".
+ * Some non-conformant roots arrive without a usable root `type`, e.g.
+ * ZodEffects (from .refine(), .transform(), .pipe()) and `$ref`-at-root
+ * shapes where the root `type` is missing/undefined. The OpenAI API rejects
+ * these with HTTP 400; this catches them in CI before deploy.
+ */
+export function checkRootIsObject(schema: unknown, toolName: string): string[] {
+  const observedType = isPlainObject(schema) ? schema.type : undefined;
+  if (observedType !== 'object') {
+    return [
+      `${toolName}: root schema type is ${observedType === undefined ? 'undefined' : JSON.stringify(observedType)}, expected "object". ` +
+        `Did you wrap the input schema with .refine(), .transform(), or .pipe()? These produce ZodEffects which OpenAI rejects.`,
+    ];
+  }
+  return [];
+}
+
 /** I1 — every `{ type: "object" }` node declares a `properties` key. */
 export function collectMissingProperties(schema: unknown, rootPath = 'root'): string[] {
   const issues: string[] = [];
@@ -228,6 +246,8 @@ export function collectUnsupportedFormats(schema: unknown, rootPath = 'root'): s
 export interface SchemaConformanceReport {
   /** Display name of the tool/action being checked. */
   name: string;
+  /** I0 violations — root schema must be type:"object". */
+  i0RootType: string[];
   /** I1 violations. */
   missingProperties: string[];
   /** I2 violations. */
@@ -243,6 +263,7 @@ export interface SchemaConformanceReport {
 export function reportSchemaConformance(name: string, schema: unknown): SchemaConformanceReport {
   return {
     name,
+    i0RootType: checkRootIsObject(schema, name),
     missingProperties: collectMissingProperties(schema),
     strictRequiredViolations: collectStrictRequiredViolations(schema),
     additionalPropertiesViolations: collectAdditionalPropertiesViolations(schema),
@@ -253,6 +274,7 @@ export function reportSchemaConformance(name: string, schema: unknown): SchemaCo
 
 export function reportHasIssues(report: SchemaConformanceReport): boolean {
   return (
+    report.i0RootType.length > 0 ||
     report.missingProperties.length > 0 ||
     report.strictRequiredViolations.length > 0 ||
     report.additionalPropertiesViolations.length > 0 ||
@@ -263,6 +285,10 @@ export function reportHasIssues(report: SchemaConformanceReport): boolean {
 
 export function formatReport(report: SchemaConformanceReport): string {
   const lines: string[] = [`Strict-mode violations in ${report.name}:`];
+  if (report.i0RootType.length > 0) {
+    lines.push('  I0 — root schema must be type:"object":');
+    for (const issue of report.i0RootType) lines.push(`    - ${issue}`);
+  }
   if (report.missingProperties.length > 0) {
     lines.push("  I1 — object node missing 'properties':");
     for (const issue of report.missingProperties) lines.push(`    - ${issue}`);
