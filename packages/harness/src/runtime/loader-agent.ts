@@ -34,7 +34,7 @@ const agentFrontmatterSchema = z.object({
   tools: z.array(z.string().min(1)).default([]),
   userActions: z.array(z.string().min(1)).default([]).optional(),
   handoffs: z.array(handoffSchema).default([]),
-  asTools: z.array(asToolRefSchema).default([]).optional(),
+  asTools: z.array(asToolRefSchema).optional(),
   'user-invocable': z.boolean().default(false),
   'model-invocable': z.boolean().optional(),
   'disable-model-invocation': z.boolean().optional(),

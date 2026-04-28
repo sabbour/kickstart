@@ -19,6 +19,13 @@ handoffs:
   - label: Generate files
     agent: core.codesmith
     prompt: Plan is approved. Please generate the requested files.
+asTools:
+  - agent: azure.architect
+    description: Consult the Azure architect for cross-domain questions (VNET peering, DNS, Private Link, Azure networking) without handing off the conversation.
+    maxTurns: 3
+  - agent: core.codesmith
+    description: Ask the Codesmith to generate infrastructure code (Bicep, Helm values, scripts) mid-diagnosis without handing off the conversation.
+    maxTurns: 5
 user-invocable: true
 model-invocable: true
 ---

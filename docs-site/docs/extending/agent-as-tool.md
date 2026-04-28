@@ -93,6 +93,54 @@ const askSecurity = asTool(securityAgent, {
 triageAgent.tools = [...triageAgent.tools, askSecurity];
 ```
 
+## asTool vs Handoff
+
+Choosing between `asTool()` and a `handoff` depends on **who owns the conversation going forward**.
+
+| Situation | Use |
+|-----------|-----|
+| You need a specialist's answer to **continue your own task** (e.g. ask the Azure architect for a cost estimate mid-design) | `asTool()` |
+| The specialist should **own the conversation** from this point on (e.g. requirements are clear, hand off to the codesmith) | `handoff` |
+
+**Rule of thumb:** if you will act on the answer and keep responding to the user yourself, use `asTool`. If you are done and the specialist takes over, use `handoff`.
+
+### Frontmatter syntax
+
+Declare `asTools:` in your agent's `.agent.md` frontmatter. The harness wires the consultation tool automatically at build time — no TypeScript code needed.
+
+```yaml
+---
+name: aks.architect
+# ... other frontmatter fields ...
+asTools:
+  - agent: azure.architect
+    description: Consult the Azure architect for cross-domain VNET/DNS questions without handing off the conversation.
+    maxTurns: 3
+  - agent: core.codesmith
+    description: Ask the Codesmith to generate infrastructure code mid-diagnosis.
+    maxTurns: 5
+---
+```
+
+Each entry generates a tool named `ask_<sanitised-agent-name>` (e.g. `ask_azure_architect`). Override with `toolName:` when needed:
+
+```yaml
+asTools:
+  - agent: azure.architect
+    toolName: ask_azure
+    description: Quick Azure cost/design consultation.
+```
+
+### Wired pairs (as of v2)
+
+| Caller | Specialist | Generated tool name | Use case |
+|--------|-----------|---------------------|----------|
+| `core.triage` | `aks.architect` | `ask_aks_architect` | AKS design questions during triage |
+| `core.triage` | `azure.architect` | `ask_azure_architect` | Azure infra questions during triage |
+| `aks.architect` | `azure.architect` | `ask_azure_architect` | Cross-domain VNET/DNS/Private Link |
+| `aks.architect` | `core.codesmith` | `ask_core_codesmith` | Generate infra code mid-diagnosis |
+| `core.codesmith` | `core.reviewer` | `ask_core_reviewer` | Immediate review of generated code |
+
 ## Architecture Note
 
-`asTool` is Part 1 of the specialist consultation design (issue #130). Part 2 wires the triage agent to specific specialists via this mechanism. The wrapper is intentionally stateless — it does not thread conversation context into the specialist — because consultation queries are expected to be self-contained. If you need stateful multi-turn specialist interaction, use a full `runChain()` instead (see [Runner Chain](./runner-chain.md)).
+`asTool` is Part 1 of the specialist consultation design (issue #130). The frontmatter `asTools:` field (issue #132 / #118) wires specific agent pairs without requiring TypeScript changes. The wrapper is intentionally stateless — it does not thread conversation context into the specialist — because consultation queries are expected to be self-contained. If you need stateful multi-turn specialist interaction, use a full `runChain()` instead (see [Runner Chain](./runner-chain.md)).

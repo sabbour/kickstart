@@ -562,3 +562,191 @@ describe('#132 Runner.buildAgentInstance — asTools wiring (triage ↔ speciali
     expect(toolNames).toContain('ask_core_agent_b');
   });
 });
+
+describe('#118 Runner.buildAgentInstance — asTools wiring (additional agent pairs)', () => {
+  beforeEach(() => {
+    vi.stubEnv('KICKSTART_CHAT_MODEL', 'gpt-4o-mini');
+    vi.stubEnv('KICKSTART_CODEX_MODEL', 'gpt-4o-mini');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function makeAgentWithAsTools(
+    name: string,
+    asTools: AgentContribution['asTools'] = [],
+  ): AgentContribution {
+    return {
+      name,
+      description: `${name} description`,
+      model: { envVar: 'KICKSTART_CHAT_MODEL' },
+      toolAllowlist: [],
+      handoffs: [],
+      asTools,
+      userInvocable: true,
+      modelInvocable: true,
+      instructionsBase: `You are ${name}.`,
+      source: { kind: 'inline' },
+    };
+  }
+
+  /** Register all agents under a single pack (pack name = first agent's namespace prefix). */
+  function buildSinglePackRegistry(agents: AgentContribution[]): PackRegistry {
+    const registry = new PackRegistry();
+    const packName = agents[0]!.name.split('.')[0]!;
+    registry.register({ name: packName, version: '1.0.0', agents });
+    registry.enable([packName]);
+    registry.seal();
+    return registry;
+  }
+
+  /**
+   * Register agents across two separate packs.
+   * callerPackAgents → registered under callerPack name
+   * specialistPackAgents → registered under specialistPack name
+   */
+  function buildCrossPackRegistry(
+    callerPackName: string,
+    callerPackAgents: AgentContribution[],
+    specialistPackName: string,
+    specialistPackAgents: AgentContribution[],
+  ): PackRegistry {
+    const registry = new PackRegistry();
+    registry.register({ name: callerPackName, version: '1.0.0', agents: callerPackAgents });
+    registry.register({ name: specialistPackName, version: '1.0.0', agents: specialistPackAgents });
+    registry.enable([callerPackName, specialistPackName]);
+    registry.seal();
+    return registry;
+  }
+
+  // T-AT-AKS1: aks.architect → azure.architect
+  it('aks.architect injects ask_aks_azure_architect tool when asTools declares azure.architect', () => {
+    const azureArchitect = makeAgentWithAsTools('aks.azure_architect');
+    const aksArchitect = makeAgentWithAsTools('aks.architect', [
+      { agent: 'aks.azure_architect', description: 'Consult for VNET/DNS questions.' },
+    ]);
+
+    const registry = buildSinglePackRegistry([aksArchitect, azureArchitect]);
+    const runner = new Runner(registry);
+    const built = callBuild(runner, 'aks.architect') as { tools: Array<{ name: string }> };
+
+    const toolNames = built.tools.map((t) => t.name);
+    expect(toolNames).toContain('ask_aks_azure_architect');
+  });
+
+  // T-AT-AKS2: aks.architect → core.codesmith
+  it('aks.architect injects ask_aks_core_codesmith tool when asTools declares core.codesmith', () => {
+    const codesmith = makeAgentWithAsTools('aks.core_codesmith');
+    const aksArchitect = makeAgentWithAsTools('aks.architect', [
+      { agent: 'aks.core_codesmith', description: 'Generate infra code mid-diagnosis.' },
+    ]);
+
+    const registry = buildSinglePackRegistry([aksArchitect, codesmith]);
+    const runner = new Runner(registry);
+    const built = callBuild(runner, 'aks.architect') as { tools: Array<{ name: string }> };
+
+    const toolNames = built.tools.map((t) => t.name);
+    expect(toolNames).toContain('ask_aks_core_codesmith');
+  });
+
+  // T-AT-CS1: codesmith → reviewer
+  it('codesmith injects ask_core_reviewer tool when asTools declares core.reviewer', () => {
+    const reviewer = makeAgentWithAsTools('core.reviewer');
+    const codesmith = makeAgentWithAsTools('core.codesmith', [
+      { agent: 'core.reviewer', description: 'Immediate review of generated code.' },
+    ]);
+
+    const registry = buildSinglePackRegistry([codesmith, reviewer]);
+    const runner = new Runner(registry);
+    const built = callBuild(runner, 'core.codesmith') as { tools: Array<{ name: string }> };
+
+    const toolNames = built.tools.map((t) => t.name);
+    expect(toolNames).toContain('ask_core_reviewer');
+  });
+
+  // T-AT-CS2: multiple asTools entries produce multiple consultation tools
+  it('agent with multiple asTools entries produces all consultation tools', () => {
+    const specialist1 = makeAgentWithAsTools('core.specialist_a');
+    const specialist2 = makeAgentWithAsTools('core.specialist_b');
+    const caller = makeAgentWithAsTools('core.caller', [
+      { agent: 'core.specialist_a', description: 'Ask A.' },
+      { agent: 'core.specialist_b', description: 'Ask B.' },
+    ]);
+
+    const registry = buildSinglePackRegistry([caller, specialist1, specialist2]);
+    const runner = new Runner(registry);
+    const built = callBuild(runner, 'core.caller') as { tools: Array<{ name: string }> };
+
+    const toolNames = built.tools.map((t) => t.name);
+    expect(toolNames).toContain('ask_core_specialist_a');
+    expect(toolNames).toContain('ask_core_specialist_b');
+  });
+
+  // T-AT-TN: toolName override respected
+  it('toolName override is respected for asTools entries', () => {
+    const reviewer = makeAgentWithAsTools('core.reviewer');
+    const codesmith = makeAgentWithAsTools('core.codesmith', [
+      { agent: 'core.reviewer', toolName: 'quick_review', description: 'Quick review.' },
+    ]);
+
+    const registry = buildSinglePackRegistry([codesmith, reviewer]);
+    const runner = new Runner(registry);
+    const built = callBuild(runner, 'core.codesmith') as { tools: Array<{ name: string }> };
+
+    const toolNames = built.tools.map((t) => t.name);
+    expect(toolNames).toContain('quick_review');
+    expect(toolNames).not.toContain('ask_core_reviewer');
+  });
+
+  // T-AT-XPACK: cross-pack asTool resolution — caller in pack-aks, specialist in pack-core
+  it('cross-pack: aks.architect can consult core.reviewer registered in a different pack', () => {
+    const reviewer = makeAgentWithAsTools('core.reviewer');
+    const aksArchitect = makeAgentWithAsTools('aks.architect', [
+      { agent: 'core.reviewer', description: 'Ask core reviewer for cross-pack quality check.' },
+    ]);
+
+    const registry = buildCrossPackRegistry('aks', [aksArchitect], 'core', [reviewer]);
+    const runner = new Runner(registry);
+    const built = callBuild(runner, 'aks.architect') as { tools: Array<{ name: string }> };
+
+    const toolNames = built.tools.map((t) => t.name);
+    expect(toolNames).toContain('ask_core_reviewer');
+  });
+
+  // T-AT-XPACK2: cross-pack with two packs each registering agents; pack-a calls pack-b
+  it('cross-pack: pack-a agent successfully calls pack-b agent via asTool lookup', () => {
+    const packBSpecialist = makeAgentWithAsTools('packb.specialist');
+    const packACaller = makeAgentWithAsTools('packa.caller', [
+      { agent: 'packb.specialist', description: 'Consult pack-b specialist.' },
+    ]);
+
+    const registry = buildCrossPackRegistry('packa', [packACaller], 'packb', [packBSpecialist]);
+    const runner = new Runner(registry);
+    const built = callBuild(runner, 'packa.caller') as { tools: Array<{ name: string }> };
+
+    const toolNames = built.tools.map((t) => t.name);
+    expect(toolNames).toContain('ask_packb_specialist');
+  });
+
+  // T-AT-MISSING: missing agent in asTools gets a stub tool, not a crash
+  it('missing asTools agent gets a stub tool — other tools still wired', () => {
+    const realSpecialist = makeAgentWithAsTools('core.real_specialist');
+    const caller = makeAgentWithAsTools('core.caller', [
+      { agent: 'core.real_specialist', description: 'Ask the real specialist.' },
+      { agent: 'core.ghost_agent', description: 'This agent does not exist.' },
+    ]);
+
+    const registry = buildSinglePackRegistry([caller, realSpecialist]);
+    const runner = new Runner(registry);
+
+    // Should NOT throw — the missing agent entry is replaced with an error-returning stub tool
+    // so the host agent can report unavailability to the user instead of crashing pack load.
+    const built = callBuild(runner, 'core.caller') as { tools: Array<{ name: string }> };
+
+    const toolNames = built.tools.map((t) => t.name);
+    expect(toolNames).toContain('ask_core_real_specialist');
+    // Stub tool is wired for the unavailable specialist so the host agent can surface the error.
+    expect(toolNames).toContain('ask_core_ghost_agent');
+  });
+});

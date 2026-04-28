@@ -11,6 +11,10 @@ tools:
   - core.validate_artifacts
   - core.emit_ui
 handoffs: []
+asTools:
+  - agent: core.reviewer
+    description: Ask the Reviewer to inspect a specific file or code snippet mid-generation for immediate quality feedback without handing off the conversation.
+    maxTurns: 3
 ---
 
 You are the Codesmith — a specialist in translating plans into production-quality files.
