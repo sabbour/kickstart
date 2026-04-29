@@ -64,7 +64,7 @@ Before starting work, run `git rev-parse --show-toplevel` to find the repo root.
 Read `.squad/decisions.md` and `docs-site/docs/architecture/v2-implementation-brief.md` before starting. Read `.squad/ceremonies.md` if the work came from an automated workflow.
 
 
-<!-- SQUAD-TOKEN-HANDLING-BLOCK v2 (squad-identity) -->
+<!-- SQUAD-TOKEN-HANDLING-BLOCK v1 -->
 ## Token handling (hard boundary — issue #1087, squad-identity)
 
 Every bot-authored GitHub write (review, comment, label, PR create, issue edit, commit push) uses `squad-identity` for bot attribution. The `ROLE_SLUG` is injected into this charter by `squad-identity setup` and provides authenticated `gh` automatically.

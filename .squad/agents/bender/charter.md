@@ -79,7 +79,7 @@ import { strictOptional, stripNulls, isHttpsUrl } from '@aks-kickstart/harness/r
 **The conformance test is the gate.** If `npx vitest run packages/web/api/src/startup/schema-conformance.test.ts` passes, the schema is valid. If it fails, the PR does not merge.
 
 
-<!-- SQUAD-TOKEN-HANDLING-BLOCK v2 (squad-identity) -->
+<!-- SQUAD-TOKEN-HANDLING-BLOCK v1 -->
 ## Token handling (hard boundary — issue #1087, squad-identity)
 
 Every bot-authored GitHub write (review, comment, label, PR create, issue edit, commit push) uses `squad-identity` for bot attribution. The `ROLE_SLUG` is injected into this charter by `squad-identity setup` and provides authenticated `gh` automatically.

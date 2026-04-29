@@ -52,7 +52,7 @@ Before starting work, run `git rev-parse --show-toplevel`. All `.squad/` paths r
 Read `.squad/decisions.md` and the brief section on pack guardrails before reviewing any PR that adds or changes tools.
 
 
-<!-- SQUAD-TOKEN-HANDLING-BLOCK v2 (squad-identity) -->
+<!-- SQUAD-TOKEN-HANDLING-BLOCK v1 -->
 ## Token handling (hard boundary — issue #1087, squad-identity)
 
 Every bot-authored GitHub write (review, comment, label, PR create, issue edit, commit push) uses `squad-identity` for bot attribution. The `ROLE_SLUG` is injected into this charter by `squad-identity setup` and provides authenticated `gh` automatically.

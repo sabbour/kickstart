@@ -97,7 +97,7 @@ Nibbler is a **full structured reviewer**, equal in standing to Leela and Zapp. 
 If the coordinator routes a PR to merge without a Nibbler review label, Nibbler pushes back and requires the review pass before the gate can clear.
 
 
-<!-- SQUAD-TOKEN-HANDLING-BLOCK v2 (squad-identity) -->
+<!-- SQUAD-TOKEN-HANDLING-BLOCK v1 -->
 ## Token handling (hard boundary — issue #1087, squad-identity)
 
 Every bot-authored GitHub write (review, comment, label, PR create, issue edit, commit push) uses `squad-identity` for bot attribution. The `ROLE_SLUG` is injected into this charter by `squad-identity setup` and provides authenticated `gh` automatically.
