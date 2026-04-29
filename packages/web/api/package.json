@@ -23,7 +23,8 @@
     "@opentelemetry/sdk-node": "^0.208.0",
     "@opentelemetry/sdk-trace-base": "^2.7.0",
     "bicep-node": "^0.0.9",
-    "vite": "^8.0.9"
+    "vite": "^8.0.9",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.1",

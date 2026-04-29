@@ -6,6 +6,12 @@ import { test as base, type Page } from '@playwright/test';
  */
 export const test = base.extend<{ mockAuth: void }>({
   mockAuth: [async ({ page }, use) => {
+    // Suppress the onboarding tour so it never blocks clicks during tests.
+    // Must run via addInitScript so localStorage is set before the app mounts.
+    await page.addInitScript(() => {
+      localStorage.setItem('kickstart-onboarding-complete', 'true');
+    });
+
     // Intercept MSAL CDN — return a lightweight mock so the
     // real MSAL library never loads (avoids Entra redirects).
     await page.route('**/msal-browser*', route =>

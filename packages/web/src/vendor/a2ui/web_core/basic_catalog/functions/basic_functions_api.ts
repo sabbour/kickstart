@@ -16,6 +16,64 @@
 
 import {z} from 'zod';
 
+/**
+ * v4-compatible numeric coercion: rejects null, undefined, empty string, NaN, and Infinity.
+ * Replaces v3 `z.preprocess(v => (v === null ? undefined : v), z.coerce.number())`.
+ */
+function numericField() {
+  return z
+    .unknown()
+    .pipe(
+      z.transform((v, payload) => {
+        if (v == null) {
+          payload.issues.push({code: 'custom', message: 'Expected number, received null', input: v});
+          return z.NEVER;
+        }
+        if (v === '') {
+          payload.issues.push({code: 'custom', message: 'Expected number, received empty string', input: v});
+          return z.NEVER;
+        }
+        const n = Number(v);
+        if (Number.isNaN(n)) {
+          payload.issues.push({code: 'custom', message: 'Expected number, received NaN', input: v});
+          return z.NEVER;
+        }
+        if (!Number.isFinite(n)) {
+          payload.issues.push({code: 'custom', message: 'Infinity is not a valid number', input: v});
+          return z.NEVER;
+        }
+        return n;
+      }),
+    )
+    .pipe(z.number());
+}
+
+/**
+ * Optional variant: undefined passes through; null, empty string, and NaN are rejected.
+ */
+function optionalNumericField() {
+  return z.union([z.undefined(), numericField()]);
+}
+
+/**
+ * v4-compatible string coercion: rejects undefined, coerces everything else via String().
+ * Replaces v3 `z.preprocess(v => (v === undefined ? undefined : String(v)), z.string())`.
+ */
+function stringCoerceField() {
+  return z
+    .unknown()
+    .pipe(
+      z.transform((v, payload) => {
+        if (v === undefined) {
+          payload.issues.push({code: 'custom', message: 'Required', input: v});
+          return z.NEVER;
+        }
+        return String(v);
+      }),
+    )
+    .pipe(z.string());
+}
+
 // Arithmetic
 /**
  * Adds two numbers.
@@ -28,8 +86,8 @@ export const AddApi = {
   name: 'add' as const,
   returnType: 'number' as const,
   schema: z.object({
-    a: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
-    b: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
+    a: numericField(),
+    b: numericField(),
   }),
 };
 
@@ -44,8 +102,8 @@ export const SubtractApi = {
   name: 'subtract' as const,
   returnType: 'number' as const,
   schema: z.object({
-    a: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
-    b: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
+    a: numericField(),
+    b: numericField(),
   }),
 };
 
@@ -60,8 +118,8 @@ export const MultiplyApi = {
   name: 'multiply' as const,
   returnType: 'number' as const,
   schema: z.object({
-    a: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
-    b: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
+    a: numericField(),
+    b: numericField(),
   }),
 };
 
@@ -76,8 +134,8 @@ export const DivideApi = {
   name: 'divide' as const,
   returnType: 'number' as const,
   schema: z.object({
-    a: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
-    b: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
+    a: numericField(),
+    b: numericField(),
   }),
 };
 
@@ -125,8 +183,8 @@ export const GreaterThanApi = {
   name: 'greater_than' as const,
   returnType: 'boolean' as const,
   schema: z.object({
-    a: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
-    b: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
+    a: numericField(),
+    b: numericField(),
   }),
 };
 
@@ -141,8 +199,8 @@ export const LessThanApi = {
   name: 'less_than' as const,
   returnType: 'boolean' as const,
   schema: z.object({
-    a: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
-    b: z.preprocess(v => (v === null ? undefined : v), z.coerce.number()),
+    a: numericField(),
+    b: numericField(),
   }),
 };
 
@@ -201,14 +259,8 @@ export const ContainsApi = {
   name: 'contains' as const,
   returnType: 'boolean' as const,
   schema: z.object({
-    string: z.preprocess(
-      v => (v === undefined ? undefined : String(v)),
-      z.string(),
-    ),
-    substring: z.preprocess(
-      v => (v === undefined ? undefined : String(v)),
-      z.string(),
-    ),
+    string: stringCoerceField(),
+    substring: stringCoerceField(),
   }),
 };
 
@@ -223,14 +275,8 @@ export const StartsWithApi = {
   name: 'starts_with' as const,
   returnType: 'boolean' as const,
   schema: z.object({
-    string: z.preprocess(
-      v => (v === undefined ? undefined : String(v)),
-      z.string(),
-    ),
-    prefix: z.preprocess(
-      v => (v === undefined ? undefined : String(v)),
-      z.string(),
-    ),
+    string: stringCoerceField(),
+    prefix: stringCoerceField(),
   }),
 };
 
@@ -245,14 +291,8 @@ export const EndsWithApi = {
   name: 'ends_with' as const,
   returnType: 'boolean' as const,
   schema: z.object({
-    string: z.preprocess(
-      v => (v === undefined ? undefined : String(v)),
-      z.string(),
-    ),
-    suffix: z.preprocess(
-      v => (v === undefined ? undefined : String(v)),
-      z.string(),
-    ),
+    string: stringCoerceField(),
+    suffix: stringCoerceField(),
   }),
 };
 
@@ -282,14 +322,8 @@ export const RegexApi = {
   name: 'regex' as const,
   returnType: 'boolean' as const,
   schema: z.object({
-    value: z.preprocess(
-      v => (v === undefined ? undefined : String(v)),
-      z.string(),
-    ),
-    pattern: z.preprocess(
-      v => (v === undefined ? undefined : String(v)),
-      z.string(),
-    ),
+    value: stringCoerceField(),
+    pattern: stringCoerceField(),
   }),
 };
 
@@ -307,8 +341,8 @@ export const LengthApi = {
   schema: z
     .object({
       value: z.any().refine(v => v !== undefined, 'Required'),
-      min: z.coerce.number().optional(),
-      max: z.coerce.number().optional(),
+      min: optionalNumericField(),
+      max: optionalNumericField(),
     })
     .refine(data => data.min !== undefined || data.max !== undefined, {
       message: "Must provide either 'min' or 'max'",
@@ -328,9 +362,9 @@ export const NumericApi = {
   returnType: 'boolean' as const,
   schema: z
     .object({
-      value: z.coerce.number(),
-      min: z.coerce.number().optional(),
-      max: z.coerce.number().optional(),
+      value: numericField(),
+      min: optionalNumericField(),
+      max: optionalNumericField(),
     })
     .refine(data => data.min !== undefined || data.max !== undefined, {
       message: "Must provide either 'min' or 'max'",
@@ -347,10 +381,7 @@ export const EmailApi = {
   name: 'email' as const,
   returnType: 'boolean' as const,
   schema: z.object({
-    value: z.preprocess(
-      v => (v === undefined ? undefined : String(v)),
-      z.string(),
-    ),
+    value: stringCoerceField(),
   }),
 };
 
@@ -391,8 +422,8 @@ export const FormatNumberApi = {
   name: 'formatNumber' as const,
   returnType: 'string' as const,
   schema: z.object({
-    value: z.coerce.number(),
-    decimals: z.coerce.number().optional(),
+    value: numericField(),
+    decimals: optionalNumericField(),
     grouping: z.boolean().default(true),
   }),
 };
@@ -410,9 +441,9 @@ export const FormatCurrencyApi = {
   name: 'formatCurrency' as const,
   returnType: 'string' as const,
   schema: z.object({
-    value: z.coerce.number(),
+    value: numericField(),
     currency: z.coerce.string(),
-    decimals: z.coerce.number().optional(),
+    decimals: optionalNumericField(),
     grouping: z.boolean().default(true),
   }),
 };
@@ -461,7 +492,7 @@ export const PluralizeApi = {
   returnType: 'string' as const,
   schema: z
     .object({
-      value: z.coerce.number(),
+      value: numericField(),
       zero: z.coerce.string().optional(),
       one: z.coerce.string().optional(),
       two: z.coerce.string().optional(),
@@ -483,10 +514,7 @@ export const OpenUrlApi = {
   name: 'openUrl' as const,
   returnType: 'void' as const,
   schema: z.object({
-    url: z.preprocess(
-      v => (v === undefined ? undefined : String(v)),
-      z.string(),
-    ),
+    url: stringCoerceField(),
   }),
 };
 

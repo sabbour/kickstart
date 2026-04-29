@@ -33,6 +33,21 @@ Top risks are XSS vectors in frontend rendering paths and unauthenticated/unthro
    https://github.com/azure-management-and-platforms/kickstart/issues/87
 8. **#88** — security: low: vulnerable transitive dev dependencies  
    https://github.com/azure-management-and-platforms/kickstart/issues/88
+   https://github.com/sabbour/kickstart/issues/81
+2. **#82** — security: high: XSS in CodeBlock/FileEditor highlight fallback  
+   https://github.com/azure-management-and-platforms/kickstart/issues/82
+3. **#83** — security: high: public AI endpoints lack auth and rate limiting  
+   https://github.com/azure-management-and-platforms/kickstart/issues/83
+4. **#84** — security: medium: /api/converse exposes full system prompt  
+   https://github.com/azure-management-and-platforms/kickstart/issues/84
+5. **#85** — security: medium: API handlers leak internal error details  
+   https://github.com/azure-management-and-platforms/kickstart/issues/85
+6. **#86** — security: medium: missing Content-Security-Policy header  
+   https://github.com/azure-management-and-platforms/kickstart/issues/86
+7. **#87** — security: medium: infra secrets not integrated with Key Vault  
+   https://github.com/azure-management-and-platforms/kickstart/issues/87
+8. **#88** — security: low: vulnerable transitive dev dependencies  
+   https://github.com/azure-management-and-platforms/kickstart/issues/88
 
 ## Supply Chain Check (`npm audit`)
 

@@ -32,7 +32,7 @@ function codesmithGenerationTurn(sessionId: string): string {
         surfaceId: 'shared:generation-progress',
         components: [
           {
-            id: 'progress',
+            id: 'root',
             component: 'GenerationProgress',
             title: 'Project Setup',
             overallStatus: 'running',
@@ -73,7 +73,7 @@ function codesmithGenerationTurn(sessionId: string): string {
         surfaceId: 'shared:generation-progress',
         components: [
           {
-            id: 'progress',
+            id: 'root',
             component: 'GenerationProgress',
             title: 'Project Setup',
             overallStatus: 'complete',
@@ -201,7 +201,7 @@ test.describe('Phase C codesmith generation progress', () => {
     await expect(page.getByTestId('a2ui-GenerationProgress')).toBeVisible({ timeout: 10_000 });
 
     // File manager sidebar should be visible (auto-opens when files appear)
-    const fileManager = page.locator('.file-manager-sidebar, [aria-label="Generated files"], aside');
-    await expect(fileManager.first()).toBeVisible({ timeout: 10_000 });
+    const fileManager = page.getByTestId('file-manager-sidebar');
+    await expect(fileManager).toBeVisible({ timeout: 10_000 });
   });
 });

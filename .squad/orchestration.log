@@ -1,0 +1,5 @@
+[2026-04-28T11:21:00Z] design-review-243-244: leela (lead) — dr-244-architecture: ✓ self-ack on #244 (architecture:approved)
+[2026-04-28T11:21:00Z] design-review-243-244: zapp (security) — dr-243-244-security: ✓ #243 (security:approved, no conditions) #244 (security:approved, non-blocking rendering note)
+[2026-04-28T11:21:00Z] design-review-243-244: nibbler (codereview) — dr-243-244-codereview: ✓ #243 (codereview:approved, 2 PR-time conditions) #244 (codereview:approved, 2 PR-time conditions)
+2026-04-28T12:12:30-07:00 | design-review-247-zod-v4 | zapp | APPROVED_WITH_CONDITIONS | null-coerce rejection envelope must be preserved in all v3→v4 migrations | comment 4338574454 | label: security:approved
+2026-04-28T12:12:30-07:00 | design-review-247-zod-v4 | nibbler | APPROVED_WITH_CONDITIONS | z.preprocess not removed (type change); equivalence tests required; harness scope must be clarified | comment 4338584960 | label: codereview:approved

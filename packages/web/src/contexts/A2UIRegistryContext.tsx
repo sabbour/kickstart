@@ -416,7 +416,7 @@ export function validateAndSanitizeComponents(
         }
         return { id, component: '_ErrorComponent' };
       }
-      return { id, component: componentName, ...result.data };
+      return { id, component: componentName, ...(result.data as Record<string, unknown>) };
     }
 
     return { id, component: componentName, ...sanitized };

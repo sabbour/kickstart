@@ -11,6 +11,9 @@ import { test as base, type Page, type Route } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -141,7 +144,7 @@ export function createGoldenTest(track: TrackName) {
         const url = new URL(route.request().url());
         const isAllowed = ALLOWED_ORIGINS.some(o => url.hostname === o || url.hostname.endsWith(`.${o}`));
         if (isAllowed) {
-          await route.fallthrough();
+          await route.continue();
         } else {
           const msg = `[HERMETIC] Blocked outbound request to: ${url.href}`;
           console.error(msg);
@@ -203,7 +206,7 @@ export function createGoldenTest(track: TrackName) {
         const url = route.request().url();
         // Allow converse (handled above via LIFO)
         if (url.includes('/api/converse')) {
-          await route.fallthrough();
+          await route.continue();
           return;
         }
         await route.fulfill({

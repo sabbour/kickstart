@@ -8,6 +8,96 @@ QA engineer and test infrastructure owner. Expertise in Playwright E2E testing, 
 - `packages/core/src/__tests__/` — 600+ unit tests for validation, action loop, tool system
 - `packages/web/src/__tests__/` — 70+ Playwright E2E tests for full user flows
 - `.playwright/` — Playwright config, webServer, browser setup
+1. **Loader bug (mine to fix):** `packages/web` is ESM (`"type": "module"`), so `__dirname` was undefined when Playwright loaded `e2e/golden/golden-fixture.ts` on CI. Suite couldn't even start. Fix `7cf3132`: switched to `fileURLToPath(import.meta.url)` + `path.dirname`. Local runs masked this with unrelated vitest/expect noise.
+2. **Pre-existing drift (not mine):** Once the loader worked, 35 specs failed across three families — `route.fallthrough is not a function` in the hermetic handler, strict-mode locator violations (e.g. `getByText('Azure Blob Storage')` matching 2 elements after A2UI surface refactor), and phase B/C/D spec-vs-app drift. None caused by #192; all hidden by prior disabled state + loader bug.
+
+**Action taken:** Pushed the loader fix. Did NOT chase the 35 failures — way out of scope for "re-enable e2e + fix one fixture id." Posted [diagnostic comment](https://github.com/azure-management-and-platforms/kickstart/pull/234#issuecomment-4336445583) on PR #234 with three options. Recommended Option A: land #234, open follow-up issue for the 35 failures.
+
+**Stopped per directive #7** — no speculative loop fixes.
+
+**Lesson for future me:** When CI fails on a re-enabled test suite, always check the loader/import errors first before assuming spec drift. ESM/CJS module-scope mismatches are silent on local runs that have other noise.
+
+---
+
+## 2026-04-28T17:45:16Z — Phase 1.6 consensus checkpoint
+
+**Ceremony:** Phase 1.6 Consensus Ack (Issue #197, Ceremony ID 197-ack-tester)
+
+**Action:** Reviewed D1–D14 architectural decisions + AKS Automatic constraint spec v1.1.1 §2.7 binding rules from testing/QA lens.
+
+**Assessment:**
+- **D1 (HTTP scale-to-zero honesty):** Testable via sim assertions that reject KEDA HTTP expectations.
+- **D5 (Postgres tier defaults):** Maps to fixture variance in E2E cost scorecards.
+- **D10 (explicit resource requests + anti-affinity):** Verifiable via unit tests on generated YAML.
+- **§2.7 binding rules:** Rules 2/3/4/5/8 are direct test targets:
+  - Rule 2 (25-deny + 5 PSS compliance) = CI-gate lint on every manifest
+  - Rule 3 (probes informational) = no E2E assertion blocks on missing probes
+  - Rule 4 (Gateway API only) = manifest parsing test rejecting `Ingress` resources
+  - Rule 5 (Workload Identity 4-resource invariant) = contract test validating UAMI/FederatedCredential/role/ServiceAccount in every plan
+  - Rule 8 (bucket categorization: incompatible vs requiresChanges) = scorecard unit test
+
+**Ack status:** Full ack (D1–D14, AKS v1.1.1 §2.7). No dissents. No blocks.
+
+**Forward dependency:** #230 (sims-as-regression-tests harness) unblocked. Needs D1–D14 frozen so assertion expectations are stable.
+
+**Critical path:** Ready for #198 (triage rewrite) + four-way ack (Bender/Fry/Zapp/Nibbler) to trigger Phase 2.0.
+
+**Comment posted:** https://github.com/azure-management-and-platforms/kickstart/issues/197#issuecomment-4337780380
+
+**Bot identity verified:** squad-tester[bot] confirmed present in comment author.
+
+
+---
+
+### 2026-04-28T17:39:30Z: Phase 1.6 Consensus Checkpoint #197 — Complete
+
+**Ceremony:** phase-1.6-consensus-197  
+**Outcome:** 7/7 acks, 0 dissents. Critical-path (Bender+Fry+Zapp+Nibbler) cleared.
+
+All decisions D1–D14 and section 2.7 rules approved. Phase 2.0 critical path (#198 triage rewrite) **officially unblocked**. Orchestration logs written to `.squad/orchestration-log/{ISO8601}-{agent}.md` per ceremony spec.
+
+**For Kif:** Investigate Fry post-flight-check.mjs exit 3 anomaly (identity verified correct, script exit unexpected).
+
+<!-- Append new learnings below. Each entry is something lasting about the project. -->
+
+- **2025-07-22 — Initial @kickstart/core test suite:** Created 35 tests across 3 files (machine.test.ts, phases.test.ts, catalog.test.ts) using vitest. Key finding: early-phase prompt templates contain K8s terms only in RULES negation context, so K8s exposure tests must check the conversational body separately from the rules section. Also: tsconfig.json must exclude `src/__tests__` and `vitest.config.ts` to avoid build errors, and vitest config must exclude `dist/` to avoid running stale compiled tests.
+
+- **2025-07-22 — @kickstart/mcp-server test suite:** Created 53 tests across 4 files (a2ui.test.ts, kickstart.test.ts, generate-manifests.test.ts, action.test.ts). Key patterns: (1) Tool handlers are pure functions accepting a `Map<string, SessionState>` — easy to unit test without MCP SDK mocking. (2) A2UI capability tier ("kickstart"/"basic"/"none") controls resource inclusion; always test all three tiers. (3) `generate-manifests` requires complete AppDefinition (name + runtime) AND AzureContext (subscriptionId + resourceGroup + region) — test each missing field individually. (4) Action handler reconstructs engine state from session — `select` stores data without advancing, `submit` stores + advances. (5) Same tsconfig exclude pattern as core: `src/__tests__` and `vitest.config.ts`.
+
+- **2026-04-08 — Web UI Playwright E2E suite:** Created 38 tests across 5 spec files for `packages/web/` static site. Key learnings: (1) **MSAL CDN mocking:** `addInitScript` fails because the CDN `<script>` tag overwrites the mock; must use `page.route('**/msal-browser*')` to intercept the CDN request and return a fake MSAL module. (2) **API health check pitfall:** `api-client.js` treats HTTP 404 as "available" (`status < 500`), so `serve`'s 404 on `/api/converse` triggers API mode instead of demo mode; intercept with 503 to force demo fallback. (3) **A2UI selectors:** All A2UI components render with generic `.card` class — no component-specific classes. Use `.card-title` text to disambiguate. Nested cards (e.g. ArchitectureDiagram's inner component cards) cause `hasText` ambiguity; filter parent `.card` elements by their `.card-title` child. (4) **Port conflicts:** Use a non-standard port (4281) for the test server to avoid clashes with Azure SWA CLI on 4280. (5) **Fluent UI CDN:** Intercept `**/unpkg.com/@fluentui/**` with noop response for test speed and stability. (6) **Demo engine timing:** 800ms setTimeout in `handleUserMessage()` means tests need ~5s wait for assistant responses.
+
+- **2025-07-25 — Chat-first UX E2E rewrite:** Rewrote E2E suite from 38 wizard tests to 21 chat-first tests across 4 spec files (landing-page, chat-transition, chat-experience, sessions-sidebar). Key learnings: (1) **Sessions toggle hidden on landing:** CSS rule `body.on-landing #topbar-sessions-toggle { display: none }` means sidebar tests must transition to chat first via `enterChatViaTrack()` helper. (2) **A2UI Text uses textContent, not innerHTML:** `renderText` sets `el.textContent`, so `**bold**` in A2UI Text components renders literally — no `<strong>` tags. The `renderMarkdown` path only activates for `msg.text` (non-A2UI) assistant messages. Demo mode always uses A2UI. (3) **API route interception broadened:** Changed `**/api/converse` to `**/api/**` to catch health-check and future endpoints. (4) **Transition timing:** The 200ms fade animation on `transitionToChat()` requires waiting for `#landing-page` detachment, not just visibility. (5) **Carousel auto-rotation:** 5-second interval; no need to wait for it in tests since click triggers transition immediately.
+# Project Context
+
+- **Owner:** Ahmed Sabbour
+- **Project:** Imagine — AI-guided onboarding experience for deploying apps to AKS
+- **Stack:** HTML/CSS/JS (Portal Prototyper framework), TypeScript, Azure/AKS
+- **Created:** 2026-04-08
+
+## Learnings
+
+<!-- Append new learnings below. Each entry is something lasting about the project. -->
+
+- **2025-07-22 — Initial @kickstart/core test suite:** Created 35 tests across 3 files (machine.test.ts, phases.test.ts, catalog.test.ts) using vitest. Key finding: early-phase prompt templates contain K8s terms only in RULES negation context, so K8s exposure tests must check the conversational body separately from the rules section. Also: tsconfig.json must exclude `src/__tests__` and `vitest.config.ts` to avoid build errors, and vitest config must exclude `dist/` to avoid running stale compiled tests.
+
+- **2025-07-22 — @kickstart/mcp-server test suite:** Created 53 tests across 4 files (a2ui.test.ts, kickstart.test.ts, generate-manifests.test.ts, action.test.ts). Key patterns: (1) Tool handlers are pure functions accepting a `Map<string, SessionState>` — easy to unit test without MCP SDK mocking. (2) A2UI capability tier ("kickstart"/"basic"/"none") controls resource inclusion; always test all three tiers. (3) `generate-manifests` requires complete AppDefinition (name + runtime) AND AzureContext (subscriptionId + resourceGroup + region) — test each missing field individually. (4) Action handler reconstructs engine state from session — `select` stores data without advancing, `submit` stores + advances. (5) Same tsconfig exclude pattern as core: `src/__tests__` and `vitest.config.ts`.
+
+- **2026-04-08 — Web UI Playwright E2E suite:** Created 38 tests across 5 spec files for `packages/web/` static site. Key learnings: (1) **MSAL CDN mocking:** `addInitScript` fails because the CDN `<script>` tag overwrites the mock; must use `page.route('**/msal-browser*')` to intercept the CDN request and return a fake MSAL module. (2) **API health check pitfall:** `api-client.js` treats HTTP 404 as "available" (`status < 500`), so `serve`'s 404 on `/api/converse` triggers API mode instead of demo mode; intercept with 503 to force demo fallback. (3) **A2UI selectors:** All A2UI components render with generic `.card` class — no component-specific classes. Use `.card-title` text to disambiguate. Nested cards (e.g. ArchitectureDiagram's inner component cards) cause `hasText` ambiguity; filter parent `.card` elements by their `.card-title` child. (4) **Port conflicts:** Use a non-standard port (4281) for the test server to avoid clashes with Azure SWA CLI on 4280. (5) **Fluent UI CDN:** Intercept `**/unpkg.com/@fluentui/**` with noop response for test speed and stability. (6) **Demo engine timing:** 800ms setTimeout in `handleUserMessage()` means tests need ~5s wait for assistant responses.
+
+- **2025-07-25 — Chat-first UX E2E rewrite:** Rewrote E2E suite from 38 wizard tests to 21 chat-first tests across 4 spec files (landing-page, chat-transition, chat-experience, sessions-sidebar). Key learnings: (1) **Sessions toggle hidden on landing:** CSS rule `body.on-landing #topbar-sessions-toggle { display: none }` means sidebar tests must transition to chat first via `enterChatViaTrack()` helper. (2) **A2UI Text uses textContent, not innerHTML:** `renderText` sets `el.textContent`, so `**bold**` in A2UI Text components renders literally — no `<strong>` tags. The `renderMarkdown` path only activates for `msg.text` (non-A2UI) assistant messages. Demo mode always uses A2UI. (3) **API route interception broadened:** Changed `**/api/converse` to `**/api/**` to catch health-check and future endpoints. (4) **Transition timing:** The 200ms fade animation on `transitionToChat()` requires waiting for `#landing-page` detachment, not just visibility. (5) **Carousel auto-rotation:** 5-second interval; no need to wait for it in tests since click triggers transition immediately.
+
+- **2025-07-25 — A2UI action loop TDD specs (B-23/B-24/B-25):** Created 72 tests across 3 files ahead of implementation. Key findings: (1) **Current action handler silently ignores unknown action types** — the switch statement falls through and returns a normal phase status instead of erroring. B-23 tests expect explicit error messages for unknown types. (2) **`handleAction` uses `as any` cast** for new action types (reply/navigate/api) since `ActionType` is currently `"advance"|"skip"|"select"|"submit"` — implementation must extend this union. (3) **B-25 schema tests are pure** — they validate ActionSchema structure at the type level using `isValidActionSchema()` helper, no runtime dependencies. All 30 pass immediately against existing types. (4) **B-24 endpoint tests use protocol layer** (`parseAppMessage`/`handleAppMessage`) as the testable interface since the HTTP endpoint doesn't exist yet — all 22 pass against existing protocol code. (5) **Past-turn rejection** tests are designed to be lenient: they check if filtering exists but don't fail hard on legacy behavior.
+
+- **2025-07-25 — React/Vite migration E2E fix + Playground suite:** Fixed all 4 existing spec files broken by React/Vite migration and created `playground.spec.ts` with 43 new tests. 57/57 pass (1 skipped). Key learnings: (1) **React components use CSS classes not IDs** — had to add `id=` attributes to ChatShell, SessionsSidebar, Topbar for stable E2E selectors. (2) **`body.on-landing` not set in React** — added `useEffect` in App.tsx to sync CSS class with mode state. (3) **Fluent UI v9 / Griffel hashes class names** — `makeStyles` generates e.g. `f1a2b3c4`; never use `[class*="..."]` selectors for Griffel-generated classes. Use role/text selectors instead. (4) **`getByRole('tab', { name: 'X' })` is a substring match** — "UI Icons" matches `{ name: 'Icons' }`; always use `exact: true` when tab names are substrings of others. (5) **`MessageBar intent="error"` does NOT render `data-intent` in DOM** — Fluent UI v9 maps intent to CSS classes only; test error messages by text content. (6) **SessionsSidebar is NOT mounted on landing page** — in React it's conditionally rendered only when `mode === 'chat'`; test with `toHaveCount(0)` not `toHaveClass(/hidden/)`. (7) **Mock mode via `?mock` URL param** — React app checks `isMockMode()` on load; all chat tests must navigate to `/?mock` to get demo responses instead of a 503 error. (8) **Playwright webServer** changed from `npx serve` to `npx vite build && npx vite preview --port 4281` with `timeout: 180_000` for the build step. (9) **WSL2 Chromium missing libs** — workaround: `LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib` after `brew install nspr nss alsa-lib libxkbcommon libxcomposite libxdamage libxfixes libxrandr mesa cups`.
+
+## About Me
+QA engineer and test infrastructure owner. Expertise in Playwright E2E testing, validation engine architecture, Kubernetes deployment safeguards, and accessibility compliance. Responsible for test coverage, regression detection, and quality gates on all releases.
+
+## Key Files
+- `packages/core/src/validation/` — ValidationEngine, 23 validators (DS001-DS020), auto-fix system
+- `packages/core/src/__tests__/` — 600+ unit tests for validation, action loop, tool system
+- `packages/web/src/__tests__/` — 70+ Playwright E2E tests for full user flows
+- `.playwright/` — Playwright config, webServer, browser setup
 - `packages/core/src/rules/` — RulesEngine metadata layer for categorized validation reports
 
 ## Patterns

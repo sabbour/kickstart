@@ -3,6 +3,7 @@
 **Date:** 2026-04-10  
 **Facilitator:** Leela (Lead)  
 **Milestone:** [v0.2.0](https://github.com/azure-management-and-platforms/kickstart/milestone/1)
+**Milestone:** [v0.2.0](https://github.com/sabbour/kickstart/milestone/1)
 
 ---
 

@@ -98,3 +98,5 @@ Deleted `docs-site/docs/architecture/v2-implementation-brief.md` (1,171 lines, i
 
 **Session log file:** 2026-04-21T08-40Z-decisions-merge.md (session artifact)
 
+## 2026-04-17 Wave 3 — Inbox merge
+
