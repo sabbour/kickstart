@@ -40,20 +40,27 @@ Agent output that ever contains a `ghs_`, `ghp_`, `gho_`, `ghu_`, `ghr_`,
    `scrub-secrets.mjs --tree` plus a diff grep on every PR. A match blocks
    merge — no override path.
 
-## Token handling (hard boundary — mirrors squad.agent.md §Pre-Spawn)
+## Token handling via squad-identity
+
+This repo uses [`squad-identity`](https://github.com/sabbour/squad-identity) for bot-authored GitHub writes. **Do not use the resolve-token.mjs pattern** — it is deprecated.
+
+Instead, agents receive `ROLE_SLUG` in their charter (injected by `squad-identity setup`). The squad-identity extension provides authenticated `gh` with the right bot identity:
 
 ```bash
-# Correct — one-liner, token scoped to the single gh invocation:
-TOKEN=$(node .squad/scripts/resolve-token.mjs --required <role>) || exit 1
-[ -n "$TOKEN" ] || exit 1
-GH_TOKEN="$TOKEN" gh pr create ...
+# From within an agent charter, ROLE_SLUG is provided:
+gh pr create --draft --title "..." --body "..."
+# ↑ Automatically uses the bot token for that role (via extension auth hook)
 
-# Forbidden — any of these is a P1 governance failure:
-node .squad/scripts/resolve-token.mjs --required <role>      # bare invocation, leaks to chat
-echo "$TOKEN"                                                # echo to log / stdout
-export GH_TOKEN; gh pr create ...                            # token persists in env
-gh pr create ...                                             # no GH_TOKEN — falls back to hosts.yml
+# If you need explicit token control (rare):
+BEARER_TOKEN=$(squad-identity token --role "$ROLE_SLUG") || exit 1
+GH_TOKEN="$BEARER_TOKEN" gh pr create ...
 ```
+
+**Never:**
+- Echo or log tokens
+- Export `GH_TOKEN` — use inline: `GH_TOKEN="$TOKEN" gh ...`
+- Use `GH_CONFIG_DIR` isolation (deprecated — squad-identity uses OS keychain)
+- Fall back to personal auth (`gh` without GH_TOKEN)
 
 ## Rotation-on-leak runbook (Zapp C10)
 
@@ -96,7 +103,17 @@ a log file, or `events.jsonl`:
      --expected-login sabbour-squad-<role>[bot]
    ```
 
-## Known legacy state (pre-#1087)
+## Deprecated: resolve-token.mjs (use squad-identity instead)
+
+Prior to `squad-identity`, agents used `.squad/scripts/resolve-token.mjs` to mint ephemeral tokens:
+
+```bash
+# Deprecated — do not use
+TOKEN=$(node .squad/scripts/resolve-token.mjs --required <role>) || exit 1
+GH_TOKEN="$TOKEN" gh pr create ...
+```
+
+**This pattern is now obsolete.** The `resolve-token.mjs` file may still exist in worktrees or git history, but should not be referenced in new code or agent charters. Use `squad-identity` instead (see "Token handling via squad-identity" above).
 
 At the time of this runbook's introduction, `.squad/identity/keys/*.pem` and
 `.squad/identity/apps/*.json` were already tracked in `HEAD` despite being
