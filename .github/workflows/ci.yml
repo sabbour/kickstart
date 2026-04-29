@@ -64,6 +64,34 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      - name: Validate microsoft-skills.json schema (#243)
+        run: |
+          node << 'VALIDATE_EOF'
+          const Ajv = require('ajv');
+          const fs = require('fs');
+          const ajv = new Ajv({ allErrors: true, format: 'full', schemaId: 'auto' });
+          const schema = JSON.parse(fs.readFileSync('config/schemas/microsoft-skills.schema.json', 'utf-8'));
+          // Strip 2020-12 meta fields for AJV v6 compatibility; rewrite $defs -> definitions
+          delete schema['$schema'];
+          delete schema['$id'];
+          if (schema['$defs'] && !schema['definitions']) {
+            schema['definitions'] = schema['$defs'];
+            delete schema['$defs'];
+          }
+          if (schema.additionalProperties && schema.additionalProperties['$ref']) {
+            schema.additionalProperties['$ref'] = schema.additionalProperties['$ref'].replace('#/$defs/', '#/definitions/');
+          }
+          const validate = ajv.compile(schema);
+          const data = JSON.parse(fs.readFileSync('config/microsoft-skills.json', 'utf-8'));
+          const valid = validate(data);
+          if (!valid) {
+            console.error('::error::config/microsoft-skills.json failed schema validation:');
+            console.error(JSON.stringify(validate.errors, null, 2));
+            process.exit(1);
+          }
+          console.log('✓ config/microsoft-skills.json is valid (' + Object.keys(data).length + ' entries)');
+          VALIDATE_EOF
+
       - name: Auth bypass regression gate (#23)
         run: |
           # Fail if any auth bypass env var references exist in API source
@@ -74,6 +102,38 @@ jobs:
             exit 1
           fi
           echo "✓ No auth bypass references found"
+
+      - name: Zod lockfile convergence check (#247)
+        run: |
+          set -eu
+          NODE_VERSIONS=$(node -e "
+            const lock = require('./package-lock.json');
+            const versions = new Set();
+            for (const [path, pkg] of Object.entries(lock.packages || {})) {
+              if (/(?:^|\/)node_modules\/zod$/.test(path) && pkg.version) {
+                versions.add(pkg.version);
+              }
+            }
+            console.log(JSON.stringify([...versions]));
+          ")
+          echo "Resolved zod versions: $NODE_VERSIONS"
+          COUNT=$(echo "$NODE_VERSIONS" | jq 'length')
+          if [ "$COUNT" -ne 1 ]; then
+            echo "::error::Multiple Zod versions detected: $NODE_VERSIONS — see #247 / .squad/skills/zod-monorepo-split/SKILL.md"
+            exit 1
+          fi
+          echo "✅ Single Zod version: $NODE_VERSIONS"
+
+      - name: Zod source pin check (#247)
+        run: |
+          set -eu
+          BAD=$(grep -rE '"zod":\s*"\^?3' packages/ harness/ 2>/dev/null || true)
+          if [ -n "$BAD" ]; then
+            echo "::error::Found zod v3 pin in package.json:"
+            echo "$BAD"
+            exit 1
+          fi
+          echo "✅ No zod v3 pins in workspace package.json files"
 
       - name: Detect docs-gate scope
         id: docs_gate
