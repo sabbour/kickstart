@@ -1,0 +1,273 @@
+/**
+ * Triage Handoff Briefing Schema v1
+ * =================================
+ *
+ * Source decisions:
+ *   D3  — ingress mode is a fixed enum, never free prose.
+ *   D5  — cost-awareness surfaced via computeTier field.
+ *   D7  — handover & migration-readiness route to aks.reviewer (Phase 1.6
+ *          consensus, AKS Automatic grounding Part 12).
+ *   D8  — Microsoft skills loaded via core.read_skill; constraint-spec
+ *          v1.1.1 (AKS 2026-03-15) is the canonical safeguard pin.
+ *   D12 — KAITO enablement is a typed boolean slot, not prose.
+ *   D13 — GPU SKU is explicit null when absent, never omitted.
+ *   Z1 (Zapp DR) — typed handoff tripwire for v1.1.1 metadata: every
+ *          triage handoff path that targets readiness/handover flows MUST
+ *          carry the constraint-spec version + skill ids in a typed slot
+ *          (not in free prose).
+ *   Z2 (Zapp DR) — CI enforcement gate: every downstream agent prompt
+ *          that consumes a triage handoff is verified to reference the
+ *          typed slot, not raw user text.
+ *   Z3 (Zapp DR) — classifier output normalization: the recognized mode
+ *          is a fixed enum, never raw user prose.
+ *   R5 (Nibbler) — define a one-page "Handoff Briefing Schema v1" so
+ *          five downstream prompts don't re-derive the format and silently
+ *          drift on version-pin shape.
+ */
+
+import { z } from 'zod';
+
+// ── Schema version ──────────────────────────────────────────────────────────
+
+export const SCHEMA_VERSION = '1.0.0' as const;
+
+// ── Z3: Mode classifier output (normalized enum, never raw user text) ───────
+
+export const TriageMode = {
+  Iteration: 'iteration',
+  Handover: 'handover',
+  Bulk: 'bulk',
+  PaaSMigration: 'paas-migration',
+  MigrationReadiness: 'migration-readiness',
+  Greenfield: 'greenfield',
+} as const;
+
+export type TriageMode = (typeof TriageMode)[keyof typeof TriageMode];
+
+export const TriageModeSchema = z.enum([
+  TriageMode.Iteration,
+  TriageMode.Handover,
+  TriageMode.Bulk,
+  TriageMode.PaaSMigration,
+  TriageMode.MigrationReadiness,
+  TriageMode.Greenfield,
+]);
+
+// ── D8 / Z1: Constraint-spec pin ────────────────────────────────────────────
+
+export const ConstraintSpecPinSchema = z
+  .object({
+    safeguardSpecVersion: z
+      .string()
+      .regex(/^v\d+\.\d+\.\d+$/, 'safeguardSpecVersion must be v<MAJOR>.<MINOR>.<PATCH>'),
+    aksVersion: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'aksVersion must be YYYY-MM-DD'),
+  })
+  .strict();
+
+export type ConstraintSpecPin = z.infer<typeof ConstraintSpecPinSchema>;
+
+export const AKS_AUTOMATIC_V1_1_1: ConstraintSpecPin = {
+  safeguardSpecVersion: 'v1.1.1',
+  aksVersion: '2026-03-15',
+};
+
+// ── Source signals ──────────────────────────────────────────────────────────
+
+const SourceSignalSchema = z
+  .object({
+    kind: z.enum([
+      'opener-keyword',
+      'inspect-repo',
+      'kickstart-state-file',
+      'helm-chart-detected',
+      'manifest-folder-detected',
+      'paas-marker',
+      'multi-repo-list',
+      'handover-marker',
+      'cost-objection',
+    ]),
+    detail: z.string().min(1).max(512),
+  })
+  .strict();
+
+export type SourceSignal = z.infer<typeof SourceSignalSchema>;
+
+// ── Mode-specific context blocks ────────────────────────────────────────────
+
+const IterationContextSchema = z
+  .object({
+    priorPlanRef: z.string().min(1).optional(),
+    diffIntent: z.string().min(1).max(512),
+  })
+  .strict();
+
+const HandoverContextSchema = z
+  .object({
+    audience: z.string().min(1).max(128),
+    artifactsPath: z.string().min(1).optional(),
+  })
+  .strict();
+
+const BulkContextSchema = z
+  .object({
+    repoCount: z.number().int().min(2),
+    repos: z.array(z.string().min(1)).min(2),
+    sharedInfraDecisionPending: z.boolean(),
+  })
+  .strict();
+
+const PaaSMigrationContextSchema = z
+  .object({
+    sourcePlatform: z.enum([
+      'render',
+      'heroku',
+      'vercel',
+      'fly',
+      'netlify',
+      'railway',
+      'unknown',
+    ]),
+    sourceUrl: z.string().min(1).optional(),
+  })
+  .strict();
+
+const MigrationReadinessContextSchema = z
+  .object({
+    sourceShape: z.enum(['raw-manifests', 'helm', 'kustomize', 'mixed']),
+    helmBridgeRequired: z.boolean(),
+  })
+  .strict();
+
+const GreenfieldContextSchema = z
+  .object({
+    track: z
+      .enum(['static_site', 'containerized_web', 'agentic_app', 'repo_uplift'])
+      .optional(),
+  })
+  .strict();
+
+// ── Top-level triage briefing schema (existing, preserved from PR #241) ──────
+
+export const TriageHandoffBriefingSchema = z
+  .object({
+    version: z.literal('triage-handoff/v1'),
+    mode: TriageModeSchema,
+    constraintSpec: ConstraintSpecPinSchema.optional(),
+    skillIdsLoaded: z.array(z.string().min(1)).default([]),
+    sourceSignals: z.array(SourceSignalSchema).min(1).max(16),
+    targetAgent: z.enum([
+      'aks.architect',
+      'aks.reviewer',
+      'azure.architect',
+      'github.publisher',
+      'core.codesmith',
+      'core.reviewer',
+    ]),
+    iteration: IterationContextSchema.optional(),
+    handover: HandoverContextSchema.optional(),
+    bulk: BulkContextSchema.optional(),
+    paasMigration: PaaSMigrationContextSchema.optional(),
+    migrationReadiness: MigrationReadinessContextSchema.optional(),
+    greenfield: GreenfieldContextSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (b) => {
+      if (b.mode === TriageMode.Handover || b.mode === TriageMode.MigrationReadiness) {
+        return b.constraintSpec !== undefined;
+      }
+      return true;
+    },
+    {
+      message:
+        'constraintSpec is REQUIRED for handover and migration-readiness modes (Zapp Z1 / D7 / D8). ' +
+        'Set constraintSpec: AKS_AUTOMATIC_V1_1_1.',
+      path: ['constraintSpec'],
+    },
+  )
+  .refine(
+    (b) => {
+      const map: Record<TriageMode, keyof typeof b> = {
+        iteration: 'iteration',
+        handover: 'handover',
+        bulk: 'bulk',
+        'paas-migration': 'paasMigration',
+        'migration-readiness': 'migrationReadiness',
+        greenfield: 'greenfield',
+      };
+      const expected = map[b.mode];
+      const blocks: Array<keyof typeof b> = [
+        'iteration',
+        'handover',
+        'bulk',
+        'paasMigration',
+        'migrationReadiness',
+        'greenfield',
+      ];
+      const populated = blocks.filter((k) => b[k] !== undefined);
+      return populated.length === 1 && populated[0] === expected;
+    },
+    {
+      message:
+        'Exactly one mode-specific context block must be populated, and it must match the `mode` field.',
+    },
+  )
+  .refine(
+    (b) => {
+      if (b.mode === TriageMode.MigrationReadiness) {
+        return b.skillIdsLoaded.includes('azure-kubernetes-automatic-readiness');
+      }
+      return true;
+    },
+    {
+      message:
+        'migration-readiness mode MUST load `azure-kubernetes-automatic-readiness` ' +
+        '(D8). Add it to skillIdsLoaded.',
+      path: ['skillIdsLoaded'],
+    },
+  );
+
+export type TriageHandoffBriefing = z.infer<typeof TriageHandoffBriefingSchema>;
+
+export function parseTriageHandoffBriefing(input: unknown): TriageHandoffBriefing {
+  return TriageHandoffBriefingSchema.parse(input);
+}
+
+// ── HandoffBriefingV1 — AKS Automatic constraint-spec typed contract ─────────
+//
+// Per the DP for #244 + Nibbler conditions (R5 / Nibbler):
+//   - ConstraintBucket enum maps exactly to AKS Automatic v1.1.1 §2.7 buckets
+//   - gpuSku is explicit null when no GPU SKU applies (D13) — never omitted
+//   - ingressMode is a fixed enum, never free prose (D3)
+//   - kaitoEnabled is a typed boolean slot (D12)
+//   - .strict() on all objects to reject unknown fields
+
+export const ConstraintBucket = z.enum(['incompatible', 'requiresChanges', 'informational']);
+export type ConstraintBucket = z.infer<typeof ConstraintBucket>;
+
+export const ConstraintEntry = z
+  .object({
+    bucket: ConstraintBucket,
+    constraint: z.string().min(1),
+    ruleId: z.string().min(1),
+    details: z.string().optional(),
+  })
+  .strict();
+
+export type ConstraintEntry = z.infer<typeof ConstraintEntry>;
+
+export const HandoffBriefingV1 = z
+  .object({
+    schemaVersion: z.literal(SCHEMA_VERSION),
+    ingressMode: z.enum(['application-routing', 'nginx', 'istio', 'none']),
+    kaitoEnabled: z.boolean(),
+    // gpuSku: explicit null required (per D13 quota-preflight gate). Never omit; null means "no GPU requested".
+    gpuSku: z.string().nullable(),
+    computeTier: z.enum(['standard', 'free', 'premium']),
+    constraintBucket: z.array(ConstraintEntry),
+  })
+  .strict();
+
+export type HandoffBriefingV1 = z.infer<typeof HandoffBriefingV1>;
