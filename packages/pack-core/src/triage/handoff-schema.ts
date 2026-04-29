@@ -3,33 +3,25 @@
  * =================================
  *
  * Source decisions:
- *   D3  — ingress mode is a fixed enum, never free prose.
- *   D5  — cost-awareness surfaced via computeTier field.
- *   D7  — handover & migration-readiness route to aks.reviewer (Phase 1.6
- *          consensus, AKS Automatic grounding Part 12).
- *   D8  — Microsoft skills loaded via core.read_skill; constraint-spec
- *          v1.1.1 (AKS 2026-03-15) is the canonical safeguard pin.
- *   D12 — KAITO enablement is a typed boolean slot, not prose.
- *   D13 — GPU SKU is explicit null when absent, never omitted.
+ *   D7 — handover & migration-readiness route to aks.reviewer (Phase 1.6
+ *        consensus, AKS Automatic grounding Part 12).
+ *   D8 — Microsoft skills loaded via core.read_skill; constraint-spec
+ *        v1.1.1 (AKS 2026-03-15) is the canonical safeguard pin.
  *   Z1 (Zapp DR) — typed handoff tripwire for v1.1.1 metadata: every
- *          triage handoff path that targets readiness/handover flows MUST
- *          carry the constraint-spec version + skill ids in a typed slot
- *          (not in free prose).
+ *        triage handoff path that targets readiness/handover flows MUST
+ *        carry the constraint-spec version + skill ids in a typed slot
+ *        (not in free prose).
  *   Z2 (Zapp DR) — CI enforcement gate: every downstream agent prompt
- *          that consumes a triage handoff is verified to reference the
- *          typed slot, not raw user text.
+ *        that consumes a triage handoff is verified to reference the
+ *        typed slot, not raw user text.
  *   Z3 (Zapp DR) — classifier output normalization: the recognized mode
- *          is a fixed enum, never raw user prose.
+ *        is a fixed enum, never raw user prose.
  *   R5 (Nibbler) — define a one-page "Handoff Briefing Schema v1" so
- *          five downstream prompts don't re-derive the format and silently
- *          drift on version-pin shape.
+ *        five downstream prompts don't re-derive the format and silently
+ *        drift on version-pin shape.
  */
 
 import { z } from 'zod';
-
-// ── Schema version ──────────────────────────────────────────────────────────
-
-export const SCHEMA_VERSION = '1.0.0' as const;
 
 // ── Z3: Mode classifier output (normalized enum, never raw user text) ───────
 
@@ -148,7 +140,7 @@ const GreenfieldContextSchema = z
   })
   .strict();
 
-// ── Top-level triage briefing schema (existing, preserved from PR #241) ──────
+// ── Top-level briefing schema ───────────────────────────────────────────────
 
 export const TriageHandoffBriefingSchema = z
   .object({
@@ -234,40 +226,3 @@ export type TriageHandoffBriefing = z.infer<typeof TriageHandoffBriefingSchema>;
 export function parseTriageHandoffBriefing(input: unknown): TriageHandoffBriefing {
   return TriageHandoffBriefingSchema.parse(input);
 }
-
-// ── HandoffBriefingV1 — AKS Automatic constraint-spec typed contract ─────────
-//
-// Per the DP for #244 + Nibbler conditions (R5 / Nibbler):
-//   - ConstraintBucket enum maps exactly to AKS Automatic v1.1.1 §2.7 buckets
-//   - gpuSku is explicit null when no GPU SKU applies (D13) — never omitted
-//   - ingressMode is a fixed enum, never free prose (D3)
-//   - kaitoEnabled is a typed boolean slot (D12)
-//   - .strict() on all objects to reject unknown fields
-
-export const ConstraintBucket = z.enum(['incompatible', 'requiresChanges', 'informational']);
-export type ConstraintBucket = z.infer<typeof ConstraintBucket>;
-
-export const ConstraintEntry = z
-  .object({
-    bucket: ConstraintBucket,
-    constraint: z.string().min(1),
-    ruleId: z.string().min(1),
-    details: z.string().optional(),
-  })
-  .strict();
-
-export type ConstraintEntry = z.infer<typeof ConstraintEntry>;
-
-export const HandoffBriefingV1 = z
-  .object({
-    schemaVersion: z.literal(SCHEMA_VERSION),
-    ingressMode: z.enum(['application-routing', 'nginx', 'istio', 'none']),
-    kaitoEnabled: z.boolean(),
-    // gpuSku: explicit null required (per D13 quota-preflight gate). Never omit; null means "no GPU requested".
-    gpuSku: z.string().nullable(),
-    computeTier: z.enum(['standard', 'free', 'premium']),
-    constraintBucket: z.array(ConstraintEntry),
-  })
-  .strict();
-
-export type HandoffBriefingV1 = z.infer<typeof HandoffBriefingV1>;

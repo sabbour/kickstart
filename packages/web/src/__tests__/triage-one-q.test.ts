@@ -26,7 +26,8 @@ describe('triage.agent.md — one-question-at-a-time policy (#110)', () => {
   const body = readFileSync(TRIAGE_PATH, 'utf-8');
 
   it('has a Requirements Gathering Policy section', () => {
-    expect(body).toContain('## Requirements Gathering Policy');
+    // The requirements gathering guidance now lives under this expanded section heading.
+    expect(body).toContain('## Posture & Requirements Gathering Policy');
   });
 
   it('instructs the agent to ask one question per turn', () => {

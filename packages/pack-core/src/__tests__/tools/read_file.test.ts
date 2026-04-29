@@ -46,7 +46,15 @@ const WORKSPACE_ROOT = '/workspace/kickstart-test';
 
 const invoke = (path: string) =>
   readFileTool.tool.invoke(
-    new RunContext({ ...makeSessionCtx(), workspaceRoot: WORKSPACE_ROOT }),
+    new RunContext({
+      ...makeSessionCtx(),
+      // Use codesmith here to test path-confinement primitives without the
+      // per-agent Z4 allowlist (which only applies to core.triage). Z4
+      // allowlist behaviour is covered separately in
+      // read_file-triage-allowlist.test.ts.
+      activeAgent: 'core.codesmith',
+      workspaceRoot: WORKSPACE_ROOT,
+    }),
     JSON.stringify({ path }),
   );
 

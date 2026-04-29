@@ -25,6 +25,53 @@ function resolveConfinedPath(workspaceRoot: string, relativePath: string): strin
   return real;
 }
 
+// ── Per-agent filename allowlist (Zapp Z4, #198) ─────────────────────────────
+//
+// Defence-in-depth on top of the workspace-root + traversal + symlink controls
+// in resolveConfinedPath. Some agents (notably core.triage) MUST only read a
+// fixed set of well-known files; widening that surface is a security
+// regression. The allowlist is hard-coded per agent rather than env-driven so
+// a misconfigured deployment can never silently broaden it.
+//
+// triage justification: per DP §5 + Zapp Z4, the triage prompt describes
+// reading three files only (`.kickstart/state.json`, `plan.md`,
+// `safeguards-report.md`). The prompt-side rule is a soft control; this
+// allowlist is the hard control enforced at the tool layer.
+//
+// Other agents (codesmith, reviewer) intentionally have broader file access
+// — they are NOT in this map, so the allowlist check is bypassed for them.
+
+export const READ_FILE_AGENT_ALLOWLIST: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  [
+    'core.triage',
+    new Set<string>([
+      '.kickstart/state.json',
+      'plan.md',
+      'safeguards-report.md',
+    ]),
+  ],
+]);
+
+function normalizeRelative(p: string): string {
+  // Strip a leading `./` so callers writing either `plan.md` or `./plan.md`
+  // hit the same allowlist entry. Backslashes are folded to forward slashes
+  // on Windows-style inputs for the same reason.
+  return p.replace(/\\/g, '/').replace(/^\.\//, '');
+}
+
+function assertAllowedForAgent(activeAgent: string | undefined, relativePath: string): void {
+  if (!activeAgent) return;
+  const allowed = READ_FILE_AGENT_ALLOWLIST.get(activeAgent);
+  if (!allowed) return; // No allowlist configured → unrestricted (codesmith etc.)
+  const normalized = normalizeRelative(relativePath);
+  if (!allowed.has(normalized)) {
+    throw new Error(
+      `read_file: path "${relativePath}" is not in the per-agent allowlist for ${activeAgent}. ` +
+        `Allowed: ${Array.from(allowed).join(', ')}`,
+    );
+  }
+}
+
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const ReadFileInputSchema = z.object({
@@ -48,6 +95,14 @@ export const readFileTool: ToolContribution = {
     parameters: ReadFileInputSchema,
     execute: async (input, runCtx) => {
       const session = runCtx?.context as SessionCtx | undefined;
+
+      // Z4 — per-agent filename allowlist (deny-by-default for agents in
+      // READ_FILE_AGENT_ALLOWLIST). Run BEFORE workspace resolution so a
+      // disallowed read is rejected even if the workspace root is misconfigured.
+      assertAllowedForAgent(
+        (session as unknown as { activeAgent?: string })?.activeAgent,
+        input.path,
+      );
 
       // Use a session-scoped workspace root when available; absent in production
       // (Azure Functions host) — return a clear error rather than crashing.
