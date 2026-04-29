@@ -46,6 +46,16 @@
 
 **Hand-off with Amy:** On releases, Kif runs the release process (version bump, branch, pipeline). Amy writes the release notes prose. They coordinate but don't overlap.
 
+
+## Git Identity
+
+- **Role slug:** devops
+- **App slug:** squad-platform
+- **Bot login:** squad-platform[bot]
+- **Commit as:** `git -c user.name="squad-platform[bot]" -c user.email="squad-platform[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the bot token resolved via `resolve-token.mjs --required "devops"`. See the spawn prompt's GIT IDENTITY block for the full protocol.
+
 ## Model
 
 - **Preferred:** auto

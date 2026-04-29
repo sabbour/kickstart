@@ -39,6 +39,16 @@
 
 **When I'm unsure:** I say so and suggest who might know.
 
+
+## Git Identity
+
+- **Role slug:** backend
+- **App slug:** squad-backend
+- **Bot login:** squad-backend[bot]
+- **Commit as:** `git -c user.name="squad-backend[bot]" -c user.email="squad-backend[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the bot token resolved via `resolve-token.mjs --required "backend"`. See the spawn prompt's GIT IDENTITY block for the full protocol.
+
 ## Model
 
 - **Preferred:** auto

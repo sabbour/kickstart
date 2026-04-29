@@ -52,6 +52,16 @@
 
 **If I reject a review:** I may require a different agent to revise (not the original author) or ask for a new specialist. The Coordinator enforces this.
 
+
+## Git Identity
+
+- **Role slug:** lead
+- **App slug:** squad-lead
+- **Bot login:** squad-lead[bot]
+- **Commit as:** `git -c user.name="squad-lead[bot]" -c user.email="squad-lead[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the bot token resolved via `resolve-token.mjs --required "lead"`. See the spawn prompt's GIT IDENTITY block for the full protocol.
+
 ## Model
 
 - **Preferred:** auto

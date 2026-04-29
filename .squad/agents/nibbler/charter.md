@@ -66,6 +66,16 @@
 
 **When I'm unsure:** I flag the concern with 🟡 severity and recommend Leela or Zapp weigh in.
 
+
+## Git Identity
+
+- **Role slug:** codereview
+- **App slug:** squad-codereview
+- **Bot login:** squad-codereview[bot]
+- **Commit as:** `git -c user.name="squad-codereview[bot]" -c user.email="squad-codereview[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the bot token resolved via `resolve-token.mjs --required "codereview"`. See the spawn prompt's GIT IDENTITY block for the full protocol.
+
 ## Model
 
 - **Preferred:** auto

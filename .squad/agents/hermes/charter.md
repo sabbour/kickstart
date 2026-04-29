@@ -57,6 +57,16 @@ I block merge if a PR regresses a documented budget, drops a span, or emits unst
 
 **When I'm unsure:** I add a test that pins the current behaviour and ask for a call from the owning agent.
 
+
+## Git Identity
+
+- **Role slug:** tester
+- **App slug:** squad-tester
+- **Bot login:** squad-tester[bot]
+- **Commit as:** `git -c user.name="squad-tester[bot]" -c user.email="squad-tester[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the bot token resolved via `resolve-token.mjs --required "tester"`. See the spawn prompt's GIT IDENTITY block for the full protocol.
+
 ## Model
 
 - **Preferred:** auto

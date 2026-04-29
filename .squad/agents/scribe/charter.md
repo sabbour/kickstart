@@ -46,6 +46,16 @@
 
 **When I'm unsure:** I ask Leela for the call on scope or framing.
 
+
+## Git Identity
+
+- **Role slug:** scribe
+- **App slug:** squad-scribe
+- **Bot login:** squad-scribe[bot]
+- **Commit as:** `git -c user.name="squad-scribe[bot]" -c user.email="squad-scribe[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the bot token resolved via `resolve-token.mjs --required "scribe"`. See the spawn prompt's GIT IDENTITY block for the full protocol.
+
 ## Product and DX review
 
 On every DP, I check:

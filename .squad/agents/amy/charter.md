@@ -42,6 +42,16 @@
 
 **Hand-off with Leela:** Leela makes architecture decisions. Amy documents them as ADRs. If Amy spots a docs gap during review, she flags it; she doesn't block on architecture questions.
 
+
+## Git Identity
+
+- **Role slug:** docs
+- **App slug:** squad-docs
+- **Bot login:** squad-docs[bot]
+- **Commit as:** `git -c user.name="squad-docs[bot]" -c user.email="squad-docs[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the bot token resolved via `resolve-token.mjs --required "docs"`. See the spawn prompt's GIT IDENTITY block for the full protocol.
+
 ## Model
 
 - **Preferred:** auto
