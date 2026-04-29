@@ -414,3 +414,24 @@ Acted as designated revision author after Zapp issued `security:rejected` on PR 
 **Verification:** `arm-direct-csp.test.ts` (CI invariant guard) green; full vitest suite 2137/2137 passing; web + api builds clean; bundle budgets within ceiling.
 
 **Commit:** b9ca7b34 (squad-frontend[bot]). Comment 4337051908 posted on PR #239 pinging Zapp for re-review. Bender did not contribute.
+## 2026-04-27T23:00:42Z — Session Close (Scribe)
+**Role:** Frontend (PR #168, #171, #171-rebase)
+**Issues:** #168, #171
+**Outcomes:**
+- PR #168 (error stubs, cross-pack tests, circular imports) ✅ MERGED
+- PR #171 (A2UI rendering logic, 8 threads resolved) ✅ MERGED
+- PR #171 rebased onto dev after upstream merge, 439 tests passing ✅ MERGED
+
+**Critical Events:**
+- Resolved 5 + 8 = 13 Copilot review threads (PR #168 + #171)
+- Discovered **lead token required** for resolveReviewThread GraphQL mutation; codereview token returns FORBIDDEN
+- Managed stacked PR rebase: squash merge from #168 caused DIRTY conflict in runner.ts on #171
+- Handled merge conflict resolution (kept stub approach from #171, integrated #168 error stubs cleanly)
+- All 439 tests passing post-rebase
+
+**Key Learnings:**
+- **Token routing matters:** Different GitHub operations require different role tokens. resolveReviewThread needs `lead` token, not `codereview`. Post-flight checks must verify `user.login` matches expected bot identity.
+- **Squash merges cause downstream conflicts:** When PR A squash-merges into dev, any stacked PR B rebasing onto dev will see DIRTY conflicts in overlapping modules. Rebase is required; conflict resolution must preserve both approaches.
+- **Stacked PRs require proactive rebasing:** After upstream merge, run `update-branch` immediately; BEHIND status is sticky and blocks auto-merge even with green checks.
+
+**Carry-forward:** All PRs merged; board clear

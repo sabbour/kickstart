@@ -206,6 +206,27 @@ function isSecureRequest(request: HttpRequest): boolean {
 }
 
 function getPublicOrigin(request: HttpRequest): string {
+  // Allow explicit override via env var (useful when SWA forwards internal hostname instead of custom domain)
+  const baseUrlOverride = process.env.GITHUB_BASE_URL?.trim();
+  if (baseUrlOverride) {
+    let parsed: URL;
+    try {
+      parsed = new URL(baseUrlOverride);
+    } catch {
+      throw new GitHubAuthError(
+        `GITHUB_BASE_URL is not a valid URL: "${baseUrlOverride}"`,
+        500,
+      );
+    }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new GitHubAuthError(
+        `GITHUB_BASE_URL must use http or https protocol (got "${parsed.protocol}")`,
+        500,
+      );
+    }
+    return parsed.origin;
+  }
+
   const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
   const host = forwardedHost || request.headers.get("host");

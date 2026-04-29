@@ -222,3 +222,88 @@ describe("commitGitHubFilesAndCreatePullRequestForRequest", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("GITHUB_BASE_URL override (getPublicOrigin)", () => {
+  const ORIGINAL_BASE_URL = process.env.GITHUB_BASE_URL;
+
+  beforeEach(() => {
+    process.env.GITHUB_CLIENT_ID = "client-id";
+    process.env.GITHUB_CLIENT_SECRET = "client-secret";
+    process.env.GITHUB_SESSION_SECRET = "session-secret";
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    process.env.GITHUB_CLIENT_ID = ORIGINAL_ENV.clientId;
+    process.env.GITHUB_CLIENT_SECRET = ORIGINAL_ENV.clientSecret;
+    process.env.GITHUB_SESSION_SECRET = ORIGINAL_ENV.sessionSecret;
+    if (ORIGINAL_BASE_URL === undefined) {
+      delete process.env.GITHUB_BASE_URL;
+    } else {
+      process.env.GITHUB_BASE_URL = ORIGINAL_BASE_URL;
+    }
+  });
+
+  function extractRedirectUri(location: string): string {
+    return new URL(location).searchParams.get("redirect_uri") ?? "";
+  }
+
+  it("uses clean https origin when GITHUB_BASE_URL is a plain origin", () => {
+    process.env.GITHUB_BASE_URL = "https://kickstart.aks.azure.sabbour.me";
+    const { location } = getGitHubAuthLogin(
+      makeRequest({}, "https://internal.azurestaticapps.net/api/github-auth/login"),
+      "principal-1",
+      "/",
+    );
+    expect(extractRedirectUri(location)).toBe(
+      "https://kickstart.aks.azure.sabbour.me/api/github-auth/callback",
+    );
+  });
+
+  it("strips path from GITHUB_BASE_URL — only origin is used", () => {
+    process.env.GITHUB_BASE_URL = "https://kickstart.aks.azure.sabbour.me/some/path?q=1";
+    const { location } = getGitHubAuthLogin(
+      makeRequest({}, "https://internal.azurestaticapps.net/api/github-auth/login"),
+      "principal-1",
+      "/",
+    );
+    expect(extractRedirectUri(location)).toBe(
+      "https://kickstart.aks.azure.sabbour.me/api/github-auth/callback",
+    );
+  });
+
+  it("strips trailing slash from GITHUB_BASE_URL — only origin is used", () => {
+    process.env.GITHUB_BASE_URL = "https://kickstart.aks.azure.sabbour.me/";
+    const { location } = getGitHubAuthLogin(
+      makeRequest({}, "https://internal.azurestaticapps.net/api/github-auth/login"),
+      "principal-1",
+      "/",
+    );
+    expect(extractRedirectUri(location)).toBe(
+      "https://kickstart.aks.azure.sabbour.me/api/github-auth/callback",
+    );
+  });
+
+  it("throws a clear 500 error when GITHUB_BASE_URL has a non-http/https protocol", () => {
+    process.env.GITHUB_BASE_URL = "ftp://kickstart.example.com";
+    expect(() =>
+      getGitHubAuthLogin(
+        makeRequest({}, "https://internal.azurestaticapps.net/api/github-auth/login"),
+        "principal-1",
+        "/",
+      ),
+    ).toThrow('GITHUB_BASE_URL must use http or https protocol (got "ftp:")');
+  });
+
+  it("throws a clear 500 error when GITHUB_BASE_URL is not a valid URL", () => {
+    process.env.GITHUB_BASE_URL = "not-a-url";
+    expect(() =>
+      getGitHubAuthLogin(
+        makeRequest({}, "https://internal.azurestaticapps.net/api/github-auth/login"),
+        "principal-1",
+        "/",
+      ),
+    ).toThrow('GITHUB_BASE_URL is not a valid URL: "not-a-url"');
+  });
+});

@@ -181,6 +181,24 @@ If the issue is labeled `estimate:M`:
 - **No commits after approvals:** Once Phase 2 begins (any approval review submitted), no further commits to the PR branch are permitted. If a commit is needed after approvals, the review cycle restarts from Phase 1.
 - **Duplicate-review guard:** Before submitting a review, check whether you already have a review submitted for the current HEAD commit (`gh pr reviews {N}`). If yes, do not submit another. This prevents duplicate reviews from coordinator retry spawns.
 
+### Review Quality Standard
+
+Every PR review submitted by a squad agent MUST:
+
+1. **Read the diff** — `gh pr diff <N>` before writing a single word
+2. **Reference specifics** — cite file paths and line numbers (e.g., `packages/foo/bar.ts:42`)
+3. **Cover all dimensions:**
+   - Correctness: bugs, logic errors, unhandled edge cases
+   - Type safety: TypeScript types, `any` usage, exported API types
+   - Test coverage: happy path AND error cases, missing scenarios
+   - Code quality: naming, duplication, complexity
+   - Security: injection risks, unvalidated input, exposed secrets
+4. **Minimum 150 words** of substantive content — not counting template headers
+5. **Use REQUEST_CHANGES** when issues are found — do not APPROVE with caveats
+6. **Re-reviews after rebase:** Must explicitly list what was verified as functionally unchanged. "Re-approving after rebase ✅" is **forbidden**.
+
+One-liner approvals are a governance violation and will be dismissed.
+
 **Feedback labels:**
 - `nibbler:approved` / `nibbler:rejected` — code quality gate
 - `leela:approved` / `leela:rejected` — architecture gate

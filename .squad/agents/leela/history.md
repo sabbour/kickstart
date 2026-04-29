@@ -386,3 +386,27 @@ For comprehensive work history prior to 2026-04-20, see git log and .squad/orche
 - **Hermes removed from PR Review Gate:** Test coverage is enforced by CI status checks, not manual reviews. Hermes no longer participates in the PR Review Gate.
 - **Duplicate-review guard added:** Before submitting a review, check `gh pr reviews {N}` for the current HEAD. Do not submit if a review already exists for that commit.
 - **No-commit-after-approval rule added:** Once any Phase 2 approval is submitted, no further commits are permitted to the branch. Any needed commit restarts the cycle from Phase 1.
+
+## 2026-04-27T23:00:42Z — Session Close (Scribe)
+**Role:** Architect (PR #166, #170, #173 reviews; design approval #165)
+**Issues:** #166, #170, #173, #165
+**Outcomes:**
+- PR #166 (null safety, ESLint, JSDoc, 6 threads) ✅ MERGED (auto)
+- PR #170 (URL encoding, existence checks, sequential Promise, 6 threads) ✅ MERGED (auto)
+- PR #173 (FileMessage schema, 5MB size guard, JSDoc, 4 threads) ✅ MERGED (auto)
+- Issue #165 architecture approved (in-browser artifact store)
+- 4 issues closed after corresponding PRs merged (#118, #132, #164, #165)
+
+**Critical Events:**
+- Reviewed and approved all three PRs in wave; resolved 16 Copilot threads (6 + 6 + 4)
+- Discovered **GitHub does NOT auto-close issues when PRs merge into non-default branches** (dev != main)
+- Manually closed issues #118, #132, #164, #165 after their corresponding PRs merged to dev
+- Approved architecture decision on artifact store (decision filed in inbox, merged to decisions.md)
+- Board cleared: no open squad issues remain
+
+**Key Learnings:**
+- **Non-main branch merge != auto-close:** GitHub's default auto-close only works when PRs merge into the default branch. When merging into dev (non-default), manual issue closure is required to remove from board.
+- **Architecture approval is part of ceremony:** Design decisions must be documented and filed in the decisions inbox before implementation PRs merge. Decision #165 (in-browser artifact store) provides reference for cross-agent implementation phases.
+- **Proactive issue management:** After PR merge, immediately check linked issues and close manually if not auto-closed. This prevents silent stalled issues blocking planning.
+
+**Carry-forward:** Board clear; next sprint ready to begin
