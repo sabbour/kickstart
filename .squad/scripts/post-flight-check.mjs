@@ -157,12 +157,15 @@ async function getActor(kind, args, token) {
     }
     case 'issue-edit': {
       // Nibbler PR #1091 C4: filter the timeline to edit-shaped events only.
+      // Includes issue state changes (closed, reopened) and metadata edits.
       // slice(-1) picks the most recent event of ANY kind and attributes the
       // edit to a bystander actor.
       const r = await ghFetch('GET', `/repos/${owner}/${repo}/issues/${issue}/timeline?per_page=100`, token);
       if (!r.ok) return { error: `timeline fetch failed: ${r.status}` };
       const editEvents = (r.data || []).filter((e) =>
-        e.event === 'renamed' || e.event === 'edited' || e.event === 'demilestoned' || e.event === 'milestoned' || e.event === 'locked' || e.event === 'unlocked',
+        e.event === 'renamed' || e.event === 'edited' || e.event === 'closed' || e.event === 'reopened' ||
+        e.event === 'demilestoned' || e.event === 'milestoned' || e.event === 'locked' || e.event === 'unlocked' ||
+        e.event === 'labeled' || e.event === 'unlabeled',
       );
       const last = editEvents.slice(-1)[0];
       if (!last) {
@@ -225,6 +228,52 @@ async function attemptRevoke(kind, args, token) {
   }
 }
 
+function validateArgs(kind, args) {
+  // Validate kind-specific required parameters BEFORE making API calls.
+  // Fail fast to distinguish validation errors from API errors.
+  switch (kind) {
+    case 'review':
+      if (!args.pr || !args.id) {
+        return 'kind=review requires --pr and --id';
+      }
+      break;
+    case 'comment':
+      if (!args.issue && !args.pr) {
+        return 'kind=comment requires --issue or --pr';
+      }
+      if (!args.id) {
+        return 'kind=comment requires --id';
+      }
+      break;
+    case 'label':
+      if (!args.issue) {
+        return 'kind=label requires --issue';
+      }
+      if (!args.label) {
+        return 'kind=label requires --label';
+      }
+      break;
+    case 'pr-create':
+      if (!args.pr) {
+        return 'kind=pr-create requires --pr';
+      }
+      break;
+    case 'issue-edit':
+      if (!args.issue) {
+        return 'kind=issue-edit requires --issue';
+      }
+      break;
+    case 'commit':
+      if (!args.sha) {
+        return 'kind=commit requires --sha';
+      }
+      break;
+    default:
+      return `unknown kind: ${kind}`;
+  }
+  return null; // null = validation passed
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   if (args.help || !args.kind) {
@@ -240,6 +289,12 @@ async function main() {
 
   if (!args.owner || !args.repo || !args.expectedLogin) {
     process.stderr.write('post-flight-check: --owner, --repo, and --expected-login are required\n');
+    process.exit(3);
+  }
+
+  const validationError = validateArgs(args.kind, args);
+  if (validationError) {
+    process.stderr.write(`post-flight-check: ${validationError}\n`);
     process.exit(3);
   }
 
@@ -306,7 +361,7 @@ async function main() {
   process.exit(revoke.ok ? 1 : 2);
 }
 
-export { parseArgs, getActor, attemptRevoke };
+export { parseArgs, validateArgs, getActor, attemptRevoke };
 
 const isCliInvocation =
   typeof process.argv[1] === 'string' &&

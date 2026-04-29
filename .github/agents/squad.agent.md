@@ -935,7 +935,7 @@ prompt: |
     --owner {owner} --repo {repo} [--pr N | --issue N | --sha SHA] [--id ID] \
     --expected-login {app_slug}[bot]
   ```
-  Exit 0 = OK, exit 1 = mismatch auto-revoked, exit 2 = mismatch revoke FAILED (HALT, file P1). Do not declare ceremony success until this passes. The check verifies both `user.login == expected` AND `user.type == "Bot"` (login-match alone is spoofable by a human account).
+  Exit 0 = OK (actor + type match), exit 1 = mismatch detected and auto-revoked, exit 2 = mismatch detected and revoke FAILED (HALT, file P1), exit 3 = validation or API error. Do not declare ceremony success until exit 0 is confirmed. The check verifies both `user.login == expected` AND `user.type == "Bot"` (login-match alone is spoofable by a human account). Exit 3 is returned for both parameter validation errors (missing required --id, --label, etc.) and unexpected API failures; see `.squad/scripts/post-flight-check.mjs` for error details.
   
   **Git commit identity:**
   - `git -c user.name="{app_slug}[bot]" -c user.email="{app_slug}[bot]@users.noreply.github.com" commit ...`
