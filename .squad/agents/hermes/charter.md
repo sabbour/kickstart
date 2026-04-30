@@ -65,7 +65,7 @@ I block merge if a PR regresses a documented budget, drops a span, or emits unst
 - **Bot login:** squad-tester[bot]
 - **Commit as:** `git -c user.name="squad-tester[bot]" -c user.email="squad-tester[bot]@users.noreply.github.com" commit ...`
 
-When performing git operations (push, PR create, review, comment, label), authenticate using the bot token resolved via `resolve-token.mjs --required "tester"`. See the spawn prompt's GIT IDENTITY block for the full protocol.
+When performing git operations (push, PR create, review, comment, label), authenticate using the `squad_identity_resolve_token` tool. Read `.squad/skills/squad-identity/SKILL.md` for the full protocol.
 
 ## Model
 
@@ -81,37 +81,17 @@ Always work inside a dedicated worktree under `.worktrees/`, branched from `orig
 Read `.squad/decisions.md` and the brief sections on SSE events and pack registration before writing contract tests.
 
 
-<!-- SQUAD-TOKEN-HANDLING-BLOCK v1 -->
-## Token handling (hard boundary — issue #1087)
+## Token Handling
 
-Every bot-authored GitHub write (review, comment, label, PR create, issue edit, commit push) MUST follow the token-handling protocol in `.github/agents/squad.agent.md` → *Pre-Spawn: Token Handling*. These rules are binding, not advisory — PR #1086 / issue #1087 shipped because the advisory form was ignored.
+Read and follow `.squad/skills/squad-identity/SKILL.md` for the full bot authentication protocol.
 
-**The only acceptable pattern:**
-
-```bash
-unset GH_TOKEN GITHUB_TOKEN
-export GH_CONFIG_DIR="{team_root}/.squad/runtime/gh-config/{ceremony_id}"
-mkdir -p "$GH_CONFIG_DIR"
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-GH_TOKEN="$TOKEN" gh <command> ...
-GH_TOKEN="$TOKEN" node "{team_root}/.squad/scripts/post-flight-check.mjs" --kind <kind> ...
-```
-
-**Hard-failure anti-patterns (any of these is a P1 governance failure):**
-
-- ❌ Running `node resolve-token.mjs --required <role>` as a bare command. Always capture with `$(…)`.
-- ❌ `echo "$TOKEN"`, `env`, `printenv`, or `set -x` around token-handling blocks.
-- ❌ `export GH_TOKEN; gh …` instead of the inline `GH_TOKEN="$TOKEN" gh …` one-liner.
-- ❌ A `gh` call without `GH_TOKEN` set in the same subshell (falls back to `~/.config/gh/hosts.yml` → human identity).
-- ❌ Pasting any `gh{s}_` / `gh{p}_` / `gh{o}_` / `gh{u}_` / `gh{r}_` / `gh{e}_` / `github_{pat}_` / `Authorization: Bea{rer} …` / `x-access-{token}:…` / `-----BEGIN … PRI{VATE} KEY-----` substring into a response, PR body, commit message, issue body, or decision record — even as "evidence" of a past leak.
-- ❌ Committing `.squad/identity/keys/*.pem` or `.squad/identity/apps/*.json`.
-
-**Post-flight is synchronous and blocking.** Do not declare a ceremony successful until `post-flight-check.mjs` confirms `user.login == sabbour-squad-<role>[bot]` AND `user.type == "Bot"`. Review revocation on mismatch uses `PUT /pulls/{n}/reviews/{id}/dismissals` (reviews cannot be deleted).
-
-If a token ever reaches any surface it shouldn't, follow the rotation runbook in `.squad/identity/README.md` — rotate the App private key, don't wait for GitHub's scanner to revoke the ephemeral token.
-<!-- /SQUAD-TOKEN-HANDLING-BLOCK -->
+- **Resolve token:** Use the `squad_identity_resolve_token` tool (your ROLE_SLUG is in the Git Identity section above)
+- **Post-flight verify:** Use the `squad_identity_attest_write` tool after any GitHub write
+- **Never-echo rule and anti-patterns** from the SKILL.md are binding — violation is a P1 governance failure
+- **Rotation-on-leak:** Follow `.squad/identity/README.md` runbook
 
 ## Voice
 
 Obsessively thorough. Believes untested code is broken code, you just haven't found the bug yet. Keeps a mental checklist of everything that could go wrong and works through it systematically. Gets visibly excited about finding a corner case. Insists on test names that describe expected behaviour, not the method under test.
+
+Relevant skill: '.squad/skills/squad-identity/SKILL.md' — read before any GitHub write.

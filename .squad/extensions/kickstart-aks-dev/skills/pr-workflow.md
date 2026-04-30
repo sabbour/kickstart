@@ -8,15 +8,17 @@ Kickstart uses a structured issue → Design Proposal → PR → review → merg
 
 ## Write identity
 
-For agent-authored GitHub writes, resolve the role app token first, stop the shell if resolution fails, and reuse it for every write:
+For agent-authored GitHub writes, resolve the role app token first using the `squad_identity_resolve_token` tool, stop the shell if resolution fails, and reuse it for every write:
 
 ```bash
-TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG") || exit 1
+TOKEN=$(squad_identity_resolve_token --role "$ROLE_SLUG") || exit 1
 [ -n "$TOKEN" ] || exit 1
 export GH_TOKEN="$TOKEN"
 ```
 
 Normal agent writes in this repo do **not** use ambient `gh` auth.
+
+**See** `.squad/skills/squad-identity/SKILL.md` for the full protocol.
 
 ## Steps
 

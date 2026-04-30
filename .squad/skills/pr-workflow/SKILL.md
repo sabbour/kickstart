@@ -20,17 +20,23 @@
 
 ## GitHub Write Identity
 
-For agent-authored GitHub writes in this repo, do **not** rely on ambient `gh` auth. Resolve the explicit app token once per shell, stop immediately if resolution fails, and reuse it for every write command:
+For agent-authenticated GitHub writes in this repo, use the `squad_identity_resolve_token` tool to resolve the bot app token. Do **not** rely on ambient `gh` auth.
 
+**Full protocol:** See `.squad/skills/squad-identity/SKILL.md` for the complete token resolution and attestation workflow.
+
+**Quick reference:**
 ```bash
-TOKEN=$(node "$TEAM_ROOT/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG") || exit 1
+# Get the bot token for your role
+TOKEN=$(squad_identity_resolve_token --role "$ROLE_SLUG") || exit 1
 [ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
+
+# Use it for GitHub writes (never export; pass inline per call)
+GH_TOKEN="$TOKEN" gh pr create --title "..." --body "..."
+git push "https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git" HEAD
 ```
 
-- `TEAM_ROOT` and `ROLE_SLUG` come from the coordinator prompt.
-- `--required` must be paired with `|| exit 1` (plus `[ -n "$TOKEN" ] || exit 1`) so the shell also fails closed when token resolution breaks.
-- Read-only `gh` commands can still use normal auth, but issue/PR comments, edits, GraphQL mutations, pushes, and PR creation must use `GH_TOKEN=$TOKEN` or token-authenticated HTTPS.
+- Read-only `gh` commands can still use normal auth, but issue/PR comments, edits, GraphQL mutations, pushes, and PR creation must use the resolved bot token.
+- The tool fails closed if token resolution breaks — the shell exits immediately.
 
 ---
 

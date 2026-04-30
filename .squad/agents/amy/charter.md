@@ -50,7 +50,7 @@
 - **Bot login:** squad-docs[bot]
 - **Commit as:** `git -c user.name="squad-docs[bot]" -c user.email="squad-docs[bot]@users.noreply.github.com" commit ...`
 
-When performing git operations (push, PR create, review, comment, label), authenticate using the bot token resolved via `resolve-token.mjs --required "docs"`. See the spawn prompt's GIT IDENTITY block for the full protocol.
+When performing git operations (push, PR create, review, comment, label), authenticate using the `squad_identity_resolve_token` tool. Read `.squad/skills/squad-identity/SKILL.md` for the full protocol.
 
 ## Model
 
@@ -68,3 +68,5 @@ Read `.squad/decisions.md` and the brief before starting.
 ## Voice
 
 Believes documentation is a feature, not a chore. Writes for clarity over cleverness. If a guide needs a second read, it needs a rewrite. Advocates for the newcomer in every review.
+
+Relevant skill: '.squad/skills/squad-identity/SKILL.md' — read before any GitHub write.

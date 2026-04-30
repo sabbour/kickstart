@@ -55,38 +55,6 @@ Changeset is committed and pushed as part of the PR branch. Do not open the PR w
 
 Amy will review the changeset quality during the PR Review Gate. Scribe curates CHANGELOG entries from aggregated changesets at release time. Neither of them writes the changeset — you do.
 
-## Bot Identity — all GitHub writes
-
-This repo has a per-role GitHub App identity configured. Every agent-authored GitHub write (PR create, issue comment, label, review) MUST use the bot token, not ambient `gh` auth.
-
-**Before any `gh` or `git push` command that writes to GitHub:**
-
-```bash
-# 1. Isolate gh auth — prevents silent fallback to the human operator's auth
-unset GH_TOKEN GITHUB_TOKEN
-export GH_CONFIG_DIR="$(git rev-parse --show-toplevel)/.squad/runtime/gh-config/$$"
-mkdir -p "$GH_CONFIG_DIR"
-
-# 2. Resolve the role token — fails closed if no app is configured
-ROLE_SLUG="<your-role-slug>"   # lead | frontend | backend | tester | security | codereview | devops | docs
-TOKEN=$(node "$(git rev-parse --show-toplevel)/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG") || exit 1
-[ -n "$TOKEN" ] || exit 1
-```
-
-Role slug mapping: Leela → `lead`, Fry → `frontend`, Bender → `backend`, Hermes → `tester`, Zapp → `security`, Nibbler → `codereview`, Kif → `devops`, Amy → `docs`. The Copilot coding agent acting as a squad member uses the role slug of that member.
-
-**Use the token inline — never `export GH_TOKEN`:**
-
-```bash
-git push "https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git" HEAD
-GH_TOKEN="$TOKEN" gh pr create --draft --title "..." --body "..."
-GH_TOKEN="$TOKEN" gh issue comment <N> --body "..."
-```
-
-**PR body must include:** `🤖 Created by [squad-{role}](https://github.com/apps/squad-{role})`
-
-**Never echo the token.** No `echo "$TOKEN"`, no `env`, no `printenv` near token-handling blocks.
-
 ## Branch Naming
 
 Use the squad branch convention:
@@ -146,3 +114,26 @@ If you make a decision that affects other team members, write it to:
 .squad/decisions/inbox/copilot-{brief-slug}.md
 ```
 The Scribe will merge it into the shared decisions file.
+
+<!-- squad-identity: start -->
+## GIT IDENTITY — Bot Authentication
+
+This project uses GitHub App bot identity for all agent-authored writes.
+Read `.squad/skills/squad-identity/SKILL.md` before any GitHub write.
+
+**Use the `squad_identity_resolve_token` tool** to get a bot token for your ROLE_SLUG.
+
+Your ROLE_SLUG is injected into your charter — look for:
+```
+ROLE_SLUG="<slug>"  # injected by configure-identity --update-charters
+```
+
+If absent, call `squad_identity_status` to see the full agentNameMap.
+
+**Token usage (inline per-call, never export):**
+```bash
+GH_TOKEN="$TOKEN" gh pr create ...
+GH_TOKEN="$TOKEN" gh api /repos/{owner}/{repo}/issues -f title="..." 
+git push "https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git" HEAD
+```
+<!-- squad-identity: end -->

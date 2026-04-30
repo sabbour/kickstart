@@ -163,7 +163,7 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 **Push command:**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
 [ -n "$TOKEN" ] || exit 1
 git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
 ```
@@ -182,7 +182,7 @@ git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{is
 
 **GitHub:**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
 [ -n "$TOKEN" ] || exit 1
 export GH_TOKEN="$TOKEN"
 
@@ -250,7 +250,7 @@ Working as {member} ({role})
 ```bash
 # Make changes
 # ⚠️ NEVER use `git add .` or `git add -A` — only stage files you intentionally changed
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
 [ -n "$TOKEN" ] || exit 1
 export GH_TOKEN="$TOKEN"
 git add -- {specific files you modified}
@@ -260,7 +260,7 @@ git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{is
 
 **Re-request review (GitHub):**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
 [ -n "$TOKEN" ] || exit 1
 export GH_TOKEN="$TOKEN"
 GH_TOKEN=$TOKEN gh pr ready {pr-number}
@@ -274,7 +274,7 @@ GH_TOKEN=$TOKEN gh pr ready {pr-number}
 
 **GitHub (merge commit):**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
 [ -n "$TOKEN" ] || exit 1
 export GH_TOKEN="$TOKEN"
 GH_TOKEN=$TOKEN gh pr merge {pr-number} --merge --delete-branch
@@ -282,7 +282,7 @@ GH_TOKEN=$TOKEN gh pr merge {pr-number} --merge --delete-branch
 
 **GitHub (squash):**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
 [ -n "$TOKEN" ] || exit 1
 export GH_TOKEN="$TOKEN"
 GH_TOKEN=$TOKEN gh pr merge {pr-number} --squash --delete-branch
@@ -345,7 +345,7 @@ When spawning an agent to work on an issue, include this context block:
 2. Push branch
 3. Open PR using:
    ```
-   TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+   TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
    [ -n "$TOKEN" ] || exit 1
    export GH_TOKEN="$TOKEN"
    cat > pr-body.txt <<'EOF'

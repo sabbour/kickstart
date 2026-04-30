@@ -1,4 +1,39 @@
-name: Squad Review Gate (Reusable)
+/**
+ * Scaffold a review gate: generates reusable + caller workflow YAML files.
+ */
+
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { loadConfig, resolveBotLogin } from './review-config.mjs';
+
+/**
+ * Generate the reusable workflow YAML content.
+ * @param {string[]} roles - reviewer role slugs
+ * @param {object} config - loaded config
+ * @param {string} repoRoot - repo root for identity config lookup
+ * @returns {string}
+ */
+export function generateReusableWorkflow(roles, config = {}, repoRoot = '.') {
+  const rolesDefault = roles.join(',');
+
+  // Build role metadata — derive botLogin from squad-identity
+  const botLoginMap = {};
+  const gateRulesMap = {};
+  for (const role of roles) {
+    const reviewer = config.reviewers?.[role];
+    const botLogin = resolveBotLogin(role, repoRoot);
+    if (botLogin) {
+      botLoginMap[role] = botLogin;
+    }
+    if (reviewer?.gateRule) {
+      gateRulesMap[role] = reviewer.gateRule;
+    }
+  }
+
+  const botLoginJson = JSON.stringify(botLoginMap);
+  const gateRulesJson = JSON.stringify(gateRulesMap);
+
+  return `name: Squad Review Gate (Reusable)
 
 on:
   workflow_call:
@@ -7,7 +42,7 @@ on:
         description: 'Comma-separated reviewer role slugs required for merge'
         required: false
         type: string
-        default: 'codereview,security,docs'
+        default: '${rolesDefault}'
       pr_number:
         description: 'Pull request number to check'
         required: true
@@ -27,21 +62,21 @@ jobs:
 
       - name: Check review approvals and unresolved threads
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         uses: actions/github-script@v7
         with:
           script: |
-            const allRoles = '${{ inputs.roles }}'.split(',').map(r => r.trim()).filter(Boolean);
-            const prNumber = ${{ inputs.pr_number }};
+            const allRoles = '\${{ inputs.roles }}'.split(',').map(r => r.trim()).filter(Boolean);
+            const prNumber = \${{ inputs.pr_number }};
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
             // Config injected at scaffold time
-            const botLoginMap = {"codereview":"squad-codereview[bot]","security":"squad-security[bot]","docs":"squad-docs[bot]"};
-            const gateRules = {"codereview":{"required":"always"},"security":{"required":"always"},"docs":{"required":"conditional","bypassLabels":["docs:not-needed"],"bypassWhen":{"labels":["squad:chore-auto"]},"authorizedActors":["amy"]}};
+            const botLoginMap = ${botLoginJson};
+            const gateRules = ${gateRulesJson};
 
-            core.info(`Checking review gate for PR #${prNumber}`);
+            core.info(\`Checking review gate for PR #\${prNumber}\`);
 
             // Fetch PR details (labels + changed files)
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
@@ -51,10 +86,10 @@ jobs:
             if (context.eventName === 'pull_request' && context.payload.action === 'synchronize') {
               core.info('New commits detected — clearing stale approval labels');
               for (const role of allRoles) {
-                const label = `${role}:approved`;
+                const label = \`\${role}:approved\`;
                 try {
                   await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: label });
-                  core.info(`Removed stale label: ${label}`);
+                  core.info(\`Removed stale label: \${label}\`);
                 } catch (e) {
                   // Label may not exist — that's fine
                 }
@@ -71,10 +106,10 @@ jobs:
             // Determine which roles are actually required based on gate rules
             function matchesGlob(path, pattern) {
               const regex = new RegExp(
-                '^' + pattern.replace(/\*\*/g, '@@GLOBSTAR@@')
-                  .replace(/\*/g, '[^/]*')
+                '^' + pattern.replace(/\\*\\*/g, '@@GLOBSTAR@@')
+                  .replace(/\\*/g, '[^/]*')
                   .replace(/@@GLOBSTAR@@/g, '.*')
-                  .replace(/\?/g, '[^/]') + '$'
+                  .replace(/\\?/g, '[^/]') + '$'
               );
               return regex.test(path);
             }
@@ -105,7 +140,7 @@ jobs:
                 // Check bypass labels (e.g., skip-docs, docs:not-applicable)
                 const bypassLabels = rule.bypassLabels || [];
                 if (bypassLabels.some(bl => prLabels.includes(bl.toLowerCase()))) {
-                  skippedRoles.push({ role, reason: `bypass label present` });
+                  skippedRoles.push({ role, reason: \`bypass label present\` });
                   continue;
                 }
 
@@ -118,12 +153,12 @@ jobs:
                 const hasRequiredPaths = anyPathMatches(changedPaths, requiredPaths);
 
                 if (hasBypassLabel && !hasRequiredPaths) {
-                  skippedRoles.push({ role, reason: `bypass label + no matching paths` });
+                  skippedRoles.push({ role, reason: \`bypass label + no matching paths\` });
                   continue;
                 }
 
                 if (requiredPaths.length > 0 && !hasRequiredPaths) {
-                  skippedRoles.push({ role, reason: `no files match requiredWhen paths` });
+                  skippedRoles.push({ role, reason: \`no files match requiredWhen paths\` });
                   continue;
                 }
 
@@ -131,9 +166,9 @@ jobs:
               }
             }
 
-            core.info(`Required roles: ${requiredRoles.join(', ') || '(none)'}`);
+            core.info(\`Required roles: \${requiredRoles.join(', ') || '(none)'}\`);
             for (const { role, reason } of skippedRoles) {
-              core.info(`Skipped role ${role}: ${reason}`);
+              core.info(\`Skipped role \${role}: \${reason}\`);
             }
 
             // Fetch ALL reviews with pagination
@@ -154,8 +189,8 @@ jobs:
                 if (botLogin) return login === botLogin.toLowerCase();
                 return (
                   login.includes(role.toLowerCase()) ||
-                  login === `${role}-bot` ||
-                  login === `squad-${role}`
+                  login === \`\${role}-bot\` ||
+                  login === \`squad-\${role}\`
                 );
               });
 
@@ -167,7 +202,7 @@ jobs:
               } else {
                 missingRoles.push(role);
                 if (latestReview) {
-                  core.info(`Role ${role}: latest review is ${latestReview.state} (not APPROVED)`);
+                  core.info(\`Role \${role}: latest review is \${latestReview.state} (not APPROVED)\`);
                 }
               }
             }
@@ -175,7 +210,7 @@ jobs:
             // Check for unresolved threads
             let unresolvedCount = 0;
             try {
-              const query = `query($owner: String!, $repo: String!, $pr: Int!) {
+              const query = \`query($owner: String!, $repo: String!, $pr: Int!) {
                 repository(owner: $owner, name: $repo) {
                   pullRequest(number: $pr) {
                     reviewThreads(first: 100) {
@@ -183,12 +218,12 @@ jobs:
                     }
                   }
                 }
-              }`;
+              }\`;
               const result = await github.graphql(query, { owner, repo, pr: prNumber });
               const threads = result?.repository?.pullRequest?.reviewThreads?.nodes || [];
               unresolvedCount = threads.filter(t => !t.isResolved).length;
             } catch (e) {
-              core.warning(`Could not check unresolved threads: ${e.message}`);
+              core.warning(\`Could not check unresolved threads: \${e.message}\`);
             }
 
             // Apply legacy labels for approved roles
@@ -196,33 +231,123 @@ jobs:
               try {
                 await github.rest.issues.addLabels({
                   owner, repo, issue_number: prNumber,
-                  labels: [`${role}:approved`]
+                  labels: [\`\${role}:approved\`]
                 });
               } catch (e) {
-                core.warning(`Could not apply label ${role}:approved: ${e.message}`);
+                core.warning(\`Could not apply label \${role}:approved: \${e.message}\`);
               }
             }
 
             // Build summary
-            let summary = '## 🔒 Review Gate Summary\n\n';
-            summary += `| Role | Status | Rule |\n|------|--------|------|\n`;
+            let summary = '## 🔒 Review Gate Summary\\n\\n';
+            summary += \`| Role | Status | Rule |\\n|------|--------|------|\\n\`;
             for (const role of requiredRoles) {
               const status = approvedRoles.has(role) ? '✅ Approved' : '⏳ Pending';
               const rule = gateRules[role]?.required || 'always';
-              summary += `| ${role} | ${status} | ${rule} |\n`;
+              summary += \`| \${role} | \${status} | \${rule} |\\n\`;
             }
             for (const { role, reason } of skippedRoles) {
-              summary += `| ${role} | ⏭️ Skipped | ${reason} |\n`;
+              summary += \`| \${role} | ⏭️ Skipped | \${reason} |\\n\`;
             }
-            summary += `\n**Unresolved threads:** ${unresolvedCount}\n`;
+            summary += \`\\n**Unresolved threads:** \${unresolvedCount}\\n\`;
 
             await core.summary.addRaw(summary).write();
 
             // Gate decision
             if (missingRoles.length > 0) {
-              core.setFailed(`Missing approvals from: ${missingRoles.join(', ')}`);
+              core.setFailed(\`Missing approvals from: \${missingRoles.join(', ')}\`);
             } else if (unresolvedCount > 0) {
-              core.setFailed(`${unresolvedCount} unresolved review thread(s) must be addressed before merge`);
+              core.setFailed(\`\${unresolvedCount} unresolved review thread(s) must be addressed before merge\`);
             } else {
               core.info('✅ Review gate passed — all roles approved, no unresolved threads');
             }
+`;
+}
+
+/**
+ * Generate the caller workflow YAML content.
+ * @param {string[]} roles - reviewer role slugs
+ * @returns {string}
+ */
+export function generateCallerWorkflow(roles) {
+  return `name: Review Gate
+
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  gate:
+    # Skip issue_comment events that aren't on PRs
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    uses: ./.github/workflows/squad-review-gate.yml
+    with:
+      roles: '${roles.join(',')}'
+      pr_number: \${{ github.event.pull_request.number || github.event.issue.number }}
+    secrets: inherit
+`;
+}
+
+/**
+ * Scaffold the review gate workflows into the target repo.
+ * @param {string} repoRoot - path to the repository root
+ * @param {object} options
+ * @param {string[]} [options.roles] - role slugs to require (defaults to all from config)
+ * @param {boolean} [options.dryRun] - if true, return content without writing files
+ * @returns {object} result summary
+ */
+export function scaffoldGate(repoRoot, { roles, dryRun = false } = {}) {
+  const config = loadConfig(repoRoot);
+  const configRoles = Object.keys(config.reviewers);
+
+  const effectiveRoles = roles && roles.length > 0 ? roles : configRoles;
+
+  // Validate that specified roles exist in config
+  const invalidRoles = effectiveRoles.filter(r => !configRoles.includes(r));
+  if (invalidRoles.length > 0) {
+    throw new Error(
+      `Unknown roles: ${invalidRoles.join(', ')}. Valid roles: ${configRoles.join(', ')}`
+    );
+  }
+
+  const workflowsDir = join(repoRoot, '.github', 'workflows');
+  const reusablePath = join(workflowsDir, 'squad-review-gate.yml');
+  const callerPath = join(workflowsDir, 'review-gate.yml');
+
+  const reusableContent = generateReusableWorkflow(effectiveRoles, config, repoRoot);
+  const callerContent = generateCallerWorkflow(effectiveRoles);
+
+  if (dryRun) {
+    return {
+      scaffolded: false,
+      dryRun: true,
+      roles: effectiveRoles,
+      files: [reusablePath, callerPath],
+      content: {
+        [reusablePath]: reusableContent,
+        [callerPath]: callerContent,
+      },
+    };
+  }
+
+  mkdirSync(workflowsDir, { recursive: true });
+  writeFileSync(reusablePath, reusableContent, 'utf8');
+  writeFileSync(callerPath, callerContent, 'utf8');
+
+  return {
+    scaffolded: true,
+    roles: effectiveRoles,
+    files: [reusablePath, callerPath],
+    reusableWorkflow: reusablePath,
+    callerWorkflow: callerPath,
+    nextSteps: [
+      'Commit the generated workflow files.',
+      'Set the Review Gate as a required status check in branch protection.',
+      'Ensure reviewer bots have write access to submit reviews.',
+    ],
+  };
+}

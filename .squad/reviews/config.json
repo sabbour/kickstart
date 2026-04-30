@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1.1.0",
+  "reviewers": {
+    "lead": {
+      "agent": "leela",
+      "dimension": "Architecture and scope alignment",
+      "charterPath": ".squad/agents/leela/charter.md",
+      "gateRule": { "required": "optional" }
+    },
+    "frontend": {
+      "agent": "fry",
+      "dimension": "User experience and accessibility",
+      "charterPath": ".squad/agents/fry/charter.md",
+      "gateRule": { "required": "optional" }
+    },
+    "backend": {
+      "agent": "bender",
+      "dimension": "API and infrastructure design",
+      "charterPath": ".squad/agents/bender/charter.md",
+      "gateRule": { "required": "optional" }
+    },
+    "tester": {
+      "agent": "hermes",
+      "dimension": "Test coverage and performance",
+      "charterPath": ".squad/agents/hermes/charter.md",
+      "gateRule": { "required": "optional" }
+    },
+    "scribe": {
+      "agent": "scribe",
+      "dimension": "Session logging and changelog",
+      "charterPath": ".squad/agents/scribe/charter.md",
+      "gateRule": { "required": "optional" }
+    },
+    "security": {
+      "agent": "zapp",
+      "dimension": "Security and threat modeling",
+      "charterPath": ".squad/agents/zapp/charter.md",
+      "gateRule": { "required": "always" }
+    },
+    "codereview": {
+      "agent": "nibbler",
+      "dimension": "Code quality and correctness",
+      "charterPath": ".squad/agents/nibbler/charter.md",
+      "gateRule": { "required": "always" }
+    },
+    "devops": {
+      "agent": "kif",
+      "dimension": "CI/CD and automation",
+      "charterPath": ".squad/agents/kif/charter.md",
+      "gateRule": { "required": "optional" }
+    },
+    "docs": {
+      "agent": "amy",
+      "dimension": "Documentation clarity and completeness",
+      "charterPath": ".squad/agents/amy/charter.md",
+      "gateRule": {
+        "required": "conditional",
+        "bypassLabels": ["docs:not-needed"],
+        "bypassWhen": { "labels": ["squad:chore-auto"] },
+        "bypassLabelAuthority": "docs"
+      }
+    }
+  },
+  "threadResolution": {
+    "requireReplyBeforeResolve": true,
+    "templates": {
+      "addressed": "Addressed in {sha}: {description}",
+      "dismissed": "Dismissed: {justification}"
+    }
+  },
+  "feedbackSources": ["squad-agents", "humans", "github-copilot-bot"]
+}
