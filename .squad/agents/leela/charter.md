@@ -64,6 +64,16 @@ Before starting work, run `git rev-parse --show-toplevel` to find the repo root.
 Read `.squad/decisions.md` and `docs-site/docs/architecture/v2-implementation-brief.md` before starting. Read `.squad/ceremonies.md` if the work came from an automated workflow.
 
 
+
+## Git Identity
+
+- **Role slug:** lead
+- **App slug:** squad-lead
+- **Bot login:** squad-lead[bot]
+- **Commit as:** `git -c user.name="squad-lead[bot]" -c user.email="squad-lead[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the `squad_identity_resolve_token` tool. Read `.squad/skills/squad-identity/SKILL.md` for the full protocol.
+
 <!-- SQUAD-TOKEN-HANDLING-BLOCK v2 (squad-identity) -->
 ## Token handling (hard boundary — issue #1087, squad-identity)
 

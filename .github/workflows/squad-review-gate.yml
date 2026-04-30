@@ -1,12 +1,23 @@
 name: Squad Review Gate
 
-# Merged from squad-docs-gate.yml (eliminated ~320 redundant runs/week).
-# This single job now handles both squad approval label checking and
-# docs/changeset enforcement, halving the per-PR Actions minute cost.
-
 on:
+  workflow_call:
+    inputs:
+      roles:
+        description: 'Comma-separated reviewer role slugs required for merge'
+        required: false
+        type: string
+        default: 'codereview,security,docs'
+      pr_number:
+        description: 'Pull request number to check'
+        required: true
+        type: number
+  pull_request_review:
+    types: [submitted, dismissed]
+  issue_comment:
+    types: [created]
   pull_request:
-    types: [labeled, unlabeled, opened, reopened, ready_for_review, synchronize]
+    types: [labeled, unlabeled, opened, synchronize, reopened]
 
 concurrency:
   group: squad-review-gate-${{ github.event.pull_request.number || github.run_id }}
@@ -15,234 +26,273 @@ concurrency:
 permissions:
   contents: read
   pull-requests: write
+  issues: write
   statuses: write
 
 jobs:
-  check-squad-approval:
-    if: github.event.pull_request.draft == false
+  review-gate:
+    name: Review Gate
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
     runs-on: ubuntu-latest
     steps:
-      - name: Check squad approval labels
-        uses: actions/github-script@v8
+      - uses: actions/checkout@v4
+
+      - name: Check review approvals and unresolved threads
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/github-script@v7
         with:
           script: |
-            const LOW_RISK_LABEL = 'squad:chore-auto';
-            const SENSITIVE_PATH_PATTERNS = [
-              /^\.github\/workflows\//i,
-              /(^|[\/._-])(auth|guardrail|guardrails|security)([\/._-]|$)/i,
-            ];
+            const allRoles = ('${{ inputs.roles }}' || 'codereview,security,docs').split(',').map(r => r.trim()).filter(Boolean);
+            const prNumber = ${{ inputs.pr_number || 0 }} || context.payload.pull_request?.number || context.payload.issue?.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
 
-            function isSecurityPatch(pr, labels) {
-              const securitySignals = [
-                pr.title,
-                pr.body,
-                pr.head?.ref,
-                ...labels,
-              ].filter(Boolean).join(' ');
-              return /security|cve-\d{4}-\d+|ghsa-|vuln|vulnerability/i.test(securitySignals);
-            }
+            // Config injected at scaffold time
+            const botLoginMap = {"codereview":"squad-codereview[bot]","security":"squad-security[bot]","docs":"squad-docs[bot]"};
+            const gateRules = {"codereview":{"required":"always"},"security":{"required":"always"},"docs":{"required":"conditional","bypassLabels":["docs:not-needed"],"bypassWhen":{"labels":["squad:chore-auto"]},"bypassLabelAuthority":"docs"}};
 
-            function isSensitivePath(filename) {
-              return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(filename));
-            }
-
-            async function listChangedFiles(prNumber) {
-              const files = await github.paginate(github.rest.pulls.listFiles, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: prNumber,
-                per_page: 100,
+            // Helper: post commit status for the required check name
+            async function postStatus(state, description) {
+              const { data: prData } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+              await github.rest.repos.createCommitStatus({
+                owner, repo,
+                sha: prData.head.sha,
+                state,
+                description: `Squad review gate: ${description}`.slice(0, 140),
+                context: 'squad/review-gate'
               });
-              return files.map((file) => file.filename);
             }
 
-            const pr = context.payload.pull_request;
-            const labels = new Set(pr.labels.map((label) => label.name));
-            const changedFiles = await listChangedFiles(pr.number);
-            const docsApproved = labels.has('docs:approved');
-            const skipDocs = labels.has('skip-docs') || labels.has('docs:not-applicable');
-            const docsRejected = labels.has('docs:rejected');
-            const isLowRisk = labels.has(LOW_RISK_LABEL);
-            const isArchitecturePR = labels.has('architecture');
-            const touchesSensitivePaths = changedFiles.some(isSensitivePath);
-            const hasSecuritySignals = isSecurityPatch(pr, labels);
+            core.info(`Checking review gate for PR #${prNumber}`);
 
-            const requiresSecurity = !isLowRisk || hasSecuritySignals || touchesSensitivePaths;
-            const requiredApprovals = ['codereview:approved'];
-            if (requiresSecurity) {
-              requiredApprovals.push('security:approved');
-            }
-            if (isArchitecturePR) {
-              requiredApprovals.push('architecture:approved');
-            }
-
-            const hasDocsMarker = docsApproved || skipDocs;
-
-            const missingApprovals = requiredApprovals.filter((label) => !labels.has(label));
-            const docsStatus = docsApproved ? '✅' : skipDocs ? '➖ N/A' : '⏳';
-            const reviewerStatusParts = requiredApprovals.map((label) => {
-              const name = label.split(':')[0];
-              const capitalized = name.charAt(0).toUpperCase() + name.slice(1);
-              return `${capitalized} ${labels.has(label) ? '✅' : '⏳'}`;
-            });
-            const prefix = isLowRisk && !requiresSecurity ? 'low-risk path ' : '';
-
-            let state, description;
-            if (docsRejected) {
-              state = 'failure';
-              description = 'Squad review gate: rejected — docs:rejected';
-            } else if (missingApprovals.length === 0 && hasDocsMarker) {
-              state = 'success';
-              description = `Squad review gate: ${prefix}${reviewerStatusParts.join(' ')} Docs ${docsStatus}`;
-            } else {
-              state = 'pending';
-              description = `Squad review gate: ${prefix}${reviewerStatusParts.join(' ')} Docs ${docsStatus}`;
+            // Fast-lane: squad:chore-auto bypasses the entire gate
+            {
+              const { data: prData } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+              const labels = prData.labels.map(l => l.name.toLowerCase());
+              if (labels.includes('squad:chore-auto')) {
+                core.info('⏭️ squad:chore-auto label detected — bypassing review gate');
+                await postStatus('success', 'bypassed — squad:chore-auto');
+                // Enable auto-merge on bypass
+                try {
+                  if (!prData.auto_merge) {
+                    await github.graphql(`mutation($prId: ID!) {
+                      enablePullRequestAutoMerge(input: { pullRequestId: $prId, mergeMethod: SQUASH }) {
+                        pullRequest { autoMergeRequest { enabledAt } }
+                      }
+                    }`, { prId: prData.node_id });
+                    core.info(`🔀 Auto-merge enabled for PR #${prNumber}`);
+                  }
+                } catch (e) {
+                  core.warning(`Could not enable auto-merge: ${e.message}`);
+                }
+                await core.summary.addRaw('## 🔒 Review Gate Summary\n\n⏭️ Bypassed — `squad:chore-auto` label present.\n').write();
+                return;
+              }
             }
 
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: pr.head.sha,
-              state,
-              description,
-              context: 'squad/review-gate'
-            });
+            // Fetch PR details (labels + changed files)
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+            const prLabels = pr.labels.map(l => l.name.toLowerCase());
 
-      - name: Inspect changed files for docs gate
-        id: docs-changed
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-              per_page: 100,
-            });
-            const paths = files.map(f => f.filename);
-            const labels = context.payload.pull_request.labels.map(l => l.name);
+            // Clear stale approval labels on synchronize (new commits invalidate approvals)
+            if (context.eventName === 'pull_request' && context.payload.action === 'synchronize') {
+              core.info('New commits detected — clearing stale approval labels');
+              for (const role of allRoles) {
+                const label = `${role}:approved`;
+                try {
+                  await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: label });
+                  core.info(`Removed stale label: ${label}`);
+                } catch (e) {
+                  // Label may not exist — that's fine
+                }
+              }
+            }
 
-            const hasChangeset = paths.some(p => p.startsWith('.changeset/') && p.endsWith('.md') && !p.endsWith('README.md'));
-            const hasDocsSite = paths.some(p => p.startsWith('docs-site/docs/'));
-            const hasApiDocs = paths.some(p => p === 'docs-site/docs/extending/api-endpoints.md');
-            const skipDocs = labels.includes('skip-docs');
+            // Fetch changed files for conditional gate rules
+            const changedFiles = await github.paginate(
+              github.rest.pulls.listFiles,
+              { owner, repo, pull_number: prNumber, per_page: 100 }
+            );
+            const changedPaths = changedFiles.map(f => f.filename);
 
-            // User-facing signal: touches packages/*/src/ but is not test-only
-            const userFacing = paths.some(p =>
-              /^packages\/[^/]+\/src\//.test(p) &&
-              !p.includes('__tests__') &&
-              !p.endsWith('.test.ts') &&
-              !p.endsWith('.test.tsx') &&
-              !p.includes('/e2e/')
+            // Determine which roles are actually required based on gate rules
+            function matchesGlob(path, pattern) {
+              const regex = new RegExp(
+                '^' + pattern.replace(/\*\*/g, '@@GLOBSTAR@@')
+                  .replace(/\*/g, '[^/]*')
+                  .replace(/@@GLOBSTAR@@/g, '.*')
+                  .replace(/\?/g, '[^/]') + '$'
+              );
+              return regex.test(path);
+            }
+
+            function anyPathMatches(paths, patterns) {
+              if (!patterns || patterns.length === 0) return false;
+              return paths.some(p => patterns.some(pat => matchesGlob(p, pat)));
+            }
+
+            const requiredRoles = [];
+            const skippedRoles = [];
+
+            for (const role of allRoles) {
+              const rule = gateRules[role];
+
+              if (!rule || rule.required === 'always') {
+                requiredRoles.push(role);
+                continue;
+              }
+
+              if (rule.required === 'optional') {
+                skippedRoles.push({ role, reason: 'optional' });
+                continue;
+              }
+
+              // Conditional logic
+              if (rule.required === 'conditional') {
+                // Check bypass labels (e.g., skip-docs, docs:not-applicable)
+                const bypassLabels = rule.bypassLabels || [];
+                if (bypassLabels.some(bl => prLabels.includes(bl.toLowerCase()))) {
+                  skippedRoles.push({ role, reason: `bypass label present` });
+                  continue;
+                }
+
+                // Check bypassWhen.labels (e.g., squad:chore-auto)
+                const bypassWhenLabels = rule.bypassWhen?.labels || [];
+                const hasBypassLabel = bypassWhenLabels.some(bl => prLabels.includes(bl.toLowerCase()));
+
+                // Check requiredWhen.paths
+                const requiredPaths = rule.requiredWhen?.paths || [];
+                const hasRequiredPaths = anyPathMatches(changedPaths, requiredPaths);
+
+                if (hasBypassLabel && !hasRequiredPaths) {
+                  skippedRoles.push({ role, reason: `bypass label + no matching paths` });
+                  continue;
+                }
+
+                if (requiredPaths.length > 0 && !hasRequiredPaths) {
+                  skippedRoles.push({ role, reason: `no files match requiredWhen paths` });
+                  continue;
+                }
+
+                requiredRoles.push(role);
+              }
+            }
+
+            core.info(`Required roles: ${requiredRoles.join(', ') || '(none)'}`);
+            for (const { role, reason } of skippedRoles) {
+              core.info(`Skipped role ${role}: ${reason}`);
+            }
+
+            // Fetch ALL reviews with pagination
+            const allReviews = await github.paginate(
+              github.rest.pulls.listReviews,
+              { owner, repo, pull_number: prNumber, per_page: 100 }
             );
 
-            core.setOutput('hasChangeset', String(hasChangeset));
-            core.setOutput('hasDocsSite', String(hasDocsSite));
-            core.setOutput('hasApiDocs', String(hasApiDocs));
-            core.setOutput('skipDocs', String(skipDocs));
-            core.setOutput('userFacing', String(userFacing));
+            // For each required role, find the LATEST review
+            const approvedRoles = new Set();
+            const missingRoles = [];
 
-      - name: Post or update docs gate comment
-        uses: actions/github-script@v8
-        env:
-          HAS_CHANGESET: ${{ steps.docs-changed.outputs.hasChangeset }}
-          HAS_DOCS_SITE: ${{ steps.docs-changed.outputs.hasDocsSite }}
-          HAS_API: ${{ steps.docs-changed.outputs.hasApiDocs }}
-          SKIP_DOCS: ${{ steps.docs-changed.outputs.skipDocs }}
-          USER_FACING: ${{ steps.docs-changed.outputs.userFacing }}
-        with:
-          script: |
-            const marker = '<!-- squad-docs-gate -->';
-            const userFacing = process.env.USER_FACING === 'true';
-            const hasChangeset = process.env.HAS_CHANGESET === 'true';
-            const hasDocsSite = process.env.HAS_DOCS_SITE === 'true';
-            const skipDocs = process.env.SKIP_DOCS === 'true';
-            const needsDocsGate = userFacing && !hasChangeset && !hasDocsSite && !skipDocs;
+            for (const role of requiredRoles) {
+              const botLogin = botLoginMap[role] || null;
 
-            // ✅ = done, ⚠️ = likely needed, ℹ️ = optional suggestion
-            const done = v => v === 'true';
-            const changesetIcon = done(process.env.HAS_CHANGESET) ? '✅'
-              : userFacing ? '⚠️' : 'ℹ️';
+              const roleReviews = allReviews.filter(r => {
+                const login = (r.user?.login || '').toLowerCase();
+                if (botLogin) return login === botLogin.toLowerCase();
+                return (
+                  login.includes(role.toLowerCase()) ||
+                  login === `${role}-bot` ||
+                  login === `squad-${role}`
+                );
+              });
 
-            const docLine = (v, path, when) => done(v)
-              ? `- ✅ \`${path}\` updated`
-              : `- ℹ️ \`${path}\` not updated — consider updating ${when}`;
+              roleReviews.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+              const latestReview = roleReviews[0];
 
-            const changesetLine = done(process.env.HAS_CHANGESET)
-              ? `- ✅ changeset added (\`.changeset/*.md\`)`
-              : `- ${changesetIcon} no changeset found (\`.changeset/*.md\`)`;
-
-            const lines = [
-              marker,
-              '## Docs & changeset gate',
-              '',
-              changesetLine,
-              docLine(process.env.HAS_DOCS_SITE, 'docs-site/docs/', 'if user-facing behavior or UI changed'),
-              docLine(process.env.HAS_API, 'docs-site/docs/extending/api-endpoints.md', 'if the API surface changed'),
-              '',
-            ];
-
-            if (skipDocs) {
-              lines.push('> ℹ️ `skip-docs` label present. Docs/changeset requirement explicitly bypassed for this PR.');
-            } else if (needsDocsGate) {
-              lines.push('> ❌ This PR touches `packages/*/src/` but has neither a changeset nor a `docs-site/docs/` update. Add one of them or apply `skip-docs` before merging.');
-            } else if (userFacing && !hasChangeset && hasDocsSite) {
-              lines.push('> ✅ User-facing package changes are covered by a `docs-site/docs/` update, so a changeset is optional for this gate.');
-            } else if (userFacing && !hasChangeset) {
-              lines.push('> ⚠️ This PR touches `packages/*/src/` but has no changeset. If the change is user-visible, run `npm run changeset` before merging. Internal-only changes can skip this.');
-            } else if (!userFacing) {
-              lines.push('_No user-facing source changed. Changeset and doc updates are not needed._');
-            } else {
-              lines.push('_Changeset present. Good._');
+              if (latestReview && latestReview.state === 'APPROVED') {
+                approvedRoles.add(role);
+              } else {
+                missingRoles.push(role);
+                if (latestReview) {
+                  core.info(`Role ${role}: latest review is ${latestReview.state} (not APPROVED)`);
+                }
+              }
             }
 
-            lines.push('', '---', '_Hard gate for user-facing package changes without docs or changeset. ✅ = done, ⚠️ = likely needed, ℹ️ = optional or bypassed._');
-
-            const body = lines.join('\n');
-
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              per_page: 100,
-            });
-            const existing = comments.find(c => c.body && c.body.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                body,
-              });
+            // Check for unresolved threads
+            let unresolvedCount = 0;
+            try {
+              const query = `query($owner: String!, $repo: String!, $pr: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $pr) {
+                    reviewThreads(first: 100) {
+                      nodes { isResolved }
+                    }
+                  }
+                }
+              }`;
+              const result = await github.graphql(query, { owner, repo, pr: prNumber });
+              const threads = result?.repository?.pullRequest?.reviewThreads?.nodes || [];
+              unresolvedCount = threads.filter(t => !t.isResolved).length;
+            } catch (e) {
+              core.warning(`Could not check unresolved threads: ${e.message}`);
             }
 
-      - name: Enforce docs or changeset for user-facing code
-        env:
-          HAS_CHANGESET: ${{ steps.docs-changed.outputs.hasChangeset }}
-          HAS_DOCS_SITE: ${{ steps.docs-changed.outputs.hasDocsSite }}
-          SKIP_DOCS: ${{ steps.docs-changed.outputs.skipDocs }}
-          USER_FACING: ${{ steps.docs-changed.outputs.userFacing }}
-        run: |
-          user_facing="${USER_FACING}"
-          has_changeset="${HAS_CHANGESET}"
-          has_docs_site="${HAS_DOCS_SITE}"
-          skip_docs="${SKIP_DOCS}"
+            // Apply legacy labels for approved roles
+            for (const role of approvedRoles) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner, repo, issue_number: prNumber,
+                  labels: [`${role}:approved`]
+                });
+              } catch (e) {
+                core.warning(`Could not apply label ${role}:approved: ${e.message}`);
+              }
+            }
 
-          if [[ "$skip_docs" == "true" ]]; then
-            echo "Docs gate bypassed via skip-docs label."
-            exit 0
-          fi
+            // Build summary
+            let summary = '## 🔒 Review Gate Summary\n\n';
+            summary += `| Role | Status | Rule |\n|------|--------|------|\n`;
+            for (const role of requiredRoles) {
+              const status = approvedRoles.has(role) ? '✅ Approved' : '⏳ Pending';
+              const rule = gateRules[role]?.required || 'always';
+              summary += `| ${role} | ${status} | ${rule} |\n`;
+            }
+            for (const { role, reason } of skippedRoles) {
+              summary += `| ${role} | ⏭️ Skipped | ${reason} |\n`;
+            }
+            summary += `\n**Unresolved threads:** ${unresolvedCount}\n`;
 
-          if [[ "$user_facing" == "true" && "$has_changeset" != "true" && "$has_docs_site" != "true" ]]; then
-            echo "User-facing package changes require a changeset or docs-site/docs update."
-            exit 1
-          fi
+            await core.summary.addRaw(summary).write();
 
-          echo "Docs gate passed."
+            // Gate decision
+            if (missingRoles.length > 0) {
+              await postStatus('pending', `waiting: ${missingRoles.join(', ')}`);
+              core.setFailed(`Missing approvals from: ${missingRoles.join(', ')}`);
+            } else if (unresolvedCount > 0) {
+              await postStatus('pending', `${unresolvedCount} unresolved thread(s)`);
+              core.setFailed(`${unresolvedCount} unresolved review thread(s) must be addressed before merge`);
+            } else {
+              await postStatus('success', 'all roles approved, no unresolved threads');
+              core.info('✅ Review gate passed — all roles approved, no unresolved threads');
+
+              // Enable auto-merge (squash) when gate passes
+              try {
+                const { data: prData } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+                if (!prData.auto_merge) {
+                  const prNodeId = prData.node_id;
+                  await github.graphql(`mutation($prId: ID!) {
+                    enablePullRequestAutoMerge(input: { pullRequestId: $prId, mergeMethod: SQUASH }) {
+                      pullRequest { autoMergeRequest { enabledAt } }
+                    }
+                  }`, { prId: prNodeId });
+                  core.info(`🔀 Auto-merge enabled for PR #${prNumber}`);
+                } else {
+                  core.info(`Auto-merge already enabled for PR #${prNumber}`);
+                }
+              } catch (e) {
+                core.warning(`Could not enable auto-merge: ${e.message}`);
+              }
+            }

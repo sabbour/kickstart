@@ -341,15 +341,8 @@ prompt: |
   {% endif %}
 
   {only if identity configured:}
-  GIT IDENTITY: Commit as `{app_slug}[bot]`. Before any write:
-  ```bash
-  unset GH_TOKEN GITHUB_TOKEN
-  export GH_CONFIG_DIR="{team_root}/.squad/runtime/gh-config/{ceremony_id}"
-  mkdir -p "$GH_CONFIG_DIR"
-  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
-  [ -n "$TOKEN" ] || exit 1
-  ```
-  Use the token **inline** on each write: `GH_TOKEN="$TOKEN" gh <command>`. **Never `export GH_TOKEN`** — the token persists in env and bleeds into `set -x` / tool-capture. After any write, run `.squad/scripts/post-flight-check.mjs` synchronously against the write actor. Agent-authored GitHub writes must use this app token; do not fall back to ambient `gh`/`git` auth. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
+  GIT IDENTITY: Commit as `{app_slug}[bot]`. Before any write, use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get a token.
+  Use the token **inline** on each write: `GH_TOKEN="$TOKEN" gh <command>`. **Never `export GH_TOKEN`** — the token persists in env and bleeds into `set -x` / tool-capture. After any write, run `squad_identity_attest_write` synchronously against the write actor. Agent-authored GitHub writes must use this app token; do not fall back to ambient `gh`/`git` auth. PR body: `🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})`.
   {end identity block}
 
   TASK: {specific task description}
@@ -750,7 +743,7 @@ This guarantees a bare `gh` call fails rather than falling back to the human ope
 **7. The one-liner write form is MANDATORY** (Zapp C7). This form:
 
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
 [ -n "$TOKEN" ] || exit 1
 GH_TOKEN="$TOKEN" gh pr review ...    # token scoped to the single call
 ```
@@ -759,7 +752,7 @@ is **REQUIRED**. `export GH_TOKEN; gh …` is **forbidden** because (a) the toke
 
 **8. The never-echo rule** (Zapp C2, Nibbler gap 6). No agent — coordinator included — may echo, paste, log, or otherwise surface any `ghs_`, `ghp_`, `gho_`, `ghu_`, `ghr_`, `ghe_`, `github_pat_`, `Authorization: Bearer …`, `x-access-token:…`, or `-----BEGIN … PRIVATE KEY-----` substring. Capture with `$(…)` only — never run the resolver as a bare command. The coordinator runs every agent's captured response through `.squad/scripts/scrub-secrets.mjs --response` before surfacing it to the user or writing it to `events.jsonl`.
 
-**9. Post-flight identity check is SYNCHRONOUS and blocking** (Zapp C4+C5, Nibbler gaps 3+4+5). After any agent-authored GitHub write (review, comment, label, PR create, issue edit, commit push), the spawn epilogue MUST verify the actor via `.squad/scripts/post-flight-check.mjs` in the same subshell the write ran in. The check:
+**9. Post-flight identity check is SYNCHRONOUS and blocking** (Zapp C4+C5, Nibbler gaps 3+4+5). After any agent-authored GitHub write (review, comment, label, PR create, issue edit, commit push), the spawn epilogue MUST verify the actor via `squad_identity_attest_write` in the same subshell the write ran in. The check:
 
 - Verifies `user.login == expected-bot-login` **AND** `user.type == "Bot"` (defends against login collision).
 - On mismatch, attempts revoke with the correct bot token:
@@ -771,7 +764,7 @@ is **REQUIRED**. `export GH_TOKEN; gh …` is **forbidden** because (a) the toke
 
 **10. Anti-pattern list — embed in every Lead/Reviewer/Bender/Fry/Hermes/Scribe spawn prompt.** Each of these is a P1 governance failure:
 
-- ❌ `node resolve-token.mjs --required <role>` as a bare command (leaks to chat/log).
+- ❌ Calling `squad_identity_resolve_token` as a bare command instead of capturing its output with `$(…)` (leaks the token to chat/log).
 - ❌ `echo "$TOKEN"` or any print of the token value.
 - ❌ `export GH_TOKEN; gh …` without the inline one-liner form.
 - ❌ A `gh` call without `GH_TOKEN` set in the same subshell (falls back to `hosts.yml`).
@@ -914,10 +907,10 @@ prompt: |
   
   **Step B — Resolve the token with the one-liner form (MANDATORY):**
   ```bash
-  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
+  TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
   [ -n "$TOKEN" ] || exit 1
   ```
-  `resolve-token.mjs` uses only explicit config keys or explicit alias mappings; it does **not** guess another app. `--required` prints a reason to stderr and exits non-zero when write auth is not explicitly configured. Never run the resolver as a bare command — it leaks the token into chat context. Always capture with `$(…)`.
+  `squad_identity_resolve_token` uses only explicit config keys or explicit alias mappings; it does **not** guess another app. It prints a reason to stderr and exits non-zero when write auth is not explicitly configured. Never invoke the tool as a bare command — it leaks the token into chat context. Always capture with `$(…)`.
   
   **Step C — Use the token inline, never `export`:**
   - **Push:** `git push "https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git" {branch}`
@@ -928,14 +921,14 @@ prompt: |
   `export GH_TOKEN; gh …` is **forbidden**: the token persists across subsequent commands, `set -x` dumps it, and tool-call stdout capture bleeds it into session logs.
   
   **Step D — Post-flight identity check (SYNCHRONOUS, blocking):**
-  After any bot-authored write, verify the actor in the same subshell:
+  After any bot-authored write, verify the actor in the same subshell using the `squad_identity_attest_write` tool:
   ```bash
-  GH_TOKEN="$TOKEN" node "{team_root}/.squad/scripts/post-flight-check.mjs" \
+  GH_TOKEN="$TOKEN" squad_identity_attest_write \
     --kind <review|comment|label|pr-create|issue-edit|commit> \
     --owner {owner} --repo {repo} [--pr N | --issue N | --sha SHA] [--id ID] \
     --expected-login {app_slug}[bot]
   ```
-  Exit 0 = OK (actor + type match), exit 1 = mismatch detected and auto-revoked, exit 2 = mismatch detected and revoke FAILED (HALT, file P1), exit 3 = validation or API error. Do not declare ceremony success until exit 0 is confirmed. The check verifies both `user.login == expected` AND `user.type == "Bot"` (login-match alone is spoofable by a human account). Exit 3 is returned for both parameter validation errors (missing required --id, --label, etc.) and unexpected API failures; see `.squad/scripts/post-flight-check.mjs` for error details.
+  Exit 0 = OK (actor + type match), exit 1 = mismatch detected and auto-revoked, exit 2 = mismatch detected and revoke FAILED (HALT, file P1), exit 3 = validation or API error. Do not declare ceremony success until exit 0 is confirmed. The check verifies both `user.login == expected` AND `user.type == "Bot"` (login-match alone is spoofable by a human account). Exit 3 is returned for both parameter validation errors (missing required --id, --label, etc.) and unexpected API failures.
   
   **Git commit identity:**
   - `git -c user.name="{app_slug}[bot]" -c user.email="{app_slug}[bot]@users.noreply.github.com" commit ...`

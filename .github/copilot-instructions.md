@@ -28,8 +28,8 @@ Before starting work, check your capability profile in `.squad/team.md` under th
 Before touching a single source file, verify all three boxes:
 
 - [ ] **Issue exists.** The work is tied to a GitHub issue number. If no issue exists, stop and create one before proceeding.
-- [ ] **Design Proposal posted.** A DP comment has been posted on the issue by the implementing agent, containing: problem statement, proposed approach, `Estimate:` field, files to modify, pack boundaries, security considerations, docs and changeset plan, alternatives considered. Fast-lane exemption: skip DP only if the issue is labeled `estimate:S` OR `squad:chore-auto`.
-- [ ] **Design Review approved.** The DP comment has all three approval labels present on the issue: `architecture:approved`, `security:approved`, `codereview:approved`. Fast-lane exemption: skip DR only if `estimate:S` OR `squad:chore-auto`.
+- [ ] **Design Proposal posted.** Use `squad_workflows_post_design_proposal` to post the DP. Fast-lane exemption: skip DP only if the issue is labeled `estimate:S` OR `squad:chore-auto` (check with `squad_workflows_fast_lane`).
+- [ ] **Design Review approved.** Use `squad_workflows_check_design_approval` to verify all approval labels are present. Fast-lane exemption: same as above.
 
 If any box is unchecked → run the missing ceremony first. Do not proceed to code.
 
@@ -55,64 +55,6 @@ Changeset is committed and pushed as part of the PR branch. Do not open the PR w
 
 Amy will review the changeset quality during the PR Review Gate. Scribe curates CHANGELOG entries from aggregated changesets at release time. Neither of them writes the changeset — you do.
 
-## Bot Identity — all GitHub writes
-
-This repo has a per-role GitHub App identity configured. Every agent-authored GitHub write (PR create, issue comment, label, review) MUST use the bot token, not ambient `gh` auth.
-
-**Before any `gh` or `git push` command that writes to GitHub:**
-
-```bash
-# 1. Isolate gh auth — prevents silent fallback to the human operator's auth
-unset GH_TOKEN GITHUB_TOKEN
-export GH_CONFIG_DIR="$(git rev-parse --show-toplevel)/.squad/runtime/gh-config/$$"
-mkdir -p "$GH_CONFIG_DIR"
-
-# 2. Resolve the role token — fails closed if no app is configured
-ROLE_SLUG="<your-role-slug>"   # lead | frontend | backend | tester | security | codereview | devops | docs
-TOKEN=$(node "$(git rev-parse --show-toplevel)/.squad/scripts/resolve-token.mjs" --required "$ROLE_SLUG") || exit 1
-[ -n "$TOKEN" ] || exit 1
-```
-
-Role slug mapping: Leela → `lead`, Fry → `frontend`, Bender → `backend`, Hermes → `tester`, Zapp → `security`, Nibbler → `codereview`, Kif → `devops`, Amy → `docs`. The Copilot coding agent acting as a squad member uses the role slug of that member.
-
-**Use the token inline — never `export GH_TOKEN`:**
-
-```bash
-git push "https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git" HEAD
-GH_TOKEN="$TOKEN" gh pr create --draft --title "..." --body "..."
-GH_TOKEN="$TOKEN" gh issue comment <N> --body "..."
-```
-
-**PR body must include:** `🤖 Created by [squad-{role}](https://github.com/apps/squad-{role})`
-
-**Never echo the token.** No `echo "$TOKEN"`, no `env`, no `printenv` near token-handling blocks.
-
-## Branch Naming
-
-Use the squad branch convention:
-```
-squad/{issue-number}-{kebab-case-slug}
-```
-Example: `squad/42-fix-login-validation`
-
-## Worktrees
-
-Never run `git checkout -b` in the top-level working tree. Every piece of issue work happens inside its own worktree under `.worktrees/`. This prevents agents from stomping on each other's uncommitted changes, branching off the wrong base, or producing mixed-diff PRs.
-
-Before starting work:
-
-```bash
-git fetch origin
-git worktree list                    # see what's already in flight; reuse if yours exists
-git worktree add .worktrees/<issue-number-or-slug> \
-  -b squad/<issue-number>-<slug> origin/main
-cd .worktrees/<issue-number-or-slug>
-```
-
-All subsequent edits, commits, and `gh pr create` calls run from inside the worktree. After the PR merges or closes, run `git worktree remove .worktrees/<name> && git worktree prune` from another checkout.
-
-If you find yourself about to branch from `main` in the top-level checkout, stop and create a worktree instead.
-
 ## PR Guidelines
 
 When opening a PR:
@@ -137,7 +79,7 @@ Review sources that MUST be acknowledged (all carry equal weight):
 **❌ FORBIDDEN: Resolving a thread without first posting a reply.**
 Silently marking a thread resolved — even after fixing the code — is a protocol violation. The reply is what proves the feedback was considered. Fix + reply + resolve is the indivisible unit.
 
-The full protocol with API commands is in `.squad/skills/pr-workflow/SKILL.md` under **Handling Review Feedback**.
+The full protocol is documented in `.squad/ceremonies.md` under **PR Review Gate**.
 
 ## Decisions
 
@@ -146,3 +88,49 @@ If you make a decision that affects other team members, write it to:
 .squad/decisions/inbox/copilot-{brief-slug}.md
 ```
 The Scribe will merge it into the shared decisions file.
+
+<!-- squad-identity: start -->
+## GIT IDENTITY — Bot Authentication
+
+This project uses GitHub App bot identity for all agent-authored writes.
+Read `.squad/skills/squad-identity/SKILL.md` before any GitHub write.
+
+**Use the `squad_identity_resolve_token` tool** to get a bot token for your ROLE_SLUG.
+
+Your ROLE_SLUG is injected into your charter — look for:
+```
+ROLE_SLUG="<slug>"  # injected by configure-identity --update-charters
+```
+
+If absent, call `squad_identity_status` to see the full agentNameMap.
+
+**Token usage (inline per-call, never export):**
+```bash
+GH_TOKEN="$TOKEN" gh pr create ...
+GH_TOKEN="$TOKEN" gh api /repos/{owner}/{repo}/issues -f title="..." 
+git push "https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git" HEAD
+```
+<!-- squad-identity: end -->
+
+<!-- squad-workflows: start -->
+## Workflow Tools (squad-workflows extension)
+
+Use these tools for the issue-to-merge lifecycle:
+
+**Planning:** `squad_workflows_estimate` → `squad_workflows_decompose` (if L/XL)
+**Design:** `squad_workflows_post_design_proposal` → `squad_workflows_check_design_approval`
+**Review:** `squad_workflows_check_feedback` + `squad_workflows_check_ci`
+**Merge:** `squad_workflows_merge_check` → `squad_workflows_merge`
+**Utility:** `squad_workflows_fast_lane`, `squad_workflows_board_sync`, `squad_workflows_wave_status`, `squad_workflows_status`
+
+### Fast Lane
+Issues labeled `estimate:S` or `squad:chore-auto` skip Design Proposal and Design Review.
+
+### Wave-Based Delivery
+Large features must be decomposed into waves (GitHub milestones). Each wave is independently shippable and produces a releasable changeset. Max issue estimate per wave: M.
+
+### Branch Conventions
+- Base branch: `dev`
+- Branch naming: `squad/{issue-number}-{kebab-case-slug}`
+- Always use worktrees: `git worktree add .worktrees/{slug} -b squad/{issue}-{slug} origin/dev`
+<!-- squad-workflows: end -->

@@ -51,6 +51,16 @@ Always work inside a dedicated worktree under `.worktrees/`, branched from `orig
 Read `.squad/decisions.md` and the brief sections on A2UI streaming and components.
 
 
+
+## Git Identity
+
+- **Role slug:** frontend
+- **App slug:** squad-frontend
+- **Bot login:** squad-frontend[bot]
+- **Commit as:** `git -c user.name="squad-frontend[bot]" -c user.email="squad-frontend[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the `squad_identity_resolve_token` tool. Read `.squad/skills/squad-identity/SKILL.md` for the full protocol.
+
 <!-- SQUAD-TOKEN-HANDLING-BLOCK v2 (squad-identity) -->
 ## Token handling (hard boundary — issue #1087, squad-identity)
 

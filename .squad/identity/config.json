@@ -65,5 +65,15 @@
       "roleSlug": "docs",
       "tier": "per-role"
     }
+  },
+  "agentNameMap": {
+    "leela": "lead",
+    "fry": "frontend",
+    "bender": "backend",
+    "hermes": "tester",
+    "zapp": "security",
+    "nibbler": "codereview",
+    "kif": "devops",
+    "amy": "docs"
   }
 }

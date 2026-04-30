@@ -79,6 +79,16 @@ import { strictOptional, stripNulls, isHttpsUrl } from '@aks-kickstart/harness/r
 **The conformance test is the gate.** If `npx vitest run packages/web/api/src/startup/schema-conformance.test.ts` passes, the schema is valid. If it fails, the PR does not merge.
 
 
+
+## Git Identity
+
+- **Role slug:** backend
+- **App slug:** squad-backend
+- **Bot login:** squad-backend[bot]
+- **Commit as:** `git -c user.name="squad-backend[bot]" -c user.email="squad-backend[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the `squad_identity_resolve_token` tool. Read `.squad/skills/squad-identity/SKILL.md` for the full protocol.
+
 <!-- SQUAD-TOKEN-HANDLING-BLOCK v2 (squad-identity) -->
 ## Token handling (hard boundary — issue #1087, squad-identity)
 

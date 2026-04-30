@@ -52,6 +52,16 @@ Before starting work, run `git rev-parse --show-toplevel`. All `.squad/` paths r
 Read `.squad/decisions.md` and the brief section on pack guardrails before reviewing any PR that adds or changes tools.
 
 
+
+## Git Identity
+
+- **Role slug:** security
+- **App slug:** squad-security
+- **Bot login:** squad-security[bot]
+- **Commit as:** `git -c user.name="squad-security[bot]" -c user.email="squad-security[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the `squad_identity_resolve_token` tool. Read `.squad/skills/squad-identity/SKILL.md` for the full protocol.
+
 <!-- SQUAD-TOKEN-HANDLING-BLOCK v2 (squad-identity) -->
 ## Token handling (hard boundary — issue #1087, squad-identity)
 

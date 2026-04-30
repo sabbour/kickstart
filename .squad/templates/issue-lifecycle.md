@@ -162,9 +162,9 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 **Commit types:** `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `style`, `build`, `ci`
 
 **Push command:**
+
+Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get a token, then:
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
 git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
 ```
 
@@ -181,11 +181,9 @@ git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{is
 **PR creation commands:**
 
 **GitHub:**
-```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
 
+Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get a token, then:
+```bash
 cat > pr-body.txt <<'EOF'
 🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
 
@@ -250,9 +248,7 @@ Working as {member} ({role})
 ```bash
 # Make changes
 # ⚠️ NEVER use `git add .` or `git add -A` — only stage files you intentionally changed
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
+# Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get TOKEN, then:
 git add -- {specific files you modified}
 git commit -m "fix: address review feedback"
 git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
@@ -260,10 +256,8 @@ git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{is
 
 **Re-request review (GitHub):**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
-GH_TOKEN=$TOKEN gh pr ready {pr-number}
+# Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get TOKEN, then:
+GH_TOKEN="$TOKEN" gh pr ready {pr-number}
 ```
 
 ### 6. PR Merge
@@ -274,18 +268,14 @@ GH_TOKEN=$TOKEN gh pr ready {pr-number}
 
 **GitHub (merge commit):**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
-GH_TOKEN=$TOKEN gh pr merge {pr-number} --merge --delete-branch
+# Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get TOKEN, then:
+GH_TOKEN="$TOKEN" gh pr merge {pr-number} --merge --delete-branch
 ```
 
 **GitHub (squash):**
 ```bash
-TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
-GH_TOKEN=$TOKEN gh pr merge {pr-number} --squash --delete-branch
+# Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get TOKEN, then:
+GH_TOKEN="$TOKEN" gh pr merge {pr-number} --squash --delete-branch
 ```
 
 **Azure DevOps:**
@@ -343,11 +333,8 @@ When spawning an agent to work on an issue, include this context block:
 **After completing work:**
 1. Commit with message referencing issue number
 2. Push branch
-3. Open PR using:
+3. Open PR using the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get TOKEN, then:
    ```
-   TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
-   [ -n "$TOKEN" ] || exit 1
-   export GH_TOKEN="$TOKEN"
    cat > pr-body.txt <<'EOF'
    🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
 
@@ -355,7 +342,7 @@ When spawning an agent to work on an issue, include this context block:
 
    {description}
    EOF
-   GH_TOKEN=$TOKEN gh pr create --title "{title}" --body-file pr-body.txt --head squad/{issue-number}-{slug} --base {base-branch}
+   GH_TOKEN="$TOKEN" gh pr create --title "{title}" --body-file pr-body.txt --head squad/{issue-number}-{slug} --base {base-branch}
    ```
 4. Report PR URL to coordinator
 ```

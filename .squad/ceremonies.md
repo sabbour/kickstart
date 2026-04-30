@@ -411,3 +411,43 @@ When a workflow opens an issue, PR, or comment via @copilot, it:
 3. If delegating a task to @copilot, names the persona explicitly (`@copilot — work as Scribe`).
 
 The existing `.github/copilot-instructions.md` tells @copilot to load the referenced charter and work in that voice. No additional plumbing needed.
+
+<!-- squad-workflows: start -->
+### Planning Ceremony (squad-workflows)
+
+| Step | Tool | Gate |
+|------|------|------|
+| Estimate issue | `squad_workflows_estimate` | Auto-applies `estimate:S/M/L/XL` label |
+| Decompose (if L/XL) | `squad_workflows_decompose` | Creates milestones + child issues |
+| Fast-lane check | `squad_workflows_fast_lane` | Issues labeled `estimate:S` or `squad:chore-auto` skip Design Proposal and Design Review |
+
+### Design Ceremony
+
+| Step | Tool | Gate |
+|------|------|------|
+| Post Design Proposal | `squad_workflows_post_design_proposal` | Posts DP comment on issue, adds `design-proposal` label |
+| Check Design Approval | `squad_workflows_check_design_approval` | Blocks until all approval labels present: `architecture:approved`, `security:approved`, `codereview:approved` |
+
+### Review Ceremony
+
+| Step | Tool | Gate |
+|------|------|------|
+| Check review feedback | `squad_workflows_check_feedback` | Lists unresolved review threads — all must be resolved before merge |
+| Check CI status | `squad_workflows_check_ci` | CI must be green — returns actionable failure context if not |
+| Pre-merge validation | `squad_workflows_merge_check` | Holistic gate: approvals + threads + CI + changeset + branch current |
+
+### Merge Ceremony
+
+| Step | Tool | Gate |
+|------|------|------|
+| Merge PR | `squad_workflows_merge` | Squash merge, delete branch, check wave completion |
+
+### Wave Completion Ceremony
+
+When the last issue in a wave merges:
+
+| Step | Tool | Gate |
+|------|------|------|
+| Check wave progress | `squad_workflows_wave_status` | Reports which waves are complete and releasable |
+| Release wave | `squad_workflows_release_wave` | Runs changeset version, closes milestone, posts summary |
+<!-- squad-workflows: end -->
