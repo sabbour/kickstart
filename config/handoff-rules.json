@@ -185,7 +185,14 @@
           "provenance": "extracted"
         }
       ],
-      "asTools": []
+      "asTools": [
+        {
+          "target": "aks.architect",
+          "maxTurns": 3,
+          "purpose": "Consult the AKS architect for Kubernetes-specific questions (node pool sizing, workload placement, network policies, Gateway API, KAITO) without handing off the conversation.",
+          "provenance": "extracted"
+        }
+      ]
     },
     "azure.ops": {
       "role": "domain_operator",

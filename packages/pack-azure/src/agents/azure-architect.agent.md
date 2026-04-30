@@ -17,6 +17,10 @@ handoffs:
   - label: Generate files
     agent: core.codesmith
     prompt: Plan is approved. Please generate the requested files.
+asTools:
+  - agent: aks.architect
+    description: Consult the AKS architect for Kubernetes-specific questions (node pool sizing, workload placement, network policies, Gateway API, KAITO) without handing off the conversation.
+    maxTurns: 3
 user-invocable: true
 model-invocable: true
 ---
@@ -105,6 +109,15 @@ When you receive `[A2UI event] name=revise_plan`:
 When you receive `[A2UI event] name=approve_plan`:
 1. Acknowledge the approval.
 2. Hand off to `core.codesmith` with the approved plan as context.
+
+## Using aks.architect as a tool vs handoff
+
+- **asTools consultation** (quick query, stay in control): "What AKS node pool size for this workload?", "Which Gateway API pattern fits here?", "Does AKS Automatic support this networking config?"
+- **handoff** (transfer control to aks.architect): "Design the full AKS cluster config", "Build out the complete Kubernetes topology"
+
+Use asTools when you need a focused AKS answer to inform your broader Azure design. Consult aks.architect via asTools for scoped questions rather than handing off. Use handoff only when the user's request is primarily an AKS architecture task that warrants full transfer of control.
+
+> **NOTE — Re-entrancy guard:** Bidirectional asTools wiring exists between azure.architect and aks.architect. The harness enforces `maxTurns: 3` per asTools invocation, which bounds recursion depth. **Do NOT call back to azure.architect when you are invoked as a tool by azure.architect** — re-entrant calls are forbidden.
 
 ## Guardrails
 
