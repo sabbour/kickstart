@@ -32,8 +32,13 @@ export function generateReusableWorkflow(roles, config = {}, repoRoot = '.') {
     }
   }
 
+  // Fallback approver for self-approval deadlock (PR author == required reviewer bot)
+  // Try 'lead' first, fall back to 'architecture' (legacy key name)
+  const fallbackApprover = resolveBotLogin('lead', repoRoot) || resolveBotLogin('architecture', repoRoot) || '';
+
   const botLoginJson = JSON.stringify(botLoginMap);
   const gateRulesJson = JSON.stringify(gateRulesMap);
+  const fallbackApproverJson = JSON.stringify(fallbackApprover);
 
   return `name: Squad Review Gate
 
@@ -89,6 +94,7 @@ jobs:
             // Config injected at scaffold time
             const botLoginMap = ${botLoginJson};
             const gateRules = ${gateRulesJson};
+            const fallbackApprover = ${fallbackApproverJson}; // accepts APPROVE when PR author == required bot
 
             // Helper: post commit status for the required check name
             async function postStatus(state, description) {
@@ -234,10 +240,17 @@ jobs:
 
             for (const role of requiredRoles) {
               const botLogin = botLoginMap[role] || null;
+              const prAuthor = (pr.user?.login || '').toLowerCase();
+              const isSelfApprovalBlocked = botLogin && prAuthor === botLogin.toLowerCase();
 
               const roleReviews = allReviews.filter(r => {
                 const login = (r.user?.login || '').toLowerCase();
-                if (botLogin) return login === botLogin.toLowerCase();
+                if (botLogin) {
+                  // Accept the primary bot OR fallback approver when self-approval is blocked
+                  if (login === botLogin.toLowerCase()) return true;
+                  if (isSelfApprovalBlocked && fallbackApprover && login === fallbackApprover.toLowerCase()) return true;
+                  return false;
+                }
                 return (
                   login.includes(role.toLowerCase()) ||
                   login === \`\${role}-bot\` ||

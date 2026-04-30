@@ -52,6 +52,7 @@ jobs:
             // Config injected at scaffold time
             const botLoginMap = {"codereview":"squad-codereview[bot]","security":"squad-security[bot]","docs":"squad-docs[bot]"};
             const gateRules = {"codereview":{"required":"always"},"security":{"required":"always"},"docs":{"required":"conditional","bypassLabels":["docs:not-needed"],"bypassWhen":{"labels":["squad:chore-auto"]},"bypassLabelAuthority":"docs"}};
+            const fallbackApprover = "squad-lead[bot]"; // accepts APPROVE when PR author == required bot
 
             // Helper: post commit status for the required check name
             async function postStatus(state, description) {
@@ -197,10 +198,17 @@ jobs:
 
             for (const role of requiredRoles) {
               const botLogin = botLoginMap[role] || null;
+              const prAuthor = (pr.user?.login || '').toLowerCase();
+              const isSelfApprovalBlocked = botLogin && prAuthor === botLogin.toLowerCase();
 
               const roleReviews = allReviews.filter(r => {
                 const login = (r.user?.login || '').toLowerCase();
-                if (botLogin) return login === botLogin.toLowerCase();
+                if (botLogin) {
+                  // Accept the primary bot OR fallback approver when self-approval is blocked
+                  if (login === botLogin.toLowerCase()) return true;
+                  if (isSelfApprovalBlocked && fallbackApprover && login === fallbackApprover.toLowerCase()) return true;
+                  return false;
+                }
                 return (
                   login.includes(role.toLowerCase()) ||
                   login === `${role}-bot` ||
