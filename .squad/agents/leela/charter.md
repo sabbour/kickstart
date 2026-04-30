@@ -67,7 +67,7 @@ Read `.squad/decisions.md` and `docs-site/docs/architecture/v2-implementation-br
 
 ## Git Identity
 
-- **Role slug:** lead
+- **Role slug:** architecture
 - **App slug:** squad-lead
 - **Bot login:** squad-lead[bot]
 - **Commit as:** `git -c user.name="squad-lead[bot]" -c user.email="squad-lead[bot]@users.noreply.github.com" commit ...`
