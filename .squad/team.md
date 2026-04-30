@@ -21,7 +21,7 @@
 | Kif | DevOps | `.squad/agents/kif/charter.md` | ✅ Active |
 | Amy | Documentation | `.squad/agents/amy/charter.md` | ✅ Active |
 | Scribe | Scribe + Product/DX | `.squad/agents/scribe/charter.md` | 📋 Silent |
-| Ralph | Work Monitor | - | 🔄 Monitor |
+| Ralph | Work Monitor | `.squad/agents/ralph/charter.md` | 🔄 Monitor |
 
 ## Coding Agent
 
