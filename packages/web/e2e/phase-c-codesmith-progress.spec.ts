@@ -165,9 +165,15 @@ test.describe('Phase C codesmith generation progress', () => {
     await expect(steps.nth(2)).toHaveAttribute('data-step', 'kaito-crd');
     await expect(steps.nth(3)).toHaveAttribute('data-step', 'gha-workflow');
 
-    // GenerationProgress shared surface stays singular
+    // GenerationProgress shared surface stays singular and contains a root component
     const progressSurface = page.locator('[data-surface-id="shared:generation-progress"]');
     await expect(progressSurface).toHaveCount(1);
+
+    // The root component must exist inside the surface (catches the bug where
+    // createSurface fires but updateComponents with root never arrives)
+    const rootInsideSurface = progressSurface.getByTestId('a2ui-GenerationProgress');
+    await expect(rootInsideSurface).toBeVisible();
+    await expect(rootInsideSurface).toContainText('Project Setup');
 
     // SummaryCard visible with publish button
     const summaryCard = page.getByTestId('a2ui-SummaryCard');

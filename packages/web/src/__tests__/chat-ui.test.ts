@@ -484,7 +484,7 @@ describe('chat file workspace rehydration', () => {
           surfaceId: 'assistant-turn-10::setup-progress',
           components: [
             {
-              id: 'setup-progress',
+              id: 'root',
               component: 'GenerationProgress',
               title: GENERATION_PROGRESS_TITLE,
               overallStatus: 'complete',
