@@ -1,6 +1,6 @@
 {
   "$schema": "./schemas/tracks.schema.json",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "tracks": [
     {
       "id": "static_site",
@@ -31,7 +31,8 @@
       "uiOptions": {
         "trackPickerOrder": 1,
         "recommended": false
-      }
+      },
+      "provenance": "extracted"
     },
     {
       "id": "containerized_web",
@@ -73,7 +74,8 @@
           "database/cache needs",
           "scale requirements"
         ]
-      }
+      },
+      "provenance": "extracted"
     },
     {
       "id": "agentic_app",
@@ -101,7 +103,9 @@
         "azure openai"
       ],
       "handoffPrimary": "aks.architect",
-      "handoffSecondary": ["azure.architect"],
+      "handoffSecondary": [
+        "azure.architect"
+      ],
       "nextStep": "select_inference_backend",
       "platformDeploymentTarget": "AKS Automatic",
       "discloseDeploymentTarget": "after_requirements",
@@ -109,7 +113,8 @@
       "uiOptions": {
         "trackPickerOrder": 3,
         "recommended": false
-      }
+      },
+      "provenance": "extracted"
     },
     {
       "id": "repo_uplift",
@@ -127,7 +132,9 @@
         "this repo"
       ],
       "handoffPrimary": "azure.architect",
-      "handoffSecondary": ["aks.architect"],
+      "handoffSecondary": [
+        "aks.architect"
+      ],
       "nextStep": "inspect_repo",
       "platformDeploymentTarget": "AKS Automatic",
       "discloseDeploymentTarget": "after_requirements",
@@ -138,13 +145,18 @@
       },
       "inspectionHints": {
         "tool": "core.inspect_repo",
-        "input": { "source": "remote", "remoteUrl": "<url>", "localPath": null },
+        "input": {
+          "source": "remote",
+          "remoteUrl": "<url>",
+          "localPath": null
+        },
         "afterInspection": {
           "summary": "Emit SummaryCard titled 'We found:' with one item per detection result (language, framework, runtime, hasDockerfile, hasHelmChart, hasGithubActions)",
-          "questionStyle": "Ask the SINGLE most important question from inspect_repo.questionnaire array in PROSE — do not emit multi-field Questionnaire",
+          "questionStyle": "Ask the SINGLE most important question from inspect_repo.questionnaire array in PROSE \u2014 do not emit multi-field Questionnaire",
           "maxFollowUps": 3
         }
-      }
+      },
+      "provenance": "extracted"
     }
   ],
   "selectionPolicy": {
@@ -152,7 +164,9 @@
     "inferenceRule": "If exactly one track's triggers match, route directly without TrackPicker. Otherwise emit TrackPicker.",
     "fallback": "If 0 tracks match or the message is genuinely ambiguous, emit TrackPicker with all four tracks as equal-weight tiles.",
     "platformNeutralFirstTurn": true,
-    "doNotMentionInFirstTurn": ["AKS Automatic"]
+    "doNotMentionInFirstTurn": [
+      "AKS Automatic"
+    ]
   },
   "trackPickerSurface": {
     "surfaceId": "shared:triage-main",

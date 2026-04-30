@@ -4,18 +4,30 @@
   "title": "Component Catalog",
   "description": "Inventory of UI components by pack and category. Bootstrap data for Phase 3 ingestion; runtime source of truth remains the sealed registry queried via core.search_components.",
   "type": "object",
-  "required": ["version", "categories", "components"],
+  "required": [
+    "version",
+    "categories",
+    "components"
+  ],
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$"
     },
-    "extractedFrom": { "type": "string" },
-    "note": { "type": "string" },
+    "extractedFrom": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
     "categories": {
       "type": "object",
-      "additionalProperties": { "type": "string" }
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "components": {
       "type": "object",
@@ -23,32 +35,73 @@
         "type": "object",
         "additionalProperties": {
           "type": "array",
-          "items": { "$ref": "#/definitions/component" }
+          "items": {
+            "$ref": "#/definitions/component"
+          }
         }
       }
     },
-    "decisionFrameworkRef": { "type": "string" },
+    "decisionFrameworkRef": {
+      "type": "string"
+    },
     "discoveryAtRuntime": {
       "type": "object",
-      "required": ["tool", "purpose"],
+      "required": [
+        "tool",
+        "purpose"
+      ],
       "properties": {
-        "tool": { "type": "string" },
-        "purpose": { "type": "string" }
+        "tool": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        }
       }
     }
   },
   "definitions": {
     "component": {
       "type": "object",
-      "required": ["name", "useCase"],
+      "required": [
+        "name",
+        "useCase",
+        "provenance"
+      ],
       "properties": {
-        "name": { "type": "string" },
-        "useCase": { "type": "string" },
-        "interactivity": { "type": "string" },
-        "fields": { "type": "array", "items": { "type": "string" } },
-        "frameworkRef": { "type": "string" },
-        "specializedFor": { "type": "string" },
-        "forbidden": { "type": "string" }
+        "name": {
+          "type": "string"
+        },
+        "useCase": {
+          "type": "string"
+        },
+        "interactivity": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "frameworkRef": {
+          "type": "string"
+        },
+        "specializedFor": {
+          "type": "string"
+        },
+        "forbidden": {
+          "type": "string"
+        },
+        "provenance": {
+          "type": "string",
+          "enum": [
+            "extracted",
+            "derived",
+            "proposed"
+          ],
+          "description": "Informational provenance label indicating how this entry was sourced. This is NOT a cryptographic attestation \u2014 do not use as a hard trust signal for runtime gating."
+        }
       }
     }
   }
