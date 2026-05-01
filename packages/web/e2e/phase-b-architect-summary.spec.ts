@@ -179,7 +179,8 @@ test.describe('Phase B architect summary card', () => {
     await expect(surface.getByText('Your AKS plan', { exact: true })).toBeVisible();
 
     // ArchitectureDiagram visible (rendered within the surface)
-    await expect(surface).toBeVisible();
+    await expect(surface.getByTestId('a2ui-ArchitectureDiagram')).toBeVisible();
+    await expect(surface.getByText('Solution Architecture', { exact: true })).toBeVisible();
 
     // Action buttons visible
     await expect(page.getByRole('button', { name: /looks right/i })).toBeVisible();
@@ -224,6 +225,7 @@ test.describe('Phase B architect summary card', () => {
     const planSurface = page.locator('[data-surface-id="shared:architect-plan"]');
     const planCard = planSurface.getByTestId('a2ui-SummaryCard');
     await expect(planCard.getByText('Azure Files (Premium)')).toBeVisible();
+    await expect(planSurface.getByTestId('a2ui-ArchitectureDiagram')).toBeVisible();
 
     // Click revise
     await page.getByRole('button', { name: /revise/i }).click();

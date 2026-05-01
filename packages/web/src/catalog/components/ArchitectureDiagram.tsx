@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createReactComponent } from '../../vendor/a2ui/react/adapter';
 import { z } from 'zod';
-import { DynamicStringSchema } from '../../vendor/a2ui/schema/common-types';
+import { DynamicStringSchema } from '../../vendor/a2ui/web_core/schema/common-types';
 import {
   Body2,
   Button,
@@ -19,16 +19,16 @@ import {
   nodesToMermaid,
   renderArchitectureDiagramSvg,
   sanitizeSvgMarkup,
-} from './architectureDiagramUtils';
+} from '../../../../pack-core/src/components/rich/architectureDiagramUtils';
 import type {
   DiagramEdge,
   DiagramNode,
-} from './architectureDiagramUtils';
+} from '../../../../pack-core/src/components/rich/architectureDiagramUtils';
 import {
   ARCHITECTURE_DIAGRAM_EMPTY_STATE_ICON_URL,
   ARCHITECTURE_DIAGRAM_HEADER_ICON_URL,
   getArchitectureDiagramIconRegistry,
-} from './architectureDiagramIconRegistry';
+} from '../../../../pack-core/src/components/rich/architectureDiagramIconRegistry';
 
 const VIEWPORT_MIN_HEIGHT = 320;
 const VIEWPORT_MAX_HEIGHT = 800;

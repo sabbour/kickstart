@@ -21,6 +21,7 @@ import {
 } from "../contexts/A2UIRegistryContext";
 import { fluentOverrides } from "../catalog/fluent-components/index";
 import {
+  ArchitectureDiagram,
   AuthCard,
   AzureAction,
   AzureLoginCard,
@@ -62,6 +63,7 @@ function buildBootstrapRegistry(): ClientComponentRegistry {
   const registry = new ClientComponentRegistry();
   for (const impl of fluentOverrides) registry.register(impl);
   const richComponents = [
+    ArchitectureDiagram,
     AuthCard,
     AzureAction,
     AzureLoginCard,

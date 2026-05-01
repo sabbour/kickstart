@@ -4,9 +4,9 @@ sidebar_position: 1
 
 # Custom Kickstart Catalog
 
-Kickstart extends the A2UI v0.9 basic catalog with **22 custom components** designed for the AKS deployment onboarding experience. These components are registered in `packages/web/src/catalog/kickstart-catalog.ts`.
+Kickstart extends the A2UI v0.9 basic catalog with **23 custom components** designed for the AKS deployment onboarding experience. These components are registered during web bootstrap in `packages/web/src/main.tsx`.
 
-> **Contract test:** `packages/core/src/__tests__/custom-component-count.test.ts` asserts that exactly 22 `.tsx` component files exist in `packages/web/src/catalog/components/`. When adding a new component, bump the count in that test and update this page.
+> **Contract tests:** `packages/web/src/__tests__/component-previews.test.ts`, `component-scenarios.test.ts`, and `a2ui-allow-list-registry.test.ts` guard that catalog fixtures resolve through the registered client component catalog.
 
 ## Component Categories
 

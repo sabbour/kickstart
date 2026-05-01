@@ -43,6 +43,7 @@ import type { ComponentContribution } from '@aks-kickstart/harness';
 // in the real rich-component module graph (which transitively requires
 // optional harness runtime deps).
 const RICH_COMPONENT_NAMES = [
+  'ArchitectureDiagram',
   'AuthCard',
   'AzureAction',
   'AzureLoginCard',

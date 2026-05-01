@@ -31,7 +31,7 @@ import type { ComponentContribution } from '@aks-kickstart/harness';
 // Matches the rich-component list registered in main.tsx; stub renderers are
 // sufficient because registry lookup keys on name only.
 const RICH_COMPONENT_NAMES = [
-  'AuthCard', 'AzureAction', 'AzureLoginCard', 'AzureResourceForm', 'AzureResourcePicker',
+  'ArchitectureDiagram', 'AuthCard', 'AzureAction', 'AzureLoginCard', 'AzureResourceForm', 'AzureResourcePicker',
   'CodeBlock', 'CostEstimate', 'DecisionCard', 'FileEditor', 'FormGroup',
   'GenerationProgress', 'GitHubAction', 'GitHubCommit', 'GitHubLoginCard', 'GitHubRepoPicker',
   'Markdown', 'ProgressSteps', 'Questionnaire', 'RadioGroup', 'SteppedCarousel', 'SummaryCard',

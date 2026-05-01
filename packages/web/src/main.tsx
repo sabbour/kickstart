@@ -57,6 +57,7 @@ for (const impl of fluentOverrides) {
 import { createLazyRegistration } from './catalog/createLazyRegistration';
 
 const richComponents = [
+  createLazyRegistration('ArchitectureDiagram', () => import('./catalog/components/ArchitectureDiagram')),
   createLazyRegistration('AuthCard', () => import('./catalog/components/AuthCard')),
   createLazyRegistration('AzureAction', () => import('./catalog/components/AzureAction')),
   createLazyRegistration('AzureLoginCard', () => import('./catalog/components/AzureLoginCard')),

@@ -271,6 +271,24 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
     },
   ],
 
+  'core/ArchitectureDiagram': [
+    {
+      id: 'root',
+      component: 'ArchitectureDiagram',
+      title: 'Solution architecture',
+      description: 'AKS Automatic with app and data services',
+      nodes: [
+        { id: 'app', label: 'App service', type: 'app' },
+        { id: 'aks', label: 'AKS Automatic', type: 'aks' },
+        { id: 'data', label: 'Azure data service', type: 'storage' },
+      ],
+      edges: [
+        { from: 'app', to: 'aks', label: 'deploys to' },
+        { from: 'aks', to: 'data', label: 'reads/writes' },
+      ],
+    },
+  ],
+
   // ── Rich auth / form / progress components ────────────────────────────────
 
   'core/AuthCard': [

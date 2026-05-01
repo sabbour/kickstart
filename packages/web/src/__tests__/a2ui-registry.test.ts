@@ -103,7 +103,7 @@ describe('ClientComponentRegistry — seal invariant', () => {
 
   it('registers all pack components at startup (simulated)', () => {
     const reg = new ClientComponentRegistry();
-    const fakePackComponents = ['Button', 'Text', 'Card', 'AuthCard', 'SummaryCard'];
+    const fakePackComponents = ['Button', 'Text', 'Card', 'AuthCard', 'SummaryCard', 'ArchitectureDiagram'];
     for (const name of fakePackComponents) {
       reg.register(makeImpl(name));
     }

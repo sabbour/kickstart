@@ -1,3 +1,4 @@
+export { ArchitectureDiagram } from './ArchitectureDiagram';
 export { AuthCard } from './AuthCard';
 export { AzureAction } from './AzureAction';
 export { AzureLoginCard } from './AzureLoginCard';
