@@ -107,7 +107,7 @@ function codesmithGenerationTurn(sessionId: string): string {
           {
             id: 'publish-btn',
             component: 'Button',
-            appearance: 'primary',
+            variant: 'primary',
             child: 'publish-text',
             action: { event: { name: 'publish', context: { action: 'publish' } } },
           },
