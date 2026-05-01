@@ -146,3 +146,40 @@ describe('issue #237 — zero /api/arm-proxy callers (hard-fail CI guard)', () =
     ).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue #320 (Wave 2 cutover): zero callers of the retired
+// `services/arm-client` shim. Everything must go through the canonical
+// `lib/arm/armFetch` wrapper from #318/#327.
+// ---------------------------------------------------------------------------
+
+const ARM_CLIENT_IMPORT_REGEX =
+  /from\s+['"][^'"]*services\/arm-client(?:['"]|\.[a-z]+['"])/;
+
+describe('issue #320 — zero services/arm-client callers (hard-fail CI guard)', () => {
+  it('no source file imports from services/arm-client (use lib/arm/armFetch instead)', () => {
+    const offenders: string[] = [];
+    for (const root of SCAN_ROOTS) {
+      const absRoot = join(REPO_ROOT, root);
+      for (const file of walk(absRoot)) {
+        const ext = file.slice(file.lastIndexOf('.'));
+        if (!SCAN_EXTS.has(ext)) continue;
+
+        const rel = relative(REPO_ROOT, file).replaceAll('\\', '/');
+        // This guard test references the path as a regex string for grep —
+        // exempt itself, the same way the /api/arm-proxy guard does above.
+        if (rel === 'packages/web/api/src/__guards__/arm-direct-csp.test.ts') continue;
+
+        const contents = readFileSync(file, 'utf8');
+        if (ARM_CLIENT_IMPORT_REGEX.test(contents)) {
+          offenders.push(rel);
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `Source files still import from services/arm-client — issue #320 (Wave 2) requires every caller to use lib/arm/armFetch:\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
+});

@@ -13,7 +13,7 @@ import type {
   GitHubCommitFilesResult,
 } from '@aks-kickstart/harness';
 import { apiFetch, buildSwaLoginUrl } from '../services/api-client';
-import { armFetchRaw, armList } from '../services/arm-client';
+import { ArmFetchError, armFetch } from '../lib/arm/armFetch';
 import {
   getGitHubSession,
   signInWithGitHubPopup,
@@ -78,7 +78,15 @@ function withSubscriptionId<T extends { id?: string; subscriptionId?: string }>(
   };
 }
 
-class BrowserAzureARMConnector implements APIConnector {
+/**
+ * Browser-side Azure ARM connector — issues calls directly to ARM via the
+ * canonical `armFetch` wrapper from `lib/arm/armFetch.ts` (issue #320 cutover).
+ *
+ * Exported (in addition to being registered by `APIConnectorProvider`) so
+ * tests can drive the implementation directly without round-tripping
+ * through the React tree.
+ */
+export class BrowserAzureARMConnector implements APIConnector {
   readonly name = 'azure-arm';
   private authenticated = false;
 
@@ -182,26 +190,78 @@ class BrowserAzureARMConnector implements APIConnector {
       });
     }
 
-    // ARM is now called directly from the browser using a SWA-issued token
-    // — see issue #237 / DP #194. The legacy /api/arm-proxy round-trip is
-    // gone. armFetchRaw still returns a Response for the legacy
-    // APIConnector.request() shape.
+    // ARM is now called directly from the browser via the canonical
+    // `armFetch` wrapper from `lib/arm/armFetch.ts` (issue #320 cutover —
+    // Wave 2 of #237 / DP #194). The legacy `services/arm-client.ts`
+    // shim and the legacy ARM passthrough endpoint it replaced are both gone.
+    //
+    // `armFetch` throws `ArmFetchError` on failure; we marshal those into
+    // the `Response` shape the legacy `APIConnector.request()` contract
+    // expects (matching the JSON envelope the old proxy emitted) so
+    // existing UI error paths keep working unchanged.
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    const response = await armFetchRaw(method, normalizedPath, body);
-    this.authenticated = response.ok;
-    return response;
+    const init: RequestInit & { apiVersion?: string | null } = {
+      method: method.toUpperCase(),
+    };
+    if (body !== undefined && !['GET', 'HEAD'].includes(init.method as string)) {
+      init.headers = { 'Content-Type': 'application/json' };
+      init.body = typeof body === 'string' ? body : JSON.stringify(body);
+    }
+
+    try {
+      const response = await armFetch(normalizedPath, init);
+      this.authenticated = true;
+      return response;
+    } catch (err) {
+      if (err instanceof ArmFetchError) {
+        if (err.kind === 'auth-error') this.authenticated = false;
+        return armErrorToResponse(err);
+      }
+      throw err;
+    }
   }
 
   private async getArmList<T>(path: string): Promise<T[]> {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    const result = await armList<T>(normalizedPath);
-    if (!result.ok) {
-      this.authenticated = result.error.kind !== 'auth-error' ? this.authenticated : false;
-      throw new Error(result.error.message);
+    try {
+      // Caller paths already include `?api-version=...`; suppress default
+      // injection so we don't append a duplicate parameter.
+      const response = await armFetch(normalizedPath, { apiVersion: null });
+      this.authenticated = true;
+      const payload = (await response.json().catch(() => undefined)) as
+        | { value?: T[] }
+        | undefined;
+      return Array.isArray(payload?.value) ? (payload!.value as T[]) : [];
+    } catch (err) {
+      if (err instanceof ArmFetchError) {
+        if (err.kind === 'auth-error') this.authenticated = false;
+        throw new Error(err.message, { cause: err });
+      }
+      throw err;
     }
-    this.authenticated = true;
-    return result.value;
   }
+}
+
+/**
+ * Marshals an {@link ArmFetchError} into the synthetic `Response` envelope
+ * the legacy `APIConnector.request()` contract expects — matching the
+ * `{ error, code }` JSON shape that the retired ARM passthrough endpoint
+ * (and the interim `services/arm-client.ts` shim) emitted, so consumer
+ * error-handling paths continue to work unchanged after the #320 cutover.
+ */
+function armErrorToResponse(err: ArmFetchError): Response {
+  const status =
+    err.kind === 'network-error' ? 502 : err.status ?? 500;
+  const code =
+    err.kind === 'network-error'
+      ? 'arm_network_error'
+      : err.kind === 'auth-error'
+        ? 'azure_access_token_missing'
+        : (err.code ?? 'arm_error');
+  return new Response(
+    JSON.stringify({ error: err.message, code }),
+    { status, headers: { 'Content-Type': 'application/json' } },
+  );
 }
 
 class BrowserGitHubConnector implements APIConnector {
