@@ -9,12 +9,13 @@
  * authoritative source for I2 enforcement (all properties must be required).
  * It is NOT a maintained forbidden-pattern list.
  *
- * Secondary walkers (I1, I4, I5) cover invariants that `toStrictJsonSchema()`
+ * Secondary walkers (I1, I4, I5, I6) cover invariants that `toStrictJsonSchema()`
  * silently accepts but the API rejects:
  *
  *   I1 — every `{ type: "object" }` node carries a `properties` key.
  *   I4 — every property schema has a `type` key or a combinator.
  *   I5 — no schema node emits `format` values OpenAI rejects (e.g. `uri`).
+ *   I6 — no unsupported `oneOf` remains after guarded compatibility rewrites.
  *
  * Note: I2 (optional without nullable) and I3 (additionalProperties) are
  * handled authoritatively by `toStrictJsonSchema()` — I2 throws, I3 is
@@ -52,9 +53,9 @@ import type { UserActionContribution } from '../types/user-action.js';
  */
 export function assertStrictlyConformant(schema: SchemaNode, toolName: string): void {
   try {
-    toStrictJsonSchema(structuredClone(schema) as JSONSchema);
+    toStrictJsonSchema(openAIStrictCompatibleSchema(schema) as JSONSchema);
   } catch (e) {
-    throw new Error(`[${toolName}] ${(e as Error).message}`);
+    throw new Error(`[${toolName}] ${(e as Error).message}`, { cause: e });
   }
 }
 
@@ -68,6 +69,108 @@ export type SchemaVisitor = (node: SchemaNode, path: string) => void;
 
 function isPlainObject(value: unknown): value is SchemaNode {
   return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenAI strict-schema compatibility
+// ─────────────────────────────────────────────────────────────────────────────
+
+function hasRequiredConstDiscriminator(
+  branch: SchemaNode,
+  key: string,
+): branch is SchemaNode & { properties: SchemaNode; required: unknown[] } {
+  if (branch.type !== 'object') return false;
+  if (branch.additionalProperties !== false) return false;
+  if (!isPlainObject(branch.properties)) return false;
+  if (!Array.isArray(branch.required) || !branch.required.includes(key)) return false;
+
+  const prop = branch.properties[key];
+  return isPlainObject(prop) && Object.prototype.hasOwnProperty.call(prop, 'const');
+}
+
+function constMapKey(value: unknown): string {
+  return `${typeof value}:${JSON.stringify(value)}`;
+}
+
+function isProvablyDiscriminatedOneOf(branches: unknown[]): branches is SchemaNode[] {
+  if (branches.length < 2 || !branches.every(isPlainObject)) return false;
+
+  const firstBranch = branches[0] as SchemaNode;
+  const firstProperties = isPlainObject(firstBranch.properties) ? firstBranch.properties : {};
+  const candidateKeys = Object.keys(firstProperties).filter((key) =>
+    hasRequiredConstDiscriminator(firstBranch, key),
+  );
+
+  for (const key of candidateKeys) {
+    const seen = new Set<string>();
+    let safe = true;
+    for (const branch of branches as SchemaNode[]) {
+      if (!hasRequiredConstDiscriminator(branch, key)) {
+        safe = false;
+        break;
+      }
+      const constValue = (branch.properties[key] as SchemaNode).const;
+      const seenKey = constMapKey(constValue);
+      if (seen.has(seenKey)) {
+        safe = false;
+        break;
+      }
+      seen.add(seenKey);
+    }
+    if (safe && seen.size === branches.length) return true;
+  }
+
+  return false;
+}
+
+/**
+ * OpenAI strict tool schemas currently reject `oneOf`, while Zod v4 emits
+ * `oneOf` for discriminated unions. Rewrite only the narrow, provably-safe
+ * shape to `anyOf`; leave all other unions untouched so conformance tests still
+ * catch unsupported/ambiguous schemas.
+ *
+ * When both `anyOf` and a safe discriminated `oneOf` exist on the same node,
+ * the original semantics are `(anyOf) AND (oneOf)` — a conjunction. Flattening
+ * them into a single `anyOf` would silently weaken that to a broad OR.  Instead
+ * we preserve the conjunction via `allOf: [{ anyOf: existing }, { anyOf: converted }]`
+ * and remove the top-level `anyOf`/`oneOf` from the node.
+ */
+export function rewriteDiscriminatedOneOfToAnyOf(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map((item) => rewriteDiscriminatedOneOfToAnyOf(item));
+  }
+  if (!isPlainObject(schema)) {
+    return schema;
+  }
+
+  const rewritten: SchemaNode = {};
+  for (const [key, value] of Object.entries(schema)) {
+    rewritten[key] = rewriteDiscriminatedOneOfToAnyOf(value);
+  }
+
+  if (Array.isArray(rewritten.oneOf) && isProvablyDiscriminatedOneOf(rewritten.oneOf)) {
+    const convertedOneOf = rewritten.oneOf;
+    delete rewritten.oneOf;
+    if (Array.isArray(rewritten.anyOf)) {
+      // Preserve conjunction: (existing anyOf) AND (converted oneOf variants).
+      const existingAnyOf = rewritten.anyOf;
+      delete rewritten.anyOf;
+      const existingAllOf = Array.isArray(rewritten.allOf) ? rewritten.allOf : [];
+      if (existingAllOf.length > 0) delete rewritten.allOf;
+      rewritten.allOf = [...existingAllOf, { anyOf: existingAnyOf }, { anyOf: convertedOneOf }];
+    } else if (!('anyOf' in rewritten)) {
+      rewritten.anyOf = convertedOneOf;
+    } else {
+      // anyOf is present but not an array — leave oneOf intact so I6 catches it.
+      rewritten.oneOf = convertedOneOf;
+    }
+  }
+
+  return rewritten;
+}
+
+export function openAIStrictCompatibleSchema(schema: SchemaNode): SchemaNode {
+  return rewriteDiscriminatedOneOfToAnyOf(schema) as SchemaNode;
 }
 
 /**
@@ -239,6 +342,17 @@ export function collectUnsupportedFormats(schema: unknown, rootPath = 'root'): s
   return [...issues];
 }
 
+/** I6 — OpenAI strict mode rejects `oneOf`; safe discriminated unions are rewritten first. */
+export function collectUnsupportedOneOf(schema: unknown, rootPath = 'root'): string[] {
+  const issues: string[] = [];
+  walkSchema(rewriteDiscriminatedOneOfToAnyOf(schema), rootPath, (node, path) => {
+    if (Array.isArray(node.oneOf)) {
+      issues.push(`${path}.oneOf`);
+    }
+  });
+  return issues;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Aggregator
 // ─────────────────────────────────────────────────────────────────────────────
@@ -258,17 +372,21 @@ export interface SchemaConformanceReport {
   missingTypes: string[];
   /** I5 violations. */
   unsupportedFormats: string[];
+  /** I6 violations. */
+  unsupportedOneOf: string[];
 }
 
 export function reportSchemaConformance(name: string, schema: unknown): SchemaConformanceReport {
+  const compatibleSchema = isPlainObject(schema) ? openAIStrictCompatibleSchema(schema) : schema;
   return {
     name,
-    i0RootType: checkRootIsObject(schema, name),
-    missingProperties: collectMissingProperties(schema),
-    strictRequiredViolations: collectStrictRequiredViolations(schema),
-    additionalPropertiesViolations: collectAdditionalPropertiesViolations(schema),
-    missingTypes: collectMissingTypes(schema),
-    unsupportedFormats: collectUnsupportedFormats(schema),
+    i0RootType: checkRootIsObject(compatibleSchema, name),
+    missingProperties: collectMissingProperties(compatibleSchema),
+    strictRequiredViolations: collectStrictRequiredViolations(compatibleSchema),
+    additionalPropertiesViolations: collectAdditionalPropertiesViolations(compatibleSchema),
+    missingTypes: collectMissingTypes(compatibleSchema),
+    unsupportedFormats: collectUnsupportedFormats(compatibleSchema),
+    unsupportedOneOf: collectUnsupportedOneOf(compatibleSchema),
   };
 }
 
@@ -279,7 +397,8 @@ export function reportHasIssues(report: SchemaConformanceReport): boolean {
     report.strictRequiredViolations.length > 0 ||
     report.additionalPropertiesViolations.length > 0 ||
     report.missingTypes.length > 0 ||
-    report.unsupportedFormats.length > 0
+    report.unsupportedFormats.length > 0 ||
+    report.unsupportedOneOf.length > 0
   );
 }
 
@@ -309,6 +428,10 @@ export function formatReport(report: SchemaConformanceReport): string {
     lines.push('  I5 — unsupported OpenAI JSON Schema format:');
     for (const issue of report.unsupportedFormats) lines.push(`    - ${issue}`);
   }
+  if (report.unsupportedOneOf.length > 0) {
+    lines.push('  I6 — unsupported OpenAI JSON Schema oneOf:');
+    for (const issue of report.unsupportedOneOf) lines.push(`    - ${issue}`);
+  }
   return lines.join('\n');
 }
 
@@ -324,7 +447,7 @@ export function formatReport(report: SchemaConformanceReport): string {
 export function getToolJsonSchema(contribution: ToolContribution): SchemaNode | null {
   const fnTool = contribution.tool as FunctionTool;
   if (fnTool.type !== 'function') return null;
-  return fnTool.parameters as SchemaNode;
+  return openAIStrictCompatibleSchema(fnTool.parameters as SchemaNode);
 }
 
 /**
@@ -344,8 +467,7 @@ export function getUserActionJsonSchema(contribution: UserActionContribution): S
     name: 'schema_conformance_probe',
     description: contribution.description,
     parameters: contribution.parameters as unknown as ZodObject<z.ZodRawShape>,
-    // eslint-disable-next-line @typescript-eslint/require-await
     execute: async () => 'unused',
   }) as unknown as FunctionTool;
-  return wrapped.parameters as SchemaNode;
+  return openAIStrictCompatibleSchema(wrapped.parameters as SchemaNode);
 }

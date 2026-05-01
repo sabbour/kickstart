@@ -30,8 +30,9 @@ import {
   formatReport,
   getToolJsonSchema,
   getUserActionJsonSchema,
-  assertStrictlyConformant,
   collectUnsupportedFormats,
+  rewriteDiscriminatedOneOfToAnyOf,
+  walkSchema,
 } from '@aks-kickstart/harness/runtime/schema-conformance';
 import type { ToolContribution } from '@aks-kickstart/harness';
 import { _resetRegistryState, getRegistry } from './packs.js';
@@ -150,6 +151,132 @@ describe('OpenAI strict-mode schema conformance — unsupported formats', () => 
       'root.properties.url (format="uri")',
       'root.properties.nested.properties.callbackUrl (format="uri")',
     ]);
+  });
+});
+
+describe('OpenAI strict-mode schema conformance — oneOf compatibility', () => {
+  it('rewrites property-level discriminated oneOf to anyOf with unique required consts', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        message: {
+          oneOf: [
+            {
+              type: 'object',
+              properties: { op: { const: 'create' }, value: { type: 'string' } },
+              required: ['op', 'value'],
+              additionalProperties: false,
+            },
+            {
+              type: 'object',
+              properties: { op: { const: 'delete' }, id: { type: 'string' } },
+              required: ['op', 'id'],
+              additionalProperties: false,
+            },
+          ],
+        },
+      },
+      required: ['message'],
+      additionalProperties: false,
+    };
+
+    const rewritten = rewriteDiscriminatedOneOfToAnyOf(schema) as Record<string, unknown>;
+    const message = (rewritten.properties as Record<string, Record<string, unknown>>).message;
+
+    expect(message.oneOf).toBeUndefined();
+    expect(message.anyOf).toHaveLength(2);
+  });
+
+  it('preserves conjunction when a safe discriminated oneOf coexists with existing anyOf', () => {
+    // Original semantics: (anyOf) AND (oneOf) — a conjunction, not a broad OR.
+    // Flattening into a single anyOf would silently weaken that invariant.
+    const schema = {
+      anyOf: [{ type: 'null' }],
+      oneOf: [
+        {
+          type: 'object',
+          properties: { kind: { const: 'a' } },
+          required: ['kind'],
+          additionalProperties: false,
+        },
+        {
+          type: 'object',
+          properties: { kind: { const: 'b' } },
+          required: ['kind'],
+          additionalProperties: false,
+        },
+      ],
+    };
+
+    const rewritten = rewriteDiscriminatedOneOfToAnyOf(schema) as Record<string, unknown>;
+
+    // Both top-level keywords must be gone; conjunction lives in allOf.
+    expect(rewritten.oneOf).toBeUndefined();
+    expect(rewritten.anyOf).toBeUndefined();
+    const allOf = rewritten.allOf as Array<Record<string, unknown>>;
+    expect(allOf).toHaveLength(2);
+    // First arm: the original anyOf preserved as-is.
+    expect(allOf[0]).toEqual({ anyOf: [{ type: 'null' }] });
+    // Second arm: the converted oneOf variants.
+    expect((allOf[1].anyOf as unknown[]).length).toBe(2);
+  });
+
+  it('leaves non-discriminated or overlapping oneOf nodes in place', () => {
+    const overlapping = {
+      oneOf: [
+        {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+          required: ['value'],
+          additionalProperties: false,
+        },
+        {
+          type: 'object',
+          properties: { value: { type: 'string' } },
+          required: ['value'],
+          additionalProperties: false,
+        },
+      ],
+    };
+    const duplicateDiscriminator = {
+      oneOf: [
+        {
+          type: 'object',
+          properties: { kind: { const: 'same' } },
+          required: ['kind'],
+          additionalProperties: false,
+        },
+        {
+          type: 'object',
+          properties: { kind: { const: 'same' } },
+          required: ['kind'],
+          additionalProperties: false,
+        },
+      ],
+    };
+
+    expect((rewriteDiscriminatedOneOfToAnyOf(overlapping) as Record<string, unknown>).oneOf).toHaveLength(2);
+    expect((rewriteDiscriminatedOneOfToAnyOf(duplicateDiscriminator) as Record<string, unknown>).oneOf).toHaveLength(2);
+    expect(reportSchemaConformance('overlapping_oneof', overlapping).unsupportedOneOf).toEqual([
+      'root.oneOf',
+    ]);
+    expect(reportSchemaConformance('duplicate_discriminator_oneof', duplicateDiscriminator).unsupportedOneOf).toEqual([
+      'root.oneOf',
+    ]);
+  });
+
+  it('registered tool schemas expose no remaining oneOf after safe compatibility rewrite', () => {
+    const remainingOneOfPaths: string[] = [];
+
+    for (const { name, contrib } of tools) {
+      const schema = getToolJsonSchema(contrib);
+      if (schema === null) continue;
+      walkSchema(schema, 'root', (node, path) => {
+        if (Array.isArray(node.oneOf)) remainingOneOfPaths.push(`${name}: ${path}.oneOf`);
+      });
+    }
+
+    expect(remainingOneOfPaths).toEqual([]);
   });
 });
 

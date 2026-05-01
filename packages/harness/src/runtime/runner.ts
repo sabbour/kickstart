@@ -39,6 +39,7 @@ import { z } from 'zod';
 import { buildRunConfig } from './run-config.js';
 import type { RunConfig } from './run-config.js';
 import { withRetry, CircuitBreaker, CircuitOpenError } from '../utils/retry.js';
+import { openAIStrictCompatibleSchema } from './schema-conformance.js';
 
 // ---------------------------------------------------------------------------
 // Retry / circuit-breaker — module-level state (#102)
@@ -312,7 +313,9 @@ function wrapTool(
     type: 'function',
     name: fnTool.name,
     description: fnTool.description ?? '',
-    parameters: fnTool.parameters,
+    parameters: openAIStrictCompatibleSchema(
+      fnTool.parameters as Record<string, unknown>,
+    ) as typeof fnTool.parameters,
     strict: fnTool.strict,
     invoke: async (runContext, input, details) => {
       const typedArgs = (() => {
@@ -379,7 +382,7 @@ function wrapUserAction(
   abortCtrl: AbortController,
   registry: PackRegistry,
 ): ReturnType<typeof tool> {
-  return tool({
+  const wrapped = tool({
     name: contrib.wireName,
     description: contrib.description,
     parameters: z.object({ input: contrib.parameters }).passthrough(),
@@ -438,6 +441,15 @@ function wrapUserAction(
       return `[UserAction ${contrib.name} pending — waiting for browser result]`;
     },
   });
+
+  if (wrapped.type !== 'function') return wrapped;
+
+  return {
+    ...wrapped,
+    parameters: openAIStrictCompatibleSchema(
+      wrapped.parameters as Record<string, unknown>,
+    ) as typeof wrapped.parameters,
+  };
 }
 
 // ---------------------------------------------------------------------------

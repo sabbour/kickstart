@@ -1,5 +1,5 @@
 ---
-"kickstart": patch
+"@aks-kickstart/pack-core": patch
 ---
 
 Config files (tracks, inference-backends, component-catalog) now include provenance markers on every entry, so you can trace whether each config value was extracted from an existing prompt, derived from facts, or proposed for future work.
