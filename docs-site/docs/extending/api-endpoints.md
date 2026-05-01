@@ -66,7 +66,8 @@ app.http("functionName", {
 
 | Endpoint | Method | Route | Auth | Response Format | Description |
 |---|---|---|---|---|---|
-| `arm-proxy` | GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS | `/api/arm-proxy/{*path}` | Azure access token | JSON | Azure Resource Manager CORS proxy |
+| `azure-token` | GET | `/api/azure/token` | SWA sign-in (Azure AD) | JSON | Returns the SWA-injected Azure AD access token so the browser can call ARM directly |
+| `arm-proxy` | GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS | `/api/arm-proxy/{*path}` | Azure access token | JSON | Azure Resource Manager CORS proxy (legacy server-side path; superseded by browser-direct ARM via `azure-token`) |
 | `azure-target` | PUT | `/api/sessions/{sessionId}/azure-target` | Azure access token + SWA sign-in + session | JSON | Persist Azure subscription / resource group for a session |
 | `azure-deployments-start` | POST | `/api/sessions/{sessionId}/azure-deployments` | Azure access token + SWA sign-in + session | JSON | Kick off an ARM deployment for a session |
 | `azure-deployments-status` | GET | `/api/azure-deployments/{runId}` | Azure access token + SWA sign-in | JSON | Poll the status of a running ARM deployment |
@@ -301,6 +302,17 @@ Commits files to a new branch and opens a pull request in a single call.
 ---
 
 ### Azure Integration
+
+#### `GET /api/azure/token`
+
+**Auth:** SWA sign-in with Azure AD identity provider (`x-ms-client-principal-id` header required; `x-ms-token-aad-access-token` header injected by SWA per request)
+**Returns:** JSON `{ token: string, expiresAt?: string }` — `token` is the user's Azure AD access token; `expiresAt` is an ISO timestamp normalized from SWA's optional `x-ms-token-aad-expires-on` hint (epoch-seconds or ISO). `Cache-Control: no-store`.
+**Errors:** `401 azure_access_token_missing` if the SWA token header is missing, empty, or whitespace-only (fail-closed). `403` if there is no authenticated principal. `405` for any non-`GET` method (Functions runtime).
+**Source:** `packages/web/api/src/functions/azure-token.ts`
+
+Thin endpoint that surfaces the SWA-injected Azure AD access token to the browser so it can call `https://management.azure.com` directly (Wave 1 of the Option A2 browser-direct ARM track, parent #237). The endpoint performs no ARM calls and no `/.auth/me` calls — it only echoes the per-request token SWA scoped to the authenticated session, so a caller can only ever receive their own token. The token value is never logged. Browsers should rely on `401`-driven refresh rather than the optional `expiresAt`.
+
+The CSP `connect-src` directive in `packages/web/public/staticwebapp.config.json` must include `https://management.azure.com` for browser-direct calls to succeed; this is enforced by the `csp-check` workflow (issue #319).
 
 #### `ANY /api/arm-proxy/{*path}`
 

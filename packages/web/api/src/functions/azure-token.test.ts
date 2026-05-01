@@ -4,20 +4,22 @@
 
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-const { registeredHandlers, registerHttpHandler } = vi.hoisted(() => {
+const { registeredHandlers, registeredConfigs, registerHttpHandler } = vi.hoisted(() => {
   const registeredHandlers = new Map<
     string,
     (request: unknown, context: unknown) => Promise<{ status: number; jsonBody?: unknown; headers?: Record<string, string> }>
   >();
+  const registeredConfigs = new Map<string, { methods?: string[]; route?: string; authLevel?: string }>();
   const registerHttpHandler = vi.fn(
     (
       name: string,
-      config: { handler: (request: unknown, context: unknown) => Promise<unknown> },
+      config: { handler: (request: unknown, context: unknown) => Promise<unknown>; methods?: string[]; route?: string; authLevel?: string },
     ) => {
       registeredHandlers.set(name, config.handler as never);
+      registeredConfigs.set(name, { methods: config.methods, route: config.route, authLevel: config.authLevel });
     },
   );
-  return { registeredHandlers, registerHttpHandler };
+  return { registeredHandlers, registeredConfigs, registerHttpHandler };
 });
 
 vi.mock('@azure/functions', () => ({
@@ -94,6 +96,27 @@ describe('GET /api/azure/token', () => {
     expect(res.status).toBe(401);
     expect(res.jsonBody?.code).toBe('azure_access_token_missing');
     expect(res.jsonBody?.token).toBeUndefined();
+  });
+
+  it('returns 401 when the SWA Azure token header is present but empty/whitespace (fail-closed)', async () => {
+    const res = await invoke(
+      makeRequest({
+        'x-ms-client-principal-id': 'principal-1',
+        'x-ms-token-aad-access-token': '   ',
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(401);
+    expect(res.jsonBody?.code).toBe('azure_access_token_missing');
+    expect(res.jsonBody?.token).toBeUndefined();
+  });
+
+  it('is registered as a GET-only route at azure/token (Functions runtime returns 405 for other methods)', async () => {
+    const config = registeredConfigs.get('azure-token');
+    expect(config).toBeDefined();
+    expect(config?.methods).toEqual(['GET']);
+    expect(config?.route).toBe('azure/token');
   });
 
   it('parses epoch-seconds expiry hint into ISO timestamp when SWA provides one', async () => {
