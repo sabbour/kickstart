@@ -4,114 +4,130 @@ sidebar_position: 8
 
 # Guardrails
 
-Kickstart enforces content safety through a **guardrail pipeline** that runs on every turn — before the LLM sees user input and after the LLM produces output. This guide covers the built-in rules, the SSE events guardrails emit, the dev kill-switch, and how to add custom rules.
+Kickstart enforces content safety through a guardrail pipeline that runs at three stages on every turn — `input` (before the LLM sees user text), `tool` (before each tool call), and `output` (before assistant text leaves the runner). The engine lives in `packages/harness/src/runtime/guardrails.ts`. Pack-contributed rules implement the `GuardrailContribution` interface from `packages/harness/src/types/guardrail.ts`.
 
-## Built-in Rules
-
-### `core/no-pii`
-
-Detects and **redacts** personally identifiable information. Applies to both input (user messages) and output (assistant messages and tool results).
-
-Patterns covered:
-
-| Pattern | Example | Notes |
-|---------|---------|-------|
-| Email address | `user@example.com` | RFC-style local@domain |
-| Phone number | `+1-800-555-0100` | US/international formats |
-| US SSN | `123-45-6789` | `NNN-NN-NNNN` pattern |
-| Azure Subscription ID | `12345678-1234-1234-1234-123456789abc` | GUID gated by 60-char keyword window |
-| AAD Object ID | `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee` | GUID gated by 60-char keyword window |
-
-**GUID context gating:** Azure Subscription ID and AAD Object ID patterns require a context keyword (e.g., `subscriptionId`, `tenantId`, `objectId`) within 60 characters of the GUID to reduce false positives on non-sensitive GUIDs.
-
-#### Backward-compatibility alias
-
-`noPiiInLogsGuardrail` remains exported as an alias for the new `core/no-pii` rule. Existing code that registers `noPiiInLogsGuardrail` continues to work unchanged.
+For deployment-time YAML safeguards (the AKS Automatic linter), see [Safeguards](./safeguards.md). The two systems are deliberately separate.
 
 ---
 
-### `core/no-credential-leak`
+## Contribution shape
 
-Detects and **redacts** secrets and credentials. Applies to both input and output.
+```ts
+// packages/harness/src/types/guardrail.ts
+export interface GuardrailContribution {
+  id: string;                      // "{packId}/{guardrailId}", e.g. "core/no-credential-leak"
+  appliesTo: string[];             // agent-name globs ("*" = all)
+  stages: Array<'input' | 'output' | 'tool'>;
+  evaluate(input: GuardrailInput): Promise<GuardrailResult>;
+}
 
-Patterns covered:
+export interface GuardrailResult {
+  verdict: 'pass' | 'block' | 'redact';
+  reason?: string;                 // server-side only — NEVER emitted in SSE
+  redacted?: unknown;              // for redact verdict (replaces stage payload)
+  redactedArgs?: Record<string, unknown>; // structured tool-arg replacement
+}
+```
 
-| Pattern | Example |
-|---------|---------|
-| API key header | `api-key: sk-abc123...` |
-| Connection string | `AccountKey=base64==` |
-| SAS token | `SharedAccessSignature sig=...` |
-| Azure Subscription Key | `SubscriptionKey=abcdef...` |
-| Azure Client Secret | `ClientSecret=abc123...` |
-| ARM Bearer token | `Bearer eyJ0...` (explicit, non-JWT) |
-| Postgres/SQL DSN password | `postgres://user:password@host/db` |
+`appliesTo` patterns are validated at registration; shell metacharacters (`;|&$\``) are rejected by the same `validateGlobPattern` used for skill `appliesTo`.
 
 ---
 
-## SSE Events
+## Bundled rules
 
-When a guardrail redacts content (verdict: `redact`), the runner emits a `guardrail_warn` event over the SSE stream:
+| Pack | Rule id | Stages |
+|---|---|---|
+| `core` | `core/no-credential-leak` | `output` |
+| `core` | `core/no_pii_in_logs` | `output` |
+| `core` | `core/no_secrets_in_artifacts` | `output` |
+| `core` | `core/token_budget` | `input`, `output` |
+| `azure` | `azure/no-hardcoded-credentials` | `output`, `tool` |
+| `azure` | `azure/no-subscription-scoped-owner` | `tool` |
+| `azure` | `azure/no-privileged-operations` | `tool` |
+| `azure` | `azure/require-subscription-scope` | `tool` |
+| `aks` | `aks/no-hostpath-volumes` | `output` |
+| `aks` | `aks/no-latest-tag` | `output` |
+| `aks` | `aks/no-privileged-containers` | `output` |
+| `aks` | `aks/require-resource-limits` | `output` |
+| `github` | `github/no-secret-exposure` | `output`, `tool` |
 
-```
-event: guardrail_warn
-data: {"rule":"core/no-pii","stage":"input","redacted":true}
-```
-
-When a guardrail blocks the turn entirely (verdict: `block`), a `guardrail_block` event is emitted and the turn is aborted:
-
-```
-event: guardrail_block
-data: {"rule":"core/no-credential-leak","stage":"input"}
-```
-
-Front-end clients should handle both event types. A `guardrail_warn` means the conversation continued with redacted content. A `guardrail_block` means the turn was rejected and no assistant response will follow.
-
----
-
-## Dev Kill-Switch
-
-Set `KICKSTART_GUARDRAILS_DISABLED=1` to **disable all guardrails** for local development:
-
-```bash
-KICKSTART_GUARDRAILS_DISABLED=1 npm run dev
-```
-
-> ⚠️ **Never set this in production.** The kill-switch bypasses all PII and credential detection. It exists only to speed up local iteration when working on harness internals.
+Rule sources: `packages/pack-core/src/guardrails/`, `packages/pack-azure/src/guardrails/`, `packages/pack-aks-automatic/src/guardrails/`, `packages/pack-github/src/guardrails/`.
 
 ---
 
-## Writing a Custom Guardrail
+## Engine semantics
 
-Custom guardrails implement the `GuardrailContribution` interface:
+The header comment of `guardrails.ts` lists the security invariants the engine guarantees:
 
-```typescript
-import type { GuardrailContribution, GuardrailVerdict } from '@aks-kickstart/harness';
+- **`core/` always wins** — `core/` rules run first and a `block` verdict is non-overridable.
+- **Fail-closed** — every thrown `evaluate()` becomes a `block`.
+- **Payload coercion errors block** — if `applyRedact()` cannot apply the proposed redaction, the engine blocks.
+- **Opaque SSE** — `error` frames look like `{ code: 'GUARDRAIL_BLOCK', message: '…' }`. The id, reason, pattern, and stage never leak.
+- **Tool-stage block stops the turn** — a single tool-stage block halts all remaining tool calls in the turn.
+- **Dual-eval chaining** — each guardrail runs against the current (possibly already-redacted) payload so downstream rules see the cleaned form.
 
-export const myCustomGuardrail: GuardrailContribution = {
-  id: 'my-pack/no-profanity',
-  stage: ['input', 'output'], // or just ['output']
+### Parallel SDK adapters (input + output)
 
-  async check(content: string): Promise<GuardrailVerdict> {
-    if (hasProfanity(content)) {
-      return { verdict: 'block', reason: 'Profanity detected' };
+The runner wraps `GuardrailContribution`s with `toSdkInputGuardrail()` / `toSdkOutputGuardrail()` so input and output rules execute concurrently inside the SDK pipeline (`Promise.all`). Behaviour:
+
+- `block` → `tripwireTriggered: true` (SDK throws `InputGuardrailTripwireTriggered`).
+- `redact` → `tripwireTriggered: false` + emits `guardrail_warn` SSE + the redacted text is stored in `outputInfo` so the runner can update `session.recentTurns` after the SDK run completes.
+- Dual-eval chaining is intentionally relaxed inside the parallel adapters in exchange for latency (DP #116 trade-off).
+
+### Sequential pipeline (tool stage)
+
+`runGuardrails()` is the sequential pipeline used at tool stage because `@openai/agents` has no tool-arg hook. It returns `RunGuardrailsResult = { blocked, mutatedInput }`. `redactedArgs` lets a tool-stage rule replace structured args; `applyRedact()` does the in-place mutation.
+
+---
+
+## Glob matching
+
+The engine uses a tiny glob (no external dep) that supports `*`, `?`, and exact strings. `appliesTo: ["*"]` is the universal match. Glob errors at registration time include the offending pack id and rule id so a grep on either surfaces the offender.
+
+---
+
+## SSE events
+
+| Event | Trigger | Payload |
+|---|---|---|
+| `error` | `block` verdict (any stage) | `{ code: 'GUARDRAIL_BLOCK', message }` — opaque |
+| `guardrail_warn` | `redact` verdict (input or output) | `{ stage }` — no rule id |
+
+These are the only two SSE event types guardrails emit. Tool-stage blocks halt the turn and surface as a generic `error`.
+
+---
+
+## Authoring a custom rule
+
+```ts
+import type { GuardrailContribution } from '@aks-kickstart/harness';
+
+export const noClusterDestroy: GuardrailContribution = {
+  id: 'mypack/no-cluster-destroy',
+  appliesTo: ['aks.*'],
+  stages: ['tool'],
+  async evaluate(input) {
+    if (input.toolName === 'aks.delete_cluster') {
+      return { verdict: 'block', reason: 'Hard-deny on cluster delete' };
     }
     return { verdict: 'pass' };
   },
 };
 ```
 
-| Verdict | Meaning |
-|---------|---------|
-| `pass` | Content is clean. No action. |
-| `redact` | Replace matched substrings (provide `redactedContent`). Emits `guardrail_warn`. |
-| `block` | Abort the turn. Emits `guardrail_block`. |
+Add it to `pack.guardrails[]`. Pack registration validates that:
 
-Register your guardrail by adding it to `BuildContext.inputGuardContribs` (checked before the LLM) or `BuildContext.outputGuardContribs` (checked after).
+- The id namespace matches the pack name (the `core/` namespace is reserved for the core pack — registry rejects others at `register()`).
+- Every `appliesTo` pattern passes `validateGlobPattern`.
 
 ---
 
-## Architecture: Parallel Execution
+## Dev override
 
-Since PR #149, input and output guardrails run in the OpenAI Agents SDK's **native parallel pipeline** rather than sequentially. See [ADR-0003](../architecture/decisions/ADR-0003-sdk-native-parallel-guardrails.md) for the full rationale and tradeoffs.
+`KICKSTART_GUARDRAILS_DISABLED=true` bypasses guardrail evaluation (the current runtime short-circuits guardrail rules to `pass` when set). **Development only** — there is no startup hard block today, so production environments must leave this env var unset.
 
-The key behavioural implication for custom guardrail authors: **with parallel input guardrails, the LLM receives the original (unredacted) user message**. The `session.recentTurns` is updated post-run using `result.inputGuardrailResults`. If your guardrail must prevent the LLM from seeing certain content entirely, use `verdict: 'block'` rather than `verdict: 'redact'`.
+---
+
+## Telemetry
+
+Guardrail decisions are emitted as App Insights custom events (rule id + verdict + stage), but never as part of any SSE frame the browser sees. Use the OTel bridge channel for live debugging — see [Observability](../operations/observability.md).

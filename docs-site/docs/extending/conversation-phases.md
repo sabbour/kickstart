@@ -4,156 +4,83 @@ sidebar_position: 2
 
 # Conversation Phases
 
-Kickstart guides users through six phases — Discover, Design, Generate, Review, Handoff, Deploy. This guide explains how the phase system works and how to extend it.
-
-## How Phases Work
-
-### The Phase Enum
-
-Every phase is a string constant defined in `packages/harness/src/types/phases.ts`:
-
-```typescript
-export enum Phase {
-  Discover = "discover",
-  Design   = "design",
-  Generate = "generate",
-  Review   = "review",
-  Handoff  = "handoff",
-  Deploy   = "deploy",
-}
-```
-
-### Phase Definitions
-
-Each phase has a `PhaseDefinition` in `packages/harness/src/types/phases.ts`:
-
-```typescript
-export interface PhaseDefinition {
-  id: Phase;
-  label: string;
-  description: string;
-  nextPhase: Phase | null;   // null = terminal phase
-}
-```
-
-The `PHASE_DEFINITIONS` array is the authoritative phase order. The first entry is the initial phase; `nextPhase` chains them together.
-
-### Session State
-
-The current phase is a plain string stored on the server-side session:
-
-```typescript
-session.state.currentPhase  // e.g. "generate"
-```
-
-This is the single source of truth. No FSM state slice, no `phaseStatuses` map.
-
-### Phase Advancement
-
-Phase transitions happen in `converse.ts` when the LLM returns `intent: "advance"` in its structured `AgentOutput`:
-
-```typescript
-// AgentOutput from @openai/agents SDK
-const AgentOutput = z.object({
-  message: z.string(),
-  intent: z.enum(['continue', 'advance', 'revise', 'auto-continue-files']).optional(),
-});
-```
-
-When `intent: "advance"` is present, `advancePhase()` looks up the current phase in `PHASE_DEFINITIONS` and returns `nextPhase`. There is no event system or transition guard — the LLM's signal is the only trigger.
-
-A2UI actions with `complete:` or `continue:` prefixes (handled in `packages/harness/src/runtime/runner.ts`) can trigger phase transitions from button clicks in the UI. After stripping the `complete:`/`continue:` prefix, if the resulting action name starts with `navigate:` or `nav:`, it is treated as a phase-navigation signal — for example, the full action name is `complete:navigate:design`.
-
-### How the LLM Navigates Phases
-
-The agent's dynamic instructions include the current phase identifier and the `description` from its `PhaseDefinition`. The LLM reads this context, determines when the phase goals are met, and signals `intent: "advance"` in its `AgentOutput`. There are no TypeScript-enforced entry or exit conditions — the LLM decides.
-
-### Skill Resolution
-
-Skills are filtered per agent turn. `packages/harness/src/runtime/skill-resolver.ts` exports `resolveSkills()` which:
-
-1. Matches skills by `appliesTo` glob against the current agent name
-2. Keyword-activates additional skills from recent conversation turns
-3. Sorts the combined set by `priority` (higher first)
-4. Caps at the token budget (2000 tokens default)
-
-### System Prompt Architecture
-
-The system prompt is assembled per turn by the harness:
-
-| Layer | Content |
-|---|---|
-| Active skills | Resolved for current agent by `resolveSkills()` |
-| Agent base instructions | Static `.agent.md` body |
-| Component catalog | Registered component type list |
+Kickstart guides users through six phases — **Discover → Design → Generate → Review → Handoff → Deploy**. The phase enum is the single source of truth for which step the user is on; agents and components both read it.
 
 ---
 
-## How to Add a Phase
+## The enum
 
-### Step 1 — Add the enum value
+`Phase` is a `const` object exported from `packages/harness/src/index.ts`:
 
-Open `packages/harness/src/types/phases.ts` and add your new phase to the `Phase` enum:
-
-```typescript
-export enum Phase {
-  Discover  = "discover",
-  Design    = "design",
-  Validate  = "validate",   // ← new phase
-  Generate  = "generate",
-  Review    = "review",
-  Handoff   = "handoff",
-  Deploy    = "deploy",
-}
+```ts
+export const Phase = {
+  Discover: 'discover',
+  Design: 'design',
+  Generate: 'generate',
+  Review: 'review',
+  Handoff: 'handoff',
+  Deploy: 'deploy',
+} as const;
+export type Phase = (typeof Phase)[keyof typeof Phase];
 ```
 
-### Step 2 — Add the phase definition
+`PHASE_DEFINITIONS` (same file) carries the human-readable label, description, and `nextPhase` link. `advancePhase(current)` returns the next phase, or the same one if there is no successor.
 
-Open `packages/harness/src/types/phases.ts` and insert a `PhaseDefinition` at the correct position in `PHASE_DEFINITIONS`. Update the `nextPhase` of the preceding entry to point to your new phase:
+A parallel set of types lives in `packages/harness/src/a2ui/chat-a2ui.ts` for chat-side rendering: `ConversationPhaseId`, `CONVERSATION_PHASE_ORDER`, `CONVERSATION_PHASE_LABELS`, `extractConversationPhase`, `normalizeConversationPhase`. The two enums are kept aligned by definition.
 
-```typescript
-{
-  id: Phase.Validate,
-  label: "Validate",
-  description: "Verify that the proposed architecture meets requirements before generating artifacts.",
-  nextPhase: Phase.Generate,
-},
+---
+
+## How phase advances
+
+Phase belongs to the **agent**, not the runner. Agent prompts decide when to advance and surface the change in their `AgentOutput`:
+
+```ts
+// packages/harness/src/types/agent-output.ts
+export const AgentOutput = z.object({
+  message: strictOptional(z.string()),
+  intent: strictOptional(z.enum(['continue', 'advance', 'revise', 'auto-continue-files'])),
+}).strict();
 ```
 
-Also update the `Design` entry so its `nextPhase` is `Phase.Validate`.
+`intent === 'advance'` tells the harness to call `advancePhase(session.currentPhase)`; `intent === 'revise'` keeps the phase but pulls in a different agent or skill set; `intent === 'auto-continue-files'` is the codesmith-chain marker that triggers another iteration without user input.
 
-### Step 3 — Register skills for the new phase
+The runner emits a `phase` SSE event on each agent **handoff** (`runtime/runner.ts` — `sseWrite('phase', { agent: newAgentName })`). Phase transitions that don't involve a handoff simply update `session.currentPhase` and the next `updateComponents` for the phase tracker reflects the change.
 
-Add `Phase.Validate` to the `phases` array of any skills that should activate during this phase:
+---
 
-```typescript
-// In your pack's SKILL.md frontmatter:
-// appliesTo: "aks.*"
-// keywords:
-//   - validate
-//   - architecture check
-```
+## The phase tracker component
 
-Or in a typed skill registration:
+`ConversationPhaseComponent` is a fixed A2UI component type:
 
-```typescript
-const mySkill: Skill = {
-  id: "my-skill",
-  name: "My Skill",
-  appliesTo: "aks.*",
-  keywords: ["validate", "architecture check"],
-  content: "When validating architecture, ...",
+```ts
+export type ConversationPhaseComponent = {
+  type: 'ConversationPhase';
+  id: string;
+  phases: PhaseItem[];
+  currentPhase: Phase;
 };
 ```
 
-### Step 4 — Write tests
+It is rendered by the SPA when surfaces include a node of this type. Any agent can update it via `core.emit_ui` with the latest `currentPhase` and the phase list.
 
-Add test cases to the harness skill resolver tests to verify your phase's skill activation behavior. Also confirm that `PHASE_DEFINITIONS` correctly chains `nextPhase` through all phases.
+---
 
-## Key Files
+## Reading phase from the chat history
 
-| File | Purpose |
-|---|---|
-| `packages/harness/src/runtime/session.ts` | Session state including `currentPhase` |
-| `packages/harness/src/runtime/skill-resolver.ts` | Per-turn skill filtering |
-| `packages/pack-core/src/agents/` | Base agent definitions (`.agent.md`) |
+`extractConversationPhase(items)` walks an array of A2UI message envelopes (most recent first) and returns the phase carried by the most recent `ConversationPhase` component, or `null` if none exists. `prepareChatA2ui(items, turnId, opts?)` rebuilds the chat surface for a turn including the resolved phase. Both helpers are re-exported from `@aks-kickstart/harness`.
+
+---
+
+## Adding a phase
+
+Phases are part of the harness contract — packs do not define new ones. To extend, edit `packages/harness/src/index.ts` (`Phase`, `PHASE_DEFINITIONS`) and `packages/harness/src/a2ui/chat-a2ui.ts` (`ConversationPhaseId`, `CONVERSATION_PHASE_ORDER`, `CONVERSATION_PHASE_LABELS`) in the same change, then update agent frontmatter that hard-codes phase strings.
+
+This is intentionally a heavyweight operation: the phase enum participates in chat history hydration, and shipping a mismatched enum across server and client breaks rehydration.
+
+---
+
+## What phases do NOT do
+
+- They do not gate guardrails. Guardrails apply to **agents** via `appliesTo` globs, not phases.
+- They do not gate tools. Tool allowlists are per-agent.
+- They are not part of the LLM system prompt. The agent's instructions and matched skills carry context — phase is metadata for the UI.

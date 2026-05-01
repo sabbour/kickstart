@@ -76,7 +76,7 @@ The SWA CLI proxies API requests from the frontend to the local Azure Functions 
 | `npm run dev` | Full-stack dev server (Vite + SWA CLI in parallel, port 4280) |
 | `npm run dev:vite` | Vite dev server only (HMR, port 5173, no API) |
 | `npm run build` | Build all packages (`core` → `web` + `mcp-server`) |
-| `npm run api:build` | Build `@kickstart/core` + API only |
+| `npm run api:build` | Build `@aks-kickstart/harness` + API only |
 | `npm test` | Unit/integration tests (vitest, all workspaces) |
 | `npm run test:e2e` | Playwright E2E tests (headless) |
 | `npm run test:e2e:ui` | Playwright E2E tests with interactive UI |
@@ -91,7 +91,7 @@ The SWA CLI proxies API requests from the frontend to the local Azure Functions 
 npm test
 
 # Specific workspace
-npm test -w @kickstart/core
+npm test -w @aks-kickstart/harness
 npm test -w @kickstart/mcp-server
 ```
 
@@ -121,13 +121,13 @@ E2E tests use their own dev server on port 4281 — they don't conflict with the
 npm run build
 
 # Build individual packages
-npm run build -w @kickstart/core
+npm run build -w @aks-kickstart/harness
 npm run build -w @kickstart/web
 npm run build -w @kickstart/mcp-server
 npm run api:build   # core + API (for deployment)
 ```
 
-Build order matters: `@kickstart/core` must be built before the web API and MCP server because they reference it via TypeScript project references.
+Build order matters: `@aks-kickstart/harness` must be built before the web API and MCP server because they reference it via TypeScript project references.
 
 ## Frontend-Only Development
 
@@ -142,7 +142,7 @@ The app opens at **http://localhost:5173** with HMR. It detects the API is unava
 ## MCP Server Development
 
 ```bash
-npm run build -w @kickstart/core
+npm run build -w @aks-kickstart/harness
 npm run build -w @kickstart/mcp-server
 
 # Run via stdio (for testing with an MCP client)

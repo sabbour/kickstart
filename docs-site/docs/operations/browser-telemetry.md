@@ -1,5 +1,6 @@
 ---
-title: Browser telemetry (v2 implementation brief)
+title: Browser telemetry
+sidebar_position: 2
 ---
 
 # Browser telemetry
@@ -17,8 +18,8 @@ root span with no link to the user action that produced it.
 
 ## SDK stack — Option B only
 
-`@microsoft/applicationinsights-web` (Option A) is **disqualified** (Zapp
-Decision 1): dynamic script injection would require widening CSP with
+`@microsoft/applicationinsights-web` (Option A) is **disqualified** for security
+reasons: dynamic script injection would require widening CSP with
 `unsafe-inline` / `unsafe-eval`.
 
 - `@opentelemetry/sdk-trace-web`
@@ -28,7 +29,7 @@ Decision 1): dynamic script injection would require widening CSP with
 - `BrowserRedactingSpanExporter` (new — mirrors the server-side
   `RedactingSpanExporter`, wraps the Azure Monitor exporter)
 
-## Redaction (Zapp Decision 3, verbatim)
+## Redaction (verbatim)
 
 | Attribute | Scrub action |
 | --- | --- |
@@ -89,7 +90,7 @@ gzipped.
 
 - Flag enabled for dogfood tenants / internal deploy slot.
 - End-to-end distributed trace validated on ≥10 real sessions.
-- Zapp spot-checks ≥20 spans for redaction correctness.
+- Security review spot-checks ≥20 spans for redaction correctness.
 - Gate to Phase 3: zero CSP violations, zero redaction leaks, kill-switch
   rehearsal signed off.
 

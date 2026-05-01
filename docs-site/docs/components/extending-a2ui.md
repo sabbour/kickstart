@@ -4,426 +4,172 @@ sidebar_position: 2
 
 # Extending the A2UI Component System
 
-> How to add new components, register them across the stack, teach the LLM to use them, and build playground scenarios — including smart components with built-in authentication, validation, and state management.
+This page is the end-to-end recipe for adding a new component to Kickstart's A2UI catalog: write the schema, register the renderer with the SPA, register the contribution with the harness, teach the LLM how to call it, and (optionally) wire a playground scenario.
 
-This guide walks through the full lifecycle of extending Kickstart's A2UI component system — from defining a React component to seeing it rendered by the LLM in production.
+The protocol is **A2UI v0.9** — see [A2UI integration](../architecture/a2ui-integration.md) for the envelope shapes and ordering rules. The bundled catalog is documented in [Custom catalog](./custom-catalog.md).
 
-## The 4-Layer Stack
+---
 
-Every A2UI component touches four layers of the stack. Missing any one layer causes the component to silently fail — either the backend drops it, the LLM never emits it, or the frontend doesn't know how to render it.
+## Component contribution
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Layer 1: LLM System Prompt                                    │
-│  packages/core/src/prompts/component-catalog.ts                │
-│  → Teaches the LLM that the component exists + usage example   │
-├─────────────────────────────────────────────────────────────────┤
-│  Layer 2: Backend Validator                                    │
-│  packages/core/src/services/a2ui-schema.ts                     │
-│  → Zod schema validates LLM output; drops unknown components  │
-├─────────────────────────────────────────────────────────────────┤
-│  Layer 3: Frontend Catalog                                     │
-│  packages/web/src/catalog/kickstart-catalog.ts                 │
-│  → Registers the React component so the A2UI renderer finds it │
-├─────────────────────────────────────────────────────────────────┤
-│  Layer 4: React Component                                      │
-│  packages/web/src/catalog/components/YourComponent.tsx         │
-│  → The actual UI implementation (Zod schema + React + Fluent)  │
-└─────────────────────────────────────────────────────────────────┘
-```
+Every component is a `ComponentContribution` (`packages/harness/src/types/component.ts`):
 
-| Missing layer | Symptom |
-|---|---|
-| System prompt catalog | LLM never emits your component |
-| Backend validator | Backend silently strips the component from the response |
-| Frontend catalog | A2UI renderer ignores the component (blank space) |
-| React component | Import fails, catalog registration breaks |
-
-## Step 1: Create the React Component
-
-**Files to modify:**
-
-| File | Action |
-|---|---|
-| `packages/web/src/catalog/components/YourComponent.tsx` | **Create** — component implementation |
-| `packages/web/src/catalog/kickstart-catalog.ts` | **Edit** — register in catalog |
-
-### Define the Zod schema
-
-The schema defines what props the LLM can send. It lives at the top of your component file.
-
-```typescript
-import { z } from 'zod';
-import {
-  DynamicStringSchema,
-  ActionSchema,
-} from '../../vendor/a2ui/web_core/schema/common-types';
-
-const StatusBannerApi = {
-  name: 'StatusBanner',
-  schema: z.object({
-    title: DynamicStringSchema,
-    message: DynamicStringSchema,
-    severity: z.enum(['info', 'warning', 'error', 'success']).optional(),
-    dismissible: z.boolean().optional(),
-    action: ActionSchema.optional(),
-  }).strict(),
-};
-```
-
-Key conventions:
-- Use `DynamicStringSchema` for any string prop — it supports both literal strings and A2UI data bindings (e.g. `{ "$ref": "/data/name" }`)
-- Use `ActionSchema` for any clickable action
-- Always call `.strict()` — this rejects unknown properties, catching LLM hallucinations early
-
-### Implement the React component
-
-Use `createReactComponent()` from `packages/web/src/vendor/a2ui/react/adapter.tsx`:
-
-```typescript
-import React from 'react';
-import { createReactComponent } from '../../vendor/a2ui/react/adapter';
-import { Card, makeStyles, tokens } from '@fluentui/react-components';
-import { sanitizeActionContext } from '../../utils/sanitize-action-context';
-
-const useStyles = makeStyles({
-  root: {
-    padding: tokens.spacingVerticalM,
-    backgroundColor: tokens.colorNeutralBackground1,
-  },
-});
-
-export const StatusBanner = createReactComponent(StatusBannerApi, ({ props, context }) => {
-  const classes = useStyles();
-
-  const handleDismiss = () => {
-    if (!props.action) return;
-    const rawAction = context.componentModel.properties.action;
-    if (rawAction && typeof rawAction === 'object' && 'event' in rawAction) {
-      const resolved = context.dataContext.resolveAction(rawAction);
-      const safeContext = sanitizeActionContext(resolved.event.context);
-      context.dispatchAction({
-        event: { ...resolved.event, context: { ...safeContext, dismissed: true } },
-      });
-    }
-  };
-
-  return (
-    <Card className={classes.root} role="status" aria-label={String(props.title)}>
-      {String(props.title)}
-      {props.dismissible && <button onClick={handleDismiss} aria-label="Dismiss">✕</button>}
-    </Card>
-  );
-});
-```
-
-### Action dispatch pattern
-
-When a user interacts with your component, dispatch an action so the LLM receives context for the next turn:
-
-```typescript
-// 1. Read the raw action definition
-const rawAction = context.componentModel.properties.action;
-
-// 2. Guard: only dispatch if the LLM provided an action
-if (rawAction && typeof rawAction === 'object' && 'event' in rawAction) {
-  // 3. Resolve any DataBindings in the action's context
-  const resolved = context.dataContext.resolveAction(rawAction);
-
-  // 4. Sanitize and enrich with the user's actual selection
-  const safeContext = sanitizeActionContext(resolved.event.context);
-  context.dispatchAction({
-    event: {
-      ...resolved.event,
-      context: { ...safeContext, value: selectedValue, selectedLabel },
-    },
-  });
+```ts
+export interface ComponentContribution {
+  name: string;                 // "<pack>/<ComponentName>", e.g. "core/Questionnaire"
+  propertySchema: z.ZodTypeAny; // strict-mode object schema
+  renderer: unknown;            // SPA-side React renderer; opaque to the harness
+  llmHint?: string;             // injected into the system prompt so the model knows HOW to use it (#1130 Phase A)
 }
 ```
 
-:::note Why enrich the context?
-The LLM defines static context in the action JSON (e.g. `{ label: "Pick a runtime" }`), but it doesn't know the user's actual selection. Your component must inject the selected value — otherwise the LLM only sees the static label.
-:::
+`name` is namespaced by pack so `core/Questionnaire` and `mypack/Questionnaire` can coexist.
 
-### Register in the catalog
+`llmHint` is the difference between a component the model never reaches for and one it uses correctly. Keep it 1–3 sentences; describe the purpose, key props, and which UserAction(s) feed back when the user interacts.
 
-Rich components use **lazy registration** so their module chunk is only downloaded when the component first renders in the UI. This keeps the initial page load fast.
+---
 
-```typescript
-// packages/web/src/main.tsx  (Step 1b section)
-import { createLazyRegistration } from './catalog/createLazyRegistration';
+## Step 1 — Define the property schema
 
-// Add your component to the richComponents array:
-const richComponents = [
-  // ... existing lazy registrations ...
-  createLazyRegistration('StatusBanner', () => import('./catalog/components/StatusBanner')),
-];
+```ts
+// packages/pack-mypack/src/components/RegionPicker/schema.ts
+import { z } from 'zod';
+import { strictOptional } from '@aks-kickstart/harness';
+
+export const RegionPickerSchema = z.object({
+  options: z.array(z.string()).min(1),
+  selected: strictOptional(z.string()),
+  helpText: strictOptional(z.string()),
+}).strict();
+export type RegionPickerProps = z.infer<typeof RegionPickerSchema>;
 ```
 
-`createLazyRegistration(name, importFn)` registers a placeholder that:
-1. Renders a Fluent UI `Skeleton` fallback while the component module downloads.
-2. Swaps in the real component once the chunk resolves.
-3. Lets Vite/Rollup split the component into its own chunk automatically.
+Strict-mode rules apply (see [Schema conformance](../architecture/schema-conformance.md)) — `propertySchema` is validated by `assertStrictlyConformant()` for any tool whose params reference it.
 
-**Important:** The `name` string must exactly match the `name` field in your component's API object (`StatusBannerApi.name`). If the factory module does not export a symbol with that exact name, the lazy wrapper throws at runtime.
+---
 
-## Step 2: Add the Backend Validation Schema
+## Step 2 — Implement the React renderer
 
-**File:** `packages/core/src/services/a2ui-schema.ts`
+The bundled adapter in `packages/pack-core/src/vendor/a2ui/react/adapter.ts` defines `ReactComponentImplementation`:
 
-### Add to `KNOWN_COMPONENT_TYPES`
+```ts
+// packages/pack-mypack/src/components/RegionPicker/RegionPicker.tsx
+import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapter';
+import { RegionPickerSchema, type RegionPickerProps } from './schema';
 
-```typescript
-export const KNOWN_COMPONENT_TYPES = new Set([
-  // ...
-  "StatusBanner",   // ← add here (alphabetical)
-  // ...
-] as const);
-```
-
-### Define the Zod schema
-
-```typescript
-const StatusBannerPropsSchema = z
-  .object({
-    id: boundedString,
-    component: z.literal("StatusBanner"),
-    title: dynamicString,
-    message: dynamicString,
-    severity: z.enum(["info", "warning", "error", "success"]).optional(),
-    dismissible: z.boolean().optional(),
-    action: actionSchema.optional(),
-  })
-  .strip();   // ← .strip() (not .strict()) removes unknown fields without rejecting
-```
-
-### Register in `COMPONENT_SCHEMA_REGISTRY`
-
-```typescript
-export const COMPONENT_SCHEMA_REGISTRY: Record<string, z.ZodType> = {
-  // ...
-  StatusBanner: StatusBannerPropsSchema,
-  // ...
+export const RegionPicker: ReactComponentImplementation<RegionPickerProps> = {
+  name: 'RegionPicker',
+  schema: RegionPickerSchema,
+  render(props, ctx) {
+    return (
+      <select value={props.selected ?? ''} onChange={(e) => ctx.emitDataModel('selected', e.target.value)}>
+        {props.options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    );
+  },
 };
 ```
 
-**Payload limits** enforced globally:
+`ctx.emitDataModel(path, value)` produces the `updateDataModel` A2UI envelope back to the harness. `ctx.invokeAction(name, args)` invokes a UserAction.
 
-```typescript
-export const PAYLOAD_LIMITS = {
-  maxMessages: 50,
-  maxComponents: 200,
-  maxPayloadBytes: 512 * 1024,   // 512 KB
-  maxNestingDepth: 10,
-  maxStringLength: 50_000,
-  maxActions: 20,
+---
+
+## Step 3 — Register with the pack
+
+Add the implementation to your pack's `components` list. The reference for shape and registration order is `packages/pack-core/src/core-pack.ts`:
+
+```ts
+// packages/pack-mypack/src/index.ts
+import type { Pack } from '@aks-kickstart/harness';
+import { RegionPicker } from './components/RegionPicker/RegionPicker';
+
+const toContrib = (impl) => ({
+  name: `mypack/${impl.name}`,
+  propertySchema: impl.schema,
+  renderer: impl.render,
+  llmHint: 'Show a single-select dropdown for regions. Read the choice via updateDataModel { path: "selected" }.',
+});
+
+export const myPack: Pack = {
+  name: 'mypack',
+  version: '0.1.0',
+  components: [toContrib(RegionPicker)],
 };
 ```
 
-## Step 3: Teach the LLM to Use Your Component
+Register the pack in `packages/web/api/src/startup/packs.ts` and `packages/mcp-server/src/startup/packs.ts`.
 
-**File:** `packages/core/src/prompts/component-catalog.ts`
+---
 
-Add a `ComponentCatalogEntry` to the `BASE_COMPONENT_CATALOG` array:
+## Step 4 — Surface to the SPA
 
-```typescript
-{
-  type: "StatusBanner",
-  category: "domain",
-  example: '{"id":"sb1","component":"StatusBanner","title":"Deployment Ready","message":"All checks passed.","severity":"success","dismissible":true}',
-  notes: "Severity: info, warning, error, success. Use for transient status messages.",
-},
-```
+The SPA boots a renderer registry; every component contribution's `renderer` is registered against `name`. The bundled set lives in `packages/pack-core/src/components/` and is wired during web bootstrap. Custom packs export their renderers from `packages/pack-<yourpack>/src/components/index.ts`; the SPA (`packages/web/src/main.tsx`) imports the bundle and registers them in one place.
 
-Category guidance:
-- `layout` — containers holding other components (Row, Column, Card)
-- `content` — display-only (Text, Markdown, Image)
-- `input` — interactive (Button, TextField, RadioGroup)
-- `domain` — Kickstart-specific (CodeBlock, ArchitectureDiagram)
+The browser learns which components exist via `GET /api/packs` (see [API endpoints](../extending/api-endpoints.md)) — the `ComponentDTO` carries the `name` and JSON-Schema-serialised `propertySchema` (no renderer code, no internal types).
 
-## Step 4: Add a Playground Scenario
+---
 
-**File:** `packages/web/src/pages/playground-scenarios.ts`
+## Step 5 — Teach the LLM
 
-```typescript
-const customStatusBanner = (): A2uiMsg[] => {
-  const sid = uid('status-demo');
-  return surface(sid, [
-    { id: 'root', component: 'Column', children: ['banner-success', 'banner-error'], gap: 'medium' },
-    {
-      id: 'banner-success',
-      component: 'StatusBanner',
-      title: 'Deployment Succeeded',
-      message: 'All 3 services are running.',
-      severity: 'success',
-      dismissible: true,
-    },
-    {
-      id: 'banner-error',
-      component: 'StatusBanner',
-      title: 'Health Check Failed',
-      message: 'Endpoint /health returned 503.',
-      severity: 'error',
-    },
-  ] as A2uiComponent[]);
-};
+Two paths:
 
-// Add to CONTROL_SCENARIOS:
-{ id: 'ctrl-status', label: 'StatusBanner', description: 'Severity-based status messages', group: 'Custom Controls', catalog: 'kickstart', generate: customStatusBanner },
-```
+1. **`llmHint`** on the contribution — visible in every system prompt that mentions this component.
+2. **A typed tool** — wrap an `updateComponents` envelope in a tool whose params are constrained to your component schema, so the model invokes the component through a function call rather than emitting raw A2UI:
 
-## Fluent 2 Styling Conventions
+```ts
+import { tool } from '@openai/agents';
+import { RegionPickerSchema } from './schema';
 
-### Rules
-
-1. **Use `makeStyles` — never inline styles**
-2. **Use longhand border properties** (Griffel doesn't support shorthand `border: ...`)
-3. **Use string values for dimensions** (`'0'` not `0`)
-4. **Use design tokens for all colors and spacing**
-
-```typescript
-import { makeStyles, tokens } from '@fluentui/react-components';
-
-const useStyles = makeStyles({
-  card: {
-    padding: tokens.spacingVerticalM,
-    backgroundColor: tokens.colorNeutralBackground1,
-    // Longhand borders:
-    borderTopWidth: tokens.strokeWidthThick,
-    borderRightWidth: tokens.strokeWidthThick,
-    borderBottomWidth: tokens.strokeWidthThick,
-    borderLeftWidth: tokens.strokeWidthThick,
-    borderTopColor: tokens.colorBrandStroke1,
-    borderRightColor: tokens.colorBrandStroke1,
-    borderBottomColor: tokens.colorBrandStroke1,
-    borderLeftColor: tokens.colorBrandStroke1,
+export const showRegionPicker = tool({
+  name: 'mypack.show_region_picker',
+  description: 'Render a region picker. Reads selection via updateDataModel.',
+  parameters: z.object({
+    surfaceId: z.string(),
+    props: RegionPickerSchema,
+  }).strict(),
+  async execute({ surfaceId, props }) {
+    return {
+      a2ui: {
+        version: 'v0.9',
+        op: 'updateComponents',
+        updateComponents: {
+          surfaceId,
+          components: [{ type: 'mypack/RegionPicker', ...props }],
+        },
+      },
+    };
   },
 });
 ```
 
-:::danger No `!important` overrides
-Never use `!important` in element-level CSS inside A2UI surfaces. It breaks Fluent UI v9 Griffel styles. Use `makeStyles` or target component-specific classes.
-:::
+The runner's post-tool a2ui drain handles ordering — the envelope is emitted *after* the LLM tool_call returns, never before. See [LLM tools](../extending/llm-tools.md).
 
-### Accessibility
+---
 
-All components must meet WCAG 2.1 AA:
-- `aria-label` on interactive elements
-- `role` attributes on custom interactive elements
-- Roving `tabIndex` for keyboard navigation in groups
-- `aria-live` regions for dynamic content updates
+## Step 6 — Optional: a UserAction for confirm / cancel
 
-## Smart Components
+If your component needs a typed result (e.g. "selected region"), add a UserAction whose `confirmComponent: { component: 'mypack/RegionPicker' }` ties UI to result. See [User actions](../extending/actions.md). The runner pauses on `user_action_req`, the browser collects the result, and `/api/converse/resume` validates against `resultSchema` (the resume schema-validation gate).
 
-### What Is a Smart Component?
+---
 
-From the LLM's perspective, smart components look identical to any other component — same JSON structure, same catalog entry. The **smart distinction is purely a frontend implementation pattern**: the component manages its own async flows (authentication, API calls, multi-step wizards) internally.
+## Step 7 — Optional: a playground scenario
 
-**LLM output — identical pattern for both:**
+Add a `PlaygroundScenario` and a `playgroundStubs[wireName]` for any UserAction the scenario needs. Stubs only resolve when `KICKSTART_PLAYGROUND=true` and the registry's frozen stub map allows them. See [Playground scenarios](../extending/playground-scenarios.md).
 
-```json
-{ "component": "Text", "text": "Click below" }
-{ "component": "GitHubLoginCard", "deviceCode": "ABCD-EFGH", "verificationUrl": "https://github.com/login/device" }
-```
+---
 
-The difference: `Text` displays its props; `GitHubLoginCard` manages the full OAuth flow internally.
+## Validation checklist
 
-### When to Build a Smart Component
+- `propertySchema` is `.strict()` and uses `strictOptional()` for nullable fields.
+- Pack tests run `assertStrictlyConformant(getToolJsonSchema(tool), tool.name)` for every tool that references the schema.
+- The renderer sanitises any free-text props before injecting them into the DOM.
+- The pack's `dependsOn` lists every pack whose components or tools you import.
+- `llmHint` is short and concrete — no internal jargon.
 
-Build a smart component when the component needs to:
-- Manage its own data fetching or polling
-- Handle authentication flows (OAuth device code, MSAL)
-- Orchestrate multi-step async processes
-- Handle errors gracefully without LLM intervention
+---
 
-### Smart Component Pattern
+## What you do NOT need to do
 
-```typescript
-import { useState, useEffect } from 'react';
-import { useAPIConnector } from '../../hooks/useAPIConnector';
-import { createReactComponent } from '../../vendor/a2ui/react/adapter';
-
-export const MyFatComponent = createReactComponent(api, ({ props }) => {
-  const connector = useAPIConnector('github');
-  const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
-  const [data, setData] = useState(null);
-
-  useEffect(() => {
-    (async () => {
-      setPhase('loading');
-      try {
-        const result = await connector.doSomething(props.config);
-        setData(result);
-        setPhase('done');
-      } catch {
-        setPhase('error');
-      }
-    })();
-  }, [props.config]);
-
-  if (phase === 'loading') return <Spinner />;
-  if (phase === 'error') return <Alert>Something went wrong</Alert>;
-  return <RenderedContent data={data} />;
-});
-```
-
-For full control over context bindings, use `createBinderlessComponent()` instead of `createReactComponent()`.
-
-### Built-in Smart Components
-
-**Azure Components:**
-| Component | Purpose | Handles Internally |
-|-----------|---------|-------------------|
-| `AzureLoginCard` | Device code MSAL auth flow | Token lifecycle, session state, logout |
-| `AzureResourcePicker` | Browse subscriptions and list resources | ARM API calls, rate-limit handling |
-| `AzureResourceForm` | Collect deployment parameters | Input validation, cost estimation |
-
-**GitHub Components:**
-| Component | Purpose | Handles Internally |
-|-----------|---------|-------------------|
-| `GitHubLoginCard` | Device code OAuth flow | Token lifecycle, polling, session state |
-| `GitHubRepoPicker` | Search and select repositories | GitHub API calls, debounced search |
-| `GitHubAction` | Execute allowlisted operations | Operation validation, confirmations for DELETE |
-| `GitHubCommit` | Create pull request | Branch validation, protected-branch guards |
-
-### Security for Smart Components
-
-Smart components integrating with external services must implement:
-- **In-memory token storage** — never `localStorage` for sensitive tokens
-- **Operation allowlisting** — validate allowed operations before execution
-- **Typed confirmation** — require explicit user confirmation for destructive operations
-- **Protected-branch guards** — block writes to production branches
-- **Rate-limit handling** — gracefully degrade with warnings when limits are hit
-
-## Checklist
-
-```
-□ Component file: packages/web/src/catalog/components/YourComponent.tsx
-  □ Zod schema with DynamicStringSchema and .strict()
-  □ createReactComponent() with makeStyles + tokens
-  □ Action dispatch: resolveAction() + sanitizeActionContext()
-  □ Accessibility: aria-label, role, keyboard support
-
-□ Catalog: packages/web/src/catalog/kickstart-catalog.ts
-  □ Import added
-  □ Component added to kickstartComponents array
-
-□ Backend schema: packages/core/src/services/a2ui-schema.ts
-  □ Type added to KNOWN_COMPONENT_TYPES (alphabetical)
-  □ YourComponentPropsSchema defined with .strip()
-  □ Schema added to COMPONENT_SCHEMA_REGISTRY (alphabetical)
-
-□ LLM catalog: packages/core/src/prompts/component-catalog.ts
-  □ ComponentCatalogEntry added to BASE_COMPONENT_CATALOG
-  □ JSON example is concise and shows key props
-
-□ Playground: packages/web/src/pages/playground-scenarios.ts
-  □ Factory function using uid() + surface() helpers
-  □ ScenarioDef added to CONTROL_SCENARIOS
-
-□ Fluent 2 styling verified
-  □ No inline styles or hardcoded colors
-  □ Longhand border properties only
-  □ Design tokens for all spacing and colors
-  □ Dark mode works (test in Playground with theme toggle)
-```
+- Modify the harness. Components are fully pack-contributed.
+- Touch `Runner` or `PackRegistry` — registration is automatic via `pack.components[]`.
+- Hand-write JSON Schema. `getToolJsonSchema()` and `assertStrictlyConformant()` derive everything from your Zod schema.

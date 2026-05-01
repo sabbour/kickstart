@@ -4,351 +4,110 @@ sidebar_position: 2
 
 # Environment Variables
 
-Complete reference for all environment variables used in Kickstart — from local development to production.
+Complete reference for the environment variables Kickstart reads at runtime. Variable names match the literals grep'd from `packages/harness/src/`, `packages/web/api/src/`, `packages/mcp-server/src/`, and `packages/pack-core/src/`.
 
-## LLM Configuration (Required)
+---
 
-These variables are required for the conversation engine to work. They configure Azure OpenAI deployments.
+## OpenAI / Azure OpenAI
 
-### AZURE_OPENAI_ENDPOINT
+| Variable | Where read | Purpose |
+|---|---|---|
+| `OPENAI_API_KEY` | API + MCP bootstrap | OpenAI API key for non-Azure deployments. |
+| `AZURE_OPENAI_API_KEY` | API + MCP bootstrap | Azure OpenAI API key. |
+| `AZURE_OPENAI_ENDPOINT` | API + MCP bootstrap | Azure OpenAI endpoint. |
+| `KICKSTART_USE_RESPONSES` | Runner | When truthy, route through the OpenAI Responses API (thread continuity via `session.responseId`). |
+| `KICKSTART_CHAT_MODEL` | Runner | Default chat model fallback when an agent does not pin a model id. |
+| `KICKSTART_CODEX_MODEL` | Codesmith chain | Model used for code-generation steps. |
+| `KICKSTART_INSPIRE_MODEL` | Inspirations endpoint | Model used by `/api/inspirations`. |
 
-**Required:** Yes  
-**Default:** None  
-**Example:** `https://your-resource.openai.azure.com/`
+---
 
-The Azure OpenAI resource endpoint. Supports both:
-- **Azure AI Services** (multi-service): `https://your-resource.cognitiveservices.azure.com/`
-- **Azure OpenAI** (single-service): `https://your-resource.openai.azure.com/`
+## Auth & identity
 
-Check your resource in the Azure Portal under **Keys and Endpoint**.
+| Variable | Purpose |
+|---|---|
+| `AZURE_TENANT_ID` | Azure AD tenant id used by ARM proxy and managed identity flows. |
+| `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` | Service-principal credentials when not running with managed identity. |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app credentials (`/api/github/auth/*`). |
+| `GITHUB_BASE_URL` | GitHub Enterprise base URL. Defaults to `https://github.com`. |
+| `GITHUB_OAUTH_SCOPES` | Comma-separated OAuth scopes requested at sign-in. |
+| `GITHUB_SESSION_SECRET` | HMAC secret for GitHub OAuth state cookies. |
+| `DEPLOY_RUN_SECRET` | Shared secret gating the deploy-run callback endpoint. |
 
-### AZURE_OPENAI_API_KEY
+---
 
-**Required:** Yes  
-**Default:** None  
-**Example:** `sk-abc123...`
+## Session storage
 
-The API key for your Azure OpenAI resource. Found in Azure Portal under **Keys and Endpoint** → **Key 1** or **Key 2**.
+| Variable | Purpose |
+|---|---|
+| `KICKSTART_SESSION_STORE` | `memory` (default) or `azure-table`. Selects the `ISessionStore` implementation. |
+| `KICKSTART_SESSION_TTL_SECONDS` | Session lifetime; drives `evictExpired` in the Azure Table backend. |
+| `AZURE_STORAGE_CONNECTION_STRING` | Connection string for `AzureTableSessionStore`. |
+| `AZURE_STORAGE_ACCOUNT` / `AZURE_STORAGE_KEY` | Account-key alternative to the connection string. |
+| `HARNESS_ALLOW_ANON_HYDRATION` | When truthy, anon sessions can be cold-rehydrated from the persistent store. Default: off. |
 
-### KICKSTART_CHAT_MODEL
+Anon-session TTL itself is hard-coded in `runtime/session.ts` as `ANON_SESSION_TTL_MS = 10 * 60 * 1000` (10 minutes); cold-rehydration bounds are `HYDRATION_DEFAULT_CAP = 20` turns and `HYDRATION_CONTENT_MAX_BYTES = 4096` per turn.
 
-**Required:** Yes  
-**Default:** `gpt-5.4` (after checking `AZURE_OPENAI_CHAT_DEPLOYMENT`)  
-**Example:** `gpt-5.4`
+---
 
-The deployment name for chat-tier models. Used for conversation turns, routing decisions, and text generation.
+## Runtime gates & limits
 
-The harness will automatically fall back to `AZURE_OPENAI_CHAT_DEPLOYMENT` if this is not set, with a deprecation warning. If neither env var is configured, chat-tier agents default to `gpt-5.4`.
+| Variable | Purpose |
+|---|---|
+| `KICKSTART_PACKS` | Comma-separated active pack list. Empty enables all four (`core,azure,aks,github`). |
+| `KICKSTART_PLAYGROUND` | Enables playground stubs (playground env-gate). Refused in production. |
+| `KICKSTART_DEBUG_ALLOWED` | Enables the API debug routes. Dev / preview only. |
+| `KICKSTART_RUNNER_MAX_TURNS` | Hard cap on turns per `Runner.run`. |
+| `KICKSTART_MAX_LIVE_SURFACES` | Cap on concurrent A2UI surfaces per session. |
+| `KICKSTART_SKILL_READ_MAX_BYTES_PER_TURN` | Per-turn skill-pull byte cap enforced by `core.read_skill`. |
+| `KICKSTART_GUARDRAILS_DISABLED` | Dev-only kill-switch for the guardrail engine. Refused if `NODE_ENV=production`. |
 
-### KICKSTART_CODEX_MODEL
+---
 
-**Required:** No (unless used by agents)  
-**Default:** None (falls back to `AZURE_OPENAI_CODEX_DEPLOYMENT`)  
-**Example:** `gpt-5.4`
+## Telemetry & observability
 
-The deployment name for code-generation tier models. Required only if agents request a codex-tier model.
+| Variable | Purpose |
+|---|---|
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Server-side App Insights connection string. |
+| `BROWSER_APPLICATIONINSIGHTS_CONNECTION_STRING` | Browser-side App Insights connection string surfaced to the SPA bootstrap. |
+| `WEB_TELEMETRY_BROWSER_ENABLED` | Opt-in to browser SDK ingestion. |
+| `KICKSTART_OTEL_RECORD_CONTENT` | Bypass OTel content redaction. **Dev only.** Production logs a security warning at boot and still redacts. |
+| `STARTUP_TRACE_ID` | Trace id stamped on startup logs. Set by the Functions host. |
 
-The harness falls back to `AZURE_OPENAI_CODEX_DEPLOYMENT` if unset, but will never cross tiers — a missing `KICKSTART_CODEX_MODEL` will not fall back to `KICKSTART_CHAT_MODEL`.
+See [Observability](../operations/observability.md) for the OTel bridge wiring and span layout.
 
-### KICKSTART_INSPIRE_MODEL (Optional)
+---
 
-**Required:** No  
-**Default:** None  
-**Example:** `gpt-5.4-nano`
+## Bicep tooling
 
-The deployment name for lightweight inspiration/ideation models. Used for suggestion generation where a smaller, faster model is sufficient.
+| Variable | Purpose |
+|---|---|
+| `BICEP_CLI_PATH` | Path to a pre-installed Bicep binary. Falls back to download. |
+| `BICEP_CLI_VERSION` | Pin a Bicep CLI version. |
 
-## Legacy Fallbacks
+---
 
-These variables are deprecated but still supported for backward compatibility. New deployments should use the `KICKSTART_*` variables instead.
+## Deployment metadata
 
-### AZURE_OPENAI_CHAT_DEPLOYMENT
+| Variable | Purpose |
+|---|---|
+| `NODE_ENV` | Standard Node lifecycle marker. `production` flips several safety rails on. |
 
-**Deprecated:** Yes  
-**Fallback for:** `KICKSTART_CHAT_MODEL`  
-**Triggers warning:** Yes
+---
 
-Used only if `KICKSTART_CHAT_MODEL` is not set. A deprecation warning is logged to encourage migration.
+## Defaults at a glance
 
-### AZURE_OPENAI_CODEX_DEPLOYMENT
+| Constant | File | Value |
+|---|---|---|
+| `ANON_SESSION_TTL_MS` | `runtime/session.ts` | 10 min |
+| `HYDRATION_DEFAULT_CAP` | `runtime/session.ts` | 20 turns |
+| `HYDRATION_CONTENT_MAX_BYTES` | `runtime/session.ts` | 4096 bytes |
+| `INTERRUPT_TTL_MS` | `mcp-server/adapter/interrupt-store.ts` | 15 min |
+| `MAX_DATA_BYTES` | `runtime/session-store-azure-table.ts` | 64 KB |
+| `AS_TOOL_MAX_TURNS_DEFAULT` | `runtime/as-tool.ts` | 5 turns |
 
-**Deprecated:** Yes  
-**Fallback for:** `KICKSTART_CODEX_MODEL`  
-**Triggers warning:** Yes
+---
 
-Used only if `KICKSTART_CODEX_MODEL` is not set.
+## Where these are read
 
-## Pack Configuration
-
-### KICKSTART_PACKS
-
-**Required:** No  
-**Default:** All available packs  
-**Example:** `core,azure,aks-automatic`
-
-Comma-separated list of packs to enable at runtime. If not set, all discovered packs are loaded.
-
-Useful for:
-- Disabling specific packs in certain environments
-- Loading only the packs needed for your deployment
-- Testing with a minimal pack set
-
-Valid pack names: `core`, `azure`, `github`, `aks-automatic`
-
-## Feature Flags
-
-### KICKSTART_PLAYGROUND
-
-**Required:** No  
-**Default:** `false`  
-**Allowed values:** `true`, `false`
-
-When `true`, enables playground scenarios for component development and testing. Adds demo data and example workflows to the UI without requiring full API integration.
-
-**Security:** Playground mode adds additional UI endpoints and demo data. Disable in production environments.
-
-### KICKSTART_DEBUG_ALLOWED
-
-**Required:** No  
-**Default:** `false`  
-**Allowed values:** `true`, `false`
-
-When `true`, enables debugging tools and verbose logging in the runtime. Useful for investigating agent behavior and pack interactions.
-
-### KICKSTART_GUARDRAILS_DISABLED
-
-**Required:** No  
-**Default:** `false`  
-**Allowed values:** `1`, unset
-
-When set to `1`, disables all content guardrails (PII detection, credential leak detection) for the current process.
-
-> ⚠️ **Development only.** Never set this variable in staging or production. All guardrail rules — including `core/no-pii` and `core/no-credential-leak` — are bypassed when this flag is set.
-
-Useful when working on harness internals where guardrail redaction interferes with test assertions.
-
-### KICKSTART_USE_RESPONSES
-
-**Required:** No  
-**Default:** unset (disabled)  
-**Allowed values:** `1`, unset
-
-When set to `1`, enables the **Responses API threading** mode. Instead of passing the full conversation history on every turn, the runner persists the `previous_response_id` returned by the OpenAI Responses API and passes it on subsequent turns. This can reduce token usage for long conversations.
-
-**Behaviour:**
-- **Turn 1:** Full history is sent as normal. The response ID is stored in `session.responseId`.
-- **Turn 2+:** Only the current user message is sent, plus `previousResponseId` pointing to the last response. The model reconstructs context server-side.
-- **Flag off (default):** Byte-identical to the previous behaviour. No regression.
-
-**Limitations:**
-- Requires the model deployment to support the Responses API (check your Azure OpenAI resource).
-- Session continuity depends on the response ID remaining valid. If the ID expires or is unavailable, the runner falls back to full history automatically.
-
-## Authentication & Security
-
-### GITHUB_CLIENT_ID
-
-**Required:** No (unless GitHub auth is needed)  
-**Default:** None  
-**Example:** `Ov23liwXXXXXXXXXXXXX`
-
-OAuth application ID for GitHub authentication. Create an OAuth app in GitHub Settings → Developer settings → OAuth Apps.
-
-### GITHUB_CLIENT_SECRET
-
-**Required:** No (unless GitHub auth is needed)  
-**Default:** None  
-**Example:** `ghp_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
-
-OAuth application secret for GitHub authentication. Keep this secret — do not commit to source control.
-
-### GITHUB_SESSION_SECRET
-
-**Required:** No  
-**Default:** Falls back to `GITHUB_CLIENT_SECRET` or `AZURE_CLIENT_SECRET`  
-**Example:** `your-secret-string`
-
-Encryption key for GitHub OAuth session cookies. If not set, falls back to other secrets in order of precedence.
-
-### GITHUB_OAUTH_SCOPES
-
-**Required:** No  
-**Default:** `repo,user:email`  
-**Example:** `repo,user:email,gist`
-
-Comma-separated list of OAuth scopes to request from GitHub. Customize based on what your deployment needs.
-
-### AZURE_CLIENT_ID
-
-**Required:** No  
-**Default:** None  
-**Example:** `e71a23c6-aeb4-459a-88fc-07ff96fc9b92`
-
-Azure Entra ID (formerly Azure AD) application ID for Azure authentication and resource deployments.
-
-### AZURE_CLIENT_SECRET
-
-**Required:** No  
-**Default:** None  
-**Example:** `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
-
-Client secret for Azure Entra ID service principal. Used for interactive deployments and resource operations.
-
-### AZURE_TENANT_ID
-
-**Required:** No  
-**Default:** None  
-**Example:** `d91aa5af-8c1e-442c-b77c-0b92988b387b`
-
-Azure Entra ID tenant ID (directory ID) for your organization.
-
-### DEPLOY_RUN_SECRET
-
-**Required:** No  
-**Default:** Falls back to `GITHUB_SESSION_SECRET` or `AZURE_CLIENT_SECRET`  
-**Example:** `your-run-secret`
-
-Secret used to authorize deployment run initiations. If not explicitly set, the system checks fallback secrets.
-
-## Runtime Configuration
-
-### NODE_ENV
-
-**Required:** No  
-**Default:** `production`  
-**Allowed values:** `development`, `production`, `test`
-
-Node.js environment mode. Affects logging verbosity and some runtime optimizations.
-
-### PORT
-
-**Required:** No  
-**Default:** `4280`  
-**Example:** `8080`
-
-Port for the dev server (when running `npm run dev`). The SWA CLI listens on this port.
-
-## Quick Start: Local Development
-
-Create `packages/web/api/local.settings.json` with the following structure:
-
-```json
-{
-  "IsEncrypted": false,
-  "Values": {
-    "FUNCTIONS_WORKER_RUNTIME": "node",
-    "AzureWebJobsStorage": "",
-    "AZURE_OPENAI_ENDPOINT": "https://your-resource.openai.azure.com/",
-    "AZURE_OPENAI_API_KEY": "your-api-key",
-    "KICKSTART_CHAT_MODEL": "gpt-5.4",
-    "KICKSTART_CODEX_MODEL": "gpt-5.4",
-    "KICKSTART_INSPIRE_MODEL": "gpt-5.4-nano",
-    "KICKSTART_PLAYGROUND": "false",
-    "AZURE_CLIENT_ID": "your-app-id",
-    "AZURE_CLIENT_SECRET": "your-secret",
-    "AZURE_TENANT_ID": "your-tenant-id",
-    "GITHUB_CLIENT_ID": "your-github-app-id",
-    "GITHUB_CLIENT_SECRET": "your-github-secret"
-  }
-}
-```
-
-:::caution
-Never commit `local.settings.json` to source control. It's already in `.gitignore`.
-:::
-
-## .env.sample Reference
-
-Use this as a template for your environment configuration:
-
-```bash
-# ============================================================================
-# Azure OpenAI (Required)
-# ============================================================================
-
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_OPENAI_API_KEY=sk-...
-
-# Preferred deployment names (v2 standard)
-KICKSTART_CHAT_MODEL=gpt-5.4
-KICKSTART_CODEX_MODEL=gpt-5.4
-KICKSTART_INSPIRE_MODEL=gpt-5.4-nano
-
-# Legacy fallbacks (deprecated, but still supported)
-# AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-5.4
-# AZURE_OPENAI_CODEX_DEPLOYMENT=gpt-5.4
-
-# ============================================================================
-# Packs & Features
-# ============================================================================
-
-# Comma-separated list of packs to enable (default: all)
-# KICKSTART_PACKS=core,azure,github,aks-automatic
-
-# Enable playground scenarios for component development
-KICKSTART_PLAYGROUND=false
-
-# Enable debug logging
-KICKSTART_DEBUG_ALLOWED=false
-
-# ============================================================================
-# Azure Authentication
-# ============================================================================
-
-AZURE_CLIENT_ID=your-app-id
-AZURE_CLIENT_SECRET=your-secret
-AZURE_TENANT_ID=your-tenant-id
-
-# ============================================================================
-# GitHub OAuth (Optional)
-# ============================================================================
-
-GITHUB_CLIENT_ID=Ov23li...
-GITHUB_CLIENT_SECRET=ghp_...
-GITHUB_OAUTH_SCOPES=repo,user:email
-
-# ============================================================================
-# Security Keys
-# ============================================================================
-
-# Session encryption (falls back to CLIENT_SECRET if not set)
-GITHUB_SESSION_SECRET=your-session-secret
-DEPLOY_RUN_SECRET=your-run-secret
-
-# ============================================================================
-# Runtime
-# ============================================================================
-
-NODE_ENV=development
-PORT=4280
-```
-
-## Troubleshooting
-
-### "Agent model is not configured" error
-
-**Cause:** `KICKSTART_CHAT_MODEL` is unset and the built-in `gpt-5.4` default does not match any deployment in your Azure OpenAI resource.
-
-**Solution:** Set `KICKSTART_CHAT_MODEL` (or `AZURE_OPENAI_CHAT_DEPLOYMENT`) to a valid Azure OpenAI deployment name for your resource.
-
-### Model deployment name mismatch
-
-**Cause:** Deployment names don't exist in your Azure OpenAI resource.
-
-**Solution:** Verify deployment names in Azure Portal → your resource → Deployments. Deployment names are NOT the same as model names (for example `gpt-5.4` is a deployment name here, not a model ID).
-
-### GitHub OAuth not working
-
-**Cause:** `GITHUB_CLIENT_ID` or `GITHUB_CLIENT_SECRET` is missing or mismatched.
-
-**Solution:** Check GitHub Settings → Developer settings → OAuth Apps. Ensure the redirect URI is correct: `http://localhost:4280/api/github-auth/callback` for local dev, or your production origin for deployments.
-
-### "Endpoint format" error
-
-**Cause:** Wrong endpoint URL format.
-
-**Solutions:**
-- For Azure AI Services: `https://resource.cognitiveservices.azure.com/`
-- For Azure OpenAI: `https://resource.openai.azure.com/`
-
-Check your resource type in Azure Portal.
+Search for any variable name in the source to find the call site. Most live under `packages/harness/src/` or `packages/web/api/src/`. The MCP server reads the same set so a single env file works for both transports.

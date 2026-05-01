@@ -2,7 +2,7 @@
 sidebar_position: 7
 ---
 
-# Agent Coordination Decisions
+# Agent Coordination
 
 How agents coordinate via handoff patterns, `asTools` wiring, question budgets, and the coordinator (triage) role.
 
@@ -138,13 +138,8 @@ The handoff schema is enforced at CI time:
 - **`triage-handoff-schema.test.ts`** — validates briefing payloads against `TriageHandoffBriefingSchema`.
 - **`triage-mode-recognition.test.ts`** — confirms mode classification produces valid enum values.
 
-:::note Partial coverage
-This document covers handoff briefing structure and zero-copy coordination patterns. Additional #221 acceptance criteria (wiring graph visualization from handoff-rules.json, handback-to-triage workaround, priorDeploymentContext, bulk handling, asTools-vs-skill-load guidance) are tracked for a follow-up doc.
-:::
-
 ## Related
 
 - [Agent as Tool (`asTool`)](../extending/agent-as-tool.md) — API reference and detailed usage.
 - [Runner Chain](../extending/runner-chain.md) — for stateful multi-turn specialist interaction.
 - [Conversation Phases](../extending/conversation-phases.md) — lifecycle of a multi-agent conversation.
-- [ADR-0004: Triage Mode Recognition](./decisions/ADR-0004-triage-mode-recognition-and-typed-handoff.md) — architectural decision record.

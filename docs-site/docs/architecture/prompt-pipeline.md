@@ -4,102 +4,68 @@ sidebar_position: 2
 
 # Prompt Pipeline
 
-Every conversation turn dynamically assembles agent instructions before calling the LLM via the `@openai/agents` SDK. This page describes how the harness builds per-turn context.
+Every conversation turn dynamically assembles agent instructions before calling the LLM. The pipeline lives in `packages/harness/src/runtime/runner.ts` (`Runner.run`) and `packages/harness/src/runtime/skill-resolver.ts`.
 
-> **Source files:**
-> - `packages/harness/src/runtime/skill-resolver.ts` — per-turn skill resolution
-> - `packages/harness/src/runtime/runner.ts` — turn orchestration
-> - `packages/web/api/src/functions/converse.ts` — HTTP handler
-
-## Assembly Order
-
-```
-POST /api/converse arrives
-    │
-    ├─ 1. Session lookup or creation
-    ├─ 2. Guardrail input check (core/token-budget, etc.)
-    │
-    ├─ 3. Runner selects active Agent
-    │      session.activeAgent ?? "core.triage"
-    │
-    ├─ 4. Dynamic instructions assembled per turn
-    │      = agent.body (base .agent.md text)
-    │      + resolvedSkills(agent.name, recentTurns)  ← skill resolver
-    │      + catalog snapshot (component type list)
-    │
-    ├─ 5. Agent streams via SDK — text chunks + tool calls
-    │      core.emit_ui → a2ui SSE events
-    │      core.write_file, azure.arm_get, etc.
-    │
-    ├─ 6. UserAction encountered?
-    │      → pause, emit user_action_required SSE
-    │      → browser acts (MSAL popup, GitHub OAuth, etc.)
-    │      → POST /api/converse/resume with typed result
-    │      → Runner resumes
-    │
-    ├─ 7. Guardrail output check
-    │
-    └─ 8. AgentOutput { message, intent } → SSE done
-```
-
-## Skill Resolution
-
-`resolveSkills(agentName, context)` in `packages/harness/src/runtime/skill-resolver.ts`:
-
-1. **Match `appliesTo`** — glob each skill's `appliesTo` field against the current agent name.
-2. **Keyword scoring** — score matched skills against the recent conversation turns.
-3. **Priority ordering** — sort by `priority` (higher first), apply token budget cap (2000 tokens default).
-4. **Inject** — append skill text to the agent's dynamic instructions.
-
-Skills are authored as `SKILL.md` files inside packs. They are pure text — no code, no execution.
-
-## Agent Instructions Structure
-
-```
-{agent.body}                     ← base .agent.md text (persona + rules)
-
-## Active Skills
-{skill1 text}
 ---
-{skill2 text}
 
-## Component Catalog
-{registered component list with schemas}
+## Inputs
+
+`Runner.run(session, userMessage, sseWrite, signal?, runConfig?)` consumes:
+
+- `Session` (`runtime/session.ts`) — `activeAgent`, `recentTurns`, `a2uiEmissions`, `artifacts`, `pendingUserAction`, `responseId`, per-turn skill counters.
+- `userMessage` (string).
+- `SSEWriter` (`(event, data) => void`).
+- Optional `AbortSignal` (forwarded into the runner's internal `AbortController`).
+- Optional `RunConfig` (`runtime/run-config.ts`) — `onHandoff`, `handoffInputFilter`, etc.
+
+---
+
+## Steps
+
+1. **`start` SSE frame** with `{ sessionId }`.
+2. **Plan-artifact gate**: agents in `PLAN_REQUIRED_AGENTS` (currently `core.codesmith` and the architects) throw a fixed-copy `PlanArtifactMissing` Card if `session.artifacts.has('plan') === false`. The raw error is logged to telemetry only, never to SSE.
+3. **Agent lookup**: `registry.getAgent(activeAgent)` returns the `AgentContribution` (`packages/harness/src/types/agent.ts`).
+4. **Skill resolution**: `resolveSkills()` (`runtime/skill-resolver.ts`) selects skills whose `appliesTo` globs match the active agent (`runtime/skill-matcher.ts`), then greedily fits them within a token budget using `fitSkillsInBudget()` and `estimateTokens()` (`runtime/token-budget.ts`, ~4 chars/token approximation). Oversized skills are skipped, never truncated.
+5. **Instruction assembly**: the agent's `instructionsBase` (loaded from the body of `<pack>/agents/<agent>.agent.md`) is concatenated with the rendered skill blocks (each wrapped as `<skill name="…">…</skill>`).
+6. **Tool surface**: `registry.getToolsForAgent(name)` returns only tools listed in the agent's `tools:` frontmatter (`toolAllowlist`). Tools never leak across allowlists.
+7. **Guardrail wiring**: input and output `GuardrailContribution` instances whose `appliesTo` matches the agent are wrapped via `toSdkInputGuardrail` / `toSdkOutputGuardrail` and attached to the SDK agent. Tool-stage guardrails stay on the sequential `runGuardrails()` path because the SDK has no tool-arg hook (see `runtime/guardrails.ts` header).
+8. **History threading**: `session.recentTurns` is fed into `runInput`. The current user turn is recorded *before* the SDK run so the model sees it; if input guardrails tripwire, the turn is popped in the catch handler (the "guardrail-on-capture" rule, #1062 Z2 in `runner.ts`).
+9. **SDK invocation**: the OpenAI Agents SDK runs with the assembled instructions, allowed tools, parallel guardrails, and a `responseId` for thread continuity (#114 Phase 3 in `runner.ts`).
+10. **Per-turn drains**: each LLM tool_call drains `session.a2uiEmissions` *after* the tool finishes (the post-tool A2UI drain rule), then emits queued frames as `a2ui` SSE events. This is what guarantees A2UI never overtakes the tool that produced it.
+11. **Termination**: `end` is emitted with skill counters (`skillsExecuted`, `skillsPulledBytes`, `skillsPulledTokens`) and `toolsExecuted`. Per-turn counters are reset in a `try/finally` so they never leak across turns on abort or thrown errors.
+
+---
+
+## Skill resolution rules
+
+- Skills live at `packages/<pack>/src/skills/<slug>/SKILL.md`.
+- Frontmatter: `name`, `description`, `version`, `x-kickstart.appliesTo[]` (agent-name globs), `x-kickstart.keywords[]`, `x-kickstart.priority` (higher first).
+- `appliesTo` patterns are validated at registration: shell metacharacters (`;|&$\``) are rejected (`runtime/skill-matcher.ts`).
+- Empty or absent `appliesTo` matches all agents. `*` is a short-circuit C1 fast-path.
+
+---
+
+## Token budget
+
+`fitSkillsInBudget(skills, budgetTokens)` is greedy: it iterates by priority order, costs each skill as its rendered block (header + body), and **skips** skills that would overshoot rather than breaking. This means a small high-value skill ranked after a large one still gets included.
+
+Default per-turn skill-pull byte cap is configured via `KICKSTART_SKILL_READ_MAX_BYTES_PER_TURN` and enforced inside `core.read_skill`.
+
+---
+
+## What the model sees
+
+A typical turn payload:
+
+```
+<system>
+{instructionsBase}
+<skill name="teach-then-ask">…</skill>
+<skill name="a2ui-output-discipline">…</skill>
+…
+</system>
+<user>{guardrail-sanitized userMessage}</user>
+{recent prior turns from session.recentTurns}
 ```
 
-## Triage Interaction Model
-
-The `core.triage` agent follows a **one-question-at-a-time** policy for gathering requirements. This replaces the previous form-dump pattern where all clarification questions were presented in a single multi-field `Questionnaire` component.
-
-### Policy (as encoded in `triage.agent.md`)
-
-| Rule | Detail |
-|------|--------|
-| One question per turn | Never emit more than one question in a single response |
-| Route immediately when clear | If the user's message makes intent unambiguous, route without any questions |
-| Re-evaluate after each answer | After receiving an answer, decide whether routing is now possible before asking another question |
-| Hard cap | Maximum 3 questions before forced routing, regardless of remaining ambiguity |
-
-### Ordering heuristic
-
-The agent is instructed to ask the **most discriminating question first** — the single piece of information that most reduces routing ambiguity. Examples:
-
-- **`repo_uplift` track:** After `core.inspect_repo` returns its questionnaire array, only the first (highest-value) question is asked. The next is asked only if routing is still ambiguous after the first answer.
-- **`kaito` inference:** If the model family is already specified in the user's request, the agent skips the model question entirely and proceeds to routing or asks the next most-important gap.
-
-### Why this matters
-
-User research shows that 3–5 questions presented at once overwhelm users and increase abandonment. The one-Q model keeps each turn focused and allows the agent to route as early as possible — often after 0 or 1 questions.
-
-
-
-Guardrails contributed by packs run at three stages:
-
-| Stage | When |
-|-------|------|
-| `input` | Before the agent receives the user message |
-| `tool` | Before each tool call result is returned to the agent |
-| `output` | After `AgentOutput` is produced |
-
-Built-in guardrails: `core/token-budget`, `core/content-safety`. Pack guardrails: `azure/no-hardcoded-creds`, `aks/no-privileged-containers`, etc.
-
+There is no fixed "phase prompt" injected at the top. Phase is owned by the agent's instructions and the `phase` SSE event is emitted by the runner only on handoff transitions.

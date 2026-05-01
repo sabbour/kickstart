@@ -4,230 +4,114 @@ sidebar_position: 3
 
 # LLM Tools
 
-LLM tools are functions you expose to the AI via [OpenAI function calling](https://platform.openai.com/docs/guides/function-calling). When the LLM decides it needs more information or needs to take an action, it emits a structured tool call — Kickstart executes the function and feeds the result back into the conversation.
-
-This guide covers the tool interface, the registry, and how to add a new tool.
-
-## How Tools Work
-
-### Tool Interface
-
-Every tool implements the `Tool<TArgs>` interface defined in `packages/pack-core/src/tools/types.ts`:
-
-```typescript
-export interface Tool<TArgs = Record<string, unknown>> {
-  name: string;
-  description: string;
-  parameters: {
-    type: "object";
-    properties: Record<string, unknown>;
-    required?: string[];
-  };
-  requireApproval?: boolean;
-  execute(args: TArgs, context: ToolContext): Promise<unknown>;
-}
-
-export interface ToolContext {
-  artifactStore: ArtifactStore;
-  fileSystem?: FileSystemProvider;
-}
-```
-
-| Property | Type | Description |
-|---|---|---|
-| `name` | `string` | Unique tool identifier — used as the function name in OpenAI calls |
-| `description` | `string` | Sent to the LLM to explain what the tool does and when to use it |
-| `parameters` | JSON Schema object | Describes the tool's arguments in OpenAI function-calling format |
-| `requireApproval` | `boolean?` | If `true`, the user must confirm before the tool executes |
-| `execute` | `function` | The implementation — receives typed args and a `ToolContext` |
-
-The `ToolContext` gives your tool access to:
-
-- **`artifactStore`** — read and write generated artifacts (Dockerfiles, manifests, etc.)
-- **`fileSystem`** — optional filesystem provider (available in MCP context, not in web API)
-
-### Tool Registry
-
-`packages/pack-core/src/tools/registry.ts` exports a `ToolRegistry` class and a `defaultRegistry` singleton:
-
-```typescript
-const registry = new ToolRegistry();
-registry.register(myTool);
-registry.registerAll([tool1, tool2, tool3]);
-
-// Convert to OpenAI function-calling format
-const toolDefs = registry.toOpenAIFormat();
-
-// Execute a tool by name
-const result = await registry.execute("my_tool", args, context);
-```
-
-Tools registered on `defaultRegistry` are automatically available in the LLM conversation.
-
-### Wiring to the LLM
-
-In `packages/web/api/src/functions/converse.ts`:
-
-1. `defaultRegistry.toOpenAIFormat()` produces the tool definitions array
-2. The definitions are passed into the Azure OpenAI chat completion call
-3. When the LLM returns a tool call, `registry.execute(name, args, context)` is called
-4. The result is fed back to the LLM as a tool message
-5. This loops up to `maxToolRounds = 5` times per user turn
-
-Tool call events are streamed to the client as SSE events of type `tool_call` and `tool_result`.
-
-### Built-in Tools
-
-| Tool Name | Description |
-|---|---|
-| `github_repo_info` | Get metadata about a GitHub repository |
-| `github_repo_tree` | List files and directories in a repo |
-| `github_repo_file_read` | Read a specific file from a GitHub repo |
-| `github_api_get` | Make an authenticated GitHub API GET request |
-| `azure_resource_list` | List Azure resources in a subscription |
-| `azure_resource_get` | Get details on a specific Azure resource |
-| `estimate_cost` | Estimate monthly cost for a set of Azure services |
-| `fetch_webpage` | Fetch and extract content from a URL |
-| `generate_kubernetes_manifest` | Generate a Kubernetes manifest from a spec |
-| `list_artifacts` | List artifacts currently in the artifact store |
-| `get_artifact` | Read the content of a specific artifact |
+LLM tools are functions you expose to the model via OpenAI function calling. The model emits a structured tool call, the harness runs your function, and the result feeds back into the conversation as a `tool` turn. Tool definitions live inside packs.
 
 ---
 
-## How to Add a Tool
+## Contribution shape
 
-### Step 1 — Create the tool file
+`ToolContribution` (`packages/harness/src/types/tool.ts`):
 
-Create a new file in `packages/pack-core/src/tools/`. Name it after your tool using kebab-case:
+```ts
+import type { Tool as SDKTool } from '@openai/agents';
 
-```
-packages/pack-core/src/tools/my-tool.ts
-```
-
-Implement the `Tool<TArgs>` interface:
-
-```typescript
-import type { Tool, ToolContext } from "./types.js";
-
-interface MyToolArgs {
-  query: string;
-  maxResults?: number;
-}
-
-export const myTool: Tool<MyToolArgs> = {
-  name: "my_tool",
-  description:
-    "Searches for relevant documentation entries matching the query. " +
-    "Use this when the user asks about a specific technology or framework.",
-  parameters: {
-    type: "object",
-    properties: {
-      query: {
-        type: "string",
-        description: "The search query",
-      },
-      maxResults: {
-        type: "number",
-        description: "Maximum number of results to return (default: 5)",
-      },
-    },
-    required: ["query"],
-  },
-  requireApproval: false,
-
-  async execute(args: MyToolArgs, context: ToolContext): Promise<unknown> {
-    const { query, maxResults = 5 } = args;
-
-    // Your implementation here
-    const results = await fetchDocumentation(query, maxResults);
-
-    return {
-      results,
-      count: results.length,
-    };
-  },
-};
-```
-
-:::tip Write good descriptions
-The LLM decides when to call your tool based entirely on the `description`. Be explicit about what the tool does, what it returns, and — crucially — **when** to use it. "Use this when..." phrasing is highly effective.
-:::
-
-### Step 2 — Add SSRF and input validation
-
-If your tool makes outbound HTTP requests, validate inputs to prevent SSRF attacks. See `packages/pack-core/src/tools/fetch-webpage.ts` for the reference implementation — it validates the URL scheme, blocks private IP ranges, and restricts to HTTP/HTTPS:
-
-```typescript
-async execute(args, context) {
-  const url = new URL(args.url); // throws on malformed URL
-  if (!["http:", "https:"].includes(url.protocol)) {
-    throw new Error("Only HTTP/HTTPS URLs are supported");
-  }
-  // ...
+export interface ToolContribution {
+  name: string;            // "<pack>.<tool>" — e.g. "core.emit_ui"
+  tool: SDKTool;
+  mcpExposed?: boolean;    // appears in MCP tool manifest. Default: false (opt-in)
+  requiresSession?: boolean; // requires an active user session — excluded from MCP entirely
 }
 ```
 
-### Step 3 — Register the tool
+Tools are added by listing them in a pack's `tools[]` (`packages/harness/src/types/pack.ts`). The `core` pack composes tools in `packages/pack-core/src/core-tools.ts` (`createCoreTools(coreComponents)`); other packs construct `ToolContribution[]` directly.
 
-Open `packages/pack-core/src/tools/index.ts` and add your tool to the registration block:
+---
 
-```typescript
-import { myTool } from "./my-tool.js";
+## Authoring a tool
 
-// Register all tools on the default registry
-defaultRegistry.registerAll([
-  // ... existing tools ...
-  myTool,
-]);
-```
+Tools wrap an `@openai/agents` `tool(...)` call. Use Zod for params, but constrain schemas to OpenAI's strict-mode contract by importing helpers from `@aks-kickstart/harness` (`runtime/z-strict.ts`):
 
-Alternatively, if your tool belongs to an integration, add it to your pack's tool contributions instead. See [Packs](./integration-kits.md) for details.
+```ts
+import { tool } from '@openai/agents';
+import { z } from 'zod';
+import { strictOptional } from '@aks-kickstart/harness';
 
-### Step 4 — Write tests
-
-Add unit tests for your tool implementation. Test both the happy path and error conditions:
-
-```typescript
-import { myTool } from "../tools/my-tool.js";
-import type { ToolContext } from "../tools/types.js";
-
-const mockContext: ToolContext = {
-  artifactStore: { /* mock */ } as any,
-};
-
-describe("myTool", () => {
-  it("returns results for a valid query", async () => {
-    const result = await myTool.execute({ query: "nginx" }, mockContext);
-    expect(result).toHaveProperty("results");
-    expect(result).toHaveProperty("count");
-  });
-
-  it("respects maxResults", async () => {
-    const result = await myTool.execute(
-      { query: "nginx", maxResults: 2 },
-      mockContext
-    ) as any;
-    expect(result.results.length).toBeLessThanOrEqual(2);
-  });
+export const myTool = tool({
+  name: 'mypack.do_thing',
+  description: 'Does the thing.',
+  parameters: z.object({
+    target: z.string(),
+    notes: strictOptional(z.string()),
+  }).strict(),
+  async execute({ target, notes }) {
+    // notes is `string | null` (strictOptional). Convert to undefined if you need it.
+    return { ok: true, target, notes: notes ?? undefined };
+  },
 });
 ```
 
-### Step 5 — Build and verify
+The full strict-mode rule table is in [Schema conformance](../architecture/schema-conformance.md). The non-negotiable rules:
 
-```bash
-npm run build -w @kickstart/core
-```
+- No `.optional()` — use `strictOptional()` so the field is in `required[]` as nullable.
+- No `z.record()` — use a closed `z.object({...}).strict()`.
+- No `z.unknown()` in tool params — give it a `type`.
+- No `z.string().url()` — `format: "uri"` is rejected; use `.refine(isHttpsUrl, …)`.
 
-Start the dev server and open a conversation. Ask the AI to do something that should trigger your tool. Watch the SSE stream in browser DevTools (Network → `converse` → EventStream) to see `tool_call` and `tool_result` events.
+Pack unit tests assert this with `assertStrictlyConformant(getToolJsonSchema(tool), tool.name)`.
 
 ---
 
-## Key Files
+## Allowlists, never globals
 
-| File | Purpose |
+There is **no** default tool registry, no `defaultRegistry`, no `ToolRegistry` global. Tools are surfaced per-agent via `PackRegistry.getToolsForAgent(agentName)` and only if the agent's frontmatter `tools:` list names them. Cross-pack tool reuse requires the dependent pack to declare `dependsOn`.
+
+```yaml
+---
+name: aks.architect
+tools:
+  - core.emit_ui
+  - core.read_file
+  - aks.list_kubernetes_versions
+---
+```
+
+---
+
+## A2UI emission from tools
+
+Tools that push UI emit A2UI envelopes. The harness queues them on `session.a2uiEmissions` during the tool call and drains the queue **after** each LLM tool_call returns (the post-tool A2UI drain rule documented at the top of `runtime/runner.ts`). This guarantees A2UI frames cannot overtake their producing tool.
+
+The canonical emission helper is `core.emit_ui`. See [Components → Extending A2UI](../components/extending-a2ui.md) for component-typed tool patterns.
+
+---
+
+## Guardrails at tool-stage
+
+Tool-stage guardrails run sequentially via `runGuardrails()` (`runtime/guardrails.ts`) because `@openai/agents` has no tool-arg hook. A `block` verdict at tool stage halts **all** remaining tool calls for the turn. SSE frames stay opaque (`{ code: 'GUARDRAIL_BLOCK' }`) — never an id or reason. See [Guardrails](./guardrails.md).
+
+Tool args can also be `redact`ed (`GuardrailResult.redactedArgs`); the runner re-evaluates downstream guardrails against the redacted form (dual-eval chaining).
+
+---
+
+## MCP exposure
+
+Set `mcpExposed: true` to surface a tool in the MCP manifest produced by `buildMcpManifest()` (`packages/harness/src/mcp/server.ts`). Tools with `requiresSession: true` are excluded from the MCP manifest entirely — the MCP transport is stateless and cannot guarantee an active SPA session. See [MCP tools](./mcp-tools.md).
+
+---
+
+## Telemetry & redaction
+
+Tool input and output are forwarded to OpenTelemetry via `OtelBridgeTraceProcessor` (`runtime/agents-otel-bridge.ts`). `runtime/redact.ts` strips secrets and PII before content is attached as span attributes; setting `KICKSTART_OTEL_RECORD_CONTENT=true` in development bypasses redaction. See [Observability](../operations/observability.md).
+
+---
+
+## Where tools live
+
+| Pack | Directory |
 |---|---|
-| `packages/pack-core/src/tools/types.ts` | `Tool<TArgs>` and `ToolContext` interfaces |
-| `packages/pack-core/src/tools/registry.ts` | `ToolRegistry` class and `defaultRegistry` singleton |
-| `packages/pack-core/src/tools/index.ts` | Tool registration entry point |
-| `packages/pack-core/src/tools/fetch-webpage.ts` | Reference implementation with SSRF protection |
-| `packages/web/api/src/functions/converse.ts` | LLM wiring: `toOpenAIFormat()`, `execute()`, multi-round loop |
+| `core` | `packages/pack-core/src/tools/` (composed in `core-tools.ts`) |
+| `azure` | `packages/pack-azure/src/tools/` |
+| `aks` | `packages/pack-aks-automatic/src/tools/` |
+| `github` | `packages/pack-github/src/tools/` |
+
+The auto-generated `extending/tools-reference.md` lists every tool with its pack, MCP flag, session flag, and one-line description.

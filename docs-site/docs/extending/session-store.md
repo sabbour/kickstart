@@ -4,120 +4,114 @@ sidebar_position: 6
 
 # Session Store
 
-Kickstart persists conversation history and metadata in a **session store** — an abstraction over whatever backing storage is appropriate for your deployment. This guide covers the `ISessionStore` interface, the built-in in-memory implementation, and how to write your own adapter (for example, an Azure Table Storage backend).
+Kickstart persists conversation state in a **session store**. The harness ships two implementations and a clean adapter contract for adding more.
 
-## Overview
+---
 
-Session stores implement the `ISessionStore` interface exported from `@aks-kickstart/harness`:
+## Interfaces — `runtime/session-store.ts`
 
-```typescript
-import type { ISessionStore } from '@aks-kickstart/harness';
-```
+```ts
+export interface ISessionStore {        // synchronous, Map-shaped
+  get(id: string): Session | undefined;
+  set(id: string, session: Session): void;
+  delete(id: string): boolean;
+  entries(): IterableIterator<[string, Session]>;
+  [Symbol.iterator](): IterableIterator<[string, Session]>;
+  list(): Session[];
+  clear(): void;
+}
 
-The harness ships with:
-- **`InMemorySessionStore`** — a Map-backed store suitable for local development and single-instance deployments.
-- **`createSessionStore(type)`** — a factory that returns the appropriate implementation. Currently supports `'memory'`; extended in later phases to support `'azure-table'`.
-
-## The `ISessionStore` Interface
-
-```typescript
-export interface ISessionStore {
-  /** Retrieve a session by ID. Returns undefined if not found. */
+export interface IAsyncSessionStore {   // Promise-returning, remote backends
   get(id: string): Promise<Session | undefined>;
-
-  /** Persist a session. Creates or updates. */
   set(id: string, session: Session): Promise<void>;
-
-  /** Remove a session. No-op if not found. */
-  delete(id: string): Promise<void>;
-
-  /** Return all session IDs currently in the store. */
-  list(): Promise<string[]>;
-
-  /** Return all [id, session] entries. */
-  entries(): Promise<Array<[string, Session]>>;
-
-  /** Remove all sessions. Use with caution. */
+  delete(id: string): Promise<boolean>;
+  entries(): AsyncIterableIterator<[string, Session]>;
+  list(): Promise<Session[]>;
   clear(): Promise<void>;
+  init?(): Promise<void>;             // create table, etc.
+  evictExpired?(): Promise<number>;   // returns count deleted
 }
 ```
 
-All methods are `async` — even the in-memory implementation returns `Promise`s — so that adapters for remote storage can be substituted without changing call sites.
+`createSessionStore(kind)` returns an `ISessionStore` for `'memory'` and is the default for tests. The async store sits behind an internal sync façade in production.
 
-## The Built-in `InMemorySessionStore`
+---
 
-`InMemorySessionStore` wraps a JavaScript `Map` and is the default for all deployments unless you configure an external adapter.
+## Bundled implementations
 
-```typescript
-import { InMemorySessionStore } from '@aks-kickstart/harness';
+| Class | Module | Notes |
+|---|---|---|
+| `InMemorySessionStore` | `runtime/session-store.ts` | Map-backed; default; loses sessions on process restart. |
+| `AzureTableSessionStore` | `runtime/session-store-azure-table.ts` | Azure Table Storage backend (#133). |
 
-const store = new InMemorySessionStore();
-await store.set('session-123', mySession);
-const s = await store.get('session-123'); // Session | undefined
+`AzureTableSessionStore` uses `@azure/data-tables` with `AzureNamedKeyCredential`. Configurable via:
+
+- `AZURE_STORAGE_CONNECTION_STRING` *or* (`AZURE_STORAGE_ACCOUNT` + `AZURE_STORAGE_KEY`)
+- `KICKSTART_SESSION_STORE=azure-table`
+
+Implementation details:
+
+- Single fixed `partitionKey: 'sessions'` (single-tenant deployments).
+- Each row stores serialised JSON in a `data` column with hard cap `MAX_DATA_BYTES = 64 * 1024` (Azure Table property limit).
+- An ISO `expiresAt` column drives lazy TTL eviction.
+- `hydrateSession()` reconstructs a `Session` instance from the JSON snapshot and re-applies mutable fields by name (`recentTurns`, `a2uiEmissions`, `pendingUserAction`, `lastActiveAt`, `activeAgent`, `anonTokenHash`, `responseId`).
+
+---
+
+## Eviction scheduler
+
+`startEvictionScheduler(store, intervalMs?)` returns a handle with `stop()`. Default interval is 5 minutes. The scheduler swallows errors and logs them so a transient backend failure doesn't crash the process. The timer is `unref()`-ed so it never blocks process exit.
+
+```ts
+import { startEvictionScheduler, AzureTableSessionStore } from '@aks-kickstart/harness';
+const store = new AzureTableSessionStore({ /* opts */ });
+await store.init?.();
+const handle = startEvictionScheduler(store);
+process.once('SIGTERM', () => handle.stop());
 ```
 
-It is also accessible as the module-level `sessionStore` singleton:
+---
 
-```typescript
-import { sessionStore } from '@aks-kickstart/harness';
-// sessionStore is an InMemorySessionStore instance shared across the process
-```
+## What's stored
 
-## Creating a Store via Factory
+`SessionData` (`runtime/session.ts`) carries:
 
-Use `createSessionStore` when you want callers to be decoupled from the concrete implementation:
+- `sessionId`, `user` (`{ oid, tid?, upn? }`), `workspaceRoot`, `currentPhase`, `activeAgent`.
+- `recentTurns: Turn[]` — server-trusted history (`role`, `content`, `timestamp`, `provenance: 'server' | 'client'`).
+- `a2uiEmissions` — queued A2UI envelopes drained by the runner after each tool_call.
+- `pendingUserAction` — set when a tool requests a UserAction; cleared via compare-and-swap in `/api/converse/resume`.
+- `artifacts: Map<string, Artifact>` — plan artifacts, generated files, etc. The plan-artifact gate in `Runner.run` reads `artifacts.has('plan')`.
+- `responseId` — Responses API thread continuity (#114/#126 Phase 3).
+- `anonTokenHash` — hash of the anonymous session token (#1079).
+- `lastActiveAt` — used by hydration / eviction.
 
-```typescript
-import { createSessionStore } from '@aks-kickstart/harness';
+---
 
-const store = createSessionStore('memory'); // ISessionStore
-```
+## Session TTL & anonymous lifecycle
 
-The factory is extensible: future adapters (for example `'azure-table'`) will be added as additional `type` values. Callers that use `createSessionStore` will not need to change.
+- `KICKSTART_SESSION_TTL_SECONDS` controls maximum session lifetime (Azure Table eviction).
+- Anonymous sessions get a stricter TTL: `ANON_SESSION_TTL_MS = 10 * 60 * 1000` (10 minutes), enforced by `getOrCreateSession()` and surfaced as the `session_token` SSE event.
+- `HARNESS_ALLOW_ANON_HYDRATION=true` enables cold-rehydration of anonymous sessions; otherwise anon sessions expire with the process.
 
-## Writing a Custom Adapter
+---
 
-To implement your own backing store (Redis, Cosmos DB, etc.), implement `ISessionStore`:
+## Cold rehydration
 
-```typescript
-import type { ISessionStore, Session } from '@aks-kickstart/harness';
+`hydrateColdSession(rawTurns, opts?)` walks the persisted history and rebuilds the in-memory `Session` with bounded fidelity:
 
-export class MyRedisSessionStore implements ISessionStore {
-  constructor(private client: RedisClient) {}
+- `HYDRATION_DEFAULT_CAP = 20` — most-recent N turns.
+- `HYDRATION_CONTENT_MAX_BYTES = 4096` per turn — long messages are truncated, not silently dropped.
 
-  async get(id: string): Promise<Session | undefined> {
-    const raw = await this.client.get(`session:${id}`);
-    return raw ? (JSON.parse(raw) as Session) : undefined;
-  }
+The bound exists so a long session doesn't blow up the prompt budget on resume. Hydrated turns retain their original `provenance` marker.
 
-  async set(id: string, session: Session): Promise<void> {
-    await this.client.set(`session:${id}`, JSON.stringify(session));
-  }
+---
 
-  async delete(id: string): Promise<void> {
-    await this.client.del(`session:${id}`);
-  }
+## Writing your own adapter
 
-  async list(): Promise<string[]> {
-    const keys = await this.client.keys('session:*');
-    return keys.map((k) => k.replace('session:', ''));
-  }
+1. Implement `IAsyncSessionStore`.
+2. Cap the per-row payload: `JSON.stringify(snapshot)` must fit your backend's row size limits.
+3. Implement `evictExpired()` — without it the eviction scheduler is a no-op.
+4. Re-create the in-memory class invariants when hydrating: rebuild `recentTurns`, `a2uiEmissions`, `pendingUserAction`, `responseId`, `anonTokenHash`, `lastActiveAt`, `activeAgent`. Don't lose `provenance` markers.
+5. Wire it via `createSessionStore` or directly in your API bootstrap.
 
-  async entries(): Promise<Array<[string, Session]>> {
-    const ids = await this.list();
-    const pairs = await Promise.all(ids.map(async (id) => [id, await this.get(id)] as [string, Session]));
-    return pairs.filter(([, s]) => s !== undefined);
-  }
-
-  async clear(): Promise<void> {
-    const ids = await this.list();
-    await Promise.all(ids.map((id) => this.delete(id)));
-  }
-}
-```
-
-Then wire it in where the harness initialises `sessionStore`, or pass it to `Runner` via the `BuildContext`.
-
-## Architecture Note
-
-The `ISessionStore` interface is Phase 1 of the distributed session store work (issue #131). Phase 2 adds an Azure Table Storage adapter (`createSessionStore('azure-table')`), enabling multi-instance deployments and session TTL management. The interface is intentionally minimal so that all current callers are unchanged and new adapters slot in without disruption.
+The class to model on is `AzureTableSessionStore` — it covers serialisation, hydration, TTL filtering on read, and `evictExpired` in ~200 lines.

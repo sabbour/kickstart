@@ -72,7 +72,7 @@ hop without weakening trust boundaries.
 
 On a `401` from ARM, the SPA refreshes the token from `/api/azure/token`
 **at most once** and retries the original request **at most once** before
-surfacing an `auth-error` and prompting re-sign-in (ADR-0002).
+surfacing an `auth-error` and prompting re-sign-in.
 
 ### Token contract — memory only
 
@@ -103,8 +103,8 @@ branch without parsing strings:
 | `network-error` | `fetch` rejected (offline, DNS, TLS)                       |
 | `arm-error`     | Any other non-2xx ARM (or token-endpoint) response         |
 
-The Azure auth-error UI surface follows ADR-0002 — refresh once, then route
-the user to a sign-in prompt instead of stacking retries.
+The Azure auth-error UI surface enforces a one-refresh / one-retry contract —
+refresh once, then route the user to a sign-in prompt instead of stacking retries.
 
 ## Call flow — server-initiated (pack tools, unchanged)
 
@@ -184,5 +184,4 @@ and the proxy file will be deleted.
 ## See also
 
 - [API Endpoints — Azure integration](../extending/api-endpoints.md#azure-integration) — full HTTP surface for `/api/azure/token` and the still-deployed `/api/arm-proxy`.
-- [ADR-0002 — Auth-error UI surface on retry](./decisions/ADR-0002-auth-error-ui-surface-on-retry.md) — the one-refresh / one-retry contract that `armFetch` implements.
 - [Architecture overview](./overview.md) — how ARM calls fit the broader Five-Primitives request flow.

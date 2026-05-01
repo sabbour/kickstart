@@ -42,6 +42,25 @@ const config: Config = {
     ],
   ],
 
+  plugins: [
+    [
+      '@docusaurus/plugin-client-redirects',
+      {
+        redirects: [
+          // ADRs were removed from the published site (kept repo-internally at docs/adrs/).
+          { from: '/docs/architecture/decisions/ADR-0001-per-role-github-apps', to: '/docs/architecture/overview' },
+          { from: '/docs/architecture/decisions/ADR-0002-auth-error-ui-surface-on-retry', to: '/docs/architecture/overview' },
+          { from: '/docs/architecture/decisions/ADR-0003-sdk-native-parallel-guardrails', to: '/docs/extending/guardrails' },
+          { from: '/docs/architecture/decisions/ADR-0004-triage-mode-recognition-and-typed-handoff', to: '/docs/architecture/agent-coordination' },
+          // Renames.
+          { from: '/docs/architecture/v2-implementation-brief', to: '/docs/operations/browser-telemetry' },
+          { from: '/docs/extending/integration-kits', to: '/docs/extending/packs' },
+          { from: '/docs/architecture/agent-coordination-decisions', to: '/docs/architecture/agent-coordination' },
+        ],
+      },
+    ],
+  ],
+
   themeConfig: {
     colorMode: {
       defaultMode: 'light',

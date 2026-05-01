@@ -1,4 +1,8 @@
-# Requirement-Gathering Methodology
+---
+sidebar_position: 10
+title: "Requirement-Gathering Methodology"
+---
+
 
 **Status:** Current | **Scope:** Every agent that asks the user *anything* (triage, architects, ops, publisher, specialists).
 
@@ -469,7 +473,7 @@ These hooks aren't Phase 1 deliverables, but Phase 1 prompts should be written s
 This methodology is doing its job when:
 
 - Median user-facing questions per agent per phase is ≤ 1.
-- The cap (3) is rarely hit (>80% of conversations finish their phase in <3 questions).
+- The cap (3) is rarely hit (more than 80% of conversations finish their phase in fewer than 3 questions).
 - Same scenario produces the same questions across agents (consistency, not coincidence).
 - Defaults are stated transparently and used silently when the user hasn't overridden them.
 - Receiving agents never re-ask what triage already routed with.
