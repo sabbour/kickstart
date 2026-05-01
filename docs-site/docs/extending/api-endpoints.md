@@ -66,8 +66,8 @@ app.http("functionName", {
 
 | Endpoint | Method | Route | Auth | Response Format | Description |
 |---|---|---|---|---|---|
-| `azure-token` | GET | `/api/azure/token` | SWA sign-in (Azure AD) | JSON | Returns the SWA-injected Azure AD access token so the browser can call ARM directly |
-| `arm-proxy` | GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS | `/api/arm-proxy/{*path}` | Azure access token | JSON | Azure Resource Manager CORS proxy (legacy server-side path; superseded by browser-direct ARM via `azure-token`) |
+| `azure-token` | GET | `/api/azure/token` | SWA sign-in (Azure AD) | JSON | Thin token surface for browser-direct ARM (Option A2). See [ARM call flow](../architecture/arm-call-flow.md) |
+| `arm-proxy` | GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS | `/api/arm-proxy/{*path}` | Azure access token | JSON | **Retiring** — superseded by browser-direct ARM via `azure-token`. Zero-traffic observation window post-Wave 3; full removal tracked in #321. Do not introduce new callers |
 | `azure-target` | PUT | `/api/sessions/{sessionId}/azure-target` | Azure access token + SWA sign-in + session | JSON | Persist Azure subscription / resource group for a session |
 | `azure-deployments-start` | POST | `/api/sessions/{sessionId}/azure-deployments` | Azure access token + SWA sign-in + session | JSON | Kick off an ARM deployment for a session |
 | `azure-deployments-status` | GET | `/api/azure-deployments/{runId}` | Azure access token + SWA sign-in | JSON | Poll the status of a running ARM deployment |
@@ -314,7 +314,11 @@ Thin endpoint that surfaces the SWA-injected Azure AD access token to the browse
 
 The CSP `connect-src` directive in `packages/web/public/staticwebapp.config.json` must include `https://management.azure.com` for browser-direct calls to succeed; this is enforced by the `csp-check` workflow (issue #319).
 
+See the [ARM call flow architecture doc](../architecture/arm-call-flow.md) for the end-to-end browser ↔ ARM sequence, the `armFetch` client contract, and the trust-boundary table.
+
 #### `ANY /api/arm-proxy/{*path}`
+
+**Status:** Retiring. Browser-direct ARM via `/api/azure/token` + `armFetch` superseded this route in Wave 3 (#320). The route is currently in a one-week zero-traffic observation window as a rollback safety net; full removal is tracked in #321. Do not add new callers — see [ARM call flow](../architecture/arm-call-flow.md#tombstone-status-of-apiarm-proxy).
 
 **Auth:** Azure access token (`X-Azure-AccessToken` header or SWA Azure auth cookie)  
 **Methods:** GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS  

@@ -97,3 +97,38 @@ Both changesets authored by implementing agents (Bender, Leela). Amy reviews cha
 **Bot Identity:** `squad-docs[bot]` (app slug: `squad-docs`, app ID 3492820)
 - Initial post-flight runs used wrong expected-login `sabbour-squad-docs[bot]` (should be `squad-docs[bot]`) — caught by post-flight check on PR #139, revoked, re-applied correctly.
 - All 9 × comments + 9 × labels verified OK with correct expected-login.
+
+## 2026-05-01 12:30 — Issue #322: ARM call-flow doc for browser-direct (Option A2)
+
+**Task:** Carved-out docs follow-up from #237 PR-1 (which I had explicitly deferred — see 2026-04-24 entry). Wave 1/2/3 of Option A2 has now landed (#317, #318, #319, #320), so the proxy is in its zero-traffic observation window and the docs can finally tell the truth.
+
+**What shipped (PR #338):**
+- New `docs-site/docs/architecture/arm-call-flow.md` (sidebar 6) — full architecture doc covering both call paths, trust boundaries, memory-only token contract, ArmFetchError discriminated union, CSP requirement, tombstone status of `/api/arm-proxy`. Two ASCII flow diagrams (Mermaid not enabled in Docusaurus config; matches existing `overview.md`/`prompt-pipeline.md` style).
+- Updated `docs-site/docs/extending/api-endpoints.md`: `/api/arm-proxy` row marked **Retiring** with link to the new doc; `/api/azure/token` row links to it; added Status line to the proxy reference entry.
+
+**Learnings:**
+- The doc is deliberately split: the *architecture* doc owns the **why** and the **call flow** narrative; the *api-endpoints* doc owns the **HTTP-surface reference table**. Cross-link, don't duplicate. This is the right shape — each doc has one job.
+- Verified `docs-site/docs/architecture/v2-implementation-brief.md` is about **browser telemetry**, not ARM, despite the issue's wording. The "v2 brief" name in older issues meant something else. **Don't auto-trust acceptance-criteria filenames** — grep the actual doc tree.
+- Mermaid is not enabled in this Docusaurus config (no `@docusaurus/theme-mermaid` in `docusaurus.config.ts`). ASCII diagrams in fenced blocks are the prevailing pattern. If a future doc *needs* a real sequence diagram, that's a separate enablement step (decision for Leela / infra owner).
+- The split between **browser-direct ARM (read-heavy SPA picker traffic)** and **server-side ARM via `getAzureToken(session)` (tool/deployment workflows)** is intentional and worth surfacing prominently — server-side needs session context (cost gates, deployment state machine, polling URL allow-list); browser-direct only needs the user's own AAD token. Future contributors will be tempted to "unify" these and shouldn't.
+- Tombstone handling: I labelled `/api/arm-proxy` **Retiring** rather than **Deprecated (410 Gone)** because it's still deployed during the rollback safety window. When #321 lands, move it into the existing 410 table — that's a one-line table edit.
+- `npm run build` in `docs-site/` is the right validation command for docs-only PRs (12s, no install side effects in worktree once `node_modules` exists). All internal `[link](path)` references must resolve or build fails.
+- Identity: `node /home/asabbour/GitWSL/EMU/kickstart/.github/extensions/squad-identity/lib/resolve-token.mjs docs` works from a worktree (the `squad_identity_resolve_token` MCP tool errored under this Copilot CLI version). PR #338 successfully attributed to `squad-docs[bot]`.
+
+## 2026-05-01 12:15 — PR #338 follow-up: Nibbler request-changes (dismissed)
+
+**Trigger:** squad-backend dispatched Amy to address Nibbler's `CHANGES_REQUESTED` review on PR #338 (PRR_kwDOSKrIb877Hcwp). Reviewer claimed the doc references nonexistent files (`packages/web/src/lib/arm/armFetch.ts`, its tests) and incorrect API shape (`thrown ArmFetchError`), and asked me to substitute `services/arm-client.ts` / `ArmResult<T>` / `ArmClientError`.
+
+**Outcome:** Dismissed under docs-authority bypass — Nibbler was factually wrong. Verified at HEAD `13bd659a`:
+- `packages/web/src/lib/arm/armFetch.ts` exists, exports `ArmFetchError` (class at :91), throws it 5× (:153, :165, :173, :184, :342, :386, :393).
+- `packages/web/src/lib/arm/__tests__/armFetch.test.ts` exists.
+- `packages/web/src/services/arm-client.ts` does **not** exist; `ArmClientError` / `ArmResult<T>` zero matches in `packages/web/src`.
+- Only `arm-client.ts` in tree is `packages/web/api/src/lib/arm-client.ts` — server-side legacy proxy (different layer entirely).
+
+**Learnings:**
+- **The `services/arm-client.ts` string in code comments is a landmine.** It appears in `packages/web/src/lib/arm/armFetch.ts:30` and `packages/web/src/contexts/APIConnectorContext.tsx:195,249` as historical commentary about a now-deleted Wave 1→2 interim shim. Future code-shape reviewers (human or bot) will keep tripping over this. Worth filing a tiny code-cleanup issue to scrub those stale comments — out of scope for this docs PR but a real papercut.
+- **Pushing back on a request-changes is the right move when evidence is on your side.** I held the line, replied with file:line citations, dismissed the thread under the docs-authority bypass, and re-requested review. Capitulating would have regressed doc accuracy and propagated the wrong names into the docs site.
+- **The `squad_identity_resolve_token` MCP tool errors out under Copilot CLI 1.0.2** ("Invalid command format" — it's invoking `copilot` as a wrapper instead of `node`). Workaround: `squad_workflows_*` and `squad_reviews_*` tools resolve their own tokens internally and worked fine. Direct-call workaround for future Amy: `node /home/asabbour/GitWSL/EMU/kickstart/.github/extensions/squad-identity/lib/resolve-token.mjs docs`.
+- Validation: `docs-site npm run build` re-ran cleanly (`[SUCCESS] Generated static files in "build"`). No file changes shipped, no commit, no push — this was purely a review-thread rebuttal.
+
+**Gate state:** docs-authority bypass label remains applied; review re-requested from `codereview` (Nibbler) to confirm against the actual source tree.
