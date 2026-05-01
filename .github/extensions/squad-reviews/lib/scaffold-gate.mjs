@@ -238,6 +238,11 @@ jobs:
             const approvedRoles = new Set();
             const missingRoles = [];
 
+            // GitHub App reviews appear in REST payloads with the \`[bot]\` suffix
+            // (e.g. \`squad-lead[bot]\`), but some surfaces (commit author, PR author
+            // attribution) drop the suffix (\`squad-lead\`). Normalize both sides so
+            // primary and fallback approver comparisons are not defeated by suffix
+            // drift. See issue #315.
             function normalizeBotLogin(login) {
               return (login || '').toLowerCase().replace(/\\[bot\\]$/, '');
             }
@@ -245,6 +250,7 @@ jobs:
             for (const role of requiredRoles) {
               const botLogin = botLoginMap[role] || null;
               const normalizedBotLogin = normalizeBotLogin(botLogin);
+              const normalizedFallback = normalizeBotLogin(fallbackApprover);
               const prAuthor = normalizeBotLogin(pr.user?.login);
               const isSelfApprovalBlocked = botLogin && prAuthor === normalizedBotLogin;
 
@@ -253,7 +259,7 @@ jobs:
                 if (botLogin) {
                   // Accept the primary bot OR fallback approver when self-approval is blocked
                   if (login === normalizedBotLogin) return true;
-                  if (isSelfApprovalBlocked && fallbackApprover && login === normalizeBotLogin(fallbackApprover)) return true;
+                  if (isSelfApprovalBlocked && normalizedFallback && login === normalizedFallback) return true;
                   return false;
                 }
                 return (
