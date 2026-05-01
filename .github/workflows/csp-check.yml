@@ -1,0 +1,43 @@
+name: CSP Check
+
+on:
+  pull_request:
+    paths:
+      - 'packages/web/public/staticwebapp.config.json'
+      - 'packages/web/scripts/check-csp.mjs'
+      - 'packages/web/src/__tests__/csp-check.test.ts'
+      - '.github/workflows/csp-check.yml'
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'packages/web/public/staticwebapp.config.json'
+      - 'packages/web/scripts/check-csp.mjs'
+      - 'packages/web/src/__tests__/csp-check.test.ts'
+      - '.github/workflows/csp-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: csp-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  csp-check:
+    name: CSP connect-src regression guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      # Hard-fail (no `continue-on-error`): blocks merge on regression.
+      # Carved from #237 PR-1 acceptance criteria; tracked in #319.
+      - name: Verify CSP connect-src includes browser-direct ARM origins
+        run: node packages/web/scripts/check-csp.mjs
