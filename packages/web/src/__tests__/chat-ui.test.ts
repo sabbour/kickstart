@@ -273,6 +273,21 @@ describe('chat/debug UI regressions', () => {
     expect(debugMarkup).toContain('gpt-5.4-mini');
   });
 
+  it('uses a starter placeholder until the first turn, then switches to a conversational placeholder', () => {
+    const initialMarkup = renderChatShell([], null);
+    const followUpMarkup = renderChatShell([
+      {
+        id: 'user-1',
+        role: 'user',
+        text: 'Deploy my app to AKS',
+        timestamp: 1,
+      },
+    ], null);
+
+    expect(initialMarkup).toContain('placeholder="Describe what you want to build..."');
+    expect(followUpMarkup).toContain('placeholder="Type a message..."');
+  });
+
   it('renders a copy button in the expanded debug panel', () => {
     const useStateSpy = vi.spyOn(React, 'useState');
     const mockSetExpanded: React.Dispatch<React.SetStateAction<unknown>> = () => undefined;

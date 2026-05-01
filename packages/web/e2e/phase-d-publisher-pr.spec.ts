@@ -152,6 +152,8 @@ test.describe('Phase D publisher PR-creation card', () => {
     // Send initial message
     await page.getByRole('textbox', { name: /describe your app/i }).fill('Deploy my app to AKS');
     await page.getByRole('button', { name: /send/i }).click();
+    const chatInput = page.getByRole('textbox', { name: /type a message/i });
+    await expect(chatInput).toHaveAttribute('placeholder', 'Type a message...');
 
     // AuthCard should appear with GitHub sign-in
     const surface = page.locator('[data-surface-id="shared:publisher-pr"]');
@@ -191,6 +193,8 @@ test.describe('Phase D publisher PR-creation card', () => {
 
     await page.getByRole('textbox', { name: /describe your app/i }).fill('Create a PR for my AKS app');
     await page.getByRole('button', { name: /send/i }).click();
+    const chatInput = page.getByRole('textbox', { name: /type a message/i });
+    await expect(chatInput).toHaveAttribute('placeholder', 'Type a message...');
 
     // CreatePRFlow should show idle state with file list
     await expect(page.getByText('Create Pull Request')).toBeVisible();
@@ -251,6 +255,8 @@ test.describe('Phase D publisher PR-creation card', () => {
     // Turn 1: AuthCard
     await page.getByRole('textbox', { name: /describe your app/i }).fill('Publish to GitHub');
     await page.getByRole('button', { name: /send/i }).click();
+    const chatInput = page.getByRole('textbox', { name: /type a message/i });
+    await expect(chatInput).toHaveAttribute('placeholder', 'Type a message...');
     await expect(page.getByText('Sign in to create a pull request.')).toBeVisible();
 
     // Turn 2: CreatePRFlow
