@@ -45,6 +45,7 @@ export function ChatInput({ onSend, disabled, statusBar }: ChatInputProps) {
           ref={textareaRef}
           className="chat-textarea"
           placeholder="Describe what you want to build..."
+          aria-label="Type a message"
           value={value}
           onChange={e => setValue(e.target.value)}
           onKeyDown={handleKeyDown}

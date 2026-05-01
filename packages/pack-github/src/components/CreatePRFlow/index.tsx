@@ -5,7 +5,6 @@ import {
   CardHeader,
   Text,
   Spinner,
-  Input,
   Label,
   Link,
   tokens,
@@ -104,12 +103,14 @@ export const CreatePRFlowRenderer: React.FC<{ props: CreatePRFlowProps }> = ({ p
         <div className={classes.form}>
           <div>
             <Label htmlFor="pr-title">PR title</Label>
-            <Input
+            <Text
               id="pr-title"
-              defaultValue={props.prTitle ? String(props.prTitle) : ''}
-              placeholder="feat: deploy AKS workload"
-              disabled
-            />
+              weight="semibold"
+              block
+              style={{ marginTop: tokens.spacingVerticalXXS }}
+            >
+              {props.prTitle ? String(props.prTitle) : 'feat: deploy AKS workload'}
+            </Text>
           </div>
           {props.targetBranch && (
             <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>

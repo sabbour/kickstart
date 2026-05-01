@@ -38,10 +38,22 @@ function authGateTurn(sessionId: string): string {
 /**
  * SSE turn: PR-creation flow card with file list and idle status.
  */
-function prCreationTurn(sessionId: string): string {
-  return [
+function prCreationTurn(sessionId: string, options: { withCreateSurface?: boolean } = {}): string {
+  const events: string[] = [
     sseEvent('start', { sessionId }),
     sseEvent('chunk', { delta: 'Ready to create your pull request.' }),
+  ];
+  if (options.withCreateSurface) {
+    // `shared:` surfaces require an explicit `createSurface` to register
+    // ownership before `updateComponents` will land (see useA2UI.ts).
+    events.push(
+      sseEvent('a2ui', {
+        version: 'v0.9',
+        createSurface: { surfaceId: 'shared:publisher-pr', catalogId: 'kickstart' },
+      }),
+    );
+  }
+  events.push(
     sseEvent('a2ui', {
       version: 'v0.9',
       updateComponents: {
@@ -62,7 +74,8 @@ function prCreationTurn(sessionId: string): string {
       },
     }),
     sseEvent('end', { sessionId, model: 'test-model' }),
-  ].join('');
+  );
+  return events.join('');
 }
 
 /**
@@ -161,7 +174,7 @@ test.describe('Phase D publisher PR-creation card', () => {
           status: 200,
           contentType: 'text/event-stream',
           headers: { 'Cache-Control': 'no-cache', Connection: 'keep-alive' },
-          body: prCreationTurn('phase-d-pr'),
+          body: prCreationTurn('phase-d-pr', { withCreateSurface: true }),
         });
       }
       return route.fulfill({
@@ -188,7 +201,7 @@ test.describe('Phase D publisher PR-creation card', () => {
     await page.getByRole('button', { name: /send/i }).click();
 
     // SummaryCard with PR link should appear
-    await expect(page.getByText('Pull request created')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('a2ui-SummaryCard').getByText('Pull request created')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('PR #42')).toBeVisible();
 
     // Verify link href
@@ -248,7 +261,7 @@ test.describe('Phase D publisher PR-creation card', () => {
     // Turn 3: SummaryCard result
     await page.getByRole('textbox', { name: /type a message/i }).fill('Create it');
     await page.getByRole('button', { name: /send/i }).click();
-    await expect(page.getByText('Pull request created')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('a2ui-SummaryCard').getByText('Pull request created')).toBeVisible({ timeout: 10_000 });
 
     // Verify link with external icon behavior
     const prLink = page.getByRole('link', { name: /PR #42/i });
