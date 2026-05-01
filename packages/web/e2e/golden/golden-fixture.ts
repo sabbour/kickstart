@@ -145,7 +145,7 @@ export function createGoldenTest(track: TrackName) {
         const url = new URL(route.request().url());
         const isAllowed = ALLOWED_ORIGINS.some(o => url.hostname === o || url.hostname.endsWith(`.${o}`));
         if (isAllowed) {
-          await route.fallthrough();
+          await route.fallback();
         } else {
           const msg = `[HERMETIC] Blocked outbound request to: ${url.href}`;
           console.error(msg);
@@ -207,7 +207,7 @@ export function createGoldenTest(track: TrackName) {
         const url = route.request().url();
         // Allow converse (handled above via LIFO)
         if (url.includes('/api/converse')) {
-          await route.fallthrough();
+          await route.fallback();
           return;
         }
         await route.fulfill({
