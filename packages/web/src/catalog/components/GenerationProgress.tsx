@@ -315,7 +315,7 @@ export const GenerationProgress = createReactComponent(GenerationProgressApi, ({
     `${step.label} — ${getStatusLabel(step.status)}`;
 
   return (
-    <Card className={classes.root}>
+    <Card className={classes.root} data-testid="a2ui-GenerationProgress">
       <div className={classes.header}>
         {merged.overallStatus === 'running' && <Spinner size="tiny" />}
         {merged.overallStatus === 'complete' && <CheckmarkCircleRegular className={classes.iconComplete} />}
@@ -343,6 +343,8 @@ export const GenerationProgress = createReactComponent(GenerationProgressApi, ({
                 className={mergeClasses(classes.step, !isLast && classes.stepWithConnector)}
                 role="listitem"
                 aria-label={getAccessibleStepLabel(step)}
+                data-step={step.id}
+                data-step-status={step.status}
               >
                 <div className={classes.iconWrapper} aria-hidden="true">
                   {getStatusIcon(step.status)}

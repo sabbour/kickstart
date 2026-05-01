@@ -105,7 +105,7 @@ export const SummaryCard = createReactComponent(SummaryCardApi, ({ props, buildC
   };
 
   return (
-    <Card className={classes.card}>
+    <Card className={classes.card} data-testid="a2ui-SummaryCard">
       {props.title && (
         <Caption1 className={classes.title}>{props.title}</Caption1>
       )}

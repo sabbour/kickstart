@@ -205,7 +205,7 @@ export const CodeBlock = createReactComponent(CodeBlockApi, ({ props }) => {
     : undefined;
 
   return (
-    <div className={classes.root}>
+    <div className={classes.root} data-component="CodeBlock" data-testid="a2ui-CodeBlock">
       <div className={classes.header}>
         <div className={classes.fileInfo}>
           {props.filename && (

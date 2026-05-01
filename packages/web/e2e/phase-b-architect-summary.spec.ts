@@ -173,11 +173,12 @@ test.describe('Phase B architect summary card', () => {
     await page.getByRole('textbox', { name: /describe your app/i }).fill('Build an AI chatbot on AKS with KAITO');
     await page.getByRole('button', { name: /send/i }).click();
 
-    // SummaryCard visible with title
-    await expect(page.getByText('Your AKS plan')).toBeVisible();
+    // SummaryCard visible with title (scoped to the surface to avoid
+    // collision with the chat chunk text "Here is your AKS plan…")
+    const surface = page.locator('[data-surface-id="shared:architect-plan"]');
+    await expect(surface.getByText('Your AKS plan', { exact: true })).toBeVisible();
 
     // ArchitectureDiagram visible (rendered within the surface)
-    const surface = page.locator('[data-surface-id="shared:architect-plan"]');
     await expect(surface).toBeVisible();
 
     // Action buttons visible
@@ -218,14 +219,17 @@ test.describe('Phase B architect summary card', () => {
     await page.getByRole('textbox', { name: /describe your app/i }).fill('Build an AI chatbot on AKS');
     await page.getByRole('button', { name: /send/i }).click();
 
-    // Initial plan shows Azure Files
-    await expect(page.getByText('Azure Files (Premium)')).toBeVisible();
+    // Initial plan shows Azure Files (scoped to the SummaryCard inside
+    // the architect-plan surface to avoid collisions with chat narration)
+    const planSurface = page.locator('[data-surface-id="shared:architect-plan"]');
+    const planCard = planSurface.getByTestId('a2ui-SummaryCard');
+    await expect(planCard.getByText('Azure Files (Premium)')).toBeVisible();
 
     // Click revise
     await page.getByRole('button', { name: /revise/i }).click();
 
     // After revision — plan updates in-place with Blob
-    await expect(page.getByText('Azure Blob Storage')).toBeVisible({ timeout: 10_000 });
+    await expect(planCard.getByText('Azure Blob Storage')).toBeVisible({ timeout: 10_000 });
 
     // Still only one plan surface
     const surfaces = page.locator('.a2ui-surface-wrapper[data-surface-id="shared:architect-plan"]');
