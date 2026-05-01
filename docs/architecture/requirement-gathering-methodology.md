@@ -1,16 +1,78 @@
 # Requirement-Gathering Methodology
 
-**Status:** Phase 1 Documentation | **Scope:** Every agent that asks the user *anything* (currently triage, architects, ops, publisher; future specialists).
+**Status:** Current | **Scope:** Every agent that asks the user *anything* (triage, architects, ops, publisher, specialists).
 
 ---
 
 ## Purpose
 
-The current state: **only `core.triage` has an explicit requirement-gathering policy.** Every other agent in the system gathers requirements ad-hoc, with no shared rules. That's the inconsistency the audit flagged.
+This document defines the system-wide requirement-gathering methodology. It covers **how many** questions to ask, **in what order**, **in what shape**, **when not to ask at all**, and — critically — **what to do before asking**.
 
-This document promotes triage's existing policy to a system-wide methodology and adds the cross-agent rules (handoff context, defaults, escalation) that triage alone can't enforce.
+The methodology rests on a single principle: **inference first, questions second**. Every agent must exhaust what it can learn from context (repo inspection, grounded skills, conversation history, configuration defaults) before spending a question from its budget.
 
-What it is *not*: a script of which questions to ask. The actual questions live in agent prompts; this document defines **how many**, **in what order**, **in what shape**, and **when not to ask at all**.
+The structured question budgets are encoded in `config/tracks.json` (via `requirementHints`) and `config/inference-backends.json` (via `questionPolicy`). This document is the human-readable specification; the JSON files are the machine-enforceable form.
+
+> **Note:** This document covers the core methodology for requirement gathering. Additional #222 acceptance criteria (acknowledge-before-asking opener pattern, bulk/multi-field exceptions, target-zero-questions metric, per-agent forbidden question lists) are tracked for a follow-up iteration.
+
+---
+
+## The Inference-First Principle
+
+Before asking the user *anything*, every agent must:
+
+1. **Read `inspect_repo` output** — if a repo URL or local path is available, call `core.inspect_repo` and consume the result. Framework, language, existing Dockerfile, Helm charts, and deployment targets are usually discoverable.
+2. **Consult grounded skills** — call `core.read_skill` for any relevant Microsoft skill (e.g., `azure-kubernetes-automatic-readiness`). Skills contain constraint specs, best practices, and defaults that answer many questions automatically.
+3. **Parse the conversation history** — answers given to a previous agent (or earlier in the same phase) are authoritative. Never re-ask.
+4. **Apply configuration defaults** — `tracks.json` `requirementHints` and `inference-backends.json` `questionPolicy` define what can be inferred vs. what must be asked.
+
+Only after steps 1–4 produce no answer should an agent spend a question from its budget.
+
+### Why inference-first matters
+
+Every question has a cost (user time, abandonment risk) and a benefit (information the agent cannot get any other way). The inference-first principle eliminates questions whose benefit is zero — the information was already available. It also ensures agents are grounded in real data (actual repo contents, actual skill constraints) rather than assumptions.
+
+---
+
+## Structured Question Budgets
+
+Question budgets are defined per-track and per-inference-backend in the configuration layer:
+
+```jsonc
+// config/inference-backends.json — each backend defines:
+{
+  "questionPolicy": {
+    "maxQuestions": 3,
+    "askOneAtATime": true,
+    "candidateQuestionsInPriorityOrder": [
+      { "key": "model_override", "askOnlyIf": "user has expressed a model preference" }
+    ],
+    "forbidden": ["presenting a stale fixed list of model families"]
+  }
+}
+```
+
+```jsonc
+// config/tracks.json — each track defines:
+{
+  "requirementHints": {
+    "imageSource": "infer (built-from-source / dockerfile / prebuilt-image)",
+    "registry": "do not assume ACR; accept public or private OCI",
+    "askOnlyIfMaterial": ["registry credentials", "database/cache needs", "scale requirements"]
+  }
+}
+```
+
+**Enforcement rules:**
+
+| Field | Meaning |
+|---|---|
+| `maxQuestions` | Hard cap per agent per phase. After this many, forced action (route or generate with defaults). |
+| `askOneAtATime` | When `true`, the agent must emit exactly one question per turn. No bundling. |
+| `candidateQuestionsInPriorityOrder` | Ordered list; agent asks from top to bottom, skipping any whose `askOnlyIf` condition is not met. |
+| `forbidden` | Actions the agent must never take regardless of question budget remaining. |
+| `askOnlyIfMaterial` | Fields that should only be asked about when they materially affect the output. |
+
+Agents consume these policies at runtime. The question budget is the ceiling, not the target — zero questions is the goal.
 
 ---
 
@@ -18,9 +80,9 @@ What it is *not*: a script of which questions to ask. The actual questions live 
 
 These are the load-bearing rules. Everything else in this doc is illustration or per-agent specialisation.
 
-### Rule 1 — One question per turn
+### Rule 1 — One question per turn (`askOneAtATime: true`)
 
-Never bundle multiple prose questions into one response. A `Questionnaire` component is one *artefact*, not multiple questions — emit it as a single surface, then wait. Two prose questions ("What region? Also what SKU?") in one turn is a violation.
+Never bundle multiple prose questions into one response. This rule is enforced in configuration via the `askOneAtATime` field in `questionPolicy`. A `Questionnaire` component is one *artefact*, not multiple questions — emit it as a single surface, then wait. Two prose questions ("What region? Also what SKU?") in one turn is a violation.
 
 ### Rule 2 — Hard cap of three questions per agent per phase
 
@@ -197,6 +259,75 @@ When agent A calls `ask_<specialist>` via `asTools`, the specialist's questions 
 
 ---
 
+## Context Preservation Across Handoffs
+
+Handoff context is the mechanism that prevents re-asking. When agent A routes to agent B, the handoff briefing must carry:
+
+1. **All user-stated values** — answers to questions, constraints mentioned in the opener, preferences expressed anywhere.
+2. **All inferred values** — what `inspect_repo` found, what skills reported, what defaults were applied and surfaced.
+3. **The constraint-spec pin** — if a constraint spec version was established (e.g., AKS Automatic v1.1.1), it must travel in a typed `constraintSpec` slot so downstream agents enforce the same version.
+4. **Skill IDs loaded** — which skills were read and are authoritative for this conversation.
+
+The typed handoff schema (see `packages/pack-core/src/triage/handoff-schema.ts`) enforces structure:
+
+```typescript
+// Typed slots ensure nothing is lost in prose translation
+constraintSpec: { safeguardSpecVersion: 'v1.1.1', aksVersion: '2026-03-15' }
+skillIdsLoaded: ["azure-kubernetes-automatic-readiness"]
+// Note: there is no `userStatedValues` typed field. User-stated values travel in
+// the handoff prompt prose and in mode-specific blocks (e.g., greenfield.track).
+greenfield: { track: 'containerized_web' }
+```
+
+**The receiving agent treats handoff data as authoritative input.** It does not re-validate, re-ask, or second-guess. If the handoff data is wrong, that's a bug in the sending agent — file an issue, don't burn the user's time.
+
+---
+
+## The Constraint-Spec Pattern (Enterprise Scenarios)
+
+In enterprise scenarios, agents must enforce versioned constraint specifications — curated sets of rules, limits, and best practices that represent organizational policy. The pattern:
+
+### How it works
+
+1. **Triage identifies the applicable constraint spec** during initial routing (e.g., `AKS Automatic constraint-spec v1.1.1`).
+2. **The spec version is pinned in the handoff briefing** via the typed `constraintSpec` slot — every downstream agent inherits it.
+3. **Downstream agents cite the spec** when enforcing constraints: *"Per constraint spec v1.1.1 §2.7, GPU node pools require spot-instance fallback configuration."*
+4. **The reviewer validates against the pinned spec** — it uses the same version the architect used, not whatever is "latest" at review time.
+
+### Why version-pin?
+
+- **Reproducibility** — the same conversation always applies the same rules, even if the spec is updated mid-sprint.
+- **Auditability** — every recommendation can be traced to a specific spec clause.
+- **Consistency across agents** — architect and reviewer see the same constraints, eliminating contradictory advice.
+
+### Configuration
+
+Constraint specs are referenced in `config/microsoft-skills.json`:
+
+```jsonc
+{
+  "loadConvention": {
+    "constraintSpecCitationFormat": "Per `<skill-id>` skill v<version>, constraint spec v<x.y.z> (AKS <date>)"
+  },
+  "skills": [
+    {
+      "id": "azure-kubernetes-automatic-readiness",
+      "references": {
+        "constraintSpec": "references/constraint-spec-v1.yaml",
+        "constraintSpecVersion": "1.1.1"
+      }
+    }
+  ]
+}
+```
+
+Agents loading a skill that includes a constraint spec must:
+- Pin the version in the handoff briefing.
+- Never mix versions within a single conversation.
+- Cite the spec version + section when surfacing a constraint to the user.
+
+---
+
 ## Per-agent application
 
 The **triage** rules apply universally; per-agent notes capture where each specialist's phase has its own constraints.
@@ -342,13 +473,26 @@ This methodology is doing its job when:
 - Same scenario produces the same questions across agents (consistency, not coincidence).
 - Defaults are stated transparently and used silently when the user hasn't overridden them.
 - Receiving agents never re-ask what triage already routed with.
-- Refactored agent prompts (Phase 2) cite this document instead of restating the rules.
+- Agent prompts cite this document instead of restating the rules.
+- `questionPolicy` in config JSON matches the agent's runtime behaviour (verifiable via telemetry).
+- Constraint-spec versions are pinned in every handoff that involves enterprise rules.
+
+---
+
+## Related configuration files
+
+| File | What it defines |
+|---|---|
+| `config/tracks.json` | Per-track `requirementHints` — what can be inferred, what to ask only if material |
+| `config/inference-backends.json` | Per-backend `questionPolicy` — max questions, priority order, forbidden actions |
+| `config/microsoft-skills.json` | Constraint-spec references, citation formats, skill metadata |
+| `packages/pack-core/src/triage/handoff-schema.ts` | Typed handoff fields (`constraintSpec`, `skillIdsLoaded`, `sourceSignals`, `mode`, plus one mode-specific block) |
 
 ---
 
 ## Next steps
 
-1. **Audit the existing prompts** — count current questions per phase, identify violations of A1–A10 above. (Triage already conforms; specialists likely don't.)
-2. **Author the per-agent default lists** — turn the recommended defaults in the table above into agent-specific frontmatter or skill content for Phase 2.
-3. **Draft Phase 2 prompt language** — replace per-agent question scripts with a single reference to this methodology + a list of agent-specific defaults and forbidden questions.
-4. **Hook telemetry in Phase 3** — implement the audit-hook logs above so the success criteria are measurable, not assumed.
+1. **Validate question budgets** — ensure every agent's runtime behaviour matches its `questionPolicy` cap.
+2. **Expand `requirementHints`** — add `askOnlyIfMaterial` to tracks that currently have empty hint objects (e.g., `static_site`, `agentic_app`).
+3. **Telemetry hooks** — implement the audit-hook logs (question count per phase, re-ask detection, ping-pong count) so success criteria are measurable.
+4. **Constraint-spec coverage** — extend the constraint-spec pattern to non-AKS enterprise scenarios (e.g., Azure Policy, landing zones).
