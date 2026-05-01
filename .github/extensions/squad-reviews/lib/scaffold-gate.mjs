@@ -238,17 +238,22 @@ jobs:
             const approvedRoles = new Set();
             const missingRoles = [];
 
+            function normalizeBotLogin(login) {
+              return (login || '').toLowerCase().replace(/\\[bot\\]$/, '');
+            }
+
             for (const role of requiredRoles) {
               const botLogin = botLoginMap[role] || null;
-              const prAuthor = (pr.user?.login || '').toLowerCase();
-              const isSelfApprovalBlocked = botLogin && prAuthor === botLogin.toLowerCase();
+              const normalizedBotLogin = normalizeBotLogin(botLogin);
+              const prAuthor = normalizeBotLogin(pr.user?.login);
+              const isSelfApprovalBlocked = botLogin && prAuthor === normalizedBotLogin;
 
               const roleReviews = allReviews.filter(r => {
-                const login = (r.user?.login || '').toLowerCase();
+                const login = normalizeBotLogin(r.user?.login);
                 if (botLogin) {
                   // Accept the primary bot OR fallback approver when self-approval is blocked
-                  if (login === botLogin.toLowerCase()) return true;
-                  if (isSelfApprovalBlocked && fallbackApprover && login === fallbackApprover.toLowerCase()) return true;
+                  if (login === normalizedBotLogin) return true;
+                  if (isSelfApprovalBlocked && fallbackApprover && login === normalizeBotLogin(fallbackApprover)) return true;
                   return false;
                 }
                 return (
