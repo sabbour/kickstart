@@ -2437,3 +2437,47 @@ limited to `.squad/ceremonies.md` and her own history.
 
 ---
 
+
+## 2026-05-02T01:09:17.042-07:00: Ralph — Feature Work First
+
+**By:** Amy (via Copilot)
+**What:** Ralph should focus on feature work first.
+**Why:** User request — prioritization directive for Ralph's task assignment
+**Applies to:** Ralph (agent) — when routing issues or assigning tasks, prioritize feature work over chores
+
+---
+
+## 2026-05-02T01:09:00-07:00: API Route Retirement → 410 Gone Tombstone
+
+**By:** Bender (via PR #349 review)
+**What:** When retiring an Azure Functions HTTP route, always replace the handler body with a `410 Gone` tombstone instead of deleting the file. Pattern:
+
+```ts
+const GONE_RESPONSE: HttpResponseInit = {
+  status: 410,
+  jsonBody: { error: "<route> retired. Use <replacement>." },
+  headers: { "Cache-Control": "no-store" },
+};
+
+app.http("<name>-legacy", {
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+  authLevel: "anonymous",
+  route: "<original-route>/{*path}",
+  handler: async () => GONE_RESPONSE,
+});
+```
+
+**Rules**:
+- File stays in `packages/web/api/src/functions/` (keeps grep guards happy).
+- Route literal must match the original (so callers hit the tombstone, not a 404).
+- Drop the route from `proxy-allowlist.ts` — no upstream forwarding from a retired route.
+- Update `arm-direct-csp` (and similar) guard `ALLOWED_FILES` comments to reflect tombstone status, not "kept live for rollback".
+- Update docs in the same PR: trust-boundary tables, tombstone-status tables, function inventory rows.
+- Changeset for the retirement PR describes **only** the tombstone — earlier wave changesets already cover the replacement endpoint and the browser-side migration.
+
+**Why:** Consistency with existing retired routes (`github-proxy.ts`, `github-oauth.ts`). Always keep tombstone, never delete. Prevents silent callers from upgrading to 404; gives explicit deprecation signal.
+
+**Affects:** Bender (API authoring), Amy (changeset review), Hermes (test guards), Leela (architecture docs).
+
+**Context:** PR #349, issue #237 PR-2. Addressed in commit 3c77cec.
+

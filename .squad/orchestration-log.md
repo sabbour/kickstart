@@ -68,3 +68,25 @@
 **Scope:** Loud-rejection policy validation (#989), presentation polish correctness (#986), deletion consistency (#988), allow-list verification + fallback duplication (#990). Zero architectural deference; all three dimensions (code correctness, readability, bug patterns) applied.  
 **Status:** Complete, draft PRs pending un-draft + nit resolution.
 
+---
+
+## 2026-05-02T01:20:00Z — PR #349 Review Gate + Merge Batch
+
+**Process:** Multi-agent review gate batch + merge orchestration.  
+**Agents:** Hermes (test readiness), Kif (CI diagnostics), Bender (feedback implementation), Leela (architecture), Zapp (security), Nibbler (code quality), Amy (docs), Coordinator (branch update + merge).  
+**PR:** #349 (Test-only scope).  
+**Scope:**
+- Hermes: Approved test-only scope; flagged Review Gate + branch blockers as real.
+- Kif: Diagnosed Review Gate blocker — two Copilot threads + missing role approvals.
+- Bender: Addressed Copilot feedback in commit 3c77cec, pushed, posted batch summary, resolved threads.
+- Leela: Approved architecture safety; applied architecture + lead labels.
+- Zapp: Approved security.
+- Amy: Approved docs as not applicable.
+- Nibbler: Approved code quality.
+- Coordinator: Updated branch (merged dev onto PR branch), waited for CI green, squash-merged PR #349 as squad-lead bot.
+
+**Decision captured:** Bender's API route retirement → 410 Gone tombstone (never delete, keep file, replace handler).
+
+**Outcome:** Merged. Cross-agent history updates captured in `.squad/history.md` and session log.  
+**Status:** Complete.
+

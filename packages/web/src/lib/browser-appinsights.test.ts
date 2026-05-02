@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach, vi } from "vitest";
+import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 import {
   resolveConnectionString,
   resolveFlagEnabled,
@@ -31,6 +31,7 @@ afterEach(() => {
   delete w.__kickstartFlushTelemetry;
   __resetBrowserTelemetryForTests();
   exporterCtor.mockReset();
+  vi.restoreAllMocks();
 });
 
 describe("resolveConnectionString — precedence", () => {
@@ -64,6 +65,10 @@ describe("resolveFlagEnabled — precedence", () => {
 });
 
 describe("initBrowserTelemetry — default-off & resilience (#1042 Leela round 2)", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
   it("short-circuits BEFORE constructing AzureMonitorTraceExporter when the flag is off", () => {
     const result = initBrowserTelemetry({
       enabled: false,
@@ -76,7 +81,7 @@ describe("initBrowserTelemetry — default-off & resilience (#1042 Leela round 2
   });
 
   it("returns null (does not throw) when exporter construction fails", () => {
-    exporterCtor.mockImplementation(() => {
+    exporterCtor.mockImplementation(function MockThrowingExporter() {
       throw new Error("boom — simulated CI connection-string rejection");
     });
     expect(() =>
