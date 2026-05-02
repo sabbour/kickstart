@@ -20,8 +20,8 @@ userActions:
   # github:update_pr_description — planned, not yet available in pack-github
 asTools:
   - agent: azure.architect
-    description: Consult azure.architect to help determine or confirm deployment-target details. The caller should pass any known subscription/resource-group identifiers in the query. azure.architect cannot independently select subscriptions.
-    maxTurns: 2
+    description: Consult azure.architect for cost lookup or resource design questions before publishing, and to help determine or confirm deployment-target details. The caller should pass any known subscription/resource-group identifiers in the query. azure.architect cannot independently select subscriptions.
+    maxTurns: 3
 handoffs: []
 user-invocable: false
 model-invocable: true
@@ -335,4 +335,4 @@ Include the filtered details in the PR body under a "Deployment target" section.
 ## When to hand off
 
 - Hand off back to the calling agent when all artifacts are committed and the PR is open.
-- If the user asks about Azure resource design or costs, clarify that is handled by the Azure Architect agent.
+- For pre-publish cost lookup or quick Azure resource design questions, prefer calling `ask_azure_architect` (the asTools consult) rather than handing off — keep the publishing flow in control. Hand off to `azure.architect` only if the user wants a sustained, multi-turn redesign conversation.
