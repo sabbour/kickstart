@@ -4,15 +4,15 @@ sidebar_position: 9
 
 # Runner Chain (`runChain` / `runWithGate`)
 
-The Kickstart runner supports **deterministic multi-step agent chains** — sequential pipelines where one agent's output is automatically piped as input to the next. This replaces the earlier voluntary-handoff pattern and ensures critical review steps cannot be skipped.
+The Kickstart runner supports **deterministic multi-step agent chains** — sequential pipelines where one agent's output is automatically piped as input to the next. The chain provides the enforcement guarantee that earlier voluntary-handoff–only wiring lacked, while still leaving room for agents to declare explicit `handoffs:` intent (see [`runWithGate` and explicit handoffs are complementary](#runwithgate-and-explicit-handoffs-are-complementary) below).
 
 ## Why Chains?
 
-The previous pattern relied on the codesmith agent voluntarily handing off to the reviewer. In practice this meant:
+The previous wiring relied on the codesmith agent *electing* to hand off to the reviewer — with no enforcement if it didn't. In practice this meant:
 - Review could be skipped if the LLM decided a handoff was unnecessary.
 - There was no circuit-breaker to prevent runaway chains.
 
-`runChain()` and `runWithGate()` make the review step **mandatory and deterministic**.
+`runChain()` and `runWithGate()` make the review step **mandatory and deterministic**, independent of whether the agent also declares an explicit handoff.
 
 ## API Reference
 
@@ -99,7 +99,11 @@ After PR #147, the top-level `Runner.run()` method automatically applies a `runW
 3. If the reviewer returns `APPROVED`, the output is streamed to the client.
 4. If the reviewer returns `REJECTED`, the rejection reason is returned and the user is prompted to revise.
 
-**Agent prompt requirements:** The reviewer agent's system prompt must instruct it to respond with `APPROVED` or `REJECTED` as the first word of its verdict. The codesmith's prompt no longer needs voluntary-handoff instructions — the chain handles routing deterministically.
+**Agent prompt requirements:** The reviewer agent's system prompt must instruct it to respond with `APPROVED` or `REJECTED` as the first word of its verdict. The codesmith may *also* declare an explicit `handoffs:` entry to `core.reviewer` to signal post-generation intent (see below) — `runWithGate` enforces the review chain regardless of whether that handoff was taken.
+
+### `runWithGate` and explicit handoffs are complementary
+
+`runWithGate` remains the **deterministic safety net** that guarantees the reviewer runs after every codesmith turn — it cannot be skipped by the LLM. The codesmith agent may *also* declare an explicit `handoffs:` entry to `core.reviewer` (prompt: *"Files generated; please review and validate before user surfaces."*); this is the formal vehicle for codesmith-initiated, post-generation conversation transfer. Use the gate for *enforcement*; use the handoff for *intent*. They do not conflict — the gate fires regardless of whether the handoff was taken.
 
 ## Updating Agent Prompts for Chain Compatibility
 
@@ -110,12 +114,4 @@ Start your response with APPROVED or REJECTED (uppercase).
 Follow with your reasoning.
 ```
 
-Codesmith-style agents do not need to change — they simply produce output and the chain wires the rest.
-
-## Migration from Voluntary Handoffs
-
-If you previously relied on `agent.handoffs` to route to a reviewer:
-
-1. Remove the `handoffs` from the codesmith agent.
-2. Use `runner.runWithGate(codesmith, reviewer, input)` at the call site instead.
-3. The reviewer agent's verdict (`APPROVED`/`REJECTED`) is now your routing signal.
+Codesmith-style agents do not need to change to participate in the chain — they simply produce output and `runWithGate` wires the rest. Declaring an explicit `handoffs:` entry to a reviewer is supported and recommended where post-generation intent is meaningful (e.g. `core.codesmith` → `core.reviewer`); the gate continues to enforce the review step either way.

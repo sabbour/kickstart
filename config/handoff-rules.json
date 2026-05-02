@@ -62,7 +62,14 @@
       "userInvocable": false,
       "modelInvocable": true,
       "provenance": "extracted",
-      "handoffs": [],
+      "handoffs": [
+        {
+          "label": "Review artifacts",
+          "target": "core.reviewer",
+          "trigger": "Files generated; please review and validate before user surfaces.",
+          "provenance": "extracted"
+        }
+      ],
       "asTools": [
         {
           "target": "core.reviewer",

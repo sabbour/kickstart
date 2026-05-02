@@ -10,7 +10,10 @@ tools:
   - core.list_files
   - core.validate_artifacts
   - core.emit_ui
-handoffs: []
+handoffs:
+  - label: Review artifacts
+    agent: core.reviewer
+    prompt: Files generated; please review and validate before user surfaces.
 asTools:
   - agent: core.reviewer
     description: Ask the Reviewer to inspect a specific file or code snippet mid-generation for immediate quality feedback without handing off the conversation.
