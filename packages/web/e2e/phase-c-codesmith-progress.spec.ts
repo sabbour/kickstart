@@ -1,4 +1,4 @@
-import { test, expect } from './helpers';
+import { test, expect, waitForStreamingIdle } from './helpers';
 import type { Page, Route } from '@playwright/test';
 
 function sseEvent(event: string, data: unknown): string {
@@ -151,6 +151,10 @@ test.describe('Phase C codesmith generation progress', () => {
     await page.getByRole('textbox', { name: /describe your app/i }).fill('Build an AI app on AKS');
     await page.getByRole('button', { name: /send/i }).click();
 
+    // Gate phase-c assertions on the SSE streaming-idle DOM signal (#310/#340)
+    // so createSurface + updateComponents + end have all flushed.
+    await waitForStreamingIdle(page);
+
     // GenerationProgress visible with test ID
     const progressCard = page.getByTestId('a2ui-GenerationProgress');
     await expect(progressCard).toBeVisible({ timeout: 10_000 });
@@ -202,6 +206,10 @@ test.describe('Phase C codesmith generation progress', () => {
 
     await page.getByRole('textbox', { name: /describe your app/i }).fill('Build an AI app');
     await page.getByRole('button', { name: /send/i }).click();
+
+    // Gate on streaming-idle (#310/#340) so write_file tool events have all
+    // flushed to the file manager before we assert it is visible.
+    await waitForStreamingIdle(page);
 
     // Wait for the generation to complete
     await expect(page.getByTestId('a2ui-GenerationProgress')).toBeVisible({ timeout: 10_000 });

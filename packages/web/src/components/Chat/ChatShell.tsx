@@ -48,7 +48,12 @@ export function ChatShell({
   const inputPlaceholder = hasStartedConversation ? 'Type a message...' : 'Describe what you want to build...';
 
   return (
-    <div id="chat-ui" className="chat-container">
+    <div
+      id="chat-ui"
+      className="chat-container"
+      data-streaming={isStreaming ? 'active' : 'idle'}
+      aria-busy={isStreaming || undefined}
+    >
       {showPhaseBar && (
         <div className="chat-phase" role="status" aria-label={`Current phase: ${CONVERSATION_PHASE_LABELS[currentPhase as keyof typeof CONVERSATION_PHASE_LABELS] || currentPhase}`}>
           {CONVERSATION_PHASE_ORDER.map((phase, index) => (

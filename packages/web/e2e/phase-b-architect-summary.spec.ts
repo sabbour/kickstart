@@ -1,4 +1,4 @@
-import { test, expect } from './helpers';
+import { test, expect, waitForStreamingIdle } from './helpers';
 import type { Page, Route } from '@playwright/test';
 
 function sseEvent(event: string, data: unknown): string {
@@ -173,6 +173,10 @@ test.describe('Phase B architect summary card', () => {
     await page.getByRole('textbox', { name: /describe your app/i }).fill('Build an AI chatbot on AKS with KAITO');
     await page.getByRole('button', { name: /send/i }).click();
 
+    // Gate on the streaming-idle DOM signal (#310/#340) so the architect
+    // surface + diagram components have all replayed before assertions.
+    await waitForStreamingIdle(page);
+
     // SummaryCard visible with title (scoped to the surface to avoid
     // collision with the chat chunk text "Here is your AKS plan…")
     const surface = page.locator('[data-surface-id="shared:architect-plan"]');
@@ -220,6 +224,9 @@ test.describe('Phase B architect summary card', () => {
     await page.getByRole('textbox', { name: /describe your app/i }).fill('Build an AI chatbot on AKS');
     await page.getByRole('button', { name: /send/i }).click();
 
+    // Gate first turn on streaming-idle (#310/#340) before reading the plan.
+    await waitForStreamingIdle(page);
+
     // Initial plan shows Azure Files (scoped to the SummaryCard inside
     // the architect-plan surface to avoid collisions with chat narration)
     const planSurface = page.locator('[data-surface-id="shared:architect-plan"]');
@@ -229,6 +236,10 @@ test.describe('Phase B architect summary card', () => {
 
     // Click revise
     await page.getByRole('button', { name: /revise/i }).click();
+
+    // Gate the chained revise turn on streaming-idle so the in-place
+    // updateComponents replay completes before we assert the new plan.
+    await waitForStreamingIdle(page);
 
     // After revision — plan updates in-place with Blob
     await expect(planCard.getByText('Azure Blob Storage')).toBeVisible({ timeout: 10_000 });

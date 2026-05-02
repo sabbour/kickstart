@@ -288,6 +288,34 @@ describe('chat/debug UI regressions', () => {
     expect(followUpMarkup).toContain('placeholder="Type a message..."');
   });
 
+  it('exposes a data-streaming attribute on the chat container so tests and a11y can observe SSE-stream completion', () => {
+    const idleMarkup = renderToStaticMarkup(
+      React.createElement(ChatShell, {
+        messages: [],
+        isStreaming: false,
+        streamingText: '',
+        currentPhase: null,
+        onSend: () => undefined,
+        getSurface: () => undefined,
+      }),
+    );
+    const activeMarkup = renderToStaticMarkup(
+      React.createElement(ChatShell, {
+        messages: [],
+        isStreaming: true,
+        streamingText: 'partial...',
+        currentPhase: null,
+        onSend: () => undefined,
+        getSurface: () => undefined,
+      }),
+    );
+
+    expect(idleMarkup).toContain('data-streaming="idle"');
+    expect(idleMarkup).not.toContain('aria-busy');
+    expect(activeMarkup).toContain('data-streaming="active"');
+    expect(activeMarkup).toContain('aria-busy="true"');
+  });
+
   it('renders a copy button in the expanded debug panel', () => {
     const useStateSpy = vi.spyOn(React, 'useState');
     const mockSetExpanded: React.Dispatch<React.SetStateAction<unknown>> = () => undefined;

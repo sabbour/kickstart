@@ -1,4 +1,4 @@
-import { test, expect } from './helpers';
+import { test, expect, waitForStreamingIdle } from './helpers';
 import type { Route } from '@playwright/test';
 
 function sseEvent(event: string, data: unknown): string {
@@ -155,6 +155,9 @@ test.describe('Phase D publisher PR-creation card', () => {
     const chatInput = page.getByRole('textbox', { name: /type a message/i });
     await expect(chatInput).toHaveAttribute('placeholder', 'Type a message...');
 
+    // Gate on streaming-idle (#310/#340) before resource-visibility assertions.
+    await waitForStreamingIdle(page);
+
     // AuthCard should appear with GitHub sign-in
     const surface = page.locator('[data-surface-id="shared:publisher-pr"]');
     await expect(surface).toBeVisible();
@@ -196,6 +199,9 @@ test.describe('Phase D publisher PR-creation card', () => {
     const chatInput = page.getByRole('textbox', { name: /type a message/i });
     await expect(chatInput).toHaveAttribute('placeholder', 'Type a message...');
 
+    // Gate first turn on streaming-idle (#310/#340).
+    await waitForStreamingIdle(page);
+
     // CreatePRFlow should show idle state with file list
     await expect(page.getByText('Create Pull Request')).toBeVisible();
     await expect(page.getByText('infra/main.bicep')).toBeVisible();
@@ -203,6 +209,10 @@ test.describe('Phase D publisher PR-creation card', () => {
     // Simulate second turn (user clicks create PR → result)
     await page.getByRole('textbox', { name: /type a message/i }).fill('Create the PR now');
     await page.getByRole('button', { name: /send/i }).click();
+
+    // Gate chained second turn on streaming-idle so the result SummaryCard
+    // has fully replayed before assertions fire.
+    await waitForStreamingIdle(page);
 
     // SummaryCard with PR link should appear
     await expect(page.getByTestId('a2ui-SummaryCard').getByText('Pull request created')).toBeVisible({ timeout: 10_000 });
@@ -257,16 +267,24 @@ test.describe('Phase D publisher PR-creation card', () => {
     await page.getByRole('button', { name: /send/i }).click();
     const chatInput = page.getByRole('textbox', { name: /type a message/i });
     await expect(chatInput).toHaveAttribute('placeholder', 'Type a message...');
+    // Gate turn 1 on streaming-idle (#310/#340) so the AuthCard surface is in place.
+    await waitForStreamingIdle(page);
     await expect(page.getByText('Sign in to create a pull request.')).toBeVisible();
 
     // Turn 2: CreatePRFlow
     await page.getByRole('textbox', { name: /type a message/i }).fill('I signed in');
     await page.getByRole('button', { name: /send/i }).click();
+    // Gate chained turn 2 on streaming-idle (#310/#340) so the CreatePRFlow surface
+    // has fully replaced the AuthCard before assertions fire.
+    await waitForStreamingIdle(page);
     await expect(page.getByText('feat: kickstart infra and deploy workflow')).toBeVisible({ timeout: 10_000 });
 
     // Turn 3: SummaryCard result
     await page.getByRole('textbox', { name: /type a message/i }).fill('Create it');
     await page.getByRole('button', { name: /send/i }).click();
+    // Gate chained turn 3 on streaming-idle (#310/#340) so the result SummaryCard
+    // has fully replayed before assertions fire.
+    await waitForStreamingIdle(page);
     await expect(page.getByTestId('a2ui-SummaryCard').getByText('Pull request created')).toBeVisible({ timeout: 10_000 });
 
     // Verify link with external icon behavior
