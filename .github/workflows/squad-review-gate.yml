@@ -12,16 +12,6 @@ on:
         description: 'Pull request number to check'
         required: true
         type: number
-  pull_request_review:
-    types: [submitted, dismissed]
-  issue_comment:
-    types: [created]
-  pull_request:
-    types: [labeled, unlabeled, opened, synchronize, reopened]
-
-concurrency:
-  group: squad-review-gate-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
