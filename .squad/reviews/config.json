@@ -5,49 +5,108 @@
       "agent": "leela",
       "dimension": "Architecture and scope alignment",
       "charterPath": ".squad/agents/leela/charter.md",
-      "gateRule": { "required": "optional" }
+      "gateRule": {
+        "required": "optional"
+      }
     },
     "frontend": {
       "agent": "fry",
       "dimension": "User experience and accessibility",
       "charterPath": ".squad/agents/fry/charter.md",
-      "gateRule": { "required": "optional" }
+      "gateRule": {
+        "required": "optional"
+      }
     },
     "backend": {
       "agent": "bender",
       "dimension": "API and infrastructure design",
       "charterPath": ".squad/agents/bender/charter.md",
-      "gateRule": { "required": "optional" }
+      "gateRule": {
+        "required": "optional"
+      }
     },
     "tester": {
       "agent": "hermes",
       "dimension": "Test coverage and performance",
       "charterPath": ".squad/agents/hermes/charter.md",
-      "gateRule": { "required": "optional" }
+      "gateRule": {
+        "required": "optional"
+      }
     },
     "scribe": {
       "agent": "scribe",
       "dimension": "Session logging and changelog",
       "charterPath": ".squad/agents/scribe/charter.md",
-      "gateRule": { "required": "optional" }
+      "gateRule": {
+        "required": "optional"
+      }
     },
     "security": {
       "agent": "zapp",
       "dimension": "Security and threat modeling",
       "charterPath": ".squad/agents/zapp/charter.md",
-      "gateRule": { "required": "always" }
+      "gateRule": {
+        "required": "conditional",
+        "bypassWhen": {
+          "docsOnly": true,
+          "noArchitectureLabel": true,
+          "noSensitivePaths": true
+        },
+        "sensitivePaths": [
+          ".github/workflows/**",
+          ".squad/reviews/**",
+          ".squad/workflows/**",
+          "**/auth/**",
+          "**/security/**",
+          "**/guardrail/**",
+          "**/guardrails/**"
+        ]
+      }
     },
     "codereview": {
       "agent": "nibbler",
       "dimension": "Code quality and correctness",
       "charterPath": ".squad/agents/nibbler/charter.md",
-      "gateRule": { "required": "always" }
+      "gateRule": {
+        "required": "always"
+      }
     },
     "devops": {
       "agent": "kif",
       "dimension": "CI/CD and automation",
       "charterPath": ".squad/agents/kif/charter.md",
-      "gateRule": { "required": "optional" }
+      "gateRule": {
+        "required": "optional"
+      }
+    },
+    "architecture": {
+      "agent": "leela",
+      "dimension": "Architecture review (label-gated)",
+      "charterPath": ".squad/agents/leela/charter.md",
+      "gateRule": {
+        "required": "conditional",
+        "requiredWhen": {
+          "labels": [
+            "architecture"
+          ]
+        },
+        "invalidationPaths": [
+          "packages/*/package.json",
+          "packages/*/src/index.ts",
+          "packages/*/src/index.tsx",
+          "packages/*/src/api/**",
+          "packages/*/src/contract/**",
+          "packages/*/src/contracts/**",
+          "packages/*/src/schema/**",
+          "packages/*/src/schemas/**",
+          "packages/*/src/**/*pack*.ts",
+          "packages/*/src/**/*boundary*.ts",
+          "packages/*/src/**/*provider*.ts",
+          "packages/*/src/**/*registry*.ts",
+          "docs/adr/**",
+          ".squad/decisions/**"
+        ]
+      }
     },
     "docs": {
       "agent": "amy",
@@ -55,9 +114,23 @@
       "charterPath": ".squad/agents/amy/charter.md",
       "gateRule": {
         "required": "conditional",
-        "bypassLabels": ["docs:not-needed"],
-        "bypassWhen": { "labels": ["squad:chore-auto"] },
-        "bypassLabelAuthority": "docs"
+        "bypassWhen": {
+          "docsOnly": true,
+          "noArchitectureLabel": true,
+          "noSensitivePaths": true
+        },
+        "bypassLabels": [
+          "docs:not-applicable",
+          "docs:approved"
+        ],
+        "satisfiedByContent": [
+          "docs/**",
+          "docs-site/**",
+          ".changeset/**",
+          "**/*.md",
+          "**/*.mdx"
+        ],
+        "hardBlockLabel": "docs:rejected"
       }
     }
   },
@@ -68,5 +141,9 @@
       "dismissed": "Dismissed: {justification}"
     }
   },
-  "feedbackSources": ["squad-agents", "humans", "github-copilot-bot"]
+  "feedbackSources": [
+    "squad-agents",
+    "humans",
+    "github-copilot-bot"
+  ]
 }

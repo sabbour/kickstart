@@ -21,9 +21,65 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    # Always runs so downstream `needs: [changes]` jobs are never skipped due to a
+    # skipped dependency. For non-PR events (push to main, workflow_dispatch) the job
+    # short-circuits and emits docs_only=false, dockerfiles_changed=true so heavy
+    # jobs run unconditionally.
+    outputs:
+      docs_only: ${{ steps.filter.outputs.docs_only }}
+      dockerfiles_changed: ${{ steps.filter.outputs.dockerfiles_changed }}
+    steps:
+      - name: Classify PR file changes
+        id: filter
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Non-PR events (push, workflow_dispatch, schedule, …) always run the full pipeline.
+            if (context.eventName !== 'pull_request') {
+              core.setOutput('docs_only', 'false');
+              core.setOutput('dockerfiles_changed', 'true');
+              core.info(`event=${context.eventName} — running full pipeline (docs_only=false, dockerfiles_changed=true)`);
+              return;
+            }
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const paths = files.map(f => f.filename);
+            // docs_only: every changed path is markdown OR lives in a docs / .squad /
+            // .changeset directory. None of these surfaces ship runtime code, so the
+            // heavy lint/build/test job is safe to skip for them.
+            const isDocsLike = (p) =>
+              p.endsWith('.md') ||
+              p.endsWith('.mdx') ||
+              p.startsWith('docs/') ||
+              p.startsWith('docs-site/') ||
+              p.startsWith('.squad/') ||
+              p.startsWith('.changeset/');
+            const docsOnly = paths.length > 0 && paths.every(isDocsLike);
+            const dockerfilesChanged = paths.some(p =>
+              /(^|\/)Dockerfile(\.[\w-]+)?$/i.test(p) ||
+              p.endsWith('.dockerignore')
+            );
+            core.setOutput('docs_only', String(docsOnly));
+            core.setOutput('dockerfiles_changed', String(dockerfilesChanged));
+            core.info(`changed=${paths.length} docs_only=${docsOnly} dockerfiles_changed=${dockerfilesChanged}`);
+
   lint-build:
     name: Lint, Build & Unit Tests
     runs-on: ubuntu-latest
+    needs: [changes]
+    # Skip the heavy job only when a PR is docs-only. For all other events (push to
+    # main, workflow_dispatch, code PRs) `changes` reports docs_only=false and this
+    # job runs. ci-gate aggregator treats `skipped` as success, so the required
+    # `CI Gate` check still goes green for docs-only PRs.
+    if: needs.changes.outputs.docs_only != 'true'
 
     steps:
       - name: Checkout code
@@ -49,6 +105,10 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install hadolint
+        # Only install when Dockerfiles changed. `changes` reports
+        # dockerfiles_changed=true for all non-PR events (push to main, dispatch),
+        # so non-PR runs always install.
+        if: needs.changes.outputs.dockerfiles_changed == 'true'
         run: |
           HADOLINT_VERSION="v2.12.0"
           HADOLINT_SHA256="56de6d5e5ec427e17b74fa48d51271c7fc0d61244bf5c90e828aab8362d55010"
@@ -158,8 +218,10 @@ jobs:
               !path.includes('/e2e/')
             );
             const hasDocsSite = paths.some(path => path.startsWith('docs-site/docs/'));
-            const skipDocs = labels.includes('skip-docs');
-            const requireChangeset = userFacing && !hasDocsSite && !skipDocs;
+            // Docs waiver labels: use `docs:not-applicable` or `docs:approved` to
+            // signal that no changeset/docs update is needed for this PR.
+            const docsWaived = labels.includes('docs:not-applicable') || labels.includes('docs:approved');
+            const requireChangeset = userFacing && !hasDocsSite && !docsWaived;
 
             core.setOutput('requireChangeset', String(requireChangeset));
 
@@ -245,16 +307,24 @@ jobs:
   ci-gate:
     name: CI Gate
     runs-on: ubuntu-latest
-    needs: [lint-build, e2e]
+    needs: [changes, lint-build, e2e]
     if: always()
     steps:
       - name: Check results
         run: |
+          changes_result="${{ needs.changes.result }}"
           lint_build_result="${{ needs.lint-build.result }}"
           e2e_result="${{ needs.e2e.result }}"
 
+          # `changes` must succeed (it gates whether lint-build is allowed to skip).
+          # A failure here would otherwise cascade-skip lint-build and falsely turn
+          # CI Gate green.
+          if [[ "$changes_result" != "success" ]]; then
+            echo "CI failed: changes=${changes_result}"
+            exit 1
+          fi
           if [[ ! "$lint_build_result" =~ ^(success|skipped)$ || ! "$e2e_result" =~ ^(success|skipped)$ ]]; then
             echo "CI failed: lint-build=${lint_build_result}, e2e=${e2e_result}"
             exit 1
           fi
-          echo "CI passed: lint-build=${lint_build_result}, e2e=${e2e_result}"
+          echo "CI passed: changes=${changes_result}, lint-build=${lint_build_result}, e2e=${e2e_result}"

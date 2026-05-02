@@ -7,7 +7,7 @@ on:
         description: 'Comma-separated reviewer role slugs required for merge'
         required: false
         type: string
-        default: 'codereview,security,docs'
+        default: 'codereview,security'
       pr_number:
         description: 'Pull request number to check'
         required: true
@@ -44,14 +44,25 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const allRoles = ('${{ inputs.roles }}' || 'codereview,security,docs').split(',').map(r => r.trim()).filter(Boolean);
+            const allRoles = ('${{ inputs.roles }}' || 'codereview,security').split(',').map(r => r.trim()).filter(Boolean);
             const prNumber = ${{ inputs.pr_number || 0 }} || context.payload.pull_request?.number || context.payload.issue?.number;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
             // Config injected at scaffold time
-            const botLoginMap = {"codereview":"squad-codereview[bot]","security":"squad-security[bot]","docs":"squad-docs[bot]"};
-            const gateRules = {"codereview":{"required":"always"},"security":{"required":"always"},"docs":{"required":"conditional","bypassLabels":["docs:not-needed"],"bypassWhen":{"labels":["squad:chore-auto"]},"bypassLabelAuthority":"docs"}};
+            // Note: docs role is enforced as a *signal* (label or shipped docs/changeset
+            // content) by squad-auto-merge.yml, not as a Bot review here. That keeps Amy
+            // out of a self-approval deadlock on docs-authored PRs while preserving the
+            // docs-required policy. Security is conditional: waived when the PR is
+            // docs-only, has no architecture label, and touches no sensitive paths.
+            const botLoginMap = {"codereview":"squad-codereview[bot]","security":"squad-security[bot]"};
+            const gateRules = {
+              "codereview": { "required": "always" },
+              "security": {
+                "required": "conditional",
+                "bypassWhen": { "docsOnly": true, "noArchitectureLabel": true, "noSensitivePaths": true }
+              }
+            };
             const fallbackApprover = "squad-lead[bot]"; // accepts APPROVE when PR author == required bot
 
             // Helper: post commit status for the required check name
@@ -97,16 +108,111 @@ jobs:
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
             const prLabels = pr.labels.map(l => l.name.toLowerCase());
 
-            // Clear stale approval labels on synchronize (new commits invalidate approvals)
+            // Clear stale approval labels on synchronize only for affected domains.
+            // Pure base-branch catch-ups (Update branch / merge from base / rebase over base)
+            // preserve every approval label because PR-vs-base content is unchanged.
             if (context.eventName === 'pull_request' && context.payload.action === 'synchronize') {
-              core.info('New commits detected — clearing stale approval labels');
-              for (const role of allRoles) {
-                const label = `${role}:approved`;
+              const before = context.payload.before;
+              const after = context.payload.after;
+              const baseSha = pr.base?.sha;
+              let isPureBaseSync = false;
+              let syncChangedPaths = [];
+
+              if (baseSha && before && after && before !== after) {
                 try {
-                  await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: label });
-                  core.info(`Removed stale label: ${label}`);
+                  const fileSig = f => `${f.status}:${f.sha || ''}`;
+                  const mapOf = cmp => new Map((cmp.data.files || []).map(f => [f.filename, fileSig(f)]));
+                  const changedBetween = (beforeCmp, afterCmp) => {
+                    const beforeMap = mapOf(beforeCmp);
+                    const afterMap = mapOf(afterCmp);
+                    const paths = new Set([...beforeMap.keys(), ...afterMap.keys()]);
+                    return [...paths].filter(p => beforeMap.get(p) !== afterMap.get(p)).sort();
+                  };
+                  const sigOf = cmp => JSON.stringify([...mapOf(cmp).entries()].sort((a, b) => a[0].localeCompare(b[0])));
+                  const [cmpBefore, cmpAfter] = await Promise.all([
+                    github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: `${baseSha}...${before}` }),
+                    github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: `${baseSha}...${after}` }),
+                  ]);
+                  syncChangedPaths = changedBetween(cmpBefore, cmpAfter);
+                  isPureBaseSync = syncChangedPaths.length === 0 && sigOf(cmpBefore) === sigOf(cmpAfter);
                 } catch (e) {
-                  // Label may not exist — that's fine
+                  core.warning(`Could not determine base-sync status (${e.message}) — clearing only safely affected domains`);
+                  syncChangedPaths = ['*'];
+                }
+              }
+
+              if (isPureBaseSync) {
+                core.info('🔁 Synchronize is a pure base-branch update (PR content unchanged) — preserving approval labels');
+              } else {
+                const DOCS_LIKE_SYNC_RE = /(\.mdx?$)|^docs\/|^docs-site\/|^\.squad\/|^\.changeset\//i;
+                const DEFAULT_SENSITIVE_SYNC_PATHS = ['.github/workflows/**', '**/auth/**', '**/security/**', '**/guardrail/**', '**/guardrails/**'];
+                const matchesSyncGlob = (path, pattern) => {
+                  if (path === '*') return true;
+                  const escaped = pattern
+                    .split('**')
+                    .map(seg =>
+                      seg
+                        .split('*')
+                        .map(s =>
+                          s
+                            .split('?')
+                            .map(p => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+                            .join('[^/]')
+                        )
+                        .join('[^/]*')
+                    )
+                    .join('.*');
+                  return new RegExp('^' + escaped + '$').test(path);
+                };
+                const anySyncPathMatches = (paths, patterns) =>
+                  paths.some(p => patterns.some(pat => matchesSyncGlob(p, pat)));
+                const roleAffectedBySync = role => {
+                  const rule = gateRules[role];
+                  const unknownSyncScope = syncChangedPaths.includes('*');
+                  if (!rule || rule.required === 'always') return syncChangedPaths.length > 0;
+                  if (rule.required === 'optional') return false;
+
+                  const invalidationPaths = rule.invalidationPaths || [];
+                  if (invalidationPaths.length > 0 && anySyncPathMatches(syncChangedPaths, invalidationPaths)) return true;
+
+                  const requiredPaths = rule.requiredWhen?.paths || [];
+                  if (requiredPaths.length > 0) return anySyncPathMatches(syncChangedPaths, requiredPaths);
+
+                  const satisfiedByContent = rule.satisfiedByContent || [];
+                  if (satisfiedByContent.length > 0 && anySyncPathMatches(syncChangedPaths, satisfiedByContent)) return true;
+
+                  const bw = rule.bypassWhen || {};
+                  if (bw.docsOnly === true) {
+                    if (unknownSyncScope) return true;
+                    const affectedDocsOnly = syncChangedPaths.length > 0 && syncChangedPaths.every(p => DOCS_LIKE_SYNC_RE.test(p));
+                    const sensitivePaths = rule.sensitivePaths || DEFAULT_SENSITIVE_SYNC_PATHS;
+                    const affectedSensitive = anySyncPathMatches(syncChangedPaths, sensitivePaths);
+                    return !affectedDocsOnly || affectedSensitive || (bw.noArchitectureLabel === true && prLabels.includes('architecture'));
+                  }
+
+                  const bypassLabels = (rule.bypassLabels || []).concat(bw.labels || []);
+                  if (bypassLabels.some(label => label.toLowerCase().startsWith('docs:'))) {
+                    return unknownSyncScope || syncChangedPaths.some(p => DOCS_LIKE_SYNC_RE.test(p));
+                  }
+
+                  if ((rule.requiredWhen?.labels || []).length > 0) return false;
+                  return syncChangedPaths.length > 0;
+                };
+
+                const rolesToClear = allRoles.filter(roleAffectedBySync);
+                if (rolesToClear.length === 0) {
+                  core.info('New commits detected, but no reviewer domains were affected — preserving approval labels');
+                } else {
+                  core.info(`New commits detected — clearing stale approval labels for affected domains: ${rolesToClear.join(', ')}`);
+                }
+                for (const role of rolesToClear) {
+                  const label = `${role}:approved`;
+                  try {
+                    await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: label });
+                    core.info(`Removed stale label: ${label}`);
+                  } catch (e) {
+                    // Label may not exist — that's fine
+                  }
                 }
               }
             }
@@ -137,6 +243,18 @@ jobs:
             const requiredRoles = [];
             const skippedRoles = [];
 
+            // Compute docs-only / sensitive-path / architecture-label flags used by
+            // the security gate's docsOnly bypass. Patterns kept in sync with
+            // squad-auto-merge.yml (DOCS_LIKE_RE / SENSITIVE_PATH_PATTERNS).
+            const DOCS_LIKE_RE = /(\.mdx?$)|^docs\/|^docs-site\/|^\.squad\/|^\.changeset\//i;
+            const SENSITIVE_RE_LIST = [
+              /^\.github\/workflows\//i,
+              /(^|[\/._-])(auth|guardrail|guardrails|security)([\/._-]|$)/i,
+            ];
+            const isDocsOnlyPR = changedPaths.length > 0 && changedPaths.every(p => DOCS_LIKE_RE.test(p));
+            const hasSensitivePath = changedPaths.some(p => SENSITIVE_RE_LIST.some(re => re.test(p)));
+            const hasArchitectureLabel = prLabels.includes('architecture');
+
             for (const role of allRoles) {
               const rule = gateRules[role];
 
@@ -152,7 +270,19 @@ jobs:
 
               // Conditional logic
               if (rule.required === 'conditional') {
-                // Check bypass labels (e.g., skip-docs, docs:not-applicable)
+                // docsOnly bypass: skip this role when the PR is docs-only,
+                // has no architecture label, and touches no sensitive paths.
+                const bw = rule.bypassWhen || {};
+                const docsOnlyWaives =
+                  bw.docsOnly === true && isDocsOnlyPR &&
+                  (bw.noArchitectureLabel !== true || !hasArchitectureLabel) &&
+                  (bw.noSensitivePaths !== true || !hasSensitivePath);
+                if (docsOnlyWaives) {
+                  skippedRoles.push({ role, reason: 'docs-only PR; no sensitive paths or architecture label' });
+                  continue;
+                }
+
+                // Check bypass labels (e.g., docs:not-applicable, docs:approved)
                 const bypassLabels = rule.bypassLabels || [];
                 if (bypassLabels.some(bl => prLabels.includes(bl.toLowerCase()))) {
                   skippedRoles.push({ role, reason: `bypass label present` });
@@ -160,7 +290,7 @@ jobs:
                 }
 
                 // Check bypassWhen.labels (e.g., squad:chore-auto)
-                const bypassWhenLabels = rule.bypassWhen?.labels || [];
+                const bypassWhenLabels = bw.labels || [];
                 const hasBypassLabel = bypassWhenLabels.some(bl => prLabels.includes(bl.toLowerCase()));
 
                 // Check requiredWhen.paths

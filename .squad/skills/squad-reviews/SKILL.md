@@ -53,12 +53,26 @@ This is done via `squad_reviews_execute_issue_review`.
 
 After review feedback arrives, the implementing agent must call `squad_reviews_acknowledge_feedback` to fetch all unresolved review threads.
 
-For each unresolved thread, choose exactly one path:
+Batch related threads for the same PR into one implementation pass before pushing:
+
+- fix all actionable feedback together
+- validate once
+- create one commit for the batch
+- prefer one consolidated PR comment/update with the batch commit SHA and summary
+
+Do **not** make one commit or push per thread; each synchronize can create notification noise and trigger repeated approval invalidation or rebases.
+
+For each unresolved thread after the batch commit exists, choose exactly one path:
 
 - **Addressed** — fix the code, then resolve with action `addressed` and include the commit SHA containing the fix.
 - **Dismissed** — keep the code as-is, then resolve with action `dismissed` and include a clear justification.
 
 Do not ignore feedback from humans or the Copilot bot.
+
+After all threads are resolved, use the two-step closure rule:
+
+1. Check the PR `reviewDecision`. If it is still `CHANGES_REQUESTED`, ping the human reviewer for re-review or dismissal. Thread resolution alone does not clear a human changes-requested decision.
+2. Separately submit any required Squad role-gate approval with `squad_reviews_execute_pr_review`. Do not assume thread resolution or human dismissal satisfies Squad role gates.
 
 ## 5) Resolve threads correctly
 
@@ -181,7 +195,7 @@ auth failure. This leaks credentials to the log sink.
 
 ```suggestion
 logger.warn('Auth failed', { tokenPrefix: token.slice(0, 8) });
-`` `
+```
 
 Overall: REQUEST_CHANGES due to the credential leak above.
 ```
@@ -196,6 +210,8 @@ Reviews are idempotent. If the reviewing bot already has a review on the current
 2. Reviewer reads artifact, applies charter, and executes review.
 3. Implementer acknowledges unresolved feedback.
 4. Each thread is answered and resolved as either `addressed` or `dismissed`.
+5. Once all threads are resolved, check `reviewDecision`; if it remains `CHANGES_REQUESTED`, ping the human reviewer for re-review/dismissal.
+6. Submit required Squad role-gate approval separately with `squad_reviews_execute_pr_review`.
 
 ## 8) Review Gate
 
@@ -217,9 +233,11 @@ Before considering a PR ready to merge:
    - **Addressed** — fix the code, commit, then call `squad_reviews_resolve_thread` with action `addressed` and the fix commit SHA.
    - **Dismissed** — keep the code as-is, then call `squad_reviews_resolve_thread` with action `dismissed` and a justification.
 3. Never leave threads unresolved — the gate will block the PR.
-4. Never self-approve — an agent must not approve its own PR.
-5. Do not manually apply `{role}:approved` labels — the gate handles this automatically.
-6. **Do not self-apply bypass labels** (e.g., `docs:not-applicable`). Only the role responsible for that review dimension is authorized to determine when a bypass is appropriate. The gate enforces this via `bypassLabelAuthority`.
+4. After all threads resolve, check `reviewDecision`; if it is still `CHANGES_REQUESTED`, ping the human reviewer for re-review/dismissal.
+5. Submit required Squad role-gate approval separately with `squad_reviews_execute_pr_review`; thread resolution and human dismissal are not role-gate approvals.
+6. Never self-approve — an agent must not approve its own PR.
+7. Do not manually apply `{role}:approved` labels — the gate handles this automatically.
+8. **Do not self-apply bypass labels** (e.g., `docs:not-applicable`). Only the role responsible for that review dimension is authorized to determine when a bypass is appropriate. The gate enforces this via `bypassLabelAuthority`.
 
 ### Bypass Label Authority
 

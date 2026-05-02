@@ -305,3 +305,95 @@ needs an inline-script change, update `scaffold-gate.mjs` in the same PR.
 Validate with `node -e "import('./.../scaffold-gate.mjs').then(m => ...)"`
 dry-run + diff against the deployed file before pushing — only
 config-derived payloads are allowed to differ.
+## Docs Restructure Audit (2026-05-01)
+- Completed baseline inventory of docs-site/docs and ADR structure
+- Risk check: recommended isolated worktree, explicit staging, redirects, local docs build/link checks
+- Single-PR strategy approved to avoid pipeline inefficiency
+- Follow-up: CI fast-path implementation for docs-only PRs (issue #????)
+
+## Learnings
+
+### 2026-05-01T12:41:57-07:00 — Review/CI gate cleanup
+- **Pure base-sync detection**: `pull_request.synchronize` events fire on both content pushes and "Update branch" / merge-from-base operations. Distinguish them by comparing the file signature of `compare(base...before)` vs `compare(base...after)` via the GitHub Compare API. Identical signatures → PR-vs-base diff unchanged → preserve approvals. Implemented in `squad-review-gate.yml` and `squad-auto-merge.yml`.
+- **Required reviewer roles** are now `codereview,security`. Docs role moved to `optional` in `.squad/reviews/config.json`. Amy still posts docs feedback as PR comments and the `docs:rejected` label remains a hard block in auto-merge for explicit rejections, but missing docs marker no longer blocks merge.
+- **Markdown-only fast path**: a `changes` job in `ci.yml` uses `actions/github-script` to paginate PR files and emit `markdown_only` / `dockerfiles_changed` outputs. `lint-build` is skipped when `markdown_only=true`. `ci-gate` already accepts `skipped` as success → required `CI Gate` check stays green without running heavy steps.
+- **Conditional hadolint install**: only installs when Dockerfiles change (or on push to main). Saves ~10s per docs/code PR with no Dockerfile changes.
+- **GraphQL gotcha**: when adding `baseRefOid` to a PR query in `squad-auto-merge.yml`, also need it for synchronize-event base-sync detection — `context.payload.pull_request.base.sha` is not always available in `pull_request_target` payload structures used by github-script.
+
+### 2026-05-01T12:41:57-07:00 — CI changes-job hardening (follow-up)
+- **Skipped-dependency cascade trap**: a job with `needs: [X]` is skipped when `X` is skipped, *even if* its own `if:` would otherwise let it run. Original `changes` job was gated `if: github.event_name == 'pull_request'`, which would have silently skipped `lint-build` on push-to-`main`.
+- **Fix**: `changes` now always runs and short-circuits to `docs_only=false`, `dockerfiles_changed=true` for non-PR events. Heavy jobs key off `docs_only != 'true'`.
+- **Renamed output** `markdown_only` → `docs_only` because the classifier already accepts `docs/`, `docs-site/`, `.squad/`, `.changeset/` (not just `*.md`).
+- **CI Gate hardening**: now `needs: [changes, lint-build, e2e]` and explicitly fails when `changes.result != 'success'`. Prevents a `changes` failure from cascading skips into a falsely green required check.
+
+## Spawn: ralph-wave-2 (2026-05-01T12:13:25)
+- **PR #337**: scaffold source drift fixed → **codereview approved** ✅
+
+### 2026-05-01T13:27:17-07:00 — Corrected docs/security gate policy (DP kif-docs-pr-fastpath, final)
+- **Two-step user correction**: (1) prior pass over-rotated to "docs optional"; (2) intermediate fix over-required docs signal on docs-only PRs. Final landing: docs is required *because of* code changes, not for its own sake — docs-only PRs skip docs/security/architecture entirely.
+- **Docs-only definition**: every changed path matches `(*.mdx?|^docs/|^docs-site/|^.squad/|^.changeset/)`, no path matches the sensitive set (`^.github/workflows/`, `auth|guardrail|security` namespace), and no `architecture` label. Codereview is still required.
+- **`docs:rejected` is always a hard block**, including on docs-only PRs — that check runs before the docs-only short-circuit in `getDocsSignalBlocker`.
+- **Self-approval deadlock**: solved structurally by removing the requirement entirely on docs-only PRs, not by a fallback approver.
+- **Three workflows updated in lockstep** to keep policy consistent: review-gate decides which roles must approve; auto-merge decides which approval labels block merge; project-board decides which label set moves a PR to "Approved". Drifting any one silently breaks the gate.
+- **Docs signal still required for code PRs**: enforced in auto-merge `getDocsSignalBlocker` via label (`docs:approved` / `docs:not-applicable`) OR content-based satisfaction (PR ships `docs/`, `docs-site/`, `.changeset/`, `*.md(x)`).
+- **Project-board Approved column** does a paginated `pulls.listFiles` API call only when the PR otherwise looks ready (codereview:approved present but standard-path criteria not met) — keeps API-call rate negligible.
+- **Validation**: js-yaml + JSON parse ✅; embedded github-script bodies parse as `(async()=>{…})()` after substituting `${{ }}` ✅; `git diff --check` clean ✅.
+
+### 2026-05-01T13:35:08-07:00 — Removed `skip-docs` from docs policy (DP kif-remove-skip-docs)
+- **What**: dropped `skip-docs` as an accepted docs bypass. Code-PR docs signal is now satisfied only by `docs:approved`, `docs:not-applicable`, or content (docs-site / changeset / `*.md(x)` shipped in the PR). Docs-only PRs continue to skip the docs gate entirely.
+- **Files updated**: `ci.yml` (changeset waiver now keys off `docs:not-applicable`/`docs:approved`), `squad-review-gate.yml` (comment only — `bypassLabels` is config-driven), `squad-auto-merge.yml` (removed `SKIP_DOCS_LABEL` constant + check + docstring + audit-message refs), `squad-project-board-automate.yml` (removed `skip-docs` from label-event short-circuit), `sync-squad-custom-labels.yml` (removed label definition; left a tombstone comment so the historical context is discoverable), `.squad/reviews/config.json` (`bypassLabels` no longer lists `skip-docs`).
+- **Existing `skip-docs` labels in the repo** are intentionally NOT deleted by automation — that's a label-deletion policy decision for Amy/Hermes. The label simply no longer satisfies any gate; PRs still carrying it must adopt `docs:not-applicable` to merge.
+- **Validation**: js-yaml + JSON parse ✅; embedded github-script bodies still parse ✅; `git diff --check` clean ✅. Remaining `skip-docs` matches in workflow/config files are tombstone comments explaining the removal — verified with `grep -n "skip-docs"`.
+- **Repo-wide grep coordination**: prose still mentioning `skip-docs` lives in `.squad/ceremonies.md`, `.squad/agents/nibbler/charter.md`, and `.squad/skills/squad-reviews/SKILL.md`. These are owned by Amy/Leela/Nibbler/Hermes (per charter boundary — DevOps doesn't rewrite user-facing docs prose). Flagged in `.squad/decisions/inbox/kif-remove-skip-docs.md` for their next pass. Workflows + config are the source of truth.
+- **Generator parity**: also updated `.github/extensions/squad-reviews/lib/scaffold-gate.mjs` so future regenerated review-gate workflows don't reintroduce the `skip-docs` example comment.
+
+### 2026-05-01T13:46:56.014-07:00 — Upstreamed corrected docs/review/CI gate policy
+- Applied the downstream docs-gate correction back to `squad-reviews` and `squad-workflows`: `skip-docs` is no longer active behavior, docs-only PRs avoid docs/security/architecture gates unless sensitive/architecture triggers apply, code PRs need `docs:approved` or `docs:not-applicable`, and `docs:rejected` hard-blocks.
+- Upstream generators/templates now preserve approval labels on pure base-sync updates and keep docs-only CI fast paths green through an explicit `CI Gate` aggregator while preserving full CI on non-PR runs.
+- Validation: `npm test`, `git diff --check`, module syntax checks, generated github-script parse, and CI workflow YAML parsing passed in both upstream repos.
+
+### 2026-05-01T13:46:56.014-07:00 — Synced upstream generated squad-workflows gate layer
+- Hermes was right to check both source and installed extension copies: `squad-workflows` had corrected docs/review policy in source/templates, but the active tracked `.github/extensions/squad-workflows/lib/` copy still carried stale merge-check/config/setup behavior.
+- Fixed the generated/installed layer by syncing the corrected source extension files for merge checks, workflow config defaults, label setup, init label creation, and doctor label validation.
+- Validation in `squad-workflows`: `npm test` 18/18 ✅; changed extension modules `node --check` ✅; `.github/workflows/squad-ci.yml` and `.squad/templates/workflows/squad-ci.yml` YAML parse ✅; `git diff --check` ✅; active `skip-docs|SKIP_DOCS|skipDocs` grep ✅ no hits.
+
+### 2026-05-01T13:46:56.014-07:00 — Active synchronize approval clearing
+- **Lesson**: preserving approvals on base-sync by omission is not sufficient; `pull_request.synchronize` needs explicit stale-label clearing for real content pushes and an explicit pure base-sync fast path.
+- **Heuristic**: treat a synchronize event as pure base-sync when the new head commit is a merge commit whose first parent is the event `before` SHA and whose parents include the PR base SHA; otherwise clear approval labels and `docs:not-applicable`, but keep `docs:rejected` as the hard-block signal.
+
+### 2026-05-01T13:46:56.014-07:00 — Scoped synchronize approval invalidation
+- **Refinement**: do not blanket-clear approvals on every real synchronize. Reapproval should be scoped to domains impacted by the changed files and policy labels.
+- **Classifier**: base-sync preserves all labels; security-like changes clear only security, architecture boundary/config/API changes clear only architecture, docs-like changes clear docs signals, and general product code clears codereview/docs. `docs:rejected` remains a hard blocker and is not auto-cleared.
+
+### 2026-05-01T14:13:44.386-07:00 — Role-scoped reapproval implemented locally and upstream
+- Changed active Kickstart workflows plus the installed/upstream `squad-reviews` scaffold sources so base-sync preserves every approval, while real synchronize events clear only labels whose reviewer-domain triggers match the changed paths.
+- Added explicit architecture invalidation paths for package/API/schema/contract/pack-boundary surfaces; security/docs/codereview invalidation now follows their gate rules instead of blanket-clearing all roles.
+- Preserved the corrected docs policy: docs-only PRs need no docs gate, code-bearing PRs need docs signal, and `docs:rejected` remains a hard block that automation never clears.
+
+### 2026-05-01T13:46:56.014-07:00 — Workflow-backed role-scoped invalidation
+- **Correction**: policy capture is not enough; the active `squad-workflows` CI workflow and template now execute role-scoped invalidation directly.
+- **Validation added**: tests exercise pure base-sync preservation, security-only invalidation, architecture-only invalidation, multi-domain scoped invalidation, and the existing docs approval/not-applicable docs-only gate behavior.
+
+### 2026-05-01T13:46:56.014-07:00 — Batched feedback response policy
+- **Noise reduction**: feedback loops now instruct agents to handle all related unresolved PR review threads in one implementation pass, one validation run, one feedback-fix commit, and one consolidated PR update where possible.
+- **Why**: avoiding one commit/comment per thread reduces notifications and prevents repeated synchronize-triggered approval invalidation or branch rebase churn.
+- **Scope**: local installed squad-workflows/squad-reviews extension layers and Ralph/pr-feedback guidance were updated alongside upstream `squad-workflows` and `squad-reviews`.
+
+### 2026-05-01T14:13:44.386-07:00 — Batched review-feedback loop
+- Added a consolidated feedback-batch comment surface to `squad-reviews` and synced the installed local extension so agents can post/update one PR-level summary after one feedback-fix commit.
+- Updated local/upstream guidance to require one implementation pass, one validation run, and one commit per related PR feedback batch where possible, while still replying to each thread before resolving it.
+- This complements role-scoped reapproval: fewer synchronize events means fewer approval invalidations/rebases, and when invalidation happens it remains scoped to affected domains.
+
+### 2026-05-01T14:39:15.602-07:00 — Push/release staging plan prepared
+- Audited dirty state in `kickstart`, `squad-reviews`, and `squad-workflows` after Hermes PASS without committing, pushing, tagging, versioning, or releasing.
+- Staging recommendation: keep validated gate-policy, scoped approval invalidation, feedback batching, and docs-signal files; exclude runtime/session artifacts (`prs.json`, `.squad/attestation/`, `.squad/reviews/audit.jsonl`, circuit-breaker state, generated history summaries).
+- Upstream release recommendation: `@sabbour/squad-reviews` minor bump `1.3.3` → `1.4.0`; `@sabbour/squad-workflows` minor bump `1.2.3` → `1.3.0`, with a blocker to reconcile missing tags/changelog entries after `v1.2.0`.
+
+### 2026-05-01T14:39:15-07:00 — Release push for review gate refinements
+- Prepared upstream Changesets releases for `squad-reviews` v1.4.0 and `squad-workflows` v1.3.0 from validated gate/feedback changes.
+- Pushed upstream `main` branches and tags `v1.4.0` / `v1.3.0`; npm publishing remains pending because npm registry auth is unavailable in this environment.
+- Validated Kickstart with `npm test` and `npm run build` before committing local gate/review feedback updates. Direct `dev` push was blocked by repository rules, so the commit was pushed to `squad/kif-review-gates-release` and PR #344 was opened for PR-based integration.
+
+### 2026-05-01T15:58:39-07:00 — Two-step PR closure update for #344
+- Updated PR #344 branch with the locally validated two-step closure rule: after all review threads resolve, agents must check `reviewDecision`, ping human reviewers when it remains `CHANGES_REQUESTED`, and submit Squad role-gate approval separately.
+- Kept the push scoped to active Kickstart installed extension/guidance changes and excluded runtime artifacts such as `prs.json`, attestation state, audit logs, and circuit-breaker state.

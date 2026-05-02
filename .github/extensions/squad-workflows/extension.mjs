@@ -249,7 +249,7 @@ const session = await joinSession({
     // ── Review ─────────────────────────────────────────────────────────────
     {
       name: 'squad_workflows_check_feedback',
-      description: 'List all unresolved review threads across all reviewers for a PR.',
+      description: 'List unresolved review threads and closure status for a PR, including the post-resolution reviewDecision check and distinct Squad role-gate approval reminder.',
       skipPermission: true,
       parameters: {
         type: 'object',
@@ -268,7 +268,7 @@ const session = await joinSession({
     },
     {
       name: 'squad_workflows_address_feedback',
-      description: 'Read rejected/unresolved PR review feedback and return structured fix instructions for an agent.',
+      description: 'Read rejected/unresolved PR review feedback and return batched fix instructions plus two-step closure guidance: check reviewDecision after threads resolve, ping humans if CHANGES_REQUESTED remains, and submit role-gate approval separately.',
       skipPermission: true,
       parameters: {
         type: 'object',
@@ -287,7 +287,7 @@ const session = await joinSession({
     },
     {
       name: 'squad_workflows_address_all_feedback',
-      description: 'Read all unresolved PR review feedback across multiple PRs and return structured fix instructions.',
+      description: 'Read all unresolved PR review feedback across multiple PRs and return batched per-PR fix instructions.',
       skipPermission: true,
       parameters: {
         type: 'object',
@@ -517,6 +517,7 @@ const session = await joinSession({
           dryRun: { type: 'boolean', description: 'Preview without writing files' },
           force: { type: 'boolean', description: 'Overwrite existing workflow file' },
         },
+        required: [],
       },
       handler: jsonHandler(async ({ dryRun, force }) => {
         const { scaffoldChangesetRelease } = await lib('scaffold-changeset-release.mjs');

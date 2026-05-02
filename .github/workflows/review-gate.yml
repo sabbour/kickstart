@@ -19,6 +19,6 @@ jobs:
     if: github.event_name != 'issue_comment' || github.event.issue.pull_request
     uses: ./.github/workflows/squad-review-gate.yml
     with:
-      roles: 'codereview,security,docs'
+      roles: 'codereview,security'
       pr_number: ${{ github.event.pull_request.number || github.event.issue.number }}
     secrets: inherit

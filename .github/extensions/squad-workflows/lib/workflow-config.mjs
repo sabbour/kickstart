@@ -19,6 +19,16 @@ const DEFAULTS = {
     requiredSections: ['problem', 'approach', 'subtasks', 'files', 'security', 'docs', 'alternatives'],
     fastLaneLabels: ['estimate:S', 'squad:chore-auto'],
   },
+  approvalFallback: {
+    // When PR author matches a role that owns a required approval,
+    // these roles can review and apply the label on their behalf.
+    // Order matters — first available reviewer is preferred.
+    'docs:approved': ['architecture', 'lead', 'codereview'],
+    'architecture:approved': ['lead', 'codereview'],
+    'security:approved': ['architecture', 'lead'],
+    'codereview:approved': ['architecture', 'lead'],
+  },
+  fastLaneScope: ['changeset', 'design-proposal'],
   waves: {
     milestonePrefix: 'Wave',
     requireDemoCriteria: true,
@@ -30,6 +40,17 @@ const DEFAULTS = {
     designApprovals: ['architecture:approved', 'security:approved', 'codereview:approved', 'docs:approved'],
     types: ['type:feature', 'type:bug', 'type:spike', 'type:docs', 'type:chore', 'type:epic'],
     priorities: ['priority:p0', 'priority:p1', 'priority:p2'],
+  },
+  reviewExemptions: {
+    docsOnly: {
+      paths: ['docs/**', '**/*.md', '**/*.mdx', '.changeset/**'],
+      skipReviews: ['security:approved'],
+    },
+  },
+  architectureReview: {
+    // Architecture approval is only required when the PR has one of these labels
+    // or (future) touches configured triggerPaths.
+    triggerLabels: ['architecture'],
   },
   board: {
     columns: ['Backlog', 'Assigned', 'In Progress', 'In Review', 'Approved', 'Merged'],
@@ -92,6 +113,51 @@ export function mustDecompose(config, estimate) {
 export function isFastLane(config, issueLabels) {
   const fastLaneLabels = config.designProposal?.fastLaneLabels || [];
   return issueLabels.some((l) => fastLaneLabels.includes(l));
+}
+
+/**
+ * Get reviews that can be skipped based on changed file paths.
+ * Returns an array of approval labels that are exempt (e.g., ['security:approved']).
+ */
+export function getExemptReviews(config, changedPaths) {
+  const exemptions = config.reviewExemptions || {};
+  const exempt = new Set();
+
+  for (const [, rule] of Object.entries(exemptions)) {
+    const patterns = rule.paths || [];
+    if (patterns.length === 0) continue;
+
+    // Check if ALL changed files match at least one exemption pattern
+    const allMatch = changedPaths.every((filePath) =>
+      patterns.some((pattern) => matchGlob(filePath, pattern))
+    );
+
+    if (allMatch && changedPaths.length > 0) {
+      for (const skip of rule.skipReviews || []) {
+        exempt.add(skip);
+      }
+    }
+  }
+
+  return [...exempt];
+}
+
+/**
+ * Simple glob matching (supports ** and * wildcards).
+ * Escape regex metacharacters by splitting on wildcards so that literal
+ * segments are escaped before being joined with their regex equivalents.
+ */
+function matchGlob(filePath, pattern) {
+  const escaped = pattern
+    .split('**')
+    .map(seg =>
+      seg
+        .split('*')
+        .map(s => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+        .join('[^/]*')
+    )
+    .join('.*');
+  return new RegExp(`^${escaped}$`).test(filePath);
 }
 
 function deepMerge(target, source) {

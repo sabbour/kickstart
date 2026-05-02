@@ -36,6 +36,11 @@ function validateGateRule(roleSlug, gateRule) {
     if (gateRule.bypassWhen.labels !== undefined && !Array.isArray(gateRule.bypassWhen.labels)) {
       invalidConfig(`reviewers.${roleSlug}.gateRule.bypassWhen.labels must be an array`);
     }
+    for (const key of ['docsOnly', 'noArchitectureLabel', 'noSensitivePaths']) {
+      if (gateRule.bypassWhen[key] !== undefined && typeof gateRule.bypassWhen[key] !== 'boolean') {
+        invalidConfig(`reviewers.${roleSlug}.gateRule.bypassWhen.${key} must be a boolean`);
+      }
+    }
   }
 
   if (gateRule.requiredWhen !== undefined) {
@@ -44,6 +49,15 @@ function validateGateRule(roleSlug, gateRule) {
     }
     if (gateRule.requiredWhen.paths !== undefined && !Array.isArray(gateRule.requiredWhen.paths)) {
       invalidConfig(`reviewers.${roleSlug}.gateRule.requiredWhen.paths must be an array`);
+    }
+    if (gateRule.requiredWhen.labels !== undefined && !Array.isArray(gateRule.requiredWhen.labels)) {
+      invalidConfig(`reviewers.${roleSlug}.gateRule.requiredWhen.labels must be an array`);
+    }
+  }
+
+  for (const key of ['invalidationPaths', 'invalidationLabels', 'satisfiedByContent']) {
+    if (gateRule[key] !== undefined && !Array.isArray(gateRule[key])) {
+      invalidConfig(`reviewers.${roleSlug}.gateRule.${key} must be an array`);
     }
   }
 

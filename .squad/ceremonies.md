@@ -168,7 +168,7 @@ If the issue is labeled `estimate:M`:
 
 **Phase 1 — Docs pass (runs in parallel with CI):**
 - Amy reviews the PR and commits any missing or updated docs directly to the PR branch (commit as `sabbour-squad-docs[bot]`). PRs ship with complete docs — no follow-up tasks after merge.
-- Amy then applies `docs:approved`, `docs:not-applicable`, or `skip-docs` (all three are accepted by the docs gate).
+- Amy then applies `docs:approved` or `docs:not-applicable`.
 - Phase 1 MUST be complete — Amy's commit landed (if any) and the label applied — before Phase 2 begins.
 - No approval reviews from Nibbler, Zapp, or Leela during Phase 1.
 
@@ -203,7 +203,7 @@ One-liner approvals are a governance violation and will be dismissed.
 - `nibbler:approved` / `nibbler:rejected` — code quality gate
 - `leela:approved` / `leela:rejected` — architecture gate
 - `zapp:approved` / `zapp:rejected` — security gate
-- `docs:approved` / `docs:not-applicable` / `skip-docs` — documentation gate (Amy applies after review + any needed docs commits)
+- `docs:approved` / `docs:not-applicable` — documentation gate (Amy applies after review + any needed docs commits)
 
 > **Mutual exclusivity:** For each reviewer namespace, `:approved` and `:rejected` are mutually exclusive. Adding one automatically removes the other — enforced by `squad-auto-merge.yml` on every `labeled` event. A PR will never carry both `nibbler:approved` and `nibbler:rejected` simultaneously.
 
@@ -349,7 +349,7 @@ Backlog → Assigned → In Progress → In Review → Approved → Merged
 | Condition | Moves To | Notes |
 |-----------|----------|-------|
 | `nibbler:approved` + `zapp:approved` + docs marker | "Approved" | All required review gates passed; `leela:approved` additionally required for PRs with `architecture` label |
-| `docs:approved` OR `docs:not-applicable` OR `skip-docs` | Counts toward "Approved" | Either explicit docs review approval (Amy committed docs), not-applicable, or explicitly skipped |
+| `docs:approved` OR `docs:not-applicable` | Counts toward "Approved" | Either explicit docs review approval (Amy committed docs), or not-applicable |
 | PR opened from `squad/NNN-*` branch | "In Review" | Automatically applied when PR title/branch matches squad naming convention |
 | Branch push to `squad/NNN-*` | "In Progress" | Triggered by `pull_request.synchronize` event |
 | PR merged to main | "Merged" | Terminal state; non-blocking (items remain in "Merged" for auditing) |
