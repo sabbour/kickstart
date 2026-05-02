@@ -2481,3 +2481,27 @@ app.http("<name>-legacy", {
 
 **Context:** PR #349, issue #237 PR-2. Addressed in commit 3c77cec.
 
+
+---
+---
+### PR #356 — CI parallelization architecture
+
+**By:** Kif (DevOps)
+**Date:** 2026-05-02
+**Context:** PR #356 — `ci: parallelize independent jobs`
+
+**Decision:** Dropped the dedicated `npm-install` job. Each parallel job (`lint`, `typecheck`, `test`, `schema-validate`, `regression-gates`, `hadolint`) is self-contained: checkout → `setup-node@v5` with `cache: 'npm'` → `npm ci` → work.
+
+**Why:** GitHub Actions jobs run on independent runners with no shared filesystem. A separate `npm-install` job that runs `npm ci` does **not** make `node_modules` available to downstream jobs — they each get a fresh runner. The previous parallelization landed broken: every downstream job would have failed at the first `npm`/`npx` invocation, or silently pulled a non-pinned tool version.
+
+The fix uses `actions/setup-node`'s built-in `cache: 'npm'`, which restores `~/.npm` (npm's download cache) keyed on `package-lock.json`. After the first job populates the cache, subsequent jobs install in seconds. This makes the dedicated install job redundant, simplifies the DAG, and removes a needs-edge bottleneck.
+
+`regression-gates` no longer needs Node at all — it's pure shell guards — so it's fully decoupled from npm-install timing too.
+
+**Side fixes folded in:**
+- Added `packages: read` to workflow `permissions:` (registry uses `npm.pkg.github.com`).
+- Removed dead `Install hadolint` step from the install path; promoted hadolint to its own conditional job that actually runs `hadolint` against Dockerfiles when `dockerfiles_changed=true`.
+- Smoke-gate guard now `set -euo pipefail` and pre-checks `test -f` on `deploy-swa.yml` so a moved/missing file fails loudly instead of being silently treated as "no regression".
+- Fixed misleading comment about `workflow_dispatch`/`schedule` triggers that aren't actually declared on this workflow.
+
+**Hand-off:** Hermes still owns test design; this change only restructures *when* CI runs them. If cache misses become common (lock churn), fall back to `actions/cache` keyed directly on `node_modules` + `hashFiles('package-lock.json')`.
