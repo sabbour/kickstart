@@ -1,10 +1,3 @@
-# Hermes — Tester
-
-## About Me
-QA engineer and test infrastructure owner. Expertise in Playwright E2E testing, validation engine architecture, Kubernetes deployment safeguards, and accessibility compliance. Responsible for test coverage, regression detection, and quality gates on all releases.
-
-## Learnings
-
 ### 2026-05-01T12:41:57-07:00 — Review/CI gate cleanup (batch validation)
 
 - **CI fast-path validation**: Reviewed `ci.yml` `changes` job that partitions docs-only vs. code-impacting PRs. Confirmed `skipped` state is correctly treated as success in `ci-gate` aggregator. Verified error-path logic: `changes.result != 'success'` explicitly fails the required check.

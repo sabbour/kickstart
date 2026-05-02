@@ -29,6 +29,7 @@ export default defineConfig({
       "packages/*/src/**/*.test.tsx",
       "packages/web/api/src/**/*.test.ts",
       ".squad/scripts/**/*.test.mjs",
+      ".github/extensions/**/*.test.mjs",
     ],
     exclude: ["dist/**", "node_modules/**", "**/*.spec.ts", "**/e2e/**"],
   },

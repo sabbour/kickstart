@@ -412,7 +412,7 @@ When a workflow opens an issue, PR, or comment via @copilot, it:
 
 The existing `.github/copilot-instructions.md` tells @copilot to load the referenced charter and work in that voice. No additional plumbing needed.
 
-<!-- squad-workflows: start -->
+<!-- squad-workflows: start v1.4.1 -->
 ### Planning Ceremony (squad-workflows)
 
 | Step | Tool | Gate |

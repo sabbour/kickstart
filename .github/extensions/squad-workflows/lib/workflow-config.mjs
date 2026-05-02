@@ -38,19 +38,15 @@ const DEFAULTS = {
     estimates: ['estimate:S', 'estimate:M', 'estimate:L', 'estimate:XL'],
     fastLane: ['estimate:S', 'squad:chore-auto'],
     designApprovals: ['architecture:approved', 'security:approved', 'codereview:approved', 'docs:approved'],
+    reviewSignals: ['docs:not-applicable', 'docs:rejected'],
     types: ['type:feature', 'type:bug', 'type:spike', 'type:docs', 'type:chore', 'type:epic'],
     priorities: ['priority:p0', 'priority:p1', 'priority:p2'],
   },
   reviewExemptions: {
     docsOnly: {
-      paths: ['docs/**', '**/*.md', '**/*.mdx', '.changeset/**'],
-      skipReviews: ['security:approved'],
+      paths: ['docs/**', 'docs-site/**', '**/*.md', '**/*.mdx', '.squad/**', '.changeset/**'],
+      skipReviews: ['security:approved', 'architecture:approved', 'docs:approved'],
     },
-  },
-  architectureReview: {
-    // Architecture approval is only required when the PR has one of these labels
-    // or (future) touches configured triggerPaths.
-    triggerLabels: ['architecture'],
   },
   board: {
     columns: ['Backlog', 'Assigned', 'In Progress', 'In Review', 'Approved', 'Merged'],
@@ -147,7 +143,7 @@ export function getExemptReviews(config, changedPaths) {
  * Escape regex metacharacters by splitting on wildcards so that literal
  * segments are escaped before being joined with their regex equivalents.
  */
-function matchGlob(filePath, pattern) {
+export function matchGlob(filePath, pattern) {
   const escaped = pattern
     .split('**')
     .map(seg =>

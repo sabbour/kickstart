@@ -150,3 +150,5 @@ corrected code here
 ```
 
 This enables one-click "commit suggestion" for the author. Plain-text comments describing what to change are insufficient — always provide the exact replacement code inline.
+
+Relevant skill: '.squad/skills/squad-identity/SKILL.md' — read before any GitHub write.

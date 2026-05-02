@@ -8,6 +8,8 @@
 
 ## Learnings
 
+- **2026-05-02 10:53 — PR #358 "Fixing" Docs Review (Infrastructure/Framework):** Reviewed PR #358 (50 files, +1050/-835) targeting internal Squad framework refactoring: `.github/extensions/squad-*`, `.github/workflows/squad-*`, `.squad/agents/*/charter.md`, `.squad/templates/`, and governance documentation. **Verdict: APPROVED (review ID 4215340888).** Zero product-user-facing docs impact (docs-site/, README.md, API refs, guides untouched). Changesets gate passed (SUCCESS). Coherence checks on `.github/copilot-instructions.md` (squad-identity/reviews/workflows blocks, lines 48–131) and `.squad/skills/squad-identity/SKILL.md` (role config + GIT IDENTITY steps + anti-patterns, lines 37–190) confirmed alignment with current agent tooling signatures. Framework infrastructure properly documented. No user-facing blockers.
+
 - Reviewed `.changeset/237-arm-direct.md` and `docs-site/` impact for PR #239 (issue #237).
 - **Verdict: docs:approved.** Posted approving review (id 4190482122) and applied `docs:approved` label as `squad-docs[bot]`. Both writes verified by post-flight identity check.
 - Changeset is correct: `@aks-kickstart/web: minor`, user-voice body covers the direct browser→ARM path, the new `GET /api/azure/token` endpoint, memory-only token guarantee, 401 retry semantics, CSP update, and the one-week proxy rollback safety net.

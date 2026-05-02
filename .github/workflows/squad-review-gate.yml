@@ -7,7 +7,7 @@ on:
         description: 'Comma-separated reviewer role slugs required for merge'
         required: false
         type: string
-        default: 'codereview,security'
+        default: 'lead,frontend,backend,tester,scribe,security,codereview,devops,architecture,docs'
       pr_number:
         description: 'Pull request number to check'
         required: true
@@ -24,6 +24,11 @@ jobs:
     name: Review Gate
     if: github.event_name != 'issue_comment' || github.event.issue.pull_request
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      statuses: write
     steps:
       - uses: actions/checkout@v4
 
@@ -34,26 +39,15 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const allRoles = ('${{ inputs.roles }}' || 'codereview,security').split(',').map(r => r.trim()).filter(Boolean);
+            const allRoles = ('${{ inputs.roles }}' || 'lead,frontend,backend,tester,scribe,security,codereview,devops,architecture,docs').split(',').map(r => r.trim()).filter(Boolean);
             const prNumber = ${{ inputs.pr_number || 0 }} || context.payload.pull_request?.number || context.payload.issue?.number;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
             // Config injected at scaffold time
-            // Note: docs role is enforced as a *signal* (label or shipped docs/changeset
-            // content) by squad-auto-merge.yml, not as a Bot review here. That keeps Amy
-            // out of a self-approval deadlock on docs-authored PRs while preserving the
-            // docs-required policy. Security is conditional: waived when the PR is
-            // docs-only, has no architecture label, and touches no sensitive paths.
-            const botLoginMap = {"codereview":"squad-codereview[bot]","security":"squad-security[bot]"};
-            const gateRules = {
-              "codereview": { "required": "always" },
-              "security": {
-                "required": "conditional",
-                "bypassWhen": { "docsOnly": true, "noArchitectureLabel": true, "noSensitivePaths": true }
-              }
-            };
-            const fallbackApprover = "squad-lead[bot]"; // accepts APPROVE when PR author == required bot
+            const botLoginMap = {"frontend":"squad-frontend[bot]","backend":"squad-backend[bot]","tester":"squad-tester[bot]","scribe":"squad-scribe[bot]","security":"squad-security[bot]","codereview":"squad-codereview[bot]","devops":"squad-platform[bot]","architecture":"squad-lead[bot]","docs":"squad-docs[bot]"};
+            const fallbackApprover = botLoginMap['lead'] || botLoginMap['architecture'] || 'squad-lead[bot]'; // accepts APPROVE when PR author == required bot
+            const gateRules = {"lead":{"required":"optional"},"frontend":{"required":"optional"},"backend":{"required":"optional"},"tester":{"required":"optional"},"scribe":{"required":"optional"},"security":{"required":"conditional","bypassWhen":{"docsOnly":true,"noArchitectureLabel":true,"noSensitivePaths":true},"sensitivePaths":[".github/workflows/**",".squad/reviews/**",".squad/workflows/**","**/auth/**","**/security/**","**/guardrail/**","**/guardrails/**"]},"codereview":{"required":"always"},"devops":{"required":"optional"},"architecture":{"required":"conditional","requiredWhen":{"labels":["architecture"]},"invalidationPaths":["packages/*/package.json","packages/*/src/index.ts","packages/*/src/index.tsx","packages/*/src/api/**","packages/*/src/contract/**","packages/*/src/contracts/**","packages/*/src/schema/**","packages/*/src/schemas/**","packages/*/src/**/*pack*.ts","packages/*/src/**/*boundary*.ts","packages/*/src/**/*provider*.ts","packages/*/src/**/*registry*.ts","docs/adr/**",".squad/decisions/**"]},"docs":{"required":"conditional","bypassWhen":{"docsOnly":true,"noArchitectureLabel":true,"noSensitivePaths":true},"bypassLabels":["docs:not-applicable","docs:approved"],"satisfiedByContent":["docs/**","docs-site/**",".changeset/**","**/*.md","**/*.mdx"],"hardBlockLabel":"docs:rejected"}};
 
             // Helper: post commit status for the required check name
             async function postStatus(state, description) {
@@ -98,9 +92,8 @@ jobs:
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
             const prLabels = pr.labels.map(l => l.name.toLowerCase());
 
-            // Clear stale approval labels on synchronize only for affected domains.
-            // Pure base-branch catch-ups (Update branch / merge from base / rebase over base)
-            // preserve every approval label because PR-vs-base content is unchanged.
+            // Clear stale approval labels on synchronize — but only for real content
+            // changes, not pure base-branch catch-ups (Update branch / merge from base).
             if (context.eventName === 'pull_request' && context.payload.action === 'synchronize') {
               const before = context.payload.before;
               const after = context.payload.after;
@@ -126,7 +119,7 @@ jobs:
                   syncChangedPaths = changedBetween(cmpBefore, cmpAfter);
                   isPureBaseSync = syncChangedPaths.length === 0 && sigOf(cmpBefore) === sigOf(cmpAfter);
                 } catch (e) {
-                  core.warning(`Could not determine base-sync status (${e.message}) — clearing only safely affected domains`);
+                  core.warning(`Could not determine base-sync status (${e.message}) — defaulting to clear approvals for required domains`);
                   syncChangedPaths = ['*'];
                 }
               }
@@ -138,21 +131,16 @@ jobs:
                 const DEFAULT_SENSITIVE_SYNC_PATHS = ['.github/workflows/**', '**/auth/**', '**/security/**', '**/guardrail/**', '**/guardrails/**'];
                 const matchesSyncGlob = (path, pattern) => {
                   if (path === '*') return true;
-                  const escaped = pattern
-                    .split('**')
-                    .map(seg =>
-                      seg
-                        .split('*')
-                        .map(s =>
-                          s
-                            .split('?')
-                            .map(p => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-                            .join('[^/]')
-                        )
-                        .join('[^/]*')
-                    )
-                    .join('.*');
-                  return new RegExp('^' + escaped + '$').test(path);
+                  const regexSource = pattern
+                    .replace(/\*\*/g, '@@GLOBSTAR@@')
+                    .replace(/\*/g, '@@STAR@@')
+                    .replace(/\?/g, '@@QMARK@@')
+                    .replace(/[|\\{}()[\]^$+?.]/g, '\\$&')
+                    .replace(/@@GLOBSTAR@@/g, '.*')
+                    .replace(/@@STAR@@/g, '[^/]*')
+                    .replace(/@@QMARK@@/g, '[^/]');
+                  const regex = new RegExp('^' + regexSource + '$');
+                  return regex.test(path);
                 };
                 const anySyncPathMatches = (paths, patterns) =>
                   paths.some(p => patterns.some(pat => matchesSyncGlob(p, pat)));
@@ -230,19 +218,18 @@ jobs:
               return paths.some(p => patterns.some(pat => matchesGlob(p, pat)));
             }
 
+            function anyLabelMatches(labels, patterns) {
+              if (!patterns || patterns.length === 0) return false;
+              return labels.some(label => patterns.some(pat => label === pat.toLowerCase()));
+            }
+
             const requiredRoles = [];
             const skippedRoles = [];
+            const hardBlockers = [];
 
-            // Compute docs-only / sensitive-path / architecture-label flags used by
-            // the security gate's docsOnly bypass. Patterns kept in sync with
-            // squad-auto-merge.yml (DOCS_LIKE_RE / SENSITIVE_PATH_PATTERNS).
             const DOCS_LIKE_RE = /(\.mdx?$)|^docs\/|^docs-site\/|^\.squad\/|^\.changeset\//i;
-            const SENSITIVE_RE_LIST = [
-              /^\.github\/workflows\//i,
-              /(^|[\/._-])(auth|guardrail|guardrails|security)([\/._-]|$)/i,
-            ];
+            const DEFAULT_SENSITIVE_PATHS = ['.github/workflows/**', '**/auth/**', '**/security/**', '**/guardrail/**', '**/guardrails/**'];
             const isDocsOnlyPR = changedPaths.length > 0 && changedPaths.every(p => DOCS_LIKE_RE.test(p));
-            const hasSensitivePath = changedPaths.some(p => SENSITIVE_RE_LIST.some(re => re.test(p)));
             const hasArchitectureLabel = prLabels.includes('architecture');
 
             for (const role of allRoles) {
@@ -260,9 +247,17 @@ jobs:
 
               // Conditional logic
               if (rule.required === 'conditional') {
+                if (rule.hardBlockLabel && prLabels.includes(rule.hardBlockLabel.toLowerCase())) {
+                  hardBlockers.push({ role, label: rule.hardBlockLabel });
+                  requiredRoles.push(role);
+                  continue;
+                }
+
                 // docsOnly bypass: skip this role when the PR is docs-only,
                 // has no architecture label, and touches no sensitive paths.
                 const bw = rule.bypassWhen || {};
+                const sensitivePaths = rule.sensitivePaths || DEFAULT_SENSITIVE_PATHS;
+                const hasSensitivePath = anyPathMatches(changedPaths, sensitivePaths);
                 const docsOnlyWaives =
                   bw.docsOnly === true && isDocsOnlyPR &&
                   (bw.noArchitectureLabel !== true || !hasArchitectureLabel) &&
@@ -283,17 +278,24 @@ jobs:
                 const bypassWhenLabels = bw.labels || [];
                 const hasBypassLabel = bypassWhenLabels.some(bl => prLabels.includes(bl.toLowerCase()));
 
-                // Check requiredWhen.paths
+                // Check requiredWhen labels and paths
+                const requiredLabels = rule.requiredWhen?.labels || [];
+                const hasRequiredLabels = anyLabelMatches(prLabels, requiredLabels);
                 const requiredPaths = rule.requiredWhen?.paths || [];
                 const hasRequiredPaths = anyPathMatches(changedPaths, requiredPaths);
+
+                if (requiredLabels.length > 0 && hasRequiredLabels) {
+                  requiredRoles.push(role);
+                  continue;
+                }
 
                 if (hasBypassLabel && !hasRequiredPaths) {
                   skippedRoles.push({ role, reason: `bypass label + no matching paths` });
                   continue;
                 }
 
-                if (requiredPaths.length > 0 && !hasRequiredPaths) {
-                  skippedRoles.push({ role, reason: `no files match requiredWhen paths` });
+                if ((requiredPaths.length > 0 || requiredLabels.length > 0) && !hasRequiredPaths && !hasRequiredLabels) {
+                  skippedRoles.push({ role, reason: `no files or labels match requiredWhen` });
                   continue;
                 }
 
@@ -407,7 +409,11 @@ jobs:
             await core.summary.addRaw(summary).write();
 
             // Gate decision
-            if (missingRoles.length > 0) {
+            if (hardBlockers.length > 0) {
+              const labels = hardBlockers.map(b => `${b.role} blocked by ${b.label}`).join(', ');
+              await postStatus('failure', labels);
+              core.setFailed(`Hard-blocking review label present: ${labels}`);
+            } else if (missingRoles.length > 0) {
               await postStatus('pending', `waiting: ${missingRoles.join(', ')}`);
               core.setFailed(`Missing approvals from: ${missingRoles.join(', ')}`);
             } else if (unresolvedCount > 0) {

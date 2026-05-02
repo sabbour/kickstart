@@ -28,3 +28,17 @@
   - Security: pass
   - Ready for merge
 - **PR #337**: scaffold source drift fixed → **codereview approved** ✅
+
+## Learnings
+
+### PR #358 review (2026-05-02T10:53:32-07:00)
+
+- Blocking review found that append-only Squad state must not be overwritten by scaffold placeholders during upgrade/source sync. In this PR, `.squad/history.md` and `.squad/orchestration-log.md` were reset to template content instead of preserving existing repo state.
+- Runtime attestation artifacts also need explicit ignore protection. `.squad/attestation/log-20260502.jsonl` landed in the diff even though it is generated state, not source.
+- For workflow/extension upgrade code, missing tests around failure handling and file-rewrite behavior deserve extra scrutiny before approval.
+
+### PR #358 re-review (2026-05-02T11:07:38-07:00)
+
+- Re-checked Bender's follow-up commit against `origin/dev`: `.squad/history.md` and `.squad/orchestration-log.md` now match dev exactly, so the prior data-loss blocker is resolved rather than papered over.
+- Verified the runtime artifact fix end-to-end: `.squad/attestation/log-20260502.jsonl` is no longer in the PR diff, and `.gitignore` now excludes `.squad/attestation/`.
+- Re-ran the new targeted Vitest coverage for squad-workflows (`upgrade`, `merge-check`, `init`): 33 tests passed. The new assertions exercise real behavior, including preserved upgrade error detail and docs/sensitive-path classification helpers.

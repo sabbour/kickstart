@@ -14,12 +14,11 @@ App bot identity — never the human operator's ambient `gh` session.
 
 | Tool | Purpose |
 |------|---------|
-| `squad_identity_status` | Show agentNameMap + registered apps |
+| `squad_identity_setup_steps` | Return step-by-step instructions for GitHub App bot identity setup |
+| `squad_identity_setup_all` | Run the guided setup flow (creates/installs GitHub Apps, updates charters) |
 | `squad_identity_doctor` | Health check (config, keys, token resolution) |
-| `squad_identity_update_charters` | Infer mapping from `team.md`, update charters + `config.json` |
-| `squad_identity_update_copilot_instructions` | Replace/append identity block in `.github/copilot-instructions.md` |
-| `squad_identity_setup_steps` | Get initial setup instructions (browser-interactive steps) |
-| `squad_identity_setup_all` | Guided full setup flow (browser, app creation, installation, charter injection) |
+| `squad_identity_update_charters` | Inject ROLE_SLUG into agent charters from agentNameMap |
+| `squad_identity_update_copilot_instructions` | Refresh the identity block in .github/copilot-instructions.md |
 
 **Agent Runtime Tools:**
 
@@ -28,7 +27,7 @@ App bot identity — never the human operator's ambient `gh` session.
 | `squad_identity_resolve_token` | Resolve bot GitHub App token for current agent |
 | `squad_identity_rotate_key` | Rotate a GitHub App private key (guided flow) |
 
-**Governance Tools (v1.1.0+):**
+**Governance Tools:**
 
 | Tool | Purpose |
 |------|---------|
@@ -46,11 +45,23 @@ ROLE_SLUG="<slug>"  # injected by configure-identity --update-charters; do not e
 ```
 
 **If this line is absent from your charter:**
-1. Call `squad_identity_status` — it prints the full `agentNameMap` from `config.json`
+1. Call `squad_identity_doctor` — it shows the full identity status including `agentNameMap`
 2. If `config.json` is missing: call `squad_identity_update_charters` to infer and populate it
 
 The mapping is stored in `.squad/identity/config.json` under `agentNameMap`.
 It is inferred from `.squad/team.md` (the `| Name | Role |` table) during setup.
+
+### GitHub Apps: custom (recommended) vs. public (future)
+
+Your role slug corresponds to a GitHub App. We support two types:
+
+**Custom app (recommended):** `{your-github-username}-<role>[bot]`  
+User-created, dedicated apps (e.g., `alice-backend[bot]`, `myteam-frontend[bot]`). You create and own these via `squad-identity create-app --role <role>`. This is the primary path because GitHub App PEM keys belong to the app owner and cannot be shared without a central token broker service.
+
+**Public app (future possibility):** `sqd-<role>[bot]`  
+Shared, pre-made apps (e.g., `sqd-backend[bot]`, `sqd-frontend[bot]`). These would be available in the future if a token broker service is built. Not recommended for current use.
+
+Token resolution works the same way for both: `squad_identity_resolve_token` looks up your role slug in `.squad/identity/config.json`, finds the app ID, and retrieves the PEM from the OS keychain.
 
 ---
 
@@ -78,6 +89,11 @@ suffix so concurrent sessions don't share state.
 **Option 1: Direct token (standard agents):**
 ```bash
 TOKEN=$(squad_identity_resolve_token  roleSlug="<from your charter>")
+```
+
+**Option 1b: Direct token from CLI (non-agent use):**
+```bash
+TOKEN=$(squad-identity resolve-token --role backend)
 ```
 
 **Option 2: Leased token (coordinator-gated agents):**
@@ -118,7 +134,7 @@ squad_identity_attest_write \
   owner="myorg" repo="myrepo" \
   writeType="pr-create" writeRef="42" \
   roleSlug="<from charter>" \
-  expectedActor="squad-identity-<role>[bot]" \
+  expectedActor="sqd-<role>[bot]" \
   token="$TOKEN" \
   verify="true"
 ```
@@ -183,8 +199,7 @@ The upgrade overwrites `.github/copilot-instructions.md` and `.github/agents/squ
 Your identity setup in `.squad/identity/` and `.github/extensions/` is **never touched**.
 
 To restore the identity references:
-1. Run `squad_identity_update_copilot_instructions` tool (or `--update-copilot-instructions`)
-2. Optionally run `squad_identity_update_charters` if charters were regenerated
+1. Run `squad_identity_update_charters` tool (to inject ROLE_SLUG into charters), then `squad_identity_update_copilot_instructions` (to restore the identity block) — or run `squad-identity setup` from CLI
 
 Everything else (config.json, extension, skill) survives automatically.
 

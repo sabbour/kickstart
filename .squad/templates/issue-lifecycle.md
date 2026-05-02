@@ -162,10 +162,8 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 **Commit types:** `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `style`, `build`, `ci`
 
 **Push command:**
-
-Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get a token, then:
 ```bash
-git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
+git push -u origin squad/{issue-number}-{slug}
 ```
 
 ### 4. PR Creation
@@ -181,19 +179,9 @@ git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{is
 **PR creation commands:**
 
 **GitHub:**
-
-Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get a token, then:
 ```bash
-cat > pr-body.txt <<'EOF'
-🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
-
-Closes #{issue-number}
-
-{description}
-EOF
-
-GH_TOKEN=$TOKEN gh pr create --title "{title}" \
-  --body-file pr-body.txt \
+gh pr create --title "{title}" \
+  --body "Closes #{issue-number}\n\n{description}" \
   --head squad/{issue-number}-{slug} \
   --base main
 ```
@@ -208,8 +196,6 @@ az repos pr create --title "{title}" \
 
 **PR description template:**
 ```markdown
-🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
-
 Closes #{issue-number}
 
 ## Summary
@@ -242,22 +228,18 @@ Working as {member} ({role})
 3. Pushes updates
 4. Requests re-review
 
-> **Fail-closed rule:** Agent-authored push / review / merge writes must resolve an explicit app token first. Do not use ambient `git` or `gh` auth in this lifecycle.
-
 **Update workflow:**
 ```bash
 # Make changes
 # ⚠️ NEVER use `git add .` or `git add -A` — only stage files you intentionally changed
-# Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get TOKEN, then:
 git add -- {specific files you modified}
 git commit -m "fix: address review feedback"
-git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
+git push
 ```
 
 **Re-request review (GitHub):**
 ```bash
-# Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get TOKEN, then:
-GH_TOKEN="$TOKEN" gh pr ready {pr-number}
+gh pr ready {pr-number}
 ```
 
 ### 6. PR Merge
@@ -268,14 +250,12 @@ GH_TOKEN="$TOKEN" gh pr ready {pr-number}
 
 **GitHub (merge commit):**
 ```bash
-# Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get TOKEN, then:
-GH_TOKEN="$TOKEN" gh pr merge {pr-number} --merge --delete-branch
+gh pr merge {pr-number} --merge --delete-branch
 ```
 
 **GitHub (squash):**
 ```bash
-# Use the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get TOKEN, then:
-GH_TOKEN="$TOKEN" gh pr merge {pr-number} --squash --delete-branch
+gh pr merge {pr-number} --squash --delete-branch
 ```
 
 **Azure DevOps:**
@@ -333,16 +313,9 @@ When spawning an agent to work on an issue, include this context block:
 **After completing work:**
 1. Commit with message referencing issue number
 2. Push branch
-3. Open PR using the `squad_identity_resolve_token` tool with roleSlug="{role_slug}" to get TOKEN, then:
+3. Open PR using:
    ```
-   cat > pr-body.txt <<'EOF'
-   🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
-
-   Closes #{number}
-
-   {description}
-   EOF
-   GH_TOKEN="$TOKEN" gh pr create --title "{title}" --body-file pr-body.txt --head squad/{issue-number}-{slug} --base {base-branch}
+   gh pr create --title "{title}" --body "Closes #{number}\n\n{description}" --head squad/{issue-number}-{slug} --base {base-branch}
    ```
 4. Report PR URL to coordinator
 ```
@@ -371,7 +344,7 @@ See `.squad/templates/ralph-reference.md` for Ralph's full lifecycle.
 If the project has no human reviewers configured:
 1. PR opens
 2. CI runs
-3. If CI passes, Ralph (or the `Squad Auto Merge` workflow for qualifying non-XL/non-`refactor` PRs, including opt-in `squad:chore-auto` PRs) auto-merges
+3. If CI passes, Ralph auto-merges
 4. Issue closes
 
 ### Human Review Required
@@ -380,7 +353,7 @@ If the project requires human approval:
 1. PR opens
 2. Human reviewer is notified (GitHub/ADO notifications)
 3. Reviewer approves or requests changes
-4. If approved + CI passes, Ralph merges (or the `Squad Auto Merge` workflow arms squash auto-merge for dual-approved PRs and opt-in `squad:chore-auto` low-risk PRs that satisfy the review gate)
+4. If approved + CI passes, Ralph merges
 5. If changes requested, agent addresses feedback
 
 ### Squad Member Review

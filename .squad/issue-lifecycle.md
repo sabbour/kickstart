@@ -231,7 +231,8 @@ Working as {member} ({role})
 **Update workflow:**
 ```bash
 # Make changes
-git add .
+# ⚠️ NEVER use `git add .` or `git add -A` — only stage files you intentionally changed
+git add -- {specific files you modified}
 git commit -m "fix: address review feedback"
 git push
 ```
@@ -411,7 +412,7 @@ All PRs reviewed → All PRs merged → Epic closed
 
 This template will be updated as worktree lifecycle support lands in #525.
 
-<!-- squad-workflows: start -->
+<!-- squad-workflows: start v1.4.1 -->
 > **⚠️ This project uses squad-workflows.** The step-by-step commands in
 > sections 1–7 below are superseded by the squad-workflows extension tools.
 > Follow these references instead:

@@ -45,7 +45,64 @@ If you make a decision that affects other team members, write it to:
 ```
 The Scribe will merge it into the shared decisions file.
 
-<!-- squad-workflows: start -->
+<!-- squad-identity: start -->
+## GIT IDENTITY — Bot Authentication
+
+This project uses GitHub App bot identity for all agent-authored writes.
+Read `.squad/skills/squad-identity/SKILL.md` before any GitHub write.
+
+**Use the `squad_identity_resolve_token` tool** to get a bot token for your ROLE_SLUG.
+
+Your ROLE_SLUG is injected into your charter — look for:
+```
+ROLE_SLUG="<slug>"  # injected by configure-identity --update-charters
+```
+
+If absent, call `squad_identity_status` to see the full agentNameMap.
+
+**Token usage (inline per-call, never export):**
+```bash
+GH_TOKEN="$TOKEN" gh pr create ...
+GH_TOKEN="$TOKEN" gh api /repos/{owner}/{repo}/issues -f title="..." 
+git push "https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git" HEAD
+```
+<!-- squad-identity: end -->
+
+<!-- squad-reviews: start v1.5.3 -->
+## REVIEW GATE — PR Merge Requirements
+
+This project enforces a CI review gate that blocks PR merges until:
+1. All required reviewer roles have submitted a native GitHub review with `APPROVED` state.
+2. All review conversation threads are resolved (no unresolved threads).
+
+### Coordinator workflow — requesting reviews
+
+`squad_reviews_dispatch_review` is a **SIGNAL ONLY** tool. It applies the
+`review:{role}:requested` label and posts a notification comment — it does
+**NOT** spawn the reviewer agent. Returning `dispatched: true` only means the
+label and comment were applied.
+
+After every `squad_reviews_dispatch_review` call, the coordinator MUST in the
+same turn dispatch the named reviewer agent via the platform's spawn tool
+(`task` on CLI, `runSubagent` on VS Code) so the review actually runs.
+
+For parallel reviews, call `squad_reviews_dispatch_review` once per role AND
+spawn each reviewer agent — both in the same turn.
+
+### Agent workflow before merge
+
+1. After pushing changes, call `squad_reviews_acknowledge_feedback` to check for unresolved threads.
+2. For each unresolved thread:
+   - If you fixed the issue: call `squad_reviews_resolve_thread` with action `addressed` and reference the fix commit.
+   - If the feedback does not apply: call `squad_reviews_resolve_thread` with action `dismissed` with a justification.
+3. **Never** resolve a thread without replying first — silent dismissal is a governance failure.
+4. **Never** self-approve your own PR.
+5. Do not manually apply `{role}:approved` labels — the gate applies them automatically.
+
+The gate will not pass until all threads are resolved and all required roles have approved.
+<!-- squad-reviews: end -->
+
+<!-- squad-workflows: start v1.4.1 -->
 ## Workflow Tools (squad-workflows extension)
 
 Use these tools for the issue-to-merge lifecycle:
@@ -71,7 +128,4 @@ Large features must be decomposed into waves (GitHub milestones). Each wave is i
 
 ### Pre-Push Validation
 Before pushing any branch, run `npm test` (and `npm run build` if a build script exists in package.json). Do NOT push code that fails tests or build.
-
-### Feedback Batching
-When addressing PR review feedback, batch related unresolved threads for the same PR into one implementation pass, one validation run, one commit, and one consolidated PR comment/update where possible. Do not push one commit/comment per thread unless items are truly unrelated and cannot be safely batched. After all threads are resolved, check `reviewDecision`; if it remains `CHANGES_REQUESTED`, ping the human reviewer for re-review/dismissal, and submit required Squad role-gate approval separately with `squad_reviews_execute_pr_review`.
 <!-- squad-workflows: end -->

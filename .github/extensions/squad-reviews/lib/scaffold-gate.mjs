@@ -34,6 +34,8 @@ export function generateReusableWorkflow(roles, config = {}, repoRoot = '.') {
 
   const botLoginJson = JSON.stringify(botLoginMap);
   const gateRulesJson = JSON.stringify(gateRulesMap);
+  const fallbackApproverLogin = botLoginMap['lead'] || botLoginMap['architecture'] || 'squad-lead[bot]';
+  const fallbackApproverJson = JSON.stringify(fallbackApproverLogin);
 
   return `name: Squad Review Gate
 
@@ -89,6 +91,7 @@ jobs:
             // Config injected at scaffold time
             const botLoginMap = ${botLoginJson};
             const gateRules = ${gateRulesJson};
+            const fallbackApprover = ${fallbackApproverJson}; // accepts APPROVE when PR author == required bot
 
             // Helper: post commit status for the required check name
             async function postStatus(state, description) {

@@ -41,6 +41,11 @@ function validateGateRule(roleSlug, gateRule) {
         invalidConfig(`reviewers.${roleSlug}.gateRule.bypassWhen.${key} must be a boolean`);
       }
     }
+    for (const key of ['docsOnly', 'noArchitectureLabel', 'noSensitivePaths']) {
+      if (gateRule.bypassWhen[key] !== undefined && typeof gateRule.bypassWhen[key] !== 'boolean') {
+        invalidConfig(`reviewers.${roleSlug}.gateRule.bypassWhen.${key} must be a boolean`);
+      }
+    }
   }
 
   if (gateRule.requiredWhen !== undefined) {
@@ -63,6 +68,14 @@ function validateGateRule(roleSlug, gateRule) {
 
   if (gateRule.bypassLabels !== undefined && !Array.isArray(gateRule.bypassLabels)) {
     invalidConfig(`reviewers.${roleSlug}.gateRule.bypassLabels must be an array`);
+  }
+
+  if (gateRule.sensitivePaths !== undefined && !Array.isArray(gateRule.sensitivePaths)) {
+    invalidConfig(`reviewers.${roleSlug}.gateRule.sensitivePaths must be an array`);
+  }
+
+  if (gateRule.hardBlockLabel !== undefined) {
+    assertNonEmptyString(gateRule.hardBlockLabel, `reviewers.${roleSlug}.gateRule.hardBlockLabel`);
   }
 
   if (gateRule.bypassLabelAuthority !== undefined) {

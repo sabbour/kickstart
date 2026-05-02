@@ -17,7 +17,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { ensureLabel } from './github-api.mjs';
 import { configExists, configPath, getTemplate, loadConfig } from './workflow-config.mjs';
-import { buildInstructionBlock, buildRalphCharterBlock, buildCeremoniesBlock, buildLifecycleOverrideBlock, patchInstructionBlock } from './init.mjs';
+import { buildInstructionBlock, buildRalphCharterBlock, buildCeremoniesBlock, buildLifecycleOverrideBlock, patchInstructionBlock, readInstalledWorkflowsVersion } from './init.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -34,6 +34,8 @@ const LABEL_COLORS = {
   'security:approved': '0e8a16',
   'codereview:approved': '0e8a16',
   'docs:approved': '0e8a16',
+  'docs:not-applicable': 'bfdadc',
+  'docs:rejected': 'd93f0b',
 };
 
 const LABEL_DESCRIPTIONS = {
@@ -135,6 +137,7 @@ export async function runSetup(repoRoot, { token, owner, repo, force, json }) {
       ...config.labels.estimates,
       ...config.labels.fastLane,
       ...config.labels.designApprovals,
+      ...(config.labels.reviewSignals || []),
     ];
     const unique = [...new Set(allLabels)];
 
@@ -167,13 +170,26 @@ export async function runSetup(repoRoot, { token, owner, repo, force, json }) {
   // Patch copilot-instructions.md
   const instrPath = join(target, '.github', 'copilot-instructions.md');
   if (existsSync(instrPath)) {
-    const patched = patchInstructionBlock(
-      readFileSync(instrPath, 'utf-8'),
-      buildInstructionBlock(config)
-    );
+    const before = readFileSync(instrPath, 'utf-8');
+    const previousVersion = readInstalledWorkflowsVersion(before);
+    const patched = patchInstructionBlock(before, buildInstructionBlock(config));
     writeFileSync(instrPath, patched);
+    const newVersion = readInstalledWorkflowsVersion(patched);
     results.instructions.push('copilot-instructions.md');
-    if (!json) log(`  ✓ Patched copilot-instructions.md`);
+    results.previousVersion = previousVersion;
+    results.newVersion = newVersion;
+    if (!json) {
+      log(`  ✓ Patched copilot-instructions.md`);
+      if (newVersion) {
+        if (previousVersion && previousVersion !== newVersion) {
+          log(`    Block version: v${previousVersion} → v${newVersion}`);
+        } else if (previousVersion && previousVersion === newVersion) {
+          log(`    Block version: v${newVersion} (unchanged)`);
+        } else {
+          log(`    Block version: v${newVersion}`);
+        }
+      }
+    }
   } else {
     if (!json) log(`  ⏭ No copilot-instructions.md found`);
   }

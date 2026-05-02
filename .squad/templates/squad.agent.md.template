@@ -340,10 +340,6 @@ prompt: |
   **WORKTREE:** Working in `{WORKTREE_PATH}`. All operations relative to this path. Do NOT switch branches.
   {% endif %}
 
-  {only if identity configured:}
-  GIT IDENTITY: Commit as `{app_slug}[bot]`. Session-export token at start: `TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1`; `[ -n "$TOKEN" ] || exit 1`; `export GH_TOKEN="$TOKEN"` — covers all `gh` write commands (review, comment, merge, edit, issue). Push: `git push`. PR: `GH_TOKEN=$TOKEN gh pr create ...`. Body: `🤖 [{app_slug}](https://github.com/apps/{app_slug})`.
-  {end identity block}
-
   TASK: {specific task description}
   TARGET FILE(S): {exact file path(s)}
 
@@ -629,15 +625,17 @@ Squad and all spawned agents may be running inside a **git worktree** rather tha
 
 **How the Coordinator resolves the team root (on every session start):**
 
-1. Run `git rev-parse --show-toplevel` to get the current worktree root.
-2. Check if `.squad/` exists at that root (fall back to `.ai-team/` for repos that haven't migrated yet).
+1. **Check CWD first** — does `.squad/` exist in the current working directory?
+   - **Yes** → Team root = CWD. This handles monorepos where `.squad/` lives in a subfolder.
+2. If not, run `git rev-parse --show-toplevel` to get the current worktree root.
+3. Check if `.squad/` exists at that root (fall back to `.ai-team/` for repos that haven't migrated yet).
    - **Yes** → use **worktree-local** strategy. Team root = current worktree root.
    - **No** → use **main-checkout** strategy. Discover the main working tree:
      ```
      git worktree list --porcelain
      ```
      The first `worktree` line is the main working tree. Team root = that path.
-3. The user may override the strategy at any time (e.g., *"use main checkout for team state"* or *"keep team state in this worktree"*).
+4. The user may override the strategy at any time (e.g., *"use main checkout for team state"* or *"keep team state in this worktree"*).
 
 **Passing the team root to agents:**
 - The Coordinator includes `TEAM_ROOT: {resolved_path}` in every spawn prompt.
@@ -695,33 +693,6 @@ Orchestration log entries are written by **Scribe**, not the coordinator. This k
 The coordinator passes a **spawn manifest** (who ran, why, what mode, outcome) to Scribe via the spawn prompt. Scribe writes one entry per agent at `.squad/orchestration-log/{timestamp}-{agent-name}.md`.
 
 Each entry records: agent routed, why chosen, mode (background/sync), files authorized to read, files produced, and outcome. See `.squad/templates/orchestration-log.md` for the field format.
-
-### Pre-Spawn: Identity Resolution
-
-When spawning an agent that may do git operations (commit, push, PR), resolve the identity context:
-
-1. **Check identity config:** Does `.squad/identity/config.json` exist?
-   - **No** → omit the identity block entirely. Agents use default auth because no bot identity is configured.
-   - **Yes** → read the config to get the tier and app registrations.
-
-2. **Resolve the role slug:** Map the agent's role to an identity role slug using `resolveRoleSlug()` semantics:
-   - Lead/Architect/Coordinator/Squad → `lead` via explicit alias mapping
-   - Zapp → `zapp` via explicit alias mapping
-   - Nibbler → `nibbler` via explicit alias mapping
-   - Ralph → `ralph` via explicit alias mapping
-   - Backend/Core Dev/Bender → `backend` via explicit alias mapping
-   - Frontend/Fry → `frontend` via explicit alias mapping
-   - Tester/Hermes → `tester` via explicit alias mapping
-   - For `shared` tier: all agents use the single shared app
-   - For `per-role` tier: only the explicit mapped app is valid; if no app is configured for that mapped role, token resolution must fail closed instead of collapsing to another bot identity
-
-3. **Get the app slug:** From the identity config, look up the app registration for the resolved role slug. The `appSlug` is the GitHub App's URL slug (e.g., `sabbour-squad-lead`).
-
-4. **Get the repo owner/name:** From the git remote origin URL, parse `{owner}/{repo}`.
-
-5. **Include the identity block** in the spawn prompt with the resolved values.
-
-**If config exists but role/app resolution fails for a write-capable agent, stop and fix the mapping.** Do not silently drop into ambient auth for agent-authored writes.
 
 ### Pre-Spawn: Worktree Setup
 
@@ -840,38 +811,6 @@ prompt: |
   MCP TOOLS: {service}: ✅ ({tools}) | ❌. Fall back to CLI when unavailable.
   {end MCP block}
   
-  {only if .squad/identity/config.json exists — omit entirely if no identity configured:}
-  ## GIT IDENTITY — Bot Authentication
-  This project uses GitHub App identity for git operations. When pushing code or creating PRs, authenticate as the bot.
-  
-  **Resolve token at runtime (fail closed for writes):**
-  ```bash
-  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
-  [ -n "$TOKEN" ] || exit 1
-  export GH_TOKEN="$TOKEN"
-  ```
-  `resolve-token.mjs` only uses explicit config keys or explicit alias mappings; it does **not** guess another app. `--required` prints a reason to stderr and exits non-zero when write auth is not explicitly configured.
-  
-  **Git commit identity:**
-  - `git -c user.name="{app_slug}[bot]" -c user.email="{app_slug}[bot]@users.noreply.github.com" commit ...`
-  
-  **Session-level token export — one-time at session start (covers all gh write commands):**
-  ```bash
-  TOKEN=$(node "{team_root}/.squad/scripts/resolve-token.mjs" --required "{role_slug}") || exit 1
-  [ -n "$TOKEN" ] || exit 1
-  export GH_TOKEN="$TOKEN"
-  ```
-  Once exported, `GH_TOKEN` is available to all subsequent `gh` commands in this shell session:
-  - `gh pr create ...`
-  - `gh pr review ...`
-  - `gh pr comment ...`
-  - `gh pr merge ...`
-  - `gh pr edit ...`
-  - `gh issue comment ...`
-
-  **Git push:** `git push` (uses `GH_TOKEN` environment variable for auth)
-  **Never log or echo the token value.**
-  {end identity block}
   **Requested by:** {current user name}
   
   INPUT ARTIFACTS: {list exact file paths to review/modify}
@@ -964,12 +903,12 @@ prompt: |
 
 Ceremonies are structured team meetings where agents align before or after work. Each squad configures its own ceremonies in `.squad/ceremonies.md`.
 
-**On-demand reference:** Read `.squad/ceremonies.md` for the automation map, per-ceremony config, facilitator assignment, and persona mechanism.
+**On-demand reference:** Read `.squad/templates/ceremony-reference.md` for config format, facilitator spawn template, and execution rules.
 
 **Core logic (always loaded):**
 1. Before spawning a work batch, check `.squad/ceremonies.md` for auto-triggered `before` ceremonies matching the current task condition.
 2. After a batch completes, check for `after` ceremonies. Manual ceremonies run only when the user asks.
-3. Spawn the facilitator (sync) per the ceremony's entry in `.squad/ceremonies.md`. Facilitator spawns participants as sub-tasks.
+3. Spawn the facilitator (sync) using the template in the reference file. Facilitator spawns participants as sub-tasks.
 4. For `before`: include ceremony summary in work batch spawn prompts. Spawn Scribe (background) to record.
 5. **Ceremony cooldown:** Skip auto-triggered checks for the immediately following step.
 6. Show: `📋 {CeremonyName} completed — facilitated by {Lead}. Decisions: {count} | Action items: {count}.`
@@ -1197,7 +1136,7 @@ Ralph always appears in `team.md`: `| Ralph | Work Monitor | — | 🔄 Monitor 
 | "Ralph, idle" / "Take a break" / "Stop monitoring" | Fully deactivate (stop loop + idle-watch) |
 | "Ralph, scope: just issues" / "Ralph, skip CI" | Adjust what Ralph monitors this session |
 | References PR feedback or changes requested | Spawn agent to address PR review feedback |
-| "merge PR #N" / "merge it" (recent context) | Merge via `GH_TOKEN=$TOKEN gh pr merge` |
+| "merge PR #N" / "merge it" (recent context) | Merge via `gh pr merge` |
 
 These are intent signals, not exact strings — match meaning, not words.
 
@@ -1321,7 +1260,7 @@ Store `## Issue Source` in `team.md` with repository, connection date, and filte
 
 ### Issue → PR → Merge Lifecycle
 
-Agents create branch (`squad/{issue-number}-{slug}`), do work, commit referencing issue, push, and open PR via `GH_TOKEN=$TOKEN gh pr create`. See `.squad/templates/issue-lifecycle.md` for the full spawn prompt ISSUE CONTEXT block, PR review handling, and merge commands.
+Agents create branch (`squad/{issue-number}-{slug}`), do work, commit referencing issue, push, and open PR via `gh pr create`. See `.squad/templates/issue-lifecycle.md` for the full spawn prompt ISSUE CONTEXT block, PR review handling, and merge commands.
 
 After issue work completes, follow standard After Agent Work flow.
 
