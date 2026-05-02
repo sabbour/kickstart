@@ -26,9 +26,10 @@ title: ARM call flow (browser-direct, Option A2)
   still resolve a token server-side via `getAzureToken(session)` and call
   ARM directly from the Functions worker. They never went through
   `/api/arm-proxy`.
-- **`/api/arm-proxy/{*path}`** is in a one-week zero-traffic observation
-  window post-Wave 3 cut-over (#320). It is scheduled for retirement under
-  #321 and **must not be re-introduced** as a calling path.
+- **`/api/arm-proxy/{*path}`** is **retired** — the route is registered only
+  as a `410 Gone` tombstone (mirroring `/api/github-proxy` and
+  `/api/github-oauth`). It receives no traffic and **must not be
+  re-introduced** as a calling path.
 
 ## Why we moved off `/api/arm-proxy`
 
@@ -154,7 +155,7 @@ only the user's own AAD token to render UI.
 | Browser → ARM                              | `/api/azure/token` (echoes per-request SWA header)   | Caller can only ever receive their own token; endpoint performs no ARM calls and no `/.auth/me` calls |
 | Browser → `/api/azure/token`               | SWA-injected `x-ms-token-aad-access-token` header    | `401 azure_access_token_missing` if header absent (fail-closed); `405` for non-`GET`; `Cache-Control: no-store` |
 | Pack tool → ARM (Functions worker)         | `getAzureToken(session)` from session-captured token | Same trust scope as the user's session; allow-listed polling hosts via `assertArmPollingUrl` |
-| `ANY /api/arm-proxy/{*path}` *(retiring)*  | SWA-injected `x-ms-client-principal-id` (principal required) **and** `x-ms-token-aad-access-token` (forwarded as `Authorization: Bearer …`) | Fail-closed: `403 principal_required` if no principal, `401 azure_access_token_missing` if no AAD token; host-allowlisted (`management.azure.com` only) via `isAllowedHost`; zero-traffic observation window prior to #321 retirement. See [`requireAzureAccessToken`](https://github.com/azure-management-and-platforms/kickstart/blob/main/packages/web/api/src/lib/azure-auth.ts) and [`arm-proxy.ts`](https://github.com/azure-management-and-platforms/kickstart/blob/main/packages/web/api/src/functions/arm-proxy.ts). |
+| `ANY /api/arm-proxy/{*path}` *(retired — `410 Gone`)* | n/a — no auth performed, route returns `410 Gone` for every method | Tombstone-only handler in [`arm-proxy.ts`](https://github.com/azure-management-and-platforms/kickstart/blob/main/packages/web/api/src/functions/arm-proxy.ts). Replaced by browser-direct ARM via `armFetch` + `/api/azure/token`. No upstream calls; no host allowlist needed. |
 
 ## CSP
 
@@ -169,19 +170,17 @@ origin disappears.
 
 ## Tombstone status of `/api/arm-proxy`
 
-| Stage                     | Status as of Wave 3 cut-over (#320)                              |
+| Stage                     | Status as of #237 PR-2 retirement                                |
 | ------------------------- | ---------------------------------------------------------------- |
 | Browser callers           | **Migrated.** `BrowserAzureARMConnector` and the catalog pickers all route through `armFetch` — no SPA call site targets `/api/arm-proxy` |
 | Server callers            | None historically — pack tools never used the proxy              |
-| Endpoint                  | **Still deployed**, receiving zero traffic, monitored as a one-week rollback safety net |
-| Removal                   | Tracked under **#321** (Wave 3 retirement)                       |
+| Endpoint                  | **Retired.** Registered as a `410 Gone` tombstone in [`arm-proxy.ts`](https://github.com/azure-management-and-platforms/kickstart/blob/main/packages/web/api/src/functions/arm-proxy.ts), matching the `/api/github-proxy` and `/api/github-oauth` pattern. No upstream forwarding; no host allowlist entry. |
 | Re-introduction guidance  | **Forbidden.** Treat `/api/arm-proxy` as deprecated for all new code; new browser ARM call sites must use `armFetch` |
 
-When #321 lands, the route will join the existing **Deprecated (410 Gone)**
-table in [API Endpoints](../extending/api-endpoints.md#deprecated-410-gone)
-and the proxy file will be deleted.
+The retired route returns `410 Gone` with `Cache-Control: no-store` and a JSON
+body pointing callers at `armFetch` + `/api/azure/token`.
 
 ## See also
 
-- [API Endpoints — Azure integration](../extending/api-endpoints.md#azure-integration) — full HTTP surface for `/api/azure/token` and the still-deployed `/api/arm-proxy`.
+- [API Endpoints — Azure integration](../extending/api-endpoints.md#azure-integration) — full HTTP surface for `/api/azure/token` and the retired `/api/arm-proxy` tombstone.
 - [Architecture overview](./overview.md) — how ARM calls fit the broader Five-Primitives request flow.

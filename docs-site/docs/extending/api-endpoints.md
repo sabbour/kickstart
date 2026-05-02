@@ -22,7 +22,7 @@ Kickstart's backend runs on **Azure Functions v4** (Node.js, ESM) deployed insid
 | `GET /api/health` | `health.ts` (~216 lines) | Readiness + dependency probes. |
 | `POST /api/generate` | `generate.ts` (~208 lines) | Direct codegen entry-point. |
 | `GET /api/github/auth/*` | `github-auth.ts` (~206 lines) | GitHub OAuth flow + callback. |
-| `*  /api/arm-proxy/*` | `arm-proxy.ts` | Browser-direct ARM proxy (Option A2). |
+| `*  /api/arm-proxy/*` | `arm-proxy.ts` | **Retired (`410 Gone` tombstone).** Browser-direct ARM (Option A2) — see [ARM call flow](../architecture/arm-call-flow.md). Use `armFetch` + `/api/azure/token`. |
 | `*  /api/github-proxy/*` | `github-proxy.ts` | Browser-direct GitHub proxy. |
 | `GET /api/cost-estimate` | `cost-estimate.ts` | Pricing lookups. |
 
@@ -78,9 +78,9 @@ interface PacksResponse {
 
 ---
 
-## ARM proxy — `/api/arm-proxy/*`
+## ARM proxy — `/api/arm-proxy/*` *(retired — `410 Gone`)*
 
-Browser-direct ARM (Option A2). The browser owns the ARM access token and forwards it through the proxy, which adds correlation headers and rate-limit shaping. See [ARM call flow](../architecture/arm-call-flow.md).
+The legacy ARM proxy is retired. The route stays registered as a minimal `410 Gone` tombstone (mirroring `/api/github-proxy` and `/api/github-oauth`) so any straggling caller gets a clear migration signal. Browser ARM traffic now goes **direct** to `https://management.azure.com` using a token from `GET /api/azure/token` and the `armFetch` wrapper. See [ARM call flow](../architecture/arm-call-flow.md).
 
 ---
 

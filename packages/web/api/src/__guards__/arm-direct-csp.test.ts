@@ -77,10 +77,12 @@ const SCAN_ROOTS = ['packages'];
 const SCAN_EXTS = new Set(['.ts', '.tsx']);
 
 const ALLOWED_FILES = new Set<string>([
-  // The proxy implementation itself (kept live for one week as rollback
-  // safety net before PR-2 deletes it).
+  // The retired /api/arm-proxy route — kept registered as a 410 Gone
+  // tombstone (mirrors github-proxy.ts / github-oauth.ts). The string
+  // 'arm-proxy' still appears here as the route literal.
   'packages/web/api/src/functions/arm-proxy.ts',
-  // The proxy allowlist that registers arm-proxy → management.azure.com.
+  // The proxy allowlist file (no longer registers arm-proxy, but the
+  // historical comment may still mention it).
   'packages/web/api/src/lib/proxy-allowlist.ts',
   // This guard test — references the route as a string for grep.
   'packages/web/api/src/__guards__/arm-direct-csp.test.ts',
