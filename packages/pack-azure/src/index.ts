@@ -11,6 +11,7 @@ import { validateBicepTool } from './tools/validate-bicep.js';
 import { whatIfTool } from './tools/what-if.js';
 import { proposeServicesTool } from './tools/propose-services.js';
 import { quotaLookupTool } from './tools/quota-lookup.js';
+import { assessAksClusterTool } from './tools/assess-aks-cluster.js';
 
 // User actions
 import { deployResourceUserAction } from './user-actions/deploy-resource.js';
@@ -70,6 +71,7 @@ export const azurePack: Pack = {
     whatIfTool,
     proposeServicesTool,
     quotaLookupTool,
+    assessAksClusterTool,
   ],
 
   userActions: [
@@ -103,6 +105,7 @@ export { validateBicepTool } from './tools/validate-bicep.js';
 export { whatIfTool } from './tools/what-if.js';
 export { proposeServicesTool, GPU_SKU_MATRIX, SUPPORTED_MODEL_SIZES } from './tools/propose-services.js';
 export { quotaLookupTool, buildQuotaRequestUrl, findSkuUsage } from './tools/quota-lookup.js';
+export { assessAksClusterTool, assessAutomaticCompatibility } from './tools/assess-aks-cluster.js';
 
 export { deployResourceUserAction } from './user-actions/deploy-resource.js';
 export { deleteResourceUserAction } from './user-actions/delete-resource.js';
