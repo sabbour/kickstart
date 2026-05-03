@@ -159,7 +159,8 @@ export async function orchestrateScaffoldApp(
         surfaceId,
         components: [
           {
-            type: 'core/GenerationProgress',
+            id: 'root',
+            component: 'GenerationProgress',
             title: 'Generating deployment artifacts',
             overallStatus,
             statusMessage,

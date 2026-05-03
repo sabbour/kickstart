@@ -103,7 +103,7 @@ export const confirmTool: ToolContribution = {
         { id: 'cancel-lbl', component: 'Text', text: cancelLabel },
       );
 
-      components.unshift({ id: 'confirm-root', component: 'Column', children: rootChildren });
+      components.unshift({ id: 'root', component: 'Column', children: rootChildren });
 
       const envelope = {
         version: 'v0.9',
