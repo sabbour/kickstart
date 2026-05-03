@@ -162,3 +162,86 @@ Both changesets authored by implementing agents (Bender, Leela). Amy reviews cha
 - No code changes; documentation only; no backward-compatibility concerns
 
 **Decision:** Filed `.squad/decisions/inbox/amy-wave3-223.md` with full context, sim validation, and rationale for Scribe merge.
+## 2026-05-02 16:04 — Issues #222 & #219: Phase 2 Requirement Gathering + Recipe-First Component Framework
+
+**Branch:** `squad/219-222-framework-docs`  
+**PR:** #374 (draft)
+
+**Task 1 (#222): Requirement-Gathering Methodology Expansion**
+
+Added three new sections to `docs-site/docs/architecture/requirement-gathering-methodology.md` consolidating Phase 1 patterns and learnings:
+
+1. **Acknowledge Before Asking (new section)**
+   - Explicit pattern: when users state 2+ constraints upfront, acknowledge what you heard before asking clarifying questions.
+   - Example flow: "I understand you need X, Y, Z. Let me confirm one thing…"
+   - Rationale: Proves active listening, prevents re-asking, reduces friction downstream.
+
+2. **Bulk-Handling Exception to One-Question-Per-Turn (new section)**
+   - Clarifies that Rule 1 does NOT preclude multi-field Questionnaires when inputs are tightly coupled.
+   - When *appropriate*: region + SKU + redundancy (one resource, three coupled decisions); pre-filled defaults (user confirming, not being interviewed); multi-select from bounded set.
+   - When *inappropriate*: unrelated fields bundled for convenience; open-ended fields mixed with structured; user thinking still forming.
+   - Questionnaire guidance: pre-fill all defaults, group by domain, surface constraints.
+
+3. **Target-Zero-Questions as Primary Outcome Metric (new section)**
+   - Reframes the goal: zero questions is optimal (not a corner case) when user provides sufficient context.
+   - Introduced Sim #1 pattern: "Rich context → Confident action → Zero questions."
+   - "Measuring enough context" — four sources: user's words, repo inspection, defaults, conversation history.
+   - Phase 2 telemetry targets: median ≤1 question per agent per phase; zero-question routes >60% = optimal.
+
+**Task 2 (#219): Component-Selection-Framework Reorganized by Intent**
+
+Completely restructured `docs-site/docs/architecture/component-selection-framework.md` from component-first to intent-first (recipe-based). Original 117 lines → 370 lines of recipe-driven guidance.
+
+**New structure:**
+1. Overview (intent-driven, not component-driven)
+2. Sealed Registry (foundational, preserved)
+3. **Recipe Gallery** (entirely new tier system):
+   - **Primary Recipes (6 promoted)**: R1 (plan summary), R2 (multi-card), R5 (diff), R7 (reassurance), R16 (cost), R17 (handover)
+   - **Extended Recipes (17+ table)**: R2.1, R3, R4, R6, R7-table, R8, R9, R9.1, R10, R12, R13, R14, R15, R16-delta, R16b (with intent, composition, when-to-use)
+4. Schema Validation (preserved)
+5. _ErrorComponent Fallback (preserved)
+6. Agent Selection Flow (revised to reference recipes)
+7. Recipe Browser (new reference section)
+8. **Vocabulary Appendix** (new): Moved component-type descriptions here (backward-compatibility layer)
+
+**Per-recipe sections include:**
+- Intent: What problem does this recipe solve?
+- Composition: ASCII tree notation (e.g., `Card[Text(h2) + List + Row[Button × 2]]`)
+- Components Used: List of primitives/rich components
+- When to Fire: Conditions for emitting this recipe
+- Anti-Patterns: What NOT to do
+- Validated By: Test simulation IDs
+
+**Key wins:**
+- Agents navigate by *use case first* (plan summary → R1), then *components*. This matches how architects think.
+- Links to `config/recipes.json` as authoritative source (42+ recipes, including non-promoted experimental patterns).
+- Vocabulary appendix preserves low-level reference material without cluttering primary flow.
+- Composition notation standardized and explained inline.
+
+**Implementation notes:**
+- Extracted recipe data from `config/recipes.json` (jq queries).
+- Composition notation preserved from recipes.json, standardized across sections.
+- Links to custom-catalog.md and extending-a2ui.md preserved.
+- No component schemas changed; only documentation reorganized.
+
+**Validation:**
+- `docs-site npm run build` — passed (static site builds cleanly).
+- No Docusaurus structure changes — sidebar_position, title, frontmatter preserved.
+- Existing cross-references (from other docs to component-selection-framework.md) still resolve (though section anchors may have shifted — noted in release notes).
+
+**Accessibility notes:**
+- Requirement-gathering expansions discoverable via search ("acknowledge", "bulk", "zero question").
+- Component-framework reorganization may affect bookmarked section links — migration path needed if this doc is heavily referenced externally.
+
+**Decision doc:** `.squad/decisions/inbox/amy-phase2-docs.md` (written).
+
+**Learnings:**
+- Recipe-first reorganization required careful structural planning but resulted in a clearer mental model for agents: "What's the right pattern for showing this information?" leads "What components do I use?"
+- Sim #1 pattern (zero-question routes) is worth measuring explicitly in Phase 2 telemetry — it's the true north for the inference-first principle.
+- Acknowledge-before-asking isn't a new tool or component; it's a *discipline* that needs to be surfaced in documentation so agents treat it as a first-class requirement-gathering move.
+
+**Next for Phase 2:**
+- Implement telemetry hooks to measure: % conversations with zero questions per agent, % of receiving agents re-asking what was in handoff (should be ~0%).
+- Review experimental recipes in config/recipes.json for promotion candidates based on validation sim coverage.
+- Add test sims for acknowledge-before-asking pattern validation (candidates: Sim #16–#18).
+- Link bulk-form guidance from agent prompts to prevent cap violations on Questionnaire usage.

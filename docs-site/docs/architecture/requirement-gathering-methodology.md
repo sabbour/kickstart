@@ -120,6 +120,94 @@ This is the same lens the [Tool Usage Framework](./tool-usage-framework.md) appl
 
 ---
 
+## Acknowledge before asking
+
+When a user has stated multiple constraints or requirements upfront, **acknowledge what you heard before asking any clarifying questions**. This pattern signals that you are listening and building on their context, not starting over with a generic interview.
+
+### Pattern
+
+> User: "I need a Node.js API on AKS in the East US region, but we're budget-constrained and can't use premium SKUs."
+
+Agent (instead of asking three questions):
+
+> "I understand you need a Node.js API on AKS in East US with a focus on cost control (no premium SKUs). Let me verify one thing before I route: is this a new cluster or migrating an existing workload?"
+
+This accomplishes several things:
+- **Proves active listening** — the user sees their constraints reflected back.
+- **Reduces question count** — it's not a new question; it's a focused follow-up after acknowledgment.
+- **Minimizes repetition** — downstream agents inherit this context without re-clarifying.
+
+Use acknowledgment **whenever the user opens with 2+ criteria**. The opener pattern is:
+1. State what you understood in one clear sentence (mention their constraints).
+2. Then ask the single highest-value clarifying question (if needed).
+
+**Do not** acknowledge, then list five follow-up questions. Acknowledge, ask *one*, then re-evaluate.
+
+---
+
+## Bulk-handling exception to one-question-per-turn
+
+Rule 1 states "one question per turn". However, **when input is inherently multi-value**, a single multi-field form (Questionnaire) is legitimate and does not violate this rule.
+
+### When bulk forms are appropriate
+
+| Case | Example | Why OK |
+|---|---|---|
+| Coupled fields (user must answer together) | Region + SKU + zone redundancy for a single AKS cluster | The user cannot decide one without the others |
+| Pre-filled defaults (user is confirming or lightly editing) | "`resource names: <app-name>-rg`, `<app-name>-acr` — proceed?"` (Questionnaire with pre-filled names) | The user is reviewing and approving, not being interviewed |
+| Multi-select from a defined list | "Which of these 5 integration services apply? (CheckBox list)" | The domain is bounded; the user can parse all options at once |
+
+### When bulk forms are NOT appropriate
+
+| Case | Problem | Fix |
+|---|---|---|
+| Unrelated fields bundled for convenience | "Name the resource group AND tell me your budget AND pick a SKU" | Ask resource-group name in prose, default budget, pick SKU in prose or UI — three separate flows |
+| Open-ended fields mixed with structured | "Paste your Dockerfile AND configure RBAC AND name the ingress" | Ask Dockerfile intent in prose ("existing or should I scaffold one?"), then proceed with RBAC and ingress separately |
+| User thinking is still forming | "Pick container registry type, Azure region, AND cost model" | Ask the single highest-value question first, let them think, then ask the next one |
+
+### Questionnaire guidance
+
+- **Pre-fill all defaults** — show the user what will be created if they accept. Never ask for a field without suggesting a sensible default.
+- **Group by domain** — if fields are on different topics (networking vs naming vs identity), split them across turns.
+- **Surface constraints** — if picking one field affects available options for another (e.g., "AKS Automatic" disables Standard node pool questions), use conditional visibility or inline clarification.
+
+---
+
+## Target-zero-questions as primary outcome metric
+
+The methodology's **gold standard** is resolving requirements without asking *any* questions when the user has provided sufficient context. This is not a corner case; it's the primary outcome metric.
+
+### Sim #1 pattern: Rich context → Confident action
+
+> User: "Deploy this React app (`https://github.com/me/site`) to Static Web Apps in `eastus2`."
+
+Agent:
+- No questions asked.
+- Route immediately to `azure.architect` with full context.
+
+**Why this matters:** The user gave you enough to act. Asking "just to confirm" is friction without benefit. If they meant something else, they will speak up during architecture review.
+
+### Measuring "enough" context
+
+An agent has enough context to proceed (zero questions) when it can answer all discriminating-value questions from:
+1. **User's words** — explicitly stated track, backend, region, constraints, preferences.
+2. **Repo inspection** — framework, existing Dockerfile, deployment targets, language version, team conventions.
+3. **Defaults** — approved sensible defaults for that phase (e.g., Bicep over ARM, Automatic over Standard, primary region fallback).
+4. **Conversation history** — answers given to a previous agent or earlier in the same phase.
+
+If all four sources together answer the discriminating-value questions (Rule 3 priority table), you have "enough" — proceed confidently.
+
+### Setting the metric
+
+In Phase 2 telemetry (audit hooks):
+- Track per-agent: **median questions per conversation** (target ≤ 1).
+- Flag conversations where triage + architect phase combined asked **more than 2 questions** (target ≤ 2 for most scenarios).
+- Log **zero-question routes** (the Sim #1 pattern) as the primary success marker.
+
+Agents that hit zero questions for >60% of conversations are performing optimally. This is not luck — it's the inference-first principle working.
+
+---
+
 ## Question shape: prose vs A2UI
 
 When you've decided to ask, choose the right vehicle.

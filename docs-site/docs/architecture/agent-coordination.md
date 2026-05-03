@@ -4,14 +4,17 @@ sidebar_position: 7
 
 # Agent Coordination
 
-How agents coordinate via handoff patterns, `asTools` wiring, question budgets, and the coordinator (triage) role.
+How agents coordinate via handoff patterns, `asTools` wiring, question budgets, prior-deployment context, and the coordinator (triage) role.
 
 ## Overview
 
-Kickstart uses a multi-agent architecture where a **coordinator agent** (the triage agent) routes conversations to specialist agents. Coordination happens through two mechanisms:
+Kickstart uses a multi-agent architecture where a **coordinator agent** (the triage agent) routes conversations to specialist agents. Coordination happens through five mechanisms:
 
 1. **Handoffs** — full ownership transfer from one agent to another.
 2. **`asTools` consultation** — bounded, stateless queries to a specialist without transferring ownership.
+3. **Question budgets** — `maxTurns` caps that prevent runaway consultation chains.
+4. **CI enforcement** — typed handoff briefings validated at CI time to keep structured data out of prose.
+5. **`priorDeploymentContext`** — cross-iteration context vehicle that carries prior-deployment metadata into the current session, enabling agents to reference what was deployed before without re-asking the user.
 
 ## The Coordinator Role (Triage)
 
@@ -102,13 +105,17 @@ Each entry generates a tool named `ask_<sanitised_agent_name>` (e.g., `ask_azure
 
 ### Current Wired Pairs
 
-| Caller | Specialist | Tool name | Use case |
-|--------|-----------|-----------|----------|
-| `core.triage` | `aks.architect` | `ask_aks_architect` | AKS design questions during triage |
-| `core.triage` | `azure.architect` | `ask_azure_architect` | Azure infra questions during triage |
-| `aks.architect` | `azure.architect` | `ask_azure_architect` | Cross-domain VNET/DNS/Private Link |
-| `aks.architect` | `core.codesmith` | `ask_core_codesmith` | Generate infra code mid-diagnosis |
-| `core.codesmith` | `core.reviewer` | `ask_core_reviewer` | Immediate review of generated code |
+Extracted verbatim from `config/handoff-rules.json` (authoritative source).
+
+| Caller | Specialist | Tool name | maxTurns | Use case |
+|--------|-----------|-----------|----------|----------|
+| `core.triage` | `aks.architect` | `ask_aks_architect` | 3 | AKS design questions during triage |
+| `core.triage` | `azure.architect` | `ask_azure_architect` | 3 | Azure infra questions during triage |
+| `aks.architect` | `azure.architect` | `ask_azure_architect` | 3 | Cross-domain VNET/DNS/Private Link |
+| `aks.architect` | `core.codesmith` | `ask_core_codesmith` | 5 | Generate infra code mid-diagnosis |
+| `core.codesmith` | `core.reviewer` | `ask_core_reviewer` | 3 | Immediate review of generated code |
+| `azure.architect` | `aks.architect` | `ask_aks_architect` | 3 | Symmetric AKS consultation (node pools, Gateway API, KAITO) |
+| `github.publisher` | `azure.architect` | `ask_azure_architect` | 3 | Cost lookup and deployment-target confirmation before publishing |
 
 ### Behaviour
 
