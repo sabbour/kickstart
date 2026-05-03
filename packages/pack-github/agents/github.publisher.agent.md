@@ -209,9 +209,25 @@ When the user wants to publish to a brand-new repository.
 3. After the repo is created, **initialize the default branch** by pushing scaffold files
    (e.g. `README.md`, `.gitignore`, license) as an initial commit directly to `main`.
    This ensures the base branch exists for subsequent PR creation.
-4. Push the generated artifacts on a feature branch.
-5. Open a PR from the feature branch to `main` using `github:create_pr`.
-6. Set OIDC secrets per the standard protocol.
+4. **Apply branch protection defaults** on `main` using `github.api_get GET /repos/{owner}/{repo}/branches/main/protection` to confirm protections aren't already set, then instruct the user to enable the following via the GitHub UI (Settings → Branches → Branch protection rules) or advise them to use the GitHub API once a write tool is available:
+   - Require pull request reviews before merging (at least 1 reviewer).
+   - Require status checks to pass (e.g. the deploy workflow).
+   - Do not allow force-pushes or deletions.
+5. Push the generated artifacts on a feature branch.
+6. Open a PR from the feature branch to `main` using `github:create_pr`.
+7. Set OIDC secrets per the standard protocol.
+
+### Bulk multi-repo creation
+
+When the user needs to spin up **multiple new repositories at once** (e.g. one per app in a monorepo, or a shared-infra repo plus per-service repos):
+
+1. Determine the full list of repos to create upfront — confirm names and owners with the user before proceeding.
+2. Create repos sequentially to avoid hitting GitHub's secondary rate limits; report progress after each.
+3. Treat any shared-infra repo as the first to create (mirrors the PR-0-first rule in Flow 4).
+4. For each created repo, run the scaffold + branch-protection + PR sequence above independently.
+5. Emit a consolidated `SummaryCard` at the end listing all created repos and their PRs (extend the new-repo surface card pattern with one item per repo).
+
+> **Note:** For bulk *PR* creation into existing repos, see Flow 4.
 
 ### Surface card (new-repo)
 
@@ -342,6 +358,38 @@ When updating a PR with a review pack:
   }
 }
 ```
+
+### Reviewer invitation (post-PR)
+
+After a PR is created — in any flow — **always offer the user the option to request reviewers**:
+
+> "Your PR is open: [{PR URL}]({PR URL})  
+> Would you like me to help you request a review? I can:
+> - Add specific GitHub users as reviewers
+> - Request review from a GitHub team (e.g. `{org}/platform-reviewers`)
+>
+> Just provide the reviewer GitHub usernames or team slug and I'll give you the `gh` command to run."
+
+Surface the PR URL prominently using a `SummaryCard` item with `badge: "success"` and a clickable `link`. This card should always appear **first** in the summary so the URL is immediately visible without scrolling.
+
+```json
+{
+  "id": "pr-url", "component": "SummaryCard",
+  "title": "Pull request ready for review",
+  "items": [
+    { "label": "Pull request", "value": "PR #42 — feat: add Kickstart-generated artifacts", "badge": "success", "link": "https://github.com/org/repo/pull/42" },
+    { "label": "Share this link", "value": "https://github.com/org/repo/pull/42", "badge": null, "link": "https://github.com/org/repo/pull/42" }
+  ],
+  "children": null
+}
+```
+
+> **Tooling note:** `github.api_get` is GET-only and cannot assign reviewers. Provide
+> the user with the equivalent `gh` CLI command:
+> ```
+> gh pr edit 42 --add-reviewer username1,username2
+> gh pr edit 42 --add-reviewer org/team-slug
+> ```
 
 ---
 
