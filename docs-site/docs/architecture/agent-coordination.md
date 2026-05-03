@@ -18,9 +18,38 @@ Kickstart uses a multi-agent architecture where a **coordinator agent** (the tri
 
 ## Multi-Agent Flow Diagrams
 
-### Primary Triage → Deployment Flow
+### AKS Greenfield: Triage → Architect → Codesmith → Reviewer → Publisher
 
-The canonical greenfield path: triage classifies intent and hands off to the architecture/ops chain, with GitHub publishing and code review at the end.
+The canonical AKS greenfield path: triage recognises intent, routes to `aks.architect` for cluster design, then hands off through the codesmith → reviewer → publisher chain to produce reviewed, PR-ready artifacts.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant T as core.triage
+    participant AKS as aks.architect
+    participant CS as core.codesmith
+    participant R as core.reviewer
+    participant GP as github.publisher
+
+    User->>T: "Deploy a Node.js app to AKS"
+    T->>T: core.read_skill("azure/arm-basics")
+    Note over T: Recognises mode=greenfield,<br/>loads skill ids into TypedBriefing
+    T->>AKS: handoff (TypedBriefing: mode=greenfield,<br/>constraintSpec=AKS_AUTOMATIC_V1_1_1)
+    AKS->>AKS: design cluster topology,<br/>select node pools, KAITO if needed
+    AKS->>CS: handoff (plan + Bicep/manifests spec)
+    CS->>CS: read_file(plan), write_file(manifests),<br/>validate_artifacts
+    CS->>R: handoff (generated artifacts)
+    Note over CS,R: Harness enforces deterministic<br/>post-generation reviewer gate
+    R->>R: list_files, read_file, validate_artifacts
+    R-->>CS: APPROVED (or REJECTED: reason)
+    CS->>GP: handoff (approved artifacts)
+    GP->>GP: check_repo_access, update_pr_description
+    GP-->>User: PR created — link + summary
+```
+
+### Azure Infrastructure: Triage → Azure Architect → Ops → Publisher
+
+The Azure infrastructure path for Bicep/ARM deployments — no codesmith step; the architect drives the ops chain directly.
 
 ```mermaid
 sequenceDiagram
@@ -29,35 +58,32 @@ sequenceDiagram
     participant AA as azure.architect
     participant AO as azure.ops
     participant GP as github.publisher
-    participant R as core.reviewer
 
-    User->>T: "Deploy my app to AKS"
+    User->>T: "Deploy my Bicep template to Azure"
     T->>AA: handoff (TypedBriefing: mode=greenfield)
     AA->>AA: propose_services, estimate_cost, validate_bicep
     AA->>AO: handoff (services plan + Bicep)
     AO->>AO: what_if → arm_deploy_resource
     AO->>GP: handoff (deployment manifest)
-    GP->>AA: ask_azure_architect (cost/target confirm)
     GP->>GP: update_pr_description, check_repo_access
-    GP->>R: handoff (generated artifacts)
-    R-->>User: structured review verdict
+    GP-->>User: PR created — link + summary
 ```
 
 ### Assessment Flow (AKS Automatic Readiness)
 
-When the user asks about upgrading an existing cluster, triage routes to `azure.architect` which calls `azure.assess_aks_cluster` to evaluate readiness before proceeding.
+When the user asks about upgrading an existing cluster, triage routes to `aks.reviewer` which calls `core.read_skill("azure-kubernetes-automatic-readiness")` to evaluate readiness before proceeding.
 
 ```mermaid
 sequenceDiagram
     actor User
     participant T as core.triage
-    participant AA as azure.architect
+    participant AR as aks.reviewer
 
     User->>T: "Can I upgrade to AKS Automatic?"
-    T->>AA: handoff (TypedBriefing: mode=migration-readiness)
-    AA->>AA: azure.assess_aks_cluster(subscriptionId, resourceGroup, clusterName)
-    Note over AA: Evaluates node pools, API versions,<br/>quota, and Automatic prerequisites
-    AA-->>User: readiness report + remediation steps
+    T->>AR: handoff (TypedBriefing: mode=migration-readiness)
+    AR->>AR: core.read_skill("azure-kubernetes-automatic-readiness")
+    Note over AR: Evaluates node pools, API versions,<br/>quota, and Automatic prerequisites
+    AR-->>User: readiness report + remediation steps
 ```
 
 ### Iteration Flow (Delta Deploy)

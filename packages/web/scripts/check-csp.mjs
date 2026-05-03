@@ -21,6 +21,9 @@
  * Enforcement model and escalation path: docs/operations/csp-enforcement.md
  *
  * Run locally:  node packages/web/scripts/check-csp.mjs
+ *
+ * Docs: docs-site/docs/operations/csp-enforcement.md
+ *   — canonical enforcement location, escalation path, and owner SLAs.
  */
 
 import { readFileSync } from 'node:fs';

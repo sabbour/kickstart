@@ -27,7 +27,9 @@ All payload schemas use `.strict()` — unknown keys throw at parse-time.
 
 ## How the harness emits A2UI
 
-A2UI envelopes are produced by **tools** (via `core.emit_ui` and component-typed tools) and **components**. The runner queues them on `session.a2uiEmissions` during a tool call and **drains** them after the LLM-side tool_call returns (the post-tool A2UI drain rule documented at the top of `packages/harness/src/runtime/runner.ts`).
+A2UI envelopes are produced by **tools** and **components**. The runner queues them on `session.a2uiEmissions` during a tool call and **drains** them after the LLM-side tool_call returns (the post-tool A2UI drain rule documented at the top of `packages/harness/src/runtime/runner.ts`).
+
+> **Deprecation:** `core.emit_ui` is deprecated (issue #112). Use the focused replacements instead: `core.show_card` (display-only cards), `core.show_form` (data collection), `core.confirm` (yes/no gates), `core.navigate` (surface switching). `core.emit_ui` remains registered for backward compatibility but will be removed in the next major release.
 
 Each drained envelope is sent as a single `a2ui` SSE frame:
 

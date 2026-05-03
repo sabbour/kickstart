@@ -9,7 +9,7 @@ tools:
   - core.write_file
   - core.list_files
   - core.validate_artifacts
-  - core.emit_ui
+  - core.show_card
 handoffs:
   - label: Review artifacts
     agent: core.reviewer

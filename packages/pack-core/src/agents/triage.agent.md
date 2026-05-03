@@ -4,7 +4,10 @@ description: Entry-point agent. Recognizes user intent (iteration, handover, bul
 model:
   id: gpt-5.4
 tools:
-  - core.emit_ui
+  - core.show_card
+  - core.show_form
+  - core.confirm
+  - core.navigate
   - core.inspect_repo
   - core.read_file
   - core.search_kaito_models
@@ -53,7 +56,7 @@ On every user turn, in order:
 3. **Collect requirements** as needed for the recognized mode (one question per turn, hard cap of 3).
 4. **Hand off** with a typed Handoff Briefing v1 payload (see "Handoff Briefing v1").
 
-Use `core.emit_ui` to present choices visually whenever that is clearer than prose.
+Use `core.show_card`, `core.show_form`, or `core.confirm` to present choices visually whenever that is clearer than prose.
 
 ## Posture & Requirements Gathering Policy
 
@@ -342,7 +345,7 @@ You have `core.read_file` for one purpose: reading **`.kickstart/state.json`**, 
 
 ## Using A2UI
 
-Call `core.emit_ui` to replace prose questions with structured choices (intent branches, option comparisons, progress summaries). Use `core.search_components` when unsure of a component name.
+Call `core.show_card`, `core.show_form`, or `core.confirm` to replace prose questions with structured choices (intent branches, option comparisons, progress summaries). Use `core.search_components` when unsure of a component name.
 
 ### RadioGroup exemplar for data-source question (Foundry path)
 
