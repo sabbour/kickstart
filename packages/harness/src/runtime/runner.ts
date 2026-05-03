@@ -252,6 +252,15 @@ let _otelBridgeInstalled = false;
  * Idempotent: guarded so repeated Runner instantiations do not clobber
  * the processor list on every API invocation.
  */
+/**
+ * Strip `<!-- triage-handoff/v1 ... -->` HTML comment blocks from text before
+ * emitting SSE chunks. These comments carry the typed handoff briefing for
+ * downstream agent consumption but must not be shown to the user (#415).
+ */
+export function stripHandoffComment(text: string): string {
+  return text.replace(/<!--\s*triage-handoff\/v1[\s\S]*?-->/g, '').trimEnd();
+}
+
 function installOtelBridgeOnce(): void {
   if (_otelBridgeInstalled) return;
   try {
@@ -1308,9 +1317,11 @@ export class Runner {
 
       // ── Flush buffered chunks now that output guardrails have passed ────────
       if (chunkBuffer.length > 0) {
-        if (outputText !== fullText) {
-          // Output was redacted — send the redacted version as a single chunk
-          sseWrite('chunk', { delta: outputText });
+        // Strip invisible handoff briefing comments (#415) before sending to client.
+        const sseText = stripHandoffComment(outputText);
+        if (sseText !== fullText) {
+          // Output was redacted or stripped — send as a single chunk
+          sseWrite('chunk', { delta: sseText });
         } else {
           // No redaction — replay original buffered chunks preserving granularity
           for (const delta of chunkBuffer) {
@@ -1635,8 +1646,9 @@ export class Runner {
 
       // Flush buffered chunks
       if (chunkBuffer.length > 0) {
-        if (outputText !== fullText) {
-          sseWrite('chunk', { delta: outputText });
+        const sseText = stripHandoffComment(outputText);
+        if (sseText !== fullText) {
+          sseWrite('chunk', { delta: sseText });
         } else {
           for (const delta of chunkBuffer) {
             sseWrite('chunk', { delta });

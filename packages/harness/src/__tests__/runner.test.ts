@@ -10,7 +10,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpenAIProvider } from '@openai/agents';
-import { buildAzureBaseUrl, buildModelProvider, isResponsesApiEnabled, resolveOutputText } from '../../src/runtime/runner.js';
+import { buildAzureBaseUrl, buildModelProvider, isResponsesApiEnabled, resolveOutputText, stripHandoffComment } from '../../src/runtime/runner.js';
 
 describe('buildAzureBaseUrl', () => {
   it('appends /openai/v1 when endpoint has no trailing slash', () => {
@@ -163,5 +163,32 @@ describe('resolveOutputText', () => {
     // Must be clean prose, not the JSON-encoded token stream
     expect(result).toBe('Hello there');
     expect(result).not.toContain('{');
+  });
+});
+
+describe('stripHandoffComment (#415)', () => {
+  it('strips a triage-handoff/v1 HTML comment from message text', () => {
+    const input = 'Routing you to the AKS Architect.\n<!-- triage-handoff/v1\n{"version":"triage-handoff/v1"}\n-->';
+    expect(stripHandoffComment(input)).toBe('Routing you to the AKS Architect.');
+  });
+
+  it('leaves text unchanged when no handoff comment is present', () => {
+    const input = 'Hello, how can I help you today?';
+    expect(stripHandoffComment(input)).toBe(input);
+  });
+
+  it('handles multi-line briefing JSON inside the comment', () => {
+    const input = 'On it.\n<!-- triage-handoff/v1\n{\n  "version": "triage-handoff/v1",\n  "mode": "greenfield"\n}\n-->';
+    expect(stripHandoffComment(input)).toBe('On it.');
+  });
+
+  it('strips comment even with extra whitespace after triage-handoff/v1 marker', () => {
+    const input = 'Summary.\n<!--  triage-handoff/v1  \n{"version":"triage-handoff/v1"}\n-->';
+    expect(stripHandoffComment(input)).toBe('Summary.');
+  });
+
+  it('does NOT strip unrelated HTML comments', () => {
+    const input = 'Text <!-- regular comment --> more text';
+    expect(stripHandoffComment(input)).toBe(input);
   });
 });
