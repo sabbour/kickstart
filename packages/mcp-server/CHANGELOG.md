@@ -1,4 +1,4 @@
-# @kickstart/mcp-server
+# @sabbour/kickstart-mcp
 
 ## 1.0.0
 

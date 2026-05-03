@@ -4,7 +4,7 @@
 '@aks-kickstart/pack-azure': patch
 '@aks-kickstart/pack-aks-automatic': patch
 '@aks-kickstart/pack-github': patch
-'@aks-kickstart/mcp-server': patch
+'@sabbour/kickstart-mcp': patch
 '@aks-kickstart/api': patch
 '@aks-kickstart/web': patch
 ---

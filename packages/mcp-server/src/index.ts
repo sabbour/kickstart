@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * @module @aks-kickstart/mcp-server
+ * @module @sabbour/kickstart-mcp
  *
  * MCP server entry point — v2 thin adapter that wraps the harness Runner.
  *
@@ -41,7 +41,7 @@ import {
   buildInterruptContent,
 } from '@aks-kickstart/harness';
 import type { McpContentItem, RunConfig } from '@aks-kickstart/harness';
-import { createReadSkillTool } from '@aks-kickstart/pack-core';
+import { createReadSkillTool } from '@aks-kickstart/pack-core/tools/read_skill';
 
 import {
   registerInterrupt,

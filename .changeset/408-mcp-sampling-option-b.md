@@ -1,6 +1,6 @@
 ---
 "@aks-kickstart/harness": minor
-"@aks-kickstart/mcp-server": minor
+"@sabbour/kickstart-mcp": minor
 ---
 
 feat(mcp): host-managed sampling Option B — zero BYOK for MCP users
