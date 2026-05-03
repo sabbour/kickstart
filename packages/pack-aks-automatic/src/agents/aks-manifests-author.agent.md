@@ -150,6 +150,60 @@ spec:
     identityId: <managed-identity-client-id>
 ```
 
+### Concrete trigger examples for event-driven workloads
+
+For **azure-servicebus** (`worker` shape — queue depth trigger):
+
+```yaml
+triggers:
+  - type: azure-servicebus
+    metadata:
+      queueName: <queue-name>
+      namespace: <servicebus-namespace>.servicebus.windows.net
+      messageCount: "5"
+    authenticationRef:
+      name: <workload-name>-trigger-auth
+```
+
+For **azure-eventhub** (`event_driven` shape — event backlog trigger):
+
+```yaml
+triggers:
+  - type: azure-eventhub
+    metadata:
+      consumerGroup: <consumer-group>
+      unprocessedEventThreshold: "64"
+      checkpointAccount: <storage-account-name>
+      checkpointContainer: <checkpoint-container-name>
+    authenticationRef:
+      name: <workload-name>-trigger-auth
+```
+
+> **⛔ Security guardrail — connection strings are forbidden:**
+> Never use `storageConnectionFromEnv` or any connection-string field in Event Hub (or Service Bus) KEDA triggers.
+> `storageConnectionFromEnv` exposes a plain-text secret and bypasses Workload Identity.
+> All KEDA Azure triggers — including checkpoint storage for Event Hubs — **must** authenticate exclusively via a `TriggerAuthentication` bound to the workload's UAMI (Workload Identity, `provider: azure-workload`).
+
+Always set `minReplicaCount` and `maxReplicaCount` on every `ScaledObject`. Always reference a `TriggerAuthentication` backed by workload identity — never inline connection strings.
+
+### RBAC requirements for KEDA scalers
+
+When generating KEDA manifests, include a note in the output reminding the operator to verify that the UAMI has the **minimum required Azure RBAC roles** on the target namespace or resource. Do NOT grant Owner or Contributor — use least-privilege data-plane roles only:
+
+| Trigger type | Minimum required role | Scope |
+|---|---|---|
+| `azure-servicebus` | `Azure Service Bus Data Receiver` | Service Bus namespace |
+| `azure-eventhub` | `Azure Event Hubs Data Receiver` + `Storage Blob Data Contributor` (checkpoint storage) | Event Hub namespace + Storage account |
+| `azure-storage-queue` | `Storage Queue Data Message Processor` | Storage account |
+
+Emit this note verbatim in the generated manifest output:
+
+```
+# RBAC check required: ensure the UAMI has ONLY the roles listed above on the target
+# namespace. Do NOT assign Owner, Contributor, or any broader role.
+# Verify: az role assignment list --assignee <uami-client-id> --all
+```
+
 ---
 
 ## Mutator Deny List
@@ -168,6 +222,43 @@ AKS Automatic's mutating webhooks auto-inject the following. **Do NOT include th
 **Rules:**
 1. If a component above is triggered by annotations/labels, emit only those triggers — never the injected containers or volumes.
 2. **CSI Secret Store exception:** Unlike other mutator-injected components, CSI SecretProviderClass volumes and volumeMounts are **app-owned** and MUST be explicitly authored in the pod spec. The CSI driver is cluster-installed but the volume/mount binding is the workload's responsibility.
+
+---
+
+## Mutator-Aware Explicit Generation (D10)
+
+AKS Automatic runs two mutators that silently add resource and scheduling defaults:
+
+- **`mutation-resource-requests-default`** — injects CPU/memory `requests` and `limits` on containers that omit them.
+- **`mutation-anti-affinity-topology-spread`** — injects `topologySpreadConstraints` on pods that omit spread rules.
+
+**Despite these mutators, always emit both fields explicitly.** Explicit configuration is auditable, reviewable, and produces clean git diffs without invisible mutation effects.
+
+**Rules:**
+
+1. **Always emit explicit `resources.requests` and `resources.limits` on every container** — even if `mutation-resource-requests-default` would inject defaults. Explicit resource allocation is auditable and prevents surprise quota exhaustion.
+
+   ```yaml
+   resources:
+     requests:
+       cpu: "100m"
+       memory: "128Mi"
+     limits:
+       cpu: "500m"
+       memory: "512Mi"
+   ```
+
+2. **Always emit `topologySpreadConstraints` or `podAntiAffinity`** — even if `mutation-anti-affinity-topology-spread` would apply defaults. Explicit spread policy documents intent and survives cluster reconfiguration.
+
+   ```yaml
+   topologySpreadConstraints:
+     - maxSkew: 1
+       topologyKey: kubernetes.io/hostname
+       whenUnsatisfiable: DoNotSchedule
+       labelSelector:
+         matchLabels:
+           app: <app-name>
+   ```
 
 ---
 
@@ -212,6 +303,8 @@ Before emitting any manifest set:
 3. Verify no deny-listed sidecar containers are present.
 4. Verify every pod spec has workload identity labels if it accesses Azure.
 5. Verify KEDA references: `ScaledObject.spec.scaleTargetRef.name` must match the Deployment name; `ScaledJob.spec.jobTargetRef` must match the Job template name. These are distinct resources — do not conflate them.
+6. Verify every container has explicit `resources.requests` and `resources.limits` (D10).
+7. Verify every Deployment with `replicas > 1` has `topologySpreadConstraints` or `podAntiAffinity` (D10).
 
 ## Tone
 
