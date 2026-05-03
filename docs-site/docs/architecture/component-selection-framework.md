@@ -136,6 +136,61 @@ The recipes below are validated patterns for specific scenarios. Use them when y
 | R15 | Capacity check card | Show remaining capacity vs plan needs | Cluster capacity validation |
 | R16-delta | Cost comparison (was/now/Δ) | Before/after cost with delta column | Cost optimization scenarios |
 | R16b | Cost trim + compliance column | Cost breakdown with compliance-critical resources | Compliance + cost trade-off |
+| R18 | Cross-artifact dependency check | Before approving a patch, identify dependent artifacts and surface breaking risks | Manifest patch affects Dockerfile user/cmd; Bicep patch affects dependent modules; HTTPRoute patch affects Gateway listeners |
+| R19 | Honest substitution card | Surface the reasoning when system swaps a default due to constraint (quota, cost, compliance) | User encounters quota limit; cost push-back with named trigger; compliance forces tier choice |
+| R20 | Cold-start breakdown (4-phase timing) | Breakdown where cold-start time goes for KEDA scale-to-zero on stateful workloads | Inference workload + scale-to-zero on the table; KEDA scale-to-zero for stateful workload with model weights or large image |
+| R-helm-bridge | Render-before-validate gating | Halt before compatibility check when source is Helm/Kustomize/jsonnet; ask user for render path | Repo contains Chart.yaml + templates/; kustomization.yaml; Go-templated manifests |
+
+#### **R18: Cross-Artifact Dependency Check**
+
+**Intent:** Before approving a patch to one artifact, identify if other artifacts in the design depend on its contract. Surface the cross-artifact concern and offer combined or staged fixes.
+
+- **Composition:** Extends R14 (diff + approval) — flag "B might break" in approval prose, offer "A-fix-only" OR "A+B-fix bundles"
+- **Components Used:** Card, Text, List, Row, Button (extends existing diff layout)
+- **When to fire:** 
+  - Patch on manifest references Dockerfile (USER, EXPOSE, CMD)
+  - Patch on Bicep references resource that another module uses
+  - Patch on HTTPRoute references hostname that Gateway listener uses
+- **Anti-patterns:** Don't approve patches in isolation — sim-02 showed `runAsUser:1000 + Dockerfile USER root` would cause CrashLoop
+- **Validated by:** sim-02
+
+#### **R19: Honest Substitution Card**
+
+**Intent:** When the system must swap a default driven by constraint (quota exhaustion, cost, compliance, capability gap), surface the swap reasoning transparently rather than silently substituting.
+
+- **Composition:** `Card[Text(h3, 'Recommended <substitute>')+Text(p, constraint rationale)+List(benefits/tradeoffs)+Text(small, reversal guidance)]`
+- **Components Used:** Card, Text, List
+- **When to fire:**
+  - Quota=0 for default SKU (sim-03)
+  - User push-back on cost with named trigger (sim-05)
+  - Compliance forces a tier choice (sim-10)
+- **Anti-patterns:** Don't silently substitute; don't blame the user for the constraint; don't omit the reversal path
+- **Validated by:** sim-03, sim-05, sim-10
+
+#### **R20: Cold-Start Breakdown (4-Phase Timing Table)**
+
+**Intent:** Breakdown where cold-start time goes for KEDA scale-to-zero workloads, helping users understand latency trade-offs for stateful/inference workloads.
+
+- **Composition:** `Card[Text(h3)+OrderedList(4 phases: image pull, container init, model load, first inference)+Text(total + recommendation)]`
+- **Components Used:** Card, Text, List
+- **When to fire:**
+  - Inference workload + scale-to-zero is on the table
+  - Any KEDA scale-to-zero recommendation for stateful workload (model weights, large image)
+- **Anti-patterns:** Don't promise scale-to-zero without surfacing cold-start (D1 violation — "I can scale to zero instantly")
+- **Validated by:** sim-03
+
+#### **R-helm-bridge: Render-Before-Validate Gating**
+
+**Intent:** Halt the flow before compatibility scoring (R12) when source is Helm, Kustomize, or jsonnet. Ask the user for the rendered manifest path to unlock downstream analysis.
+
+- **Composition:** `Card[Text(h3, 'Your repo has a Helm chart')+Text(p, why-render explanation)+RadioGroup[paste-rendered|render-here-from-values]+Text(small, source citation)]`
+- **Components Used:** Card, Text, RadioGroup
+- **When to fire:**
+  - `inspect_repo` finds Chart.yaml + templates/
+  - Kustomization.yaml present
+  - Go-templated manifests detected
+- **Anti-patterns:** Don't pattern-match Go templates as YAML; don't render with hallucinated values; don't punt with "helm template first" without a concrete command
+- **Validated by:** sim-07
 
 ---
 
