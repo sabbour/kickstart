@@ -13,6 +13,7 @@ import {
   type SchemaNode,
 } from '@aks-kickstart/harness/runtime/schema-conformance';
 import { apiGetTool } from './api-get.js';
+import { updatePrDescriptionTool } from './update-pr-description.js';
 
 function getParams(t: { tool: unknown }): SchemaNode {
   return (t.tool as FunctionTool).parameters as SchemaNode;
@@ -21,5 +22,9 @@ function getParams(t: { tool: unknown }): SchemaNode {
 describe('pack-github tool input schemas — OpenAI strict-mode conformance (#127)', () => {
   it('github.api_get — no strict-mode violations', () => {
     assertStrictlyConformant(getParams(apiGetTool), 'github.api_get');
+  });
+
+  it('github.update_pr_description — no strict-mode violations', () => {
+    assertStrictlyConformant(getParams(updatePrDescriptionTool), 'github.update_pr_description');
   });
 });

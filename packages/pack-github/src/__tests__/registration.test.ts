@@ -19,6 +19,11 @@ describe('githubPack registration', () => {
     expect(toolNames).toContain('github.api_get');
   });
 
+  it('registers the github.update_pr_description tool', () => {
+    const toolNames = githubPack.tools?.map((t) => t.name) ?? [];
+    expect(toolNames).toContain('github.update_pr_description');
+  });
+
   it('registers 6 user actions', () => {
     expect(githubPack.userActions).toHaveLength(6);
   });
