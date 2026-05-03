@@ -85,11 +85,37 @@ Each workload shape produces a canonical set of resources. When the pack's shape
 - ConfigMap (optional, for job parameters)
 
 ### `gpu_inference`
-- Deployment (single container with GPU resource requests)
-- Service (ClusterIP or internal LoadBalancer)
-- ServiceAccount (workload identity annotated)
-- ScaledObject (Prometheus trigger on request queue depth, or HTTP trigger)
-- PriorityClass (high-priority for GPU scheduling)
+
+> **AKS Automatic uses KAITO for GPU inference workloads.** Do NOT emit a vanilla `Deployment` with GPU resource requests — KAITO manages GPU scheduling, node provisioning, and model lifecycle through its `Workspace` CRD. Emit a `Workspace` instead.
+
+- Workspace (KAITO `kaito.sh/v1alpha1` CRD — replaces Deployment; KAITO provisions the node and runs the model)
+- ServiceAccount (workload identity annotated — for application code calling the inference endpoint)
+
+**Canonical `gpu_inference` Workspace:**
+
+```yaml
+apiVersion: kaito.sh/v1alpha1
+kind: Workspace
+metadata:
+  name: workspace-<model-slug>  # e.g., workspace-falcon-7b
+  namespace: <namespace>
+  annotations:
+    kaito.sh/revision: "1"
+resource:
+  instanceType: Standard_NC12s_v3  # GPU SKU — confirm with user; KAITO provisions this node
+  labelSelector:
+    matchLabels:
+      apps: <workload-name>
+inference:
+  preset:
+    name: <model-name>  # KAITO model preset, e.g., falcon-7b, llama-2-7b, mistral-7b
+```
+
+> **D6/D12 compliance:** `instanceType` must be a GPU SKU supported by AKS Automatic node auto-provisioning. `name` under `inference.preset` must be a KAITO-supported model preset — do not invent model names.
+> Do not emit `resources.requests.nvidia.com/gpu` — KAITO's admission webhook handles GPU scheduling.
+> Do not emit a `ScaledObject` for the Workspace — KAITO manages inference pod lifecycle internally.
+
+- Service (ClusterIP, port 80 → KAITO inference service endpoint)
 
 ---
 
@@ -130,7 +156,7 @@ HTTP-serving shapes (`static_site`, `web_app`, `web_postgres`) use **standard Ku
 | `worker` | KEDA `azure-servicebus` | `queueName`, `namespace`, `messageCount: "5"` |
 | `event_driven` | KEDA `azure-eventhub` | `consumerGroup`, `unprocessedEventThreshold: "64"` |
 | `cron_job` | None (CronJob schedule) | standard `schedule` field in CronJob spec |
-| `gpu_inference` | KEDA `prometheus` | `serverAddress` (must be in-cluster endpoint), `query`, `threshold` |
+| `gpu_inference` | None (KAITO Workspace) | KAITO manages inference pod lifecycle — no ScaledObject |
 
 > **SSRF advisory:** The `serverAddress` in the prometheus trigger MUST reference an in-cluster Prometheus endpoint (e.g., `http://prometheus-server.monitoring.svc.cluster.local`). Never expose or proxy external addresses through this field.
 
