@@ -231,7 +231,7 @@ test.describe('Phase B architect summary card', () => {
     // the architect-plan surface to avoid collisions with chat narration)
     const planSurface = page.locator('[data-surface-id="shared:architect-plan"]');
     const planCard = planSurface.getByTestId('a2ui-SummaryCard');
-    await expect(planCard.getByText('Azure Files (Premium)')).toBeVisible();
+    await expect(planCard.getByTestId('a2ui-SummaryCard-items').getByText('Azure Files (Premium)')).toBeVisible();
     await expect(planSurface.getByTestId('a2ui-ArchitectureDiagram')).toBeVisible();
 
     // Click revise
@@ -242,7 +242,7 @@ test.describe('Phase B architect summary card', () => {
     await waitForStreamingIdle(page);
 
     // After revision — plan updates in-place with Blob
-    await expect(planCard.getByText('Azure Blob Storage')).toBeVisible({ timeout: 10_000 });
+    await expect(planCard.getByTestId('a2ui-SummaryCard-items').getByText('Azure Blob Storage')).toBeVisible({ timeout: 10_000 });
 
     // Still only one plan surface
     const surfaces = page.locator('.a2ui-surface-wrapper[data-surface-id="shared:architect-plan"]');

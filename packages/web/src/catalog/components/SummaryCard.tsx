@@ -109,7 +109,7 @@ export const SummaryCard = createReactComponent(SummaryCardApi, ({ props, buildC
       {props.title && (
         <Caption1 className={classes.title}>{props.title}</Caption1>
       )}
-      <div className={classes.grid}>
+      <div className={classes.grid} data-testid="a2ui-SummaryCard-items">
         {items.map((item, idx) => (
           <React.Fragment key={idx}>
             <Body1 className={classes.label}>{item.label}</Body1>
