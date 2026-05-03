@@ -107,7 +107,7 @@ export const ProgressSteps = createReactComponent(ProgressStepsApi, ({ props }) 
             {step.status === 'active' && '●'}
             {step.status === 'pending' && (i + 1)}
           </div>
-          <Caption1>{step.label}</Caption1>
+          <Caption1>{String(step.label)}</Caption1>
         </li>
       ))}
     </ol>

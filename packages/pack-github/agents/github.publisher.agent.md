@@ -23,7 +23,10 @@ asTools:
   - agent: azure.architect
     description: Consult azure.architect for cost lookup or resource design questions before publishing, and to help determine or confirm deployment-target details. The caller should pass any known subscription/resource-group identifiers in the query. azure.architect cannot independently select subscriptions.
     maxTurns: 3
-handoffs: []
+handoffs:
+  - label: Send to reviewer
+    agent: core.reviewer
+    prompt: Publishing complete. Routing to reviewer for final sign-off.
 user-invocable: false
 model-invocable: true
 ---

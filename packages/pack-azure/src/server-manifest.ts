@@ -70,6 +70,7 @@ export const azurePackServer: Pack = {
   name: 'azure',
   version: '0.1.0',
   dependsOn: ['core'],
+  handoffTargets: ['github'],
 
   agentsDir: resolveAssetURL(import.meta.url, './agents/', './pack-assets/azure/agents/'),
   skillsDir: resolveAssetURL(import.meta.url, './skills/', './pack-assets/azure/skills/'),

@@ -13,6 +13,9 @@ handoffs:
   - label: Back to architect
     agent: azure.architect
     prompt: Deployment complete. Returning to architect for post-deployment review.
+  - label: Publish to GitHub
+    agent: github.publisher
+    prompt: Deployment succeeded. Hand off to GitHub Publisher to commit manifests and open a PR.
 user-invocable: true
 model-invocable: true
 ---

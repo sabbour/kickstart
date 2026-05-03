@@ -83,7 +83,7 @@ export const JobToBeDoneTable = createReactComponent(JobToBeDoneTableApi, ({ pro
   return (
     <Card className={classes.card} data-testid="a2ui-JobToBeDoneTable">
       {props.title && (
-        <Body1Strong className={classes.title}>{props.title}</Body1Strong>
+        <Body1Strong className={classes.title}>{String(props.title)}</Body1Strong>
       )}
       <Table aria-label="Job to be done">
         <TableHeader>
@@ -95,8 +95,8 @@ export const JobToBeDoneTable = createReactComponent(JobToBeDoneTableApi, ({ pro
         <TableBody>
           {rows.map((row, idx) => (
             <TableRow key={idx}>
-              <TableCell><Body1>{row.you_want}</Body1></TableCell>
-              <TableCell><Body1>{row.how_aks}</Body1></TableCell>
+              <TableCell><Body1>{String(row.you_want)}</Body1></TableCell>
+              <TableCell><Body1>{String(row.how_aks)}</Body1></TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -104,13 +104,13 @@ export const JobToBeDoneTable = createReactComponent(JobToBeDoneTableApi, ({ pro
       {(props.reshapeLabel || props.stayLabel || props.exitLabel) && (
         <div className={classes.actions}>
           {props.reshapeLabel && (
-            <Button appearance="primary" size="small">{props.reshapeLabel}</Button>
+            <Button appearance="primary" size="small">{String(props.reshapeLabel)}</Button>
           )}
           {props.stayLabel && (
-            <Button appearance="secondary" size="small">{props.stayLabel}</Button>
+            <Button appearance="secondary" size="small">{String(props.stayLabel)}</Button>
           )}
           {props.exitLabel && (
-            <Button appearance="subtle" size="small">{props.exitLabel}</Button>
+            <Button appearance="subtle" size="small">{String(props.exitLabel)}</Button>
           )}
         </div>
       )}
