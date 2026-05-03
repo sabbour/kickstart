@@ -90,10 +90,15 @@ These are functions the LLM autonomously decides to call during a conversation t
 | `aks.validate_manifests` | aks-automatic | Lint Kubernetes manifests against safeguards | |
 | `aks.validate_safeguards` | aks-automatic | Run AKS safeguard policy checks on a cluster spec | |
 | `aks.build_architecture_diagram` | aks-automatic | Generate an AKS architecture visualization | |
+| `core.priorDeploymentContext` | core | Read prior deployment context from `.kickstart/state.json` for the iteration path | |
 | `github.api_get` | github | Make a read-only GitHub API call | |
 | `github.check_repo_access` | github | Verify the user's access to a GitHub repository | |
 
-> **Not exposed:** Several tool files exist in the source tree but are not registered in any server manifest and are therefore never available to agents at runtime: `core.read_skill`, `core.scaffold_app`, `core.gen_foundry_wiring`, `core.gen_kaito_crd`, `core.gen_helm`, `core.gen_dockerfile`, `azure.propose_services`, `azure.quota_lookup`.
+> **Runner-injected (not in pack manifests):** `core.read_skill` is registered by the harness `Runner` when `readSkillToolFactory` is provided in `RunnerOptions` (all production runners include it; some test stubs omit it). It never appears in pack server manifests or agent `toolAllowlists`. See `packages/harness/src/runtime/runner.ts:150`.
+
+> **Implemented but not exposed:** Several tool files exist in the source tree but are not registered in any server manifest and are therefore never available to agents at runtime: `core.scaffold_app`, `core.gen_foundry_wiring`, `core.gen_kaito_crd`, `core.gen_helm`, `core.gen_dockerfile`, `azure.propose_services`, `azure.quota_lookup`.
+
+> **Phase 3 (planned):** `core.assess_aks_cluster` (Issue #214), `core.notify` (Issue #232, Slack/Teams — **must be implemented as a `UserActionContribution` with explicit confirmation gate; an autonomous LLM-callable tool would be a data-exfiltration vector**) — not yet implemented. Note: `core.priorDeploymentContext` is already implemented (reads `.kickstart/state.json`); Issue #218 tracks the advanced cross-session persistence layer.
 
 The LLM receives tool definitions in OpenAI function-calling format and emits structured `tool_call` messages when it determines a tool is needed.
 
@@ -182,6 +187,26 @@ The parent agent calls `consult_security` like any other tool — the harness ru
 - The specialist agent runs in an isolated context with its own tool access.
 - `maxTurns` defaults to 5 (exported as `AS_TOOL_MAX_TURNS_DEFAULT`).
 - The specialist cannot access the parent's conversation history.
+
+## Inference-First Principle
+
+Tools have real costs — latency, token consumption, and API quota. Agents must exhaust passive sources before calling any tool:
+
+1. **Conversation history first** — check whether the answer is already present in the thread before issuing a tool call.
+2. **`core.read_skill` before anything else** — skills encode curated, pre-validated guidance for common scenarios. Reading a skill is free and synchronous; calling `azure.arm_get` or `aks.validate_manifests` is not.
+3. **Handoff context and briefing** — when a triage handoff is present in the agent's context, consume it fully before reaching for a tool.
+4. **Only then: tools** — if passive sources are insufficient, call the narrowest tool that answers the question. Prefer read-only tools (`azure.arm_get`, `github.api_get`) over write or mutating tools.
+
+```
+[User turn]
+  ↓ Check conversation history           ← free
+  ↓ core.read_skill({ id: "..." })       ← free, always try first
+  ↓ Handoff context and briefing         ← free
+  ↓ Minimal tool call if still needed    ← has cost
+  ↓ [Response]
+```
+
+This principle applies to all agents — skills surface curated, pre-validated guidance that agents should consult before reaching for live API calls.
 
 ## Tool Selection at Runtime
 
