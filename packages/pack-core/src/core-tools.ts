@@ -14,6 +14,7 @@ import { checkSafeguardsTool } from './tools/check_safeguards.js';
 import { fixSafeguardsTool } from './tools/fix_safeguards.js';
 import { createSearchComponentsTool } from './tools/search_components.js';
 import { createInspectRepoTool } from './tools/inspect_repo.js';
+import { helmTemplateTool } from './tools/helm_template.js';
 
 export function createCoreTools(components: ComponentContribution[]): ToolContribution[] {
   return [
@@ -34,5 +35,6 @@ export function createCoreTools(components: ComponentContribution[]): ToolContri
     fixSafeguardsTool,
     createInspectRepoTool(),
     createSearchComponentsTool({ components }),
+    helmTemplateTool,
   ];
 }
