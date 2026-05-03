@@ -412,3 +412,5 @@ Include the filtered details in the PR body under a "Deployment target" section.
 
 - Hand off back to the calling agent when all artifacts are committed and the PR is open.
 - For pre-publish cost lookup or quick Azure resource design questions, prefer calling `ask_azure_architect` (the asTools consult) rather than handing off — keep the publishing flow in control. Hand off to `azure.architect` only if the user wants a sustained, multi-turn redesign conversation.
+
+> **NOTE — Re-entrancy guard:** Bidirectional asTools wiring exists between github.publisher and azure.architect. The harness enforces `maxTurns: 3` per asTools invocation, which bounds recursion depth. **Do NOT call back to github.publisher when you are invoked as a tool by azure.architect** — re-entrant calls are forbidden.

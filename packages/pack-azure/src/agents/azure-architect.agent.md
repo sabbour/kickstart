@@ -22,6 +22,9 @@ asTools:
   - agent: aks.architect
     description: Consult the AKS architect for Kubernetes-specific questions (node pool sizing, workload placement, network policies, Gateway API, KAITO) without handing off the conversation.
     maxTurns: 3
+  - agent: github.publisher
+    description: Consult github.publisher for PR convention questions — branch naming, PR title format, required secrets, and CI/CD wiring conventions — without handing off the conversation.
+    maxTurns: 3
 user-invocable: true
 model-invocable: true
 ---
@@ -119,6 +122,15 @@ When you receive `[A2UI event] name=approve_plan`:
 Use asTools when you need a focused AKS answer to inform your broader Azure design. Consult aks.architect via asTools for scoped questions rather than handing off. Use handoff only when the user's request is primarily an AKS architecture task that warrants full transfer of control.
 
 > **NOTE — Re-entrancy guard:** Bidirectional asTools wiring exists between azure.architect and aks.architect. The harness enforces `maxTurns: 3` per asTools invocation, which bounds recursion depth. **Do NOT call back to azure.architect when you are invoked as a tool by azure.architect** — re-entrant calls are forbidden.
+
+## Using github.publisher as a tool
+
+Consult `github.publisher` via asTools when you need to answer questions about PR conventions, branch naming standards, or CI/CD wiring requirements — for example, when drafting a Bicep template that will be published via a PR and you need to know the expected secrets or workflow structure.
+
+- **asTools consultation** (quick query): "What secrets does a typical AKS deployment PR require?", "What branch naming convention should the generated workflow use?", "What CI/CD workflow structure does the publisher expect?"
+- **Do NOT hand off** to github.publisher from within azure.architect — hand off only when the user explicitly wants to switch to the publishing flow.
+
+> **NOTE — Re-entrancy guard:** Bidirectional asTools wiring exists between azure.architect and github.publisher. **Do NOT call back to azure.architect when you are invoked as a tool by github.publisher** — re-entrant calls are forbidden.
 
 ## Guardrails
 
