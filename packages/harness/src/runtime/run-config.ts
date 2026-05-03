@@ -17,6 +17,7 @@
  */
 
 import type { HandoffInputData, RunItem } from '@openai/agents';
+import type { ModelProvider } from '@openai/agents';
 
 // ---------------------------------------------------------------------------
 // HandoffContext — carried into each HandoffCallback invocation (#108)
@@ -172,6 +173,20 @@ export type RunConfig = {
 
   /** Maximum number of agent-loop iterations (circuit-breaker). */
   maxTurns?: number;
+
+  /**
+   * Scoped model-provider override.
+   *
+   * When set, the runner creates a short-lived `SDKRunner` with this provider
+   * instead of the module-level singleton.  The singleton is NOT mutated —
+   * all standard SWA/direct-call paths are unaffected.
+   *
+   * Intended use: MCP host-managed sampling (Option B), where a
+   * `McpSamplingProvider` delegates inference to the MCP client via
+   * `sampling/createMessage` instead of calling Azure OpenAI directly.
+   * Set this only when the MCP client has declared `sampling` capability.
+   */
+  samplingProvider?: ModelProvider;
 };
 
 // ---------------------------------------------------------------------------

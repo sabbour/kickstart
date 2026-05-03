@@ -1059,7 +1059,16 @@ export class Runner {
     const getSkillsExecuted = (): string[] => Array.from(session.skillsPulled ?? []);
 
     try {
-      const sdkRunner = getSdkRunner();
+      // #408 MCP sampling Option B: when the caller provides a scoped
+      // samplingProvider, create a local SDKRunner with that provider instead
+      // of the module-level singleton.  The singleton is never mutated so
+      // SWA / direct-call paths are completely unaffected.
+      const sdkRunner = runConfig?.samplingProvider
+        ? (() => {
+            installOtelBridgeOnce();
+            return new SDKRunner({ modelProvider: runConfig.samplingProvider });
+          })()
+        : getSdkRunner();
 
       // #102: Guard against open circuit breaker before attempting the SDK call.
       if (runnerCircuitBreaker.isOpen) {
@@ -1456,6 +1465,8 @@ export class Runner {
     session: Session,
     actionResult: unknown,
     sseWrite: SSEWriter,
+    signal?: AbortSignal,
+    runConfig?: RunConfig,
   ): Promise<void> {
     const pending = session.pendingUserAction;
     if (!pending) {
@@ -1475,7 +1486,7 @@ export class Runner {
       `[UserAction ${pending.name} result]: ${resultSummary}`;
 
     // Continue the conversation with the result
-    await this.run(session, continuationMessage, sseWrite);
+    await this.run(session, continuationMessage, sseWrite, signal, runConfig);
   }
 
   // ---------------------------------------------------------------------------
