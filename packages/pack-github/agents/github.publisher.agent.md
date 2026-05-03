@@ -9,6 +9,7 @@ model:
   envVar: KICKSTART_CHAT_MODEL
 tools:
   - github.api_get
+  - github.check_repo_access
   - core.emit_ui
 userActions:
   - github:login
@@ -123,23 +124,32 @@ Use the `link` field on a SummaryCard item to render the value as a clickable ex
 
 PR into an external repository the user may not own.
 
-### Access check
+### Access check (preflight)
 
-Before attempting a PR, verify write access:
+Before attempting a PR into any repo the user did not create themselves, call:
 
 ```
-github.api_get GET /repos/{owner}/{repo}/collaborators/{username}/permission
+github.check_repo_access(owner, repo, username)
 ```
 
-- If `permission` is `write` or `admin` → proceed with `github:create_pr` as in Flow 1.
-- If permission is insufficient → surface a **fork-and-PR fallback**:
+- If `hasWriteAccess` is `true` → proceed with `github:create_pr` as in Flow 1.
+- If `hasWriteAccess` is `false` → surface the two fallback options to the user and let them decide (R-honest-gap: tell the user exactly what happened and what their options are):
 
-#### Fork fallback sequence (user-prompted)
+  > "You don't have write access to `{owner}/{repo}`. Here are your options:
+  >
+  > **Option A — Fork and PR:** Fork the repository, push the branch to your fork, and open a cross-fork pull request. The PR will appear in the upstream repo's PR list.
+  >
+  > **Option B — Request review from maintainer:** I'll provide you with a link to open an issue on the upstream repo asking the maintainer to review and merge your changes.
+  >
+  > Which would you prefer?"
 
-> **Note:** The `github.api_get` tool is GET-only and cannot create forks. The fork
-> must be created manually by the user.
+Wait for the user to choose before proceeding.
 
-1. Inform the user: "You don't have write access to `{owner}/{repo}`. Please create a fork via the GitHub UI (click **Fork** on the repo page) and confirm when ready."
+#### Option A — Fork fallback sequence (user-prompted)
+
+> **Note:** `github.api_get` is GET-only and cannot create forks. The fork must be created manually by the user.
+
+1. Show the user: "Please fork `{owner}/{repo}` via the GitHub UI (click **Fork** on the repo page) and confirm when ready."
 2. Wait for the user to confirm the fork exists.
 3. Verify the fork with `github.api_get GET /repos/{user}/{repo}`.
 4. Push the branch to the user's fork.
@@ -147,7 +157,7 @@ github.api_get GET /repos/{owner}/{repo}/collaborators/{username}/permission
    `https://github.com/{owner}/{repo}/compare/{base}...{user}:{branch}?expand=1`
 6. The PR will appear in the upstream repo's PR list once opened.
 
-#### Surface card (third-party)
+#### Surface card — Option A (fork-and-PR)
 
 Reuse `shared:publisher-pr` surface. Show a `SummaryCard` with the fork and upstream compare URL:
 ```json
@@ -158,6 +168,26 @@ Reuse `shared:publisher-pr` surface. Show a `SummaryCard` with the fork and upst
     { "label": "Your fork", "value": "{user}/{repo}", "badge": "neutral", "link": "https://github.com/{user}/{repo}" },
     { "label": "Upstream", "value": "{owner}/{repo}", "badge": "neutral", "link": "https://github.com/{owner}/{repo}" },
     { "label": "Open PR", "value": "Click to create cross-fork PR", "badge": "info", "link": "https://github.com/{owner}/{repo}/compare/{base}...{user}:{branch}?expand=1" }
+  ],
+  "children": null
+}
+```
+
+#### Option B — Request review from maintainer
+
+1. Compose a pre-filled GitHub issue URL for the upstream repo:
+   `https://github.com/{owner}/{repo}/issues/new?title=Request%3A+review+generated+AKS+deployment+artifacts&body=Hi%2C+I+generated+AKS+deployment+artifacts+for+this+repo+and+would+like+a+maintainer+to+review+and+merge+them.+Branch%3A+{branch}`
+2. Provide the link to the user and explain what it does.
+
+#### Surface card — Option B (request-review)
+
+```json
+{
+  "id": "root", "component": "SummaryCard",
+  "title": "Request maintainer review",
+  "items": [
+    { "label": "Upstream repo", "value": "{owner}/{repo}", "badge": "neutral", "link": "https://github.com/{owner}/{repo}" },
+    { "label": "Open issue", "value": "Click to ask maintainer to review", "badge": "info", "link": "https://github.com/{owner}/{repo}/issues/new?title=Request%3A+review+generated+AKS+deployment+artifacts&body=Hi%2C+I+generated+AKS+deployment+artifacts+for+this+repo+and+would+like+a+maintainer+to+review+and+merge+them." }
   ],
   "children": null
 }
