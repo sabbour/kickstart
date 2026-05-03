@@ -2,4 +2,4 @@
 "@aks-kickstart/pack-core": patch
 ---
 
-The reviewer agent now cross-references generated artifacts against the Microsoft skills catalog (`config/microsoft-skills.json`), documents the codesmith→reviewer 3-turn wiring contract, and clarifies the review context it produces for downstream publishing flows. The scope boundary with `aks.reviewer` as the manifest/safeguards reviewer is explicitly documented.
+The reviewer agent scope boundary is explicit: terminal review (post-codesmith generation), distinct from `aks.reviewer` (readiness). Documents D8 Microsoft skill cross-reference, codesmith→reviewer two-path wiring (optional asTools consult + deterministic harness gate), and R9 review-pack composition for `github.publisher` downstream.

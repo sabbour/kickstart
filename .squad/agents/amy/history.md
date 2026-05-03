@@ -134,3 +134,31 @@ Both changesets authored by implementing agents (Bender, Leela). Amy reviews cha
 - Validation: `docs-site npm run build` re-ran cleanly (`[SUCCESS] Generated static files in "build"`). No file changes shipped, no commit, no push — this was purely a review-thread rebuttal.
 
 **Gate state:** docs-authority bypass label remains applied; review re-requested from `codereview` (Nibbler) to confirm against the actual source tree.
+
+## 2026-05-02 23:04 — Issue #223: Document New Candidate Recipes (R18-R20+)
+
+**Trigger:** Task routing assignment to Amy as Documentation specialist. Four sim-validated recipes (R18, R19, R20, R-helm-bridge) existed in `config/recipes.json` with metadata and validation but lacked **prose documentation** in component-selection-framework.md.
+
+**Work:**
+1. Reviewed current state: `docs-site/docs/architecture/component-selection-framework.md` (117 lines, old organization) vs. b54b7161 commit (278 lines, recipe-first reorganization from PR #374). Pulled the newer version into worktree.
+2. Updated Extended Recipes table (lines 138–142) with four new rows:
+   - **R18:** cross-artifact dependency check — surface breaking risks when patches affect dependent artifacts
+   - **R19:** honest substitution card — surface reasoning when constraints force default swaps
+   - **R20:** cold-start breakdown (4-phase timing) — explain latency trade-offs for KEDA scale-to-zero
+   - **R-helm-bridge:** render-before-validate gating — gate before compatibility check for Helm/Kustomize/jsonnet
+3. Added detailed recipe sections (lines 144–220) with Intent, Composition, When to Fire, Anti-Patterns, Validated By for each recipe, mirroring the Primary Recipes format above the table.
+4. Verified all four recipes already in `config/recipes.json` with correct provenance and sim validation:
+   - R18: sim-02 (manifest + Dockerfile cross-artifact risk)
+   - R19: sim-03, sim-05, sim-10 (honest substitution patterns)
+   - R20: sim-03 (cold-start breakdown for scale-to-zero)
+   - R-helm-bridge: sim-07 (Helm chart rendering gating)
+5. Committed: `5093f379` — 230 insertions to framework doc
+6. Pushed branch; PR #376 created
+
+**Outcome:** ✅ Issue #223 closed.
+- New recipes are now discoverable in prose, not just JSON metadata
+- Agents can reference Intent, Anti-Patterns, and Validated By without jumping to config files
+- Aligns with intent-first organization of component-selection-framework from PR #374
+- No code changes; documentation only; no backward-compatibility concerns
+
+**Decision:** Filed `.squad/decisions/inbox/amy-wave3-223.md` with full context, sim validation, and rationale for Scribe merge.

@@ -1,16 +1,25 @@
 # Bender — Backend Dev
 
-## Current Focus (2026-04-28 onwards)
+## Current Focus (2026-05-02 onwards)
 
 **Recent Work:**
 - Zod v4 migration (PR #247): multi-domain harness refactor, z.toJSONSchema() transition
 - ARM direct call endpoint (PR #239): /api/azure/token SWA passthrough, CSP updates
 - Phase 2 config extracts (PR #238): schema validation, handoff rules normalization
 - Design decision: oneOf→anyOf guard layer for OpenAI strict-schema compatibility
+- PR #358 security fix: deterministic lease pruning on every mutation/read path in token-lease-store.mjs
+- **PR #375 (2026-05-02)**: Two-issue batch — azure-architect Gateway API guardrail + tool-usage-framework 28-tool expansion
+- **PR #378 (2026-05-02)** — Issue #204: `aks-manifests-author.agent.md`:
+  - Added §Mutator-Aware Explicit Generation (D10) — always emit explicit resources.requests/limits and topologySpreadConstraints, even if AKS mutators would inject defaults
+  - Added concrete KEDA trigger YAML for azure-servicebus and azure-eventhub
+  - Extended validation sequence with D10 checks (steps 6 & 7)
+- **PR #377 (2026-05-02)** — Issue #211: `config/recipes.json`:
+  - Added `"provenance": "derived"` to 5 `promotionRecommendations` (R2, R5, R7, R16, R17) — last gap in config-wide coverage
 
 **Pending:**
-- PR #239 merged; PR #238 in review (Leela/Zapp/Nibbler/Amy gates)
-- Phase 2 issue #229 shipped (PR #240 opened, fast-lane)
+- PR #378 (issue #204) open — needs squad review for KEDA schema + mutator guidance
+- PR #377 (issue #211) open — mechanical chore, fast-lane eligible
+- PR #239 merged; PR #238 in review
 
 ---
 
