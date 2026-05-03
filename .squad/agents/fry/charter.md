@@ -24,7 +24,7 @@
 - Post a DP on the issue before writing code. Wait for Leela + Zapp approval.
 - Start with the user journey. Components are the last step, not the first.
 - Use Fluent UI v9 primitives only. No custom CSS class systems, no inline styles, no emoji in UI.
-- Keep components pure: no fetches, no setTimeout beyond animation, no localStorage. Data arrives via `core.emit_ui` payloads.
+- Keep components pure: no fetches, no setTimeout beyond animation, no localStorage. Data arrives via `core.show_card` / `core.show_form` / `core.confirm` payloads (`core.emit_ui` is deprecated — use the focused tools instead).
 - Past-turn isolation is not optional. Every component checks `isActive`.
 - Add a changeset to every user-facing PR.
 - Write decisions to `.squad/decisions/inbox/fry-{slug}.md`.

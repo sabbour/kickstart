@@ -16,6 +16,68 @@ Kickstart uses a multi-agent architecture where a **coordinator agent** (the tri
 4. **CI enforcement** — typed handoff briefings validated at CI time to keep structured data out of prose.
 5. **`priorDeploymentContext`** — cross-iteration context vehicle that carries prior-deployment metadata into the current session, enabling agents to reference what was deployed before without re-asking the user.
 
+## Multi-Agent Flow Diagrams
+
+### Primary Triage → Deployment Flow
+
+The canonical greenfield path: triage classifies intent and hands off to the architecture/ops chain, with GitHub publishing and code review at the end.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant T as core.triage
+    participant AA as azure.architect
+    participant AO as azure.ops
+    participant GP as github.publisher
+    participant R as core.reviewer
+
+    User->>T: "Deploy my app to AKS"
+    T->>AA: handoff (TypedBriefing: mode=greenfield)
+    AA->>AA: propose_services, estimate_cost, validate_bicep
+    AA->>AO: handoff (services plan + Bicep)
+    AO->>AO: what_if → arm_deploy_resource
+    AO->>GP: handoff (deployment manifest)
+    GP->>AA: ask_azure_architect (cost/target confirm)
+    GP->>GP: update_pr_description, check_repo_access
+    GP->>R: handoff (generated artifacts)
+    R-->>User: structured review verdict
+```
+
+### Assessment Flow (AKS Automatic Readiness)
+
+When the user asks about upgrading an existing cluster, triage routes to `azure.architect` which calls `azure.assess_aks_cluster` to evaluate readiness before proceeding.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant T as core.triage
+    participant AA as azure.architect
+
+    User->>T: "Can I upgrade to AKS Automatic?"
+    T->>AA: handoff (TypedBriefing: mode=migration-readiness)
+    AA->>AA: azure.assess_aks_cluster(subscriptionId, resourceGroup, clusterName)
+    Note over AA: Evaluates node pools, API versions,<br/>quota, and Automatic prerequisites
+    AA-->>User: readiness report + remediation steps
+```
+
+### Iteration Flow (Delta Deploy)
+
+When the user returns to iterate on a prior deployment, triage hydrates `priorDeploymentContext` and routes directly to `azure.ops` for a delta deploy — skipping the full greenfield architecture phase.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant T as core.triage
+    participant AO as azure.ops
+
+    User->>T: "Scale my cluster to 5 nodes"
+    T->>T: core.priorDeploymentContext(repo, sessionId)
+    Note over T: Reads prior cluster name, resource group,<br/>aksVersion, trackUsed from session state
+    T->>AO: handoff (TypedBriefing: mode=iteration,<br/>priorDeploymentContext hydrated)
+    AO->>AO: what_if (delta only) → arm_update_resource
+    AO-->>User: deployment status + diff summary
+```
+
 ## The Coordinator Role (Triage)
 
 The triage agent (`core.triage`) is the entry point for all user conversations. Its responsibilities:
@@ -105,7 +167,7 @@ Each entry generates a tool named `ask_<sanitised_agent_name>` (e.g., `ask_azure
 
 ### Current Wired Pairs
 
-Extracted verbatim from `config/handoff-rules.json` (authoritative source). All 7 wired pairs are documented below — verified against `config/handoff-rules.json` v2.0.0.
+Extracted verbatim from `config/handoff-rules.json` (authoritative source). All 7 wired pairs are documented below.
 
 | Caller | Specialist | Tool name | maxTurns | Use case |
 |--------|-----------|-----------|----------|----------|
@@ -181,7 +243,7 @@ Downstream agents (e.g., `aks.architect`) reference `briefing.priorDeploymentCon
 
 ### Status
 
-`core.priorDeploymentContext` is a **Phase 3 tool** — not yet implemented. The Phase 2 fallback uses `core.inspect_repo` + `core.read_file` to read Kickstart-generated manifests and infer prior deployment state. See `config/handoff-rules.proposed.json` → `proposedAgentChanges[core.triage]`.
+`core.priorDeploymentContext` is implemented (`packages/pack-core/src/tools/prior_deployment_context.ts`). When triage detects `mode: iteration` it calls this tool to hydrate the `priorDeploymentContext` slot in the handoff briefing, enabling downstream agents to skip re-confirmation questions and jump directly to delta planning.
 
 ## CI Enforcement
 

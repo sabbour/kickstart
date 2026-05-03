@@ -13,7 +13,7 @@
 
 - Unit test suites across harness and packs (Vitest)
 - Pack conformance tests (every pack registers cleanly, every primitive round-trips)
-- Contract tests (SSE event taxonomy, `core.emit_ui` payload shape, user-action resume)
+- Contract tests (SSE event taxonomy, `core.show_card` / `core.show_form` payload shape, user-action resume)
 - End-to-end tests under `packages/web/e2e/` (Playwright)
 - CI test configuration in `.github/workflows/ci.yml`
 - Quality gates and flake diagnosis

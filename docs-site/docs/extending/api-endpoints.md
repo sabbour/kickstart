@@ -12,16 +12,16 @@ Kickstart's backend runs on **Azure Functions v4** (Node.js, ESM) deployed insid
 
 | Endpoint | File | Purpose |
 |---|---|---|
-| `POST /api/converse` | `converse.ts` (~649 lines) | Per-turn SSE stream — runs the active agent through `Runner.run()`. |
-| `POST /api/converse/resume` | `resume.ts` (~136 lines) | Resume a paused Runner after a UserAction result arrives. |
-| `POST /api/action` | `action.ts` (~338 lines) | Execute a one-shot UserAction outside a converse stream. |
-| `GET /api/packs` | `packs.ts` (~129 lines) | Safe client DTO of components, user actions, and playground scenarios. |
-| `POST /api/inspirations` | `inspirations.ts` (~312 lines) | Generate inspiration suggestions. |
-| `POST /api/widget-inspirations` | `widget-inspirations.ts` (~265 lines) | Per-component inspirations. |
-| `POST /api/playground` | `playground.ts` (~249 lines) | Drive a playground scenario (gated by `KICKSTART_PLAYGROUND`). |
-| `GET /api/health` | `health.ts` (~216 lines) | Readiness + dependency probes. |
-| `POST /api/generate` | `generate.ts` (~208 lines) | Direct codegen entry-point. |
-| `GET /api/github/auth/*` | `github-auth.ts` (~206 lines) | GitHub OAuth flow + callback. |
+| `POST /api/converse` | `converse.ts` | Per-turn SSE stream — runs the active agent through `Runner.run()`. |
+| `POST /api/converse/resume` | `resume.ts` | Resume a paused Runner after a UserAction result arrives. |
+| `POST /api/action` | `action.ts` | Execute a one-shot UserAction outside a converse stream. |
+| `GET /api/packs` | `packs.ts` | Safe client DTO of components, user actions, and playground scenarios. |
+| `POST /api/inspirations` | `inspirations.ts` | Generate inspiration suggestions. |
+| `POST /api/widget-inspirations` | `widget-inspirations.ts` | Per-component inspirations. |
+| `POST /api/playground` | `playground.ts` | Drive a playground scenario (gated by `KICKSTART_PLAYGROUND`). |
+| `GET /api/health` | `health.ts` | Readiness + dependency probes. |
+| `POST /api/generate` | `generate.ts` | Direct codegen entry-point. |
+| `GET /api/github/auth/*` | `github-auth.ts` | GitHub OAuth flow + callback. |
 | `*  /api/arm-proxy/*` | `arm-proxy.ts` | **Retired (`410 Gone` tombstone).** Browser-direct ARM (Option A2) — see [ARM call flow](../architecture/arm-call-flow.md). Use `armFetch` + `/api/azure/token`. |
 | `*  /api/github-proxy/*` | `github-proxy.ts` | Browser-direct GitHub proxy. |
 | `GET /api/cost-estimate` | `cost-estimate.ts` | Pricing lookups. |

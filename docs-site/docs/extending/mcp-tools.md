@@ -59,7 +59,7 @@ The MCP adapter (`packages/mcp-server/src/adapter/`) provides:
 
 Pack registration happens in `packages/mcp-server/src/startup/packs.ts` — same fixed order as the API (`core, azure, aks, github`), filtered by `KICKSTART_PACKS`. The registry is sealed before the stdio loop begins so all schema and handoff validation has run.
 
-The server entry point (`packages/mcp-server/src/index.ts`, ~215 lines) wires the `Runner`, `sessionStore`, `SSEWriter` (mapped onto MCP `notifications/message` frames), and the manifest into the MCP transport.
+The server entry point (`packages/mcp-server/src/index.ts`) wires the `Runner`, `sessionStore`, `SSEWriter` (mapped onto MCP `notifications/message` frames), and the manifest into the MCP transport.
 
 ---
 

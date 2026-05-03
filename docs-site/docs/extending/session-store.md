@@ -114,4 +114,4 @@ The bound exists so a long session doesn't blow up the prompt budget on resume. 
 4. Re-create the in-memory class invariants when hydrating: rebuild `recentTurns`, `a2uiEmissions`, `pendingUserAction`, `responseId`, `anonTokenHash`, `lastActiveAt`, `activeAgent`. Don't lose `provenance` markers.
 5. Wire it via `createSessionStore` or directly in your API bootstrap.
 
-The class to model on is `AzureTableSessionStore` — it covers serialisation, hydration, TTL filtering on read, and `evictExpired` in ~200 lines.
+The class to model on is `AzureTableSessionStore` — it covers serialisation, hydration, TTL filtering on read, and `evictExpired`.

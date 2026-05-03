@@ -26,10 +26,10 @@ The harness exports its public surface from `packages/harness/src/index.ts` unde
 
 A single `POST /api/converse` request walks the following path. File references are exact.
 
-1. **Functions handler** (`packages/web/api/src/functions/converse.ts`, ~649 lines) opens an SSE stream using `SSE_RESPONSE_HEADERS` from `runtime/sse.ts` and emits `start`.
+1. **Functions handler** (`packages/web/api/src/functions/converse.ts`) opens an SSE stream using `SSE_RESPONSE_HEADERS` from `runtime/sse.ts` and emits `start`.
 2. **Session lookup or create** via `getOrCreateSession()` (`runtime/session.ts`); anonymous sessions get an `anon_session_token` (10‑minute TTL — `ANON_SESSION_TTL_MS`) and the token is broadcast as the `session_token` SSE event.
 3. **Hydration**: cold sessions are rebuilt from the persistent store (`hydrateColdSession`, capped by `HYDRATION_DEFAULT_CAP = 20` turns and `HYDRATION_CONTENT_MAX_BYTES = 4096` per turn).
-4. **Runner.run()** (`runtime/runner.ts`, ~1784 lines) is invoked with the session, user message, an `SSEWriter`, an `AbortSignal`, and an optional `RunConfig` (`runtime/run-config.ts`). The runner wraps `@openai/agents` and is responsible for skill resolution, guardrail wiring, agent handoffs, A2UI emission, and tool-result truncation.
+4. **Runner.run()** (`runtime/runner.ts`) is invoked with the session, user message, an `SSEWriter`, an `AbortSignal`, and an optional `RunConfig` (`runtime/run-config.ts`). The runner wraps `@openai/agents` and is responsible for skill resolution, guardrail wiring, agent handoffs, A2UI emission, and tool-result truncation.
 5. **Guardrails** run via `toSdkInputGuardrail` / `toSdkOutputGuardrail` for parallel input/output rules and via the sequential `runGuardrails()` engine for tool-stage rules (`runtime/guardrails.ts`). Verdicts are `pass | block | redact`; SSE only ever sees the opaque shape `{ code: 'GUARDRAIL_BLOCK', message: '…' }` and never a guardrail id, reason, or pattern.
 6. **Tools and A2UI**: tool-call results are streamed as `tool_start` / `tool_done`. A2UI emissions queued during the tool call are drained after the LLM tool_call (per the post-tool A2UI drain rule documented at the top of `runner.ts`) and emitted as `a2ui` events.
 7. **End**: the runner emits `end` with skill/tool counters; `phase` events fire on agent handoffs; `guardrail_warn` fires on redactions; `chain_step` for the deterministic codesmith→reviewer chain.
@@ -47,7 +47,7 @@ user_action_req | end | error | session_token | guardrail_warn | chain_step
 
 ## Harness + packs registry
 
-The `PackRegistry` (`runtime/registry.ts`, ~705 lines) is the integration point. Packs register at startup in a fixed order — `core, azure, aks, github` — and the registry then `seal()`s itself:
+The `PackRegistry` (`runtime/registry.ts`) is the integration point. Packs register at startup in a fixed order — `core, azure, aks, github` — and the registry then `seal()`s itself:
 
 - All inter-pack handoff targets are validated; cross-pack handoffs are rejected unless the source pack lists the target in `dependsOn` or `handoffTargets`.
 - Playground stubs are snapshotted and frozen; post-seal mutations throw.

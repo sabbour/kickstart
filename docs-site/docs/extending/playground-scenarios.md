@@ -6,7 +6,7 @@ sidebar_position: 10
 
 The Playground is a developer-only mode where the browser drives the agent loop with **fixed scripted inputs** and tools resolve via deterministic stubs. It exists to debug A2UI emission, surface negotiation, and the UserAction lifecycle without having to call live cloud APIs. The whole feature is gated by `KICKSTART_PLAYGROUND=true` (the playground env-gate enforced inside `Runner.run`).
 
-The browser entry-point is `packages/web/src/playground/Playground.tsx`. The API entry-point is `packages/web/api/src/functions/playground.ts` (~249 lines). Scenarios and stubs are pack-contributed.
+The browser entry-point is `packages/web/src/playground/Playground.tsx`. The API entry-point is `packages/web/api/src/functions/playground.ts`. Scenarios and stubs are pack-contributed.
 
 ---
 
