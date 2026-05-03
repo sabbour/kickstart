@@ -255,3 +255,16 @@ Validation evidence:
 - Created `docs/audit/phase2-prompt-drift-audit.md` with per-file severity table.
 - PR #380 created; comment posted on issue #228.
 - Decisions written to `.squad/decisions/inbox/hermes-wave2.md`.
+### 2026-05-02T23:04:32-07:00 — Issue #201: aks-reviewer readiness assessment extension
+
+- **Task:** Extended `packages/pack-aks-automatic/src/agents/aks-reviewer.agent.md` with structured readiness assessment capability per D7 and Sims #2/#7.
+- **Branch:** `squad/201-aks-reviewer-readiness`
+- **Changes made:**
+  - Updated frontmatter: added `core.helm_template` and `core.show_card` to tools array; updated description.
+  - Added "When loaded with the readiness skill" section: skill activation gating on `azure-kubernetes-automatic-readiness` v1.0.0; 10-check structured checklist (resource requests/limits, anti-affinity, probes, securityContext, host namespaces, image pull policy, PDB, NetworkPolicy); ReviewCard output contract via `core.show_card`.
+  - Added raw manifest review path (Sim #2): per-workload ReviewCards, session summary, FAIL remediation offer with handoff to `aks.manifests_author`.
+  - Added Helm chart review path (Sim #7): render-first via `core.helm_template`, same checklist on rendered output, Helm-specific pattern flags (missing resources, mutable tags, absent anti-affinity).
+- **Changeset:** `.changeset/201-aks-reviewer-readiness.md` (patch on `@aks-kickstart/pack-aks-automatic`)
+- **Decisions:** `.squad/decisions/inbox/hermes-wave4-201.md` (gitignored inbox, local only for Scribe)
+- **PR:** Created via `gh pr create` targeting `dev` — flagged 🟡 needs review.
+- **Validation:** Markdown structure verified; no build/test scripts affect agent .md files; existing tests unaffected.
