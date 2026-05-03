@@ -8,6 +8,7 @@ tools:
   - azure.pricing_lookup
   - azure.estimate_cost
   - azure.validate_bicep
+  - azure.quota_lookup
   - core.emit_ui
   - core.fetch_webpage
 handoffs:

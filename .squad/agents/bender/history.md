@@ -15,6 +15,9 @@
   - Extended validation sequence with D10 checks (steps 6 & 7)
 - **PR #377 (2026-05-02)** — Issue #211: `config/recipes.json`:
   - Added `"provenance": "derived"` to 5 `promotionRecommendations` (R2, R5, R7, R16, R17) — last gap in config-wide coverage
+- **PR #375 (2026-05-02)**: Two-issue batch on `squad/202-azure-architect-rewrite`:
+  - Issue #202: azure-architect.agent.md — fixed ArchitectureDiagram exemplar node from "Ingress Controller" → "App Routing (Gateway API)"; added hard guardrail blocking ingress-nginx / NGINX mode (both EOL); changeset created
+  - Issue #220: tool-usage-framework.md — expanded tool inventory table from 4 rows to 28-tool complete surface; marked core.emit_ui as deprecated; fixed code example (added buildArchitectureDiagramTool); added "Not exposed" callout for unregistered tool files
 
 **Pending:**
 - PR #378 (issue #204) open — needs squad review for KEDA schema + mutator guidance
@@ -24,6 +27,21 @@
 ---
 
 For detailed work history, see `history-archive.md`.
+
+## 2026-05-02 — Issue #200: aks-architect.agent.md rewrite
+
+**Branch:** `squad/200-aks-architect-rewrite`
+**Status:** PR opened, flagged for Leela architecture review (🔴 not suitable for @copilot)
+
+**Added 4 sections to `packages/pack-aks-automatic/src/agents/aks-architect.agent.md`:**
+1. **R8 reshape-locally pattern** — emits job-to-be-done table when user requests non-AKS service; keeps conversation in-track
+2. **Foundry/AI via Workload Identity** — enforces UAMI + FederatedCredential via Service Connector; API keys hard-banned
+3. **GPU quota preflight for KAITO** — blocks manifest generation until `azure.quota_lookup` confirms sufficient quota; QuotaCard with CTA emitted if not
+4. **AGC trade-off card** — App Routing as primary, AGC as WAF/multi-site-TLS opt-in, ingress-nginx hard-banned
+
+**Key decisions:** See `.squad/decisions/inbox/bender-wave4-200.md`
+
+---
 ## Docs Restructure Audit (2026-05-01)
 - Runtime/harness/packs docs audit completed — identified stale/missing coverage
 - Findings fed into Leela's IA proposal and single-PR execution plan
