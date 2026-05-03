@@ -105,7 +105,7 @@ Each entry generates a tool named `ask_<sanitised_agent_name>` (e.g., `ask_azure
 
 ### Current Wired Pairs
 
-Extracted verbatim from `config/handoff-rules.json` (authoritative source).
+Extracted verbatim from `config/handoff-rules.json` (authoritative source). All 7 wired pairs are documented below — verified against `config/handoff-rules.json` v2.0.0.
 
 | Caller | Specialist | Tool name | maxTurns | Use case |
 |--------|-----------|-----------|----------|----------|
@@ -113,7 +113,7 @@ Extracted verbatim from `config/handoff-rules.json` (authoritative source).
 | `core.triage` | `azure.architect` | `ask_azure_architect` | 3 | Azure infra questions during triage |
 | `aks.architect` | `azure.architect` | `ask_azure_architect` | 3 | Cross-domain VNET/DNS/Private Link |
 | `aks.architect` | `core.codesmith` | `ask_core_codesmith` | 5 | Generate infra code mid-diagnosis |
-| `core.codesmith` | `core.reviewer` | `ask_core_reviewer` | 3 | Immediate review of generated code |
+| `core.codesmith` | `core.reviewer` | `ask_core_reviewer` | 3 | Immediate quality review of generated code |
 | `azure.architect` | `aks.architect` | `ask_aks_architect` | 3 | Symmetric AKS consultation (node pools, Gateway API, KAITO) |
 | `github.publisher` | `azure.architect` | `ask_azure_architect` | 3 | Cost lookup and deployment-target confirmation before publishing |
 
@@ -123,6 +123,14 @@ Extracted verbatim from `config/handoff-rules.json` (authoritative source).
 - **Stateless** — no conversation history passes to the specialist; each call starts fresh.
 - **Non-mutating** — the original agent object is never modified (cloned internally).
 - **Text extraction** — returns plain string to the parent LLM.
+
+### Track-Flip / Reshape Locally (No Handback to Triage)
+
+No agent in the current wiring has `core.triage` as a handoff target. This was a documented gap (`no-handback-to-triage` in `config/handoff-rules.proposed.json`): if a user changes track mid-conversation (e.g., "use Container Apps instead of AKS" in Sim #8), there was no clean route back to the coordinator.
+
+**Decision (Sim #8 Stefan, 2026-05):** The **reshape-locally** pattern is the approved workaround and no triage-handback wiring is required. When a user requests a track flip, the current specialist reshapes the plan in-place, updates the conversation context, and continues — rather than handing back to triage for re-routing. This avoids a round-trip through the coordinator for what is often a minor scope adjustment.
+
+> **Rule:** If the user names a different service (e.g., Container Apps vs AKS), reshape locally. If the user describes a fundamentally different workload shape (e.g., greenfield cluster → PaaS migration), escalate via a new conversation entry through triage.
 
 ## Question Budgets
 
@@ -136,6 +144,44 @@ These budgets ensure:
 1. Specialist consultations are focused and concise.
 2. Costs remain predictable (each turn = one LLM call).
 3. Runaway loops are impossible — the harness hard-stops at the budget limit.
+
+## `priorDeploymentContext`
+
+The fifth coordination vehicle carries context about **prior deployments** across conversation iterations, enabling agents to reference what was deployed before without re-asking the user.
+
+### Problem it solves
+
+Triage has no built-in rule for recognising iteration on prior Kickstart deployments (Sim #9). Without this context, it falls into the greenfield architect-plan flow and re-proposes the cluster as if it were the first deployment.
+
+### How it works
+
+`core.priorDeploymentContext` is a session-scoped tool (Phase 3) — or `core.inspect_repo` + `core.read_file` as a Phase 2 fallback — that populates a `priorDeploymentContext` payload at session start when triage detects `mode: iteration`. The payload carries:
+
+| Field | Description |
+|-------|-------------|
+| `clusterName` | Name of the previously deployed cluster |
+| `resourceGroup` | Azure resource group of the prior deployment |
+| `aksVersion` | Kubernetes version from prior deploy |
+| `trackUsed` | Original track (`containerized_web`, `agentic_app`, etc.) |
+| `deployedAt` | Approximate timestamp of the prior deployment |
+| `priorConstraintSpec` | Safeguard spec version and AKS API version pinned at deploy time |
+
+### Usage pattern
+
+```typescript
+// Triage reads prior context before routing
+const priorCtx = await core.priorDeploymentContext({ repo, sessionId });
+if (priorCtx) {
+  briefing.priorDeploymentContext = priorCtx;  // typed slot, not prose
+  briefing.mode = 'iteration';
+}
+```
+
+Downstream agents (e.g., `aks.architect`) reference `briefing.priorDeploymentContext` to skip re-confirmation questions about cluster identity and instead jump directly to the delta between the prior state and the requested change.
+
+### Status
+
+`core.priorDeploymentContext` is a **Phase 3 tool** — not yet implemented. The Phase 2 fallback uses `core.inspect_repo` + `core.read_file` to read Kickstart-generated manifests and infer prior deployment state. See `config/handoff-rules.proposed.json` → `proposedAgentChanges[core.triage]`.
 
 ## CI Enforcement
 
