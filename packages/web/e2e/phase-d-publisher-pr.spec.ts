@@ -158,10 +158,11 @@ test.describe('Phase D publisher PR-creation card', () => {
     // Gate on streaming-idle (#310/#340) before resource-visibility assertions.
     await waitForStreamingIdle(page);
 
-    // AuthCard should appear with GitHub sign-in
+    // AuthCard should appear with GitHub sign-in (scoped to publisher surface
+    // to guard against strict-mode collision with chat narration text)
     const surface = page.locator('[data-surface-id="shared:publisher-pr"]');
     await expect(surface).toBeVisible();
-    await expect(page.getByText('Sign in to create a pull request.')).toBeVisible();
+    await expect(surface.getByText('Sign in to create a pull request.')).toBeVisible();
 
     // Only one publisher surface
     const surfaces = page.locator('.a2ui-surface-wrapper[data-surface-id="shared:publisher-pr"]');
@@ -202,9 +203,13 @@ test.describe('Phase D publisher PR-creation card', () => {
     // Gate first turn on streaming-idle (#310/#340).
     await waitForStreamingIdle(page);
 
+    // Scope all surface assertions to avoid strict-mode collisions with
+    // chat narration text that may repeat the same strings.
+    const publisherSurface = page.locator('[data-surface-id="shared:publisher-pr"]');
+
     // CreatePRFlow should show idle state with file list
-    await expect(page.getByText('Create Pull Request')).toBeVisible();
-    await expect(page.getByText('infra/main.bicep')).toBeVisible();
+    await expect(publisherSurface.getByText('Create Pull Request')).toBeVisible();
+    await expect(publisherSurface.getByText('infra/main.bicep')).toBeVisible();
 
     // Simulate second turn (user clicks create PR → result)
     await page.getByRole('textbox', { name: /type a message/i }).fill('Create the PR now');
@@ -216,7 +221,7 @@ test.describe('Phase D publisher PR-creation card', () => {
 
     // SummaryCard with PR link should appear
     await expect(page.getByTestId('a2ui-SummaryCard').getByText('Pull request created')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('PR #42')).toBeVisible();
+    await expect(publisherSurface.getByText('PR #42')).toBeVisible();
 
     // Verify link href
     const prLink = page.getByRole('link', { name: /PR #42/i });
@@ -269,7 +274,10 @@ test.describe('Phase D publisher PR-creation card', () => {
     await expect(chatInput).toHaveAttribute('placeholder', 'Type a message...');
     // Gate turn 1 on streaming-idle (#310/#340) so the AuthCard surface is in place.
     await waitForStreamingIdle(page);
-    await expect(page.getByText('Sign in to create a pull request.')).toBeVisible();
+    // Scope to the publisher surface throughout all three turns to guard against
+    // strict-mode collision with duplicate text in chat narration bubbles.
+    const publisherSurface3 = page.locator('[data-surface-id="shared:publisher-pr"]');
+    await expect(publisherSurface3.getByText('Sign in to create a pull request.')).toBeVisible();
 
     // Turn 2: CreatePRFlow
     await page.getByRole('textbox', { name: /type a message/i }).fill('I signed in');
@@ -277,7 +285,7 @@ test.describe('Phase D publisher PR-creation card', () => {
     // Gate chained turn 2 on streaming-idle (#310/#340) so the CreatePRFlow surface
     // has fully replaced the AuthCard before assertions fire.
     await waitForStreamingIdle(page);
-    await expect(page.getByText('feat: kickstart infra and deploy workflow')).toBeVisible({ timeout: 10_000 });
+    await expect(publisherSurface3.getByText('feat: kickstart infra and deploy workflow')).toBeVisible({ timeout: 10_000 });
 
     // Turn 3: SummaryCard result
     await page.getByRole('textbox', { name: /type a message/i }).fill('Create it');

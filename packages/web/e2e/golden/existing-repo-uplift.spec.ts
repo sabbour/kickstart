@@ -4,9 +4,40 @@
  * Replays a full Phase A → E run for an existing repository uplift.
  * Asserts: PR URL returned, editor diff view, uplift summary, phase completion.
  */
+import { type Page } from '@playwright/test';
 import { createGoldenTest, expect, loadFixtureMeta, checkFreshness, loadPhaseFixtures, validateNoSecrets } from './golden-fixture';
 
 const test = createGoldenTest('existing-repo-uplift');
+
+/**
+ * Navigate from the landing page to the chat UI for the uplift track.
+ *
+ * The uplift track does not have a dedicated card on the landing page — the
+ * landing page exposes only "web-app" and "agentic-app" tiles. When the
+ * dedicated card is absent we fall back to submitting a representative uplift
+ * prompt via the hero textarea so the chat UI still enters the correct
+ * SSE-replay path for the golden fixture.
+ */
+async function enterUpliftChat(page: Page) {
+  const trackCard = page.locator(
+    '[data-track="existing-repo-uplift"], [data-track="uplift"], .track-card-link[data-track="uplift"]',
+  ).first();
+
+  if (await trackCard.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await trackCard.click();
+  } else {
+    // No dedicated track card — submit via the hero textarea.
+    const heroInput = page.getByRole('textbox', { name: /describe your app/i });
+    await heroInput.waitFor({ state: 'visible', timeout: 5000 });
+    await heroInput.fill('Uplift my existing repository to AKS');
+    await page.getByRole('button', { name: /send/i }).click();
+  }
+
+  await page.waitForSelector('#chat-ui, [data-testid="chat-ui"], .chat-container', {
+    state: 'visible',
+    timeout: 10_000,
+  });
+}
 
 test.describe('Golden E2E — existing-repo-uplift track', () => {
   test.beforeAll(() => {
@@ -28,17 +59,7 @@ test.describe('Golden E2E — existing-repo-uplift track', () => {
 
   test('completes all 5 phases with SSE replay', async ({ page }) => {
     await page.goto('/');
-
-    // Uplift track uses a different entry point
-    const trackCard = page.locator('[data-track="existing-repo-uplift"], [data-track="uplift"], .track-card-link[data-track="uplift"]').first();
-    if (await trackCard.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await trackCard.click();
-    }
-
-    await page.waitForSelector('#chat-ui, [data-testid="chat-ui"], .chat-container', {
-      state: 'visible',
-      timeout: 10_000,
-    });
+    await enterUpliftChat(page);
 
     const chatArea = page.locator('#chat-ui, [data-testid="chat-ui"], .chat-container').first();
     await expect(chatArea).toBeVisible();
@@ -49,32 +70,14 @@ test.describe('Golden E2E — existing-repo-uplift track', () => {
     page.on('pageerror', err => errors.push(err.message));
 
     await page.goto('/');
-
-    const trackCard = page.locator('[data-track="existing-repo-uplift"], [data-track="uplift"], .track-card-link[data-track="uplift"]').first();
-    if (await trackCard.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await trackCard.click();
-    }
-
-    await page.waitForSelector('#chat-ui, [data-testid="chat-ui"], .chat-container', {
-      state: 'visible',
-      timeout: 10_000,
-    });
+    await enterUpliftChat(page);
 
     expect(errors).toHaveLength(0);
   });
 
   test('no credential or PII leakage in uplift UI', async ({ page }) => {
     await page.goto('/');
-
-    const trackCard = page.locator('[data-track="existing-repo-uplift"], [data-track="uplift"], .track-card-link[data-track="uplift"]').first();
-    if (await trackCard.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await trackCard.click();
-    }
-
-    await page.waitForSelector('#chat-ui, [data-testid="chat-ui"], .chat-container', {
-      state: 'visible',
-      timeout: 10_000,
-    });
+    await enterUpliftChat(page);
 
     const body = await page.locator('body').textContent();
     expect(body).not.toContain('REDACTED_TOKEN');
