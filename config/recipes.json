@@ -521,23 +521,28 @@
   "promotionRecommendations": [
     {
       "recipe": "R2",
-      "rationale": "Used in 6+ sims; the default for any plan with multiple distinct concepts. Promote to first-class `MultiCardPlan` rich component with named slots (plan / preview / cost / actions)."
+      "rationale": "Used in 6+ sims; the default for any plan with multiple distinct concepts. Promote to first-class `MultiCardPlan` rich component with named slots (plan / preview / cost / actions).",
+      "provenance": "derived"
     },
     {
       "recipe": "R5",
-      "rationale": "Used in 6+ sims. Promote to first-class `DiffPlan` rich component with marker support (+/~/-/space) and annotation column."
+      "rationale": "Used in 6+ sims. Promote to first-class `DiffPlan` rich component with marker support (+/~/-/space) and annotation column.",
+      "provenance": "derived"
     },
     {
       "recipe": "R7",
-      "rationale": "Used in 7+ sims. Promote to first-class `InvisibleWorkCard` rich component with auto-population from generated-artifacts list."
+      "rationale": "Used in 7+ sims. Promote to first-class `InvisibleWorkCard` rich component with auto-population from generated-artifacts list.",
+      "provenance": "derived"
     },
     {
       "recipe": "R16",
-      "rationale": "Universal (11/11 sims). Promote to first-class `CostCard` rich component with variants (fresh / delta / trim-with-compliance / per-PR-day / per-app-rollup)."
+      "rationale": "Universal (11/11 sims). Promote to first-class `CostCard` rich component with variants (fresh / delta / trim-with-compliance / per-PR-day / per-app-rollup).",
+      "provenance": "derived"
     },
     {
       "recipe": "R17",
-      "rationale": "Universal (11/11 sims). Promote to first-class `NextSurfaceHandover` rich component with extension slots (futureYouDoors, crossSurfaceHandoff, ifReviewerRequestsChanges)."
+      "rationale": "Universal (11/11 sims). Promote to first-class `NextSurfaceHandover` rich component with extension slots (futureYouDoors, crossSurfaceHandoff, ifReviewerRequestsChanges).",
+      "provenance": "derived"
     }
   ]
 }
