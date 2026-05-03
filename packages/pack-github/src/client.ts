@@ -44,6 +44,14 @@ export {
   SecretSetterRenderer,
   secretSetterContribution,
 } from './components/SecretSetter/index.js';
+export {
+  GitHubLoginCardRenderer,
+  gitHubLoginCardContribution,
+} from './components/GitHubLoginCard/index.js';
+export {
+  GitHubCommitRenderer,
+  gitHubCommitContribution,
+} from './components/GitHubCommit/index.js';
 
 import { loginContribution } from './components/Login/index.js';
 import { orgPickerContribution } from './components/OrgPicker/index.js';
@@ -52,6 +60,8 @@ import { repoInfoContribution } from './components/RepoInfo/index.js';
 import { actionContribution } from './components/Action/index.js';
 import { createPRFlowContribution } from './components/CreatePRFlow/index.js';
 import { secretSetterContribution } from './components/SecretSetter/index.js';
+import { gitHubLoginCardContribution } from './components/GitHubLoginCard/index.js';
+import { gitHubCommitContribution } from './components/GitHubCommit/index.js';
 
 /** All GitHub pack components eligible for client-side registration. */
 export const githubClientComponents: readonly ComponentContribution[] = Object.freeze([
@@ -62,6 +72,8 @@ export const githubClientComponents: readonly ComponentContribution[] = Object.f
   actionContribution,
   createPRFlowContribution,
   secretSetterContribution,
+  gitHubLoginCardContribution,
+  gitHubCommitContribution,
 ]);
 
 export interface PackClientRegisterTarget {
@@ -177,6 +189,34 @@ export const previews: Readonly<Record<string, PackPreview>> = Object.freeze({
       secretName: 'AZURE_CREDENTIALS',
       hint: 'Service principal JSON used by the deploy workflow.',
       status: 'saved',
+    },
+  ],
+  'github/GitHubLoginCard': [
+    {
+      id: 'root',
+      component: 'github/GitHubLoginCard',
+      status: 'success',
+      username: 'octocat',
+      displayName: 'The Octocat',
+      avatarUrl: 'https://github.com/octocat.png',
+      configured: true,
+      isActive: true,
+    },
+  ],
+  'github/GitHubCommit': [
+    {
+      id: 'root',
+      component: 'github/GitHubCommit',
+      status: 'idle',
+      repoFullName: 'octocat/kickstart-sample',
+      defaultBranch: 'main',
+      suggestedBranchName: 'kickstart/add-infra',
+      suggestedTitle: 'feat: add AKS infra',
+      files: [
+        { path: 'infra/main.bicep' },
+        { path: '.github/workflows/deploy.yml' },
+      ],
+      isActive: true,
     },
   ],
 });

@@ -351,10 +351,10 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
     { id: 'step3', component: 'Text', text: 'Review your configuration before creating.' },
   ],
 
-  'core/CostEstimate': [
+  'azure/CostEstimate': [
     {
       id: 'root',
-      component: 'CostEstimate',
+      component: 'azure/CostEstimate',
       title: 'Monthly estimate',
       items: [
         { name: 'AKS cluster (Standard_D2s_v3 × 3)', sku: 'Standard', monthlyCost: 219 },
@@ -367,11 +367,11 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
 
   // ── User Actions ──────────────────────────────────────────────────────────
 
-  'core/AzureLoginCard': [
-    { id: 'root', component: 'AzureLoginCard', displayName: 'Azure User', showTokenInfo: true },
+  'azure/AzureLoginCard': [
+    { id: 'root', component: 'azure/AzureLoginCard', displayName: 'Azure User', showTokenInfo: true },
   ],
 
-  'core/GitHubLoginCard': [
-    { id: 'root', component: 'GitHubLoginCard' },
+  'github/GitHubLoginCard': [
+    { id: 'root', component: 'github/GitHubLoginCard' },
   ],
 };

@@ -18,7 +18,10 @@ import type { ComponentContribution } from '@aks-kickstart/harness';
 import { createReactComponent } from '../vendor/a2ui/react/adapter';
 import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
 
-type PackRenderer = React.ComponentType<{ props: Record<string, unknown> }>;
+type PackRenderer = React.ComponentType<{
+  props: Record<string, unknown>;
+  dispatchAction?: (action: unknown) => void;
+}>;
 
 export function adaptPackComponent(
   contribution: ComponentContribution,
@@ -33,7 +36,10 @@ export function adaptPackComponent(
     // bender-1000-revise-2026-04-21.
     schema: contribution.propertySchema as unknown as z.ZodTypeAny,
   };
-  return createReactComponent(api, ({ props }) =>
-    React.createElement(Renderer, { props: props as Record<string, unknown> }),
+  return createReactComponent(api, ({ props, context }) =>
+    React.createElement(Renderer, {
+      props: props as Record<string, unknown>,
+      dispatchAction: (action: unknown) => { void context.dispatchAction(action); },
+    }),
   );
 }

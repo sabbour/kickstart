@@ -195,7 +195,14 @@ jobs:
               per_page: 100,
             });
             const paths = files.map(file => file.filename);
-            const labels = context.payload.pull_request.labels.map(label => label.name);
+            // Fetch labels via API (not event payload) to avoid stale-snapshot race
+            // conditions when labels are stripped/re-applied by concurrent workflows.
+            const { data: prData } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const labels = prData.labels.map(label => label.name);
 
             const userFacing = paths.some(path =>
               /^packages\/[^/]+\/src\//.test(path) &&

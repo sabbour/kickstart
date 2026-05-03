@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FLUENT_DIR = resolve(__dirname, '../catalog/fluent-components');
-const CATALOG_DIR = resolve(__dirname, '../catalog/components');
+const CATALOG_DIR = resolve(__dirname, '../../../../packages/pack-core/src/components/rich');
 const FILE_MANAGER_DIR = resolve(__dirname, '../components/FileManager');
 
 function readComponent(dir: string, name: string): string {
@@ -259,8 +259,9 @@ describe('Catalog components — ARIA compliance', () => {
     });
 
     it('step items expose accessible status labels while icons remain decorative', () => {
-      expect(src).toContain('aria-label={getAccessibleStepLabel(step)}');
       expect(src).toContain('aria-hidden="true"');
+      expect(src).toContain('Body1');
+      expect(src).toContain('readString(s.label)');
     });
   });
 

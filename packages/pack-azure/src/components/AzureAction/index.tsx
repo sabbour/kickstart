@@ -68,7 +68,10 @@ const useStyles = makeStyles({
   },
 });
 
-export const AzureActionRenderer: React.FC<{ props: AzureActionProps }> = ({ props }) => {
+export const AzureActionRenderer: React.FC<{
+  props: AzureActionProps;
+  dispatchAction?: (action: unknown) => void;
+}> = ({ props, dispatchAction }) => {
   const classes = useStyles();
 
   const isTerminal = props.status === 'succeeded' || props.status === 'failed' || props.status === 'canceled';
@@ -122,17 +125,17 @@ export const AzureActionRenderer: React.FC<{ props: AzureActionProps }> = ({ pro
         )}
         {!isTerminal && !isExecuting && (
           <div className={classes.actions}>
-            {/* Buttons are rendered for display purposes. Actual confirmation is driven
-                by the A2UI user-action protocol — the runner pauses and waits for the
-                browser to POST a result to /api/converse/resume. */}
             <Button
               appearance={props.destructive ? 'primary' : 'primary'}
               style={props.destructive ? { backgroundColor: tokens.colorPaletteRedBackground3 } : undefined}
-              disabled
+              onClick={() => dispatchAction?.({ event: { name: 'azure:arm_write:confirm' } })}
             >
               Confirm
             </Button>
-            <Button appearance="secondary" disabled>Cancel</Button>
+            <Button
+              appearance="secondary"
+              onClick={() => dispatchAction?.({ event: { name: 'azure:arm_write:cancel' } })}
+            >Cancel</Button>
           </div>
         )}
       </div>

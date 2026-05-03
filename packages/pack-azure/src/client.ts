@@ -36,6 +36,18 @@ export {
   LocationSelectorRenderer,
   locationSelectorContribution,
 } from './components/LocationSelector/index.js';
+export {
+  AzureLoginCardRenderer,
+  azureLoginCardContribution,
+} from './components/AzureLoginCard/index.js';
+export {
+  AzureResourceFormRenderer,
+  azureResourceFormContribution,
+} from './components/AzureResourceForm/index.js';
+export {
+  AzureResourcePickerRenderer,
+  azureResourcePickerContribution,
+} from './components/AzureResourcePicker/index.js';
 
 import { azureResourceCardContribution } from './components/AzureResourceCard/index.js';
 import { costEstimateContribution } from './components/CostEstimate/index.js';
@@ -45,6 +57,9 @@ import { resourceGroupSelectorContribution } from './components/ResourceGroupSel
 import { bicepEditorContribution } from './components/BicepEditor/index.js';
 import { azureActionContribution } from './components/AzureAction/index.js';
 import { locationSelectorContribution } from './components/LocationSelector/index.js';
+import { azureLoginCardContribution } from './components/AzureLoginCard/index.js';
+import { azureResourceFormContribution } from './components/AzureResourceForm/index.js';
+import { azureResourcePickerContribution } from './components/AzureResourcePicker/index.js';
 
 /** All Azure pack components eligible for client-side registration. */
 export const azureClientComponents: readonly ComponentContribution[] = Object.freeze([
@@ -56,6 +71,9 @@ export const azureClientComponents: readonly ComponentContribution[] = Object.fr
   bicepEditorContribution,
   azureActionContribution,
   locationSelectorContribution,
+  azureLoginCardContribution,
+  azureResourceFormContribution,
+  azureResourcePickerContribution,
 ]);
 
 /** Minimal registration target — any object that accepts a `ComponentContribution`. */
@@ -205,6 +223,62 @@ export const previews: Readonly<Record<string, PackPreview>> = Object.freeze({
         { name: 'westeurope', displayName: 'West Europe', regionalDisplayName: '(Europe) West Europe', geographyGroup: 'Europe' },
         { name: 'southeastasia', displayName: 'Southeast Asia', regionalDisplayName: '(Asia Pacific) Southeast Asia', geographyGroup: 'Asia Pacific' },
       ],
+    },
+  ],
+  'azure/AzureLoginCard': [
+    {
+      id: 'root',
+      component: 'azure/AzureLoginCard',
+      status: 'success',
+      displayName: 'Azure Operator',
+      subscriptions: [
+        { subscriptionId: '00000000-0000-0000-0000-000000000000', displayName: 'Kickstart Prod', state: 'Enabled' },
+      ],
+      configured: true,
+      isActive: true,
+    },
+  ],
+  'azure/AzureResourceForm': [
+    {
+      id: 'root',
+      component: 'azure/AzureResourceForm',
+      status: 'idle',
+      title: 'Create AKS Cluster',
+      subscriptionId: '00000000-0000-0000-0000-000000000000',
+      resourceGroup: 'rg-kickstart-prod',
+      resourceType: 'Microsoft.ContainerService/managedClusters',
+      locations: [
+        { name: 'eastus', displayName: 'East US' },
+        { name: 'westeurope', displayName: 'West Europe' },
+      ],
+      selectedLocation: 'eastus',
+      isActive: true,
+    },
+  ],
+  'azure/AzureResourcePicker': [
+    {
+      id: 'root',
+      component: 'azure/AzureResourcePicker',
+      status: 'loaded',
+      label: 'Select a resource to deploy to',
+      subscriptions: [
+        { subscriptionId: '00000000-0000-0000-0000-000000000000', displayName: 'Kickstart Prod', state: 'Enabled' },
+      ],
+      selectedSubscriptionId: '00000000-0000-0000-0000-000000000000',
+      resourceGroups: [
+        { name: 'rg-kickstart-prod', location: 'eastus', provisioningState: 'Succeeded' },
+      ],
+      selectedResourceGroup: 'rg-kickstart-prod',
+      resources: [
+        {
+          id: '/subscriptions/00000000/resourceGroups/rg-kickstart-prod/providers/Microsoft.ContainerService/managedClusters/kickstart-aks',
+          name: 'kickstart-aks',
+          type: 'Microsoft.ContainerService/managedClusters',
+          location: 'eastus',
+          resourceGroup: 'rg-kickstart-prod',
+        },
+      ],
+      isActive: true,
     },
   ],
 });

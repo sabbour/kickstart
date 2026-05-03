@@ -83,13 +83,13 @@ export const CORE_SCENARIOS: readonly Scenario[] = Object.freeze([
       { id: 'heading', component: 'Text', text: 'Test an authenticated Azure deployment flow' },
       {
         id: 'login',
-        component: 'AzureLoginCard',
+        component: 'azure/AzureLoginCard',
         displayName: 'Azure operator',
         showTokenInfo: true,
       },
       {
         id: 'target',
-        component: 'AzureResourcePicker',
+        component: 'azure/AzureResourcePicker',
         label: 'Choose the subscription and resource group to test with',
       },
     ],
@@ -103,19 +103,19 @@ export const CORE_SCENARIOS: readonly Scenario[] = Object.freeze([
       { id: 'heading', component: 'Text', text: 'Test an authenticated GitHub handoff flow' },
       {
         id: 'login',
-        component: 'GitHubLoginCard',
+        component: 'github/GitHubLoginCard',
         username: 'octocat',
       },
       {
         id: 'repo',
-        component: 'GitHubRepoPicker',
+        component: 'github/RepoPicker',
         placeholder: 'Select a real repository from the signed-in account',
         suggestedName: 'kickstart-sample',
         allowCreate: true,
       },
       {
         id: 'pr',
-        component: 'GitHubCommit',
+        component: 'github/GitHubCommit',
         repoFullName: 'kickstart-mock/kickstart-sample',
         defaultBranch: 'main',
         suggestedBranchName: 'kickstart/playground-test',
