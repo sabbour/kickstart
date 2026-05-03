@@ -25,6 +25,7 @@ import { proposeServicesTool } from './propose-services.js';
 import { armGetTool } from './arm-get.js';
 import { armUpdateResourceTool } from './arm-update-resource.js';
 import { armDeployResourceTool } from './arm-deploy-resource.js';
+import { quotaLookupTool } from './quota-lookup.js';
 
 function getParams(t: { tool: unknown }): SchemaNode {
   return (t.tool as FunctionTool).parameters as SchemaNode;
@@ -61,5 +62,9 @@ describe('pack-azure tool input schemas — OpenAI strict-mode conformance (#127
 
   it('azure.arm_deploy_resource — no strict-mode violations', () => {
     assertStrictlyConformant(getParams(armDeployResourceTool), 'azure.arm_deploy_resource');
+  });
+
+  it('azure.quota_lookup — no strict-mode violations', () => {
+    assertStrictlyConformant(getParams(quotaLookupTool), 'azure.quota_lookup');
   });
 });

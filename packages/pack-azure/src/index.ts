@@ -10,6 +10,7 @@ import { estimateCostTool } from './tools/estimate-cost.js';
 import { validateBicepTool } from './tools/validate-bicep.js';
 import { whatIfTool } from './tools/what-if.js';
 import { proposeServicesTool } from './tools/propose-services.js';
+import { quotaLookupTool } from './tools/quota-lookup.js';
 
 // User actions
 import { deployResourceUserAction } from './user-actions/deploy-resource.js';
@@ -68,6 +69,7 @@ export const azurePack: Pack = {
     validateBicepTool,
     whatIfTool,
     proposeServicesTool,
+    quotaLookupTool,
   ],
 
   userActions: [
@@ -100,6 +102,7 @@ export { estimateCostTool } from './tools/estimate-cost.js';
 export { validateBicepTool } from './tools/validate-bicep.js';
 export { whatIfTool } from './tools/what-if.js';
 export { proposeServicesTool, GPU_SKU_MATRIX, SUPPORTED_MODEL_SIZES } from './tools/propose-services.js';
+export { quotaLookupTool, buildQuotaRequestUrl, findSkuUsage } from './tools/quota-lookup.js';
 
 export { deployResourceUserAction } from './user-actions/deploy-resource.js';
 export { deleteResourceUserAction } from './user-actions/delete-resource.js';
