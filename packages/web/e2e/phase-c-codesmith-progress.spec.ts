@@ -148,7 +148,9 @@ test.describe('Phase C codesmith generation progress', () => {
     await page.goto('/');
     await healthReady;
 
-    await page.getByRole('textbox', { name: /describe your app/i }).fill('Build an AI app on AKS');
+    const heroInput = page.getByRole('textbox', { name: /describe your app/i });
+    await heroInput.waitFor({ state: 'visible', timeout: 10_000 });
+    await heroInput.fill('Build an AI app on AKS', { timeout: 5_000 });
     await page.getByRole('button', { name: /send/i }).click();
 
     // Gate phase-c assertions on the SSE streaming-idle DOM signal (#310/#340)
@@ -204,7 +206,9 @@ test.describe('Phase C codesmith generation progress', () => {
     await page.goto('/');
     await healthReady;
 
-    await page.getByRole('textbox', { name: /describe your app/i }).fill('Build an AI app');
+    const heroInput = page.getByRole('textbox', { name: /describe your app/i });
+    await heroInput.waitFor({ state: 'visible', timeout: 10_000 });
+    await heroInput.fill('Build an AI app', { timeout: 5_000 });
     await page.getByRole('button', { name: /send/i }).click();
 
     // Gate on streaming-idle (#310/#340) so write_file tool events have all
