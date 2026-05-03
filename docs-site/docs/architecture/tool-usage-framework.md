@@ -23,11 +23,13 @@ Every pack exposes a **server manifest** — a plain TypeScript module with no R
 // Simplified — imports and type definitions omitted for brevity
 // packages/pack-aks-automatic/src/server-manifest.ts
 import { validateManifestsTool } from './tools/validate-manifests.js';
+import { validateSafeguardsTool } from './tools/validate-safeguards.js';
+import { buildArchitectureDiagramTool } from './tools/build-architecture-diagram.js';
 import { aksDeployUserAction } from './user-actions/deploy.js';
 
 export const aksAutomaticPackServer: Pack = {
   name: 'aks',
-  tools: [validateManifestsTool, validateSafeguardsTool],
+  tools: [validateManifestsTool, validateSafeguardsTool, buildArchitectureDiagramTool],
   userActions: [aksDeployUserAction],
   components: serverComponents,
   guardrails: [noPrivilegedContainersGuardrail],
@@ -56,14 +58,42 @@ Kickstart distinguishes two categories:
 
 ### Model-Invocable Tools
 
-These are functions the LLM autonomously decides to call during a conversation turn. Examples:
+These are functions the LLM autonomously decides to call during a conversation turn. The table below lists every tool actually exposed via the pack server manifests (`createCoreTools()`, `azurePackServer.tools`, `aksAutomaticPackServer.tools`, `githubPackServer.tools`):
 
-| Tool | Pack | Purpose |
-|------|------|---------|
-| `core.emit_ui` | core | Render UI components to the client surface |
-| `core.read_file` | core | Read a workspace file (with confinement) |
-| `aks.validate_manifests` | aks-automatic | Lint Kubernetes manifests against safeguards |
-| `aks.build_architecture_diagram` | aks-automatic | Generate an architecture visualization |
+| Tool | Pack | Purpose | Notes |
+|------|------|---------|-------|
+| `core.show_card` | core | Render a card component to a client surface | Preferred over `core.emit_ui` |
+| `core.show_form` | core | Render a form component to a client surface | Preferred over `core.emit_ui` |
+| `core.confirm` | core | Prompt the user for a yes/no confirmation | Preferred over `core.emit_ui` |
+| `core.navigate` | core | Navigate the client to a route or surface | Preferred over `core.emit_ui` |
+| `core.emit_ui` | core | Send a raw A2UI envelope to the client surface | **Deprecated** — use focused tools above; retained for backward compat (#112) |
+| `core.fetch_webpage` | core | Fetch and return the text content of a URL | |
+| `core.search_kaito_models` | core | Search the KAITO model catalog | |
+| `core.read_file` | core | Read a workspace file (with confinement) | |
+| `core.write_file` | core | Write a file to the workspace | |
+| `core.list_files` | core | List files in the workspace | |
+| `core.validate_artifacts` | core | Run automated checks on generated artifacts | |
+| `core.check_safeguards` | core | Evaluate a manifest against active safeguard policies | |
+| `core.fix_safeguards` | core | Apply automatic remediations for safeguard violations | |
+| `core.inspect_repo` | core | Fetch repo metadata and file tree from GitHub | |
+| `core.search_components` | core | Search the registered UI component catalog | |
+| `core.helm_template` | core | Render a Helm chart via `helm template` | |
+| `core.kustomize_build` | core | Build a Kustomize overlay via `kustomize build` | |
+| `azure.arm_get` | azure | Read an ARM resource or resource group | |
+| `azure.arm_deploy_resource` | azure | Deploy an ARM/Bicep resource | |
+| `azure.arm_delete_resource` | azure | Delete an ARM resource | |
+| `azure.arm_update_resource` | azure | Patch an existing ARM resource | |
+| `azure.pricing_lookup` | azure | Look up Azure retail pricing for a resource SKU | |
+| `azure.estimate_cost` | azure | Estimate monthly cost for a resource topology | |
+| `azure.validate_bicep` | azure | Lint and validate a Bicep template | |
+| `azure.what_if` | azure | Preview ARM changes before deployment | |
+| `aks.validate_manifests` | aks-automatic | Lint Kubernetes manifests against safeguards | |
+| `aks.validate_safeguards` | aks-automatic | Run AKS safeguard policy checks on a cluster spec | |
+| `aks.build_architecture_diagram` | aks-automatic | Generate an AKS architecture visualization | |
+| `github.api_get` | github | Make a read-only GitHub API call | |
+| `github.check_repo_access` | github | Verify the user's access to a GitHub repository | |
+
+> **Not exposed:** Several tool files exist in the source tree but are not registered in any server manifest and are therefore never available to agents at runtime: `core.read_skill`, `core.scaffold_app`, `core.gen_foundry_wiring`, `core.gen_kaito_crd`, `core.gen_helm`, `core.gen_dockerfile`, `azure.propose_services`, `azure.quota_lookup`.
 
 The LLM receives tool definitions in OpenAI function-calling format and emits structured `tool_call` messages when it determines a tool is needed.
 

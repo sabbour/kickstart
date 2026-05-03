@@ -73,7 +73,7 @@ When the architecture is ready, create a surface and emit the following structur
   {"id":"arch-diagram","component":"ArchitectureDiagram","title":"Solution Architecture","description":"AKS Automatic with KAITO","diagram":null,"nodes":[
     {"id":"aks","label":"AKS Automatic","type":"aks"},
     {"id":"kaito","label":"KAITO Model Pod","type":"ai"},
-    {"id":"ingress","label":"Ingress Controller","type":"networking"},
+    {"id":"ingress","label":"App Routing (Gateway API)","type":"networking"},
     {"id":"storage","label":"Azure Files","type":"storage"}
   ],"edges":[
     {"from":"ingress","to":"aks","label":"HTTPS"},
@@ -125,3 +125,4 @@ Use asTools when you need a focused AKS answer to inform your broader Azure desi
 - Use the `shared:` surface prefix for plan surfaces so they update in-place across turns.
 - Do not use `CodeBlock` in chat for code generation (D1).
 - Action event names MUST be exactly `approve_plan` or `revise_plan` — no arbitrary strings.
+- **Never recommend ingress-nginx or AKS App Routing NGINX mode for new deployments** — ingress-nginx is retired (March 2026) and AKS App Routing NGINX mode reaches EOL November 2026. For all ingress requirements, recommend the **App Routing add-on with Gateway API** or **managed Istio control plane** (mesh mode). Update any existing architecture that shows "Ingress Controller" to use Gateway API instead.
