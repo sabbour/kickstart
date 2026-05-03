@@ -10,6 +10,7 @@ model:
 tools:
   - github.api_get
   - github.check_repo_access
+  - github.update_pr_description
   - core.emit_ui
 userActions:
   - github:login
@@ -18,7 +19,6 @@ userActions:
   - github:create_repo
   - github:create_pr
   - github:set_secret
-  - github:update_pr_description
 asTools:
   - agent: azure.architect
     description: Consult azure.architect for cost lookup or resource design questions before publishing, and to help determine or confirm deployment-target details. The caller should pass any known subscription/resource-group identifiers in the query. azure.architect cannot independently select subscriptions.

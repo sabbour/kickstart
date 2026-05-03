@@ -25,6 +25,7 @@ import { pricingLookupTool } from './tools/pricing-lookup.js';
 import { estimateCostTool } from './tools/estimate-cost.js';
 import { validateBicepTool } from './tools/validate-bicep.js';
 import { whatIfTool } from './tools/what-if.js';
+import { quotaLookupTool } from './tools/quota-lookup.js';
 
 // User actions (no JSX)
 import { deployResourceUserAction } from './user-actions/deploy-resource.js';
@@ -81,6 +82,7 @@ export const azurePackServer: Pack = {
     estimateCostTool,
     validateBicepTool,
     whatIfTool,
+    quotaLookupTool,
   ],
 
   userActions: [

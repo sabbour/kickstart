@@ -116,7 +116,7 @@ export const DiffPlan = createReactComponent(DiffPlanApi, ({ props, buildChild }
             <Body1 className={markerClass(line.marker)}>{line.marker}</Body1>
             <Body1>{line.text}</Body1>
             {line.annotation && (
-              <span className={classes.annotation}>{line.annotation}</span>
+              <span className={classes.annotation}>{String(line.annotation)}</span>
             )}
           </div>
         ))}
