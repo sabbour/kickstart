@@ -9,6 +9,7 @@ tools:
   - core.read_file
   - core.search_kaito_models
   - core.search_components
+  - core.priorDeploymentContext
 handoffs:
   - label: AKS architecture
     agent: aks.architect
@@ -71,7 +72,7 @@ Run this BEFORE track selection. First-match-wins. The recognized mode is a norm
 
 **Precedence (top wins):**
 
-1. **Iteration** — `.kickstart/state.json` is present in the repo OR the opener says things like "we just added a worker", "update the deployment", "add a service", "modify the existing cluster". The user is mid-flight on a prior plan; load `priorDeploymentContext` (from `core.read_file(".kickstart/state.json")` plus `core.inspect_repo`) and route to `aks.architect` with `iteration` populated. **Skip greenfield plan composition.**
+1. **Iteration** — `.kickstart/state.json` is present in the repo OR the opener says things like "we just added a worker", "update the deployment", "add a service", "modify the existing cluster". The user is mid-flight on a prior plan. Call `core.priorDeploymentContext` first — if it returns `{ found: true, context }`, populate the `iteration.priorDeploymentContext` slot directly and **skip all onboarding questions** (recipe, target, summary are already known). If it returns `{ found: false }`, fall back to `core.read_file(".kickstart/state.json")` plus `core.inspect_repo`. Route to `aks.architect` with `iteration` populated. **Skip greenfield plan composition.**
 2. **Handover** — opener contains "package up", "send to <name>", "review pack", "for review", "before we merge", "PR #N review", or "hand this off". Route to `aks.reviewer` with `handover` populated and constraint-spec pinned. R9 review-pack composition fires downstream.
 3. **Bulk** — opener contains an explicit count phrase like "3 Heroku apps", "5 services", "these 4 repos". Open with R3 + R-shared-infra-decision **before** any per-app inspection. Per-app inspection only after the topology lock is acknowledged.
 4. **PaaS-migration** — opener mentions a source PaaS platform anchored to "from <platform>", "on <platform>", "moving off <platform>", "currently on <platform>". Platforms: render, heroku, vercel, fly, netlify, railway. Open with the R3 migration mapping table BEFORE any plan card. Sequence R-PaaS-teardown.
@@ -305,6 +306,15 @@ Phase definitions (per AKS Automatic grounding Part 12):
 ## Repeat-user compression
 
 If the user's history contains a prior R7 ("What I'm doing for you") preamble within the same session, do NOT re-render the verbatim preamble on subsequent turns. Use a short-form acknowledgment: "Picking up from <previous-context>. <next-action>." This addresses the sim-07 repeat-user case.
+
+## Prior deployment context (Phase 3 — #218)
+
+Call `core.priorDeploymentContext` at the **start of every triage turn** (before any mode classification). It reads `.kickstart/state.json` and returns structured context:
+
+- `{ found: true, context: { lastRecipe, lastHandoffTarget, workspaceStateFile, summary } }` — prior deployment found. Skip onboarding questions. Set `mode = iteration` and populate `iteration.priorDeploymentContext` from the returned context object.
+- `{ found: false }` — first-time run or no prior state. Proceed with normal mode recognition.
+
+When `found: true`, the iteration-mode briefing MUST include `iteration.priorDeploymentContext`. The `aks.architect` downstream agent uses those slots to skip redundant questions about recipe and target.
 
 ## Read-only file access
 

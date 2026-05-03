@@ -65,11 +65,11 @@ describe('triage frontmatter — loader-resolvable invariant (R6)', () => {
     ).toEqual([]);
   });
 
-  it('triage frontmatter does NOT list core.priorDeploymentContext (Phase 3 placeholder per #218)', () => {
+  it('triage frontmatter DOES list core.priorDeploymentContext (Phase 3 implemented in #218)', () => {
     expect(
       tools.includes('core.priorDeploymentContext'),
-      'core.priorDeploymentContext is a Phase 3 placeholder; triage degrades to core.inspect_repo + core.read_file in Phase 2 (Nibbler R6).',
-    ).toBe(false);
+      'core.priorDeploymentContext was added in Phase 3 (#218); it must be present in triage frontmatter and registered in pack-core.',
+    ).toBe(true);
   });
 
   it('triage frontmatter does NOT list core.read_skill (universally registered by runner)', () => {

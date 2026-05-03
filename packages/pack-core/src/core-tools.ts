@@ -16,6 +16,7 @@ import { createSearchComponentsTool } from './tools/search_components.js';
 import { createInspectRepoTool } from './tools/inspect_repo.js';
 import { helmTemplateTool } from './tools/helm_template.js';
 import { createKustomizeBuildTool } from './tools/kustomize_build.js';
+import { priorDeploymentContextTool } from './tools/prior_deployment_context.js';
 
 export function createCoreTools(components: ComponentContribution[]): ToolContribution[] {
   return [
@@ -38,5 +39,6 @@ export function createCoreTools(components: ComponentContribution[]): ToolContri
     createSearchComponentsTool({ components }),
     helmTemplateTool,
     createKustomizeBuildTool(),
+    priorDeploymentContextTool,
   ];
 }

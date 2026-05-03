@@ -86,12 +86,30 @@ const SourceSignalSchema = z
 
 export type SourceSignal = z.infer<typeof SourceSignalSchema>;
 
+// ── Phase 3: Prior deployment context (#218) ────────────────────────────────
+//
+// Extracted from `.kickstart/state.json` by `core.priorDeploymentContext` and
+// placed in the iteration block. Allows the triage agent to skip redundant
+// questions and go straight to iteration mode when a prior deployment exists.
+
+export const PriorDeploymentContextSchema = z
+  .object({
+    lastRecipe: z.string().min(1).max(256),
+    lastHandoffTarget: z.string().min(1).max(128),
+    workspaceStateFile: z.string().min(1),
+    summary: z.string().min(1).max(1024),
+  })
+  .strict();
+
+export type PriorDeploymentContext = z.infer<typeof PriorDeploymentContextSchema>;
+
 // ── Mode-specific context blocks ────────────────────────────────────────────
 
 const IterationContextSchema = z
   .object({
     priorPlanRef: z.string().min(1).optional(),
     diffIntent: z.string().min(1).max(512),
+    priorDeploymentContext: PriorDeploymentContextSchema.optional(),
   })
   .strict();
 
