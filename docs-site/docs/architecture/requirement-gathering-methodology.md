@@ -16,8 +16,6 @@ The methodology rests on a single principle: **inference first, questions second
 
 The structured question budgets are encoded in `config/tracks.json` (via `requirementHints`) and `config/inference-backends.json` (via `questionPolicy`). This document is the human-readable specification; the JSON files are the machine-enforceable form.
 
-> **Note:** This document covers the core methodology for requirement gathering. Additional #222 acceptance criteria (acknowledge-before-asking opener pattern, bulk/multi-field exceptions, target-zero-questions metric, per-agent forbidden question lists) are tracked for a follow-up iteration.
-
 ---
 
 ## The Inference-First Principle
@@ -221,7 +219,7 @@ When you've decided to ask, choose the right vehicle.
 
 Specific cross-references:
 - For *which component* to emit, see the [Component Selection Framework](./component-selection-framework.md).
-- For *whether `core.emit_ui` should fire at all*, see the **Category 5: UI emission** rules in the [Tool Usage Framework](./tool-usage-framework.md).
+- For *whether a UI surface should fire at all*, see the **Category 5: UI emission** rules in the [Tool Usage Framework](./tool-usage-framework.md).
 
 The current triage prompt enforces an important sub-rule under `repo_uplift`: **do not bundle the inspect_repo questionnaire array into a single multi-field form** — ask the most important one in prose, re-evaluate, then maybe ask the next. That's Rule 1 + Rule 3 in practice; it generalises: a Questionnaire is for inputs the user must answer *together*, not for whatever questions the agent has on its mental list.
 
