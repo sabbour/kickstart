@@ -18,6 +18,8 @@
  * CSP-owning files. Exits non-zero on any violation; the workflow is
  * non-bypassable (no `continue-on-error`).
  *
+ * Enforcement model and escalation path: docs/operations/csp-enforcement.md
+ *
  * Run locally:  node packages/web/scripts/check-csp.mjs
  */
 
@@ -75,3 +77,11 @@ if (missing.length > 0) {
 }
 
 console.log(`✅ CSP check passed: connect-src includes ${REQUIRED_CONNECT_SRC.join(', ')}`);
+
+// TODO(#348): If the project adopts non-globalHeaders CSP enforcement locations, extend this
+// script to scan those locations. Planned future scanners:
+//   1. <meta http-equiv="Content-Security-Policy"> in packages/web/public/index.html / built HTML
+//   2. Server-set CSP headers if a proxy or custom origin fronts the SWA
+// Each scanner must validate connect-src includes required origins (REQUIRED_CONNECT_SRC).
+// Do NOT implement until the corresponding CSP location is actually adopted.
+// See docs/operations/csp-enforcement.md § Future Scope for details.
