@@ -154,12 +154,10 @@ describe('BrowserAzureARMConnector (issue #320 cutover) — request()', () => {
 });
 
 describe('BrowserAzureARMConnector (issue #320 cutover) — list endpoints', () => {
-  it('listSubscriptions hits ARM directly and unwraps `{ value: [...] }`', async () => {
-    let observedUrl: string | undefined;
+  it('listSubscriptions calls the typed /api/azure/subscriptions endpoint and unwraps `{ value: [...] }`', async () => {
     armMswServer.use(
-      http.get(armUrl('/subscriptions'), ({ request }) => {
-        observedUrl = request.url;
-        return HttpResponse.json({
+      http.get('/api/azure/subscriptions', () =>
+        HttpResponse.json({
           value: [
             {
               subscriptionId: 'sub-1',
@@ -168,23 +166,20 @@ describe('BrowserAzureARMConnector (issue #320 cutover) — list endpoints', () 
               tenantId: 't-1',
             },
           ],
-        });
-      }),
+        }),
+      ),
     );
 
     const connector = new BrowserAzureARMConnector();
     const subs = await connector.listSubscriptions();
 
-    expect(observedUrl).toMatch(/^https:\/\/management\.azure\.com\/subscriptions\?/);
-    // No api-version was double-injected — the path supplied its own.
-    expect((observedUrl ?? '').match(/api-version=/g) ?? []).toHaveLength(1);
     expect(subs).toHaveLength(1);
     expect(subs[0].subscriptionId).toBe('sub-1');
   });
 
   it('listResourceGroups stamps the subscriptionId on every group', async () => {
     armMswServer.use(
-      http.get(armUrl('/subscriptions/sub-1/resourcegroups'), () =>
+      http.get('/api/azure/subscriptions/sub-1/resource-groups', () =>
         HttpResponse.json({
           value: [
             { id: '/subscriptions/sub-1/resourceGroups/rg-1', name: 'rg-1', location: 'eastus' },
@@ -200,9 +195,9 @@ describe('BrowserAzureARMConnector (issue #320 cutover) — list endpoints', () 
     expect(groups[0].subscriptionId).toBe('sub-1');
   });
 
-  it('list endpoints surface ARM errors as Error (legacy contract preserved)', async () => {
+  it('list endpoints surface API errors as Error', async () => {
     armMswServer.use(
-      http.get(armUrl('/subscriptions'), () =>
+      http.get('/api/azure/subscriptions', () =>
         HttpResponse.json(
           { error: { code: 'BadGateway', message: 'Upstream blew up.' } },
           { status: 502 },
@@ -216,18 +211,16 @@ describe('BrowserAzureARMConnector (issue #320 cutover) — list endpoints', () 
 });
 
 describe('BrowserAzureARMConnector (issue #320 cutover) — token endpoint', () => {
-  it('uses the canonical /api/azure/token endpoint (never the legacy proxy)', async () => {
-    let tokenHits = 0;
+  it('listSubscriptions marks connector authenticated on success', async () => {
     armMswServer.use(
-      http.get(TOKEN_ENDPOINT, () => {
-        tokenHits += 1;
-        return HttpResponse.json({ token: 'fresh-tok' });
-      }),
-      http.get(armUrl('/subscriptions'), () => HttpResponse.json({ value: [] })),
+      http.get('/api/azure/subscriptions', () =>
+        HttpResponse.json({ value: [{ subscriptionId: 'sub-ok', displayName: 'OK', state: 'Enabled', tenantId: 't-1' }] }),
+      ),
     );
 
     const connector = new BrowserAzureARMConnector();
+    expect(connector.isAuthenticated()).toBe(false);
     await connector.listSubscriptions();
-    expect(tokenHits).toBeGreaterThanOrEqual(1);
+    expect(connector.isAuthenticated()).toBe(true);
   });
 });

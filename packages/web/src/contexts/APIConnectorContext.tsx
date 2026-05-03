@@ -127,8 +127,8 @@ export class BrowserAzureARMConnector implements APIConnector {
       return MOCK_SUBSCRIPTIONS;
     }
 
-    const body = await this.getArmList<AzureSubscription>('/subscriptions?api-version=2022-12-01');
-    return body
+    const value = await this.fetchAzureList<AzureSubscription>('/api/azure/subscriptions');
+    return value
       .map((subscription) => ({
         ...subscription,
         subscriptionId: subscription.subscriptionId ?? subscription.id?.split('/').pop() ?? '',
@@ -142,8 +142,8 @@ export class BrowserAzureARMConnector implements APIConnector {
       return MOCK_LOCATIONS.map((location) => ({ ...location, subscriptionId }));
     }
 
-    return this.getArmList<AzureLocation>(
-      `/subscriptions/${encodeURIComponent(subscriptionId)}/locations?api-version=2022-12-01`,
+    return this.fetchAzureList<AzureLocation>(
+      `/api/azure/subscriptions/${encodeURIComponent(subscriptionId)}/locations`,
     );
   }
 
@@ -153,8 +153,8 @@ export class BrowserAzureARMConnector implements APIConnector {
       return MOCK_RESOURCE_GROUPS.map((group) => withSubscriptionId(group, subscriptionId));
     }
 
-    const groups = await this.getArmList<AzureResourceGroup>(
-      `/subscriptions/${encodeURIComponent(subscriptionId)}/resourcegroups?api-version=2021-04-01`,
+    const groups = await this.fetchAzureList<AzureResourceGroup>(
+      `/api/azure/subscriptions/${encodeURIComponent(subscriptionId)}/resource-groups`,
     );
     return groups.map((group) => ({ ...group, subscriptionId }));
   }
@@ -165,8 +165,8 @@ export class BrowserAzureARMConnector implements APIConnector {
       return MOCK_RESOURCES.map((resource) => withSubscriptionId(resource, subscriptionId));
     }
 
-    const resources = await this.getArmList<AzureResource>(
-      `/subscriptions/${encodeURIComponent(subscriptionId)}/resources?api-version=2021-04-01`,
+    const resources = await this.fetchAzureList<AzureResource>(
+      `/api/azure/subscriptions/${encodeURIComponent(subscriptionId)}/resources`,
     );
     return resources.map((resource) => ({
       ...resource,
@@ -221,24 +221,20 @@ export class BrowserAzureARMConnector implements APIConnector {
     }
   }
 
-  private async getArmList<T>(path: string): Promise<T[]> {
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    try {
-      // Caller paths already include `?api-version=...`; suppress default
-      // injection so we don't append a duplicate parameter.
-      const response = await armFetch(normalizedPath, { apiVersion: null });
-      this.authenticated = true;
-      const payload = (await response.json().catch(() => undefined)) as
-        | { value?: T[] }
-        | undefined;
-      return Array.isArray(payload?.value) ? (payload!.value as T[]) : [];
-    } catch (err) {
-      if (err instanceof ArmFetchError) {
-        if (err.kind === 'auth-error') this.authenticated = false;
-        throw new Error(err.message, { cause: err });
+  private async fetchAzureList<T>(url: string): Promise<T[]> {
+    const response = await apiFetch(url);
+    const json = await response.json().catch(() => undefined) as { value?: T[] } | undefined;
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        this.authenticated = false;
       }
-      throw err;
+      const message =
+        (json as { error?: { message?: string } })?.error?.message ??
+        `Azure request failed (${response.status}).`;
+      throw new Error(message);
     }
+    this.authenticated = true;
+    return Array.isArray(json?.value) ? (json!.value as T[]) : [];
   }
 }
 

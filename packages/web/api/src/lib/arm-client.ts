@@ -217,3 +217,16 @@ export async function listResourceGroupDeploymentOperations(
 
   return response.value ?? [];
 }
+
+/**
+ * Generic ARM list helper: GET `path`, extract and return `value[]`.
+ * Throws an {@link AzureApiError} on any non-2xx ARM response so callers
+ * can rely on `azureErrorResponse` to convert it to an HTTP reply.
+ */
+export async function armGetList<T>(
+  accessToken: string,
+  path: string,
+): Promise<T[]> {
+  const result = await armRequest<ValueEnvelope<T>>(accessToken, "GET", path);
+  return result?.value ?? [];
+}

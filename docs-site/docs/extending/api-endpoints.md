@@ -10,21 +10,91 @@ Kickstart's backend runs on **Azure Functions v4** (Node.js, ESM) deployed insid
 
 ## Function inventory
 
-| Endpoint | File | Purpose |
+
+### Azure Functions v4 Pattern
+
+Every endpoint follows the same registration pattern using `app.http()` in `packages/web/api/src/functions/`:
+
+```typescript
+import { app } from "@azure/functions";
+import type {
+  HttpRequest,
+  HttpResponseInit,
+  InvocationContext,
+} from "@azure/functions";
+
+app.http("functionName", {
+  methods: ["POST"],
+  authLevel: "anonymous",
+  route: "endpoint-path",
+  handler: async (
+    request: HttpRequest,
+    context: InvocationContext,
+  ): Promise<HttpResponseInit> => {
+    // Handler logic
+  },
+});
+```
+
+| Property | Description |
+|---|---|
+| `"functionName"` | Unique function name used by the Azure Functions runtime |
+| `methods` | HTTP methods to accept (`["GET"]`, `["POST"]`, etc.) |
+| `authLevel` | Always `"anonymous"` — SWA handles auth at the edge |
+| `route` | URL path (relative to `/api/`) |
+| `handler` | Async function receiving the request and invocation context |
+
+### Existing Endpoints
+
+#### Conversation & Session
+
+| Endpoint | Method | Route | Auth | Response Format | Description |
+|---|---|---|---|---|---|
+| `converse` | POST | `/api/converse` | None (rate-limited) | SSE or JSON | Main LLM conversation proxy — multi-round tool calling |
+| `action` | POST | `/api/action` | Session required | JSON | A2UI action event processing |
+| `generate` | POST | `/api/generate` | None (rate-limited) | SSE or JSON | Codex-powered code generation |
+| `health` | GET | `/api/health` | None | JSON | Health check (`{ status: "ok" }`) |
+
+#### GitHub Integration
+
+| Endpoint | Method | Route | Auth | Response Format | Description |
+|---|---|---|---|---|---|
+| `github-auth` | GET/POST | `/api/github-auth/{action}` | SWA principal | HTML / JSON | GitHub OAuth flow — login, callback, session state, logout |
+| `github-repos` | GET/POST | `/api/github/repos` | GitHub session cookie | JSON | List or create GitHub repositories |
+| `github-pulls` | POST | `/api/github/pulls` | GitHub session cookie | JSON | Commit files and open a pull request |
+
+#### Azure Integration
+
+| Endpoint | Method | Route | Auth | Response Format | Description |
+|---|---|---|---|---|---|
+| `azure-subscriptions` | GET | `/api/azure/subscriptions` | `x-ms-token-aad-access-token` | JSON `{ value: [] }` | List Azure subscriptions for the signed-in user |
+| `azure-locations` | GET | `/api/azure/subscriptions/{subId}/locations` | `x-ms-token-aad-access-token` | JSON `{ value: [] }` | List Azure locations available in a subscription |
+| `azure-resource-groups` | GET | `/api/azure/subscriptions/{subId}/resource-groups` | `x-ms-token-aad-access-token` | JSON `{ value: [] }` | List resource groups in a subscription |
+| `azure-resources` | GET | `/api/azure/subscriptions/{subId}/resources` | `x-ms-token-aad-access-token` | JSON `{ value: [] }` | List resources in a subscription |
+| `azure-target` | PUT | `/api/sessions/{sessionId}/azure-target` | Azure access token + SWA sign-in + session | JSON | Persist Azure subscription / resource group for a session |
+| `azure-deployments-start` | POST | `/api/sessions/{sessionId}/azure-deployments` | Azure access token + SWA sign-in + session | JSON | Kick off an ARM deployment for a session |
+| `azure-deployments-status` | GET | `/api/azure-deployments/{runId}` | Azure access token + SWA sign-in | JSON | Poll the status of a running ARM deployment |
+| `deploy-cost-gate` | POST | `/api/sessions/{sessionId}/deploy-gates/cost` | SWA sign-in + session | JSON | Record that the user acknowledged estimated deployment costs |
+| `cost-estimate` | POST | `/api/sessions/{sessionId}/cost-estimate` | Session required | JSON | Fetch a live Azure cost estimate for the session's resource line-items |
+
+#### Utility
+
+| Endpoint | Method | Route | Auth | Response Format | Description |
+|---|---|---|---|---|---|
+| `pricing-proxy` | GET | `/api/pricing-proxy` | None | JSON | CORS proxy for the Azure Retail Prices API |
+| `inspirations` | GET | `/api/inspirations` | None | JSON / SSE | Landing page inspiration ideas (LLM-generated or hardcoded fallback) |
+| `widget-inspirations` | GET | `/api/inspirations/widgets` | None | JSON / SSE | Playground widget inspiration prompts |
+| `playground` | POST | `/api/playground` | None | JSON | 🔧 Internal — A2UI Playground Create tab; iterates A2UI component designs |
+
+#### Deprecated (410 Gone)
+
+These routes are registered solely to return `410 Gone` to any client still calling them. Do not use them.
+
+| Endpoint | Route | Replacement |
 |---|---|---|
-| `POST /api/converse` | `converse.ts` | Per-turn SSE stream — runs the active agent through `Runner.run()`. |
-| `POST /api/converse/resume` | `resume.ts` | Resume a paused Runner after a UserAction result arrives. |
-| `POST /api/action` | `action.ts` | Execute a one-shot UserAction outside a converse stream. |
-| `GET /api/packs` | `packs.ts` | Safe client DTO of components, user actions, and playground scenarios. |
-| `POST /api/inspirations` | `inspirations.ts` | Generate inspiration suggestions. |
-| `POST /api/widget-inspirations` | `widget-inspirations.ts` | Per-component inspirations. |
-| `POST /api/playground` | `playground.ts` | Drive a playground scenario (gated by `KICKSTART_PLAYGROUND`). |
-| `GET /api/health` | `health.ts` | Readiness + dependency probes. |
-| `POST /api/generate` | `generate.ts` | Direct codegen entry-point. |
-| `GET /api/github/auth/*` | `github-auth.ts` | GitHub OAuth flow + callback. |
-| `*  /api/arm-proxy/*` | `arm-proxy.ts` | **Retired (`410 Gone` tombstone).** Browser-direct ARM (Option A2) — see [ARM call flow](../architecture/arm-call-flow.md). Use `armFetch` + `/api/azure/token`. |
-| `*  /api/github-proxy/*` | `github-proxy.ts` | Browser-direct GitHub proxy. |
-| `GET /api/cost-estimate` | `cost-estimate.ts` | Pricing lookups. |
+| `github-proxy-legacy` | `/api/github-proxy/{*path}` | Use `/api/github-auth`, `/api/github/repos`, `/api/github/pulls` |
+| `github-oauth-legacy` | `/api/github-oauth/{*path}` | Use `/api/github-auth/login` |
+| `arm-proxy-legacy` | `/api/arm-proxy/{*path}` | **Deprecated → `410 Gone`.** Use the typed `/api/azure/*` endpoints (subscriptions, locations, resource-groups, resources) instead. |
 
 The companion `packages/web/api/src/functions/converse.md` keeps a focused architecture note for the converse handler; this page is the inventory.
 
