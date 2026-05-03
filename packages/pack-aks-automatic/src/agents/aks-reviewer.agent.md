@@ -62,7 +62,7 @@ Run every check in order. For each check emit a single-line verdict: **PASS**, *
 | 4 | **Readiness probe** | No `readinessProbe` on any container | Probe present but `failureThreshold` < 3 |
 | 5 | **SecurityContext — non-root** | `runAsNonRoot: false` or `runAsUser: 0` anywhere in pod or container spec | `runAsNonRoot` absent (not explicitly set) |
 | 6 | **SecurityContext — readOnlyRootFilesystem** | `readOnlyRootFilesystem: false` explicitly | Field absent (not explicitly set) |
-| 7 | **hostNetwork / hostPID / hostIPC** | Any of these set to `true` | — |
+| 7 | **hostNetwork / hostPID / hostIPC / hostPath** | Any of `hostNetwork`, `hostPID`, `hostIPC` set to `true`; or any volume with a `hostPath` source | — |
 | 8 | **Image pull policy** | Mutable tag (`:latest` or no digest) with `imagePullPolicy: IfNotPresent` or absent | Pinned digest with `imagePullPolicy: Always` (wasteful, not blocking) |
 | 9 | **PodDisruptionBudget** | Multi-replica workload with no matching PDB in submitted manifests | PDB present but `minAvailable: 0` or `maxUnavailable: 100%` |
 | 10 | **NetworkPolicy** | No NetworkPolicy selects this workload's pod labels | NetworkPolicy present but allows all ingress or all egress (`{}` selector) |
@@ -82,7 +82,7 @@ After running the checklist, emit findings with `core.show_card`:
 | Readiness probe | … | … |
 | SecurityContext — non-root | … | … |
 | SecurityContext — readOnlyRootFilesystem | … | … |
-| hostNetwork/hostPID/hostIPC | … | … |
+| hostNetwork/hostPID/hostIPC/hostPath | … | … |
 | Image pull policy | … | … |
 | PodDisruptionBudget | … | … |
 | NetworkPolicy | … | … |
@@ -134,7 +134,7 @@ When the user provides a Helm chart (either a `values.yaml` file or a path to a 
    | Pattern | Severity | Note |
    |---------|----------|------|
    | `resources: {}` or `resources:` absent in `values.yaml` | WARN | Chart ships without default resource requests/limits — callers must set them |
-   | Image tag hardcoded in `values.yaml` as `:latest` or a bare word (not a digest) | WARN | Mutable tags bypass image immutability guarantees |
+   | Image tag hardcoded in `values.yaml` as `:latest` or a bare word (not a digest) | FAIL | Mutable tags violate AKS Automatic image immutability requirement — unconditional prohibition |
    | `replicaCount: 1` with no PDB defined in templates | WARN | Single replica — PDB is moot, but flag if this is a production chart |
    | Anti-affinity absent from chart templates and not parameterisable via values | FAIL | Cluster may schedule all pods on one node |
 
