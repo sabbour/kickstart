@@ -1,0 +1,32 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Bundler",
+    "verbatimModuleSyntax": false,
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@aks-kickstart/harness/runtime/registry":   ["packages/harness/src/runtime/registry.ts"],
+      "@aks-kickstart/harness/runtime/runner":     ["packages/harness/src/runtime/runner.ts"],
+      "@aks-kickstart/harness/runtime/session":    ["packages/harness/src/runtime/session.ts"],
+      "@aks-kickstart/harness/runtime/sse":        ["packages/harness/src/runtime/sse.ts"],
+      "@aks-kickstart/harness/runtime/asset-url":  ["packages/harness/src/runtime/asset-url.ts"],
+      "@aks-kickstart/harness/runtime/guardrails": ["packages/harness/src/runtime/guardrails.ts"],
+      "@aks-kickstart/harness/runtime/catalog":    ["packages/harness/src/runtime/catalog.ts"],
+      "@aks-kickstart/harness/runtime/loader-agent": ["packages/harness/src/runtime/loader-agent.ts"],
+      "@aks-kickstart/harness/runtime/loader-skill": ["packages/harness/src/runtime/loader-skill.ts"],
+      "@aks-kickstart/harness/runtime/frontmatter": ["packages/harness/src/runtime/frontmatter.ts"],
+      "@aks-kickstart/harness/runtime/redact":     ["packages/harness/src/runtime/redact.ts"],
+      "@aks-kickstart/harness/runtime/z-strict":   ["packages/harness/src/runtime/z-strict.ts"],
+      "@aks-kickstart/harness/runtime/resume":     ["packages/harness/src/runtime/resume.ts"],
+      "@aks-kickstart/harness/runtime/session-store": ["packages/harness/src/runtime/session-store.ts"],
+      "@aks-kickstart/harness":                    ["packages/harness/src/index.ts"],
+      "@aks-kickstart/pack-core/server-manifest":  ["packages/pack-core/src/server-manifest.ts"],
+      "@aks-kickstart/pack-azure/server-manifest": ["packages/pack-azure/src/server-manifest.ts"],
+      "@aks-kickstart/pack-aks-automatic/server-manifest": ["packages/pack-aks-automatic/src/server-manifest.ts"],
+      "@aks-kickstart/pack-github/server-manifest": ["packages/pack-github/src/server-manifest.ts"]
+    }
+  },
+  "include": ["scripts/**/*.ts", "packages/sim-test/src/**/*.ts"]
+}

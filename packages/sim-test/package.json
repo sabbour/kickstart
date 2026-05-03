@@ -1,0 +1,18 @@
+{
+  "name": "@aks-kickstart/sim-test",
+  "version": "0.1.0",
+  "description": "Sim-as-regression-test harness — parser, scorer, and CLI runner for sim transcripts",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+  },
+  "devDependencies": {
+    "typescript": "*",
+    "vitest": "*"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  }
+}

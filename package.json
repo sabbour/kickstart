@@ -30,7 +30,9 @@
     "changeset:status": "changeset status",
     "golden:record": "npx tsx scripts/record-golden-fixtures.ts",
     "golden:lint": "npx tsx scripts/lint-golden-fixtures.ts",
-    "test:golden": "npx playwright test --project=golden"
+    "test:golden": "npx playwright test --project=golden",
+    "sim-test": "npx tsx scripts/sim-test.ts",
+    "chat": "npx tsx --tsconfig tsconfig.scripts.json scripts/chat.ts"
   },
   "engines": {
     "node": ">=22.0.0"
