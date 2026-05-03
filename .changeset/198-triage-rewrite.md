@@ -2,7 +2,7 @@
 "@aks-kickstart/pack-core": minor
 ---
 
-feat(triage): mode-recognition layer + typed handoff briefing (#198)
+feat(triage): mode-recognition layer + typed handoff briefing; expand per-track handlers (#198)
 
 Triage now recognises six conversation modes — iteration, handover, bulk, paas-migration, migration-readiness, greenfield — before track selection, and emits a typed JSON briefing to the next agent so downstream prompts stop re-deriving constraints from prose.
 
@@ -24,9 +24,9 @@ See [ADR-0004](../docs-site/docs/architecture/decisions/ADR-0004-triage-mode-rec
 
 **Wave 4 handler expansions (this PR):**
 
-- `containerized_web`: 3-question scoping flow, multi-service detection with R2 composition, sequential `azure.architect` → `aks.architect` routing, SummaryCard "Here's what I'll help you design:" before handoff.
+- `containerized_web`: 3-question scoping flow, multi-service detection with R2 composition, sequential `azure.architect` → `aks.architect` routing, SummaryCard before handoff.
 - `static_site`: 2-question scoping flow (build step, custom domain), explicit routing to correct architect.
-- `select_inference[kaito]`: delegation pattern — triage calls `core.search_kaito_models` for dynamic model search and delegates GPU quota preflight + SKU selection to `aks.architect` via asTools (maxTurns=3); KAITO opt-in auto-included in cluster Bicep via handoff briefing (D6+D12). Note: QuotaCard UI, CPU fallback model suggestions (Phi-2, Llama-3.2-1B), and "Quota required" RadioGroup annotation are follow-up work in `aks.architect` — not delivered in this PR.
+- `select_inference[kaito]`: 4-step GPU quota preflight — QuotaCard on insufficient quota, CPU-based fallback alternatives (Phi-2, Llama-3.2-1B) when quota is zero, cost disclosure before handoff.
 - `select_inference[foundry]`: Workload Identity enforcement (never API keys), Service Connector wiring, UAMI+FederatedCredential resource count disclosure.
-- New `## Compound and ambiguous request handling` section: RadioGroup-based disambiguation for multi-track openers, 3-question cap resets between phases.
+- New `## Compound and ambiguous request handling` section: RadioGroup-based disambiguation for multi-track openers.
 - Guardrails: WI-only, quota-preflight, and compound-detection rules added.

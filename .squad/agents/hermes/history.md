@@ -268,3 +268,6 @@ Validation evidence:
 - **Decisions:** `.squad/decisions/inbox/hermes-wave4-201.md` (gitignored inbox, local only for Scribe)
 - **PR:** Created via `gh pr create` targeting `dev` — flagged 🟡 needs review.
 - **Validation:** Markdown structure verified; no build/test scripts affect agent .md files; existing tests unaffected.
+- **Decisions:** `.squad/decisions/inbox/hermes-wave4-201.md`
+- **PR:** Created via `gh pr create` targeting `dev` — 🟡 needs review flagged.
+- **Validation:** Markdown structure verified; no tests exist for agent .md files; existing tests unaffected.
