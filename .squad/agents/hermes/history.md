@@ -233,3 +233,25 @@ Validation evidence:
 - `squad-workflows`: `npm test -- --test-reporter=dot` passed 30/30.
 - Local Kickstart: installed extension JS syntax checks passed; all workflow YAML parsed; embedded GitHub scripts syntax-checked after GitHub expression normalization; cross-repo policy assertions passed; scoped `git diff --check` passed.
 - Active-pattern grep found no active `skip-docs` bypass/label provisioning and no one-feedback-one implementation loop; remaining per-thread mentions are anti-pattern prohibitions or post-batch reply/resolve instructions.
+
+### 2026-05-02T23:04:32-07:00 — Wave 2 agent prompt audits (Issues #206, #228)
+
+**Issue #206 — reviewer.agent.md scope audit:**
+- Audited `packages/pack-core/src/agents/reviewer.agent.md` against Phase 2.0 acceptance criteria.
+- Verdict: scope is sound, no rewrite needed.
+- Findings: All 4 acceptance criteria already met in base agent + prior branch work:
+  - Terminal review scope ✅, D8 Microsoft skills cited ✅, codesmith→reviewer wiring documented ✅, R9 review-pack composition present ✅
+- Fixes applied (PR #379): explicit `aks.reviewer` domain distinction in scope boundary; `## Review-pack composition (R9)` heading with structured list; `core.search_components` in tools.
+- Resolved rebase conflicts between two prior branch commits (a1e34860 and 28659c54) by merging best of both sides.
+
+**Issue #228 — Full prompt drift audit:**
+- Audited all 9 `*.agent.md` files against D1-D14 decisions, constraint-spec v1.1.1, and tool registration state.
+- Drift found:
+  - HIGH: `azure-architect.agent.md` ArchitectureDiagram `"Ingress Controller"` node → deferred, tracked in open PR #375. Not re-fixed to avoid merge conflict.
+  - MEDIUM: `github.publisher.agent.md` — `github:update_pr_description` listed as "planned/not available" but tool shipped in PR #364. Fixed: uncommented `userActions` entry; updated prose to use tool directly.
+  - LOW (informational): `aks-manifests-author.agent.md` uses "nginx" for container image — not ingress-nginx drift, no action.
+  - All other 6 files: clean.
+- arm_proxy tombstone verified: no agent files reference deprecated `/api/arm-proxy`.
+- Created `docs/audit/phase2-prompt-drift-audit.md` with per-file severity table.
+- PR #380 created; comment posted on issue #228.
+- Decisions written to `.squad/decisions/inbox/hermes-wave2.md`.

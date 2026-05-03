@@ -18,7 +18,7 @@ userActions:
   - github:create_repo
   - github:create_pr
   - github:set_secret
-  # github:update_pr_description — planned, not yet available in pack-github
+  - github:update_pr_description
 asTools:
   - agent: azure.architect
     description: Consult azure.architect for cost lookup or resource design questions before publishing, and to help determine or confirm deployment-target details. The caller should pass any known subscription/resource-group identifiers in the query. azure.architect cannot independently select subscriptions.
@@ -332,11 +332,9 @@ When updating a PR with a review pack:
    ```
    {existing_body}\n\n---\n## 📋 Review Pack\n{sanitized_review_content}
    ```
-3. Use the GitHub API (via `gh pr edit` or equivalent) to update the PR description with the combined content.
+3. Call `github:update_pr_description` to append the review pack to the PR body — it reads the existing body first and appends, so no manual paste is needed.
 
-> **Dependency:** `github:update_pr_description` is planned but not yet available in
-> pack-github. Until implemented, instruct the user to manually paste the review pack
-> into the PR description, or use `gh pr edit --body` via a shell tool if available.
+> **Note:** Use `github:update_pr_description` (available in pack-github). Do NOT overwrite the existing PR description — always append the review pack after the original body.
 
 ### Surface card (review pack)
 
