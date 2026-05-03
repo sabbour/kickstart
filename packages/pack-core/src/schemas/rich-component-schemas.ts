@@ -281,6 +281,110 @@ export const SteppedCarouselSchema = z.object({
   }).strict()).describe('Array of carousel steps — each with a title and one child component ID.'),
   activeStep: z.number().nullable().describe('Zero-based index of the currently displayed step, or null for default (0).'),
 }).strict();
+// ---------------------------------------------------------------------------
+// #231 — Phase 3 promoted recipe components
+// ---------------------------------------------------------------------------
+
+export const PlanSummarySchema = z.object({
+  id: z.string().describe('Unique component ID within this surface.'),
+  component: z.literal('PlanSummary'),
+  title: DynStr.nullable().optional(),
+  body: DynStr.nullable().optional(),
+  items: z.array(z.object({ label: DynStr }).strict()).nullable().optional(),
+  primaryAction: DynStr.nullable().optional(),
+  secondaryAction: DynStr.nullable().optional(),
+  children: z.array(z.string()).nullable().optional(),
+}).strict();
+
+export const MigrationMappingTableSchema = z.object({
+  id: z.string().describe('Unique component ID within this surface.'),
+  component: z.literal('MigrationMappingTable'),
+  title: DynStr.nullable().optional(),
+  rows: z.array(z.object({
+    from_source: DynStr,
+    to_azure: DynStr,
+    why: DynStr,
+  }).strict()),
+  citation: DynStr.nullable().optional(),
+  children: z.array(z.string()).nullable().optional(),
+}).strict();
+
+export const DiffPlanSchema = z.object({
+  id: z.string().describe('Unique component ID within this surface.'),
+  component: z.literal('DiffPlan'),
+  title: DynStr.nullable().optional(),
+  lines: z.array(z.object({
+    marker: z.enum(['+', '-', '~', ' ']),
+    text: DynStr,
+    annotation: DynStr.nullable().optional(),
+  }).strict()),
+  approveLabel: DynStr.nullable().optional(),
+  children: z.array(z.string()).nullable().optional(),
+}).strict();
+
+export const CostCardSchema = z.object({
+  id: z.string().describe('Unique component ID within this surface.'),
+  component: z.literal('CostCard'),
+  title: DynStr.nullable().optional(),
+  lines: z.array(z.object({
+    resource: DynStr,
+    sku: DynStr,
+    qty: DynStr,
+    unit: DynStr,
+    monthly: DynStr,
+  }).strict()),
+  fixedVsVariable: DynStr.nullable().optional(),
+  priceNote: DynStr.nullable().optional(),
+  children: z.array(z.string()).nullable().optional(),
+}).strict();
+
+export const JobToBeDoneTableSchema = z.object({
+  id: z.string().describe('Unique component ID within this surface.'),
+  component: z.literal('JobToBeDoneTable'),
+  title: DynStr.nullable().optional(),
+  rows: z.array(z.object({
+    you_want: DynStr,
+    how_aks: DynStr,
+  }).strict()),
+  reshapeLabel: DynStr.nullable().optional(),
+  stayLabel: DynStr.nullable().optional(),
+  exitLabel: DynStr.nullable().optional(),
+  children: z.array(z.string()).nullable().optional(),
+}).strict();
+
+export const ReviewPackSchema = z.object({
+  id: z.string().describe('Unique component ID within this surface.'),
+  component: z.literal('ReviewPack'),
+  title: DynStr.nullable().optional(),
+  files: z.array(z.object({
+    name: DynStr,
+    provenance: z.enum(['new', 'modified', 'existing']).nullable().optional(),
+    description: DynStr.nullable().optional(),
+  }).strict()),
+  deliveryOptions: z.array(z.object({
+    label: DynStr,
+    channel: z.enum(['pr', 'slack', 'zip', 'link', 'terminal']).nullable().optional(),
+  }).strict()).nullable().optional(),
+  children: z.array(z.string()).nullable().optional(),
+}).strict();
+
+export const CompatibilityScorecardSchema = z.object({
+  id: z.string().describe('Unique component ID within this surface.'),
+  component: z.literal('CompatibilityScorecard'),
+  title: DynStr.nullable().optional(),
+  buckets: z.array(z.object({
+    bucket: z.enum(['incompatible', 'requiresChanges', 'autoFixed', 'informational']),
+    count: z.number(),
+    description: DynStr.nullable().optional(),
+  }).strict()),
+  manifests: z.array(z.object({
+    manifest: DynStr,
+    findings: z.array(DynStr),
+  }).strict()).nullable().optional(),
+  specVersion: DynStr.nullable().optional(),
+  children: z.array(z.string()).nullable().optional(),
+}).strict();
+
 export const RICH_COMPONENT_SCHEMAS = new Map<string, z.ZodTypeAny>([
   ['DecisionCard', DecisionCardSchema],
   ['TrackPicker', TrackPickerSchema],
@@ -297,6 +401,13 @@ export const RICH_COMPONENT_SCHEMAS = new Map<string, z.ZodTypeAny>([
   ['FileEditor', FileEditorSchema],
   ['SteppedCarousel', SteppedCarouselSchema],
   ['github/CreatePRFlow', CreatePRFlowSchema],
+  ['PlanSummary', PlanSummarySchema],
+  ['MigrationMappingTable', MigrationMappingTableSchema],
+  ['DiffPlan', DiffPlanSchema],
+  ['CostCard', CostCardSchema],
+  ['JobToBeDoneTable', JobToBeDoneTableSchema],
+  ['ReviewPack', ReviewPackSchema],
+  ['CompatibilityScorecard', CompatibilityScorecardSchema],
 ]);
 
 /** LLM hints for each rich component — one-liner use-case + key props. */
@@ -441,5 +552,64 @@ export const RICH_COMPONENT_HINTS = new Map<string, string>([
       '{"title":"Step 1: Configure","child":"form-config"},' +
       '{"title":"Step 2: Review","child":"summary-card"},' +
       '{"title":"Step 3: Deploy","child":"gen-progress"}]}',
+  ],
+  [
+    'PlanSummary',
+    'Single-card plan summary for floor-case containerised deployments (R1). ' +
+      'Props: title, body, items (array of {label}), primaryAction, secondaryAction. ' +
+      'Exemplar: {"id":"ps","component":"PlanSummary","title":"Your plan","body":"Single service — no existing manifests.",' +
+      '"items":[{"label":"AKS Automatic cluster"},{"label":"1 Deployment + 1 Service"}],' +
+      '"primaryAction":"Deploy now","secondaryAction":"Customise"}',
+  ],
+  [
+    'MigrationMappingTable',
+    'Mental-model bridge table for PaaS-to-Azure migrants (R3). Show BEFORE any plan card. ' +
+      'Props: title, rows (required — array of {from_source, to_azure, why}), citation. ' +
+      'Exemplar: {"id":"mmt","component":"MigrationMappingTable","title":"Render → Azure mapping",' +
+      '"rows":[{"from_source":"Render Web Service","to_azure":"AKS Deployment + Service","why":"Same always-on workload model"}]}',
+  ],
+  [
+    'DiffPlan',
+    'Diff-style plan showing preserved/added/modified/deleted files before any write (R5). ' +
+      'Markers: + new, - deleted, ~ modified, space unchanged. ' +
+      'Props: title, lines (required — array of {marker, text, annotation?}), approveLabel. ' +
+      'Exemplar: {"id":"dp","component":"DiffPlan","title":"What changes","approveLabel":"Approve",' +
+      '"lines":[{"marker":"+","text":"k8s/deployment.yml","annotation":"new file"},' +
+      '{"marker":"~","text":"Dockerfile","annotation":"+3 lines"}]}',
+  ],
+  [
+    'CostCard',
+    'Cost card with line-item retail prices (R16). Required in every plan card per D14. ' +
+      'Props: title, lines (required — array of {resource, sku, qty, unit, monthly}), fixedVsVariable, priceNote. ' +
+      'Exemplar: {"id":"cc","component":"CostCard","title":"Estimated monthly cost",' +
+      '"lines":[{"resource":"AKS Automatic","sku":"Standard_D4s_v5","qty":"1","unit":"node","monthly":"$140"}],' +
+      '"priceNote":"Live prices via Azure Retail Prices API"}',
+  ],
+  [
+    'JobToBeDoneTable',
+    'Job-to-be-done two-column table when user names a competing product or pushes on cost (R8). ' +
+      'Props: title, rows (required — array of {you_want, how_aks}), reshapeLabel, stayLabel, exitLabel. ' +
+      'Exemplar: {"id":"jt","component":"JobToBeDoneTable",' +
+      '"title":"Same outcome — let me reshape",' +
+      '"rows":[{"you_want":"Zero infra ops","how_aks":"AKS Automatic manages node pools automatically"}],' +
+      '"reshapeLabel":"Reshape for AKS","stayLabel":"Keep current approach"}',
+  ],
+  [
+    'ReviewPack',
+    'Multi-file review pack for human SRE/ops reviewer with curated reading order (R9). ' +
+      'Props: title, files (required — array of {name, provenance?, description?}), deliveryOptions (array of {label, channel?}). ' +
+      'Exemplar: {"id":"rp","component":"ReviewPack","title":"Review pack",' +
+      '"files":[{"name":"k8s/deployment.yml","provenance":"new","description":"Core workload"}],' +
+      '"deliveryOptions":[{"label":"Open PR","channel":"pr"},{"label":"Download ZIP","channel":"zip"}]}',
+  ],
+  [
+    'CompatibilityScorecard',
+    'Migration readiness scorecard with 4 severity buckets (R12). ' +
+      'Buckets: incompatible, requiresChanges, autoFixed, informational. ' +
+      'Props: title, buckets (required — array of {bucket, count, description?}), manifests (per-file breakdown), specVersion. ' +
+      'Exemplar: {"id":"cs","component":"CompatibilityScorecard","title":"AKS readiness",' +
+      '"buckets":[{"bucket":"incompatible","count":1,"description":"hostNetwork: true not allowed"},' +
+      '{"bucket":"autoFixed","count":3}],' +
+      '"specVersion":"Source: constraint spec v1.2.0 AKS 2024-11"}',
   ],
 ]);

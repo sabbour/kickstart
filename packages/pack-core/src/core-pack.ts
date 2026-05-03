@@ -11,7 +11,7 @@ import { noCredentialLeakGuardrail } from './guardrails/no-credential-leak.js';
 // Basic components (27 Fluent renderers)
 import { fluentOverrides } from './components/basic/index.js';
 
-// Rich components (13 domain-neutral)
+// Rich components (20 domain-neutral)
 import { ArchitectureDiagram } from './components/rich/ArchitectureDiagram.js';
 import { AuthCard } from './components/rich/AuthCard.js';
 import { CodeBlock } from './components/rich/CodeBlock.js';
@@ -25,6 +25,13 @@ import { Questionnaire } from './components/rich/Questionnaire.js';
 import { RadioGroup } from './components/rich/RadioGroup.js';
 import { SteppedCarousel } from './components/rich/SteppedCarousel.js';
 import { SummaryCard } from './components/rich/SummaryCard.js';
+import { PlanSummary } from './components/rich/PlanSummary.js';
+import { MigrationMappingTable } from './components/rich/MigrationMappingTable.js';
+import { DiffPlan } from './components/rich/DiffPlan.js';
+import { CostCard } from './components/rich/CostCard.js';
+import { JobToBeDoneTable } from './components/rich/JobToBeDoneTable.js';
+import { ReviewPack } from './components/rich/ReviewPack.js';
+import { CompatibilityScorecard } from './components/rich/CompatibilityScorecard.js';
 
 // Playground scenarios
 import { questionnaireScenario } from './playground/questionnaire.scenario.js';
@@ -52,6 +59,13 @@ const richComponents: ReactComponentImplementation[] = [
   RadioGroup,
   SteppedCarousel,
   SummaryCard,
+  PlanSummary,
+  MigrationMappingTable,
+  DiffPlan,
+  CostCard,
+  JobToBeDoneTable,
+  ReviewPack,
+  CompatibilityScorecard,
 ];
 
 const coreComponents: ComponentContribution[] = [
