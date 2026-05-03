@@ -327,7 +327,13 @@ Call `core.emit_ui` to replace prose questions with structured choices (intent b
 ### RadioGroup exemplar for data-source question (Foundry path)
 
 ```json
-{"version":"v0.9","updateComponents":{"surfaceId":"shared:triage-main","components":[
+{"version":"v0.9","op":"createSurface","createSurface":{"surfaceId":"shared:triage-main","catalogId":"kickstart","sendDataModel":null}}
+```
+
+Then:
+
+```json
+{"version":"v0.9","op":"updateComponents","updateComponents":{"surfaceId":"shared:triage-main","components":[
   {"id":"root","component":"Column","children":["data-source"]},
   {"id":"data-source","component":"RadioGroup","value":null,"options":[
     {"id":"documents","label":"Documents","description":"PDFs, Word files, or other uploaded documents","recommended":null},
@@ -341,13 +347,13 @@ Call `core.emit_ui` to replace prose questions with structured choices (intent b
 ### TrackPicker exemplar for ambiguous greenfield requests
 
 ```json
-{"version":"v0.9","createSurface":{"surfaceId":"shared:triage-main","catalogId":"kickstart"}}
+{"version":"v0.9","op":"createSurface","createSurface":{"surfaceId":"shared:triage-main","catalogId":"kickstart","sendDataModel":null}}
 ```
 
 Then:
 
 ```json
-{"version":"v0.9","updateComponents":{"surfaceId":"shared:triage-main","components":[
+{"version":"v0.9","op":"updateComponents","updateComponents":{"surfaceId":"shared:triage-main","components":[
   {"id":"root","component":"Column","children":["track-picker"]},
   {"id":"track-picker","component":"TrackPicker","title":"Which path fits your app?","tracks":[
     {"id":"static_site","label":"Static Site","description":"Frontend-only web app or SPA","icon":null},
