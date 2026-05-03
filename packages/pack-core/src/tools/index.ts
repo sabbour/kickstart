@@ -29,3 +29,5 @@ export { createInspectRepoTool, inspectRepo, validateGitHubUrl, validateLocalPat
 export type { InspectRepoInput, InspectRepoOutput } from './inspect_repo.js';
 export { helmTemplateTool, runHelmTemplate, buildSourceMap, parseChartMetadata, resolveChartPath, resolveValuesPath } from './helm_template.js';
 export type { HelmTemplateInput, HelmTemplateOutput, SourceMapEntry, ChartMetadata } from './helm_template.js';
+export { kustomizeBuildTool, createKustomizeBuildTool, parseSourceMap, classifySourceKind, validateBoundedPath, redactSecretValues, _deps as kustomizeBuildDeps } from './kustomize_build.js';
+export type { KustomizeBuildOutput, SourceMapEntry as KustomizeSourceMapEntry } from './kustomize_build.js';
