@@ -16,6 +16,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/environment-variables',
         'getting-started/project-structure',
         'getting-started/chat-cli',
+        'getting-started/mcp-vscode',
         'getting-started/deployment',
       ],
     },
