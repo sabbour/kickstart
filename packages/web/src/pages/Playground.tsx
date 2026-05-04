@@ -1570,7 +1570,7 @@ function PlaygroundInner() {
                 })}
                 {/* Debug panel — shown only when debug mode is active on assistant messages */}
                 {debugEnabled && msg.role === 'assistant' && (
-                  <DebugPanel debugInfo={msg.debugInfo} />
+                  <DebugPanel debugInfo={msg.debugInfo} a2uiMessages={msg.a2uiMessages} />
                 )}
               </div>
             ))}

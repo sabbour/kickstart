@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { TokenUsageTracker } from './TokenUsageTracker';
+import { DebugTraceExport } from './DebugTraceExport';
 import type { ChatMessage, TokenUsageSummary } from '../../types';
 import type { SurfaceModel } from '../../vendor/a2ui/web_core/index';
 import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapter';
@@ -20,6 +21,7 @@ interface ChatShellProps {
   debugEnabled?: boolean;
   usageSummary?: TokenUsageSummary | null;
   hasStartedConversation?: boolean;
+  sessionId?: string;
 }
 
 export function ChatShell({
@@ -35,6 +37,7 @@ export function ChatShell({
   debugEnabled,
   usageSummary,
   hasStartedConversation: hasStartedConversationOverride,
+  sessionId,
 }: ChatShellProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -84,6 +87,9 @@ export function ChatShell({
             onRetryMessage={onRetryMessage}
           />
           <div ref={messagesEndRef} />
+          {debugEnabled && !isStreaming && messages.length > 0 && (
+            <DebugTraceExport messages={messages} sessionId={sessionId} />
+          )}
         </div>
       </div>
       <ChatInput
