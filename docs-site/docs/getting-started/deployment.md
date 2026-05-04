@@ -155,6 +155,56 @@ Set these in the Azure Static Web App **Application Settings** (Azure Portal →
 | `AZURE_OPENAI_CODEX_DEPLOYMENT` | Generate deployment for trusted `generate` turns |
 | `AZURE_OPENAI_DEPLOYMENT` | Optional legacy fallback when explicit chat/coding deployments are not set |
 | `AZURE_OPENAI_API_KEY` | API key for the Azure OpenAI resource |
+| `GITHUB_BASE_URL` | **Optional.** Forces the public base URL used in GitHub OAuth redirect URIs. Set this when your SWA custom domain differs from the internal Function App hostname. Full URL, e.g. `https://mykickstart.example.com`. |
+| `GITHUB_ALLOWED_ORIGINS` | **Recommended.** Comma-separated allowlist of permitted OAuth redirect origins, e.g. `https://mykickstart.example.com,https://mykickstart.azurestaticapps.net`. When set, any origin derived from the `x-ms-original-url` header that is not in this list is rejected with a 500 error (fail-closed). When absent, the derived origin is used with a warning. |
+
+### GitHub OAuth redirect URI — `GITHUB_BASE_URL`
+
+GitHub's OAuth flow requires that the redirect URI sent during authorization **exactly matches** a URI registered in your GitHub OAuth App settings. In Azure SWA deployments, the internal Function App hostname (e.g. `internal-func.azurewebsites.net`) can differ from the public hostname the user actually visits, causing a redirect URI mismatch and a **404 after the user authorizes**.
+
+`GITHUB_BASE_URL` lets you override the base URL used when constructing the OAuth callback:
+
+| Scenario | Recommended setting |
+|---|---|
+| Standard SWA with no custom domain | Not required — omit the variable |
+| SWA with a custom domain (e.g. `mykickstart.example.com`) | `https://mykickstart.example.com` |
+| Local development | Not required — callback is derived from the request |
+
+**Format:** Full URL with scheme and host, no trailing slash. Example:
+
+```
+GITHUB_BASE_URL=https://mykickstart.example.com
+```
+
+**Fallback priority when `GITHUB_BASE_URL` is not set:**
+
+1. `x-ms-original-url` header — injected by SWA's trusted reverse proxy; always carries the full public URL the end-user requested.
+2. `x-forwarded-proto` + `x-forwarded-host` / `host` headers.
+3. `request.url` origin (with a console warning).
+
+If `GITHUB_BASE_URL` is set to a value that cannot be parsed as a URL, the API logs an error with remediation guidance and falls through to the header-based strategies.
+
+:::tip Register the exact redirect URI in your GitHub OAuth App
+In GitHub → Settings → Developer settings → OAuth Apps, the **Authorization callback URL** must match `{GITHUB_BASE_URL}/api/github-auth/callback`. A mismatch causes a 404 immediately after the user clicks "Authorize".
+:::
+
+### Allowlist validation — `GITHUB_ALLOWED_ORIGINS`
+
+When `GITHUB_BASE_URL` is not set, Kickstart derives the OAuth redirect origin from the `x-ms-original-url` header injected by SWA's reverse proxy. To prevent open-redirect attacks if the Function App is ever exposed through a non-SWA path, configure an explicit allowlist:
+
+```
+GITHUB_ALLOWED_ORIGINS=https://mykickstart.example.com,https://mykickstart.azurestaticapps.net
+```
+
+**Behaviour:**
+
+| `GITHUB_ALLOWED_ORIGINS` | Derived origin | Result |
+|---|---|---|
+| Set | In the list | ✅ Origin accepted |
+| Set | **Not** in the list | ❌ 500 error — fail closed |
+| Not set | Any | ⚠️ Origin accepted with a warning logged |
+
+Setting `GITHUB_ALLOWED_ORIGINS` is **strongly recommended** in production. If both `GITHUB_BASE_URL` and `GITHUB_ALLOWED_ORIGINS` are configured, `GITHUB_BASE_URL` takes precedence (header-derived origin is never evaluated) and the allowlist acts as an additional defence-in-depth layer for header-based fallback paths.
 
 ### GitHub Secrets
 

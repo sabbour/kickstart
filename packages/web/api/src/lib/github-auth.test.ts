@@ -306,4 +306,186 @@ describe("GITHUB_BASE_URL override (getPublicOrigin)", () => {
       ),
     ).toThrow('GITHUB_BASE_URL is not a valid URL: "not-a-url"');
   });
+
+  it("uses x-ms-original-url origin when GITHUB_BASE_URL is absent and x-forwarded-host is an internal hostname", () => {
+    delete process.env.GITHUB_BASE_URL;
+    const { location } = getGitHubAuthLogin(
+      makeRequest(
+        {
+          "x-ms-original-url": "https://kickstart.azurestaticapps.net/api/github-auth/login",
+          "x-forwarded-host": "internal-func.azurewebsites.net",
+          "x-forwarded-proto": "https",
+        },
+        "https://internal-func.azurewebsites.net/api/github-auth/login",
+      ),
+      "principal-1",
+      "/",
+    );
+    expect(extractRedirectUri(location)).toBe(
+      "https://kickstart.azurestaticapps.net/api/github-auth/callback",
+    );
+  });
+
+  it("prefers GITHUB_BASE_URL over x-ms-original-url", () => {
+    process.env.GITHUB_BASE_URL = "https://my-custom-domain.example.com";
+    const { location } = getGitHubAuthLogin(
+      makeRequest(
+        {
+          "x-ms-original-url": "https://kickstart.azurestaticapps.net/api/github-auth/login",
+        },
+        "https://internal-func.azurewebsites.net/api/github-auth/login",
+      ),
+      "principal-1",
+      "/",
+    );
+    expect(extractRedirectUri(location)).toBe(
+      "https://my-custom-domain.example.com/api/github-auth/callback",
+    );
+  });
+
+  it("falls back to x-forwarded-host when x-ms-original-url is absent", () => {
+    delete process.env.GITHUB_BASE_URL;
+    const { location } = getGitHubAuthLogin(
+      makeRequest(
+        {
+          "x-forwarded-host": "kickstart.azurestaticapps.net",
+          "x-forwarded-proto": "https",
+        },
+        "https://internal-func.azurewebsites.net/api/github-auth/login",
+      ),
+      "principal-1",
+      "/",
+    );
+    expect(extractRedirectUri(location)).toBe(
+      "https://kickstart.azurestaticapps.net/api/github-auth/callback",
+    );
+  });
+
+  it("silently skips a malformed x-ms-original-url and continues to x-forwarded-host", () => {
+    delete process.env.GITHUB_BASE_URL;
+    const { location } = getGitHubAuthLogin(
+      makeRequest(
+        {
+          "x-ms-original-url": "not a url at all",
+          "x-forwarded-host": "kickstart.azurestaticapps.net",
+          "x-forwarded-proto": "https",
+        },
+        "https://internal-func.azurewebsites.net/api/github-auth/login",
+      ),
+      "principal-1",
+      "/",
+    );
+    expect(extractRedirectUri(location)).toBe(
+      "https://kickstart.azurestaticapps.net/api/github-auth/callback",
+    );
+  });
+});
+
+describe("GITHUB_ALLOWED_ORIGINS allowlist (getPublicOrigin)", () => {
+  const ORIGINAL_BASE_URL = process.env.GITHUB_BASE_URL;
+  const ORIGINAL_ALLOWED_ORIGINS = process.env.GITHUB_ALLOWED_ORIGINS;
+
+  beforeEach(() => {
+    process.env.GITHUB_CLIENT_ID = "client-id";
+    process.env.GITHUB_CLIENT_SECRET = "client-secret";
+    process.env.GITHUB_SESSION_SECRET = "session-secret";
+    delete process.env.GITHUB_BASE_URL;
+    delete process.env.GITHUB_ALLOWED_ORIGINS;
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    process.env.GITHUB_CLIENT_ID = ORIGINAL_ENV.clientId;
+    process.env.GITHUB_CLIENT_SECRET = ORIGINAL_ENV.clientSecret;
+    process.env.GITHUB_SESSION_SECRET = ORIGINAL_ENV.sessionSecret;
+    if (ORIGINAL_BASE_URL === undefined) {
+      delete process.env.GITHUB_BASE_URL;
+    } else {
+      process.env.GITHUB_BASE_URL = ORIGINAL_BASE_URL;
+    }
+    if (ORIGINAL_ALLOWED_ORIGINS === undefined) {
+      delete process.env.GITHUB_ALLOWED_ORIGINS;
+    } else {
+      process.env.GITHUB_ALLOWED_ORIGINS = ORIGINAL_ALLOWED_ORIGINS;
+    }
+  });
+
+  function extractRedirectUri(location: string): string {
+    return new URL(location).searchParams.get("redirect_uri") ?? "";
+  }
+
+  it("allows x-ms-original-url origin when it is in the allowlist", () => {
+    process.env.GITHUB_ALLOWED_ORIGINS = "https://kickstart.azurestaticapps.net,https://kickstart.example.com";
+    const { location } = getGitHubAuthLogin(
+      makeRequest(
+        {
+          "x-ms-original-url": "https://kickstart.azurestaticapps.net/api/github-auth/login",
+          "x-forwarded-host": "internal-func.azurewebsites.net",
+          "x-forwarded-proto": "https",
+        },
+        "https://internal-func.azurewebsites.net/api/github-auth/login",
+      ),
+      "principal-1",
+      "/",
+    );
+    expect(extractRedirectUri(location)).toBe(
+      "https://kickstart.azurestaticapps.net/api/github-auth/callback",
+    );
+  });
+
+  it("throws a 500 when x-ms-original-url origin is not in the allowlist", () => {
+    process.env.GITHUB_ALLOWED_ORIGINS = "https://legit-app.example.com";
+    expect(() =>
+      getGitHubAuthLogin(
+        makeRequest(
+          {
+            "x-ms-original-url": "https://attacker.evil.com/api/github-auth/login",
+            "x-forwarded-host": "internal-func.azurewebsites.net",
+            "x-forwarded-proto": "https",
+          },
+          "https://internal-func.azurewebsites.net/api/github-auth/login",
+        ),
+        "principal-1",
+        "/",
+      ),
+    ).toThrow('x-ms-original-url origin "https://attacker.evil.com" is not in GITHUB_ALLOWED_ORIGINS');
+  });
+
+  it("warns but allows through when GITHUB_ALLOWED_ORIGINS is not set", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { location } = getGitHubAuthLogin(
+      makeRequest(
+        {
+          "x-ms-original-url": "https://kickstart.azurestaticapps.net/api/github-auth/login",
+          "x-forwarded-host": "internal-func.azurewebsites.net",
+          "x-forwarded-proto": "https",
+        },
+        "https://internal-func.azurewebsites.net/api/github-auth/login",
+      ),
+      "principal-1",
+      "/",
+    );
+    expect(extractRedirectUri(location)).toBe(
+      "https://kickstart.azurestaticapps.net/api/github-auth/callback",
+    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("GITHUB_ALLOWED_ORIGINS is not set"));
+  });
+
+  it("blocks a second allowlist entry from being used when the header carries a disallowed origin", () => {
+    process.env.GITHUB_ALLOWED_ORIGINS = "https://kickstart.azurestaticapps.net";
+    expect(() =>
+      getGitHubAuthLogin(
+        makeRequest(
+          {
+            "x-ms-original-url": "https://other-app.azurestaticapps.net/api/github-auth/login",
+          },
+          "https://internal-func.azurewebsites.net/api/github-auth/login",
+        ),
+        "principal-1",
+        "/",
+      ),
+    ).toThrow('x-ms-original-url origin "https://other-app.azurestaticapps.net" is not in GITHUB_ALLOWED_ORIGINS');
+  });
 });

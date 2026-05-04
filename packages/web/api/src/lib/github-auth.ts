@@ -205,8 +205,21 @@ function isSecureRequest(request: HttpRequest): boolean {
   }
 }
 
+/**
+ * Parse GITHUB_ALLOWED_ORIGINS into a Set of permitted origins.
+ * Returns null when the env var is absent or empty (allowlist disabled).
+ */
+function parseAllowedOrigins(): Set<string> | null {
+  const raw = process.env.GITHUB_ALLOWED_ORIGINS?.trim();
+  if (!raw) return null;
+  const origins = raw.split(",").map((o) => o.trim()).filter(Boolean);
+  return origins.length > 0 ? new Set(origins) : null;
+}
+
 function getPublicOrigin(request: HttpRequest): string {
-  // Allow explicit override via env var (useful when SWA forwards internal hostname instead of custom domain)
+  // 1. Explicit operator override — highest priority.
+  //    Set GITHUB_BASE_URL in SWA application settings when the app is deployed
+  //    under a custom domain or when SWA's forwarded headers carry an internal hostname.
   const baseUrlOverride = process.env.GITHUB_BASE_URL?.trim();
   if (baseUrlOverride) {
     let parsed: URL;
@@ -214,19 +227,60 @@ function getPublicOrigin(request: HttpRequest): string {
       parsed = new URL(baseUrlOverride);
     } catch {
       throw new GitHubAuthError(
-        `GITHUB_BASE_URL is not a valid URL: "${baseUrlOverride}"`,
+        `GITHUB_BASE_URL is not a valid URL: "${baseUrlOverride}". ` +
+        `Set it to the full public origin, e.g. "https://my-app.azurestaticapps.net".`,
         500,
       );
     }
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
       throw new GitHubAuthError(
-        `GITHUB_BASE_URL must use http or https protocol (got "${parsed.protocol}")`,
+        `GITHUB_BASE_URL must use http or https protocol (got "${parsed.protocol}"). ` +
+        `Set it to the full public origin, e.g. "https://my-app.azurestaticapps.net".`,
         500,
       );
     }
     return parsed.origin;
   }
 
+  // 2. x-ms-original-url — injected by SWA's trusted reverse proxy with the full
+  //    public URL that the end-user actually requested. More reliable than
+  //    x-forwarded-host, which can carry the internal Function App hostname.
+  //    Trust model: SWA strips x-ms-* headers from client requests before they
+  //    reach the Function App. However, if this Function App is exposed directly
+  //    or via a non-SWA proxy, that assumption may not hold. Validate the derived
+  //    origin against GITHUB_ALLOWED_ORIGINS when configured.
+  const msOriginalUrl = request.headers.get("x-ms-original-url")?.trim();
+  if (msOriginalUrl) {
+    try {
+      const derivedOrigin = new URL(msOriginalUrl).origin;
+      const allowedOrigins = parseAllowedOrigins();
+      if (allowedOrigins === null) {
+        // No allowlist configured — allow through with a warning.
+        console.warn(
+          "[github-auth] GITHUB_ALLOWED_ORIGINS is not set. " +
+          "The OAuth redirect origin is derived from the x-ms-original-url header without " +
+          "explicit validation. Set GITHUB_ALLOWED_ORIGINS to a comma-separated list of " +
+          "permitted origins (e.g. https://myapp.azurestaticapps.net) to prevent " +
+          "open-redirect via crafted proxy headers.",
+        );
+        return derivedOrigin;
+      }
+      if (!allowedOrigins.has(derivedOrigin)) {
+        throw new GitHubAuthError(
+          `x-ms-original-url origin "${derivedOrigin}" is not in GITHUB_ALLOWED_ORIGINS. ` +
+          "Add this origin to GITHUB_ALLOWED_ORIGINS if it is a valid public hostname, " +
+          "or set GITHUB_BASE_URL to the canonical public origin.",
+          500,
+        );
+      }
+      return derivedOrigin;
+    } catch (err) {
+      if (err instanceof GitHubAuthError) throw err;
+      // Malformed header — fall through to the next strategy.
+    }
+  }
+
+  // 3. x-forwarded-proto + x-forwarded-host — standard proxy headers.
   const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
   const host = forwardedHost || request.headers.get("host");
@@ -235,6 +289,14 @@ function getPublicOrigin(request: HttpRequest): string {
     return `${forwardedProto ?? "https"}://${host}`;
   }
 
+  // 4. Last resort: derive from the request URL itself (typically an internal
+  //    Function App URL in SWA — will produce the wrong origin for OAuth callbacks
+  //    if GITHUB_BASE_URL is not set and no proxy headers are present).
+  console.warn(
+    "[github-auth] getPublicOrigin: no reliable public origin header found. " +
+    "Set the GITHUB_BASE_URL application setting to the public SWA URL to avoid " +
+    "OAuth callback URL mismatches.",
+  );
   return new URL(request.url).origin;
 }
 

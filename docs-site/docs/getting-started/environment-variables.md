@@ -29,7 +29,8 @@ Complete reference for the environment variables Kickstart reads at runtime. Var
 | `AZURE_TENANT_ID` | Azure AD tenant id used by ARM proxy and managed identity flows. |
 | `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` | Service-principal credentials when not running with managed identity. |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app credentials (`/api/github/auth/*`). |
-| `GITHUB_BASE_URL` | GitHub Enterprise base URL. Defaults to `https://github.com`. |
+| `GITHUB_BASE_URL` | **Optional.** Overrides the public base URL used in GitHub OAuth redirect URIs. Required in SWA custom-domain deployments where the internal Function App hostname differs from the public hostname. Full URL, no trailing slash (e.g. `https://mykickstart.example.com`). See [deployment guide](./deployment.md#github-oauth-redirect-uri----github_base_url). |
+| `GITHUB_ALLOWED_ORIGINS` | **Recommended.** Comma-separated allowlist of origins permitted as OAuth redirect base URLs (e.g. `https://myapp.azurestaticapps.net,https://myapp.example.com`). Origins derived from `x-ms-original-url` that are not in this list are rejected (fail-closed). When absent, header-derived origins are accepted with a warning. See [deployment guide](./deployment.md#allowlist-validation----github_allowed_origins). |
 | `GITHUB_OAUTH_SCOPES` | Comma-separated OAuth scopes requested at sign-in. |
 | `GITHUB_SESSION_SECRET` | HMAC secret for GitHub OAuth state cookies. |
 | `DEPLOY_RUN_SECRET` | Shared secret gating the deploy-run callback endpoint. |
