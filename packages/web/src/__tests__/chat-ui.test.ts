@@ -86,6 +86,7 @@ function renderChatMessage(message: ChatMessage, debugEnabled = true): string {
     React.createElement(ChatMessageView, {
       message,
       getSurface: () => undefined,
+      getSurfaceRenderKey: (id: string) => id,
       debugEnabled,
     }),
   );
@@ -105,11 +106,52 @@ function renderChatShell(
       currentPhase,
       onSend: () => undefined,
       getSurface: () => undefined,
+      getSurfaceRenderKey: (id: string) => id,
       debugEnabled,
       usageSummary,
     }),
   );
 }
+
+// Surface render-key generation logic (inline — mirrors useA2UI.getSurfaceRenderKey)
+function makeGetSurfaceRenderKey() {
+  const gens = new Map<string, number>();
+  const bump = (id: string) => gens.set(id, (gens.get(id) ?? 0) + 1);
+  const getKey = (id: string) => {
+    const gen = gens.get(id) ?? 0;
+    return gen === 0 ? id : `${id}#gen:${gen}`;
+  };
+  return { bump, getKey };
+}
+
+describe('surfaceRenderKey generation', () => {
+  it('returns bare id at gen-0', () => {
+    const { getKey } = makeGetSurfaceRenderKey();
+    expect(getKey('shared:triage-main')).toBe('shared:triage-main');
+  });
+
+  it('returns id#gen:1 after first bump', () => {
+    const { bump, getKey } = makeGetSurfaceRenderKey();
+    bump('foo');
+    expect(getKey('foo')).toBe('foo#gen:1');
+  });
+
+  it('returns id#gen:2 after second bump', () => {
+    const { bump, getKey } = makeGetSurfaceRenderKey();
+    bump('foo');
+    bump('foo');
+    expect(getKey('foo')).toBe('foo#gen:2');
+  });
+
+  it('does not collide with surfaces using :: scoping separator', () => {
+    const { bump, getKey } = makeGetSurfaceRenderKey();
+    bump('assistant-turn-10::setup-progress');
+    const key = getKey('assistant-turn-10::setup-progress');
+    expect(key).toBe('assistant-turn-10::setup-progress#gen:1');
+    // Must not equal a surface named literally 'assistant-turn-10::setup-progress::1'
+    expect(key).not.toBe('assistant-turn-10::setup-progress::1');
+  });
+});
 
 describe('chat/debug UI regressions', () => {
   it('renders the visible phase bar for a phase-indicator payload returned with assistant content', () => {
@@ -297,6 +339,7 @@ describe('chat/debug UI regressions', () => {
         currentPhase: null,
         onSend: () => undefined,
         getSurface: () => undefined,
+        getSurfaceRenderKey: (id: string) => id,
       }),
     );
     const activeMarkup = renderToStaticMarkup(
@@ -307,6 +350,7 @@ describe('chat/debug UI regressions', () => {
         currentPhase: null,
         onSend: () => undefined,
         getSurface: () => undefined,
+        getSurfaceRenderKey: (id: string) => id,
       }),
     );
 

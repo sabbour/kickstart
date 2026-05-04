@@ -16,6 +16,7 @@ interface ChatShellProps {
   onSend: (text: string) => void;
   onRetryMessage?: (message: ChatMessage) => void;
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
+  getSurfaceRenderKey: (id: string) => string;
   debugEnabled?: boolean;
   usageSummary?: TokenUsageSummary | null;
   hasStartedConversation?: boolean;
@@ -30,6 +31,7 @@ export function ChatShell({
   onSend,
   onRetryMessage,
   getSurface,
+  getSurfaceRenderKey,
   debugEnabled,
   usageSummary,
   hasStartedConversation: hasStartedConversationOverride,
@@ -77,6 +79,7 @@ export function ChatShell({
             streamingText={streamingText}
             streamingSurfaceIds={streamingSurfaceIds}
             getSurface={getSurface}
+            getSurfaceRenderKey={getSurfaceRenderKey}
             debugEnabled={debugEnabled}
             onRetryMessage={onRetryMessage}
           />

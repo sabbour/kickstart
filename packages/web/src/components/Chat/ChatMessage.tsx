@@ -11,6 +11,7 @@ import type { ReactComponentImplementation } from '../../vendor/a2ui/react/adapt
 interface ChatMessageProps {
   message: ChatMessageType;
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
+  getSurfaceRenderKey: (id: string) => string;
   isActive?: boolean;
   debugEnabled?: boolean;
   onRetry?: (message: ChatMessageType) => void;
@@ -20,6 +21,7 @@ interface ChatMessageProps {
 export function ChatMessage({
   message,
   getSurface,
+  getSurfaceRenderKey,
   isActive = true,
   debugEnabled = false,
   onRetry,
@@ -82,7 +84,7 @@ export function ChatMessage({
             const surface = getSurface(surfaceId);
             if (!surface) return null;
             return (
-              <div key={surfaceId} className="a2ui-component">
+              <div key={getSurfaceRenderKey(surfaceId)} className="a2ui-component">
                 <A2UISurfaceWrapper surface={surface} isActive={isActive} />
               </div>
             );

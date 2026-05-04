@@ -405,6 +405,10 @@ export function App() {
       // current turn — fixing the "updates the wrong surface" bug where
       // new A2UI content appeared under an old assistant message.
       //
+      // Also bump the surface render generation for each transferred surface so
+      // React unmounts and remounts the component, clearing any stale local
+      // state (e.g. RadioGroup hasFiredActionRef after a prior selection).
+      //
       // Compute the next messages array and the persistence updates from
       // `messagesRef.current` (committed state) outside `setMessages`, so we
       // never rely on side effects inside the state updater (which React 18
@@ -430,6 +434,10 @@ export function App() {
             sessions.updateMessage(sessionId, messageId, { surfaceIds: nextSurfaceIds });
           }
         }
+      }
+      // Bump render keys for all transferred surfaces to force React remount.
+      for (const surfaceId of transferredFromMessageIds.keys()) {
+        a2ui.bumpSurfaceRenderKey(surfaceId);
       }
     }
 
@@ -1319,6 +1327,7 @@ export function App() {
               onSend={handleSendMessage}
               onRetryMessage={handleRetryMessage}
               getSurface={a2ui.getSurface}
+              getSurfaceRenderKey={a2ui.getSurfaceRenderKey}
               debugEnabled={debugEnabled}
               usageSummary={usageSummary}
               hasStartedConversation={hasSubmittedFirstPrompt}

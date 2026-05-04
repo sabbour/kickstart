@@ -29,6 +29,8 @@ export interface A2UIHandle {
   surfaces: Map<string, SurfaceModel<ReactComponentImplementation>>;
   processMessages: (msgs: A2uiMsg[]) => string[];
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
+  getSurfaceRenderKey: (id: string) => string;
+  bumpSurfaceRenderKey: (id: string) => void;
   reset: () => void;
 }
 
@@ -146,6 +148,11 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
   const processorRef = useRef<MessageProcessor<ReactComponentImplementation> | null>(null);
   const [surfaces, setSurfaces] = useState<Map<string, SurfaceModel<ReactComponentImplementation>>>(new Map());
 
+  // Tracks per-surface render generation. Incremented when ownership transfers
+  // to a new assistant bubble, forcing React to unmount/remount the surface
+  // component and reset any stale local state (e.g. RadioGroup hasFiredActionRef).
+  const [surfaceRenderGens, setSurfaceRenderGens] = useState<Map<string, number>>(new Map());
+
   // Shared surface registry: tracks shared:<id> → ownership for fail-closed guard.
   const sharedSurfaceRegistryRef = useRef(new Map<string, SharedSurfaceEntry>());
   const batchCounterRef = useRef(0);
@@ -202,6 +209,13 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
         next.delete(id);
         return next;
       });
+      // Prune the generation counter so re-created surfaces start fresh.
+      setSurfaceRenderGens(prev => {
+        if (!prev.has(id)) return prev;
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
     });
     return () => {
       sub1.unsubscribe();
@@ -240,6 +254,21 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
     return processor.model.getSurface(id) as SurfaceModel<ReactComponentImplementation> | undefined;
   }, [processor]);
 
+  const getSurfaceRenderKey = useCallback((id: string): string => {
+    const gen = surfaceRenderGens.get(id) ?? 0;
+    // Use '#gen:' suffix to avoid collisions with the '::' scoping separator
+    // already used in surface IDs like 'assistant-turn-10::setup-progress'.
+    return gen === 0 ? id : `${id}#gen:${gen}`;
+  }, [surfaceRenderGens]);
+
+  const bumpSurfaceRenderKey = useCallback((id: string): void => {
+    setSurfaceRenderGens(prev => {
+      const next = new Map(prev);
+      next.set(id, (prev.get(id) ?? 0) + 1);
+      return next;
+    });
+  }, []);
+
   const reset = useCallback(() => {
     for (const [id] of processor.model.surfacesMap) {
       try { processor.model.deleteSurface(id); } catch { /* ignore */ }
@@ -247,7 +276,8 @@ export function useA2UI(options: A2UIOptions = {}): A2UIHandle {
     sharedSurfaceRegistryRef.current.clear();
     batchCounterRef.current = 0;
     setSurfaces(new Map());
+    setSurfaceRenderGens(new Map());
   }, [processor]);
 
-  return { processor, surfaces, processMessages, getSurface, reset };
+  return { processor, surfaces, processMessages, getSurface, getSurfaceRenderKey, bumpSurfaceRenderKey, reset };
 }
