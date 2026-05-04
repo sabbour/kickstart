@@ -5,9 +5,15 @@ interface ChatInputProps {
   onSend: (text: string) => void;
   disabled?: boolean;
   statusBar?: React.ReactNode;
+  placeholder?: string;
 }
 
-export function ChatInput({ onSend, disabled, statusBar }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  disabled,
+  statusBar,
+  placeholder = 'Describe what you want to build...',
+}: ChatInputProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -44,7 +50,8 @@ export function ChatInput({ onSend, disabled, statusBar }: ChatInputProps) {
         <textarea
           ref={textareaRef}
           className="chat-textarea"
-          placeholder="Describe what you want to build..."
+          placeholder={placeholder}
+          aria-label="Type a message"
           value={value}
           onChange={e => setValue(e.target.value)}
           onKeyDown={handleKeyDown}

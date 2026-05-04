@@ -27,3 +27,8 @@ export { genFoundryWiring } from './gen_foundry_wiring.js';
 export type { GenFoundryWiringInput, GenFoundryWiringOutput } from './gen_foundry_wiring.js';
 export { createInspectRepoTool, inspectRepo, validateGitHubUrl, validateLocalPath } from './inspect_repo.js';
 export type { InspectRepoInput, InspectRepoOutput } from './inspect_repo.js';
+export { helmTemplateTool, runHelmTemplate, buildSourceMap, parseChartMetadata, resolveChartPath, resolveValuesPath } from './helm_template.js';
+export type { HelmTemplateInput, HelmTemplateOutput, SourceMapEntry, ChartMetadata } from './helm_template.js';
+export { kustomizeBuildTool, createKustomizeBuildTool, parseSourceMap, classifySourceKind, validateBoundedPath, redactSecretValues, _deps as kustomizeBuildDeps } from './kustomize_build.js';
+export type { KustomizeBuildOutput, SourceMapEntry as KustomizeSourceMapEntry } from './kustomize_build.js';
+export { priorDeploymentContextTool, extractPriorDeploymentContext } from './prior_deployment_context.js';

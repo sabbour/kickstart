@@ -36,6 +36,7 @@ local.settings.json
 .worktrees/
 
 # Squad: ignore runtime state (logs, inbox, sessions)
+.squad/attestation/
 .squad/orchestration-log/
 .squad/log/
 .squad/decisions/inbox/
@@ -63,3 +64,4 @@ events.jsonl
 .squad-*-token
 .squad-*-token.json
 node_modules
+.squad/ralph-circuit-breaker.json

@@ -15,12 +15,11 @@ jobs:
   sync-labels:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - name: Parse roster and sync labels
-        uses: actions/github-script@v8
+        uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             let teamFile = '.squad/team.md';
@@ -104,14 +103,6 @@ jobs:
               { name: 'priority:p2', color: 'FBCA04', description: 'Next sprint' }
             ];
 
-            // Automation labels consumed by the squad-* workflows
-            const AUTOMATION_LABELS = [
-              { name: 'process', color: '5319E7', description: 'Process improvement tracked by the weekly pulse' },
-              { name: 'pulse:daily', color: 'BFD4F2', description: 'Daily pulse rolling issue' },
-              { name: 'pulse:weekly', color: '6B8EB5', description: 'Weekly pulse issue' },
-              { name: 'release', color: '0E8A16', description: 'Release PR opened by the cadence workflow' }
-            ];
-
             function slugify(t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 
             // Ensure the base "squad" triage label exists
@@ -136,13 +127,12 @@ jobs:
               });
             }
 
-            // Add go:, release:, type:, priority:, high-signal, and automation labels
+            // Add go:, release:, type:, priority:, and high-signal labels
             labels.push(...GO_LABELS);
             labels.push(...RELEASE_LABELS);
             labels.push(...TYPE_LABELS);
             labels.push(...PRIORITY_LABELS);
             labels.push(...SIGNAL_LABELS);
-            labels.push(...AUTOMATION_LABELS);
 
             // Sync labels (create or update)
             for (const label of labels) {

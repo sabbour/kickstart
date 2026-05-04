@@ -1,4 +1,4 @@
-import { test, expect } from './helpers';
+import { test, expect, waitForStreamingIdle } from './helpers';
 import type { Page, Route } from '@playwright/test';
 
 function sseEvent(event: string, data: unknown): string {
@@ -107,7 +107,7 @@ function codesmithGenerationTurn(sessionId: string): string {
           {
             id: 'publish-btn',
             component: 'Button',
-            appearance: 'primary',
+            variant: 'primary',
             child: 'publish-text',
             action: { event: { name: 'publish', context: { action: 'publish' } } },
           },
@@ -148,8 +148,14 @@ test.describe('Phase C codesmith generation progress', () => {
     await page.goto('/');
     await healthReady;
 
-    await page.getByRole('textbox', { name: /describe your app/i }).fill('Build an AI app on AKS');
+    const heroInput = page.getByRole('textbox', { name: /describe your app/i });
+    await heroInput.waitFor({ state: 'visible', timeout: 10_000 });
+    await heroInput.fill('Build an AI app on AKS', { timeout: 5_000 });
     await page.getByRole('button', { name: /send/i }).click();
+
+    // Gate phase-c assertions on the SSE streaming-idle DOM signal (#310/#340)
+    // so createSurface + updateComponents + end have all flushed.
+    await waitForStreamingIdle(page);
 
     // GenerationProgress visible with test ID
     const progressCard = page.getByTestId('a2ui-GenerationProgress');
@@ -165,9 +171,15 @@ test.describe('Phase C codesmith generation progress', () => {
     await expect(steps.nth(2)).toHaveAttribute('data-step', 'kaito-crd');
     await expect(steps.nth(3)).toHaveAttribute('data-step', 'gha-workflow');
 
-    // GenerationProgress shared surface stays singular
+    // GenerationProgress shared surface stays singular and contains a root component
     const progressSurface = page.locator('[data-surface-id="shared:generation-progress"]');
     await expect(progressSurface).toHaveCount(1);
+
+    // The root component must exist inside the surface (catches the bug where
+    // createSurface fires but updateComponents with root never arrives)
+    const rootInsideSurface = progressSurface.getByTestId('a2ui-GenerationProgress');
+    await expect(rootInsideSurface).toBeVisible();
+    await expect(rootInsideSurface).toContainText('Project Setup');
 
     // SummaryCard visible with publish button
     const summaryCard = page.getByTestId('a2ui-SummaryCard');
@@ -194,8 +206,14 @@ test.describe('Phase C codesmith generation progress', () => {
     await page.goto('/');
     await healthReady;
 
-    await page.getByRole('textbox', { name: /describe your app/i }).fill('Build an AI app');
+    const heroInput = page.getByRole('textbox', { name: /describe your app/i });
+    await heroInput.waitFor({ state: 'visible', timeout: 10_000 });
+    await heroInput.fill('Build an AI app', { timeout: 5_000 });
     await page.getByRole('button', { name: /send/i }).click();
+
+    // Gate on streaming-idle (#310/#340) so write_file tool events have all
+    // flushed to the file manager before we assert it is visible.
+    await waitForStreamingIdle(page);
 
     // Wait for the generation to complete
     await expect(page.getByTestId('a2ui-GenerationProgress')).toBeVisible({ timeout: 10_000 });

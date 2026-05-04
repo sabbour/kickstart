@@ -235,7 +235,7 @@ export function buildStepwiseSetupMessages(
     ? buildStepwiseRecoveryStatus(state)
     : ((options.final ?? false) ? buildFinalStepwiseStatus(state) : state.statusText);
   const components: A2uiComponent[] = [{
-    id: STEPWISE_SETUP_SURFACE_SUFFIX,
+    id: 'root',
     component: 'GenerationProgress',
     title: GENERATION_PROGRESS_TITLE,
     overallStatus,

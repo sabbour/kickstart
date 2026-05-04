@@ -1,7 +1,7 @@
 ---
 "@aks-kickstart/harness": minor
 "@aks-kickstart/pack-core": minor
-"@aks-kickstart/mcp-server": patch
+"@sabbour/kickstart-mcp": patch
 "@aks-kickstart/api": patch
 ---
 

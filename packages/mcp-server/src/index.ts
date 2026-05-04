@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * @module @aks-kickstart/mcp-server
+ * @module @sabbour/kickstart-mcp
  *
  * MCP server entry point — v2 thin adapter that wraps the harness Runner.
  *
@@ -40,8 +40,8 @@ import {
   buildA2UIContent,
   buildInterruptContent,
 } from '@aks-kickstart/harness';
-import type { McpContentItem } from '@aks-kickstart/harness';
-import { createReadSkillTool } from '@aks-kickstart/pack-core';
+import type { McpContentItem, RunConfig } from '@aks-kickstart/harness';
+import { createReadSkillTool } from '@aks-kickstart/pack-core/tools/read_skill';
 
 import {
   registerInterrupt,
@@ -50,6 +50,7 @@ import {
 } from './adapter/interrupt-store.js';
 import { withSessionMutex } from './adapter/session-mutex.js';
 import { getRegistry } from './startup/packs.js';
+import { McpSamplingProvider } from './sampling/mcp-sampling-provider.js';
 
 // ── Load app HTML ──────────────────────────────────────────────────
 
@@ -72,11 +73,21 @@ const registry = getRegistry();
 
 const runner = new Runner(registry, { readSkillToolFactory: createReadSkillTool });
 
+// ── Pre-build the MCP manifest for sampling tool allowlist ─────────
+// Derive once at startup; stable for the lifetime of the process.
+const manifestTools = buildMcpManifest(registry);
+const samplingAllowedToolNames = manifestTools.map((d) => d.name);
+const samplingToolSchemas = Object.fromEntries(
+  manifestTools.map((d) => [d.name, d.parametersSchema as Record<string, unknown>]),
+);
+
 // ── Connection-level state ─────────────────────────────────────────
 // Assigned at initialize handshake; never client-supplied (Zapp condition 2).
 
 let connectionId: string | null = null;
 let isVsCode = false;
+/** True when the MCP client declared sampling capability at initialize. */
+let hostSupportsSampling = false;
 
 // ── Periodic cleanup ───────────────────────────────────────────────
 
@@ -92,7 +103,7 @@ export const server = new McpServer({
   version: '2.0.0',
 });
 
-// ── Initialize hook — assign connectionId, detect VS Code ──────────
+// ── Initialize hook — assign connectionId, detect VS Code, detect sampling
 //
 // oninitialized fires after the MCP initialize handshake completes.
 // We read clientInfo from the underlying Server instance.
@@ -105,10 +116,37 @@ server.server.oninitialized = () => {
   connectionId = randomUUID();
   isVsCode = isVsCodeClient(clientInfo as { name?: string; version?: string } | undefined);
 
+  // Detect whether the host declared sampling capability.
+  const caps = server.server.getClientCapabilities?.() as
+    | { sampling?: unknown }
+    | undefined;
+  hostSupportsSampling = !!(caps?.sampling);
+
   process.stderr.write(
-    `[kickstart-mcp] connection=${connectionId} vsCode=${isVsCode} client=${clientInfo?.name ?? 'unknown'}\n`,
+    `[kickstart-mcp] connection=${connectionId} vsCode=${isVsCode} ` +
+    `sampling=${hostSupportsSampling} client=${clientInfo?.name ?? 'unknown'}\n`,
   );
 };
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+/**
+ * Build a `RunConfig` for the current connection.
+ *
+ * When the host declared sampling capability, wires a `McpSamplingProvider`
+ * that routes inference through `sampling/createMessage`.  Otherwise returns
+ * an empty config so the runner falls back to its default model provider.
+ */
+function buildConnectionRunConfig(): RunConfig {
+  if (!hostSupportsSampling) return {};
+
+  return {
+    samplingProvider: new McpSamplingProvider(server.server, {
+      allowedToolNames: samplingAllowedToolNames,
+      toolSchemas: samplingToolSchemas,
+    }),
+  };
+}
 
 // ── Tool: converse ─────────────────────────────────────────────────
 //
@@ -185,7 +223,7 @@ server.tool(
         }
       };
 
-      await runner.run(session, message, sseWrite);
+      await runner.run(session, message, sseWrite, undefined, buildConnectionRunConfig());
 
       const content: McpContentItem[] = [];
 
@@ -286,7 +324,7 @@ server.tool(
         }
       };
 
-      await runner.resume(session, result, sseWrite);
+      await runner.resume(session, result, sseWrite, undefined, buildConnectionRunConfig());
 
       const content: McpContentItem[] = [];
       const fullText = textChunks.join('');
@@ -305,7 +343,6 @@ server.tool(
 // File-system tools are excluded by name (defence-in-depth).
 // UserActions are NEVER registered here — they surface as interrupt blocks.
 
-const manifestTools = buildMcpManifest(registry);
 for (const descriptor of manifestTools) {
   server.tool(
     descriptor.name,
@@ -329,7 +366,7 @@ for (const descriptor of manifestTools) {
         };
 
         const toolMessage = `[tool:${descriptor.name}] ${JSON.stringify(params)}`;
-        await runner.run(session, toolMessage, sseWrite);
+        await runner.run(session, toolMessage, sseWrite, undefined, buildConnectionRunConfig());
 
         const content: McpContentItem[] = [];
         const fullText = textChunks.join('');
@@ -374,4 +411,4 @@ main().catch((error: unknown) => {
 });
 
 // Expose for testing
-export { connectionId, isVsCode, registry, runner };
+export { connectionId, isVsCode, hostSupportsSampling, registry, runner };

@@ -4,93 +4,71 @@ sidebar_position: 1
 
 # Architecture Overview
 
-Kickstart is a **harness + packs** system. The harness is domain-agnostic; packs carry all product knowledge.
+Kickstart is a **harness + packs** system. The harness (under `packages/harness/`) is domain-agnostic — it owns the runner, session, registry, guardrail engine, MCP adapter, and SSE plumbing. **Packs** (under `packages/pack-core/`, `packages/pack-azure/`, `packages/pack-aks-automatic/`, `packages/pack-github/`) carry every piece of product knowledge: agents, skills, tools, user actions, components, and guardrail rules.
 
-## Monorepo Structure
+---
 
-```
-kickstart/
-├── packages/
-│   ├── harness/           @kickstart/harness — runtime engine
-│   │   └── src/
-│   │       ├── runtime/       Runner, session, SSE adapter
-│   │       ├── a2ui/          A2UI v0.9 message types and helpers
-│   │       ├── mcp/           MCP adapter utilities
-│   │       └── types/         Shared Zod schemas (AgentOutput, etc.)
-│   ├── pack-core/         @kickstart/pack-core — base agents, skills, tools, components
-│   ├── pack-azure/        @kickstart/pack-azure — Azure agents, tools, user actions
-│   ├── pack-aks-automatic/ @kickstart/pack-aks-automatic — AKS Automatic deployment pack
-│   ├── pack-github/       @kickstart/pack-github — GitHub agents, tools, user actions
-│   ├── web/               @kickstart/web — React SPA + Azure Functions API
-│   │   ├── api/               Azure Functions (converse, resume, packs manifest)
-│   │   └── src/               React app, A2UI renderer, catalog components
-│   └── mcp-server/        @kickstart/mcp-server — MCP adapter for IDE clients
-└── infra/                 Bicep templates for Azure provisioning
-```
+## Layers
 
-## The Five Primitives
+| Layer | Where it lives | What it owns |
+|---|---|---|
+| **Browser SPA** | `packages/web/src/` | A2UI v0.9 renderer, surface management, chat, packs gallery, deploy diary, playground. |
+| **API (Azure Functions)** | `packages/web/api/src/functions/` | Per-turn handlers (`converse`, `resume`, `action`, `inspirations`, `playground`, `health`, `packs`, `github-auth`, …). |
+| **Harness runtime** | `packages/harness/src/runtime/` | `Runner`, `Session`, `PackRegistry`, `runGuardrails`, `SSEWriter`, schema-conformance, OTel bridge. |
+| **MCP adapter** | `packages/harness/src/mcp/` + `packages/mcp-server/` | `buildMcpManifest`, `buildA2UIContent`, `buildInterruptContent`, session mutex, interrupt store. |
+| **Packs** | `packages/pack-*/src/` | Agents (`*.agent.md`), skills (`skills/<slug>/SKILL.md`), tools, user actions, components, guardrails, playground scenarios. |
 
-Every harness interaction is built from five primitive types that packs contribute:
+The harness exports its public surface from `packages/harness/src/index.ts` under the package name **`@aks-kickstart/harness`** (not `@kickstart/core`). Packs depend on this barrel; nothing else.
 
-| Primitive | Sigil | Example |
-|-----------|-------|---------|
-| **Agent** | `.` | `core.triage`, `azure.architect` |
-| **Tool** | `.` | `azure.arm_get`, `core.write_file` |
-| **UserAction** | `:` | `azure:login`, `github:oauth` |
-| **Component** | `/` | `pack-core/Button`, `azure/Login` |
-| **Guardrail** | — | `core/token-budget`, `azure/no-hardcoded-creds` |
+---
 
-## Request Flow
+## Per-turn data flow
+
+A single `POST /api/converse` request walks the following path. File references are exact.
+
+1. **Functions handler** (`packages/web/api/src/functions/converse.ts`) opens an SSE stream using `SSE_RESPONSE_HEADERS` from `runtime/sse.ts` and emits `start`.
+2. **Session lookup or create** via `getOrCreateSession()` (`runtime/session.ts`); anonymous sessions get an `anon_session_token` (10‑minute TTL — `ANON_SESSION_TTL_MS`) and the token is broadcast as the `session_token` SSE event.
+3. **Hydration**: cold sessions are rebuilt from the persistent store (`hydrateColdSession`, capped by `HYDRATION_DEFAULT_CAP = 20` turns and `HYDRATION_CONTENT_MAX_BYTES = 4096` per turn).
+4. **Runner.run()** (`runtime/runner.ts`) is invoked with the session, user message, an `SSEWriter`, an `AbortSignal`, and an optional `RunConfig` (`runtime/run-config.ts`). The runner wraps `@openai/agents` and is responsible for skill resolution, guardrail wiring, agent handoffs, A2UI emission, and tool-result truncation.
+5. **Guardrails** run via `toSdkInputGuardrail` / `toSdkOutputGuardrail` for parallel input/output rules and via the sequential `runGuardrails()` engine for tool-stage rules (`runtime/guardrails.ts`). Verdicts are `pass | block | redact`; SSE only ever sees the opaque shape `{ code: 'GUARDRAIL_BLOCK', message: '…' }` and never a guardrail id, reason, or pattern.
+6. **Tools and A2UI**: tool-call results are streamed as `tool_start` / `tool_done`. A2UI emissions queued during the tool call are drained after the LLM tool_call (per the post-tool A2UI drain rule documented at the top of `runner.ts`) and emitted as `a2ui` events.
+7. **End**: the runner emits `end` with skill/tool counters; `phase` events fire on agent handoffs; `guardrail_warn` fires on redactions; `chain_step` for the deterministic codesmith→reviewer chain.
+
+The full SSE event taxonomy lives in `packages/harness/src/runtime/sse.ts`:
 
 ```
-POST /api/converse { sessionId, message }
-  1. Rate limit + guardrail input check
-  2. Session lookup or creation
-  3. Runner selects active Agent (session.activeAgent, default core.triage)
-  4. Dynamic instructions = agent body + resolvedSkills(agent, ctx) + catalog
-  5. Agent streams text, emits A2UI via core.emit_ui tool calls
-  6. Agent may call Tools or UserActions
-     └─ UserAction: pause → emit user_action_required SSE → browser acts → POST /api/converse/resume
-  7. Guardrails run at input, tool-call, and output stages
-  8. AgentOutput { message, intent } returned
-  9. Handoff → next Agent picks up future turns
- 10. Stream typed SSE events to client: chunk | a2ui | tool | handoff | intent | done | error
+start | chunk | a2ui | tool_start | tool_done | phase |
+user_action_req | end | error | session_token | guardrail_warn | chain_step
 ```
 
-See [Prompt Pipeline](./prompt-pipeline.md) for the per-turn assembly details.
+`SSE_EVENT_TYPES` is a `Set` exported alongside, so any writer that adds a new event without updating the taxonomy fails type-check.
 
-## Server-Side vs Client-Side State
+---
 
-| What | Where | Lifetime |
-|------|-------|----------|
-| Conversation messages | Server session (memory) | 1 hour |
-| Active agent name | Server session | Per turn |
-| Generated artifact metadata | Server session | 1 hour |
-| Virtual FS (file content) | Client memory + IndexedDB (`kickstart-vfs`) | No TTL |
+## Harness + packs registry
 
-**Cold start:** Server session expires → client resends message history. Session is restored from the conversation log.
+The `PackRegistry` (`runtime/registry.ts`) is the integration point. Packs register at startup in a fixed order — `core, azure, aks, github` — and the registry then `seal()`s itself:
 
-## Session Lifecycle
+- All inter-pack handoff targets are validated; cross-pack handoffs are rejected unless the source pack lists the target in `dependsOn` or `handoffTargets`.
+- Playground stubs are snapshotted and frozen; post-seal mutations throw.
+- `core/` guardrail ids are reserved for the core pack.
 
-```
-Client POST (no sessionId)
-  → createSession() → Session ID returned
+Active packs are filtered from the env var `KICKSTART_PACKS` (comma-separated; defaults to all four).
 
-Client POST (with sessionId, session alive)
-  → getSession(sessionId) → found → continue
+---
 
-Client POST (with sessionId, session expired)
-  → createSession() → fresh session
+## What the harness deliberately does NOT own
 
-Garbage collection
-  → Every 10 minutes: delete sessions older than 1 hour
-```
+- **No "default registry"**: there is no `defaultRegistry`, `ToolRegistry`, or singleton tool list. Tools are owned by packs and surface via `PackRegistry.getToolsForAgent(name)`.
+- **No artifact store**: artifacts live on `Session.artifacts` (a `Map` per session). There is no `InMemoryArtifactStore` import.
+- **No phase enum on the runner**: `Phase` is a const object exported from `packages/harness/src/index.ts` (`Discover → Design → Generate → Review → Handoff → Deploy`). The runner emits `phase` events on handoff; phase advancement is owned by agents and `advancePhase()`.
 
-## A2UI Component Catalog
+---
 
-Components are registered per pack at startup. The harness seals the registry before the first request. The negotiated catalog is served via `GET /api/packs`.
+## Where to go next
 
-- **In-chat components** — emitted via `core.emit_ui` tool calls during agent turns.
-- **Sidebar FileEditor** (`components/FileEditor/`) — persistent panel backed by `services/virtual-fs.ts`.
-
-See [A2UI Integration](./a2ui-integration.md) for the full component model.
+- [Prompt pipeline](./prompt-pipeline.md) — how per-turn instructions are assembled.
+- [Harness runtime](./harness-runtime.md) — Runner, session, guardrail, OTel-bridge internals.
+- [A2UI integration](./a2ui-integration.md) — the v0.9 envelope, surfaces, and emission discipline.
+- [MCP server internals](./mcp-server-internals.md) — manifest, interrupt store, session mutex.
+- [Schema conformance](./schema-conformance.md) — strict-mode JSON Schema invariants.

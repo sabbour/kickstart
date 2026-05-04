@@ -168,7 +168,7 @@ If the issue is labeled `estimate:M`:
 
 **Phase 1 — Docs pass (runs in parallel with CI):**
 - Amy reviews the PR and commits any missing or updated docs directly to the PR branch (commit as `sabbour-squad-docs[bot]`). PRs ship with complete docs — no follow-up tasks after merge.
-- Amy then applies `docs:approved`, `docs:not-applicable`, or `skip-docs` (all three are accepted by the docs gate).
+- Amy then applies `docs:approved` or `docs:not-applicable`.
 - Phase 1 MUST be complete — Amy's commit landed (if any) and the label applied — before Phase 2 begins.
 - No approval reviews from Nibbler, Zapp, or Leela during Phase 1.
 
@@ -203,7 +203,7 @@ One-liner approvals are a governance violation and will be dismissed.
 - `nibbler:approved` / `nibbler:rejected` — code quality gate
 - `leela:approved` / `leela:rejected` — architecture gate
 - `zapp:approved` / `zapp:rejected` — security gate
-- `docs:approved` / `docs:not-applicable` / `skip-docs` — documentation gate (Amy applies after review + any needed docs commits)
+- `docs:approved` / `docs:not-applicable` — documentation gate (Amy applies after review + any needed docs commits)
 
 > **Mutual exclusivity:** For each reviewer namespace, `:approved` and `:rejected` are mutually exclusive. Adding one automatically removes the other — enforced by `squad-auto-merge.yml` on every `labeled` event. A PR will never carry both `nibbler:approved` and `nibbler:rejected` simultaneously.
 
@@ -349,7 +349,7 @@ Backlog → Assigned → In Progress → In Review → Approved → Merged
 | Condition | Moves To | Notes |
 |-----------|----------|-------|
 | `nibbler:approved` + `zapp:approved` + docs marker | "Approved" | All required review gates passed; `leela:approved` additionally required for PRs with `architecture` label |
-| `docs:approved` OR `docs:not-applicable` OR `skip-docs` | Counts toward "Approved" | Either explicit docs review approval (Amy committed docs), not-applicable, or explicitly skipped |
+| `docs:approved` OR `docs:not-applicable` | Counts toward "Approved" | Either explicit docs review approval (Amy committed docs), or not-applicable |
 | PR opened from `squad/NNN-*` branch | "In Review" | Automatically applied when PR title/branch matches squad naming convention |
 | Branch push to `squad/NNN-*` | "In Progress" | Triggered by `pull_request.synchronize` event |
 | PR merged to main | "Merged" | Terminal state; non-blocking (items remain in "Merged" for auditing) |
@@ -411,3 +411,43 @@ When a workflow opens an issue, PR, or comment via @copilot, it:
 3. If delegating a task to @copilot, names the persona explicitly (`@copilot — work as Scribe`).
 
 The existing `.github/copilot-instructions.md` tells @copilot to load the referenced charter and work in that voice. No additional plumbing needed.
+
+<!-- squad-workflows: start v1.4.1 -->
+### Planning Ceremony (squad-workflows)
+
+| Step | Tool | Gate |
+|------|------|------|
+| Estimate issue | `squad_workflows_estimate` | Auto-applies `estimate:S/M/L/XL` label |
+| Decompose (if L/XL) | `squad_workflows_decompose` | Creates milestones + child issues |
+| Fast-lane check | `squad_workflows_fast_lane` | Issues labeled `estimate:S` or `squad:chore-auto` skip Design Proposal and Design Review |
+
+### Design Ceremony
+
+| Step | Tool | Gate |
+|------|------|------|
+| Post Design Proposal | `squad_workflows_post_design_proposal` | Posts DP comment on issue, adds `design-proposal` label |
+| Check Design Approval | `squad_workflows_check_design_approval` | Blocks until all approval labels present: `architecture:approved`, `security:approved`, `codereview:approved` |
+
+### Review Ceremony
+
+| Step | Tool | Gate |
+|------|------|------|
+| Check review feedback | `squad_workflows_check_feedback` | Lists unresolved review threads — all must be resolved before merge |
+| Check CI status | `squad_workflows_check_ci` | CI must be green — returns actionable failure context if not |
+| Pre-merge validation | `squad_workflows_merge_check` | Holistic gate: approvals + threads + CI + changeset + branch current |
+
+### Merge Ceremony
+
+| Step | Tool | Gate |
+|------|------|------|
+| Merge PR | `squad_workflows_merge` | Squash merge, delete branch, check wave completion |
+
+### Wave Completion Ceremony
+
+When the last issue in a wave merges:
+
+| Step | Tool | Gate |
+|------|------|------|
+| Check wave progress | `squad_workflows_wave_status` | Reports which waves are complete and releasable |
+| Release wave | `squad_workflows_release_wave` | Runs changeset version, closes milestone, posts summary |
+<!-- squad-workflows: end -->

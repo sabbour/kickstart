@@ -14,36 +14,28 @@
  * Keep this test in place as a structural guard.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
+// Mock Monaco Editor module to avoid window reference in Node.js test environment
+// FileEditor from pack-core imports monaco-editor which accesses window at module load time
+vi.mock("monaco-editor", () => ({
+  editor: {
+    create: vi.fn(),
+    defineTheme: vi.fn(),
+    setTheme: vi.fn(),
+  },
+  languages: {
+    register: vi.fn(),
+    setMonarchTokensProvider: vi.fn(),
+  },
+}));
+
 import {
   ClientComponentRegistry,
 } from "../contexts/A2UIRegistryContext";
 import { fluentOverrides } from "../catalog/fluent-components/index";
-import {
-  AuthCard,
-  AzureAction,
-  AzureLoginCard,
-  AzureResourceForm,
-  AzureResourcePicker,
-  CodeBlock,
-  CostEstimate,
-  DecisionCard,
-  FileEditor,
-  FormGroup,
-  GenerationProgress,
-  GitHubAction,
-  GitHubCommit,
-  GitHubLoginCard,
-  GitHubRepoPicker,
-  Markdown,
-  ProgressSteps,
-  Questionnaire,
-  RadioGroup,
-  SteppedCarousel,
-  SummaryCard,
-  TrackPicker,
-} from "../catalog/components/index";
+import { coreClientComponents } from "@aks-kickstart/pack-core/client";
 import { azureClientComponents } from "@aks-kickstart/pack-azure/client";
 import { aksClientComponents } from "@aks-kickstart/pack-aks-automatic/client";
 import { githubClientComponents } from "@aks-kickstart/pack-github/client";
@@ -61,31 +53,13 @@ import { ALLOWED_A2UI_COMPONENTS } from "../../api/src/lib/widget-inspirations-d
 function buildBootstrapRegistry(): ClientComponentRegistry {
   const registry = new ClientComponentRegistry();
   for (const impl of fluentOverrides) registry.register(impl);
-  const richComponents = [
-    AuthCard,
-    AzureAction,
-    AzureLoginCard,
-    AzureResourceForm,
-    AzureResourcePicker,
-    CodeBlock,
-    CostEstimate,
-    DecisionCard,
-    FileEditor,
-    FormGroup,
-    GenerationProgress,
-    GitHubAction,
-    GitHubCommit,
-    GitHubLoginCard,
-    GitHubRepoPicker,
-    Markdown,
-    ProgressSteps,
-    Questionnaire,
-    RadioGroup,
-    SteppedCarousel,
-    SummaryCard,
-    TrackPicker,
-  ];
-  for (const impl of richComponents) registry.register(impl);
+  // Core components from pack-core — already ReactComponentImplementation; cast
+  // bridges the nominal vendor-path difference between web and pack-core copies.
+  for (const impl of coreClientComponents) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registry.register(impl as any);
+  }
+  
   // Pack components — mirrors registerPackComponents() in main.tsx. Stub
   // renderers since the registry only checks by name; adapter details are
   // covered by the component-previews.test.ts render-time guard.
@@ -130,3 +104,4 @@ describe("Create-tab inspirations allow-list ↔ client registry", () => {
     expect(unique.size).toBe(ALLOWED_A2UI_COMPONENTS.length);
   });
 });
+

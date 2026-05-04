@@ -194,8 +194,7 @@ export async function fetchPrThreads(token, owner, repo, prNumber) {
 
       return {
         threadId: metadata?.threadId ?? comment.node_id,
-        commentId: comment.node_id,
-        commentDatabaseId: metadata?.commentDatabaseId ?? comment.id ?? null,
+        commentId: metadata?.commentDatabaseId ?? comment.id ?? null,
         author: comment.user?.login ?? null,
         body: comment.body ?? '',
         path: comment.path ?? null,
@@ -203,6 +202,49 @@ export async function fetchPrThreads(token, owner, repo, prNumber) {
         isResolved: metadata?.isResolved ?? false,
       };
     });
+}
+
+
+export async function fetchPrClosureStatus(token, owner, repo, prNumber) {
+  const query = `
+    query($owner: String!, $repo: String!, $prNumber: Int!) {
+      repository(owner: $owner, name: $repo) {
+        pullRequest(number: $prNumber) {
+          reviewDecision
+          reviews(last: 100) {
+            nodes {
+              state
+              author { login }
+            }
+          }
+          reviewThreads(first: 100) {
+            nodes {
+              isResolved
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const data = await graphqlRequest(token, query, {
+    owner,
+    repo,
+    prNumber: Number(prNumber),
+  });
+  const pullRequest = data?.repository?.pullRequest;
+  const threads = pullRequest?.reviewThreads?.nodes ?? [];
+  const changeRequestReviewers = (pullRequest?.reviews?.nodes ?? [])
+    .filter((review) => review?.state === 'CHANGES_REQUESTED')
+    .map((review) => review?.author?.login)
+    .filter((login) => typeof login === 'string' && login.trim() !== '');
+
+  return {
+    reviewDecision: pullRequest?.reviewDecision ?? null,
+    totalThreads: threads.length,
+    unresolvedThreads: threads.filter((thread) => thread?.isResolved === false).length,
+    changeRequestReviewers: [...new Set(changeRequestReviewers)],
+  };
 }
 
 export async function postReview(token, owner, repo, prNumber, payload) {
@@ -224,6 +266,35 @@ export async function postReview(token, owner, repo, prNumber, payload) {
   });
 
   return review.id;
+}
+
+export async function listIssueComments(token, owner, repo, issueNumber) {
+  const url = `${GITHUB_API_BASE_URL}/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100`;
+  return requestPaginatedJson(url, token);
+}
+
+export async function updateComment(token, owner, repo, commentId, body) {
+  const url = `${GITHUB_API_BASE_URL}/repos/${owner}/${repo}/issues/comments/${commentId}`;
+  const comment = await requestJson(url, {
+    method: 'PATCH',
+    token,
+    body: { body },
+  });
+
+  return comment.id;
+}
+
+export async function upsertIssueComment(token, owner, repo, issueNumber, { marker, body }) {
+  const comments = await listIssueComments(token, owner, repo, issueNumber);
+  const existing = comments.find((comment) => typeof comment.body === 'string' && comment.body.includes(marker));
+
+  if (existing) {
+    const commentId = await updateComment(token, owner, repo, existing.id, body);
+    return { commentId, updated: true };
+  }
+
+  const commentId = await postComment(token, owner, repo, issueNumber, body);
+  return { commentId, updated: false };
 }
 
 export async function postComment(token, owner, repo, issueNumber, body) {

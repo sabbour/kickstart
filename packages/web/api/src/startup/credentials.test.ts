@@ -2,7 +2,7 @@
  * Tests for credential loading and validation.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loadAndValidateCredentials } from './credentials.js';
 
 // Save original env vars
@@ -34,9 +34,12 @@ function restoreEnv() {
 describe('credentials', () => {
   beforeEach(() => {
     resetEnv();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     restoreEnv();
   });
 

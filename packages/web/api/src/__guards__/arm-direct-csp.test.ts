@@ -77,10 +77,12 @@ const SCAN_ROOTS = ['packages'];
 const SCAN_EXTS = new Set(['.ts', '.tsx']);
 
 const ALLOWED_FILES = new Set<string>([
-  // The proxy implementation itself (kept live for one week as rollback
-  // safety net before PR-2 deletes it).
+  // The retired /api/arm-proxy route — kept registered as a 410 Gone
+  // tombstone (mirrors github-proxy.ts / github-oauth.ts). The string
+  // 'arm-proxy' still appears here as the route literal.
   'packages/web/api/src/functions/arm-proxy.ts',
-  // The proxy allowlist that registers arm-proxy → management.azure.com.
+  // The proxy allowlist file (no longer registers arm-proxy, but the
+  // historical comment may still mention it).
   'packages/web/api/src/lib/proxy-allowlist.ts',
   // This guard test — references the route as a string for grep.
   'packages/web/api/src/__guards__/arm-direct-csp.test.ts',
@@ -143,6 +145,43 @@ describe('issue #237 — zero /api/arm-proxy callers (hard-fail CI guard)', () =
     expect(
       offenders,
       `Production source files still reference /api/arm-proxy — PR-1 of #237 requires zero callers:\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #320 (Wave 2 cutover): zero callers of the retired
+// `services/arm-client` shim. Everything must go through the canonical
+// `lib/arm/armFetch` wrapper from #318/#327.
+// ---------------------------------------------------------------------------
+
+const ARM_CLIENT_IMPORT_REGEX =
+  /from\s+['"][^'"]*services\/arm-client(?:['"]|\.[a-z]+['"])/;
+
+describe('issue #320 — zero services/arm-client callers (hard-fail CI guard)', () => {
+  it('no source file imports from services/arm-client (use lib/arm/armFetch instead)', () => {
+    const offenders: string[] = [];
+    for (const root of SCAN_ROOTS) {
+      const absRoot = join(REPO_ROOT, root);
+      for (const file of walk(absRoot)) {
+        const ext = file.slice(file.lastIndexOf('.'));
+        if (!SCAN_EXTS.has(ext)) continue;
+
+        const rel = relative(REPO_ROOT, file).replaceAll('\\', '/');
+        // This guard test references the path as a regex string for grep —
+        // exempt itself, the same way the /api/arm-proxy guard does above.
+        if (rel === 'packages/web/api/src/__guards__/arm-direct-csp.test.ts') continue;
+
+        const contents = readFileSync(file, 'utf8');
+        if (ARM_CLIENT_IMPORT_REGEX.test(contents)) {
+          offenders.push(rel);
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `Source files still import from services/arm-client — issue #320 (Wave 2) requires every caller to use lib/arm/armFetch:\n${offenders.join('\n')}`,
     ).toEqual([]);
   });
 });

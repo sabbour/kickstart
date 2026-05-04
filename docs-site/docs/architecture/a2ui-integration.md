@@ -1,155 +1,116 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 ---
 
 # A2UI v0.9 Integration
 
-Kickstart uses [A2UI (Agent-to-User Interface)](https://github.com/nicholasgasior/a2ui) v0.9 — a protocol for rendering structured AI output as interactive UI components. Instead of the AI returning plain text, it returns A2UI instructions that the frontend renders as cards, forms, code blocks, and more.
+Kickstart speaks **A2UI v0.9** — a small JSON envelope protocol used to push UI state from agents to the browser. The schema and helpers live in `packages/harness/src/types/a2ui.ts` (re-exported from `@aks-kickstart/harness` as `A2UI_VERSION`, `A2UIMessageEnvelopeSchema`, the four message-payload schemas, and the typed message types).
 
-## How It Works
+`A2UI_VERSION = 'v0.9'`. Every envelope carries `version: 'v0.9'` and is rejected by `A2UIMessageEnvelopeSchema.parse()` if it doesn't.
 
-The A2UI renderer is vendored directly into the project at:
+---
+
+## The four message ops
+
+`A2UIMessageEnvelopeSchema` is a discriminated union on `op`:
+
+| op | Payload | Purpose |
+|---|---|---|
+| `createSurface` | `{ surfaceId, catalogId, theme?, sendDataModel? }` | Create a new render target on the client. |
+| `updateComponents` | `{ surfaceId, components: [...] }` (min 1) | Replace the component tree on a surface. |
+| `updateDataModel` | `{ surfaceId, path, value }` (`value` is `string \| number \| boolean \| null`) | Patch a scalar in the surface's data model. |
+| `deleteSurface` | `{ surfaceId }` | Tear down a surface. |
+
+All payload schemas use `.strict()` — unknown keys throw at parse-time.
+
+---
+
+## How the harness emits A2UI
+
+A2UI envelopes are produced by **tools** and **components**. The runner queues them on `session.a2uiEmissions` during a tool call and **drains** them after the LLM-side tool_call returns (the post-tool A2UI drain rule documented at the top of `packages/harness/src/runtime/runner.ts`).
+
+> **Deprecation:** `core.emit_ui` is deprecated (issue #112). Use the focused replacements instead: `core.show_card` (display-only cards), `core.show_form` (data collection), `core.confirm` (yes/no gates), `core.navigate` (surface switching). `core.emit_ui` remains registered for backward compatibility but will be removed in the next major release.
+
+Each drained envelope is sent as a single `a2ui` SSE frame:
 
 ```
-packages/web/src/vendor/a2ui/
+event: a2ui
+data: {"version":"v0.9","op":"updateComponents","updateComponents":{...}}
 ```
 
-The integration follows this flow:
+Because the queue is drained between tool calls, A2UI frames can never appear before the `tool_done` of the tool that produced them.
 
-1. The LLM returns a JSON envelope containing an `a2ui` array
-2. `MessageProcessor` iterates over the A2UI messages
-3. Each message creates or updates a **surface** — a container for components
-4. Surfaces are rendered using **catalog components** — React components mapped by type
+---
 
-## Component Model
+## Catalogs
 
-A2UI uses a **flat adjacency list** model, not nested component trees. Each component has:
+A *catalog* is a named bundle of components and user-actions a client can render. The harness builds a catalog snapshot at seal-time (`runtime/catalog.ts`):
 
-- `id` — unique identifier within the surface
-- `type` — component type from the catalog (e.g., `Text`, `Card`, `Button`)
-- `dataModel` — component-specific data (text content, options, status, etc.)
-- `parentId` — optional reference to a parent component for layout
+```ts
+export interface CatalogSnapshot extends A2UICatalog {
+  components: readonly string[];
+  userActions: readonly string[];
+}
 
-This flat model allows the AI to update individual components without resending the entire tree.
+export function buildCatalogSnapshot(...): CatalogSnapshot;
+export function negotiateCatalog(advertisedCatalogIds, snapshot): CatalogSnapshot;
+```
 
-## Basic Catalog (18 components)
+`negotiateCatalog()` lets the browser advertise the catalog ids it knows; the harness picks one or returns the default (`'kickstart'`).
 
-The vendored A2UI renderer includes these standard components:
+---
 
-| Component | Purpose |
-|-----------|---------|
-| `Text` | Rich text content (markdown supported) |
-| `Button` | Clickable action button |
-| `Card` | Bordered container with title and content |
-| `Tabs` | Tabbed content container |
-| `TabPanel` | Content panel within Tabs |
-| `List` | Ordered or unordered list |
-| `ListItem` | Item within a List |
-| `Table` | Data table with headers |
-| `Image` | Image display |
-| `Link` | Hyperlink |
-| `Divider` | Visual separator |
-| `Badge` | Small label/tag |
-| `Icon` | Icon display |
-| `Chip` | Compact interactive element |
-| `Input` | Text input field |
-| `Select` | Dropdown selection |
-| `Checkbox` | Boolean toggle |
-| `Switch` | On/off toggle |
+## MCP transport
 
-## A2UI Message Types
+When the conversation runs over MCP rather than the SPA, A2UI envelopes are wrapped as **embedded resources**:
 
-### `createSurface`
+- `mimeType: 'application/json+a2ui'`
+- `audience: ['user']`
+- `text` is the stringified envelope.
 
-Creates a new surface (UI container) with a specific catalog:
+See `packages/harness/src/mcp/server.ts` (`buildA2UIContent`, `A2UIEmbeddedResource`) and the [MCP server internals](./mcp-server-internals.md) page.
 
-```json
-{
-  "version": "v0.9",
-  "createSurface": {
-    "surfaceId": "architecture-view",
-    "catalogId": "kickstart"
-  }
+---
+
+## Browser rendering
+
+The SPA renders surfaces through the A2UI React adapter at `packages/web/src/` (driven by component implementations the renderer is registered with at boot — see `packages/pack-core/src/components/` for the bundled set). Custom components are added by registering a `ComponentContribution` (`packages/harness/src/types/component.ts`):
+
+```ts
+export interface ComponentContribution {
+  name: string;
+  propertySchema: z.ZodTypeAny;
+  renderer: unknown;
+  llmHint?: string; // injected into the system prompt so the model knows HOW to use it
 }
 ```
 
-### `updateComponents`
+See [Components → Extending A2UI](../components/extending-a2ui.md) for the full add-a-component walkthrough.
 
-Adds or updates components within a surface:
+---
 
-```json
-{
-  "version": "v0.9",
-  "updateComponents": {
-    "surfaceId": "architecture-view",
-    "components": [
-      {
-        "id": "title",
-        "type": "Text",
-        "dataModel": {
-          "text": "## Proposed Architecture"
-        }
-      },
-      {
-        "id": "services-card",
-        "type": "Card",
-        "dataModel": {
-          "title": "Azure Services",
-          "variant": "outlined"
-        }
-      }
-    ]
-  }
-}
+## Conversation phases as a special component
+
+`ConversationPhaseComponent` is a fixed A2UI component type defined in `packages/harness/src/index.ts`:
+
+```ts
+export type ConversationPhaseComponent = {
+  type: 'ConversationPhase';
+  id: string;
+  phases: PhaseItem[];
+  currentPhase: Phase;
+};
 ```
 
-### `updateDataModel`
+The phase enum (`Phase` in the same file) — `Discover → Design → Generate → Review → Handoff → Deploy` — drives the visible phase tracker. See [Conversation phases](../extending/conversation-phases.md).
 
-Updates just the data of an existing component (without replacing it):
+---
 
-```json
-{
-  "version": "v0.9",
-  "updateDataModel": {
-    "surfaceId": "architecture-view",
-    "componentId": "deploy-progress",
-    "dataModel": {
-      "currentStep": 3,
-      "status": "active"
-    }
-  }
-}
-```
+## Strict validation
 
-## Smart Components
+A2UI envelopes that originate from tools are validated *twice*:
 
-Starting in v0.3.0, Kickstart includes **smart components** — self-managing implementations of common workflows with built-in authentication, validation, and security controls. Contributed by the `pack-azure` and `pack-github` packs.
+1. The tool's own params schema (`z.object(...).strict()` per `runtime/z-strict.ts`).
+2. The shared `A2UIMessageSchema` / `A2UIMessageEnvelopeSchema` at the harness boundary.
 
-### Azure Smart Components
-
-| Component | Purpose | Auth | Security |
-|-----------|---------|------|----------|
-| **AzureLoginCard** | Device code auth flow for Azure MSAL | MSAL | Token in memory; logout clears session |
-| **AzureResourcePicker** | Browse subscriptions and list resources | AzureARMConnector | Rate-limit handling; stub fallback |
-| **AzureResourceForm** | Collect deployment parameters and estimate cost | AzureARMConnector | Input validation; cost preview before submit |
-
-### GitHub Smart Components
-
-| Component | Purpose | Auth | Security |
-|-----------|---------|------|----------|
-| **GitHubLoginCard** | Device code auth flow for GitHub OAuth | GitHub OAuth | Token in memory; no localStorage |
-| **GitHubRepoPicker** | Search and select from user's repositories | GitHubConnector | Debounced search; pagination; rate-limit warnings |
-| **GitHubAction** | Execute allowlisted GitHub API operations | GitHubConnector | Operation allowlisting; typed confirmation for DELETE |
-| **GitHubCommit** | Create pull request with artifact selection | GitHubConnector | Branch validation; protected-branch guards; diff preview |
-
-**Key security features:**
-- **In-memory token storage** — No localStorage; tokens cleared on logout
-- **Operation allowlisting** — Write operations must be explicitly approved
-- **Typed confirmation** — DELETE and merge operations require developer confirmation
-- **Protected-branch blocking** — Cannot push to `main`/`master`/`production`
-
-See [Extending the A2UI Component System](../components/extending-a2ui.md) for how to build your own smart component.
-
-## Custom Kickstart Catalog
-
-Kickstart extends the basic catalog with 4 custom components tailored for the deployment onboarding experience. See [Custom Kickstart Catalog](../components/custom-catalog.md) for details.
+Failures are caught and surfaced as `error` SSE frames; the offending tool result is dropped, never partially rendered.

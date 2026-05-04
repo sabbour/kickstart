@@ -15,16 +15,122 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  packages: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  lint-build:
-    name: Lint, Build & Unit Tests
+  changes:
+    name: Detect changed paths
     runs-on: ubuntu-latest
+    # Always runs so downstream `needs: [changes]` jobs are never skipped due to a
+    # skipped dependency. For non-PR events (push to main, workflow_dispatch) the job
+    # short-circuits and emits docs_only=false, dockerfiles_changed=true so heavy
+    # jobs run unconditionally.
+    outputs:
+      docs_only: ${{ steps.filter.outputs.docs_only }}
+      dockerfiles_changed: ${{ steps.filter.outputs.dockerfiles_changed }}
+    steps:
+      - name: Classify PR file changes
+        id: filter
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Non-PR events (push to main) always run the full pipeline. If
+            // workflow_dispatch / schedule triggers are added later, this branch
+            // will continue to short-circuit them to a full run as well.
+            if (context.eventName !== 'pull_request') {
+              core.setOutput('docs_only', 'false');
+              core.setOutput('dockerfiles_changed', 'true');
+              core.info(`event=${context.eventName} — running full pipeline (docs_only=false, dockerfiles_changed=true)`);
+              return;
+            }
 
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const paths = files.map(f => f.filename);
+            // docs_only: every changed path is markdown OR lives in a docs / .squad /
+            // .changeset directory. None of these surfaces ship runtime code, so the
+            // heavy lint/build/test job is safe to skip for them.
+            const isDocsLike = (p) =>
+              p.endsWith('.md') ||
+              p.endsWith('.mdx') ||
+              p.startsWith('docs/') ||
+              p.startsWith('docs-site/') ||
+              p.startsWith('.squad/') ||
+              p.startsWith('.changeset/');
+            const docsOnly = paths.length > 0 && paths.every(isDocsLike);
+            const dockerfilesChanged = paths.some(p =>
+              /(^|\/)Dockerfile(\.[\w-]+)?$/i.test(p) ||
+              p.endsWith('.dockerignore')
+            );
+            core.setOutput('docs_only', String(docsOnly));
+            core.setOutput('dockerfiles_changed', String(dockerfilesChanged));
+            core.info(`changed=${paths.length} docs_only=${docsOnly} dockerfiles_changed=${dockerfilesChanged}`);
+
+  typecheck:
+    name: TypeScript check
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: "npm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@aks-kickstart"
+          always-auth: true
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: TypeScript check (web)
+        run: cd packages/web && npx tsc --noEmit
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: "npm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@aks-kickstart"
+          always-auth: true
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Unit tests
+        run: npx vitest run
+
+  schema-validate:
+    name: Schema validation & changeset gate
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -47,22 +153,6 @@ jobs:
         run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install hadolint
-        run: |
-          HADOLINT_VERSION="v2.12.0"
-          HADOLINT_SHA256="56de6d5e5ec427e17b74fa48d51271c7fc0d61244bf5c90e828aab8362d55010"
-          curl -sL "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64" -o hadolint
-          echo "${HADOLINT_SHA256}  hadolint" | sha256sum --check --strict
-          chmod +x hadolint
-          sudo mv hadolint /usr/local/bin/hadolint
-          hadolint --version
-
-      - name: TypeScript check (web)
-        run: cd packages/web && npx tsc --noEmit
-
-      - name: Unit tests
-        run: npx vitest run
 
       - name: Validate microsoft-skills.json schema (#243)
         run: |
@@ -91,6 +181,59 @@ jobs:
           }
           console.log('✓ config/microsoft-skills.json is valid (' + Object.keys(data).length + ' entries)');
           VALIDATE_EOF
+
+      - name: Detect docs-gate scope
+        id: docs_gate
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const paths = files.map(file => file.filename);
+            // Fetch labels via API (not event payload) to avoid stale-snapshot race
+            // conditions when labels are stripped/re-applied by concurrent workflows.
+            const { data: prData } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const labels = prData.labels.map(label => label.name);
+
+            const userFacing = paths.some(path =>
+              /^packages\/[^/]+\/src\//.test(path) &&
+              !path.includes('__tests__') &&
+              !path.endsWith('.test.ts') &&
+              !path.endsWith('.test.tsx') &&
+              !path.includes('/e2e/')
+            );
+            const hasDocsSite = paths.some(path => path.startsWith('docs-site/docs/'));
+            // Docs waiver labels: use `docs:not-applicable` or `docs:approved` to
+            // signal that no changeset/docs update is needed for this PR.
+            const docsWaived = labels.includes('docs:not-applicable') || labels.includes('docs:approved');
+            const requireChangeset = userFacing && !hasDocsSite && !docsWaived;
+
+            core.setOutput('requireChangeset', String(requireChangeset));
+
+      - name: Changeset status
+        if: steps.docs_gate.outputs.requireChangeset == 'true'
+        run: |
+          # Create a local main branch for changesets to compare against
+          git fetch origin main:main --no-tags || git fetch origin main:main
+          npx changeset status
+
+  regression-gates:
+    name: Regression gates
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
 
       - name: Auth bypass regression gate (#23)
         run: |
@@ -135,42 +278,20 @@ jobs:
           fi
           echo "✅ No zod v3 pins in workspace package.json files"
 
-      - name: Detect docs-gate scope
-        id: docs_gate
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-              per_page: 100,
-            });
-            const paths = files.map(file => file.filename);
-            const labels = context.payload.pull_request.labels.map(label => label.name);
-
-            const userFacing = paths.some(path =>
-              /^packages\/[^/]+\/src\//.test(path) &&
-              !path.includes('__tests__') &&
-              !path.endsWith('.test.ts') &&
-              !path.endsWith('.test.tsx') &&
-              !path.includes('/e2e/')
-            );
-            const hasDocsSite = paths.some(path => path.startsWith('docs-site/docs/'));
-            const skipDocs = labels.includes('skip-docs');
-            const requireChangeset = userFacing && !hasDocsSite && !skipDocs;
-
-            core.setOutput('requireChangeset', String(requireChangeset));
-
       - name: Guard against smoke gate regression
         run: |
-          if grep -nE 'exit 0' .github/workflows/deploy-swa.yml | grep -iE 'smoke|production_url|base_url'; then
-            echo "::error file=.github/workflows/deploy-swa.yml::Regression: smoke-resolve step uses exit 0 (silent skip). Must be exit 1."
+          set -euo pipefail
+          DEPLOY_WF=.github/workflows/deploy-swa.yml
+          if [ ! -f "$DEPLOY_WF" ]; then
+            echo "::error file=$DEPLOY_WF::Guard failed: $DEPLOY_WF not found (moved or deleted?). Smoke-gate regression check cannot run."
             exit 1
           fi
-          if grep -nE 'continue-on-error:\s*true' .github/workflows/deploy-swa.yml; then
-            echo "::error file=.github/workflows/deploy-swa.yml::Regression: continue-on-error:true in deploy-swa workflow. Smoke chain must fail loudly."
+          if grep -nE 'exit 0' "$DEPLOY_WF" | grep -iE 'smoke|production_url|base_url'; then
+            echo "::error file=$DEPLOY_WF::Regression: smoke-resolve step uses exit 0 (silent skip). Must be exit 1."
+            exit 1
+          fi
+          if grep -nE 'continue-on-error:\s*true' "$DEPLOY_WF"; then
+            echo "::error file=$DEPLOY_WF::Regression: continue-on-error:true in deploy-swa workflow. Smoke chain must fail loudly."
             exit 1
           fi
           echo "✅ Smoke gate integrity verified"
@@ -194,12 +315,35 @@ jobs:
           fi
           echo "✅ appinsights.ts useAzureMonitor single-init invariant verified (count=1)"
 
-      - name: Changeset status
-        if: steps.docs_gate.outputs.requireChangeset == 'true'
+  hadolint:
+    name: Hadolint (Dockerfiles)
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.dockerfiles_changed == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install hadolint
         run: |
-          # Create a local main branch for changesets to compare against
-          git fetch origin main:main --no-tags || git fetch origin main:main
-          npx changeset status
+          set -euo pipefail
+          HADOLINT_VERSION="v2.12.0"
+          HADOLINT_SHA256="56de6d5e5ec427e17b74fa48d51271c7fc0d61244bf5c90e828aab8362d55010"
+          curl -sL "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64" -o hadolint
+          echo "${HADOLINT_SHA256}  hadolint" | sha256sum --check --strict
+          chmod +x hadolint
+          sudo mv hadolint /usr/local/bin/hadolint
+          hadolint --version
+
+      - name: Run hadolint on Dockerfiles
+        run: |
+          set -euo pipefail
+          mapfile -t DOCKERFILES < <(git ls-files | grep -iE '(^|/)Dockerfile(\.[A-Za-z0-9_-]+)?$' || true)
+          if [ "${#DOCKERFILES[@]}" -eq 0 ]; then
+            echo "No Dockerfiles found in repo — nothing to lint."
+            exit 0
+          fi
+          printf '%s\n' "${DOCKERFILES[@]}" | xargs -r hadolint
 
   e2e:
     name: Playwright E2E Tests
@@ -245,16 +389,44 @@ jobs:
   ci-gate:
     name: CI Gate
     runs-on: ubuntu-latest
-    needs: [lint-build, e2e]
+    needs: [changes, typecheck, test, schema-validate, regression-gates, hadolint, e2e]
     if: always()
     steps:
       - name: Check results
         run: |
-          lint_build_result="${{ needs.lint-build.result }}"
-          e2e_result="${{ needs.e2e.result }}"
-
-          if [[ ! "$lint_build_result" =~ ^(success|skipped)$ || ! "$e2e_result" =~ ^(success|skipped)$ ]]; then
-            echo "CI failed: lint-build=${lint_build_result}, e2e=${e2e_result}"
+          # `changes` must succeed (it gates whether downstream jobs are allowed to
+          # skip). A failure here would otherwise cascade-skip the parallel jobs and
+          # falsely turn CI Gate green.
+          changes_result="${{ needs.changes.result }}"
+          if [[ "$changes_result" != "success" ]]; then
+            echo "CI failed: changes=${changes_result}"
             exit 1
           fi
-          echo "CI passed: lint-build=${lint_build_result}, e2e=${e2e_result}"
+
+          # All other jobs must be success or skipped (skipped is treated as success
+          # so docs-only PRs and conditionally-skipped jobs like hadolint/e2e still
+          # let CI Gate go green).
+          declare -A results=(
+            [typecheck]="${{ needs.typecheck.result }}"
+            [test]="${{ needs.test.result }}"
+            [schema-validate]="${{ needs.schema-validate.result }}"
+            [regression-gates]="${{ needs.regression-gates.result }}"
+            [hadolint]="${{ needs.hadolint.result }}"
+            [e2e]="${{ needs.e2e.result }}"
+          )
+          failed=0
+          for job in "${!results[@]}"; do
+            r="${results[$job]}"
+            if [[ ! "$r" =~ ^(success|skipped)$ ]]; then
+              echo "CI failed: ${job}=${r}"
+              failed=1
+            fi
+          done
+          if [[ "$failed" -ne 0 ]]; then
+            exit 1
+          fi
+          echo "CI passed:"
+          echo "  changes=${changes_result}"
+          for job in "${!results[@]}"; do
+            echo "  ${job}=${results[$job]}"
+          done

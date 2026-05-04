@@ -650,6 +650,94 @@ describe('#118 Runner.buildAgentInstance — asTools wiring (additional agent pa
     expect(toolNames).toContain('ask_aks_core_codesmith');
   });
 
+  // T-AT-AZ1: azure.architect → aks.architect (#224 reverse direction)
+  it('azure.architect injects ask_aks_architect tool when asTools declares aks.architect', () => {
+    const aksArchitect = makeAgentWithAsTools('aks.architect');
+    const azureArchitect = makeAgentWithAsTools('azure.architect', [
+      {
+        agent: 'aks.architect',
+        description: 'Consult for AKS topology, networking, workload placement.',
+      },
+    ]);
+
+    const registry = buildCrossPackRegistry('azure', [azureArchitect], 'aks', [aksArchitect]);
+    const runner = new Runner(registry);
+    const built = callBuild(runner, 'azure.architect') as { tools: Array<{ name: string }> };
+
+    const toolNames = built.tools.map((t) => t.name);
+    expect(toolNames).toContain('ask_aks_architect');
+  });
+
+  // T-AT-SYM1: symmetric bidirectional wiring — azure.architect ↔ aks.architect (#224)
+  // Both architects declare each other as asTools. Verifies both directions resolve
+  // through the *shared* per-turn cache (mutual-recursion path), and that the
+  // resulting tools are real consultation tools — not the missing-pack error stub.
+  // Asterisk-named arguments are intentionally omitted so the assertions can rely
+  // on the asTool() default description as a discriminator vs. the stub fallback.
+  it('azure.architect ↔ aks.architect symmetric: shared-cache mutual recursion wires real ask_* tools both ways', () => {
+    const aksArchitect = makeAgentWithAsTools('aks.architect', [
+      // No description / toolName — let asTool() supply its defaults so the
+      // discriminator below is meaningful.
+      { agent: 'azure.architect' },
+    ]);
+    const azureArchitect = makeAgentWithAsTools('azure.architect', [
+      { agent: 'aks.architect' },
+    ]);
+
+    const registry = buildCrossPackRegistry('azure', [azureArchitect], 'aks', [aksArchitect]);
+    const runner = new Runner(registry);
+
+    // Single shared cache: building azure.architect recurses into
+    // aks.architect via asTools, which in turn references azure.architect —
+    // the back-edge must be satisfied from the cache, exercising the
+    // mutual-recursion path. Using two fresh callBuild() calls (as the prior
+    // version did) would skip this path entirely.
+    const cache = new Map<string, any>();
+    const builtAzure = callBuild(runner, 'azure.architect', cache) as {
+      tools: Array<{ name: string; description: string; invoke?: unknown; parameters?: unknown }>;
+    };
+
+    // Cache invariant: both agents present, populated by recursion, not by
+    // separate top-level builds.
+    expect(cache.has('azure.architect')).toBe(true);
+    expect(cache.has('aks.architect')).toBe(true);
+
+    const builtAks = cache.get('aks.architect') as {
+      tools: Array<{ name: string; description: string; invoke?: unknown; parameters?: unknown }>;
+    };
+
+    const azureToAks = builtAzure.tools.find((t) => t.name === 'ask_aks_architect');
+    const aksToAzure = builtAks.tools.find((t) => t.name === 'ask_azure_architect');
+    expect(azureToAks, 'azure.architect should expose ask_aks_architect').toBeDefined();
+    expect(aksToAzure, 'aks.architect should expose ask_azure_architect').toBeDefined();
+
+    // Discriminator: the missing-pack stub uses the description
+    //   "Ask the <agent> specialist."
+    // while the real asTool() default ends with
+    //   "specialist a question and return their response."
+    // Asserting the latter proves both directions were wired through the
+    // consultation runtime, not the error-returning fallback. This catches
+    // a regression where shared-cache resolution silently routed the
+    // back-edge into the catch-block stub.
+    expect(azureToAks!.description).toBe(
+      'Ask the aks.architect specialist a question and return their response.',
+    );
+    expect(aksToAzure!.description).toBe(
+      'Ask the azure.architect specialist a question and return their response.',
+    );
+
+    // Both wired tools are real, invocable FunctionTools with a `query`
+    // parameter — a host LLM call would actually execute them rather than
+    // hit a no-op. We can't drive the SDK runner end-to-end in a unit test
+    // (it requires a live model), but verifying the shape proves the
+    // asTool() factory ran to completion for each direction.
+    for (const t of [azureToAks!, aksToAzure!]) {
+      expect(typeof t.invoke).toBe('function');
+      const params = t.parameters as { properties?: Record<string, unknown> } | undefined;
+      expect(params?.properties).toHaveProperty('query');
+    }
+  });
+
   // T-AT-CS1: codesmith → reviewer
   it('codesmith injects ask_core_reviewer tool when asTools declares core.reviewer', () => {
     const reviewer = makeAgentWithAsTools('core.reviewer');

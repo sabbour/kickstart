@@ -10,7 +10,6 @@
 
 /** Allowed upstream hosts grouped by proxy route. */
 export const ALLOWED_HOSTS: Record<string, readonly string[]> = {
-  "arm-proxy": ["management.azure.com"],
   "github-proxy": ["api.github.com"],
   "github-oauth": ["github.com"],
   "pricing-proxy": ["prices.azure.com"],

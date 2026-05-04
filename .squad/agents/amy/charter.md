@@ -42,7 +42,6 @@
 
 **Hand-off with Leela:** Leela makes architecture decisions. Amy documents them as ADRs. If Amy spots a docs gap during review, she flags it; she doesn't block on architecture questions.
 
-
 ## Git Identity
 
 - **Role slug:** docs

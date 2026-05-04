@@ -300,7 +300,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
           <div className="ide-cards">
             <a
               className="ide-card"
-              href={`vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'kickstart', command: 'npx', args: ['-y', '@aks-kickstart/mcp-server'] }))}`}
+              href={`vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'kickstart', command: 'npx', args: ['-y', '@sabbour/kickstart-mcp'] }))}`}
               target="_blank"
               rel="noopener"
               title="Install Kickstart MCP server in VS Code"
@@ -321,7 +321,7 @@ export function Landing({ onStartChat, recentSessions, onResumeSession, onDelete
             </a>
             <a
               className="ide-card"
-              href={`vscode-insiders:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'kickstart', command: 'npx', args: ['-y', '@aks-kickstart/mcp-server'] }))}`}
+              href={`vscode-insiders:mcp/install?${encodeURIComponent(JSON.stringify({ name: 'kickstart', command: 'npx', args: ['-y', '@sabbour/kickstart-mcp'] }))}`}
               target="_blank"
               rel="noopener"
               title="Install Kickstart MCP server in VS Code Insiders"

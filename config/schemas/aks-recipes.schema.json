@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/azure-management-and-platforms/kickstart/config/schemas/aks-recipes.schema.json",
+  "title": "AKS Automatic Recipes",
+  "description": "Per-shape AKS Automatic recipes with detection signals, scaling config, and cost hints.",
+  "type": "object",
+  "required": ["$schema", "version", "shapes"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "shapes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/Shape" }
+    }
+  },
+  "definitions": {
+    "Shape": {
+      "type": "object",
+      "required": ["id", "label", "description", "detectionSignals", "recipe", "costBandHint", "provenance"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "detectionSignals": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/DetectionSignal" }
+        },
+        "recipe": { "$ref": "#/definitions/Recipe" },
+        "costBandHint": { "type": "string", "enum": ["low", "medium", "high"] },
+        "provenance": { "type": "string", "enum": ["extracted", "derived", "proposed"] }
+      }
+    },
+    "DetectionSignal": {
+      "type": "object",
+      "required": ["type", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["file_pattern", "library_import", "keyword", "dockerfile_pattern", "manifest_pattern"] },
+        "value": { "type": "string", "minLength": 1 }
+      }
+    },
+    "Recipe": {
+      "type": "object",
+      "required": ["kedaScaler", "nodePool", "gateway", "persistentVolume", "identity"],
+      "additionalProperties": false,
+      "properties": {
+        "kedaScaler": { "$ref": "#/definitions/KedaScaler" },
+        "nodePool": { "$ref": "#/definitions/NodePool" },
+        "gateway": { "$ref": "#/definitions/Gateway" },
+        "persistentVolume": { "$ref": "#/definitions/PersistentVolume" },
+        "identity": { "$ref": "#/definitions/Identity" }
+      }
+    },
+    "KedaScaler": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "metadata": { "type": "object" },
+        "authenticationRef": { "type": "object" }
+      }
+    },
+    "NodePool": {
+      "type": "object",
+      "required": ["skuFamily", "minNodes"],
+      "additionalProperties": false,
+      "properties": {
+        "skuFamily": { "type": "string" },
+        "minNodes": { "type": "integer", "minimum": 0 },
+        "maxNodes": { "type": "integer", "minimum": 1 },
+        "gpuRequired": { "type": "boolean" }
+      }
+    },
+    "Gateway": {
+      "type": "object",
+      "required": ["pattern"],
+      "additionalProperties": false,
+      "properties": {
+        "pattern": { "type": "string", "enum": ["none", "simple_ingress", "path_based_routing", "grpc_passthrough", "event_trigger"] },
+        "tlsRequired": { "type": "boolean" }
+      }
+    },
+    "PersistentVolume": {
+      "type": "object",
+      "required": ["recommended"],
+      "additionalProperties": false,
+      "properties": {
+        "recommended": { "type": "boolean" },
+        "storageClass": { "type": "string" },
+        "accessMode": { "type": "string", "enum": ["ReadWriteOnce", "ReadWriteMany", "ReadOnlyMany"] }
+      }
+    },
+    "Identity": {
+      "type": "object",
+      "required": ["pattern"],
+      "additionalProperties": false,
+      "properties": {
+        "pattern": { "type": "string", "enum": ["workload_identity", "managed_identity", "none"] },
+        "scopeHint": { "type": "string" }
+      }
+    }
+  }
+}

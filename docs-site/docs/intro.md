@@ -2,42 +2,37 @@
 sidebar_position: 1
 ---
 
-# What is Kickstart?
+# Welcome to Kickstart
 
-**Kickstart** is an AI-guided web application that helps developers deploy their applications to [Azure Kubernetes Service (AKS) Automatic](https://learn.microsoft.com/azure/aks/intro-aks-automatic) — without needing Kubernetes expertise.
+**Kickstart** gets your application running on [AKS Automatic](https://learn.microsoft.com/azure/aks/intro-aks-automatic) through a conversation — no Kubernetes expertise required.
 
-Instead of writing YAML manifests and Dockerfiles from scratch, you have a conversation. Kickstart uses a conversational AI agent to gather your requirements, design your architecture, generate deployment artifacts, and execute deployments — all through a rich, interactive UI.
+You describe your app. Kickstart asks the right questions, proposes an architecture, generates production-ready Dockerfiles and manifests, and walks you through deployment — all inside an interactive chat interface.
 
-## Key Features
+## How it works in 60 seconds
 
-### Conversational AI Interface
+1. **Tell Kickstart about your app** — language, framework, ports, any dependencies
+2. **Review the proposed architecture** — the agent designs an AKS Automatic setup suited to your inputs
+3. **Inspect generated artifacts** — Dockerfile, Kubernetes manifests, GitHub Actions workflow
+4. **Deploy** — the agent executes the deployment against your cluster and surfaces any errors
 
-Kickstart guides you through a multi-phase conversation:
+That's it. The conversation is the pipeline.
 
-1. **Discover** — understand your application (language, framework, dependencies)
-2. **Design** — propose an architecture on AKS Automatic
-3. **Generate** — create Dockerfiles, Kubernetes manifests, and GitHub Actions workflows
-4. **Review** — let you inspect and edit every generated artifact
-5. **Handoff** — prepare the deployment pipeline
-6. **Deploy** — execute the deployment to AKS
+## What makes this different
 
-### Rich UI with A2UI v0.9
+**No blank YAML.** You never write a Kubernetes manifest from scratch. Every artifact is generated from your conversation context and presented for review before anything is applied.
 
-Kickstart is built on **A2UI v0.9** (Agent-to-User Interface), an open protocol from Google for rendering structured AI output. The AI doesn't just return text — it renders interactive cards, forms, tabs, code blocks, and progress indicators inline in the conversation.
+**Progressive disclosure.** Kubernetes concepts appear only when relevant. In the early phases your app is just "an application to deploy" — complexity surfaces gradually as you approach the Deploy phase.
 
-### Progressive Disclosure
+**Structured AI output.** Kickstart is built on [A2UI v0.9](https://learn.microsoft.com/), an open protocol that lets the AI render interactive cards, progress bars, code blocks, and forms directly inside the chat thread — not just plain text.
 
-The interface starts simple. You describe your app in plain language, and Kickstart reveals complexity only when needed. Kubernetes concepts are hidden until the later phases — your app is framed as deploying to an "app platform," not a container orchestrator.
+**Purpose-built for AKS Automatic.** [AKS Automatic](https://learn.microsoft.com/azure/aks/intro-aks-automatic) manages nodes, scaling, patching, and monitoring for you. Kickstart is designed around its constraints and capabilities.
 
-### Real Deployment Artifacts
+## Where to go next
 
-Kickstart generates production-ready files:
-
-- **Dockerfile** — multi-stage build optimized for your runtime
-- **Kubernetes manifests** — Deployments, Services, Ingress for AKS Automatic
-- **GitHub Actions workflow** — CI/CD pipeline for build and deploy
-- **Helm charts** (when appropriate)
-
-### Targets AKS Automatic
-
-[AKS Automatic](https://learn.microsoft.com/azure/aks/intro-aks-automatic) is Azure's fully managed Kubernetes offering. It handles node management, scaling, patching, and monitoring — so developers can focus on their application code. Kickstart is purpose-built for this experience.
+| Goal | Link |
+|------|------|
+| Run Kickstart locally | [Local Setup](/docs/getting-started/local-setup) |
+| Understand key concepts | [Core Concepts](/docs/core-concepts) |
+| Add a pack or tool | [Pack Authoring Guide](/docs/pack-authoring) |
+| Understand the internals | [Architecture Overview](/docs/architecture/overview) |
+| Contribute to the project | [Contributing](/docs/contributing) |

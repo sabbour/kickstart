@@ -271,6 +271,24 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
     },
   ],
 
+  'core/ArchitectureDiagram': [
+    {
+      id: 'root',
+      component: 'ArchitectureDiagram',
+      title: 'Solution architecture',
+      description: 'AKS Automatic with app and data services',
+      nodes: [
+        { id: 'app', label: 'App service', type: 'app' },
+        { id: 'aks', label: 'AKS Automatic', type: 'aks' },
+        { id: 'data', label: 'Azure data service', type: 'storage' },
+      ],
+      edges: [
+        { from: 'app', to: 'aks', label: 'deploys to' },
+        { from: 'aks', to: 'data', label: 'reads/writes' },
+      ],
+    },
+  ],
+
   // ── Rich auth / form / progress components ────────────────────────────────
 
   'core/AuthCard': [
@@ -333,10 +351,10 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
     { id: 'step3', component: 'Text', text: 'Review your configuration before creating.' },
   ],
 
-  'core/CostEstimate': [
+  'azure/CostEstimate': [
     {
       id: 'root',
-      component: 'CostEstimate',
+      component: 'azure/CostEstimate',
       title: 'Monthly estimate',
       items: [
         { name: 'AKS cluster (Standard_D2s_v3 × 3)', sku: 'Standard', monthlyCost: 219 },
@@ -349,11 +367,11 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
 
   // ── User Actions ──────────────────────────────────────────────────────────
 
-  'core/AzureLoginCard': [
-    { id: 'root', component: 'AzureLoginCard', displayName: 'Azure User', showTokenInfo: true },
+  'azure/AzureLoginCard': [
+    { id: 'root', component: 'azure/AzureLoginCard', displayName: 'Azure User', showTokenInfo: true },
   ],
 
-  'core/GitHubLoginCard': [
-    { id: 'root', component: 'GitHubLoginCard' },
+  'github/GitHubLoginCard': [
+    { id: 'root', component: 'github/GitHubLoginCard' },
   ],
 };

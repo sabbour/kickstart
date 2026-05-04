@@ -15,6 +15,7 @@
  */
 
 import type { ComponentContribution } from '@aks-kickstart/harness';
+import type { ReactComponentImplementation } from './vendor/a2ui/react/adapter.js';
 
 // Import components from pack-core/rich as ReactComponentImplementation
 // (compatible with ComponentContribution interface: name, schema, render)
@@ -59,7 +60,7 @@ import { ArchitectureDiagram } from './components/rich/ArchitectureDiagram.js';
  * field naming (schema vs propertySchema, render vs renderer). The adaptPackComponent
  * adapter in web bootstrap handles the conversion.
  */
-export const coreClientComponents: readonly ComponentContribution[] = Object.freeze([
+export const coreClientComponents: readonly ReactComponentImplementation[] = Object.freeze([
   AuthCard,
   CodeBlock,
   DecisionCard,
@@ -74,12 +75,11 @@ export const coreClientComponents: readonly ComponentContribution[] = Object.fre
   SummaryCard,
   TrackPicker,
   ArchitectureDiagram,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-] as any);
+]);
 
-/** Minimal registration target — any object that accepts a `ComponentContribution`. */
+/** Minimal registration target — any object that accepts a `ReactComponentImplementation`. */
 export interface PackClientRegisterTarget {
-  register(contribution: ComponentContribution): void;
+  register(impl: ReactComponentImplementation): void;
 }
 
 /**

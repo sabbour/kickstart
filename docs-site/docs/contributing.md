@@ -4,37 +4,37 @@ sidebar_position: 5
 
 # Contributing with Squad
 
-Kickstart is maintained by **Squad** — a coordinated team of AI agents supervised by a human lead. When you open an issue or want to contribute, it gets routed to the right agent based on work type. This guide explains how to work within the Squad framework and interact with our AI team.
+Kickstart is maintained by **Squad** — a coordinated team of role-based AI agents supervised by a human lead. When you open an issue or want to contribute, it gets routed to the right role based on work type. This guide explains how to work within the Squad framework.
 
-## The Squad Team
+## The Squad roles
 
-| Agent | Role | Handles |
-|-------|------|---------|
-| **Leela** | Lead | Architecture, design reviews, scope, priority triage |
-| **Fry** | Frontend Dev | Web client, A2UI components, UX, routing |
-| **Bender** | Backend Dev | Harness, packs, SDK tools, API, infrastructure |
-| **Hermes** | Tester | Test strategy, performance, observability |
-| **Zapp** | Security | Auth, secrets, guardrail design, security reviews |
-| **Nibbler** | Code Quality | PR code review, readability, patterns |
-| **Scribe** | Docs & Product | Public docs, release notes, DX, decisions |
-| **@copilot** | Coding Agent | Small safe tasks: bugs, tests, docs, small features |
+| Role | Handles |
+|------|---------|
+| **Lead** | Architecture, design reviews, scope, priority triage |
+| **Frontend** | Web client, A2UI components, UX, routing |
+| **Backend** | Harness, packs, SDK tools, API, infrastructure |
+| **Tester** | Test strategy, performance, observability |
+| **Security** | Auth, secrets, guardrail design, security reviews |
+| **Code Quality** | PR code review, readability, patterns |
+| **Docs & Product** | Public docs, release notes, DX, decisions |
+| **@copilot** | Coding agent — small safe tasks: bugs, tests, docs, small features |
 
 ---
 
-## How Issues Get Routed to Squad
+## How issues get routed
 
 **The workflow:**
 
 1. You open an issue (or the Lead opens one)
-2. Lead **triages** it: assigns a `squad:{member}` label
-3. That agent **picks it up** in their next session
-4. Agent completes the work, following the gates below
+2. The Lead **triages** it: assigns a role label
+3. The agent for that role **picks it up** in their next session
+4. The agent completes the work, following the gates below
 
 **Example labels:**
-- `squad:leela` → Leela handles this
-- `squad:fry` → Fry handles this  
+- `squad:lead` → Lead role handles this
+- `squad:frontend` → Frontend role handles this
 - `squad:copilot` → Copilot auto-routes based on capability
-- `squad` (no member suffix) → Waiting for Lead triage
+- `squad` (no role suffix) → Waiting for Lead triage
 
 ---
 
@@ -51,12 +51,12 @@ Kickstart is maintained by **Squad** — a coordinated team of AI agents supervi
 - Documentation fixes and updates
 - Changeset additions
 
-### 🟡 Needs review (routed to @copilot, but a squad member must review the PR before merge)
+### 🟡 Needs review (routed to @copilot, but a squad role must review the PR before merge)
 - Medium features with clear specs and acceptance criteria
 - Refactoring with existing test coverage
 - New API endpoints following established patterns
 
-### 🔴 Not suitable for @copilot (routed to a human squad member instead)
+### 🔴 Not suitable for @copilot (routed to a human squad role instead)
 - Architecture decisions and system design
 - Pack boundary changes
 - SSE event taxonomy or A2UI contract changes
@@ -65,16 +65,14 @@ Kickstart is maintained by **Squad** — a coordinated team of AI agents supervi
 - Performance-critical paths needing benchmarking
 - Ambiguous requirements needing discussion
 
-**If your issue has `squad:copilot`, @copilot will pick it up and follow the same gates as human agents** — see below for Design Proposal and PR Review gates.
-
-See [`.squad/team.md`](https://github.com/azure-management-and-platforms/kickstart/blob/main/.squad/team.md) for the complete capability matrix and [`.squad/routing.md`](https://github.com/azure-management-and-platforms/kickstart/blob/main/.squad/routing.md) for the full routing table.
+**If your issue has `squad:copilot`, @copilot will pick it up and follow the same gates as human-owned roles** — see below for Design Proposal and PR Review gates.
 
 ---
 
 ## Issue Workflow Overview
 
 ```
-Issue Created → Triaged (squad:{member} label)
+Issue Created → Triaged (squad:{role} label)
 → Design Proposal (comment) → Design Review (approved)
 → Create Worktree → Implementation → Tests Pass
 → Open PR → PR Review (gates) → Merge → Cleanup
@@ -84,10 +82,10 @@ Issue Created → Triaged (squad:{member} label)
 
 ## Step 1: Design Proposal (DP) — Before Any Code
 
-**When:** Any implementation issue (except docs-only)  
+**When:** Any implementation issue (except docs-only)
 **Gate:** ✅ **Blocks code** until DP is posted and approved
 
-When you pick up an issue labeled with your name, **post a Design Proposal comment** on the issue before writing code.
+When you pick up an issue labeled with your role, **post a Design Proposal comment** on the issue before writing code.
 
 ### Design Proposal Template
 
@@ -132,8 +130,8 @@ When you pick up an issue labeled with your name, **post a Design Proposal comme
 ```
 
 **Review process:**
-- Leela reviews for architecture alignment with the current architecture
-- Zapp reviews for security concerns (if applicable)
+- The Lead role reviews for architecture alignment with the current architecture
+- The Security role reviews for security concerns (if applicable)
 - Once approved, you can start implementation
 
 **Note:** Docs-only PRs skip the DP gate and go straight to review.
@@ -261,20 +259,20 @@ When reviewers comment on your PR, **you must address every comment:**
 6. **Request re-review**
 
 **Reviewers:**
-- **Leela** — Architecture alignment
-- **Zapp** — Security (if touching auth, secrets, validation)
-- **Nibbler** — Code quality, readability, patterns
+- **Lead role** — Architecture alignment
+- **Security role** — Security (if touching auth, secrets, validation)
+- **Code Quality role** — Code quality, readability, patterns
 
 ### Gate 3: All Approval Labels
 
 The PR cannot merge until:
-- ✅ `leela:approved` label
-- ✅ `zapp:approved` label (if security-sensitive paths affected)
-- ✅ `nibbler:approved` label (code quality)
+- ✅ Lead-approved label
+- ✅ Security-approved label (if security-sensitive paths affected)
+- ✅ Code-quality-approved label
 - ✅ All review threads resolved
 - ✅ CI passing
 
-**Docs-only PRs:** Need only `leela:approved` + `zapp:approved` labels.
+**Docs-only PRs:** Need only the Lead-approved and Security-approved labels.
 
 ---
 
@@ -445,10 +443,6 @@ The canonical documentation lives in **`docs-site/docs/`** and is published to [
 
 | File | Purpose |
 |------|---------|
-| `.squad/team.md` | Team roster, @copilot capability matrix |
-| `.squad/routing.md` | Work routing: who handles what type |
-| `.squad/ceremonies.md` | Design Proposal and PR Review gates |
-| `.squad/decisions.md` | Architecture decisions and RFCs |
 | `docs-site/docs/architecture/overview.md` | System architecture reference |
 | `.github/workflows/squad-review-gate.yml` | CI enforcing label-based approval |
 | `CONTRIBUTING.md` | (Local repo) Setup and development commands |
@@ -457,8 +451,8 @@ The canonical documentation lives in **`docs-site/docs/`** and is published to [
 
 ## Troubleshooting & Common Questions
 
-**Issue doesn't have a `squad:{name}` label?**  
-Comment asking Leela to triage it.
+**Issue doesn't have a `squad:{role}` label?**
+Comment asking for the Lead to triage it.
 
 **Can I work on multiple issues simultaneously?**  
 Yes, use separate worktrees:
@@ -493,7 +487,7 @@ File a separate issue; don't bundle it with your PR.
 - Reviewers respond to PRs within 24 hours
 
 **Monthly:**
-- Docs freshness sweep (Scribe)
+- Docs freshness sweep
 - Release prep (if ready)
 
 **Per PR:**

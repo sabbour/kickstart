@@ -40,16 +40,6 @@
 
 **If I reject a review:** I may require a different agent to revise (not the original author) or ask for a new specialist.
 
-
-## Git Identity
-
-- **Role slug:** security
-- **App slug:** squad-security
-- **Bot login:** squad-security[bot]
-- **Commit as:** `git -c user.name="squad-security[bot]" -c user.email="squad-security[bot]@users.noreply.github.com" commit ...`
-
-When performing git operations (push, PR create, review, comment, label), authenticate using the `squad_identity_resolve_token` tool. Read `.squad/skills/squad-identity/SKILL.md` for the full protocol.
-
 ## Model
 
 - **Preferred:** gpt-5.3-codex
@@ -62,14 +52,45 @@ Before starting work, run `git rev-parse --show-toplevel`. All `.squad/` paths r
 Read `.squad/decisions.md` and the brief section on pack guardrails before reviewing any PR that adds or changes tools.
 
 
-## Token Handling
 
-Read and follow `.squad/skills/squad-identity/SKILL.md` for the full bot authentication protocol.
+## Git Identity
 
-- **Resolve token:** Use the `squad_identity_resolve_token` tool (your ROLE_SLUG is in the Git Identity section above)
-- **Post-flight verify:** Use the `squad_identity_attest_write` tool after any GitHub write
-- **Never-echo rule and anti-patterns** from the SKILL.md are binding — violation is a P1 governance failure
-- **Rotation-on-leak:** Follow `.squad/identity/README.md` runbook
+- **Role slug:** security
+- **App slug:** squad-security
+- **Bot login:** squad-security[bot]
+- **Commit as:** `git -c user.name="squad-security[bot]" -c user.email="squad-security[bot]@users.noreply.github.com" commit ...`
+
+When performing git operations (push, PR create, review, comment, label), authenticate using the `squad_identity_resolve_token` tool. Read `.squad/skills/squad-identity/SKILL.md` for the full protocol.
+
+<!-- SQUAD-TOKEN-HANDLING-BLOCK v2 (squad-identity) -->
+## Token handling (hard boundary — issue #1087, squad-identity)
+
+Every bot-authored GitHub write (review, comment, label, PR create, issue edit, commit push) uses `squad-identity` for bot attribution. The `ROLE_SLUG` is injected into this charter by `squad-identity setup` and provides authenticated `gh` automatically.
+
+**The only acceptable pattern:**
+
+```bash
+# ROLE_SLUG is injected by squad-identity setup
+gh pr create --title "..." --body "..."
+# ↑ Automatically authenticated as squad-<role>[bot]
+
+# If explicit token control is needed (rare):
+BEARER_TOKEN=$(squad-identity token --role "$ROLE_SLUG") || exit 1
+[ -n "$BEARER_TOKEN" ] || exit 1
+GH_TOKEN="$BEARER_TOKEN" gh pr create ...
+```
+
+**Hard-failure anti-patterns (any of these is a P1 governance failure):**
+
+- ❌ Running `node resolve-token.mjs` (deprecated — use `squad-identity token` or direct `gh`)
+- ❌ `echo "$TOKEN"`, `env`, `printenv`, or `set -x` around token-handling blocks
+- ❌ `export GH_TOKEN; gh …` instead of the inline `GH_TOKEN="$TOKEN" gh …` one-liner
+- ❌ A `gh` call without `ROLE_SLUG` context or `GH_TOKEN` set (falls back to `~/.config/gh/hosts.yml` → human identity)
+- ❌ Pasting tokens into responses or commits
+- ❌ Committing `.squad/identity/keys/*.pem` or `.squad/identity/apps/*.json`
+
+**Post-flight verification:** Verify bot identity with `squad-identity doctor` or by checking the last comment/review.
+<!-- /SQUAD-TOKEN-HANDLING-BLOCK -->
 
 ## Voice
 

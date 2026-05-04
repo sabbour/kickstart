@@ -25,6 +25,8 @@ import { pricingLookupTool } from './tools/pricing-lookup.js';
 import { estimateCostTool } from './tools/estimate-cost.js';
 import { validateBicepTool } from './tools/validate-bicep.js';
 import { whatIfTool } from './tools/what-if.js';
+import { quotaLookupTool } from './tools/quota-lookup.js';
+import { assessAksClusterTool } from './tools/assess-aks-cluster.js';
 
 // User actions (no JSX)
 import { deployResourceUserAction } from './user-actions/deploy-resource.js';
@@ -68,6 +70,7 @@ export const azurePackServer: Pack = {
   name: 'azure',
   version: '0.1.0',
   dependsOn: ['core'],
+  handoffTargets: ['github'],
 
   agentsDir: resolveAssetURL(import.meta.url, './agents/', './pack-assets/azure/agents/'),
   skillsDir: resolveAssetURL(import.meta.url, './skills/', './pack-assets/azure/skills/'),
@@ -81,6 +84,8 @@ export const azurePackServer: Pack = {
     estimateCostTool,
     validateBicepTool,
     whatIfTool,
+    quotaLookupTool,
+    assessAksClusterTool,
   ],
 
   userActions: [

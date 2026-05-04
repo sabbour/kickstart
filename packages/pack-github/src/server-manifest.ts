@@ -18,6 +18,8 @@ import { resolveAssetURL } from '@aks-kickstart/harness/runtime/asset-url';
 
 // Tools (no JSX)
 import { apiGetTool } from './tools/api-get.js';
+import { checkRepoAccessTool } from './tools/check-repo-access.js';
+import { updatePrDescriptionTool } from './tools/update-pr-description.js';
 
 // User actions (no JSX)
 import { loginUserAction } from './user-actions/login.js';
@@ -68,7 +70,7 @@ export const githubPackServer: Pack = {
   agentsDir: resolveAssetURL(import.meta.url, '../agents/', './pack-assets/github/agents/'),
   skillsDir: resolveAssetURL(import.meta.url, '../skills/', './pack-assets/github/skills/'),
 
-  tools: [apiGetTool],
+  tools: [apiGetTool, checkRepoAccessTool, updatePrDescriptionTool],
 
   userActions: [
     loginUserAction,

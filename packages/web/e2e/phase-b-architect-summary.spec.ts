@@ -173,12 +173,11 @@ test.describe('Phase B architect summary card', () => {
     await page.getByRole('textbox', { name: /describe your app/i }).fill('Build an AI chatbot on AKS with KAITO');
     await page.getByRole('button', { name: /send/i }).click();
 
-    // SummaryCard visible with title
-    await expect(page.getByText('Your AKS plan')).toBeVisible();
-
-    // ArchitectureDiagram visible (rendered within the surface)
+    // SummaryCard visible with title (scoped to the surface to avoid strict-mode
+    // violation against the streaming chunk text which also contains the substring)
     const surface = page.locator('[data-surface-id="shared:architect-plan"]');
     await expect(surface).toBeVisible();
+    await expect(surface.getByText('Your AKS plan')).toBeVisible();
 
     // Action buttons visible
     await expect(page.getByRole('button', { name: /looks right/i })).toBeVisible();

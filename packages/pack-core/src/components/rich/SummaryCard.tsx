@@ -107,12 +107,12 @@ export const SummaryCard = createReactComponent(SummaryCardApi, ({ props, buildC
   return (
     <Card className={classes.card} data-testid="a2ui-SummaryCard">
       {props.title && (
-        <Caption1 className={classes.title}>{props.title}</Caption1>
+        <Caption1 className={classes.title}>{String(props.title)}</Caption1>
       )}
       <div className={classes.grid}>
         {items.map((item, idx) => (
           <React.Fragment key={idx}>
-            <Body1 className={classes.label}>{item.label}</Body1>
+            <Body1 className={classes.label}>{String(item.label)}</Body1>
             <div className={classes.valueRow}>
               {item.link && isSafeUrl(item.link) ? (
                 <Link
@@ -121,11 +121,11 @@ export const SummaryCard = createReactComponent(SummaryCardApi, ({ props, buildC
                   rel="noopener noreferrer"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                 >
-                  <Body1Strong>{item.value}</Body1Strong>
+                  <Body1Strong>{String(item.value)}</Body1Strong>
                   <Open16Regular />
                 </Link>
               ) : (
-                <Body1Strong>{item.value}</Body1Strong>
+                <Body1Strong>{String(item.value)}</Body1Strong>
               )}
               {item.badge && (
                 <Badge

@@ -7,19 +7,17 @@ on:
 permissions:
   issues: write
   contents: read
-  repository-projects: write
 
 jobs:
   triage:
     if: github.event.label.name == 'squad'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - name: Triage issue via Lead agent
-        uses: actions/github-script@v8
+        uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const issue = context.payload.issue;
@@ -262,6 +260,3 @@ jobs:
             });
 
             core.info(`Triaged issue #${issue.number} → ${assignedMember.name} (${assignLabel})`);
-
-      # Board-add removed: squad-project-board-automate.yml is the authoritative handler
-      # for project board additions and fires on the same label events.

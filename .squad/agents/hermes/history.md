@@ -1,204 +1,273 @@
-# Hermes — Tester
+### 2026-05-01T12:41:57-07:00 — Review/CI gate cleanup (batch validation)
 
-## About Me
-QA engineer and test infrastructure owner. Expertise in Playwright E2E testing, validation engine architecture, Kubernetes deployment safeguards, and accessibility compliance. Responsible for test coverage, regression detection, and quality gates on all releases.
+- **CI fast-path validation**: Reviewed `ci.yml` `changes` job that partitions docs-only vs. code-impacting PRs. Confirmed `skipped` state is correctly treated as success in `ci-gate` aggregator. Verified error-path logic: `changes.result != 'success'` explicitly fails the required check.
+- **Approval preservation**: Tested base-sync detection (Compare API file-signature comparison in `squad-review-gate.yml`) — approvals preserved on "Update branch" / no-content-change rebase; ordinary new commits still clear stale approvals.
+- **Branch protection semantics**: Validated that the two required status checks (`CI Gate` and `squad/review-gate`) will enforce gates correctly when `lint-build` is skipped on docs-only PRs.
+- **Edge cases tested**: 
+  - Mixed docs + code changes (all jobs run) ✅
+  - Markdown-only changes (skips lint-build/e2e) ✅
+  - Push to main (always runs all) ✅
+  - Base-sync with no content change (preserves approvals) ✅
 
-## Key Files
-- `packages/core/src/validation/` — ValidationEngine, 23 validators (DS001-DS020), auto-fix system
-- `packages/core/src/__tests__/` — 600+ unit tests for validation, action loop, tool system
-- `packages/web/src/__tests__/` — 70+ Playwright E2E tests for full user flows
-- `.playwright/` — Playwright config, webServer, browser setup
-1. **Loader bug (mine to fix):** `packages/web` is ESM (`"type": "module"`), so `__dirname` was undefined when Playwright loaded `e2e/golden/golden-fixture.ts` on CI. Suite couldn't even start. Fix `7cf3132`: switched to `fileURLToPath(import.meta.url)` + `path.dirname`. Local runs masked this with unrelated vitest/expect noise.
-2. **Pre-existing drift (not mine):** Once the loader worked, 35 specs failed across three families — `route.fallthrough is not a function` in the hermetic handler, strict-mode locator violations (e.g. `getByText('Azure Blob Storage')` matching 2 elements after A2UI surface refactor), and phase B/C/D spec-vs-app drift. None caused by #192; all hidden by prior disabled state + loader bug.
+### 2026-05-01T13:27:17-07:00 — Corrected gate policy validation (BLOCKED)
 
-**Action taken:** Pushed the loader fix. Did NOT chase the 35 failures — way out of scope for "re-enable e2e + fix one fixture id." Posted [diagnostic comment](https://github.com/azure-management-and-platforms/kickstart/pull/234#issuecomment-4336445583) on PR #234 with three options. Recommended Option A: land #234, open follow-up issue for the 35 failures.
+Validated the corrected docs-required / security+architecture-conditional policy after Kif/Amy work. Result: **inconsistent**.
 
-**Stopped per directive #7** — no speculative loop fixes.
+- **Amy (ceremonies.md):** ✅ Updated. Docs is now described as a **required** signal (`docs:approved` / `docs:not-applicable` / `skip-docs`); security and architecture are explicitly **conditional** (waived for doc-only / doc-owned PRs lacking sensitive surfaces, security label, or architecture label). Phase-1 docs pass is required and runs in parallel with CI.
+- **Kif (squad-review-gate.yml):** ⚠️ Comment block (lines 53–57) was updated to *describe* the corrected policy ("Security is conditional: waived when the PR is docs-only…") but the runtime config was **not** changed: `gateRules` still has `security: { required: "always" }` and `botLoginMap` still omits `docs`. No path-conditional logic, no doc-only branch, no docs label signal check. Comment ↔ behavior drift.
+- **Kif (squad-auto-merge.yml):** ⚠️ Standard path (lines 165–169) still requires `security:approved` unconditionally; only `LOW_RISK_LABEL` opt-in path makes security conditional on sensitive paths/labels. `getDocsBlocker` (181–189) still treats docs as advisory and only blocks on `docs:rejected` — does **not** require a docs signal as Amy's ceremony now mandates.
+- **CI fast-path (ci.yml):** ✅ Confirmed working. `changes` job classifies docs-only PRs (md/mdx, docs/, docs-site/, .squad/, .changeset/), `lint-build` is skipped, `ci-gate` aggregator treats `skipped` as success. Push-to-main with docs-only changes is excluded via `paths-ignore`. No regression.
+- **YAML/JSON parse:** ✅ All five workflow files + `config.json` parse cleanly.
+- **Scoped `git diff --check`:** Trailing-whitespace warnings on Amy's ceremonies.md edits (lines 22, 161, 169–173, 176, 208, 354, 383–386). Cosmetic; not a gate failure.
 
-**Lesson for future me:** When CI fails on a re-enabled test suite, always check the loader/import errors first before assuming spec drift. ESM/CJS module-scope mismatches are silent on local runs that have other noise.
+**Validation matrix vs. corrected policy:**
 
----
+| # | Scenario | Desired | ci.yml | review-gate | auto-merge | Verdict |
+|---|---|---|---|---|---|---|
+| 1 | Docs-only PR | docs required; security/arch waived | ✅ skip lint-build | ❌ security still always | ❌ security still always | FAIL |
+| 2 | Docs+code PR | normal gates + docs signal | ✅ runs full | ⚠️ docs not signaled | ⚠️ docs not signaled (advisory) | PARTIAL |
+| 3 | Workflow/security-docs PR | security still required | ✅ md still skips lint but `.github/workflows/` paths trigger full pipeline | ✅ accidentally — security is `always` | ✅ accidentally | PASS-by-accident |
+| 4 | Architecture-labeled docs PR | architecture required | ✅ | ❌ no `architecture` role wired | ✅ requires `architecture:approved` when labeled | PARTIAL |
+| 5 | Markdown/docs-only fast-path | CI Gate green; push-to-main fine | ✅ | n/a | n/a | PASS |
+| 6 | YAML/JSON parse + diff --check | clean | ✅ | ✅ | ✅ (whitespace nits in ceremonies) | PASS |
 
-## 2026-04-28T17:45:16Z — Phase 1.6 consensus checkpoint
+**Blockers for Kif:**
+1. `squad-review-gate.yml` `gateRules` must add a `security` conditional branch keyed off doc-only diff + sensitive-path detection + `architecture`/`security` label absence (mirror auto-merge's `isSensitivePath` / `isSecurityPatch`). Add `docs` to `botLoginMap` *or* read the docs label as a non-bot signal.
+2. `squad-auto-merge.yml` standard path (`getRequiredApprovals`) must apply the same doc-only relaxation outside the `LOW_RISK_LABEL` opt-in. `getDocsBlocker` must be promoted from advisory to required (missing docs label → block, matching Amy's ceremony language).
+3. Stale comment in `squad-review-gate.yml` lines 52–57 should match whichever direction is shipped.
 
-**Ceremony:** Phase 1.6 Consensus Ack (Issue #197, Ceremony ID 197-ack-tester)
+Once Kif's edits land I'll re-run the matrix and flip `validate-corrected-gates` to done.
 
-**Action:** Reviewed D1–D14 architectural decisions + AKS Automatic constraint spec v1.1.1 §2.7 binding rules from testing/QA lens.
+### 2026-05-01T13:27:17-07:00 — Re-validation after Kif edits visible (PASS)
 
-**Assessment:**
-- **D1 (HTTP scale-to-zero honesty):** Testable via sim assertions that reject KEDA HTTP expectations.
-- **D5 (Postgres tier defaults):** Maps to fixture variance in E2E cost scorecards.
-- **D10 (explicit resource requests + anti-affinity):** Verifiable via unit tests on generated YAML.
-- **§2.7 binding rules:** Rules 2/3/4/5/8 are direct test targets:
-  - Rule 2 (25-deny + 5 PSS compliance) = CI-gate lint on every manifest
-  - Rule 3 (probes informational) = no E2E assertion blocks on missing probes
-  - Rule 4 (Gateway API only) = manifest parsing test rejecting `Ingress` resources
-  - Rule 5 (Workload Identity 4-resource invariant) = contract test validating UAMI/FederatedCredential/role/ServiceAccount in every plan
-  - Rule 8 (bucket categorization: incompatible vs requiresChanges) = scorecard unit test
+User clarified policy: **docs-only PRs do NOT require `docs:approved`** (only `docs:rejected` blocks). Kif's working-tree edits are now visible in `squad-review-gate.yml` and `squad-auto-merge.yml`. Re-ran the matrix:
 
-**Ack status:** Full ack (D1–D14, AKS v1.1.1 §2.7). No dissents. No blocks.
+- **`squad-review-gate.yml`:** `gateRules` now codes `security` as `conditional` with `bypassWhen: { docsOnly, noArchitectureLabel, noSensitivePaths }`; new `isDocsOnlyPR` / `hasSensitivePath` / `hasArchitectureLabel` precomputation drives the bypass; `docs` role removed from gate (signal handled by auto-merge); patterns kept in sync with auto-merge (`DOCS_LIKE_PATTERN`, `SENSITIVE_PATH_PATTERNS`).
+- **`squad-auto-merge.yml`:** `getRequiredApprovals` short-circuits to `['codereview:approved']` when `docsOnly && !sensitive && !architecture`; standard path otherwise (codereview+security, +architecture if labeled); `getDocsSignalBlocker` satisfies docs signal by **content** (PR ships `*.md*` / `docs/` / `docs-site/` / `.changeset/`) OR by an explicit waiver label (`docs:approved` / `docs:not-applicable` / `skip-docs`); `docs:rejected` remains a hard block. `isPureBaseSync` preserves approvals on Update-branch syncs.
+- **`ci.yml`:** Docs-only fast-path unchanged and correct (`changes` job + `lint-build` skip + `ci-gate` aggregator treating `skipped` as success).
+- **YAML/JSON parse:** ✅ All 5 workflows + `config.json` clean.
+- **Scoped `git diff --check`** on Kif's files: clean (no whitespace nits introduced).
 
-**Forward dependency:** #230 (sims-as-regression-tests harness) unblocked. Needs D1–D14 frozen so assertion expectations are stable.
+| # | Scenario | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Docs-only PR | ✅ PASS | review-gate waives security via `docsOnly` bypass; auto-merge requires only codereview; docs signal auto-satisfied by content; `docs:rejected` still blocks |
+| 2 | Product/code PR | ✅ PASS | review-gate requires codereview+security; auto-merge standard path; docs signal required (content or label) |
+| 3 | Docs+code PR | ✅ PASS | not docsOnly → security required; docs content present in diff satisfies signal |
+| 4 | Sensitive (workflows/auth/guardrails) docs PR | ✅ PASS | `hasSensitivePath` blocks docsOnly bypass in both workflows → security required |
+| 5 | Architecture-labeled docs PR | ✅ PASS | `hasArchitectureLabel` blocks docsOnly bypass; auto-merge `getRequiredApprovals` adds `architecture:approved` |
+| 6 | CI docs-only fast-path | ✅ PASS | lint-build skipped; CI Gate aggregator returns success; push-to-main untouched |
 
-**Critical path:** Ready for #198 (triage rewrite) + four-way ack (Bender/Fry/Zapp/Nibbler) to trigger Phase 2.0.
+**Minor edge (non-blocking):** A `.squad/`-only PR containing no `*.md*` would be treated as docsOnly by review-gate (matches `DOCS_LIKE_PATTERN`) but auto-merge's `getDocsSignalBlocker` content check uses the narrower `DOCS_CONTENT_PATTERN` (excludes `.squad/`), so such a PR would still need an explicit docs label. Acceptable — internal squad state isn't user-facing docs. Flagged for Kif's awareness, not a blocker.
 
-**Comment posted:** https://github.com/azure-management-and-platforms/kickstart/issues/197#issuecomment-4337780380
+**Verdict:** ✅ All six rows pass. Kif's edits implement the corrected policy; Amy's ceremony language is consistent with the implementation. Marking `validate-corrected-gates` → **done**. Caveat: edits are uncommitted working-tree changes; re-confirm after the PR merges to `dev`.
 
-**Bot identity verified:** squad-tester[bot] confirmed present in comment author.
+### 2026-05-01T13:27:17-07:00 — `remove-skip-docs` directive validation (BLOCKED)
+
+User added directive: `skip-docs` must be removed entirely as a docs satisfier. Product/code docs signal must be `docs:approved` OR `docs:not-applicable` only. Docs-only PRs need no docs approval. Ran scoped grep — `skip-docs` is still actively wired in 6 surfaces:
+
+**Active gate behavior (must be removed for `remove-skip-docs` to pass):**
+1. `.github/workflows/ci.yml:221–222` — `const skipDocs = labels.includes('skip-docs'); … requireChangeset = userFacing && !hasDocsSite && !skipDocs;` actively bypasses the changeset gate.
+2. `.github/workflows/squad-auto-merge.yml:92, 245, 256` — `SKIP_DOCS_LABEL` constant + acceptance branch in `getDocsSignalBlocker` + user-facing error message recommending `skip-docs`. Also rationale comments at L83 and L532.
+3. `.github/workflows/squad-project-board-automate.yml:67` — workflow trigger condition fires on `skip-docs` label add/remove.
+4. `.github/workflows/sync-squad-custom-labels.yml:38` — provisions the label itself with description "Explicitly bypass docs and changeset gate for this PR".
+5. `.squad/reviews/config.json:86` — `bypassLabels: ["skip-docs", "docs:not-applicable", "docs:approved"]` declares it as a valid docs bypass.
+6. `.squad/ceremonies.md:171, 208, 212, 346, 354` and `.squad/skills/squad-reviews/SKILL.md:224` and `.squad/agents/nibbler/charter.md:94` and `.squad/decisions.md:113, 130, 723, 2409` — current (non-archive) docs all describe `skip-docs` as an accepted docs satisfier; ceremonies.md L2409 even says "**Cannot be removed** without also reworking `ci.yml`."
+
+**Stale comment (low-priority):** `.github/workflows/squad-review-gate.yml:218` — comment example mentions `skip-docs`; harmless since gate-rule logic doesn't reference it.
+
+**Historical / archive (OK to keep):** `.squad/agents/bender/history-archive.md:1095`, `.squad/decisions-archive/decisions-2026-04-24T07:46:08Z.md`, `.squad/decisions-archive/decisions-20260427-233336.md`. Consistent with directive's "historical-only or label-cleanup rationale" allowance.
+
+**Updated matrix (post-directive):**
+
+| # | Scenario | Verdict | Notes |
+|---|---|---|---|
+| 1 | Docs-only PR | ✅ PASS | docsOnly bypass already requires no docs label; `skip-docs` not on the satisfier path here |
+| 2 | Product/code PR docs signal | ⚠️ REGRESSION | `getDocsSignalBlocker` still accepts `SKIP_DOCS_LABEL`; must restrict to `docs:approved` ∪ `docs:not-applicable` |
+| 3 | Docs+code PR | ⚠️ REGRESSION | same `SKIP_DOCS_LABEL` acceptance as row 2 |
+| 4 | Sensitive paths | ✅ PASS | unchanged |
+| 5 | Architecture-labeled docs | ✅ PASS | unchanged |
+| 6 | CI docs-only fast-path | ✅ PASS | docs-only branch unaffected; but `Detect docs-gate scope` step in `lint-build` still consumes `skip-docs` to bypass changeset → directive violation, separate from fast-path correctness |
+
+**Blockers for `remove-skip-docs` (owner: Kif primary, Amy + Nibbler for prose):**
+- Code: drop `SKIP_DOCS_LABEL` from `squad-auto-merge.yml` (constant, satisfier branch, error message, comments). Drop `skipDocs` consumption from `ci.yml` `Detect docs-gate scope`. Drop label trigger from `squad-project-board-automate.yml`. Remove provisioning entry from `sync-squad-custom-labels.yml`. Remove `skip-docs` from `bypassLabels` in `.squad/reviews/config.json`.
+- Docs: update `ceremonies.md`, `skills/squad-reviews/SKILL.md`, `agents/nibbler/charter.md`, `decisions.md` (lines 113/130/723/2409) to drop `skip-docs` from the live signal list (keep only as historical citation if needed). Update `decisions.md:2409` claim that ci.yml cannot be reworked.
+- Stale comment cleanup (cosmetic): `squad-review-gate.yml:218`.
+
+**Combined fleet status:**
+- `validate-corrected-gates` → **done** (matrix rows 1, 4, 5, 6 all PASS; rows 2 and 3 PASS for the gate-conditional logic — the new regression is specifically the `skip-docs` satisfier still being live).
+- `remove-skip-docs` → **blocked** until the 6 active surfaces above are scrubbed.
+
+YAML/JSON parse: ✅. Scoped `git diff --check`: clean on Kif's workflow files.
+
+### 2026-05-01T13:27:17-07:00 — Final `remove-skip-docs` re-validation (PARTIAL PASS)
+
+User issued final directive: full migration to `docs:not-applicable`; CI changeset heuristic must use `docs:not-applicable` (not `skip-docs`); product/code satisfiers exactly `docs:approved` ∪ `docs:not-applicable`; docs-only PRs need no docs label; permit historical/rationale mentions only.
+
+**Workflow + config layer (Kif's domain): ✅ COMPLETE**
+- `ci.yml:225–228` — `Detect docs-gate scope` now reads `docsWaived = labels.includes('docs:not-applicable') || labels.includes('docs:approved')`. `skipDocs` constant removed; lines 221–223 are tombstone comment citing DP `kif-remove-skip-docs`. ✅
+- `squad-auto-merge.yml` `getDocsSignalBlocker` (verified at L240+): satisfiers are exactly `DOCS_APPROVED_LABEL`, `DOCS_NOT_APPLICABLE_LABEL`, or content (`isDocsContentPath`). `SKIP_DOCS_LABEL` constant + check + error-message reference all removed; remaining hits at L82, 85, 534, 535 are rationale tombstones. ✅
+- `squad-auto-merge.yml` docs-only fast path returns `null` *before* the satisfier check, so docs-only PRs need no docs label at all. ✅
+- `squad-project-board-automate.yml` — no active `skip-docs` consumer remains (label-event short-circuit dropped). ✅
+- `squad-review-gate.yml` — no active reference (prior cosmetic comment was inside removed lines). ✅
+- `sync-squad-custom-labels.yml:38–39` — label provisioning entry deleted; tombstone comment retained per directive. ✅
+- `.squad/reviews/config.json:86` — `bypassLabels: ["docs:not-applicable", "docs:approved"]`. `skip-docs` removed. ✅
+- YAML/JSON parse on all 6 affected workflows + `config.json`: ✅
+
+**Guidance + prose layer (Amy + Nibbler + Scribe): ❌ NOT YET MIGRATED**
+- `.squad/ceremonies.md:171, 176, 211, 216, 217, 353, 361` — Amy's prose still lists `skip-docs` as an active docs satisfier. Owner: Amy.
+- `.squad/skills/squad-reviews/SKILL.md:225` — guidance still says "one of `docs:approved`, `docs:not-applicable`, or `skip-docs` must be present". Owner: Amy.
+- `.squad/agents/nibbler/charter.md:94` — charter still lists `skip-docs` as docs-impact signal. Owner: Nibbler (or Amy by delegation).
+- `.squad/decisions.md:113, 130, 723, 2409` — live ledger entries still describe `skip-docs` as accepted; L2409 still asserts "**Cannot be removed** without also reworking `ci.yml`" — flatly contradicted by Kif's commit. Owner: Scribe.
+
+**Historical-only (permitted by directive — no action):**
+- Agent history files (`amy/history.md:12`, `kif/history.md:43–47`, `leela/history.md:21–28`, `bender/history-archive.md:1095`, prior entries in this very file)
+- `.squad/decisions-archive/*` (archived ledger snapshots)
+- Tombstone rationale comments in `ci.yml`, `squad-auto-merge.yml`, `sync-squad-custom-labels.yml` (explicitly cite DP `kif-remove-skip-docs`)
+
+**Final matrix:**
+
+| # | Scenario | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Docs-only PR — no docs label needed | ✅ PASS | `getDocsSignalBlocker` returns `null` early on `docsOnly && !sensitive && !architecture`; review-gate `bypassWhen.docsOnly` waives security |
+| 2 | Product/code PR — only `docs:approved` ∪ `docs:not-applicable` satisfy | ✅ PASS | satisfier branch reduced to those two labels (or content); `SKIP_DOCS_LABEL` removed; error message updated |
+| 3 | Docs+code PR | ✅ PASS | same satisfier logic; content-shipping path satisfies automatically |
+| 4 | Sensitive (workflows/auth/guardrails) docs PR | ✅ PASS | `hasSensitivePaths` cancels docsOnly bypass → docs signal + security required; `skip-docs` no longer accepted |
+| 5 | Architecture-labeled docs PR | ✅ PASS | `hasArchitectureLabel` cancels docsOnly bypass; auto-merge adds `architecture:approved` |
+| 6 | CI changeset/docs-gate heuristic | ⚠️ workflow ✅ / prose ❌ | `ci.yml` uses `docs:not-applicable` ∪ `docs:approved`; `ceremonies.md` / `SKILL.md` / `nibbler/charter.md` / `decisions.md` prose still describe `skip-docs` as live |
+
+**Combined fleet status:**
+- `validate-corrected-gates` → 🟢 **done** — all six gate-behavior rows pass.
+- `remove-skip-docs` → 🟡 **partial** — workflow/config layer ✅; prose layer ❌. Will flip to 🟢 when Amy/Nibbler/Scribe scrub the four prose surfaces above.
+
+**Re-validation contract:** rerun `grep -rnE "skip-docs|SKIP_DOCS|skipDocs"` excluding `*-archive*`, `audit.jsonl`, `*/inbox/*`, and `*/agents/*/history.md`. Directive PASSES when the only remaining hits are rationale tombstones inside `.github/workflows/`.
+
+## Spawn: ralph-wave-2 (2026-05-01T12:13:25)
+- **Issue #312**: Serial test validation ✅
+  - PR #342 opened
+  - 3 serial test runs: all passing ✅
+  - Issue marked done
 
 
----
+### 2026-05-01T20:38:03Z — Validated corrected docs-gate matrix (DP hermes-corrected-gate-validation)
+- **What**: ran validation matrix over Kif's working-tree edits to `.github/workflows/` files and `.squad/reviews/config.json` to confirm six gate-behavior scenarios pass against corrected policy.
+- **Matrix status**: ✅ all six rows pass (docs-only + no sensitive/arch triggers, product/code, docs+code, sensitive-paths override, architecture-labeled, CI docs-only fast-path).
+- **`skip-docs` removal directive**: workflow + config layer **complete** (active code paths reference `docs:not-applicable` / `docs:approved` only; remaining refs are tombstone comments); prose layer **outstanding** in `.squad/ceremonies.md`, `.squad/skills/squad-reviews/SKILL.md`, `.squad/agents/nibbler/charter.md`, `.squad/decisions.md` (delegated to Amy/Scribe).
+- **Validation commands**: YAML/JSON parse ✅; scoped `git diff --check` ✅; workflow logic spot-checks ✅; CI fast-path confirmed orthogonal to gate changes ✅.
+- **Re-validation contract**: will spot-check after implementing PRs merge to confirm no rebase drift.
+- **Coordination note**: Updated `.squad/decisions/inbox/hermes-corrected-gate-validation.md` flagging that prose cleanup is the critical path to "PASS" — workflow code is already compliant with the directive.
 
-### 2026-04-28T17:39:30Z: Phase 1.6 Consensus Checkpoint #197 — Complete
+### 2026-05-01T13:46:56.014-07:00 — Upstream docs-gate validation (BLOCKED)
 
-**Ceremony:** phase-1.6-consensus-197  
-**Outcome:** 7/7 acks, 0 dissents. Critical-path (Bender+Fry+Zapp+Nibbler) cleared.
+Validated Kif's uncommitted docs-gate changes in `/home/asabbour/GitWSL/squad-reviews` and `/home/asabbour/GitWSL/squad-workflows`.
 
-All decisions D1–D14 and section 2.7 rules approved. Phase 2.0 critical path (#198 triage rewrite) **officially unblocked**. Orchestration logs written to `.squad/orchestration-log/{ISO8601}-{agent}.md` per ceremony spec.
+- `squad-reviews`: source extension and generated review-gate policy match the target model: docs-only non-sensitive/non-architecture PRs skip docs/security/architecture gates; code PRs require docs signal (`docs:approved` or `docs:not-applicable`); `docs:rejected` hard-blocks; synchronize preserves labels on pure base-sync and clears role approval labels on real content changes. `skip-docs` only appears in `CHANGELOG.md` historical text.
+- `squad-workflows`: packaged source under `extensions/squad-workflows` matches the target merge-check policy and CI fast-path. However the tracked installed copy under `.github/extensions/squad-workflows/lib/` is stale: `merge-check.mjs` still requires architecture unconditionally, lacks docs-impact signal enforcement, and only exempts security for docs-only; `workflow-config.mjs` still lacks `reviewSignals` and only skips `security:approved` for docs-only. Treat this as an active-surface blocker unless `.github/extensions/` is explicitly non-authoritative in this repo.
+- CI fast-path in both repos classifies docs-like PR changes and skips the heavy test job while `CI Gate` accepts `skipped`; non-PR push paths force `docs_only=false` and run full CI.
+- Validation run: `npm test`, `git diff --check`, scoped `node --check`, PyYAML workflow parsing, and GitHub-script syntax checks all pass in both repos after rerunning with repo-local `TMPDIR`.
+- `skip-docs` grep: `squad-reviews` has one historical/tombstone `CHANGELOG.md` hit only; `squad-workflows` has no hits.
 
-**For Kif:** Investigate Fry post-flight-check.mjs exit 3 anomaly (identity verified correct, script exit unexpected).
+### 2026-05-01T13:46:56.014-07:00 — Base-sync approval preservation validation
 
-<!-- Append new learnings below. Each entry is something lasting about the project. -->
+Validated `squad-reviews` for the specific stale-approval optimization. The generated review gate only clears legacy `{role}:approved` labels on `pull_request.synchronize` when the PR-vs-base file signature changes; pure base catch-up / update-branch syncs log preservation and skip label removal. Native PR review approvals are also evaluated by latest reviewer state and are not stripped by this logic. Focused validation run: `TMPDIR=$PWD/.copilot-test-tmp node --test test/scaffold-gate.test.mjs` plus inline assertions over `generateReusableWorkflow` for `synchronize`, `compareCommitsWithBasehead`, `isPureBaseSync`, preservation logging, content-change logging, and `removeLabel`.
 
-- **2025-07-22 — Initial @kickstart/core test suite:** Created 35 tests across 3 files (machine.test.ts, phases.test.ts, catalog.test.ts) using vitest. Key finding: early-phase prompt templates contain K8s terms only in RULES negation context, so K8s exposure tests must check the conversational body separately from the rules section. Also: tsconfig.json must exclude `src/__tests__` and `vitest.config.ts` to avoid build errors, and vitest config must exclude `dist/` to avoid running stale compiled tests.
+For `squad-workflows`, I only inspected Kif's visible WIP as requested. The working tree now shows a `stale-approvals` synchronize job in both `squad-ci.yml` surfaces and an untracked focused test file that preserves labels for pure base-sync and clears approvals for real content syncs, but final assurance remains pending Kif completing that fix and post-fix revalidation.
 
-- **2025-07-22 — @kickstart/mcp-server test suite:** Created 53 tests across 4 files (a2ui.test.ts, kickstart.test.ts, generate-manifests.test.ts, action.test.ts). Key patterns: (1) Tool handlers are pure functions accepting a `Map<string, SessionState>` — easy to unit test without MCP SDK mocking. (2) A2UI capability tier ("kickstart"/"basic"/"none") controls resource inclusion; always test all three tiers. (3) `generate-manifests` requires complete AppDefinition (name + runtime) AND AzureContext (subscriptionId + resourceGroup + region) — test each missing field individually. (4) Action handler reconstructs engine state from session — `select` stores data without advancing, `submit` stores + advances. (5) Same tsconfig exclude pattern as core: `src/__tests__` and `vitest.config.ts`.
+### 2026-05-01T13:46:56.014-07:00 — Role-scoped reapproval validation update
 
-- **2026-04-08 — Web UI Playwright E2E suite:** Created 38 tests across 5 spec files for `packages/web/` static site. Key learnings: (1) **MSAL CDN mocking:** `addInitScript` fails because the CDN `<script>` tag overwrites the mock; must use `page.route('**/msal-browser*')` to intercept the CDN request and return a fake MSAL module. (2) **API health check pitfall:** `api-client.js` treats HTTP 404 as "available" (`status < 500`), so `serve`'s 404 on `/api/converse` triggers API mode instead of demo mode; intercept with 503 to force demo fallback. (3) **A2UI selectors:** All A2UI components render with generic `.card` class — no component-specific classes. Use `.card-title` text to disambiguate. Nested cards (e.g. ArchitectureDiagram's inner component cards) cause `hasText` ambiguity; filter parent `.card` elements by their `.card-title` child. (4) **Port conflicts:** Use a non-standard port (4281) for the test server to avoid clashes with Azure SWA CLI on 4280. (5) **Fluent UI CDN:** Intercept `**/unpkg.com/@fluentui/**` with noop response for test speed and stability. (6) **Demo engine timing:** 800ms setTimeout in `handleUserMessage()` means tests need ~5s wait for assistant responses.
+User clarified that real-content synchronize events must not force arbitrary blanket reapproval: only reviewer domains affected by changed paths/labels/config triggers should be invalidated (e.g., a security-review response should not force architecture reapproval unless architecture triggers are touched).
 
-- **2025-07-25 — Chat-first UX E2E rewrite:** Rewrote E2E suite from 38 wizard tests to 21 chat-first tests across 4 spec files (landing-page, chat-transition, chat-experience, sessions-sidebar). Key learnings: (1) **Sessions toggle hidden on landing:** CSS rule `body.on-landing #topbar-sessions-toggle { display: none }` means sidebar tests must transition to chat first via `enterChatViaTrack()` helper. (2) **A2UI Text uses textContent, not innerHTML:** `renderText` sets `el.textContent`, so `**bold**` in A2UI Text components renders literally — no `<strong>` tags. The `renderMarkdown` path only activates for `msg.text` (non-A2UI) assistant messages. Demo mode always uses A2UI. (3) **API route interception broadened:** Changed `**/api/converse` to `**/api/**` to catch health-check and future endpoints. (4) **Transition timing:** The 200ms fade animation on `transitionToChat()` requires waiting for `#landing-page` detachment, not just visibility. (5) **Carousel auto-rotation:** 5-second interval; no need to wait for it in tests since click triggers transition immediately.
-# Project Context
+- **squad-reviews:** Initial inspection found the generated review gate still blanket-cleared `{role}:approved` labels for every configured role on real content synchronize. Fixed surgically in `/home/asabbour/GitWSL/squad-reviews` so base-sync still preserves all labels, and real content synchronize computes changed paths between before/after PR-vs-base comparisons and clears only `rolesToClear = allRoles.filter(roleAffectedBySync)`. Label-only conditional roles such as architecture are not invalidated by unrelated security/code response paths; always-required roles and conditional path/domain-triggered roles are invalidated when their domain is touched. Updated the stale-approval README text and scaffold tests.
+- **Validation:** `node --check extensions/squad-reviews/lib/scaffold-gate.mjs`; `TMPDIR=$PWD/.copilot-test-tmp node --test test/scaffold-gate.test.mjs`; full `TMPDIR=$PWD/.copilot-test-tmp npm test -- --test-reporter=dot` passed (87/87).
+- **squad-workflows:** Kif's WIP currently preserves pure base-sync, but the visible `stale-approvals` job/test still blanket-clears `codereview:approved`, `architecture:approved`, `security:approved`, `docs:approved`, and `docs:not-applicable` for real content syncs. Did not modify Kif's active fix. Final assurance is pending post-fix revalidation and must include: base-sync preserves all; real content does not blanket-clear; security-only response does not clear architecture; architecture clears only when architecture label/path/config triggers are touched.
 
-- **Owner:** Ahmed Sabbour
-- **Project:** Imagine — AI-guided onboarding experience for deploying apps to AKS
-- **Stack:** HTML/CSS/JS (Portal Prototyper framework), TypeScript, Azure/AKS
-- **Created:** 2026-04-08
+### 2026-05-01T13:46:56.014-07:00 — Local/upstream role-scoped approval implementation verification
 
-## Learnings
+User clarified the role-scoped reapproval behavior must be implemented and verified in local `kickstart`, upstream `squad-reviews`, and upstream `squad-workflows`, not only recorded as a decision.
 
-<!-- Append new learnings below. Each entry is something lasting about the project. -->
+- **Local `/home/asabbour/GitWSL/EMU/kickstart`:** Verified actual `squad-review-gate.yml` and installed `squad-reviews` extension include pure base-sync preservation and `rolesToClear = allRoles.filter(roleAffectedBySync)`, with docs `satisfiedByContent` and no blanket `allRoles` clearing. Verified `skip-docs` is not active in `ci.yml`, custom label provisioning, or `.squad/reviews/config.json`; docs policy uses `docs:approved` / `docs:not-applicable` and hard-blocks `docs:rejected`.
+- **Upstream `/home/asabbour/GitWSL/squad-reviews`:** Fixed and verified generated gate behavior: base-sync preserves all approvals; real content sync invalidates only affected role domains using changed-path deltas, `requiredWhen.paths`, `invalidationPaths`, and `satisfiedByContent`; label-only architecture is not cleared by unrelated security/code responses.
+- **Upstream `/home/asabbour/GitWSL/squad-workflows`:** Kif's WIP now includes role-scoped stale-approval clearing in both `squad-ci.yml` surfaces. I tightened architecture invalidation so a security-only response does not clear `architecture:approved` merely because the PR has an `architecture` label; architecture clears only on architecture-like paths.
+- **Validation:** local node syntax/policy assertions passed; `squad-reviews` `node --check`, focused scaffold-gate test, and full `npm test -- --test-reporter=dot` passed (89/89); `squad-workflows` stale approval + workflow/merge-check tests passed (19/19), plus policy assertions for no `skip-docs` labels and role-scoped invalidation.
 
-- **2025-07-22 — Initial @kickstart/core test suite:** Created 35 tests across 3 files (machine.test.ts, phases.test.ts, catalog.test.ts) using vitest. Key finding: early-phase prompt templates contain K8s terms only in RULES negation context, so K8s exposure tests must check the conversational body separately from the rules section. Also: tsconfig.json must exclude `src/__tests__` and `vitest.config.ts` to avoid build errors, and vitest config must exclude `dist/` to avoid running stale compiled tests.
+### 2026-05-01T13:46:56.014-07:00 — Batching + role-scoped gate validation
 
-- **2025-07-22 — @kickstart/mcp-server test suite:** Created 53 tests across 4 files (a2ui.test.ts, kickstart.test.ts, generate-manifests.test.ts, action.test.ts). Key patterns: (1) Tool handlers are pure functions accepting a `Map<string, SessionState>` — easy to unit test without MCP SDK mocking. (2) A2UI capability tier ("kickstart"/"basic"/"none") controls resource inclusion; always test all three tiers. (3) `generate-manifests` requires complete AppDefinition (name + runtime) AND AzureContext (subscriptionId + resourceGroup + region) — test each missing field individually. (4) Action handler reconstructs engine state from session — `select` stores data without advancing, `submit` stores + advances. (5) Same tsconfig exclude pattern as core: `src/__tests__` and `vitest.config.ts`.
+User added a batching requirement: feedback-addressing must not loop one feedback item → one implementation/commit/comment. It should batch related review fixes into one implementation pass, one validation run, one commit, and one consolidated PR update where possible, then resolve individual threads with concise references to that batch.
 
-- **2026-04-08 — Web UI Playwright E2E suite:** Created 38 tests across 5 spec files for `packages/web/` static site. Key learnings: (1) **MSAL CDN mocking:** `addInitScript` fails because the CDN `<script>` tag overwrites the mock; must use `page.route('**/msal-browser*')` to intercept the CDN request and return a fake MSAL module. (2) **API health check pitfall:** `api-client.js` treats HTTP 404 as "available" (`status < 500`), so `serve`'s 404 on `/api/converse` triggers API mode instead of demo mode; intercept with 503 to force demo fallback. (3) **A2UI selectors:** All A2UI components render with generic `.card` class — no component-specific classes. Use `.card-title` text to disambiguate. Nested cards (e.g. ArchitectureDiagram's inner component cards) cause `hasText` ambiguity; filter parent `.card` elements by their `.card-title` child. (4) **Port conflicts:** Use a non-standard port (4281) for the test server to avoid clashes with Azure SWA CLI on 4280. (5) **Fluent UI CDN:** Intercept `**/unpkg.com/@fluentui/**` with noop response for test speed and stability. (6) **Demo engine timing:** 800ms setTimeout in `handleUserMessage()` means tests need ~5s wait for assistant responses.
+- **Local `kickstart`:** Updated installed `squad-workflows` address-feedback source, installed `squad-reviews` acknowledge-feedback source, workflow tool descriptions, `.copilot/skills/pr-feedback-loop/SKILL.md`, and `.squad/skills/squad-reviews/SKILL.md` to return/use batched instructions and remove active one-thread-one-commit guidance. Local assertions confirm batching guidance/source, role-scoped review-gate invalidation, and active docs gate migration off `skip-docs`.
+- **Upstream `squad-reviews`:** Verified source/tests/guidance now return `batchPlan` and explicit one-pass/one-commit/consolidated-comment instructions; full test suite still passes. Role-scoped stale approval clearing and docs policy still pass.
+- **Upstream `squad-workflows`:** Verified Kif's batching implementation in source/installed extension/tool descriptions/README/SKILL plus focused `address-feedback-batching` test. Role-scoped synchronize invalidation tests still pass, including security-only changes preserving architecture approval and base-sync preserving all approvals.
+- **Validation:** Local `node --check` + policy assertions passed. Upstream `squad-reviews`: `npm test -- --test-reporter=dot` passed (89/89). Upstream `squad-workflows`: `node --test test/address-feedback-batching.test.mjs test/ci-stale-approvals.test.mjs test/workflow-config.test.mjs test/merge-check-branch-freshness.test.mjs` passed (20/20). Scoped grep found remaining per-thread/one-commit mentions only as anti-pattern/prohibition or post-batch thread-resolution instructions.
 
-- **2025-07-25 — Chat-first UX E2E rewrite:** Rewrote E2E suite from 38 wizard tests to 21 chat-first tests across 4 spec files (landing-page, chat-transition, chat-experience, sessions-sidebar). Key learnings: (1) **Sessions toggle hidden on landing:** CSS rule `body.on-landing #topbar-sessions-toggle { display: none }` means sidebar tests must transition to chat first via `enterChatViaTrack()` helper. (2) **A2UI Text uses textContent, not innerHTML:** `renderText` sets `el.textContent`, so `**bold**` in A2UI Text components renders literally — no `<strong>` tags. The `renderMarkdown` path only activates for `msg.text` (non-A2UI) assistant messages. Demo mode always uses A2UI. (3) **API route interception broadened:** Changed `**/api/converse` to `**/api/**` to catch health-check and future endpoints. (4) **Transition timing:** The 200ms fade animation on `transitionToChat()` requires waiting for `#landing-page` detachment, not just visibility. (5) **Carousel auto-rotation:** 5-second interval; no need to wait for it in tests since click triggers transition immediately.
+### 2026-05-01T13:46:56.014-07:00 — Final cross-repo batching + approval-gate validation
 
-- **2025-07-25 — A2UI action loop TDD specs (B-23/B-24/B-25):** Created 72 tests across 3 files ahead of implementation. Key findings: (1) **Current action handler silently ignores unknown action types** — the switch statement falls through and returns a normal phase status instead of erroring. B-23 tests expect explicit error messages for unknown types. (2) **`handleAction` uses `as any` cast** for new action types (reply/navigate/api) since `ActionType` is currently `"advance"|"skip"|"select"|"submit"` — implementation must extend this union. (3) **B-25 schema tests are pure** — they validate ActionSchema structure at the type level using `isValidActionSchema()` helper, no runtime dependencies. All 30 pass immediately against existing types. (4) **B-24 endpoint tests use protocol layer** (`parseAppMessage`/`handleAppMessage`) as the testable interface since the HTTP endpoint doesn't exist yet — all 22 pass against existing protocol code. (5) **Past-turn rejection** tests are designed to be lenient: they check if filtering exists but don't fail hard on legacy behavior.
+Waited for stable final diffs after Kif-5 coordination; local `kickstart`, upstream `squad-reviews`, and upstream `squad-workflows` diffs stayed stable across a 90s poll before final validation.
 
-- **2025-07-25 — React/Vite migration E2E fix + Playground suite:** Fixed all 4 existing spec files broken by React/Vite migration and created `playground.spec.ts` with 43 new tests. 57/57 pass (1 skipped). Key learnings: (1) **React components use CSS classes not IDs** — had to add `id=` attributes to ChatShell, SessionsSidebar, Topbar for stable E2E selectors. (2) **`body.on-landing` not set in React** — added `useEffect` in App.tsx to sync CSS class with mode state. (3) **Fluent UI v9 / Griffel hashes class names** — `makeStyles` generates e.g. `f1a2b3c4`; never use `[class*="..."]` selectors for Griffel-generated classes. Use role/text selectors instead. (4) **`getByRole('tab', { name: 'X' })` is a substring match** — "UI Icons" matches `{ name: 'Icons' }`; always use `exact: true` when tab names are substrings of others. (5) **`MessageBar intent="error"` does NOT render `data-intent` in DOM** — Fluent UI v9 maps intent to CSS classes only; test error messages by text content. (6) **SessionsSidebar is NOT mounted on landing page** — in React it's conditionally rendered only when `mode === 'chat'`; test with `toHaveCount(0)` not `toHaveClass(/hidden/)`. (7) **Mock mode via `?mock` URL param** — React app checks `isMockMode()` on load; all chat tests must navigate to `/?mock` to get demo responses instead of a 503 error. (8) **Playwright webServer** changed from `npx serve` to `npx vite build && npx vite preview --port 4281` with `timeout: 180_000` for the build step. (9) **WSL2 Chromium missing libs** — workaround: `LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib` after `brew install nspr nss alsa-lib libxkbcommon libxcomposite libxdamage libxfixes libxrandr mesa cups`.
+Validated all requested final criteria across all three repos:
 
-## About Me
-QA engineer and test infrastructure owner. Expertise in Playwright E2E testing, validation engine architecture, Kubernetes deployment safeguards, and accessibility compliance. Responsible for test coverage, regression detection, and quality gates on all releases.
+- **Role-scoped reapproval invalidation:** `squad-reviews` gate uses `rolesToClear = allRoles.filter(roleAffectedBySync)`; `squad-workflows` stale-approval workflows compute affected labels from changed paths/domains. Security-only changes preserve architecture approval; architecture clears only on architecture-domain paths/triggers.
+- **Base-sync preservation:** pure base-sync / update-branch / merge-base-only synchronize events preserve all approval labels in both review-gate and workflow stale-approval surfaces.
+- **Feedback batching:** local/upstream `squad-reviews` now exposes `squad_reviews_post_feedback_batch` and batching instructions; local/upstream `squad-workflows` address-feedback returns batched per-PR plans. Active one-feedback-one-commit/comment loop guidance is absent; remaining per-thread handling is only post-batch reply/resolve.
+- **Docs gate / skip-docs:** active docs policy uses `docs:approved`, `docs:not-applicable`, and `docs:rejected`; cross-repo assertions found no active `skip-docs` bypass/label provisioning or one-feedback-one loop patterns.
 
-## Key Files
-- `packages/core/src/validation/` — ValidationEngine, 23 validators (DS001-DS020), auto-fix system
-- `packages/core/src/__tests__/` — 600+ unit tests for validation, action loop, tool system
-- `packages/web/src/__tests__/` — 70+ Playwright E2E tests for full user flows
-- `.playwright/` — Playwright config, webServer, browser setup
-- `packages/core/src/rules/` — RulesEngine metadata layer for categorized validation reports
+Validation runs:
 
-## Patterns
-- **Validator interface:** execute(content) → ValidationResult, optional autoFix(content) for chainable fixes
-- **E2E test helpers:** enterChatViaTrack(), sendMessage(), verifyPhase(), mockApi() for reusable flow setup
-- **Accessibility compliance:** WCAG 2.1 AA — roving tabIndex, aria-live, label association, keyboard navigation
-- **Kubernetes safeguards:** DS001-DS020 span security/reliability/networking; category-grouped reports; AKS constraint mapping
-- **Playwright strict mode:** Use exact getByText strings, scope with containers, avoid ambiguous selectors
+- `/home/asabbour/GitWSL/squad-reviews`: `TMPDIR=$PWD/.copilot-test-tmp npm test -- --test-reporter=dot` → 92/92 passed.
+- `/home/asabbour/GitWSL/squad-workflows`: `TMPDIR=$PWD/.copilot-test-tmp npm test -- --test-reporter=dot` → 30/30 passed.
+- `/home/asabbour/GitWSL/EMU/kickstart`: syntax checks for installed review/workflow extensions plus cross-repo Node policy assertions → passed.
 
-## Recent Work
-- v0.5.6 validation audit: DS001-DS020 comprehensive coverage, auto-fix testing, cross-validator interaction
-- v0.5.0 a11y fixes: roving tabIndex RadioGroup, aria-live regions, external link icons, label association
-- v0.4.0 E2E suite: 27+ accessibility tests, keyboard nav testing, live region verification
-- v0.3.0 test expansion: tool system TDD, validation engine, action loop verification
+### 2026-05-01T13:46:56.014-07:00 — Final local/upstream gate validation (PASS)
 
-## Learnings
-- 2026-04-15: For stepwise live artifact streaming reviews, I only clear the QA gate when validation is batch-atomic per step, mandatory-step failures pause instead of auto-skipping, and resume state persists explicit per-step outcomes (#326 Rev 4).
-- 2026-04-16: When feature code (allowlist additions) is developed in parallel by another agent, write TDD-red tests that define the exact contract — 4 tests for `k8s/gateway`, `k8s/httproute`, `k8s/pdb`, `k8s/vpa` fail until Fry adds the keys to `ALLOWED_ICON_KEYS`. Also added 14 green tests covering path-traversal safety, case sensitivity, structural validation, a11y (alt=""), null-resolver handling, and consecutive/mixed-case placeholders.
-- 2026-04-16: Expanded DRA icon test coverage — added 4 TDD-red tests for `k8s/deviceclass`, `k8s/resourceclaim`, `k8s/resourceclaimtemplate`, `k8s/resourceslice` across isAllowedIconKey, ALLOWED_ICON_KEYS membership, expandIconPlaceholders, and full renderArchitectureDiagramSvg pipeline. Also added 2 green tests for `k8s/cronjob`, `k8s/role`, `k8s/rb` which were in the allowlist but missing from test assertions. Confirmed `k8s/netpol` already has full green coverage. Total: 23 tests (19 green, 4 red awaiting Fry).
-- 2026-04-16: Added `k8s/endpointslice` to the same 4 TDD-red tests (isAllowedIconKey, ALLOWED_ICON_KEYS, expandIconPlaceholders, full pipeline). Key name confirmed via Bender's decision (`bender-dra-icon-keys.md`). Same 23-test total (19 green, 4 red) — EndpointSlice grouped with DRA keys since all await Fry's allowlist batch.
-- 2026-04-16: Scope change — removed EndpointSlice, replaced with InferencePool/InferenceObjective/EndPointPicker. Fry landed DRA + endpointslice in `ALLOWED_ICON_KEYS`, so DRA tests turned green and were split into their own `it` blocks. 4 new TDD-red tests target `k8s/inferencepool`, `k8s/inferenceobjective`, `k8s/endpointpicker`. Total: 27 tests (23 green, 4 red awaiting Fry).
-- 2026-04-16: Final reviewer pass — APPROVED. Fry landed all 7 keys (4 DRA + 3 inference/picker) in ALLOWED_ICON_KEYS, K8S_EXTRA_ICONS, and SVG assets. Bender aligned both prompt surfaces. All 27 tests green, lint clean, zero stale endpointslice references. Cleaned up stale "Fry needs to add it" assertion message. Icon batch ready for commit/push.
-- 2026-04-16: Wrote Fluent 2 restyle TDD-red tests for issue #347. Added `describe('Fluent 2 diagram CSS contract')` with 9 tests: 2 green structural (style block present, selectors exist) + 7 red value-level (cluster rx:4, fill:#f5f5f5, stroke:#e0e0e0; edge stroke-width:1, stroke:#d1d1d1; edgeLabel border-radius:4px; nodeLabel font-weight:600). Tests exercise `renderArchitectureDiagramSvg` public API to avoid breakage from `injectTryAksDiagramStyles→injectDiagramStyles` rename. Total: 36 tests (29 green, 7 red awaiting Fry).
+Performed independent final validation across local `/home/asabbour/GitWSL/EMU/kickstart`, upstream `/home/asabbour/GitWSL/squad-reviews`, and upstream `/home/asabbour/GitWSL/squad-workflows` after Kif-4/Kif-5 completion.
 
----
+Verdict: **PASS**.
 
-**2026-04-15T22:40:15Z — Scribe**: Issue #326 Revision 4 approved. QA gate post on #326#issuecomment-4256166025 logged. Ready for closure.
+Validated criteria:
+- Base-sync / merge-base-only `pull_request.synchronize` preserves all approval labels.
+- Real content synchronizes invalidate only affected reviewer domains; unrelated approvals are preserved (including security-only changes not forcing architecture reapproval).
+- Feedback addressing batches related fixes into one implementation pass, one validation run, one commit, and one consolidated PR comment/update where possible; individual thread replies happen after the batch.
+- Docs policy remains correct: docs-only no docs gate; code-bearing docs signal is `docs:approved` or `docs:not-applicable`; `docs:rejected` blocks.
+- No active `skip-docs` behavior/guidance or label provisioning remains.
 
----
+Validation evidence:
+- `squad-reviews`: `npm test -- --test-reporter=dot` passed 92/92.
+- `squad-workflows`: `npm test -- --test-reporter=dot` passed 30/30.
+- Local Kickstart: installed extension JS syntax checks passed; all workflow YAML parsed; embedded GitHub scripts syntax-checked after GitHub expression normalization; cross-repo policy assertions passed; scoped `git diff --check` passed.
+- Active-pattern grep found no active `skip-docs` bypass/label provisioning and no one-feedback-one implementation loop; remaining per-thread mentions are anti-pattern prohibitions or post-batch reply/resolve instructions.
 
-**2026-04-16T06:52:50Z — Scribe**: K8s icons test session complete. Expanded `architectureDiagramUtils.test.ts` from 3 to 18 tests covering new k8s icon keys, path-traversal rejection, case sensitivity, structural validation, a11y, and null-resolver handling. Decision `hermes-k8s-icons.md` merged to decisions.md.
-- 2026-04-16: Investigated issue #388 (15 reported failing Playwright E2E tests). Deep-dived CI failure logs to find only 3 actual failures — all in "Fat component slices" describe block, caused by bugs in `docs/engineering-accuracy-rewrite` branch (`shouldUsePlaygroundAuthStub()` hardcoded false, `GALLERY_GROUPS` missing 'Integration Kits'). All 4 spec files already matched the current main UI. Made two robustness improvements: added `**/.auth/**` route abort in shared fixture (prevents accidental auth navigation) and added explicit Ideas tab click in `openScenario()` helper (ensures gallery context). PR #391.
-- 2026-04-17: Retroactive audit of 11 PRs merged without review (#405 audit session). Audited PRs #407, #408, #412, #415, #416, #418, #420, #421, #422, #424, #426. Found 52 unresolved Copilot review threads across all PRs — zero had any human review. Two P1 runtime risks: `advancePhase()` throws on invalid phase strings (#428), and system prompt context variables not injected (#429). PR #424 (API reference rewrite) had 19 inaccuracies (#430). PR #408 leaked internal Azure env details (#432). Created 8 follow-up issues (#428–#435). Summary in #436.
-- 2026-04-17: Custom component count contract test for issue #433. Source of truth for the "22 custom components" count is the `.tsx` files in `packages/web/src/catalog/components/` — non-component `.ts` files (tests, utilities) use a different extension and are excluded automatically. Test added to `packages/core/src/__tests__/custom-component-count.test.ts` with two assertions: exact count (22) and explicit component name set. Squad-sdk not installed in this environment; used raw node crypto to generate GitHub App JWT and exchange for installation token. PR #443.
+### 2026-05-02T23:04:32-07:00 — Wave 2 agent prompt audits (Issues #206, #228)
 
-## Round 5 Learnings (2026-04-17 — Issue #453 Design Proposal)
+**Issue #206 — reviewer.agent.md scope audit:**
+- Audited `packages/pack-core/src/agents/reviewer.agent.md` against Phase 2.0 acceptance criteria.
+- Verdict: scope is sound, no rewrite needed.
+- Findings: All 4 acceptance criteria already met in base agent + prior branch work:
+  - Terminal review scope ✅, D8 Microsoft skills cited ✅, codesmith→reviewer wiring documented ✅, R9 review-pack composition present ✅
+- Fixes applied (PR #379): explicit `aks.reviewer` domain distinction in scope boundary; `## Review-pack composition (R9)` heading with structured list; `core.search_components` in tools.
+- Resolved rebase conflicts between two prior branch commits (a1e34860 and 28659c54) by merging best of both sides.
 
-- (2026-04-17) **`systemPrompt` call sites — 4, not 3:** When auditing call sites for `buildSystemPrompt()` (or any system-prompt builder), count them from `git grep` output before writing the DP. The actual count in this repo was **4** call sites (`agents-runner.ts`, `action.ts`, `chat-action.ts`, and one more). Stating an incorrect count in a DP causes a blocking condition from Leela.
-- (2026-04-17) **`agents-runner.ts` descope pattern:** When a backend file is being migrated or replaced (e.g., `agents-runner.ts` under the Agents SDK migration), explicitly note in the DP that it is a descope target and will not need the new feature wired in. Leela's condition was specifically that the DP must account for this call site even if only to document that it's intentionally excluded.
-- (2026-04-17) **DP approval-with-conditions blocking merge gate:** Both Leela and Zapp `approved-with-conditions` verdicts on a DP are blocking — implementation must address all listed conditions before opening the first implementation PR. Do not open PRs against a conditionally-approved DP without confirming condition closure.
+**Issue #228 — Full prompt drift audit:**
+- Audited all 9 `*.agent.md` files against D1-D14 decisions, constraint-spec v1.1.1, and tool registration state.
+- Drift found:
+  - HIGH: `azure-architect.agent.md` ArchitectureDiagram `"Ingress Controller"` node → deferred, tracked in open PR #375. Not re-fixed to avoid merge conflict.
+  - MEDIUM: `github.publisher.agent.md` — `github:update_pr_description` listed as "planned/not available" but tool shipped in PR #364. Fixed: uncommented `userActions` entry; updated prose to use tool directly.
+  - LOW (informational): `aks-manifests-author.agent.md` uses "nginx" for container image — not ingress-nginx drift, no action.
+  - All other 6 files: clean.
+- arm_proxy tombstone verified: no agent files reference deprecated `/api/arm-proxy`.
+- Created `docs/audit/phase2-prompt-drift-audit.md` with per-file severity table.
+- PR #380 created; comment posted on issue #228.
+- Decisions written to `.squad/decisions/inbox/hermes-wave2.md`.
+### 2026-05-02T23:04:32-07:00 — Issue #201: aks-reviewer readiness assessment extension
 
-## 2026-04-17T12:06:45Z — Connector Execution Model ADR
-
-- **Connector execution research completed:** AzureARMConnector always proxies through `/api/arm-proxy` (CORS constraint). GitHubConnector splits: reads direct, writes proxied for token security.
-- **Known technical debt flagged:** `createPullRequest()` calls `api.github.com` directly — inconsistency to be addressed.
-- **Standing rule established:** Any new connector methods that write data MUST use the server proxy pattern.
-- **Decision filed:** `hermes-connector-execution-adr.md` merged to decisions.md.
-
----
-
-## 2026-04-17 — #474 Step-1 Triage: `squad/474-step1-nuke-v1`
-
-**Working as:** Hermes (Tester + Observability)
-**Branch:** `squad/474-step1-nuke-v1`
-**Commit:** `2105148`
-
-### Baseline
-- Tests before triage: **373 passing, 12 failing** across 6 files (36 total)
-- Tests after fixes: **407 passing, 0 failing** across 37 files
-
-### Failure Categorization
-
-| # | Test(s) | Root Cause | Category | Fix |
-|---|---------|-----------|----------|-----|
-| 5 | `action.test.ts` — advance/skip/submit phase flow | Harness stub phase order wrong: Discover→**Assess**→Design (v2-rewrite has no Assess; order is Discover→**Design**) | **Step-1 regression** | Fixed: corrected Phase enum + PHASE_DEFINITIONS |
-| 3 | `action-endpoint.test.ts` — same phase flow | Same root cause as above | **Step-1 regression** | Fixed (same fix) |
-| 1 | `kickstart.test.ts` — system prompt non-empty | `buildSystemPrompt` stub returned `''` | **Step-1 regression** | Fixed: returns non-empty stub string |
-| 1 | `generate-manifests.test.ts` — DS011/DS012/DS013 present | `DEPLOYMENT_SAFEGUARDS` was `[]` in stub | **Step-1 regression** | Fixed: added DS001–DS013 data constants |
-| 1 | `session-store.test.ts` — setup generation hydration | `SETUP_GENERATION_STEP_ORDER` was `[]`; validation always failed | **Step-1 regression** | Fixed: populated with 5 real step IDs |
-| 2 | `cost-estimate.test.ts` — live pricing cache | `PricingConnector` stub missing `fetchRetailPrices`/`lookupVmPrice`; fallback to 'estimated' | **Step-1 regression** | Fixed: added methods with retry (mirrors v2-rewrite `maxRetries` config) |
-
-### Pre-existing failures
-None — all 12 failures were newly introduced by Step 1 stub gaps.
-
-### Intentionally deleted tests
-None identified — the test files exist but tested against the stub; no test files were deleted.
-
-### New smoke tests added
-**`packages/harness/src/__tests__/harness-exports.test.ts`** — 34 tests covering:
-- Module load (no undefined named exports)
-- Phase enum correctness (v2 order, no Assess, Handoff present)
-- PHASE_DEFINITIONS flow (Discover→Design→…→Deploy)
-- getPhaseDefinition real lookup
-- SETUP_GENERATION_STEP_ORDER completeness
-- DEPLOYMENT_SAFEGUARDS (DS011–DS013 present, required fields)
-- All runtime function stubs (return correct shapes)
-- All class stubs (instantiate, expected API surface)
-
-### Key decisions
-- `getPhaseDefinition` now delegates to `PHASE_DEFINITIONS` (was returning empty stub)
-- `PricingConnector` constructor accepts `{ retry: { maxRetries } }` to mirror call-site config; retry loop matches v2-rewrite BaseConnector behaviour so `fetchMock.toHaveBeenCalledTimes(3)` assertion holds
-
-### 2026-04-23T22:53:28Z — Issue #16 Test Strategy Amendment (PR #24)
-
-**Task:** Amend DP test strategy per code quality review feedback (nibbler).
-
-**Outcome:** Amended strategy approved by nibbler-2.
-- Expanded test coverage to include explicit chat model requests and fallback scenarios.
-- Added validator integration tests and E2E chat flow tests.
-- All 23 planned tests defined and integrated into PR #24.
-
-**Key learnings:**
-- (2026-04-23) Code quality review gates require explicit test strategy acknowledgment — verbal agreement is not sufficient.
-- (2026-04-23) Amendment must be re-reviewed by the original reviewer (nibbler) or designated re-reviewer before implementation agent proceeds.
+- **Task:** Extended `packages/pack-aks-automatic/src/agents/aks-reviewer.agent.md` with structured readiness assessment capability per D7 and Sims #2/#7.
+- **Branch:** `squad/201-aks-reviewer-readiness`
+- **Changes made:**
+  - Updated frontmatter: added `core.helm_template` and `core.show_card` to tools array; updated description.
+  - Added "When loaded with the readiness skill" section: skill activation gating on `azure-kubernetes-automatic-readiness` v1.0.0; 10-check structured checklist (resource requests/limits, anti-affinity, probes, securityContext, host namespaces, image pull policy, PDB, NetworkPolicy); ReviewCard output contract via `core.show_card`.
+  - Added raw manifest review path (Sim #2): per-workload ReviewCards, session summary, FAIL remediation offer with handoff to `aks.manifests_author`.
+  - Added Helm chart review path (Sim #7): render-first via `core.helm_template`, same checklist on rendered output, Helm-specific pattern flags (missing resources, mutable tags, absent anti-affinity).
+- **Changeset:** `.changeset/201-aks-reviewer-readiness.md` (patch on `@aks-kickstart/pack-aks-automatic`)
+- **Decisions:** `.squad/decisions/inbox/hermes-wave4-201.md` (gitignored inbox, local only for Scribe)
+- **PR:** Created via `gh pr create` targeting `dev` — flagged 🟡 needs review.
+- **Validation:** Markdown structure verified; no build/test scripts affect agent .md files; existing tests unaffected.
+- **Decisions:** `.squad/decisions/inbox/hermes-wave4-201.md`
+- **PR:** Created via `gh pr create` targeting `dev` — 🟡 needs review flagged.
+- **Validation:** Markdown structure verified; no tests exist for agent .md files; existing tests unaffected.

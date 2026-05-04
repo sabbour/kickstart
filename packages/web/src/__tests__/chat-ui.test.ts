@@ -273,6 +273,49 @@ describe('chat/debug UI regressions', () => {
     expect(debugMarkup).toContain('gpt-5.4-mini');
   });
 
+  it('uses a starter placeholder until the first turn, then switches to a conversational placeholder', () => {
+    const initialMarkup = renderChatShell([], null);
+    const followUpMarkup = renderChatShell([
+      {
+        id: 'user-1',
+        role: 'user',
+        text: 'Deploy my app to AKS',
+        timestamp: 1,
+      },
+    ], null);
+
+    expect(initialMarkup).toContain('placeholder="Describe what you want to build..."');
+    expect(followUpMarkup).toContain('placeholder="Type a message..."');
+  });
+
+  it('exposes a data-streaming attribute on the chat container so tests and a11y can observe SSE-stream completion', () => {
+    const idleMarkup = renderToStaticMarkup(
+      React.createElement(ChatShell, {
+        messages: [],
+        isStreaming: false,
+        streamingText: '',
+        currentPhase: null,
+        onSend: () => undefined,
+        getSurface: () => undefined,
+      }),
+    );
+    const activeMarkup = renderToStaticMarkup(
+      React.createElement(ChatShell, {
+        messages: [],
+        isStreaming: true,
+        streamingText: 'partial...',
+        currentPhase: null,
+        onSend: () => undefined,
+        getSurface: () => undefined,
+      }),
+    );
+
+    expect(idleMarkup).toContain('data-streaming="idle"');
+    expect(idleMarkup).not.toContain('aria-busy');
+    expect(activeMarkup).toContain('data-streaming="active"');
+    expect(activeMarkup).toContain('aria-busy="true"');
+  });
+
   it('renders a copy button in the expanded debug panel', () => {
     const useStateSpy = vi.spyOn(React, 'useState');
     const mockSetExpanded: React.Dispatch<React.SetStateAction<unknown>> = () => undefined;
@@ -484,7 +527,7 @@ describe('chat file workspace rehydration', () => {
           surfaceId: 'assistant-turn-10::setup-progress',
           components: [
             {
-              id: 'setup-progress',
+              id: 'root',
               component: 'GenerationProgress',
               title: GENERATION_PROGRESS_TITLE,
               overallStatus: 'complete',

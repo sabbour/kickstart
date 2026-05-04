@@ -1,6 +1,6 @@
 {
   "$schema": "./schemas/component-catalog.schema.json",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "extractedFrom": "packages/*/src/components on main as of Phase 1.5",
   "note": "This catalog is derived from filesystem inventory plus prompt usage patterns. The runtime sealed component registry (queried by core.search_components) remains the source of truth at execution time. This file is for agent-prompt grounding (Phase 2) and Phase 3 ingestion bootstrap.",
   "categories": {
@@ -11,144 +11,375 @@
   "components": {
     "core": {
       "basic": [
-        { "name": "Accordion", "useCase": "Collapsible content sections", "interactivity": "expand/collapse" },
-        { "name": "Alert", "useCase": "Inline status/warning/error banner", "interactivity": "none" },
-        { "name": "AudioPlayer", "useCase": "Audio playback", "interactivity": "media controls" },
-        { "name": "Badge", "useCase": "Inline label/tag with optional severity", "interactivity": "none" },
-        { "name": "Button", "useCase": "Single action trigger", "interactivity": "click event" },
-        { "name": "Card", "useCase": "Generic container with title/body", "interactivity": "container only" },
-        { "name": "CheckBox", "useCase": "Boolean toggle with label", "interactivity": "toggle event" },
-        { "name": "ChildList", "useCase": "Repeating child container", "interactivity": "container only" },
-        { "name": "ChoicePicker", "useCase": "Single-selection picker", "interactivity": "select event" },
-        { "name": "Column", "useCase": "Vertical layout container", "interactivity": "container only" },
-        { "name": "ComboBox", "useCase": "Searchable single-select dropdown", "interactivity": "select event" },
-        { "name": "DateTimeInput", "useCase": "Date/time input field", "interactivity": "change event" },
-        { "name": "Divider", "useCase": "Visual separator", "interactivity": "none" },
-        { "name": "Icon", "useCase": "Inline iconography", "interactivity": "none" },
-        { "name": "Image", "useCase": "Image display (URL required)", "interactivity": "none" },
-        { "name": "Link", "useCase": "Inline hyperlink", "interactivity": "navigation" },
-        { "name": "List", "useCase": "Bulleted/numbered list of items", "interactivity": "none" },
-        { "name": "Modal", "useCase": "Overlay dialog", "interactivity": "open/close + content events" },
-        { "name": "MultiSelect", "useCase": "Multi-selection picker", "interactivity": "multi-select event" },
-        { "name": "Row", "useCase": "Horizontal layout container", "interactivity": "container only" },
-        { "name": "Slider", "useCase": "Numeric range input", "interactivity": "change event" },
-        { "name": "Table", "useCase": "Tabular data display", "interactivity": "optional row events" },
-        { "name": "Tabs", "useCase": "Tabbed content sections", "interactivity": "tab switch event" },
-        { "name": "Text", "useCase": "Inline or block text (text required)", "interactivity": "none" },
-        { "name": "TextField", "useCase": "Single-line text input (label required)", "interactivity": "change event" },
-        { "name": "Toggle", "useCase": "Switch-style boolean toggle", "interactivity": "toggle event" },
-        { "name": "Video", "useCase": "Video playback", "interactivity": "media controls" }
+        {
+          "name": "Accordion",
+          "useCase": "Collapsible content sections",
+          "interactivity": "expand/collapse",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Alert",
+          "useCase": "Inline status/warning/error banner",
+          "interactivity": "none",
+          "provenance": "extracted"
+        },
+        {
+          "name": "AudioPlayer",
+          "useCase": "Audio playback",
+          "interactivity": "media controls",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Badge",
+          "useCase": "Inline label/tag with optional severity",
+          "interactivity": "none",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Button",
+          "useCase": "Single action trigger",
+          "interactivity": "click event",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Card",
+          "useCase": "Generic container with title/body",
+          "interactivity": "container only",
+          "provenance": "extracted"
+        },
+        {
+          "name": "CheckBox",
+          "useCase": "Boolean toggle with label",
+          "interactivity": "toggle event",
+          "provenance": "extracted"
+        },
+        {
+          "name": "ChildList",
+          "useCase": "Repeating child container",
+          "interactivity": "container only",
+          "provenance": "extracted"
+        },
+        {
+          "name": "ChoicePicker",
+          "useCase": "Single-selection picker",
+          "interactivity": "select event",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Column",
+          "useCase": "Vertical layout container",
+          "interactivity": "container only",
+          "provenance": "extracted"
+        },
+        {
+          "name": "ComboBox",
+          "useCase": "Searchable single-select dropdown",
+          "interactivity": "select event",
+          "provenance": "extracted"
+        },
+        {
+          "name": "DateTimeInput",
+          "useCase": "Date/time input field",
+          "interactivity": "change event",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Divider",
+          "useCase": "Visual separator",
+          "interactivity": "none",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Icon",
+          "useCase": "Inline iconography",
+          "interactivity": "none",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Image",
+          "useCase": "Image display (URL required)",
+          "interactivity": "none",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Link",
+          "useCase": "Inline hyperlink",
+          "interactivity": "navigation",
+          "provenance": "extracted"
+        },
+        {
+          "name": "List",
+          "useCase": "Bulleted/numbered list of items",
+          "interactivity": "none",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Modal",
+          "useCase": "Overlay dialog",
+          "interactivity": "open/close + content events",
+          "provenance": "extracted"
+        },
+        {
+          "name": "MultiSelect",
+          "useCase": "Multi-selection picker",
+          "interactivity": "multi-select event",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Row",
+          "useCase": "Horizontal layout container",
+          "interactivity": "container only",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Slider",
+          "useCase": "Numeric range input",
+          "interactivity": "change event",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Table",
+          "useCase": "Tabular data display",
+          "interactivity": "optional row events",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Tabs",
+          "useCase": "Tabbed content sections",
+          "interactivity": "tab switch event",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Text",
+          "useCase": "Inline or block text (text required)",
+          "interactivity": "none",
+          "provenance": "extracted"
+        },
+        {
+          "name": "TextField",
+          "useCase": "Single-line text input (label required)",
+          "interactivity": "change event",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Toggle",
+          "useCase": "Switch-style boolean toggle",
+          "interactivity": "toggle event",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Video",
+          "useCase": "Video playback",
+          "interactivity": "media controls",
+          "provenance": "extracted"
+        }
       ],
       "rich": [
         {
           "name": "ArchitectureDiagram",
           "useCase": "Render nodes/edges architecture diagram from build_architecture_diagram output",
-          "fields": ["title", "description", "nodes", "edges", "diagram"],
-          "frameworkRef": "ArchitectureDiagram entry in component-selection-framework.md"
+          "fields": [
+            "title",
+            "description",
+            "nodes",
+            "edges",
+            "diagram"
+          ],
+          "frameworkRef": "ArchitectureDiagram entry in component-selection-framework.md",
+          "provenance": "extracted"
         },
         {
           "name": "AuthCard",
           "useCase": "Login or auth-state display",
-          "interactivity": "auth events"
+          "interactivity": "auth events",
+          "provenance": "extracted"
         },
         {
           "name": "CodeBlock",
           "useCase": "Syntax-highlighted code or config preview",
           "interactivity": "copy-to-clipboard",
-          "forbidden": "Do not use for per-file code generation in chat — that is core.codesmith's responsibility (D1 guardrail in triage prompt)"
+          "forbidden": "Do not use for per-file code generation in chat \u2014 that is core.codesmith's responsibility (D1 guardrail in triage prompt)",
+          "provenance": "extracted"
         },
         {
           "name": "DecisionCard",
           "useCase": "Side-by-side option comparison",
-          "interactivity": "decision event"
+          "interactivity": "decision event",
+          "provenance": "extracted"
         },
         {
           "name": "FileEditor",
           "useCase": "In-place file editing surface",
-          "interactivity": "edit/save events"
+          "interactivity": "edit/save events",
+          "provenance": "extracted"
         },
         {
           "name": "FormGroup",
           "useCase": "Grouped form field container",
-          "interactivity": "container only"
+          "interactivity": "container only",
+          "provenance": "extracted"
         },
         {
           "name": "GenerationProgress",
           "useCase": "Real-time progress for file generation",
-          "interactivity": "none"
+          "interactivity": "none",
+          "provenance": "extracted"
         },
         {
           "name": "Markdown",
           "useCase": "Formatted markdown rendering",
-          "interactivity": "links only"
+          "interactivity": "links only",
+          "provenance": "extracted"
         },
         {
           "name": "ProgressSteps",
           "useCase": "Phased workflow visualization (4-8 steps)",
           "interactivity": "step navigation",
-          "frameworkRef": "ProgressSteps entry in component-selection-framework.md"
+          "frameworkRef": "ProgressSteps entry in component-selection-framework.md",
+          "provenance": "extracted"
         },
         {
           "name": "Questionnaire",
           "useCase": "Multi-field structured form (3-10 related fields)",
           "interactivity": "submit event",
           "frameworkRef": "Questionnaire entry in component-selection-framework.md",
-          "forbidden": "Do not use to bundle unrelated questions; ask sequentially in prose instead (per requirement-gathering rule 1)"
+          "forbidden": "Do not use to bundle unrelated questions; ask sequentially in prose instead (per requirement-gathering rule 1)",
+          "provenance": "extracted"
         },
         {
           "name": "RadioGroup",
           "useCase": "Single-selection from 5-8 options with descriptions",
           "interactivity": "select event",
-          "frameworkRef": "RadioGroup entry in component-selection-framework.md"
+          "frameworkRef": "RadioGroup entry in component-selection-framework.md",
+          "provenance": "extracted"
         },
         {
           "name": "SteppedCarousel",
           "useCase": "Step-through carousel of content panels",
-          "interactivity": "next/prev events"
+          "interactivity": "next/prev events",
+          "provenance": "extracted"
         },
         {
           "name": "SummaryCard",
           "useCase": "Read-only structured key-value summary (4-10 items), can embed children like ArchitectureDiagram",
           "interactivity": "container actions only",
-          "frameworkRef": "SummaryCard entry in component-selection-framework.md"
+          "frameworkRef": "SummaryCard entry in component-selection-framework.md",
+          "provenance": "extracted"
         },
         {
           "name": "TrackPicker",
           "useCase": "Specialized RadioGroup for app-track selection at triage entry",
           "interactivity": "pick_track event",
-          "specializedFor": "core.triage first-turn ambiguous routing"
+          "specializedFor": "core.triage first-turn ambiguous routing",
+          "provenance": "extracted"
         }
       ]
     },
     "azure": {
       "specialized": [
-        { "name": "AzureAction", "useCase": "Trigger an Azure-specific action (deploy, what-if, etc.)" },
-        { "name": "AzureResourceCard", "useCase": "Display a single Azure resource with its key properties" },
-        { "name": "BicepEditor", "useCase": "Edit/preview a Bicep template inline" },
-        { "name": "CostEstimate", "useCase": "Display Azure cost estimate (used by azure.architect after estimate_cost tool)" },
-        { "name": "DeploymentStatus", "useCase": "Track in-flight Azure deployment status" },
-        { "name": "LocationSelector", "useCase": "Pick an Azure region" },
-        { "name": "ResourceGroupSelector", "useCase": "Pick or create an Azure resource group" },
-        { "name": "SubscriptionSelector", "useCase": "Pick an Azure subscription" }
+        {
+          "name": "AzureAction",
+          "useCase": "Trigger an Azure-specific action (deploy, what-if, etc.)",
+          "provenance": "extracted"
+        },
+        {
+          "name": "AzureResourceCard",
+          "useCase": "Display a single Azure resource with its key properties",
+          "provenance": "extracted"
+        },
+        {
+          "name": "BicepEditor",
+          "useCase": "Edit/preview a Bicep template inline",
+          "provenance": "extracted"
+        },
+        {
+          "name": "CostEstimate",
+          "useCase": "Display Azure cost estimate (used by azure.architect after estimate_cost tool)",
+          "provenance": "extracted"
+        },
+        {
+          "name": "DeploymentStatus",
+          "useCase": "Track in-flight Azure deployment status",
+          "provenance": "extracted"
+        },
+        {
+          "name": "LocationSelector",
+          "useCase": "Pick an Azure region",
+          "provenance": "extracted"
+        },
+        {
+          "name": "ResourceGroupSelector",
+          "useCase": "Pick or create an Azure resource group",
+          "provenance": "extracted"
+        },
+        {
+          "name": "SubscriptionSelector",
+          "useCase": "Pick an Azure subscription",
+          "provenance": "extracted"
+        }
       ]
     },
     "aks": {
       "specialized": [
-        { "name": "AksClusterCard", "useCase": "Display AKS cluster summary card" },
-        { "name": "ArchitectureDiagram", "useCase": "AKS-specific architecture diagram (also generic in core)" },
-        { "name": "DeploymentProgress", "useCase": "AKS workload deployment progress" },
-        { "name": "SafeguardViolations", "useCase": "Display AKS safeguard rule violations (used by aks.reviewer after validate_safeguards)" }
+        {
+          "name": "AksClusterCard",
+          "useCase": "Display AKS cluster summary card",
+          "provenance": "extracted"
+        },
+        {
+          "name": "ArchitectureDiagram",
+          "useCase": "AKS-specific architecture diagram (also generic in core)",
+          "provenance": "extracted"
+        },
+        {
+          "name": "DeploymentProgress",
+          "useCase": "AKS workload deployment progress",
+          "provenance": "extracted"
+        },
+        {
+          "name": "SafeguardViolations",
+          "useCase": "Display AKS safeguard rule violations (used by aks.reviewer after validate_safeguards)",
+          "provenance": "extracted"
+        }
       ]
     },
     "github": {
       "specialized": [
-        { "name": "Action", "useCase": "Trigger a GitHub user action (login, pick_repo, etc.)" },
-        { "name": "CreatePRFlow", "useCase": "Multi-step PR creation flow" },
-        { "name": "Login", "useCase": "GitHub OAuth login surface" },
-        { "name": "OrgPicker", "useCase": "Pick a GitHub organization" },
-        { "name": "RepoInfo", "useCase": "Display GitHub repository metadata" },
-        { "name": "RepoPicker", "useCase": "Pick a GitHub repository" },
-        { "name": "SecretSetter", "useCase": "Set a GitHub Actions secret (delegates to user action)" }
+        {
+          "name": "Action",
+          "useCase": "Trigger a GitHub user action (login, pick_repo, etc.)",
+          "provenance": "extracted"
+        },
+        {
+          "name": "CreatePRFlow",
+          "useCase": "Multi-step PR creation flow",
+          "provenance": "extracted"
+        },
+        {
+          "name": "Login",
+          "useCase": "GitHub OAuth login surface",
+          "provenance": "extracted"
+        },
+        {
+          "name": "OrgPicker",
+          "useCase": "Pick a GitHub organization",
+          "provenance": "extracted"
+        },
+        {
+          "name": "RepoInfo",
+          "useCase": "Display GitHub repository metadata",
+          "provenance": "extracted"
+        },
+        {
+          "name": "RepoPicker",
+          "useCase": "Pick a GitHub repository",
+          "provenance": "extracted"
+        },
+        {
+          "name": "SecretSetter",
+          "useCase": "Set a GitHub Actions secret (delegates to user action)",
+          "provenance": "extracted"
+        }
       ]
     }
   },

@@ -282,6 +282,7 @@ export function App() {
 
   // Messages for the active session
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [hasSubmittedFirstPrompt, setHasSubmittedFirstPrompt] = useState(false);
   // Ref mirroring the latest committed `messages` so callbacks can compute
   // derived updates without relying on side effects inside state updaters
   // (which React 18 concurrent rendering may invoke multiple times).
@@ -324,11 +325,13 @@ export function App() {
       const normalized = normalizeMessageSurfaceAttachments(active.messages);
       surfaceOwnersRef.current = normalized.surfaceOwners;
       setMessages(normalized.messages);
+      setHasSubmittedFirstPrompt(active.messages.length > 0 || Boolean(active.title));
       const phase = getLatestConversationPhase(active.messages);
       setCurrentPhase(phase);
       currentPhaseRef.current = phase;
     } else {
       setMessages([]);
+      setHasSubmittedFirstPrompt(false);
       setCurrentPhase(null);
       currentPhaseRef.current = null;
       surfaceOwnersRef.current = new Map();
@@ -720,6 +723,9 @@ export function App() {
         }
       }
     } else {
+      if (!isAutoContinue) {
+        setHasSubmittedFirstPrompt(true);
+      }
       // Add user message (auto-continue shows a subtle indicator instead of the full text)
       const userMsg: ChatMessage = {
         id: msgId(isAutoContinue ? 'auto-continue' : 'user'),
@@ -969,6 +975,7 @@ export function App() {
   const handleStartChat = useCallback(async (prompt: string) => {
     await clearWorkspace();
     setMessages([]);
+    setHasSubmittedFirstPrompt(true);
     setMode('chat');
     document.body.classList.remove('on-landing');
 
@@ -983,6 +990,7 @@ export function App() {
     clearAuthRedirectPending();
     sessions.clearAllSessions();
     setMessages([]);
+    setHasSubmittedFirstPrompt(false);
     await vfs.clearWorkspaceSnapshots().catch((err) => {
       console.error('[Workspace] failed to clear saved session snapshots:', err);
     });
@@ -1001,6 +1009,7 @@ export function App() {
     clearAuthRedirectPending();
     await clearWorkspace();
     setMessages([]);
+    setHasSubmittedFirstPrompt(false);
     setMode('landing');
     document.body.classList.add('on-landing');
     sessions.setActiveSessionId(null);
@@ -1014,6 +1023,7 @@ export function App() {
     const session = sessions.sessions.find(s => s.id === sessionId);
     if (session) {
       await clearWorkspace();
+      setHasSubmittedFirstPrompt(session.messages.length > 0 || Boolean(session.title));
       const workspaceSnapshot = await vfs.loadWorkspaceSnapshot(sessionId).catch((err) => {
         console.error('[Workspace] failed to restore session snapshot:', err);
         return [];
@@ -1311,6 +1321,7 @@ export function App() {
               getSurface={a2ui.getSurface}
               debugEnabled={debugEnabled}
               usageSummary={usageSummary}
+              hasStartedConversation={hasSubmittedFirstPrompt}
             />
           )}
         </Layout>

@@ -1,0 +1,275 @@
+{
+  "$schema": "./schemas/aks-recipes.schema.json",
+  "version": "1.0.0",
+  "shapes": [
+    {
+      "id": "static_site",
+      "label": "Static Site",
+      "description": "Pre-built static assets served via a lightweight web server or CDN-backed container.",
+      "detectionSignals": [
+        { "type": "file_pattern", "value": "dist/**/*.html" },
+        { "type": "file_pattern", "value": "build/**/*.html" },
+        { "type": "keyword", "value": "static site generator" },
+        { "type": "library_import", "value": "next export" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "http", "metadata": { "targetPendingRequests": "100" } },
+        "nodePool": { "skuFamily": "B", "minNodes": 1, "maxNodes": 3 },
+        "gateway": { "pattern": "simple_ingress", "tlsRequired": true },
+        "persistentVolume": { "recommended": false },
+        "identity": { "pattern": "none" }
+      },
+      "costBandHint": "low",
+      "provenance": "extracted"
+    },
+    {
+      "id": "single_container_web",
+      "label": "Single Container Web App",
+      "description": "A single-container HTTP service (API or rendered web app) with horizontal autoscaling.",
+      "detectionSignals": [
+        { "type": "dockerfile_pattern", "value": "EXPOSE 8080" },
+        { "type": "file_pattern", "value": "Dockerfile" },
+        { "type": "library_import", "value": "express" },
+        { "type": "library_import", "value": "fastapi" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "http", "metadata": { "targetPendingRequests": "50" } },
+        "nodePool": { "skuFamily": "D", "minNodes": 2, "maxNodes": 10 },
+        "gateway": { "pattern": "simple_ingress", "tlsRequired": true },
+        "persistentVolume": { "recommended": false },
+        "identity": { "pattern": "workload_identity", "scopeHint": "Azure services accessed by the app" }
+      },
+      "costBandHint": "low",
+      "provenance": "extracted"
+    },
+    {
+      "id": "multi_service_web",
+      "label": "Multi-Service Web App",
+      "description": "Multiple cooperating microservices behind a shared gateway with path-based routing.",
+      "detectionSignals": [
+        { "type": "file_pattern", "value": "docker-compose.yml" },
+        { "type": "file_pattern", "value": "services/*/Dockerfile" },
+        { "type": "manifest_pattern", "value": "multiple Deployment resources" },
+        { "type": "keyword", "value": "microservices" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "http", "metadata": { "targetPendingRequests": "30" } },
+        "nodePool": { "skuFamily": "D", "minNodes": 3, "maxNodes": 20 },
+        "gateway": { "pattern": "path_based_routing", "tlsRequired": true },
+        "persistentVolume": { "recommended": false },
+        "identity": { "pattern": "workload_identity", "scopeHint": "Per-service scoped identities" }
+      },
+      "costBandHint": "medium",
+      "provenance": "extracted"
+    },
+    {
+      "id": "web_postgres",
+      "label": "Web + PostgreSQL",
+      "description": "Web application backed by a PostgreSQL database, using persistent volumes for data.",
+      "detectionSignals": [
+        { "type": "library_import", "value": "pg" },
+        { "type": "library_import", "value": "psycopg2" },
+        { "type": "library_import", "value": "sequelize" },
+        { "type": "keyword", "value": "postgresql" },
+        { "type": "file_pattern", "value": "migrations/*.sql" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "http", "metadata": { "targetPendingRequests": "50" } },
+        "nodePool": { "skuFamily": "D", "minNodes": 2, "maxNodes": 10 },
+        "gateway": { "pattern": "simple_ingress", "tlsRequired": true },
+        "persistentVolume": { "recommended": true, "storageClass": "managed-premium", "accessMode": "ReadWriteOnce" },
+        "identity": { "pattern": "workload_identity", "scopeHint": "Azure Database for PostgreSQL access" }
+      },
+      "costBandHint": "medium",
+      "provenance": "extracted"
+    },
+    {
+      "id": "web_postgres_redis",
+      "label": "Web + PostgreSQL + Redis",
+      "description": "Web app with PostgreSQL for persistence and Redis for caching/sessions.",
+      "detectionSignals": [
+        { "type": "library_import", "value": "ioredis" },
+        { "type": "library_import", "value": "redis" },
+        { "type": "keyword", "value": "redis" },
+        { "type": "keyword", "value": "postgresql" },
+        { "type": "file_pattern", "value": "redis.conf" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "http", "metadata": { "targetPendingRequests": "50" } },
+        "nodePool": { "skuFamily": "D", "minNodes": 3, "maxNodes": 15 },
+        "gateway": { "pattern": "simple_ingress", "tlsRequired": true },
+        "persistentVolume": { "recommended": true, "storageClass": "managed-premium", "accessMode": "ReadWriteOnce" },
+        "identity": { "pattern": "workload_identity", "scopeHint": "Azure Database for PostgreSQL and Azure Cache for Redis" }
+      },
+      "costBandHint": "medium",
+      "provenance": "extracted"
+    },
+    {
+      "id": "web_queue_worker",
+      "label": "Web + Queue Worker",
+      "description": "Web frontend with background workers consuming from a message queue (Service Bus, Storage Queue).",
+      "detectionSignals": [
+        { "type": "library_import", "value": "@azure/service-bus" },
+        { "type": "library_import", "value": "azure-servicebus" },
+        { "type": "keyword", "value": "queue worker" },
+        { "type": "keyword", "value": "background job" },
+        { "type": "file_pattern", "value": "workers/*.{ts,js,py}" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "azure-servicebus", "metadata": { "queueName": "<queue-name>", "namespace": "<service-bus-namespace>", "messageCount": "5" } },
+        "nodePool": { "skuFamily": "D", "minNodes": 2, "maxNodes": 20 },
+        "gateway": { "pattern": "simple_ingress", "tlsRequired": true },
+        "persistentVolume": { "recommended": false },
+        "identity": { "pattern": "workload_identity", "scopeHint": "Service Bus and downstream Azure resources" }
+      },
+      "costBandHint": "medium",
+      "provenance": "extracted"
+    },
+    {
+      "id": "cron",
+      "label": "Cron / Scheduled Job",
+      "description": "Periodic batch jobs running on a schedule via CronJob resources.",
+      "detectionSignals": [
+        { "type": "manifest_pattern", "value": "kind: CronJob" },
+        { "type": "keyword", "value": "cron" },
+        { "type": "keyword", "value": "scheduled task" },
+        { "type": "file_pattern", "value": "crontab" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "cron", "metadata": { "timezone": "UTC", "start": "0 * * * *", "end": "5 * * * *", "desiredReplicas": "1" } },
+        "nodePool": { "skuFamily": "B", "minNodes": 0, "maxNodes": 5 },
+        "gateway": { "pattern": "none" },
+        "persistentVolume": { "recommended": false },
+        "identity": { "pattern": "workload_identity", "scopeHint": "Resources accessed by the job" }
+      },
+      "costBandHint": "low",
+      "provenance": "extracted"
+    },
+    {
+      "id": "agentic_app",
+      "label": "Agentic AI App",
+      "description": "LLM-orchestrated agent app calling tools/APIs with long-running requests and token-heavy workloads.",
+      "detectionSignals": [
+        { "type": "library_import", "value": "langchain" },
+        { "type": "library_import", "value": "semantic-kernel" },
+        { "type": "library_import", "value": "openai" },
+        { "type": "keyword", "value": "agent" },
+        { "type": "keyword", "value": "tool calling" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "http", "metadata": { "targetPendingRequests": "10" } },
+        "nodePool": { "skuFamily": "D", "minNodes": 2, "maxNodes": 10 },
+        "gateway": { "pattern": "simple_ingress", "tlsRequired": true },
+        "persistentVolume": { "recommended": false },
+        "identity": { "pattern": "workload_identity", "scopeHint": "Azure OpenAI, Cognitive Services, and tool backends" }
+      },
+      "costBandHint": "medium",
+      "provenance": "extracted"
+    },
+    {
+      "id": "inference_workload",
+      "label": "GPU Inference Workload",
+      "description": "ML model inference requiring GPU-accelerated node pools and high-memory instances.",
+      "detectionSignals": [
+        { "type": "library_import", "value": "torch" },
+        { "type": "library_import", "value": "tensorflow" },
+        { "type": "library_import", "value": "triton" },
+        { "type": "keyword", "value": "inference" },
+        { "type": "dockerfile_pattern", "value": "nvidia/cuda" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "http", "metadata": { "targetPendingRequests": "5" } },
+        "nodePool": { "skuFamily": "NC", "minNodes": 1, "maxNodes": 8, "gpuRequired": true },
+        "gateway": { "pattern": "grpc_passthrough", "tlsRequired": true },
+        "persistentVolume": { "recommended": true, "storageClass": "azurefile-premium", "accessMode": "ReadOnlyMany" },
+        "identity": { "pattern": "workload_identity", "scopeHint": "Model registry and storage account" }
+      },
+      "costBandHint": "high",
+      "provenance": "extracted"
+    },
+    {
+      "id": "static_plus_api",
+      "label": "Static Frontend + API Backend",
+      "description": "SPA or static frontend served separately from an API backend, routed via path-based gateway.",
+      "detectionSignals": [
+        { "type": "file_pattern", "value": "frontend/package.json" },
+        { "type": "file_pattern", "value": "api/Dockerfile" },
+        { "type": "keyword", "value": "SPA" },
+        { "type": "keyword", "value": "single page application" },
+        { "type": "library_import", "value": "react" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "http", "metadata": { "targetPendingRequests": "50" } },
+        "nodePool": { "skuFamily": "D", "minNodes": 2, "maxNodes": 10 },
+        "gateway": { "pattern": "path_based_routing", "tlsRequired": true },
+        "persistentVolume": { "recommended": false },
+        "identity": { "pattern": "workload_identity", "scopeHint": "API backend Azure service access" }
+      },
+      "costBandHint": "low",
+      "provenance": "extracted"
+    },
+    {
+      "id": "event_driven",
+      "label": "Event-Driven Processor",
+      "description": "Event consumers scaling on queue depth or event stream lag (Event Hubs, Kafka, Storage Queue).",
+      "detectionSignals": [
+        { "type": "library_import", "value": "@azure/event-hubs" },
+        { "type": "library_import", "value": "azure-eventhub" },
+        { "type": "keyword", "value": "event driven" },
+        { "type": "keyword", "value": "event hub" },
+        { "type": "keyword", "value": "kafka consumer" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "azure-eventhub", "metadata": { "consumerGroup": "$Default", "unprocessedEventThreshold": "64" } },
+        "nodePool": { "skuFamily": "D", "minNodes": 2, "maxNodes": 30 },
+        "gateway": { "pattern": "event_trigger" },
+        "persistentVolume": { "recommended": false },
+        "identity": { "pattern": "workload_identity", "scopeHint": "Event Hubs and downstream processors" }
+      },
+      "costBandHint": "medium",
+      "provenance": "extracted"
+    },
+    {
+      "id": "functions_shaped",
+      "label": "Functions-Shaped Workload",
+      "description": "Short-lived event-triggered functions with scale-to-zero, similar to Azure Functions on containers.",
+      "detectionSignals": [
+        { "type": "file_pattern", "value": "host.json" },
+        { "type": "file_pattern", "value": "function.json" },
+        { "type": "library_import", "value": "azure-functions" },
+        { "type": "keyword", "value": "serverless" },
+        { "type": "keyword", "value": "functions" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "azure-queue", "metadata": { "queueName": "<queue-name>", "queueLength": "5" } },
+        "nodePool": { "skuFamily": "B", "minNodes": 0, "maxNodes": 15 },
+        "gateway": { "pattern": "simple_ingress", "tlsRequired": true },
+        "persistentVolume": { "recommended": false },
+        "identity": { "pattern": "workload_identity", "scopeHint": "Bound Azure resources (Storage, Cosmos, etc.)" }
+      },
+      "costBandHint": "low",
+      "provenance": "extracted"
+    },
+    {
+      "id": "batch",
+      "label": "Batch Processing",
+      "description": "Large-scale parallel batch jobs processing data from storage or queues with scale-to-zero between runs.",
+      "detectionSignals": [
+        { "type": "keyword", "value": "batch processing" },
+        { "type": "keyword", "value": "ETL" },
+        { "type": "keyword", "value": "data pipeline" },
+        { "type": "library_import", "value": "apache-beam" },
+        { "type": "manifest_pattern", "value": "kind: Job" }
+      ],
+      "recipe": {
+        "kedaScaler": { "type": "azure-queue", "metadata": { "queueName": "<queue-name>", "queueLength": "10" } },
+        "nodePool": { "skuFamily": "D", "minNodes": 0, "maxNodes": 50 },
+        "gateway": { "pattern": "none" },
+        "persistentVolume": { "recommended": true, "storageClass": "azurefile-premium", "accessMode": "ReadWriteMany" },
+        "identity": { "pattern": "workload_identity", "scopeHint": "Storage accounts and data lake" }
+      },
+      "costBandHint": "high",
+      "provenance": "extracted"
+    }
+  ]
+}

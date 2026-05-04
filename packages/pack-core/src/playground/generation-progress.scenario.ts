@@ -21,7 +21,8 @@ export const generationProgressScenario: PlaygroundScenario = {
         surfaceId: 'core-generation-progress',
         components: [
           {
-            type: 'core/GenerationProgress',
+            id: 'root',
+            component: 'GenerationProgress',
             title: 'Generating deployment artifacts',
             overallStatus: 'running',
             statusMessage: 'Writing manifests…',

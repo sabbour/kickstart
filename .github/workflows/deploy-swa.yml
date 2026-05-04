@@ -105,4 +105,29 @@ jobs:
           SWA_HEALTHCHECK_REQUIRE_JSON_OK: "false"
         run: node scripts/check-swa-health.mjs
 
+      - name: Smoke check runtime CSP header
+        env:
+          CSP_SMOKE_URL: ${{ steps.production_url.outputs.base_url }}
+        run: |
+          RESPONSE_HEADERS=$(curl -sI --max-time 15 --connect-timeout 10 "$CSP_SMOKE_URL")
+          CSP_HEADER=$(echo "$RESPONSE_HEADERS" | grep -i "^content-security-policy:" | head -1)
+
+          if [ -z "$CSP_HEADER" ]; then
+            echo "::error::CSP runtime smoke check FAILED — no Content-Security-Policy header in response from $CSP_SMOKE_URL" >&2
+            echo "::error::Escalation: see docs/operations/csp-enforcement.md for owner (Kif) and SLA (revert ≤ 24h, fix ≤ 1 sprint). Parent: #324" >&2
+            exit 1
+          fi
+
+          # Extract the connect-src directive specifically to avoid false positives
+          # from other directives (e.g. img-src) that might mention the same origin.
+          CONNECT_SRC=$(echo "$CSP_HEADER" | grep -oi "connect-src[^;]*")
+          if ! echo "$CONNECT_SRC" | grep -q "https://management.azure.com"; then
+            echo "::error::CSP runtime smoke check FAILED — connect-src directive is missing https://management.azure.com" >&2
+            echo "::error::connect-src value: $CONNECT_SRC" >&2
+            echo "::error::Full header: $CSP_HEADER" >&2
+            echo "::error::Escalation: see docs/operations/csp-enforcement.md for owner (Kif) and SLA (revert ≤ 24h, fix ≤ 1 sprint). Parent: #324" >&2
+            exit 1
+          fi
+
+          echo "✅ CSP runtime smoke check passed — connect-src includes https://management.azure.com"
 

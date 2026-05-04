@@ -18,6 +18,7 @@ interface ChatShellProps {
   getSurface: (id: string) => SurfaceModel<ReactComponentImplementation> | undefined;
   debugEnabled?: boolean;
   usageSummary?: TokenUsageSummary | null;
+  hasStartedConversation?: boolean;
 }
 
 export function ChatShell({
@@ -31,6 +32,7 @@ export function ChatShell({
   getSurface,
   debugEnabled,
   usageSummary,
+  hasStartedConversation: hasStartedConversationOverride,
 }: ChatShellProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -41,9 +43,17 @@ export function ChatShell({
 
   const activePhaseIndex = currentPhase ? CONVERSATION_PHASE_ORDER.indexOf(currentPhase as typeof CONVERSATION_PHASE_ORDER[number]) : -1;
   const showPhaseBar = Boolean(currentPhase) && activePhaseIndex !== -1;
+  const hasStartedConversation = hasStartedConversationOverride
+    ?? (messages.length > 0 || Boolean(streamingText) || Boolean(streamingSurfaceIds?.length));
+  const inputPlaceholder = hasStartedConversation ? 'Type a message...' : 'Describe what you want to build...';
 
   return (
-    <div id="chat-ui" className="chat-container">
+    <div
+      id="chat-ui"
+      className="chat-container"
+      data-streaming={isStreaming ? 'active' : 'idle'}
+      aria-busy={isStreaming || undefined}
+    >
       {showPhaseBar && (
         <div className="chat-phase" role="status" aria-label={`Current phase: ${CONVERSATION_PHASE_LABELS[currentPhase as keyof typeof CONVERSATION_PHASE_LABELS] || currentPhase}`}>
           {CONVERSATION_PHASE_ORDER.map((phase, index) => (
@@ -76,6 +86,7 @@ export function ChatShell({
       <ChatInput
         onSend={onSend}
         disabled={isStreaming}
+        placeholder={inputPlaceholder}
         statusBar={debugEnabled && usageSummary ? <TokenUsageTracker usage={usageSummary} /> : undefined}
       />
     </div>

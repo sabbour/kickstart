@@ -1,22 +1,6 @@
-export { AuthCard } from './AuthCard';
-export { AzureAction } from './AzureAction';
-export { AzureLoginCard } from './AzureLoginCard';
-export { AzureResourceForm } from './AzureResourceForm';
-export { AzureResourcePicker } from './AzureResourcePicker';
-export { CodeBlock } from './CodeBlock';
-export { CostEstimate } from './CostEstimate';
-export { DecisionCard } from './DecisionCard';
-export { FileEditor } from './FileEditor';
-export { FormGroup } from './FormGroup';
-export { GenerationProgress } from './GenerationProgress';
-export { GitHubAction } from './GitHubAction';
-export { GitHubCommit } from './GitHubCommit';
-export { GitHubLoginCard } from './GitHubLoginCard';
-export { GitHubRepoPicker } from './GitHubRepoPicker';
-export { Markdown } from './Markdown';
-export { ProgressSteps } from './ProgressSteps';
-export { Questionnaire } from './Questionnaire';
-export { RadioGroup } from './RadioGroup';
-export { SteppedCarousel } from './SteppedCarousel';
-export { SummaryCard } from './SummaryCard';
-export { TrackPicker } from './TrackPicker';
+// Azure/GitHub-specific components have moved to their respective packs:
+// - azure/AzureLoginCard, azure/AzureResourceForm, azure/AzureResourcePicker → @aks-kickstart/pack-azure/client
+// - azure/AzureAction, azure/CostEstimate → @aks-kickstart/pack-azure/client
+// - github/GitHubLoginCard, github/GitHubCommit → @aks-kickstart/pack-github/client
+// - github/Action (was GitHubAction), github/RepoPicker (was GitHubRepoPicker) → @aks-kickstart/pack-github/client
+// All are registered via registerPackComponents() in main.tsx.

@@ -2,13 +2,6 @@
   "tier": "per-role",
   "keysDir": "/home/asabbour/.config/squad/asabbour_microsoft/keys",
   "apps": {
-    "lead": {
-      "appId": 3492550,
-      "appSlug": "squad-lead",
-      "installationId": 126815909,
-      "roleSlug": "lead",
-      "tier": "per-role"
-    },
     "frontend": {
       "appId": 3492104,
       "appSlug": "squad-frontend",
@@ -64,10 +57,17 @@
       "installationId": 126820502,
       "roleSlug": "docs",
       "tier": "per-role"
+    },
+    "architecture": {
+      "appId": 3492550,
+      "appSlug": "squad-lead",
+      "installationId": 126815909,
+      "roleSlug": "architecture",
+      "tier": "per-role"
     }
   },
   "agentNameMap": {
-    "leela": "lead",
+    "leela": "architecture",
     "fry": "frontend",
     "bender": "backend",
     "hermes": "tester",

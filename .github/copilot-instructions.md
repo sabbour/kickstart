@@ -21,40 +21,6 @@ Before starting work, check your capability profile in `.squad/team.md` under th
   🤖 This issue doesn't match my capability profile (reason: {why}). Suggesting reassignment to a squad member.
   ```
 
-## Pre-Dispatch Checkpoint — MUST complete before writing any code
-
-**These checks are non-negotiable. Writing code before they pass is a governance violation.**
-
-Before touching a single source file, verify all three boxes:
-
-- [ ] **Issue exists.** The work is tied to a GitHub issue number. If no issue exists, stop and create one before proceeding.
-- [ ] **Design Proposal posted.** A DP comment has been posted on the issue by the implementing agent, containing: problem statement, proposed approach, `Estimate:` field, files to modify, pack boundaries, security considerations, docs and changeset plan, alternatives considered. Fast-lane exemption: skip DP only if the issue is labeled `estimate:S` OR `squad:chore-auto`.
-- [ ] **Design Review approved.** The DP comment has all three approval labels present on the issue: `architecture:approved`, `security:approved`, `codereview:approved`. Fast-lane exemption: skip DR only if `estimate:S` OR `squad:chore-auto`.
-
-If any box is unchecked → run the missing ceremony first. Do not proceed to code.
-
-## Changeset Requirement — every code-producing PR
-
-The agent writing the code is responsible for including a changeset in the same PR branch. This is not Amy's job. This is not Scribe's job.
-
-**Before opening a PR, from inside the worktree:**
-
-```bash
-npm run changeset
-```
-
-- Select affected packages.
-- Pick bump type: `patch` for fixes, `minor` for new behaviour, `major` for breaking changes.
-- Write the changeset body in the user's voice — what the user gains or loses, not what files changed.
-
-**Exceptions** (no changeset needed, but state this explicitly in the PR body):
-- `estimate:S` internal-only changes (refactor, test-only, dev tooling with no user-visible effect)
-- Docs-only changes
-
-Changeset is committed and pushed as part of the PR branch. Do not open the PR without it (unless explicitly exempt).
-
-Amy will review the changeset quality during the PR Review Gate. Scribe curates CHANGELOG entries from aggregated changesets at release time. Neither of them writes the changeset — you do.
-
 ## Branch Naming
 
 Use the squad branch convention:
@@ -63,24 +29,6 @@ squad/{issue-number}-{kebab-case-slug}
 ```
 Example: `squad/42-fix-login-validation`
 
-## Worktrees
-
-Never run `git checkout -b` in the top-level working tree. Every piece of issue work happens inside its own worktree under `.worktrees/`. This prevents agents from stomping on each other's uncommitted changes, branching off the wrong base, or producing mixed-diff PRs.
-
-Before starting work:
-
-```bash
-git fetch origin
-git worktree list                    # see what's already in flight; reuse if yours exists
-git worktree add .worktrees/<issue-number-or-slug> \
-  -b squad/<issue-number>-<slug> origin/main
-cd .worktrees/<issue-number-or-slug>
-```
-
-All subsequent edits, commits, and `gh pr create` calls run from inside the worktree. After the PR merges or closes, run `git worktree remove .worktrees/<name> && git worktree prune` from another checkout.
-
-If you find yourself about to branch from `main` in the top-level checkout, stop and create a worktree instead.
-
 ## PR Guidelines
 
 When opening a PR:
@@ -88,24 +36,6 @@ When opening a PR:
 - If the issue had a `squad:{member}` label, mention the member: `Working as {member} ({role})`
 - If this is a 🟡 needs-review task, add to the PR description: `⚠️ This task was flagged as "needs review" — please have a squad member review before merging.`
 - Follow any project conventions in `.squad/decisions.md`
-
-## PR Review Feedback — Required Loop
-
-Review sources that MUST be acknowledged (all carry equal weight):
-- Squad reviewers: Leela, Zapp, Nibbler, Amy
-- GitHub Copilot PR review bot (`copilot-pull-request-reviewer[bot]`)
-- Human reviewers
-
-**Strict order — no exceptions:**
-1. Fix the code (or decide not to and explain why)
-2. **Post a reply** to the specific comment: `"Addressed in {sha}: {description}"` or `"Dismissed: {justification}"`
-3. **Only after the reply is posted** — resolve the thread via `resolveReviewThread` GraphQL mutation
-4. Verify 0 unresolved threads before attempting merge
-
-**❌ FORBIDDEN: Resolving a thread without first posting a reply.**
-Silently marking a thread resolved — even after fixing the code — is a protocol violation. The reply is what proves the feedback was considered. Fix + reply + resolve is the indivisible unit.
-
-The full protocol with API commands is in `.squad/skills/pr-workflow/SKILL.md` under **Handling Review Feedback**.
 
 ## Decisions
 
@@ -137,3 +67,65 @@ GH_TOKEN="$TOKEN" gh api /repos/{owner}/{repo}/issues -f title="..."
 git push "https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git" HEAD
 ```
 <!-- squad-identity: end -->
+
+<!-- squad-reviews: start v1.5.3 -->
+## REVIEW GATE — PR Merge Requirements
+
+This project enforces a CI review gate that blocks PR merges until:
+1. All required reviewer roles have submitted a native GitHub review with `APPROVED` state.
+2. All review conversation threads are resolved (no unresolved threads).
+
+### Coordinator workflow — requesting reviews
+
+`squad_reviews_dispatch_review` is a **SIGNAL ONLY** tool. It applies the
+`review:{role}:requested` label and posts a notification comment — it does
+**NOT** spawn the reviewer agent. Returning `dispatched: true` only means the
+label and comment were applied.
+
+After every `squad_reviews_dispatch_review` call, the coordinator MUST in the
+same turn dispatch the named reviewer agent via the platform's spawn tool
+(`task` on CLI, `runSubagent` on VS Code) so the review actually runs.
+
+For parallel reviews, call `squad_reviews_dispatch_review` once per role AND
+spawn each reviewer agent — both in the same turn.
+
+### Agent workflow before merge
+
+1. After pushing changes, call `squad_reviews_acknowledge_feedback` to check for unresolved threads.
+2. For each unresolved thread:
+   - If you fixed the issue: call `squad_reviews_resolve_thread` with action `addressed` and reference the fix commit.
+   - If the feedback does not apply: call `squad_reviews_resolve_thread` with action `dismissed` with a justification.
+3. **Never** resolve a thread without replying first — silent dismissal is a governance failure.
+4. **Never** self-approve your own PR.
+5. Do not manually apply `{role}:approved` labels — the gate applies them automatically.
+
+The gate will not pass until all threads are resolved and all required roles have approved.
+<!-- squad-reviews: end -->
+
+<!-- squad-workflows: start v1.4.1 -->
+## Workflow Tools (squad-workflows extension)
+
+Use these tools for the issue-to-merge lifecycle:
+
+**Planning:** `squad_workflows_estimate` → `squad_workflows_decompose` (if L/XL)
+**Design:** `squad_workflows_post_design_proposal` → `squad_workflows_check_design_approval`
+**Review:** `squad_workflows_check_feedback` + `squad_workflows_check_ci`
+**Feedback Loop:** `squad_workflows_address_feedback` / `squad_workflows_address_all_feedback` → batch fixes → one commit/consolidated update → resolve → reviewDecision check → human re-review/dismissal ping if needed → role-gate approval via `squad_reviews_execute_pr_review`
+**Branch Sync:** `squad_workflows_update_branch` (reactive — only when merge blocked by stale branch)
+**Merge:** `squad_workflows_merge_check` → `squad_workflows_merge`
+**Utility:** `squad_workflows_fast_lane`, `squad_workflows_board_sync`, `squad_workflows_wave_status`, `squad_workflows_status`
+
+### Fast Lane
+Issues labeled `estimate:S` or `squad:chore-auto` skip Design Proposal and Design Review.
+
+### Wave-Based Delivery
+Large features must be decomposed into waves (GitHub milestones). Each wave is independently shippable and produces a releasable changeset. Max issue estimate per wave: M.
+
+### Branch Conventions
+- Base branch: `dev`
+- Branch naming: `squad/{issue-number}-{kebab-case-slug}`
+- Always use worktrees: `git worktree add .worktrees/{slug} -b squad/{issue}-{slug} origin/dev`
+
+### Pre-Push Validation
+Before pushing any branch, run `npm test` (and `npm run build` if a build script exists in package.json). Do NOT push code that fails tests or build.
+<!-- squad-workflows: end -->

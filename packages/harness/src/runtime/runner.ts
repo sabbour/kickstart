@@ -39,6 +39,7 @@ import { z } from 'zod';
 import { buildRunConfig } from './run-config.js';
 import type { RunConfig } from './run-config.js';
 import { withRetry, CircuitBreaker, CircuitOpenError } from '../utils/retry.js';
+import { openAIStrictCompatibleSchema } from './schema-conformance.js';
 
 // ---------------------------------------------------------------------------
 // Retry / circuit-breaker — module-level state (#102)
@@ -251,6 +252,15 @@ let _otelBridgeInstalled = false;
  * Idempotent: guarded so repeated Runner instantiations do not clobber
  * the processor list on every API invocation.
  */
+/**
+ * Strip `<!-- triage-handoff/v1 ... -->` HTML comment blocks from text before
+ * emitting SSE chunks. These comments carry the typed handoff briefing for
+ * downstream agent consumption but must not be shown to the user (#415).
+ */
+export function stripHandoffComment(text: string): string {
+  return text.replace(/<!--\s*triage-handoff\/v1[\s\S]*?-->/g, '').trimEnd();
+}
+
 function installOtelBridgeOnce(): void {
   if (_otelBridgeInstalled) return;
   try {
@@ -312,7 +322,9 @@ function wrapTool(
     type: 'function',
     name: fnTool.name,
     description: fnTool.description ?? '',
-    parameters: fnTool.parameters,
+    parameters: openAIStrictCompatibleSchema(
+      fnTool.parameters as Record<string, unknown>,
+    ) as typeof fnTool.parameters,
     strict: fnTool.strict,
     invoke: async (runContext, input, details) => {
       const typedArgs = (() => {
@@ -379,7 +391,7 @@ function wrapUserAction(
   abortCtrl: AbortController,
   registry: PackRegistry,
 ): ReturnType<typeof tool> {
-  return tool({
+  const wrapped = tool({
     name: contrib.wireName,
     description: contrib.description,
     parameters: z.object({ input: contrib.parameters }).passthrough(),
@@ -438,6 +450,15 @@ function wrapUserAction(
       return `[UserAction ${contrib.name} pending — waiting for browser result]`;
     },
   });
+
+  if (wrapped.type !== 'function') return wrapped;
+
+  return {
+    ...wrapped,
+    parameters: openAIStrictCompatibleSchema(
+      wrapped.parameters as Record<string, unknown>,
+    ) as typeof wrapped.parameters,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1047,7 +1068,16 @@ export class Runner {
     const getSkillsExecuted = (): string[] => Array.from(session.skillsPulled ?? []);
 
     try {
-      const sdkRunner = getSdkRunner();
+      // #408 MCP sampling Option B: when the caller provides a scoped
+      // samplingProvider, create a local SDKRunner with that provider instead
+      // of the module-level singleton.  The singleton is never mutated so
+      // SWA / direct-call paths are completely unaffected.
+      const sdkRunner = runConfig?.samplingProvider
+        ? (() => {
+            installOtelBridgeOnce();
+            return new SDKRunner({ modelProvider: runConfig.samplingProvider });
+          })()
+        : getSdkRunner();
 
       // #102: Guard against open circuit breaker before attempting the SDK call.
       if (runnerCircuitBreaker.isOpen) {
@@ -1287,9 +1317,11 @@ export class Runner {
 
       // ── Flush buffered chunks now that output guardrails have passed ────────
       if (chunkBuffer.length > 0) {
-        if (outputText !== fullText) {
-          // Output was redacted — send the redacted version as a single chunk
-          sseWrite('chunk', { delta: outputText });
+        // Strip invisible handoff briefing comments (#415) before sending to client.
+        const sseText = stripHandoffComment(outputText);
+        if (sseText !== fullText) {
+          // Output was redacted or stripped — send as a single chunk
+          sseWrite('chunk', { delta: sseText });
         } else {
           // No redaction — replay original buffered chunks preserving granularity
           for (const delta of chunkBuffer) {
@@ -1444,6 +1476,8 @@ export class Runner {
     session: Session,
     actionResult: unknown,
     sseWrite: SSEWriter,
+    signal?: AbortSignal,
+    runConfig?: RunConfig,
   ): Promise<void> {
     const pending = session.pendingUserAction;
     if (!pending) {
@@ -1463,7 +1497,7 @@ export class Runner {
       `[UserAction ${pending.name} result]: ${resultSummary}`;
 
     // Continue the conversation with the result
-    await this.run(session, continuationMessage, sseWrite);
+    await this.run(session, continuationMessage, sseWrite, signal, runConfig);
   }
 
   // ---------------------------------------------------------------------------
@@ -1612,8 +1646,9 @@ export class Runner {
 
       // Flush buffered chunks
       if (chunkBuffer.length > 0) {
-        if (outputText !== fullText) {
-          sseWrite('chunk', { delta: outputText });
+        const sseText = stripHandoffComment(outputText);
+        if (sseText !== fullText) {
+          sseWrite('chunk', { delta: sseText });
         } else {
           for (const delta of chunkBuffer) {
             sseWrite('chunk', { delta });

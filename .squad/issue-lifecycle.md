@@ -115,63 +115,29 @@ gh issue view {number} --json number,title,body,labels,assignees
 az boards work-item show --id {id} --output json
 ```
 
-### 2. Branch Creation & Work Start
+### 2. Branch Creation (Start Work)
 
 **Trigger:** Agent accepts issue assignment and begins work.
 
 **Actions:**
 1. Ensure working on latest base branch (usually `main` or `dev`)
 2. Create feature branch using Squad naming convention
-3. **Post a start comment on the issue** (using GitHub App identity)
-4. **Move the issue to "In Progress" on the project board** (using GitHub App identity)
-5. Transition issue to `inProgress` state
+3. Transition issue to `inProgress` state
 
-**Start comment and board transition (GitHub — using bot identity):**
+**Branch creation commands:**
 
-Agents MUST use their GitHub App token for these calls so the comment appears as the bot, not the human user.
-
+**Standard (single-agent, no parallelism):**
 ```bash
-# Resolve bot token (see GIT IDENTITY in spawn prompt)
-TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
-
-# Post start comment on the issue
-GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
-  --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
-⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-🌿 Branch: \`squad/{issue-number}-{slug}\`"
-
-# Move issue to "In Progress" on the project board
-# Use the GitHub Projects GraphQL API to update the status field
-GH_TOKEN=$TOKEN gh api graphql -f query='
-  mutation {
-    updateProjectV2ItemFieldValue(
-      input: {
-        projectId: "{project-node-id}"
-        itemId: "{item-node-id}"
-        fieldId: "{status-field-id}"
-        value: { singleSelectOptionId: "{in-progress-option-id}" }
-      }
-    ) { projectV2Item { id } }
-  }'
+git checkout main && git pull && git checkout -b squad/{issue-number}-{slug}
 ```
 
-> **Fail-closed rule:** Agent-authored writes must resolve an explicit app token first. If `squad_identity_resolve_token` fails, stop; do not fall back to ambient `gh` or `git` auth. See `.squad/skills/squad-identity/SKILL.md` for the full protocol.
-
-> **Board IDs:** The coordinator resolves project/item/field/option IDs before spawning and passes them in the ISSUE CONTEXT block. See spawn prompt additions below.
-
-**Branch creation — worktree required:**
-
-Agents always branch inside a dedicated worktree under `.worktrees/`. Branching in the top-level checkout is not allowed: multiple agents on the same checkout cause dirty diffs, wrong-base branches, and lost work.
-
+**Worktree (parallel multi-agent):**
 ```bash
-git fetch origin
-git worktree list                                      # reuse if one already exists
-git worktree add .worktrees/{issue-number-or-slug} \
-  -b squad/{issue-number}-{slug} origin/main
-cd .worktrees/{issue-number-or-slug}
+git worktree add ../worktrees/{issue-number} -b squad/{issue-number}-{slug}
+cd ../worktrees/{issue-number}
 ```
+
+> **Note:** Worktree support is in progress (#525). Current implementation uses standard checkout.
 
 ### 3. Implementation & Commit
 
@@ -197,9 +163,7 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 **Push command:**
 ```bash
-TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
+git push -u origin squad/{issue-number}-{slug}
 ```
 
 ### 4. PR Creation
@@ -216,20 +180,8 @@ git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{is
 
 **GitHub:**
 ```bash
-TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
-
-cat > pr-body.txt <<'EOF'
-🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
-
-Closes #{issue-number}
-
-{description}
-EOF
-
-GH_TOKEN=$TOKEN gh pr create --title "{title}" \
-  --body-file pr-body.txt \
+gh pr create --title "{title}" \
+  --body "Closes #{issue-number}\n\n{description}" \
   --head squad/{issue-number}-{slug} \
   --base main
 ```
@@ -244,8 +196,6 @@ az repos pr create --title "{title}" \
 
 **PR description template:**
 ```markdown
-🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
-
 Closes #{issue-number}
 
 ## Summary
@@ -257,11 +207,6 @@ Closes #{issue-number}
 
 ## Testing
 {how this was tested}
-
-## Time Spent
-- Implementation: {X} min
-- Feedback rounds: {Y} min ({N} rounds)
-- Total: {Z} min
 
 {If working as a squad member:}
 Working as {member} ({role})
@@ -278,52 +223,23 @@ Working as {member} ({role})
 - **CI failure** → `ciFailure`
 
 **When changes are requested:**
-1. **Post an acknowledgment comment on the PR** (using bot identity) before making any changes
-2. Agent addresses feedback
-3. Commits fixes to the same branch
-4. Pushes updates
-5. Posts a completion comment summarizing what was changed
-6. Requests re-review
-
-**Feedback acknowledgment (GitHub — using bot identity):**
-
-```bash
-TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
-
-# Before making changes
-GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
-  --body "🔧 **{AgentName}** ({Role}) is addressing review feedback.
-⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-# After pushing changes
-GH_TOKEN=$TOKEN gh pr comment {pr-number} --repo {owner}/{repo} \
-  --body "✅ **{AgentName}** addressed the feedback.
-⏱️ Completed: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-**Changes:** {summary}
-Ready for re-review."
-```
-
-> Agent-authored feedback/status writes must use the explicit app token path above; do not fall back to ambient auth.
+1. Agent addresses feedback
+2. Commits fixes to the same branch
+3. Pushes updates
+4. Requests re-review
 
 **Update workflow:**
 ```bash
 # Make changes
 # ⚠️ NEVER use `git add .` or `git add -A` — only stage files you intentionally changed
-TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
 git add -- {specific files you modified}
 git commit -m "fix: address review feedback"
-git push https://x-access-token:${TOKEN}@github.com/{owner}/{repo}.git squad/{issue-number}-{slug}
+git push
 ```
 
 **Re-request review (GitHub):**
 ```bash
-TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
-GH_TOKEN=$TOKEN gh pr ready {pr-number}
+gh pr ready {pr-number}
 ```
 
 ### 6. PR Merge
@@ -334,18 +250,12 @@ GH_TOKEN=$TOKEN gh pr ready {pr-number}
 
 **GitHub (merge commit):**
 ```bash
-TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
-GH_TOKEN=$TOKEN gh pr merge {pr-number} --merge --delete-branch
+gh pr merge {pr-number} --merge --delete-branch
 ```
 
 **GitHub (squash):**
 ```bash
-TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
-[ -n "$TOKEN" ] || exit 1
-export GH_TOKEN="$TOKEN"
-GH_TOKEN=$TOKEN gh pr merge {pr-number} --squash --delete-branch
+gh pr merge {pr-number} --squash --delete-branch
 ```
 
 **Azure DevOps:**
@@ -355,20 +265,24 @@ az repos pr update --id {pr-id} --status completed --delete-source-branch true
 
 **Post-merge actions:**
 1. Issue automatically closes (if "Closes #{number}" is in PR description)
-2. Feature branch is deleted on the remote
+2. Feature branch is deleted
 3. Squad board state transitions to `done`
-4. Worktree is removed locally
+4. Worktree cleanup (if worktree was used — #525)
 
 ### 7. Cleanup
 
-From any checkout other than the worktree you're removing:
-
+**Standard workflow cleanup:**
 ```bash
-git worktree remove .worktrees/{issue-number-or-slug}
-git worktree prune
+git checkout main
+git pull
+git branch -d squad/{issue-number}-{slug}
 ```
 
-If the worktree has uncommitted changes, move them first. `git worktree remove` refusing to delete is usually a signal that something went wrong and needs attention.
+**Worktree cleanup (future, #525):**
+```bash
+cd {original-cwd}
+git worktree remove ../worktrees/{issue-number}
+```
 
 ## Spawn Prompt Additions for Issue Work
 
@@ -396,84 +310,14 @@ When spawning an agent to work on an issue, include this context block:
 **Your task:**
 {specific directive to the agent}
 
-**Project Board IDs** (for moving issue on the board):
-- Project Node ID: `{project-node-id}`
-- Item Node ID: `{item-node-id}`
-- Status Field ID: `{status-field-id}`
-- "In Progress" Option ID: `{in-progress-option-id}`
-- "Done" Option ID: `{done-option-id}`
-
-## WORK START PROTOCOL
-
-🚀 **Before writing any code**, you MUST:
-
-1. **Post a start comment on the issue** using your bot identity:
-   ```bash
-   TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
-   [ -n "$TOKEN" ] || exit 1
-   export GH_TOKEN="$TOKEN"
-   GH_TOKEN=$TOKEN gh issue comment {number} --repo {owner}/{repo} \
-     --body "🚀 **{AgentName}** ({Role}) is starting work on this issue.
-   ⏱️ Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-   🌿 Branch: \`squad/{issue-number}-{slug}\`"
-   ```
-
-2. **Move the issue to "In Progress" on the project board:**
-   ```bash
-   GH_TOKEN=$TOKEN gh api graphql -f query='
-     mutation { updateProjectV2ItemFieldValue(input: {
-       projectId: "{project-node-id}", itemId: "{item-node-id}",
-       fieldId: "{status-field-id}",
-       value: { singleSelectOptionId: "{in-progress-option-id}" }
-     }) { projectV2Item { id } } }'
-   ```
-
-> Agent-authored writes in this lifecycle are fail-closed and must use an explicit app token.
-
-## FEEDBACK ACKNOWLEDGMENT PROTOCOL
-
-📝 **If this is a feedback round** (addressing PR review or issue comments):
-1. Post `🔧 {Name} is addressing review feedback...` on the PR/issue BEFORE changes
-2. Post `✅ {Name} addressed the feedback` with summary AFTER pushing
-
-## TIME TRACKING
-
-⏱️ **You MUST track time spent on this issue.** The coordinator records spawn and completion timestamps in the orchestration log. Your responsibilities:
-
-1. **Note your start** — at the very beginning of your work, before any file reads or code changes, output:
-   `⏱️ STARTED: {ISO 8601 UTC timestamp}`
-2. **Note your finish** — as the last thing before your final summary, output:
-   `⏱️ COMPLETED: {ISO 8601 UTC timestamp}`
-3. **If this is a feedback round** (addressing PR review comments), additionally output:
-   `⏱️ FEEDBACK_ROUND: yes`
-4. **Include time in your PR description** — add a `## Time Spent` section:
-   ```
-   ## Time Spent
-   - Implementation: {X} min
-   - Feedback rounds: {Y} min (N rounds)
-   - Total: {Z} min
-   ```
-
-This data feeds Sprint Retro velocity analysis and Sprint Planning estimation.
-
 **After completing work:**
 1. Commit with message referencing issue number
 2. Push branch
 3. Open PR using:
    ```
-   TOKEN=$(squad_identity_resolve_token --role "{role_slug}") || exit 1
-   [ -n "$TOKEN" ] || exit 1
-   export GH_TOKEN="$TOKEN"
-   cat > pr-body.txt <<'EOF'
-   🤖 Created by [{app_slug}](https://github.com/apps/{app_slug})
-
-   Closes #{number}
-
-   {description}
-   EOF
-   GH_TOKEN=$TOKEN gh pr create --title "{title}" --body-file pr-body.txt --head squad/{issue-number}-{slug} --base {base-branch}
+   gh pr create --title "{title}" --body "Closes #{number}\n\n{description}" --head squad/{issue-number}-{slug} --base {base-branch}
    ```
-4. Report PR URL and time spent to coordinator
+4. Report PR URL to coordinator
 ```
 
 ## Ralph's Role in Issue Lifecycle
@@ -500,7 +344,7 @@ See `.squad/templates/ralph-reference.md` for Ralph's full lifecycle.
 If the project has no human reviewers configured:
 1. PR opens
 2. CI runs
-3. If CI passes, Ralph (or the `Squad Auto Merge` workflow for qualifying non-XL/non-`refactor` PRs, including opt-in `squad:chore-auto` PRs) auto-merges
+3. If CI passes, Ralph auto-merges
 4. Issue closes
 
 ### Human Review Required
@@ -509,7 +353,7 @@ If the project requires human approval:
 1. PR opens
 2. Human reviewer is notified (GitHub/ADO notifications)
 3. Reviewer approves or requests changes
-4. If approved + CI passes, Ralph merges (or the `Squad Auto Merge` workflow arms squash auto-merge for dual-approved PRs and opt-in `squad:chore-auto` low-risk PRs that satisfy the review gate)
+4. If approved + CI passes, Ralph merges
 5. If changes requested, agent addresses feedback
 
 ### Squad Member Review
@@ -541,7 +385,7 @@ Research documented → Research PR merged → Implementation issue created →
 Implementation agent spawned → Feature built → PR merged
 ```
 
-### Pattern 4: Parallel Multi-Agent
+### Pattern 4: Parallel Multi-Agent (Future, #525)
 ```
 Epic issue created → Decomposed into sub-issues → Each sub-issue assigned → 
 Multiple agents work in parallel worktrees → PRs opened concurrently → 
@@ -555,6 +399,27 @@ All PRs reviewed → All PRs merged → Epic closed
 - ❌ Opening PRs without "Closes #{number}" in description
 - ❌ Merging PRs before CI passes
 - ❌ Leaving feature branches undeleted after merge
-- ❌ Running `git checkout -b` in the top-level checkout — always use a worktree under `.worktrees/`
+- ❌ Using `checkout -b` when parallel agents are active (causes working directory conflicts)
 - ❌ Manually transitioning issue states — let the platform and Squad automation handle it
 - ❌ Skipping the branch naming convention — breaks Ralph's tracking logic
+
+## Migration Notes
+
+**v0.8.x → v0.9.x (Worktree Support):**
+- `checkout -b` → `git worktree add` for parallel agents
+- Worktree cleanup added to post-merge flow
+- `TEAM_ROOT` passing to agents to support worktree-aware state resolution
+
+This template will be updated as worktree lifecycle support lands in #525.
+
+<!-- squad-workflows: start v1.4.1 -->
+> **⚠️ This project uses squad-workflows.** The step-by-step commands in
+> sections 1–7 below are superseded by the squad-workflows extension tools.
+> Follow these references instead:
+>
+> - **Workflow tools**: `.squad/skills/squad-workflows/SKILL.md`
+> - **Ceremonies & gates**: `.squad/ceremonies.md`
+> - **Branch model & identity**: `.github/copilot-instructions.md`
+>
+> If this notice is missing, run `squad-workflows setup` to re-patch.
+<!-- squad-workflows: end -->

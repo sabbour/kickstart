@@ -62,7 +62,14 @@
       "userInvocable": false,
       "modelInvocable": true,
       "provenance": "extracted",
-      "handoffs": [],
+      "handoffs": [
+        {
+          "label": "Review artifacts",
+          "target": "core.reviewer",
+          "trigger": "Files generated; please review and validate before user surfaces.",
+          "provenance": "extracted"
+        }
+      ],
       "asTools": [
         {
           "target": "core.reviewer",
@@ -185,7 +192,14 @@
           "provenance": "extracted"
         }
       ],
-      "asTools": []
+      "asTools": [
+        {
+          "target": "aks.architect",
+          "maxTurns": 3,
+          "purpose": "Consult the AKS architect for Kubernetes-specific questions (node pool sizing, workload placement, network policies, Gateway API, KAITO) without handing off the conversation.",
+          "provenance": "extracted"
+        }
+      ]
     },
     "azure.ops": {
       "role": "domain_operator",
@@ -209,7 +223,14 @@
       "modelInvocable": true,
       "provenance": "extracted",
       "handoffs": [],
-      "asTools": [],
+      "asTools": [
+        {
+          "target": "azure.architect",
+          "maxTurns": 3,
+          "purpose": "Consult azure.architect for cost lookup or resource design questions before publishing, and to confirm deployment-target details (resource group, cluster name) when composing PR descriptions. Pass known subscription/resource-group identifiers in the query.",
+          "provenance": "extracted"
+        }
+      ],
       "userActions": [
         "github:login",
         "github:pick_org",

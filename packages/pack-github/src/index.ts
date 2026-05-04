@@ -1,7 +1,9 @@
 import type { Pack, ComponentContribution } from '@aks-kickstart/harness';
 
-// Tool
+// Tools
 import { apiGetTool } from './tools/api-get.js';
+import { updatePrDescriptionTool } from './tools/update-pr-description.js';
+import { checkRepoAccessTool } from './tools/check-repo-access.js';
 
 // User actions
 import { loginUserAction } from './user-actions/login.js';
@@ -42,11 +44,10 @@ export const githubPack: Pack = {
   version: '0.1.0',
   dependsOn: ['core'],
 
-  // Agents and skills are loaded from directory by the harness registry
   agentsDir: new URL('../agents/', import.meta.url),
   skillsDir: new URL('../skills/', import.meta.url),
 
-  tools: [apiGetTool],
+  tools: [apiGetTool, updatePrDescriptionTool, checkRepoAccessTool],
 
   userActions: [
     loginUserAction,

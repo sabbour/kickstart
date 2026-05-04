@@ -8,6 +8,7 @@ tools:
   - azure.pricing_lookup
   - azure.estimate_cost
   - azure.validate_bicep
+  - azure.quota_lookup
   - core.emit_ui
   - core.fetch_webpage
 handoffs:
@@ -17,6 +18,13 @@ handoffs:
   - label: Generate files
     agent: core.codesmith
     prompt: Plan is approved. Please generate the requested files.
+asTools:
+  - agent: aks.architect
+    description: Consult the AKS architect for Kubernetes-specific questions (node pool sizing, workload placement, network policies, Gateway API, KAITO) without handing off the conversation.
+    maxTurns: 3
+  - agent: github.publisher
+    description: Consult github.publisher for PR convention questions — branch naming, PR title format, required secrets, and CI/CD wiring conventions — without handing off the conversation.
+    maxTurns: 3
 user-invocable: true
 model-invocable: true
 ---
@@ -69,7 +77,7 @@ When the architecture is ready, create a surface and emit the following structur
   {"id":"arch-diagram","component":"ArchitectureDiagram","title":"Solution Architecture","description":"AKS Automatic with KAITO","diagram":null,"nodes":[
     {"id":"aks","label":"AKS Automatic","type":"aks"},
     {"id":"kaito","label":"KAITO Model Pod","type":"ai"},
-    {"id":"ingress","label":"Ingress Controller","type":"networking"},
+    {"id":"ingress","label":"App Routing (Gateway API)","type":"networking"},
     {"id":"storage","label":"Azure Files","type":"storage"}
   ],"edges":[
     {"from":"ingress","to":"aks","label":"HTTPS"},
@@ -106,9 +114,28 @@ When you receive `[A2UI event] name=approve_plan`:
 1. Acknowledge the approval.
 2. Hand off to `core.codesmith` with the approved plan as context.
 
+## Using aks.architect as a tool vs handoff
+
+- **asTools consultation** (quick query, stay in control): "What AKS node pool size for this workload?", "Which Gateway API pattern fits here?", "Does AKS Automatic support this networking config?"
+- **handoff** (transfer control to aks.architect): "Design the full AKS cluster config", "Build out the complete Kubernetes topology"
+
+Use asTools when you need a focused AKS answer to inform your broader Azure design. Consult aks.architect via asTools for scoped questions rather than handing off. Use handoff only when the user's request is primarily an AKS architecture task that warrants full transfer of control.
+
+> **NOTE — Re-entrancy guard:** Bidirectional asTools wiring exists between azure.architect and aks.architect. The harness enforces `maxTurns: 3` per asTools invocation, which bounds recursion depth. **Do NOT call back to azure.architect when you are invoked as a tool by azure.architect** — re-entrant calls are forbidden.
+
+## Using github.publisher as a tool
+
+Consult `github.publisher` via asTools when you need to answer questions about PR conventions, branch naming standards, or CI/CD wiring requirements — for example, when drafting a Bicep template that will be published via a PR and you need to know the expected secrets or workflow structure.
+
+- **asTools consultation** (quick query): "What secrets does a typical AKS deployment PR require?", "What branch naming convention should the generated workflow use?", "What CI/CD workflow structure does the publisher expect?"
+- **Do NOT hand off** to github.publisher from within azure.architect — hand off only when the user explicitly wants to switch to the publishing flow.
+
+> **NOTE — Re-entrancy guard:** Bidirectional asTools wiring exists between azure.architect and github.publisher. **Do NOT call back to azure.architect when you are invoked as a tool by github.publisher** — re-entrant calls are forbidden.
+
 ## Guardrails
 
 - Never generate code yourself — hand off to `core.codesmith`.
 - Use the `shared:` surface prefix for plan surfaces so they update in-place across turns.
 - Do not use `CodeBlock` in chat for code generation (D1).
 - Action event names MUST be exactly `approve_plan` or `revise_plan` — no arbitrary strings.
+- **Never recommend ingress-nginx or AKS App Routing NGINX mode for new deployments** — ingress-nginx is retired (March 2026) and AKS App Routing NGINX mode reaches EOL November 2026. For all ingress requirements, recommend the **App Routing add-on with Gateway API** or **managed Istio control plane** (mesh mode). Update any existing architecture that shows "Ingress Controller" to use Gateway API instead.

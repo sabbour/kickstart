@@ -1,107 +1,31 @@
 /**
  * @module @aks-kickstart/api/functions/arm-proxy
  *
- * ANY /api/arm-proxy/{*path} — CORS proxy for Azure Resource Manager API.
+ * Tombstone for the retired `/api/arm-proxy/*` route (issue #237 / #321).
  *
- * Proxy for AzureARMConnector — proxies all ARM management.azure.com requests.
- * SSRF protected by allowlist.
- *
- * Forwards requests to management.azure.com, passing the caller's
- * Authorization header and all query parameters. Adds a default api-version
- * if the caller omits one.
+ * Browser-direct ARM (Option A2) replaces this proxy: the SPA obtains its
+ * AAD token from `/api/azure/token` and calls `https://management.azure.com`
+ * directly through `armFetch`. This handler stays registered to return an
+ * explicit `410 Gone` so any straggling caller gets a clear migration signal
+ * — same pattern used by `github-proxy.ts` and `github-oauth.ts`.
  */
-
 import { app } from "@azure/functions";
-import type { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { requireAzureAccessToken } from "../lib/azure-auth.js";
-import { AzureApiError, azureErrorResponse } from "../lib/azure-errors.js";
-import { isAllowedHost, blockedHostResponse } from "../lib/proxy-allowlist.js";
+import type { HttpRequest, HttpResponseInit } from "@azure/functions";
 
-const ARM_BASE = "https://management.azure.com";
-const DEFAULT_API_VERSION = "2024-03-01";
+const GONE_RESPONSE: HttpResponseInit = {
+  status: 410,
+  jsonBody: {
+    error:
+      "The /api/arm-proxy route has been retired. Browser ARM calls now go directly to https://management.azure.com using a token from GET /api/azure/token (see armFetch).",
+  },
+  headers: {
+    "Cache-Control": "no-store",
+  },
+};
 
-const RATE_LIMIT_HEADERS = [
-  "x-ratelimit-limit",
-  "x-ratelimit-remaining",
-  "x-ratelimit-reset",
-  "retry-after",
-  "x-ms-ratelimit-remaining-subscription-reads",
-  "x-ms-ratelimit-remaining-subscription-writes",
-  "x-ms-request-id",
-  "x-ms-correlation-request-id",
-];
-
-app.http("arm-proxy", {
+app.http("arm-proxy-legacy", {
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
   authLevel: "anonymous",
   route: "arm-proxy/{*path}",
-  handler: async (
-    request: HttpRequest,
-    context: InvocationContext,
-  ): Promise<HttpResponseInit> => {
-    const upstreamPath = request.params["path"] ?? "";
-
-    // Build upstream URL, preserving all query parameters
-    const upstreamUrl = new URL(`${ARM_BASE}/${upstreamPath}`);
-
-    // Host allowlist validation
-    if (!isAllowedHost(upstreamUrl, "arm-proxy")) {
-      context.warn(`[arm-proxy] blocked host: ${upstreamUrl.hostname}`);
-      return blockedHostResponse(upstreamUrl.hostname);
-    }
-    request.query.forEach((value, key) => {
-      upstreamUrl.searchParams.set(key, value);
-    });
-
-    // Inject default api-version if caller omitted it
-    if (!upstreamUrl.searchParams.has("api-version")) {
-      upstreamUrl.searchParams.set("api-version", DEFAULT_API_VERSION);
-    }
-
-    try {
-      const accessToken = requireAzureAccessToken(request);
-
-      const upstreamHeaders: Record<string, string> = {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": request.headers.get("content-type") ?? "application/json",
-        Accept: request.headers.get("accept") ?? "application/json",
-      };
-
-      let body: BodyInit | undefined;
-      if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
-        body = await request.arrayBuffer();
-      }
-
-      context.log(`[arm-proxy] ${request.method} ${upstreamUrl.toString()}`);
-
-      let upstream: Response;
-      try {
-        upstream = await fetch(upstreamUrl.toString(), {
-          method: request.method,
-          headers: upstreamHeaders,
-          body,
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        throw new AzureApiError(502, "arm_upstream_unreachable", `Upstream unreachable: ${message}`);
-      }
-
-      const responseHeaders: Record<string, string> = {
-        "Content-Type": upstream.headers.get("content-type") ?? "application/json",
-      };
-      for (const header of RATE_LIMIT_HEADERS) {
-        const value = upstream.headers.get(header);
-        if (value) responseHeaders[header] = value;
-      }
-
-      const responseBody = await upstream.arrayBuffer();
-      return {
-        status: upstream.status,
-        headers: responseHeaders,
-        body: responseBody,
-      };
-    } catch (error) {
-      return azureErrorResponse(error, context, "[arm-proxy]");
-    }
-  },
+  handler: async (_request: HttpRequest): Promise<HttpResponseInit> => GONE_RESPONSE,
 });

@@ -15,6 +15,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@aks-kickstart/harness": ["../harness/src/index.ts"],
+      "@aks-kickstart/pack-core/client": ["../pack-core/src/client.ts"],
       "@aks-kickstart/pack-azure/client": ["../pack-azure/src/client.ts"],
       "@aks-kickstart/pack-aks-automatic/client": ["../pack-aks-automatic/src/client.ts"],
       "@aks-kickstart/pack-github/client": ["../pack-github/src/client.ts"]

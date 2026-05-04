@@ -1,5 +1,7 @@
 /**
  * Scaffold a review gate: generates reusable + caller workflow YAML files.
+ * The caller workflow ("Squad Review Gate") triggers on PR events and delegates
+ * to the reusable workflow which contains the gate logic.
  */
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -32,8 +34,10 @@ export function generateReusableWorkflow(roles, config = {}, repoRoot = '.') {
 
   const botLoginJson = JSON.stringify(botLoginMap);
   const gateRulesJson = JSON.stringify(gateRulesMap);
+  const fallbackApproverLogin = botLoginMap['lead'] || botLoginMap['architecture'] || 'squad-lead[bot]';
+  const fallbackApproverJson = JSON.stringify(fallbackApproverLogin);
 
-  return `name: Squad Review Gate (Reusable)
+  return `name: Squad Review Gate
 
 on:
   workflow_call:
@@ -47,15 +51,27 @@ on:
         description: 'Pull request number to check'
         required: true
         type: number
+  pull_request_review:
+    types: [submitted, dismissed]
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [labeled, unlabeled, opened, synchronize, reopened]
+
+concurrency:
+  group: squad-review-gate-\${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
   pull-requests: write
   issues: write
+  statuses: write
 
 jobs:
   review-gate:
     name: Review Gate
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,31 +83,155 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const allRoles = '\${{ inputs.roles }}'.split(',').map(r => r.trim()).filter(Boolean);
-            const prNumber = \${{ inputs.pr_number }};
+            const allRoles = ('\${{ inputs.roles }}' || '${rolesDefault}').split(',').map(r => r.trim()).filter(Boolean);
+            const prNumber = \${{ inputs.pr_number || 0 }} || context.payload.pull_request?.number || context.payload.issue?.number;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
             // Config injected at scaffold time
             const botLoginMap = ${botLoginJson};
             const gateRules = ${gateRulesJson};
+            const fallbackApprover = ${fallbackApproverJson}; // accepts APPROVE when PR author == required bot
+
+            // Helper: post commit status for the required check name
+            async function postStatus(state, description) {
+              const { data: prData } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+              await github.rest.repos.createCommitStatus({
+                owner, repo,
+                sha: prData.head.sha,
+                state,
+                description: \`Squad review gate: \${description}\`.slice(0, 140),
+                context: 'squad/review-gate'
+              });
+            }
 
             core.info(\`Checking review gate for PR #\${prNumber}\`);
+
+            // Fast-lane: squad:chore-auto bypasses the entire gate
+            {
+              const { data: prData } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+              const labels = prData.labels.map(l => l.name.toLowerCase());
+              if (labels.includes('squad:chore-auto')) {
+                core.info('⏭️ squad:chore-auto label detected — bypassing review gate');
+                await postStatus('success', 'bypassed — squad:chore-auto');
+                // Enable auto-merge on bypass
+                try {
+                  if (!prData.auto_merge) {
+                    await github.graphql(\`mutation($prId: ID!) {
+                      enablePullRequestAutoMerge(input: { pullRequestId: $prId, mergeMethod: SQUASH }) {
+                        pullRequest { autoMergeRequest { enabledAt } }
+                      }
+                    }\`, { prId: prData.node_id });
+                    core.info(\`🔀 Auto-merge enabled for PR #\${prNumber}\`);
+                  }
+                } catch (e) {
+                  core.warning(\`Could not enable auto-merge: \${e.message}\`);
+                }
+                await core.summary.addRaw('## 🔒 Review Gate Summary\\n\\n⏭️ Bypassed — \`squad:chore-auto\` label present.\\n').write();
+                return;
+              }
+            }
 
             // Fetch PR details (labels + changed files)
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
             const prLabels = pr.labels.map(l => l.name.toLowerCase());
 
-            // Clear stale approval labels on synchronize (new commits invalidate approvals)
+            // Clear stale approval labels on synchronize — but only for real content
+            // changes, not pure base-branch catch-ups (Update branch / merge from base).
             if (context.eventName === 'pull_request' && context.payload.action === 'synchronize') {
-              core.info('New commits detected — clearing stale approval labels');
-              for (const role of allRoles) {
-                const label = \`\${role}:approved\`;
+              const before = context.payload.before;
+              const after = context.payload.after;
+              const baseSha = pr.base?.sha;
+              let isPureBaseSync = false;
+              let syncChangedPaths = [];
+
+              if (baseSha && before && after && before !== after) {
                 try {
-                  await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: label });
-                  core.info(\`Removed stale label: \${label}\`);
+                  const fileSig = f => \`\${f.status}:\${f.sha || ''}\`;
+                  const mapOf = cmp => new Map((cmp.data.files || []).map(f => [f.filename, fileSig(f)]));
+                  const changedBetween = (beforeCmp, afterCmp) => {
+                    const beforeMap = mapOf(beforeCmp);
+                    const afterMap = mapOf(afterCmp);
+                    const paths = new Set([...beforeMap.keys(), ...afterMap.keys()]);
+                    return [...paths].filter(p => beforeMap.get(p) !== afterMap.get(p)).sort();
+                  };
+                  const sigOf = cmp => JSON.stringify([...mapOf(cmp).entries()].sort((a, b) => a[0].localeCompare(b[0])));
+                  const [cmpBefore, cmpAfter] = await Promise.all([
+                    github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: \`\${baseSha}...\${before}\` }),
+                    github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: \`\${baseSha}...\${after}\` }),
+                  ]);
+                  syncChangedPaths = changedBetween(cmpBefore, cmpAfter);
+                  isPureBaseSync = syncChangedPaths.length === 0 && sigOf(cmpBefore) === sigOf(cmpAfter);
                 } catch (e) {
-                  // Label may not exist — that's fine
+                  core.warning(\`Could not determine base-sync status (\${e.message}) — defaulting to clear approvals for required domains\`);
+                  syncChangedPaths = ['*'];
+                }
+              }
+
+              if (isPureBaseSync) {
+                core.info('🔁 Synchronize is a pure base-branch update (PR content unchanged) — preserving approval labels');
+              } else {
+                const DOCS_LIKE_SYNC_RE = /(\\.mdx?$)|^docs\\/|^docs-site\\/|^\\.squad\\/|^\\.changeset\\//i;
+                const DEFAULT_SENSITIVE_SYNC_PATHS = ['.github/workflows/**', '**/auth/**', '**/security/**', '**/guardrail/**', '**/guardrails/**'];
+                const matchesSyncGlob = (path, pattern) => {
+                  if (path === '*') return true;
+                  const regex = new RegExp(
+                    '^' + pattern.replace(/\\*\\*/g, '@@GLOBSTAR@@')
+                      .replace(/\\*/g, '[^/]*')
+                      .replace(/@@GLOBSTAR@@/g, '.*')
+                      .replace(/\\?/g, '[^/]') + '$'
+                  );
+                  return regex.test(path);
+                };
+                const anySyncPathMatches = (paths, patterns) =>
+                  paths.some(p => patterns.some(pat => matchesSyncGlob(p, pat)));
+                const roleAffectedBySync = role => {
+                  const rule = gateRules[role];
+                  const unknownSyncScope = syncChangedPaths.includes('*');
+                  if (!rule || rule.required === 'always') return syncChangedPaths.length > 0;
+                  if (rule.required === 'optional') return false;
+
+                  const invalidationPaths = rule.invalidationPaths || [];
+                  if (invalidationPaths.length > 0 && anySyncPathMatches(syncChangedPaths, invalidationPaths)) return true;
+
+                  const requiredPaths = rule.requiredWhen?.paths || [];
+                  if (requiredPaths.length > 0) return anySyncPathMatches(syncChangedPaths, requiredPaths);
+
+                  const satisfiedByContent = rule.satisfiedByContent || [];
+                  if (satisfiedByContent.length > 0 && anySyncPathMatches(syncChangedPaths, satisfiedByContent)) return true;
+
+                  const bw = rule.bypassWhen || {};
+                  if (bw.docsOnly === true) {
+                    if (unknownSyncScope) return true;
+                    const affectedDocsOnly = syncChangedPaths.length > 0 && syncChangedPaths.every(p => DOCS_LIKE_SYNC_RE.test(p));
+                    const sensitivePaths = rule.sensitivePaths || DEFAULT_SENSITIVE_SYNC_PATHS;
+                    const affectedSensitive = anySyncPathMatches(syncChangedPaths, sensitivePaths);
+                    return !affectedDocsOnly || affectedSensitive || (bw.noArchitectureLabel === true && prLabels.includes('architecture'));
+                  }
+
+                  const bypassLabels = (rule.bypassLabels || []).concat(bw.labels || []);
+                  if (bypassLabels.some(label => label.toLowerCase().startsWith('docs:'))) {
+                    return unknownSyncScope || syncChangedPaths.some(p => DOCS_LIKE_SYNC_RE.test(p));
+                  }
+
+                  if ((rule.requiredWhen?.labels || []).length > 0) return false;
+                  return syncChangedPaths.length > 0;
+                };
+
+                const rolesToClear = allRoles.filter(roleAffectedBySync);
+                if (rolesToClear.length === 0) {
+                  core.info('New commits detected, but no reviewer domains were affected — preserving approval labels');
+                } else {
+                  core.info(\`New commits detected — clearing stale approval labels for affected domains: \${rolesToClear.join(', ')}\`);
+                }
+                for (const role of rolesToClear) {
+                  const label = \`\${role}:approved\`;
+                  try {
+                    await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: label });
+                    core.info(\`Removed stale label: \${label}\`);
+                  } catch (e) {
+                    // Label may not exist — that's fine
+                  }
                 }
               }
             }
@@ -119,8 +259,19 @@ jobs:
               return paths.some(p => patterns.some(pat => matchesGlob(p, pat)));
             }
 
+            function anyLabelMatches(labels, patterns) {
+              if (!patterns || patterns.length === 0) return false;
+              return labels.some(label => patterns.some(pat => label === pat.toLowerCase()));
+            }
+
             const requiredRoles = [];
             const skippedRoles = [];
+            const hardBlockers = [];
+
+            const DOCS_LIKE_RE = /(\\.mdx?$)|^docs\\/|^docs-site\\/|^\\.squad\\/|^\\.changeset\\//i;
+            const DEFAULT_SENSITIVE_PATHS = ['.github/workflows/**', '**/auth/**', '**/security/**', '**/guardrail/**', '**/guardrails/**'];
+            const isDocsOnlyPR = changedPaths.length > 0 && changedPaths.every(p => DOCS_LIKE_RE.test(p));
+            const hasArchitectureLabel = prLabels.includes('architecture');
 
             for (const role of allRoles) {
               const rule = gateRules[role];
@@ -137,7 +288,27 @@ jobs:
 
               // Conditional logic
               if (rule.required === 'conditional') {
-                // Check bypass labels (e.g., skip-docs, docs:not-applicable)
+                if (rule.hardBlockLabel && prLabels.includes(rule.hardBlockLabel.toLowerCase())) {
+                  hardBlockers.push({ role, label: rule.hardBlockLabel });
+                  requiredRoles.push(role);
+                  continue;
+                }
+
+                // docsOnly bypass: skip this role when the PR is docs-only,
+                // has no architecture label, and touches no sensitive paths.
+                const bw = rule.bypassWhen || {};
+                const sensitivePaths = rule.sensitivePaths || DEFAULT_SENSITIVE_PATHS;
+                const hasSensitivePath = anyPathMatches(changedPaths, sensitivePaths);
+                const docsOnlyWaives =
+                  bw.docsOnly === true && isDocsOnlyPR &&
+                  (bw.noArchitectureLabel !== true || !hasArchitectureLabel) &&
+                  (bw.noSensitivePaths !== true || !hasSensitivePath);
+                if (docsOnlyWaives) {
+                  skippedRoles.push({ role, reason: 'docs-only PR; no sensitive paths or architecture label' });
+                  continue;
+                }
+
+                // Check bypass labels (e.g., docs:not-applicable, docs:approved)
                 const bypassLabels = rule.bypassLabels || [];
                 if (bypassLabels.some(bl => prLabels.includes(bl.toLowerCase()))) {
                   skippedRoles.push({ role, reason: \`bypass label present\` });
@@ -145,20 +316,27 @@ jobs:
                 }
 
                 // Check bypassWhen.labels (e.g., squad:chore-auto)
-                const bypassWhenLabels = rule.bypassWhen?.labels || [];
+                const bypassWhenLabels = bw.labels || [];
                 const hasBypassLabel = bypassWhenLabels.some(bl => prLabels.includes(bl.toLowerCase()));
 
-                // Check requiredWhen.paths
+                // Check requiredWhen labels and paths
+                const requiredLabels = rule.requiredWhen?.labels || [];
+                const hasRequiredLabels = anyLabelMatches(prLabels, requiredLabels);
                 const requiredPaths = rule.requiredWhen?.paths || [];
                 const hasRequiredPaths = anyPathMatches(changedPaths, requiredPaths);
+
+                if (requiredLabels.length > 0 && hasRequiredLabels) {
+                  requiredRoles.push(role);
+                  continue;
+                }
 
                 if (hasBypassLabel && !hasRequiredPaths) {
                   skippedRoles.push({ role, reason: \`bypass label + no matching paths\` });
                   continue;
                 }
 
-                if (requiredPaths.length > 0 && !hasRequiredPaths) {
-                  skippedRoles.push({ role, reason: \`no files match requiredWhen paths\` });
+                if ((requiredPaths.length > 0 || requiredLabels.length > 0) && !hasRequiredPaths && !hasRequiredLabels) {
+                  skippedRoles.push({ role, reason: \`no files or labels match requiredWhen\` });
                   continue;
                 }
 
@@ -181,12 +359,30 @@ jobs:
             const approvedRoles = new Set();
             const missingRoles = [];
 
+            // GitHub App reviews appear in REST payloads with the \`[bot]\` suffix
+            // (e.g. \`squad-lead[bot]\`), but some surfaces (commit author, PR author
+            // attribution) drop the suffix (\`squad-lead\`). Normalize both sides so
+            // primary and fallback approver comparisons are not defeated by suffix
+            // drift. See issue #315.
+            function normalizeBotLogin(login) {
+              return (login || '').toLowerCase().replace(/\\[bot\\]$/, '');
+            }
+
             for (const role of requiredRoles) {
               const botLogin = botLoginMap[role] || null;
+              const normalizedBotLogin = normalizeBotLogin(botLogin);
+              const normalizedFallback = normalizeBotLogin(fallbackApprover);
+              const prAuthor = normalizeBotLogin(pr.user?.login);
+              const isSelfApprovalBlocked = botLogin && prAuthor === normalizedBotLogin;
 
               const roleReviews = allReviews.filter(r => {
-                const login = (r.user?.login || '').toLowerCase();
-                if (botLogin) return login === botLogin.toLowerCase();
+                const login = normalizeBotLogin(r.user?.login);
+                if (botLogin) {
+                  // Accept the primary bot OR fallback approver when self-approval is blocked
+                  if (login === normalizedBotLogin) return true;
+                  if (isSelfApprovalBlocked && normalizedFallback && login === normalizedFallback) return true;
+                  return false;
+                }
                 return (
                   login.includes(role.toLowerCase()) ||
                   login === \`\${role}-bot\` ||
@@ -254,12 +450,37 @@ jobs:
             await core.summary.addRaw(summary).write();
 
             // Gate decision
-            if (missingRoles.length > 0) {
+            if (hardBlockers.length > 0) {
+              const labels = hardBlockers.map(b => \`\${b.role} blocked by \${b.label}\`).join(', ');
+              await postStatus('failure', labels);
+              core.setFailed(\`Hard-blocking review label present: \${labels}\`);
+            } else if (missingRoles.length > 0) {
+              await postStatus('pending', \`waiting: \${missingRoles.join(', ')}\`);
               core.setFailed(\`Missing approvals from: \${missingRoles.join(', ')}\`);
             } else if (unresolvedCount > 0) {
+              await postStatus('pending', \`\${unresolvedCount} unresolved thread(s)\`);
               core.setFailed(\`\${unresolvedCount} unresolved review thread(s) must be addressed before merge\`);
             } else {
+              await postStatus('success', 'all roles approved, no unresolved threads');
               core.info('✅ Review gate passed — all roles approved, no unresolved threads');
+
+              // Enable auto-merge (squash) when gate passes
+              try {
+                const { data: prData } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+                if (!prData.auto_merge) {
+                  const prNodeId = prData.node_id;
+                  await github.graphql(\`mutation($prId: ID!) {
+                    enablePullRequestAutoMerge(input: { pullRequestId: $prId, mergeMethod: SQUASH }) {
+                      pullRequest { autoMergeRequest { enabledAt } }
+                    }
+                  }\`, { prId: prNodeId });
+                  core.info(\`🔀 Auto-merge enabled for PR #\${prNumber}\`);
+                } else {
+                  core.info(\`Auto-merge already enabled for PR #\${prNumber}\`);
+                }
+              } catch (e) {
+                core.warning(\`Could not enable auto-merge: \${e.message}\`);
+              }
             }
 `;
 }
@@ -270,7 +491,7 @@ jobs:
  * @returns {string}
  */
 export function generateCallerWorkflow(roles) {
-  return `name: Review Gate
+  return `name: Squad Review Gate
 
 on:
   pull_request_review:
@@ -278,10 +499,15 @@ on:
   issue_comment:
     types: [created]
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [labeled, unlabeled, opened, synchronize, reopened]
+
+concurrency:
+  group: squad-review-gate-\${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   gate:
+    name: Review Gate
     # Skip issue_comment events that aren't on PRs
     if: github.event_name != 'issue_comment' || github.event.issue.pull_request
     uses: ./.github/workflows/squad-review-gate.yml
@@ -346,7 +572,7 @@ export function scaffoldGate(repoRoot, { roles, dryRun = false } = {}) {
     callerWorkflow: callerPath,
     nextSteps: [
       'Commit the generated workflow files.',
-      'Set the Review Gate as a required status check in branch protection.',
+      'Set squad/review-gate as a required status check in branch protection.',
       'Ensure reviewer bots have write access to submit reviews.',
     ],
   };

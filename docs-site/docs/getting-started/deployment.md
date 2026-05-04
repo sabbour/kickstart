@@ -87,11 +87,11 @@ After upload, the workflow retries `GET /api/health` against the production cust
 - Push to `main` → production deployment
 - PR opened/synced → staging environment (auto-destroyed on PR close)
 
-**Build order is critical:** The API depends on `@kickstart/core`, so both must be built before the SWA action:
+**Build order is critical:** The API depends on `@aks-kickstart/harness`, so both must be built before the SWA action:
 
 ```bash
 npm ci
-npm run build -w @kickstart/core    # Build core first
+npm run build -w @aks-kickstart/harness    # Build core first
 npm run build -w @kickstart/api     # Then API (depends on core)
 ```
 

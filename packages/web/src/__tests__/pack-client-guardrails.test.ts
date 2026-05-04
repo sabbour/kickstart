@@ -21,6 +21,11 @@
  * `./client` subpath, which today is `src/client.ts` plus every renderer under
  * `src/components/`. Globs also cover `src/client/**` in case packs later
  * split the subpath into a directory.
+ *
+ * Exemption: pack-core/client is part of the shipped harness (not a third-party
+ * extension point) and may use dangerouslySetInnerHTML for sanitized content
+ * in CodeBlock, Markdown, and FileEditor. These components are harness-maintained
+ * and don't accept untrusted HTML (see decision record bender-component-contribution-migration).
  */
 
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
@@ -30,6 +35,8 @@ import { describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), '../../../../..');
 
+// Third-party pack clients must not use dangerous patterns.
+// pack-core is exempt as a shipped harness component.
 const PACKS = ['pack-azure', 'pack-aks-automatic', 'pack-github'] as const;
 
 const FORBIDDEN = ['dangerouslySetInnerHTML', 'eval(', 'new Function('] as const;
@@ -98,10 +105,11 @@ describe('pack client guardrails — forbidden primitives', () => {
 
       expect(
         hits,
-        `Pack client code must not use dangerouslySetInnerHTML, eval(, or new Function(. ` +
+        `Pack client code must not use dangerouslySetInnerHTML, eval(, or new Function(). ` +
           `These bypass the Zod + A2UI prop-validation rails and are non-negotiable.\n` +
           hits.map((h) => `  ${h.file}:${h.line} [${h.needle}] ${h.excerpt}`).join('\n'),
       ).toEqual([]);
     });
   }
 });
+

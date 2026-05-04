@@ -124,7 +124,7 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
           else if (i < clampedStep) pillClass = classes.pillCompleted;
 
           return (
-            <div key={i} className={classes.indicator} role="tab" aria-selected={i === clampedStep} aria-label={`Step ${i + 1}: ${step.title}`}>
+            <div key={i} className={classes.indicator} role="tab" aria-selected={i === clampedStep} aria-label={`Step ${i + 1}: ${String(step.title)}`}>
               <div className={`${classes.pill} ${pillClass}`} aria-hidden="true" />
               <Caption1
                 style={{
@@ -134,7 +134,7 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
                   fontWeight: i === clampedStep ? 600 : 400,
                 }}
               >
-                {step.title}
+                {String(step.title)}
               </Caption1>
             </div>
           );
@@ -142,7 +142,7 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
       </div>
 
       {/* Active step title */}
-      <Subtitle1>{activeStepData?.title}</Subtitle1>
+      <Subtitle1>{activeStepData ? String(activeStepData.title) : ''}</Subtitle1>
 
       {/* Active step content — key forces remount so CSS animation replays */}
       <div
@@ -150,7 +150,7 @@ export const SteppedCarousel = createReactComponent(SteppedCarouselApi, ({ props
         className={`${classes.body} ${direction === 'next' ? classes.bodyEnterNext : classes.bodyEnterPrev}`}
         role="tabpanel"
         aria-live="polite"
-        aria-label={`Step ${clampedStep + 1}: ${activeStepData?.title}`}
+        aria-label={`Step ${clampedStep + 1}: ${activeStepData ? String(activeStepData.title) : ''}`}
       >
         {activeStepData?.child ? buildChild(activeStepData.child) : null}
       </div>

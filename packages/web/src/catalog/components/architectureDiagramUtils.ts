@@ -50,6 +50,12 @@ const XLINK_NS = 'http://www.w3.org/1999/xlink';
  * comparing against the dangerous scheme. This catches obfuscated vectors
  * like `"  javascript:"`, `"java\tscript:"`, and `"%6Aavascript:..."`.
  */
+function hasDataScheme(raw: string): boolean {
+  if (!raw) return false;
+  const stripped = raw.replace(/[\s\u0000-\u001f]+/g, '').toLowerCase();
+  return stripped.startsWith('data:');
+}
+
 function hasJavaScriptScheme(raw: string): boolean {
   if (!raw) return false;
   const candidates = new Set<string>();
@@ -92,8 +98,12 @@ function isExternalUseReference(href: string): boolean {
  *      on `href`/`xlink:href` of `<a>`, `<image>`, and `<use>` elements.
  *   2. `<use>` elements whose `href` points at an external document
  *      (data:, http:, //host/…). Same-document `#fragment` refs are kept.
- *   3. `<foreignObject>` elements are removed wholesale — they embed
- *      arbitrary HTML which is an easy XSS escape hatch.
+ *   3. `<foreignObject>` elements are sanitized (not removed) — they embed
+ *      arbitrary HTML but are required by Mermaid for node label rendering.
+ *      Dangerous child elements (<script>, <iframe>, <object>, <embed>, <link>,
+ *      <meta>, <base>) are stripped; javascript:/data: URIs on href/xlink:href/src
+ *      and javascript: URIs on formaction are removed. Removing foreignObject
+ *      wholesale causes blank diagram labels (bug #405).
  *
  * The function parses the SVG with `DOMParser` (image/svg+xml) so traversal
  * happens on real DOM nodes — never on the raw string. On parse failure the
@@ -112,7 +122,39 @@ export function sanitizeSvgMarkup(svg: string): string {
   }
 
   doc.querySelectorAll('script').forEach((el) => el.remove());
-  doc.querySelectorAll('foreignObject').forEach((el) => el.remove());
+
+  // Sanitize foreignObject content instead of removing it wholesale.
+  // foreignObject is required by Mermaid (htmlLabels: true) for node label rendering.
+  // Removing it blanks all diagram labels (bug #405). Strip dangerous embedded elements
+  // and dangerous URI schemes on href/src/formaction while keeping the element itself.
+  doc.querySelectorAll('foreignObject').forEach((fo) => {
+    fo.querySelectorAll('script, iframe, object, embed, link, meta, base').forEach((dangerous) =>
+      dangerous.remove(),
+    );
+    fo.querySelectorAll('[src]').forEach((child) => {
+      const src = child.getAttribute('src');
+      if (src !== null && hasJavaScriptScheme(src)) {
+        child.removeAttribute('src');
+      }
+    });
+    fo.querySelectorAll('[href]').forEach((child) => {
+      const href = child.getAttribute('href');
+      if (href !== null && (hasJavaScriptScheme(href) || hasDataScheme(href))) {
+        child.removeAttribute('href');
+      }
+      const xlinkHref = child.getAttributeNS(XLINK_NS, 'href') ?? child.getAttribute('xlink:href');
+      if (xlinkHref !== null && (hasJavaScriptScheme(xlinkHref) || hasDataScheme(xlinkHref))) {
+        child.removeAttributeNS(XLINK_NS, 'href');
+        child.removeAttribute('xlink:href');
+      }
+    });
+    fo.querySelectorAll('[formaction]').forEach((child) => {
+      const formaction = child.getAttribute('formaction');
+      if (formaction !== null && hasJavaScriptScheme(formaction)) {
+        child.removeAttribute('formaction');
+      }
+    });
+  });
 
   doc.querySelectorAll('*').forEach((el) => {
     Array.from(el.attributes).forEach((attr) => {

@@ -1,5 +1,6 @@
 import { loadConfig } from './review-config.mjs';
 import {
+  fetchPrClosureStatus,
   replyToThread as githubReplyToThread,
   resolveThread as githubResolveThread,
 } from './github-api.mjs';
@@ -140,7 +141,34 @@ function createDefaultDeps() {
     replyToThread: ({ token, owner, repo, prNumber, commentId, body }) =>
       githubReplyToThread(token, owner, repo, prNumber, commentId, body),
     resolveThread: ({ token, threadId }) => githubResolveThread(token, threadId),
+    getClosureStatus: ({ token, owner, repo, prNumber }) =>
+      fetchPrClosureStatus(token, owner, repo, prNumber),
     sleep,
+  };
+}
+
+function isBotLogin(login) {
+  return typeof login === 'string' && login.toLowerCase().endsWith('[bot]');
+}
+
+function buildClosureRule(status) {
+  const remainingUnresolvedThreads = status?.unresolvedThreads ?? null;
+  const reviewDecision = status?.reviewDecision ?? null;
+  const allThreadsResolved = remainingUnresolvedThreads === 0;
+  const humanReviewersNeedingReReview = (status?.changeRequestReviewers ?? [])
+    .filter((login) => !isBotLogin(login));
+  const reviewDecisionStillChangesRequested = reviewDecision === 'CHANGES_REQUESTED';
+
+  return {
+    allThreadsResolved,
+    reviewDecision,
+    remainingUnresolvedThreads,
+    humanReviewersNeedingReReview,
+    humanReReviewRequired: allThreadsResolved && reviewDecisionStillChangesRequested,
+    roleGateApprovalRequired: allThreadsResolved,
+    instruction: allThreadsResolved
+      ? 'All threads are resolved. Check PR reviewDecision now. If it is still CHANGES_REQUESTED, ping the human reviewer for re-review or dismissal; separately submit any required Squad role-gate approval with squad_reviews_execute_pr_review.'
+      : 'Continue resolving remaining threads before checking reviewDecision or submitting role-gate approval.',
   };
 }
 
@@ -188,7 +216,12 @@ async function executeResolveFlow({
   assertPositiveInteger(prNumber, 'pr');
 
   if (commentId !== undefined) {
+    if (typeof commentId === 'string' && /^[A-Za-z]/.test(commentId)) {
+      throw new Error('commentId must be a numeric database ID, not a GraphQL node_id');
+    }
     assertPositiveInteger(commentId, 'commentId');
+  } else {
+    throw new Error('commentId is required (must be a numeric database ID)');
   }
 
   const formattedReply = formatReply(config.threadResolution.templates, {
@@ -217,10 +250,13 @@ async function executeResolveFlow({
     deps,
   );
 
+  const closureStatus = await deps.getClosureStatus({ token, owner, repo, prNumber });
+
   return {
     resolved: true,
     replyId: String(replyId),
     action,
+    closureRule: buildClosureRule(closureStatus),
   };
 }
 

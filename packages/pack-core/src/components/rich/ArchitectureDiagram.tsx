@@ -13,6 +13,7 @@ import {
   Subtitle2,
   tokens,
 } from '@fluentui/react-components';
+import { ArrowDownload16Regular } from '@fluentui/react-icons';
 import {
   FLUENT_DIAGRAM_PALETTE,
   loadMermaid,
@@ -201,6 +202,52 @@ const useStyles = makeStyles({
 
 let diagramCounter = 0;
 
+async function exportSvgToPng(container: HTMLDivElement, title: string): Promise<void> {
+  const svg = container.querySelector('svg');
+  if (!svg) {
+    return;
+  }
+
+  const { width, height } = measureSvg(svg as SVGSVGElement);
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('width', String(width));
+  clone.setAttribute('height', String(height));
+
+  const serialized = new XMLSerializer().serializeToString(clone);
+  const blob = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
+
+  try {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Failed to load SVG for PNG export'));
+      img.src = blobUrl;
+    });
+
+    const dpr = window.devicePixelRatio || 1;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(width * dpr);
+    canvas.height = Math.ceil(height * dpr);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return;
+    }
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const dataUrl = canvas.toDataURL('image/png');
+    const anchor = document.createElement('a');
+    anchor.download = `${(title || 'architecture').toLowerCase().replace(/\s+/g, '-')}.png`;
+    anchor.href = dataUrl;
+    anchor.click();
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+}
 
 function raiseClusterLabels(svg: SVGSVGElement): void {
   const overlay = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -260,6 +307,7 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
   const [isRendering, setIsRendering] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(VIEWPORT_MIN_HEIGHT);
   const [renderVersion, setRenderVersion] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const offsetAtDragStart = useRef({ x: 0, y: 0 });
@@ -400,9 +448,20 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
   const zoomIn = () => setScale((currentScale) => Math.min(MAX_SCALE, currentScale * 1.2));
   const resetView = () => fitAndCenter();
   const regenerateDiagram = () => setRenderVersion((currentVersion) => currentVersion + 1);
+  const handleExport = useCallback(async () => {
+    if (!containerRef.current) {
+      return;
+    }
+    setIsExporting(true);
+    try {
+      await exportSvgToPng(containerRef.current, headerTitle);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [headerTitle]);
 
   return (
-    <Card appearance="outline" className={classes.root}>
+    <Card appearance="outline" className={classes.root} data-testid="a2ui-ArchitectureDiagram">
       <div className={classes.header}>
         <div className={classes.titleGroup}>
           <div className={classes.titleRow}>
@@ -457,6 +516,20 @@ export const ArchitectureDiagram = createReactComponent(ArchitectureDiagramApi, 
             disabled={isRendering || !hasDiagram}
           >
             {isRendering ? 'Rendering' : 'Regenerate'}
+          </Button>
+          <Button
+            type="button"
+            size="small"
+            appearance="transparent"
+            className={mergeClasses(classes.controlButton, classes.actionButton)}
+            onClick={handleExport}
+            aria-label="Export as PNG"
+            title="Export as PNG"
+            disabled={isRendering || isExporting || !hasDiagram}
+            icon={<ArrowDownload16Regular />}
+            data-testid="architecture-diagram-export-btn"
+          >
+            {isExporting ? 'Exporting' : 'Export PNG'}
           </Button>
         </div>
       </div>

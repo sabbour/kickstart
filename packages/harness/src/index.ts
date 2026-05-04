@@ -491,6 +491,9 @@ export {
   collectStrictRequiredViolations,
   collectAdditionalPropertiesViolations,
   collectMissingTypes,
+  collectUnsupportedOneOf,
+  rewriteDiscriminatedOneOfToAnyOf,
+  openAIStrictCompatibleSchema,
   reportSchemaConformance,
   reportHasIssues,
   formatReport,
@@ -507,6 +510,9 @@ export type {
 export { Runner } from './runtime/runner.js';
 export type { RunConfig, HandoffCallback, HandoffContext, HandoffInputFilter } from './runtime/run-config.js';
 export { buildRunConfig, defaultHandoffInputFilter, defaultHandoffCallback } from './runtime/run-config.js';
+// Re-export ModelProvider so callers can implement sampling providers without
+// a direct dependency on @openai/agents-core.
+export type { ModelProvider } from '@openai/agents';
 export { asTool, AS_TOOL_MAX_TURNS_DEFAULT } from './runtime/as-tool.js';
 export type { AsToolOptions } from './runtime/as-tool.js';
 export { Session, sessionStore, getOrCreateSession, getOrCreateSessionResult, generateAnonSessionToken, validateAnonSessionToken, isAnonymousSession, ANON_SESSION_TTL_MS, AnonTokenGenerationError } from './runtime/session.js';

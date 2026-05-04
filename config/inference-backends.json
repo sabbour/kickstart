@@ -1,6 +1,6 @@
 {
   "$schema": "./schemas/inference-backends.schema.json",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "appliesTo": "agentic_app",
   "selectionEvent": "select_inference",
   "uiSurface": {
@@ -13,7 +13,7 @@
     {
       "id": "foundry",
       "label": "Microsoft Foundry",
-      "description": "Managed model endpoints — no GPU nodes needed. Best for standard LLM workloads.",
+      "description": "Managed model endpoints \u2014 no GPU nodes needed. Best for standard LLM workloads.",
       "recommended": true,
       "deploymentShape": "managed_endpoint",
       "requiresGpuNodes": false,
@@ -47,7 +47,8 @@
           "presenting a stale fixed list of model families",
           "asking the user to restate use case or data sources they already provided"
         ]
-      }
+      },
+      "provenance": "extracted"
     },
     {
       "id": "kaito",
@@ -86,7 +87,8 @@
       },
       "constraints": {
         "gpuCapacity": "Treat GPU sizes as user constraints until live regional capacity APIs are available."
-      }
+      },
+      "provenance": "extracted"
     },
     {
       "id": "generic_endpoint",
@@ -107,7 +109,9 @@
           {
             "key": "auth_secret_name",
             "askOnlyIf": "not inferable",
-            "forbidden": ["asking the user to paste secret values"]
+            "forbidden": [
+              "asking the user to paste secret values"
+            ]
           },
           {
             "key": "database_or_cache",
@@ -118,7 +122,8 @@
           "rejecting an endpoint because it is not Microsoft Foundry or KAITO",
           "asking the user to paste secret values"
         ]
-      }
+      },
+      "provenance": "extracted"
     }
   ]
 }
