@@ -18,7 +18,7 @@ export function A2UISurfaceWrapper({ surface, isActive = true }: A2UISurfaceWrap
       style={{
         borderRadius: 'var(--radius-large, 8px)',
         overflow: 'hidden',
-        ...(isActive ? {} : { opacity: 0.5 }),
+        ...(isActive ? {} : { opacity: 0.5, pointerEvents: 'none' }),
       }}
     >
       <A2uiSurface surface={surface} />

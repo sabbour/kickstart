@@ -46,6 +46,72 @@ afterEach(() => {
 });
 
 describe('A2UIEnvelopePreview', () => {
+  it('applies pointer-events:none and opacity when isActive is false', async () => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root!.render(
+        <DebugProvider>
+          <A2UIEnvelopePreview
+            surfaceId="preview-inactive"
+            components={[
+              { id: 'root', component: 'Column' },
+            ]}
+            isActive={false}
+          />
+        </DebugProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const surface = container!.querySelector('[data-testid="a2ui-surface"]') as HTMLElement | null;
+    expect(surface).not.toBeNull();
+    expect(surface!.style.opacity).toBe('0.5');
+    expect(surface!.style.pointerEvents).toBe('none');
+  });
+
+  it('does not set pointer-events when isActive is true', async () => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root!.render(
+        <DebugProvider>
+          <A2UIEnvelopePreview
+            surfaceId="preview-active"
+            components={[
+              { id: 'root', component: 'Column' },
+            ]}
+            isActive={true}
+          />
+        </DebugProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const surface = container!.querySelector('[data-testid="a2ui-surface"]') as HTMLElement | null;
+    expect(surface).not.toBeNull();
+    expect(surface!.style.opacity).toBe('');
+    expect(surface!.style.pointerEvents).toBe('');
+  });
+
   it('renders the root component content in StrictMode instead of getting stuck on root fallback', async () => {
     localStorage.setItem('kickstart-debug', 'true');
 
