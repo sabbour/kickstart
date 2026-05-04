@@ -31,6 +31,7 @@ import { useDebug } from '../contexts/DebugContext';
 import { A2UISurfaceWrapper } from '../components/A2UI/A2UISurfaceWrapper';
 import { A2UIEnvelopePreview } from '../components/A2UI/A2UIEnvelopePreview';
 import { DebugPanel } from '../components/Chat/DebugPanel';
+import { DebugTraceExport } from '../components/Chat/DebugTraceExport';
 import type { ChatMessage, DebugMetadata } from '../types';
 import { PlaygroundWorkspace } from './PlaygroundWorkspace';
 import {
@@ -1579,6 +1580,11 @@ function PlaygroundInner() {
               <div className={classes.createTypingDots}>
                 <span /><span /><span />
               </div>
+            )}
+
+            {/* Debug trace export — shown only when debug mode is active */}
+            {debugEnabled && !createLoading && (
+              <DebugTraceExport messages={createMessages} sessionId={createSessionIdRef.current} />
             )}
 
             {/* Advanced JSON editor (collapsible, scrolls with messages) */}
