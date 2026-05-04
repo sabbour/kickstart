@@ -49,3 +49,4 @@ Full getting-started guide: [Using Kickstart as an MCP Server in VS Code](https:
 ## License
 
 MIT
+
