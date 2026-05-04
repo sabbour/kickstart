@@ -27,6 +27,10 @@ See [`docs-site/docs/architecture/v2-implementation-brief.md`](../../../../docs-
 - **Components** use slash + PascalCase: `core/Card`, `azure/CostSummary`, `aks/ProgressTree`
 
 The pack name is the prefix. Never ship an unprefixed tool, action, or component.
+This is enforced by CI: each pack has a `tool-namespace.test.ts` that asserts every
+registered tool name starts with the correct prefix. For packs that register both
+server-manifest tools and client-only pack tools (e.g., `pack-azure`), both lists are
+checked. Tests fail fast if the convention is violated.
 
 ## Agent authoring (`.agent.md`)
 
