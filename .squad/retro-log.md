@@ -98,6 +98,8 @@ Historical rows before each schema extension keep their older trailing columns.
 
 <!-- entries below this line, newest at top -->
 
+- 2026-05-04 | #1153 "ci: add publish-mcp workflow for npmjs publishing" | S | impl=0m | review=1m | cycles=1 | closed | @sabbour | first_review=n/a | ci=1m | reviewer=none | human_comments=1 | issue=none | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
+
 - 2026-04-24 | #1142 "fix: strip markdown from widget-inspiration LLM output" | M | impl=0m | review=1358m | cycles=1 | merged | @sabbour-squad-frontend[bot] | first_review=103m | ci=11m | reviewer=bot | human_comments=0 | issue=#1054 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
 
 - 2026-04-23 | #1105 "chore(ci): harden ci.yml — concurrency, npm cache, Playwright cache" | S | impl=4m | review=65m | cycles=1 | merged | @sabbour-squad-backend[bot] | first_review=55m | ci=7m | reviewer=bot | human_comments=0 | issue=#1101 | estimate=unknown | rejections_by_reviewer=nibbler:0,leela:0,zapp:0 | reverted=false
