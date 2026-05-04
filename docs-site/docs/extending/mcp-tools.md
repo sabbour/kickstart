@@ -49,12 +49,6 @@ The MCP adapter (`packages/mcp-server/src/adapter/`) provides:
 
 ---
 
-## VS Code client detection
-
-`isVsCodeClient()` (`packages/harness/src/mcp/server.ts`) sniffs the MCP `clientInfo` to decide when to emit VS-Code-specific framing. Other clients fall back to the generic envelope set.
-
----
-
 ## Startup wiring
 
 Pack registration happens in `packages/mcp-server/src/startup/packs.ts` — same fixed order as the API (`core, azure, aks, github`), filtered by `KICKSTART_PACKS`. The registry is sealed before the stdio loop begins so all schema and handoff validation has run.

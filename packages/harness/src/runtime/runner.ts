@@ -1328,6 +1328,10 @@ export class Runner {
             sseWrite('chunk', { delta });
           }
         }
+      } else if (outputText) {
+        // No streaming chunks were buffered (e.g. MCP sampling provider emits a single
+        // response_done instead of output_text_delta events) — emit the resolved text now.
+        sseWrite('chunk', { delta: stripHandoffComment(outputText) });
       }
 
       // ── Deterministic codesmith→reviewer chain (#119) ─────────────────────

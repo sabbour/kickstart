@@ -75,6 +75,10 @@ export function buildModelProvider(): OpenAIProvider {
  *  2. `fullText` fallback (passed from the caller's streaming accumulator)
  */
 export function resolveOutputText(finalOutput: unknown, fullText: string): string {
+  // Plain string output (e.g., outputType: 'text' with MCP sampling)
+  if (typeof finalOutput === 'string') {
+    return finalOutput || fullText;
+  }
   if (
     finalOutput !== null &&
     typeof finalOutput === 'object' &&

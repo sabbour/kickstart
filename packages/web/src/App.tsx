@@ -1331,6 +1331,7 @@ export function App() {
               debugEnabled={debugEnabled}
               usageSummary={usageSummary}
               hasStartedConversation={hasSubmittedFirstPrompt}
+              sessionId={sessions.activeSessionId ?? undefined}
             />
           )}
         </Layout>

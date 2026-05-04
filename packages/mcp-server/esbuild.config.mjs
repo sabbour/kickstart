@@ -142,7 +142,7 @@ const bundleAssetCopies = [
   ['../pack-aks-automatic/src/agents', 'dist/pack-assets/aks/agents'],
   ['../pack-aks-automatic/src/skills', 'dist/pack-assets/aks/skills'],
   ['../pack-github/agents', 'dist/pack-assets/github/agents'],
-  ['../pack-github/src/skills', 'dist/pack-assets/github/skills'],
+  ['../pack-github/skills', 'dist/pack-assets/github/skills'],
 ];
 
 const seenBundleTargets = new Map();

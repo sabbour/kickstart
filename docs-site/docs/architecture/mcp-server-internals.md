@@ -88,55 +88,15 @@ There is **no** runtime escape hatch to expose a tool over MCP without
 `mcpExposed: true`. Adding a new tool to MCP is therefore a code change
 to the pack that owns the tool, not an environment-variable change.
 
-## VS Code client detection — `isVsCodeClient`
-
-A2UI message shaping depends on whether the MCP client is VS Code (where
-embedded resources can be rendered as live UI) or any other client (where
-they cannot). Detection happens in `isVsCodeClient`, also in
-`packages/harness/src/mcp/server.ts`. The function inspects
-`clientInfo.name` from the MCP `initialize` handshake and returns true
-when the lower-cased name contains `vscode`, `visual studio code`, or
-`copilot`. The result is captured into a process-local `isVsCode` flag
-inside `server.server.oninitialized` (see `index.ts`).
-
-This is intentionally a coarse, name-based check. It is not a security
-boundary — A2UI payloads are bounded by `audience: ['user']` and never
-contain server credentials regardless of client type.
-
 ## A2UI shaping — `buildA2UIContent`
 
 When the Runner emits an `a2ui` SSE event, the adapter buffers the message
 into an in-memory list for the duration of the turn. After the Runner
-finishes, `buildA2UIContent(messages, isVsCode)` converts that list into
-MCP content items:
-
-- **VS Code clients** receive one embedded resource per message:
-
-  ```json
-  {
-    "type": "resource",
-    "resource": {
-      "uri": "a2ui://kickstart/turn/<index>",
-      "mimeType": "application/json+a2ui",
-      "text": "<serialised A2UI message>",
-      "audience": ["user"]
-    }
-  }
-  ```
-
-  The `audience: ["user"]` field tells the MCP client this content is for
-  the human, not the model. VS Code's MCP client renders the resource via
-  its A2UI integration; the LLM does not see the JSON payload.
-
-- **Other clients** receive a single text content item with one line per
-  message of the form `[A2UI <type>]`. The raw JSON is intentionally
-  *not* injected into the model context, because non-VS Code clients
-  typically display all content to the LLM, and unmoderated A2UI payloads
-  would pollute the prompt.
-
-Both branches are exercised in
-`packages/harness/src/__tests__` and in
-`packages/mcp-server/src/__tests__`.
+finishes, `buildA2UIContent` converts that list into MCP content items as
+a plain-text summary — one line per message of the form `[A2UI <type>]`.
+The raw JSON is intentionally not injected into the model context, because
+MCP clients typically pass all content to the LLM and unmoderated A2UI
+payloads would pollute the prompt.
 
 ## Interrupt model — `registerInterrupt` / `claimInterrupt`
 

@@ -156,6 +156,10 @@ describe('resolveOutputText', () => {
     expect(resolveOutputText({ message: null, intent: 'continue' }, 'plain text')).toBe('');
   });
 
+  it('returns the string directly when finalOutput is a plain string (text output mode)', () => {
+    expect(resolveOutputText('plain text response', '')).toBe('plain text response');
+  });
+
   it('does NOT return raw JSON string when finalOutput.message is the clean prose (regression guard for #937)', () => {
     const jsonTokenStream = '{"message":"Hello there","intent":"continue"}';
     const finalOutput = { message: 'Hello there', intent: 'continue' };
