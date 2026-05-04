@@ -203,6 +203,11 @@ When the latest message carries `[A2UI event] name=<event_name> payload=<json>`,
 - `pick_track` → see "Track selection" (Greenfield mode only)
 - `select_inference` → see "Inference selection" (Greenfield agentic_app)
 - `select_data_source` → confirmed data source; re-evaluate routing
+- `pick_compound_order` → compound order confirmed; begin requirements for the first thread immediately.
+  - `value: "start_agent"` → start AI app / agentic track
+  - `value: "start_api"` → start backend API / infrastructure track
+  - `value: "both"` → start AI app track first; resume backend API track after that handoff completes
+  Do NOT re-ask for a pick. Do NOT produce prose-only. Immediately call `core.show_form` with the first requirements question for that track (or hand off directly if enough context already exists).
 
 Accept prose alternatives. "I'll build an agent" is a valid selection; do not ask them to pick the same track again.
 

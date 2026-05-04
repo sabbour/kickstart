@@ -35,12 +35,10 @@ import { z } from 'zod';
 import {
   Runner,
   getOrCreateSession,
-  isVsCodeClient,
-  buildMcpManifest,
   buildA2UIContent,
   buildInterruptContent,
 } from '@aks-kickstart/harness';
-import type { McpContentItem, RunConfig } from '@aks-kickstart/harness';
+import type { McpContentItem } from '@aks-kickstart/harness';
 import { createReadSkillTool } from '@aks-kickstart/pack-core/tools/read_skill';
 
 import {
@@ -50,7 +48,6 @@ import {
 } from './adapter/interrupt-store.js';
 import { withSessionMutex } from './adapter/session-mutex.js';
 import { getRegistry } from './startup/packs.js';
-import { McpSamplingProvider } from './sampling/mcp-sampling-provider.js';
 
 // ── Load app HTML ──────────────────────────────────────────────────
 
@@ -73,21 +70,10 @@ const registry = getRegistry();
 
 const runner = new Runner(registry, { readSkillToolFactory: createReadSkillTool });
 
-// ── Pre-build the MCP manifest for sampling tool allowlist ─────────
-// Derive once at startup; stable for the lifetime of the process.
-const manifestTools = buildMcpManifest(registry);
-const samplingAllowedToolNames = manifestTools.map((d) => d.name);
-const samplingToolSchemas = Object.fromEntries(
-  manifestTools.map((d) => [d.name, d.parametersSchema as Record<string, unknown>]),
-);
-
 // ── Connection-level state ─────────────────────────────────────────
 // Assigned at initialize handshake; never client-supplied (Zapp condition 2).
 
 let connectionId: string | null = null;
-let isVsCode = false;
-/** True when the MCP client declared sampling capability at initialize. */
-let hostSupportsSampling = false;
 
 // ── Periodic cleanup ───────────────────────────────────────────────
 
@@ -103,10 +89,9 @@ export const server = new McpServer({
   version: '2.0.0',
 });
 
-// ── Initialize hook — assign connectionId, detect VS Code, detect sampling
+// ── Initialize hook — assign connectionId
 //
 // oninitialized fires after the MCP initialize handshake completes.
-// We read clientInfo from the underlying Server instance.
 // connectionId is ALWAYS server-assigned — the client has no say.
 
 server.server.oninitialized = () => {
@@ -114,44 +99,15 @@ server.server.oninitialized = () => {
 
   // Server assigns connectionId — never read from client params.
   connectionId = randomUUID();
-  isVsCode = isVsCodeClient(clientInfo as { name?: string; version?: string } | undefined);
-
-  // Detect whether the host declared sampling capability.
-  const caps = server.server.getClientCapabilities?.() as
-    | { sampling?: unknown }
-    | undefined;
-  hostSupportsSampling = !!(caps?.sampling);
 
   process.stderr.write(
-    `[kickstart-mcp] connection=${connectionId} vsCode=${isVsCode} ` +
-    `sampling=${hostSupportsSampling} client=${clientInfo?.name ?? 'unknown'}\n`,
+    `[kickstart-mcp] connection=${connectionId} client=${clientInfo?.name ?? 'unknown'}\n`,
   );
 };
-
-// ── Helpers ────────────────────────────────────────────────────────
-
-/**
- * Build a `RunConfig` for the current connection.
- *
- * When the host declared sampling capability, wires a `McpSamplingProvider`
- * that routes inference through `sampling/createMessage`.  Otherwise returns
- * an empty config so the runner falls back to its default model provider.
- */
-function buildConnectionRunConfig(): RunConfig {
-  if (!hostSupportsSampling) return {};
-
-  return {
-    samplingProvider: new McpSamplingProvider(server.server, {
-      allowedToolNames: samplingAllowedToolNames,
-      toolSchemas: samplingToolSchemas,
-    }),
-  };
-}
 
 // ── Tool: converse ─────────────────────────────────────────────────
 //
 // Primary entry point. Routes user messages through the Runner.
-// Returns buffered text + A2UI resources (VS Code) or plain-text (others).
 // Returns structured interrupt block when the Runner hits a UserAction.
 // UserAction interrupt blocks are structured JSON — never listed as tools.
 
@@ -179,12 +135,17 @@ server.tool(
         resultSchema: Record<string, unknown>;
       } | null = null;
 
+      let runnerError: string | null = null;
+
       const sseWrite = (event: string, data: unknown): void => {
         if (event === 'chunk') {
           const d = data as { delta?: string };
           if (d.delta) textChunks.push(d.delta);
         } else if (event === 'a2ui') {
           a2uiMessages.push(data as Record<string, unknown>);
+        } else if (event === 'error') {
+          const d = data as { message?: string; code?: string };
+          runnerError = d.message ?? d.code ?? 'Unknown error';
         } else if (event === 'user_action_req') {
           const d = data as {
             actionId?: string;
@@ -223,7 +184,7 @@ server.tool(
         }
       };
 
-      await runner.run(session, message, sseWrite, undefined, buildConnectionRunConfig());
+      await runner.run(session, message, sseWrite, undefined, {});
 
       const content: McpContentItem[] = [];
 
@@ -231,7 +192,7 @@ server.tool(
       if (fullText) content.push({ type: 'text', text: fullText });
 
       // A2UI: embedded resources for VS Code, plain-text summary for others
-      content.push(...buildA2UIContent(a2uiMessages, isVsCode));
+      content.push(...buildA2UIContent(a2uiMessages, false));
 
       // UserAction interrupt: always structured JSON, never human-readable text
       if (pendingInterrupt !== null) {
@@ -252,7 +213,9 @@ server.tool(
         );
       }
 
-      if (content.length === 0) content.push({ type: 'text', text: '(no output)' });
+      if (content.length === 0) {
+        content.push({ type: 'text', text: runnerError ? `Error: ${runnerError}` : '(no output)' });
+      }
 
       return { content };
     });
@@ -314,6 +277,7 @@ server.tool(
 
       const textChunks: string[] = [];
       const a2uiMessages: Record<string, unknown>[] = [];
+      let runnerError: string | null = null;
 
       const sseWrite = (event: string, data: unknown): void => {
         if (event === 'chunk') {
@@ -321,16 +285,19 @@ server.tool(
           if (d.delta) textChunks.push(d.delta);
         } else if (event === 'a2ui') {
           a2uiMessages.push(data as Record<string, unknown>);
+        } else if (event === 'error') {
+          const d = data as { message?: string; code?: string };
+          runnerError = d.message ?? d.code ?? 'Unknown error';
         }
       };
 
-      await runner.resume(session, result, sseWrite, undefined, buildConnectionRunConfig());
+      await runner.resume(session, result, sseWrite, undefined, {});
 
       const content: McpContentItem[] = [];
       const fullText = textChunks.join('');
       if (fullText) content.push({ type: 'text', text: fullText });
-      content.push(...buildA2UIContent(a2uiMessages, isVsCode));
-      if (content.length === 0) content.push({ type: 'text', text: '(no output)' });
+      content.push(...buildA2UIContent(a2uiMessages, false));
+      if (content.length === 0) content.push({ type: 'text', text: runnerError ? `Error: ${runnerError}` : '(no output)' });
 
       return { content };
     });
@@ -366,12 +333,12 @@ for (const descriptor of manifestTools) {
         };
 
         const toolMessage = `[tool:${descriptor.name}] ${JSON.stringify(params)}`;
-        await runner.run(session, toolMessage, sseWrite, undefined, buildConnectionRunConfig());
+        await runner.run(session, toolMessage, sseWrite, undefined, {});
 
         const content: McpContentItem[] = [];
         const fullText = textChunks.join('');
         if (fullText) content.push({ type: 'text', text: fullText });
-        content.push(...buildA2UIContent(a2uiMessages, isVsCode));
+        content.push(...buildA2UIContent(a2uiMessages, false));
         if (content.length === 0) content.push({ type: 'text', text: '(no output)' });
 
         return { content };
@@ -411,4 +378,4 @@ main().catch((error: unknown) => {
 });
 
 // Expose for testing
-export { connectionId, isVsCode, hostSupportsSampling, registry, runner };
+export { connectionId, registry, runner };

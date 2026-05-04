@@ -69,7 +69,7 @@ The frontend application and API layer. React 19 + Vite 6 SPA with Azure Functio
 
 ### `packages/mcp-server`
 
-MCP adapter wrapping the Runner. Exposes Kickstart turns to MCP-compatible clients (VS Code Copilot, Claude Code). A2UI surfaces emitted as MCP embedded resources with `mimeType: "application/json+a2ui"`.
+MCP adapter wrapping the Runner. Exposes Kickstart turns to MCP-compatible clients (Claude Code, Cursor, and other stdio-based MCP hosts).
 
 ### `docs-site`
 

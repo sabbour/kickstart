@@ -756,8 +756,6 @@ export class Runner {
       isHalted: () => boolean;
       setHalted: () => void;
       handoffInputFilter?: import('./run-config.js').HandoffInputFilter;
-      /** When set, skips resolveModelName — used when a samplingProvider handles model selection. */
-      modelNameOverride?: string;
     },
     /** Agents currently being constructed in the call stack — guards against circular recursion. */
     inProgress = new Set<string>(),
@@ -846,7 +844,7 @@ export class Runner {
       : '';
 
     const instructions = agentContrib.instructionsBase + skillsBlock + catalogBlock;
-    const modelName = ctx.modelNameOverride ?? resolveModelName(agentContrib.model);
+    const modelName = resolveModelName(agentContrib.model);
 
     // Construct SDK-native input/output guardrails for parallel execution (#116).
     // Each contribution is wrapped as an SDK InputGuardrail / OutputGuardrail so
@@ -1050,12 +1048,9 @@ export class Runner {
       setHalted,
       // #104: thread handoff input filter into every handoff() call in the agent tree.
       handoffInputFilter: resolvedRunConfig.handoffInputFilter,
-      // When a samplingProvider is active, model resolution is handled by the host —
-      // skip resolveModelName so missing Azure env vars don't crash MCP-sampling callers.
-      modelNameOverride: runConfig?.samplingProvider ? 'mcp-host' : undefined,
     };
     const agent = this.buildAgentInstance(agentName, agentBuildCache, buildCtx);
-    const modelName = runConfig?.samplingProvider ? 'mcp-host' : resolveModelName(agentContrib.model);
+    const modelName = resolveModelName(agentContrib.model);
 
     let fullText = '';
     // Buffer all text chunks — output guardrails must pass before any chunk is sent to the client.

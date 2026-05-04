@@ -693,8 +693,8 @@ function collectMarkdownFiles(baseDir: string, expectedSuffix: string): string[]
   return entries.sort((left, right) => left.localeCompare(right));
 }
 
-function directoryURLToPath(url: URL, opts?: { allowMissing?: false }): string;
 function directoryURLToPath(url: URL, opts: { allowMissing: true }): string | null;
+function directoryURLToPath(url: URL, opts?: { allowMissing?: false }): string;
 function directoryURLToPath(url: URL, opts?: { allowMissing?: boolean }): string | null {
   if (url.protocol !== 'file:') {
     throw new Error(`Only file URLs are supported for loader paths: ${url.toString()}`);
