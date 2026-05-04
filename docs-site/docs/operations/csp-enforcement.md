@@ -7,7 +7,7 @@ sidebar_position: 4
 
 ## Canonical Enforcement Location
 
-CSP is enforced at **runtime** by **Azure Static Web Apps** via the `globalHeaders` section of [`packages/web/public/staticwebapp.config.json`](../../../../packages/web/public/staticwebapp.config.json).
+CSP is enforced at **runtime** by **Azure Static Web Apps** via the `globalHeaders` section of `packages/web/public/staticwebapp.config.json`.
 
 This is the single source of truth for the deployed CSP header. Every change to the CSP policy must be made in that file.
 
@@ -24,7 +24,7 @@ This is the single source of truth for the deployed CSP header. Every change to 
 
 A compile-time companion guard runs on every PR that touches CSP-owning files:
 
-- **Script:** [`packages/web/scripts/check-csp.mjs`](../../../../packages/web/scripts/check-csp.mjs)
+- **Script:** `packages/web/scripts/check-csp.mjs`
 - **Workflow:** `.github/workflows/csp-check.yml`
 
 The guard reads `staticwebapp.config.json`, extracts the `Content-Security-Policy` value, and validates that required directives (e.g. `connect-src https://management.azure.com`) are present. It exits non-zero on any violation, blocking the PR.
@@ -77,5 +77,5 @@ The current guard only scans `globalHeaders` in `staticwebapp.config.json`. If t
 - Parent tracking issue: #324
 - Runtime smoke check: #347
 - Scope guard extension: #348
-- CSP guard script: [`packages/web/scripts/check-csp.mjs`](../../../../packages/web/scripts/check-csp.mjs)
-- Static Web App config: [`packages/web/public/staticwebapp.config.json`](../../../../packages/web/public/staticwebapp.config.json)
+- CSP guard script: `packages/web/scripts/check-csp.mjs`
+- Static Web App config: `packages/web/public/staticwebapp.config.json`

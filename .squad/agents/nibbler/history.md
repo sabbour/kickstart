@@ -42,3 +42,13 @@
 - Re-checked Bender's follow-up commit against `origin/dev`: `.squad/history.md` and `.squad/orchestration-log.md` now match dev exactly, so the prior data-loss blocker is resolved rather than papered over.
 - Verified the runtime artifact fix end-to-end: `.squad/attestation/log-20260502.jsonl` is no longer in the PR diff, and `.gitignore` now excludes `.squad/attestation/`.
 - Re-ran the new targeted Vitest coverage for squad-workflows (`upgrade`, `merge-check`, `init`): 33 tests passed. The new assertions exercise real behavior, including preserved upgrade error detail and docs/sensitive-path classification helpers.
+
+### PR #453 review (2026-05-04T03:21:06-07:00)
+
+- **🔴 CHANGES_REQUESTED** — docs-only restructure PR introduced 54 broken internal links.
+- Root cause: Wave 3 description claimed it merged `extending/*` and `guides/*` into a `pack-authoring/` section, but that directory was never created. Wave 4 then updated links across 24 files to point at `../pack-authoring/*` and `../agent-authoring/*` sub-pages that don't exist.
+- The new `agent-authoring/index.md` is self-referentially broken: all 5 link targets it lists (`conversation-phases`, `agent-as-tool`, `runner-chain`, `resume-and-session-token`, `/docs/pack-authoring`) point at non-existent paths.
+- Two script files (`generate-skills-reference.mjs`, `generate-tools-reference.mjs`) had their link paths changed in a way that broke previously-working relative links by applying wrong relative depth.
+- `extending-a2ui.md` is referenced via `../architecture/extending-a2ui.md` in 6 files, but the file lives at `components/extending-a2ui.md`.
+- **Detection method**: automated link resolution check using `git ls-tree` to verify every relative link target in the branch — surfaced all 54 broken links systematically. Worth making this a reusable verification step for docs PRs.
+- PR content (prose edits, new changeset, non-link portions) was accurate and well-written; problem was purely in the link targets.

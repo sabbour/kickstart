@@ -16,7 +16,14 @@ Frontend engineer owning web surface and A2UI catalog components. Expertise in R
 
 ## Learnings
 
-### Issue #233 — ArchitectureDiagram PNG Export (2026-05-02)
+### Issue #440 — DebugTraceExport Review Fixes (2026-05-04)
+- `setTimeout` in a `useCallback` must always be tracked via `useRef` with a `useEffect` cleanup — never fire-and-forget; PR review caught this pattern immediately.
+- `navigator.clipboard` is unavailable in non-HTTPS or older browsers; always fall through to `document.execCommand('copy')` with a hidden `<textarea>` as fallback.
+- Changeset descriptions must match actual implementation — claiming "no custom styling" while using `makeStyles` is a factual error that reviewers will flag. Be precise: "uses `makeStyles` with Fluent UI tokens" is accurate and acceptable under charter rules.
+- `sessionId.slice(0, 8)` in filenames diverges from the exported `sessionId` field (which is full). Keep filename and data consistent — use full ID unless there's an explicit length convention documented elsewhere.
+- Review thread IDs from GitHub task descriptions may have different casing/suffix than the actual GraphQL IDs returned by the API — always query the real thread IDs via `reviewThreads` before resolving.
+
+
 - Browser-native SVG → Canvas → PNG is the right approach for SWA-hosted apps: no puppeteer, no server round-trip, zero new deps.
 - `XMLSerializer` + Blob URL + `<canvas>` drawImage works well for Mermaid-generated SVGs because all assets (icons) are already embedded as data URIs.
 - A2UI components do NOT receive `isActive` directly — isolation is only at the surface-wrapper level (opacity). For per-button disable logic, use functional state (`isRendering`, `hasDiagram`) instead.

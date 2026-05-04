@@ -85,7 +85,7 @@ export interface ComponentContribution {
 }
 ```
 
-See [Components → Extending A2UI](../components/extending-a2ui.md) for the full add-a-component walkthrough.
+See [Components → Extending A2UI](../architecture/extending-a2ui.md) for the full add-a-component walkthrough.
 
 ---
 

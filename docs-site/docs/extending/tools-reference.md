@@ -6,7 +6,7 @@ sidebar_position: 11
 
 > Auto-generated from each pack's `tools/*.ts` files. Do not edit by hand — run `npm --prefix docs-site run build` (or invoke `node docs-site/scripts/generate-tools-reference.mjs` directly).
 
-See [LLM tools](./llm-tools.md) for authoring guidance and [MCP tools](./mcp-tools.md) for exposure rules.
+See [LLM tools](../llm-tools.md) for authoring guidance and [MCP tools](../mcp-tools.md) for exposure rules.
 
 ## core
 

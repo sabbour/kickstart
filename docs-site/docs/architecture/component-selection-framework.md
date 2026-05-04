@@ -329,5 +329,5 @@ Card[Text(h2) + Text(body) + List + Row[Button × 2]]
 
 - [Custom Kickstart Catalog](../components/custom-catalog.md) — full list of available components.
 - [A2UI Integration](./a2ui-integration.md) — how the A2UI protocol connects to the component layer.
-- [Extending A2UI](../components/extending-a2ui.md) — building new component types.
+- [Extending A2UI](../architecture/extending-a2ui.md) — building new component types.
 - `config/recipes.json` — complete recipe database.

@@ -6,7 +6,7 @@ sidebar_position: 2
 
 This page is the end-to-end recipe for adding a new component to Kickstart's A2UI catalog: write the schema, register the renderer with the SPA, register the contribution with the harness, teach the LLM how to call it, and (optionally) wire a playground scenario.
 
-The protocol is **A2UI v0.9** — see [A2UI integration](../architecture/a2ui-integration.md) for the envelope shapes and ordering rules. The bundled catalog is documented in [Custom catalog](./custom-catalog.md).
+The protocol is **A2UI v0.9** — see [A2UI integration](./a2ui-integration.md) for the envelope shapes and ordering rules. The bundled catalog is documented in [Custom catalog](./custom-catalog.md).
 
 ---
 

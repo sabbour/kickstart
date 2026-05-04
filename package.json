@@ -12,7 +12,7 @@
     "worktrees": true
   },
   "scripts": {
-    "build": "npm run clean --workspaces --if-present && npm run build -w @aks-kickstart/harness && npm run build -w @aks-kickstart/pack-core -w @aks-kickstart/pack-azure -w @aks-kickstart/pack-aks-automatic -w @aks-kickstart/pack-github && npm run build -w @aks-kickstart/mcp-server && npm run build -w @aks-kickstart/web && npm run build -w @aks-kickstart/api",
+    "build": "npm run clean --workspaces --if-present && npm run build -w @aks-kickstart/harness && npm run build -w @aks-kickstart/pack-core -w @aks-kickstart/pack-azure -w @aks-kickstart/pack-aks-automatic -w @aks-kickstart/pack-github && npm run build -w @sabbour/kickstart-mcp && npm run build -w @aks-kickstart/web && npm run build -w @aks-kickstart/api",
     "test": "npx vitest run",
     "lint": "eslint packages/*/src/**/*.ts packages/*/src/**/*.tsx",
     "api:build": "npm run build -w @aks-kickstart/harness && npm run build -w @aks-kickstart/api",
