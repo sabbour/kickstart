@@ -1564,3 +1564,22 @@ Commit `ef13a697` (my own commit, Apr 24, "Fix secret-scan blockers") had saniti
 - **Worktree gotcha:** worktree was cloned without `node_modules` in per-package dirs (`packages/web/node_modules` missing). The vite config aliases `react` to `${__dirname}/node_modules/react` which then fails with "Could not load node_modules/react". Fix: `npm install` from the worktree root forces hoisting + per-workspace links. The shared root `node_modules` symlink alone isn't sufficient when configs use `__dirname`-relative resolution.
 
 **PR:** https://github.com/azure-management-and-platforms/kickstart/pull/339 (no changeset — test-only internal fix, estimate:S exemption).
+
+## 2026-05-03 — PR #419: Research rewrite — @openai/agents vs github/copilot-sdk
+
+**Status:** Addressed 4 unresolved review threads, committed and pushed fix.
+
+**What changed:** The research doc had 3 factual errors (pnpm vs npm, wrong MCP package name, missing sim-test) plus Ahmed's core objection that the comparison was against the wrong SDK (`@copilot-extensions/preview-sdk` instead of `github/copilot-sdk`). The doc had already been rewritten in a prior session to compare against `github/copilot-sdk` correctly, so the actual code change was surgical: fix the package table.
+
+**Learnings about `github/copilot-sdk`:**
+
+- **It is not a framework — it is a runtime embedding SDK.** `@github/copilot-sdk` exposes the same production engine that powers the GitHub Copilot CLI as a programmable library. You don't build an agent loop; you spawn the CLI subprocess and control it via JSON-RPC.
+- **Architecture:** `Your App → CopilotClient → JSON-RPC over stdio/TCP → @github/copilot CLI subprocess → Copilot agent runtime`. The CLI is bundled in the npm package (`@github/copilot@^1.0.40` dep in `nodejs/package.json`), so no separate install is needed.
+- **Multi-language:** TypeScript/Node.js, Python, Go, .NET, Java — all speaking the same JSON-RPC protocol to the CLI server.
+- **BYOK parity:** Supports Azure OpenAI, Anthropic, Ollama, OpenAI directly — no GitHub subscription needed in BYOK mode. This is directly relevant to the project's Azure OpenAI setup.
+- **Custom agents and tools:** `defineTool()` with Zod schema inference; named custom sub-agents with scoped tool sets; session-level MCP server injection.
+- **40+ streaming event types** via `session.on()` — but the vocabulary is fixed; you can't add project-specific events like `a2ui` or `user_action_req`.
+- **Session persistence and infinite context compaction** are built in — no need to implement a 128K token budget trimmer.
+- **`@github/copilot-sdk/extension`** is the separate entry point for building CLI Extension tools (injected into existing Copilot CLI sessions) — distinct from the full client SDK.
+- **Status:** Public preview (v0.3.0 on npm) — explicitly not stable. The repo source tree is at v0.1.8; latest published is v0.3.0.
+- **Key differentiator vs `@openai/agents`:** abstraction level. Copilot SDK is high-abstraction, low-maintenance; `@openai/agents` is low-abstraction, full control. The harness is built on that control (A2UI, structured output, SSE streaming, OTel, pack system) — replacing `@openai/agents` would mean discarding all of that.
