@@ -8,7 +8,56 @@ Common debugging recipes for the harness, packs, and the SPA. For the App Insigh
 
 ---
 
-## Live SSE inspection
+## Exporting a full conversation trace
+
+When debug mode is active, the playground surface shows a **DebugTraceExport** bar below the conversation. Activate it with **Ctrl+Shift+D**.
+
+Two actions are available:
+
+- **Download trace** — saves `trace-<sessionId>-<date>.json` to disk
+- **Copy trace** — copies the same JSON to the clipboard
+
+### Trace format
+
+```json
+{
+  "exportedAt": "2026-05-04T08:40:00.000Z",
+  "sessionId": "sess-abc",
+  "turns": [
+    {
+      "id": "...",
+      "role": "assistant",
+      "text": "...",
+      "model": "gpt-4o",
+      "debugInfo": {
+        "agentName": "core.triage",
+        "toolsExecuted": [
+          { "name": "core.emit_ui", "status": "ok" },
+          { "name": "core.show_card", "status": "ok" }
+        ]
+      }
+    }
+  ],
+  "actionLog": [
+    { "actionName": "choose_build", "category": "user-action" }
+  ]
+}
+```
+
+The trace captures every turn (user + assistant), the agent that handled each assistant turn, every tool called in that turn, and every user action taken. Feed it into `scoreSimRun` via the [Sim-Test Harness](../guides/sim-test-harness.md) or use it as a bug report attachment.
+
+### Enabling debug mode
+
+```bash
+# API side — allows debug routes
+KICKSTART_DEBUG_ALLOWED=true
+
+# Then in the browser: Ctrl+Shift+D
+```
+
+---
+
+
 
 Every conversation turn produces an SSE stream over `POST /api/converse`. Stream it directly with `curl` and the same JSON envelopes the browser sees:
 
