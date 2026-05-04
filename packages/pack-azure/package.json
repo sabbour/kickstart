@@ -31,12 +31,12 @@
   },
   "dependencies": {
     "@aks-kickstart/harness": "*",
-    "@openai/agents": "^0.8.4",
+    "@openai/agents": "^0.8.5",
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@fluentui/react-components": "*",
-    "@fluentui/react-icons": "*",
+    "@fluentui/react-components": "^9.73.8",
+    "@fluentui/react-icons": "^2.0.325",
     "typescript": "*",
     "vitest": "*"
   },
