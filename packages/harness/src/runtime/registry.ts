@@ -340,9 +340,11 @@ export class PackRegistry {
   private loadSkills(pack: Pack): Skill[] {
     const fileSkills: Skill[] = [];
     if (pack.skillsDir) {
-      const baseDir = directoryURLToPath(pack.skillsDir);
-      for (const entry of collectMarkdownFiles(baseDir, 'SKILL.md')) {
-        fileSkills.push(loadSkillFile(pack, entry));
+      const baseDir = directoryURLToPath(pack.skillsDir, { allowMissing: true });
+      if (baseDir) {
+        for (const entry of collectMarkdownFiles(baseDir, 'SKILL.md')) {
+          fileSkills.push(loadSkillFile(pack, entry));
+        }
       }
     }
 
@@ -691,7 +693,9 @@ function collectMarkdownFiles(baseDir: string, expectedSuffix: string): string[]
   return entries.sort((left, right) => left.localeCompare(right));
 }
 
-function directoryURLToPath(url: URL): string {
+function directoryURLToPath(url: URL, opts?: { allowMissing?: false }): string;
+function directoryURLToPath(url: URL, opts: { allowMissing: true }): string | null;
+function directoryURLToPath(url: URL, opts?: { allowMissing?: boolean }): string | null {
   if (url.protocol !== 'file:') {
     throw new Error(`Only file URLs are supported for loader paths: ${url.toString()}`);
   }
@@ -699,6 +703,7 @@ function directoryURLToPath(url: URL): string {
   const pathname = fileURLToPath(url);
   const stat = statSync(pathname, { throwIfNoEntry: false });
   if (!stat?.isDirectory()) {
+    if (opts?.allowMissing) return null;
     throw new Error(`Expected a directory URL for ${url.toString()}`);
   }
   return pathname;
