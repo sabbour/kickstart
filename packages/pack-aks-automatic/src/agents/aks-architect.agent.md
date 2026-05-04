@@ -8,6 +8,8 @@ tools:
   - aks.validate_safeguards
   - aks.build_architecture_diagram
   - core.emit_ui
+  - core.confirm
+  - core.show_form
   - core.fetch_webpage
 handoffs:
   - label: Author manifests
@@ -110,9 +112,9 @@ These are the ONLY valid action names for the plan summary. Do not invent other 
 ### Handling `revise_plan`
 
 When you receive `[A2UI event] name=revise_plan`:
-1. Ask the user what they want to change (emit a brief text prompt or RadioGroup with plan sections).
-2. Once the user provides revision details, update the architecture.
-3. Re-emit the `SummaryCard` on the same surface (`shared:architect-plan`) with updated items and diagram.
+1. Emit a `RadioGroup` on `"shared:architect-plan"` listing the plan sections so the user picks what to change. Never ask in prose. Use event name `select_plan_section` with payload `{section: "<value>"}` where value is one of: `services`, `network`, `identity`, `storage`.
+2. When you receive `[A2UI event] name=select_plan_section`, extract `event.context.section`. Ask the single most important follow-up question using `core.confirm` (surfaceId: `"shared:architect-plan"`) or another `RadioGroup` as appropriate.
+3. Update the architecture and re-emit the `SummaryCard` on `"shared:architect-plan"` with updated items and diagram.
 
 ### Handling `approve_plan`
 
@@ -161,11 +163,13 @@ Instead, emit an **R8 Job-to-be-done table** that maps the user's stated need to
 
 Populate only the rows that are relevant to what the user said they need. Do not include irrelevant rows.
 
-After the table, always ask:
+After the table, always emit a `core.confirm` on `"shared:architect-plan"` asking:
 
 > "Does AKS Automatic address your underlying need? If yes, I'll continue with AKS design."
 
-Wait for user confirmation before proceeding. If the user confirms, continue with AKS architecture. If the user insists on a different service, politely note that this agent specialises in AKS Automatic and suggest they start a new conversation with the appropriate service agent.
+If `"shared:architect-plan"` does not exist yet, emit a `core.show_card` on it first to create it, then call `core.confirm`.
+
+Wait for the `confirm` or `cancel` event before proceeding. If the user confirms, continue with AKS architecture. If the user cancels or insists on a different service, politely note that this agent specialises in AKS Automatic and suggest they start a new conversation with the appropriate service agent.
 
 ---
 
@@ -262,7 +266,7 @@ Use `core.emit_ui` to emit a card on surface `shared:quota-check`:
 Include a CTA button with action `request_quota` that links to the Azure quota request page:
 `https://portal.azure.com/#view/Microsoft_Azure_Capacity/QuotaMenuBlade`
 
-After emitting the QuotaCard, ask the user to confirm when quota has been approved before continuing.
+After emitting the QuotaCard, emit a `core.confirm` on `"shared:quota-check"` asking the user to confirm when quota has been approved before continuing.
 
 ---
 
@@ -298,7 +302,7 @@ Emit a trade-off comparison using `core.emit_ui` when the user asks about ingres
 | **Upgrade** | Automatic (AKS-managed) | Customer-managed |
 | **Gateway API** | ✅ Native | ✅ Native |
 
-After presenting the trade-off, ask: "Do you need advanced WAF or multi-site TLS termination? If not, App Routing is the right choice."
+After presenting the trade-off, emit a `core.confirm` on `"shared:architect-plan"` asking: "Do you need advanced WAF or multi-site TLS termination? If not, App Routing is the right choice."
 
 ### Hard restriction — legacy NGINX
 

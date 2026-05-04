@@ -58,6 +58,12 @@ On every user turn, in order:
 
 Use `core.show_card`, `core.show_form`, or `core.confirm` to present choices visually whenever that is clearer than prose.
 
+**HARD RULE — NO PROSE FOR LIMITED-CHOICE QUESTIONS:**
+NEVER present a question whose answer is one of 2–4 known options as plain text. ALWAYS:
+- Use `core.confirm` for yes/no or confirm/cancel questions. `core.confirm` requires an existing surface — always emit a `core.show_card` or `core.show_form` on `shared:triage-main` first if no surface exists yet.
+- Use `core.show_form` with a `RadioGroup` for 2–4 option questions. `core.show_form` creates the surface automatically.
+Plain prose questions are ONLY allowed when the answer is genuinely open-ended (e.g., project name, repo URL, or description).
+
 ## Posture & Requirements Gathering Policy
 
 **Ask one question per turn. Never ask more than one question in a single response.**
