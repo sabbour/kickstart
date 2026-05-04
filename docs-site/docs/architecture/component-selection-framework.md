@@ -265,7 +265,7 @@ Agents do not randomly pick components. The selection is guided by:
 3. Register the component in `packages/web/src/main.tsx` (add to the richComponents map or pack registration).
 4. Update the contract test in `packages/web/src/__tests__/a2ui-allow-list-registry.test.ts` to include the new component count.
 5. **If the component is intended for a new pattern**, add a recipe in `config/recipes.json` with intent, composition, and anti-patterns.
-6. Update the [Custom Catalog](../components/custom-catalog.md) documentation.
+6. Update the [Custom Catalog](../pack-authoring/custom-catalog.md) documentation.
 
 ---
 
@@ -327,7 +327,7 @@ Card[Text(h2) + Text(body) + List + Row[Button × 2]]
 
 ## Related
 
-- [Custom Kickstart Catalog](../components/custom-catalog.md) — full list of available components.
+- [Custom Kickstart Catalog](../pack-authoring/custom-catalog.md) — full list of available components.
 - [A2UI Integration](./a2ui-integration.md) — how the A2UI protocol connects to the component layer.
-- [Extending A2UI](../components/extending-a2ui.md) — building new component types.
+- [Extending A2UI](../architecture/extending-a2ui.md) — building new component types.
 - `config/recipes.json` — complete recipe database.

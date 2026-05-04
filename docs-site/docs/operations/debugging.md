@@ -77,7 +77,7 @@ If a UserAction stalls because the browser tab closed before resuming, the sessi
 node -e "import('./packages/harness/dist/runtime/session.js').then(m => console.log(m.sessionStore.list().map(s=>({id:s.sessionId,pending:!!s.pendingUserAction}))))"
 ```
 
-Then `POST /api/converse/resume` with a synthetic result that satisfies the action's `resultSchema` (see [Resume & session token](../extending/resume-and-session-token.md)). The compare-and-swap on `pendingUserAction` means a duplicate replay safely returns `404`.
+Then `POST /api/converse/resume` with a synthetic result that satisfies the action's `resultSchema` (see [Resume & session token](../agent-authoring/resume-and-session-token.md)). The compare-and-swap on `pendingUserAction` means a duplicate replay safely returns `404`.
 
 ---
 

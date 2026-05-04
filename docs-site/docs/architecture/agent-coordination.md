@@ -281,6 +281,6 @@ The handoff schema is enforced at CI time:
 
 ## Related
 
-- [Agent as Tool (`asTool`)](../extending/agent-as-tool.md) — API reference and detailed usage.
-- [Runner Chain](../extending/runner-chain.md) — for stateful multi-turn specialist interaction.
-- [Conversation Phases](../extending/conversation-phases.md) — lifecycle of a multi-agent conversation.
+- [Agent as Tool (`asTool`)](../agent-authoring/agent-as-tool.md) — API reference and detailed usage.
+- [Runner Chain](../agent-authoring/runner-chain.md) — for stateful multi-turn specialist interaction.
+- [Conversation Phases](../agent-authoring/conversation-phases.md) — lifecycle of a multi-agent conversation.

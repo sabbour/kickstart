@@ -122,7 +122,7 @@ For the per-turn data flow, see [Architecture overview](../architecture/overview
 > Critical 2: `resultPayload` validated against `UserAction.resultSchema` → 400.
 > Critical 3: Playground stub gate enforced in `runner.ts` (`KICKSTART_PLAYGROUND=true`).
 
-The handler also performs a **compare-and-swap** on `session.pendingUserAction` — clearing it before validation prevents a concurrent replay from re-firing the same action. See [Resume & session token](./resume-and-session-token.md) for the full flow.
+The handler also performs a **compare-and-swap** on `session.pendingUserAction` — clearing it before validation prevents a concurrent replay from re-firing the same action. See [Resume & session token](../agent-authoring/resume-and-session-token.md) for the full flow.
 
 ---
 

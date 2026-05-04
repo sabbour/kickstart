@@ -82,7 +82,7 @@ function generate() {
   lines.push('');
   lines.push('> Auto-generated from each pack\'s `SKILL.md` files. Do not edit by hand — run `npm --prefix docs-site run build` (or invoke `node docs-site/scripts/generate-skills-reference.mjs` directly).');
   lines.push('');
-  lines.push('See [Packs, skills & actions](../guides/packs-and-skills.md) for the resolution rules and [Prompt pipeline](../architecture/prompt-pipeline.md) for how skills are assembled into the per-turn system prompt.');
+  lines.push('See [Packs, skills & actions](../packs-and-skills.md) for the resolution rules and [Prompt pipeline](../../architecture/prompt-pipeline.md) for how skills are assembled into the per-turn system prompt.');
   lines.push('');
   for (const pack of PACKS) {
     const abs = resolve(REPO_ROOT, pack.dir);

@@ -6,7 +6,7 @@ sidebar_position: 1
 
 The core pack contributes 27 basic Fluent overrides + 13 rich domain-neutral components. Pack-contributed catalogs add domain components (Azure resource pickers, AKS readiness cards, etc.). Every component is a `ComponentContribution` registered with the harness `PackRegistry` and rendered by the SPA's A2UI v0.9 adapter.
 
-For the protocol, see [A2UI integration](../architecture/a2ui-integration.md). For the recipe to add new ones, see [Extending the A2UI component system](./extending-a2ui.md).
+For the protocol, see [A2UI integration](../architecture/a2ui-integration.md). For the recipe to add new ones, see [Extending the A2UI component system](../architecture/extending-a2ui.md).
 
 ---
 
@@ -79,7 +79,7 @@ export type ConversationPhaseComponent = {
 };
 ```
 
-Any pack can update it via `core.emit_ui` (or via the chat-A2UI helpers in `packages/harness/src/a2ui/chat-a2ui.ts`). See [Conversation phases](../extending/conversation-phases.md).
+Any pack can update it via `core.emit_ui` (or via the chat-A2UI helpers in `packages/harness/src/a2ui/chat-a2ui.ts`). See [Conversation phases](../agent-authoring/conversation-phases.md).
 
 ---
 
@@ -107,4 +107,4 @@ The recommended pattern is:
 3. **Bind to a UserAction** when the component must produce a typed result the agent reads.
 4. **Wrap in a typed tool** when you want strict-mode validation on the entire envelope before the runner's a2ui drain emits it.
 
-See [Extending the A2UI component system](./extending-a2ui.md) for the full step-by-step.
+See [Extending the A2UI component system](../architecture/extending-a2ui.md) for the full step-by-step.

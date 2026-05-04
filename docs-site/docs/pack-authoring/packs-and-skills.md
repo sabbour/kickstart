@@ -81,13 +81,13 @@ Resolution rules (`runtime/skill-resolver.ts`, `runtime/skill-matcher.ts`, `runt
 - `fitSkillsInBudget` is greedy with **skip-on-overshoot** semantics — a small high-priority skill ranked after a large one still gets included.
 - The per-turn skill-pull byte cap is configured via `KICKSTART_SKILL_READ_MAX_BYTES_PER_TURN` and enforced inside `core.read_skill`.
 
-Bundled core skills include `a2ui-media-discipline`, `a2ui-output-discipline`, `collaborator-voice`, `file-generation-batching`, `gen-gha-workflow`, `phase-acceleration`, `teach-then-ask`. The full inventory is the auto-generated [Skills reference](../extending/skills-reference.md).
+Bundled core skills include `a2ui-media-discipline`, `a2ui-output-discipline`, `collaborator-voice`, `file-generation-batching`, `gen-gha-workflow`, `phase-acceleration`, `teach-then-ask`. The full inventory is the auto-generated [Skills reference](./reference/skills.md).
 
 ---
 
 ## Tools
 
-`ToolContribution` (`packages/harness/src/types/tool.ts`) — full reference: [LLM tools](../extending/llm-tools.md).
+`ToolContribution` (`packages/harness/src/types/tool.ts`) — full reference: [LLM tools](./llm-tools.md).
 
 ```ts
 export interface ToolContribution {
@@ -100,13 +100,13 @@ export interface ToolContribution {
 
 Tools are *per-pack*, *per-agent-allowlist*. There is no global tool registry. Schema-strictness is enforced by `assertStrictlyConformant()` (see [Schema conformance](../architecture/schema-conformance.md)).
 
-The full inventory with MCP/session flags is the auto-generated [Tools reference](../extending/tools-reference.md).
+The full inventory with MCP/session flags is the auto-generated [Tools reference](./reference/tools.md).
 
 ---
 
 ## User actions
 
-`UserActionContribution` (`packages/harness/src/types/user-action.ts`) — full reference: [User actions](../extending/actions.md).
+`UserActionContribution` (`packages/harness/src/types/user-action.ts`) — full reference: [User actions](./actions.md).
 
 ```ts
 {
@@ -126,7 +126,7 @@ The runner pauses on `user_action_req`, the SPA / MCP client collects input, and
 
 ## Components
 
-`ComponentContribution` (`packages/harness/src/types/component.ts`) — full guide: [Custom catalog](../components/custom-catalog.md) and [Extending the A2UI component system](../components/extending-a2ui.md).
+`ComponentContribution` (`packages/harness/src/types/component.ts`) — full guide: [Custom catalog](./custom-catalog.md) and [Extending the A2UI component system](../architecture/extending-a2ui.md).
 
 ```ts
 {
@@ -141,7 +141,7 @@ The runner pauses on `user_action_req`, the SPA / MCP client collects input, and
 
 ## Guardrails
 
-`GuardrailContribution` (`packages/harness/src/types/guardrail.ts`) — full reference: [Guardrails](../extending/guardrails.md).
+`GuardrailContribution` (`packages/harness/src/types/guardrail.ts`) — full reference: [Guardrails](./guardrails.md).
 
 ```ts
 {
@@ -158,7 +158,7 @@ Engine invariants: fail-closed on throw, opaque SSE codes, `core/` always wins, 
 
 ## Playground scenarios
 
-Pack-contributed via `pack.playgroundScenarios[]` and `pack.playgroundStubs`. Surfaced to the SPA through `/api/packs` (`PlaygroundScenarioDTO`). Stubs only resolve when `KICKSTART_PLAYGROUND=true`. See [Playground scenarios](../extending/playground-scenarios.md).
+Pack-contributed via `pack.playgroundScenarios[]` and `pack.playgroundStubs`. Surfaced to the SPA through `/api/packs` (`PlaygroundScenarioDTO`). Stubs only resolve when `KICKSTART_PLAYGROUND=true`. See [Playground scenarios](./playground-scenarios.md).
 
 ---
 

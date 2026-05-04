@@ -6,7 +6,7 @@ sidebar_position: 12
 
 > Auto-generated from each pack's `SKILL.md` files. Do not edit by hand — run `npm --prefix docs-site run build` (or invoke `node docs-site/scripts/generate-skills-reference.mjs` directly).
 
-See [Packs, skills & actions](../guides/packs-and-skills.md) for the resolution rules and [Prompt pipeline](../architecture/prompt-pipeline.md) for how skills are assembled into the per-turn system prompt.
+See [Packs, skills & actions](../packs-and-skills.md) for the resolution rules and [Prompt pipeline](../../architecture/prompt-pipeline.md) for how skills are assembled into the per-turn system prompt.
 
 ## core
 

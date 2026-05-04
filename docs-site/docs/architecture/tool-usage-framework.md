@@ -249,6 +249,6 @@ export const myPackServer: Pack = {
 
 ## Related Documentation
 
-- [LLM Tools](../extending/llm-tools.md) — detailed tool interface and registry API
-- [Agent as Tool](../extending/agent-as-tool.md) — full `asTool()` API reference
-- [MCP Tools](../extending/mcp-tools.md) — exposing tools over MCP
+- [LLM Tools](../pack-authoring/llm-tools.md) — detailed tool interface and registry API
+- [Agent as Tool](../agent-authoring/agent-as-tool.md) — full `asTool()` API reference
+- [MCP Tools](../pack-authoring/mcp-tools.md) — exposing tools over MCP

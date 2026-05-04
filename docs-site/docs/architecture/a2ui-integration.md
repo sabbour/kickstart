@@ -85,7 +85,7 @@ export interface ComponentContribution {
 }
 ```
 
-See [Components → Extending A2UI](../components/extending-a2ui.md) for the full add-a-component walkthrough.
+See [Components → Extending A2UI](../architecture/extending-a2ui.md) for the full add-a-component walkthrough.
 
 ---
 
@@ -102,7 +102,7 @@ export type ConversationPhaseComponent = {
 };
 ```
 
-The phase enum (`Phase` in the same file) — `Discover → Design → Generate → Review → Handoff → Deploy` — drives the visible phase tracker. See [Conversation phases](../extending/conversation-phases.md).
+The phase enum (`Phase` in the same file) — `Discover → Design → Generate → Review → Handoff → Deploy` — drives the visible phase tracker. See [Conversation phases](../agent-authoring/conversation-phases.md).
 
 ---
 

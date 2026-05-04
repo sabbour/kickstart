@@ -12,9 +12,9 @@ Symptom-first table for the most common failures. Each row links to the underlyi
 
 | Symptom | Likely cause | Where to look |
 |---|---|---|
-| SSE stream returns `error: {code: "GUARDRAIL_BLOCK"}` | A guardrail at any stage returned `block`. SSE is opaque by design (no id, reason, or stage). | App Insights `guardrail.evaluate` span carries the rule id and (redacted) reason. See [Guardrails](../extending/guardrails.md). |
+| SSE stream returns `error: {code: "GUARDRAIL_BLOCK"}` | A guardrail at any stage returned `block`. SSE is opaque by design (no id, reason, or stage). | App Insights `guardrail.evaluate` span carries the rule id and (redacted) reason. See [Guardrails](../pack-authoring/guardrails.md). |
 | `403 Forbidden` from `/api/converse/resume` | OID from `X-MS-CLIENT-PRINCIPAL` did not match `session.user.oid` (resume principal-match gate). | `packages/web/api/src/functions/resume.ts`; verify the auth principal. |
-| `400` from `/api/converse/resume` with no useful body | `resultPayload` did not pass the action's `resultSchema` (resume schema-validation gate). | App Insights has the full sanitized parse error. See [Resume & session token](../extending/resume-and-session-token.md). |
+| `400` from `/api/converse/resume` with no useful body | `resultPayload` did not pass the action's `resultSchema` (resume schema-validation gate). | App Insights has the full sanitized parse error. See [Resume & session token](../agent-authoring/resume-and-session-token.md). |
 | `404 No pending UserAction on this session` | A prior resume already cleared `pendingUserAction` (compare-and-swap). | Concurrent retry — by-design rejection. |
 | Anon session "lost" after about 10 minutes | Anon TTL is `ANON_SESSION_TTL_MS = 10 * 60 * 1000`. | `runtime/session.ts`. Surface a fresh anon token via the `session_token` SSE event. |
 | Hydrated session is missing older turns | `HYDRATION_DEFAULT_CAP = 20` keeps the most-recent 20 turns. | Adjust before calling `hydrateColdSession`. |
@@ -28,7 +28,7 @@ Symptom-first table for the most common failures. Each row links to the underlyi
 |---|---|---|
 | API boot fails with `[mypack.foo] Zod field at … uses .optional() without .nullable()` | Strict-mode I2 violation. | Replace `.optional()` with `strictOptional()` and call `stripNulls` in the tool body. See [Schema conformance](../architecture/schema-conformance.md). |
 | Tool not visible to the LLM | Tool not in the agent's frontmatter `tools:` allowlist, or the agent is from another pack and `dependsOn` is missing. | Check the agent's `*.agent.md`; confirm `dependsOn` includes the providing pack. |
-| Tool not visible over MCP | `mcpExposed !== true` or `requiresSession === true`. | See [MCP tools](../extending/mcp-tools.md). |
+| Tool not visible over MCP | `mcpExposed !== true` or `requiresSession === true`. | See [MCP tools](../pack-authoring/mcp-tools.md). |
 | `Pack already registered: X` at boot | Duplicate `pack.name` in the bootstrap. | Remove the duplicate registration. |
 | `Cross-pack handoff rejected: agent "A" in pack "P1" declares handoff to "B" in pack "P2"` | Handoff target outside `dependsOn` and `handoffTargets`. | Add `P2` to `P1.handoffTargets` (narrow) or `P1.dependsOn` (full trust). |
 
@@ -71,7 +71,7 @@ Symptom-first table for the most common failures. Each row links to the underlyi
 |---|---|---|
 | Stuck UserAction over MCP | Interrupt TTL is `INTERRUPT_TTL_MS = 15 * 60 * 1000`. | Re-issue the request after replying or after the TTL expires. |
 | Out-of-order tool calls over MCP | Per-session mutex (`session-mutex.ts`) only orders within a session — different sessions race. | Pin the test client to one session. |
-| Tool missing from MCP manifest | `mcpExposed !== true` *or* `requiresSession === true`. | See [MCP tools](../extending/mcp-tools.md). |
+| Tool missing from MCP manifest | `mcpExposed !== true` *or* `requiresSession === true`. | See [MCP tools](../pack-authoring/mcp-tools.md). |
 
 ---
 

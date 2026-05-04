@@ -79,7 +79,7 @@ Handoffs to agents in another pack are rejected unless the source pack lists the
 2. Add agents under `src/agents/<name>.agent.md` (markdown front matter + body). See an example like `packages/pack-core/src/agents/triage.agent.md`.
 3. Add skills under `src/skills/<slug>/SKILL.md`.
 4. Add tools as `ToolContribution` objects — see [LLM tools](./llm-tools.md).
-5. Add user actions, components, and guardrails as needed — see [Actions](./actions.md), [Components → Custom catalog](../components/custom-catalog.md), and [Guardrails](./guardrails.md).
+5. Add user actions, components, and guardrails as needed — see [Actions](./actions.md), [Components → Custom catalog](./custom-catalog.md), and [Guardrails](./guardrails.md).
 6. Register the pack in the API and MCP bootstraps:
    - `packages/web/api/src/startup/packs.ts`
    - `packages/mcp-server/src/startup/packs.ts`
@@ -90,4 +90,4 @@ Handoffs to agents in another pack are rejected unless the source pack lists the
 
 ## What's auto-generated
 
-The reference pages [Tools reference](./tools-reference.md) and [Skills reference](./skills-reference.md) are produced by scripts in `docs-site/scripts/` by walking pack source files: `packages/pack-*/src/tools/*.ts` for tools and `packages/pack-*/src/skills/**/SKILL.md` (including `*.SKILL.md`) for skills. Update the source, run `npm --prefix docs-site run build`, and the docs reflect the change.
+The reference pages [Tools reference](./reference/tools.md) and [Skills reference](./reference/skills.md) are produced by scripts in `docs-site/scripts/` by walking pack source files: `packages/pack-*/src/tools/*.ts` for tools and `packages/pack-*/src/skills/**/SKILL.md` (including `*.SKILL.md`) for skills. Update the source, run `npm --prefix docs-site run build`, and the docs reflect the change.

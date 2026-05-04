@@ -404,7 +404,7 @@ To add a component to the Kickstart catalog:
 
 ## Adding New Conversation Phases
 
-See [Conversation Phases](./extending/conversation-phases.md) for the full walkthrough.
+See [Conversation Phases](./agent-authoring/conversation-phases.md) for the full walkthrough.
 
 In brief:
 1. Add a new phase to the `Phase` enum in `packages/harness/src/types/`

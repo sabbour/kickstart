@@ -6,7 +6,7 @@ sidebar_position: 2
 
 This page is the end-to-end recipe for adding a new component to Kickstart's A2UI catalog: write the schema, register the renderer with the SPA, register the contribution with the harness, teach the LLM how to call it, and (optionally) wire a playground scenario.
 
-The protocol is **A2UI v0.9** — see [A2UI integration](../architecture/a2ui-integration.md) for the envelope shapes and ordering rules. The bundled catalog is documented in [Custom catalog](./custom-catalog.md).
+The protocol is **A2UI v0.9** — see [A2UI integration](./a2ui-integration.md) for the envelope shapes and ordering rules. The bundled catalog is documented in [Custom catalog](../pack-authoring/custom-catalog.md).
 
 ---
 
@@ -105,7 +105,7 @@ Register the pack in `packages/web/api/src/startup/packs.ts` and `packages/mcp-s
 
 The SPA boots a renderer registry; every component contribution's `renderer` is registered against `name`. The bundled set lives in `packages/pack-core/src/components/` and is wired during web bootstrap. Custom packs export their renderers from `packages/pack-<yourpack>/src/components/index.ts`; the SPA (`packages/web/src/main.tsx`) imports the bundle and registers them in one place.
 
-The browser learns which components exist via `GET /api/packs` (see [API endpoints](../extending/api-endpoints.md)) — the `ComponentDTO` carries the `name` and JSON-Schema-serialised `propertySchema` (no renderer code, no internal types).
+The browser learns which components exist via `GET /api/packs` (see [API endpoints](../pack-authoring/api-endpoints.md)) — the `ComponentDTO` carries the `name` and JSON-Schema-serialised `propertySchema` (no renderer code, no internal types).
 
 ---
 
@@ -142,19 +142,19 @@ export const showRegionPicker = tool({
 });
 ```
 
-The runner's post-tool a2ui drain handles ordering — the envelope is emitted *after* the LLM tool_call returns, never before. See [LLM tools](../extending/llm-tools.md).
+The runner's post-tool a2ui drain handles ordering — the envelope is emitted *after* the LLM tool_call returns, never before. See [LLM tools](../pack-authoring/llm-tools.md).
 
 ---
 
 ## Step 6 — Optional: a UserAction for confirm / cancel
 
-If your component needs a typed result (e.g. "selected region"), add a UserAction whose `confirmComponent: { component: 'mypack/RegionPicker' }` ties UI to result. See [User actions](../extending/actions.md). The runner pauses on `user_action_req`, the browser collects the result, and `/api/converse/resume` validates against `resultSchema` (the resume schema-validation gate).
+If your component needs a typed result (e.g. "selected region"), add a UserAction whose `confirmComponent: { component: 'mypack/RegionPicker' }` ties UI to result. See [User actions](../pack-authoring/actions.md). The runner pauses on `user_action_req`, the browser collects the result, and `/api/converse/resume` validates against `resultSchema` (the resume schema-validation gate).
 
 ---
 
 ## Step 7 — Optional: a playground scenario
 
-Add a `PlaygroundScenario` and a `playgroundStubs[wireName]` for any UserAction the scenario needs. Stubs only resolve when `KICKSTART_PLAYGROUND=true` and the registry's frozen stub map allows them. See [Playground scenarios](../extending/playground-scenarios.md).
+Add a `PlaygroundScenario` and a `playgroundStubs[wireName]` for any UserAction the scenario needs. Stubs only resolve when `KICKSTART_PLAYGROUND=true` and the registry's frozen stub map allows them. See [Playground scenarios](../pack-authoring/playground-scenarios.md).
 
 ---
 

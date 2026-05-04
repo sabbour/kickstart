@@ -25,7 +25,7 @@ The main conversation loop is itself an agent. Specialist agents (e.g., a dedica
 
 ## Sections
 
-- [Conversation Phases](./conversation-phases) — how phase transitions are defined and enforced
-- [Agent as Tool](./agent-as-tool) — expose one agent as a callable tool for another
-- [Runner Chain](./runner-chain) — sequence multiple agents in a pipeline
-- [Session Tokens & Resume](./resume-and-session-token) — persist state across browser refreshes and long deployments
+- [Conversation Phases](/docs/agent-authoring/conversation-phases) — how phase transitions are defined and enforced
+- [Agent as Tool](/docs/agent-authoring/agent-as-tool) — expose one agent as a callable tool for another
+- [Runner Chain](/docs/agent-authoring/runner-chain) — sequence multiple agents in a pipeline
+- [Session Tokens & Resume](/docs/agent-authoring/resume-and-session-token) — persist state across browser refreshes and long deployments

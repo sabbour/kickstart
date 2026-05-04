@@ -182,5 +182,5 @@ body pointing callers at `armFetch` + `/api/azure/token`.
 
 ## See also
 
-- [API Endpoints — Azure integration](../extending/api-endpoints.md#azure-integration) — full HTTP surface for `/api/azure/token` and the retired `/api/arm-proxy` tombstone.
+- [API Endpoints — Azure integration](../pack-authoring/api-endpoints.md#azure-integration) — full HTTP surface for `/api/azure/token` and the retired `/api/arm-proxy` tombstone.
 - [Architecture overview](./overview.md) — how ARM calls fit the broader Five-Primitives request flow.

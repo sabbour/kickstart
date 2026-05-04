@@ -149,7 +149,7 @@ npm run build -w @kickstart/mcp-server
 node packages/mcp-server/dist/index.js
 ```
 
-See [MCP Tools](../extending/mcp-tools.md) for connecting to VS Code Copilot or Claude Code.
+See [MCP Tools](../pack-authoring/mcp-tools.md) for connecting to VS Code Copilot or Claude Code.
 
 ## Dev Container
 

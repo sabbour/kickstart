@@ -209,4 +209,4 @@ should not add them without an architectural review.
 ## Cross-references
 
 - [Architecture overview](./overview.md)
-- [Extending — MCP tools](../extending/mcp-tools.md)
+- [Extending — MCP tools](../pack-authoring/mcp-tools.md)

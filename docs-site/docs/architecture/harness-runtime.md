@@ -47,7 +47,7 @@ Defines the `Session` class plus the `sessionStore` (default in-memory) and help
 | `ANON_SESSION_TTL_MS = 10 * 60 * 1000` | 10-minute TTL on anonymous sessions. |
 | `hydrateColdSession`, `HYDRATION_DEFAULT_CAP = 20`, `HYDRATION_CONTENT_MAX_BYTES = 4096` | Cold-rehydration for sessions evicted from memory. |
 
-See [Resume & session token](../extending/resume-and-session-token.md) for the full flow.
+See [Resume & session token](../agent-authoring/resume-and-session-token.md) for the full flow.
 
 ---
 
@@ -60,7 +60,7 @@ Two abstractions:
 
 Pick the backend by setting `KICKSTART_SESSION_STORE=memory|azure-table`. `createSessionStore()` and `startEvictionScheduler()` are exported from the same module. Eviction polls `evictExpired()` every 5 minutes by default and `unref()`s the timer so the process can exit cleanly.
 
-See [Session store](../extending/session-store.md) for the full adapter contract.
+See [Session store](../pack-authoring/session-store.md) for the full adapter contract.
 
 ---
 
@@ -72,7 +72,7 @@ Exports `SSEEventType`, `SSE_EVENT_TYPES` (a `Set` so adding a new event without
 
 ## Guardrails — `runtime/guardrails.ts`
 
-The shared engine. See [Guardrails](../extending/guardrails.md) and [Safeguards](../extending/safeguards.md). Public surface:
+The shared engine. See [Guardrails](../pack-authoring/guardrails.md) and [Safeguards](../pack-authoring/safeguards.md). Public surface:
 
 - `runGuardrails(input, contributions, sseWrite?)` — sequential pipeline used at the tool stage.
 - `applyRedact(input, result)` — payload mutation for `redact` verdicts.
@@ -105,7 +105,7 @@ Companion modules: `redact.ts` (regex-based PII / secret redaction), `sanitize-e
 
 ## Resume — `runtime/resume.ts`
 
-Server-side handler shared by `web/api/src/functions/resume.ts`. Exports `ResumeHandlerInput`, `ResumeHandlerResult`, and `ClientPrincipal`. Performs three security gates in the call site: OID match against the session's user, payload schema validation, and the `KICKSTART_PLAYGROUND` gate. See [Resume & session token](../extending/resume-and-session-token.md).
+Server-side handler shared by `web/api/src/functions/resume.ts`. Exports `ResumeHandlerInput`, `ResumeHandlerResult`, and `ClientPrincipal`. Performs three security gates in the call site: OID match against the session's user, payload schema validation, and the `KICKSTART_PLAYGROUND` gate. See [Resume & session token](../agent-authoring/resume-and-session-token.md).
 
 ---
 
@@ -131,4 +131,4 @@ Server-side handler shared by `web/api/src/functions/resume.ts`. Exports `Resume
 
 ## Registry — `runtime/registry.ts`
 
-`PackRegistry` owns all contributions. Lifecycle: `register(pack)` → `enable(names)` → `seal()`. Post-seal mutations throw. `seal()` validates every handoff target across active packs (#1073), snapshots playground stubs, and reserves the `core/` namespace for the core pack. See [Packs, skills & actions](../guides/packs-and-skills.md) for usage.
+`PackRegistry` owns all contributions. Lifecycle: `register(pack)` → `enable(names)` → `seal()`. Post-seal mutations throw. `seal()` validates every handoff target across active packs (#1073), snapshots playground stubs, and reserves the `core/` namespace for the core pack. See [Packs, skills & actions](../pack-authoring/packs-and-skills.md) for usage.
