@@ -2,7 +2,7 @@ name: Publish MCP Server
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
     paths:
       - 'packages/mcp-server/**'
   workflow_dispatch:
