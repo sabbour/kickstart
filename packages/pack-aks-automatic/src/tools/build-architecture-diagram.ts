@@ -80,7 +80,7 @@ const _BuildArchitectureDiagramOutputSchema = z.object({
 
 export type PlanInput = z.infer<typeof BuildArchitectureDiagramInputSchema>['plan'];
 export type DiagramOutput = z.infer<typeof _BuildArchitectureDiagramOutputSchema>;
-interface DiagramNode { id: string; label: string; type?: string; }
+interface DiagramNode { id: string; label: string; type?: string; iconKey?: string | null; }
 interface DiagramEdge { from: string; to: string; label?: string; }
 
 // ── Deterministic builder (pure function, no randomness) ──────────────────────
@@ -107,6 +107,7 @@ export function buildArchitectureDiagram(plan: PlanInput): DiagramOutput {
     id: 'control-plane',
     label: `AKS Automatic\\n${clusterLabel}`,
     type: 'compute',
+    iconKey: 'azure/aks-automatic',
   });
 
   // Node pools — sorted by name for determinism (codepoint order, not locale)
@@ -135,6 +136,7 @@ export function buildArchitectureDiagram(plan: PlanInput): DiagramOutput {
       id: poolId,
       label: `${escapeLabel(pool.name)}\\n${mode} Pool${sizeLabel}`,
       type: 'compute',
+      iconKey: 'azure/aks',
     });
     edges.push({
       from: 'control-plane',
@@ -166,6 +168,7 @@ export function buildArchitectureDiagram(plan: PlanInput): DiagramOutput {
       id: wlId,
       label: `${escapeLabel(wl.name)}${typeLabel}`,
       type: 'compute',
+      iconKey: 'k8s/deploy',
     });
 
     if (userPool) {
@@ -184,6 +187,7 @@ export function buildArchitectureDiagram(plan: PlanInput): DiagramOutput {
       id: 'ingress',
       label: `${escapeLabel(ingressType)}`,
       type: 'network',
+      iconKey: ingressType === 'Application Gateway' ? 'azure/app-gateway' : 'k8s/ing',
     });
     edges.push({ from: 'ingress', to: 'control-plane', label: 'routes to' });
 
@@ -203,6 +207,7 @@ export function buildArchitectureDiagram(plan: PlanInput): DiagramOutput {
       id: 'storage',
       label: escapeLabel(storageName),
       type: 'storage',
+      iconKey: 'azure/storage',
     });
 
     for (const wl of workloads) {
@@ -221,6 +226,7 @@ export function buildArchitectureDiagram(plan: PlanInput): DiagramOutput {
       id: 'kaito',
       label: `KAITO\\n${escapeLabel(modelName)}`,
       type: 'compute',
+      iconKey: null,
     });
     // KAITO runs on a GPU-enabled pool, or the first user pool (mode omitted defaults to 'User')
     const gpuPool = pools.find(p => p.vmSize?.includes('gpu') || p.vmSize?.includes('NC') || p.vmSize?.includes('ND'))
@@ -250,6 +256,7 @@ export function buildArchitectureDiagram(plan: PlanInput): DiagramOutput {
       id: 'foundry',
       label: `Foundry\\n${escapeLabel(foundryModel)}`,
       type: 'network',
+      iconKey: 'azure/cognitive-services',
     });
     edges.push({ from: 'control-plane', to: 'foundry', label: 'connects' });
 
@@ -269,6 +276,7 @@ export function buildArchitectureDiagram(plan: PlanInput): DiagramOutput {
       id: 'cicd',
       label: escapeLabel(provider),
       type: 'compute',
+      iconKey: null,
     });
 
     if (plan.cicd.registry) {
@@ -276,6 +284,7 @@ export function buildArchitectureDiagram(plan: PlanInput): DiagramOutput {
         id: 'registry',
         label: escapeLabel(plan.cicd.registry),
         type: 'storage',
+        iconKey: 'azure/acr',
       });
       edges.push({ from: 'cicd', to: 'registry', label: 'pushes' });
       edges.push({ from: 'registry', to: 'control-plane', label: 'pulls' });

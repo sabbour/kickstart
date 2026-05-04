@@ -4,6 +4,7 @@ export interface DiagramNode {
   id: string;
   label: string;
   type?: string;
+  iconKey?: string | null;
 }
 
 export interface DiagramEdge {
@@ -185,7 +186,9 @@ function escapeMermaidText(value: string): string {
 }
 
 function nodeToMermaid(node: DiagramNode): string {
-  const escaped = escapeMermaidText(node.label);
+  const iconPrefix =
+    node.iconKey && isAllowedIconKey(node.iconKey) ? `%%icon:${node.iconKey}%% ` : '';
+  const escaped = `${iconPrefix}${escapeMermaidText(node.label)}`;
   switch (node.type) {
     case 'database':
       return `  ${node.id}[("${escaped}")]`;

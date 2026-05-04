@@ -1087,8 +1087,8 @@ describe('core.emit_ui', () => {
               description: 'AKS with KAITO',
               diagram: null,
               nodes: [
-                { id: 'aks', label: 'AKS Automatic', type: 'aks' },
-                { id: 'kaito', label: 'KAITO Pod', type: null },
+                { id: 'aks', label: 'AKS Automatic', type: 'aks', iconKey: null },
+                { id: 'kaito', label: 'KAITO Pod', type: null, iconKey: null },
               ],
               edges: [
                 { from: 'aks', to: 'kaito', label: 'inference' },
@@ -1153,10 +1153,10 @@ describe('core.emit_ui', () => {
             component: 'ArchitectureDiagram',
             diagram: null,
             nodes: [
-              { id: 'aks', label: 'AKS Automatic', type: 'aks' },
-              { id: 'kaito', label: 'KAITO Pod', type: 'ai' },
-              { id: 'ingress', label: 'Ingress', type: 'networking' },
-              { id: 'storage', label: 'Azure Files', type: 'storage' },
+              { id: 'aks', label: 'AKS Automatic', type: 'aks', iconKey: null },
+              { id: 'kaito', label: 'KAITO Pod', type: 'ai', iconKey: null },
+              { id: 'ingress', label: 'Ingress', type: 'networking', iconKey: null },
+              { id: 'storage', label: 'Azure Files', type: 'storage', iconKey: null },
             ],
             edges: [
               { from: 'ingress', to: 'aks', label: 'HTTPS' },
@@ -1218,8 +1218,8 @@ describe('core.emit_ui', () => {
               description: null,
               diagram: null,
               nodes: [
-                { id: 'aks', label: 'AKS', type: 'aks' },
-                { id: 'app', label: 'App', type: null },
+                { id: 'aks', label: 'AKS', type: 'aks', iconKey: null },
+                { id: 'app', label: 'App', type: null, iconKey: null },
               ],
               edges: [{ from: 'aks', to: 'app', label: null }],
             },

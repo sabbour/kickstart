@@ -136,6 +136,9 @@ export const ArchitectureDiagramSchema = z.object({
       id: z.string().describe('Unique node identifier used in edges.'),
       label: z.string().describe('Display label for the node.'),
       type: z.string().nullable().describe('Node type hint (e.g. "aks", "storage"), or null.'),
+      iconKey: z.string().nullable().describe(
+        'Icon key from the allowed registry (e.g. "azure/aks", "k8s/deploy"), or null to omit icon.',
+      ),
     }),
   ).nullable().describe('Structured node list — alternative to diagram string, or null.'),
   edges: z.array(

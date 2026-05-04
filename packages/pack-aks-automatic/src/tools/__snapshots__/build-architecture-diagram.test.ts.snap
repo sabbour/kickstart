@@ -42,31 +42,37 @@ exports[`aks.build_architecture_diagram > snapshot for Foundry plan matches gold
   ],
   "nodes": [
     {
+      "iconKey": "azure/aks-automatic",
       "id": "control-plane",
       "label": "AKS Automatic\\nfoundry-cluster",
       "type": "compute",
     },
     {
+      "iconKey": "azure/cognitive-services",
       "id": "foundry",
       "label": "Foundry\\ngpt-4o",
       "type": "network",
     },
     {
+      "iconKey": "k8s/ing",
       "id": "ingress",
       "label": "Ingress NGINX",
       "type": "network",
     },
     {
+      "iconKey": "azure/aks",
       "id": "pool-app-pool",
       "label": "app-pool\\nUser Pool (Standard_D8s_v5)",
       "type": "compute",
     },
     {
+      "iconKey": "azure/aks",
       "id": "pool-system",
       "label": "system\\nSystem Pool (Standard_D4s_v5)",
       "type": "compute",
     },
     {
+      "iconKey": "k8s/deploy",
       "id": "workload-chat-api",
       "label": "chat-api (Deployment)",
       "type": "compute",
@@ -154,51 +160,61 @@ exports[`aks.build_architecture_diagram > snapshot for KAITO plan matches golden
   ],
   "nodes": [
     {
+      "iconKey": null,
       "id": "cicd",
       "label": "GitHub Actions",
       "type": "compute",
     },
     {
+      "iconKey": "azure/aks-automatic",
       "id": "control-plane",
       "label": "AKS Automatic\\nkaito-demo-cluster",
       "type": "compute",
     },
     {
+      "iconKey": "azure/app-gateway",
       "id": "ingress",
       "label": "Application Gateway",
       "type": "network",
     },
     {
+      "iconKey": null,
       "id": "kaito",
       "label": "KAITO\\nfalcon-7b",
       "type": "compute",
     },
     {
+      "iconKey": "azure/aks",
       "id": "pool-gpu-pool",
       "label": "gpu-pool\\nUser Pool (Standard_NC24ads_A100_v4)",
       "type": "compute",
     },
     {
+      "iconKey": "azure/aks",
       "id": "pool-system",
       "label": "system\\nSystem Pool (Standard_D4s_v5)",
       "type": "compute",
     },
     {
+      "iconKey": "azure/acr",
       "id": "registry",
       "label": "ACR",
       "type": "storage",
     },
     {
+      "iconKey": "azure/storage",
       "id": "storage",
       "label": "Premium SSD",
       "type": "storage",
     },
     {
+      "iconKey": "k8s/deploy",
       "id": "workload-api-server",
       "label": "api-server (Deployment)",
       "type": "compute",
     },
     {
+      "iconKey": "k8s/deploy",
       "id": "workload-web-frontend",
       "label": "web-frontend (Deployment)",
       "type": "compute",
