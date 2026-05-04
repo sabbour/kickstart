@@ -292,7 +292,7 @@ export const COMPONENT_PREVIEWS: Readonly<Record<string, ComponentPreviewEntry>>
   // ── Rich auth / form / progress components ────────────────────────────────
 
   'core/AuthCard': [
-    { id: 'root', component: 'AuthCard', provider: 'azure' },
+    { id: 'root', component: 'AuthCard', provider: 'azure', title: 'Sign in to Azure', description: 'Required to deploy Azure resources.' },
   ],
 
   'core/FormGroup': [

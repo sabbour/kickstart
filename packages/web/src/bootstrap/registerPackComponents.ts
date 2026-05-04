@@ -10,24 +10,32 @@
  * renderers (see A2UIRegistryContext.tsx).
  */
 
+import React from 'react';
+import type { z } from 'zod';
 import type { ComponentContribution } from '@aks-kickstart/harness';
 import { registerClient as registerCorePackClient } from '@aks-kickstart/pack-core/client';
 import { registerClient as registerAzureClient } from '@aks-kickstart/pack-azure/client';
 import { registerClient as registerAksClient } from '@aks-kickstart/pack-aks-automatic/client';
 import { registerClient as registerGithubClient } from '@aks-kickstart/pack-github/client';
 import type { ClientComponentRegistry } from '../contexts/A2UIRegistryContext';
-import type { ReactComponentImplementation } from '../vendor/a2ui/react/adapter';
+import { createReactComponent } from '../vendor/a2ui/react/adapter';
 import { adaptPackComponent } from './adaptPackComponent';
 
 export function registerPackComponents(registry: ClientComponentRegistry): void {
-  // Core pack components are already ReactComponentImplementation. The web and
-  // pack-core vendor copies of ReactComponentImplementation are structurally
-  // identical at runtime but diverge in ComponentContext.dataContext.resolveAction
-  // generics — cast to bridge the nominal difference.
+  // Pack-core's createReactComponent is a simple pass-through that stores the raw
+  // render function directly as `impl.render`. Web's A2UI surface calls
+  // `render({context, buildChild})` without a `props` argument, so pack-core
+  // components receive `props=undefined` and crash. Re-wrap each impl with web's
+  // createReactComponent to get GenericBinder prop resolution.
   const coreTarget = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     register: (impl: any) => {
-      registry.register(impl as ReactComponentImplementation);
+      const rewrapped = createReactComponent(
+        { name: impl.name as string, schema: impl.schema as unknown as z.ZodTypeAny },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        impl.render as React.FC<any>,
+      );
+      registry.register(rewrapped);
     },
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
