@@ -47,7 +47,7 @@ describe("requireAzureAccessToken", () => {
       }));
     } catch (error) {
       expect(error).toMatchObject({
-        status: 401,
+        status: 403,
         code: "azure_access_token_missing",
       });
     }

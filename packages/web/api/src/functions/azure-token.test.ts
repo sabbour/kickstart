@@ -93,7 +93,7 @@ describe('GET /api/azure/token', () => {
       makeContext(),
     );
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
     expect(res.jsonBody?.code).toBe('azure_access_token_missing');
     expect(res.jsonBody?.token).toBeUndefined();
   });
@@ -107,7 +107,7 @@ describe('GET /api/azure/token', () => {
       makeContext(),
     );
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
     expect(res.jsonBody?.code).toBe('azure_access_token_missing');
     expect(res.jsonBody?.token).toBeUndefined();
   });

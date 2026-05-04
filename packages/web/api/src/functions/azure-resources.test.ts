@@ -80,7 +80,7 @@ describe("GET /api/azure/subscriptions/{subId}/resources", () => {
       makeRequest({ "x-ms-client-principal-id": "user-1" }, { subId: "sub-1" }),
       makeContext(),
     ) as { status: number; jsonBody: { code: string } };
-    expect(result.status).toBe(401);
+    expect(result.status).toBe(403);
     expect(result.jsonBody.code).toBe("azure_access_token_missing");
   });
 
