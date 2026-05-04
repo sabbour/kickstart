@@ -15,6 +15,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/local-setup',
         'getting-started/environment-variables',
         'getting-started/project-structure',
+        'getting-started/chat-cli',
         'getting-started/deployment',
       ],
     },
@@ -78,6 +79,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'guides/packs-and-skills',
         'guides/conversation-limits',
+        'guides/sim-test-harness',
       ],
     },
     {
