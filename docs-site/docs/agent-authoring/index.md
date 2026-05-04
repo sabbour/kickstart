@@ -6,7 +6,7 @@ sidebar_position: 1
 
 This section covers how to build and integrate agents — components that run their own LLM inference loop — inside the Kickstart harness.
 
-Most contributors only need the [Pack Authoring Guide](/docs/extending). Read this section if you are:
+Most contributors only need the [Pack Authoring Guide](/docs/extending/overview). Read this section if you are:
 
 - Adding a **new conversation phase** that requires a dedicated agent
 - Embedding an **agent-as-tool** so one agent can delegate to another

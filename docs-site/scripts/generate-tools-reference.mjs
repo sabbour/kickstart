@@ -227,7 +227,7 @@ function generate() {
   lines.push('');
   lines.push('> Auto-generated from each pack\'s `tools/*.ts` files. Do not edit by hand — run `npm --prefix docs-site run build` (or invoke `node docs-site/scripts/generate-tools-reference.mjs` directly).');
   lines.push('');
-  lines.push('See [LLM tools](../llm-tools.md) for authoring guidance and [MCP tools](../mcp-tools.md) for exposure rules.');
+  lines.push('See [LLM tools](./llm-tools.md) for authoring guidance and [MCP tools](./mcp-tools.md) for exposure rules.');
   lines.push('');
   const errors = [];
   for (const pack of PACKS) {

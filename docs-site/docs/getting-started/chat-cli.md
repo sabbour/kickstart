@@ -174,7 +174,7 @@ npm run chat -- \
   --sim sims/autoscale.md
 ```
 
-For sim fixture authoring, see [Sim Testing](../operations/sim-testing.md).
+For sim fixture authoring, see sim-test scoring.
 
 ## Common Patterns
 

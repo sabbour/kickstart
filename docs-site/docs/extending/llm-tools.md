@@ -81,7 +81,7 @@ tools:
 
 Tools that push UI emit A2UI envelopes. The harness queues them on `session.a2uiEmissions` during the tool call and drains the queue **after** each LLM tool_call returns (the post-tool A2UI drain rule documented at the top of `runtime/runner.ts`). This guarantees A2UI frames cannot overtake their producing tool.
 
-The canonical emission helper is `core.emit_ui`. See [Components → Extending A2UI](../architecture/extending-a2ui.md) for component-typed tool patterns.
+The canonical emission helper is `core.emit_ui`. See [Components → Extending A2UI](../components/extending-a2ui.md) for component-typed tool patterns.
 
 ---
 
