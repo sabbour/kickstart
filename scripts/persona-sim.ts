@@ -336,14 +336,24 @@ interface TurnRecord {
   logs:       string[]; // probe diagnostic messages captured during this turn
 }
 
+interface LogTrace {
+  time:     string;
+  severity: number; // 0=Verbose 1=Info 2=Warning 3=Error 4=Critical
+  message:  string;
+  agent?:   string;
+  tool?:    string;
+}
+
 interface SimResult {
-  persona:      Persona;
-  turns:        TurnRecord[];
-  milestones:   Milestone[];
-  error?:       string;
-  duration_ms:  number;
-  goalMet:      boolean;
-  sessionId:    string; // probe session ID — use to correlate with runner logs / App Insights
+  persona:        Persona;
+  turns:          TurnRecord[];
+  milestones:     Milestone[];
+  error?:         string;
+  duration_ms:    number;
+  goalMet:        boolean;
+  sessionId:      string;     // probe session ID — correlates with runner logs / App Insights
+  traces?:        LogTrace[]; // rows fetched from Log Analytics after the run
+  tracesQueried?: boolean;    // true once the query has been attempted (even if empty)
 }
 
 function buildPersonaClient(): OpenAI {
@@ -649,20 +659,93 @@ function fmtMs(ms: number): string {
 }
 
 /**
- * Build a direct App Insights / Azure Monitor deep-link for the session.
- * Falls back to a generic KQL query hint when the workspace ID isn't available.
+ * Build a direct Azure Monitor / Log Analytics deep-link for the session.
+ *
+ * Resolution order for the workspace resource ID:
+ *   1. LOG_ANALYTICS_WORKSPACE_RESOURCE_ID env var  (Log Analytics workspace)
+ *   2. APPLICATIONINSIGHTS_APP_ID env var            (Application Insights resource)
+ *   3. Falls back to a printable KQL snippet
+ *
+ * Log Analytics workspace resource ID format:
+ *   /subscriptions/{sub}/resourceGroups/{rg}/providers/microsoft.operationalinsights/workspaces/{ws}
  */
+const DEFAULT_LOG_ANALYTICS_WORKSPACE =
+  '/subscriptions/4498459e-01d5-4a3f-b07e-8f1f36598c16/resourceGroups/' +
+  'ai_kickstart-ai_4f4f6258-c704-49e2-a8b7-e69b7faed7fb_managed/providers/' +
+  'microsoft.operationalinsights/workspaces/managed-kickstart-ai-ws';
+
 function buildAppInsightsUrl(sessionId: string): string {
-  const appId = process.env.APPLICATIONINSIGHTS_APP_ID?.trim()
-             ?? process.env.APPINSIGHTS_INSTRUMENTATIONKEY?.trim();
+  const resourceId = (
+    process.env.LOG_ANALYTICS_WORKSPACE_RESOURCE_ID?.trim() ||
+    process.env.APPLICATIONINSIGHTS_APP_ID?.trim() ||
+    DEFAULT_LOG_ANALYTICS_WORKSPACE
+  );
   const query = encodeURIComponent(
     `traces | where customDimensions.session_id == "${sessionId}" | order by timestamp asc`
   );
-  if (appId) {
-    return `https://portal.azure.com/#blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/${encodeURIComponent(appId)}/source/LogsBlade.AnalyticsShareLinkToQuery/query/${query}`;
+  return (
+    `https://portal.azure.com/#blade/Microsoft_Azure_Monitoring_Logs/LogsBlade` +
+    `/resourceId/${encodeURIComponent(resourceId)}` +
+    `/source/LogsBlade.AnalyticsShareLinkToQuery/query/${query}`
+  );
+}
+
+/**
+ * Query the Log Analytics workspace for all AppTraces for a session.
+ * Requires AZURE_ACCESS_TOKEN (ARM token).  Returns null when the token is
+ * absent or the request fails.
+ */
+async function queryLogAnalytics(sessionId: string): Promise<LogTrace[] | null> {
+  const token = process.env.AZURE_ACCESS_TOKEN?.trim();
+  if (!token) return null;
+
+  const resourceId = (
+    process.env.LOG_ANALYTICS_WORKSPACE_RESOURCE_ID?.trim() ||
+    DEFAULT_LOG_ANALYTICS_WORKSPACE
+  );
+  const url = `https://management.azure.com${resourceId}/api/query?api-version=2020-08-01`;
+  const kql = [
+    'AppTraces',
+    `| where Properties.session_id == "${sessionId}"`,
+    '| project TimeGenerated, SeverityLevel, Message,',
+    '    AgentName = tostring(Properties.agent_name),',
+    '    ToolName  = tostring(Properties.tool_name)',
+    '| order by TimeGenerated asc',
+    '| take 500',
+  ].join('\n');
+
+  try {
+    const resp = await fetch(url, {
+      method:  'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ query: kql, timespan: 'PT4H' }),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => '');
+      process.stderr.write(`[sim] Log Analytics query HTTP ${resp.status}: ${txt.slice(0, 200)}\n`);
+      return null;
+    }
+    const data = await resp.json() as {
+      tables: Array<{ columns: Array<{ name: string }>; rows: unknown[][] }>;
+    };
+    const table = data.tables?.[0];
+    if (!table?.rows?.length) return [];
+
+    const cols = table.columns.map(c => c.name);
+    return table.rows.map(row => {
+      const obj: Record<string, unknown> = Object.fromEntries(cols.map((c, i) => [c, row[i]]));
+      return {
+        time:     String(obj['TimeGenerated'] ?? ''),
+        severity: Number(obj['SeverityLevel']  ?? 0),
+        message:  String(obj['Message']         ?? ''),
+        agent:    obj['AgentName'] ? String(obj['AgentName']) : undefined,
+        tool:     obj['ToolName']  ? String(obj['ToolName'])  : undefined,
+      } satisfies LogTrace;
+    });
+  } catch (e) {
+    process.stderr.write(`[sim] Log Analytics query error: ${e}\n`);
+    return null;
   }
-  // No resource ID — emit the KQL so the user can paste it
-  return `App Insights KQL: traces | where customDimensions.session_id == "${sessionId}" | order by timestamp asc`;
 }
 
 async function runPersona(persona: Persona, client: OpenAI): Promise<SimResult> {
@@ -975,6 +1058,17 @@ grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:24px 
 .scm{display:flex;gap:4px;flex-wrap:wrap}.scm span{font-size:10px;padding:1px 6px;border-radius:8px}
 .mh{background:#1a3a2a;color:#3fb950;border:1px solid #2ea043}.mm{background:#21262d;color:#6e7681;border:1px solid #30363d}
 .sct2{font-size:12px;color:#8b949e}.ii{padding:16px 32px;color:#8b949e;font-size:14px;border-bottom:1px solid #21262d}
+.traces-section{margin:24px 32px}
+details.trc>summary{cursor:pointer;font-size:13px;font-weight:600;color:#8b949e;padding:8px 0;list-style:none;display:flex;align-items:center;gap:6px}
+details.trc>summary::before{content:"▶";font-size:10px;transition:transform .2s}
+details.trc[open]>summary::before{transform:rotate(90deg)}
+.trt{width:100%;border-collapse:collapse;font-size:12px;font-family:'SF Mono',Consolas,monospace;margin-top:8px}
+.trt th{background:#161b22;color:#6e7681;font-weight:600;padding:6px 10px;border:1px solid #21262d;text-align:left;position:sticky;top:0}
+.trt td{padding:5px 10px;border:1px solid #21262d;vertical-align:top;word-break:break-word}
+.trt tr:nth-child(even) td{background:#0d1117}.trt tr:hover td{background:#1c2128}
+.sev0 td:nth-child(2){color:#6e7681}.sev1 td:nth-child(2){color:#58a6ff}.sev2 td:nth-child(2){color:#d29922}.sev3 td:nth-child(2){color:#f85149}.sev4 td:nth-child(2){color:#ff7b72;font-weight:700}
+.trc-empty{color:#6e7681;font-size:12px;font-style:italic;margin-top:8px}
+.trc-link{font-size:11px;color:#58a6ff;margin-left:8px}
 `;
 
 function bar(milestones: Milestone[], totalMs: number): string {
@@ -987,6 +1081,37 @@ function bar(milestones: Milestone[], totalMs: number): string {
     return `<div class="mst ${done ? 'msd' : 'msp'}"><div class="md">${done ? '&#10003;' : ''}</div><div class="ml">${esc(def.label)}</div>${hit ? `<div class="mt">${fmtMs(hit.elapsed_ms)}</div><div class="mev">${esc(hit.evidence)}</div>` : ''}</div>`;
   }).join('');
   return `<div class="mb">${steps}<div class="bw"><div class="bl">Time vs 10-min goal</div><div class="bt"><div class="bf" style="width:${pct.toFixed(1)}%;background:${col}"></div><div class="bti"></div></div><div class="be" style="color:${col}">${fmtMs(totalMs)} / 10:00</div></div></div>`;
+}
+
+const SEV_LABELS = ['VERBOSE', 'INFO', 'WARN', 'ERROR', 'CRIT'];
+
+function tracesSection(r: SimResult): string {
+  const aiUrl = r.sessionId ? buildAppInsightsUrl(r.sessionId) : '';
+  const portalLink = `<a class="trc-link" href="${esc(aiUrl)}" target="_blank">&#128202; Open in Azure Monitor</a>`;
+
+  if (!r.tracesQueried) {
+    // Traces not yet fetched — show portal link only
+    return `<div class="traces-section"><details class="trc"><summary>&#128203; Server Traces${portalLink}</summary>
+<p class="trc-empty">No ARM token available — traces could not be fetched automatically. ${aiUrl ? 'Use the Azure Monitor link above.' : ''}</p>
+</details></div>`;
+  }
+
+  const rows = r.traces ?? [];
+  if (!rows.length) {
+    return `<div class="traces-section"><details class="trc"><summary>&#128203; Server Traces — pending ingestion${portalLink}</summary>
+<p class="trc-empty">No traces found at query time (Log Analytics ingestion lag is typically 2–5 min). ${aiUrl ? 'Retry with the Azure Monitor link above.' : ''}</p>
+</details></div>`;
+  }
+
+  const tbody = rows.map(t => {
+    const time = t.time.length > 19 ? t.time.slice(11, 23) : t.time;
+    return `<tr class="sev${t.severity}"><td>${esc(time)}</td><td>${SEV_LABELS[t.severity] ?? t.severity}</td><td>${esc(t.agent ?? '')}</td><td>${esc(t.tool ?? '')}</td><td>${esc(t.message)}</td></tr>`;
+  }).join('');
+
+  return `<div class="traces-section"><details class="trc" open><summary>&#128203; Server Traces — ${rows.length} rows${portalLink}</summary>
+<table class="trt"><thead><tr><th>Time</th><th>Sev</th><th>Agent</th><th>Tool</th><th>Message</th></tr></thead>
+<tbody>${tbody}</tbody></table>
+</details></div>`;
 }
 
 function renderTurn(t: TurnRecord): string {
@@ -1058,7 +1183,8 @@ ${bar(r.milestones, r.duration_ms)}
 <div class="ss">${r.turns.length} turns &middot; ${fmtMs(r.duration_ms)} &middot; ${ach.size}/6 milestones &middot; <span style="color:#58a6ff">&#129302; AI-driven responses</span>${sessionBadge ? ' &middot; ' + sessionBadge : ''}${aiLink ? ' &middot; ' + aiLink : ''}</div>
 ${frustrationSparkline(r.turns)}</div>
 ${r.error ? `<div class="eb">&#9888; ${esc(r.error)}</div>` : ''}
-<div class="turns">${r.turns.map(renderTurn).join('\n')}</div></body></html>`;
+<div class="turns">${r.turns.map(renderTurn).join('\n')}</div>
+${tracesSection(r)}</body></html>`;
 }
 
 function indexPage(results: SimResult[]): string {
@@ -1125,6 +1251,34 @@ async function main(): Promise<void> {
     process.stderr.write(`  -> ${outFile}\n\n`);
 
     fs.writeFileSync(path.join(REPORTS_DIR, 'index.html'), indexPage(results), 'utf8');
+  }
+
+  // Fetch Log Analytics traces now that all runs are complete.
+  // Querying at the end (rather than immediately after each run) gives
+  // ingestion time to catch up for earlier personas.
+  const hasArmToken = !!process.env.AZURE_ACCESS_TOKEN?.trim();
+  const sessionsToFetch = results.filter(r => r.sessionId);
+  if (hasArmToken && sessionsToFetch.length) {
+    process.stderr.write(`\n[sim] Fetching Log Analytics traces for ${sessionsToFetch.length} session(s)...\n`);
+    for (const result of sessionsToFetch) {
+      process.stderr.write(`  ${result.persona.id} session=${result.sessionId} ... `);
+      const rows = await queryLogAnalytics(result.sessionId);
+      result.traces        = rows ?? [];
+      result.tracesQueried = true;
+      if (rows === null) {
+        process.stderr.write(`⚠ query failed (see above)\n`);
+      } else if (!rows.length) {
+        process.stderr.write(`⚠ 0 rows (ingestion may still be in progress)\n`);
+      } else {
+        process.stderr.write(`✓ ${rows.length} traces\n`);
+      }
+      // Re-write the HTML report to include traces
+      const outFile = path.join(REPORTS_DIR, `${result.persona.id}.html`);
+      fs.writeFileSync(outFile, simPage(result), 'utf8');
+    }
+    fs.writeFileSync(path.join(REPORTS_DIR, 'index.html'), indexPage(results), 'utf8');
+  } else if (!hasArmToken) {
+    process.stderr.write(`\n[sim] Skipping Log Analytics query — no AZURE_ACCESS_TOKEN\n`);
   }
 
   process.stderr.write(`All done -> ${path.join(REPORTS_DIR, 'index.html')}\n`);
