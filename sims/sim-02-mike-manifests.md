@@ -115,3 +115,14 @@ If a Dockerfile is referenced by the Deployment image, R18 fires.
 - [ ] ≤1 question asked
 - [ ] R17 "Where to next" card present at end
 - [ ] R18 cross-artifact check noted if Dockerfile referenced
+
+## Follow-ups
+
+- "Both services are containerised, using images from our private registry"
+- "Yes, go ahead and review the manifests against AKS Automatic requirements"
+- "Please generate the updated manifests with any required changes"
+- "Connect to my GitHub repo and open a PR with the fixed manifests"
+- "Yes, create the pull request"
+- "Confirm"
+- "Yes"
+- "Continue"
