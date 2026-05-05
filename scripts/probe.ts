@@ -38,7 +38,7 @@ import { randomUUID } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { Session } from '@aks-kickstart/harness/runtime/session';
 import { Runner } from '@aks-kickstart/harness/runtime/runner';
-import { assertCredentials, buildCliRegistry } from '../packages/sim-test/src/harness-bootstrap.js';
+import { assertCredentials, buildCliRegistry, printBootstrapSummary } from '../packages/sim-test/src/harness-bootstrap.js';
 
 const { values: args } = parseArgs({
   options: {
@@ -54,6 +54,7 @@ console.warn  = (...a: unknown[]) => process.stderr.write(a.map(String).join(' '
 console.error = (...a: unknown[]) => process.stderr.write(a.map(String).join(' ') + '\n');
 
 assertCredentials();
+printBootstrapSummary('probe');
 const registry = buildCliRegistry();
 
 const session = new Session({
@@ -65,6 +66,12 @@ const session = new Session({
 if (args.agent && args.agent !== 'core.triage') session.activeAgent = args.agent;
 
 const runner = new Runner(registry);
+
+// Emit sessionId as the first stdout line — persona-sim captures this for correlation.
+// The same sessionId appears in runner logs under the `sessionId` field,
+// and can be used to grep Application Insights / local stderr for this run's traces.
+process.stderr.write(`[probe] session=${session.sessionId}\n`);
+process.stdout.write(JSON.stringify({ stream: 'session', sessionId: session.sessionId }) + '\n');
 
 // ---------------------------------------------------------------------------
 // A2UI surface state
@@ -248,6 +255,7 @@ async function runTurn(userInput: string): Promise<void> {
 
   const record = {
     turn: turnIndex,
+    sessionId: session.sessionId,
     agent: session.activeAgent,
     text: text.trim(),
     toolCalls,
