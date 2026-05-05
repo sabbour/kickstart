@@ -40,10 +40,13 @@ Output goes to the `reports/` directory as HTML files — one per persona run pl
 
 | Output | Description |
 |---|---|
-| **Live terminal** | Streaming turn-by-turn output with spinner while waiting for agent response |
+| **Bootstrap summary** | Printed at startup: which harness (LOCAL vs hosted), LLM provider endpoint, ARM token status, and packs loaded |
+| **Live terminal** | Streaming token-by-token output as the agent responds; tool calls appear inline as `⚙️ toolname…` |
+| **Session correlation** | `🔗 session=<id>` printed when probe connects; repeated at end of each persona run with an Azure Monitor deep-link |
 | **Milestone tracker** | Real-time `✓ / ✗` table showing which milestones were hit and when |
-| **HTML reports** | Per-persona conversation replays with milestone annotations, saved to `reports/` |
-| **NOT MET table** | Diagnostic table shown for any milestone not reached, including last captured logs |
+| **Per-turn NOT MET table** | Shown after each turn where the goal isn't yet reached — lists missing milestones |
+| **HTML reports** | Per-persona conversation replays with milestone annotations and a collapsible **Server Traces** section, saved to `reports/` |
+| **Log Analytics traces** | After all runs complete, traces are fetched from the `managed-kickstart-ai-ws` workspace and embedded in the HTML report |
 
 ---
 
@@ -84,20 +87,39 @@ persona-sim.ts (parent)
         └── generates HTML report on completion
 ```
 
+### Bootstrap diagnostics
+
+When `probe` or `persona-sim` starts, it prints a one-time summary line before any turns begin:
+
+```
+[harness] LOCAL  endpoint=https://my-aoai.openai.azure.com  arm_token=✓  packs=pack-core,pack-azure,pack-aks-automatic
+```
+
+This tells you at a glance which harness variant is active (LOCAL means the subprocess harness, not a hosted API), which LLM endpoint will be used, whether an ARM access token is present, and which packs are registered.
+
 ### Streaming protocol
 
 Each line written by `probe.ts` is a JSON record with a `type` field:
 
 | Type | Description |
 |---|---|
+| `session` | **First line emitted** — the runner `sessionId`, used for correlation (`{ stream: "session", id }`) |
 | `turn` | Full turn record: `{ turn, agent, text, tools, a2ui, elapsed_ms }` |
 | `chunk` | Streaming text delta from the model |
 | `tool` | Tool call record: `{ name, args }` |
 | `log` | Internal runner log line (captured for diagnostics) |
 
+`persona-sim` reads the `session` record immediately on probe startup and prints `🔗 session=<id>` to the terminal. The same `sessionId` is used for Log Analytics queries at the end of the run.
+
 ### Silent turn detection and recovery
 
-If the agent returns an empty response (no text, no tool calls), persona-sim treats it as a **silent turn**. It automatically sends a nudge message ("Please continue") on the first silent turn. If two consecutive silent turns occur, persona-sim bails out of that run and marks all remaining milestones as NOT MET.
+If the agent returns an empty response (no text, no tool calls), persona-sim treats it as a **silent turn**:
+
+1. Prints a `🔴 SILENT TURN` diagnostic block with the server logs captured for that turn.
+2. Auto-nudges: clicks the first available action button in the last A2UI card, or sends a fallback prompt if no button is available.
+3. If two **consecutive** silent turns occur, persona-sim bails out of that run and marks all remaining milestones as NOT MET.
+
+After each turn where the goal is not yet fully reached, persona-sim prints a **per-turn NOT MET table** listing which milestones are still outstanding.
 
 ### Session poisoning protection
 
@@ -105,7 +127,61 @@ Each probe.ts child process has a 180-second hard timeout. If the runner hangs o
 
 ---
 
-## Debugging NOT MET milestones
+## Session correlation and Log Analytics
+
+### Correlation IDs
+
+Every probe subprocess emits its runner `sessionId` as the very first line of stdout (`stream:"session"`). `persona-sim` prints this as:
+
+```
+🔗 session=3f7a1b2c-…
+```
+
+The same ID is printed again at the end of each persona run alongside an **Azure Monitor deep-link** that opens the relevant traces directly in the Azure Portal:
+
+```
+🔗 session=3f7a1b2c-…
+📊 https://portal.azure.com/#blade/…?query=AppTraces%20…
+```
+
+After **all** persona runs complete, persona-sim queries the Log Analytics workspace and embeds the results in the summary HTML report.
+
+### Log Analytics trace embedding
+
+At end-of-run, `persona-sim` POSTs the following KQL to the ARM query endpoint using `AZURE_ACCESS_TOKEN`:
+
+```kql
+AppTraces
+| where Properties.session_id == "<sessionId>"
+| project TimeGenerated, SeverityLevel, Message, AgentName, ToolName
+| order by TimeGenerated asc
+| take 500
+```
+
+**Default workspace:**
+```
+/subscriptions/4498459e-01d5-4a3f-b07e-8f1f36598c16/resourceGroups/ai_kickstart-ai_4f4f6258-c704-49e2-a8b7-e69b7faed7fb_managed/providers/microsoft.operationalinsights/workspaces/managed-kickstart-ai-ws
+```
+
+Override with `LOG_ANALYTICS_WORKSPACE_RESOURCE_ID`.
+
+### HTML report — Server Traces section
+
+Each per-persona HTML report and the summary index gain a collapsible **Server Traces** section containing a table with these columns:
+
+| Column | Description |
+|---|---|
+| Time | `TimeGenerated` from Log Analytics |
+| Severity | Colour-coded: error (red), warning (yellow), info (blue) |
+| Agent | `AgentName` property |
+| Tool | `ToolName` property (if the trace is from a tool call) |
+| Message | Full trace message |
+
+This lets you correlate exactly which agent calls and tool invocations happened server-side for any given persona conversation, without leaving the report.
+
+---
+
+
 
 When a run finishes with milestones not reached, the harness prints a diagnostic table:
 
@@ -138,6 +214,10 @@ The persona sim requires the same environment variables as the harness itself, p
 | `AZURE_OPENAI_ENDPOINT` | Yes | Azure OpenAI endpoint for persona generation |
 | `AZURE_OPENAI_API_KEY` | Yes (or `AZURE_OPENAI_AD_TOKEN`) | API key for persona generation |
 | `AZURE_OPENAI_DEPLOYMENT` | No | Model deployment name (default: `gpt-4o`) |
+| `AZURE_ACCESS_TOKEN` | No | ARM bearer token — required for Log Analytics trace queries and the Azure Monitor deep-link |
+| `LOG_ANALYTICS_WORKSPACE_RESOURCE_ID` | No | Override the default Log Analytics workspace resource ID for trace embedding |
 | `HARNESS_*` | As needed | Any env vars required by probe.ts / runner |
 
 The probe subprocess inherits all environment variables from the parent process.
+
+> **ARM token tip:** Run `az account get-access-token --resource https://management.azure.com --query accessToken -o tsv` and export the result as `AZURE_ACCESS_TOKEN` before running the sim. Without it, Log Analytics queries are skipped and the deep-link is omitted from reports.

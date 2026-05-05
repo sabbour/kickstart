@@ -77,6 +77,21 @@ Then configure your MCP client (VS Code or Claude Code) to connect to the server
 
 Open the A2UI playground at [**/?playground**](https://kickstart.aks.azure.sabbour.me/?playground) to build and preview A2UI components with AI. The playground provides an interactive sandbox for exploring the component catalog, testing scenarios, and previewing JSON-driven surfaces in real time — no backend required.
 
+## Testing
+
+**Unit / integration:** `npm test` (Vitest)
+
+**Persona sim harness:** end-to-end regression testing driven by LLM-generated synthetic personas.
+
+```bash
+npm run persona-sims           # 3 generated personas (default)
+npm run persona-sims -- --count 5 --turns 15
+```
+
+The sim boots a real harness session, streams agent responses token-by-token to the terminal (tool calls appear inline as `⚙️ toolname…`), detects silent turns and auto-recovers, and writes HTML reports to `reports/`. Each run prints a `🔗 session=<id>` correlation ID and an Azure Monitor deep-link; if `AZURE_ACCESS_TOKEN` is set, server traces from the `managed-kickstart-ai-ws` Log Analytics workspace are embedded directly in the report.
+
+📖 [Persona Sim guide](https://azure-management-and-platforms.github.io/kickstart/docs/guides/persona-sim)
+
 ## Tech Stack
 
 | Layer | Technology |
