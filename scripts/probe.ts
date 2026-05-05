@@ -61,6 +61,7 @@ const session = new Session({
   user: { oid: 'probe-user', upn: 'probe@localhost' },
   workspaceRoot: process.cwd(),
 });
+
 if (args.agent && args.agent !== 'core.triage') session.activeAgent = args.agent;
 
 const runner = new Runner(registry);
@@ -81,8 +82,9 @@ function applyA2UI(msg: unknown): void {
   }
   if (m.updateComponents) {
     const { surfaceId, components } = m.updateComponents as { surfaceId: string; components: Comp[] };
-    if (!surfaces.has(surfaceId)) surfaces.set(surfaceId, new Map());
-    const s = surfaces.get(surfaceId)!;
+    // Replace the surface entirely — stale components from prior turns must not linger
+    const s = new Map<string, Comp>();
+    surfaces.set(surfaceId, s);
     for (const c of components ?? []) {
       if (typeof c.id === 'string') s.set(c.id, c);
     }
@@ -154,37 +156,95 @@ function rebuildActions(): void {
 
 let turnIndex = 0;
 
+// Routing turns (transfer_to_* agent handoffs) can take > 90s because the target
+// agent generates its full first response within the same runner.run() call.
+// Use a longer timeout to accommodate that. If the timeout fires, we mark the
+// session as poisoned — subsequent runTurn() calls skip runner.run() so a stale
+// background run cannot corrupt the shared session object.
+const RUNNER_TIMEOUT_MS      = 180_000; // 3 min per turn — routing turns can be slow
+let sessionPoisoned = false;
+
 async function runTurn(userInput: string): Promise<void> {
   turnIndex++;
   const toolCalls: string[] = [];
   const a2uiEvents: unknown[] = [];
   let text = '';
 
+  if (sessionPoisoned) {
+    text = '[probe] session poisoned by prior timeout — cannot continue';
+    process.stderr.write(`[probe] ⚠️  Skipping turn ${turnIndex} — session is poisoned\n`);
+    process.stdout.write(JSON.stringify({
+      turn: turnIndex, agent: session.activeAgent ?? 'unknown',
+      text, toolCalls, a2ui: [], actions: [],
+    }) + '\n');
+    return;
+  }
+
   const sseWrite = (event: string, data: unknown) => {
     switch (event) {
       case 'chunk': {
         const d = data as { delta?: string; content?: string };
-        text += d.delta ?? d.content ?? (typeof data === 'string' ? data : '');
+        const delta = d.delta ?? d.content ?? (typeof data === 'string' ? data : '');
+        text += delta;
+        if (delta) process.stdout.write(JSON.stringify({ stream: 'chunk', delta }) + '\n');
         break;
       }
       case 'tool_start': {
         const d = data as { toolName?: string; name?: string };
-        toolCalls.push(d.toolName ?? d.name ?? '?');
+        const name = d.toolName ?? d.name ?? '?';
+        toolCalls.push(name);
+        process.stdout.write(JSON.stringify({ stream: 'tool', name }) + '\n');
         break;
       }
       case 'a2ui':
         a2uiEvents.push(data);
         applyA2UI(data);
         break;
+      case 'user_action_req': {
+        const d = data as { actionName?: string };
+        process.stderr.write(`[probe] ⚡ UserAction: ${d.actionName ?? '?'} — not auto-resolved in sim\n`);
+        break;
+      }
       case 'error':
         process.stderr.write(`[error] ${(data as any)?.message ?? data}\n`);
+        // Forward to stdout so persona-sim can capture it per-turn
+        process.stdout.write(JSON.stringify({ stream: 'log', level: 'error', msg: (data as any)?.message ?? String(data) }) + '\n');
         break;
     }
   };
 
-  await runner.run(session, userInput, sseWrite as any);
+  // Race runner against a timeout so a hung tool call doesn't freeze the whole sim.
+  // On timeout we poison the session — the background runner.run() is still live
+  // and sharing the session object, so any further calls would corrupt state.
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`runner timed out after ${RUNNER_TIMEOUT_MS / 1000}s`)), RUNNER_TIMEOUT_MS),
+  );
+
+  try {
+    await Promise.race([
+      runner.run(session, userInput, sseWrite as any),
+      timeoutPromise,
+    ]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`[probe] ⚠️  runner error: ${msg}\n`);
+    if (!text) text = `[runner error: ${msg}]`;
+    if (msg.includes('timed out')) {
+      sessionPoisoned = true;
+      process.stderr.write(`[probe] 🔴 session poisoned — probe will not accept further turns\n`);
+    }
+  }
 
   rebuildActions();
+
+  // Emit a diagnostic when the agent produced no text — helps persona-sim detect dead ends
+  if (!text.trim()) {
+    const tools = toolCalls.join(', ') || 'none';
+    process.stdout.write(JSON.stringify({
+      stream: 'log', level: 'warn',
+      msg: `silent turn — tools: [${tools}], a2ui: ${a2uiEvents.length} event(s), actions: ${pendingActions.length}`,
+    }) + '\n');
+  }
 
   const record = {
     turn: turnIndex,
