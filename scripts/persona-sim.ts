@@ -1256,7 +1256,6 @@ async function main(): Promise<void> {
   // Fetch Log Analytics traces now that all runs are complete.
   // Querying at the end (rather than immediately after each run) gives
   // ingestion time to catch up for earlier personas.
-  const hasArmToken = !!process.env.AZURE_ACCESS_TOKEN?.trim();
   const sessionsToFetch = results.filter(r => r.sessionId);
   if (hasArmToken && sessionsToFetch.length) {
     process.stderr.write(`\n[sim] Fetching Log Analytics traces for ${sessionsToFetch.length} session(s)...\n`);
