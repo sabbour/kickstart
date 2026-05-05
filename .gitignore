@@ -65,3 +65,4 @@ events.jsonl
 .squad-*-token.json
 node_modules
 .squad/ralph-circuit-breaker.json
+reports/

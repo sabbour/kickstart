@@ -6,6 +6,7 @@ import { ChatShell } from './components/Chat/ChatShell';
 import { SessionsSidebar } from './components/Sidebar/SessionsSidebar';
 import { FileManagerSidebar, FileViewer } from './components/FileManager';
 const Playground = lazy(() => import('./pages/Playground').then((m) => ({ default: m.Playground })));
+const SimReport = lazy(() => import('./pages/SimReport').then((m) => ({ default: m.SimReport })));
 import { useA2UI } from './hooks/useA2UI';
 import { useActionDispatch } from './hooks/useActionDispatch';
 import { useProgressiveQueue } from './hooks/useProgressiveQueue';
@@ -47,7 +48,9 @@ const mockEnabled = false; // TODO(Step 5): mock mode deleted in Step 1
 
 export function getInitialAppMode(locationSearch?: string): AppMode {
   const search = locationSearch ?? (typeof window !== 'undefined' ? window.location.search : '');
-  return new URLSearchParams(search).has('playground') ? 'playground' : 'landing';
+  return new URLSearchParams(search).has('playground') ? 'playground'
+    : new URLSearchParams(search).has('report') ? 'report'
+    : 'landing';
 }
 
 let msgSeq = 0;
@@ -1237,6 +1240,13 @@ export function App() {
       setFilePanelOpen(false);
     }
   }, [fileSidebarOpen]);
+
+  // Report mode — standalone sim probe report viewer
+  if (mode === 'report') {
+    return (
+      <Suspense fallback={null}><SimReport /></Suspense>
+    );
+  }
 
   // Playground mode — standalone A2UI test harness
   if (mode === 'playground') {

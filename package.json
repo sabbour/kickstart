@@ -32,7 +32,12 @@
     "golden:lint": "npx tsx scripts/lint-golden-fixtures.ts",
     "test:golden": "npx playwright test --project=golden",
     "sim-test": "npx tsx scripts/sim-test.ts",
-    "chat": "npx tsx --tsconfig tsconfig.scripts.json scripts/chat.ts"
+    "chat": "npx tsx --tsconfig tsconfig.scripts.json scripts/chat.ts",
+    "repl": "npx tsx --tsconfig tsconfig.scripts.json scripts/repl.ts",
+    "probe": "npx tsx --tsconfig tsconfig.scripts.json scripts/probe.ts",
+    "ssr-report": "npx vitest run packages/web/src/__tests__/sim-report-ssr.test.ts",
+    "run-sims": "npx tsx --tsconfig tsconfig.scripts.json scripts/run-sims.ts",
+    "persona-sims": "npx tsx --tsconfig tsconfig.scripts.json scripts/persona-sim.ts"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -52,8 +57,8 @@
   },
   "devDependencies": {
     "@azure/static-web-apps-cli": "^2.0.8",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "@changesets/changelog-github": "^0.6.0",
     "@changesets/cli": "^2.31.0",
     "@eslint/js": "^10.0.1",

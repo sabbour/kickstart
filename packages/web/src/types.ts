@@ -9,7 +9,7 @@
 // App shell
 // ---------------------------------------------------------------------------
 
-export type AppMode = 'landing' | 'chat' | 'playground';
+export type AppMode = 'landing' | 'chat' | 'playground' | 'report';
 
 // ---------------------------------------------------------------------------
 // Conversation phases

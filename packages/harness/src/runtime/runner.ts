@@ -40,6 +40,24 @@ import { buildRunConfig } from './run-config.js';
 import type { RunConfig } from './run-config.js';
 import { withRetry, CircuitBreaker, CircuitOpenError } from '../utils/retry.js';
 import { openAIStrictCompatibleSchema } from './schema-conformance.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { resolve, dirname } from 'node:path';
+
+// ---------------------------------------------------------------------------
+// Ground rules — prepended to every agent's instructions
+// ---------------------------------------------------------------------------
+
+const _groundRulesPath = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../pack-core/src/agents/agent-ground-rules.md',
+);
+let _groundRules: string;
+try {
+  _groundRules = '\n\n' + readFileSync(_groundRulesPath, 'utf8').trim();
+} catch {
+  _groundRules = ''; // graceful degradation if file not found
+}
 
 // ---------------------------------------------------------------------------
 // Retry / circuit-breaker — module-level state (#102)
@@ -843,7 +861,7 @@ export class Runner {
         }).join('\n')}`
       : '';
 
-    const instructions = agentContrib.instructionsBase + skillsBlock + catalogBlock;
+    const instructions = agentContrib.instructionsBase + skillsBlock + catalogBlock + _groundRules;
     const modelName = resolveModelName(agentContrib.model);
 
     // Construct SDK-native input/output guardrails for parallel execution (#116).

@@ -121,3 +121,14 @@ breakdown card **before or alongside** the plan card, covering:
 - [ ] R17 "Where to next" card present at end
 - [ ] No bait-and-switch to Container Apps (D1)
 - [ ] FutureYou door in R17 references cold-start optimisation
+
+## Follow-ups
+
+- "Yes, scale to zero with KEDA is exactly what I want, configure it for AKS Automatic"
+- "East US region, no custom domain needed, use AKS Automatic defaults"
+- "Please generate the manifests including KEDA ScaledObject and Deployment"
+- "Connect to my GitHub repo at github.com/sabbour/ContosoAir and open a PR"
+- "Yes, create the pull request with all the generated files"
+- "Confirm"
+- "Yes"
+- "Continue"
