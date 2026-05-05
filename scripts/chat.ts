@@ -258,14 +258,14 @@ async function main(): Promise<void> {
 
       console.error('\n── Sim Score ──────────────────────────────');
       console.error(`Sim:    ${transcript.title}`);
-      console.error(`Score:  ${score.totalScore}/100 — ${score.passed ? '✅ PASS' : '❌ FAIL'}`);
+      console.error(`Score:  ${score.overallScore}/100 — ${score.pass ? '✅ PASS' : '❌ FAIL'}`);
       for (const c of score.criteria) {
-        const icon = c.passed ? '✓' : '✗';
-        console.error(`  ${icon} ${c.name}: ${c.score}/${c.maxScore}  ${c.detail ?? ''}`);
+        const icon = c.pass ? '✓' : '✗';
+        console.error(`  ${icon} ${c.name}: ${c.score}/${c.weight}pts  ${c.details ?? ''}`);
       }
       console.error('───────────────────────────────────────────\n');
 
-      if (!score.passed) process.exit(1);
+      if (!score.pass) process.exit(1);
     } catch (err) {
       console.error(`[chat] Could not score against '${args.sim}': ${(err as Error).message}`);
       process.exit(2);

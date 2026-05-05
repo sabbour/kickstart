@@ -103,3 +103,14 @@ act confidently and immediately.
 - [ ] R17 "Where to next" card present at conversation end
 - [ ] Handoff briefing includes `constraintSpec: AKS_AUTOMATIC_V1_1_1`
 - [ ] No bait-and-switch on compute platform (D1)
+
+## Follow-ups
+
+- "Yes, generate the Dockerfile and Kubernetes manifests for me"
+- "Use East US region, AKS Automatic defaults, I don't need a custom domain"
+- "Please connect to my GitHub repo at github.com/sam/my-next-app and open a PR"
+- "Yes, go ahead and create the pull request"
+- "Confirm, open the PR"
+- "Yes that looks right"
+- "Continue"
+- "Yes"
