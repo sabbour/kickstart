@@ -343,6 +343,7 @@ interface SimResult {
   error?:       string;
   duration_ms:  number;
   goalMet:      boolean;
+  sessionId:    string; // probe session ID — use to correlate with runner logs / App Insights
 }
 
 function buildPersonaClient(): OpenAI {
@@ -571,10 +572,11 @@ function longestCommonSubstring(a: string, b: string): number {
 // NOT MET diagnostic — per-turn breakdown printed to stderr on failure
 // ---------------------------------------------------------------------------
 
-function printNotMetDiagnostic(turns: TurnRecord[]): void {
+function printNotMetDiagnostic(turns: TurnRecord[], sessionId?: string): void {
   const div = '─'.repeat(72);
   process.stderr.write(`\n  ${div}\n`);
   process.stderr.write(`  🔍  NOT MET — turn-by-turn breakdown\n`);
+  if (sessionId) process.stderr.write(`  🔗  session=${sessionId}  ← grep runner logs / App Insights\n`);
   process.stderr.write(`  ${div}\n`);
   for (const t of turns) {
     const ms    = t.milestones.length ? ` ✅ ${t.milestones.map(m => m.label).join(', ')}` : '';
@@ -646,6 +648,23 @@ function fmtMs(ms: number): string {
   return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
 }
 
+/**
+ * Build a direct App Insights / Azure Monitor deep-link for the session.
+ * Falls back to a generic KQL query hint when the workspace ID isn't available.
+ */
+function buildAppInsightsUrl(sessionId: string): string {
+  const appId = process.env.APPLICATIONINSIGHTS_APP_ID?.trim()
+             ?? process.env.APPINSIGHTS_INSTRUMENTATIONKEY?.trim();
+  const query = encodeURIComponent(
+    `traces | where customDimensions.session_id == "${sessionId}" | order by timestamp asc`
+  );
+  if (appId) {
+    return `https://portal.azure.com/#blade/Microsoft_Azure_Monitoring_Logs/LogsBlade/resourceId/${encodeURIComponent(appId)}/source/LogsBlade.AnalyticsShareLinkToQuery/query/${query}`;
+  }
+  // No resource ID — emit the KQL so the user can paste it
+  return `App Insights KQL: traces | where customDimensions.session_id == "${sessionId}" | order by timestamp asc`;
+}
+
 async function runPersona(persona: Persona, client: OpenAI): Promise<SimResult> {
   const start     = Date.now();
   const achieved  = new Set<MilestoneId>();
@@ -663,6 +682,7 @@ async function runPersona(persona: Persona, client: OpenAI): Promise<SimResult> 
 
   let stdoutBuf = '';
   let turnNum   = 0;
+  let probeSessionId = '';          // set when probe emits stream:"session"
   let pendingGeneration: Promise<{ response: string; frustration: number }> | null = null;
   let pendingFrustration = 0;
   let consecutiveSilent  = 0;   // silent turns in a row — bail out at 2
@@ -746,6 +766,11 @@ async function runPersona(persona: Persona, client: OpenAI): Promise<SimResult> 
         try { parsed = JSON.parse(line); } catch { /* non-JSON probe line */ }
 
         // ── Streaming events (not final turn records) ──────────────────────
+        if (parsed.stream === 'session') {
+          probeSessionId = (parsed.sessionId as string) ?? '';
+          process.stderr.write(`  🔗  session=${probeSessionId}  (grep runner logs / App Insights by this ID)\n`);
+          continue;
+        }
         if (parsed.stream === 'chunk') {
           writeStreamDelta((parsed.delta as string) ?? '');
           continue;
@@ -830,7 +855,7 @@ async function runPersona(persona: Persona, client: OpenAI): Promise<SimResult> 
           if (consecutiveSilent >= 2) {
             stopSpinner();
             process.stderr.write(`\n  🔴  2 consecutive silent turns — aborting persona run\n`);
-            printNotMetDiagnostic(turns);
+            printNotMetDiagnostic(turns, probeSessionId);
             child.stdin.end();
             return;
           }
@@ -873,8 +898,8 @@ async function runPersona(persona: Persona, client: OpenAI): Promise<SimResult> 
 
   if (child.exitCode !== 0 && !error) error = `probe exited ${child.exitCode}`;
   const goalMet = achieved.size >= 6 && (allMS.at(-1)?.elapsed_ms ?? Infinity) <= GOAL_BUDGET_MS;
-  if (!goalMet) printNotMetDiagnostic(turns);
-  return { persona, turns, milestones: allMS, error, duration_ms: Date.now() - start, goalMet };
+  if (!goalMet) printNotMetDiagnostic(turns, probeSessionId);
+  return { persona, turns, milestones: allMS, error, duration_ms: Date.now() - start, goalMet, sessionId: probeSessionId };
 }
 
 // ---------------------------------------------------------------------------
@@ -1015,13 +1040,22 @@ function frustrationSparkline(turns: TurnRecord[]): string {
 function simPage(r: SimResult): string {
   const ach = new Set(r.milestones.map(m => m.id));
   const ts  = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+  const aiUrl = r.sessionId ? buildAppInsightsUrl(r.sessionId) : null;
+  const aiLink = aiUrl
+    ? (aiUrl.startsWith('http')
+        ? `<a href="${esc(aiUrl)}" style="color:#58a6ff;font-size:11px;font-family:monospace" target="_blank">&#128202; App Insights</a>`
+        : `<code style="font-size:10px;color:#6e7681">${esc(aiUrl)}</code>`)
+    : '';
+  const sessionBadge = r.sessionId
+    ? `<span style="font-size:10px;color:#6e7681;font-family:monospace">session=${esc(r.sessionId)}</span>`
+    : '';
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(r.persona.id)}: ${esc(r.persona.title)}</title><style>${CSS}</style></head><body>
 <div class="ph"><div><a class="back" href="index.html">&larr; All personas</a><h1>&#129302; ${esc(r.persona.title)}</h1></div>
 <span style="color:#6e7681;font-size:12px">${ts}</span><div class="gb ${r.goalMet ? 'gm' : 'gnm'}">${r.goalMet ? '&#9989; Goal met' : '&#10060; Not met'}</div></div>
 ${bar(r.milestones, r.duration_ms)}
 <div class="sm"><div class="so">&ldquo;${esc(r.persona.opener)}&rdquo;</div>
-<div class="ss">${r.turns.length} turns &middot; ${fmtMs(r.duration_ms)} &middot; ${ach.size}/6 milestones &middot; <span style="color:#58a6ff">&#129302; AI-driven responses</span></div>
+<div class="ss">${r.turns.length} turns &middot; ${fmtMs(r.duration_ms)} &middot; ${ach.size}/6 milestones &middot; <span style="color:#58a6ff">&#129302; AI-driven responses</span>${sessionBadge ? ' &middot; ' + sessionBadge : ''}${aiLink ? ' &middot; ' + aiLink : ''}</div>
 ${frustrationSparkline(r.turns)}</div>
 ${r.error ? `<div class="eb">&#9888; ${esc(r.error)}</div>` : ''}
 <div class="turns">${r.turns.map(renderTurn).join('\n')}</div></body></html>`;
@@ -1056,10 +1090,22 @@ async function main(): Promise<void> {
 
   fs.mkdirSync(REPORTS_DIR, { recursive: true });
 
-  process.stderr.write(`\n[Goal] Deploy to AKS Automatic in < 10 minutes\n`);
-  process.stderr.write(`[Mode] AI-driven personas (LLM generates each response)\n`);
-  process.stderr.write(`[Max ] ${MAX_TURNS} turns per persona\n`);
-  process.stderr.write(`Running ${personas.length} persona(s)...\n\n`);
+  // Bootstrap summary — make it obvious what environment we're running against
+  const div = '─'.repeat(60);
+  const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim() ?? '';
+  const probeHost = (() => { try { return new URL(azureEndpoint).host; } catch { return azureEndpoint || '?'; } })();
+  const personaModel = process.env.KICKSTART_CHAT_MODEL ?? 'gpt-5.4-mini';
+  const hasArmToken  = !!process.env.AZURE_ACCESS_TOKEN?.trim();
+  const hasTenant    = !!process.env.AZURE_TENANT_ID?.trim();
+  process.stderr.write(`\n[sim] ${div}\n`);
+  process.stderr.write(`[sim] Harness  : LOCAL (packages/* source, no build)\n`);
+  process.stderr.write(`[sim] Probe    : Azure OpenAI  →  ${probeHost}  (agent inference)\n`);
+  process.stderr.write(`[sim] Personas : ${probeHost}  model=${personaModel}  (response generation)\n`);
+  process.stderr.write(`[sim] Azure    : ARM token ${hasArmToken ? '✓' : '✗'}  tenant ${hasTenant ? '✓' : '✗'}  (quota + resource ops)\n`);
+  process.stderr.write(`[sim] ${div}\n`);
+  process.stderr.write(`[sim] Goal     : Deploy to AKS Automatic in < 10 minutes\n`);
+  process.stderr.write(`[sim] Personas : ${personas.length}  max turns: ${MAX_TURNS}\n`);
+  process.stderr.write(`[sim] ${div}\n\n`);
 
   const results: SimResult[] = [];
 
@@ -1068,6 +1114,11 @@ async function main(): Promise<void> {
     const result = await runPersona(persona, client);
     results.push(result);
     process.stderr.write(`\n  ${result.goalMet ? '[GOAL MET]' : '[NOT MET]'} ${result.milestones.length}/6 milestones in ${fmtMs(result.duration_ms)}\n`);
+    if (result.sessionId) {
+      const aiUrl = buildAppInsightsUrl(result.sessionId);
+      process.stderr.write(`  🔗  session=${result.sessionId}\n`);
+      process.stderr.write(`  📊  ${aiUrl}\n`);
+    }
 
     const outFile = path.join(REPORTS_DIR, `${persona.id}.html`);
     fs.writeFileSync(outFile, simPage(result), 'utf8');

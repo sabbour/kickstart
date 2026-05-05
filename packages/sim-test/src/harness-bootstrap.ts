@@ -56,6 +56,49 @@ export function assertCredentials(): void {
 }
 
 /**
+ * Print a clear bootstrap summary so it's obvious which harness and model
+ * provider the probe/sim is running against.
+ *
+ * Always write to stderr so it doesn't pollute the probe's JSON stdout.
+ */
+export function printBootstrapSummary(label = 'probe'): void {
+  const div = '─'.repeat(60);
+  const lines: string[] = [`[${label}] ${div}`];
+
+  lines.push(`[${label}] Harness : LOCAL (packages/* source, no build)`);
+
+  // LLM provider
+  const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();
+  const hasAzureKey   = !!process.env.AZURE_OPENAI_API_KEY?.trim();
+  const hasOpenAI     = !!process.env.OPENAI_API_KEY?.trim();
+
+  if (azureEndpoint && hasAzureKey) {
+    // Mask key — show host only
+    const host = (() => { try { return new URL(azureEndpoint).host; } catch { return azureEndpoint; } })();
+    lines.push(`[${label}] Provider: Azure OpenAI  →  ${host}`);
+  } else if (hasOpenAI) {
+    lines.push(`[${label}] Provider: OpenAI (OPENAI_API_KEY)`);
+  }
+
+  // Azure credentials (ARM / quota)
+  const hasArmToken = !!process.env.AZURE_ACCESS_TOKEN?.trim();
+  const hasMsalTenant = !!process.env.AZURE_TENANT_ID?.trim();
+  if (hasArmToken || hasMsalTenant) {
+    lines.push(`[${label}] Azure   : ARM token ${hasArmToken ? '✓' : '✗'}  tenant ${hasMsalTenant ? '✓' : '✗'} (quota + resource ops)`);
+  } else {
+    lines.push(`[${label}] Azure   : no ARM token — quota will be unknown, pricing-only mode`);
+  }
+
+  // Packs
+  const packs = parseEnabledPacks(process.env.KICKSTART_PACKS);
+  lines.push(`[${label}] Packs   : ${packs.join(', ')}`);
+
+  lines.push(`[${label}] ${div}`);
+
+  for (const l of lines) process.stderr.write(l + '\n');
+}
+
+/**
  * Build and seal a PackRegistry for CLI use.
  *
  * Fail-soft on non-core packs (same policy as the web API). Core pack failure
