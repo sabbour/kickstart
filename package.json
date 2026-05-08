@@ -35,7 +35,7 @@
   "overrides": {
     "cookie": "0.7.2",
     "tmp": "0.2.5",
-    "hono": "4.12.14",
+    "hono": "4.12.18",
     "follow-redirects": "1.16.0"
   },
   "optionalDependencies": {
